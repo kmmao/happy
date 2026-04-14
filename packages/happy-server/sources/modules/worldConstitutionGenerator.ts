@@ -1,20 +1,28 @@
 /**
- * Generate World Constitution elements (narrative, laws, roles)
+ * Generate World Constitution elements (narrative, laws, roles, member, goal)
  * from project context.
  *
  * Two modes:
  * - "auto": Smart initialization — only generates missing elements.
  * - "custom": User provides a description; generates all elements based on it.
  *
+ * Selective generation:
+ * - `elements`: Optional whitelist of element types to generate.
+ *   When provided, only those elements are generated (even if they already exist = reset).
+ *   When omitted, auto/custom logic determines what to generate.
+ *
  * Text language: "en" | "zh" (matches app appearance language: Chinese variants → zh, else en).
  */
 
 import { db } from "@/storage/db";
 import { log } from "@/utils/log";
+import { auditLog } from "./worldAuditLog";
 
 // ── Types ──
 
 export type WorldContentLanguage = "en" | "zh";
+
+export type WorldElement = "narrative" | "laws" | "roles" | "member" | "goal";
 
 interface GeneratedLaw {
     id: string;
@@ -32,11 +40,25 @@ interface GeneratedRole {
     duties: string[];
 }
 
+interface GeneratedMember {
+    id: string;
+    role: string;
+    maxConcurrency: number;
+}
+
+interface GeneratedGoal {
+    id: string;
+    title: string;
+    priority: string;
+    layer: string;
+}
+
 export interface WorldGenerateResult {
     narrative: string | null;
     laws: GeneratedLaw[] | null;
     roles: GeneratedRole[] | null;
-    goals: null;
+    member: GeneratedMember | null;
+    goals: GeneratedGoal[] | null;
     skipped: string[];
     errors: string[];
 }
@@ -300,7 +322,17 @@ function buildLaws(
 
 // ── Roles Builder ──
 
-function defaultRoles(lang: WorldContentLanguage): Array<{ name: string; type: string; description: string; duties: string[] }> {
+/** Default agentType per role type. null = inherit from CLI active profile. */
+const ROLE_AGENT_TYPE: Record<string, string | null> = {
+    guardian: "claude",
+    builder: "claude",
+    healer: "claude",
+    chronicler: "claude",
+    planner: "claude",
+    messenger: null,
+};
+
+function defaultRoles(lang: WorldContentLanguage): Array<{ name: string; type: string; description: string; duties: string[]; agentType: string | null }> {
     if (lang === "zh") {
         return [
             {
@@ -308,36 +340,42 @@ function defaultRoles(lang: WorldContentLanguage): Array<{ name: string; type: s
                 type: "guardian",
                 description: "守护代码质量、安全性并确保遵守世界法则。",
                 duties: ["扫描安全漏洞", "核对是否符合世界法则", "检查依赖更新与已知 CVE"],
+                agentType: ROLE_AGENT_TYPE.guardian,
             },
             {
                 name: "建造者",
                 type: "builder",
                 description: "按规格实现功能并编写代码。",
                 duties: ["实现分配的任务与功能", "为新代码编写测试", "遵守世界约定与风格指南"],
+                agentType: ROLE_AGENT_TYPE.builder,
             },
             {
                 name: "治愈者",
                 type: "healer",
                 description: "诊断与修复问题，监控健康并优化性能。",
                 duties: ["修复失败测试与构建中断", "诊断并修复性能问题", "以最小改动修复缺陷"],
+                agentType: ROLE_AGENT_TYPE.healer,
             },
             {
                 name: "编年史官",
                 type: "chronicler",
                 description: "维护世界知识库，记录变更并总结学习成果。",
                 duties: ["维护并更新世界文档", "记录重要决策及理由", "将会话结果整理为知识条目"],
+                agentType: ROLE_AGENT_TYPE.chronicler,
             },
             {
                 name: "规划者",
                 type: "planner",
                 description: "分析目标，拆解任务并制定执行计划。",
                 duties: ["分析高层世界目标", "将目标拆为可执行任务并估算", "排定执行顺序并识别风险"],
+                agentType: ROLE_AGENT_TYPE.planner,
             },
             {
                 name: "信使",
                 type: "messenger",
                 description: "协调各角色沟通并保持共享上下文一致。",
                 duties: ["在角色间传递请求与更新并明确负责人", "总结关键决策与未解决冲突", "确保法则建议与冲突报告送达合适评审人"],
+                agentType: ROLE_AGENT_TYPE.messenger,
             },
         ];
     }
@@ -351,6 +389,7 @@ function defaultRoles(lang: WorldContentLanguage): Array<{ name: string; type: s
                 "Verify compliance with world laws",
                 "Check dependency updates and known CVEs",
             ],
+            agentType: ROLE_AGENT_TYPE.guardian,
         },
         {
             name: "Builder",
@@ -361,6 +400,7 @@ function defaultRoles(lang: WorldContentLanguage): Array<{ name: string; type: s
                 "Write tests for new code",
                 "Follow world conventions and style guides",
             ],
+            agentType: ROLE_AGENT_TYPE.builder,
         },
         {
             name: "Healer",
@@ -371,6 +411,7 @@ function defaultRoles(lang: WorldContentLanguage): Array<{ name: string; type: s
                 "Diagnose and fix performance issues",
                 "Fix reported bugs with minimal changes",
             ],
+            agentType: ROLE_AGENT_TYPE.healer,
         },
         {
             name: "Chronicler",
@@ -381,6 +422,7 @@ function defaultRoles(lang: WorldContentLanguage): Array<{ name: string; type: s
                 "Record important decisions and their rationale",
                 "Summarize session outcomes into knowledge entries",
             ],
+            agentType: ROLE_AGENT_TYPE.chronicler,
         },
         {
             name: "Planner",
@@ -391,6 +433,7 @@ function defaultRoles(lang: WorldContentLanguage): Array<{ name: string; type: s
                 "Break goals into actionable tasks with estimates",
                 "Prioritize task execution order and identify risks",
             ],
+            agentType: ROLE_AGENT_TYPE.planner,
         },
         {
             name: "Messenger",
@@ -401,20 +444,52 @@ function defaultRoles(lang: WorldContentLanguage): Array<{ name: string; type: s
                 "Summarize key decisions and unresolved conflicts",
                 "Ensure law suggestions and conflict reports reach the right reviewers",
             ],
+            agentType: ROLE_AGENT_TYPE.messenger,
         },
     ];
 }
 
-function buildRoles(lang: WorldContentLanguage): Array<{ name: string; type: string; description: string; duties: string[] }> {
+function buildRoles(lang: WorldContentLanguage): Array<{ name: string; type: string; description: string; duties: string[]; agentType: string | null }> {
     return [...defaultRoles(lang)];
 }
+
+// ── Default Goal Templates ──
+
+function defaultGoalTemplates(lang: WorldContentLanguage): Array<{ title: string; priority: string }> {
+    if (lang === "zh") {
+        return [
+            { title: "建立并维护全面的测试覆盖率", priority: "normal" },
+            { title: "审查并加固安全防线", priority: "normal" },
+        ];
+    }
+    return [
+        { title: "Establish and maintain comprehensive test coverage", priority: "normal" },
+        { title: "Review and harden security posture", priority: "normal" },
+    ];
+}
+
+// ── WorldMember Owner Defaults ──
+
+const OWNER_DEFAULTS = {
+    role: "owner" as const,
+    lawAuthority: "create",
+    decisionScope: "all",
+    goalAuthority: "create",
+    notifyLevel: "all",
+    maxConcurrency: 10,
+};
 
 // ── Main Function ──
 
 export async function generateWorldConstitution(
     projectId: string,
     accountId: string,
-    opts: { mode: "auto" | "custom"; prompt?: string; contentLanguage?: WorldContentLanguage },
+    opts: {
+        mode: "auto" | "custom";
+        prompt?: string;
+        contentLanguage?: WorldContentLanguage;
+        elements?: WorldElement[];
+    },
 ): Promise<WorldGenerateResult> {
     const lang: WorldContentLanguage = opts.contentLanguage === "zh" ? "zh" : "en";
 
@@ -428,13 +503,21 @@ export async function generateWorldConstitution(
     const skipped: string[] = [];
     const errors: string[] = [];
 
+    // When elements is provided, only generate those elements (force-generate even if exist)
+    const elementSet = opts.elements ? new Set(opts.elements) : null;
+    const shouldGenerate = (el: WorldElement, existsCheck: boolean): boolean => {
+        if (elementSet) return elementSet.has(el);
+        // Original auto/custom logic
+        return opts.mode === "custom" || !existsCheck;
+    };
+
     const profileRecord = await db.projectProfile.findUnique({
         where: { projectId },
         select: { content: true },
     });
     const profile = parseProfile(profileRecord?.content);
 
-    const [conventions, warnings, existingRoles] = await Promise.all([
+    const [conventions, warnings, existingRoleCount] = await Promise.all([
         db.projectKnowledge.findMany({
             where: { projectId, entryType: "convention", status: "active" },
             orderBy: { createdAt: "desc" },
@@ -450,13 +533,11 @@ export async function generateWorldConstitution(
         db.agentRole.count({ where: { accountId, projectId } }),
     ]);
 
-    const isAuto = opts.mode === "auto";
+    // ── Narrative ──
 
     let narrative: string | null = null;
     const hasNarrative = Boolean(project.narrative && project.narrative.trim().length > 0);
-    if (isAuto && hasNarrative) {
-        skipped.push("narrative");
-    } else {
+    if (shouldGenerate("narrative", hasNarrative)) {
         narrative = buildNarrative(
             lang,
             projectName,
@@ -464,25 +545,34 @@ export async function generateWorldConstitution(
             conventions.map((c) => c.title),
             opts.prompt,
         );
+    } else {
+        skipped.push("narrative");
     }
+
+    // ── Laws ──
 
     let laws: GeneratedLaw[] | null = null;
     const hasLaws = Boolean(project.laws && project.laws.trim().length > 2);
-    if (isAuto && hasLaws) {
-        skipped.push("laws");
-    } else {
+    if (shouldGenerate("laws", hasLaws)) {
         laws = buildLaws(lang, profile, conventions, warnings);
+    } else {
+        skipped.push("laws");
     }
 
+    // ── Roles ──
+
     let roles: GeneratedRole[] | null = null;
-    if (isAuto && existingRoles > 0) {
-        skipped.push("roles");
-    } else {
+    if (shouldGenerate("roles", existingRoleCount > 0)) {
+        // When resetting roles, delete existing ones first
+        if (elementSet?.has("roles") && existingRoleCount > 0) {
+            await db.agentRole.deleteMany({ where: { accountId, projectId } });
+        }
+
         const roleDefs = buildRoles(lang);
         const createdRoles: GeneratedRole[] = [];
 
         const existingNames =
-            existingRoles > 0
+            existingRoleCount > 0 && !elementSet?.has("roles")
                 ? (await db.agentRole.findMany({
                       where: { accountId, projectId },
                       select: { name: true },
@@ -501,7 +591,7 @@ export async function generateWorldConstitution(
                         description: def.description,
                         duties: JSON.stringify(def.duties),
                         skillIds: "[]",
-                        maxConcurrency: 1,
+                        agentType: def.agentType,
                     },
                 });
                 createdRoles.push({
@@ -519,7 +609,117 @@ export async function generateWorldConstitution(
 
         roles = createdRoles.length > 0 ? createdRoles : null;
         if (!roles) skipped.push("roles");
+    } else {
+        skipped.push("roles");
     }
 
-    return { narrative, laws, roles, goals: null, skipped, errors };
+    // ── WorldMember (owner) ──
+
+    let member: GeneratedMember | null = null;
+    const existingMember = await db.worldMember.findUnique({
+        where: { accountId_projectId: { accountId, projectId } },
+        select: { id: true },
+    });
+    if (shouldGenerate("member", existingMember != null)) {
+        try {
+            if (existingMember && elementSet?.has("member")) {
+                // Reset: update existing member to owner defaults
+                const updated = await db.worldMember.update({
+                    where: { id: existingMember.id },
+                    data: OWNER_DEFAULTS,
+                });
+                member = { id: updated.id, role: updated.role, maxConcurrency: updated.maxConcurrency };
+            } else if (!existingMember) {
+                // Create new owner record
+                const created = await db.worldMember.create({
+                    data: {
+                        accountId,
+                        projectId,
+                        ...OWNER_DEFAULTS,
+                    },
+                });
+                member = { id: created.id, role: created.role, maxConcurrency: created.maxConcurrency };
+            } else {
+                // Auto mode + member already exists → skip
+                skipped.push("member");
+            }
+        } catch (e) {
+            log({ module: "world-gen" }, `Failed to create/update owner member: ${e}`);
+            errors.push("member");
+        }
+    } else {
+        skipped.push("member");
+    }
+
+    // ── Goals ──
+
+    let goals: GeneratedGoal[] | null = null;
+    const existingGoalCount = await db.goal.count({ where: { accountId, projectId } });
+    if (shouldGenerate("goal", existingGoalCount > 0)) {
+        const goalTemplates = defaultGoalTemplates(lang);
+        const createdGoals: GeneratedGoal[] = [];
+
+        // Find a machine for this account+project (needed for goal creation)
+        const machine = await db.machine.findFirst({
+            where: { accountId, active: true },
+            select: { id: true },
+            orderBy: { lastActiveAt: "desc" },
+        });
+
+        if (machine) {
+            for (const tmpl of goalTemplates) {
+                try {
+                    const goal = await db.goal.create({
+                        data: {
+                            accountId,
+                            projectId,
+                            machineId: machine.id,
+                            title: tmpl.title,
+                            priority: tmpl.priority,
+                            createdBy: "system",
+                            layer: "strategic",
+                        },
+                    });
+                    createdGoals.push({
+                        id: goal.id,
+                        title: goal.title,
+                        priority: goal.priority,
+                        layer: goal.layer ?? "strategic",
+                    });
+                } catch (e) {
+                    log({ module: "world-gen" }, `Failed to create goal "${tmpl.title}": ${e}`);
+                    errors.push(`goal:${tmpl.title}`);
+                }
+            }
+        } else {
+            errors.push("goal:no-active-machine");
+        }
+
+        goals = createdGoals.length > 0 ? createdGoals : null;
+        if (!goals) skipped.push("goal");
+    } else {
+        skipped.push("goal");
+    }
+
+    // ── Audit log ──
+    const generated: string[] = [];
+    if (narrative) generated.push("narrative");
+    if (laws) generated.push("laws");
+    if (roles) generated.push("roles");
+    if (member) generated.push("member");
+    if (goals) generated.push("goals");
+
+    if (generated.length > 0) {
+        void auditLog({
+            accountId,
+            projectId,
+            memberId: member?.id ?? null,
+            action: elementSet ? "world.reset" : "world.generate",
+            entityType: "world",
+            summary: `${elementSet ? "Reset" : "Generated"} world elements: ${generated.join(", ")}`,
+            after: { elements: generated, mode: opts.mode },
+        });
+    }
+
+    return { narrative, laws, roles, member, goals, skipped, errors };
 }

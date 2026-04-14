@@ -227,6 +227,7 @@ const ROLES = ["owner", "admin", "member", "observer"] as const;
 const MemberFormSheet = React.memo(function MemberFormSheet({
     member,
     projectId,
+    agentRoles,
     onSave,
     onDelete,
     onClose,
@@ -240,6 +241,7 @@ const MemberFormSheet = React.memo(function MemberFormSheet({
     const [maxConcurrency, setMaxConcurrency] = React.useState(member?.maxConcurrency ?? 3);
     const [notifyLevel, setNotifyLevel] = React.useState(member?.notifyLevel ?? "all");
     const [availability, setAvailability] = React.useState(member?.availability ?? "active");
+    const [assignedRoleIds, setAssignedRoleIds] = React.useState<string[]>(member?.assignedRoleIds ?? []);
     const [saving, setSaving] = React.useState(false);
 
     const addTag = React.useCallback(() => {
@@ -275,6 +277,7 @@ const MemberFormSheet = React.memo(function MemberFormSheet({
                     maxConcurrency,
                     notifyLevel,
                     availability,
+                    assignedRoleIds,
                 });
                 onSave(saved);
             }
@@ -380,6 +383,48 @@ const MemberFormSheet = React.memo(function MemberFormSheet({
                                 <Ionicons name="add" size={20} color={theme.colors.accentPurple} />
                             </Pressable>
                         </View>
+                    )}
+
+                    {/* Assigned Agent Roles (edit only, when roles exist) */}
+                    {!isNew && agentRoles.length > 0 && (
+                        <>
+                            <View style={styles.sectionDivider}>
+                                <View style={styles.sectionDividerLine} />
+                                <Text style={styles.sectionDividerLabel}>{t("members.assignedRolesSection")}</Text>
+                                <View style={styles.sectionDividerLine} />
+                            </View>
+                            <Text style={[styles.fieldLabel, { marginTop: 4 }]}>{t("members.assignedRolesHint")}</Text>
+                            <View style={styles.chipRow}>
+                                {agentRoles.map((ar) => {
+                                    const isAssigned = assignedRoleIds.includes(ar.id);
+                                    return (
+                                        <Pressable
+                                            key={ar.id}
+                                            style={[
+                                                styles.chip,
+                                                isAssigned && { backgroundColor: theme.colors.accentPurple },
+                                            ]}
+                                            onPress={() =>
+                                                setAssignedRoleIds((prev) =>
+                                                    isAssigned
+                                                        ? prev.filter((id) => id !== ar.id)
+                                                        : [...prev, ar.id],
+                                                )
+                                            }
+                                        >
+                                            <Ionicons
+                                                name={isAssigned ? "checkmark-circle" : "ellipse-outline"}
+                                                size={16}
+                                                color={isAssigned ? "#fff" : theme.colors.textSecondary}
+                                            />
+                                            <Text style={[styles.chipText, isAssigned && { color: "#fff" }]}>
+                                                {ar.name}
+                                            </Text>
+                                        </Pressable>
+                                    );
+                                })}
+                            </View>
+                        </>
                     )}
 
                     {/* Task Capacity (edit only) */}

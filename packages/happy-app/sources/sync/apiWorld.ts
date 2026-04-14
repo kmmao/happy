@@ -87,6 +87,8 @@ export interface WorldDashboard {
     };
 }
 
+export type WorldElement = "narrative" | "laws" | "roles" | "member" | "goal";
+
 export interface WorldGenerateResult {
     narrative: string | null;
     laws: Array<{
@@ -103,7 +105,17 @@ export interface WorldGenerateResult {
         description: string;
         duties: string[];
     }> | null;
-    goals: null;
+    member: {
+        id: string;
+        role: string;
+        maxConcurrency: number;
+    } | null;
+    goals: Array<{
+        id: string;
+        title: string;
+        priority: string;
+        layer: string;
+    }> | null;
     skipped: string[];
     errors: string[];
 }
@@ -111,7 +123,7 @@ export interface WorldGenerateResult {
 export async function generateWorld(
     credentials: AuthCredentials,
     projectId: string,
-    opts: { mode: "auto" | "custom"; prompt?: string; contentLanguage?: "en" | "zh" },
+    opts: { mode: "auto" | "custom"; prompt?: string; contentLanguage?: "en" | "zh"; elements?: WorldElement[] },
 ): Promise<WorldGenerateResult> {
     const API_ENDPOINT = getServerUrl();
     const contentLanguage = opts.contentLanguage ?? worldContentLanguageForGenerate();

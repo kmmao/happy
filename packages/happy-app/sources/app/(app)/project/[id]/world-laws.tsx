@@ -12,7 +12,7 @@ import { projectManager } from "@/sync/projectManager";
 import { Ionicons } from "@expo/vector-icons";
 import { Modal } from "@/modal";
 import { layout } from "@/components/layout";
-import { generateWorld, type WorldGenerateResult } from "@/sync/apiWorld";
+import { generateWorld, type WorldGenerateResult, type WorldElement } from "@/sync/apiWorld";
 import {
     type Law,
     CATEGORY_LABELS,
@@ -22,6 +22,14 @@ import {
     parseLaws,
 } from "@/components/project/worldLawConstants";
 import { LawEditor } from "@/components/project/LawEditor";
+
+const ALL_ELEMENTS: { key: WorldElement; icon: string }[] = [
+    { key: "narrative", icon: "book-outline" },
+    { key: "laws", icon: "shield-checkmark-outline" },
+    { key: "roles", icon: "people-outline" },
+    { key: "member", icon: "person-outline" },
+    { key: "goal", icon: "flag-outline" },
+];
 
 const WorldLawsScreen = React.memo(function WorldLawsScreen() {
     const { id } = useLocalSearchParams<{ id: string }>();
@@ -36,6 +44,23 @@ const WorldLawsScreen = React.memo(function WorldLawsScreen() {
     const [saving, setSaving] = React.useState(false);
     const [generating, setGenerating] = React.useState(false);
     const [editingLaw, setEditingLaw] = React.useState<Law | null>(null);
+
+    // Element selection for generation
+    const [selectedElements, setSelectedElements] = React.useState<Set<WorldElement>>(
+        new Set(ALL_ELEMENTS.map((e) => e.key)),
+    );
+
+    const toggleElement = React.useCallback((el: WorldElement) => {
+        setSelectedElements((prev) => {
+            const next = new Set(prev);
+            if (next.has(el)) {
+                next.delete(el);
+            } else {
+                next.add(el);
+            }
+            return next;
+        });
+    }, []);
 
     React.useEffect(() => {
         navigation.setOptions({ title: t("world.title") });
@@ -133,6 +158,8 @@ const WorldLawsScreen = React.memo(function WorldLawsScreen() {
         if (result.narrative) parts.push(t("world.narrativeLabel"));
         if (result.laws) parts.push(t("world.lawsLabel"));
         if (result.roles && result.roles.length > 0) parts.push(`${result.roles.length} ${t("roles.title")}`);
+        if (result.member) parts.push(t("world.elementMember"));
+        if (result.goals && result.goals.length > 0) parts.push(`${result.goals.length} ${t("world.goalsOverview")}`);
 
         const messages: string[] = [t("world.generateSuccess")];
 
@@ -142,6 +169,8 @@ const WorldLawsScreen = React.memo(function WorldLawsScreen() {
                     narrative: t("world.narrativeLabel"),
                     laws: t("world.lawsLabel"),
                     roles: t("roles.title"),
+                    member: t("world.elementMember"),
+                    goal: t("world.goalsOverview"),
                 };
                 return map[s] ?? s;
             }).join(", ");
@@ -157,6 +186,7 @@ const WorldLawsScreen = React.memo(function WorldLawsScreen() {
 
     const handleGenerate = React.useCallback(async (mode: "auto" | "custom") => {
         if (!project?.serverId) return;
+        if (selectedElements.size === 0) return;
 
         if (mode === "custom" && !customPrompt.trim()) return;
 
@@ -175,9 +205,11 @@ const WorldLawsScreen = React.memo(function WorldLawsScreen() {
         try {
             const credentials = await TokenStorage.getCredentials();
             if (!credentials) return;
+            const elements = Array.from(selectedElements);
             const result = await generateWorld(credentials, project.serverId, {
                 mode,
                 prompt: mode === "custom" ? customPrompt.trim() : undefined,
+                elements,
             });
             if (!mountedRef.current) return;
             applyResult(result);
@@ -186,7 +218,7 @@ const WorldLawsScreen = React.memo(function WorldLawsScreen() {
         } finally {
             if (mountedRef.current) setGenerating(false);
         }
-    }, [project?.serverId, customPrompt, narrative, laws, applyResult]);
+    }, [project?.serverId, customPrompt, narrative, laws, applyResult, selectedElements]);
 
     if (!project) {
         return (
@@ -195,6 +227,14 @@ const WorldLawsScreen = React.memo(function WorldLawsScreen() {
             </View>
         );
     }
+
+    const elementLabelMap: Record<WorldElement, string> = {
+        narrative: t("world.narrativeLabel"),
+        laws: t("world.lawsLabel"),
+        roles: t("roles.title"),
+        member: t("world.elementMember"),
+        goal: t("world.goalsOverview"),
+    };
 
     return (
         <View style={{ flex: 1, backgroundColor: theme.colors.groupped.background }}>
@@ -240,6 +280,29 @@ const WorldLawsScreen = React.memo(function WorldLawsScreen() {
                         {genMode === "auto" ? t("world.modeAutoHint") : t("world.modeCustomHint")}
                     </Text>
 
+                    {/* Element Selection Chips */}
+                    <View style={styles.elementChips}>
+                        {ALL_ELEMENTS.map(({ key, icon }) => {
+                            const selected = selectedElements.has(key);
+                            return (
+                                <Pressable
+                                    key={key}
+                                    style={[styles.elementChip, selected && styles.elementChipSelected]}
+                                    onPress={() => toggleElement(key)}
+                                >
+                                    <Ionicons
+                                        name={selected ? (icon.replace("-outline", "") as any) : (icon as any)}
+                                        size={14}
+                                        color={selected ? "#fff" : theme.colors.textSecondary}
+                                    />
+                                    <Text style={[styles.elementChipText, selected && styles.elementChipTextSelected]}>
+                                        {elementLabelMap[key]}
+                                    </Text>
+                                </Pressable>
+                            );
+                        })}
+                    </View>
+
                     {/* Custom Prompt Input */}
                     {genMode === "custom" && (
                         <TextInput
@@ -259,10 +322,10 @@ const WorldLawsScreen = React.memo(function WorldLawsScreen() {
                     <Pressable
                         style={[
                             styles.generateButton,
-                            (generating || !project.serverId || (genMode === "custom" && !customPrompt.trim())) && { opacity: 0.4 },
+                            (generating || !project.serverId || selectedElements.size === 0 || (genMode === "custom" && !customPrompt.trim())) && { opacity: 0.4 },
                         ]}
                         onPress={() => handleGenerate(genMode)}
-                        disabled={generating || !project.serverId || (genMode === "custom" && !customPrompt.trim())}
+                        disabled={generating || !project.serverId || selectedElements.size === 0 || (genMode === "custom" && !customPrompt.trim())}
                     >
                         {generating ? (
                             <ActivityIndicator size="small" color="#fff" />
@@ -449,6 +512,34 @@ const styles = StyleSheet.create((theme) => ({
         fontSize: 12,
         color: theme.colors.textSecondary,
         lineHeight: 16,
+    },
+    elementChips: {
+        flexDirection: "row" as const,
+        flexWrap: "wrap" as const,
+        gap: 8,
+    },
+    elementChip: {
+        flexDirection: "row" as const,
+        alignItems: "center" as const,
+        gap: 5,
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+        borderRadius: 16,
+        backgroundColor: theme.colors.groupped.background,
+        borderWidth: 1,
+        borderColor: theme.colors.divider,
+    },
+    elementChipSelected: {
+        backgroundColor: theme.colors.accentPurple,
+        borderColor: theme.colors.accentPurple,
+    },
+    elementChipText: {
+        ...Typography.default("semiBold"),
+        fontSize: 12,
+        color: theme.colors.textSecondary,
+    },
+    elementChipTextSelected: {
+        color: "#fff",
     },
     customPromptInput: {
         ...Typography.default(),

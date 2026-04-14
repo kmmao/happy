@@ -279,6 +279,7 @@ export function worldDashboardRoutes(app: Fastify) {
                     mode: z.enum(["auto", "custom"]).default("auto"),
                     prompt: z.string().max(5000).optional(),
                     contentLanguage: z.enum(["en", "zh"]).default("en"),
+                    elements: z.array(z.enum(["narrative", "laws", "roles", "member", "goal"])).optional(),
                 }),
             },
         },
@@ -291,6 +292,7 @@ export function worldDashboardRoutes(app: Fastify) {
                         mode: request.body.mode,
                         prompt: request.body.prompt,
                         contentLanguage: request.body.contentLanguage,
+                        elements: request.body.elements,
                     },
                 );
                 return reply.send(result);
