@@ -192,6 +192,26 @@ export async function claudeRemoteLauncher(
   let pendingFileHint: string | null = null; // File-based knowledge hint for next message
   let currentTurnFilePaths = new Set<string>(); // Files edited in the current turn
 
+  // Sync server-side knowledgeConfig to TurnCollector at runtime
+  function syncKnowledgeConfig(cfg: {
+    sensitivity?: string;
+    trackFileEdits?: boolean;
+    trackToolCalls?: boolean;
+    trackTokens?: boolean;
+  } | undefined): void {
+    if (!cfg || !turnCollector) return;
+    const patch: Partial<TurnCollectorConfig> = {};
+    if (cfg.sensitivity === "conservative" || cfg.sensitivity === "balanced" || cfg.sensitivity === "aggressive") {
+      patch.sensitivity = cfg.sensitivity;
+    }
+    if (cfg.trackFileEdits !== undefined) patch.trackFileEdits = cfg.trackFileEdits;
+    if (cfg.trackToolCalls !== undefined) patch.trackToolCalls = cfg.trackToolCalls;
+    if (cfg.trackTokens !== undefined) patch.trackTokens = cfg.trackTokens;
+    if (Object.keys(patch).length > 0) {
+      turnCollector.updateConfig(patch);
+    }
+  }
+
   // Pre-fetch knowledge context for injection (non-blocking)
   if (knowledgeEnabled) {
     const mode = (process.env.HAPPY_KNOWLEDGE_MODE as "auto" | "full" | "minimal") || "auto";
@@ -203,6 +223,7 @@ export async function claudeRemoteLauncher(
         }
         logger.debug(`[knowledge] Pre-fetched context: ${knowledgeContext!.length} chars, ${result.entries.length} entries`);
       }
+      syncKnowledgeConfig(result?.knowledgeConfig);
     }).catch((err) => {
       logger.debug(`[knowledge] Failed to pre-fetch: ${err}`);
     });
@@ -1079,6 +1100,7 @@ export async function claudeRemoteLauncher(
               knowledgeContext = formatKnowledgeForInjection(result);
               logger.debug(`[knowledge] Re-fetched context after session reset: ${knowledgeContext!.length} chars, ${result.entries.length} entries`);
             }
+            syncKnowledgeConfig(result?.knowledgeConfig);
           }).catch((err) => {
             logger.debug(`[knowledge] Failed to re-fetch after session reset: ${err}`);
           });
@@ -1268,6 +1290,7 @@ export async function claudeRemoteLauncher(
               const query = typeof args["query"] === "string" ? args["query"] : "";
               try {
                 const result = await session.client.fetchKnowledge("auto", [query]);
+                syncKnowledgeConfig(result?.knowledgeConfig);
                 if (!result || result.entries.length === 0) {
                   return { content: [{ type: "text" as const, text: "No relevant knowledge found." }] };
                 }
@@ -1414,6 +1437,7 @@ export async function claudeRemoteLauncher(
                         knowledgeContext = effectiveKnowledgeContext;
                         logger.debug(`[knowledge] Contextual fetch on first message: ${effectiveKnowledgeContext.length} chars, ${contextualResult.entries.length} entries`);
                       }
+                      syncKnowledgeConfig(contextualResult?.knowledgeConfig);
                     } catch (err) {
                       logger.debug(`[knowledge] Contextual fetch failed: ${err}`);
                     }
@@ -1432,6 +1456,7 @@ export async function claudeRemoteLauncher(
                     session.client.fetchKnowledge("auto", hints.length > 0 ? hints : undefined),
                     new Promise<null>((resolve) => setTimeout(() => resolve(null), 1000)),
                   ]);
+                  syncKnowledgeConfig(refreshResult?.knowledgeConfig);
                   if (refreshResult && refreshResult.entries.length > 0) {
                     const newEntries = refreshResult.entries.filter((e) => !knowledgeEntryIds.has(e.id));
                     logger.debug(`[knowledge] Per-turn refresh: ${refreshResult.entries.length} total, ${newEntries.length} new`);
@@ -1609,6 +1634,7 @@ export async function claudeRemoteLauncher(
               const fileHints = extractTags(editedPaths.map((p) => ({ path: p, type: "edit" as const })));
               if (fileHints.length > 0) {
                 session.client.fetchKnowledge("auto", fileHints).then((result) => {
+                  syncKnowledgeConfig(result?.knowledgeConfig);
                   if (!result || result.entries.length === 0) return;
                   const newEntries = result.entries.filter((e) => !knowledgeEntryIds.has(e.id));
                   if (newEntries.length === 0) return;

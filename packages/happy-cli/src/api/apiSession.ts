@@ -1024,6 +1024,14 @@ export class ApiSessionClient extends EventEmitter {
       confidence: string;
       createdAt: string;
     }[];
+    knowledgeConfig?: {
+      enabled: boolean;
+      mode: "auto" | "full" | "minimal";
+      sensitivity: "conservative" | "balanced" | "aggressive";
+      trackFileEdits: boolean;
+      trackToolCalls: boolean;
+      trackTokens: boolean;
+    };
   } | null> {
     try {
       const result = await this.socket.timeout(10_000).emitWithAck("fetch-knowledge", {

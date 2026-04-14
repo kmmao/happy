@@ -59,13 +59,23 @@ export class TurnCollector {
   private pendingTurns: TurnData[] = [];
   private lastExtractionTime: number = Date.now();
 
-  private readonly config: TurnCollectorConfig;
-  private readonly preset: SensitivityPreset;
+  private config: TurnCollectorConfig;
+  private preset: SensitivityPreset;
 
   constructor(config?: Partial<TurnCollectorConfig>) {
     this.config = { ...DEFAULT_CONFIG, ...config };
     this.preset = SENSITIVITY_PRESETS[this.config.sensitivity];
     logger.debug(`[knowledge] TurnCollector initialized: sensitivity=${this.config.sensitivity}, trackFileEdits=${this.config.trackFileEdits}, trackToolCalls=${this.config.trackToolCalls}, trackTokens=${this.config.trackTokens}`);
+  }
+
+  /** Update config at runtime (e.g. from server knowledgeConfig). Only applies changed fields. */
+  updateConfig(patch: Partial<TurnCollectorConfig>): void {
+    const prev = { ...this.config };
+    this.config = { ...this.config, ...patch };
+    if (patch.sensitivity && patch.sensitivity !== prev.sensitivity) {
+      this.preset = SENSITIVITY_PRESETS[this.config.sensitivity];
+    }
+    logger.debug(`[knowledge] TurnCollector config updated: sensitivity=${this.config.sensitivity}, trackFileEdits=${this.config.trackFileEdits}, trackToolCalls=${this.config.trackToolCalls}, trackTokens=${this.config.trackTokens}`);
   }
 
   startTurn(turnId: string, model: string): void {
