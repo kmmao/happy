@@ -125,6 +125,8 @@ export const en: TranslationStructure = {
       `Remove "${name}" from ${section}?`,
     optional: "optional",
     openSettings: "Open Settings",
+    created: "Created",
+    updated: "Updated",
   },
 
   profile: {
@@ -1193,6 +1195,13 @@ export const en: TranslationStructure = {
     staged: "staged",
     modified: "modified",
     untracked: "untracked",
+    knowledgeCaptured: "Knowledge Captured",
+    knowledgeCapturedValue: ({ count }: { count: number }) =>
+      `${count} ${count === 1 ? "entry" : "entries"}`,
+    knowledgeReferenced: "Knowledge Referenced",
+    knowledgeReferencedValue: ({ count }: { count: number }) =>
+      `${count} ${count === 1 ? "entry" : "entries"}`,
+    knowledgeLatestPrefix: "Latest",
   },
 
   settingsVoice: {
@@ -2134,6 +2143,12 @@ export const en: TranslationStructure = {
     confirmDelete: "Delete this task? This cannot be undone.",
     queuedCount: ({ count }: { count: number }) => `${count} queued`,
     runningCount: ({ count }: { count: number }) => `${count} running`,
+    editTask: "Edit Task",
+    restoreTask: "Restore Task",
+    confirmRestore: "Restore this task to the queue?",
+    restored: "Task restored",
+    session: "Session",
+    trigger: "Trigger",
   },
 
   skills: {
@@ -4169,6 +4184,13 @@ export const en: TranslationStructure = {
     replanTriggered: "Replanning triggered",
     replanError: "Failed to trigger replan",
     avgHealthScore: "Avg Health",
+    assigned: "Assigned",
+    blockerKindPlannerTimeout: "Planner Timeout",
+    blockerKindTaskFailed: "Task Failed",
+    blockerKindAgentConflict: "Agent Conflict",
+    blockerKindAgentRequest: "Agent Request",
+    statusFailed: "Failed",
+    statusPaused: "Paused",
   },
   decision: {
     pending: "Pending",

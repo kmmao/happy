@@ -112,6 +112,8 @@ export const zhHans: TranslationStructure = {
       `从${section}中移除"${name}"？`,
     optional: "可选的",
     openSettings: "打开设置",
+    created: "创建时间",
+    updated: "更新时间",
   },
 
   profile: {
@@ -1154,6 +1156,11 @@ export const zhHans: TranslationStructure = {
     staged: "已暂存",
     modified: "已修改",
     untracked: "未跟踪",
+    knowledgeCaptured: "知识捕获",
+    knowledgeCapturedValue: ({ count }: { count: number }) => `${count} 条`,
+    knowledgeReferenced: "知识引用",
+    knowledgeReferencedValue: ({ count }: { count: number }) => `${count} 条`,
+    knowledgeLatestPrefix: "最新",
   },
 
   settingsVoice: {
@@ -2085,6 +2092,12 @@ export const zhHans: TranslationStructure = {
     confirmDelete: "删除此任务？此操作不可撤销。",
     queuedCount: ({ count }: { count: number }) => `${count} 排队中`,
     runningCount: ({ count }: { count: number }) => `${count} 运行中`,
+    editTask: "编辑任务",
+    restoreTask: "恢复任务",
+    confirmRestore: "将此任务恢复到队列？",
+    restored: "任务已恢复",
+    session: "会话",
+    trigger: "触发方式",
   },
 
   skills: {
@@ -4075,6 +4088,13 @@ export const zhHans: TranslationStructure = {
     replanTriggered: "已触发重新规划",
     replanError: "触发重新规划失败",
     avgHealthScore: "平均健康度",
+    assigned: "已分配",
+    blockerKindPlannerTimeout: "规划超时",
+    blockerKindTaskFailed: "任务失败",
+    blockerKindAgentConflict: "智能体冲突",
+    blockerKindAgentRequest: "智能体请求",
+    statusFailed: "已失败",
+    statusPaused: "已暂停",
   },
   decision: {
     pending: "待裁决",

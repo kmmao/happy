@@ -2563,6 +2563,35 @@ export async function startDaemon(): Promise<void> {
         });
     });
 
+    // Set up task cancel handler: abort running sessions when App cancels a task
+    apiMachine.setTaskCancelHandler((data) => {
+      logger.debug(`[DAEMON RUN] Received task-cancel for task ${data.taskId} (session: ${data.sessionId ?? "none"})`);
+
+      // If a sessionId is provided, kill the running session directly
+      if (data.sessionId) {
+        const trackedSession = findTrackedSessionByHappySessionId(data.sessionId);
+        if (trackedSession) {
+          requestTrackedSessionTermination(trackedSession.pid, trackedSession, {
+            reason: "task-cancel",
+            terminalStatus: "cancelled",
+            terminalError: "Task cancelled by user",
+          });
+          return;
+        }
+      }
+
+      // Fallback: find a queued job matching taskId and cancel it
+      const jobs = automationScheduler?.getJobsSnapshot() ?? [];
+      for (const job of jobs) {
+        if (job.kind === "task" && (job.payload as import("@/automation/types").TaskTriggerData).taskId === data.taskId) {
+          void automationScheduler?.cancelJob(job.id).then((result) => {
+            logger.debug(`[DAEMON RUN] Cancelled queued task job ${job.id}: ${result.success ? "ok" : result.errorMessage}`);
+          });
+          break;
+        }
+      }
+    });
+
     // Set up fix-kill handler: terminate fix sessions after completion/failure
     apiMachine.setFixKillHandler((data) => {
       logger.debug(

@@ -110,6 +110,8 @@ export const ca: TranslationStructure = {
       `Eliminar "${name}" de ${section}?`,
     optional: "Opcional",
     openSettings: "Obrir configuració",
+    created: "Creat",
+    updated: "Actualitzat",
   },
 
   profile: {
@@ -1196,6 +1198,13 @@ export const ca: TranslationStructure = {
     staged: "preparat",
     modified: "modificat",
     untracked: "sense seguiment",
+    knowledgeCaptured: "Coneixement capturat",
+    knowledgeCapturedValue: ({ count }: { count: number }) =>
+      `${count} ${count === 1 ? "entrada" : "entrades"}`,
+    knowledgeReferenced: "Coneixement referenciat",
+    knowledgeReferencedValue: ({ count }: { count: number }) =>
+      `${count} ${count === 1 ? "entrada" : "entrades"}`,
+    knowledgeLatestPrefix: "Últim",
   },
 
   settingsVoice: {
@@ -2141,6 +2150,12 @@ export const ca: TranslationStructure = {
     confirmDelete: "Delete this task? This cannot be undone.",
     queuedCount: ({ count }: { count: number }) => `${count} queued`,
     runningCount: ({ count }: { count: number }) => `${count} running`,
+    editTask: "Editar tasca",
+    restoreTask: "Restaurar tasca",
+    confirmRestore: "Restaurar aquesta tasca a la cua?",
+    restored: "Tasca restaurada",
+    session: "Sessió",
+    trigger: "Activador",
   },
 
   skills: {
@@ -4175,6 +4190,13 @@ export const ca: TranslationStructure = {
     replanTriggered: "Replanificació iniciada",
     replanError: "Error en iniciar la replanificació",
     avgHealthScore: "Salut mitjana",
+    assigned: "Assignat",
+    blockerKindPlannerTimeout: "Temps d'espera del planificador",
+    blockerKindTaskFailed: "Tasca fallida",
+    blockerKindAgentConflict: "Conflicte d'agent",
+    blockerKindAgentRequest: "Sol·licitud d'agent",
+    statusFailed: "Fallat",
+    statusPaused: "En pausa",
   },
   decision: {
     pending: "Pending",

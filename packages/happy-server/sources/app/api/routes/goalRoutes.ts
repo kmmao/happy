@@ -3,6 +3,7 @@ import {
     buildGoalProgressEphemeral,
     buildTaskTriggerEphemeral,
     buildTaskStatusChangedEphemeral,
+    buildTaskCancelEphemeral,
 } from "@/app/events/eventRouter";
 import { type Fastify } from "../types";
 import { db } from "@/storage/db";
@@ -616,16 +617,16 @@ export function goalRoutes(app: Fastify) {
             const activeTasks = await db.task.findMany({
                 where: {
                     goalId: goal.id,
-                    status: { in: ["queued", "dispatching"] },
+                    status: { in: ["queued", "dispatching", "running"] },
                 },
-                select: { id: true, machineId: true },
+                select: { id: true, machineId: true, sessionId: true, status: true },
             });
 
             await db.$transaction([
                 db.task.updateMany({
                     where: {
                         goalId: goal.id,
-                        status: { in: ["queued", "dispatching"] },
+                        status: { in: ["queued", "dispatching", "running"] },
                     },
                     data: { status: "cancelled", completedAt: now },
                 }),
@@ -635,7 +636,7 @@ export function goalRoutes(app: Fastify) {
                 }),
             ]);
 
-            // Notify App about cancelled tasks
+            // Notify App about cancelled tasks + tell CLI daemon to abort running sessions
             for (const task of activeTasks) {
                 eventRouter.emitEphemeral({
                     userId: request.userId,
@@ -647,6 +648,13 @@ export function goalRoutes(app: Fastify) {
                     }),
                     recipientFilter: { type: "user-scoped-only" },
                 });
+                if (task.status === "running" || task.status === "dispatching") {
+                    eventRouter.emitEphemeral({
+                        userId: request.userId,
+                        payload: buildTaskCancelEphemeral({ taskId: task.id, sessionId: task.sessionId ?? undefined }),
+                        recipientFilter: { type: "machine-scoped-only", machineId: task.machineId },
+                    });
+                }
             }
 
             // Notify App about goal status

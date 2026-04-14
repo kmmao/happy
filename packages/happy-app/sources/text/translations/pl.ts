@@ -123,6 +123,8 @@ export const pl: TranslationStructure = {
       `Usunąć „${name}" z ${section}?`,
     optional: "opcjonalnie",
     openSettings: "Otwórz ustawienia",
+    created: "Utworzono",
+    updated: "Zaktualizowano",
   },
 
   profile: {
@@ -1207,6 +1209,13 @@ export const pl: TranslationStructure = {
     staged: "przygotowane",
     modified: "zmodyfikowane",
     untracked: "nieśledzone",
+    knowledgeCaptured: "Wiedza przechwycona",
+    knowledgeCapturedValue: ({ count }: { count: number }) =>
+      `${count} ${count === 1 ? "wpis" : "wpisów"}`,
+    knowledgeReferenced: "Wiedza przywołana",
+    knowledgeReferencedValue: ({ count }: { count: number }) =>
+      `${count} ${count === 1 ? "wpis" : "wpisów"}`,
+    knowledgeLatestPrefix: "Najnowsze",
   },
 
   settingsVoice: {
@@ -2150,6 +2159,12 @@ export const pl: TranslationStructure = {
     confirmDelete: "Delete this task? This cannot be undone.",
     queuedCount: ({ count }: { count: number }) => `${count} queued`,
     runningCount: ({ count }: { count: number }) => `${count} running`,
+    editTask: "Edytuj zadanie",
+    restoreTask: "Przywróć zadanie",
+    confirmRestore: "Przywrócić zadanie do kolejki?",
+    restored: "Zadanie przywrócone",
+    session: "Sesja",
+    trigger: "Wyzwalacz",
   },
 
   skills: {
@@ -4191,6 +4206,13 @@ export const pl: TranslationStructure = {
     replanTriggered: "Przeplanowanie uruchomione",
     replanError: "Nie udało się uruchomić przeplanowania",
     avgHealthScore: "Średnie zdrowie",
+    assigned: "Przydzielono",
+    blockerKindPlannerTimeout: "Przekroczenie czasu planisty",
+    blockerKindTaskFailed: "Zadanie nieudane",
+    blockerKindAgentConflict: "Konflikt agenta",
+    blockerKindAgentRequest: "Żądanie agenta",
+    statusFailed: "Nieudane",
+    statusPaused: "Wstrzymane",
   },
   decision: {
     pending: "Pending",

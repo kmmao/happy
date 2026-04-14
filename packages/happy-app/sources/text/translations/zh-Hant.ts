@@ -112,6 +112,8 @@ export const zhHant: TranslationStructure = {
       `從${section}中移除「${name}」？`,
     optional: "選填",
     openSettings: "開啟設定",
+    created: "建立時間",
+    updated: "更新時間",
   },
 
   profile: {
@@ -1154,6 +1156,11 @@ export const zhHant: TranslationStructure = {
     staged: "已暫存",
     modified: "已修改",
     untracked: "未追蹤",
+    knowledgeCaptured: "知識擷取",
+    knowledgeCapturedValue: ({ count }: { count: number }) => `${count} 條`,
+    knowledgeReferenced: "知識引用",
+    knowledgeReferencedValue: ({ count }: { count: number }) => `${count} 條`,
+    knowledgeLatestPrefix: "最新",
   },
 
   settingsVoice: {
@@ -2086,6 +2093,12 @@ export const zhHant: TranslationStructure = {
     confirmDelete: "刪除此任務？此操作無法復原。",
     queuedCount: ({ count }: { count: number }) => `${count} 排隊中`,
     runningCount: ({ count }: { count: number }) => `${count} 執行中`,
+    editTask: "編輯任務",
+    restoreTask: "恢復任務",
+    confirmRestore: "將此任務恢復到佇列？",
+    restored: "任務已恢復",
+    session: "工作階段",
+    trigger: "觸發方式",
   },
 
   skills: {
@@ -4079,6 +4092,13 @@ export const zhHant: TranslationStructure = {
     replanTriggered: "已觸發重新規劃",
     replanError: "觸發重新規劃失敗",
     avgHealthScore: "平均健康度",
+    assigned: "已分配",
+    blockerKindPlannerTimeout: "規劃超時",
+    blockerKindTaskFailed: "任務失敗",
+    blockerKindAgentConflict: "智能體衝突",
+    blockerKindAgentRequest: "智能體請求",
+    statusFailed: "已失敗",
+    statusPaused: "已暫停",
   },
   decision: {
     pending: "待裁決",

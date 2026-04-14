@@ -79,6 +79,48 @@ export function buildGoalDetailSections(goal: GoalDetail): GoalDetailViewModel {
     };
 }
 
+export function getGoalStatusLabel(status: string, t: (key: string) => string): string {
+    const map: Record<string, string> = {
+        planning: t("goals.statusPlanning"),
+        in_progress: t("goals.statusInProgress"),
+        blocked: t("goals.statusBlocked"),
+        completed: t("goals.statusCompleted"),
+        cancelled: t("goals.statusCancelled"),
+        failed: t("goals.statusFailed"),
+        paused: t("goals.statusPaused"),
+    };
+    return map[status] ?? status;
+}
+
+export function getGoalPriorityLabel(priority: string, t: (key: string) => string): string {
+    const map: Record<string, string> = {
+        urgent: t("goals.priorityUrgent"),
+        normal: t("goals.priorityNormal"),
+        low: t("goals.priorityLow"),
+    };
+    return map[priority] ?? priority;
+}
+
+export function getDecisionStatusLabel(status: string, t: (key: string) => string): string {
+    const map: Record<string, string> = {
+        pending: t("decision.pending"),
+        decided: t("decision.decided"),
+        expired: t("decision.expired"),
+        auto_resolved: t("decision.autoResolved"),
+    };
+    return map[status] ?? status;
+}
+
+export function getBlockerKindLabel(kind: string, t: (key: string) => string): string {
+    const map: Record<string, string> = {
+        planner_timeout: t("goals.blockerKindPlannerTimeout"),
+        task_failed: t("goals.blockerKindTaskFailed"),
+        agent_conflict: t("goals.blockerKindAgentConflict"),
+        agent_request: t("goals.blockerKindAgentRequest"),
+    };
+    return map[kind] ?? kind;
+}
+
 export function filterGoalDetailSuggestions(
     suggestions: SuggestionSummary[],
     goalId: string,

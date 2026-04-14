@@ -110,6 +110,8 @@ export const it: TranslationStructure = {
     optional: "opzionale",
     openSettings: "Apri impostazioni",
     saveAs: "Salva con nome",
+    created: "Creato",
+    updated: "Aggiornato",
   },
 
   profile: {
@@ -1304,6 +1306,13 @@ export const it: TranslationStructure = {
     staged: "preparato",
     modified: "modificato",
     untracked: "non tracciato",
+    knowledgeCaptured: "Conoscenza acquisita",
+    knowledgeCapturedValue: ({ count }: { count: number }) =>
+      `${count} ${count === 1 ? "voce" : "voci"}`,
+    knowledgeReferenced: "Conoscenza referenziata",
+    knowledgeReferencedValue: ({ count }: { count: number }) =>
+      `${count} ${count === 1 ? "voce" : "voci"}`,
+    knowledgeLatestPrefix: "Ultimo",
   },
 
   settingsVoice: {
@@ -2248,6 +2257,12 @@ export const it: TranslationStructure = {
     confirmDelete: "Delete this task? This cannot be undone.",
     queuedCount: ({ count }: { count: number }) => `${count} queued`,
     runningCount: ({ count }: { count: number }) => `${count} running`,
+    editTask: "Modifica attività",
+    restoreTask: "Ripristina attività",
+    confirmRestore: "Ripristinare questa attività nella coda?",
+    restored: "Attività ripristinata",
+    session: "Sessione",
+    trigger: "Trigger",
   },
 
   skills: {
@@ -4169,6 +4184,13 @@ export const it: TranslationStructure = {
     replanTriggered: "Ripianificazione avviata",
     replanError: "Impossibile avviare la ripianificazione",
     avgHealthScore: "Salute media",
+    assigned: "Assegnato",
+    blockerKindPlannerTimeout: "Timeout del pianificatore",
+    blockerKindTaskFailed: "Attività fallita",
+    blockerKindAgentConflict: "Conflitto agente",
+    blockerKindAgentRequest: "Richiesta agente",
+    statusFailed: "Fallito",
+    statusPaused: "In pausa",
   },
   decision: {
     pending: "Pending",

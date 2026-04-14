@@ -446,6 +446,11 @@ export type EphemeralEvent =
       suggestionId: string;
       status: string;
     }
+  | {
+      type: "task-cancel";
+      taskId: string;
+      sessionId?: string;
+    }
 ;
 
 // === EVENT PAYLOAD TYPES ===
@@ -1276,6 +1281,13 @@ export function buildAgentMessageEphemeral(opts: {
 export function buildWorldSuggestionUpdatedEphemeral(opts: Omit<WorldSuggestionUpdated, "type">): WorldSuggestionUpdated {
   return {
     type: "world-suggestion-updated",
+    ...opts,
+  };
+}
+
+export function buildTaskCancelEphemeral(opts: { taskId: string; sessionId?: string }): EphemeralPayload {
+  return {
+    type: "task-cancel",
     ...opts,
   };
 }

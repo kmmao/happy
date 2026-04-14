@@ -123,6 +123,8 @@ export const ru: TranslationStructure = {
       `Удалить «${name}» из ${section}?`,
     optional: "необязательно",
     openSettings: "Открыть настройки",
+    created: "Создано",
+    updated: "Обновлено",
   },
 
   connect: {
@@ -1207,6 +1209,13 @@ export const ru: TranslationStructure = {
     staged: "подготовлено",
     modified: "изменено",
     untracked: "неотслеживаемое",
+    knowledgeCaptured: "Знания получены",
+    knowledgeCapturedValue: ({ count }: { count: number }) =>
+      `${count} ${count === 1 ? "запись" : "записей"}`,
+    knowledgeReferenced: "Знания использованы",
+    knowledgeReferencedValue: ({ count }: { count: number }) =>
+      `${count} ${count === 1 ? "запись" : "записей"}`,
+    knowledgeLatestPrefix: "Последнее",
   },
 
   settingsVoice: {
@@ -2136,6 +2145,12 @@ export const ru: TranslationStructure = {
     confirmDelete: "Delete this task? This cannot be undone.",
     queuedCount: ({ count }: { count: number }) => `${count} queued`,
     runningCount: ({ count }: { count: number }) => `${count} running`,
+    editTask: "Редактировать задачу",
+    restoreTask: "Восстановить задачу",
+    confirmRestore: "Вернуть задачу в очередь?",
+    restored: "Задача восстановлена",
+    session: "Сеанс",
+    trigger: "Триггер",
   },
 
   skills: {
@@ -4189,6 +4204,13 @@ export const ru: TranslationStructure = {
     replanTriggered: "Перепланирование запущено",
     replanError: "Не удалось запустить перепланирование",
     avgHealthScore: "Среднее здоровье",
+    assigned: "Назначено",
+    blockerKindPlannerTimeout: "Таймаут планировщика",
+    blockerKindTaskFailed: "Задача не выполнена",
+    blockerKindAgentConflict: "Конфликт агента",
+    blockerKindAgentRequest: "Запрос агента",
+    statusFailed: "Не выполнено",
+    statusPaused: "Приостановлено",
   },
   decision: {
     pending: "Pending",

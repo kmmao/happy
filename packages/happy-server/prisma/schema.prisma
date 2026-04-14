@@ -776,7 +776,7 @@ model KnowledgeAccess {
     projectId   String
     at          DateTime @default(now())
 
-    @@index([sessionId])
+    @@unique([sessionId, knowledgeId])
     @@index([knowledgeId])
     @@index([projectId, sessionId])
 }

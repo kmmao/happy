@@ -113,6 +113,8 @@ export const ja: TranslationStructure = {
     optional: "任意",
     openSettings: "設定を開く",
     saveAs: "名前を付けて保存",
+    created: "作成日時",
+    updated: "更新日時",
   },
 
   profile: {
@@ -1292,6 +1294,11 @@ export const ja: TranslationStructure = {
     staged: "ステージ済み",
     modified: "変更済み",
     untracked: "未追跡",
+    knowledgeCaptured: "ナレッジ取得",
+    knowledgeCapturedValue: ({ count }: { count: number }) => `${count} 件`,
+    knowledgeReferenced: "ナレッジ参照",
+    knowledgeReferencedValue: ({ count }: { count: number }) => `${count} 件`,
+    knowledgeLatestPrefix: "最新",
   },
 
   settingsVoice: {
@@ -2231,6 +2238,12 @@ export const ja: TranslationStructure = {
     confirmDelete: "このタスクを削除しますか？元に戻せません。",
     queuedCount: ({ count }: { count: number }) => `${count}件待機中`,
     runningCount: ({ count }: { count: number }) => `${count}件実行中`,
+    editTask: "タスクを編集",
+    restoreTask: "タスクを復元",
+    confirmRestore: "このタスクをキューに戻しますか？",
+    restored: "タスクを復元しました",
+    session: "セッション",
+    trigger: "トリガー",
   },
 
   skills: {
@@ -4145,6 +4158,13 @@ export const ja: TranslationStructure = {
     replanTriggered: "再計画を開始しました",
     replanError: "再計画の開始に失敗しました",
     avgHealthScore: "平均ヘルス",
+    assigned: "割り当て済み",
+    blockerKindPlannerTimeout: "プランナータイムアウト",
+    blockerKindTaskFailed: "タスク失敗",
+    blockerKindAgentConflict: "エージェント競合",
+    blockerKindAgentRequest: "エージェントリクエスト",
+    statusFailed: "失敗",
+    statusPaused: "一時停止",
   },
   decision: {
     pending: "保留中",

@@ -79,6 +79,7 @@ export async function goalCreate(input: GoalCreateInput): Promise<GoalCreateResu
             parentGoalId: parentGoalId ?? null,
             createdBy: "user",
             layer: initialLayer,
+            status: autoDecompose ? "planning" : "in_progress",
         },
     });
 

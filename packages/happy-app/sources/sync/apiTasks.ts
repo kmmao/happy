@@ -19,6 +19,7 @@ export interface ServerTask {
     completedAt: number | null;
     createdAt: number;
     updatedAt: number;
+    title: string | null;
     promptPreview: string;
     skillNames: string[];
 }
@@ -170,4 +171,42 @@ export async function deleteTask(
         const data = await response.json().catch(() => ({}));
         throw new Error((data as Record<string, string>).error ?? `Failed to delete task: ${response.status}`);
     }
+}
+
+export async function updateTask(
+    credentials: AuthCredentials,
+    taskId: string,
+    body: { prompt?: string; priority?: string },
+): Promise<ServerTask> {
+    const API_ENDPOINT = getServerUrl();
+
+    const response = await fetch(`${API_ENDPOINT}/v1/tasks/${taskId}`, {
+        method: "PATCH",
+        headers: authHeaders(credentials),
+        body: JSON.stringify(body),
+    });
+    if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error((data as Record<string, string>).error ?? `Failed to update task: ${response.status}`);
+    }
+    const data = (await response.json()) as TaskResponse;
+    return data.task;
+}
+
+export async function restoreTask(
+    credentials: AuthCredentials,
+    taskId: string,
+): Promise<ServerTask> {
+    const API_ENDPOINT = getServerUrl();
+
+    const response = await fetch(`${API_ENDPOINT}/v1/tasks/${taskId}/restore`, {
+        method: "POST",
+        headers: authHeaders(credentials),
+    });
+    if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error((data as Record<string, string>).error ?? `Failed to restore task: ${response.status}`);
+    }
+    const data = (await response.json()) as TaskResponse;
+    return data.task;
 }

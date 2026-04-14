@@ -65,6 +65,8 @@ export function buildTaskDetailActions(task: ServerTask): {
     canCancel: boolean;
     canRetry: boolean;
     canDelete: boolean;
+    canEdit: boolean;
+    canRestore: boolean;
     sessionHref: string | null;
 } {
     const isActive = isTaskActive(task.status);
@@ -75,6 +77,8 @@ export function buildTaskDetailActions(task: ServerTask): {
         canCancel: isActive,
         canRetry: isFailed,
         canDelete: isTerminal,
+        canEdit: task.status === "queued",
+        canRestore: task.status === "cancelled",
         sessionHref: task.sessionId ? `/session/${task.sessionId}` : null,
     };
 }

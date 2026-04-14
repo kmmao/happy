@@ -17,6 +17,7 @@ import {
     cancelTask,
     deleteTask,
     fetchTask,
+    restoreTask,
     retryTask,
     type ServerTask,
 } from "@/sync/apiTasks";
@@ -108,9 +109,9 @@ function TaskDetailScreen() {
 
     React.useLayoutEffect(() => {
         navigation.setOptions({
-            headerTitle: task?.promptPreview || t("tasks.title"),
+            headerTitle: task?.title ?? task?.promptPreview ?? t("tasks.title"),
         });
-    }, [navigation, task?.promptPreview]);
+    }, [navigation, task?.title, task?.promptPreview]);
 
     React.useEffect(() => {
         taskEventRetrierRef.current?.dispose();
@@ -176,6 +177,21 @@ function TaskDetailScreen() {
         }
     }, [machineId, router, taskId]);
 
+    const handleEdit = React.useCallback(() => {
+        if (!taskId || !machineId) return;
+        router.push(`/machine/${machineId}/task/edit?taskId=${taskId}` as any);
+    }, [machineId, router, taskId]);
+
+    const handleRestore = React.useCallback(async () => {
+        const confirmed = await Modal.confirm(t("tasks.restoreTask"), t("tasks.confirmRestore"));
+        if (!confirmed || !taskId) return;
+        await runAction(async () => {
+            const credentials = await TokenStorage.getCredentials();
+            if (!credentials) throw new Error(t("common.error"));
+            await restoreTask(credentials, taskId);
+        });
+    }, [runAction, taskId]);
+
     if (loading) {
         return (
             <View style={styles.centered}>
@@ -202,7 +218,7 @@ function TaskDetailScreen() {
             <View style={styles.heroCard}>
                 <View style={styles.heroHeader}>
                     <View style={styles.heroTextWrap}>
-                        <Text style={styles.title}>{task.promptPreview || task.id}</Text>
+                        <Text style={styles.title}>{task.title ?? task.promptPreview ?? task.id}</Text>
                         <Text style={styles.subtitle}>{task.id}</Text>
                     </View>
                     <View style={[styles.badge, { backgroundColor: getTaskStatusBadgeColor(task.status) }]}>
@@ -236,12 +252,12 @@ function TaskDetailScreen() {
                 <Row label={t("profile.status")} value={getTaskStatusLabel(task.status, t as (key: string) => string)} />
                 <Row label={t("machine.machineId")} value={task.machineId} />
                 <Row label={t("tasks.project")} value={task.projectId ?? "-"} />
-                <Row label="Session" value={task.sessionId ?? "-"} />
-                <Row label="Trigger"
+                <Row label={t("tasks.session")} value={task.sessionId ?? "-"} />
+                <Row label={t("tasks.trigger")}
                     value={task.triggerRef ? `${task.triggerType} · ${task.triggerRef}` : task.triggerType}
                 />
-                <Row label="Created" value={formatTaskDate(task.createdAt)} />
-                <Row label="Updated" value={formatTaskDate(task.updatedAt)} />
+                <Row label={t("common.created")} value={formatTaskDate(task.createdAt)} />
+                <Row label={t("common.updated")} value={formatTaskDate(task.updatedAt)} />
                 <Row label={t("tasks.statusDispatching")} value={formatTaskDate(task.dispatchedAt)} />
                 <Row label={t("tasks.statusCompleted")} value={formatTaskDate(task.completedAt)} />
             </View>
@@ -261,6 +277,16 @@ function TaskDetailScreen() {
             ) : null}
 
             <View style={styles.actionRow}>
+                {actions.canEdit ? (
+                    <Pressable style={[styles.secondaryAction, acting && styles.disabledAction]} disabled={acting} onPress={handleEdit}>
+                        <Text style={styles.secondaryActionText}>{t("tasks.editTask")}</Text>
+                    </Pressable>
+                ) : null}
+                {actions.canRestore ? (
+                    <Pressable style={[styles.primaryAction, acting && styles.disabledAction]} disabled={acting} onPress={() => void handleRestore()}>
+                        <Text style={styles.primaryActionText}>{t("tasks.restoreTask")}</Text>
+                    </Pressable>
+                ) : null}
                 {actions.canCancel ? (
                     <Pressable style={[styles.secondaryAction, acting && styles.disabledAction]} disabled={acting} onPress={() => void handleCancel()}>
                         <Text style={styles.secondaryActionText}>{t("tasks.cancelTask")}</Text>

@@ -110,6 +110,8 @@ export const pt: TranslationStructure = {
       `Remover "${name}" de ${section}?`,
     optional: "Opcional",
     openSettings: "Abrir configurações",
+    created: "Criado",
+    updated: "Atualizado",
   },
 
   profile: {
@@ -1194,6 +1196,13 @@ export const pt: TranslationStructure = {
     staged: "preparado",
     modified: "modificado",
     untracked: "não rastreado",
+    knowledgeCaptured: "Conhecimento capturado",
+    knowledgeCapturedValue: ({ count }: { count: number }) =>
+      `${count} ${count === 1 ? "entrada" : "entradas"}`,
+    knowledgeReferenced: "Conhecimento referenciado",
+    knowledgeReferencedValue: ({ count }: { count: number }) =>
+      `${count} ${count === 1 ? "entrada" : "entradas"}`,
+    knowledgeLatestPrefix: "Último",
   },
 
   settingsVoice: {
@@ -2138,6 +2147,12 @@ export const pt: TranslationStructure = {
     confirmDelete: "Delete this task? This cannot be undone.",
     queuedCount: ({ count }: { count: number }) => `${count} queued`,
     runningCount: ({ count }: { count: number }) => `${count} running`,
+    editTask: "Editar tarefa",
+    restoreTask: "Restaurar tarefa",
+    confirmRestore: "Restaurar esta tarefa à fila?",
+    restored: "Tarefa restaurada",
+    session: "Sessão",
+    trigger: "Gatilho",
   },
 
   skills: {
@@ -4172,6 +4187,13 @@ export const pt: TranslationStructure = {
     replanTriggered: "Replanejamento iniciado",
     replanError: "Falha ao iniciar replanejamento",
     avgHealthScore: "Saúde média",
+    assigned: "Atribuído",
+    blockerKindPlannerTimeout: "Tempo esgotado do planejador",
+    blockerKindTaskFailed: "Tarefa falhou",
+    blockerKindAgentConflict: "Conflito de agente",
+    blockerKindAgentRequest: "Solicitação de agente",
+    statusFailed: "Falhou",
+    statusPaused: "Pausado",
   },
   decision: {
     pending: "Pending",

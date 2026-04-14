@@ -9,7 +9,7 @@ import { db } from "@/storage/db";
 
 /**
  * Fire-and-forget: record that a session accessed a set of knowledge entries.
- * Deduplicates per session+knowledge pair (upsert pattern via createMany + skipDuplicates).
+ * Deduplicates per session+knowledge pair via @@unique constraint + skipDuplicates.
  * Also bumps accessCount and lastAccessedAt on each entry.
  */
 export async function recordKnowledgeAccess(

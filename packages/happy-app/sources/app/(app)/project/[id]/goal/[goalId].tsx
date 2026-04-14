@@ -27,7 +27,12 @@ import {
     buildGoalDetailSections,
     deriveGoalDetailScreenState,
     filterGoalDetailSuggestions,
+    getBlockerKindLabel,
+    getDecisionStatusLabel,
+    getGoalPriorityLabel,
+    getGoalStatusLabel,
 } from "./goalDetailViewModel";
+import { getTaskStatusLabel } from "@/app/(app)/machine/[id]/task/taskDetailViewModel";
 import { buildGoalDetailRouteState } from "./goalDetailRouteSafety";
 import { SuggestionCard } from "@/components/project/SuggestionCard";
 import {
@@ -219,7 +224,10 @@ function GoalDetailScreen() {
                 <Text style={styles.title}>{readyGoal.title}</Text>
                 {readyGoal.description ? <Text style={styles.description}>{readyGoal.description}</Text> : null}
                 <View style={styles.badgeRow}>
-                    {viewModel.hero.badges.map((badge) => (
+                    {[
+                        getGoalStatusLabel(readyGoal.status, t as (key: string) => string),
+                        getGoalPriorityLabel(readyGoal.priority, t as (key: string) => string),
+                    ].map((badge) => (
                         <View key={badge} style={styles.badge}>
                             <Text style={styles.badgeText}>{badge}</Text>
                         </View>
@@ -272,10 +280,10 @@ function GoalDetailScreen() {
                         >
                             <View style={styles.rowMain}>
                                 <Text style={styles.rowTitle}>{task.title ?? t("goals.taskIndex", { index: index + 1 })}</Text>
-                                <Text style={styles.rowMeta}>{task.status}</Text>
+                                <Text style={styles.rowMeta}>{getTaskStatusLabel(task.status, t as (key: string) => string)}</Text>
                             </View>
                             {task.roleType ? <Text style={styles.rowMeta}>{task.roleType}</Text> : null}
-                            {task.assignedMemberId ? <Text style={styles.rowMeta}>{"\u00B7"} assigned</Text> : null}
+                            {task.assignedMemberId ? <Text style={styles.rowMeta}>{"\u00B7"} {t("goals.assigned")}</Text> : null}
                         </Pressable>
                     ))}
                 </View>
@@ -288,7 +296,7 @@ function GoalDetailScreen() {
                         <View key={subGoal.id} style={styles.row}>
                             <View style={styles.rowMain}>
                                 <Text style={styles.rowTitle}>{subGoal.title}</Text>
-                                <Text style={styles.rowMeta}>{subGoal.status}</Text>
+                                <Text style={styles.rowMeta}>{getGoalStatusLabel(subGoal.status, t as (key: string) => string)}</Text>
                             </View>
                             <Text style={styles.rowMeta}>{t("goals.progress", { value: subGoal.progress })}</Text>
                         </View>
@@ -307,7 +315,7 @@ function GoalDetailScreen() {
                             <View key={`${blocker.kind}-${index}`} style={styles.row}>
                                 <View style={styles.rowMain}>
                                     <Text style={styles.rowTitle}>{blocker.summary}</Text>
-                                    <Text style={styles.rowMeta}>{blocker.kind}</Text>
+                                    <Text style={styles.rowMeta}>{getBlockerKindLabel(blocker.kind, t as (key: string) => string)}</Text>
                                 </View>
                                 <View style={styles.metaRow}>
                                     {blocker.requiresHuman ? <Text style={styles.metaText}>{t("status.needsAttention")}</Text> : null}
@@ -347,7 +355,7 @@ function GoalDetailScreen() {
                         >
                             <View style={styles.rowMain}>
                                 <Text style={styles.rowTitle}>{decision.question}</Text>
-                                <Text style={styles.rowMeta}>{decision.status}</Text>
+                                <Text style={styles.rowMeta}>{getDecisionStatusLabel(decision.status, t as (key: string) => string)}</Text>
                             </View>
                         </Pressable>
                     ))}

@@ -2,6 +2,7 @@ import {
     eventRouter,
     buildTaskTriggerEphemeral,
     buildTaskStatusChangedEphemeral,
+    buildTaskCancelEphemeral,
 } from "@/app/events/eventRouter";
 import { type Fastify } from "../types";
 import { db } from "@/storage/db";
@@ -31,6 +32,11 @@ const CreateTaskBodySchema = z.object({
     maxAttempts: z.number().int().min(1).max(10).default(3),
     skillIds: z.array(z.string()).max(10).default([]),
     directory: z.string().min(1).max(4096).optional(),
+});
+
+const UpdateTaskBodySchema = z.object({
+    prompt: z.string().min(1).optional(),
+    priority: TaskPrioritySchema.optional(),
 });
 
 const TaskStatusReportSchema = z.object({
@@ -319,6 +325,7 @@ export function taskRoutes(app: Fastify) {
                 data: { status: "cancelled", completedAt: new Date() },
             });
 
+            // Notify App (UI update)
             eventRouter.emitEphemeral({
                 userId: request.userId,
                 payload: buildTaskStatusChangedEphemeral({
@@ -329,6 +336,15 @@ export function taskRoutes(app: Fastify) {
                 }),
                 recipientFilter: { type: "user-scoped-only" },
             });
+
+            // Notify CLI daemon to abort the running session
+            if (task.status === "running" || task.status === "dispatching") {
+                eventRouter.emitEphemeral({
+                    userId: request.userId,
+                    payload: buildTaskCancelEphemeral({ taskId: task.id, sessionId: task.sessionId ?? undefined }),
+                    recipientFilter: { type: "machine-scoped-only", machineId: task.machineId },
+                });
+            }
 
             log({ module: "task" }, `Cancelled task ${task.id}`);
             return reply.send({ task: serializeTask(updated) });
@@ -412,6 +428,91 @@ export function taskRoutes(app: Fastify) {
             });
 
             log({ module: "task" }, `Retrying task ${task.id} (attempt ${updated.attempt})`);
+            return reply.send({ task: serializeTask(updated) });
+        },
+    );
+
+    app.patch(
+        "/v1/tasks/:id",
+        {
+            preHandler: app.authenticate,
+            schema: {
+                params: z.object({ id: z.string() }),
+                body: UpdateTaskBodySchema,
+            },
+        },
+        async (request, reply) => {
+            const task = await db.task.findFirst({
+                where: { id: request.params.id, accountId: request.userId },
+            });
+            if (!task) {
+                return reply.code(404).send({ error: "Task not found" });
+            }
+            if (task.status !== "queued") {
+                return reply.code(400).send({ error: `Can only edit queued tasks, current: '${task.status}'` });
+            }
+
+            const { prompt, priority } = request.body;
+            const updated = await db.task.update({
+                where: { id: task.id },
+                data: {
+                    ...(prompt !== undefined ? { prompt } : {}),
+                    ...(priority !== undefined ? { priority } : {}),
+                },
+                include: {
+                    skillBindings: { include: { skill: { select: { name: true } } } },
+                },
+            });
+
+            log({ module: "task" }, `Updated task ${task.id}`);
+            return reply.send({ task: serializeTask(updated) });
+        },
+    );
+
+    app.post(
+        "/v1/tasks/:id/restore",
+        {
+            preHandler: app.authenticate,
+            schema: {
+                params: z.object({ id: z.string() }),
+            },
+        },
+        async (request, reply) => {
+            const task = await db.task.findFirst({
+                where: { id: request.params.id, accountId: request.userId },
+            });
+            if (!task) {
+                return reply.code(404).send({ error: "Task not found" });
+            }
+            if (task.status !== "cancelled") {
+                return reply.code(400).send({ error: `Can only restore cancelled tasks, current: '${task.status}'` });
+            }
+
+            const updated = await db.task.update({
+                where: { id: task.id },
+                data: {
+                    status: "queued",
+                    completedAt: null,
+                    errorMessage: null,
+                    sessionId: null,
+                    dispatchedAt: null,
+                },
+                include: {
+                    skillBindings: { include: { skill: { select: { name: true } } } },
+                },
+            });
+
+            eventRouter.emitEphemeral({
+                userId: request.userId,
+                payload: buildTaskStatusChangedEphemeral({
+                    taskId: task.id,
+                    machineId: task.machineId,
+                    status: "queued",
+                }),
+                recipientFilter: { type: "user-scoped-only" },
+            });
+
+            log({ module: "task" }, `Restored task ${task.id} to queued`);
             return reply.send({ task: serializeTask(updated) });
         },
     );
@@ -706,6 +807,7 @@ function serializeTask(task: Record<string, unknown>): Record<string, unknown> {
         createdAt: Date;
         updatedAt: Date;
         roleType?: string | null;
+        title?: string | null;
         waitingDecisionId?: string | null;
         skillBindings?: Array<{ skill: { name: string } }>;
     };
@@ -727,6 +829,7 @@ function serializeTask(task: Record<string, unknown>): Record<string, unknown> {
         completedAt: t.completedAt?.getTime() ?? null,
         createdAt: t.createdAt.getTime(),
         updatedAt: t.updatedAt.getTime(),
+        title: t.title ?? null,
         promptPreview: truncateText(t.prompt, TEXT_LIMITS.PROMPT_PREVIEW),
         roleType: t.roleType ?? null,
         waitingDecisionId: t.waitingDecisionId ?? null,

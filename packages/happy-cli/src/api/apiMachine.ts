@@ -328,6 +328,7 @@ export class ApiMachineClient {
     | null = null;
 
   private taskHandler: ((data: { type: string; taskId: string; prompt: string; directory: string; priority: string; projectId?: string; resultToken?: string; skillContents?: Array<{ name: string; content: string }> }) => void) | null = null;
+  private taskCancelHandler: ((data: { taskId: string; sessionId?: string }) => void) | null = null;
   private fixKillHandler:
     | ((data: { fixSessionId: string; projectId: string; fixStatus: string }) => void)
     | null = null;
@@ -806,6 +807,14 @@ export class ApiMachineClient {
   }
 
   /**
+   * Set handler for task-cancel events.
+   * Called when Server signals that a running/dispatching task should be aborted.
+   */
+  setTaskCancelHandler(handler: (data: { taskId: string; sessionId?: string }) => void) {
+    this.taskCancelHandler = handler;
+  }
+
+  /**
    * Set handler for fix-kill-session events.
    * Called when Server signals that a fix session should be terminated.
    */
@@ -1240,6 +1249,13 @@ export class ApiMachineClient {
           `[API MACHINE] Received task-trigger for task ${data.taskId}`,
         );
         this.taskHandler(data as { type: string; taskId: string; prompt: string; directory: string; priority: string; projectId?: string; resultToken?: string; skillContents?: Array<{ name: string; content: string }> });
+      }
+
+      if (data.type === "task-cancel" && this.taskCancelHandler) {
+        logger.debug(
+          `[API MACHINE] Received task-cancel for task ${data.taskId}`,
+        );
+        this.taskCancelHandler(data as unknown as { taskId: string; sessionId?: string });
       }
 
       if (data.type === "supervisor-fix-kill-session" && this.fixKillHandler) {

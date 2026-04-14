@@ -33,6 +33,7 @@ function createTask(overrides: Partial<ServerTask> = {}): ServerTask {
         createdAt: 1710000000000,
         updatedAt: 1710000005000,
         promptPreview: "Run task",
+        title: null,
         skillNames: ["skill-a"],
         ...overrides,
     };
