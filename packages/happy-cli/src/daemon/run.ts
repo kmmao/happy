@@ -651,6 +651,7 @@ export async function startDaemon(): Promise<void> {
         machineId,
         approvedNewDirectoryCreation = true,
         happySessionId,
+        forkSourceId,
         automationContext,
       } = options;
       let directoryCreated = false;
@@ -962,6 +963,9 @@ export async function startDaemon(): Promise<void> {
           const happySessionArg = happySessionId
             ? ` --happy-session-id ${happySessionId}`
             : "";
+          const forkSourceArg = forkSourceId
+            ? ` --happy-fork-source ${forkSourceId}`
+            : "";
           // Build --claude-env args for tmux command so profile env vars survive
           // Claude Code SDK settings.json overrides
           const claudeEnvArgs = Object.entries(extraEnv)
@@ -971,7 +975,7 @@ export async function startDaemon(): Promise<void> {
               return ` --claude-env '${key}=${escaped}'`;
             })
             .join("");
-          const fullCommand = `node --no-warnings --no-deprecation ${cliPath} ${agent} --happy-starting-mode remote --started-by daemon${resumeArg}${happySessionArg}${claudeEnvArgs}`;
+          const fullCommand = `node --no-warnings --no-deprecation ${cliPath} ${agent} --happy-starting-mode remote --started-by daemon${resumeArg}${happySessionArg}${forkSourceArg}${claudeEnvArgs}`;
 
           // Spawn in tmux with environment variables
           // IMPORTANT: Pass complete environment (process.env + extraEnv) because:
@@ -1117,6 +1121,14 @@ export async function startDaemon(): Promise<void> {
             args.push("--happy-session-id", happySessionId);
             logger.debug(
               `[DAEMON RUN] Adding --happy-session-id ${happySessionId} to spawn args`,
+            );
+          }
+
+          // Mark fork sessions with source session ID for diagnostics
+          if (forkSourceId) {
+            args.push("--happy-fork-source", forkSourceId);
+            logger.debug(
+              `[DAEMON RUN] Adding --happy-fork-source ${forkSourceId} to spawn args`,
             );
           }
 

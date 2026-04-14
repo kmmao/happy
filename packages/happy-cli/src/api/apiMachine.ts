@@ -425,6 +425,7 @@ export class ApiMachineClient {
           token,
           environmentVariables,
           happySessionId,
+          forkSourceId,
           profileId,
         } = params || {};
         const safeParams = {
@@ -449,6 +450,7 @@ export class ApiMachineClient {
           token,
           environmentVariables,
           happySessionId,
+          forkSourceId,
           profileId,
         });
 

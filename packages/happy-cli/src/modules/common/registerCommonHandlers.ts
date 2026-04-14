@@ -178,8 +178,10 @@ export interface SpawnSessionOptions {
   approvedNewDirectoryCreation?: boolean;
   agent?: "claude" | "codex" | "gemini";
   token?: string;
-  /** Happy session ID for reconnecting to an existing session */
+  /** Happy session ID for reconnecting to an existing session (or pre-allocating one for fork) */
   happySessionId?: string;
+  /** Source session ID when this spawn is a fork — written as --happy-fork-source in the process command */
+  forkSourceId?: string;
   /** Profile ID from GUI — if it matches a locally configured profile, operator-only env vars are trusted */
   profileId?: string;
   automationContext?: {
