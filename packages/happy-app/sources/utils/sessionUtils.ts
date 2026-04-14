@@ -115,20 +115,68 @@ export function getLatestUserRequestPreview(
 }
 
 /**
+ * Delay (ms) before committing the thinking→waiting transition.
+ * Timer starts when rawState first flips to "waiting"; if rawState
+ * bounces back to "thinking" before the timer fires, the timer is
+ * cancelled and we stay in "thinking".
+ */
+const THINKING_TO_WAITING_DELAY_MS = 1500;
+
+/**
  * Get the current state of a session based on presence and thinking status.
  * Uses centralized session state from storage.ts
  */
 export function useSessionStatus(session: Session): SessionStatus {
-  const currentState = getSessionStatusState(session);
-  const isRunning = isSessionRunning(session);
+  const rawState = getSessionStatusState(session);
+
+  // Debounce thinking→waiting: when rawState flips to "waiting" while we
+  // are showing "thinking", wait THINKING_TO_WAITING_DELAY_MS.  If rawState
+  // bounces back to "thinking" before the timer fires, cancel and stay.
+  const [debouncedState, setDebouncedState] = React.useState(rawState);
+  const debouncedStateRef = React.useRef(debouncedState);
+  debouncedStateRef.current = debouncedState;
+  const timerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  React.useEffect(() => {
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+
+    if (rawState === "thinking") {
+      setDebouncedState("thinking");
+    } else if (
+      debouncedStateRef.current === "thinking" &&
+      rawState === "waiting"
+    ) {
+      // Start a fixed delay from NOW (the moment "waiting" first appears)
+      timerRef.current = setTimeout(() => {
+        timerRef.current = null;
+        setDebouncedState("waiting");
+      }, THINKING_TO_WAITING_DELAY_MS);
+    } else {
+      // All other transitions (disconnected, permission_required, etc.)
+      setDebouncedState(rawState);
+    }
+
+    return () => {
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+        timerRef.current = null;
+      }
+    };
+  }, [rawState]);
+
+  const currentState = debouncedState;
+  const isEffectivelyRunning = currentState === "thinking";
 
   // Derive a stable index from session ID + a counter that increments
-  // each time the unified running state changes, so the word updates per cycle
-  // but stays consistent across all component instances showing this session.
+  // each time the *debounced* running state changes, so the word updates
+  // per real turn boundary but stays stable during mid-turn bouncing.
   const thinkingGeneration = React.useRef(0);
-  const prevRunning = React.useRef(isRunning);
-  if (isRunning !== prevRunning.current) {
-    prevRunning.current = isRunning;
+  const prevRunning = React.useRef(isEffectivelyRunning);
+  if (isEffectivelyRunning !== prevRunning.current) {
+    prevRunning.current = isEffectivelyRunning;
     thinkingGeneration.current += 1;
   }
   const generation = thinkingGeneration.current;
