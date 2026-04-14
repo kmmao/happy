@@ -9,12 +9,16 @@ import { Modal } from "@/modal";
 import { Project } from "@/sync/projectManager";
 import { createGoal, type GoalSummary } from "@/sync/apiProjects";
 import { PRIORITY_COLORS, priorityLabel } from "./worldGoalConstants";
+import { formSheetStyles as fs } from "@/components/formSheetStyles";
 
 interface GoalCreateSheetProps {
     project: Project;
     onCreated: (goal: GoalSummary) => void;
     onClose: () => void;
 }
+
+type PriorityKey = "urgent" | "normal" | "low";
+const PRIORITIES: readonly PriorityKey[] = ["urgent", "normal", "low"];
 
 export const GoalCreateSheet = React.memo(function GoalCreateSheet({
     project,
@@ -24,9 +28,11 @@ export const GoalCreateSheet = React.memo(function GoalCreateSheet({
     const { theme } = useUnistyles();
     const [title, setTitle] = React.useState("");
     const [description, setDescription] = React.useState("");
-    const [priority, setPriority] = React.useState("normal");
+    const [priority, setPriority] = React.useState<PriorityKey>("normal");
     const [autoDecompose, setAutoDecompose] = React.useState(true);
     const [saving, setSaving] = React.useState(false);
+    const [titleFocused, setTitleFocused] = React.useState(false);
+    const [descFocused, setDescFocused] = React.useState(false);
 
     const handleSave = React.useCallback(async () => {
         if (!title.trim() || !project.serverId) return;
@@ -49,83 +55,160 @@ export const GoalCreateSheet = React.memo(function GoalCreateSheet({
         }
     }, [title, description, priority, autoDecompose, project.serverId, project.key.machineId, onCreated]);
 
+    const canSave = title.trim().length > 0 && !saving;
+
     return (
-        <View style={styles.modalOverlay}>
-            <Pressable style={styles.modalBackdrop} onPress={onClose} />
+        <View style={local.modalOverlay}>
+            <Pressable style={local.modalBackdrop} onPress={onClose} />
             <ScrollView
-                style={styles.modalScroll}
-                contentContainerStyle={styles.modalScrollContent}
+                style={local.modalScroll}
+                contentContainerStyle={local.modalScrollContent}
                 showsVerticalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled"
             >
-                <View style={styles.modalContent}>
-                    <View style={styles.modalHeader}>
-                        <Text style={styles.modalTitle}>{t("goals.createGoal")}</Text>
-                        <Pressable style={styles.closeButton} onPress={onClose}>
-                            <Ionicons name="close" size={18} color={theme.colors.textSecondary} />
+                <View style={local.modalContent}>
+                    {/* ── Header ── */}
+                    <View style={fs.header}>
+                        <Text style={fs.headerTitle}>{t("goals.createGoal")}</Text>
+                        <Pressable style={fs.closeButton} onPress={onClose} hitSlop={8}>
+                            <Ionicons name="close" size={16} color={theme.colors.textSecondary} />
                         </Pressable>
                     </View>
 
-                    <Text style={styles.fieldLabel}>{t("goals.goalTitle")}</Text>
-                    <TextInput
-                        style={styles.textInput}
-                        value={title}
-                        onChangeText={setTitle}
-                        placeholder={t("goals.goalTitlePlaceholder")}
-                        placeholderTextColor={theme.colors.textSecondary}
-                        maxLength={500}
-                        autoFocus
-                    />
-
-                    <Text style={styles.fieldLabel}>{t("goals.goalDescription")}</Text>
-                    <TextInput
-                        style={[styles.textInput, { minHeight: 80 }]}
-                        value={description}
-                        onChangeText={setDescription}
-                        placeholder={t("goals.goalDescriptionPlaceholder")}
-                        placeholderTextColor={theme.colors.textSecondary}
-                        multiline
-                        textAlignVertical="top"
-                        maxLength={5000}
-                    />
-
-                    <Text style={styles.fieldLabel}>{t("goals.goalPriority")}</Text>
-                    <View style={styles.chipRow}>
-                        {(["urgent", "normal", "low"] as const).map((p) => (
-                            <Pressable
-                                key={p}
-                                style={[
-                                    styles.chip,
-                                    priority === p && { backgroundColor: PRIORITY_COLORS[p] },
-                                ]}
-                                onPress={() => setPriority(p)}
-                            >
-                                <Text style={[styles.chipText, priority === p && { color: "#fff" }]}>
-                                    {priorityLabel(p)}
+                    {/* ── Section 1: Title + Description ── */}
+                    <View style={fs.sectionGroup}>
+                        <View style={fs.fieldContainer}>
+                            <View style={[
+                                fs.accentBar,
+                                titleFocused && { backgroundColor: theme.colors.accentPurple },
+                            ]} />
+                            <View style={fs.fieldInner}>
+                                <Text style={[
+                                    fs.floatingLabel,
+                                    titleFocused && { color: theme.colors.accentPurple },
+                                ]}>
+                                    {t("goals.goalTitle")}
                                 </Text>
-                            </Pressable>
-                        ))}
+                                <TextInput
+                                    style={fs.textInput}
+                                    value={title}
+                                    onChangeText={setTitle}
+                                    placeholder={t("goals.goalTitlePlaceholder")}
+                                    placeholderTextColor={theme.colors.input.placeholder}
+                                    maxLength={500}
+                                    autoFocus
+                                    onFocus={() => setTitleFocused(true)}
+                                    onBlur={() => setTitleFocused(false)}
+                                />
+                            </View>
+                        </View>
+
+                        <View style={fs.insetDivider} />
+
+                        <View style={fs.fieldContainer}>
+                            <View style={[
+                                fs.accentBar,
+                                descFocused && { backgroundColor: theme.colors.accentPurple },
+                            ]} />
+                            <View style={fs.fieldInner}>
+                                <Text style={[
+                                    fs.floatingLabel,
+                                    descFocused && { color: theme.colors.accentPurple },
+                                ]}>
+                                    {t("goals.goalDescription")}
+                                </Text>
+                                <TextInput
+                                    style={[fs.textInput, { minHeight: 72 }]}
+                                    value={description}
+                                    onChangeText={setDescription}
+                                    placeholder={t("goals.goalDescriptionPlaceholder")}
+                                    placeholderTextColor={theme.colors.input.placeholder}
+                                    multiline
+                                    textAlignVertical="top"
+                                    maxLength={5000}
+                                    onFocus={() => setDescFocused(true)}
+                                    onBlur={() => setDescFocused(false)}
+                                />
+                            </View>
+                        </View>
                     </View>
 
-                    <View style={styles.switchRow}>
-                        <Text style={styles.switchLabel}>{t("goals.autoDecompose")}</Text>
-                        <Switch value={autoDecompose} onValueChange={setAutoDecompose} />
+                    {/* ── Section 2: Priority + Auto-decompose ── */}
+                    <View style={fs.sectionGroup}>
+                        <View style={fs.optionRow}>
+                            <Text style={fs.optionLabel}>{t("goals.goalPriority")}</Text>
+                            <View style={local.segmentedControl}>
+                                {PRIORITIES.map((p) => {
+                                    const isActive = priority === p;
+                                    return (
+                                        <Pressable
+                                            key={p}
+                                            style={[
+                                                local.segment,
+                                                isActive && {
+                                                    backgroundColor: PRIORITY_COLORS[p] + "18",
+                                                    borderColor: PRIORITY_COLORS[p] + "40",
+                                                },
+                                            ]}
+                                            onPress={() => setPriority(p)}
+                                        >
+                                            <View style={[
+                                                local.segmentDot,
+                                                { backgroundColor: PRIORITY_COLORS[p] },
+                                                !isActive && { opacity: 0.3 },
+                                            ]} />
+                                            <Text style={[
+                                                local.segmentText,
+                                                isActive && { color: PRIORITY_COLORS[p], fontWeight: "600" },
+                                            ]}>
+                                                {priorityLabel(p)}
+                                            </Text>
+                                        </Pressable>
+                                    );
+                                })}
+                            </View>
+                        </View>
+
+                        <View style={fs.insetDivider} />
+
+                        <View style={fs.optionRow}>
+                            <View style={local.switchLabelGroup}>
+                                <Ionicons
+                                    name="git-branch-outline"
+                                    size={18}
+                                    color={theme.colors.textSecondary}
+                                />
+                                <Text style={fs.optionLabel}>{t("goals.autoDecompose")}</Text>
+                            </View>
+                            <Switch
+                                value={autoDecompose}
+                                onValueChange={setAutoDecompose}
+                                trackColor={{
+                                    false: theme.colors.switch.track.inactive,
+                                    true: theme.colors.switch.track.active,
+                                }}
+                                thumbColor={autoDecompose
+                                    ? theme.colors.switch.thumb.active
+                                    : theme.colors.switch.thumb.inactive}
+                            />
+                        </View>
                     </View>
 
-                    <View style={styles.modalActions}>
-                        <View style={{ flex: 1 }} />
-                        <Pressable style={styles.cancelButton} onPress={onClose}>
-                            <Text style={styles.cancelButtonText}>{t("common.cancel")}</Text>
-                        </Pressable>
+                    {/* ── Actions ── */}
+                    <View style={local.actionsSection}>
                         <Pressable
-                            style={[styles.confirmButton, (!title.trim() || saving) && { opacity: 0.4 }]}
-                            disabled={!title.trim() || saving}
+                            style={[fs.primaryButton, !canSave && { opacity: 0.4 }]}
+                            disabled={!canSave}
                             onPress={handleSave}
                         >
                             {saving ? (
                                 <ActivityIndicator size="small" color="#fff" />
                             ) : (
-                                <Text style={styles.confirmButtonText}>{t("common.save")}</Text>
+                                <Text style={fs.primaryButtonText}>{t("goals.createGoal")}</Text>
                             )}
+                        </Pressable>
+                        <Pressable style={fs.cancelLink} onPress={onClose} hitSlop={8}>
+                            <Text style={fs.cancelLinkText}>{t("common.cancel")}</Text>
                         </Pressable>
                     </View>
                 </View>
@@ -134,7 +217,8 @@ export const GoalCreateSheet = React.memo(function GoalCreateSheet({
     );
 });
 
-const styles = StyleSheet.create((theme) => ({
+/** Styles specific to GoalCreateSheet (overlay container + priority segments) */
+const local = StyleSheet.create((theme) => ({
     modalOverlay: {
         position: "absolute" as const,
         top: 0,
@@ -168,97 +252,39 @@ const styles = StyleSheet.create((theme) => ({
         backgroundColor: theme.colors.surface,
         borderRadius: 16,
         padding: 20,
+        gap: 20,
     },
-    modalHeader: {
+    actionsSection: {
+        gap: 10,
+        alignItems: "center" as const,
+    },
+    switchLabelGroup: {
         flexDirection: "row" as const,
         alignItems: "center" as const,
-        justifyContent: "space-between" as const,
-        marginBottom: 4,
-    },
-    modalTitle: {
-        ...Typography.default("semiBold"),
-        fontSize: 18,
-        color: theme.colors.text,
-    },
-    closeButton: {
-        width: 28,
-        height: 28,
-        borderRadius: 14,
-        alignItems: "center" as const,
-        justifyContent: "center" as const,
-        backgroundColor: theme.colors.groupped.background,
-    },
-    fieldLabel: {
-        ...Typography.default("semiBold"),
-        fontSize: 13,
-        color: theme.colors.textSecondary,
-        marginBottom: 6,
-        marginTop: 12,
-    },
-    textInput: {
-        ...Typography.default(),
-        fontSize: 15,
-        color: theme.colors.text,
-        backgroundColor: theme.colors.groupped.background,
-        borderRadius: 8,
-        padding: 12,
-    },
-    chipRow: {
-        flexDirection: "row" as const,
-        flexWrap: "wrap" as const,
         gap: 8,
     },
-    chip: {
+    segmentedControl: {
+        flexDirection: "row" as const,
+        gap: 6,
+    },
+    segment: {
         flexDirection: "row" as const,
         alignItems: "center" as const,
-        gap: 4,
-        paddingHorizontal: 12,
-        paddingVertical: 6,
-        borderRadius: 16,
-        backgroundColor: theme.colors.groupped.background,
+        gap: 5,
+        paddingHorizontal: 10,
+        paddingVertical: 5,
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: "transparent",
     },
-    chipText: {
+    segmentDot: {
+        width: 7,
+        height: 7,
+        borderRadius: 3.5,
+    },
+    segmentText: {
         ...Typography.default(),
         fontSize: 13,
-        color: theme.colors.text,
-    },
-    switchRow: {
-        flexDirection: "row" as const,
-        alignItems: "center" as const,
-        justifyContent: "space-between" as const,
-        marginTop: 16,
-    },
-    switchLabel: {
-        ...Typography.default(),
-        fontSize: 15,
-        color: theme.colors.text,
-    },
-    modalActions: {
-        flexDirection: "row" as const,
-        alignItems: "center" as const,
-        marginTop: 20,
-        gap: 10,
-    },
-    cancelButton: {
-        paddingHorizontal: 16,
-        paddingVertical: 10,
-        borderRadius: 10,
-        backgroundColor: theme.colors.groupped.background,
-    },
-    cancelButtonText: {
-        ...Typography.default("semiBold"),
-        fontSize: 14,
-        color: theme.colors.text,
-    },
-    confirmButton: {
-        paddingHorizontal: 16,
-        paddingVertical: 10,
-        borderRadius: 10,
-        backgroundColor: theme.dark ? theme.colors.accentPurple : theme.colors.header.tint,
-    },
-    confirmButtonText: {
-        ...Typography.default("semiBold"),
-        fontSize: 14,
-        color: "#fff",
+        color: theme.colors.textSecondary,
     },
 }));
