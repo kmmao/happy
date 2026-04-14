@@ -124,21 +124,34 @@ async function pickLeastBusy(
 
     const countMap = new Map(activeCounts.map((c) => [c.assignedMemberId, c._count]));
 
-    // Score: available slots (higher = better)
-    const scored = members
+    // Build availability map for all members (including "delegate")
+    const allScored = members.map((m) => {
+        const active = countMap.get(m.id) ?? 0;
+        const available = Math.max(0, m.maxConcurrency - active);
+        return { ...m, active, available };
+    });
+
+    // Prefer active members, sorted by available slots (higher = better)
+    const scored = allScored
         .filter((m) => m.availability === "active")
-        .map((m) => {
-            const active = countMap.get(m.id) ?? 0;
-            const available = Math.max(0, m.maxConcurrency - active);
-            return { ...m, active, available };
-        })
         .sort((a, b) => b.available - a.available);
 
-    // Handle delegation: if best is "delegate", follow chain
     let best = scored[0];
     if (!best) {
-        // All members away — pick any member (they'll get notified)
-        const fallback = members[0];
+        // No active members — try resolving delegates
+        const delegating = allScored.filter((m) => m.availability === "delegate" && m.delegateTo);
+        for (const d of delegating) {
+            const target = allScored.find((m) => m.id === d.delegateTo && m.availability === "active");
+            if (target && target.available > 0) {
+                best = target;
+                break;
+            }
+        }
+    }
+
+    if (!best) {
+        // All members away/busy — pick any member (they'll get notified)
+        const fallback = allScored[0] ?? members[0];
         const active = countMap.get(fallback.id) ?? 0;
         return {
             memberId: fallback.id,
@@ -148,6 +161,15 @@ async function pickLeastBusy(
             agentType: fallback.agentType,
             modelOverride: fallback.modelOverride,
         };
+    }
+
+    // Follow delegation chain on best candidate (max 3 hops, symmetric with decisionRoute)
+    let hops = 0;
+    while (best.availability === "delegate" && best.delegateTo && hops < 3) {
+        const delegate = allScored.find((m) => m.id === best!.delegateTo);
+        if (!delegate) break;
+        best = delegate;
+        hops++;
     }
 
     return {

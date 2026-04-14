@@ -137,6 +137,13 @@ export const WorldMembersTab = React.memo(
             return member.account?.username ?? member.accountId.slice(0, 8);
         }, []);
 
+        // Resolve assignedRoleIds → role names for display on member cards
+        const roleNameMap = React.useMemo(() => {
+            const map = new Map<string, string>();
+            for (const r of agentRoles) map.set(r.id, r.name);
+            return map;
+        }, [agentRoles]);
+
         return (
             <View style={styles.container}>
                 <ScrollView
@@ -193,6 +200,20 @@ export const WorldMembersTab = React.memo(
                                         )}
                                     </View>
                                 </View>
+                                {member.assignedRoleIds.length > 0 && (
+                                    <View style={styles.roleTagRow}>
+                                        {member.assignedRoleIds.map((rid) => {
+                                            const name = roleNameMap.get(rid);
+                                            if (!name) return null;
+                                            return (
+                                                <View key={rid} style={styles.roleTag}>
+                                                    <Ionicons name="briefcase-outline" size={11} color={theme.colors.accentPurple} />
+                                                    <Text style={styles.roleTagText}>{name}</Text>
+                                                </View>
+                                            );
+                                        })}
+                                    </View>
+                                )}
                                 {member.expertise.length > 0 && (
                                     <View style={styles.expertiseRow}>
                                         {member.expertise.map((tag) => (
@@ -261,19 +282,20 @@ const MemberFormSheet = React.memo(function MemberFormSheet({
     const [notifyLevel, setNotifyLevel] = React.useState(member?.notifyLevel ?? initDefaults.notifyLevel);
     const [availability, setAvailability] = React.useState(member?.availability ?? "active");
     const [assignedRoleIds, setAssignedRoleIds] = React.useState<string[]>(member?.assignedRoleIds ?? []);
-    const [lawAuthority, setLawAuthority] = React.useState(member?.lawAuthority ?? initDefaults.lawAuthority);
     const [decisionScope, setDecisionScope] = React.useState(member?.decisionScope ?? initDefaults.decisionScope);
-    const [goalAuthority, setGoalAuthority] = React.useState(member?.goalAuthority ?? initDefaults.goalAuthority);
     const [saving, setSaving] = React.useState(false);
+
+    // lawAuthority / goalAuthority: auto-set from role defaults, not shown in UI
+    const roleDefaults = PERMISSION_DEFAULTS[role] ?? PERMISSION_DEFAULTS.member;
+    const lawAuthority = member?.lawAuthority ?? roleDefaults.lawAuthority;
+    const goalAuthority = member?.goalAuthority ?? roleDefaults.goalAuthority;
 
     // When picking a permission level, snap dependent fields to defaults (user can still override)
     const handleRoleChange = React.useCallback((newRole: string) => {
         setRole(newRole);
         if (isNew) {
             const defaults = PERMISSION_DEFAULTS[newRole] ?? PERMISSION_DEFAULTS.member;
-            setLawAuthority(defaults.lawAuthority);
             setDecisionScope(defaults.decisionScope);
-            setGoalAuthority(defaults.goalAuthority);
             setNotifyLevel(defaults.notifyLevel);
         }
     }, [isNew]);
@@ -471,29 +493,11 @@ const MemberFormSheet = React.memo(function MemberFormSheet({
                         </>
                     )}
 
-                    {/* Permissions */}
+                    {/* Permissions — only decisionScope is enforced server-side */}
                     <View style={styles.sectionDivider}>
                         <View style={styles.sectionDividerLine} />
                         <Text style={styles.sectionDividerLabel}>{t("members.permissionsSection")}</Text>
                         <View style={styles.sectionDividerLine} />
-                    </View>
-
-                    <Text style={styles.fieldLabel}>{t("members.lawAuthorityLabel")}</Text>
-                    <View style={styles.chipRow}>
-                        {(["create", "suggest", "readonly"] as const).map((v) => {
-                            const selected = lawAuthority === v;
-                            return (
-                                <Pressable
-                                    key={v}
-                                    style={[styles.chip, selected && { backgroundColor: theme.colors.accentPurple }]}
-                                    onPress={() => setLawAuthority(v)}
-                                >
-                                    <Text style={[styles.chipText, selected && { color: "#fff" }]}>
-                                        {v === "create" ? t("members.lawCreate") : v === "suggest" ? t("members.lawSuggest") : t("members.lawReadonly")}
-                                    </Text>
-                                </Pressable>
-                            );
-                        })}
                     </View>
 
                     <Text style={styles.fieldLabel}>{t("members.decisionScopeLabel")}</Text>
@@ -508,24 +512,6 @@ const MemberFormSheet = React.memo(function MemberFormSheet({
                                 >
                                     <Text style={[styles.chipText, selected && { color: "#fff" }]}>
                                         {v === "all" ? t("members.decisionAll") : v === "assigned" ? t("members.decisionAssigned") : t("members.decisionNone")}
-                                    </Text>
-                                </Pressable>
-                            );
-                        })}
-                    </View>
-
-                    <Text style={styles.fieldLabel}>{t("members.goalAuthorityLabel")}</Text>
-                    <View style={styles.chipRow}>
-                        {(["create", "suggest", "readonly"] as const).map((v) => {
-                            const selected = goalAuthority === v;
-                            return (
-                                <Pressable
-                                    key={v}
-                                    style={[styles.chip, selected && { backgroundColor: theme.colors.accentPurple }]}
-                                    onPress={() => setGoalAuthority(v)}
-                                >
-                                    <Text style={[styles.chipText, selected && { color: "#fff" }]}>
-                                        {v === "create" ? t("members.goalCreate") : v === "suggest" ? t("members.goalSuggest") : t("members.goalReadonly")}
                                     </Text>
                                 </Pressable>
                             );
@@ -725,6 +711,28 @@ const styles = StyleSheet.create((theme) => ({
     },
     cardDeleteButton: {
         padding: 4,
+    },
+    roleTagRow: {
+        flexDirection: "row" as const,
+        flexWrap: "wrap" as const,
+        gap: 6,
+        marginTop: 8,
+    },
+    roleTag: {
+        flexDirection: "row" as const,
+        alignItems: "center" as const,
+        gap: 3,
+        paddingHorizontal: 8,
+        paddingVertical: 3,
+        borderRadius: 10,
+        backgroundColor: theme.dark
+            ? "rgba(59,130,246,0.15)"
+            : "rgba(59,130,246,0.08)",
+    },
+    roleTagText: {
+        ...Typography.default("semiBold"),
+        fontSize: 11,
+        color: theme.colors.accentPurple,
     },
     expertiseRow: {
         flexDirection: "row" as const,
