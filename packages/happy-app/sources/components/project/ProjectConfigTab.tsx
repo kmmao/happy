@@ -1,7 +1,6 @@
 import * as React from "react";
 import { ScrollView } from "react-native";
-import { StyleSheet, useUnistyles } from "react-native-unistyles";
-import { Ionicons } from "@expo/vector-icons";
+import { StyleSheet } from "react-native-unistyles";
 import { Project, projectManager, getProjectDisplayName } from "@/sync/projectManager";
 import { layout } from "@/components/layout";
 import { t } from "@/text";
@@ -10,11 +9,9 @@ import { ItemGroup } from "@/components/ItemGroup";
 import { Modal } from "@/modal";
 import { TokenStorage } from "@/auth/tokenStorage";
 import { updateProject } from "@/sync/apiProjects";
-import { getClaudeModelModes, ModelMode } from "@/components/modelModeOptions";
 
 interface ProjectConfig {
     alias?: string;
-    defaultModel?: string;
 }
 
 function parseProjectConfig(metadata: string | null | undefined): ProjectConfig {
@@ -32,7 +29,6 @@ interface ProjectConfigTabProps {
 
 export const ProjectConfigTab = React.memo(
     ({ project }: ProjectConfigTabProps) => {
-        const { theme } = useUnistyles();
         const [config, setConfig] = React.useState<ProjectConfig>(() =>
             parseProjectConfig(project.serverMetadata),
         );
@@ -49,8 +45,6 @@ export const ProjectConfigTab = React.memo(
             project.key.machineId;
 
         const createdDate = new Date(project.createdAt).toLocaleDateString();
-
-        const models = React.useMemo(() => getClaudeModelModes(), []);
 
         const saveConfig = React.useCallback(
             async (newConfig: ProjectConfig) => {
@@ -103,19 +97,6 @@ export const ProjectConfigTab = React.memo(
                 alias: trimmed || undefined,
             });
         }, [config, project, saveConfig]);
-
-        const handleSelectModel = React.useCallback(
-            async (model: ModelMode) => {
-                const newModelKey =
-                    model.key === "default" ? undefined : model.key;
-                if (newModelKey === config.defaultModel) return;
-                await saveConfig({
-                    ...config,
-                    defaultModel: newModelKey,
-                });
-            },
-            [config, saveConfig],
-        );
 
         const handleToggleArchive = React.useCallback(async () => {
             if (!project.serverId) return;
@@ -193,37 +174,6 @@ export const ProjectConfigTab = React.memo(
                         showChevron
                         disabled={saving || !project.serverId}
                     />
-                </ItemGroup>
-
-                {/* Default Model */}
-                <ItemGroup
-                    title={t("projects.configDefaultModel")}
-                    footer={t("projects.configDefaultModelDescription")}
-                >
-                    {models.map((model) => {
-                        const isSelected =
-                            model.key === "default"
-                                ? !config.defaultModel
-                                : model.key === config.defaultModel;
-                        return (
-                            <Item
-                                key={model.key}
-                                title={model.name}
-                                subtitle={model.description ?? undefined}
-                                rightElement={
-                                    isSelected ? (
-                                        <Ionicons
-                                            name="checkmark"
-                                            size={20}
-                                            color={theme.colors.header.tint}
-                                        />
-                                    ) : undefined
-                                }
-                                onPress={() => handleSelectModel(model)}
-                                disabled={saving || !project.serverId}
-                            />
-                        );
-                    })}
                 </ItemGroup>
 
                 {/* Archive */}
