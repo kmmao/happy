@@ -18,6 +18,10 @@
    - 3.7 [裁决系统（Decisions）](#37-裁决系统-decisions)
    - 3.8 [Agent 消息（Agent Messages）](#38-agent-消息-agent-messages)
    - 3.9 [自治统计（Autonomy Stats）](#39-自治统计-autonomy-stats)
+   - 3.10 [团队协作（WorldMember）](#310-团队协作-worldmember)
+   - 3.11 [Decision 智能路由](#311-decision-智能路由)
+   - 3.12 [审计日志（WorldAuditLog）](#312-审计日志-worldauditlog)
+   - 3.13 [Agent 升级路径](#313-agent-升级路径)
 4. [CLI 如何上报 AgentMessage](#4-cli-如何上报-agentmessage)
 5. [Goal 分解与 Task 调度](#5-goal-分解与-task-调度)
 6. [App 界面入口](#6-app-界面入口)
@@ -55,6 +59,7 @@ App 世界 Tab（总览 / 目标 / 角色）
 | **Narrative（叙事）** | 项目的愿景文本，注入 Supervisor 提示词，影响 Agent 行为方向 |
 | **Laws（规则）** | JSON 数组，每条规则有类别、描述、严重级别、启用开关 |
 | **Agent Role（角色）** | 为 Agent 分配的职责身份，影响目标分解和任务调度时的角色归属 |
+| **WorldMember（团队成员）** | 项目的人类参与者，拥有角色绑定、并发容量、专长标签、权限和通知偏好 |
 | **Goal（目标）** | 用户或系统创建的可分层目标，由 Planner Agent 分解为 Task |
 | **World Suggestion（建议）** | 系统基于现状生成的「下一步行动」提案，需用户或系统接受/驳回 |
 | **Decision（裁决）** | Agent 遭遇不确定时上报给用户的决策请求 |
@@ -114,11 +119,11 @@ App 世界 Tab（总览 / 目标 / 角色）
 - `description`：角色行为指令，注入提示词
 - `duties`：职责列表（JSON 数组）
 - `skillIds`：绑定的 Skill ID 列表
-- `maxConcurrency`：最大并发循环数（已强制执行：plan-result 创建任务时检查、超限排队、终态释放槽位后自动派发队列）
+- `maxConcurrency`：**已废弃**（@deprecated）。并发容量已迁移到 WorldMember.maxConcurrency，按人而非按角色控制
 - `enabled`：是否启用
 
 **影响范围：**
-- 目标分解时 Planner 会按角色分配 Task 的 `roleType`
+- 目标分解时 Planner 按角色分配 Task 的 `roleType`，然后 `taskAssignMember` 自动将任务分配给绑定了该角色的最闲成员
 - `roleCollaboration.ts`：生成协作摘要（协作 Tab 数据）
 - World Dashboard 中的角色统计数字
 - Agent 消息的 `fromRole` / `toRole` 关联
@@ -353,6 +358,67 @@ Agent 执行中 → decision_request → Task 暂停 (waiting_decision) → 释�
 - GovernanceDashboard：显示自治策略并允许修改
 - World Dashboard 汇总卡片
 
+### 3.10 团队协作（WorldMember）
+
+**存储位置：** `WorldMember` 表
+
+**角色层级与权限：**
+| 角色 | 修改叙事 | 创建法则 | 裁决 Decision | 创建 Goal | 管理角色 | 邀请成员 |
+|------|:---:|:---:|:---:|:---:|:---:|:---:|
+| `owner` | ✅ | ✅ | ✅ 全部 | ✅ | ✅ | ✅ |
+| `admin` | ✅ | ✅ | ✅ 全部 | ✅ | ✅ | ✅ |
+| `member` | ❌ | 仅建议 | 仅分配的 | ✅ | ❌ | ❌ |
+| `observer` | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+
+**关键字段：**
+- `maxConcurrency`：此成员最多同时执行的任务数（默认 3）
+- `assignedRoleIds`：JSON 数组，绑定的 AgentRole ID 列表（决定此成员可以执行哪些角色的任务）
+- `expertise`：专长标签（用于 Decision 路由和 Agent 升级匹配）
+- `notifyLevel`：通知级别（all / critical / assigned / none）
+- `availability`：可用性（active / away / delegate）
+- `delegateTo`：委托给哪个成员
+
+**零配置兼容：** 无 WorldMember 记录时，项目 owner 自动获得 implicit owner 全权限（maxConcurrency=10），单用户场景完全不受影响。
+
+**App 入口：** 项目 → 成员 Tab → WorldMembersTab
+
+### 3.11 Decision 智能路由
+
+Decision 创建时自动路由到最合适的成员：
+
+```
+Decision 创建 → extractTags(question, context)
+  → matchExpertise(tags, member.expertise) 按专长评分
+  → 过滤 availability=active + decisionScope≠none
+  → 选出最佳匹配者 → assignedTo
+  → 超时 12h 未处理 → 自动转交下一候选人
+```
+
+**App 中的显示：** Decision 详情页显示 "Assigned" 徽章和 opinions 数量。
+
+### 3.12 审计日志（WorldAuditLog）
+
+**存储位置：** `WorldAuditLog` 表
+
+记录谁在什么时间修改了世界模型的哪个部分：
+- `action`：操作类型（law.create / narrative.update / role.create / role.update / role.delete / decision.adjudicate / decision.reassign / member.add 等）
+- `entityType`：实体类型（law / narrative / role / decision / member）
+- `before` / `after`：变更前后的 JSON 快照
+
+**API：** `GET /v1/projects/:id/audit-log`（支持 entityType 过滤和分页）
+
+### 3.13 Agent 升级路径
+
+Agent 遇到问题时可升级到具体人类成员（而非广播给所有人）：
+
+| 升级类型 | 路由目标 |
+|---------|---------|
+| `technical` | 按 expertise 标签匹配最佳成员 |
+| `process` | 找 admin 或 owner |
+| `permission` | 找 owner |
+
+**API：** `POST /v1/projects/:id/agent-messages/escalate`
+
 ---
 
 ## 4. CLI 如何上报 AgentMessage
@@ -464,7 +530,7 @@ POST /v1/projects/:id/agent-messages
     → 更新 agentMessage.decisionId
   decision_request 额外：
     → 按 sessionId 找到运行中 Task → 更新为 waiting_decision + waitingDecisionId
-    → 释放并发槽 → dispatchQueuedTasksForRole()
+    → 释放并发槽 → dispatchQueuedTasksForMember()
   conflict / law_suggestion / dependency_blocked / review_request
     → inboxCreate() 写入收件箱（用户 App 内收件箱 Tab 可见）
         ↓
@@ -592,14 +658,14 @@ Planner Session 关键约束：
    - **worldBaseline**：当前世界宪法摘要（narrative + 重要 laws）
    - **roleIdentity**：该 Task 分配角色的身份指令（`roleType` 对应 AgentRole.description）
    - **branchPolicy**：分支策略提示（需在独立分支工作、完成后提 PR）
-3. **并发检查**：对每个任务按其 `roleType` 查询 `AgentRole.maxConcurrency`，若当前活跃任务数（dispatching/running/waiting_decision）已达上限，任务状态设为 `queued` 而非 `dispatching`，不发送 ephemeral 触发事件。批量创建时使用内存计数器避免 N+1 查询。
+3. **成员分配与并发检查**：对每个任务，`taskAssignMember` 根据 `roleType` 找到绑定了该角色的最闲成员（WorldMember），写入 `assignedMemberId`。然后检查该成员的 `maxConcurrency`，若活跃任务数已达上限，任务状态设为 `queued`。无显式成员时回退到 implicit owner（maxConcurrency=10）。
 4. 对通过并发检查的任务发送 `buildTaskTriggerEphemeral` → CLI 启动执行 Session；排队任务等待槽位释放后自动派发
 5. Goal 状态更新为 `in_progress`
 6. 调用 `goalProgressUpdate()` 触发初始进度计算
 
 ### 5.6 目标进度递归更新（goalProgressUpdate）
 
-每当一个 Task 状态变更（完成/失败/取消），触发 `goalProgressUpdate()`，并调用 `dispatchQueuedTasksForRole()` 尝试填充释放的并发槽位。
+每当一个 Task 状态变更（完成/失败/取消），触发 `goalProgressUpdate()`，并调用 `dispatchQueuedTasksForMember()` 尝试填充释放的并发槽位。
 
 **状态推导规则（从 Task 终态集合推导 Goal 状态）：**
 
@@ -698,9 +764,16 @@ POST /v1/projects/:id/goals/:goalId/replan
 
 显示内容：
 - 已启用角色列表
-- 角色类型、描述、职责、绑定 Skills
+- 角色类型、描述、职责、绑定 Skills、绑定成员数
+- 角色编辑表单内可 toggle 绑定/解绑成员
 
-### 6.4 其他相关页面
+### 6.4 项目 → 成员 Tab（WorldMembersTab）
+
+显示内容：
+- 团队成员列表（角色、专长标签、可用性状态灯）
+- 成员编辑表单：角色、专长、maxConcurrency 选择器（1/2/3/5/10）、通知级别、可用性
+
+### 6.5 其他相关页面
 
 | 页面路径 | 说明 |
 |---------|------|
@@ -718,14 +791,16 @@ POST /v1/projects/:id/goals/:goalId/replan
 ```
 Project
 ├── narrative / laws / supervisorMode / supervisorConfig
-├── AgentRole[]
+├── AgentRole[]             ← 纯模板（maxConcurrency @deprecated）
+├── WorldMember[]           ← 团队成员（maxConcurrency + assignedRoleIds）
+├── WorldAuditLog[]         ← 审计日志
 ├── Goal[]
 │   ├── Goal[] (subGoals)
-│   ├── Task[]  (status: queued|dispatching|running|waiting_decision|completed|failed|cancelled)
+│   ├── Task[]  (assignedMemberId → WorldMember, roleType → AgentRole.type)
 │   │   └── waitingDecisionId → Decision (暂停等待裁决)
-│   ├── Decision[]
+│   ├── Decision[]  (assignedTo → WorldMember)
 │   └── healthScore / layer / blockedSince
-├── AgentMessage[]
+├── AgentMessage[]  (toMemberId → WorldMember)
 │   └── relatedGoalId / relatedTaskId / decisionId
 └── WorldSuggestion[]
     ├── type / bucket / status
@@ -803,6 +878,26 @@ Project
 | GET | `/v1/projects/:id/agent-messages` | 查询消息（支持状态/类型/目标过滤） |
 | POST | `/v1/projects/:id/agent-messages` | CLI/Agent 上报消息 |
 | PATCH | `/v1/projects/:id/agent-messages/:msgId` | 更新消息状态 |
+
+### Team Members
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | `/v1/projects/:id/members` | 成员列表 |
+| POST | `/v1/projects/:id/members` | 添加成员（admin+ 权限） |
+| PATCH | `/v1/projects/:id/members/:memberId` | 更新成员（角色/专长/容量/通知） |
+| DELETE | `/v1/projects/:id/members/:memberId` | 移除成员（owner 不可移除） |
+| GET | `/v1/projects/:id/members/me` | 当前用户有效权限 |
+| GET | `/v1/projects/:id/member-stats` | 成员活跃度统计 |
+
+### Audit & Escalation
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | `/v1/projects/:id/audit-log` | 审计日志（支持 entityType 过滤） |
+| POST | `/v1/projects/:id/decisions/:id/opinion` | 提交成员意见（多人投票） |
+| POST | `/v1/projects/:id/decisions/:id/reassign` | 手动转交 Decision |
+| POST | `/v1/projects/:id/agent-messages/escalate` | Agent 升级到人类成员 |
 
 ---
 
@@ -883,7 +978,7 @@ CLI TaskRunner
 服务端 plan-result 处理
   ├── 为每个 task 注入前缀：worldBaseline + roleIdentity + branchPolicy
   ├── 批量创建执行 Task 记录
-  │   └── 每个 task 按 roleType 检查 maxConcurrency
+  │   └── 每个 task 由 taskAssignMember 分配给最闲成员，按成员 maxConcurrency 检查
   │       ├── 有槽位 → status=dispatching, 发送 ephemeral
   │       └── 无槽位 → status=queued, 等待释放
   ├── Goal.status → in_progress
@@ -895,12 +990,12 @@ CLI TaskRunner
   │   goalProgressUpdate()  （递归，最多 5 层父目标）
   │     ├── 推导 Goal.status（completed / blocked / in_progress / cancelled）
   │     ├── 更新 blockedSince / layer
-  │     └── dispatchQueuedTasksForRole() → 填充空出的并发槽
+  │     └── dispatchQueuedTasksForMember() → 填充空出的并发槽
   │
   └── Agent 发送 decision_request
         ↓
       Task → waiting_decision + waitingDecisionId
-      dispatchQueuedTasksForRole() → 释放的槽位派发排队任务
+      dispatchQueuedTasksForMember() → 释放的槽位派发排队任务
         ↓
       用户裁决 (decisionAdjudicate)
         ├── 创建延续 Task (原始 prompt + 裁决结果)
@@ -961,7 +1056,15 @@ CLI TaskRunner
 
 **Q: maxConcurrency 如何工作**
 
-AgentRole 的 `maxConcurrency` 限制该角色同时活跃的任务数。活跃状态包括 `dispatching`、`running`、`waiting_decision`。plan-result 创建任务时会检查角色并发槽位：超限任务设为 `queued` 排队。当活跃任务终止（completed/failed/cancelled）或进入 `waiting_decision` 释放槽位时，`dispatchQueuedTasksForRole()` 自动从队列中取出最老的 queued 任务派发。
+并发容量现在绑定在 **WorldMember**（人）上，而非 AgentRole（角色模板）。每个成员有独立的 `maxConcurrency`（默认 3），控制该成员同时可执行的任务数。AgentRole 上的 `maxConcurrency` 字段已标记为 @deprecated，不再用于调度。
+
+调度流程：
+1. Planner 返回 `suggestedRole`（如 "builder"）
+2. `taskAssignMember` 找到绑定了该角色的所有成员，选最闲的
+3. 检查该成员的 `maxConcurrency`，超限则排队
+4. 任务完成后 `dispatchQueuedTasksForMember` 自动派发队列中的下一个任务
+
+单人场景（无 WorldMember 记录）：自动回退到 implicit owner（maxConcurrency=10），行为与之前完全相同。
 
 **Q: decision_request 如何暂停任务**
 
