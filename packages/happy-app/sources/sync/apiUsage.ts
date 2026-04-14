@@ -1,5 +1,5 @@
 import { AuthCredentials } from "@/auth/tokenStorage";
-import { backoff } from "@/utils/time";
+import { backoff, NonRetryableError } from "@/utils/time";
 import { getServerUrl } from "./serverConfig";
 
 export interface UsageDataPoint {
@@ -42,8 +42,8 @@ export async function queryUsage(
     });
 
     if (!response.ok) {
-      if (response.status === 404 && params.sessionId) {
-        throw new Error("Session not found");
+      if (response.status >= 400 && response.status < 500) {
+        throw new NonRetryableError(`Failed to query usage: ${response.status}`);
       }
       throw new Error(`Failed to query usage: ${response.status}`);
     }
@@ -237,7 +237,7 @@ export async function getSessionUsageSummary(
           reportCount: 0,
         };
       }
-      throw new Error(
+      throw new NonRetryableError(
         `Failed to get session usage summary: ${response.status}`,
       );
     }
