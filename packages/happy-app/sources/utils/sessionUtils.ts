@@ -115,12 +115,22 @@ export function getLatestUserRequestPreview(
 }
 
 /**
- * Delay (ms) before committing the thinking→waiting transition.
- * Timer starts when rawState first flips to "waiting"; if rawState
+ * Delay (ms) before committing a transition away from "thinking".
+ * Timer starts when rawState first leaves "thinking"; if rawState
  * bounces back to "thinking" before the timer fires, the timer is
  * cancelled and we stay in "thinking".
+ *
+ * Only "soft" exits are debounced (waiting, needs_attention).
+ * Hard exits (disconnected, permission_required) pass through immediately
+ * because they require user attention.
  */
-const THINKING_TO_WAITING_DELAY_MS = 1500;
+const THINKING_EXIT_DELAY_MS = 1500;
+
+/** States that must pass through immediately even when leaving "thinking". */
+const IMMEDIATE_EXIT_STATES: ReadonlySet<SessionState> = new Set([
+  "disconnected",
+  "permission_required",
+]);
 
 /**
  * Get the current state of a session based on presence and thinking status.
@@ -129,33 +139,43 @@ const THINKING_TO_WAITING_DELAY_MS = 1500;
 export function useSessionStatus(session: Session): SessionStatus {
   const rawState = getSessionStatusState(session);
 
-  // Debounce thinking→waiting: when rawState flips to "waiting" while we
-  // are showing "thinking", wait THINKING_TO_WAITING_DELAY_MS.  If rawState
-  // bounces back to "thinking" before the timer fires, cancel and stay.
+  // Debounce exits from "thinking": when rawState leaves "thinking" for a
+  // soft state (waiting / needs_attention), hold for THINKING_EXIT_DELAY_MS.
+  // If rawState bounces back to "thinking" before the timer fires, cancel.
+  // Hard states (disconnected, permission_required) pass through immediately.
   const [debouncedState, setDebouncedState] = React.useState(rawState);
   const debouncedStateRef = React.useRef(debouncedState);
   debouncedStateRef.current = debouncedState;
   const timerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingTargetRef = React.useRef<SessionState | null>(null);
 
   React.useEffect(() => {
     if (timerRef.current) {
       clearTimeout(timerRef.current);
       timerRef.current = null;
+      pendingTargetRef.current = null;
     }
 
     if (rawState === "thinking") {
+      // Enter or stay in thinking — apply immediately
       setDebouncedState("thinking");
-    } else if (
-      debouncedStateRef.current === "thinking" &&
-      rawState === "waiting"
-    ) {
-      // Start a fixed delay from NOW (the moment "waiting" first appears)
-      timerRef.current = setTimeout(() => {
-        timerRef.current = null;
-        setDebouncedState("waiting");
-      }, THINKING_TO_WAITING_DELAY_MS);
+    } else if (debouncedStateRef.current === "thinking") {
+      // Leaving thinking — check if this exit needs debouncing
+      if (IMMEDIATE_EXIT_STATES.has(rawState)) {
+        // Hard exit: user action needed, pass through now
+        setDebouncedState(rawState);
+      } else {
+        // Soft exit (waiting / needs_attention): debounce
+        pendingTargetRef.current = rawState;
+        timerRef.current = setTimeout(() => {
+          timerRef.current = null;
+          const target = pendingTargetRef.current;
+          pendingTargetRef.current = null;
+          if (target) setDebouncedState(target);
+        }, THINKING_EXIT_DELAY_MS);
+      }
     } else {
-      // All other transitions (disconnected, permission_required, etc.)
+      // Not currently in thinking — apply immediately
       setDebouncedState(rawState);
     }
 
@@ -163,6 +183,7 @@ export function useSessionStatus(session: Session): SessionStatus {
       if (timerRef.current) {
         clearTimeout(timerRef.current);
         timerRef.current = null;
+        pendingTargetRef.current = null;
       }
     };
   }, [rawState]);
