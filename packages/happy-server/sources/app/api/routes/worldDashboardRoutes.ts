@@ -174,7 +174,7 @@ export function worldDashboardRoutes(app: Fastify) {
                     byType: rolesByType,
                 },
                 members: {
-                    total: membersCount,
+                    total: membersCount > 0 ? membersCount : 1,
                 },
                 goals: {
                     total: totalGoals,
