@@ -172,12 +172,16 @@ function ProcessRow({
         }
     };
 
-    // Show a short version of the command
-    const shortCmd = proc.command.length > 60
-        ? proc.command.slice(0, 57) + "..."
-        : proc.command;
-
     const canOpenSession = proc.type === "session" && !!proc.sessionId;
+
+    // For sessions show the session ID so each row is unique (the raw command
+    // prefix is identical for all spawned sessions and gets truncated before
+    // --happy-session-id appears). For other types truncate the raw command.
+    const displayText = canOpenSession
+        ? proc.sessionId!
+        : proc.command.length > 60
+            ? proc.command.slice(0, 57) + "..."
+            : proc.command;
 
     return (
         <View style={[rowStyles.row, { backgroundColor: theme.colors.surfaceHighest }]}>
@@ -199,8 +203,8 @@ function ProcessRow({
                         />
                     )}
                 </View>
-                <Text style={[rowStyles.cmd, { color: theme.colors.textSecondary }]} numberOfLines={2}>
-                    {shortCmd}
+                <Text style={[rowStyles.cmd, { color: theme.colors.textSecondary }]} numberOfLines={1}>
+                    {displayText}
                 </Text>
             </Pressable>
             <Pressable
