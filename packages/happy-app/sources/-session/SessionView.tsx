@@ -729,7 +729,7 @@ function SessionViewInner({
     }
     prevRunningRef.current = isRunning;
   }, [isRunning, session.sdkSessionState, sessionId]);
-  const promptSuggestion = usePromptSuggestion(sessionId);
+  const rawPromptSuggestion = usePromptSuggestion(sessionId);
   const needsContinue = useNeedsContinue(sessionId);
   const alwaysShowContextSize = useSetting("alwaysShowContextSize");
   const collapsibleInputEnabled = useSetting("collapsibleInput");
@@ -761,6 +761,20 @@ function SessionViewInner({
       optionsHash: buildOptionsHash(latestOptions.items),
     };
   }, [latestOptions]);
+  // When the SDK sends a prompt-suggestion, override the text with the recommended
+  // option from the options list (if one exists) so the input chip and the 推荐 badge
+  // always point to the same option. The lifecycle (null ↔ non-null) is unchanged —
+  // the chip still appears/disappears based on rawPromptSuggestion, avoiding stale
+  // chip issues after the user sends a message.
+  const promptSuggestion = React.useMemo(() => {
+    if (!rawPromptSuggestion) return null;
+    const recIdx = getRecommendedOptionIndex(latestOptions.items);
+    if (recIdx !== null && latestOptions.items[recIdx]) {
+      return latestOptions.items[recIdx];
+    }
+    return rawPromptSuggestion;
+  }, [latestOptions.items, rawPromptSuggestion]);
+
   const [showOptionsPopover, setShowOptionsPopover] = React.useState(false);
   const handleFloatingOptionPress = React.useCallback(
     (option: string) => {

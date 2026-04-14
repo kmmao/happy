@@ -74,6 +74,8 @@ export interface QueryOptions {
     | "plan"
     | "dontAsk"
     | "auto";
+  /** Must be true when using permissionMode: 'bypassPermissions'. Passed as --allow-dangerously-skip-permissions to Claude Code. */
+  allowDangerouslySkipPermissions?: boolean;
   continue?: boolean;
   resume?: string;
   model?: string;

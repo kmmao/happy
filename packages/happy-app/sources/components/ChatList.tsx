@@ -14,11 +14,9 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { MessageView } from "./MessageView";
 import { Metadata, Session } from "@/sync/storageTypes";
 import { ChatFooter } from "./ChatFooter";
-import { isSessionRunning } from "@/utils/sessionUtils";
 import { Message } from "@/sync/typesMessage";
 import { knownTools } from "./tools/knownTools";
 import { parseLegacyCodexDiffPreview } from "./tools/codexDiffCompat";
-import { TypingBubble } from "./TypingBubble";
 
 type DisplayItem = Message;
 
@@ -72,18 +70,9 @@ const ListHeader = React.memo(() => {
 
 const ListFooter = React.memo((props: { sessionId: string; contentMaxWidth?: number }) => {
   const session = useSession(props.sessionId)!;
-  const { messages } = useSessionMessages(props.sessionId);
-  const isThinking = isSessionRunning(session);
-  const lastMsg = messages.length > 0 ? messages[0] : undefined;
-  const showTyping =
-    isThinking &&
-    lastMsg?.kind !== "agent-text" &&
-    lastMsg?.kind !== "agent-event";
   return (
     <>
-      {showTyping && (
-        <TypingBubble contentMaxWidth={props.contentMaxWidth} />
-      )}
+      {/* TypingBubble hidden */}
       <ChatFooter
         controlledByUser={session.agentState?.controlledByUser || false}
       />
@@ -242,7 +231,6 @@ const ChatListInternal = React.memo(
         return map;
       }
       const map = new Map<number, number>();
-      let msgIdx = 0;
       let diIdx = 0;
       for (let mi = 0; mi < props.messages.length; mi++) {
         if (diIdx < displayItems.length && displayItems[diIdx] === props.messages[mi]) {

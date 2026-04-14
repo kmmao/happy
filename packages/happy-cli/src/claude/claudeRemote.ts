@@ -256,7 +256,16 @@ export async function claudeRemote(opts: {
     resume: startFrom ?? undefined,
     continue: initial.mode.continue || undefined,
     mcpServers: opts.mcpServers,
-    permissionMode: mapToClaudeMode(initial.mode.permissionMode),
+    // Never pass bypassPermissions to SDK — it causes Claude Code to skip
+    // permission requests entirely, so canUseTool is never called and
+    // AskUserQuestion cannot block. PermissionHandler handles auto-approval
+    // for bypass mode via canCallTool instead.
+    permissionMode: mapToClaudeMode(initial.mode.permissionMode) === "bypassPermissions"
+      ? "default"
+      : mapToClaudeMode(initial.mode.permissionMode),
+    // Pass through so Claude Code knows bypass is intended (enables
+    // --allow-dangerously-skip-permissions flag on the spawned process).
+    allowDangerouslySkipPermissions: mapToClaudeMode(initial.mode.permissionMode) === "bypassPermissions",
     model: model || undefined,
     fallbackModel: initial.mode.fallbackModel,
     customSystemPrompt: initial.mode.customSystemPrompt
@@ -268,14 +277,7 @@ export async function claudeRemote(opts: {
     allowedTools: initial.mode.allowedTools
       ? initial.mode.allowedTools.concat(opts.allowedTools)
       : opts.allowedTools,
-    // In bypassPermissions (yolo) mode, Claude Code runs with --dangerously-skip-permissions
-    // and never sends permission requests to the SDK — canUseTool is never called.
-    // AskUserQuestion must be disallowed to prevent it from executing without blocking:
-    // the blocking Promise in PermissionHandler would never be created, causing the
-    // question to appear in the App but the session to continue without waiting.
-    disallowedTools: mapToClaudeMode(initial.mode.permissionMode) === "bypassPermissions"
-      ? [...(initial.mode.disallowedTools ?? []), "AskUserQuestion"]
-      : initial.mode.disallowedTools,
+    disallowedTools: initial.mode.disallowedTools,
     canCallTool: (
       toolName: string,
       input: unknown,

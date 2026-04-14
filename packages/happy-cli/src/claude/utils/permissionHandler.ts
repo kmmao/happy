@@ -34,6 +34,9 @@ interface PendingRequest {
   input: unknown;
 }
 
+/** Modes that auto-approve all tools except AskUserQuestion */
+const BYPASS_MODES: ReadonlySet<string> = new Set(["bypassPermissions", "yolo"]);
+
 export class PermissionHandler {
   private toolCalls: { id: string; name: string; input: any; used: boolean }[] =
     [];
@@ -168,8 +171,8 @@ export class PermissionHandler {
     // Without it, isAborted() returns true for ExitPlanMode and claudeRemote exits,
     // but the restart message is never queued, causing the session to hang forever.
     if (descriptor.exitPlan) {
-      // Auto-approve in bypassPermissions/Yolo mode
-      if (this.permissionMode === "bypassPermissions") {
+      // Auto-approve in bypassPermissions/yolo mode
+      if (BYPASS_MODES.has(this.permissionMode)) {
         return this.autoApproveExitPlan(toolName, input);
       }
 
@@ -223,7 +226,7 @@ export class PermissionHandler {
     //
 
     if (
-      this.permissionMode === "bypassPermissions" &&
+      BYPASS_MODES.has(this.permissionMode) &&
       toolName !== "AskUserQuestion"
     ) {
       return {

@@ -48,6 +48,7 @@ export function mapOptions(opts: QueryOptions): OfficialOptions {
   if (opts.pathToClaudeCodeExecutable)
     result.pathToClaudeCodeExecutable = opts.pathToClaudeCodeExecutable;
   if (opts.permissionMode) result.permissionMode = opts.permissionMode;
+  if (opts.allowDangerouslySkipPermissions) result.allowDangerouslySkipPermissions = opts.allowDangerouslySkipPermissions;
   if (opts.continue) result.continue = opts.continue;
   if (opts.resume) result.resume = opts.resume;
   if (opts.model) result.model = opts.model;
