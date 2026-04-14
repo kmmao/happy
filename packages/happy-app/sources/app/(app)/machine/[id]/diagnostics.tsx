@@ -219,7 +219,7 @@ function ProcessRow({
     );
 }
 
-const rowStyles = StyleSheet.create((theme) => ({
+const rowStyles = StyleSheet.create(() => ({
     row: {
         flexDirection: "row" as const,
         alignItems: "flex-start" as const,
@@ -419,7 +419,7 @@ export default React.memo(function DiagnosticsPage() {
     );
 });
 
-const pageStyles = StyleSheet.create((theme) => ({
+const pageStyles = StyleSheet.create(() => ({
     container: {
         flex: 1,
     },
