@@ -6,8 +6,8 @@ WHERE id NOT IN (
     ORDER BY "sessionId", "knowledgeId", "at" ASC
 );
 
--- Drop the old sessionId index (replaced by unique constraint which auto-creates an index)
-DROP INDEX "KnowledgeAccess_sessionId_idx";
+-- Drop the old sessionId index if it exists (replaced by unique constraint)
+DROP INDEX IF EXISTS "KnowledgeAccess_sessionId_idx";
 
 -- Add unique constraint on (sessionId, knowledgeId) so skipDuplicates actually works
-CREATE UNIQUE INDEX "KnowledgeAccess_sessionId_knowledgeId_key" ON "KnowledgeAccess"("sessionId", "knowledgeId");
+CREATE UNIQUE INDEX IF NOT EXISTS "KnowledgeAccess_sessionId_knowledgeId_key" ON "KnowledgeAccess"("sessionId", "knowledgeId");
