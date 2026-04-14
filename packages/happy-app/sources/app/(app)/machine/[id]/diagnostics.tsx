@@ -136,7 +136,7 @@ function ProcessTypeLabel({ type }: { type: HappyProcessType }) {
     );
 }
 
-const typeStyles = StyleSheet.create((theme) => ({
+const typeStyles = StyleSheet.create(() => ({
     badge: {
         flexDirection: "row" as const,
         alignItems: "center" as const,
@@ -174,15 +174,6 @@ function ProcessRow({
 
     const canOpenSession = proc.type === "session" && !!proc.sessionId;
 
-    // For sessions show the session ID so each row is unique (the raw command
-    // prefix is identical for all spawned sessions and gets truncated before
-    // --happy-session-id appears). For other types truncate the raw command.
-    const displayText = canOpenSession
-        ? proc.sessionId!
-        : proc.command.length > 60
-            ? proc.command.slice(0, 57) + "..."
-            : proc.command;
-
     return (
         <View style={[rowStyles.row, { backgroundColor: theme.colors.surfaceHighest }]}>
             <Pressable
@@ -203,8 +194,8 @@ function ProcessRow({
                         />
                     )}
                 </View>
-                <Text style={[rowStyles.cmd, { color: theme.colors.textSecondary }]} numberOfLines={1}>
-                    {displayText}
+                <Text style={[rowStyles.cmd, { color: theme.colors.textSecondary }]} numberOfLines={4}>
+                    {proc.command}
                 </Text>
             </Pressable>
             <Pressable
@@ -231,7 +222,7 @@ function ProcessRow({
 const rowStyles = StyleSheet.create((theme) => ({
     row: {
         flexDirection: "row" as const,
-        alignItems: "center" as const,
+        alignItems: "flex-start" as const,
         paddingHorizontal: 14,
         paddingVertical: 10,
         borderRadius: 12,
