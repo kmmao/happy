@@ -1271,6 +1271,10 @@ export function reducer(
 
   for (let msg of nonSidechainMessages) {
     if (msg.role === "event") {
+      // Dedup: skip if already processed (e.g. re-fetched via sync)
+      if (state.messageIds.has(msg.id)) continue;
+      state.messageIds.set(msg.id, msg.id);
+
       let mid = allocateId();
       state.messages.set(mid, {
         id: mid,

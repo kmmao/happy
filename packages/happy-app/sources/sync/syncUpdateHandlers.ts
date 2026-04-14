@@ -278,8 +278,12 @@ export async function handleNewMessageUpdate(
                 }
             }
 
-            // If seq is non-consecutive, also fetch missing messages from server
-            if (!isConsecutive) {
+            // If seq is non-consecutive, also fetch missing messages from server.
+            // But skip when incomingSeq <= currentLastSeq — that means the message
+            // is an echo (already received via POST response or earlier fetch), not
+            // a gap.  Fetching in that case races with the next socket push and can
+            // cause duplicate messages (e.g. double "Context was reset" on /clear).
+            if (!isConsecutive && (currentLastSeq === undefined || incomingSeq > currentLastSeq)) {
                 ctx.getMessagesSync(body.sid)?.invalidate();
             }
         }
