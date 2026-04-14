@@ -15,11 +15,8 @@ export const ExitPlanToolView = React.memo<ToolViewProps>(({ tool, sessionId }) 
     const [isLoading, setIsLoading] = React.useState(false);
 
     // Parse plan from tool input as fallback
-    let inputPlan = '<empty>';
     const parsed = knownTools.ExitPlanMode.input.safeParse(tool.input);
-    if (parsed.success) {
-        inputPlan = parsed.data.plan ?? '<empty>';
-    }
+    const inputPlan = parsed.success ? (parsed.data.plan || null) : null;
 
     const displayPlan = planContent ?? inputPlan;
 
@@ -39,10 +36,21 @@ export const ExitPlanToolView = React.memo<ToolViewProps>(({ tool, sessionId }) 
         }
     }, [sessionId]);
 
+    // Auto-fetch plan file content when tool input is empty
+    React.useEffect(() => {
+        if (!inputPlan && sessionId && !planContent) {
+            handleRefreshFromFile();
+        }
+    }, [inputPlan, sessionId, planContent, handleRefreshFromFile]);
+
     return (
         <ToolSectionView>
             <View style={{ paddingHorizontal: 8, marginTop: -10 }}>
-                <MarkdownView markdown={displayPlan} />
+                {displayPlan ? (
+                    <MarkdownView markdown={displayPlan!} />
+                ) : (
+                    <ActivityIndicator size="small" style={{ paddingVertical: 12 }} />
+                )}
             </View>
 
             {/* Plan file actions */}
