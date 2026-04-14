@@ -10,7 +10,7 @@ import {
 } from "react-native";
 import { knownTools } from "../../tools/knownTools";
 import { Ionicons } from "@expo/vector-icons";
-import { Message, ToolCall } from "@/sync/typesMessage";
+import { ToolCall, TaskStatusMessage } from "@/sync/typesMessage";
 import { AgentEvent } from "@/sync/typesRaw";
 import { useUnistyles } from "react-native-unistyles";
 import { useSetting } from "@/sync/storage";
@@ -44,11 +44,17 @@ interface FilteredTool {
   stats: SubTaskStats | null;
 }
 
+interface TaskStatusEntry {
+  taskStatus: TaskStatusMessage;
+  createdAt: number;
+}
+
 export const TaskView = React.memo<ToolViewProps>(
   ({ tool, metadata, messages }) => {
     const { theme } = useUnistyles();
     const showAgentActivity = useSetting("showAgentActivity");
     const filtered: FilteredTool[] = [];
+    const taskStatusItems: TaskStatusEntry[] = [];
 
     for (let m of messages) {
       if (m.kind === "tool-call") {
@@ -120,6 +126,12 @@ export const TaskView = React.memo<ToolViewProps>(
             stats,
           });
         }
+      } else if (m.kind === "agent-text" && m.taskStatus) {
+        // Task status messages redirected from main timeline (Phase 3.7)
+        taskStatusItems.push({
+          taskStatus: m.taskStatus,
+          createdAt: m.createdAt,
+        });
       }
     }
 
@@ -344,6 +356,33 @@ export const TaskView = React.memo<ToolViewProps>(
               width: "117.6%", // 1/0.85
             }),
       },
+      taskStatusSection: {
+        marginHorizontal: 4,
+        marginBottom: 6,
+        gap: 3,
+      },
+      taskStatusRow: {
+        flexDirection: "row" as const,
+        alignItems: "flex-start" as const,
+        gap: 5,
+        paddingVertical: 2,
+        paddingHorizontal: 2,
+      },
+      taskStatusText: {
+        fontSize: 12,
+        fontWeight: "600" as const,
+        fontFamily: "monospace",
+      },
+      taskStatusSummary: {
+        fontSize: 12,
+        fontFamily: "monospace",
+        flex: 1,
+      },
+      taskStatusMetrics: {
+        fontSize: 11,
+        fontFamily: "monospace",
+        opacity: 0.7,
+      },
     });
 
     const expandTools = useSetting("expandTools");
@@ -365,8 +404,75 @@ export const TaskView = React.memo<ToolViewProps>(
       });
     }, []);
 
-    if (filtered.length === 0) {
+    if (filtered.length === 0 && taskStatusItems.length === 0) {
       return null;
+    }
+
+    // Render task status section (always visible, between header and tools)
+    const renderTaskStatus = () =>
+      taskStatusItems.length > 0 ? (
+        <View style={styles.taskStatusSection}>
+          {taskStatusItems.map((entry, index) => {
+            const statusIcon =
+              entry.taskStatus.status === "completed"
+                ? "checkmark-circle-outline" as const
+                : entry.taskStatus.status === "failed"
+                  ? "close-circle-outline" as const
+                  : entry.taskStatus.status === "stopped"
+                    ? "stop-circle-outline" as const
+                    : "hourglass-outline" as const;
+            const statusColor =
+              entry.taskStatus.status === "completed"
+                ? theme.colors.success
+                : entry.taskStatus.status === "failed" || entry.taskStatus.status === "stopped"
+                  ? theme.colors.textDestructive
+                  : theme.colors.accentOrange;
+            const statusLabel =
+              entry.taskStatus.status === "start"
+                ? t("message.taskStarted")
+                : entry.taskStatus.status === "progress"
+                  ? t("message.taskProgress")
+                  : entry.taskStatus.status === "completed"
+                    ? t("message.taskCompleted")
+                    : entry.taskStatus.status === "failed"
+                      ? t("message.taskFailed")
+                      : t("message.taskStopped");
+            return (
+              <View key={`ts-${index}`} style={styles.taskStatusRow}>
+                <Ionicons
+                  name={statusIcon}
+                  size={11}
+                  color={statusColor}
+                  style={{ marginTop: 1 }}
+                />
+                <Text
+                  numberOfLines={2}
+                  style={[styles.taskStatusText, { color: statusColor }]}
+                >
+                  {statusLabel}
+                </Text>
+                <Text
+                  numberOfLines={2}
+                  style={[styles.taskStatusSummary, { color: theme.colors.text }]}
+                >
+                  {entry.taskStatus.summary}
+                </Text>
+                {entry.taskStatus.metrics ? (
+                  <Text
+                    numberOfLines={1}
+                    style={[styles.taskStatusMetrics, { color: statusColor }]}
+                  >
+                    {entry.taskStatus.metrics}
+                  </Text>
+                ) : null}
+              </View>
+            );
+          })}
+        </View>
+      ) : null;
+
+    if (filtered.length === 0) {
+      return renderTaskStatus();
     }
 
     // Summary stats for collapsed view
@@ -488,17 +594,20 @@ export const TaskView = React.memo<ToolViewProps>(
 
     if (collapsed) {
       return (
-        <Pressable
-          onPress={() => setCollapsed(false)}
-          style={styles.summaryRow}
-        >
-          <Ionicons
-            name="chevron-forward"
-            size={14}
-            color={theme.colors.textSecondary}
-          />
-          {renderSummaryBadges()}
-        </Pressable>
+        <>
+          {renderTaskStatus()}
+          <Pressable
+            onPress={() => setCollapsed(false)}
+            style={styles.summaryRow}
+          >
+            <Ionicons
+              name="chevron-forward"
+              size={14}
+              color={theme.colors.textSecondary}
+            />
+            {renderSummaryBadges()}
+          </Pressable>
+        </>
       );
     }
 
@@ -511,6 +620,7 @@ export const TaskView = React.memo<ToolViewProps>(
 
     return (
       <View style={styles.container}>
+        {renderTaskStatus()}
         <Pressable onPress={() => setCollapsed(true)} style={styles.summaryRow}>
           <Ionicons
             name="chevron-down"

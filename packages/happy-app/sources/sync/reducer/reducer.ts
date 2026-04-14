@@ -271,6 +271,8 @@ export function reducer(
   let newMessages: Message[] = [];
   let changed: Set<string> = new Set();
   let hasReadyEvent = false;
+  // Track task status messages for Phase 3.7 sidechain redirection
+  const taskStatusMsgIds = new Map<string, string>(); // reducerMsg mid → taskId
 
   // First, trace all messages to identify sidechains
   const tracedMessages = traceMessages(state.tracerState, messages);
@@ -802,6 +804,13 @@ export function reducer(
             meta: msg.meta,
           });
           changed.add(mid);
+          // Track task status message for potential sidechain redirection in Phase 3.7
+          if (taskStatus) {
+            const taskId = msg.taskStartInfo?.taskId ?? msg.taskProgressInfo?.taskId ?? msg.taskEndInfo?.taskId;
+            if (taskId) {
+              taskStatusMsgIds.set(mid, taskId);
+            }
+          }
           // Track latest agent text time incrementally for Phase 6
           if (c.type === "text" && msg.createdAt > state.latestAgentTextTime) {
             state.latestAgentTextTime = msg.createdAt;
@@ -1105,6 +1114,31 @@ export function reducer(
   }
 
   //
+  // Phase 3.7: Redirect task status messages to their parent Agent/Task sidechains.
+  // Task-start/progress/end are main-turn agent-text messages that report subagent
+  // lifecycle. They should be displayed inside the corresponding subagent's expanded
+  // view, not as independent cards in the main timeline.
+  //
+
+  for (const [mid, taskId] of taskStatusMsgIds) {
+    if (!changed.has(mid)) continue;
+    const bgTask = state.backgroundTasks.get(taskId);
+    if (!bgTask?.toolUseId) continue;
+    const parentMsgId = state.toolIdToMessageId.get(bgTask.toolUseId);
+    const parentMsg = parentMsgId ? state.messages.get(parentMsgId) : null;
+    if (!parentMsg?.tool || (parentMsg.tool.name !== "Agent" && parentMsg.tool.name !== "Task")) continue;
+    const sidechainKey = parentMsg.realID;
+    if (!sidechainKey) continue;
+    const taskStatusMsg = state.messages.get(mid);
+    if (!taskStatusMsg) continue;
+    const sidechain = state.sidechains.get(sidechainKey) || [];
+    sidechain.push(taskStatusMsg);
+    state.sidechains.set(sidechainKey, sidechain);
+    changed.delete(mid);
+    changed.add(parentMsgId!);
+  }
+
+  //
   // Phase 4: Process sidechains and store them in state
   //
 
@@ -1143,6 +1177,28 @@ export function reducer(
         if (c.type === "text" || c.type === "thinking") {
           let mid = allocateId();
           const isThinking = c.type === "thinking";
+          // Extract taskStatus for sidechain task lifecycle messages (same as Phase 1)
+          const taskStatus = !isThinking
+            ? msg.taskStartInfo
+              ? {
+                  status: "start" as const,
+                  summary: msg.taskStartInfo.description,
+                  metrics: null,
+                }
+              : msg.taskProgressInfo
+                ? {
+                    status: "progress" as const,
+                    summary: msg.taskProgressInfo.summary,
+                    metrics: c.text.split("\n")[2]?.trim()?.replace(/^_/, "").replace(/_$/, "") ?? null,
+                  }
+                : msg.taskEndInfo
+                  ? {
+                      status: msg.taskEndInfo.status,
+                      summary: c.text.split("\n")[1]?.trim() || c.text,
+                      metrics: null,
+                    }
+                  : undefined
+            : undefined;
           let textMsg: ReducerMessage = {
             id: mid,
             realID: msg.id,
@@ -1150,6 +1206,7 @@ export function reducer(
             createdAt: msg.createdAt,
             text: isThinking ? `*${c.thinking}*` : c.text,
             isThinking,
+            ...(taskStatus && { taskStatus }),
             tool: null,
             event: null,
             meta: msg.meta,
