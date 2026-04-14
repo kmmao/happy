@@ -102,7 +102,7 @@ const GitChangesTab = React.memo<{
   sessionId: string;
   repoPath?: string;
   compact?: boolean;
-  onFilePress?: (fullPath: string) => void;
+  onFilePress?: (fullPath: string, submodulePath?: string) => void;
   onPullDown?: () => void;
   onScrollUp?: () => void;
 }>(({ sessionId, repoPath, compact, onFilePress: onFilePressExternal, onPullDown, onScrollUp }) => {
@@ -351,9 +351,9 @@ const GitChangesTab = React.memo<{
   }, [searchQuery, gitStatusFiles, sessionId, isLoading]);
 
   const handleFilePress = React.useCallback(
-    (file: GitFileStatus | FileItem) => {
+    (file: GitFileStatus | FileItem, submodulePath?: string) => {
       if (onFilePressExternal) {
-        onFilePressExternal(file.fullPath);
+        onFilePressExternal(file.fullPath, submodulePath);
       } else {
         const encodedPath = btoa(file.fullPath);
         router.push(`/session/${sessionId}/file?path=${encodedPath}`);
@@ -1102,11 +1102,14 @@ const GitChangesTab = React.memo<{
                           subtitle={renderFileSubtitle(file)}
                           icon={renderFileIcon(file)}
                           rightElement={renderStatusIcon(file)}
-                          onPress={() => handleFilePress(file)}
+                          onPress={() => handleFilePress(file, submodule.path)}
                           showDivider={
                             idx < submodule.stagedFiles.length - 1 ||
                             submodule.unstagedFiles.length > 0
                           }
+                          style={compactItemStyle}
+                          titleStyle={compactTitleStyle}
+                          subtitleStyle={compactSubtitleStyle}
                         />
                       ))}
                     </>
@@ -1146,8 +1149,11 @@ const GitChangesTab = React.memo<{
                           subtitle={renderFileSubtitle(file)}
                           icon={renderFileIcon(file)}
                           rightElement={renderStatusIcon(file)}
-                          onPress={() => handleFilePress(file)}
+                          onPress={() => handleFilePress(file, submodule.path)}
                           showDivider={idx < submodule.unstagedFiles.length - 1}
+                          style={compactItemStyle}
+                          titleStyle={compactTitleStyle}
+                          subtitleStyle={compactSubtitleStyle}
                         />
                       ))}
                     </>

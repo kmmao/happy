@@ -100,10 +100,12 @@ export const SidePanelGitPanel = React.memo<SidePanelGitPanelProps>(
         }, []);
 
         // Convert git-relative path to absolute path for file preview
+        // submodulePath is passed when clicking files inside a submodule/child repo
         const handleChangesFilePress = React.useCallback(
-            (gitRelativePath: string) => {
-                const basePath = selectedRepoPath
-                    ? `${sessionPath}/${selectedRepoPath}`
+            (gitRelativePath: string, submodulePath?: string) => {
+                const repoBase = submodulePath ?? selectedRepoPath;
+                const basePath = repoBase
+                    ? `${sessionPath}/${repoBase}`
                     : sessionPath;
                 onFilePress?.(`${basePath}/${gitRelativePath}`);
             },
