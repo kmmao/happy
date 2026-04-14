@@ -180,7 +180,18 @@ export const WorldMembersTab = React.memo(
                                             {member.account?.username ? ` · @${member.account.username}` : ""}
                                         </Text>
                                     </View>
-                                    <View style={[styles.availabilityDot, { backgroundColor: AVAILABILITY_COLORS[member.availability] ?? "#6B7280" }]} />
+                                    <View style={styles.memberCardActions}>
+                                        <View style={[styles.availabilityDot, { backgroundColor: AVAILABILITY_COLORS[member.availability] ?? "#6B7280" }]} />
+                                        {member.role !== "owner" && (
+                                            <Pressable
+                                                style={styles.cardDeleteButton}
+                                                onPress={(e) => { e.stopPropagation?.(); handleDelete(member); }}
+                                                hitSlop={8}
+                                            >
+                                                <Ionicons name="trash-outline" size={16} color="#DC2626" />
+                                            </Pressable>
+                                        )}
+                                    </View>
                                 </View>
                                 {member.expertise.length > 0 && (
                                     <View style={styles.expertiseRow}>
@@ -702,10 +713,18 @@ const styles = StyleSheet.create((theme) => ({
         color: theme.colors.textSecondary,
         marginTop: 2,
     },
+    memberCardActions: {
+        flexDirection: "row" as const,
+        alignItems: "center" as const,
+        gap: 10,
+    },
     availabilityDot: {
         width: 10,
         height: 10,
         borderRadius: 5,
+    },
+    cardDeleteButton: {
+        padding: 4,
     },
     expertiseRow: {
         flexDirection: "row" as const,

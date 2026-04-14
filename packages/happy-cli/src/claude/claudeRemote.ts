@@ -268,7 +268,14 @@ export async function claudeRemote(opts: {
     allowedTools: initial.mode.allowedTools
       ? initial.mode.allowedTools.concat(opts.allowedTools)
       : opts.allowedTools,
-    disallowedTools: initial.mode.disallowedTools,
+    // In bypassPermissions (yolo) mode, Claude Code runs with --dangerously-skip-permissions
+    // and never sends permission requests to the SDK — canUseTool is never called.
+    // AskUserQuestion must be disallowed to prevent it from executing without blocking:
+    // the blocking Promise in PermissionHandler would never be created, causing the
+    // question to appear in the App but the session to continue without waiting.
+    disallowedTools: mapToClaudeMode(initial.mode.permissionMode) === "bypassPermissions"
+      ? [...(initial.mode.disallowedTools ?? []), "AskUserQuestion"]
+      : initial.mode.disallowedTools,
     canCallTool: (
       toolName: string,
       input: unknown,
