@@ -36,6 +36,26 @@ const AVAILABILITY_COLORS: Record<string, string> = {
     delegate: "#8B5CF6",
 };
 
+const ROLE_LABELS: Record<string, () => string> = {
+    owner: () => t("members.roleOwner"),
+    admin: () => t("members.roleAdmin"),
+    member: () => t("members.roleMember"),
+    observer: () => t("members.roleObserver"),
+};
+
+const NOTIFY_LABELS: Record<string, () => string> = {
+    all: () => t("members.notifyAll"),
+    critical: () => t("members.notifyCritical"),
+    assigned: () => t("members.notifyAssigned"),
+    none: () => t("members.notifyNone"),
+};
+
+const AVAILABILITY_LABELS: Record<string, () => string> = {
+    active: () => t("members.availabilityActive"),
+    away: () => t("members.availabilityAway"),
+    delegate: () => t("members.availabilityDelegate"),
+};
+
 interface WorldMembersTabProps {
     project: Project;
     isActive: boolean;
@@ -149,7 +169,7 @@ export const WorldMembersTab = React.memo(
                                     <View style={styles.memberCardInfo}>
                                         <Text style={styles.memberName}>{getDisplayName(member)}</Text>
                                         <Text style={styles.memberMeta}>
-                                            {t(`members.role${member.role.charAt(0).toUpperCase() + member.role.slice(1)}` as any)}
+                                            {ROLE_LABELS[member.role]?.() ?? member.role}
                                             {member.account?.username ? ` · @${member.account.username}` : ""}
                                         </Text>
                                     </View>
@@ -316,7 +336,7 @@ const MemberFormSheet = React.memo(function MemberFormSheet({
                                         color={selected ? "#fff" : theme.colors.text}
                                     />
                                     <Text style={[styles.chipText, selected && { color: "#fff" }]}>
-                                        {t(`members.role${r.charAt(0).toUpperCase() + r.slice(1)}` as any)}
+                                        {ROLE_LABELS[r]?.() ?? r}
                                     </Text>
                                 </Pressable>
                             );
@@ -371,7 +391,7 @@ const MemberFormSheet = React.memo(function MemberFormSheet({
                                             onPress={() => setNotifyLevel(level)}
                                         >
                                             <Text style={[styles.chipText, selected && { color: "#fff" }]}>
-                                                {t(`members.notify${level.charAt(0).toUpperCase() + level.slice(1)}` as any)}
+                                                {NOTIFY_LABELS[level]?.() ?? level}
                                             </Text>
                                         </Pressable>
                                     );
@@ -389,7 +409,7 @@ const MemberFormSheet = React.memo(function MemberFormSheet({
                                             onPress={() => setAvailability(av)}
                                         >
                                             <Text style={[styles.chipText, selected && { color: "#fff" }]}>
-                                                {t(`members.availability${av.charAt(0).toUpperCase() + av.slice(1)}` as any)}
+                                                {AVAILABILITY_LABELS[av]?.() ?? av}
                                             </Text>
                                         </Pressable>
                                     );

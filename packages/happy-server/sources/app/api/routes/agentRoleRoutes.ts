@@ -2,6 +2,7 @@ import { type Fastify } from "../types";
 import { db } from "@/storage/db";
 import { z } from "zod";
 import { log } from "@/utils/log";
+import { auditLog } from "@/modules/worldAuditLog";
 
 const ROLE_TYPES = ["guardian", "builder", "healer", "chronicler", "planner", "messenger", "custom"] as const;
 
@@ -144,6 +145,15 @@ export function agentRoleRoutes(app: Fastify) {
                 });
 
                 log({ module: "agent-role" }, `AgentRole created: ${role.id} "${name}" (${finalType})`);
+                void auditLog({
+                    accountId: request.userId,
+                    projectId,
+                    action: "role.create",
+                    entityType: "role",
+                    entityId: role.id,
+                    summary: `Created role "${name}" (${finalType})`,
+                    after: { name, type: finalType, description: finalDescription },
+                });
                 return reply.code(201).send({ role: serializeAgentRole(role) });
             } catch (e: any) {
                 if (e.code === "P2002" && e.meta?.target?.includes("name")) {
@@ -308,6 +318,16 @@ export function agentRoleRoutes(app: Fastify) {
                     where: { id: role.id },
                     data,
                 });
+                void auditLog({
+                    accountId: request.userId,
+                    projectId: role.projectId,
+                    action: "role.update",
+                    entityType: "role",
+                    entityId: role.id,
+                    summary: `Updated role "${updated.name}"`,
+                    before: { name: role.name, type: role.type },
+                    after: data,
+                });
                 return reply.send({ role: serializeAgentRole(updated) });
             } catch (e: any) {
                 if (e.code === "P2002" && e.meta?.target?.includes("name")) {
@@ -336,6 +356,15 @@ export function agentRoleRoutes(app: Fastify) {
             }
 
             await db.agentRole.delete({ where: { id: role.id } });
+            void auditLog({
+                accountId: request.userId,
+                projectId: role.projectId,
+                action: "role.delete",
+                entityType: "role",
+                entityId: role.id,
+                summary: `Deleted role "${role.name}" (${role.type})`,
+                before: { name: role.name, type: role.type },
+            });
             return reply.send({ deleted: true });
         },
     );

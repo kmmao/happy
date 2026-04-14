@@ -131,6 +131,22 @@ const DecisionDetailScreen = React.memo(function DecisionDetailScreen() {
                 {decision.agentRole && (
                     <Text style={styles.roleText}>{decision.agentRole}</Text>
                 )}
+                {decision.assignedTo && (
+                    <View style={styles.assignedBadge}>
+                        <Ionicons name="person" size={12} color="#8B5CF6" />
+                        <Text style={styles.assignedText}>
+                            {t("decision.assignedTo")}
+                        </Text>
+                    </View>
+                )}
+                {decision.opinions.length > 0 && (
+                    <View style={styles.assignedBadge}>
+                        <Ionicons name="chatbubbles" size={12} color="#F59E0B" />
+                        <Text style={[styles.assignedText, { color: "#F59E0B" }]}>
+                            {decision.opinions.length} {decision.opinions.length === 1 ? "opinion" : "opinions"}
+                        </Text>
+                    </View>
+                )}
             </View>
 
             {/* Question */}
@@ -298,6 +314,22 @@ const styles = StyleSheet.create((theme) => ({
         ...Typography.default(),
         fontSize: 12,
         color: theme.colors.accentPurple,
+    },
+    assignedBadge: {
+        flexDirection: "row" as const,
+        alignItems: "center" as const,
+        gap: 4,
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 8,
+        backgroundColor: theme.dark
+            ? "rgba(139,92,246,0.15)"
+            : "rgba(109,40,217,0.08)",
+    },
+    assignedText: {
+        ...Typography.default(),
+        fontSize: 12,
+        color: "#8B5CF6",
     },
     card: {
         marginHorizontal: 16,

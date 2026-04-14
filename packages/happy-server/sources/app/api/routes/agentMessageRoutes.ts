@@ -10,6 +10,7 @@ import {
     buildAgentMessageEphemeral,
 } from "@/app/events/eventRouter";
 import { dispatchQueuedTasksForRole } from "@/modules/roleConcurrencyCheck";
+import { agentEscalateToMember } from "@/modules/agentEscalateToMember";
 
 const MsgTypeSchema = z.enum([
     "request",
@@ -343,6 +344,54 @@ export function agentMessageRoutes(app: Fastify) {
             return reply.send({ message: serializeMessage(updated) });
         },
     );
+
+    // POST /v1/projects/:id/agent-messages/escalate — agent escalates issue to human member
+    app.post(
+        "/v1/projects/:id/agent-messages/escalate",
+        {
+            preHandler: app.authenticate,
+            schema: {
+                params: z.object({ id: z.string() }),
+                body: z.object({
+                    fromRole: z.string().min(1).max(200),
+                    content: z.string().min(1).max(10000),
+                    escalationType: z.enum(["technical", "process", "permission"]),
+                    contextTags: z.array(z.string().max(50)).max(20).default([]),
+                    sessionId: z.string().optional(),
+                    relatedGoalId: z.string().optional(),
+                    relatedTaskId: z.string().optional(),
+                }),
+            },
+        },
+        async (request, reply) => {
+            const projectId = request.params.id;
+            const project = await db.project.findFirst({
+                where: { id: projectId, accountId: request.userId },
+                select: { id: true },
+            });
+            if (!project) {
+                return reply.code(404).send({ error: "Project not found" });
+            }
+
+            const result = await agentEscalateToMember({
+                accountId: request.userId,
+                projectId,
+                fromRole: request.body.fromRole,
+                msgType: "request",
+                content: request.body.content,
+                escalationType: request.body.escalationType,
+                contextTags: request.body.contextTags,
+                sessionId: request.body.sessionId,
+                relatedGoalId: request.body.relatedGoalId,
+                relatedTaskId: request.body.relatedTaskId,
+            });
+
+            return reply.code(201).send({
+                messageId: result.messageId,
+                targetMemberId: result.targetMemberId,
+            });
+        },
+    );
 }
 
 // === Serialization ===
@@ -352,6 +401,7 @@ function serializeMessage(m: {
     projectId: string;
     fromRole: string;
     toRole: string | null;
+    toMemberId: string | null;
     msgType: string;
     content: string;
     status: string;
@@ -368,6 +418,7 @@ function serializeMessage(m: {
         projectId: m.projectId,
         fromRole: m.fromRole,
         toRole: m.toRole,
+        toMemberId: m.toMemberId,
         msgType: m.msgType,
         content: m.content,
         status: m.status,

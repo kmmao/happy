@@ -4,6 +4,9 @@ import { z } from "zod";
 import { decisionCreate } from "@/modules/decisionCreate";
 import { decisionAdjudicate } from "@/modules/decisionAdjudicate";
 import { matchPrecedent } from "@/modules/decisionMatch";
+import { reassignDecision } from "@/modules/decisionRoute";
+import { requireRole, resolveEffectiveMember } from "@/modules/worldMemberResolve";
+import { addDecisionOpinion } from "@/modules/decisionOpinion";
 import { log } from "@/utils/log";
 
 const OptionSchema = z.object({
@@ -216,6 +219,73 @@ export function decisionRoutes(app: Fastify) {
         },
     );
 
+    // POST /v1/projects/:id/decisions/:decisionId/opinion — submit member opinion
+    app.post(
+        "/v1/projects/:id/decisions/:decisionId/opinion",
+        {
+            preHandler: app.authenticate,
+            schema: {
+                params: z.object({ id: z.string(), decisionId: z.string() }),
+                body: z.object({
+                    chosenOption: z.string(),
+                    rationale: z.string().max(2000).optional(),
+                }),
+            },
+        },
+        async (request, reply) => {
+            const member = await resolveEffectiveMember(request.userId, request.params.id);
+            if (member.decisionScope === "none") {
+                return reply.code(403).send({ error: "No decision authority" });
+            }
+
+            try {
+                const result = await addDecisionOpinion({
+                    decisionId: request.params.decisionId,
+                    accountId: request.userId,
+                    memberId: member.id ?? request.userId,
+                    chosenOption: request.body.chosenOption,
+                    rationale: request.body.rationale,
+                });
+                return reply.send(result);
+            } catch (e: any) {
+                if (e.statusCode) {
+                    return reply.code(e.statusCode).send({ error: e.message });
+                }
+                throw e;
+            }
+        },
+    );
+
+    // POST /v1/projects/:id/decisions/:decisionId/reassign — manually reassign to another member
+    app.post(
+        "/v1/projects/:id/decisions/:decisionId/reassign",
+        {
+            preHandler: app.authenticate,
+            schema: {
+                params: z.object({ id: z.string(), decisionId: z.string() }),
+                body: z.object({ memberId: z.string() }),
+            },
+        },
+        async (request, reply) => {
+            await requireRole(request.userId, request.params.id, "admin");
+
+            const decision = await db.decision.findFirst({
+                where: {
+                    id: request.params.decisionId,
+                    projectId: request.params.id,
+                    status: "pending",
+                },
+            });
+            if (!decision) {
+                return reply.code(404).send({ error: "Pending decision not found" });
+            }
+
+            await reassignDecision(decision.id, request.body.memberId, "manual_reassign");
+            const updated = await db.decision.findUnique({ where: { id: decision.id } });
+            return reply.send({ decision: updated ? serializeDecision(updated) : null });
+        },
+    );
+
     // GET /v1/projects/:id/decisions/match — match precedent (from CLI Agent)
     app.get(
         "/v1/projects/:id/decisions/match",
@@ -259,6 +329,9 @@ function serializeDecision(d: {
     rationale: string | null;
     knowledgeId: string | null;
     precedentKey: string | null;
+    assignedTo: string | null;
+    assignHistory: string;
+    opinions: string;
     expiresAt: Date | null;
     decidedAt: Date | null;
     createdAt: Date;
@@ -278,6 +351,9 @@ function serializeDecision(d: {
         rationale: d.rationale,
         knowledgeId: d.knowledgeId,
         precedentKey: d.precedentKey,
+        assignedTo: d.assignedTo,
+        assignHistory: safeParseJsonArray(d.assignHistory),
+        opinions: safeParseJsonArray(d.opinions),
         expiresAt: d.expiresAt?.getTime() ?? null,
         decidedAt: d.decidedAt?.getTime() ?? null,
         createdAt: d.createdAt.getTime(),

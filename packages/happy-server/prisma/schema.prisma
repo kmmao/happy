@@ -66,6 +66,7 @@ model Account {
     AgentMessage        AgentMessage[]
     WorldSuggestion     WorldSuggestion[]
     WorldMember         WorldMember[]
+    WorldAuditLog       WorldAuditLog[]
 }
 
 model TerminalAuthRequest {
@@ -468,6 +469,7 @@ model Project {
     agentMessages      AgentMessage[]
     worldSuggestions   WorldSuggestion[]
     worldMembers       WorldMember[]
+    worldAuditLogs     WorldAuditLog[]
 
     @@unique([accountId, machineId, path])
     @@index([accountId])
@@ -1130,6 +1132,7 @@ model Decision {
     // Member routing (WorldMember integration)
     assignedTo      String?                         // WorldMember.id — currently assigned member
     assignHistory   String    @default("[]")        // JSON: [{memberId, assignedAt, reason}]
+    opinions        String    @default("[]")        // JSON: [{memberId, accountId, chosenOption, rationale, createdAt}] — multi-member opinions before final adjudication
 
     // Lifecycle
     expiresAt       DateTime?
@@ -1264,4 +1267,32 @@ model WorldSuggestion {
     @@index([projectId, bucket])
     @@index([projectId, relatedGoalId])
     @@index([accountId])
+}
+
+// World Model — Audit Log (tracks who changed laws, narrative, roles, decisions)
+model WorldAuditLog {
+    id              String    @id @default(cuid())
+
+    // Who
+    accountId       String
+    account         Account   @relation(fields: [accountId], references: [id], onDelete: Cascade)
+    projectId       String
+    project         Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+    memberId        String?                         // WorldMember.id — null for implicit owner
+
+    // What
+    action          String                          // law.create | law.update | law.delete | narrative.update | role.create | role.update | role.delete | decision.adjudicate | decision.reassign | member.add | member.update | member.remove
+    entityType      String                          // law | narrative | role | decision | member
+    entityId        String?                         // ID of affected entity (law id, role id, etc.)
+
+    // Detail
+    summary         String                          // Human-readable summary
+    before          String?                         // JSON snapshot before change (null for creates)
+    after           String?                         // JSON snapshot after change (null for deletes)
+
+    createdAt       DateTime  @default(now())
+
+    @@index([projectId, createdAt(sort: Desc)])
+    @@index([projectId, entityType, createdAt(sort: Desc)])
+    @@index([accountId, createdAt(sort: Desc)])
 }

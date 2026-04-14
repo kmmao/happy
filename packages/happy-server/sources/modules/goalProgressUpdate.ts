@@ -5,7 +5,7 @@
  */
 
 import { db } from "@/storage/db";
-import { inboxCreate } from "./inboxCreate";
+import { inboxNotifyMembers } from "./inboxNotifyMembers";
 import { eventRouter, buildGoalProgressEphemeral } from "@/app/events/eventRouter";
 import { log } from "@/utils/log";
 import { truncateText, TEXT_LIMITS } from "./worldConstants";
@@ -112,8 +112,9 @@ export async function goalProgressUpdate(input: GoalProgressInput, depth: number
 
         // Notify on completion
         if (newStatus === "completed" && goal.status !== "completed") {
-            void inboxCreate({
+            void inboxNotifyMembers({
                 accountId: goal.accountId,
+                projectId: goal.projectId,
                 category: "goal",
                 eventType: "goal.completed",
                 severity: "info",

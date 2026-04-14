@@ -12,6 +12,7 @@ import { ProjectConfigTab } from "./ProjectConfigTab";
 import { ProjectKnowledgeTab } from "./ProjectKnowledgeTab";
 import { ProjectAnalyticsTab } from "./ProjectAnalyticsTab";
 import { WorldRolesTab } from "./WorldRolesTab";
+import { WorldMembersTab } from "./WorldMembersTab";
 import { WorldGoalsTab } from "./WorldGoalsTab";
 import { WorldOverviewTab } from "./WorldOverviewTab";
 import { layout } from "@/components/layout";
@@ -60,6 +61,7 @@ export const ProjectDetailView = React.memo(
                 const base: { key: TabKey; label: string }[] = [
                     { key: "world", label: t("projects.tabWorld") },
                     { key: "roles", label: t("projects.tabRoles") },
+                    { key: "members", label: t("projects.tabMembers") },
                     { key: "goals", label: t("projects.tabGoals") },
                     { key: "sessions", label: t("projects.tabSessions") },
                     { key: "git", label: t("projects.tabGit") },
@@ -206,6 +208,15 @@ export const ProjectDetailView = React.memo(
                         }
                     >
                         <WorldRolesTab project={project} isActive={activeTab === "roles"} />
+                    </View>
+                    <View
+                        style={
+                            activeTab === "members"
+                                ? styles.tabVisible
+                                : styles.tabHidden
+                        }
+                    >
+                        <WorldMembersTab project={project} isActive={activeTab === "members"} />
                     </View>
                     <View
                         style={

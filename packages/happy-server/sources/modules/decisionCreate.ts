@@ -10,6 +10,7 @@ import { worldSuggestionRefresh } from "./worldSuggestionGenerate";
 import { matchPrecedent } from "./decisionMatch";
 import { canAutoResolveDecision, autoResolveDecision } from "./decisionAutoResolve";
 import { resolveWorldAutonomyPolicy } from "./worldSuggestionAutoAccept";
+import { routeDecision } from "./decisionRoute";
 
 interface DecisionCreateInput {
     accountId: string;
@@ -78,9 +79,26 @@ export async function decisionCreate(input: DecisionCreateInput): Promise<{ id: 
         }
     }
 
-    // Create high-priority InboxItem (only when not auto-resolved)
+    // Route decision to the best-matching WorldMember
+    const route = await routeDecision(input.projectId, input.question, input.context);
+    if (route.memberId) {
+        await db.decision.update({
+            where: { id: decision.id },
+            data: {
+                assignedTo: route.memberId,
+                assignHistory: JSON.stringify([{
+                    memberId: route.memberId,
+                    assignedAt: new Date().toISOString(),
+                    reason: route.reason,
+                }]),
+            },
+        });
+    }
+
+    // Notify the assigned member (or the project owner if no routing)
+    const notifyAccountId = route.memberAccountId ?? input.accountId;
     void inboxCreate({
-        accountId: input.accountId,
+        accountId: notifyAccountId,
         category: "decision",
         eventType: "decision.created",
         severity: "warning",

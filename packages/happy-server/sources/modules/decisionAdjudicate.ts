@@ -8,6 +8,7 @@ import { log } from "@/utils/log";
 import { worldSuggestionRefresh } from "./worldSuggestionGenerate";
 import { eventRouter, buildTaskTriggerEphemeral } from "@/app/events/eventRouter";
 import { availableSlotsForRole } from "./roleConcurrencyCheck";
+import { auditLog } from "./worldAuditLog";
 
 interface AdjudicateInput {
     decisionId: string;
@@ -102,6 +103,17 @@ export async function decisionAdjudicate(input: AdjudicateInput): Promise<Adjudi
     });
 
     log({ module: "decision" }, `Decision ${decision.id} adjudicated → option "${input.chosenOption}", precedent ${knowledge.id}`);
+
+    void auditLog({
+        accountId: input.accountId,
+        projectId: decision.projectId,
+        action: "decision.adjudicate",
+        entityType: "decision",
+        entityId: decision.id,
+        summary: `Adjudicated: "${chosenDesc}"${input.rationale ? ` — ${input.rationale}` : ""}`,
+        before: { status: "pending", question: decision.question },
+        after: { status: "decided", chosenOption: input.chosenOption, chosenDesc },
+    });
 
     void worldSuggestionRefresh(input.accountId, decision.projectId);
 

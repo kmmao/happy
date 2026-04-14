@@ -3,7 +3,7 @@
  */
 
 import { db } from "@/storage/db";
-import { inboxCreate } from "./inboxCreate";
+import { inboxNotifyMembers } from "./inboxNotifyMembers";
 import {
     eventRouter,
     buildTaskTriggerEphemeral,
@@ -113,8 +113,9 @@ export async function goalCreate(input: GoalCreateInput): Promise<GoalCreateResu
     });
 
     // Create InboxItem
-    void inboxCreate({
+    void inboxNotifyMembers({
         accountId,
+        projectId,
         category: "goal",
         eventType: "goal.created",
         severity: "info",

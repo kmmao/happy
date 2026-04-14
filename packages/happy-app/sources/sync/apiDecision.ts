@@ -23,6 +23,9 @@ export interface ServerDecision {
     rationale: string | null;
     knowledgeId: string | null;
     precedentKey: string | null;
+    assignedTo: string | null;
+    assignHistory: Array<{ memberId: string; assignedAt: string; reason: string }>;
+    opinions: Array<{ memberId: string; accountId: string; chosenOption: string; rationale: string | null; createdAt: string }>;
     expiresAt: number | null;
     decidedAt: number | null;
     createdAt: number;
