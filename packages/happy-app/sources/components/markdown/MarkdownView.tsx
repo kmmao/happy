@@ -263,14 +263,44 @@ function RenderListBlock(props: {
   last: boolean;
   selectable: boolean;
 }) {
+  const { theme } = useUnistyles();
   const listStyle = [style.text, style.list];
   return (
     <View style={{ flexDirection: "column", marginBottom: 8, gap: 1 }}>
-      {props.items.map((item, index) => (
-        <Text selectable={props.selectable} style={listStyle} key={index}>
-          - <RenderSpans spans={item} baseStyle={listStyle} />
-        </Text>
-      ))}
+      {props.items.map((item, index) => {
+        // Detect task list: first span starts with "[ ] " or "[x] "
+        const firstSpan = item[0];
+        const firstText = firstSpan?.text ?? "";
+        const isUnchecked = firstText.startsWith("[ ] ");
+        const isChecked = firstText.startsWith("[x] ") || firstText.startsWith("[X] ");
+
+        if (isUnchecked || isChecked) {
+          // Strip the checkbox prefix from the first span
+          const strippedSpans: MarkdownSpan[] = [
+            { ...firstSpan, text: firstText.slice(4) },
+            ...item.slice(1),
+          ];
+          return (
+            <View key={index} style={{ flexDirection: "row", alignItems: "flex-start", gap: 6 }}>
+              <Ionicons
+                name={isChecked ? "checkbox" : "square-outline"}
+                size={16}
+                color={isChecked ? theme.colors.success : theme.colors.textSecondary}
+                style={{ marginTop: 3 }}
+              />
+              <Text selectable={props.selectable} style={[listStyle, { flex: 1 }]}>
+                <RenderSpans spans={strippedSpans} baseStyle={listStyle} />
+              </Text>
+            </View>
+          );
+        }
+
+        return (
+          <Text selectable={props.selectable} style={listStyle} key={index}>
+            - <RenderSpans spans={item} baseStyle={listStyle} />
+          </Text>
+        );
+      })}
     </View>
   );
 }
