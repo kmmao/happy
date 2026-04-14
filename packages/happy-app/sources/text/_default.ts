@@ -4090,6 +4090,9 @@ export const en = {
     modelOverridePlaceholder: "e.g. claude-sonnet-4-20250514 (leave empty for default)",
     modelDefault: "Default (inherit)",
     modelCustom: "Custom...",
+    boundMembers: ({ count }: { count: number }) => `${count} ${count === 1 ? "member" : "members"}`,
+    boundMembersSection: "Bound Members",
+    boundMembersHint: "Toggle which team members can perform this role",
   },
   members: {
     title: "Members",
@@ -4139,6 +4142,8 @@ export const en = {
     expertiseCount: ({ count }: { count: number }) => `${count} ${count === 1 ? "tag" : "tags"}`,
     permissionsSection: "Permissions",
     notificationsSection: "Notifications",
+    capacitySection: "Task Capacity",
+    maxConcurrencyLabel: "Max Concurrent Tasks",
   },
   goals: {
     title: "Goals",

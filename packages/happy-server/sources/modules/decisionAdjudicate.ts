@@ -7,7 +7,7 @@ import { lawSuggestionApply } from "./lawSuggestionApply";
 import { log } from "@/utils/log";
 import { worldSuggestionRefresh } from "./worldSuggestionGenerate";
 import { eventRouter, buildTaskTriggerEphemeral } from "@/app/events/eventRouter";
-import { availableSlotsForRole } from "./roleConcurrencyCheck";
+import { availableSlotsForMember, availableSlotsForImplicitOwner } from "./memberConcurrencyCheck";
 import { auditLog } from "./worldAuditLog";
 
 interface AdjudicateInput {
@@ -172,15 +172,16 @@ async function resumeWaitingTasks(opts: {
 
             const continuationPrompt = `${task.prompt}\n\n${decisionSummary}`;
 
-            // Check concurrency slot for role
+            // Check concurrency slot for assigned member (or implicit owner)
             let shouldDispatch = true;
-            if (task.roleType && task.projectId) {
-                const slots = await availableSlotsForRole({
-                    accountId,
-                    projectId,
-                    roleType: task.roleType,
-                });
-                shouldDispatch = slots > 0;
+            if (task.projectId) {
+                if (task.assignedMemberId) {
+                    const slots = await availableSlotsForMember({ memberId: task.assignedMemberId });
+                    shouldDispatch = slots > 0;
+                } else {
+                    const slots = await availableSlotsForImplicitOwner({ accountId, projectId });
+                    shouldDispatch = slots > 0;
+                }
             }
 
             const continuation = await db.task.create({
@@ -196,6 +197,7 @@ async function resumeWaitingTasks(opts: {
                     status: shouldDispatch ? "dispatching" : "queued",
                     goalId: task.goalId,
                     roleType: task.roleType,
+                    assignedMemberId: task.assignedMemberId,
                     directory: task.directory,
                 },
             });

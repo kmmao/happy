@@ -17,7 +17,7 @@ import {
 } from "@/modules/taskStatusLogic";
 import { truncateText, TEXT_LIMITS } from "@/modules/worldConstants";
 import { worldSuggestionRefresh } from "@/modules/worldSuggestionGenerate";
-import { dispatchQueuedTasksForRole } from "@/modules/roleConcurrencyCheck";
+import { dispatchQueuedTasksForMember, dispatchQueuedTasksForImplicitOwner } from "@/modules/memberConcurrencyCheck";
 
 const TaskPrioritySchema = z.enum(["urgent", "user", "background"]);
 const TaskStatusSchema = z.enum(["queued", "dispatching", "running", "waiting_decision", "completed", "failed", "cancelled"]);
@@ -541,14 +541,23 @@ export function taskRoutes(app: Fastify) {
             // Auto-resolve dependency_blocked messages waiting on this task
             void resolveBlockedMessagesByTask({ taskId, accountId: request.userId });
 
-            // Free up concurrency slot for next queued task of same role
-            if (updated.roleType && updated.projectId) {
-                void dispatchQueuedTasksForRole({
-                    accountId: request.userId,
-                    projectId: updated.projectId,
-                    roleType: updated.roleType,
-                    machineId: updated.machineId,
-                });
+            // Free up concurrency slot: dispatch next queued task for this member (or implicit owner)
+            const isTerminalOutcome = ["completed", "failed", "cancelled"].includes(resolvedStatus);
+            if (isTerminalOutcome && updated.projectId) {
+                if (updated.assignedMemberId) {
+                    void dispatchQueuedTasksForMember({
+                        memberId: updated.assignedMemberId,
+                        accountId: request.userId,
+                        machineId: updated.machineId,
+                    });
+                } else if (updated.roleType) {
+                    void dispatchQueuedTasksForImplicitOwner({
+                        accountId: request.userId,
+                        projectId: updated.projectId,
+                        machineId: updated.machineId,
+                        roleType: updated.roleType,
+                    });
+                }
             }
 
             log({ module: "task" }, `Task ${taskId} outcome → ${outcome} (status=${resolvedStatus})`);
@@ -633,14 +642,22 @@ export function taskRoutes(app: Fastify) {
                 void resolveBlockedMessagesByTask({ taskId, accountId: request.userId });
             }
 
-            // Free up concurrency slot for next queued task of same role
-            if (isTerminal && updated.roleType && updated.projectId) {
-                void dispatchQueuedTasksForRole({
-                    accountId: request.userId,
-                    projectId: updated.projectId,
-                    roleType: updated.roleType,
-                    machineId: updated.machineId,
-                });
+            // Free up concurrency slot: dispatch next queued task for this member (or implicit owner)
+            if (isTerminal && updated.projectId) {
+                if (updated.assignedMemberId) {
+                    void dispatchQueuedTasksForMember({
+                        memberId: updated.assignedMemberId,
+                        accountId: request.userId,
+                        machineId: updated.machineId,
+                    });
+                } else if (updated.roleType) {
+                    void dispatchQueuedTasksForImplicitOwner({
+                        accountId: request.userId,
+                        projectId: updated.projectId,
+                        machineId: updated.machineId,
+                        roleType: updated.roleType,
+                    });
+                }
             }
 
             log({ module: "task" }, `Task ${taskId} status → ${resolvedStatus}`);

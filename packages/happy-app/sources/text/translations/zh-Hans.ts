@@ -3935,6 +3935,9 @@ export const zhHans: TranslationStructure = {
     modelOverridePlaceholder: "如 claude-sonnet-4-20250514（留空则使用默认）",
     modelDefault: "默认（继承）",
     modelCustom: "自定义...",
+    boundMembers: ({ count }: { count: number }) => `${count} 个成员`,
+    boundMembersSection: "绑定成员",
+    boundMembersHint: "切换哪些团队成员可以执行此角色",
   },
   members: {
     title: "成员",
@@ -3984,6 +3987,8 @@ export const zhHans: TranslationStructure = {
     expertiseCount: ({ count }: { count: number }) => `${count} 个标签`,
     permissionsSection: "权限",
     notificationsSection: "通知",
+    capacitySection: "任务容量",
+    maxConcurrencyLabel: "最大并发任务数",
   },
   goals: {
     title: "目标",

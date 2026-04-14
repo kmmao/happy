@@ -4033,6 +4033,9 @@ export const ca: TranslationStructure = {
     modelOverridePlaceholder: "p.ex. claude-sonnet-4-20250514 (buit = per defecte)",
     modelDefault: "Per defecte (heretat)",
     modelCustom: "Personalitzat...",
+    boundMembers: ({ count }: { count: number }) => `${count} ${count === 1 ? "membre" : "membres"}`,
+    boundMembersSection: "Membres vinculats",
+    boundMembersHint: "Commuta quins membres de l'equip poden exercir aquest rol",
   },
   members: {
     title: "Membres",
@@ -4082,6 +4085,8 @@ export const ca: TranslationStructure = {
     expertiseCount: ({ count }: { count: number }) => `${count} ${count === 1 ? "etiqueta" : "etiquetes"}`,
     permissionsSection: "Permisos",
     notificationsSection: "Notificacions",
+    capacitySection: "Capacitat de tasques",
+    maxConcurrencyLabel: "Màx. tasques concurrents",
   },
   goals: {
     title: "Objectius",

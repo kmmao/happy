@@ -14,7 +14,10 @@ import {
     createAgentRole,
     updateAgentRole,
     deleteAgentRole,
+    fetchWorldMembers,
+    updateWorldMember,
     type AgentRoleSummary,
+    type WorldMemberSummary,
 } from "@/sync/apiProjects";
 
 const ROLE_TYPES = ["guardian", "builder", "healer", "chronicler", "planner", "messenger", "custom"] as const;
@@ -139,6 +142,7 @@ export const WorldRolesTab = React.memo(
         const { theme } = useUnistyles();
         const router = useRouter();
         const [roles, setRoles] = React.useState<AgentRoleSummary[]>([]);
+        const [members, setMembers] = React.useState<WorldMemberSummary[]>([]);
         const [loading, setLoading] = React.useState(false);
         const [editingRole, setEditingRole] = React.useState<AgentRoleSummary | "new" | null>(null);
 
@@ -146,14 +150,23 @@ export const WorldRolesTab = React.memo(
             router.push(`/session/${sessionId}`);
         }, [router]);
 
+        /** Count members who have this role ID in their assignedRoleIds */
+        const getBoundMemberCount = React.useCallback((roleId: string) => {
+            return members.filter((m) => m.assignedRoleIds.includes(roleId)).length;
+        }, [members]);
+
         const loadRoles = React.useCallback(async () => {
             if (!project.serverId) return;
             setLoading(true);
             try {
                 const credentials = await TokenStorage.getCredentials();
                 if (!credentials) return;
-                const fetched = await fetchAgentRoles(credentials, project.serverId);
-                setRoles(fetched);
+                const [fetchedRoles, fetchedMembers] = await Promise.all([
+                    fetchAgentRoles(credentials, project.serverId),
+                    fetchWorldMembers(credentials, project.serverId).catch(() => [] as WorldMemberSummary[]),
+                ]);
+                setRoles(fetchedRoles);
+                setMembers(fetchedMembers);
             } catch {
                 // best effort
             } finally {
@@ -248,6 +261,7 @@ export const WorldRolesTab = React.memo(
                                             {TYPE_LABELS[role.type]?.() ?? role.type}
                                             {role.duties.length > 0 ? ` \u00B7 ${t("roles.dutiesCount", { count: role.duties.length })}` : ""}
                                             {role.skillIds.length > 0 ? ` \u00B7 ${t("roles.skillsCount", { count: role.skillIds.length })}` : ""}
+                                            {getBoundMemberCount(role.id) > 0 ? ` \u00B7 ${t("roles.boundMembers", { count: getBoundMemberCount(role.id) })}` : ""}
                                         </Text>
                                     </View>
                                     <Switch
@@ -301,7 +315,9 @@ export const WorldRolesTab = React.memo(
                     <RoleFormSheet
                         role={editingRole === "new" ? undefined : editingRole}
                         projectId={project.serverId ?? ""}
+                        members={members}
                         onSave={handleSaved}
+                        onMembersChanged={setMembers}
                         onDelete={handleDelete}
                         onClose={() => setEditingRole(null)}
                     />
@@ -316,7 +332,9 @@ export const WorldRolesTab = React.memo(
 interface RoleFormSheetProps {
     role?: AgentRoleSummary;
     projectId: string;
+    members: WorldMemberSummary[];
     onSave: (role: AgentRoleSummary) => void;
+    onMembersChanged: React.Dispatch<React.SetStateAction<WorldMemberSummary[]>>;
     onDelete: (role: AgentRoleSummary) => void;
     onClose: () => void;
 }
@@ -324,7 +342,9 @@ interface RoleFormSheetProps {
 const RoleFormSheet = React.memo(function RoleFormSheet({
     role,
     projectId,
+    members,
     onSave,
+    onMembersChanged,
     onDelete,
     onClose,
 }: RoleFormSheetProps) {
@@ -645,6 +665,62 @@ const RoleFormSheet = React.memo(function RoleFormSheet({
                             autoCapitalize="none"
                             autoCorrect={false}
                         />
+                    )}
+
+                    {/* Bound Members Section (edit only, when members exist) */}
+                    {!isNew && members.length > 0 && (
+                        <>
+                            <View style={styles.sectionDivider}>
+                                <View style={styles.sectionDividerLine} />
+                                <Text style={styles.sectionDividerLabel}>{t("roles.boundMembersSection")}</Text>
+                                <View style={styles.sectionDividerLine} />
+                            </View>
+                            <Text style={[styles.fieldLabel, { marginTop: 4 }]}>{t("roles.boundMembersHint")}</Text>
+                            <View style={styles.chipRow}>
+                                {members.map((m) => {
+                                    const isBound = m.assignedRoleIds.includes(role!.id);
+                                    const displayName = m.displayName
+                                        ?? m.account?.firstName
+                                        ?? m.account?.username
+                                        ?? m.accountId.slice(0, 8);
+                                    return (
+                                        <Pressable
+                                            key={m.id}
+                                            style={[
+                                                styles.chip,
+                                                isBound && { backgroundColor: theme.colors.accentPurple },
+                                            ]}
+                                            onPress={async () => {
+                                                try {
+                                                    const credentials = await TokenStorage.getCredentials();
+                                                    if (!credentials) return;
+                                                    const newIds = isBound
+                                                        ? m.assignedRoleIds.filter((id) => id !== role!.id)
+                                                        : [...m.assignedRoleIds, role!.id];
+                                                    const updated = await updateWorldMember(credentials, projectId, m.id, {
+                                                        assignedRoleIds: newIds,
+                                                    });
+                                                    onMembersChanged(
+                                                        members.map((p) => (p.id === updated.id ? updated : p)),
+                                                    );
+                                                } catch {
+                                                    Modal.toast(t("members.saveError"));
+                                                }
+                                            }}
+                                        >
+                                            <Ionicons
+                                                name={isBound ? "checkmark-circle" : "ellipse-outline"}
+                                                size={16}
+                                                color={isBound ? "#fff" : theme.colors.textSecondary}
+                                            />
+                                            <Text style={[styles.chipText, isBound && { color: "#fff" }]}>
+                                                {displayName}
+                                            </Text>
+                                        </Pressable>
+                                    );
+                                })}
+                            </View>
+                        </>
                     )}
 
                     {/* Actions */}

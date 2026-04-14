@@ -3939,6 +3939,9 @@ export const zhHant: TranslationStructure = {
     modelOverridePlaceholder: "如 claude-sonnet-4-20250514（留空則使用預設）",
     modelDefault: "預設（繼承）",
     modelCustom: "自訂...",
+    boundMembers: ({ count }: { count: number }) => `${count} 個成員`,
+    boundMembersSection: "綁定成員",
+    boundMembersHint: "切換哪些團隊成員可以執行此角色",
   },
   members: {
     title: "成員",
@@ -3988,6 +3991,8 @@ export const zhHant: TranslationStructure = {
     expertiseCount: ({ count }: { count: number }) => `${count} 個標籤`,
     permissionsSection: "權限",
     notificationsSection: "通知",
+    capacitySection: "任務容量",
+    maxConcurrencyLabel: "最大並行任務數",
   },
   goals: {
     title: "目標",

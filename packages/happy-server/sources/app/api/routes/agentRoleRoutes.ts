@@ -15,7 +15,7 @@ const CreateAgentRoleBodySchema = z.object({
     description: z.string().max(5000).optional(),
     duties: z.array(z.string().max(200)).max(10).default([]),
     skillIds: z.array(z.string()).max(10).default([]),
-    maxConcurrency: z.number().int().min(1).max(10).default(1),
+    // maxConcurrency removed — capacity is now per-member (WorldMember.maxConcurrency)
     templateType: z.enum(ROLE_TYPES).optional(),
     agentType: z.enum(AGENT_TYPES).nullable().optional(),
     modelOverride: z.string().max(100).nullable().optional(),
@@ -27,7 +27,7 @@ const UpdateAgentRoleBodySchema = z.object({
     description: z.string().max(5000).nullable().optional(),
     duties: z.array(z.string().max(200)).max(10).optional(),
     skillIds: z.array(z.string()).max(10).optional(),
-    maxConcurrency: z.number().int().min(1).max(10).optional(),
+    // maxConcurrency removed — capacity is now per-member (WorldMember.maxConcurrency)
     enabled: z.boolean().optional(),
     agentType: z.enum(AGENT_TYPES).nullable().optional(),
     modelOverride: z.string().max(100).nullable().optional(),
@@ -111,7 +111,7 @@ export function agentRoleRoutes(app: Fastify) {
             schema: { body: CreateAgentRoleBodySchema },
         },
         async (request, reply) => {
-            const { projectId, name, type, description, duties, skillIds, maxConcurrency, templateType, agentType, modelOverride } = request.body;
+            const { projectId, name, type, description, duties, skillIds, templateType, agentType, modelOverride } = request.body;
 
             // Verify project ownership
             const project = await db.project.findFirst({
@@ -138,7 +138,6 @@ export function agentRoleRoutes(app: Fastify) {
                         description: finalDescription,
                         duties: JSON.stringify(finalDuties),
                         skillIds: JSON.stringify(skillIds),
-                        maxConcurrency,
                         agentType: agentType ?? null,
                         modelOverride: modelOverride ?? null,
                     },
@@ -300,7 +299,7 @@ export function agentRoleRoutes(app: Fastify) {
                 return reply.code(404).send({ error: "Agent role not found" });
             }
 
-            const { name, type, description, duties, skillIds, maxConcurrency, enabled, agentType, modelOverride } = request.body;
+            const { name, type, description, duties, skillIds, enabled, agentType, modelOverride } = request.body;
             const data: Record<string, unknown> = {};
 
             if (name !== undefined) data.name = name;
@@ -308,7 +307,6 @@ export function agentRoleRoutes(app: Fastify) {
             if (description !== undefined) data.description = description;
             if (duties !== undefined) data.duties = JSON.stringify(duties);
             if (skillIds !== undefined) data.skillIds = JSON.stringify(skillIds);
-            if (maxConcurrency !== undefined) data.maxConcurrency = maxConcurrency;
             if (enabled !== undefined) data.enabled = enabled;
             if (agentType !== undefined) data.agentType = agentType;
             if (modelOverride !== undefined) data.modelOverride = modelOverride;

@@ -12,7 +12,7 @@ import { goalCreate, goalDecompose } from "@/modules/goalCreate";
 import { buildWorldSessionBaseline, buildRoleIdentityPrefix } from "@/modules/goalHelpers";
 import { serializeGoal, serializeGoalDetail, type GoalAgentMessageSummary } from "@/modules/goalSerializer";
 import { TIME_MS } from "@/modules/worldConstants";
-import { availableSlotsForRole } from "@/modules/roleConcurrencyCheck";
+import { assignMemberForTask } from "@/modules/taskAssignMember";
 
 const GoalStatusSchema = z.enum(["planning", "in_progress", "blocked", "completed", "cancelled"]);
 const GoalPrioritySchema = z.enum(["urgent", "normal", "low"]);
@@ -844,17 +844,19 @@ export function goalRoutes(app: Fastify) {
                 promptParts.push(`## Your Task\n\n${taskDef.prompt}`);
                 const fullPrompt = promptParts.join("\n\n---\n\n");
 
-                // Concurrency check: does this role have an available slot?
+                // Member-centric concurrency: assign task to best member for this role
                 let shouldDispatch = true;
+                let assignedMemberId: string | null = null;
                 if (taskDef.suggestedRole) {
                     const alreadyActive = roleActiveCounts.get(taskDef.suggestedRole) ?? 0;
-                    const slots = await availableSlotsForRole({
+                    const assignment = await assignMemberForTask({
                         accountId: userId,
                         projectId,
                         roleType: taskDef.suggestedRole,
                         alreadyActive,
                     });
-                    if (slots <= 0) {
+                    assignedMemberId = assignment.memberId;
+                    if (assignment.availableSlots <= 0) {
                         shouldDispatch = false;
                     } else {
                         roleActiveCounts.set(taskDef.suggestedRole, alreadyActive + 1);
@@ -874,6 +876,7 @@ export function goalRoutes(app: Fastify) {
                         status: shouldDispatch ? "dispatching" : "queued",
                         goalId: goal.id,
                         roleType: taskDef.suggestedRole ?? null,
+                        assignedMemberId,
                         directory: project.path,
                     },
                 });

@@ -9,7 +9,7 @@ import {
     eventRouter,
     buildAgentMessageEphemeral,
 } from "@/app/events/eventRouter";
-import { dispatchQueuedTasksForRole } from "@/modules/roleConcurrencyCheck";
+import { dispatchQueuedTasksForMember, dispatchQueuedTasksForImplicitOwner } from "@/modules/memberConcurrencyCheck";
 import { agentEscalateToMember } from "@/modules/agentEscalateToMember";
 
 const MsgTypeSchema = z.enum([
@@ -196,7 +196,7 @@ export function agentMessageRoutes(app: Fastify) {
                             sessionId,
                             status: { in: ["running", "dispatching"] },
                         },
-                        select: { id: true, roleType: true, machineId: true },
+                        select: { id: true, roleType: true, machineId: true, assignedMemberId: true },
                     });
                     if (runningTask) {
                         await db.task.update({
@@ -206,12 +206,18 @@ export function agentMessageRoutes(app: Fastify) {
                         log({ module: "agent-message" }, `Task ${runningTask.id} paused waiting for decision ${decisionResult.id}`);
 
                         // Free concurrency slot so queued tasks can proceed
-                        if (runningTask.roleType) {
-                            void dispatchQueuedTasksForRole({
+                        if (runningTask.assignedMemberId) {
+                            void dispatchQueuedTasksForMember({
+                                memberId: runningTask.assignedMemberId,
+                                accountId: userId,
+                                machineId: runningTask.machineId,
+                            });
+                        } else if (runningTask.roleType) {
+                            void dispatchQueuedTasksForImplicitOwner({
                                 accountId: userId,
                                 projectId,
-                                roleType: runningTask.roleType,
                                 machineId: runningTask.machineId,
+                                roleType: runningTask.roleType,
                             });
                         }
                     }

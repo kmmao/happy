@@ -4047,6 +4047,9 @@ export const ru: TranslationStructure = {
     modelOverridePlaceholder: "напр. claude-sonnet-4-20250514 (оставьте пустым для по умолчанию)",
     modelDefault: "По умолчанию (наследовать)",
     modelCustom: "Другой...",
+    boundMembers: ({ count }: { count: number }) => `${count} ${count === 1 ? "участник" : "участников"}`,
+    boundMembersSection: "Привязанные участники",
+    boundMembersHint: "Выберите, какие участники могут выполнять эту роль",
   },
   members: {
     title: "Участники",
@@ -4096,6 +4099,8 @@ export const ru: TranslationStructure = {
     expertiseCount: ({ count }: { count: number }) => `${count} ${count === 1 ? "тег" : "тегов"}`,
     permissionsSection: "Разрешения",
     notificationsSection: "Уведомления",
+    capacitySection: "Ёмкость задач",
+    maxConcurrencyLabel: "Макс. параллельных задач",
   },
   goals: {
     title: "Цели",

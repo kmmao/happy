@@ -4028,6 +4028,9 @@ export const es: TranslationStructure = {
     modelOverridePlaceholder: "p.ej. claude-sonnet-4-20250514 (vacío = predeterminado)",
     modelDefault: "Predeterminado (heredar)",
     modelCustom: "Personalizado...",
+    boundMembers: ({ count }: { count: number }) => `${count} ${count === 1 ? "miembro" : "miembros"}`,
+    boundMembersSection: "Miembros vinculados",
+    boundMembersHint: "Alterna qué miembros del equipo pueden desempeñar este rol",
   },
   members: {
     title: "Miembros",
@@ -4077,6 +4080,8 @@ export const es: TranslationStructure = {
     expertiseCount: ({ count }: { count: number }) => `${count} ${count === 1 ? "etiqueta" : "etiquetas"}`,
     permissionsSection: "Permisos",
     notificationsSection: "Notificaciones",
+    capacitySection: "Capacidad de tareas",
+    maxConcurrencyLabel: "Máx. tareas concurrentes",
   },
   goals: {
     title: "Objetivos",

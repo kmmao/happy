@@ -835,6 +835,8 @@ model Task {
 
     // Role identity (e.g. "builder", "healer") assigned by the Planner
     roleType        String?
+    // Member assignment — who is responsible for this task (WorldMember.id)
+    assignedMemberId String?
 
     // Decision wait mechanism — task paused waiting for human adjudication
     waitingDecisionId String?
@@ -850,6 +852,7 @@ model Task {
     @@index([goalId, status])
     @@index([accountId, createdAt(sort: Desc)])
     @@index([waitingDecisionId])
+    @@index([assignedMemberId, status])
 }
 
 //
@@ -1045,7 +1048,8 @@ model AgentRole {
     duties          String    @default("[]")        // JSON array of duty strings
     skillIds        String    @default("[]")        // JSON array of Skill IDs to bind
 
-    maxConcurrency  Int       @default(1)           // Max concurrent task slots per role (enforced by roleConcurrencyCheck)
+    /// @deprecated Capacity moved to WorldMember.maxConcurrency — this field is no longer used for scheduling
+    maxConcurrency  Int       @default(1)
     enabled         Boolean   @default(true)
 
     // Execution environment — null means inherit from CLI active profile
@@ -1088,6 +1092,14 @@ model WorldMember {
     // Availability
     availability    String    @default("active")    // active | away | delegate
     delegateTo      String?                         // WorldMember.id to delegate to
+
+    // Task capacity (moved from AgentRole — capacity belongs to people, not templates)
+    maxConcurrency  Int       @default(3)           // Max concurrent task slots for this member
+    assignedRoleIds String    @default("[]")        // JSON: AgentRole.id[] — which roles this member can perform
+
+    // Execution environment override (member-level, takes precedence over role-level)
+    agentType       String?                         // Override role's agentType — null = inherit from role
+    modelOverride   String?                         // Override role's modelOverride — null = inherit from role
 
     // Lifecycle
     joinedAt        DateTime  @default(now())

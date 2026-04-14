@@ -372,7 +372,6 @@ export async function updateAgentRole(
         description?: string | null;
         duties?: string[];
         skillIds?: string[];
-        maxConcurrency?: number;
         enabled?: boolean;
         agentType?: string | null;
         modelOverride?: string | null;
@@ -797,6 +796,10 @@ export interface WorldMemberSummary {
     notifyLevel: string;
     availability: string;
     delegateTo: string | null;
+    maxConcurrency: number;
+    assignedRoleIds: string[];
+    agentType: string | null;
+    modelOverride: string | null;
     joinedAt: number;
     updatedAt: number;
     account: WorldMemberAccount | null;
@@ -853,6 +856,8 @@ export async function updateWorldMember(
         role?: string;
         displayName?: string | null;
         expertise?: string[];
+        maxConcurrency?: number;
+        assignedRoleIds?: string[];
         lawAuthority?: string;
         decisionScope?: string;
         goalAuthority?: string;

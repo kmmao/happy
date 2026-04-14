@@ -9,6 +9,10 @@ interface WorldMemberUpdateInput {
     role?: string;
     displayName?: string | null;
     expertise?: string[];
+    maxConcurrency?: number;
+    assignedRoleIds?: string[];
+    agentType?: string | null;
+    modelOverride?: string | null;
     lawAuthority?: string;
     decisionScope?: string;
     goalAuthority?: string;
@@ -23,6 +27,10 @@ export async function worldMemberUpdate(input: WorldMemberUpdateInput) {
     if (input.role !== undefined) data.role = input.role;
     if (input.displayName !== undefined) data.displayName = input.displayName;
     if (input.expertise !== undefined) data.expertise = JSON.stringify(input.expertise);
+    if (input.maxConcurrency !== undefined) data.maxConcurrency = input.maxConcurrency;
+    if (input.assignedRoleIds !== undefined) data.assignedRoleIds = JSON.stringify(input.assignedRoleIds);
+    if (input.agentType !== undefined) data.agentType = input.agentType;
+    if (input.modelOverride !== undefined) data.modelOverride = input.modelOverride;
     if (input.lawAuthority !== undefined) data.lawAuthority = input.lawAuthority;
     if (input.decisionScope !== undefined) data.decisionScope = input.decisionScope;
     if (input.goalAuthority !== undefined) data.goalAuthority = input.goalAuthority;

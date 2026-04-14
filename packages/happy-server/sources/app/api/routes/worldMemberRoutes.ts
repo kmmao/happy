@@ -20,6 +20,8 @@ const UpdateMemberBodySchema = z.object({
     role: z.enum(MEMBER_ROLES).optional(),
     displayName: z.string().max(100).nullable().optional(),
     expertise: z.array(z.string().max(50)).max(20).optional(),
+    maxConcurrency: z.number().int().min(1).max(20).optional(),
+    assignedRoleIds: z.array(z.string()).max(10).optional(),
     lawAuthority: z.enum(["create", "suggest", "readonly"]).optional(),
     decisionScope: z.enum(["all", "assigned", "none"]).optional(),
     goalAuthority: z.enum(["create", "suggest", "readonly"]).optional(),
@@ -306,12 +308,18 @@ function serializeMember(member: {
     notifyLevel: string;
     availability: string;
     delegateTo: string | null;
+    maxConcurrency: number;
+    assignedRoleIds: string;
+    agentType: string | null;
+    modelOverride: string | null;
     joinedAt: Date;
     updatedAt: Date;
     account?: { id: string; username: string | null; firstName: string | null; lastName: string | null; avatar: unknown } | null;
 }) {
     let expertise: string[] = [];
     try { expertise = JSON.parse(member.expertise); } catch { /* keep empty */ }
+    let assignedRoleIds: string[] = [];
+    try { assignedRoleIds = JSON.parse(member.assignedRoleIds); } catch { /* keep empty */ }
 
     return {
         id: member.id,
@@ -326,6 +334,10 @@ function serializeMember(member: {
         notifyLevel: member.notifyLevel,
         availability: member.availability,
         delegateTo: member.delegateTo,
+        maxConcurrency: member.maxConcurrency,
+        assignedRoleIds,
+        agentType: member.agentType,
+        modelOverride: member.modelOverride,
         joinedAt: member.joinedAt.getTime(),
         updatedAt: member.updatedAt.getTime(),
         account: member.account ? {

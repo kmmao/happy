@@ -228,6 +228,7 @@ const MemberFormSheet = React.memo(function MemberFormSheet({
     const [role, setRole] = React.useState(member?.role ?? "member");
     const [expertise, setExpertise] = React.useState<string[]>(member?.expertise ?? []);
     const [newTag, setNewTag] = React.useState("");
+    const [maxConcurrency, setMaxConcurrency] = React.useState(member?.maxConcurrency ?? 3);
     const [notifyLevel, setNotifyLevel] = React.useState(member?.notifyLevel ?? "all");
     const [availability, setAvailability] = React.useState(member?.availability ?? "active");
     const [saving, setSaving] = React.useState(false);
@@ -262,6 +263,7 @@ const MemberFormSheet = React.memo(function MemberFormSheet({
                 const saved = await updateWorldMember(credentials, projectId, member!.id, {
                     role: member!.role === "owner" ? undefined : role,
                     expertise,
+                    maxConcurrency,
                     notifyLevel,
                     availability,
                 });
@@ -369,6 +371,33 @@ const MemberFormSheet = React.memo(function MemberFormSheet({
                                 <Ionicons name="add" size={20} color={theme.colors.accentPurple} />
                             </Pressable>
                         </View>
+                    )}
+
+                    {/* Task Capacity (edit only) */}
+                    {!isNew && (
+                        <>
+                            <View style={styles.sectionDivider}>
+                                <View style={styles.sectionDividerLine} />
+                                <Text style={styles.sectionDividerLabel}>{t("members.capacitySection")}</Text>
+                                <View style={styles.sectionDividerLine} />
+                            </View>
+
+                            <Text style={styles.fieldLabel}>{t("members.maxConcurrencyLabel")}</Text>
+                            <View style={styles.chipRow}>
+                                {[1, 2, 3, 5, 10].map((n) => {
+                                    const selected = maxConcurrency === n;
+                                    return (
+                                        <Pressable
+                                            key={n}
+                                            style={[styles.chip, selected && { backgroundColor: theme.colors.accentPurple }]}
+                                            onPress={() => setMaxConcurrency(n)}
+                                        >
+                                            <Text style={[styles.chipText, selected && { color: "#fff" }]}>{n}</Text>
+                                        </Pressable>
+                                    );
+                                })}
+                            </View>
+                        </>
                     )}
 
                     {/* Notifications Section (edit only) */}

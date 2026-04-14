@@ -4005,6 +4005,9 @@ export const ja: TranslationStructure = {
     modelOverridePlaceholder: "例: claude-sonnet-4-20250514（空欄でデフォルト）",
     modelDefault: "デフォルト（継承）",
     modelCustom: "カスタム...",
+    boundMembers: ({ count }: { count: number }) => `${count}人のメンバー`,
+    boundMembersSection: "割り当てメンバー",
+    boundMembersHint: "このロールを実行できるメンバーを切り替え",
   },
   members: {
     title: "メンバー",
@@ -4054,6 +4057,8 @@ export const ja: TranslationStructure = {
     expertiseCount: ({ count }: { count: number }) => `${count}個のタグ`,
     permissionsSection: "権限",
     notificationsSection: "通知",
+    capacitySection: "タスク容量",
+    maxConcurrencyLabel: "最大同時実行タスク数",
   },
   goals: {
     title: "ゴール",
