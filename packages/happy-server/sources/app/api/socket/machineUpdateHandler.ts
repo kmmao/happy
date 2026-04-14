@@ -305,6 +305,29 @@ export function machineUpdateHandler(userId: string, socket: Socket) {
         }
     });
 
+    // Daemon reconnect: re-activate sessions that are still alive on the daemon side.
+    // Called immediately after the daemon (re-)connects so the server has an accurate
+    // view of which sessions are running without waiting for the 10-min idle timeout.
+    socket.on('session-sync', async (data: { sessionIds: string[] }) => {
+        try {
+            const sessionIds = data?.sessionIds;
+            if (!Array.isArray(sessionIds) || sessionIds.length === 0) return;
+
+            await db.session.updateMany({
+                where: {
+                    id: { in: sessionIds },
+                    accountId: userId,
+                },
+                data: {
+                    active: true,
+                    lastActiveAt: new Date(),
+                },
+            });
+        } catch (error) {
+            log({ module: 'websocket', level: 'error' }, `Error in session-sync: ${error}`);
+        }
+    });
+
     // Handle transcript knowledge submissions from AutoDream
     socket.on('transcript-knowledge', async (data: any) => {
         try {

@@ -2100,6 +2100,25 @@ export async function startDaemon(): Promise<void> {
       },
     });
 
+    // Provide active session IDs to the client so it can re-sync with the server on reconnect.
+    apiMachine.setSessionSyncProvider(() =>
+      Array.from(pidToTrackedSession.values())
+        .map((s) => s.happySessionId)
+        .filter((id): id is string => Boolean(id))
+    );
+
+    // Provide a cleanup handler that gracefully terminates all child processes
+    // if the server has been unreachable for too long (default 5 min).
+    apiMachine.setDisconnectCleanupHandler(() => {
+      for (const [pid, session] of pidToTrackedSession.entries()) {
+        requestTrackedSessionTermination(pid, session, {
+          reason: "server-disconnect-timeout",
+          terminalStatus: "failed",
+          terminalError: "Server disconnected for too long; session terminated",
+        });
+      }
+    });
+
     // Connect to server
     apiMachine.connect();
 

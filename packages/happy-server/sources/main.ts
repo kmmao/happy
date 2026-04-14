@@ -35,6 +35,15 @@ async function main() {
     await loadFiles();
     await auth.init();
 
+    // Startup cleanup: all previously-active sessions and machines must be
+    // considered disconnected because their socket connections are gone.
+    // Daemons will re-activate their sessions via session-sync after reconnecting.
+    const [staleSessionResult, staleMachineResult] = await Promise.all([
+        db.session.updateMany({ where: { active: true }, data: { active: false } }),
+        db.machine.updateMany({ where: { active: true }, data: { active: false } }),
+    ]);
+    log(`Startup cleanup: ${staleSessionResult.count} sessions and ${staleMachineResult.count} machines marked inactive`);
+
     //
     // Start
     //

@@ -51,6 +51,10 @@ interface ServerToDaemonEvents {
 interface DaemonToServerEvents {
   "machine-alive": (data: { machineId: string; time: number }) => void;
 
+  // Sent immediately after (re-)connect to tell the server which sessions are
+  // still running so it can restore their active flags after a server restart.
+  "session-sync": (data: { sessionIds: string[] }) => void;
+
   "machine-update-metadata": (
     data: {
       machineId: string;
@@ -343,6 +347,12 @@ export class ApiMachineClient {
   }> = [];
   private terminalManager = new TerminalManager();
 
+  // Disconnect cleanup: timer fires after prolonged disconnect to terminate orphaned child processes
+  private disconnectCleanupTimer: NodeJS.Timeout | null = null;
+  // Provided by run.ts — returns happySessionIds of currently-running sessions for reconnect sync
+  private sessionSyncProvider: (() => string[]) | null = null;
+  // Provided by run.ts — terminates all tracked child processes after prolonged server disconnect
+  private disconnectCleanupHandler: (() => void) | null = null;
 
   constructor(
     private token: string,
@@ -1068,6 +1078,12 @@ export class ApiMachineClient {
     this.socket.on("connect", () => {
       logger.debug("[API MACHINE] Connected to server");
 
+      // Cancel any pending disconnect cleanup timer
+      if (this.disconnectCleanupTimer) {
+        clearTimeout(this.disconnectCleanupTimer);
+        this.disconnectCleanupTimer = null;
+      }
+
       // Update daemon state to running
       // We need to override previous state because the daemon (this process)
       // has restarted with new PID & port
@@ -1107,6 +1123,17 @@ export class ApiMachineClient {
       this.flushPendingFixStatuses();
       this.flushPendingTaskStatuses();
 
+      // Re-activate sessions that are still running on this daemon.
+      // The server cleared all active flags on startup, so we must tell it
+      // which sessions survived the reconnect window.
+      if (this.sessionSyncProvider) {
+        const sessionIds = this.sessionSyncProvider();
+        if (sessionIds.length > 0) {
+          logger.debug(`[API MACHINE] Syncing ${sessionIds.length} active session(s) with server`);
+          this.socket.emit("session-sync", { sessionIds });
+        }
+      }
+
       // Start keep-alive
       this.startKeepAlive();
 
@@ -1120,6 +1147,21 @@ export class ApiMachineClient {
       this.stopKeepAlive();
       this.stopTailscaleRefresh();
       this.terminalManager.closeAll();
+
+      // After a prolonged disconnect, child processes can no longer report
+      // results back to the server. Schedule a graceful cleanup so they don't
+      // run indefinitely as orphans.
+      const timeoutMs = parseInt(
+        process.env.HAPPY_DISCONNECT_CLEANUP_TIMEOUT_MS ?? `${5 * 60_000}`,
+      );
+      if (timeoutMs > 0 && this.disconnectCleanupHandler) {
+        const handler = this.disconnectCleanupHandler;
+        this.disconnectCleanupTimer = setTimeout(() => {
+          this.disconnectCleanupTimer = null;
+          logger.warn(`[API MACHINE] Server unreachable for ${timeoutMs / 1000}s — terminating orphaned child sessions`);
+          handler();
+        }, timeoutMs);
+      }
     });
 
     // Single consolidated RPC handler
@@ -1252,6 +1294,19 @@ export class ApiMachineClient {
   /** Allow run.ts to attach TunnelManager for refresh & RPC. */
   setTunnelManager(manager: TunnelManager) {
     this.tunnelManager = manager;
+  }
+
+  /** Called by run.ts so the client can report active sessions on reconnect. */
+  setSessionSyncProvider(provider: () => string[]) {
+    this.sessionSyncProvider = provider;
+  }
+
+  /**
+   * Called by run.ts to register a cleanup handler that terminates all tracked
+   * child processes when the server has been unreachable for too long.
+   */
+  setDisconnectCleanupHandler(handler: () => void) {
+    this.disconnectCleanupHandler = handler;
   }
 
   private startTailscaleRefresh() {
