@@ -202,6 +202,26 @@ export function parseMarkdownBlock(markdown: string) {
             continue;
         }
 
+        // Blockquote
+        if (trimmed.startsWith('> ') || trimmed === '>') {
+            const quoteLines: string[] = [];
+            quoteLines.push(trimmed === '>' ? '' : trimmed.slice(2));
+            while (index < lines.length) {
+                const nextTrimmed = lines[index].trim();
+                if (nextTrimmed.startsWith('> ') || nextTrimmed === '>') {
+                    quoteLines.push(nextTrimmed === '>' ? '' : nextTrimmed.slice(2));
+                    index++;
+                } else {
+                    break;
+                }
+            }
+            const quoteText = quoteLines.join(' ').trim();
+            if (quoteText.length > 0) {
+                blocks.push({ type: 'blockquote', content: parseMarkdownSpans(quoteText, false) });
+            }
+            continue;
+        }
+
         // If it is a numbered list
         const numberedListMatch = trimmed.match(/^(\d+)\.\s/);
         if (numberedListMatch) {

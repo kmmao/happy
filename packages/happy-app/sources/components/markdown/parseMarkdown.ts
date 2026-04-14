@@ -30,6 +30,9 @@ export type MarkdownBlock = {
     headers: string[],
     rows: string[][]
 } | {
+    type: 'blockquote',
+    content: MarkdownSpan[]
+} | {
     type: 'math-block',
     content: string
 } | {

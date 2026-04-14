@@ -139,6 +139,14 @@ export const MarkdownView = React.memo(
                   risks={block.risks}
                 />
               );
+            } else if (block.type === "blockquote") {
+              return (
+                <RenderBlockquote
+                  spans={block.content}
+                  key={index}
+                  selectable={selectable}
+                />
+              );
             } else if (block.type === "table") {
               return (
                 <RenderTableBlock
@@ -301,6 +309,29 @@ function RenderListBlock(props: {
           </Text>
         );
       })}
+    </View>
+  );
+}
+
+function RenderBlockquote(props: {
+  spans: MarkdownSpan[];
+  selectable: boolean;
+}) {
+  const { theme } = useUnistyles();
+  return (
+    <View
+      style={{
+        borderLeftWidth: 3,
+        borderLeftColor: theme.colors.textLink,
+        paddingLeft: 12,
+        paddingVertical: 4,
+        marginBottom: 8,
+        opacity: 0.85,
+      }}
+    >
+      <Text selectable={props.selectable} style={[style.text, { fontStyle: "italic", color: theme.colors.textSecondary }]}>
+        <RenderSpans spans={props.spans} baseStyle={[style.text]} />
+      </Text>
     </View>
   );
 }
