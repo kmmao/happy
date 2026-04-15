@@ -555,7 +555,7 @@ describe('Acceptance: Full test suite runs', () => {
 
         try {
             const config = loadConfig();
-            expect(config.serverUrl).toBe('https://happyserve.xycloud.info');
+            expect(config.serverUrl).toBe('https://s.sangreal.code.xycloud.info:2443');
             expect(config.homeDir).toContain('.happy');
             expect(config.credentialPath).toContain('agent.key');
         } finally {

@@ -23,7 +23,7 @@
 #   DEFAULT_OPUS        Opus 模型      (默认: claude-opus-4-6)
 #   DEFAULT_SONNET      Sonnet 模型    (默认: claude-sonnet-4-6)
 #   DEFAULT_HAIKU       Haiku 模型     (默认: claude-haiku-4-5-20251001)
-#   HAPPY_SERVER_URL    Happy 服务地址 (默认: https://happyserve.xycloud.info)
+#   HAPPY_SERVER_URL    Happy 服务地址 (默认: https://s.sangreal.code.xycloud.info:2443)
 #
 # 示例:
 #   PROXY_HOST=10.0.0.1 PROXY_PORT=9000 sudo -E ./deploy.sh 10
@@ -54,7 +54,7 @@ DEFAULT_SONNET="${DEFAULT_SONNET:-claude-sonnet-4-6}"
 DEFAULT_HAIKU="${DEFAULT_HAIKU:-claude-haiku-4-5-20251001}"
 
 # Happy Server 地址（环境变量 > 默认值）
-HAPPY_SERVER_URL="${HAPPY_SERVER_URL:-https://happyserve.xycloud.info}"
+HAPPY_SERVER_URL="${HAPPY_SERVER_URL:-https://s.sangreal.code.xycloud.info:2443}"
 
 # ======================== 颜色输出 ========================
 

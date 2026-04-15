@@ -18,7 +18,7 @@ describe('config', () => {
     describe('defaults', () => {
         it('uses default server URL', () => {
             const config = loadConfig();
-            expect(config.serverUrl).toBe('https://happyserve.xycloud.info');
+            expect(config.serverUrl).toBe('https://s.sangreal.code.xycloud.info:2443');
         });
 
         it('uses default home directory', () => {

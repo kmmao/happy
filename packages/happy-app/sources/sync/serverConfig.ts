@@ -5,7 +5,7 @@ const serverConfigStorage = new MMKV({ id: "server-config" });
 
 const SERVER_KEY = "custom-server-url";
 const WEBAPP_KEY = "custom-webapp-url";
-const DEFAULT_SERVER_URL = "https://happyserve.xycloud.info";
+const DEFAULT_SERVER_URL = "https://s.sangreal.code.xycloud.info:2443";
 
 export function getServerUrl(): string {
   return (

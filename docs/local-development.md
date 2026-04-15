@@ -398,8 +398,8 @@ CLI 启动时加载 `.env.dev` 或 `.env.dev-local-server`。
 
 | 变量 | 默认值 | 说明 |
 |------|--------|------|
-| `HAPPY_SERVER_URL` | `https://happyserve.xycloud.info` | 连接的 Server 地址 |
-| `HAPPY_WEBAPP_URL` | `https://happy.xycloud.info` | Web 应用地址（配对码页面等） |
+| `HAPPY_SERVER_URL` | `https://s.sangreal.code.xycloud.info:2443` | 连接的 Server 地址 |
+| `HAPPY_WEBAPP_URL` | `https://w.sangreal.code.xycloud.info:2443` | Web 应用地址（配对码页面等） |
 | `HAPPY_HOME_DIR` | `~/.happy` | 数据目录。开发时建议 `~/.happy-dev` |
 | `HAPPY_VARIANT` | `stable` | CLI 变体（stable/dev） |
 

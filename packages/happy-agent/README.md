@@ -119,7 +119,7 @@ Exit code 0 when agent becomes idle, 1 on timeout.
 
 ## Environment Variables
 
-- `HAPPY_SERVER_URL` - API server URL (default: `https://happyserve.xycloud.info`)
+- `HAPPY_SERVER_URL` - API server URL (default: `https://s.sangreal.code.xycloud.info:2443`)
 - `HAPPY_HOME_DIR` - Home directory for credential storage (default: `~/.happy`)
 
 ## Session ID Matching
