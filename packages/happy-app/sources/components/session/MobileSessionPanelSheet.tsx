@@ -17,8 +17,9 @@ import { SessionKnowledgeSheet } from "@/components/knowledge/SessionKnowledgeSh
 import { useProjectForSession, useSession } from "@/sync/storage";
 import { SidePanelGitPanel } from "./SidePanelGitPanel";
 import { SidePanelSummaryTab } from "./SidePanelSummaryTab";
-import { SidePanelTimelineTab } from "./SidePanelTimelineTab";
 import { SidePanelTerminalTab } from "./SidePanelTerminalTab";
+import { SidePanelCodeTab } from "./SidePanelCodeTab";
+import { SidePanelPreviewTab } from "./SidePanelPreviewTab";
 import { SidePanelFilePreview } from "./SidePanelFilePreview";
 import { buildFileReferenceText } from "./sessionSidePanelReference";
 import { InputContext } from "@/hooks/useInputContext";
@@ -96,8 +97,10 @@ export const MobileSessionPanelSheet = React.memo<MobileSessionPanelSheetProps>(
                             onOpenKnowledge={() => setShowKnowledgeSheet(true)}
                         />
                     );
-                case "timeline":
-                    return <SidePanelTimelineTab sessionId={sessionId} />;
+                case "code":
+                    return <SidePanelCodeTab sessionId={sessionId} />;
+                case "preview":
+                    return <SidePanelPreviewTab sessionId={sessionId} />;
                 case "terminal":
                     return <SidePanelTerminalTab sessionId={sessionId} />;
             }
@@ -187,16 +190,15 @@ export const MobileSessionPanelSheet = React.memo<MobileSessionPanelSheetProps>(
                                     >
                                         {tabs.map((tab) => {
                                             const isActive = tab === activeTab;
-                                            const label =
-                                                tab === "files"
-                                                    ? t("sidePanel.files")
-                                                    : tab === "changes"
-                                                      ? t("sidePanel.changes")
-                                                      : tab === "summary"
-                                                        ? t("sidePanel.summary")
-                                                        : tab === "timeline"
-                                                          ? t("sidePanel.timeline")
-                                                          : t("sidePanel.terminal");
+                                            const labelMap: Record<MobileSessionPanelTab, string> = {
+                                                files: t("sidePanel.files"),
+                                                changes: t("sidePanel.changes"),
+                                                code: t("sidePanel.code"),
+                                                preview: t("sidePanel.preview"),
+                                                summary: t("sidePanel.summary"),
+                                                terminal: t("sidePanel.terminal"),
+                                            };
+                                            const label = labelMap[tab];
                                             return (
                                                 <View
                                                     key={tab}

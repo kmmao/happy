@@ -1,8 +1,9 @@
 export type MobileSessionPanelTab =
     | "files"
     | "changes"
+    | "code"
+    | "preview"
     | "summary"
-    | "timeline"
     | "terminal";
 
 interface MobileSessionPanelVisibilityInput {
@@ -18,5 +19,5 @@ export function shouldShowMobileSessionPanelButton({
 }
 
 export function getMobileSessionPanelTabs(): MobileSessionPanelTab[] {
-    return ["files", "changes", "summary", "timeline", "terminal"];
+    return ["files", "changes", "code", "preview", "summary", "terminal"];
 }

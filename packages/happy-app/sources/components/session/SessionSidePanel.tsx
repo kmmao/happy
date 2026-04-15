@@ -9,7 +9,8 @@ import { GitBrowseTab } from "@/components/git/GitBrowseTab";
 import { SidePanelSummaryTab } from "./SidePanelSummaryTab";
 import { SidePanelGitPanel } from "./SidePanelGitPanel";
 import { SidePanelFilePreview } from "./SidePanelFilePreview";
-import { SidePanelTimelineTab } from "./SidePanelTimelineTab";
+import { SidePanelCodeTab } from "./SidePanelCodeTab";
+import { SidePanelPreviewTab } from "./SidePanelPreviewTab";
 import { SidePanelTerminalTab } from "./SidePanelTerminalTab";
 import { InputContext } from "@/hooks/useInputContext";
 import { buildFileReferenceText } from "./sessionSidePanelReference";
@@ -24,7 +25,7 @@ export const SIDE_PANEL_WIDTH = 360;
 export const SIDE_PANEL_MIN_WINDOW_WIDTH = 1200;
 const COLLAPSED_WIDTH = 36;
 
-type TabKey = "files" | "changes" | "summary" | "timeline" | "terminal";
+type TabKey = "files" | "changes" | "code" | "preview" | "summary" | "terminal";
 
 interface SessionSidePanelProps {
     sessionId: string;
@@ -95,8 +96,9 @@ export const SessionSidePanel = React.memo<SessionSidePanelProps>(
         const tabs: Array<{ key: TabKey; label: string }> = [
             { key: "files", label: t("sidePanel.files") },
             { key: "changes", label: t("sidePanel.changes") },
+            { key: "code", label: t("sidePanel.code") },
+            { key: "preview", label: t("sidePanel.preview") },
             { key: "summary", label: t("sidePanel.summary") },
-            { key: "timeline", label: t("sidePanel.timeline") },
             { key: "terminal", label: t("sidePanel.terminal") },
         ];
 
@@ -203,14 +205,17 @@ export const SessionSidePanel = React.memo<SessionSidePanelProps>(
                                     onFilePress={handleFilePress}
                                 />
                             )}
+                            {activeTab === "code" && (
+                                <SidePanelCodeTab sessionId={sessionId} />
+                            )}
+                            {activeTab === "preview" && (
+                                <SidePanelPreviewTab sessionId={sessionId} />
+                            )}
                             {activeTab === "summary" && (
                                 <SidePanelSummaryTab
                                     sessionId={sessionId}
                                     onOpenKnowledge={onOpenKnowledge}
                                 />
-                            )}
-                            {activeTab === "timeline" && (
-                                <SidePanelTimelineTab sessionId={sessionId} />
                             )}
                             {activeTab === "terminal" && (
                                 <SidePanelTerminalTab sessionId={sessionId} />

@@ -112,21 +112,6 @@ import { autoOptionSendService } from "@/sync/autoOptionSendService";
 import { log } from '@/log';
 import { shouldShowMobileSessionPanelButton } from "@/components/session/mobileSessionPanelState";
 
-const FILE_EDIT_TOOLS = new Set(["Edit", "edit", "MultiEdit", "Write"]);
-
-function hasFileChanges(messages: readonly Message[]): boolean {
-  for (const msg of messages) {
-    if (msg.kind === "tool-call") {
-      if (msg.tool && FILE_EDIT_TOOLS.has(msg.tool.name) && msg.tool.state === "completed") {
-        return true;
-      }
-      if (msg.children.length > 0 && hasFileChanges(msg.children)) {
-        return true;
-      }
-    }
-  }
-  return false;
-}
 
 function hasPendingAskUserQuestion(messages: readonly Message[]): boolean {
   for (const msg of messages) {
@@ -244,16 +229,6 @@ export const SessionView = React.memo((props: { id: string }) => {
   const sessionIsConnected = session?.presence === "online";
   const { hasConfig: hasDevConfig } = useDevConfig(sessionId, sessionIsConnected);
 
-  const hasChanges = storage((state) => {
-    const msgs = state.sessionMessages[sessionId]?.messages;
-    if (!msgs || !hasFileChanges(msgs)) return false;
-    // Hide when all changes have been committed (clean working tree)
-    const gitStatus = state.getSessionProjectGitStatus(sessionId)
-      ?? state.sessionGitStatus[sessionId];
-    if (gitStatus && !gitStatus.isDirty) return false;
-    return true;
-  });
-
   // Compute header props based on session state
   const headerProps = useMemo(() => {
     if (!isDataReady) {
@@ -356,12 +331,6 @@ export const SessionView = React.memo((props: { id: string }) => {
                 onPanelPress={shouldShowMobilePanelButton ? () => setShowMobilePanelSheet(true) : undefined}
                 onBackPress={() => router.back()}
                 onRefreshPress={() => sync.refreshSession(sessionId)}
-                onPreviewPress={
-                  headerProps.isConnected
-                    ? () => router.push(`/session/${sessionId}/preview`)
-                    : undefined
-                }
-                onChangesPress={hasChanges ? () => router.push(`/session/${sessionId}/changes`) : undefined}
                 onForkPress={session?.forkedFromSessionId ? () => router.push(`/session/${session.forkedFromSessionId!}` as any) : undefined}
                 devButtonState={headerProps.isConnected && hasDevConfig ? "idle" : "hidden"}
                 onDevPress={headerProps.isConnected && hasDevConfig ? () => router.push(`/session/${sessionId}/dev` as any) : undefined}

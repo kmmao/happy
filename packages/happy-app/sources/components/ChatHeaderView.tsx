@@ -18,8 +18,6 @@ interface ChatHeaderViewProps {
   subtitle?: string;
   onBackPress?: () => void;
   onAvatarPress?: () => void;
-  onPreviewPress?: () => void;
-  onChangesPress?: () => void;
   onPanelPress?: () => void;
   onRefreshPress?: () => Promise<void> | void;
   avatarId?: string;
@@ -43,8 +41,6 @@ export const ChatHeaderView: React.FC<ChatHeaderViewProps> = ({
   subtitle,
   onBackPress,
   onAvatarPress,
-  onPreviewPress,
-  onChangesPress,
   onPanelPress,
   onRefreshPress,
   avatarId,
@@ -226,20 +222,6 @@ export const ChatHeaderView: React.FC<ChatHeaderViewProps> = ({
             </Pressable>
           )}
 
-          {onChangesPress && (
-            <Pressable
-              onPress={onChangesPress}
-              hitSlop={15}
-              style={styles.actionButton}
-            >
-              <Ionicons
-                name="code-slash-outline"
-                size={20}
-                color={theme.colors.header.tint}
-              />
-            </Pressable>
-          )}
-
           {onPanelPress && (
             <Pressable
               onPress={onPanelPress}
@@ -248,20 +230,6 @@ export const ChatHeaderView: React.FC<ChatHeaderViewProps> = ({
             >
               <Ionicons
                 name="grid-outline"
-                size={20}
-                color={theme.colors.header.tint}
-              />
-            </Pressable>
-          )}
-
-          {onPreviewPress && (
-            <Pressable
-              onPress={onPreviewPress}
-              hitSlop={15}
-              style={styles.actionButton}
-            >
-              <Ionicons
-                name="eye-outline"
                 size={20}
                 color={theme.colors.header.tint}
               />
