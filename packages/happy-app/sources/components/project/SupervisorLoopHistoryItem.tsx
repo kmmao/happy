@@ -14,6 +14,7 @@ interface SupervisorLoopHistoryItemProps {
     readonly loop: SupervisorLoop;
     readonly isLast: boolean;
     readonly onPress?: () => void;
+    readonly onDelete?: () => void;
 }
 
 const statusIcons: Record<string, { name: any; color: string }> = {
@@ -23,7 +24,7 @@ const statusIcons: Record<string, { name: any; color: string }> = {
 };
 
 export const SupervisorLoopHistoryItem = React.memo(
-    ({ loop, isLast, onPress }: SupervisorLoopHistoryItemProps) => {
+    ({ loop, isLast, onPress, onDelete }: SupervisorLoopHistoryItemProps) => {
         const { theme } = useUnistyles();
 
         const icon = statusIcons[loop.status] ?? {
@@ -156,13 +157,31 @@ export const SupervisorLoopHistoryItem = React.memo(
                         </Text>
                     )}
                 </View>
-                {onPress && (
-                    <Ionicons
-                        name="chevron-forward"
-                        size={18}
-                        color={theme.colors.textSecondary}
-                    />
-                )}
+                <View style={styles.rightActions}>
+                    {onDelete && (
+                        <Pressable
+                            onPress={(e) => {
+                                e.stopPropagation();
+                                onDelete();
+                            }}
+                            style={styles.deleteButton}
+                            hitSlop={8}
+                        >
+                            <Ionicons
+                                name="trash-outline"
+                                size={16}
+                                color={theme.colors.textSecondary}
+                            />
+                        </Pressable>
+                    )}
+                    {onPress && (
+                        <Ionicons
+                            name="chevron-forward"
+                            size={18}
+                            color={theme.colors.textSecondary}
+                        />
+                    )}
+                </View>
             </Pressable>
         );
     },
@@ -219,5 +238,13 @@ const styles = StyleSheet.create((theme) => ({
         color: theme.colors.textSecondary,
         fontStyle: "italic" as const,
         marginTop: 2,
+    },
+    rightActions: {
+        flexDirection: "row" as const,
+        alignItems: "center" as const,
+        gap: 4,
+    },
+    deleteButton: {
+        padding: 4,
     },
 }));

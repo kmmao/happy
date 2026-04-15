@@ -3503,6 +3503,8 @@ export const en = {
     // Run history
     runHistory: "Run History",
     noRuns: "No scan runs yet",
+    deleteRun: "Delete Run",
+    deleteRunConfirm: "Delete this run record? This action cannot be undone.",
     moreRuns: ({ count }: { count: number }) =>
       `${count} more ${count === 1 ? "run" : "runs"}`,
     showMoreRuns: ({ count }: { count: number }) =>
@@ -3747,6 +3749,8 @@ export const en = {
     loopStop: "Stop",
     loopStopConfirm: "Stop Loop?",
     loopStopConfirmBody: "The current iteration will complete, but no new iterations will start.",
+    deleteLoop: "Delete Loop",
+    deleteLoopConfirm: "Delete this loop record? This action cannot be undone.",
     loopPhase_idle: "Idle",
     loopPhase_analyzing: "Analyzing",
     loopPhase_fixing: "Fixing",

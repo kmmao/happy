@@ -36,6 +36,8 @@ import {
     type SupervisorSummary,
     fetchSupervisorSummary,
     clearAllActions,
+    deleteSupervisorRun,
+    deleteSupervisorLoop,
     type SupervisorLoop,
     fetchActiveLoop,
     fetchLoopHistory,
@@ -446,6 +448,42 @@ export const ProjectHealthTab = React.memo(
             }, [serverId, loadData]),
         );
 
+        const handleDeleteRun = React.useCallback(
+            async (runId: string) => {
+                const confirmed = await Modal.confirm(
+                    t("supervisor.deleteRun"),
+                    t("supervisor.deleteRunConfirm"),
+                    { confirmText: t("common.delete"), destructive: true },
+                );
+                if (!confirmed) return;
+                if (!serverId) return;
+                const credentials = await TokenStorage.getCredentials();
+                if (!credentials) return;
+                await deleteSupervisorRun(credentials, serverId, runId);
+                setRuns((prev) => prev.filter((r) => r.id !== runId));
+                setTotal((prev) => Math.max(0, prev - 1));
+            },
+            [serverId],
+        );
+
+        const handleDeleteLoop = React.useCallback(
+            async (loopId: string) => {
+                const confirmed = await Modal.confirm(
+                    t("supervisor.deleteLoop"),
+                    t("supervisor.deleteLoopConfirm"),
+                    { confirmText: t("common.delete"), destructive: true },
+                );
+                if (!confirmed) return;
+                if (!serverId) return;
+                const credentials = await TokenStorage.getCredentials();
+                if (!credentials) return;
+                await deleteSupervisorLoop(credentials, serverId, loopId);
+                setLoopHistory((prev) => prev.filter((l) => l.id !== loopId));
+                setLoopHistoryTotal((prev) => Math.max(0, prev - 1));
+            },
+            [serverId],
+        );
+
         // Compute health score delta from trend data
         const scoreDelta = React.useMemo(() => {
             if (!trendData || trendData.points.length < 2) return null;
@@ -831,6 +869,7 @@ export const ProjectHealthTab = React.memo(
                                         params: { id: project.id, loopId: loop.id },
                                     })
                                 }
+                                onDelete={() => handleDeleteLoop(loop.id)}
                             />
                         ))}
                         {loopHistoryTotal > 3 && (
@@ -875,6 +914,11 @@ export const ProjectHealthTab = React.memo(
                                                           runId: run.id,
                                                       },
                                                   })
+                                            : undefined
+                                    }
+                                    onDelete={
+                                        run.status !== "pending" && run.status !== "running"
+                                            ? () => handleDeleteRun(run.id)
                                             : undefined
                                     }
                                 />

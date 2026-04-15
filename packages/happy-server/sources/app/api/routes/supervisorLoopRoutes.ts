@@ -197,6 +197,41 @@ export function supervisorLoopRoutes(app: Fastify) {
         },
     );
 
+    // DELETE /v1/projects/:id/supervisor/loops/:loopId — Delete a completed/failed/stopped loop
+    app.delete(
+        "/v1/projects/:id/supervisor/loops/:loopId",
+        {
+            preHandler: app.authenticate,
+            schema: {
+                params: z.object({
+                    id: z.string(),
+                    loopId: z.string(),
+                }),
+            },
+        },
+        async (request, reply) => {
+            const userId = request.userId;
+            const { id, loopId } = request.params;
+
+            const loop = await db.supervisorLoop.findFirst({
+                where: { id: loopId, projectId: id, accountId: userId },
+                select: { status: true },
+            });
+
+            if (!loop) {
+                return reply.code(404).send({ error: "Loop not found" });
+            }
+
+            if (loop.status === "running" || loop.status === "paused") {
+                return reply.code(409).send({ error: "Cannot delete an active loop. Stop it first." });
+            }
+
+            await db.supervisorLoop.delete({ where: { id: loopId } });
+
+            return reply.send({ deleted: true });
+        },
+    );
+
     // POST /v1/projects/:id/supervisor/loop/:loopId/pause
     app.post(
         "/v1/projects/:id/supervisor/loop/:loopId/pause",

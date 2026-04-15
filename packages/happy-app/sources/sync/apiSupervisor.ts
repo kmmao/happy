@@ -897,6 +897,54 @@ export async function deleteAction(
 }
 
 /**
+ * Delete a single supervisor run (must be completed/failed/cancelled)
+ */
+export async function deleteSupervisorRun(
+    credentials: AuthCredentials,
+    projectId: string,
+    runId: string,
+): Promise<{ deleted: boolean }> {
+    const API_ENDPOINT = getServerUrl();
+    return await backoff(async () => {
+        const response = await fetch(
+            `${API_ENDPOINT}/v1/projects/${projectId}/supervisor/runs/${runId}`,
+            {
+                method: "DELETE",
+                headers: authHeaders(credentials),
+            },
+        );
+        if (!response.ok) {
+            throw new NonRetryableError(`Failed to delete run: ${response.status}`);
+        }
+        return (await response.json()) as { deleted: boolean };
+    });
+}
+
+/**
+ * Delete a single supervisor loop (must be completed/failed/stopped)
+ */
+export async function deleteSupervisorLoop(
+    credentials: AuthCredentials,
+    projectId: string,
+    loopId: string,
+): Promise<{ deleted: boolean }> {
+    const API_ENDPOINT = getServerUrl();
+    return await backoff(async () => {
+        const response = await fetch(
+            `${API_ENDPOINT}/v1/projects/${projectId}/supervisor/loops/${loopId}`,
+            {
+                method: "DELETE",
+                headers: authHeaders(credentials),
+            },
+        );
+        if (!response.ok) {
+            throw new NonRetryableError(`Failed to delete loop: ${response.status}`);
+        }
+        return (await response.json()) as { deleted: boolean };
+    });
+}
+
+/**
  * Fetch action stats (counts by approval status)
  */
 export async function fetchActionStats(

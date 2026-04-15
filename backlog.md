@@ -123,6 +123,27 @@ Phase 1-5 已完成并发布 @kmmao/happy-agent@0.4.0。Phase 6.1 已完成（�
 - [x] spawnInTmux() 创建/复用命名 tmux 会话
 - [x] 返回 {sessionWindow, pid} 用于跟踪
 
+## 知识库配置统一到项目级（2026-04-14 记录）
+
+去掉设置页（Settings → Features）的知识库配置，所有配置统一到项目级 knowledgeConfig。
+
+### 背景
+- 设置页和项目级有 6 个完全重叠的字段（mode, sensitivity, trackFileEdits/ToolCalls/Tokens + 开关）
+- 项目级还多 3 个生命周期字段（decay/merge/refine），功能更全
+- 当前设置页的全局开关能覆盖项目级决策，设计倒置
+
+### 改动范围
+1. **CLI** (`claudeRemoteLauncher.ts`): 不再依赖 `HAPPY_KNOWLEDGE_*` 环境变量，始终创建 TurnCollector，从服务器获取项目级 config 后决定是否启用
+2. **App** (`ops.ts`): 不再注入 `HAPPY_KNOWLEDGE_*` 环境变量
+3. **App** (`features.tsx`): 删除知识库相关 UI
+4. **App** (`settings.ts`): 删除 6 个 `knowledgeBase*` 字段
+5. **Tab 可见性**: 待定（跟随项目 enabled / 始终显示 / 保留全局开关）
+
+### 待决策
+- [ ] 会话界面知识库 Tab 可见性策略
+
+---
+
 ## Auto-Option-Send 跨设备同步（2026-04-11 记录）
 
 当前 auto-send 开关存储在 `localSettings`（device-local MMKV），不跨设备同步。

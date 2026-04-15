@@ -26,10 +26,11 @@ interface SupervisorRunHistoryItemProps {
     run: SupervisorRun;
     isLast: boolean;
     onPress?: () => void;
+    onDelete?: () => void;
 }
 
 export const SupervisorRunHistoryItem = React.memo(
-    ({ run, isLast, onPress }: SupervisorRunHistoryItemProps) => {
+    ({ run, isLast, onPress, onDelete }: SupervisorRunHistoryItemProps) => {
         const { theme } = useUnistyles();
         const router = useRouter();
         const linkedSession = useSession(run.sessionId ?? "");
@@ -184,13 +185,31 @@ export const SupervisorRunHistoryItem = React.memo(
                         </Pressable>
                     )}
                 </View>
-                {onPress && (
-                    <Ionicons
-                        name="chevron-forward"
-                        size={18}
-                        color={theme.colors.textSecondary}
-                    />
-                )}
+                <View style={styles.rightActions}>
+                    {onDelete && (
+                        <Pressable
+                            onPress={(e) => {
+                                e.stopPropagation();
+                                onDelete();
+                            }}
+                            style={styles.deleteButton}
+                            hitSlop={8}
+                        >
+                            <Ionicons
+                                name="trash-outline"
+                                size={16}
+                                color={theme.colors.textSecondary}
+                            />
+                        </Pressable>
+                    )}
+                    {onPress && (
+                        <Ionicons
+                            name="chevron-forward"
+                            size={18}
+                            color={theme.colors.textSecondary}
+                        />
+                    )}
+                </View>
             </Pressable>
         );
     },
@@ -267,5 +286,13 @@ const styles = StyleSheet.create((theme) => ({
         ...Typography.default(),
         fontSize: 12,
         color: theme.colors.header.tint,
+    },
+    rightActions: {
+        flexDirection: "row" as const,
+        alignItems: "center" as const,
+        gap: 4,
+    },
+    deleteButton: {
+        padding: 4,
     },
 }));

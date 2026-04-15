@@ -317,6 +317,41 @@ export function supervisorRunRoutes(app: Fastify) {
         },
     );
 
+    // DELETE /v1/projects/:id/supervisor/runs/:runId — Delete a completed/failed/cancelled run
+    app.delete(
+        "/v1/projects/:id/supervisor/runs/:runId",
+        {
+            preHandler: app.authenticate,
+            schema: {
+                params: z.object({
+                    id: z.string(),
+                    runId: z.string(),
+                }),
+            },
+        },
+        async (request, reply) => {
+            const userId = request.userId;
+            const { id, runId } = request.params;
+
+            const run = await db.supervisorRun.findFirst({
+                where: { id: runId, projectId: id, accountId: userId },
+                select: { status: true },
+            });
+
+            if (!run) {
+                return reply.code(404).send({ error: "Supervisor run not found" });
+            }
+
+            if (run.status === "pending" || run.status === "running") {
+                return reply.code(409).send({ error: "Cannot delete an active run. Cancel it first." });
+            }
+
+            await db.supervisorRun.delete({ where: { id: runId } });
+
+            return reply.send({ deleted: true });
+        },
+    );
+
     // POST /v1/projects/:id/supervisor/runs/:runId/status — CLI callback to update run status
     // NOTE: Currently uses standard authenticate. Phase 4 should add machine-scoped auth
     // to prevent App clients from spoofing CLI status callbacks.
