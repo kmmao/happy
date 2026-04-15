@@ -3560,6 +3560,12 @@ export const ja: TranslationStructure = {
     customRulesSection: "カスタムルール",
     customRulesDesc: "プロジェクト固有の分析ルールを追加",
     customRulesPlaceholder: "例: すべてのAPIエンドポイントにレート制限があるか確認",
+
+    defaultProfileSection: "デフォルト実行プロファイル",
+    defaultProfileDesc: "ヘルススキャンとループモードに使用するAIバックエンドプロファイルを選択します。選択したプロファイルがこのマシンに設定されていない場合、実行はエラーで失敗します。",
+    defaultProfileNone: "プロファイルが設定されていません。設定 → プロファイルで追加してください。",
+    defaultProfileDefault: "デフォルト（CLI設定）",
+
     notificationsSection: "通知",
     notifAnalysisComplete: "分析完了",
     notifIssueCreated: "Issue作成完了",

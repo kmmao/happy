@@ -3580,6 +3580,12 @@ export const en: TranslationStructure = {
     customRulesSection: "Custom Rules",
     customRulesDesc: "Add project-specific analysis rules",
     customRulesPlaceholder: "e.g. Check that all API endpoints have rate limiting",
+
+    defaultProfileSection: "Default Run Profile",
+    defaultProfileDesc: "Select the AI backend profile for health scans and loop mode. If the selected profile is not configured on this machine, the run will fail with an error.",
+    defaultProfileNone: "No profiles configured. Add profiles in Settings → Profiles.",
+    defaultProfileDefault: "Default (CLI settings)",
+
     notificationsSection: "Notifications",
     notifAnalysisComplete: "Analysis Complete",
     notifIssueCreated: "Issue Created",

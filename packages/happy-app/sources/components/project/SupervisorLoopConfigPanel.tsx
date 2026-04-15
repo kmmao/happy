@@ -12,9 +12,11 @@ import { t } from "@/text";
 import { useHappyAction } from "@/hooks/useHappyAction";
 import { TokenStorage } from "@/auth/tokenStorage";
 import { type SupervisorLoop, type LoopConfig, startSupervisorLoop } from "@/sync/apiSupervisor";
+import { useSettings } from "@/sync/storage";
 
 interface SupervisorLoopConfigPanelProps {
     readonly projectId: string;
+    readonly defaultProfileId?: string | null;
     readonly onStarted: (loop: SupervisorLoop) => void;
     readonly onCancel: () => void;
 }
@@ -91,12 +93,17 @@ const stepperStyles = StyleSheet.create(() => ({
 }));
 
 export const SupervisorLoopConfigPanel = React.memo(
-    ({ projectId, onStarted, onCancel }: SupervisorLoopConfigPanelProps) => {
+    ({ projectId, defaultProfileId, onStarted, onCancel }: SupervisorLoopConfigPanelProps) => {
         const { theme } = useUnistyles();
+        const settings = useSettings();
+        const profiles = settings.profiles ?? [];
+
         const [maxIterations, setMaxIterations] = React.useState(5);
         const [autoApproveThreshold, setAutoApproveThreshold] = React.useState(80);
         const [costCapEnabled, setCostCapEnabled] = React.useState(false);
         const [costCapUsd, setCostCapUsd] = React.useState(10);
+        // Profile selection: inherit default from supervisor settings, allow per-run override
+        const [selectedProfileId, setSelectedProfileId] = React.useState<string | null>(defaultProfileId ?? null);
 
         const [startLoading, doStart] = useHappyAction(
             React.useCallback(async () => {
@@ -106,10 +113,11 @@ export const SupervisorLoopConfigPanel = React.memo(
                     maxIterations,
                     autoApproveThreshold,
                     ...(costCapEnabled ? { costCapUsd } : {}),
+                    ...(selectedProfileId ? { profileId: selectedProfileId } : {}),
                 };
                 const loop = await startSupervisorLoop(credentials, projectId, config);
                 onStarted(loop);
-            }, [projectId, maxIterations, autoApproveThreshold, costCapEnabled, costCapUsd, onStarted]),
+            }, [projectId, maxIterations, autoApproveThreshold, costCapEnabled, costCapUsd, selectedProfileId, onStarted]),
         );
 
         return (
@@ -203,6 +211,44 @@ export const SupervisorLoopConfigPanel = React.memo(
                     </Text>
                 </View>
 
+                {/* Profile selection */}
+                {profiles.length > 0 && (
+                    <View style={styles.configRow}>
+                        <View style={styles.configLabelRow}>
+                            <Text style={styles.configLabel}>
+                                {t("supervisor.defaultProfileSection")}
+                            </Text>
+                        </View>
+                        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 4 }}>
+                            <Pressable
+                                style={[
+                                    styles.profileChip,
+                                    selectedProfileId === null && { backgroundColor: theme.colors.header.tint },
+                                ]}
+                                onPress={() => setSelectedProfileId(null)}
+                            >
+                                <Text style={[styles.profileChipText, selectedProfileId === null && { color: "#fff" }]}>
+                                    {t("supervisor.defaultProfileDefault")}
+                                </Text>
+                            </Pressable>
+                            {profiles.map((p) => (
+                                <Pressable
+                                    key={p.id}
+                                    style={[
+                                        styles.profileChip,
+                                        selectedProfileId === p.id && { backgroundColor: theme.colors.header.tint },
+                                    ]}
+                                    onPress={() => setSelectedProfileId(p.id)}
+                                >
+                                    <Text style={[styles.profileChipText, selectedProfileId === p.id && { color: "#fff" }]}>
+                                        {p.name}
+                                    </Text>
+                                </Pressable>
+                            ))}
+                        </View>
+                    </View>
+                )}
+
                 {/* Safety note */}
                 <View style={styles.safetyNote}>
                     <Ionicons
@@ -285,6 +331,17 @@ const styles = StyleSheet.create((theme) => ({
         ...Typography.default(),
         fontSize: 11,
         color: theme.colors.textSecondary,
+    },
+    profileChip: {
+        paddingHorizontal: 10,
+        paddingVertical: 5,
+        borderRadius: 6,
+        backgroundColor: theme.colors.surface,
+    },
+    profileChipText: {
+        ...Typography.default(),
+        fontSize: 12,
+        color: theme.colors.text,
     },
     safetyNote: {
         flexDirection: "row",

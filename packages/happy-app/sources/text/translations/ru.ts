@@ -3606,6 +3606,12 @@ export const ru: TranslationStructure = {
     customRulesSection: "Пользовательские правила",
     customRulesDesc: "Добавить правила анализа для проекта",
     customRulesPlaceholder: "Например: Проверить rate limiting на всех API-эндпоинтах",
+
+    defaultProfileSection: "Профиль запуска по умолчанию",
+    defaultProfileDesc: "Выберите профиль AI-бэкенда для проверок работоспособности и режима цикла. Если выбранный профиль не настроен на этом устройстве, запуск завершится ошибкой.",
+    defaultProfileNone: "Профили не настроены. Добавьте профили в Настройки → Профили.",
+    defaultProfileDefault: "По умолчанию (настройки CLI)",
+
     notificationsSection: "Уведомления",
     notifAnalysisComplete: "Анализ завершён",
     notifIssueCreated: "Issue создан",

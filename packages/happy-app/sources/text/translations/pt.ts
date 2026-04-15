@@ -3589,6 +3589,12 @@ export const pt: TranslationStructure = {
     customRulesSection: "Regras personalizadas",
     customRulesDesc: "Adicionar regras de análise específicas do projeto",
     customRulesPlaceholder: "Ex: Verificar que todos os endpoints tenham rate limiting",
+
+    defaultProfileSection: "Perfil de execução padrão",
+    defaultProfileDesc: "Selecione o perfil de backend de IA para verificações de saúde e modo de loop. Se o perfil selecionado não estiver configurado nesta máquina, a execução falhará.",
+    defaultProfileNone: "Nenhum perfil configurado. Adicione perfis em Configurações → Perfis.",
+    defaultProfileDefault: "Padrão (configurações CLI)",
+
     notificationsSection: "Notificações",
     notifAnalysisComplete: "Análise concluída",
     notifIssueCreated: "Issue criada",

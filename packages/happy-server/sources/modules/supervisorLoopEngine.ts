@@ -26,6 +26,7 @@ export interface LoopConfig {
     autoApproveThreshold: number;
     maxConsecutiveFailures?: number;
     maxDurationMinutes?: number;
+    profileId?: string;
 }
 
 export type LoopExitReason =
@@ -157,6 +158,7 @@ export async function startLoop(
                 autoApproveThreshold: config.autoApproveThreshold,
                 maxConsecutiveFailures: config.maxConsecutiveFailures ?? 2,
                 maxDurationMinutes: config.maxDurationMinutes ?? 240,
+                profileId: config.profileId ?? null,
             },
         });
 
@@ -203,6 +205,7 @@ export async function startLoop(
             maxConcurrentAnalysis: concurrency.maxAnalysis,
             maxConcurrentFix: concurrency.maxFix,
             maxFindings: concurrency.maxFindings,
+            profileId: config.profileId,
         }),
         recipientFilter: {
             type: "machine-scoped-only",
@@ -554,6 +557,7 @@ async function decideNextStep(
                 fixStrategy: "direct", // Loop always uses direct strategy
                 maxConcurrentAnalysis: concurrency.maxAnalysis,
                 maxConcurrentFix: concurrency.maxFix,
+                profileId: loop.profileId ?? undefined,
             }),
             recipientFilter: {
                 type: "machine-scoped-only",
@@ -662,6 +666,7 @@ async function triggerNextAnalysis(
             existingActions,
             maxConcurrentAnalysis: concurrency.maxAnalysis,
             maxConcurrentFix: concurrency.maxFix,
+            profileId: loop.profileId ?? undefined,
         }),
         recipientFilter: {
             type: "machine-scoped-only",

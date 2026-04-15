@@ -281,6 +281,8 @@ export type SupervisorTriggerData = {
   /** Loop association — present when this run/fix is part of a loop. */
   loopId?: string;
   loopIteration?: number;
+  /** AI backend profile ID to use for this run. If set but not found locally, run is aborted. */
+  profileId?: string;
 };
 
 export type SupervisorRunStatusData = {

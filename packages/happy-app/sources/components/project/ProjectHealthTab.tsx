@@ -107,6 +107,17 @@ export const ProjectHealthTab = React.memo(
 
         const serverId = project.serverId;
 
+        // Read defaultProfileId from supervisorConfig JSON
+        const defaultProfileId = React.useMemo<string | null>(() => {
+            if (!project.supervisorConfig) return null;
+            try {
+                const cfg = JSON.parse(project.supervisorConfig) as { defaultProfileId?: string | null };
+                return cfg.defaultProfileId ?? null;
+            } catch {
+                return null;
+            }
+        }, [project.supervisorConfig]);
+
         const loadData = React.useCallback(async () => {
             if (!serverId) return;
             try {
@@ -396,7 +407,9 @@ export const ProjectHealthTab = React.memo(
                 const credentials = await TokenStorage.getCredentials();
                 if (!credentials) return;
                 try {
-                    const run = await triggerSupervisorRun(credentials, serverId);
+                    const run = await triggerSupervisorRun(credentials, serverId, {
+                        ...(defaultProfileId ? { profileId: defaultProfileId } : {}),
+                    });
                     // Optimistic: add the new run to the list immediately
                     setRuns((prev) => [run, ...prev]);
                 } catch (e) {
@@ -405,7 +418,7 @@ export const ProjectHealthTab = React.memo(
                     }
                     throw e;
                 }
-            }, [serverId]),
+            }, [serverId, defaultProfileId]),
         );
 
         const handleLoopStarted = React.useCallback((loop: SupervisorLoop) => {
@@ -621,6 +634,7 @@ export const ProjectHealthTab = React.memo(
                             ) : showLoopConfig ? (
                                 <SupervisorLoopConfigPanel
                                     projectId={serverId}
+                                    defaultProfileId={defaultProfileId}
                                     onStarted={handleLoopStarted}
                                     onCancel={() => setShowLoopConfig(false)}
                                 />

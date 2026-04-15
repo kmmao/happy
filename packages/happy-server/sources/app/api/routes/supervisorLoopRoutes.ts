@@ -28,6 +28,7 @@ export function supervisorLoopRoutes(app: Fastify) {
                     autoApproveThreshold: z.number().int().min(50).max(100).default(80),
                     maxConsecutiveFailures: z.number().int().min(1).max(10).default(2),
                     maxDurationMinutes: z.number().int().min(10).max(480).default(240),
+                    profileId: z.string().optional(),
                 }),
             },
         },

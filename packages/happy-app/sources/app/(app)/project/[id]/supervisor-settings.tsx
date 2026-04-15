@@ -13,6 +13,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { Modal } from "@/modal";
 import { layout } from "@/components/layout";
 import { SEVERITY_COLORS, SEVERITY_KEY_MAP } from "@/components/project/supervisorConstants";
+import { useSettings } from "@/sync/storage";
 
 type SupervisorMode = "suggest" | "semi-auto" | "auto";
 
@@ -67,6 +68,7 @@ const defaultConfig = {
         onPRCreated: true,
         onError: true,
     },
+    defaultProfileId: null as string | null,
 };
 
 type SupervisorConfig = typeof defaultConfig;
@@ -76,6 +78,9 @@ function SupervisorSettingsScreen() {
     const navigation = useNavigation();
     const project = useProject(id);
     const { theme } = useUnistyles();
+
+    const settings = useSettings();
+    const profiles = settings.profiles ?? [];
 
     const [config, setConfig] = React.useState<SupervisorConfig>(defaultConfig);
     const [initialConfig, setInitialConfig] =
@@ -712,6 +717,57 @@ function SupervisorSettingsScreen() {
                     <Text style={styles.customRulesCharCount}>
                         {config.customRules.length}/2000
                     </Text>
+                </View>
+            </ItemGroup>
+
+            {/* Default Run Profile */}
+            <ItemGroup title={t("supervisor.defaultProfileSection")}>
+                <View style={styles.customRulesCard}>
+                    <Text style={styles.customRulesDesc}>
+                        {t("supervisor.defaultProfileDesc")}
+                    </Text>
+                    {profiles.length === 0 ? (
+                        <Text style={[styles.customRulesDesc, { color: theme.colors.textSecondary, fontStyle: "italic" }]}>
+                            {t("supervisor.defaultProfileNone")}
+                        </Text>
+                    ) : (
+                        <View style={{ gap: 6, marginTop: 8 }}>
+                            {/* No profile option */}
+                            <Pressable
+                                style={[
+                                    styles.concurrencyOption,
+                                    config.defaultProfileId === null && styles.concurrencyOptionSelected,
+                                    { flex: 0, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8 },
+                                ]}
+                                onPress={() => updateConfig((prev) => ({ ...prev, defaultProfileId: null }))}
+                            >
+                                <Text style={[
+                                    styles.concurrencyOptionText,
+                                    config.defaultProfileId === null && styles.concurrencyOptionTextSelected,
+                                ]}>
+                                    {t("supervisor.defaultProfileDefault")}
+                                </Text>
+                            </Pressable>
+                            {profiles.map((p) => (
+                                <Pressable
+                                    key={p.id}
+                                    style={[
+                                        styles.concurrencyOption,
+                                        config.defaultProfileId === p.id && styles.concurrencyOptionSelected,
+                                        { flex: 0, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8 },
+                                    ]}
+                                    onPress={() => updateConfig((prev) => ({ ...prev, defaultProfileId: p.id }))}
+                                >
+                                    <Text style={[
+                                        styles.concurrencyOptionText,
+                                        config.defaultProfileId === p.id && styles.concurrencyOptionTextSelected,
+                                    ]}>
+                                        {p.name}
+                                    </Text>
+                                </Pressable>
+                            ))}
+                        </View>
+                    )}
                 </View>
             </ItemGroup>
 

@@ -13,6 +13,7 @@ import { writeFile, mkdir, unlink } from "fs/promises";
 import { join } from "path";
 import { logger } from "@/ui/logger";
 import { withTimeout } from "@/utils/withTimeout";
+import { readSettings } from "@/persistence";
 import { buildSupervisorPrompt } from "./buildSupervisorPrompt";
 import { buildFixPrompt } from "./buildFixPrompt";
 import { buildResearchPrompt } from "./buildResearchPrompt";
@@ -191,6 +192,23 @@ export async function handleSupervisorTrigger(
     return { success: false, errorMessage: "Run already processing" };
   }
   processingRuns.set(runId, Date.now());
+
+  // Validate profileId if specified — fail fast with a clear error rather than silently ignoring
+  if (data.profileId) {
+    const settings = await readSettings();
+    const profileExists = settings.profiles.some((p) => p.id === data.profileId);
+    if (!profileExists) {
+      const errorMessage = `Profile "${data.profileId}" is not configured on this machine. Please check the supervisor settings and ensure the selected profile exists.`;
+      logger.info(`[SUPERVISOR] ${errorMessage}`);
+      processingRuns.delete(runId);
+      if (trigger === "fix") {
+        deps.emitSupervisorFixStatus({ actionId: runId, projectId, fixStatus: "failed" });
+      } else {
+        deps.emitSupervisorRunStatus({ runId, projectId, status: "failed", errorMessage });
+      }
+      return { success: false, errorMessage };
+    }
+  }
 
   // Determine which pool to use
   const slotType: SlotType = trigger === "fix" ? "fix" : "analysis";
@@ -439,6 +457,7 @@ async function handleAnalysisTrigger(
     approvedNewDirectoryCreation: false,
     agent: "claude",
     happySessionId: guardianSessionId,
+    profileId: data.profileId,
     automationContext: {
       kind: "supervisor",
       trigger,
@@ -523,6 +542,7 @@ async function handleResearchTrigger(
     approvedNewDirectoryCreation: false,
     agent: "claude",
     happySessionId: guardianSessionId,
+    profileId: data.profileId,
     automationContext: {
       kind: "supervisor",
       trigger,
@@ -649,6 +669,7 @@ async function handleFixTrigger(
     directory: worktreeResult.worktreePath,
     approvedNewDirectoryCreation: true,
     agent: "claude",
+    profileId: data.profileId,
     automationContext: {
       kind: "supervisor",
       trigger,

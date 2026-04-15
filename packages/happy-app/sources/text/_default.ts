@@ -3630,6 +3630,12 @@ export const en = {
     customRulesPlaceholder:
       "e.g. Check that all API endpoints have rate limiting",
 
+    // Settings: Default Profile
+    defaultProfileSection: "Default Run Profile",
+    defaultProfileDesc: "Select the AI backend profile to use for health scans and loop mode. If a profile is selected but not configured on this machine, the run will fail with an error.",
+    defaultProfileNone: "No profiles configured. Add profiles in Settings → Profiles.",
+    defaultProfileDefault: "Default (CLI settings)",
+
     // Settings: Notifications
     notificationsSection: "Notifications",
     notifAnalysisComplete: "Analysis Complete",

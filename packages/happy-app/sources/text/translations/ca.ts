@@ -3592,6 +3592,12 @@ export const ca: TranslationStructure = {
     customRulesSection: "Regles personalitzades",
     customRulesDesc: "Afegir regles d'anàlisi específiques del projecte",
     customRulesPlaceholder: "Ex: Verificar que tots els endpoints tinguin rate limiting",
+
+    defaultProfileSection: "Perfil d'execució per defecte",
+    defaultProfileDesc: "Seleccioneu el perfil de backend d'IA per a les exploracions de salut i el mode bucle. Si el perfil seleccionat no està configurat en aquesta màquina, l'execució fallarà amb un error.",
+    defaultProfileNone: "No hi ha perfils configurats. Afegiu perfils a Configuració → Perfils.",
+    defaultProfileDefault: "Predeterminat (configuració CLI)",
+
     notificationsSection: "Notificacions",
     notifAnalysisComplete: "Anàlisi completada",
     notifIssueCreated: "Issue creat",

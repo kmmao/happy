@@ -64,6 +64,7 @@ export async function triggerSupervisorRun(
             additionalNotes?: string;
             featureDirection?: string;
         };
+        profileId?: string;
     },
 ): Promise<SupervisorRun> {
     const API_ENDPOINT = getServerUrl();
@@ -284,6 +285,7 @@ export interface LoopConfig {
     autoApproveThreshold?: number;
     maxConsecutiveFailures?: number;
     maxDurationMinutes?: number;
+    profileId?: string;
 }
 
 export async function startSupervisorLoop(

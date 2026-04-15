@@ -3492,6 +3492,12 @@ export const zhHant: TranslationStructure = {
     customRulesSection: "自訂規則",
     customRulesDesc: "新增專案特定的分析規則",
     customRulesPlaceholder: "例如：檢查所有 API 端點是否有速率限制",
+
+    defaultProfileSection: "預設執行配置檔",
+    defaultProfileDesc: "選擇健康掃描和循環模式使用的 AI 後端配置檔。若選擇的配置檔在本機未設定，執行將報錯終止。",
+    defaultProfileNone: "尚無配置檔。請前往設定 → 配置檔 新增。",
+    defaultProfileDefault: "預設（CLI 設定）",
+
     notificationsSection: "通知",
     notifAnalysisComplete: "分析完成",
     notifIssueCreated: "Issue 已建立",

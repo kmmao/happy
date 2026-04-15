@@ -1104,6 +1104,8 @@ export interface SupervisorTriggerOptions {
   maxFindings?: number;
   narrative?: string;
   laws?: string;
+  /** AI backend profile ID to use for this run. If set but not found on CLI, run is aborted. */
+  profileId?: string;
 }
 
 export function buildSupervisorTriggerEphemeral(opts: SupervisorTriggerOptions): EphemeralPayload {
