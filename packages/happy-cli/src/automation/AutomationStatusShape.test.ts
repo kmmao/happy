@@ -18,7 +18,6 @@ describe("Automation status snapshot shape", () => {
             emitSupervisorRunStatus: () => {},
             emitSupervisorFixStatus: () => {},
             serverUrl: "https://example.com",
-            authToken: "token",
           },
           webhook: {
             spawnSession: async () => ({ type: "success", sessionId: "sid" }),

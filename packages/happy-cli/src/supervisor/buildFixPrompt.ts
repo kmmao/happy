@@ -107,7 +107,8 @@ If your analysis concludes the issue is real and the fix is feasible (Recommenda
 5. Report as completed:
 \`\`\`
 curl -s -X PATCH "${reportUrl}" \\
-  -H "Authorization: Bearer $HAPPY_SUPERVISOR_AUTH_TOKEN" \\
+  -H "Authorization: Bearer $HAPPY_SUPERVISOR_CALLBACK_TOKEN" \\
+  -H "X-Happy-Machine-Id: $HAPPY_SUPERVISOR_MACHINE_ID" \\
   -H "Content-Type: application/json" \\
   -d '{"fixStatus":"completed"}'
 \`\`\`
@@ -117,7 +118,8 @@ If your analysis concludes the issue should NOT be fixed (Recommendation = SKIP 
 - Report as analyzed:
 \`\`\`
 curl -s -X PATCH "${reportUrl}" \\
-  -H "Authorization: Bearer $HAPPY_SUPERVISOR_AUTH_TOKEN" \\
+  -H "Authorization: Bearer $HAPPY_SUPERVISOR_CALLBACK_TOKEN" \\
+  -H "X-Happy-Machine-Id: $HAPPY_SUPERVISOR_MACHINE_ID" \\
   -H "Content-Type: application/json" \\
   -d '{"fixStatus":"analyzed"}'
 \`\`\``
@@ -130,7 +132,8 @@ After completing your analysis, you MUST report back to the server.
 ### Report as analyzed:
 \`\`\`
 curl -s -X PATCH "${reportUrl}" \\
-  -H "Authorization: Bearer $HAPPY_SUPERVISOR_AUTH_TOKEN" \\
+  -H "Authorization: Bearer $HAPPY_SUPERVISOR_CALLBACK_TOKEN" \\
+  -H "X-Happy-Machine-Id: $HAPPY_SUPERVISOR_MACHINE_ID" \\
   -H "Content-Type: application/json" \\
   -d '{"fixStatus":"analyzed"}'
 \`\`\``;
@@ -228,7 +231,8 @@ After completing (or failing) your fix, you MUST report back to the server using
 ### On Success (direct push):
 \`\`\`
 curl -s -X PATCH "${reportUrl}" \\
-  -H "Authorization: Bearer $HAPPY_SUPERVISOR_AUTH_TOKEN" \\
+  -H "Authorization: Bearer $HAPPY_SUPERVISOR_CALLBACK_TOKEN" \\
+  -H "X-Happy-Machine-Id: $HAPPY_SUPERVISOR_MACHINE_ID" \\
   -H "Content-Type: application/json" \\
   -d '{"fixStatus":"completed"}'
 \`\`\`
@@ -236,7 +240,8 @@ curl -s -X PATCH "${reportUrl}" \\
 ### On Success (fell back to PR):
 \`\`\`
 curl -s -X PATCH "${reportUrl}" \\
-  -H "Authorization: Bearer $HAPPY_SUPERVISOR_AUTH_TOKEN" \\
+  -H "Authorization: Bearer $HAPPY_SUPERVISOR_CALLBACK_TOKEN" \\
+  -H "X-Happy-Machine-Id: $HAPPY_SUPERVISOR_MACHINE_ID" \\
   -H "Content-Type: application/json" \\
   -d "{\\"fixStatus\\":\\"completed\\",\\"issueUrl\\":\\"$PR_URL\\"}"
 \`\`\`
@@ -244,7 +249,8 @@ curl -s -X PATCH "${reportUrl}" \\
 ### On Failure:
 \`\`\`
 curl -s -X PATCH "${reportUrl}" \\
-  -H "Authorization: Bearer $HAPPY_SUPERVISOR_AUTH_TOKEN" \\
+  -H "Authorization: Bearer $HAPPY_SUPERVISOR_CALLBACK_TOKEN" \\
+  -H "X-Happy-Machine-Id: $HAPPY_SUPERVISOR_MACHINE_ID" \\
   -H "Content-Type: application/json" \\
   -d '{"fixStatus":"failed"}'
 \`\`\``;
@@ -272,7 +278,8 @@ After completing (or failing) your fix, you MUST report back to the server using
 ### On Success:
 \`\`\`
 curl -s -X PATCH "${reportUrl}" \\
-  -H "Authorization: Bearer $HAPPY_SUPERVISOR_AUTH_TOKEN" \\
+  -H "Authorization: Bearer $HAPPY_SUPERVISOR_CALLBACK_TOKEN" \\
+  -H "X-Happy-Machine-Id: $HAPPY_SUPERVISOR_MACHINE_ID" \\
   -H "Content-Type: application/json" \\
   -d "{\\"fixStatus\\":\\"completed\\",\\"issueUrl\\":\\"$PR_URL\\"}"
 \`\`\`
@@ -280,7 +287,8 @@ curl -s -X PATCH "${reportUrl}" \\
 If \`gh\` is not available or PR creation fails, still push the branch and report completed without issueUrl:
 \`\`\`
 curl -s -X PATCH "${reportUrl}" \\
-  -H "Authorization: Bearer $HAPPY_SUPERVISOR_AUTH_TOKEN" \\
+  -H "Authorization: Bearer $HAPPY_SUPERVISOR_CALLBACK_TOKEN" \\
+  -H "X-Happy-Machine-Id: $HAPPY_SUPERVISOR_MACHINE_ID" \\
   -H "Content-Type: application/json" \\
   -d '{"fixStatus":"completed"}'
 \`\`\`
@@ -288,7 +296,8 @@ curl -s -X PATCH "${reportUrl}" \\
 ### On Failure:
 \`\`\`
 curl -s -X PATCH "${reportUrl}" \\
-  -H "Authorization: Bearer $HAPPY_SUPERVISOR_AUTH_TOKEN" \\
+  -H "Authorization: Bearer $HAPPY_SUPERVISOR_CALLBACK_TOKEN" \\
+  -H "X-Happy-Machine-Id: $HAPPY_SUPERVISOR_MACHINE_ID" \\
   -H "Content-Type: application/json" \\
   -d '{"fixStatus":"failed"}'
 \`\`\``;

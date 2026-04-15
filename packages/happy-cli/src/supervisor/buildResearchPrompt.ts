@@ -208,7 +208,8 @@ Add this at the end of the report:
 After understanding the project (Step 1), report progress:
 \`\`\`
 curl -s -X POST "${reportUrl}" \\
-  -H "Authorization: Bearer $HAPPY_SUPERVISOR_AUTH_TOKEN" \\
+  -H "Authorization: Bearer $HAPPY_SUPERVISOR_CALLBACK_TOKEN" \\
+  -H "X-Happy-Machine-Id: $HAPPY_SUPERVISOR_MACHINE_ID" \\
   -H "Content-Type: application/json" \\
   -d '{"status":"running","currentDimension":"research","dimensionIndex":1,"totalDimensions":2}'
 \`\`\`
@@ -242,7 +243,8 @@ RESEARCH_EOF
 
 # POST results to server
 curl -s -X POST "${reportUrl}" \\
-  -H "Authorization: Bearer $HAPPY_SUPERVISOR_AUTH_TOKEN" \\
+  -H "Authorization: Bearer $HAPPY_SUPERVISOR_CALLBACK_TOKEN" \\
+  -H "X-Happy-Machine-Id: $HAPPY_SUPERVISOR_MACHINE_ID" \\
   -H "Content-Type: application/json" \\
   -d @/tmp/research-result-${options.runId}.json
 
@@ -256,7 +258,7 @@ rm -f /tmp/research-result-${options.runId}.json
 - \`"reportContent"\` — full Markdown report
 - \`"actions"\` — array of actionable items extracted in Step 4 (max 10)
 
-Use the HAPPY_SUPERVISOR_AUTH_TOKEN environment variable (already set) for authentication.
+Use the HAPPY_SUPERVISOR_CALLBACK_TOKEN environment variable (already set) for authentication.
 Escape all special characters properly in the JSON. For newlines in reportContent, use \\n.
 
 ### Step 2: Exit the session
@@ -265,7 +267,8 @@ After successfully reporting results, send the text "/exit" to end this session.
 If the curl command fails, report failure instead:
 \`\`\`
 curl -s -X POST "${reportUrl}" \\
-  -H "Authorization: Bearer $HAPPY_SUPERVISOR_AUTH_TOKEN" \\
+  -H "Authorization: Bearer $HAPPY_SUPERVISOR_CALLBACK_TOKEN" \\
+  -H "X-Happy-Machine-Id: $HAPPY_SUPERVISOR_MACHINE_ID" \\
   -H "Content-Type: application/json" \\
   -d '{"status":"failed","errorMessage":"Failed to report research results"}'
 \`\`\`

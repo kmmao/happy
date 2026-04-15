@@ -49,7 +49,6 @@ export interface SupervisorHandlerDeps {
   readonly emitSupervisorRunStatus: (data: SupervisorRunStatusData) => void;
   readonly emitSupervisorFixStatus: (data: SupervisorFixStatusData) => void;
   readonly serverUrl: string;
-  readonly authToken: string;
   readonly resolveGuardianSessionId?: (data: SupervisorTriggerData) => string | undefined;
   readonly rememberGuardianSession?: (data: SupervisorTriggerData, sessionId: string) => Promise<void> | void;
 }
@@ -475,7 +474,8 @@ async function handleAnalysisTrigger(
       HAPPY_SUPERVISOR_RUN_ID: runId,
       HAPPY_SUPERVISOR_PROJECT_ID: projectId,
       HAPPY_SUPERVISOR_SERVER_URL: deps.serverUrl,
-      HAPPY_SUPERVISOR_AUTH_TOKEN: deps.authToken,
+      HAPPY_SUPERVISOR_CALLBACK_TOKEN: data.callbackToken ?? "",
+      HAPPY_SUPERVISOR_MACHINE_ID: data.machineId,
     },
   });
 
@@ -561,7 +561,8 @@ async function handleResearchTrigger(
       HAPPY_SUPERVISOR_RUN_ID: runId,
       HAPPY_SUPERVISOR_PROJECT_ID: projectId,
       HAPPY_SUPERVISOR_SERVER_URL: deps.serverUrl,
-      HAPPY_SUPERVISOR_AUTH_TOKEN: deps.authToken,
+      HAPPY_SUPERVISOR_CALLBACK_TOKEN: data.callbackToken ?? "",
+      HAPPY_SUPERVISOR_MACHINE_ID: data.machineId,
     },
   });
 
@@ -688,7 +689,8 @@ async function handleFixTrigger(
       HAPPY_SUPERVISOR_ACTION_ID: actionId,
       HAPPY_SUPERVISOR_PROJECT_ID: projectId,
       HAPPY_SUPERVISOR_SERVER_URL: deps.serverUrl,
-      HAPPY_SUPERVISOR_AUTH_TOKEN: deps.authToken,
+      HAPPY_SUPERVISOR_CALLBACK_TOKEN: data.callbackToken ?? "",
+      HAPPY_SUPERVISOR_MACHINE_ID: data.machineId,
     },
   });
 

@@ -243,6 +243,7 @@ export type SupervisorTriggerData = {
   trigger: string;
   machineId: string;
   repoPath: string;
+  callbackToken?: string;
   mode?: string;
   dimensions?: string[];
   changedFiles?: string[];

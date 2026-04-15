@@ -175,7 +175,8 @@ ${dimKeyList}
 After finishing each dimension, run:
 \`\`\`
 curl -s -X POST "${reportUrl}" \\
-  -H "Authorization: Bearer $HAPPY_SUPERVISOR_AUTH_TOKEN" \\
+  -H "Authorization: Bearer $HAPPY_SUPERVISOR_CALLBACK_TOKEN" \\
+  -H "X-Happy-Machine-Id: $HAPPY_SUPERVISOR_MACHINE_ID" \\
   -H "Content-Type: application/json" \\
   -d '{"status":"running","currentDimension":"<DIMENSION_KEY>","dimensionIndex":<INDEX>,"totalDimensions":${totalDimensions}}'
 \`\`\`
@@ -199,7 +200,8 @@ SUPERVISOR_EOF
 
 # POST results to server
 curl -s -X POST "${reportUrl}" \\
-  -H "Authorization: Bearer $HAPPY_SUPERVISOR_AUTH_TOKEN" \\
+  -H "Authorization: Bearer $HAPPY_SUPERVISOR_CALLBACK_TOKEN" \\
+  -H "X-Happy-Machine-Id: $HAPPY_SUPERVISOR_MACHINE_ID" \\
   -H "Content-Type: application/json" \\
   -d @/tmp/supervisor-result-${options.runId}.json
 
@@ -207,7 +209,7 @@ curl -s -X POST "${reportUrl}" \\
 rm -f /tmp/supervisor-result-${options.runId}.json
 \`\`\`
 
-**Important**: The JSON body must contain \`"status": "completed"\` and the \`"actions"\` array with your findings. Use the HAPPY_SUPERVISOR_AUTH_TOKEN environment variable (already set) for authentication.
+**Important**: The JSON body must contain \`"status": "completed"\` and the \`"actions"\` array with your findings. Use the HAPPY_SUPERVISOR_CALLBACK_TOKEN environment variable (already set) for authentication.
 
 ### Step 2: Exit the session
 After successfully reporting results, send the text "/exit" to end this session.
@@ -215,7 +217,8 @@ After successfully reporting results, send the text "/exit" to end this session.
 If the curl command fails, report failure instead:
 \`\`\`
 curl -s -X POST "${reportUrl}" \\
-  -H "Authorization: Bearer $HAPPY_SUPERVISOR_AUTH_TOKEN" \\
+  -H "Authorization: Bearer $HAPPY_SUPERVISOR_CALLBACK_TOKEN" \\
+  -H "X-Happy-Machine-Id: $HAPPY_SUPERVISOR_MACHINE_ID" \\
   -H "Content-Type: application/json" \\
   -d '{"status":"failed","errorMessage":"Failed to report results"}'
 \`\`\`
@@ -365,7 +368,7 @@ If you encounter a situation where:
 **First**, check if a precedent exists:
 \`\`\`
 curl -s "${matchUrl}?precedentKey=<KEY>" \\
-  -H "Authorization: Bearer $HAPPY_SUPERVISOR_AUTH_TOKEN"
+  -H "Authorization: Bearer $HAPPY_SUPERVISOR_CALLBACK_TOKEN"
 \`\`\`
 
 If the response contains \`"matched": true\`, follow the precedent's \`chosenOption\` and do NOT report a new decision.
@@ -373,7 +376,8 @@ If the response contains \`"matched": true\`, follow the precedent's \`chosenOpt
 If no precedent found (\`"matched": false\`), report the decision:
 \`\`\`
 curl -s -X POST "${decisionUrl}" \\
-  -H "Authorization: Bearer $HAPPY_SUPERVISOR_AUTH_TOKEN" \\
+  -H "Authorization: Bearer $HAPPY_SUPERVISOR_CALLBACK_TOKEN" \\
+  -H "X-Happy-Machine-Id: $HAPPY_SUPERVISOR_MACHINE_ID" \\
   -H "Content-Type: application/json" \\
   -d '{"question":"<describe the decision>","options":[{"id":"a","description":"Option A","pros":"...","cons":"..."},{"id":"b","description":"Option B","pros":"...","cons":"..."}],"precedentKey":"<category-key>"}'
 \`\`\`
@@ -407,7 +411,8 @@ suggest a new law.
 To suggest a law:
 \`\`\`
 curl -s -X POST "${messageUrl}" \\
-  -H "Authorization: Bearer $HAPPY_SUPERVISOR_AUTH_TOKEN" \\
+  -H "Authorization: Bearer $HAPPY_SUPERVISOR_CALLBACK_TOKEN" \\
+  -H "X-Happy-Machine-Id: $HAPPY_SUPERVISOR_MACHINE_ID" \\
   -H "Content-Type: application/json" \\
   -d '{"fromRole":"guardian","msgType":"law_suggestion","content":"{\\"category\\":\\"<category>\\",\\"description\\":\\"<law description>\\",\\"severity\\":\\"<low|medium|high|critical>\\"}"}'
 \`\`\`
@@ -431,7 +436,8 @@ approaches, send an AgentMessage:
 
 \`\`\`
 curl -s -X POST "${messageUrl}" \\
-  -H "Authorization: Bearer $HAPPY_SUPERVISOR_AUTH_TOKEN" \\
+  -H "Authorization: Bearer $HAPPY_SUPERVISOR_CALLBACK_TOKEN" \\
+  -H "X-Happy-Machine-Id: $HAPPY_SUPERVISOR_MACHINE_ID" \\
   -H "Content-Type: application/json" \\
   -d '{"fromRole":"<your-role>","toRole":"<target-role>","msgType":"request|report|conflict","content":"<message>"}'
 \`\`\`

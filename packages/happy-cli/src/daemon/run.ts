@@ -2303,7 +2303,6 @@ export async function startDaemon(): Promise<void> {
           emitSupervisorRunStatus,
           emitSupervisorFixStatus,
           serverUrl: configuration.serverUrl,
-          authToken: credentials.token,
           resolveGuardianSessionId: (data) => {
             const resolved = guardianSessionRegistry.resolveForSupervisor(data);
             if (resolved) {

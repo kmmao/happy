@@ -64,7 +64,7 @@ describe('buildFixPrompt', () => {
     it('should include curl reporting instructions', () => {
         const prompt = buildFixPrompt(baseOptions);
         expect(prompt).toContain('curl');
-        expect(prompt).toContain('HAPPY_SUPERVISOR_AUTH_TOKEN');
+        expect(prompt).toContain('HAPPY_SUPERVISOR_CALLBACK_TOKEN');
         expect(prompt).toContain('"fixStatus":"completed"');
         expect(prompt).toContain('"fixStatus":"failed"');
     });
