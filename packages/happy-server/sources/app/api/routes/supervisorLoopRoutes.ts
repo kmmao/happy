@@ -29,6 +29,7 @@ export function supervisorLoopRoutes(app: Fastify) {
                     maxConsecutiveFailures: z.number().int().min(1).max(10).default(2),
                     maxDurationMinutes: z.number().int().min(10).max(480).default(240),
                     profileId: z.string().optional(),
+                    profileEnvironmentVariables: z.record(z.string(), z.string()).optional(),
                 }),
             },
         },
@@ -36,7 +37,10 @@ export function supervisorLoopRoutes(app: Fastify) {
             const userId = request.userId;
             const { id } = request.params;
 
-            const result = await startLoop(id, userId, request.body);
+            const result = await startLoop(id, userId, {
+                ...request.body,
+                profileEnvironmentVariables: request.body.profileEnvironmentVariables as Record<string, string> | undefined,
+            });
 
             if ("error" in result) {
                 return reply.code(result.code).send({ error: result.error });

@@ -521,6 +521,8 @@ model SupervisorLoop {
 
     // AI backend profile to use for all runs in this loop
     profileId               String?
+    /// [ProfileEnvVars]
+    profileEnvironmentVariables Json?
 
     createdAt               DateTime  @default(now())
     updatedAt               DateTime  @updatedAt

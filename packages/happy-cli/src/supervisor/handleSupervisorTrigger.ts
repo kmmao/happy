@@ -469,6 +469,7 @@ async function handleAnalysisTrigger(
       dedupeKey: `supervisor:${runId}`,
     },
     environmentVariables: {
+      ...data.profileEnvironmentVariables,
       HAPPY_INITIAL_PROMPT_FILE: promptFilePath,
       HAPPY_SUPERVISOR_GUARDIAN_SESSION: guardianSessionId ?? "",
       HAPPY_SUPERVISOR_RUN_ID: runId,
@@ -554,6 +555,7 @@ async function handleResearchTrigger(
       dedupeKey: `supervisor:${runId}`,
     },
     environmentVariables: {
+      ...data.profileEnvironmentVariables,
       HAPPY_INITIAL_PROMPT_FILE: promptFilePath,
       HAPPY_SUPERVISOR_GUARDIAN_SESSION: guardianSessionId ?? "",
       HAPPY_SUPERVISOR_RUN_ID: runId,
@@ -681,6 +683,7 @@ async function handleFixTrigger(
       dedupeKey: `supervisor:${actionId}`,
     },
     environmentVariables: {
+      ...data.profileEnvironmentVariables,
       HAPPY_INITIAL_PROMPT_FILE: promptFilePath,
       HAPPY_SUPERVISOR_ACTION_ID: actionId,
       HAPPY_SUPERVISOR_PROJECT_ID: projectId,

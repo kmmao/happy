@@ -40,6 +40,7 @@ export function supervisorRunRoutes(app: Fastify) {
                             featureDirection: z.string().max(1000).optional(),
                         }).optional(),
                         profileId: z.string().optional(),
+                        profileEnvironmentVariables: z.record(z.string(), z.string()).optional(),
                     })
                     .optional(),
             },
@@ -152,6 +153,7 @@ export function supervisorRunRoutes(app: Fastify) {
                     maxConcurrentFix: concurrency.maxFix,
                     maxFindings,
                     profileId: request.body?.profileId,
+                    profileEnvironmentVariables: request.body?.profileEnvironmentVariables as Record<string, string> | undefined,
                 }),
                 recipientFilter: {
                     type: "machine-scoped-only",

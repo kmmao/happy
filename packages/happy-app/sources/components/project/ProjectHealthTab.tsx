@@ -13,6 +13,8 @@ import { Typography } from "@/constants/Typography";
 import { t } from "@/text";
 import { Project } from "@/sync/projectManager";
 import { TokenStorage } from "@/auth/tokenStorage";
+import { getProfileEnvironmentVariables } from "@/sync/settings";
+import { getBuiltInProfile } from "@/sync/profileUtils";
 import { onProjectEvent } from "@/utils/projectEvents";
 import { useHappyAction } from "@/hooks/useHappyAction";
 import {
@@ -46,7 +48,7 @@ import { ItemGroup } from "@/components/ItemGroup";
 import { useRouter } from "expo-router";
 import { sync } from "@/sync/sync";
 import { sessionKill } from "@/sync/ops";
-import { useSession } from "@/sync/storage";
+import { useSession, storage } from "@/sync/storage";
 import { SupervisorSummaryCard } from "./SupervisorSummaryCard";
 import { SupervisorTrendChart } from "./SupervisorTrendChart";
 import { SupervisorRunHistoryItem } from "./SupervisorRunHistoryItem";
@@ -106,6 +108,19 @@ export const ProjectHealthTab = React.memo(
         const [analyticsLoading, setAnalyticsLoading] = React.useState(false);
 
         const serverId = project.serverId;
+
+        // Resolve profile environment variables for a given profileId
+        const resolveProfileEnvVars = React.useCallback((profileId: string | null): Record<string, string> | undefined => {
+            if (!profileId) return undefined;
+            // Try built-in profile first
+            const builtIn = getBuiltInProfile(profileId);
+            if (builtIn) return getProfileEnvironmentVariables(builtIn);
+            // Try user-defined profile from settings
+            const userProfiles = storage.getState().settings.profiles ?? [];
+            const userProfile = userProfiles.find((p) => p.id === profileId);
+            if (userProfile) return getProfileEnvironmentVariables(userProfile);
+            return undefined;
+        }, []);
 
         // Read defaultProfileId from supervisorConfig JSON
         const defaultProfileId = React.useMemo<string | null>(() => {
@@ -407,8 +422,10 @@ export const ProjectHealthTab = React.memo(
                 const credentials = await TokenStorage.getCredentials();
                 if (!credentials) return;
                 try {
+                    const envVars = resolveProfileEnvVars(defaultProfileId);
                     const run = await triggerSupervisorRun(credentials, serverId, {
                         ...(defaultProfileId ? { profileId: defaultProfileId } : {}),
+                        ...(envVars ? { profileEnvironmentVariables: envVars } : {}),
                     });
                     // Optimistic: add the new run to the list immediately
                     setRuns((prev) => [run, ...prev]);

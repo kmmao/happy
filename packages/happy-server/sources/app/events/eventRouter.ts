@@ -1106,6 +1106,8 @@ export interface SupervisorTriggerOptions {
   laws?: string;
   /** AI backend profile ID to use for this run. If set but not found on CLI, run is aborted. */
   profileId?: string;
+  /** Pre-resolved environment variables from the AI backend profile. */
+  profileEnvironmentVariables?: Record<string, string>;
 }
 
 export function buildSupervisorTriggerEphemeral(opts: SupervisorTriggerOptions): EphemeralPayload {

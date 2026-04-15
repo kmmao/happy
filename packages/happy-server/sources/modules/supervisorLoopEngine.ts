@@ -27,6 +27,7 @@ export interface LoopConfig {
     maxConsecutiveFailures?: number;
     maxDurationMinutes?: number;
     profileId?: string;
+    profileEnvironmentVariables?: Record<string, string>;
 }
 
 export type LoopExitReason =
@@ -159,6 +160,7 @@ export async function startLoop(
                 maxConsecutiveFailures: config.maxConsecutiveFailures ?? 2,
                 maxDurationMinutes: config.maxDurationMinutes ?? 240,
                 profileId: config.profileId ?? null,
+                profileEnvironmentVariables: config.profileEnvironmentVariables ?? undefined,
             },
         });
 
@@ -206,6 +208,7 @@ export async function startLoop(
             maxConcurrentFix: concurrency.maxFix,
             maxFindings: concurrency.maxFindings,
             profileId: config.profileId,
+            profileEnvironmentVariables: config.profileEnvironmentVariables,
         }),
         recipientFilter: {
             type: "machine-scoped-only",
@@ -558,6 +561,7 @@ async function decideNextStep(
                 maxConcurrentAnalysis: concurrency.maxAnalysis,
                 maxConcurrentFix: concurrency.maxFix,
                 profileId: loop.profileId ?? undefined,
+                profileEnvironmentVariables: (loop.profileEnvironmentVariables as Record<string, string> | null) ?? undefined,
             }),
             recipientFilter: {
                 type: "machine-scoped-only",
@@ -667,6 +671,7 @@ async function triggerNextAnalysis(
             maxConcurrentAnalysis: concurrency.maxAnalysis,
             maxConcurrentFix: concurrency.maxFix,
             profileId: loop.profileId ?? undefined,
+            profileEnvironmentVariables: (loop.profileEnvironmentVariables as Record<string, string> | null) ?? undefined,
         }),
         recipientFilter: {
             type: "machine-scoped-only",

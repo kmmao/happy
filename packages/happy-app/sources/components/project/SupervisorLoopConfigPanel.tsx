@@ -12,8 +12,9 @@ import { t } from "@/text";
 import { useHappyAction } from "@/hooks/useHappyAction";
 import { TokenStorage } from "@/auth/tokenStorage";
 import { type SupervisorLoop, type LoopConfig, startSupervisorLoop } from "@/sync/apiSupervisor";
-import { useSettings } from "@/sync/storage";
-import { DEFAULT_PROFILES } from "@/sync/profileUtils";
+import { useSettings, storage } from "@/sync/storage";
+import { DEFAULT_PROFILES, getBuiltInProfile } from "@/sync/profileUtils";
+import { getProfileEnvironmentVariables } from "@/sync/settings";
 
 interface SupervisorLoopConfigPanelProps {
     readonly projectId: string;
@@ -111,19 +112,31 @@ export const SupervisorLoopConfigPanel = React.memo(
         // Profile selection: inherit default from supervisor settings, allow per-run override
         const [selectedProfileId, setSelectedProfileId] = React.useState<string | null>(defaultProfileId ?? null);
 
+        const resolveProfileEnvVars = React.useCallback((profileId: string | null): Record<string, string> | undefined => {
+            if (!profileId) return undefined;
+            const builtIn = getBuiltInProfile(profileId);
+            if (builtIn) return getProfileEnvironmentVariables(builtIn);
+            const userProfiles = storage.getState().settings.profiles ?? [];
+            const userProfile = userProfiles.find((p) => p.id === profileId);
+            if (userProfile) return getProfileEnvironmentVariables(userProfile);
+            return undefined;
+        }, []);
+
         const [startLoading, doStart] = useHappyAction(
             React.useCallback(async () => {
                 const credentials = await TokenStorage.getCredentials();
                 if (!credentials) return;
+                const envVars = resolveProfileEnvVars(selectedProfileId);
                 const config: LoopConfig = {
                     maxIterations,
                     autoApproveThreshold,
                     ...(costCapEnabled ? { costCapUsd } : {}),
                     ...(selectedProfileId ? { profileId: selectedProfileId } : {}),
+                    ...(envVars ? { profileEnvironmentVariables: envVars } : {}),
                 };
                 const loop = await startSupervisorLoop(credentials, projectId, config);
                 onStarted(loop);
-            }, [projectId, maxIterations, autoApproveThreshold, costCapEnabled, costCapUsd, selectedProfileId, onStarted]),
+            }, [projectId, maxIterations, autoApproveThreshold, costCapEnabled, costCapUsd, selectedProfileId, resolveProfileEnvVars, onStarted]),
         );
 
         return (
