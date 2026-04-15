@@ -14,9 +14,19 @@ import { layout } from "@/components/layout";
 import { t } from "@/text";
 import { useSetting } from "@/sync/storage";
 
-import { resolveProjectDetailInitialTab, type ProjectDetailTabKey } from "./projectDetailTabs";
+import { resolveProjectDetailInitialTab, resolveProjectDetailTabs, type ProjectDetailTabKey } from "./projectDetailTabs";
 
 type TabKey = ProjectDetailTabKey;
+
+const TAB_LABELS: Record<TabKey, () => string> = {
+    world: () => t("projects.tabWorld"),
+    team: () => t("projects.tabGroups"),
+    goals: () => t("projects.tabGoals"),
+    sessions: () => t("projects.tabSessions"),
+    health: () => t("projects.tabHealth"),
+    research: () => t("projects.tabResearch"),
+    knowledge: () => t("projects.tabKnowledge"),
+};
 
 interface ProjectDetailViewProps {
     project: Project;
@@ -26,35 +36,27 @@ interface ProjectDetailViewProps {
 export const ProjectDetailView = React.memo(
     ({ project, initialTab }: ProjectDetailViewProps) => {
         const { theme } = useUnistyles();
-        const [activeTab, setActiveTab] = React.useState<TabKey>("world");
+        const [activeTab, setActiveTab] = React.useState<TabKey>("sessions");
         const [researchSyncStatus, setResearchSyncStatus] =
             React.useState<ResearchSyncStatus>("idle");
         const knowledgeBaseEnabled = useSetting("knowledgeBase");
+        const worldModelEnabled = useSetting("worldModel");
 
         React.useEffect(() => {
             const nextTab = resolveProjectDetailInitialTab({
                 requestedTab: initialTab,
+                worldModelEnabled,
                 knowledgeBaseEnabled,
             });
             setActiveTab(nextTab);
-        }, [initialTab, knowledgeBaseEnabled]);
+        }, [initialTab, worldModelEnabled, knowledgeBaseEnabled]);
 
         const tabs: { key: TabKey; label: string }[] = React.useMemo(
             () => {
-                const base: { key: TabKey; label: string }[] = [
-                    { key: "world", label: t("projects.tabWorld") },
-                    { key: "team", label: t("projects.tabGroups") },
-                    { key: "goals", label: t("projects.tabGoals") },
-                    { key: "sessions", label: t("projects.tabSessions") },
-                    { key: "health", label: t("projects.tabHealth") },
-                    { key: "research", label: t("projects.tabResearch") },
-                ];
-                if (knowledgeBaseEnabled) {
-                    base.push({ key: "knowledge", label: t("projects.tabKnowledge") });
-                }
-                return base;
+                const tabKeys = resolveProjectDetailTabs({ worldModelEnabled, knowledgeBaseEnabled });
+                return tabKeys.map((key) => ({ key, label: TAB_LABELS[key]() }));
             },
-            [knowledgeBaseEnabled],
+            [worldModelEnabled, knowledgeBaseEnabled],
         );
 
         return (
@@ -151,33 +153,37 @@ export const ProjectDetailView = React.memo(
                             <ProjectKnowledgeTab projectId={project.id} isActive={activeTab === "knowledge"} />
                         </View>
                     )}
-                    <View
-                        style={
-                            activeTab === "world"
-                                ? styles.tabVisible
-                                : styles.tabHidden
-                        }
-                    >
-                        <WorldOverviewTab project={project} isActive={activeTab === "world"} />
-                    </View>
-                    <View
-                        style={
-                            activeTab === "team"
-                                ? styles.tabVisible
-                                : styles.tabHidden
-                        }
-                    >
-                        <WorldTeamTab project={project} isActive={activeTab === "team"} />
-                    </View>
-                    <View
-                        style={
-                            activeTab === "goals"
-                                ? styles.tabVisible
-                                : styles.tabHidden
-                        }
-                    >
-                        <WorldGoalsTab project={project} isActive={activeTab === "goals"} />
-                    </View>
+                    {worldModelEnabled && (
+                        <>
+                            <View
+                                style={
+                                    activeTab === "world"
+                                        ? styles.tabVisible
+                                        : styles.tabHidden
+                                }
+                            >
+                                <WorldOverviewTab project={project} isActive={activeTab === "world"} />
+                            </View>
+                            <View
+                                style={
+                                    activeTab === "team"
+                                        ? styles.tabVisible
+                                        : styles.tabHidden
+                                }
+                            >
+                                <WorldTeamTab project={project} isActive={activeTab === "team"} />
+                            </View>
+                            <View
+                                style={
+                                    activeTab === "goals"
+                                        ? styles.tabVisible
+                                        : styles.tabHidden
+                                }
+                            >
+                                <WorldGoalsTab project={project} isActive={activeTab === "goals"} />
+                            </View>
+                        </>
+                    )}
                 </View>
             </View>
         );

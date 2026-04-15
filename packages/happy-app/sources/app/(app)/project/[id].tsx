@@ -34,6 +34,7 @@ function ProjectDetailScreen() {
 
     const initialTab = resolveProjectDetailInitialTab({
         requestedTab: tab,
+        worldModelEnabled: true,
         knowledgeBaseEnabled: true,
     });
 

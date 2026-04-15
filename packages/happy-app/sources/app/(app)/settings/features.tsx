@@ -28,6 +28,7 @@ function FeaturesSettingsScreen() {
   );
   const [useEnhancedSessionWizard, setUseEnhancedSessionWizard] =
     useSettingMutable("useEnhancedSessionWizard");
+  const [worldModel, setWorldModel] = useSettingMutable("worldModel");
   const [knowledgeBase, setKnowledgeBase] = useSettingMutable("knowledgeBase");
   const [knowledgeBaseMode, setKnowledgeBaseMode] = useSettingMutable("knowledgeBaseMode");
   const [knowledgeBaseSensitivity, setKnowledgeBaseSensitivity] = useSettingMutable("knowledgeBaseSensitivity");
@@ -98,6 +99,19 @@ function FeaturesSettingsScreen() {
               value={useEnhancedSessionWizard}
               onValueChange={setUseEnhancedSessionWizard}
             />
+          }
+          showChevron={false}
+        />
+        <Item
+          title={t("settingsFeatures.worldModel")}
+          subtitle={
+            worldModel
+              ? t("settingsFeatures.worldModelEnabled")
+              : t("settingsFeatures.worldModelDisabled")
+          }
+          icon={<Ionicons name="globe-outline" size={29} color={theme.colors.textLink} />}
+          rightElement={
+            <Switch value={worldModel} onValueChange={setWorldModel} />
           }
           showChevron={false}
         />
