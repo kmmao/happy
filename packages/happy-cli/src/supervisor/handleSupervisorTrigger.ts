@@ -194,7 +194,9 @@ export async function handleSupervisorTrigger(
   processingRuns.set(runId, Date.now());
 
   // Validate profileId if specified — fail fast with a clear error rather than silently ignoring
-  if (data.profileId) {
+  // Built-in profile IDs (hardcoded in App's profileUtils) are always valid
+  const BUILT_IN_PROFILE_IDS = new Set(["anthropic", "deepseek", "zai", "openai", "azure-openai", "minimax", "kimi"]);
+  if (data.profileId && !BUILT_IN_PROFILE_IDS.has(data.profileId)) {
     const settings = await readSettings();
     const profileExists = settings.profiles.some((p) => p.id === data.profileId);
     if (!profileExists) {
