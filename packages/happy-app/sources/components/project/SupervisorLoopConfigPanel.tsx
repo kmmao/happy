@@ -13,6 +13,7 @@ import { useHappyAction } from "@/hooks/useHappyAction";
 import { TokenStorage } from "@/auth/tokenStorage";
 import { type SupervisorLoop, type LoopConfig, startSupervisorLoop } from "@/sync/apiSupervisor";
 import { useSettings } from "@/sync/storage";
+import { DEFAULT_PROFILES } from "@/sync/profileUtils";
 
 interface SupervisorLoopConfigPanelProps {
     readonly projectId: string;
@@ -96,7 +97,12 @@ export const SupervisorLoopConfigPanel = React.memo(
     ({ projectId, defaultProfileId, onStarted, onCancel }: SupervisorLoopConfigPanelProps) => {
         const { theme } = useUnistyles();
         const settings = useSettings();
-        const profiles = settings.profiles ?? [];
+        const allProfiles = React.useMemo(() => {
+            const userProfiles = settings.profiles ?? [];
+            const builtIn = DEFAULT_PROFILES.map((p) => ({ id: p.id, name: p.name, isBuiltIn: true as const }));
+            const userList = userProfiles.map((p) => ({ id: p.id, name: p.name, isBuiltIn: false as const }));
+            return [...builtIn, ...userList];
+        }, [settings.profiles]);
 
         const [maxIterations, setMaxIterations] = React.useState(5);
         const [autoApproveThreshold, setAutoApproveThreshold] = React.useState(80);
@@ -212,42 +218,40 @@ export const SupervisorLoopConfigPanel = React.memo(
                 </View>
 
                 {/* Profile selection */}
-                {profiles.length > 0 && (
-                    <View style={styles.configRow}>
-                        <View style={styles.configLabelRow}>
-                            <Text style={styles.configLabel}>
-                                {t("supervisor.defaultProfileSection")}
+                <View style={styles.configRow}>
+                    <View style={styles.configLabelRow}>
+                        <Text style={styles.configLabel}>
+                            {t("supervisor.defaultProfileSection")}
+                        </Text>
+                    </View>
+                    <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 4 }}>
+                        <Pressable
+                            style={[
+                                styles.profileChip,
+                                selectedProfileId === null && { backgroundColor: theme.colors.header.tint },
+                            ]}
+                            onPress={() => setSelectedProfileId(null)}
+                        >
+                            <Text style={[styles.profileChipText, selectedProfileId === null && { color: "#fff" }]}>
+                                {t("supervisor.defaultProfileDefault")}
                             </Text>
-                        </View>
-                        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 4 }}>
+                        </Pressable>
+                        {allProfiles.map((p) => (
                             <Pressable
+                                key={p.id}
                                 style={[
                                     styles.profileChip,
-                                    selectedProfileId === null && { backgroundColor: theme.colors.header.tint },
+                                    selectedProfileId === p.id && { backgroundColor: theme.colors.header.tint },
                                 ]}
-                                onPress={() => setSelectedProfileId(null)}
+                                onPress={() => setSelectedProfileId(p.id)}
                             >
-                                <Text style={[styles.profileChipText, selectedProfileId === null && { color: "#fff" }]}>
-                                    {t("supervisor.defaultProfileDefault")}
+                                <Text style={[styles.profileChipText, selectedProfileId === p.id && { color: "#fff" }]}>
+                                    {p.name}
                                 </Text>
                             </Pressable>
-                            {profiles.map((p) => (
-                                <Pressable
-                                    key={p.id}
-                                    style={[
-                                        styles.profileChip,
-                                        selectedProfileId === p.id && { backgroundColor: theme.colors.header.tint },
-                                    ]}
-                                    onPress={() => setSelectedProfileId(p.id)}
-                                >
-                                    <Text style={[styles.profileChipText, selectedProfileId === p.id && { color: "#fff" }]}>
-                                        {p.name}
-                                    </Text>
-                                </Pressable>
-                            ))}
-                        </View>
+                        ))}
                     </View>
-                )}
+                </View>
 
                 {/* Safety note */}
                 <View style={styles.safetyNote}>
