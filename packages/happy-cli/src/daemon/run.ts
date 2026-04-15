@@ -781,14 +781,42 @@ export async function startDaemon(): Promise<void> {
           );
         }
 
+        // Layer 2a: Load profile API env vars from local settings when profileId is provided
+        // This handles supervisor triggers where profileId is set but environmentVariables
+        // only contains operational vars (HAPPY_INITIAL_PROMPT_FILE etc.), not API config.
+        if (options.profileId) {
+          try {
+            const profileVars = await getProfileEnvironmentVariablesForAgent(
+              options.profileId,
+              options.agent || "claude",
+            );
+            const profileVarCount = Object.keys(profileVars).length;
+            if (profileVarCount > 0) {
+              profileEnv = profileVars;
+              logger.info(
+                `[DAEMON RUN] Loaded ${profileVarCount} env vars from profile ${options.profileId} (keys: ${Object.keys(profileVars).join(", ")})`,
+              );
+            } else {
+              logger.debug(
+                `[DAEMON RUN] Profile ${options.profileId} has no env vars (built-in or empty)`,
+              );
+            }
+          } catch (error) {
+            logger.debug(
+              `[DAEMON RUN] Failed to load profile ${options.profileId} env vars:`,
+              error,
+            );
+          }
+        }
+
         if (guiProfileProvided) {
-          // GUI explicitly provided profile environment variables
+          // GUI explicitly provided environment variables (may be profile API vars or operational vars)
           // Security: Only strip operator-only keys when the daemon operator has already
           // set them in process.env AND the profile is NOT trusted (not in local settings).
           // Trusted profiles (configured by operator) are allowed to override operator-only vars.
           const raw = options.environmentVariables!;
           const stripped: string[] = [];
-          profileEnv = Object.fromEntries(
+          const guiVars = Object.fromEntries(
             Object.entries(raw).filter((entry): entry is [string, string] => {
               if (entry[1] === undefined) return false;
               if (
@@ -807,17 +835,14 @@ export async function startDaemon(): Promise<void> {
               `[DAEMON RUN] Security: Stripped ${stripped.length} operator-only env vars from GUI profile (daemon already has them, profile untrusted): ${stripped.join(", ")}`,
             );
           }
+          // Merge: profile API vars first, then GUI-provided vars on top (GUI overrides)
+          profileEnv = { ...profileEnv, ...guiVars };
           const varCount = Object.keys(profileEnv).length;
           logger.info(
-            `[DAEMON RUN] Using GUI-provided profile environment variables (${varCount} vars)`,
+            `[DAEMON RUN] Using merged profile environment variables (${varCount} vars)`,
           );
-          if (varCount === 0) {
-            logger.warn(
-              `[DAEMON RUN] GUI profile has ZERO environment variables — this may be the Anthropic default profile or a misconfigured custom profile`,
-            );
-          }
           logger.debug(
-            `[DAEMON RUN] GUI profile env var keys: ${Object.keys(profileEnv).join(", ") || "(none)"}`,
+            `[DAEMON RUN] Merged env var keys: ${Object.keys(profileEnv).join(", ") || "(none)"}`,
           );
         } else {
           // No GUI profile provided — fallback to CLI local active profile

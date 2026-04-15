@@ -283,6 +283,8 @@ export type SupervisorTriggerData = {
   loopIteration?: number;
   /** AI backend profile ID to use for this run. If set but not found locally, run is aborted. */
   profileId?: string;
+  /** Pre-resolved environment variables from the AI backend profile. Sent by App since CLI may not have the profile config locally. */
+  profileEnvironmentVariables?: Record<string, string>;
 };
 
 export type SupervisorRunStatusData = {
