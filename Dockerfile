@@ -2,7 +2,7 @@
 # Uses PGlite (embedded Postgres), local filesystem storage, no Redis
 
 # Stage 1: install dependencies
-FROM node:20 AS deps
+FROM node:22 AS deps
 
 RUN apt-get update && apt-get install -y python3 make g++ build-essential && rm -rf /var/lib/apt/lists/*
 
@@ -37,7 +37,7 @@ RUN yarn workspace @kmmao/happy-wire build
 RUN yarn workspace happy-server build
 
 # Stage 3: runtime
-FROM node:20-slim AS runner
+FROM node:22-slim AS runner
 
 WORKDIR /repo
 
