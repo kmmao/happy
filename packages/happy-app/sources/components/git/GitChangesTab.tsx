@@ -132,12 +132,15 @@ const GitChangesTab = React.memo<{
   );
   const [activeOp, setActiveOp] = React.useState<string | null>(null);
 
-  // Exit selection mode when git status changes
+  // Reload file list and exit selection mode when git status changes
   React.useEffect(() => {
+    if (!gitStatus?.lastUpdatedAt) return;
+    loadGitStatusFiles();
     if (selectionMode) {
       setSelectionMode(false);
       setSelectedFiles(new Set());
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gitStatus?.lastUpdatedAt]);
 
   const toggleFileSelection = React.useCallback((fullPath: string) => {

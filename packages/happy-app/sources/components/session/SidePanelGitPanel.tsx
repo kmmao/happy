@@ -4,7 +4,8 @@
  */
 
 import * as React from "react";
-import { View } from "react-native";
+import { View, Pressable, ActivityIndicator } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { GitTabBar, GitTabId } from "@/components/git/GitTabBar";
 import { GitChangesTab } from "@/components/git/GitChangesTab";
 import { GitHistoryTab } from "@/components/git/GitHistoryTab";
@@ -22,6 +23,7 @@ import {
 import { storage } from "@/sync/storage";
 import { issueStore } from "@/sync/issueStore";
 import { prStore } from "@/sync/prStore";
+import { gitStatusSync } from "@/sync/gitStatusSync";
 import { useUnistyles } from "react-native-unistyles";
 
 interface SidePanelGitPanelProps {
@@ -34,7 +36,18 @@ export const SidePanelGitPanel = React.memo<SidePanelGitPanelProps>(
         const [activeTab, setActiveTab] = React.useState<GitTabId>("changes");
         const [selectedRepoPath, setSelectedRepoPath] = React.useState<string | null>(null);
         const [isRepoSelectorExpanded, setIsRepoSelectorExpanded] = React.useState(false);
+        const [isRefreshing, setIsRefreshing] = React.useState(false);
         const { theme } = useUnistyles();
+
+        const handleRefresh = React.useCallback(async () => {
+            if (isRefreshing) return;
+            setIsRefreshing(true);
+            try {
+                await gitStatusSync.invalidateAndAwait(sessionId);
+            } finally {
+                setIsRefreshing(false);
+            }
+        }, [sessionId, isRefreshing]);
 
         const projectGitStatus = useSessionProjectGitStatus(sessionId);
         const sessionGitStatus = useSessionGitStatus(sessionId);
@@ -146,14 +159,36 @@ export const SidePanelGitPanel = React.memo<SidePanelGitPanelProps>(
                     gitStatus={activeGitStatus}
                     compact
                 />
-                <GitTabBar
-                    activeTab={activeTab}
-                    onTabChange={handleTabChange}
-                    compact
-                    stashCount={gitStatus?.stashCount}
-                    issueCount={issueCount}
-                    prCount={prCount}
-                />
+                <View style={{ flexDirection: "row", alignItems: "stretch" }}>
+                    <View style={{ flex: 1 }}>
+                        <GitTabBar
+                            activeTab={activeTab}
+                            onTabChange={handleTabChange}
+                            compact
+                            stashCount={gitStatus?.stashCount}
+                            issueCount={issueCount}
+                            prCount={prCount}
+                        />
+                    </View>
+                    <Pressable
+                        onPress={handleRefresh}
+                        disabled={isRefreshing}
+                        style={(p) => ({
+                            paddingHorizontal: 10,
+                            alignItems: "center",
+                            justifyContent: "center",
+                            borderBottomWidth: 1,
+                            borderBottomColor: theme.colors.divider,
+                            opacity: p.pressed ? 0.5 : 1,
+                        })}
+                    >
+                        {isRefreshing ? (
+                            <ActivityIndicator size={14} color={theme.colors.textSecondary} />
+                        ) : (
+                            <Ionicons name="refresh-outline" size={16} color={theme.colors.textSecondary} />
+                        )}
+                    </Pressable>
+                </View>
 
                 <View
                     style={{
