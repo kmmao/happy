@@ -14,6 +14,7 @@ import { Modal } from "@/modal";
 import { layout } from "@/components/layout";
 import { SEVERITY_COLORS, SEVERITY_KEY_MAP } from "@/components/project/supervisorConstants";
 import { useSettings } from "@/sync/storage";
+import { DEFAULT_PROFILES } from "@/sync/profileUtils";
 
 type SupervisorMode = "suggest" | "semi-auto" | "auto";
 
@@ -80,7 +81,14 @@ function SupervisorSettingsScreen() {
     const { theme } = useUnistyles();
 
     const settings = useSettings();
-    const profiles = settings.profiles ?? [];
+    // Merge built-in profiles with user-defined profiles
+    const allProfiles = React.useMemo(() => {
+        const userProfiles = settings.profiles ?? [];
+        const builtIn = DEFAULT_PROFILES.map((p) => ({ id: p.id, name: p.name, isBuiltIn: true as const }));
+        const userList = userProfiles.map((p) => ({ id: p.id, name: p.name, isBuiltIn: false as const }));
+        return [...builtIn, ...userList];
+    }, [settings.profiles]);
+    const [profilePickerOpen, setProfilePickerOpen] = React.useState(false);
 
     const [config, setConfig] = React.useState<SupervisorConfig>(defaultConfig);
     const [initialConfig, setInitialConfig] =
@@ -720,38 +728,55 @@ function SupervisorSettingsScreen() {
                 </View>
             </ItemGroup>
 
-            {/* Default Run Profile */}
+            {/* Default Run Profile — collapsible picker */}
             <ItemGroup title={t("supervisor.defaultProfileSection")}>
                 <View style={styles.customRulesCard}>
                     <Text style={styles.customRulesDesc}>
                         {t("supervisor.defaultProfileDesc")}
                     </Text>
-                    {profiles.length === 0 ? (
-                        <Text style={[styles.customRulesDesc, { color: theme.colors.textSecondary, fontStyle: "italic" }]}>
-                            {t("supervisor.defaultProfileNone")}
+                    {/* Current selection — tap to expand/collapse */}
+                    <Pressable
+                        style={{
+                            flexDirection: "row",
+                            alignItems: "center",
+                            justifyContent: "space-between",
+                            paddingVertical: 10,
+                            marginTop: 8,
+                        }}
+                        onPress={() => setProfilePickerOpen((v) => !v)}
+                    >
+                        <Text style={{ fontSize: 14, fontWeight: "600", color: theme.colors.text, ...Typography.default() }}>
+                            {config.defaultProfileId
+                                ? allProfiles.find((p) => p.id === config.defaultProfileId)?.name ?? config.defaultProfileId
+                                : t("supervisor.defaultProfileDefault")}
                         </Text>
-                    ) : (
-                        <View style={{ marginTop: 8 }}>
-                            {/* No profile (default) option */}
+                        <Ionicons
+                            name={profilePickerOpen ? "chevron-up" : "chevron-down"}
+                            size={18}
+                            color={theme.colors.textSecondary}
+                        />
+                    </Pressable>
+                    {/* Expanded option list */}
+                    {profilePickerOpen && (
+                        <View style={{ borderTopWidth: 0.5, borderTopColor: theme.colors.divider }}>
+                            {/* Default (no profile) */}
                             <Pressable
-                                style={{
-                                    flexDirection: "row",
-                                    alignItems: "center",
-                                    paddingVertical: 10,
-                                    gap: 8,
+                                style={{ flexDirection: "row", alignItems: "center", paddingVertical: 10, gap: 8 }}
+                                onPress={() => {
+                                    updateConfig((prev) => ({ ...prev, defaultProfileId: null }));
+                                    setProfilePickerOpen(false);
                                 }}
-                                onPress={() => updateConfig((prev) => ({ ...prev, defaultProfileId: null }))}
                             >
                                 <Ionicons
                                     name={config.defaultProfileId === null ? "radio-button-on" : "radio-button-off"}
-                                    size={20}
+                                    size={18}
                                     color={config.defaultProfileId === null ? theme.colors.header.tint : theme.colors.textSecondary}
                                 />
                                 <Text style={{ fontSize: 14, color: theme.colors.text, ...Typography.default() }}>
                                     {t("supervisor.defaultProfileDefault")}
                                 </Text>
                             </Pressable>
-                            {profiles.map((p) => (
+                            {allProfiles.map((p) => (
                                 <Pressable
                                     key={p.id}
                                     style={{
@@ -762,16 +787,24 @@ function SupervisorSettingsScreen() {
                                         borderTopWidth: 0.5,
                                         borderTopColor: theme.colors.divider,
                                     }}
-                                    onPress={() => updateConfig((prev) => ({ ...prev, defaultProfileId: p.id }))}
+                                    onPress={() => {
+                                        updateConfig((prev) => ({ ...prev, defaultProfileId: p.id }));
+                                        setProfilePickerOpen(false);
+                                    }}
                                 >
                                     <Ionicons
                                         name={config.defaultProfileId === p.id ? "radio-button-on" : "radio-button-off"}
-                                        size={20}
+                                        size={18}
                                         color={config.defaultProfileId === p.id ? theme.colors.header.tint : theme.colors.textSecondary}
                                     />
                                     <Text style={{ fontSize: 14, color: theme.colors.text, flex: 1, ...Typography.default() }}>
                                         {p.name}
                                     </Text>
+                                    {p.isBuiltIn && (
+                                        <Text style={{ fontSize: 11, color: theme.colors.textSecondary, ...Typography.default() }}>
+                                            Built-in
+                                        </Text>
+                                    )}
                                 </Pressable>
                             ))}
                         </View>
