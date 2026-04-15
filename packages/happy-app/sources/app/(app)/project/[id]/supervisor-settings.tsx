@@ -731,37 +731,45 @@ function SupervisorSettingsScreen() {
                             {t("supervisor.defaultProfileNone")}
                         </Text>
                     ) : (
-                        <View style={{ gap: 6, marginTop: 8 }}>
-                            {/* No profile option */}
+                        <View style={{ marginTop: 8 }}>
+                            {/* No profile (default) option */}
                             <Pressable
-                                style={[
-                                    styles.concurrencyOption,
-                                    config.defaultProfileId === null && styles.concurrencyOptionSelected,
-                                    { flex: 0, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8 },
-                                ]}
+                                style={{
+                                    flexDirection: "row",
+                                    alignItems: "center",
+                                    paddingVertical: 10,
+                                    gap: 8,
+                                }}
                                 onPress={() => updateConfig((prev) => ({ ...prev, defaultProfileId: null }))}
                             >
-                                <Text style={[
-                                    styles.concurrencyOptionText,
-                                    config.defaultProfileId === null && styles.concurrencyOptionTextSelected,
-                                ]}>
+                                <Ionicons
+                                    name={config.defaultProfileId === null ? "radio-button-on" : "radio-button-off"}
+                                    size={20}
+                                    color={config.defaultProfileId === null ? theme.colors.header.tint : theme.colors.textSecondary}
+                                />
+                                <Text style={{ fontSize: 14, color: theme.colors.text, ...Typography.default() }}>
                                     {t("supervisor.defaultProfileDefault")}
                                 </Text>
                             </Pressable>
                             {profiles.map((p) => (
                                 <Pressable
                                     key={p.id}
-                                    style={[
-                                        styles.concurrencyOption,
-                                        config.defaultProfileId === p.id && styles.concurrencyOptionSelected,
-                                        { flex: 0, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8 },
-                                    ]}
+                                    style={{
+                                        flexDirection: "row",
+                                        alignItems: "center",
+                                        paddingVertical: 10,
+                                        gap: 8,
+                                        borderTopWidth: 0.5,
+                                        borderTopColor: theme.colors.divider,
+                                    }}
                                     onPress={() => updateConfig((prev) => ({ ...prev, defaultProfileId: p.id }))}
                                 >
-                                    <Text style={[
-                                        styles.concurrencyOptionText,
-                                        config.defaultProfileId === p.id && styles.concurrencyOptionTextSelected,
-                                    ]}>
+                                    <Ionicons
+                                        name={config.defaultProfileId === p.id ? "radio-button-on" : "radio-button-off"}
+                                        size={20}
+                                        color={config.defaultProfileId === p.id ? theme.colors.header.tint : theme.colors.textSecondary}
+                                    />
+                                    <Text style={{ fontSize: 14, color: theme.colors.text, flex: 1, ...Typography.default() }}>
                                         {p.name}
                                     </Text>
                                 </Pressable>
