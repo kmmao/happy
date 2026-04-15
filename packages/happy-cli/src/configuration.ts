@@ -31,7 +31,7 @@ class Configuration {
   constructor() {
     // Server configuration - priority: parameter > environment > default
     this.serverUrl =
-      process.env.HAPPY_SERVER_URL || "https://happyserve.xycloud.info";
+      process.env.HAPPY_SERVER_URL || "https://s.sangreal.code.xycloud.info:2443";
     this.webappUrl =
       process.env.HAPPY_WEBAPP_URL || "https://happy.xycloud.info";
 

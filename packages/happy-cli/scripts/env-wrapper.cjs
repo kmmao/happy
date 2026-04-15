@@ -24,13 +24,13 @@ const VARIANTS = {
     homeDir: path.join(os.homedir(), '.happy'),
     color: '\x1b[32m', // Green
     label: '✅ STABLE',
-    serverUrl: process.env.HAPPY_SERVER_URL || 'https://happyserve.xycloud.info'
+    serverUrl: process.env.HAPPY_SERVER_URL || 'https://s.sangreal.code.xycloud.info:2443'
   },
   dev: {
     homeDir: path.join(os.homedir(), '.happy-dev'),
     color: '\x1b[33m', // Yellow
     label: '🔧 DEV',
-    serverUrl: process.env.HAPPY_SERVER_URL || 'https://happyserve.xycloud.info'
+    serverUrl: process.env.HAPPY_SERVER_URL || 'https://s.sangreal.code.xycloud.info:2443'
   }
 };
 

@@ -124,7 +124,7 @@ happy sandbox disable    # Disable sandboxing
 
 ### Happy Configuration
 
-- `HAPPY_SERVER_URL` - Custom server URL (default: https://happyserve.xycloud.info)
+- `HAPPY_SERVER_URL` - Custom server URL (default: https://s.sangreal.code.xycloud.info:2443)
 - `HAPPY_WEBAPP_URL` - Custom web app URL (default: https://app.happy.engineering)
 - `HAPPY_HOME_DIR` - Custom home directory for Happy data (default: ~/.happy)
 - `HAPPY_DISABLE_CAFFEINATE` - Disable macOS sleep prevention (set to `true`, `1`, or `yes`)

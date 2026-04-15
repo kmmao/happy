@@ -12,6 +12,6 @@
 
 export HAPPY_HOME_DIR="$HOME/.happy-dev"
 export HAPPY_VARIANT="dev"
-export HAPPY_SERVER_URL="${HAPPY_SERVER_URL:-https://happyserve.xycloud.info}"
+export HAPPY_SERVER_URL="${HAPPY_SERVER_URL:-https://s.sangreal.code.xycloud.info:2443}"
 
 echo "🔧 DEV environment activated (data: $HAPPY_HOME_DIR)"

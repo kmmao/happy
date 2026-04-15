@@ -5,7 +5,7 @@ export class PushNotificationClient {
     private readonly token: string
     private readonly baseUrl: string
 
-    constructor(token: string, baseUrl: string = 'https://happyserve.xycloud.info') {
+    constructor(token: string, baseUrl: string = 'https://s.sangreal.code.xycloud.info:2443') {
         this.token = token
         this.baseUrl = baseUrl
     }

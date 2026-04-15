@@ -97,7 +97,7 @@ if (startFrom) {
 **Problem**: Happy-CLI crashes when Happy API server is unreachable
 
 **Server Details**:
-- Default server: `https://happyserve.xycloud.info`
+- Default server: `https://s.sangreal.code.xycloud.info:2443`
 - Environment variable: `HAPPY_SERVER_URL` (overrides default)
 - Local development: `http://localhost:3005`
 - The server handles session management and real-time communication for Happy CLI
