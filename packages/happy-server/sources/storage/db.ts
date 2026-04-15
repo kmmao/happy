@@ -1,4 +1,5 @@
 import { PrismaClient } from "@prisma/client";
+import { PrismaPg } from "@prisma/adapter-pg";
 import { PGlite } from "@electric-sql/pglite";
 import { PrismaPGlite } from "pglite-prisma-adapter";
 import * as fs from "fs";
@@ -49,7 +50,8 @@ function createClient(): PrismaClient {
         const adapter = new PrismaPGlite(pgliteInstance);
         return new PrismaClient({ adapter } as any);
     }
-    return new PrismaClient();
+    const adapter = new PrismaPg(process.env.DATABASE_URL!);
+    return new PrismaClient({ adapter });
 }
 
 export const db = createClient();

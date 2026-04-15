@@ -3,7 +3,7 @@
 
 generator client {
     provider        = "prisma-client-js"
-    previewFeatures = ["metrics", "relationJoins", "driverAdapters"]
+    previewFeatures = ["relationJoins"]
 }
 
 generator json {
@@ -12,7 +12,6 @@ generator json {
 
 datasource db {
     provider = "postgresql"
-    url      = env("DATABASE_URL")
 }
 
 //
