@@ -33,7 +33,7 @@ class Configuration {
     this.serverUrl =
       process.env.HAPPY_SERVER_URL || "https://s.sangreal.code.xycloud.info:2443";
     this.webappUrl =
-      process.env.HAPPY_WEBAPP_URL || "https://happy.xycloud.info";
+      process.env.HAPPY_WEBAPP_URL || "https://w.sangreal.code.xycloud.info:2443";
 
     // Check if we're running as daemon based on process args
     const args = process.argv.slice(2);
