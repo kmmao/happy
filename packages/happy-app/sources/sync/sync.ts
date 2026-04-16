@@ -700,11 +700,14 @@ class Sync {
     }
 
     // Get session data from storage
-    const session = storage.getState().sessions[sessionId];
+    const state = storage.getState();
+    const session = state.sessions[sessionId];
     if (!session) {
       log.error(`Session ${sessionId} not found in storage`);
       return;
     }
+    const requestTimingDiagnosticsEnabled =
+      state.settings.requestTimingDiagnostics;
 
     // Clear needsAttention when user sends a message (user has responded)
     if (session.needsAttention) {
@@ -735,10 +738,12 @@ class Sync {
     }
 
     const fallbackModel: string | null = null;
+    const createdAt = Date.now();
 
     // Create user message content with metadata
     const content: RawRecord = {
       role: "user",
+      ...(requestTimingDiagnosticsEnabled ? { localKey: localId } : {}),
       content: {
         type: "text",
         text,
@@ -757,12 +762,20 @@ class Sync {
         ...(maxBudgetUsd != null && { maxBudgetUsd }),
         ...(taskBudget && { taskBudget }),
         ...(options?.continue && { continue: true }),
+        ...(requestTimingDiagnosticsEnabled
+          ? {
+              requestDiagnostics: {
+                version: 1 as const,
+                requestId: localId,
+                clientCreatedAtMs: createdAt,
+              },
+            }
+          : {}),
       },
     };
     const encryptedRawRecord = await encryption.encryptRawRecord(content);
 
     // Add to messages - normalize the raw record
-    const createdAt = Date.now();
     const normalizedMessage = normalizeRawMessage(
       localId,
       localId,
@@ -814,6 +827,14 @@ class Sync {
 
   refreshProfile = async () => {
     await this.profileSync.invalidateAndAwait();
+  };
+
+  refreshAccountProfiles = async () => {
+    await this.accountProfilesSync.invalidateAndAwait();
+  };
+
+  refreshProjects = async () => {
+    await this.projectsSync.invalidateAndAwait();
   };
 
   purchaseProduct = async (

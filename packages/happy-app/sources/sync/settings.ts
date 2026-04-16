@@ -68,6 +68,9 @@ export const SettingsSchema = z.object({
     .boolean()
     .describe("Whether to opt out of anonymous analytics"),
   experiments: z.boolean().describe("Whether to enable experimental features"),
+  requestTimingDiagnostics: z
+    .boolean()
+    .describe("Record request timing diagnostics for session analysis"),
   showAgentActivity: z
     .boolean()
     .describe(
@@ -94,9 +97,13 @@ export const SettingsSchema = z.object({
   knowledgeBaseTrackTokens: z
     .boolean()
     .describe("Track output token count as valuable turn signal"),
+  enablePreviewTab: z
+    .boolean()
+    .describe("Enable preview tab in session side panel (experimental)"),
   useEnhancedSessionWizard: z
     .boolean()
     .describe("A/B test flag: Use enhanced profile-based session wizard UI"),
+
   alwaysShowContextSize: z
     .boolean()
     .describe("Always show context size in agent input"),
@@ -405,6 +412,7 @@ export const settingsDefaults: Settings = {
   wrapLinesInDiffs: false,
   analyticsOptOut: false,
   experiments: false,
+  requestTimingDiagnostics: false,
   showAgentActivity: true,
   worldModel: false,
   knowledgeBase: false,
@@ -413,6 +421,7 @@ export const settingsDefaults: Settings = {
   knowledgeBaseTrackFileEdits: true,
   knowledgeBaseTrackToolCalls: true,
   knowledgeBaseTrackTokens: true,
+  enablePreviewTab: false,
   useEnhancedSessionWizard: false,
   alwaysShowContextSize: true,
   agentInputEnterToSend: true,

@@ -329,6 +329,13 @@ export const MessageMetaSchema = z.object({
   effort: z.enum(["low", "medium", "high", "max", "xhigh"]).nullable().optional(), // Effort level (null = reset)
   continue: z.boolean().optional(), // Continue from last conversation without new prompt (one-time flag)
   locale: z.string().optional(), // User's preferred UI language (e.g. 'en', 'zh-Hans', 'ja')
+  requestDiagnostics: z
+    .object({
+      version: z.literal(1),
+      requestId: z.string(),
+      clientCreatedAtMs: z.number(),
+    })
+    .optional(),
 });
 
 export type MessageMeta = z.infer<typeof MessageMetaSchema>;

@@ -14,7 +14,12 @@ import { TokenStorage } from "@/auth/tokenStorage";
 import { type SupervisorLoop, type LoopConfig, startSupervisorLoop } from "@/sync/apiSupervisor";
 import { useSettings, storage } from "@/sync/storage";
 import { DEFAULT_PROFILES, getBuiltInProfile } from "@/sync/profileUtils";
-import { getProfileEnvironmentVariables } from "@/sync/settings";
+import { sync } from "@/sync/sync";
+import {
+    createSupervisorProfileSelectionState,
+    selectSupervisorProfile,
+    syncSupervisorProfileSelectionState,
+} from "./supervisorProfileSelection";
 
 interface SupervisorLoopConfigPanelProps {
     readonly projectId: string;
@@ -110,7 +115,35 @@ export const SupervisorLoopConfigPanel = React.memo(
         const [costCapEnabled, setCostCapEnabled] = React.useState(false);
         const [costCapUsd, setCostCapUsd] = React.useState(10);
         // Profile selection: inherit default from supervisor settings, allow per-run override
-        const [selectedProfileId, setSelectedProfileId] = React.useState<string | null>(defaultProfileId ?? null);
+        const [profileSelectionState, setProfileSelectionState] = React.useState(() =>
+            createSupervisorProfileSelectionState(defaultProfileId ?? null),
+        );
+        const [profileRefreshing, setProfileRefreshing] = React.useState(false);
+        const selectedProfileId = profileSelectionState.selectedProfileId;
+
+        React.useEffect(() => {
+            setProfileSelectionState((currentState) =>
+                syncSupervisorProfileSelectionState(currentState, defaultProfileId ?? null),
+            );
+        }, [defaultProfileId]);
+
+        const handleRefreshProfiles = React.useCallback(async () => {
+            setProfileRefreshing(true);
+            try {
+                await Promise.all([
+                    sync.refreshAccountProfiles(),
+                    sync.refreshProjects(),
+                ]);
+            } finally {
+                setProfileRefreshing(false);
+            }
+        }, []);
+
+        const handleSelectProfile = React.useCallback((profileId: string | null) => {
+            setProfileSelectionState((currentState) =>
+                selectSupervisorProfile(currentState, profileId),
+            );
+        }, []);
 
         const resolveProfileName = React.useCallback((profileId: string | null): string | null => {
             if (!profileId) return null;
@@ -236,20 +269,41 @@ export const SupervisorLoopConfigPanel = React.memo(
 
                 {/* Profile selection */}
                 <View style={styles.configRow}>
-                    <View style={styles.configLabelRow}>
+                    <View style={styles.profileHeaderRow}>
                         <Text style={styles.configLabel}>
                             {t("supervisor.defaultProfileSection")}
                         </Text>
+                        <Pressable
+                            style={styles.refreshButton}
+                            onPress={handleRefreshProfiles}
+                            disabled={profileRefreshing}
+                        >
+                            {profileRefreshing ? (
+                                <ActivityIndicator size="small" color={theme.colors.header.tint} />
+                            ) : (
+                                <Ionicons
+                                    name="refresh"
+                                    size={14}
+                                    color={theme.colors.header.tint}
+                                />
+                            )}
+                            <Text style={styles.refreshButtonText}>
+                                {t("suggestions.refresh")}
+                            </Text>
+                        </Pressable>
                     </View>
-                    <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 4 }}>
+                    <View style={styles.profileChipsWrap}>
                         <Pressable
                             style={[
                                 styles.profileChip,
-                                selectedProfileId === null && { backgroundColor: theme.colors.header.tint },
+                                selectedProfileId === null && styles.profileChipSelected,
                             ]}
-                            onPress={() => setSelectedProfileId(null)}
+                            onPress={() => handleSelectProfile(null)}
                         >
-                            <Text style={[styles.profileChipText, selectedProfileId === null && { color: "#fff" }]}>
+                            <Text style={[
+                                styles.profileChipText,
+                                selectedProfileId === null && styles.profileChipTextSelected,
+                            ]}>
                                 {t("supervisor.defaultProfileDefault")}
                             </Text>
                         </Pressable>
@@ -258,13 +312,21 @@ export const SupervisorLoopConfigPanel = React.memo(
                                 key={p.id}
                                 style={[
                                     styles.profileChip,
-                                    selectedProfileId === p.id && { backgroundColor: theme.colors.header.tint },
+                                    selectedProfileId === p.id && styles.profileChipSelected,
                                 ]}
-                                onPress={() => setSelectedProfileId(p.id)}
+                                onPress={() => handleSelectProfile(p.id)}
                             >
-                                <Text style={[styles.profileChipText, selectedProfileId === p.id && { color: "#fff" }]}>
+                                <Text style={[
+                                    styles.profileChipText,
+                                    selectedProfileId === p.id && styles.profileChipTextSelected,
+                                ]}>
                                     {p.name}
                                 </Text>
+                                {p.isBuiltIn ? (
+                                    <View style={styles.profileBadge}>
+                                        <Text style={styles.profileBadgeText}>Built-in</Text>
+                                    </View>
+                                ) : null}
                             </Pressable>
                         ))}
                     </View>
@@ -358,6 +420,28 @@ const styles = StyleSheet.create((theme) => ({
         color: theme.colors.text,
         flex: 1,
     },
+    profileHeaderRow: {
+        flexDirection: "row",
+        justifyContent: "space-between",
+        alignItems: "center",
+        gap: 12,
+    },
+    refreshButton: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 6,
+        borderWidth: 1,
+        borderColor: `${theme.colors.header.tint}22`,
+        backgroundColor: `${theme.colors.header.tint}12`,
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+        borderRadius: 999,
+    },
+    refreshButtonText: {
+        ...Typography.default("semiBold"),
+        fontSize: 11,
+        color: theme.colors.header.tint,
+    },
     costCapStepper: {
         alignItems: "flex-end",
         paddingTop: 4,
@@ -367,16 +451,45 @@ const styles = StyleSheet.create((theme) => ({
         fontSize: 11,
         color: theme.colors.textSecondary,
     },
+    profileChipsWrap: {
+        flexDirection: "row",
+        flexWrap: "wrap",
+        gap: 8,
+        marginTop: 4,
+    },
     profileChip: {
-        paddingHorizontal: 10,
-        paddingVertical: 5,
-        borderRadius: 6,
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 6,
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        borderRadius: 10,
         backgroundColor: theme.colors.surface,
+        borderWidth: 1,
+        borderColor: theme.colors.divider,
+    },
+    profileChipSelected: {
+        backgroundColor: theme.colors.header.tint,
+        borderColor: theme.colors.header.tint,
     },
     profileChipText: {
-        ...Typography.default(),
+        ...Typography.default("semiBold"),
         fontSize: 12,
         color: theme.colors.text,
+    },
+    profileChipTextSelected: {
+        color: "#fff",
+    },
+    profileBadge: {
+        paddingHorizontal: 6,
+        paddingVertical: 2,
+        borderRadius: 999,
+        backgroundColor: `${theme.colors.textSecondary}18`,
+    },
+    profileBadgeText: {
+        ...Typography.default("semiBold"),
+        fontSize: 10,
+        color: theme.colors.textSecondary,
     },
     missingProfileBanner: {
         flexDirection: "row",

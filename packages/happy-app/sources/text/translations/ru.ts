@@ -280,6 +280,11 @@ export const ru: TranslationStructure = {
     experimentalFeatures: "Экспериментальные функции",
     experimentalFeaturesEnabled: "Экспериментальные функции включены",
     experimentalFeaturesDisabled: "Используются только стабильные функции",
+    requestTimingDiagnostics: "Диагностика таймингов запросов",
+    requestTimingDiagnosticsEnabled:
+      "Записывать тайминги запросов и ходов для последующего анализа",
+    requestTimingDiagnosticsDisabled:
+      "Не записывать дополнительные данные о таймингах запросов",
     webFeatures: "Веб-функции",
     webFeaturesDescription:
       "Функции, доступные только в веб-версии приложения.",
@@ -294,6 +299,9 @@ export const ru: TranslationStructure = {
     markdownCopyV2Subtitle:
       "Долгое нажатие открывает модальное окно копирования",
     hideInactiveSessions: "Скрывать неактивные сессии",
+    previewTab: "Вкладка предпросмотра",
+    previewTabEnabled: "Вкладка предпросмотра видна в боковой панели сессии",
+    previewTabDisabled: "Вкладка предпросмотра скрыта",
     hideInactiveSessionsSubtitle: "Показывать в списке только активные чаты",
     enhancedSessionWizard: "Улучшенный мастер сессий",
     enhancedSessionWizardEnabled: "Лаунчер с профилем активен",
@@ -719,6 +727,87 @@ export const ru: TranslationStructure = {
     deleteAllArchivedSessions: "Удалить все архивные сессии",
     deleteAllArchivedWarning: ({ count }: { count: number }) =>
       `Это навсегда удалит ${count} архивных сессий и все их сообщения. Это действие нельзя отменить.`,
+    requestTimingAnalysis: "Анализ времени запросов",
+    requestTimingAnalysisHint: "Включите диагностику времени и отправьте несколько запросов",
+    requestTimingAnalysisEmpty:
+      "Для этой сессии пока нет завершённых ходов с диагностикой времени.",
+    requestTimingAnalyzedTurns: "Проанализированные ходы",
+    requestTimingCorrelatedTurns: "Связанные ходы",
+    requestTimingTrackedSessions: "Отслеживаемые сессии",
+    requestTimingTrackedModels: "Отслеживаемые модели",
+    requestTimingSocketToQueue: "От сокета до очереди",
+    requestTimingTtft: "Время до первого токена",
+    requestTimingQueueWait: "Ожидание в очереди",
+    requestTimingGenerationTail: "Хвост генерации",
+    requestTimingTurnDuration: "Длительность хода",
+    requestTimingLatestTurn: "Последний ход",
+    requestTimingRecentTurns: "Диагностика последних ходов",
+    requestTimingOverview: "Сводка по времени запросов",
+    requestTimingOverviewSubtitle:
+      "Сравнить узкие места между сессиями и моделями",
+    requestTimingOverviewEmpty:
+      "Пока не собрано завершённых ходов с диагностикой времени.",
+    requestTimingEnableDiagnostics: "Включить диагностику времени",
+    requestTimingEnableDiagnosticsSubtitle:
+      "Сначала включите эксперимент, чтобы новые запросы записывали данные времени.",
+    requestTimingClockNote:
+      "Эти значения приходят из диагностики хода на стороне CLI. Не вычитайте время телефона из времени CLI на разных устройствах.",
+    requestTimingUnavailable: "—",
+    requestTimingP50P95: ({ p50, p95 }: { p50: string; p95: string }) =>
+      `P50 ${p50} · P95 ${p95}`,
+    requestTimingAverages: ({
+      socketToQueue,
+      ttft,
+      queueWait,
+      generationTail,
+      duration,
+    }: {
+      socketToQueue: string;
+      ttft: string;
+      queueWait: string;
+      generationTail: string;
+      duration: string;
+    }) =>
+      `Avg socket→queue ${socketToQueue} · Avg TTFT ${ttft} · Avg queue ${queueWait} · Avg tail ${generationTail} · Avg turn ${duration}`,
+    requestTimingTurnsCount: ({ count }: { count: number }) =>
+      `${count} turn${count === 1 ? "" : "s"}`,
+    requestTimingLikelyIssue: "Вероятное узкое место",
+    requestTimingOverallDiagnosis: "Общий вывод",
+    requestTimingDiagnosisDistribution: "Распределение диагнозов",
+    requestTimingSuggestedChecks: "Рекомендуемые проверки",
+    requestTimingCopyReport: "Скопировать отчёт по сессии",
+    requestTimingCopyReportSubtitle:
+      "Скопировать сводные метрики и диагностику последних ходов в JSON",
+    requestTimingCopyOverviewReport: "Скопировать общий отчёт",
+    requestTimingCopyOverviewReportSubtitle:
+      "Скопировать агрегированный межсессионный отчёт в JSON",
+    requestTimingReportCopied: "Отчёт по времени скопирован",
+    requestTimingReportCopyFailed: "Не удалось скопировать отчёт по времени",
+    requestTimingDiagnosisLowConfidence: "Нужно больше данных",
+    requestTimingDiagnosisLowConfidenceHint:
+      "Текущей выборки или корреляции запросов пока недостаточно, чтобы доверять диагнозу.",
+    requestTimingDiagnosisLowConfidenceAction:
+      "Оставьте эксперимент включённым и соберите ещё несколько завершённых ходов перед оптимизацией.",
+    requestTimingDiagnosisQueue: "Очередь / диспетчеризация",
+    requestTimingDiagnosisQueueHint:
+      "Заметная часть задержки накапливается до фактического начала хода модели.",
+    requestTimingDiagnosisQueueAction:
+      "Проверьте очередь сессии, переподключения, предварительную обработку и не накапливаются ли запросы до старта инференса.",
+    requestTimingDiagnosisTtft: "Медленный первый токен",
+    requestTimingDiagnosisTtftHint:
+      "После начала хода модель слишком долго выдаёт первый видимый токен.",
+    requestTimingDiagnosisTtftAction:
+      "Проверьте размер промпта, уровень reasoning, предзаполнение retrieval/tools и жёсткие ограничения структурированного вывода.",
+    requestTimingDiagnosisGeneration: "Медленный хвост генерации",
+    requestTimingDiagnosisGenerationHint:
+      "Модель начинает отвечать, но основное время уходит на оставшуюся часть хода.",
+    requestTimingDiagnosisGenerationAction:
+      "Проверьте длину ответа, скорость декодирования модели, ограничения JSON/schema и не растягивают ли инструменты хвост хода.",
+    requestTimingDiagnosisBalanced: "Нет одного доминирующего узкого места",
+    requestTimingDiagnosisBalancedHint:
+      "Задержка распределена по этапам, а не сосредоточена в одном сегменте.",
+    requestTimingDiagnosisBalancedAction:
+      "Сравните по моделям, размеру промпта и маршрутам — скорее всего нужна поэтапная оптимизация, а не одно очевидное исправление.",
   },
 
   components: {
@@ -901,6 +990,13 @@ export const ru: TranslationStructure = {
       codex: "Codex",
       gemini: "Gemini",
     },
+    rpcState: {
+      disconnected: "Отключено",
+      reconnecting: "Переподключение",
+      rpcReady: "RPC готов",
+    },
+    inputDisabledDisconnected: "Сессия отключена. Ожидание переподключения…",
+    inputDisabledReconnecting: "RPC переподключается. Ввод разблокируется после готовности…",
     model: {
       title: "МОДЕЛЬ",
       configureInCli: "Настройте модели в настройках CLI",

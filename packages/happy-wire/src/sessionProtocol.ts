@@ -58,6 +58,21 @@ export const sessionTurnStartEventSchema = z.object({
   t: z.literal("turn-start"),
 });
 
+export const sessionTurnDiagnosticsSchema = z.object({
+  version: z.literal(1),
+  requestIds: z.array(z.string()).optional(),
+  provider: z.string().optional(),
+  queueWaitMs: z.number().optional(),
+  socketToQueueMs: z.number().optional(),
+  queueToTurnStartMs: z.number().optional(),
+  firstOutputMs: z.number().optional(),
+  firstTextMs: z.number().optional(),
+  turnDurationMs: z.number().optional(),
+  postFirstOutputMs: z.number().optional(),
+  postFirstTextMs: z.number().optional(),
+});
+export type SessionTurnDiagnostics = z.infer<typeof sessionTurnDiagnosticsSchema>;
+
 export const sessionStartEventSchema = z.object({
   t: z.literal("start"),
   title: z.string().optional(),
@@ -97,6 +112,7 @@ export const sessionTurnEndEventSchema = z.object({
   totalCostUsd: z.number().optional(),
   numTurns: z.number().optional(),
   modelUsage: z.record(z.string(), sessionModelUsageSchema).optional(),
+  diagnostics: sessionTurnDiagnosticsSchema.optional(),
 });
 
 export const sessionStopEventSchema = z.object({

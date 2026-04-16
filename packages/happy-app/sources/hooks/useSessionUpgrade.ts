@@ -8,6 +8,8 @@ import { isMachineOnline } from "@/utils/machineUtils";
 import { compareVersions } from "@/utils/versionUtils";
 import { Modal } from "@/modal";
 import { t } from "@/text";
+import { storage } from "@/sync/storage";
+import { buildSessionRespawnProfile } from "./sessionUpgradeProfile";
 
 /**
  * Hook for upgrading an active session to the latest CLI version.
@@ -41,12 +43,17 @@ export function useSessionUpgrade(
                     false,
                 );
             }
+            const spawnProfile = buildSessionRespawnProfile(
+                session,
+                storage.getState().settings.profiles ?? [],
+            );
             const spawnResult = await machineSpawnNewSession({
                 machineId: session.metadata!.machineId!,
                 directory: session.metadata!.path!,
                 claudeSessionId: session.metadata!.claudeSessionId!,
                 happySessionId: session.id,
                 agent: (session.metadata?.flavor as "claude" | "codex" | "gemini") ?? "claude",
+                ...spawnProfile,
             });
             if (spawnResult.type === "error") {
                 throw new HappyError(spawnResult.errorMessage, false);

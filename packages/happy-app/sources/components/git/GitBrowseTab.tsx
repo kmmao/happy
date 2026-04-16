@@ -19,7 +19,7 @@ import { Item } from "@/components/Item";
 import { ItemList } from "@/components/ItemList";
 import { Typography } from "@/constants/Typography";
 import { sessionListDirectory, DirectoryEntry } from "@/sync/ops";
-import { storage, useLocalSetting } from "@/sync/storage";
+import { storage, useLocalSetting, useSession } from "@/sync/storage";
 import { useUnistyles, StyleSheet } from "react-native-unistyles";
 import { layout } from "@/components/layout";
 import { FileIcon } from "@/components/FileIcon";
@@ -72,6 +72,8 @@ export const GitBrowseTab = React.memo<{
 }>(function GitBrowseTab({ sessionId, onPullDown, onScrollUp, embedded, onFileOpen, onFilePress, onReference }) {
     const router = useRouter();
     const { theme } = useUnistyles();
+    const session = useSession(sessionId);
+    const sessionRpcReady = session?.rpcReady ?? false;
 
     const basePath = storage((state) => state.sessions[sessionId]?.metadata?.path ?? null);
 
@@ -124,6 +126,14 @@ export const GitBrowseTab = React.memo<{
             setCurrentPath(basePath);
         }
     }, [basePath, currentPath]);
+
+    const prevSessionRpcReadyRef = React.useRef(sessionRpcReady);
+    React.useEffect(() => {
+        if (sessionRpcReady && !prevSessionRpcReadyRef.current && currentPath) {
+            setRefreshKey((k) => k + 1);
+        }
+        prevSessionRpcReadyRef.current = sessionRpcReady;
+    }, [sessionRpcReady, currentPath]);
 
     // Load directory entries
     React.useEffect(() => {

@@ -1,34 +1,39 @@
 import * as React from "react";
-import { View, Platform, Pressable } from "react-native";
-import { Text } from "@/components/StyledText";
-import { Typography } from "@/constants/Typography";
+import { Platform, Pressable, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useUnistyles } from "react-native-unistyles";
-import { t } from "@/text";
+
+import { Text } from "@/components/StyledText";
 import { GitBrowseTab } from "@/components/git/GitBrowseTab";
 import { SessionKnowledgeSheet } from "@/components/knowledge/SessionKnowledgeSheet";
 import type { SessionKnowledgeTab } from "@/components/knowledge/sessionKnowledgeLoadState";
-import { SidePanelSummaryTab } from "./SidePanelSummaryTab";
-import { SidePanelGitPanel } from "./SidePanelGitPanel";
-import { SidePanelFilePreview } from "./SidePanelFilePreview";
-import { SidePanelCodeTab } from "./SidePanelCodeTab";
-import { SidePanelPreviewTab } from "./SidePanelPreviewTab";
-import { SidePanelTerminalTab } from "./SidePanelTerminalTab";
+import { Typography } from "@/constants/Typography";
 import { InputContext } from "@/hooks/useInputContext";
-import { buildFileReferenceText } from "./sessionSidePanelReference";
 import {
+    useProjectForSession,
     useSessionGitStatus,
     useSessionProjectGitStatus,
     useSessionProjectSubmodules,
-    useProjectForSession,
+    useSetting,
 } from "@/sync/storage";
+import { t } from "@/text";
 import { aggregateLineChanges } from "@/utils/gitStatusUtils";
+import { SidePanelCodeTab } from "./SidePanelCodeTab";
+import { SidePanelFilePreview } from "./SidePanelFilePreview";
+import { SidePanelGitPanel } from "./SidePanelGitPanel";
+import { SidePanelPreviewTab } from "./SidePanelPreviewTab";
+import { SidePanelSummaryTab } from "./SidePanelSummaryTab";
+import { SidePanelTerminalTab } from "./SidePanelTerminalTab";
+import {
+    getSessionPanelTabs,
+    resolveSessionPanelActiveTab,
+    type SessionPanelTab,
+} from "./sessionPanelTabs";
+import { buildFileReferenceText } from "./sessionSidePanelReference";
 
 export const SIDE_PANEL_WIDTH = 360;
 export const SIDE_PANEL_MIN_WINDOW_WIDTH = 1200;
 const COLLAPSED_WIDTH = 36;
-
-type TabKey = "files" | "changes" | "code" | "preview" | "summary" | "terminal";
 
 interface SessionSidePanelProps {
     sessionId: string;
@@ -37,10 +42,20 @@ interface SessionSidePanelProps {
     width?: number;
 }
 
+const SESSION_PANEL_TAB_LABELS: Record<SessionPanelTab, string> = {
+    changes: t("sidePanel.changes"),
+    files: t("sidePanel.files"),
+    code: t("sidePanel.code"),
+    preview: t("sidePanel.preview"),
+    summary: t("sidePanel.summary"),
+    terminal: t("sidePanel.terminal"),
+};
+
 export const SessionSidePanel = React.memo<SessionSidePanelProps>(
     function SessionSidePanel({ sessionId, collapsed, onToggleCollapse }) {
         const { theme } = useUnistyles();
-        const [activeTab, setActiveTab] = React.useState<TabKey>("files");
+        const enablePreviewTab = useSetting("enablePreviewTab");
+        const [activeTab, setActiveTab] = React.useState<SessionPanelTab>("changes");
         const [previewingFile, setPreviewingFile] = React.useState<string | null>(null);
         const [showKnowledgeSheet, setShowKnowledgeSheet] = React.useState(false);
         const [knowledgeSheetInitialTab, setKnowledgeSheetInitialTab] = React.useState<SessionKnowledgeTab>("changes");
@@ -67,7 +82,6 @@ export const SessionSidePanel = React.memo<SessionSidePanelProps>(
             setShowKnowledgeSheet(true);
         }, []);
 
-        // Git status for changes tab badge
         const projectGitStatus = useSessionProjectGitStatus(sessionId);
         const sessionGitStatus = useSessionGitStatus(sessionId);
         const gitStatus = projectGitStatus || sessionGitStatus;
@@ -80,7 +94,15 @@ export const SessionSidePanel = React.memo<SessionSidePanelProps>(
             return { totalAdded, totalRemoved };
         }, [gitStatus, submodules]);
 
-        // Collapsed state: show a thin vertical bar with expand button
+        const tabs = React.useMemo(
+            () => getSessionPanelTabs(enablePreviewTab),
+            [enablePreviewTab],
+        );
+
+        React.useEffect(() => {
+            setActiveTab((currentTab) => resolveSessionPanelActiveTab(currentTab, tabs));
+        }, [tabs]);
+
         if (collapsed) {
             return (
                 <Pressable
@@ -103,15 +125,6 @@ export const SessionSidePanel = React.memo<SessionSidePanelProps>(
             );
         }
 
-        const tabs: Array<{ key: TabKey; label: string }> = [
-            { key: "files", label: t("sidePanel.files") },
-            { key: "changes", label: t("sidePanel.changes") },
-            { key: "code", label: t("sidePanel.code") },
-            { key: "preview", label: t("sidePanel.preview") },
-            { key: "summary", label: t("sidePanel.summary") },
-            { key: "terminal", label: t("sidePanel.terminal") },
-        ];
-
         return (
             <View
                 style={{
@@ -119,7 +132,6 @@ export const SessionSidePanel = React.memo<SessionSidePanelProps>(
                     backgroundColor: theme.colors.surface,
                 }}
             >
-                {/* File preview overlay */}
                 {previewingFile ? (
                     <SidePanelFilePreview
                         sessionId={sessionId}
@@ -128,7 +140,6 @@ export const SessionSidePanel = React.memo<SessionSidePanelProps>(
                     />
                 ) : (
                     <>
-                        {/* Tab bar */}
                         <View
                             style={{
                                 flexDirection: "row",
@@ -140,15 +151,15 @@ export const SessionSidePanel = React.memo<SessionSidePanelProps>(
                         >
                             {tabs.map((tab) => (
                                 <Pressable
-                                    key={tab.key}
-                                    onPress={() => setActiveTab(tab.key)}
+                                    key={tab}
+                                    onPress={() => setActiveTab(tab)}
                                     style={{
                                         flex: 1,
                                         paddingVertical: 10,
                                         alignItems: "center",
                                         borderBottomWidth: 2,
                                         borderBottomColor:
-                                            activeTab === tab.key
+                                            activeTab === tab
                                                 ? theme.colors.textLink
                                                 : "transparent",
                                         flexDirection: "row",
@@ -159,17 +170,17 @@ export const SessionSidePanel = React.memo<SessionSidePanelProps>(
                                     <Text
                                         style={{
                                             fontSize: 13,
-                                            fontWeight: activeTab === tab.key ? "600" : "400",
+                                            fontWeight: activeTab === tab ? "600" : "400",
                                             color:
-                                                activeTab === tab.key
+                                                activeTab === tab
                                                     ? theme.colors.textLink
                                                     : theme.colors.textSecondary,
                                             ...Typography.default(),
                                         }}
                                     >
-                                        {tab.label}
+                                        {SESSION_PANEL_TAB_LABELS[tab]}
                                     </Text>
-                                    {tab.key === "changes" && changesInfo && (
+                                    {tab === "changes" && changesInfo && (
                                         <View style={{ flexDirection: "row", gap: 2 }}>
                                             <Text style={{ fontSize: 10, fontWeight: "600", color: theme.colors.gitAddedText }}>
                                                 +{changesInfo.totalAdded}
@@ -181,7 +192,6 @@ export const SessionSidePanel = React.memo<SessionSidePanelProps>(
                                     )}
                                 </Pressable>
                             ))}
-                            {/* Collapse button */}
                             <Pressable
                                 onPress={onToggleCollapse}
                                 hitSlop={6}
@@ -198,7 +208,6 @@ export const SessionSidePanel = React.memo<SessionSidePanelProps>(
                             </Pressable>
                         </View>
 
-                        {/* Tab content — conditionally render active tab */}
                         <View style={{ flex: 1 }}>
                             {activeTab === "files" && (
                                 <GitBrowseTab

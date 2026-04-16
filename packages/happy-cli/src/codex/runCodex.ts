@@ -394,6 +394,11 @@ export async function runCodex(opts: {
     | NonNullable<import("@/api/types").MessageMeta["effort"]>
     | undefined = undefined;
   session.onUserMessage((message) => {
+    const perfSocketReceivedAt = session.lastPerfSocketReceivedAt;
+    const perfQueuedAt = Date.now();
+    const socketToQueueMs = perfSocketReceivedAt
+      ? perfQueuedAt - perfSocketReceivedAt
+      : undefined;
     const resolvedMode = resolveCodexMessageMode({
       current: {
         permissionMode: currentPermissionMode,
@@ -442,7 +447,12 @@ export async function runCodex(opts: {
       );
     }
 
-    messageQueue.push(message.content.text, resolvedMode.mode);
+    messageQueue.push(message.content.text, resolvedMode.mode, message.localKey, {
+      priority: "user",
+      kind: "prompt",
+      source: "user",
+      ...(socketToQueueMs !== undefined ? { socketToQueueMs } : {}),
+    });
   });
   let thinking = false;
   let currentTurnId: string | null = null;
@@ -1341,6 +1351,9 @@ export async function runCodex(opts: {
       mode: CodexMessageMode;
       isolate: boolean;
       hash: string;
+      requestIds: string[];
+      queueWaitMs?: number;
+      socketToQueueMs?: number;
     } | null = null;
     // If we restart (e.g., mode change), use this to carry a resume file
     let nextExperimentalResume: string | null = null;
@@ -1353,6 +1366,9 @@ export async function runCodex(opts: {
         mode: CodexMessageMode;
         isolate: boolean;
         hash: string;
+        requestIds: string[];
+        queueWaitMs?: number;
+        socketToQueueMs?: number;
       } | null = pending;
       pending = null;
       if (!message) {
@@ -1421,6 +1437,13 @@ export async function runCodex(opts: {
         session.keepAlive(thinking, "remote");
         continue;
       }
+
+      session.beginTurnDiagnostics({
+        provider: "codex",
+        requestIds: message.requestIds,
+        queueWaitMs: message.queueWaitMs,
+        socketToQueueMs: message.socketToQueueMs,
+      });
 
       // Display user messages in the UI
       messageBuffer.addMessage(message.message, "user");

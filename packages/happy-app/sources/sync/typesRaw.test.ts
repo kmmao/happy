@@ -939,9 +939,17 @@ describe('Zod Transform - WOLOG Content Normalization', () => {
         it('handles user role messages with text content', () => {
             const userMessage = {
                 role: 'user',
+                localKey: 'req-123',
                 content: {
                     type: 'text',
                     text: 'User input message'
+                },
+                meta: {
+                    requestDiagnostics: {
+                        version: 1,
+                        requestId: 'req-123',
+                        clientCreatedAtMs: 1234567890,
+                    }
                 }
             };
 
@@ -949,8 +957,14 @@ describe('Zod Transform - WOLOG Content Normalization', () => {
 
             expect(result.success).toBe(true);
             if (result.success && result.data.role === 'user') {
+                expect(result.data.localKey).toBe('req-123');
                 expect(result.data.content.type).toBe('text');
                 expect(result.data.content.text).toBe('User input message');
+                expect(result.data.meta?.requestDiagnostics).toEqual({
+                    version: 1,
+                    requestId: 'req-123',
+                    clientCreatedAtMs: 1234567890,
+                });
             }
         });
     });

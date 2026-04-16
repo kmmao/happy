@@ -13,6 +13,7 @@ export interface QueueMetadata {
   priority?: QueuePriority;
   kind?: QueueKind;
   source?: string;
+  socketToQueueMs?: number;
 }
 
 interface QueueItem<T> {
@@ -22,6 +23,7 @@ interface QueueItem<T> {
   isolate?: boolean;
   localKey?: string;
   _perfPushTime?: number;
+  _perfSocketToQueueMs?: number;
   priority: QueuePriority;
   kind?: QueueKind;
   source?: string;
@@ -81,6 +83,7 @@ export class MessageQueue2<T> {
       isolate: false,
       localKey,
       _perfPushTime: pushTime,
+      _perfSocketToQueueMs: metadata?.socketToQueueMs,
       priority: metadata?.priority ?? "user",
       kind: metadata?.kind ?? "prompt",
       source: metadata?.source,
@@ -108,6 +111,7 @@ export class MessageQueue2<T> {
       mode,
       modeHash,
       isolate: false,
+      _perfSocketToQueueMs: metadata?.socketToQueueMs,
       priority: metadata?.priority ?? "user",
       kind: metadata?.kind ?? "prompt",
       source: metadata?.source,
@@ -136,6 +140,7 @@ export class MessageQueue2<T> {
       mode,
       modeHash,
       isolate: true,
+      _perfSocketToQueueMs: metadata?.socketToQueueMs,
       priority: metadata?.priority ?? "urgent",
       kind: metadata?.kind ?? "isolated",
       source: metadata?.source,
@@ -163,6 +168,7 @@ export class MessageQueue2<T> {
       mode,
       modeHash,
       isolate: false,
+      _perfSocketToQueueMs: metadata?.socketToQueueMs,
       priority: metadata?.priority ?? "urgent",
       kind: metadata?.kind ?? "notification",
       source: metadata?.source,
@@ -231,6 +237,9 @@ export class MessageQueue2<T> {
     priority: QueuePriority;
     kind?: QueueKind;
     source?: string;
+    requestIds: string[];
+    queueWaitMs?: number;
+    socketToQueueMs?: number;
   } | null> {
     if (this.queue.length > 0) {
       return this.collectBatch();
@@ -257,6 +266,9 @@ export class MessageQueue2<T> {
     priority: QueuePriority;
     kind?: QueueKind;
     source?: string;
+    requestIds: string[];
+    queueWaitMs?: number;
+    socketToQueueMs?: number;
   } | null {
     const firstIdx = this.findHighestPriorityIndex();
     if (firstIdx === -1) {
@@ -271,12 +283,20 @@ export class MessageQueue2<T> {
     const targetPriority = firstItem.priority;
     let kind = firstItem.kind;
     let source = firstItem.source;
+    const requestIds: string[] = [];
 
     let earliestPushTime: number | undefined;
+    let socketToQueueMs: number | undefined;
     if (firstItem.isolate) {
       const [item] = this.queue.splice(firstIdx, 1);
       sameModeMessages.push(item!.message);
       earliestPushTime = item!._perfPushTime;
+      if (item?.localKey) {
+        requestIds.push(item.localKey);
+      }
+      if (item?._perfSocketToQueueMs !== undefined) {
+        socketToQueueMs = item._perfSocketToQueueMs;
+      }
       logger.debug(
         `[MessageQueue2] Collected isolated message with mode hash: ${targetModeHash}`,
       );
@@ -305,6 +325,16 @@ export class MessageQueue2<T> {
           ) {
             earliestPushTime = item._perfPushTime;
           }
+          if (item.localKey) {
+            requestIds.push(item.localKey);
+          }
+          if (
+            item._perfSocketToQueueMs !== undefined &&
+            (socketToQueueMs === undefined ||
+              item._perfSocketToQueueMs < socketToQueueMs)
+          ) {
+            socketToQueueMs = item._perfSocketToQueueMs;
+          }
           this.queue.splice(i, 1);
           continue;
         }
@@ -322,6 +352,9 @@ export class MessageQueue2<T> {
         `[perf] queue_wait: ${Date.now() - earliestPushTime}ms (push → collectBatch, batch=${sameModeMessages.length})`,
       );
     }
+    const queueWaitMs = earliestPushTime
+      ? Date.now() - earliestPushTime
+      : undefined;
 
     return {
       message: sameModeMessages.join("\n"),
@@ -331,6 +364,9 @@ export class MessageQueue2<T> {
       priority: targetPriority,
       kind,
       source,
+      requestIds,
+      queueWaitMs,
+      ...(socketToQueueMs !== undefined ? { socketToQueueMs } : {}),
     };
   }
 

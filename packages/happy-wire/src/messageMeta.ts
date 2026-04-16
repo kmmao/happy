@@ -10,5 +10,12 @@ export const MessageMetaSchema = z.object({
   allowedTools: z.array(z.string()).nullable().optional(),
   disallowedTools: z.array(z.string()).nullable().optional(),
   displayText: z.string().optional(),
+  requestDiagnostics: z
+    .object({
+      version: z.literal(1),
+      requestId: z.string(),
+      clientCreatedAtMs: z.number(),
+    })
+    .optional(),
 });
 export type MessageMeta = z.infer<typeof MessageMetaSchema>;

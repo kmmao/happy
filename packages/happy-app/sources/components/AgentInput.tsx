@@ -1,6 +1,7 @@
 import { Ionicons, Octicons } from "@expo/vector-icons";
 import * as React from "react";
 import {
+  Animated,
   View,
   Platform,
   useWindowDimensions,
@@ -10,6 +11,7 @@ import {
   Pressable,
   ScrollView,
   Modal as RNModal,
+  Easing,
 } from "react-native";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
@@ -88,6 +90,12 @@ export const AgentInput = React.memo(
       [props.availableModes],
     );
     const availableModels = props.availableModels ?? [];
+    const modelSummaryGlowOpacity = React.useRef(new Animated.Value(0)).current;
+    const isInputDisabled = props.isInputDisabled ?? false;
+    const resolvedInputPlaceholder =
+      isInputDisabled && props.disabledPlaceholder
+        ? props.disabledPlaceholder
+        : props.placeholder;
     const isSandboxEnabled = React.useMemo(() => {
       const sandbox = props.metadata?.sandbox as unknown;
       if (!sandbox) {
@@ -115,6 +123,101 @@ export const AgentInput = React.memo(
       },
       [isSandboxEnabled],
     );
+
+    const modelSummaryStatusLabel = React.useMemo(() => {
+      switch (props.modelSummaryRpcState) {
+        case "disconnected":
+          return t("agentInput.rpcState.disconnected");
+        case "reconnecting":
+          return t("agentInput.rpcState.reconnecting");
+        case "rpcReady":
+          return t("agentInput.rpcState.rpcReady");
+        default:
+          return null;
+      }
+    }, [props.modelSummaryRpcState]);
+
+    const modelSummaryVisualState = React.useMemo(() => {
+      switch (props.modelSummaryRpcState) {
+        case "reconnecting":
+          return {
+            borderColor: `${theme.colors.accentOrange}55`,
+            backgroundColor: `${theme.colors.accentOrange}12`,
+            glowColor: theme.colors.accentOrange,
+            pillBackgroundColor: `${theme.colors.accentOrange}18`,
+            pillTextColor: theme.colors.accentOrange,
+            pillDotColor: theme.colors.accentOrange,
+            summaryTextColor: theme.colors.text,
+          };
+        case "rpcReady":
+          return {
+            borderColor: `${theme.colors.success}45`,
+            backgroundColor: `${theme.colors.success}10`,
+            glowColor: theme.colors.success,
+            pillBackgroundColor: `${theme.colors.success}18`,
+            pillTextColor: theme.colors.success,
+            pillDotColor: theme.colors.success,
+            summaryTextColor: theme.colors.text,
+          };
+        case "disconnected":
+          return {
+            borderColor: theme.colors.divider,
+            backgroundColor: theme.colors.surfacePressed,
+            glowColor: theme.colors.textSecondary,
+            pillBackgroundColor: `${theme.colors.textSecondary}14`,
+            pillTextColor: theme.colors.textSecondary,
+            pillDotColor: theme.colors.textSecondary,
+            summaryTextColor: theme.colors.textSecondary,
+          };
+        default:
+          return {
+            borderColor: "transparent",
+            backgroundColor: `${theme.colors.surfacePressed}CC`,
+            glowColor: theme.colors.shadow.color,
+            pillBackgroundColor: `${theme.colors.surfacePressed}CC`,
+            pillTextColor: theme.colors.textSecondary,
+            pillDotColor: theme.colors.textSecondary,
+            summaryTextColor: theme.colors.textSecondary,
+          };
+      }
+    }, [props.modelSummaryRpcState, theme.colors]);
+
+    React.useEffect(() => {
+      let animation: Animated.CompositeAnimation | null = null;
+      modelSummaryGlowOpacity.stopAnimation();
+
+      if (props.modelSummaryRpcState === "reconnecting") {
+        modelSummaryGlowOpacity.setValue(0.2);
+        animation = Animated.loop(
+          Animated.sequence([
+            Animated.timing(modelSummaryGlowOpacity, {
+              toValue: 0.7,
+              duration: 900,
+              easing: Easing.inOut(Easing.ease),
+              useNativeDriver: false,
+            }),
+            Animated.timing(modelSummaryGlowOpacity, {
+              toValue: 0.18,
+              duration: 900,
+              easing: Easing.inOut(Easing.ease),
+              useNativeDriver: false,
+            }),
+          ]),
+        );
+        animation.start();
+      } else {
+        Animated.timing(modelSummaryGlowOpacity, {
+          toValue: props.modelSummaryRpcState === "rpcReady" ? 0.14 : 0,
+          duration: 220,
+          easing: Easing.out(Easing.quad),
+          useNativeDriver: false,
+        }).start();
+      }
+
+      return () => {
+        animation?.stop();
+      };
+    }, [modelSummaryGlowOpacity, props.modelSummaryRpcState]);
 
     // Profile data
     const profiles = useSetting("profiles");
@@ -145,6 +248,12 @@ export const AgentInput = React.memo(
     const [isAborting, setIsAborting] = React.useState(false);
     const shakerRef = React.useRef<ShakeInstance>(null);
     const inputRef = React.useRef<MultiTextInputHandle>(null);
+
+    React.useEffect(() => {
+      if (isInputDisabled) {
+        inputRef.current?.blur();
+      }
+    }, [isInputDisabled]);
 
     // Forward ref to the MultiTextInput
     React.useImperativeHandle(ref, () => inputRef.current!, []);
@@ -975,73 +1084,117 @@ export const AgentInput = React.memo(
                   </>
                 )}
               </View>
-              <Pressable
-                onPress={handleModelSummaryPress}
-                disabled={!props.onModelModeChange || availableModels.length === 0}
-                hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
-                style={({ pressed }) => ({
-                  flexDirection: "row",
-                  alignItems: "center",
+              <Animated.View
+                style={{
                   alignSelf: "flex-end",
                   minWidth: 150,
-                  maxWidth: 260,
+                  maxWidth: screenWidth > 700 ? 360 : 260,
                   marginLeft: 12,
-                  paddingLeft: 10,
-                  paddingRight: 8,
-                  paddingVertical: 6,
                   borderRadius: 12,
-                  backgroundColor:
-                    !props.onModelModeChange || availableModels.length === 0
-                      ? "transparent"
-                      : pressed
-                        ? theme.colors.surfacePressed
-                        : `${theme.colors.surfacePressed}CC`,
-                  opacity:
-                    !props.onModelModeChange || availableModels.length === 0
-                      ? 1
-                      : pressed
-                        ? 0.85
-                        : 1,
-                  gap: 4,
-                })}
+                  borderWidth: props.modelSummaryRpcState ? 1 : 0,
+                  borderColor: modelSummaryVisualState.borderColor,
+                  backgroundColor: modelSummaryVisualState.backgroundColor,
+                  shadowColor: modelSummaryVisualState.glowColor,
+                  shadowOffset: { width: 0, height: 0 },
+                  shadowRadius: props.modelSummaryRpcState === "reconnecting" ? 10 : 6,
+                  shadowOpacity: modelSummaryGlowOpacity,
+                  elevation: props.modelSummaryRpcState === "reconnecting" ? 5 : 1,
+                }}
               >
-                <Text
-                  numberOfLines={1}
-                  ellipsizeMode="tail"
-                  style={{
-                    flex: 1,
-                    fontSize: 11,
-                    color: theme.colors.textSecondary,
-                    textAlign: "right",
-                    ...Typography.default(),
-                  }}
+                <Pressable
+                  onPress={handleModelSummaryPress}
+                  disabled={!props.onModelModeChange || availableModels.length === 0}
+                  hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
+                  style={({ pressed }) => ({
+                    flexDirection: "row",
+                    alignItems: "center",
+                    alignSelf: "stretch",
+                    paddingLeft: 10,
+                    paddingRight: 8,
+                    paddingVertical: 6,
+                    borderRadius: 12,
+                    backgroundColor:
+                      !props.onModelModeChange || availableModels.length === 0
+                        ? "transparent"
+                        : pressed
+                          ? theme.colors.surfacePressedOverlay
+                          : "transparent",
+                    opacity:
+                      !props.onModelModeChange || availableModels.length === 0
+                        ? 1
+                        : pressed
+                          ? 0.9
+                          : 1,
+                    gap: 6,
+                  })}
                 >
-                  {[
-                    displayPermissionMode
-                      ? withSandboxSuffix(
-                          displayPermissionMode.name,
-                          permissionModeKey,
-                        )
-                      : null,
-                    props.effectiveModelLabel ?? props.modelMode?.name,
-                    ...getReasoningSummaryLabels({
-                      isCodex,
-                      isGemini,
-                      reasoning: props.reasoning,
-                      translate: t,
-                    }),
-                  ]
-                    .filter(Boolean)
-                    .join(" · ")}
-                </Text>
-                {!!props.onModelModeChange && availableModels.length > 0 && (
-                  <Ionicons
-                    name="chevron-forward"
-                    size={12}
-                    color={theme.colors.textSecondary}
-                  />
-                )}
-              </Pressable>
+                  {modelSummaryStatusLabel ? (
+                    <View
+                      style={{
+                        flexDirection: "row",
+                        alignItems: "center",
+                        gap: 5,
+                        paddingHorizontal: 7,
+                        paddingVertical: 3,
+                        borderRadius: 999,
+                        backgroundColor: modelSummaryVisualState.pillBackgroundColor,
+                        flexShrink: 0,
+                      }}
+                    >
+                      <StatusDot
+                        color={modelSummaryVisualState.pillDotColor}
+                        isPulsing={props.modelSummaryRpcState === "reconnecting"}
+                        size={5}
+                      />
+                      <Text
+                        style={{
+                          fontSize: 10,
+                          color: modelSummaryVisualState.pillTextColor,
+                          ...Typography.default("semiBold"),
+                        }}
+                      >
+                        {modelSummaryStatusLabel}
+                      </Text>
+                    </View>
+                  ) : null}
+                  <Text
+                    numberOfLines={1}
+                    ellipsizeMode="tail"
+                    style={{
+                      flex: 1,
+                      fontSize: 11,
+                      color: modelSummaryVisualState.summaryTextColor,
+                      textAlign: "right",
+                      ...Typography.default(),
+                    }}
+                  >
+                    {[
+                      displayPermissionMode
+                        ? withSandboxSuffix(
+                            displayPermissionMode.name,
+                            permissionModeKey,
+                          )
+                        : null,
+                      props.effectiveModelLabel ?? props.modelMode?.name,
+                      ...getReasoningSummaryLabels({
+                        isCodex,
+                        isGemini,
+                        reasoning: props.reasoning,
+                        translate: t,
+                      }),
+                    ]
+                      .filter(Boolean)
+                      .join(" · ")}
+                  </Text>
+                  {!!props.onModelModeChange && availableModels.length > 0 && (
+                    <Ionicons
+                      name="chevron-forward"
+                      size={12}
+                      color={modelSummaryVisualState.summaryTextColor}
+                    />
+                  )}
+                </Pressable>
+              </Animated.View>
             </View>
           )}
 
@@ -1519,6 +1672,11 @@ export const AgentInput = React.memo(
             <View
               style={[
                 styles.inputContainer,
+                isInputDisabled
+                  ? {
+                      opacity: 0.72,
+                    }
+                  : undefined,
                 props.minHeight ? { minHeight: props.minHeight } : undefined,
               ]}
             >
@@ -1528,7 +1686,8 @@ export const AgentInput = React.memo(
                 paddingTop={Platform.OS === "web" ? 10 : 8}
                 paddingBottom={Platform.OS === "web" ? 10 : 8}
                 onChangeText={props.onChangeText}
-                placeholder={props.placeholder}
+                placeholder={resolvedInputPlaceholder}
+                editable={!isInputDisabled}
                 onKeyPress={handleKeyPress}
                 onStateChange={handleInputStateChange}
                 maxHeight={120}

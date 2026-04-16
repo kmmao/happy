@@ -1,5 +1,6 @@
 import { PermissionMode, ModelMode } from "./PermissionModeSelector";
 import { Metadata } from "@/sync/storageTypes";
+import type { SessionRpcVisualState } from "@/utils/sessionRpcVisualState";
 
 /** SDK reasoning & budget settings */
 export interface ReasoningProps {
@@ -69,6 +70,7 @@ export interface AgentInputProps {
             gemini?: boolean | null;
         };
     };
+    modelSummaryRpcState?: SessionRpcVisualState | null;
     autocompletePrefixes: string[];
     autocompleteSuggestions: (
         query: string,
@@ -109,6 +111,8 @@ export interface AgentInputProps {
     onMachineClick?: () => void;
     currentPath?: string | null;
     onPathClick?: () => void;
+    isInputDisabled?: boolean;
+    disabledPlaceholder?: string | null;
     isSendDisabled?: boolean;
     isSending?: boolean;
     minHeight?: number;

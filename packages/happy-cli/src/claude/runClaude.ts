@@ -721,8 +721,11 @@ export async function runClaude(
     // Perf tracking: capture timing from socket layer (stored by ApiSessionClient before Zod strips it)
     const perfSocketReceivedAt = session.lastPerfSocketReceivedAt;
     const perfQueuedAt = Date.now();
+    const socketToQueueMs = perfSocketReceivedAt
+      ? perfQueuedAt - perfSocketReceivedAt
+      : undefined;
     if (perfSocketReceivedAt) {
-      logger.debug(`[perf] socket_received → queued: ${perfQueuedAt - perfSocketReceivedAt}ms (meta processing)`);
+      logger.debug(`[perf] socket_received → queued: ${socketToQueueMs}ms (meta processing)`);
     }
 
     // Push with resolved permission mode, model, system prompts, and tools
@@ -751,6 +754,7 @@ export async function runClaude(
         priority: "user",
         kind: messageContinue ? "continue" : "prompt",
         source: "user",
+        ...(socketToQueueMs !== undefined ? { socketToQueueMs } : {}),
       },
     );
     logger.debugLargeJson("User message pushed to queue:", message);

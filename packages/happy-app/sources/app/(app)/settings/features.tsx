@@ -19,12 +19,17 @@ function FeaturesSettingsScreen() {
   const [agentInputEnterToSend, setAgentInputEnterToSend] = useSettingMutable(
     "agentInputEnterToSend",
   );
+  const [requestTimingDiagnostics, setRequestTimingDiagnostics] =
+    useSettingMutable("requestTimingDiagnostics");
   const [commandPaletteEnabled, setCommandPaletteEnabled] =
     useLocalSettingMutable("commandPaletteEnabled");
   const [markdownCopyV2, setMarkdownCopyV2] =
     useLocalSettingMutable("markdownCopyV2");
   const [hideInactiveSessions, setHideInactiveSessions] = useSettingMutable(
     "hideInactiveSessions",
+  );
+  const [enablePreviewTab, setEnablePreviewTab] = useSettingMutable(
+    "enablePreviewTab",
   );
   const [useEnhancedSessionWizard, setUseEnhancedSessionWizard] =
     useSettingMutable("useEnhancedSessionWizard");
@@ -66,6 +71,22 @@ function FeaturesSettingsScreen() {
           showChevron={false}
         />
         <Item
+          title={t("settingsFeatures.requestTimingDiagnostics")}
+          subtitle={
+            requestTimingDiagnostics
+              ? t("settingsFeatures.requestTimingDiagnosticsEnabled")
+              : t("settingsFeatures.requestTimingDiagnosticsDisabled")
+          }
+          icon={<Ionicons name="pulse-outline" size={29} color={theme.colors.accentTeal} />}
+          rightElement={
+            <Switch
+              value={requestTimingDiagnostics}
+              onValueChange={setRequestTimingDiagnostics}
+            />
+          }
+          showChevron={false}
+        />
+        <Item
           title={t("settingsFeatures.markdownCopyV2")}
           subtitle={t("settingsFeatures.markdownCopyV2Subtitle")}
           icon={<Ionicons name="text-outline" size={29} color={theme.colors.success} />}
@@ -87,17 +108,17 @@ function FeaturesSettingsScreen() {
           showChevron={false}
         />
         <Item
-          title={t("settingsFeatures.enhancedSessionWizard")}
+          title={t("settingsFeatures.previewTab")}
           subtitle={
-            useEnhancedSessionWizard
-              ? t("settingsFeatures.enhancedSessionWizardEnabled")
-              : t("settingsFeatures.enhancedSessionWizardDisabled")
+            enablePreviewTab
+              ? t("settingsFeatures.previewTabEnabled")
+              : t("settingsFeatures.previewTabDisabled")
           }
-          icon={<Ionicons name="sparkles-outline" size={29} color={theme.colors.accentMagenta} />}
+          icon={<Ionicons name="images-outline" size={29} color={theme.colors.textLink} />}
           rightElement={
             <Switch
-              value={useEnhancedSessionWizard}
-              onValueChange={setUseEnhancedSessionWizard}
+              value={enablePreviewTab}
+              onValueChange={setEnablePreviewTab}
             />
           }
           showChevron={false}

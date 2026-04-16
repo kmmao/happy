@@ -32,6 +32,7 @@ export const EditView = React.memo<ToolViewProps>(({ tool }) => {
           showPlusMinusSymbols={showLineNumbersInToolViews}
           collapsible
           language={language}
+          visibleLineCount={5}
         />
       </ToolSectionView>
     </>

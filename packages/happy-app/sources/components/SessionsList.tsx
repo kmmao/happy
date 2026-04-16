@@ -15,6 +15,7 @@ import {
   useSetting,
   useMachine,
   useSessionMessages,
+  storage,
 } from "@/sync/storage";
 import { Ionicons } from "@expo/vector-icons";
 import {
@@ -48,6 +49,7 @@ import { Item } from "./Item";
 import { ItemGroup } from "./ItemGroup";
 import { useHappyAction } from "@/hooks/useHappyAction";
 import { sessionDelete, machineSpawnNewSession } from "@/sync/ops";
+import { buildSessionRespawnProfile } from "@/hooks/sessionUpgradeProfile";
 import { handleSessionResumeResult } from "@/sync/sessionResumeFlow";
 import { runWithSessionResumeGuard } from "@/sync/sessionResumeGuard";
 import { HappyError } from "@/utils/errors";
@@ -361,9 +363,9 @@ export function SessionsList() {
   const isTablet = useIsTablet();
   const navigateToSession = useNavigateToSession();
   const compactSessionView = useSetting("compactSessionView");
+  const requestTimingDiagnosticsEnabled = useSetting("requestTimingDiagnostics");
   const router = useRouter();
   const selectable = isTablet;
-  const experiments = useSetting("experiments");
   const dataWithSelected = selectable
     ? React.useMemo(() => {
         return data?.map((item) => ({
@@ -526,28 +528,50 @@ export function SessionsList() {
   }, [performDeleteAll, inactiveSessionIds.length]);
 
   const FooterComponent = React.useCallback(() => {
-    if (inactiveSessionIds.length === 0) return null;
+    if (!requestTimingDiagnosticsEnabled && inactiveSessionIds.length === 0) {
+      return null;
+    }
     return (
-      <View style={styles.deleteAllContainer}>
-        <Pressable
-          style={styles.deleteAllButton}
-          onPress={handleDeleteAll}
-          disabled={deletingAll}
-        >
-          <Ionicons
-            name="trash-outline"
-            size={16}
-            color={styles.deleteAllText.color}
-          />
-          <Text style={styles.deleteAllText}>
-            {deletingAll
-              ? t("common.loading")
-              : t("sessionInfo.deleteAllArchivedSessions")}
-          </Text>
-        </Pressable>
-      </View>
+      <>
+        {requestTimingDiagnosticsEnabled ? (
+          <ItemGroup>
+            <Item
+              title={t("sessionInfo.requestTimingOverview")}
+              subtitle={t("sessionInfo.requestTimingOverviewSubtitle")}
+              icon={<Ionicons name="analytics-outline" size={29} color="#5856D6" />}
+              onPress={() => router.push("/session/timing")}
+            />
+          </ItemGroup>
+        ) : null}
+        {inactiveSessionIds.length > 0 ? (
+          <View style={styles.deleteAllContainer}>
+            <Pressable
+              style={styles.deleteAllButton}
+              onPress={handleDeleteAll}
+              disabled={deletingAll}
+            >
+              <Ionicons
+                name="trash-outline"
+                size={16}
+                color={styles.deleteAllText.color}
+              />
+              <Text style={styles.deleteAllText}>
+                {deletingAll
+                  ? t("common.loading")
+                  : t("sessionInfo.deleteAllArchivedSessions")}
+              </Text>
+            </Pressable>
+          </View>
+        ) : null}
+      </>
     );
-  }, [inactiveSessionIds.length, handleDeleteAll, deletingAll]);
+  }, [
+    deletingAll,
+    handleDeleteAll,
+    inactiveSessionIds.length,
+    requestTimingDiagnosticsEnabled,
+    router,
+  ]);
 
   return (
     <View style={styles.container}>
@@ -637,6 +661,10 @@ const SessionItem = React.memo(
 
     const [resumingSession, performResume] = useHappyAction(async () => {
       await runWithSessionResumeGuard(session.id, async () => {
+        const spawnProfile = buildSessionRespawnProfile(
+          session,
+          storage.getState().settings.profiles ?? [],
+        );
         const createResumeRequest = (approvedNewDirectoryCreation: boolean = false) =>
           machineSpawnNewSession({
             machineId: session.metadata!.machineId!,
@@ -645,6 +673,7 @@ const SessionItem = React.memo(
             claudeSessionId: session.metadata!.claudeSessionId!,
             happySessionId: session.id,
             agent: "claude",
+            ...spawnProfile,
           });
 
         const result = await createResumeRequest();

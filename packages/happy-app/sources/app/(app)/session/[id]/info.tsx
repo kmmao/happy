@@ -8,7 +8,13 @@ import { Item } from "@/components/Item";
 import { ItemGroup } from "@/components/ItemGroup";
 import { ItemList } from "@/components/ItemList";
 import { Avatar } from "@/components/Avatar";
-import { storage, useSession, useIsDataReady } from "@/sync/storage";
+import {
+  storage,
+  useIsDataReady,
+  useSession,
+  useSessionMessages,
+  useSetting,
+} from "@/sync/storage";
 import {
   getSessionName,
   useSessionStatus,
@@ -42,9 +48,11 @@ import {
   applySessionStartPreferences,
   buildForkSessionStartPreferences,
 } from "@/app/(app)/new/sessionStartPreferences";
+import { buildSessionRespawnProfile } from "@/hooks/sessionUpgradeProfile";
 import { sync } from "@/sync/sync";
 import { CodexInfoSection } from "./CodexInfoSection";
 import { SessionMetadataSection } from "./SessionMetadataSection";
+import { SessionTimingDiagnosticsSection } from "./SessionTimingDiagnosticsSection";
 
 // Animated status dot component
 function StatusDot({
@@ -98,9 +106,11 @@ function SessionInfoContent({ session }: { session: Session }) {
   const router = useRouter();
   const auth = useAuth();
   const devModeEnabled = __DEV__;
+  const requestTimingDiagnosticsEnabled = useSetting("requestTimingDiagnostics");
   const sessionName = getSessionName(session);
   const sessionStatus = useSessionStatus(session);
   const navigateToSession = useNavigateToSession();
+  const { messages } = useSessionMessages(session.id);
 
   // Resume preconditions: session has claudeSessionId, machineId, path, and flavor is claude or undefined
   const machine = useMachine(session.metadata?.machineId ?? "");
@@ -222,6 +232,10 @@ function SessionInfoContent({ session }: { session: Session }) {
   const [resumingSession, performResume] = useHappyAction(async () => {
     await runWithSessionResumeGuard(session.id, async () => {
       const worktree = session.metadata?.worktree;
+      const spawnProfile = buildSessionRespawnProfile(
+        session,
+        storage.getState().settings.profiles ?? [],
+      );
       const createResumeRequest = (directory?: string) =>
         machineSpawnNewSession({
           machineId: session.metadata!.machineId!,
@@ -229,6 +243,7 @@ function SessionInfoContent({ session }: { session: Session }) {
           claudeSessionId: session.metadata!.claudeSessionId!,
           happySessionId: session.id,
           agent: "claude",
+          ...spawnProfile,
         });
 
       const result = await createResumeRequest();
@@ -267,6 +282,10 @@ function SessionInfoContent({ session }: { session: Session }) {
     // Pre-allocate a Happy session ID so the spawned process command includes
     // --happy-session-id, enabling diagnostics to identify and navigate to this fork.
     const preAllocatedSessionId = randomUUID();
+    const spawnProfile = buildSessionRespawnProfile(
+      session,
+      storage.getState().settings.profiles ?? [],
+    );
     const spawnResult = await machineSpawnNewSession({
       machineId: session.metadata!.machineId!,
       directory: forkResult.path,
@@ -274,6 +293,7 @@ function SessionInfoContent({ session }: { session: Session }) {
       happySessionId: preAllocatedSessionId,
       forkSourceId: session.id,
       agent: "claude",
+      ...spawnProfile,
     });
     if (spawnResult.type === "error") {
       throw new HappyError(spawnResult.errorMessage, false);
@@ -648,6 +668,12 @@ function SessionInfoContent({ session }: { session: Session }) {
             />
           )}
         </ItemGroup>
+
+        <SessionTimingDiagnosticsSection
+          enabled={requestTimingDiagnosticsEnabled}
+          session={session}
+          messages={messages}
+        />
 
         {/* Raw JSON (Dev Mode Only) */}
         {devModeEnabled && (

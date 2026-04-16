@@ -15,7 +15,7 @@ import { t } from "@/text";
 import { GitBrowseTab } from "@/components/git/GitBrowseTab";
 import { SessionKnowledgeSheet } from "@/components/knowledge/SessionKnowledgeSheet";
 import type { SessionKnowledgeTab } from "@/components/knowledge/sessionKnowledgeLoadState";
-import { useProjectForSession, useSession } from "@/sync/storage";
+import { useProjectForSession, useSession, useSetting } from "@/sync/storage";
 import { SidePanelGitPanel } from "./SidePanelGitPanel";
 import { SidePanelSummaryTab } from "./SidePanelSummaryTab";
 import { SidePanelTerminalTab } from "./SidePanelTerminalTab";
@@ -25,14 +25,15 @@ import { SidePanelFilePreview } from "./SidePanelFilePreview";
 import { buildFileReferenceText } from "./sessionSidePanelReference";
 import { InputContext } from "@/hooks/useInputContext";
 import {
-    getMobileSessionPanelTabs,
-    type MobileSessionPanelTab,
-} from "./mobileSessionPanelState";
-import {
     getMobilePanelLayoutConfig,
     getMobilePanelTabChipMinWidth,
 } from "./mobileSessionPanelStyle";
 import { getSessionName } from "@/utils/sessionUtils";
+import {
+    getSessionPanelTabs,
+    resolveSessionPanelActiveTab,
+    type SessionPanelTab,
+} from "./sessionPanelTabs";
 
 interface MobileSessionPanelSheetProps {
     visible: boolean;
@@ -44,7 +45,8 @@ export const MobileSessionPanelSheet = React.memo<MobileSessionPanelSheetProps>(
     function MobileSessionPanelSheet({ visible, onClose, sessionId }) {
         const { theme } = useUnistyles();
         const insets = useSafeAreaInsets();
-        const [activeTab, setActiveTab] = React.useState<MobileSessionPanelTab>("files");
+        const enablePreviewTab = useSetting("enablePreviewTab");
+        const [activeTab, setActiveTab] = React.useState<SessionPanelTab>("changes");
         const [previewingFile, setPreviewingFile] = React.useState<string | null>(null);
         const [showKnowledgeSheet, setShowKnowledgeSheet] = React.useState(false);
         const [knowledgeSheetInitialTab, setKnowledgeSheetInitialTab] = React.useState<SessionKnowledgeTab>("changes");
@@ -52,9 +54,13 @@ export const MobileSessionPanelSheet = React.memo<MobileSessionPanelSheetProps>(
         const project = useProjectForSession(sessionId);
         const session = useSession(sessionId);
         const sessionTitle = session ? getSessionName(session) : "Panel";
-        const tabs = React.useMemo(() => getMobileSessionPanelTabs(), []);
+        const tabs = React.useMemo(() => getSessionPanelTabs(enablePreviewTab), [enablePreviewTab]);
         const layoutConfig = React.useMemo(() => getMobilePanelLayoutConfig(), []);
         const tabChipMinWidth = React.useMemo(() => getMobilePanelTabChipMinWidth(), []);
+
+        React.useEffect(() => {
+            setActiveTab((currentTab) => resolveSessionPanelActiveTab(currentTab, tabs));
+        }, [tabs]);
 
         const handleReference = React.useCallback(
             (path: string) => {
@@ -111,6 +117,15 @@ export const MobileSessionPanelSheet = React.memo<MobileSessionPanelSheetProps>(
                 case "terminal":
                     return <SidePanelTerminalTab sessionId={sessionId} />;
             }
+        };
+
+        const labelMap: Record<SessionPanelTab, string> = {
+            changes: t("sidePanel.changes"),
+            files: t("sidePanel.files"),
+            code: t("sidePanel.code"),
+            preview: t("sidePanel.preview"),
+            summary: t("sidePanel.summary"),
+            terminal: t("sidePanel.terminal"),
         };
 
         return (
@@ -197,14 +212,6 @@ export const MobileSessionPanelSheet = React.memo<MobileSessionPanelSheetProps>(
                                     >
                                         {tabs.map((tab) => {
                                             const isActive = tab === activeTab;
-                                            const labelMap: Record<MobileSessionPanelTab, string> = {
-                                                files: t("sidePanel.files"),
-                                                changes: t("sidePanel.changes"),
-                                                code: t("sidePanel.code"),
-                                                preview: t("sidePanel.preview"),
-                                                summary: t("sidePanel.summary"),
-                                                terminal: t("sidePanel.terminal"),
-                                            };
                                             const label = labelMap[tab];
                                             return (
                                                 <View

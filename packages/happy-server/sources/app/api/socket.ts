@@ -30,6 +30,7 @@ import { taskLogHandler } from "./socket/taskLogHandler";
 import { taskStatusHandler } from "./socket/taskStatusHandler";
 import { sessionEventHandler } from "./socket/sessionEventHandler";
 import { terminalHandler } from "./socket/terminalHandler";
+import { listRpcReadyScopes } from "./socket/listRpcReadyScopes";
 
 export function startSocket(app: Fastify) {
   const allowedOrigins = process.env.ALLOWED_ORIGINS
@@ -187,6 +188,16 @@ export function startSocket(app: Fastify) {
       userRpcListeners = new Map<string, Socket>();
       rpcListeners.set(userId, userRpcListeners);
     }
+
+    if (connection.connectionType === "user-scoped") {
+      for (const readyScope of listRpcReadyScopes(userRpcListeners)) {
+        socket.emit(
+          "ephemeral",
+          buildRpcReadyEphemeral(readyScope.scope, readyScope.id, true),
+        );
+      }
+    }
+
     rpcHandler({
       userId,
       socket,

@@ -417,6 +417,11 @@ export const ja: TranslationStructure = {
     experimentalFeatures: "実験的機能",
     experimentalFeaturesEnabled: "実験的機能が有効です",
     experimentalFeaturesDisabled: "安定版機能のみを使用",
+    requestTimingDiagnostics: "リクエスト時間診断",
+    requestTimingDiagnosticsEnabled:
+      "後で分析できるよう、リクエストとターンの時間を記録します",
+    requestTimingDiagnosticsDisabled:
+      "追加のリクエスト時間データを記録しません",
     webFeatures: "Web機能",
     webFeaturesDescription: "Webバージョンでのみ利用可能な機能。",
     enterToSend: "Enterで送信",
@@ -428,6 +433,9 @@ export const ja: TranslationStructure = {
     markdownCopyV2: "Markdownコピー v2",
     markdownCopyV2Subtitle: "長押しでコピーモーダルを開く",
     hideInactiveSessions: "非アクティブセッションを非表示",
+    previewTab: "プレビュータブ",
+    previewTabEnabled: "セッションのサイドパネルにプレビュータブを表示",
+    previewTabDisabled: "プレビュータブを非表示",
     hideInactiveSessionsSubtitle: "アクティブなチャットのみをリストに表示",
     enhancedSessionWizard: "拡張セッションウィザード",
     enhancedSessionWizardEnabled: "プロファイル優先セッションランチャーが有効",
@@ -937,6 +945,87 @@ export const ja: TranslationStructure = {
     deleteAllArchivedSessions: "アーカイブ済みセッションをすべて削除",
     deleteAllArchivedWarning: ({ count }: { count: number }) =>
       `${count}件のアーカイブ済みセッションとすべてのメッセージを完全に削除します。この操作は取り消せません。`,
+    requestTimingAnalysis: "リクエスト時間分析",
+    requestTimingAnalysisHint: "時間診断を有効にしてから、いくつかリクエストを送信してください",
+    requestTimingAnalysisEmpty:
+      "このセッションには、時間診断付きの完了ターンがまだありません。",
+    requestTimingAnalyzedTurns: "分析済みターン",
+    requestTimingCorrelatedTurns: "関連付け済みターン",
+    requestTimingTrackedSessions: "対象セッション数",
+    requestTimingTrackedModels: "対象モデル数",
+    requestTimingSocketToQueue: "ソケット→キュー",
+    requestTimingTtft: "最初のトークンまでの時間",
+    requestTimingQueueWait: "キュー待ち",
+    requestTimingGenerationTail: "生成後半",
+    requestTimingTurnDuration: "ターン全体時間",
+    requestTimingLatestTurn: "最新ターン",
+    requestTimingRecentTurns: "最近のターン診断",
+    requestTimingOverview: "リクエスト時間の概要",
+    requestTimingOverviewSubtitle:
+      "セッションとモデルをまたいでボトルネックを比較",
+    requestTimingOverviewEmpty:
+      "時間診断付きの完了ターンはまだ収集されていません。",
+    requestTimingEnableDiagnostics: "時間診断を有効化",
+    requestTimingEnableDiagnosticsSubtitle:
+      "新しいリクエストで時間データを記録するには、先に実験機能を有効にしてください。",
+    requestTimingClockNote:
+      "これらの値は CLI 側のターン診断から取得されます。端末が異なる場合、スマホ時間から CLI 時間を直接引かないでください。",
+    requestTimingUnavailable: "—",
+    requestTimingP50P95: ({ p50, p95 }: { p50: string; p95: string }) =>
+      `P50 ${p50} · P95 ${p95}`,
+    requestTimingAverages: ({
+      socketToQueue,
+      ttft,
+      queueWait,
+      generationTail,
+      duration,
+    }: {
+      socketToQueue: string;
+      ttft: string;
+      queueWait: string;
+      generationTail: string;
+      duration: string;
+    }) =>
+      `Avg socket→queue ${socketToQueue} · Avg TTFT ${ttft} · Avg queue ${queueWait} · Avg tail ${generationTail} · Avg turn ${duration}`,
+    requestTimingTurnsCount: ({ count }: { count: number }) =>
+      `${count} turn${count === 1 ? "" : "s"}`,
+    requestTimingLikelyIssue: "想定ボトルネック",
+    requestTimingOverallDiagnosis: "総合診断",
+    requestTimingDiagnosisDistribution: "診断分布",
+    requestTimingSuggestedChecks: "推奨チェック項目",
+    requestTimingCopyReport: "セッションレポートをコピー",
+    requestTimingCopyReportSubtitle:
+      "集計メトリクスと最近のターン診断を JSON でコピー",
+    requestTimingCopyOverviewReport: "概要レポートをコピー",
+    requestTimingCopyOverviewReportSubtitle:
+      "セッション横断の集計レポートを JSON でコピー",
+    requestTimingReportCopied: "時間レポートをコピーしました",
+    requestTimingReportCopyFailed: "時間レポートのコピーに失敗しました",
+    requestTimingDiagnosisLowConfidence: "サンプル不足",
+    requestTimingDiagnosisLowConfidenceHint:
+      "現在のサンプル数またはリクエスト相関が少なすぎて、まだ診断を信頼できません。",
+    requestTimingDiagnosisLowConfidenceAction:
+      "最適化する前に、実験を有効のまま数ターン分の完了データを追加で集めてください。",
+    requestTimingDiagnosisQueue: "キュー / ディスパッチ",
+    requestTimingDiagnosisQueueHint:
+      "モデルのターンが実際に始まる前に、無視できない遅延が発生しています。",
+    requestTimingDiagnosisQueueAction:
+      "セッションのキュー、再接続、前処理、推論開始前にリクエストが滞留していないか確認してください。",
+    requestTimingDiagnosisTtft: "初回トークン遅延",
+    requestTimingDiagnosisTtftHint:
+      "ターン開始後、最初の可視トークンが出るまでに時間がかかりすぎています。",
+    requestTimingDiagnosisTtftAction:
+      "プロンプトサイズ、reasoning レベル、retrieval/tool の事前投入、厳しい構造化出力制約を確認してください。",
+    requestTimingDiagnosisGeneration: "生成後半が遅い",
+    requestTimingDiagnosisGenerationHint:
+      "モデルは応答を開始していますが、残りのターン後半に大半の時間がかかっています。",
+    requestTimingDiagnosisGenerationAction:
+      "出力長、モデルのデコード速度、JSON/schema 制約、ツール呼び出しがターン後半を引き延ばしていないか確認してください。",
+    requestTimingDiagnosisBalanced: "単一の支配的なボトルネックなし",
+    requestTimingDiagnosisBalancedHint:
+      "遅延は一箇所に偏らず、複数段階に分散しています。",
+    requestTimingDiagnosisBalancedAction:
+      "モデル、プロンプトサイズ、ルート別に比較してください。単一の修正より段階的な最適化が必要な可能性が高いです。",
   },
 
   components: {
@@ -987,6 +1076,13 @@ export const ja: TranslationStructure = {
       codex: "Codex",
       gemini: "Gemini",
     },
+    rpcState: {
+      disconnected: "切断",
+      reconnecting: "再接続中",
+      rpcReady: "RPC 準備完了",
+    },
+    inputDisabledDisconnected: "セッションは切断されています。再接続を待っています…",
+    inputDisabledReconnecting: "RPC を再接続中です。準備完了後に入力が有効になります…",
     model: {
       title: "モデル",
       configureInCli: "CLIの設定でモデルを構成",

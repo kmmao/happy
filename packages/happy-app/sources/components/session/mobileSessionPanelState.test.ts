@@ -1,8 +1,7 @@
 import { describe, expect, it } from "vitest";
-import {
-    getMobileSessionPanelTabs,
-    shouldShowMobileSessionPanelButton,
-} from "./mobileSessionPanelState";
+
+import { getSessionPanelTabs } from "./sessionPanelTabs";
+import { shouldShowMobileSessionPanelButton } from "./mobileSessionPanelState";
 
 describe("mobileSessionPanelState", () => {
     it("shows mobile panel button only when desktop side panel is unavailable and session is online", () => {
@@ -28,12 +27,23 @@ describe("mobileSessionPanelState", () => {
         ).toBe(false);
     });
 
-    it("returns all mobile panel tabs in expected order", () => {
-        expect(getMobileSessionPanelTabs()).toEqual([
-            "files",
+    it("uses the shared tab definition for mobile ordering", () => {
+        expect(getSessionPanelTabs(true)).toEqual([
             "changes",
+            "files",
+            "code",
+            "preview",
             "summary",
-            "timeline",
+            "terminal",
+        ]);
+    });
+
+    it("uses the shared preview gating for mobile", () => {
+        expect(getSessionPanelTabs(false)).toEqual([
+            "changes",
+            "files",
+            "code",
+            "summary",
             "terminal",
         ]);
     });

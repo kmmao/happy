@@ -380,6 +380,118 @@ describe('ApiSessionClient v3 messages API migration', () => {
         });
     });
 
+    it('attaches turn diagnostics to turn-end session envelopes', async () => {
+        const client = new ApiSessionClient('fake-token', session);
+        let seq = 0;
+        mockAxiosPost.mockImplementation(async (_url, payload) => ({
+            data: {
+                messages: payload.messages.map(() => {
+                    seq += 1;
+                    return {
+                        id: `msg-${seq}`,
+                        seq,
+                        localId: `local-${seq}`,
+                        createdAt: seq,
+                        updatedAt: seq,
+                    };
+                })
+            }
+        }));
+
+        const decryptPostedMessages = () =>
+            mockAxiosPost.mock.calls.flatMap(([, payload]) =>
+                payload.messages.map((message: { content: string }) =>
+                    decrypt(
+                        session.encryptionKey,
+                        session.encryptionVariant,
+                        decodeBase64(message.content)
+                    )
+                )
+            );
+
+        const findTurnEndMessage = () =>
+            decryptPostedMessages().find((message: any) =>
+                message.role === 'session' && message.content?.id === 'env-end'
+            );
+
+        const dateNowSpy = vi.spyOn(Date, 'now');
+
+        try {
+            let now = 1_000;
+            dateNowSpy.mockImplementation(() => now);
+
+            (client as any).beginTurnDiagnostics({
+                provider: 'claude',
+                requestIds: ['req-1'],
+                queueWaitMs: 25,
+                socketToQueueMs: 7,
+                queueCollectedAtMs: 900,
+            });
+
+            client.sendSessionProtocolMessage({
+                id: 'env-start',
+                time: 1000,
+                role: 'agent',
+                turn: 'turn-1',
+                ev: { t: 'turn-start' },
+            });
+
+            now = 1_100;
+            client.sendSessionProtocolMessage({
+                id: 'env-text',
+                time: 1100,
+                role: 'agent',
+                turn: 'turn-1',
+                ev: { t: 'text', text: 'hello' },
+            });
+
+            now = 1_400;
+            client.sendSessionProtocolMessage({
+                id: 'env-end',
+                time: 1400,
+                role: 'agent',
+                turn: 'turn-1',
+                ev: { t: 'turn-end', status: 'completed' },
+            });
+
+            await waitForCheck(() => {
+                expect(findTurnEndMessage()).toBeTruthy();
+            });
+
+            expect(findTurnEndMessage()).toEqual({
+                role: 'session',
+                content: {
+                    id: 'env-end',
+                    time: 1400,
+                    role: 'agent',
+                    turn: 'turn-1',
+                    ev: {
+                        t: 'turn-end',
+                        status: 'completed',
+                        diagnostics: {
+                            version: 1,
+                            provider: 'claude',
+                            requestIds: ['req-1'],
+                            queueWaitMs: 25,
+                            socketToQueueMs: 7,
+                            queueToTurnStartMs: 100,
+                            firstOutputMs: 100,
+                            firstTextMs: 100,
+                            turnDurationMs: 400,
+                            postFirstOutputMs: 300,
+                            postFirstTextMs: 300,
+                        }
+                    }
+                },
+                meta: {
+                    sentFrom: 'cli'
+                }
+            });
+        } finally {
+            dateNowSpy.mockRestore();
+        }
+    });
+
     it('sends only modern payload for user session envelopes', async () => {
         const client = new ApiSessionClient('fake-token', session);
         mockAxiosPost.mockResolvedValueOnce({

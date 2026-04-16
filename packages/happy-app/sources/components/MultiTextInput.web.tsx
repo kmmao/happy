@@ -41,6 +41,7 @@ interface MultiTextInputProps {
   value: string;
   onChangeText: (text: string) => void;
   placeholder?: string;
+  editable?: boolean;
   maxHeight?: number;
   paddingTop?: number;
   paddingBottom?: number;
@@ -61,6 +62,7 @@ export const MultiTextInput = React.forwardRef<
     value,
     onChangeText,
     placeholder,
+    editable = true,
     maxHeight = 120,
     onKeyPress,
     onSelectionChange,
@@ -291,6 +293,8 @@ export const MultiTextInput = React.forwardRef<
           fontFamily: Typography.default().fontFamily,
           lineHeight: "1.4",
           scrollbarWidth: "none",
+          opacity: editable ? 1 : 0.55,
+          cursor: editable ? "text" : "not-allowed",
           paddingTop: props.paddingTop,
           paddingBottom: props.paddingBottom,
           paddingLeft: props.paddingLeft,
@@ -298,6 +302,7 @@ export const MultiTextInput = React.forwardRef<
         }}
         placeholder={placeholder}
         value={value}
+        disabled={!editable}
         onChange={handleChange}
         onSelect={handleSelect}
         onKeyDown={handleKeyDown}

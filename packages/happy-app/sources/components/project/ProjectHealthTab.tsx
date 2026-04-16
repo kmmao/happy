@@ -55,8 +55,9 @@ import { useElapsedSeconds, type DimensionProgress } from "./supervisorUtils";
 import { SupervisorProgressView } from "./SupervisorProgressView";
 import { SupervisorLoopStatusCard } from "./SupervisorLoopStatusCard";
 import { SupervisorLoopConfigPanel } from "./SupervisorLoopConfigPanel";
-import { SupervisorLoopHistoryItem } from "./SupervisorLoopHistoryItem";
 import { DayRangeSelector } from "./DayRangeSelector";
+import { SupervisorLoopHistoryItem } from "./SupervisorLoopHistoryItem";
+import { getSupervisorDefaultProfileId } from "./supervisorProfileSelection";
 
 
 interface ProjectHealthTabProps {
@@ -120,13 +121,7 @@ export const ProjectHealthTab = React.memo(
 
         // Read defaultProfileId from supervisorConfig JSON
         const defaultProfileId = React.useMemo<string | null>(() => {
-            if (!project.supervisorConfig) return null;
-            try {
-                const cfg = JSON.parse(project.supervisorConfig) as { defaultProfileId?: string | null };
-                return cfg.defaultProfileId ?? null;
-            } catch {
-                return null;
-            }
+            return getSupervisorDefaultProfileId(project.supervisorConfig);
         }, [project.supervisorConfig]);
 
         const missingDefaultProfileName = React.useMemo(() => {

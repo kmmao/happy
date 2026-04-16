@@ -15,6 +15,8 @@ import { layout } from "@/components/layout";
 import { SEVERITY_COLORS, SEVERITY_KEY_MAP } from "@/components/project/supervisorConstants";
 import { useSettings } from "@/sync/storage";
 import { DEFAULT_PROFILES } from "@/sync/profileUtils";
+import { sync } from "@/sync/sync";
+import { getSupervisorDefaultProfileId } from "@/components/project/supervisorProfileSelection";
 
 type SupervisorMode = "suggest" | "semi-auto" | "auto";
 
@@ -94,6 +96,7 @@ function SupervisorSettingsScreen() {
     const [initialConfig, setInitialConfig] =
         React.useState<SupervisorConfig>(defaultConfig);
     const [saving, setSaving] = React.useState(false);
+    const [profileRefreshing, setProfileRefreshing] = React.useState(false);
 
     const resolveProfileName = React.useCallback((profileId: string | null): string | null => {
         if (!profileId) return null;
@@ -116,7 +119,6 @@ function SupervisorSettingsScreen() {
         });
     }, [navigation]);
 
-    // Load config from project's supervisorConfig (if any)
     React.useEffect(() => {
         if (project?.supervisorConfig) {
             try {
@@ -162,10 +164,28 @@ function SupervisorSettingsScreen() {
     const mountedRef = React.useRef(true);
     React.useEffect(() => () => { mountedRef.current = false; }, []);
 
+    const handleRefreshProfiles = React.useCallback(async () => {
+        setProfileRefreshing(true);
+        try {
+            await Promise.all([
+                sync.refreshAccountProfiles(),
+                sync.refreshProjects(),
+            ]);
+        } finally {
+            setProfileRefreshing(false);
+        }
+    }, []);
+
+    const displayedDefaultProfileId = React.useMemo(() => {
+        if (isDirty) {
+            return config.defaultProfileId;
+        }
+        return getSupervisorDefaultProfileId(project?.supervisorConfig) ?? config.defaultProfileId;
+    }, [config.defaultProfileId, isDirty, project?.supervisorConfig]);
+
     const handleSave = React.useCallback(async () => {
         if (!project?.serverId || !isDirty) return;
         setSaving(true);
-        // Capture before setInitialConfig mutates the ref
         const previousMode = initialConfig.mode;
         try {
             const credentials = await TokenStorage.getCredentials();
@@ -195,7 +215,6 @@ function SupervisorSettingsScreen() {
                     fixStrategy: config.fixStrategy,
                 },
             );
-            // Update local projectManager cache so re-entering this page shows fresh data
             const localProject = projectManager.getProject(id);
             if (localProject) {
                 localProject.supervisorConfig = configJson;
@@ -213,7 +232,6 @@ function SupervisorSettingsScreen() {
             setInitialConfig(config);
             Modal.toast(t("supervisor.settingsSaved"));
 
-            // Check if mode was upgraded and offer to reprocess pending actions
             const modeOrder: Record<string, number> = { suggest: 0, "semi-auto": 1, auto: 2 };
             const oldOrder = modeOrder[previousMode] ?? 0;
             const newOrder = modeOrder[config.mode] ?? 0;
@@ -258,7 +276,7 @@ function SupervisorSettingsScreen() {
                 setSaving(false);
             }
         }
-    }, [project?.serverId, isDirty, config, initialConfig.mode]);
+    }, [project?.serverId, isDirty, initialConfig.mode, config, id]);
 
     const updateConfig = React.useCallback(
         (updater: (prev: SupervisorConfig) => SupervisorConfig) => {
@@ -750,27 +768,41 @@ function SupervisorSettingsScreen() {
                         {t("supervisor.defaultProfileDesc")}
                     </Text>
                     {/* Current selection — tap to expand/collapse */}
-                    <Pressable
-                        style={{
-                            flexDirection: "row",
-                            alignItems: "center",
-                            justifyContent: "space-between",
-                            paddingVertical: 10,
-                            marginTop: 8,
-                        }}
-                        onPress={() => setProfilePickerOpen((v) => !v)}
-                    >
-                        <Text style={{ fontSize: 14, fontWeight: "600", color: theme.colors.text, ...Typography.default() }}>
-                            {config.defaultProfileId
-                                ? allProfiles.find((p) => p.id === config.defaultProfileId)?.name ?? config.defaultProfileId
-                                : t("supervisor.defaultProfileDefault")}
-                        </Text>
-                        <Ionicons
-                            name={profilePickerOpen ? "chevron-up" : "chevron-down"}
-                            size={18}
-                            color={theme.colors.textSecondary}
-                        />
-                    </Pressable>
+                    <View style={styles.defaultProfileHeaderRow}>
+                        <Pressable
+                            style={styles.defaultProfileTrigger}
+                            onPress={() => setProfilePickerOpen((v) => !v)}
+                        >
+                            <Text style={styles.defaultProfileTriggerText}>
+                                {displayedDefaultProfileId
+                                    ? allProfiles.find((p) => p.id === displayedDefaultProfileId)?.name ?? displayedDefaultProfileId
+                                    : t("supervisor.defaultProfileDefault")}
+                            </Text>
+                            <Ionicons
+                                name={profilePickerOpen ? "chevron-up" : "chevron-down"}
+                                size={18}
+                                color={theme.colors.textSecondary}
+                            />
+                        </Pressable>
+                        <Pressable
+                            style={styles.defaultProfileRefreshButton}
+                            onPress={handleRefreshProfiles}
+                            disabled={profileRefreshing}
+                        >
+                            {profileRefreshing ? (
+                                <ActivityIndicator size="small" color={theme.colors.header.tint} />
+                            ) : (
+                                <Ionicons
+                                    name="refresh"
+                                    size={14}
+                                    color={theme.colors.header.tint}
+                                />
+                            )}
+                            <Text style={styles.defaultProfileRefreshText}>
+                                {t("suggestions.refresh")}
+                            </Text>
+                        </Pressable>
+                    </View>
                     {missingDefaultProfileName && (
                         <View style={[styles.safetyCard, { marginTop: 8, flexDirection: "row", alignItems: "flex-start", gap: 8 }] }>
                             <Ionicons
@@ -1190,6 +1222,41 @@ const styles = StyleSheet.create((theme) => ({
         padding: 12,
         minHeight: 100,
         textAlignVertical: "top",
+    },
+    defaultProfileHeaderRow: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 10,
+        marginTop: 8,
+    },
+    defaultProfileTrigger: {
+        flex: 1,
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "space-between",
+        paddingVertical: 10,
+    },
+    defaultProfileTriggerText: {
+        ...Typography.default("semiBold"),
+        fontSize: 14,
+        color: theme.colors.text,
+        flex: 1,
+    },
+    defaultProfileRefreshButton: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 6,
+        borderWidth: 1,
+        borderColor: `${theme.colors.header.tint}22`,
+        backgroundColor: `${theme.colors.header.tint}12`,
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+        borderRadius: 999,
+    },
+    defaultProfileRefreshText: {
+        ...Typography.default("semiBold"),
+        fontSize: 11,
+        color: theme.colors.header.tint,
     },
     customRulesCharCount: {
         ...Typography.default(),

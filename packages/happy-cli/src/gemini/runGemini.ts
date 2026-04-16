@@ -251,6 +251,11 @@ export async function runGemini(opts: {
   let currentModel: string | undefined = undefined;
 
   session.onUserMessage((message) => {
+    const perfSocketReceivedAt = session.lastPerfSocketReceivedAt;
+    const perfQueuedAt = Date.now();
+    const socketToQueueMs = perfSocketReceivedAt
+      ? perfQueuedAt - perfSocketReceivedAt
+      : undefined;
     // Resolve permission mode (validate) - same as Codex
     let messagePermissionMode = currentPermissionMode;
     if (message.meta?.permissionMode) {
@@ -341,7 +346,12 @@ export async function runGemini(opts: {
       model: messageModel,
       originalUserMessage, // Store original message separately
     };
-    messageQueue.push(fullPrompt, mode);
+    messageQueue.push(fullPrompt, mode, message.localKey, {
+      priority: "user",
+      kind: "prompt",
+      source: "user",
+      ...(socketToQueueMs !== undefined ? { socketToQueueMs } : {}),
+    });
 
     // Record user message in conversation history for context preservation
     conversationHistory.addUserMessage(originalUserMessage);
@@ -1067,6 +1077,9 @@ export async function runGemini(opts: {
       mode: GeminiMode;
       isolate: boolean;
       hash: string;
+      requestIds: string[];
+      queueWaitMs?: number;
+      socketToQueueMs?: number;
     } | null = null;
 
     while (!shouldExit) {
@@ -1075,6 +1088,9 @@ export async function runGemini(opts: {
         mode: GeminiMode;
         isolate: boolean;
         hash: string;
+        requestIds: string[];
+        queueWaitMs?: number;
+        socketToQueueMs?: number;
       } | null = pending;
       pending = null;
 
@@ -1100,6 +1116,13 @@ export async function runGemini(opts: {
       if (!message) {
         break;
       }
+
+      session.beginTurnDiagnostics({
+        provider: "gemini",
+        requestIds: message.requestIds,
+        queueWaitMs: message.queueWaitMs,
+        socketToQueueMs: message.socketToQueueMs,
+      });
 
       // Track if we need to inject conversation history (after model change)
       let injectHistoryContext = false;

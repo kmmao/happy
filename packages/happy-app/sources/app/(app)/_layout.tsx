@@ -84,6 +84,14 @@ export default function RootLayout() {
         }}
       />
       <Stack.Screen
+        name="session/timing"
+        options={{
+          headerShown: true,
+          headerTitle: t("sessionInfo.requestTimingOverview"),
+          headerBackTitle: t("common.back"),
+        }}
+      />
+      <Stack.Screen
         name="session/[id]/preview"
         options={{
           headerShown: true,

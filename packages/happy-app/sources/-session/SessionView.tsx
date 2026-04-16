@@ -50,6 +50,7 @@ import {
   usePromptSuggestion,
   useNeedsContinue,
   useRealtimeStatus,
+  useSocketStatus,
   useSession,
   useSessionMessages,
   useBackgroundTaskEntries,
@@ -111,6 +112,7 @@ import { getSessionContentMaxWidth } from "./sessionContentWidth";
 import { autoOptionSendService } from "@/sync/autoOptionSendService";
 import { log } from '@/log';
 import { shouldShowMobileSessionPanelButton } from "@/components/session/mobileSessionPanelState";
+import { resolveSessionRpcVisualState } from "@/utils/sessionRpcVisualState";
 
 
 function hasPendingAskUserQuestion(messages: readonly Message[]): boolean {
@@ -487,6 +489,7 @@ function SessionViewInner({
     [sessionId],
   );
   const realtimeStatus = useRealtimeStatus();
+  const socketStatus = useSocketStatus();
   const contentMaxWidth = getSessionContentMaxWidth({
     platform: Platform.OS,
     defaultMaxWidth: layout.maxWidth,
@@ -646,6 +649,25 @@ function SessionViewInner({
     : (session.pinnedModelId ?? session.metadata?.currentModelCode ?? modelMode?.key);
 
   const sessionStatus = useSessionStatus(session);
+  const modelSummaryRpcState = React.useMemo(
+    () =>
+      resolveSessionRpcVisualState({
+        presence: session.presence,
+        realtimeStatus: socketStatus.status,
+        rpcReady: session.rpcReady,
+      }),
+    [socketStatus.status, session.presence, session.rpcReady],
+  );
+  const isSessionInputDisabled = modelSummaryRpcState !== "rpcReady";
+  const disabledInputPlaceholder = React.useMemo(() => {
+    if (modelSummaryRpcState === "reconnecting") {
+      return t("agentInput.inputDisabledReconnecting");
+    }
+    if (modelSummaryRpcState === "disconnected") {
+      return t("agentInput.inputDisabledDisconnected");
+    }
+    return null;
+  }, [modelSummaryRpcState]);
   const sessionUsage = useSessionUsage(sessionId);
   const contextUsage = useSessionContextUsage(sessionId);
   const isRunning = isSessionRunning(session);
@@ -1150,6 +1172,7 @@ function SessionViewInner({
       <View onLayout={(e) => setAgentInputHeight(e.nativeEvent.layout.height)}>
       <AgentInput
         placeholder={t("session.inputPlaceholder")}
+        disabledPlaceholder={disabledInputPlaceholder}
         value={message}
         onChangeText={setMessage}
         sessionId={sessionId}
@@ -1187,6 +1210,9 @@ function SessionViewInner({
           dotColor: sessionStatus.statusDotColor,
           isPulsing: sessionStatus.isPulsing,
         }}
+        modelSummaryRpcState={modelSummaryRpcState}
+        isInputDisabled={isSessionInputDisabled}
+        isSendDisabled={isSessionInputDisabled}
         onSend={() => {
           // Prevent double-tap sending duplicate messages
           if (sendingRef.current) return;

@@ -174,6 +174,7 @@ const FileChangeItem = React.memo(({ change }: { change: FileChange }) => {
                                 newText={edit.newText}
                                 collapsible={false}
                                 language={language}
+                                visibleLineCount={5}
                             />
                         </View>
                     ))}
