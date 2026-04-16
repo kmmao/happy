@@ -518,6 +518,12 @@ export async function claudeRemoteLauncher(
   // Perf tracking: end-to-end timing from socket to first assistant response
   let _perfTurnSocketReceivedAt: number | undefined;
   let _perfTurnFirstResponseLogged = false;
+  // Throttle the SDK 'requesting' status to one event per user turn.
+  // SDK 0.2.108+ emits it before every API call (incl. tool-result follow-ups),
+  // which would otherwise spam the App with a "Requesting..." chip on every
+  // retry/tool-use iteration. Reset alongside _perfTurnFirstResponseLogged at
+  // turn boundaries below.
+  let _requestingEventSentThisTurn = false;
 
   function onMessage(message: SDKMessage) {
     // End-to-end perf: log total latency on first assistant response per turn
@@ -689,12 +695,18 @@ export async function claudeRemoteLauncher(
             message: "Compacting context...",
           });
         } else if (statusMsg.status === "requesting") {
-          // SDK 0.2.108+: emitted before each API request when includePartialMessages is on.
-          // Surfaced to App as a lightweight status ping; App decides how to render.
-          session.client.sendSessionEvent({
-            type: "message",
-            message: "Requesting...",
-          });
+          // SDK 0.2.108+ fires this before every API call — including each
+          // tool-result follow-up and retry. Show only the first occurrence
+          // per turn so the App gets a single "Requesting..." signal instead
+          // of a flood during long tool-chained turns. Use SDKAPIRetryMessage
+          // if you need explicit retry visibility.
+          if (!_requestingEventSentThisTurn) {
+            _requestingEventSentThisTurn = true;
+            session.client.sendSessionEvent({
+              type: "message",
+              message: "Requesting...",
+            });
+          }
         }
       } else if ((message as SDKCompactMsg).subtype === "compact_boundary") {
         session.client.sendSessionEvent({
@@ -1378,6 +1390,7 @@ export async function claudeRemoteLauncher(
               // Reset E2E perf tracking for new turn
               _perfTurnSocketReceivedAt = p.mode._perfSocketReceivedAt;
               _perfTurnFirstResponseLogged = false;
+              _requestingEventSentThisTurn = false;
               permissionHandler.handleModeChange(p.mode.permissionMode);
               startMidTurnDrain();
               return p;
@@ -1438,6 +1451,7 @@ export async function claudeRemoteLauncher(
                   // Reset E2E perf tracking for hot-swap turn
                   _perfTurnSocketReceivedAt = msg.mode._perfSocketReceivedAt;
                   _perfTurnFirstResponseLogged = false;
+                  _requestingEventSentThisTurn = false;
                   permissionHandler.handleModeChange(mode.permissionMode);
                   startMidTurnDrain();
                   return {
@@ -1468,6 +1482,7 @@ export async function claudeRemoteLauncher(
               // Reset E2E perf tracking for new turn
               _perfTurnSocketReceivedAt = msg.mode._perfSocketReceivedAt;
               _perfTurnFirstResponseLogged = false;
+              _requestingEventSentThisTurn = false;
               permissionHandler.handleModeChange(mode.permissionMode);
               startMidTurnDrain();
 
