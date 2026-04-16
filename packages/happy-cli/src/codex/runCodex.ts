@@ -1438,13 +1438,6 @@ export async function runCodex(opts: {
         continue;
       }
 
-      session.beginTurnDiagnostics({
-        provider: "codex",
-        requestIds: message.requestIds,
-        queueWaitMs: message.queueWaitMs,
-        socketToQueueMs: message.socketToQueueMs,
-      });
-
       // Display user messages in the UI
       messageBuffer.addMessage(message.message, "user");
       currentModeHash = message.hash;

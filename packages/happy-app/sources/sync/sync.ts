@@ -707,8 +707,6 @@ class Sync {
       log.error(`Session ${sessionId} not found in storage`);
       return;
     }
-    const requestTimingDiagnosticsEnabled =
-      state.settings.requestTimingDiagnostics;
 
     // Clear needsAttention when user sends a message (user has responded)
     if (session.needsAttention) {
@@ -744,7 +742,6 @@ class Sync {
     // Create user message content with metadata
     const content: RawRecord = {
       role: "user",
-      ...(requestTimingDiagnosticsEnabled ? { localKey: localId } : {}),
       content: {
         type: "text",
         text,
@@ -763,15 +760,6 @@ class Sync {
         ...(maxBudgetUsd != null && { maxBudgetUsd }),
         ...(taskBudget && { taskBudget }),
         ...(options?.continue && { continue: true }),
-        ...(requestTimingDiagnosticsEnabled
-          ? {
-              requestDiagnostics: {
-                version: 1 as const,
-                requestId: localId,
-                clientCreatedAtMs: createdAt,
-              },
-            }
-          : {}),
       },
     };
     const encryptedRawRecord = await encryption.encryptRawRecord(content);

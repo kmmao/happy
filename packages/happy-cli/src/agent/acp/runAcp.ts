@@ -1116,12 +1116,6 @@ export async function runAcp(opts: {
         "incoming",
         `Incoming prompt: ${formatUnknownForConsole(batch.message, ACP_EVENT_PREVIEW_CHARS)}`,
       );
-      session.beginTurnDiagnostics({
-        provider: opts.agentName,
-        requestIds: batch.requestIds,
-        queueWaitMs: batch.queueWaitMs,
-        socketToQueueMs: batch.socketToQueueMs,
-      });
       sendEnvelopes(sessionManager.startTurn());
       const turnEnded = waitForTurnEnd();
       try {

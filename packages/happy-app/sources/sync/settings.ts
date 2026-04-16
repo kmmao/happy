@@ -68,9 +68,6 @@ export const SettingsSchema = z.object({
     .boolean()
     .describe("Whether to opt out of anonymous analytics"),
   experiments: z.boolean().describe("Whether to enable experimental features"),
-  requestTimingDiagnostics: z
-    .boolean()
-    .describe("Record request timing diagnostics for session analysis"),
   showAgentActivity: z
     .boolean()
     .describe(
@@ -412,7 +409,6 @@ export const settingsDefaults: Settings = {
   wrapLinesInDiffs: false,
   analyticsOptOut: false,
   experiments: false,
-  requestTimingDiagnostics: false,
   showAgentActivity: true,
   worldModel: false,
   knowledgeBase: false,

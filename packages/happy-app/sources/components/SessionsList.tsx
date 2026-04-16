@@ -363,7 +363,6 @@ export function SessionsList() {
   const isTablet = useIsTablet();
   const navigateToSession = useNavigateToSession();
   const compactSessionView = useSetting("compactSessionView");
-  const requestTimingDiagnosticsEnabled = useSetting("requestTimingDiagnostics");
   const router = useRouter();
   const selectable = isTablet;
   const dataWithSelected = selectable
@@ -528,49 +527,33 @@ export function SessionsList() {
   }, [performDeleteAll, inactiveSessionIds.length]);
 
   const FooterComponent = React.useCallback(() => {
-    if (!requestTimingDiagnosticsEnabled && inactiveSessionIds.length === 0) {
+    if (inactiveSessionIds.length === 0) {
       return null;
     }
     return (
-      <>
-        {requestTimingDiagnosticsEnabled ? (
-          <ItemGroup>
-            <Item
-              title={t("sessionInfo.requestTimingOverview")}
-              subtitle={t("sessionInfo.requestTimingOverviewSubtitle")}
-              icon={<Ionicons name="analytics-outline" size={29} color="#5856D6" />}
-              onPress={() => router.push("/session/timing")}
-            />
-          </ItemGroup>
-        ) : null}
-        {inactiveSessionIds.length > 0 ? (
-          <View style={styles.deleteAllContainer}>
-            <Pressable
-              style={styles.deleteAllButton}
-              onPress={handleDeleteAll}
-              disabled={deletingAll}
-            >
-              <Ionicons
-                name="trash-outline"
-                size={16}
-                color={styles.deleteAllText.color}
-              />
-              <Text style={styles.deleteAllText}>
-                {deletingAll
-                  ? t("common.loading")
-                  : t("sessionInfo.deleteAllArchivedSessions")}
-              </Text>
-            </Pressable>
-          </View>
-        ) : null}
-      </>
+      <View style={styles.deleteAllContainer}>
+        <Pressable
+          style={styles.deleteAllButton}
+          onPress={handleDeleteAll}
+          disabled={deletingAll}
+        >
+          <Ionicons
+            name="trash-outline"
+            size={16}
+            color={styles.deleteAllText.color}
+          />
+          <Text style={styles.deleteAllText}>
+            {deletingAll
+              ? t("common.loading")
+              : t("sessionInfo.deleteAllArchivedSessions")}
+          </Text>
+        </Pressable>
+      </View>
     );
   }, [
     deletingAll,
     handleDeleteAll,
     inactiveSessionIds.length,
-    requestTimingDiagnosticsEnabled,
-    router,
   ]);
 
   return (

@@ -16,12 +16,5 @@ export const MessageMetaSchema = z.object({
    * Defaults to true when unset (normal turn-triggering message).
    */
   shouldQuery: z.boolean().optional(),
-  requestDiagnostics: z
-    .object({
-      version: z.literal(1),
-      requestId: z.string(),
-      clientCreatedAtMs: z.number(),
-    })
-    .optional(),
 });
 export type MessageMeta = z.infer<typeof MessageMetaSchema>;

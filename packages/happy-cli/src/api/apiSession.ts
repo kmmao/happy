@@ -24,7 +24,6 @@ import {
   createEnvelope,
   type SessionEnvelope,
   type SessionTurnEndStatus,
-  type SessionTurnDiagnostics,
 } from "@kmmao/happy-wire";
 import {
   closeClaudeTurnWithStatus,
@@ -87,21 +86,6 @@ export type ACPMessageData =
   | { type: "token_count"; [key: string]: unknown };
 
 export type ACPProvider = "gemini" | "codex" | "claude" | "opencode";
-
-type PendingTurnDiagnostics = {
-  provider?: string;
-  requestIds: string[];
-  queueWaitMs?: number;
-  socketToQueueMs?: number;
-  queueCollectedAtMs: number;
-};
-
-type ActiveTurnDiagnostics = PendingTurnDiagnostics & {
-  turnStartedAtMs: number;
-  queueToTurnStartMs?: number;
-  firstOutputAtMs?: number;
-  firstTextAtMs?: number;
-};
 
 type V3SessionMessage = {
   id: string;
@@ -239,8 +223,6 @@ export class ApiSessionClient extends EventEmitter {
   // SDK's total_cost_usd is cumulative since session start, but we report per-turn deltas.
   private lastReportedCumulativeCost = 0;
   private lastReportedModelCosts: Record<string, number> = {};
-  private pendingTurnDiagnostics: PendingTurnDiagnostics | null = null;
-  private activeTurnDiagnostics = new Map<string, ActiveTurnDiagnostics>();
 
   constructor(token: string, session: Session) {
     super();
@@ -784,26 +766,6 @@ export class ApiSessionClient extends EventEmitter {
     return this.currentTurnModel;
   }
 
-  beginTurnDiagnostics(input: {
-    provider?: string;
-    requestIds?: string[];
-    queueWaitMs?: number;
-    socketToQueueMs?: number;
-    queueCollectedAtMs?: number;
-  }) {
-    this.pendingTurnDiagnostics = {
-      provider: input.provider,
-      requestIds: input.requestIds ?? [],
-      ...(input.queueWaitMs !== undefined
-        ? { queueWaitMs: input.queueWaitMs }
-        : {}),
-      ...(input.socketToQueueMs !== undefined
-        ? { socketToQueueMs: input.socketToQueueMs }
-        : {}),
-      queueCollectedAtMs: input.queueCollectedAtMs ?? Date.now(),
-    };
-  }
-
   sendCodexMessage(body: any) {
     let content = {
       role: "agent",
@@ -834,8 +796,6 @@ export class ApiSessionClient extends EventEmitter {
   }
 
   sendSessionProtocolMessage(envelope: SessionEnvelope) {
-    envelope = this.annotateTurnDiagnostics(envelope);
-
     if (envelope.role !== "user") {
       this.enqueueSessionProtocolEnvelope(envelope);
       return;
@@ -847,100 +807,6 @@ export class ApiSessionClient extends EventEmitter {
     }
 
     this.enqueueSessionProtocolEnvelope(envelope);
-  }
-
-  private annotateTurnDiagnostics(envelope: SessionEnvelope): SessionEnvelope {
-    if (!envelope.turn) {
-      return envelope;
-    }
-
-    if (envelope.ev.t === "turn-start") {
-      const pending = this.pendingTurnDiagnostics;
-      if (!pending) {
-        return envelope;
-      }
-
-      const turnStartedAtMs = Date.now();
-      const queueToTurnStartMs = Math.max(
-        0,
-        turnStartedAtMs - pending.queueCollectedAtMs,
-      );
-      this.activeTurnDiagnostics.set(envelope.turn, {
-        ...pending,
-        turnStartedAtMs,
-        queueToTurnStartMs,
-      });
-      this.pendingTurnDiagnostics = null;
-      return envelope;
-    }
-
-    const active = this.activeTurnDiagnostics.get(envelope.turn);
-    if (!active) {
-      return envelope;
-    }
-
-    const now = Date.now();
-    if (!active.firstOutputAtMs && this.isTurnOutputEvent(envelope)) {
-      active.firstOutputAtMs = now;
-    }
-    if (!active.firstTextAtMs && this.isTurnTextEvent(envelope)) {
-      active.firstTextAtMs = now;
-    }
-
-    if (envelope.ev.t !== "turn-end") {
-      return envelope;
-    }
-
-    const diagnostics: SessionTurnDiagnostics = {
-      version: 1,
-      ...(active.provider ? { provider: active.provider } : {}),
-      ...(active.requestIds.length > 0 ? { requestIds: active.requestIds } : {}),
-      ...(active.queueWaitMs !== undefined
-        ? { queueWaitMs: active.queueWaitMs }
-        : {}),
-      ...(active.socketToQueueMs !== undefined
-        ? { socketToQueueMs: active.socketToQueueMs }
-        : {}),
-      ...(active.queueToTurnStartMs !== undefined
-        ? { queueToTurnStartMs: active.queueToTurnStartMs }
-        : {}),
-      ...(active.firstOutputAtMs !== undefined
-        ? { firstOutputMs: active.firstOutputAtMs - active.turnStartedAtMs }
-        : {}),
-      ...(active.firstTextAtMs !== undefined
-        ? { firstTextMs: active.firstTextAtMs - active.turnStartedAtMs }
-        : {}),
-      turnDurationMs: now - active.turnStartedAtMs,
-      ...(active.firstOutputAtMs !== undefined
-        ? { postFirstOutputMs: now - active.firstOutputAtMs }
-        : {}),
-      ...(active.firstTextAtMs !== undefined
-        ? { postFirstTextMs: now - active.firstTextAtMs }
-        : {}),
-    };
-    this.activeTurnDiagnostics.delete(envelope.turn);
-
-    return {
-      ...envelope,
-      ev: {
-        ...envelope.ev,
-        diagnostics,
-      },
-    };
-  }
-
-  private isTurnOutputEvent(envelope: SessionEnvelope): boolean {
-    return (
-      envelope.ev.t === "text" ||
-      envelope.ev.t === "text-delta" ||
-      envelope.ev.t === "service" ||
-      envelope.ev.t === "tool-call-start" ||
-      envelope.ev.t === "file"
-    );
-  }
-
-  private isTurnTextEvent(envelope: SessionEnvelope): boolean {
-    return envelope.ev.t === "text" || envelope.ev.t === "text-delta";
   }
 
   /**

@@ -1117,13 +1117,6 @@ export async function runGemini(opts: {
         break;
       }
 
-      session.beginTurnDiagnostics({
-        provider: "gemini",
-        requestIds: message.requestIds,
-        queueWaitMs: message.queueWaitMs,
-        socketToQueueMs: message.socketToQueueMs,
-      });
-
       // Track if we need to inject conversation history (after model change)
       let injectHistoryContext = false;
 

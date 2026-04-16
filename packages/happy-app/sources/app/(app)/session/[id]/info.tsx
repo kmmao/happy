@@ -52,7 +52,6 @@ import { buildSessionRespawnProfile } from "@/hooks/sessionUpgradeProfile";
 import { sync } from "@/sync/sync";
 import { CodexInfoSection } from "./CodexInfoSection";
 import { SessionMetadataSection } from "./SessionMetadataSection";
-import { SessionTimingDiagnosticsSection } from "./SessionTimingDiagnosticsSection";
 
 // Animated status dot component
 function StatusDot({
@@ -106,7 +105,6 @@ function SessionInfoContent({ session }: { session: Session }) {
   const router = useRouter();
   const auth = useAuth();
   const devModeEnabled = __DEV__;
-  const requestTimingDiagnosticsEnabled = useSetting("requestTimingDiagnostics");
   const sessionName = getSessionName(session);
   const sessionStatus = useSessionStatus(session);
   const navigateToSession = useNavigateToSession();
@@ -668,12 +666,6 @@ function SessionInfoContent({ session }: { session: Session }) {
             />
           )}
         </ItemGroup>
-
-        <SessionTimingDiagnosticsSection
-          enabled={requestTimingDiagnosticsEnabled}
-          session={session}
-          messages={messages}
-        />
 
         {/* Raw JSON (Dev Mode Only) */}
         {devModeEnabled && (

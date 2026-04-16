@@ -69,21 +69,6 @@ const agentEventSchema = z.discriminatedUnion("type", [
         }),
       )
       .optional(),
-    diagnostics: z
-      .object({
-        version: z.literal(1),
-        requestIds: z.array(z.string()).optional(),
-        provider: z.string().optional(),
-        queueWaitMs: z.number().optional(),
-        socketToQueueMs: z.number().optional(),
-        queueToTurnStartMs: z.number().optional(),
-        firstOutputMs: z.number().optional(),
-        firstTextMs: z.number().optional(),
-        turnDurationMs: z.number().optional(),
-        postFirstOutputMs: z.number().optional(),
-        postFirstTextMs: z.number().optional(),
-      })
-      .optional(),
   }),
   z.object({
     type: z.literal("usage-stats"),
@@ -174,20 +159,6 @@ const sessionTurnStartEventSchema = z.object({
   t: z.literal("turn-start"),
 });
 
-const sessionTurnDiagnosticsSchema = z.object({
-  version: z.literal(1),
-  requestIds: z.array(z.string()).optional(),
-  provider: z.string().optional(),
-  queueWaitMs: z.number().optional(),
-  socketToQueueMs: z.number().optional(),
-  queueToTurnStartMs: z.number().optional(),
-  firstOutputMs: z.number().optional(),
-  firstTextMs: z.number().optional(),
-  turnDurationMs: z.number().optional(),
-  postFirstOutputMs: z.number().optional(),
-  postFirstTextMs: z.number().optional(),
-});
-
 const sessionStartEventSchema = z.object({
   t: z.literal("start"),
   title: z.string().optional(),
@@ -219,7 +190,6 @@ const sessionTurnEndEventSchema = z.object({
   totalCostUsd: z.number().optional(),
   numTurns: z.number().optional(),
   modelUsage: z.record(z.string(), sessionModelUsageSchema).optional(),
-  diagnostics: sessionTurnDiagnosticsSchema.optional(),
 });
 
 const sessionStopEventSchema = z.object({
@@ -1058,9 +1028,6 @@ function normalizeSessionEnvelope(
           : {}),
         ...(envelope.ev.modelUsage !== undefined
           ? { modelUsage: envelope.ev.modelUsage }
-          : {}),
-        ...(envelope.ev.diagnostics !== undefined
-          ? { diagnostics: envelope.ev.diagnostics }
           : {}),
       },
       meta,

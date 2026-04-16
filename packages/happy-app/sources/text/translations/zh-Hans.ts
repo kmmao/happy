@@ -301,9 +301,6 @@ export const zhHans: TranslationStructure = {
     experimentalFeatures: "实验功能",
     experimentalFeaturesEnabled: "实验功能已启用",
     experimentalFeaturesDisabled: "仅使用稳定功能",
-    requestTimingDiagnostics: "请求时序诊断",
-    requestTimingDiagnosticsEnabled: "记录请求与回合时序，供后续分析",
-    requestTimingDiagnosticsDisabled: "不记录额外的请求时序数据",
     webFeatures: "Web 功能",
     webFeaturesDescription: "仅在应用的 Web 版本中可用的功能。",
     enterToSend: "回车发送",
@@ -812,82 +809,6 @@ export const zhHans: TranslationStructure = {
     deleteAllArchivedSessions: "删除所有已归档会话",
     deleteAllArchivedWarning: ({ count }: { count: number }) =>
       `将永久删除 ${count} 个已归档会话及其所有消息。此操作无法撤销。`,
-    requestTimingAnalysis: "请求耗时分析",
-    requestTimingAnalysisHint: "打开耗时诊断后，先发送几次请求",
-    requestTimingAnalysisEmpty: "这个会话里还没有带耗时诊断的已完成回合。",
-    requestTimingAnalyzedTurns: "已分析回合",
-    requestTimingCorrelatedTurns: "已关联请求的回合",
-    requestTimingTrackedSessions: "已覆盖会话",
-    requestTimingTrackedModels: "已覆盖模型",
-    requestTimingSocketToQueue: "入队前耗时",
-    requestTimingTtft: "首字时间 TTFT",
-    requestTimingQueueWait: "队列等待",
-    requestTimingGenerationTail: "生成尾段",
-    requestTimingTurnDuration: "回合总时长",
-    requestTimingLatestTurn: "最近一回合",
-    requestTimingRecentTurns: "最近回合诊断",
-    requestTimingOverview: "请求耗时总览",
-    requestTimingOverviewSubtitle: "跨会话、跨模型对比瓶颈分布",
-    requestTimingOverviewEmpty: "还没有收集到带耗时诊断的已完成回合。",
-    requestTimingEnableDiagnostics: "开启耗时诊断",
-    requestTimingEnableDiagnosticsSubtitle:
-      "先在实验设置里打开开关，后续新请求才会写入诊断数据。",
-    requestTimingClockNote:
-      "这些值来自 CLI 本地的回合诊断。跨设备时不要直接用手机时间减 CLI 时间。",
-    requestTimingUnavailable: "—",
-    requestTimingP50P95: ({ p50, p95 }: { p50: string; p95: string }) =>
-      `P50 ${p50} · P95 ${p95}`,
-    requestTimingAverages: ({
-      socketToQueue,
-      ttft,
-      queueWait,
-      generationTail,
-      duration,
-    }: {
-      socketToQueue: string;
-      ttft: string;
-      queueWait: string;
-      generationTail: string;
-      duration: string;
-    }) =>
-      `平均入队前 ${socketToQueue} · 平均 TTFT ${ttft} · 平均排队 ${queueWait} · 平均尾段 ${generationTail} · 平均回合 ${duration}`,
-    requestTimingTurnsCount: ({ count }: { count: number }) => `${count} 回合`,
-    requestTimingLikelyIssue: "可能瓶颈",
-    requestTimingOverallDiagnosis: "整体结论",
-    requestTimingDiagnosisDistribution: "诊断分布",
-    requestTimingSuggestedChecks: "建议排查",
-    requestTimingCopyReport: "复制会话报告",
-    requestTimingCopyReportSubtitle: "复制摘要指标和最近回合诊断 JSON",
-    requestTimingCopyOverviewReport: "复制总览报告",
-    requestTimingCopyOverviewReportSubtitle:
-      "复制跨会话聚合后的诊断 JSON",
-    requestTimingReportCopied: "耗时报告已复制",
-    requestTimingReportCopyFailed: "复制耗时报告失败",
-    requestTimingDiagnosisLowConfidence: "样本还不够",
-    requestTimingDiagnosisLowConfidenceHint:
-      "当前样本数或 requestId 关联率太低，还不适合下优化结论。",
-    requestTimingDiagnosisLowConfidenceAction:
-      "先继续开着实验，至少再收集几轮完整请求后再动优化。",
-    requestTimingDiagnosisQueue: "排队 / 调度",
-    requestTimingDiagnosisQueueHint:
-      "明显有一段耗时堆在模型真正开始回合之前。",
-    requestTimingDiagnosisQueueAction:
-      "先查会话队列、重连、前置预处理，以及请求是否在推理开始前堆积。",
-    requestTimingDiagnosisTtft: "首字慢",
-    requestTimingDiagnosisTtftHint:
-      "回合开始后，到第一个可见 token 的时间过长。",
-    requestTimingDiagnosisTtftAction:
-      "先查 prompt 体积、reasoning 强度、检索/工具预填充，以及严格 JSON/schema 约束。",
-    requestTimingDiagnosisGeneration: "生成尾段慢",
-    requestTimingDiagnosisGenerationHint:
-      "模型已经开始回了，但后半段生成耗时占了大头。",
-    requestTimingDiagnosisGenerationAction:
-      "先查输出长度、模型解码吞吐、JSON/schema 约束，以及工具调用是否把尾段拉长。",
-    requestTimingDiagnosisBalanced: "没有单一主瓶颈",
-    requestTimingDiagnosisBalancedHint:
-      "延迟分散在多个阶段，不是某一段特别离谱。",
-    requestTimingDiagnosisBalancedAction:
-      "按模型、prompt 大小、路由分桶对比，你大概率需要分段优化，而不是赌一个点。",
   },
 
   components: {

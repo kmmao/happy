@@ -19,8 +19,6 @@ function FeaturesSettingsScreen() {
   const [agentInputEnterToSend, setAgentInputEnterToSend] = useSettingMutable(
     "agentInputEnterToSend",
   );
-  const [requestTimingDiagnostics, setRequestTimingDiagnostics] =
-    useSettingMutable("requestTimingDiagnostics");
   const [commandPaletteEnabled, setCommandPaletteEnabled] =
     useLocalSettingMutable("commandPaletteEnabled");
   const [markdownCopyV2, setMarkdownCopyV2] =
@@ -67,22 +65,6 @@ function FeaturesSettingsScreen() {
           icon={<Ionicons name="flask-outline" size={29} color={theme.colors.accentPurple} />}
           rightElement={
             <Switch value={experiments} onValueChange={setExperiments} />
-          }
-          showChevron={false}
-        />
-        <Item
-          title={t("settingsFeatures.requestTimingDiagnostics")}
-          subtitle={
-            requestTimingDiagnostics
-              ? t("settingsFeatures.requestTimingDiagnosticsEnabled")
-              : t("settingsFeatures.requestTimingDiagnosticsDisabled")
-          }
-          icon={<Ionicons name="pulse-outline" size={29} color={theme.colors.accentTeal} />}
-          rightElement={
-            <Switch
-              value={requestTimingDiagnostics}
-              onValueChange={setRequestTimingDiagnostics}
-            />
           }
           showChevron={false}
         />

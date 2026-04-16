@@ -1380,12 +1380,6 @@ export async function claudeRemoteLauncher(
             if (pending) {
               let p = pending;
               pending = null;
-              session.client.beginTurnDiagnostics({
-                provider: "claude",
-                requestIds: p.requestIds,
-                queueWaitMs: p.queueWaitMs,
-                socketToQueueMs: p.socketToQueueMs,
-              });
               dispatchTurn(reasonForQueuedMessage(p));
               // Reset E2E perf tracking for new turn
               _perfTurnSocketReceivedAt = p.mode._perfSocketReceivedAt;
@@ -1439,12 +1433,6 @@ export async function claudeRemoteLauncher(
                   logger.debug(
                     `[remote]: hot-swap detected (${changed || "unknown"}), no restart needed`,
                   );
-                  session.client.beginTurnDiagnostics({
-                    provider: "claude",
-                    requestIds: msg.requestIds,
-                    queueWaitMs: msg.queueWaitMs,
-                    socketToQueueMs: msg.socketToQueueMs,
-                  });
                   dispatchTurn(reasonForQueuedMessage(msg));
                   modeHash = msg.hash;
                   mode = msg.mode;
@@ -1469,12 +1457,6 @@ export async function claudeRemoteLauncher(
                 return null;
               }
 
-              session.client.beginTurnDiagnostics({
-                provider: "claude",
-                requestIds: msg.requestIds,
-                queueWaitMs: msg.queueWaitMs,
-                socketToQueueMs: msg.socketToQueueMs,
-              });
               dispatchTurn(reasonForQueuedMessage(msg));
               modeHash = msg.hash;
               mode = msg.mode;

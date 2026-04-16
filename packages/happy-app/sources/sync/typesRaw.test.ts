@@ -944,13 +944,6 @@ describe('Zod Transform - WOLOG Content Normalization', () => {
                     type: 'text',
                     text: 'User input message'
                 },
-                meta: {
-                    requestDiagnostics: {
-                        version: 1,
-                        requestId: 'req-123',
-                        clientCreatedAtMs: 1234567890,
-                    }
-                }
             };
 
             const result = RawRecordSchema.safeParse(userMessage);
@@ -960,11 +953,6 @@ describe('Zod Transform - WOLOG Content Normalization', () => {
                 expect(result.data.localKey).toBe('req-123');
                 expect(result.data.content.type).toBe('text');
                 expect(result.data.content.text).toBe('User input message');
-                expect(result.data.meta?.requestDiagnostics).toEqual({
-                    version: 1,
-                    requestId: 'req-123',
-                    clientCreatedAtMs: 1234567890,
-                });
             }
         });
     });

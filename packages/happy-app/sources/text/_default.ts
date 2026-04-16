@@ -308,11 +308,6 @@ export const en = {
     experimentalFeatures: "Experimental Features",
     experimentalFeaturesEnabled: "Experimental features enabled",
     experimentalFeaturesDisabled: "Using stable features only",
-    requestTimingDiagnostics: "Request Timing Diagnostics",
-    requestTimingDiagnosticsEnabled:
-      "Record request and turn timing for later analysis",
-    requestTimingDiagnosticsDisabled:
-      "Do not record extra request timing data",
     webFeatures: "Web Features",
     webFeaturesDescription:
       "Features available only in the web version of the app.",
@@ -833,87 +828,6 @@ export const en = {
     deleteAllArchivedSessions: "Delete All Archived Sessions",
     deleteAllArchivedWarning: ({ count }: { count: number }) =>
       `This will permanently delete ${count} archived session(s) and all their messages. This cannot be undone.`,
-    requestTimingAnalysis: "Request Timing Analysis",
-    requestTimingAnalysisHint: "Turn on timing diagnostics and send a few requests",
-    requestTimingAnalysisEmpty:
-      "No completed turns with timing diagnostics yet for this session.",
-    requestTimingAnalyzedTurns: "Analyzed Turns",
-    requestTimingCorrelatedTurns: "Correlated Turns",
-    requestTimingTrackedSessions: "Tracked Sessions",
-    requestTimingTrackedModels: "Tracked Models",
-    requestTimingSocketToQueue: "Socket to Queue",
-    requestTimingTtft: "TTFT",
-    requestTimingQueueWait: "Queue Wait",
-    requestTimingGenerationTail: "Generation Tail",
-    requestTimingTurnDuration: "Turn Duration",
-    requestTimingLatestTurn: "Latest Turn",
-    requestTimingRecentTurns: "Recent Turn Diagnostics",
-    requestTimingOverview: "Request Timing Overview",
-    requestTimingOverviewSubtitle:
-      "Compare bottlenecks across sessions and models",
-    requestTimingOverviewEmpty:
-      "No completed turns with timing diagnostics have been collected yet.",
-    requestTimingEnableDiagnostics: "Enable Timing Diagnostics",
-    requestTimingEnableDiagnosticsSubtitle:
-      "Turn on the experiment first so new requests record timing data.",
-    requestTimingClockNote:
-      "These values come from CLI-side turn diagnostics. Do not subtract phone time from CLI time across devices.",
-    requestTimingUnavailable: "—",
-    requestTimingP50P95: ({ p50, p95 }: { p50: string; p95: string }) =>
-      `P50 ${p50} · P95 ${p95}`,
-    requestTimingAverages: ({
-      socketToQueue,
-      ttft,
-      queueWait,
-      generationTail,
-      duration,
-    }: {
-      socketToQueue: string;
-      ttft: string;
-      queueWait: string;
-      generationTail: string;
-      duration: string;
-    }) =>
-      `Avg socket→queue ${socketToQueue} · Avg TTFT ${ttft} · Avg queue ${queueWait} · Avg tail ${generationTail} · Avg turn ${duration}`,
-    requestTimingTurnsCount: ({ count }: { count: number }) =>
-      `${count} turn${count === 1 ? "" : "s"}`,
-    requestTimingLikelyIssue: "Likely Bottleneck",
-    requestTimingOverallDiagnosis: "Overall Diagnosis",
-    requestTimingDiagnosisDistribution: "Diagnosis Distribution",
-    requestTimingSuggestedChecks: "Suggested Checks",
-    requestTimingCopyReport: "Copy Session Report",
-    requestTimingCopyReportSubtitle:
-      "Copy summary metrics and recent turn diagnostics as JSON",
-    requestTimingCopyOverviewReport: "Copy Overview Report",
-    requestTimingCopyOverviewReportSubtitle:
-      "Copy the cross-session aggregate report as JSON",
-    requestTimingReportCopied: "Timing report copied",
-    requestTimingReportCopyFailed: "Failed to copy timing report",
-    requestTimingDiagnosisLowConfidence: "Need More Samples",
-    requestTimingDiagnosisLowConfidenceHint:
-      "The current sample size or request correlation is too thin to trust the diagnosis yet.",
-    requestTimingDiagnosisLowConfidenceAction:
-      "Keep the experiment on and collect a few more completed turns before optimizing.",
-    requestTimingDiagnosisQueue: "Queueing / Dispatch",
-    requestTimingDiagnosisQueueHint:
-      "A meaningful chunk of latency is building up before the model turn actually starts.",
-    requestTimingDiagnosisQueueAction:
-      "Check session queueing, reconnects, pre-processing, and whether requests are piling up before inference starts.",
-    requestTimingDiagnosisTtft: "Slow First Token",
-    requestTimingDiagnosisTtftHint:
-      "The model spends too long getting to the first visible token after the turn starts.",
-    requestTimingDiagnosisTtftAction:
-      "Check prompt size, reasoning level, retrieval/tool prefill, and any strict structured-output constraints.",
-    requestTimingDiagnosisGeneration: "Slow Generation Tail",
-    requestTimingDiagnosisGenerationHint:
-      "The model starts responding, but the remainder of the turn is where most time is spent.",
-    requestTimingDiagnosisGenerationAction:
-      "Check output length, model decode speed, JSON/schema constraints, and whether tools are stretching the tail of the turn.",
-    requestTimingDiagnosisBalanced: "No Single Dominant Bottleneck",
-    requestTimingDiagnosisBalancedHint:
-      "Latency is spread across stages instead of clearly pooling in one segment.",
-    requestTimingDiagnosisBalancedAction:
-      "Compare by model, prompt size, and route; you likely need segmented optimization instead of one obvious fix.",
   },
 
   components: {
