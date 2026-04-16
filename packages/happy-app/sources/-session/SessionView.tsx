@@ -427,7 +427,6 @@ export const SessionView = React.memo((props: { id: string }) => {
             sessionId={sessionId}
             collapsed={sidePanelCollapsed}
             onToggleCollapse={toggleSidePanelOuter}
-            onOpenKnowledge={() => setShowKnowledgeSheet(true)}
           />
         )}
       </View>
@@ -644,7 +643,7 @@ function SessionViewInner({
   // Falls back to the mode key itself (e.g., "sonnet-1m") if currentModelCode is absent.
   const effectiveModelCode = modelMode?.key && modelMode.key !== "default"
     ? modelMode.key
-    : (session.metadata?.currentModelCode ?? modelMode?.key);
+    : (session.pinnedModelId ?? session.metadata?.currentModelCode ?? modelMode?.key);
 
   const sessionStatus = useSessionStatus(session);
   const sessionUsage = useSessionUsage(sessionId);
@@ -1049,6 +1048,8 @@ function SessionViewInner({
         ? modelMode.name
         : session.resolvedModelId
           ? formatModelName(session.resolvedModelId)
+          : session.pinnedModelId
+            ? formatModelName(session.pinnedModelId)
           : modelMode?.name,
       contextSize: usageSource?.contextSize,
       contextWindow: usageSource?.contextWindow,
@@ -1163,6 +1164,8 @@ function SessionViewInner({
             ? undefined
             : session.resolvedModelId
               ? formatModelName(session.resolvedModelId)
+              : session.pinnedModelId
+                ? formatModelName(session.pinnedModelId)
               : undefined
         }
         availableModels={availableModels}

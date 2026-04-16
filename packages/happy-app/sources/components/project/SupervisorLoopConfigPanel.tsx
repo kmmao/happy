@@ -112,31 +112,35 @@ export const SupervisorLoopConfigPanel = React.memo(
         // Profile selection: inherit default from supervisor settings, allow per-run override
         const [selectedProfileId, setSelectedProfileId] = React.useState<string | null>(defaultProfileId ?? null);
 
-        const resolveProfileEnvVars = React.useCallback((profileId: string | null): Record<string, string> | undefined => {
-            if (!profileId) return undefined;
+        const resolveProfileName = React.useCallback((profileId: string | null): string | null => {
+            if (!profileId) return null;
             const builtIn = getBuiltInProfile(profileId);
-            if (builtIn) return getProfileEnvironmentVariables(builtIn);
+            if (builtIn) return builtIn.name;
             const userProfiles = storage.getState().settings.profiles ?? [];
             const userProfile = userProfiles.find((p) => p.id === profileId);
-            if (userProfile) return getProfileEnvironmentVariables(userProfile);
-            return undefined;
+            return userProfile?.name ?? null;
         }, []);
+
+        const missingSelectedProfileName = React.useMemo(() => {
+            if (!selectedProfileId) return null;
+            const builtIn = getBuiltInProfile(selectedProfileId);
+            if (builtIn) return null;
+            return resolveProfileName(selectedProfileId) ?? selectedProfileId;
+        }, [selectedProfileId, resolveProfileName]);
 
         const [startLoading, doStart] = useHappyAction(
             React.useCallback(async () => {
                 const credentials = await TokenStorage.getCredentials();
                 if (!credentials) return;
-                const envVars = resolveProfileEnvVars(selectedProfileId);
                 const config: LoopConfig = {
                     maxIterations,
                     autoApproveThreshold,
                     ...(costCapEnabled ? { costCapUsd } : {}),
                     ...(selectedProfileId ? { profileId: selectedProfileId } : {}),
-                    ...(envVars ? { profileEnvironmentVariables: envVars } : {}),
                 };
                 const loop = await startSupervisorLoop(credentials, projectId, config);
                 onStarted(loop);
-            }, [projectId, maxIterations, autoApproveThreshold, costCapEnabled, costCapUsd, selectedProfileId, resolveProfileEnvVars, onStarted]),
+            }, [projectId, maxIterations, autoApproveThreshold, costCapEnabled, costCapUsd, selectedProfileId, onStarted]),
         );
 
         return (
@@ -264,6 +268,20 @@ export const SupervisorLoopConfigPanel = React.memo(
                             </Pressable>
                         ))}
                     </View>
+                    {missingSelectedProfileName && (
+                        <View style={styles.missingProfileBanner}>
+                            <Ionicons
+                                name="alert-circle-outline"
+                                size={14}
+                                color="#FF9500"
+                            />
+                            <Text style={styles.missingProfileBannerText}>
+                                {t("supervisor.defaultProfileMissing", {
+                                    profileName: missingSelectedProfileName,
+                                })}
+                            </Text>
+                        </View>
+                    )}
                 </View>
 
                 {/* Safety note */}
@@ -359,6 +377,22 @@ const styles = StyleSheet.create((theme) => ({
         ...Typography.default(),
         fontSize: 12,
         color: theme.colors.text,
+    },
+    missingProfileBanner: {
+        flexDirection: "row",
+        alignItems: "flex-start",
+        gap: 6,
+        backgroundColor: "#FF950014",
+        paddingHorizontal: 10,
+        paddingVertical: 8,
+        borderRadius: 8,
+    },
+    missingProfileBannerText: {
+        ...Typography.default(),
+        fontSize: 11,
+        lineHeight: 16,
+        color: theme.colors.text,
+        flex: 1,
     },
     safetyNote: {
         flexDirection: "row",

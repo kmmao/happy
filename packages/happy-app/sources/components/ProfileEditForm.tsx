@@ -17,12 +17,9 @@ import { t } from "@/text";
 import { AIBackendProfile } from "@/sync/settings";
 import { SessionTypeSelector } from "@/components/SessionTypeSelector";
 import { getBuiltInProfileDocumentation } from "@/sync/profileUtils";
-import {
-  useEnvironmentVariables,
-  extractEnvVarReferences,
-} from "@/hooks/useEnvironmentVariables";
 import { EnvironmentVariablesList } from "@/components/EnvironmentVariablesList";
 import { log } from '@/log';
+import { buildProfileForSave } from "./profileSavePayload";
 
 export interface ProfileEditFormProps {
   profile: AIBackendProfile;
@@ -51,17 +48,6 @@ export function ProfileEditForm({
   const [environmentVariables, setEnvironmentVariables] = React.useState<
     Array<{ name: string; value: string }>
   >(profile.environmentVariables || []);
-
-  // Extract ${VAR} references from environmentVariables for querying daemon
-  const envVarNames = React.useMemo(() => {
-    return extractEnvVarReferences(environmentVariables);
-  }, [environmentVariables]);
-
-  // Query daemon environment using hook
-  const { variables: actualEnvVars } = useEnvironmentVariables(
-    machineId,
-    envVarNames,
-  );
 
   const [name, setName] = React.useState(profile.name || "");
   const [useTmux, setUseTmux] = React.useState(
@@ -133,90 +119,33 @@ export function ProfileEditForm({
       return;
     }
 
-    onSave({
-      ...profile,
-      name: name.trim(),
-      // Clear all config objects - ALL configuration now in environmentVariables
-      anthropicConfig: {},
-      openaiConfig: {},
-      azureOpenAIConfig: {},
-      // Use environment variables from state (managed by EnvironmentVariablesList)
-      environmentVariables,
-      // Keep non-env-var configuration
-      tmuxConfig: useTmux
-        ? {
-            sessionName: tmuxSession.trim() || "", // Empty string = use current/most recent tmux session
-            tmpDir: tmuxTmpDir.trim() || undefined,
-            updateEnvironment: undefined, // Preserve schema compatibility, not used by daemon
-          }
-        : {
-            sessionName: undefined,
-            tmpDir: undefined,
-            updateEnvironment: undefined,
-          },
-      startupBashScript: useStartupScript
-        ? startupScript.trim() || undefined
-        : undefined,
-      codexConfig:
-        agentType === "codex"
-          ? {
-              backendMode: codexBackendMode,
-              configMode: codexConfigMode,
-              codexProfileName:
-                codexConfigMode === "managed-profile"
-                  ? codexProfileName.trim() || undefined
-                  : undefined,
-              ...(codexConfigMode === "managed-overrides" &&
-              codexOverrideModel.trim()
-                ? { model: codexOverrideModel.trim() }
-                : {}),
-              ...(codexConfigMode === "managed-overrides" &&
-              codexOverrideReasoningEffort.trim()
-                ? {
-                    reasoningEffort: codexOverrideReasoningEffort.trim(),
-                  }
-                : {}),
-              ...(codexConfigMode === "managed-overrides" &&
-              codexOverrideReasoningSummary.trim()
-                ? {
-                    reasoningSummary: codexOverrideReasoningSummary.trim(),
-                  }
-                : {}),
-              ...(codexConfigMode === "managed-overrides" &&
-              codexOverrideVerbosity.trim()
-                ? { verbosity: codexOverrideVerbosity.trim() }
-                : {}),
-              ...(codexConfigMode === "managed-overrides" &&
-              codexOverridePersonality.trim()
-                ? { personality: codexOverridePersonality.trim() }
-                : {}),
-              ...(codexConfigMode === "managed-overrides" &&
-              codexOverrideServiceTier.trim()
-                ? { serviceTier: codexOverrideServiceTier.trim() }
-                : {}),
-              ...(codexConfigMode === "managed-overrides" &&
-              codexOverrideWebSearch.trim()
-                ? {
-                    webSearchEnabled:
-                      codexOverrideWebSearch.trim() === "live",
-                  }
-                : {}),
-              ...(codexConfigMode === "managed-overrides" &&
-              codexOverrideApprovalPolicy.trim()
-                ? {
-                    approvalPolicy: codexOverrideApprovalPolicy.trim(),
-                  }
-                : {}),
-              ...(codexConfigMode === "managed-overrides" &&
-              codexOverrideSandboxMode.trim()
-                ? { sandboxMode: codexOverrideSandboxMode.trim() }
-                : {}),
-            }
-          : profile.codexConfig,
-      defaultSessionType: defaultSessionType,
-      defaultPermissionMode: defaultPermissionMode,
-      updatedAt: Date.now(),
-    });
+    onSave(
+      buildProfileForSave({
+        profile,
+        name,
+        environmentVariables,
+        useTmux,
+        tmuxSession,
+        tmuxTmpDir,
+        useStartupScript,
+        startupScript,
+        agentType,
+        defaultSessionType,
+        defaultPermissionMode,
+        codexBackendMode,
+        codexConfigMode,
+        codexProfileName,
+        codexOverrideModel,
+        codexOverrideReasoningEffort,
+        codexOverrideReasoningSummary,
+        codexOverrideVerbosity,
+        codexOverridePersonality,
+        codexOverrideServiceTier,
+        codexOverrideWebSearch,
+        codexOverrideApprovalPolicy,
+        codexOverrideSandboxMode,
+      }) as AIBackendProfile,
+    );
   };
 
   return (

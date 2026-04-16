@@ -13,9 +13,11 @@ import { t } from "@/text";
 import { TokenStorage } from "@/auth/tokenStorage";
 import {
     fetchRunComparison,
+    fetchSupervisorRun,
     exportRunReport,
     type RunComparisonAction,
     type RunComparison,
+    type SupervisorRun,
 } from "@/sync/apiSupervisor";
 import { Ionicons } from "@expo/vector-icons";
 import * as Clipboard from "expo-clipboard";
@@ -70,6 +72,19 @@ function formatTokens(tokenCount: number | null): string {
     return String(tokenCount);
 }
 
+const statusKeyMap = {
+    pending: "supervisor.status_pending",
+    running: "supervisor.status_running",
+    completed: "supervisor.status_completed",
+    failed: "supervisor.status_failed",
+    cancelled: "supervisor.status_cancelled",
+} as const;
+
+function formatRunStatus(status: string): string {
+    const key = statusKeyMap[status as keyof typeof statusKeyMap];
+    return key ? t(key) : status;
+}
+
 
 // --- Main Screen ---
 
@@ -85,22 +100,24 @@ function SupervisorRunDetailScreen() {
     const [comparison, setComparison] = React.useState<RunComparison | null>(
         null,
     );
+    const [run, setRun] = React.useState<SupervisorRun | null>(null);
     const [loading, setLoading] = React.useState(true);
     const [error, setError] = React.useState<string | null>(null);
     const waitingForProject = Boolean(id && !project?.serverId);
+    const isCompletedRun = run?.status === "completed";
 
     const [exporting, handleExport] = useHappyAction(
         React.useCallback(async () => {
             const credentials = await TokenStorage.getCredentials();
             const projectServerId = project?.serverId;
-            if (!credentials || !projectServerId) return;
+            if (!credentials || !projectServerId || !isCompletedRun) return;
             const result = await exportRunReport(credentials, projectServerId, runId);
             await Clipboard.setStringAsync(result.content);
             Modal.toast(t("supervisor.exportCopied"));
-        }, [project?.serverId, runId]),
+        }, [project?.serverId, runId, isCompletedRun]),
     );
 
-    // Fetch comparison data
+    // Fetch run data and comparison when available
     React.useEffect(() => {
         let cancelled = false;
 
@@ -114,13 +131,28 @@ function SupervisorRunDetailScreen() {
                 const credentials = await TokenStorage.getCredentials();
                 const projectServerId = project?.serverId;
                 if (!credentials || cancelled || !projectServerId) return;
-                const data = await fetchRunComparison(
+
+                const runData = await fetchSupervisorRun(
+                    credentials,
+                    projectServerId,
+                    runId,
+                );
+                if (cancelled) return;
+
+                setRun(runData);
+
+                if (runData.status !== "completed") {
+                    setComparison(null);
+                    return;
+                }
+
+                const comparisonData = await fetchRunComparison(
                     credentials,
                     projectServerId,
                     runId,
                 );
                 if (!cancelled) {
-                    setComparison(data);
+                    setComparison(comparisonData);
                 }
             } catch (err) {
                 if (!cancelled) {
@@ -145,11 +177,13 @@ function SupervisorRunDetailScreen() {
 
     // Set header title to run date
     React.useLayoutEffect(() => {
-        const title = comparison
-            ? formatDate(comparison.currentRun.createdAt)
-            : t("supervisor.runDetail");
+        const title = run
+            ? formatDate(run.createdAt)
+            : comparison
+              ? formatDate(comparison.currentRun.createdAt)
+              : t("supervisor.runDetail");
         navigation.setOptions({ headerTitle: title });
-    }, [navigation, comparison]);
+    }, [navigation, run, comparison]);
 
     if (loading) {
         return (
@@ -162,7 +196,7 @@ function SupervisorRunDetailScreen() {
         );
     }
 
-    if (error || !comparison) {
+    if (error || !run) {
         return (
             <View style={styles.centered}>
                 <Text style={styles.errorText}>
@@ -172,9 +206,12 @@ function SupervisorRunDetailScreen() {
         );
     }
 
-    const { currentRun, previousRun, newActions: rawNewActions, resolvedActions: rawResolvedActions, persistentActions: rawPersistentActions } =
-        comparison;
-    const hasPreviousRun = previousRun != null;
+    const currentRun = run;
+    const hasComparison = comparison != null;
+
+    const rawNewActions = comparison?.newActions ?? [];
+    const rawResolvedActions = comparison?.resolvedActions ?? [];
+    const rawPersistentActions = comparison?.persistentActions ?? [];
 
     // Reclassify: fixStatus=completed actions are resolved, not new/persistent
     const fixedFromNew = rawNewActions.filter((a) => a.fixStatus === "completed");
@@ -195,6 +232,10 @@ function SupervisorRunDetailScreen() {
                 <MetadataRow
                     label={t("supervisor.runTrigger")}
                     value={currentRun.trigger}
+                />
+                <MetadataRow
+                    label={t("profile.status")}
+                    value={formatRunStatus(currentRun.status)}
                 />
                 <MetadataRow
                     label={t("supervisor.runDuration")}
@@ -225,29 +266,44 @@ function SupervisorRunDetailScreen() {
             </View>
 
             {/* Export button */}
-            <Pressable
-                style={styles.exportButton}
-                onPress={handleExport}
-                disabled={exporting}
-            >
-                {exporting ? (
-                    <ActivityIndicator size="small" color={theme.colors.header.tint} />
-                ) : (
-                    <>
-                        <Ionicons
-                            name="share-outline"
-                            size={16}
-                            color={theme.colors.header.tint}
-                        />
-                        <Text style={styles.exportButtonText}>
-                            {t("supervisor.exportReport")}
-                        </Text>
-                    </>
-                )}
-            </Pressable>
+            {isCompletedRun && (
+                <Pressable
+                    style={styles.exportButton}
+                    onPress={handleExport}
+                    disabled={exporting}
+                >
+                    {exporting ? (
+                        <ActivityIndicator size="small" color={theme.colors.header.tint} />
+                    ) : (
+                        <>
+                            <Ionicons
+                                name="share-outline"
+                                size={16}
+                                color={theme.colors.header.tint}
+                            />
+                            <Text style={styles.exportButtonText}>
+                                {t("supervisor.exportReport")}
+                            </Text>
+                        </>
+                    )}
+                </Pressable>
+            )}
+
+            {!isCompletedRun && currentRun.errorMessage && (
+                <View style={styles.noPreviousRunBanner}>
+                    <Ionicons
+                        name="alert-circle-outline"
+                        size={18}
+                        color="#FF3B30"
+                    />
+                    <Text style={styles.noPreviousRunText}>
+                        {currentRun.errorMessage}
+                    </Text>
+                </View>
+            )}
 
             {/* Comparison or flat list */}
-            {hasPreviousRun ? (
+            {hasComparison ? (
                 <>
                     <ActionSection
                         title={t("supervisor.newIssues")}
@@ -325,8 +381,6 @@ interface ActionSectionProps {
 
 const ActionSection = React.memo(
     ({ title, count, badgeColor, actions }: ActionSectionProps) => {
-        const { theme } = useUnistyles();
-
         return (
             <View style={styles.section}>
                 <View style={styles.sectionHeader}>

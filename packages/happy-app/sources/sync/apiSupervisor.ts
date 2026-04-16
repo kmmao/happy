@@ -65,7 +65,6 @@ export async function triggerSupervisorRun(
             featureDirection?: string;
         };
         profileId?: string;
-        profileEnvironmentVariables?: Record<string, string>;
     },
 ): Promise<SupervisorRun> {
     const API_ENDPOINT = getServerUrl();
@@ -287,7 +286,6 @@ export interface LoopConfig {
     maxConsecutiveFailures?: number;
     maxDurationMinutes?: number;
     profileId?: string;
-    profileEnvironmentVariables?: Record<string, string>;
 }
 
 export async function startSupervisorLoop(

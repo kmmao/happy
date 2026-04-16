@@ -48,6 +48,8 @@ import { Item } from "./Item";
 import { ItemGroup } from "./ItemGroup";
 import { useHappyAction } from "@/hooks/useHappyAction";
 import { sessionDelete, machineSpawnNewSession } from "@/sync/ops";
+import { handleSessionResumeResult } from "@/sync/sessionResumeFlow";
+import { runWithSessionResumeGuard } from "@/sync/sessionResumeGuard";
 import { HappyError } from "@/utils/errors";
 import { Modal } from "@/modal";
 import { useAutoOptionSendEnabled } from "@/hooks/useAutoOptionSendEnabled";
@@ -634,19 +636,32 @@ const SessionItem = React.memo(
       isMachineOnline(machine);
 
     const [resumingSession, performResume] = useHappyAction(async () => {
-      const result = await machineSpawnNewSession({
-        machineId: session.metadata!.machineId!,
-        directory: session.metadata!.path!,
-        claudeSessionId: session.metadata!.claudeSessionId!,
-        happySessionId: session.id,
-        agent: "claude",
+      await runWithSessionResumeGuard(session.id, async () => {
+        const createResumeRequest = (approvedNewDirectoryCreation: boolean = false) =>
+          machineSpawnNewSession({
+            machineId: session.metadata!.machineId!,
+            directory: session.metadata!.path!,
+            approvedNewDirectoryCreation,
+            claudeSessionId: session.metadata!.claudeSessionId!,
+            happySessionId: session.id,
+            agent: "claude",
+          });
+
+        const result = await createResumeRequest();
+        await handleSessionResumeResult({
+          result,
+          onSuccess: () => navigateToSession(session.id),
+          requestDirectoryApproval: (directory) =>
+            Modal.confirm(
+              t("machine.createDirectoryTitle"),
+              t("machine.createDirectoryMessage", { directory }),
+              { cancelText: t("common.cancel"), confirmText: t("common.create") },
+            ),
+          retryWithApprovedDirectoryCreation: () => createResumeRequest(true),
+          createError: (message) => new HappyError(message, false),
+          getStartSessionFallbackMessage: () => t("machine.failedToStartSession"),
+        });
       });
-      if (result.type === "error") {
-        throw new HappyError(result.errorMessage, false);
-      }
-      if (result.type === "success") {
-        navigateToSession(session.id);
-      }
     });
 
     const handleResume = React.useCallback(() => {

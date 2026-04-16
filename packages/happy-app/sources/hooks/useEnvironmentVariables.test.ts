@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { extractEnvVarReferences, resolveEnvVarSubstitution } from './envVarUtils';
+import {
+    extractEnvVarReferences,
+    filterEnvVarNamesForRemoteLookup,
+    isSensitiveEnvVarName,
+    resolveEnvVarSubstitution,
+} from './envVarUtils';
 
 describe('extractEnvVarReferences', () => {
     it('extracts simple ${VAR} references', () => {
@@ -115,5 +120,40 @@ describe('resolveEnvVarSubstitution', () => {
     it('handles complex default values with special characters', () => {
         expect(resolveEnvVarSubstitution('${URL:-https://api.example.com/v1?key=value&foo=bar}', {}))
             .toBe('https://api.example.com/v1?key=value&foo=bar');
+    });
+});
+
+describe('isSensitiveEnvVarName', () => {
+    it('treats auth tokens and secrets as sensitive', () => {
+        expect(isSensitiveEnvVarName('DEEPSEEK_AUTH_TOKEN')).toBe(true);
+        expect(isSensitiveEnvVarName('OPENAI_API_KEY')).toBe(true);
+        expect(isSensitiveEnvVarName('HAPPY_AGENT_LOOP_AUTH_TOKEN')).toBe(true);
+        expect(isSensitiveEnvVarName('GITHUB_CLIENT_SECRET')).toBe(true);
+    });
+
+    it('does not treat model and host variables as sensitive', () => {
+        expect(isSensitiveEnvVarName('DEEPSEEK_BASE_URL')).toBe(false);
+        expect(isSensitiveEnvVarName('Z_AI_MODEL')).toBe(false);
+        expect(isSensitiveEnvVarName('API_TIMEOUT_MS')).toBe(false);
+    });
+});
+
+describe('filterEnvVarNamesForRemoteLookup', () => {
+    it('filters out sensitive names before remote lookup', () => {
+        expect(filterEnvVarNamesForRemoteLookup([
+            'DEEPSEEK_AUTH_TOKEN',
+            'DEEPSEEK_BASE_URL',
+            'Z_AI_MODEL',
+            'OPENAI_API_KEY',
+        ])).toEqual(['DEEPSEEK_BASE_URL', 'Z_AI_MODEL']);
+    });
+
+    it('deduplicates and rejects invalid names', () => {
+        expect(filterEnvVarNamesForRemoteLookup([
+            'Z_AI_MODEL',
+            'Z_AI_MODEL',
+            'bad-name',
+            '123_NOPE',
+        ])).toEqual(['Z_AI_MODEL']);
     });
 });

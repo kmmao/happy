@@ -69,8 +69,8 @@ import { uploadRawFile } from "@/utils/imageUpload.shared";
 import { useCLIDetection } from "@/hooks/useCLIDetection";
 import {
   useEnvironmentVariables,
-  resolveEnvVarSubstitution,
   extractEnvVarReferences,
+  filterEnvVarNamesForRemoteLookup,
 } from "@/hooks/useEnvironmentVariables";
 import { formatPathRelativeToHome } from "@/utils/sessionUtils";
 import { resolveAbsolutePath } from "@/utils/pathUtils";
@@ -88,6 +88,10 @@ import {
 } from "@/sync/persistence";
 import { styles, RECENT_PATHS_DEFAULT_VISIBLE, STATUS_ITEM_GAP } from "./newSessionStyles";
 import {
+  resolveProfileDefaultModelMode,
+  resolveProfileDefaultPermissionMode,
+} from "./profileDefaults";
+import {
   useProfileMap,
   transformProfileToEnvironmentVars,
   getCachedMetadataForMachine,
@@ -96,6 +100,8 @@ import {
 import { applySessionStartPreferences } from "./sessionStartPreferences";
 import { CLIWarningBanner } from "./CLIWarningBanner";
 import { log } from '@/log';
+import { getProfileConfigSummary } from "@/utils/profileConfigSummary";
+import { createResolvedRuntimeProfile } from "@kmmao/happy-wire";
 
 // Simple temporary state for passing selections back from picker screens
 let onMachineSelected: (machineId: string) => void = () => {};
@@ -535,7 +541,7 @@ function NewSessionWizard() {
         (ref) => refs.add(ref),
       );
     });
-    return Array.from(refs);
+    return filterEnvVarNamesForRemoteLookup(Array.from(refs));
   }, [allProfiles]);
 
   // Query daemon environment for ${VAR} resolution
@@ -771,6 +777,7 @@ function NewSessionWizard() {
       // Check both custom profiles and built-in profiles
       const profile = profileMap.get(profileId) || getBuiltInProfile(profileId);
       if (profile) {
+        let nextAgentType = agentType;
         // Auto-select agent based on profile's EXCLUSIVE compatibility
         // Only switch if profile supports exactly one CLI - scales automatically with new agents
         const supportedCLIs = (
@@ -789,25 +796,46 @@ function NewSessionWizard() {
           const isAllowed = requiredAgent !== "gemini" || experimentsEnabled;
 
           if (isAvailable && isAllowed) {
+            nextAgentType = requiredAgent;
             setAgentType(requiredAgent);
           }
           // If the required CLI is unavailable or not allowed, keep current agent (profile will show as unavailable)
         }
         // If supportedCLIs.length > 1, profile supports multiple CLIs - don't force agent switch
 
+        const nextProfileCustomModels = profile.customModels?.length
+          ? profile.customModels
+          : undefined;
+        const nextAvailableModes = getAvailablePermissionModes(
+          nextAgentType,
+          cachedMetadata,
+          t,
+        );
+        const nextAvailableModels = getAvailableModels(
+          nextAgentType,
+          nextProfileCustomModels?.length ? null : cachedMetadata,
+          t,
+          nextProfileCustomModels,
+        );
+
         // Set session type from profile's default
         if (profile.defaultSessionType) {
           setSessionType(profile.defaultSessionType);
         }
         // Set permission mode from profile's default
-        if (profile.defaultPermissionMode) {
-          const profileMode = resolveCurrentOption(availableModes, [
-            profile.defaultPermissionMode,
-            getDefaultPermissionModeKey(agentType),
-          ]);
-          if (profileMode) {
-            setPermissionMode(profileMode);
-          }
+        const profileMode = resolveProfileDefaultPermissionMode(
+          profile,
+          nextAvailableModes,
+        );
+        if (profileMode) {
+          setPermissionMode(profileMode);
+        }
+        const profileModelMode = resolveProfileDefaultModelMode(
+          profile,
+          nextAvailableModels,
+        );
+        if (profileModelMode) {
+          setModelMode(profileModelMode);
         }
       }
     },
@@ -817,8 +845,8 @@ function NewSessionWizard() {
       cliAvailability.codex,
       cliAvailability.gemini,
       experimentsEnabled,
-      availableModes,
       agentType,
+      cachedMetadata,
     ],
   );
 
@@ -970,71 +998,16 @@ function NewSessionWizard() {
         }
       }
 
-      // Get model name - check both anthropicConfig and environmentVariables
-      let modelName: string | undefined;
-      if (profile.anthropicConfig?.model) {
-        // User set in GUI - literal value, no evaluation needed
-        modelName = profile.anthropicConfig.model;
-      } else if (profile.openaiConfig?.model) {
-        modelName = profile.openaiConfig.model;
-      } else {
-        // Check environmentVariables - may need ${VAR} evaluation
-        const modelEnvVar = profile.environmentVariables?.find(
-          (ev) => ev.name === "ANTHROPIC_MODEL",
-        );
-        if (modelEnvVar) {
-          const resolved = resolveEnvVarSubstitution(
-            modelEnvVar.value,
-            daemonEnv,
-          );
-          if (resolved) {
-            // Show as "VARIABLE: value" when evaluated from ${VAR}
-            const varName = modelEnvVar.value.match(/^\$\{(.+)\}$/)?.[1];
-            modelName = varName ? `${varName}: ${resolved}` : resolved;
-          } else {
-            // Show raw ${VAR} if not resolved (machine not selected or var not set)
-            modelName = modelEnvVar.value;
-          }
-        }
-      }
-
-      if (modelName) {
-        parts.push(modelName);
-      }
-
-      // Add base URL if exists in environmentVariables
-      const baseUrlEnvVar = profile.environmentVariables?.find(
-        (ev) => ev.name === "ANTHROPIC_BASE_URL",
-      );
-      if (baseUrlEnvVar) {
-        const resolved = resolveEnvVarSubstitution(
-          baseUrlEnvVar.value,
-          daemonEnv,
-        );
-        if (resolved) {
-          // Extract hostname and show with variable name
-          const varName = baseUrlEnvVar.value.match(
-            /^\$\{([A-Z_][A-Z0-9_]*)/,
-          )?.[1];
-          try {
-            const url = new URL(resolved);
-            const display = varName
-              ? `${varName}: ${url.hostname}`
-              : url.hostname;
-            parts.push(display);
-          } catch {
-            // Not a valid URL, show as-is with variable name
-            parts.push(varName ? `${varName}: ${resolved}` : resolved);
-          }
-        } else {
-          // Show raw ${VAR} if not resolved (machine not selected or var not set)
-          parts.push(baseUrlEnvVar.value);
-        }
+      const configSummary = getProfileConfigSummary(profile, {
+        daemonEnv,
+      });
+      if (configSummary) {
+        parts.push(configSummary);
       }
 
       return parts.join(", ");
     },
-    [agentType, isProfileAvailable, daemonEnv],
+    [isProfileAvailable, daemonEnv],
   );
 
   const handleDeleteProfile = React.useCallback(
@@ -1097,6 +1070,16 @@ function NewSessionWizard() {
           isBuiltIn: false,
         };
       }
+
+      const existingProfile = profiles.find((p) => p.id === profileToSave.id);
+      profileToSave = {
+        ...profileToSave,
+        createdAt:
+          existingProfile?.createdAt ??
+          profileToSave.createdAt ??
+          Date.now(),
+        updatedAt: Date.now(),
+      };
 
       const existingIndex = profiles.findIndex(
         (p) => p.id === profileToSave.id,
@@ -1197,6 +1180,7 @@ function NewSessionWizard() {
 
       // Get environment variables from selected profile (check custom + built-in)
       let environmentVariables = undefined;
+      let runtimeProfile = undefined;
       const resolvedProfile = selectedProfileId
         ? (profileMap.get(selectedProfileId) ??
           getBuiltInProfile(selectedProfileId))
@@ -1223,6 +1207,14 @@ function NewSessionWizard() {
           setIsCreating(false);
           return;
         }
+
+        runtimeProfile = createResolvedRuntimeProfile(resolvedProfile, {
+          source: resolvedProfile.isBuiltIn
+            ? "built-in-profile"
+            : "account-profile",
+          trust: "trusted",
+          environmentVariables,
+        });
       }
 
       const result = await machineSpawnNewSession({
@@ -1231,6 +1223,7 @@ function NewSessionWizard() {
         approvedNewDirectoryCreation: true,
         agent: agentType,
         profileId: resolvedProfile?.id,
+        runtimeProfile,
         environmentVariables,
       });
 
@@ -1264,13 +1257,13 @@ function NewSessionWizard() {
             ...(thinkingMode != null ? { thinkingMode } : {}),
             ...(effortLevel != null ? { effortLevel } : {}),
           },
-          customModels: resolvedProfile?.customModels ?? null,
-          modelMappings: resolvedProfile?.modelMappings ?? null,
+          customModels: runtimeProfile?.customModels ?? null,
+          modelMappings: runtimeProfile?.modelMappings ?? null,
           profile:
-            selectedProfileId && resolvedProfile
+            selectedProfileId && runtimeProfile
               ? {
                   id: selectedProfileId,
-                  name: resolvedProfile.name,
+                  name: runtimeProfile.profileName ?? resolvedProfile?.name ?? null,
                 }
               : null,
         });

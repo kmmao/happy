@@ -1,50 +1,80 @@
 import React from "react";
 import { View, Text, Pressable, ScrollView } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { useSettingMutable } from "@/sync/storage";
-import { StyleSheet } from "react-native-unistyles";
-import { useUnistyles } from "react-native-unistyles";
+import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { Typography } from "@/constants/Typography";
 import { t } from "@/text";
 import { Modal as HappyModal } from "@/modal/ModalManager";
 import { layout } from "@/components/layout";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useWindowDimensions } from "react-native";
-import { AIBackendProfile } from "@/sync/settings";
+import type { AIBackendProfile } from "@/sync/settings";
 import { getBuiltInProfile, DEFAULT_PROFILES } from "@/sync/profileUtils";
 import { ProfileEditForm } from "@/components/ProfileEditForm";
 import { randomUUID } from "expo-crypto";
-
-interface ProfileDisplay {
-  id: string;
-  name: string;
-  isBuiltIn: boolean;
-}
+import { TokenStorage } from "@/auth/tokenStorage";
+import {
+  createAccountProfile,
+  deleteAccountProfile,
+  fetchAccountProfiles,
+  updateAccountProfile,
+} from "@/sync/apiAccountProfiles";
+import { sync } from "@/sync/sync";
+import { storage, useSettingMutable } from "@/sync/storage";
+import { getProfileConfigSummary } from "@/utils/profileConfigSummary";
+import { mergeAccountProfiles } from "@/utils/mergeAccountProfiles";
 
 interface ProfileManagerProps {
   onProfileSelect?: (profile: AIBackendProfile | null) => void;
   selectedProfileId?: string | null;
 }
 
-// Profile utilities now imported from @/sync/profileUtils
-
 function ProfileManager({
   onProfileSelect,
   selectedProfileId,
 }: ProfileManagerProps) {
   const { theme } = useUnistyles();
-  const [profiles, setProfiles] = useSettingMutable("profiles");
-  const [lastUsedProfile, setLastUsedProfile] =
-    useSettingMutable("lastUsedProfile");
-  const [editingProfile, setEditingProfile] =
-    React.useState<AIBackendProfile | null>(null);
-  const [showAddForm, setShowAddForm] = React.useState(false);
-  const [showTemplateSelector, setShowTemplateSelector] = React.useState(false);
   const safeArea = useSafeAreaInsets();
   const screenWidth = useWindowDimensions().width;
 
-  const handleAddBlankProfile = () => {
-    setEditingProfile({
+  const [profiles, setProfiles] = useSettingMutable("profiles");
+  const [profileRevisions, setProfileRevisions] = React.useState<Record<string, number>>({});
+  const [editingProfile, setEditingProfile] = React.useState<AIBackendProfile | null>(null);
+  const [showAddForm, setShowAddForm] = React.useState(false);
+  const [showTemplateSelector, setShowTemplateSelector] = React.useState(false);
+
+  const loadProfiles = React.useCallback(async () => {
+    const currentLocalProfiles = storage.getState().settings.profiles ?? [];
+    const credentials = await TokenStorage.getCredentials();
+    if (!credentials) {
+      setProfileRevisions({});
+      return;
+    }
+    const remoteProfiles = await fetchAccountProfiles(credentials);
+    const mergedProfiles = mergeAccountProfiles({
+      localProfiles: currentLocalProfiles,
+      remoteProfiles,
+    });
+    storage.getState().applySettingsLocal({
+      profiles: mergedProfiles.profiles,
+    });
+    setProfileRevisions(mergedProfiles.revisions);
+  }, []);
+
+  React.useEffect(() => {
+    loadProfiles().catch(() => {
+      // noop
+    });
+  }, [loadProfiles]);
+
+  const openEditor = React.useCallback((profile: AIBackendProfile) => {
+    setEditingProfile({ ...profile });
+    setShowTemplateSelector(false);
+    setShowAddForm(true);
+  }, []);
+
+  const handleAddBlankProfile = React.useCallback(() => {
+    openEditor({
       id: randomUUID(),
       name: "",
       anthropicConfig: {},
@@ -55,127 +85,183 @@ function ProfileManager({
       updatedAt: Date.now(),
       version: "1.0.0",
     });
-    setShowTemplateSelector(false);
-    setShowAddForm(true);
-  };
+  }, [openEditor]);
 
-  const handleAddFromTemplate = (templateId: string) => {
-    const template = getBuiltInProfile(templateId);
-    if (!template) return;
+  const handleAddFromTemplate = React.useCallback(
+    (templateId: string) => {
+      const template = getBuiltInProfile(templateId);
+      if (!template) return;
+      openEditor({
+        ...template,
+        id: randomUUID(),
+        name: `${template.name} (Custom)`,
+        isBuiltIn: false,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      });
+    },
+    [openEditor],
+  );
 
-    setEditingProfile({
-      ...template,
-      id: randomUUID(),
-      name: `${template.name} (Custom)`,
-      isBuiltIn: false,
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
-    });
-    setShowTemplateSelector(false);
-    setShowAddForm(true);
-  };
-
-  const handleEditProfile = (profile: AIBackendProfile) => {
-    setEditingProfile({ ...profile });
-    setShowAddForm(true);
-  };
-
-  const handleResetBuiltInProfile = async (profileId: string) => {
-    const builtIn = getBuiltInProfile(profileId);
-    if (!builtIn) return;
-
-    const confirmed = await HappyModal.confirm(
-      t("profiles.reset.title"),
-      t("profiles.reset.message", { name: builtIn.name }),
-      {
-        cancelText: t("common.cancel"),
-        confirmText: t("profiles.reset.confirm"),
-      },
-    );
-
-    if (!confirmed) return;
-
-    // Remove the override, restoring built-in defaults
-    setProfiles(profiles.filter((p) => p.id !== profileId));
-  };
-
-  const handleDeleteProfile = async (profile: AIBackendProfile) => {
-    const confirmed = await HappyModal.confirm(
-      t("profiles.delete.title"),
-      t("profiles.delete.message", { name: profile.name }),
-      {
-        cancelText: t("profiles.delete.cancel"),
-        confirmText: t("profiles.delete.confirm"),
-        destructive: true,
-      },
-    );
-
-    if (!confirmed) return;
-
-    const updatedProfiles = profiles.filter((p) => p.id !== profile.id);
-    setProfiles(updatedProfiles);
-
-    // Clear last used profile if it was deleted
-    if (lastUsedProfile === profile.id) {
-      setLastUsedProfile(null);
-    }
-
-    // Notify parent if this was the selected profile
-    if (selectedProfileId === profile.id && onProfileSelect) {
-      onProfileSelect(null);
-    }
-  };
-
-  const handleSelectProfile = (profileId: string | null) => {
-    let profile: AIBackendProfile | null = null;
-
-    if (profileId) {
-      // Check if it's a built-in profile
-      const builtInProfile = getBuiltInProfile(profileId);
-      if (builtInProfile) {
-        profile = builtInProfile;
-      } else {
-        // Check if it's a custom profile
-        profile = profiles.find((p) => p.id === profileId) || null;
+  const handleSelectProfile = React.useCallback(
+    (profileId: string | null) => {
+      let profile: AIBackendProfile | null = null;
+      if (profileId) {
+        const override = profiles.find((p) => p.id === profileId) ?? null;
+        profile = override ?? getBuiltInProfile(profileId);
       }
-    }
+      onProfileSelect?.(profile);
+      sync.applySettings({ lastUsedProfile: profileId });
+    },
+    [onProfileSelect, profiles],
+  );
 
-    if (onProfileSelect) {
-      onProfileSelect(profile);
-    }
-    setLastUsedProfile(profileId);
-  };
+  const handleResetBuiltInProfile = React.useCallback(
+    async (profileId: string) => {
+      const builtIn = getBuiltInProfile(profileId);
+      if (!builtIn) return;
 
-  const handleSaveProfile = (profile: AIBackendProfile) => {
-    // Profile validation - ensure name is not empty
-    if (!profile.name || profile.name.trim() === "") {
-      return;
-    }
+      const confirmed = await HappyModal.confirm(
+        t("profiles.reset.title"),
+        t("profiles.reset.message", { name: builtIn.name }),
+        {
+          cancelText: t("common.cancel"),
+          confirmText: t("profiles.reset.confirm"),
+        },
+      );
+      if (!confirmed) return;
 
-    // Check for duplicate names (excluding current profile)
-    const isDuplicate = profiles.some(
-      (p) => p.id !== profile.id && p.name.trim() === profile.name.trim(),
-    );
-    if (isDuplicate) {
-      return;
-    }
+      const existingRevision = profileRevisions[profileId];
+      const credentials = await TokenStorage.getCredentials();
+      if (credentials && existingRevision != null) {
+        const nextProfiles = profiles.filter((profile) => profile.id !== profileId);
+        setProfiles(nextProfiles);
+        setProfileRevisions((currentRevisions) => {
+          const nextRevisions = { ...currentRevisions };
+          delete nextRevisions[profileId];
+          return nextRevisions;
+        });
+        await deleteAccountProfile(credentials, profileId);
+        await loadProfiles();
+        return;
+      }
 
-    const existingIndex = profiles.findIndex((p) => p.id === profile.id);
-    let updatedProfiles: AIBackendProfile[];
+      setProfiles(profiles.filter((profile) => profile.id !== profileId));
+      setProfileRevisions((currentRevisions) => {
+        const nextRevisions = { ...currentRevisions };
+        delete nextRevisions[profileId];
+        return nextRevisions;
+      });
+    },
+    [loadProfiles, profileRevisions, profiles, setProfiles],
+  );
 
-    if (existingIndex >= 0) {
-      // Update existing profile (works for both custom and built-in overrides)
-      updatedProfiles = [...profiles];
-      updatedProfiles[existingIndex] = profile;
-    } else {
-      // Add new profile (or first-time override of a built-in profile)
-      updatedProfiles = [...profiles, profile];
-    }
 
-    setProfiles(updatedProfiles);
-    setShowAddForm(false);
-    setEditingProfile(null);
-  };
+  const handleDeleteProfile = React.useCallback(
+    async (profile: AIBackendProfile) => {
+      const confirmed = await HappyModal.confirm(
+        t("profiles.delete.title"),
+        t("profiles.delete.message", { name: profile.name }),
+        {
+          cancelText: t("profiles.delete.cancel"),
+          confirmText: t("profiles.delete.confirm"),
+          destructive: true,
+        },
+      );
+      if (!confirmed) return;
+
+      if (selectedProfileId === profile.id) {
+        handleSelectProfile(null);
+      }
+
+      const existingRevision = profileRevisions[profile.id];
+      const credentials = await TokenStorage.getCredentials();
+      if (credentials && existingRevision != null) {
+        const nextProfiles = profiles.filter((currentProfile) => currentProfile.id !== profile.id);
+        setProfiles(nextProfiles);
+        setProfileRevisions((currentRevisions) => {
+          const nextRevisions = { ...currentRevisions };
+          delete nextRevisions[profile.id];
+          return nextRevisions;
+        });
+        await deleteAccountProfile(credentials, profile.id);
+        await loadProfiles();
+        return;
+      }
+
+      setProfiles(profiles.filter((currentProfile) => currentProfile.id !== profile.id));
+      setProfileRevisions((currentRevisions) => {
+        const nextRevisions = { ...currentRevisions };
+        delete nextRevisions[profile.id];
+        return nextRevisions;
+      });
+    },
+    [
+      handleSelectProfile,
+      loadProfiles,
+      profileRevisions,
+      profiles,
+      selectedProfileId,
+      setProfiles,
+    ],
+  );
+
+  const handleSaveProfile = React.useCallback(
+    async (profile: AIBackendProfile) => {
+      if (!profile.name.trim()) return;
+
+      const isDuplicate = profiles.some(
+        (p) => p.id !== profile.id && p.name.trim() === profile.name.trim(),
+      );
+      if (isDuplicate) return;
+
+      const existingIndex = profiles.findIndex(
+        (currentProfile) => currentProfile.id === profile.id,
+      );
+      const existingProfile =
+        existingIndex >= 0 ? profiles[existingIndex] : undefined;
+      const normalizedProfile: AIBackendProfile = {
+        ...profile,
+        createdAt: existingProfile?.createdAt ?? profile.createdAt ?? Date.now(),
+        updatedAt: Date.now(),
+      };
+      const nextProfiles =
+        existingIndex >= 0
+          ? profiles.map((currentProfile) =>
+              currentProfile.id === normalizedProfile.id ? normalizedProfile : currentProfile,
+            )
+          : [...profiles, normalizedProfile];
+
+      setProfiles(nextProfiles);
+
+      const credentials = await TokenStorage.getCredentials();
+      if (!credentials) {
+        setShowAddForm(false);
+        setEditingProfile(null);
+        return;
+      }
+
+      const existingRevision = profileRevisions[normalizedProfile.id];
+      if (existingRevision == null) {
+        await createAccountProfile(credentials, normalizedProfile);
+      } else {
+        const result = await updateAccountProfile(
+          credentials,
+          normalizedProfile.id,
+          normalizedProfile,
+          existingRevision,
+        );
+        if (!result.success) {
+          throw new Error("revision-mismatch");
+        }
+      }
+
+      await loadProfiles();
+      setShowAddForm(false);
+      setEditingProfile(null);
+    },
+    [loadProfiles, profileRevisions, profiles, setProfiles],
+  );
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.colors.surface }}>
@@ -186,11 +272,7 @@ function ProfileManager({
           paddingBottom: safeArea.bottom + 100,
         }}
       >
-        <View
-          style={[
-            { maxWidth: layout.maxWidth, alignSelf: "center", width: "100%" },
-          ]}
-        >
+        <View style={{ maxWidth: layout.maxWidth, alignSelf: "center", width: "100%" }}>
           <Text
             style={{
               fontSize: 24,
@@ -203,7 +285,6 @@ function ProfileManager({
             {t("profiles.title")}
           </Text>
 
-          {/* None option - no profile */}
           <Pressable
             style={{
               backgroundColor: theme.colors.input.background,
@@ -255,22 +336,18 @@ function ProfileManager({
               </Text>
             </View>
             {selectedProfileId === null && (
-              <Ionicons
-                name="checkmark-circle"
-                size={20}
-                color={theme.colors.text}
-              />
+              <Ionicons name="checkmark-circle" size={20} color={theme.colors.text} />
             )}
           </Pressable>
 
-          {/* Built-in profiles (with override support) */}
           {DEFAULT_PROFILES.map((profileDisplay) => {
             const builtInDefault = getBuiltInProfile(profileDisplay.id);
             if (!builtInDefault) return null;
-
-            // Use saved override if exists, otherwise use built-in default
             const override = profiles.find((p) => p.id === profileDisplay.id);
             const profile = override || builtInDefault;
+            const profileSummary =
+              getProfileConfigSummary(profile, { includeTmux: true }) ||
+              t("profiles.defaultModel");
 
             return (
               <Pressable
@@ -319,9 +396,7 @@ function ProfileManager({
                       ...Typography.default(),
                     }}
                   >
-                    {profile.anthropicConfig?.model || "Default model"}
-                    {profile.anthropicConfig?.baseUrl &&
-                      ` • ${profile.anthropicConfig.baseUrl}`}
+                    {profileSummary}
                   </Text>
                 </View>
                 <View style={{ flexDirection: "row", alignItems: "center" }}>
@@ -347,7 +422,7 @@ function ProfileManager({
                   )}
                   <Pressable
                     hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                    onPress={() => handleEditProfile(profile)}
+                    onPress={() => openEditor(profile)}
                     style={{ marginLeft: profiles.some((p) => p.id === profile.id) ? 16 : 0 }}
                   >
                     <Ionicons
@@ -361,96 +436,98 @@ function ProfileManager({
             );
           })}
 
-          {/* Custom profiles (exclude built-in overrides, shown above) */}
-          {profiles.filter((p) => !DEFAULT_PROFILES.some((bp) => bp.id === p.id)).map((profile) => (
-            <Pressable
-              key={profile.id}
-              style={{
-                backgroundColor: theme.colors.input.background,
-                borderRadius: 12,
-                padding: 16,
-                marginBottom: 12,
-                flexDirection: "row",
-                alignItems: "center",
-                borderWidth: selectedProfileId === profile.id ? 2 : 0,
-                borderColor: theme.colors.text,
-              }}
-              onPress={() => handleSelectProfile(profile.id)}
-            >
-              <View
-                style={{
-                  width: 24,
-                  height: 24,
-                  borderRadius: 12,
-                  backgroundColor: theme.colors.button.secondary.tint,
-                  justifyContent: "center",
-                  alignItems: "center",
-                  marginRight: 12,
-                }}
-              >
-                <Ionicons name="person" size={16} color="white" />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text
-                  style={{
-                    fontSize: 16,
-                    fontWeight: "600",
-                    color: theme.colors.text,
-                    ...Typography.default("semiBold"),
-                  }}
-                >
-                  {profile.name}
-                </Text>
-                <Text
-                  style={{
-                    fontSize: 14,
-                    color: theme.colors.textSecondary,
-                    marginTop: 2,
-                    ...Typography.default(),
-                  }}
-                >
-                  {profile.anthropicConfig?.model || t("profiles.defaultModel")}
-                  {profile.tmuxConfig?.sessionName &&
-                    ` • tmux: ${profile.tmuxConfig.sessionName}`}
-                  {profile.tmuxConfig?.tmpDir &&
-                    ` • dir: ${profile.tmuxConfig.tmpDir}`}
-                </Text>
-              </View>
-              <View style={{ flexDirection: "row", alignItems: "center" }}>
-                {selectedProfileId === profile.id && (
-                  <Ionicons
-                    name="checkmark-circle"
-                    size={20}
-                    color={theme.colors.text}
-                    style={{ marginRight: 12 }}
-                  />
-                )}
-                <Pressable
-                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                  onPress={() => handleEditProfile(profile)}
-                >
-                  <Ionicons
-                    name="create-outline"
-                    size={20}
-                    color={theme.colors.button.secondary.tint}
-                  />
-                </Pressable>
-                <Pressable
-                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                  onPress={() => handleDeleteProfile(profile)}
-                  style={{ marginLeft: 16 }}
-                >
-                  <Ionicons
-                    name="trash-outline"
-                    size={20}
-                    color={theme.colors.deleteAction}
-                  />
-                </Pressable>
-              </View>
-            </Pressable>
-          ))}
+          {profiles
+            .filter((p) => !DEFAULT_PROFILES.some((bp) => bp.id === p.id))
+            .map((profile) => {
+              const profileSummary =
+                getProfileConfigSummary(profile, { includeTmux: true }) ||
+                t("profiles.defaultModel");
 
-          {/* Add profile button / template selector */}
+              return (
+                <Pressable
+                  key={profile.id}
+                  style={{
+                    backgroundColor: theme.colors.input.background,
+                    borderRadius: 12,
+                    padding: 16,
+                    marginBottom: 12,
+                    flexDirection: "row",
+                    alignItems: "center",
+                    borderWidth: selectedProfileId === profile.id ? 2 : 0,
+                    borderColor: theme.colors.text,
+                  }}
+                  onPress={() => handleSelectProfile(profile.id)}
+                >
+                  <View
+                    style={{
+                      width: 24,
+                      height: 24,
+                      borderRadius: 12,
+                      backgroundColor: theme.colors.button.secondary.tint,
+                      justifyContent: "center",
+                      alignItems: "center",
+                      marginRight: 12,
+                    }}
+                  >
+                    <Ionicons name="person" size={16} color="white" />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text
+                      style={{
+                        fontSize: 16,
+                        fontWeight: "600",
+                        color: theme.colors.text,
+                        ...Typography.default("semiBold"),
+                      }}
+                    >
+                      {profile.name}
+                    </Text>
+                    <Text
+                      style={{
+                        fontSize: 14,
+                        color: theme.colors.textSecondary,
+                        marginTop: 2,
+                        ...Typography.default(),
+                      }}
+                    >
+                      {profileSummary}
+                    </Text>
+                  </View>
+                  <View style={{ flexDirection: "row", alignItems: "center" }}>
+                    {selectedProfileId === profile.id && (
+                      <Ionicons
+                        name="checkmark-circle"
+                        size={20}
+                        color={theme.colors.text}
+                        style={{ marginRight: 12 }}
+                      />
+                    )}
+                    <Pressable
+                      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                      onPress={() => openEditor(profile)}
+                    >
+                      <Ionicons
+                        name="create-outline"
+                        size={20}
+                        color={theme.colors.button.secondary.tint}
+                      />
+                    </Pressable>
+                    <Pressable
+                      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                      onPress={() => handleDeleteProfile(profile)}
+                      style={{ marginLeft: 16 }}
+                    >
+                      <Ionicons
+                        name="trash-outline"
+                        size={20}
+                        color={theme.colors.deleteAction}
+                      />
+                    </Pressable>
+                  </View>
+                </Pressable>
+              );
+            })}
+
           <Pressable
             style={{
               backgroundColor: theme.colors.surface,
@@ -463,7 +540,7 @@ function ProfileManager({
               alignItems: "center",
               justifyContent: "center",
             }}
-            onPress={() => setShowTemplateSelector(!showTemplateSelector)}
+            onPress={() => setShowTemplateSelector((prev) => !prev)}
           >
             <Ionicons
               name="add-circle-outline"
@@ -499,7 +576,6 @@ function ProfileManager({
                 overflow: "hidden",
               }}
             >
-              {/* Blank profile option */}
               <Pressable
                 style={{
                   flexDirection: "row",
@@ -522,11 +598,7 @@ function ProfileManager({
                     marginRight: 12,
                   }}
                 >
-                  <Ionicons
-                    name="document-outline"
-                    size={14}
-                    color={theme.colors.textSecondary}
-                  />
+                  <Ionicons name="document-outline" size={14} color={theme.colors.textSecondary} />
                 </View>
                 <Text
                   style={{
@@ -539,7 +611,6 @@ function ProfileManager({
                 </Text>
               </Pressable>
 
-              {/* Built-in templates */}
               {DEFAULT_PROFILES.map((bp) => (
                 <Pressable
                   key={bp.id}
@@ -582,14 +653,20 @@ function ProfileManager({
         </View>
       </ScrollView>
 
-      {/* Profile Add/Edit Modal */}
       {showAddForm && editingProfile && (
         <View style={profileManagerStyles.modalOverlay}>
           <View style={profileManagerStyles.modalContent}>
             <ProfileEditForm
               profile={editingProfile}
               machineId={null}
-              onSave={handleSaveProfile}
+              onSave={(savedProfile) => {
+                handleSaveProfile(savedProfile).catch((error) => {
+                  HappyModal.alert(
+                    t("common.error"),
+                    error instanceof Error ? error.message : t("profiles.saveFailed"),
+                  );
+                });
+              }}
               onCancel={() => {
                 setShowAddForm(false);
                 setEditingProfile(null);
@@ -602,9 +679,7 @@ function ProfileManager({
   );
 }
 
-// ProfileEditForm now imported from @/components/ProfileEditForm
-
-const profileManagerStyles = StyleSheet.create((theme) => ({
+const profileManagerStyles = StyleSheet.create(() => ({
   modalOverlay: {
     position: "absolute",
     top: 0,

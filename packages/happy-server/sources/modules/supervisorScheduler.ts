@@ -5,6 +5,7 @@ import {
     buildSupervisorTriggerEphemeral,
 } from "@/app/events/eventRouter";
 import { checkDailyRunLimit, incrementDailyRunCount } from "./supervisorLimits";
+import { auth } from "@/app/auth/auth";
 
 const DEFAULT_SCHEDULE_INTERVAL_HOURS = 24;
 
@@ -190,6 +191,14 @@ export async function checkAndTriggerScheduledRuns(
                 // ignore malformed config and proceed with defaults
             }
 
+            const callbackToken = await auth.createSupervisorCallbackToken({
+                userId,
+                projectId: project.id,
+                machineId,
+                purpose: "run-status",
+                runId: claimed.run.id,
+            });
+
             eventRouter.emitEphemeral({
                 userId,
                 payload: buildSupervisorTriggerEphemeral({
@@ -198,6 +207,7 @@ export async function checkAndTriggerScheduledRuns(
                     trigger: "scheduled",
                     machineId,
                     repoPath: project.path,
+                    callbackToken,
                     mode: project.supervisorMode ?? undefined,
                     dimensions,
                     customRules: project.supervisorCustomRules ?? undefined,

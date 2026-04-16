@@ -5,7 +5,7 @@
 
 import { InvalidateSync } from "@/utils/sync";
 import { sessionBash } from "./ops";
-import { GitStatus } from "./storageTypes";
+import { GitStatus, Session } from "./storageTypes";
 import { storage } from "./storage";
 import {
   parseStatusSummary,
@@ -60,6 +60,51 @@ export class GitStatusSync {
   }
 
   /**
+   * Recompute a project key directly from a stored session object.
+   */
+  private getProjectKeyForStoredSession(session: Session): string | null {
+    if (!session.metadata?.machineId || !session.metadata?.path) {
+      return null;
+    }
+    return `${session.metadata.machineId}:${session.metadata.path}`;
+  }
+
+  /**
+   * Prefer the freshest ready session for a project so project-scoped refreshes
+   * do not keep targeting the first session that happened to initialize the sync.
+   */
+  private getPreferredSessionIdForProject(projectKey: string): string | null {
+    const sessions = storage.getState().sessions;
+    const candidates = Array.from(this.sessionToProjectKey.entries())
+      .filter(([, mappedProjectKey]) => mappedProjectKey === projectKey)
+      .map(([sessionId]) => {
+        const session = sessions[sessionId];
+        return session ? { sessionId, session } : null;
+      })
+      .filter((entry): entry is { sessionId: string; session: Session } => {
+        if (!entry) {
+          return false;
+        }
+        return this.getProjectKeyForStoredSession(entry.session) === projectKey;
+      })
+      .sort((left, right) => {
+        if (left.session.rpcReady !== right.session.rpcReady) {
+          return Number(right.session.rpcReady) - Number(left.session.rpcReady);
+        }
+        if (left.session.active !== right.session.active) {
+          return Number(right.session.active) - Number(left.session.active);
+        }
+        if (left.session.updatedAt !== right.session.updatedAt) {
+          return right.session.updatedAt - left.session.updatedAt;
+        }
+        return right.session.activeAt - left.session.activeAt;
+      });
+
+    const readyCandidate = candidates.find(({ session }) => session.rpcReady);
+    return readyCandidate?.sessionId ?? null;
+  }
+
+  /**
    * Get or create git status sync for a session (creates project-based sync)
    */
   getSync(sessionId: string): InvalidateSync {
@@ -74,9 +119,7 @@ export class GitStatusSync {
 
     let sync = this.projectSyncMap.get(projectKey);
     if (!sync) {
-      sync = new InvalidateSync(() =>
-        this.fetchGitStatusForProject(sessionId, projectKey),
-      );
+      sync = new InvalidateSync(() => this.fetchGitStatusForProject(projectKey));
       this.projectSyncMap.set(projectKey, sync);
     }
     return sync;
@@ -167,9 +210,13 @@ export class GitStatusSync {
    * Fetch git status for a project using any session in that project
    */
   private async fetchGitStatusForProject(
-    sessionId: string,
     projectKey: string,
   ): Promise<void> {
+    const sessionId = this.getPreferredSessionIdForProject(projectKey);
+    if (!sessionId) {
+      return;
+    }
+
     try {
       // Check if we have a session with valid metadata
       const session = storage.getState().sessions[sessionId];

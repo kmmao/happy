@@ -34,6 +34,7 @@ function formatLocalTime(timestamp?: number) {
 }
 
 const transports: any[] = [];
+const DEFAULT_LOG_LEVEL = process.env.LOG_LEVEL ?? 'info';
 
 // Resolve pino-pretty target - use absolute path for bundled binaries
 let pinoPrettyTarget: string = 'pino-pretty';
@@ -65,7 +66,7 @@ if (process.env.DANGEROUSLY_LOG_TO_SERVER_FOR_AI_AUTO_DEBUGGING && consolidatedL
 
 // Main server logger with local time formatting
 export const logger = pino({
-    level: 'debug',
+    level: DEFAULT_LOG_LEVEL,
     transport: {
         targets: transports,
     },
@@ -84,7 +85,7 @@ export const logger = pino({
 // Optional file-only logger for remote logs from CLI/mobile
 export const fileConsolidatedLogger = process.env.DANGEROUSLY_LOG_TO_SERVER_FOR_AI_AUTO_DEBUGGING && consolidatedLogFile ? 
     pino({
-        level: 'debug',
+        level: DEFAULT_LOG_LEVEL,
         transport: {
             targets: [{
                 target: 'pino/file',
@@ -107,8 +108,47 @@ export const fileConsolidatedLogger = process.env.DANGEROUSLY_LOG_TO_SERVER_FOR_
         timestamp: () => `,"time":${Date.now()},"localTime":"${formatLocalTime()}"`,
     }) : undefined;
 
+function resolveLogLevel(src: any): pino.LevelWithSilent | null {
+    if (!src || typeof src !== 'object' || Array.isArray(src)) {
+        return null;
+    }
+    const level = src.level;
+    if (typeof level !== 'string') {
+        return null;
+    }
+    switch (level) {
+        case 'trace':
+        case 'debug':
+        case 'info':
+        case 'warn':
+        case 'error':
+        case 'fatal':
+        case 'silent':
+            return level;
+        default:
+            return null;
+    }
+}
+
+function stripLevel(src: any): any {
+    if (!src || typeof src !== 'object' || Array.isArray(src) || !('level' in src)) {
+        return src;
+    }
+    const { level: _, ...rest } = src;
+    return rest;
+}
+
 export function log(src: any, ...args: any[]) {
+    const level = resolveLogLevel(src);
+    if (level) {
+        logger[level](stripLevel(src), ...args);
+        return;
+    }
     logger.info(src, ...args);
+}
+
+export function debug(src: any, ...args: any[]) {
+    logger.debug(src, ...args);
 }
 
 export function warn(src: any, ...args: any[]) {

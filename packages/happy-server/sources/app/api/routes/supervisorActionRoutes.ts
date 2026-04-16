@@ -9,6 +9,11 @@ import {
 import { pushSupervisorNotification } from "@/modules/pushSend";
 import { onFixCompleted as loopOnFixCompleted } from "@/modules/supervisorLoopEngine";
 import { log } from "@/utils/log";
+import {
+    resolveSupervisorProfile,
+    parseDefaultProfileId,
+} from "@/modules/supervisorProfileResolver";
+import { auth } from "@/app/auth/auth";
 
 /**
  * Supervisor action routes for the approval workflow.
@@ -473,6 +478,16 @@ export function supervisorActionRoutes(app: Fastify) {
 
             // Emit a fix trigger event to CLI
             // Reuse supervisor-trigger with a "fix" trigger type
+            const requestedProfileId = parseDefaultProfileId(project.supervisorConfig);
+            const resolvedProfile = await resolveSupervisorProfile(userId, requestedProfileId);
+            const callbackToken = await auth.createSupervisorCallbackToken({
+                userId,
+                projectId: id,
+                machineId,
+                purpose: "fix-status",
+                actionId,
+            });
+
             eventRouter.emitEphemeral({
                 userId,
                 payload: buildSupervisorTriggerEphemeral({
@@ -491,6 +506,8 @@ export function supervisorActionRoutes(app: Fastify) {
                     fixStrategy: project.fixStrategy ?? undefined,
                     fixMode,
                     analyzeAutoFix,
+                    callbackToken,
+                    runtimeProfile: resolvedProfile.runtimeProfile,
                 }),
                 recipientFilter: {
                     type: "machine-scoped-only",
@@ -511,7 +528,7 @@ export function supervisorActionRoutes(app: Fastify) {
     app.patch(
         "/v1/projects/:id/supervisor/actions/:actionId/fix-status",
         {
-            preHandler: app.authenticate,
+            preHandler: app.authenticateMachineScopedCallback,
             schema: {
                 params: z.object({
                     id: z.string(),
@@ -530,9 +547,69 @@ export function supervisorActionRoutes(app: Fastify) {
             },
         },
         async (request, reply) => {
-            const userId = request.userId;
+            const callbackAuth = request.supervisorCallbackAuth;
             const { id, actionId } = request.params;
+            if (!callbackAuth || callbackAuth.purpose !== "fix-status" || callbackAuth.projectId !== id || callbackAuth.actionId !== actionId) {
+                return reply.code(403).send({ error: "Callback token mismatch" });
+            }
+
+            const userId = callbackAuth.userId;
+            const machineId = callbackAuth.machineId;
             const { fixStatus, fixSessionId, issueUrl } = request.body;
+
+            const action = await db.supervisorAction.findFirst({
+
+                where: {
+                    id: actionId,
+                    projectId: id,
+                    accountId: userId,
+                    approval: "approved",
+                },
+                select: {
+                    id: true,
+                    runId: true,
+                    title: true,
+                    fixSessionId: true,
+                },
+            });
+
+            if (!action) {
+                return reply.code(404).send({
+                    error: "Approved action not found",
+                });
+            }
+
+            const project = await db.project.findFirst({
+                where: {
+                    id,
+                    accountId: userId,
+                },
+                select: {
+                    machineId: true,
+                },
+            });
+
+            if (!project) {
+                return reply.code(404).send({ error: "Project not found" });
+            }
+
+            if (!machineId || project.machineId !== machineId) {
+                return reply.code(403).send({ error: "Machine mismatch" });
+            }
+
+            if (fixSessionId) {
+                const matchedSession = await db.session.findFirst({
+                    where: {
+                        id: fixSessionId,
+                        accountId: userId,
+                        projectId: id,
+                    },
+                    select: { id: true },
+                });
+                if (!matchedSession) {
+                    return reply.code(403).send({ error: "Invalid fix session for machine" });
+                }
+            }
 
             const data: Record<string, unknown> = { fixStatus };
             if (fixSessionId !== undefined) data.fixSessionId = fixSessionId;

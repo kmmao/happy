@@ -95,6 +95,21 @@ function SupervisorSettingsScreen() {
         React.useState<SupervisorConfig>(defaultConfig);
     const [saving, setSaving] = React.useState(false);
 
+    const resolveProfileName = React.useCallback((profileId: string | null): string | null => {
+        if (!profileId) return null;
+        const builtIn = DEFAULT_PROFILES.find((p) => p.id === profileId);
+        if (builtIn) return builtIn.name;
+        const userProfile = (settings.profiles ?? []).find((p) => p.id === profileId);
+        return userProfile?.name ?? null;
+    }, [settings.profiles]);
+
+    const missingDefaultProfileName = React.useMemo(() => {
+        if (!config.defaultProfileId) return null;
+        const exists = allProfiles.some((p) => p.id === config.defaultProfileId);
+        if (exists) return null;
+        return resolveProfileName(config.defaultProfileId) ?? config.defaultProfileId;
+    }, [allProfiles, config.defaultProfileId, resolveProfileName]);
+
     React.useLayoutEffect(() => {
         navigation.setOptions({
             headerTitle: t("supervisor.settings"),
@@ -756,6 +771,20 @@ function SupervisorSettingsScreen() {
                             color={theme.colors.textSecondary}
                         />
                     </Pressable>
+                    {missingDefaultProfileName && (
+                        <View style={[styles.safetyCard, { marginTop: 8, flexDirection: "row", alignItems: "flex-start", gap: 8 }] }>
+                            <Ionicons
+                                name="alert-circle-outline"
+                                size={16}
+                                color="#FF9500"
+                            />
+                            <Text style={[styles.safetyText, { flex: 1, marginTop: 0 }] }>
+                                {t("supervisor.defaultProfileMissing", {
+                                    profileName: missingDefaultProfileName,
+                                })}
+                            </Text>
+                        </View>
+                    )}
                     {/* Expanded option list */}
                     {profilePickerOpen && (
                         <View style={{ borderTopWidth: 0.5, borderTopColor: theme.colors.divider }}>

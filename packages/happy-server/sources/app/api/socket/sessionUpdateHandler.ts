@@ -13,7 +13,7 @@ import { inboxCreate } from "@/modules/inboxCreate";
 import { db } from "@/storage/db";
 import { allocateSessionSeq, allocateUserSeq } from "@/storage/seq";
 import { AsyncLock } from "@/utils/lock";
-import { log } from "@/utils/log";
+import { debug, log } from "@/utils/log";
 import { randomKeyNaked } from "@/utils/randomKeyNaked";
 import { Socket } from "socket.io";
 
@@ -204,7 +204,7 @@ export function sessionUpdateHandler(userId: string, socket: Socket, connection:
                 websocketEventsCounter.inc({ event_type: 'message' });
                 const { sid, message, localId } = data;
 
-                log({ module: 'websocket' }, `Received message from socket ${socket.id}: sessionId=${sid}, messageLength=${message.length} bytes, connectionType=${connection.connectionType}, connectionSessionId=${connection.connectionType === 'session-scoped' ? connection.sessionId : 'N/A'}`);
+                debug({ module: 'websocket' }, `Received message from socket ${socket.id}: sessionId=${sid}, messageLength=${message.length} bytes, connectionType=${connection.connectionType}, connectionSessionId=${connection.connectionType === 'session-scoped' ? connection.sessionId : 'N/A'}`);
 
                 // Resolve session
                 const session = await db.session.findUnique({

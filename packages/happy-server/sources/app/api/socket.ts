@@ -7,7 +7,7 @@ import {
   eventRouter,
 } from "@/app/events/eventRouter";
 import { Server, Socket } from "socket.io";
-import { log } from "@/utils/log";
+import { debug, log } from "@/utils/log";
 import { auth } from "@/app/auth/auth";
 import {
   decrementWebSocketConnection,
@@ -54,7 +54,7 @@ export function startSocket(app: Fastify) {
 
   let rpcListeners = new Map<string, Map<string, Socket>>();
   io.on("connection", async (socket) => {
-    log(
+    debug(
       { module: "websocket" },
       `New connection attempt from socket: ${socket.id}`,
     );
@@ -103,7 +103,7 @@ export function startSocket(app: Fastify) {
     }
 
     const userId = verified.userId;
-    log(
+    debug(
       { module: "websocket" },
       `Token verified: ${userId}, clientType: ${clientType || "user-scoped"}, sessionId: ${sessionId || "none"}, machineId: ${machineId || "none"}, socketId: ${socket.id}`,
     );
@@ -161,7 +161,7 @@ export function startSocket(app: Fastify) {
       eventRouter.removeConnection(userId, connection);
       decrementWebSocketConnection(connection.connectionType);
 
-      log({ module: "websocket" }, `User disconnected: ${userId}`);
+      debug({ module: "websocket" }, `User disconnected: ${userId}`);
 
       // Broadcast daemon offline status
       if (connection.connectionType === "machine-scoped") {
@@ -241,7 +241,7 @@ export function startSocket(app: Fastify) {
     sessionEventHandler(socket, userId);
     terminalHandler(userId, socket);
     // Ready
-    log({ module: "websocket" }, `User connected: ${userId}`);
+    debug({ module: "websocket" }, `User connected: ${userId}`);
   });
 
   onShutdown("api", async () => {

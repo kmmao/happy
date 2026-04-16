@@ -8,6 +8,10 @@ import { sync } from "./sync";
 import { storage } from "./storage";
 import type { MachineMetadata } from "./storageTypes";
 import { getErrorMessage } from "@/utils/errors";
+import {
+  normalizeResolvedRuntimeProfile,
+  type ResolvedRuntimeProfile,
+} from "@kmmao/happy-wire";
 
 // Strict type definitions for all operations
 
@@ -152,6 +156,8 @@ export interface SpawnSessionOptions {
   // Profile ID — sent to daemon so it can verify trust (profile exists in local settings)
   // Trusted profiles are allowed to override operator-only env vars (ANTHROPIC_BASE_URL, etc.)
   profileId?: string;
+  // Unified runtime profile resolved before session spawn.
+  runtimeProfile?: ResolvedRuntimeProfile;
   // Environment variables from AI backend profile
   // Accepts any environment variables - daemon will pass them to the agent process
   // Common variables include:
@@ -183,10 +189,21 @@ export async function machineSpawnNewSession(
     happySessionId,
     forkSourceId,
     profileId,
+    runtimeProfile,
     environmentVariables,
   } = options;
 
   try {
+    const normalizedRuntimeProfile = normalizeResolvedRuntimeProfile(
+      runtimeProfile,
+    );
+    if (runtimeProfile && !normalizedRuntimeProfile) {
+      return {
+        type: "error",
+        errorMessage: "Runtime profile payload is invalid or unsupported",
+      };
+    }
+
     // Inject knowledge base settings as environment variables
     const settings = storage.getState().settings;
     const knowledgeEnvVars: Record<string, string> = {};
@@ -212,6 +229,7 @@ export async function machineSpawnNewSession(
         happySessionId?: string;
         forkSourceId?: string;
         profileId?: string;
+        runtimeProfile?: ResolvedRuntimeProfile;
         environmentVariables?: Record<string, string>;
       }
     >(machineId, "spawn-happy-session", {
@@ -223,7 +241,8 @@ export async function machineSpawnNewSession(
       sessionId: claudeSessionId,
       happySessionId,
       forkSourceId,
-      profileId,
+      profileId: profileId ?? normalizedRuntimeProfile?.profileId,
+      runtimeProfile: normalizedRuntimeProfile,
       environmentVariables: mergedEnvironmentVariables,
     });
     return result;
@@ -1189,6 +1208,13 @@ export interface MachineBashResult {
   readonly error?: string;
 }
 
+export interface MachineDoctorCleanResult {
+  readonly success: boolean;
+  readonly killed: number;
+  readonly errors: readonly { pid: number; error: string }[];
+  readonly error?: string;
+}
+
 export async function machineBash(
   machineId: string,
   command: string,
@@ -1211,6 +1237,29 @@ export async function machineBash(
       stdout: "",
       stderr: getErrorMessage(error),
       exitCode: -1,
+      error: getErrorMessage(error),
+    };
+  }
+}
+
+export async function machineCleanRunawayProcesses(
+  machineId: string,
+): Promise<MachineDoctorCleanResult> {
+  try {
+    const result = await apiSocket.machineRPC<
+      { success: boolean; killed?: number; errors?: readonly { pid: number; error: string }[] },
+      Record<string, never>
+    >(machineId, "doctor-clean", {});
+    return {
+      success: Boolean(result.success),
+      killed: result.killed ?? 0,
+      errors: result.errors ?? [],
+    };
+  } catch (error) {
+    return {
+      success: false,
+      killed: 0,
+      errors: [],
       error: getErrorMessage(error),
     };
   }
@@ -1804,6 +1853,17 @@ export async function sessionSwitch(
   return response;
 }
 
+function getSessionRpcUnavailableError(sessionId: string): string | null {
+  const session = storage.getState().sessions[sessionId];
+  if (!session) {
+    return "Session not found";
+  }
+  if (!session.rpcReady) {
+    return "Session RPC not ready";
+  }
+  return null;
+}
+
 /**
  * Execute a bash command in the session
  */
@@ -1811,6 +1871,16 @@ export async function sessionBash(
   sessionId: string,
   request: SessionBashRequest,
 ): Promise<SessionBashResponse> {
+  const rpcError = getSessionRpcUnavailableError(sessionId);
+  if (rpcError) {
+    return {
+      success: false,
+      stdout: "",
+      stderr: rpcError,
+      exitCode: -1,
+      error: rpcError,
+    };
+  }
   try {
     const response = await apiSocket.sessionRPC<
       SessionBashResponse,
@@ -1837,6 +1907,9 @@ export async function subscribeTaskLog(
     taskId: string,
     outputFile: string,
 ): Promise<{ ok: boolean; already?: boolean }> {
+    if (getSessionRpcUnavailableError(sessionId)) {
+        return { ok: false };
+    }
     try {
         return await apiSocket.sessionRPC<
             { ok: boolean; already?: boolean },
@@ -1854,6 +1927,9 @@ export async function unsubscribeTaskLog(
     sessionId: string,
     taskId: string,
 ): Promise<{ ok: boolean }> {
+    if (getSessionRpcUnavailableError(sessionId)) {
+        return { ok: false };
+    }
     try {
         return await apiSocket.sessionRPC<
             { ok: boolean },
@@ -1871,6 +1947,13 @@ export async function sessionReadFile(
   sessionId: string,
   path: string,
 ): Promise<SessionReadFileResponse> {
+  const rpcError = getSessionRpcUnavailableError(sessionId);
+  if (rpcError) {
+    return {
+      success: false,
+      error: rpcError,
+    };
+  }
   try {
     const request: SessionReadFileRequest = { path };
     const response = await apiSocket.sessionRPC<
@@ -1895,6 +1978,13 @@ export async function sessionWriteFile(
   content: string,
   expectedHash?: string | null,
 ): Promise<SessionWriteFileResponse> {
+  const rpcError = getSessionRpcUnavailableError(sessionId);
+  if (rpcError) {
+    return {
+      success: false,
+      error: rpcError,
+    };
+  }
   try {
     const request: SessionWriteFileRequest = { path, content, expectedHash };
     const response = await apiSocket.sessionRPC<
@@ -1917,6 +2007,13 @@ export async function sessionListDirectory(
   sessionId: string,
   path: string,
 ): Promise<SessionListDirectoryResponse> {
+  const rpcError = getSessionRpcUnavailableError(sessionId);
+  if (rpcError) {
+    return {
+      success: false,
+      error: rpcError,
+    };
+  }
   try {
     const request: SessionListDirectoryRequest = { path };
     const response = await apiSocket.sessionRPC<
@@ -1940,6 +2037,13 @@ export async function sessionGetDirectoryTree(
   path: string,
   maxDepth: number,
 ): Promise<SessionGetDirectoryTreeResponse> {
+  const rpcError = getSessionRpcUnavailableError(sessionId);
+  if (rpcError) {
+    return {
+      success: false,
+      error: rpcError,
+    };
+  }
   try {
     const request: SessionGetDirectoryTreeRequest = { path, maxDepth };
     const response = await apiSocket.sessionRPC<
@@ -1963,6 +2067,16 @@ export async function sessionRipgrep(
   args: string[],
   cwd?: string,
 ): Promise<SessionRipgrepResponse> {
+  const rpcError = getSessionRpcUnavailableError(sessionId);
+  if (rpcError) {
+    return {
+      success: false,
+      stdout: "",
+      stderr: rpcError,
+      exitCode: -1,
+      error: rpcError,
+    };
+  }
   try {
     const request: SessionRipgrepRequest = { args, cwd };
     const response = await apiSocket.sessionRPC<
@@ -1984,6 +2098,13 @@ export async function sessionRipgrep(
 export async function sessionKill(
   sessionId: string,
 ): Promise<SessionKillResponse> {
+  const rpcError = getSessionRpcUnavailableError(sessionId);
+  if (rpcError) {
+    return {
+      success: false,
+      message: rpcError,
+    };
+  }
   try {
     const response = await apiSocket.sessionRPC<SessionKillResponse, {}>(
       sessionId,

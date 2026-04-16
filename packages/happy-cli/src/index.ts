@@ -44,6 +44,7 @@ import { spawnHappyCLI } from "./utils/spawnHappyCLI";
 import { claudeCliPath } from "./claude/claudeLocal";
 import { execFileSync } from "node:child_process";
 import { extractNoSandboxFlag } from "./utils/sandboxFlags";
+import { sanitizeProcessArgv } from "./utils/securityRedaction";
 
 type AutomationTimelineEntry = {
   timestamp: number;
@@ -235,7 +236,7 @@ function filterAutomationAudit<T extends { kind: string; status?: string; projec
 
   // If --version is passed - do not log, its likely daemon inquiring about our version
   if (!args.includes("--version")) {
-    logger.debug("Starting happy CLI with args: ", process.argv);
+    logger.debug("Starting happy CLI with args: ", sanitizeProcessArgv(process.argv));
   }
 
   // Check if first argument is a subcommand

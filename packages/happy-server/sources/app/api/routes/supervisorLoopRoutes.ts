@@ -12,6 +12,7 @@ import {
     resumeLoop,
     stopLoop,
 } from "@/modules/supervisorLoopEngine";
+import { resolveSupervisorProfile, parseDefaultProfileId } from "@/modules/supervisorProfileResolver";
 
 export function supervisorLoopRoutes(app: Fastify) {
     // POST /v1/projects/:id/supervisor/loop — Start a new loop
@@ -29,7 +30,6 @@ export function supervisorLoopRoutes(app: Fastify) {
                     maxConsecutiveFailures: z.number().int().min(1).max(10).default(2),
                     maxDurationMinutes: z.number().int().min(10).max(480).default(240),
                     profileId: z.string().optional(),
-                    profileEnvironmentVariables: z.record(z.string(), z.string()).optional(),
                 }),
             },
         },
@@ -37,9 +37,20 @@ export function supervisorLoopRoutes(app: Fastify) {
             const userId = request.userId;
             const { id } = request.params;
 
+            const project = await db.project.findFirst({
+                where: { id, accountId: userId },
+                select: { supervisorConfig: true },
+            });
+            if (!project) {
+                return reply.code(404).send({ error: "Project not found" });
+            }
+
+            const requestedProfileId = request.body.profileId ?? parseDefaultProfileId(project.supervisorConfig);
+            const resolvedProfile = await resolveSupervisorProfile(userId, requestedProfileId);
+
             const result = await startLoop(id, userId, {
                 ...request.body,
-                profileEnvironmentVariables: request.body.profileEnvironmentVariables as Record<string, string> | undefined,
+                runtimeProfile: resolvedProfile.runtimeProfile,
             });
 
             if ("error" in result) {

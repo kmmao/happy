@@ -8,7 +8,7 @@ import { Item } from "@/components/Item";
 import { ItemGroup } from "@/components/ItemGroup";
 import { ItemList } from "@/components/ItemList";
 import { Avatar } from "@/components/Avatar";
-import { useSession, useIsDataReady } from "@/sync/storage";
+import { storage, useSession, useIsDataReady } from "@/sync/storage";
 import {
   getSessionName,
   useSessionStatus,
@@ -21,6 +21,8 @@ import {
 import * as Clipboard from "expo-clipboard";
 import { Modal } from "@/modal";
 import { sessionKill, sessionDelete, machineSpawnNewSession, sessionForkSession } from "@/sync/ops";
+import { handleSessionResumeResult } from "@/sync/sessionResumeFlow";
+import { runWithSessionResumeGuard } from "@/sync/sessionResumeGuard";
 import { setSessionForkSource } from "@/sync/apiProjects";
 import { useAuth } from "@/auth/AuthContext";
 import { useUnistyles } from "react-native-unistyles";
@@ -36,6 +38,11 @@ import { useMachine } from "@/sync/storage";
 import { isMachineOnline } from "@/utils/machineUtils";
 import { useNavigateToSession } from "@/hooks/useNavigateToSession";
 import { WorktreeInfoSection } from "@/components/WorktreeInfoSection";
+import {
+  applySessionStartPreferences,
+  buildForkSessionStartPreferences,
+} from "@/app/(app)/new/sessionStartPreferences";
+import { sync } from "@/sync/sync";
 import { CodexInfoSection } from "./CodexInfoSection";
 import { SessionMetadataSection } from "./SessionMetadataSection";
 
@@ -213,40 +220,38 @@ function SessionInfoContent({ session }: { session: Session }) {
 
   // Use HappyAction for resume - reconnects to the same Happy session with --resume
   const [resumingSession, performResume] = useHappyAction(async () => {
-    const worktree = session.metadata?.worktree;
-    const result = await machineSpawnNewSession({
-      machineId: session.metadata!.machineId!,
-      directory: session.metadata!.path!,
-      claudeSessionId: session.metadata!.claudeSessionId!,
-      happySessionId: session.id,
-      agent: "claude",
-    });
+    await runWithSessionResumeGuard(session.id, async () => {
+      const worktree = session.metadata?.worktree;
+      const createResumeRequest = (directory?: string) =>
+        machineSpawnNewSession({
+          machineId: session.metadata!.machineId!,
+          directory: directory ?? session.metadata!.path!,
+          claudeSessionId: session.metadata!.claudeSessionId!,
+          happySessionId: session.id,
+          agent: "claude",
+        });
 
-    // Worktree directory was deleted — fall back to parent repo path
-    if (result.type === "requestToApproveDirectoryCreation" && worktree?.isWorktree && worktree.parentRepoPath) {
-      const fallback = await machineSpawnNewSession({
-        machineId: session.metadata!.machineId!,
-        directory: worktree.parentRepoPath,
-        claudeSessionId: session.metadata!.claudeSessionId!,
-        happySessionId: session.id,
-        agent: "claude",
+      const result = await createResumeRequest();
+      await handleSessionResumeResult({
+        result,
+        onSuccess: () => router.back(),
+        requestDirectoryApproval: (directory) =>
+          Modal.confirm(
+            t("machine.createDirectoryTitle"),
+            t("machine.createDirectoryMessage", { directory }),
+            { cancelText: t("common.cancel"), confirmText: t("common.create") },
+          ),
+        retryWithApprovedDirectoryCreation: (directory) => createResumeRequest(directory),
+        createError: (message) => new HappyError(message, false),
+        getStartSessionFallbackMessage: () => t("machine.failedToStartSession"),
+        mapRetryDirectory: (directory) => {
+          if (worktree?.isWorktree && worktree.parentRepoPath && directory === session.metadata!.path!) {
+            return worktree.parentRepoPath;
+          }
+          return directory;
+        },
       });
-      if (fallback.type === "error") {
-        throw new HappyError(fallback.errorMessage, false);
-      }
-      if (fallback.type === "success") {
-        router.back();
-      }
-      return;
-    }
-
-    if (result.type === "error") {
-      throw new HappyError(result.errorMessage, false);
-    }
-    if (result.type === "success") {
-      // Same session reconnected — go back to the session view
-      router.back();
-    }
+    });
   });
 
   const handleResumeSession = useCallback(() => {
@@ -274,6 +279,11 @@ function SessionInfoContent({ session }: { session: Session }) {
       throw new HappyError(spawnResult.errorMessage, false);
     }
     if (spawnResult.type === "success") {
+      await sync.refreshSessions();
+      applySessionStartPreferences(
+        storage.getState(),
+        buildForkSessionStartPreferences(session, spawnResult.sessionId),
+      );
       // Record fork relationship on server BEFORE navigating so
       // forkedFromSessionId is available when EmptyMessages renders.
       if (auth.credentials) {

@@ -1,3 +1,4 @@
+import { runWithSessionResumeGuard } from "@/sync/sessionResumeGuard";
 import { useCallback } from "react";
 import { Session, Machine } from "@/sync/storageTypes";
 import { sessionKill, machineSpawnNewSession } from "@/sync/ops";
@@ -32,24 +33,25 @@ export function useSessionUpgrade(
         compareVersions(session.metadata.version, machineCliVersion) < 0;
 
     const [upgrading, performUpgrade] = useHappyAction(async () => {
-        const killResult = await sessionKill(session.id);
-        if (!killResult.success) {
-            throw new HappyError(
-                killResult.message || t("sessionInfo.failedToUpgradeSession"),
-                false,
-            );
-        }
-        const spawnResult = await machineSpawnNewSession({
-            machineId: session.metadata!.machineId!,
-            directory: session.metadata!.path!,
-            claudeSessionId: session.metadata!.claudeSessionId!,
-            happySessionId: session.id,
-            agent: (session.metadata?.flavor as "claude" | "codex" | "gemini") ?? "claude",
+        await runWithSessionResumeGuard(session.id, async () => {
+            const killResult = await sessionKill(session.id);
+            if (!killResult.success) {
+                throw new HappyError(
+                    killResult.message || t("sessionInfo.failedToUpgradeSession"),
+                    false,
+                );
+            }
+            const spawnResult = await machineSpawnNewSession({
+                machineId: session.metadata!.machineId!,
+                directory: session.metadata!.path!,
+                claudeSessionId: session.metadata!.claudeSessionId!,
+                happySessionId: session.id,
+                agent: (session.metadata?.flavor as "claude" | "codex" | "gemini") ?? "claude",
+            });
+            if (spawnResult.type === "error") {
+                throw new HappyError(spawnResult.errorMessage, false);
+            }
         });
-        if (spawnResult.type === "error") {
-            throw new HappyError(spawnResult.errorMessage, false);
-        }
-        // spawnResult consumed — no return needed
     });
 
     const handleUpgrade = useCallback(() => {

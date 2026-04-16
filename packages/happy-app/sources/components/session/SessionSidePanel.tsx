@@ -6,6 +6,8 @@ import { Ionicons } from "@expo/vector-icons";
 import { useUnistyles } from "react-native-unistyles";
 import { t } from "@/text";
 import { GitBrowseTab } from "@/components/git/GitBrowseTab";
+import { SessionKnowledgeSheet } from "@/components/knowledge/SessionKnowledgeSheet";
+import type { SessionKnowledgeTab } from "@/components/knowledge/sessionKnowledgeLoadState";
 import { SidePanelSummaryTab } from "./SidePanelSummaryTab";
 import { SidePanelGitPanel } from "./SidePanelGitPanel";
 import { SidePanelFilePreview } from "./SidePanelFilePreview";
@@ -18,6 +20,7 @@ import {
     useSessionGitStatus,
     useSessionProjectGitStatus,
     useSessionProjectSubmodules,
+    useProjectForSession,
 } from "@/sync/storage";
 import { aggregateLineChanges } from "@/utils/gitStatusUtils";
 
@@ -31,16 +34,18 @@ interface SessionSidePanelProps {
     sessionId: string;
     collapsed: boolean;
     onToggleCollapse: () => void;
-    onOpenKnowledge?: () => void;
     width?: number;
 }
 
 export const SessionSidePanel = React.memo<SessionSidePanelProps>(
-    function SessionSidePanel({ sessionId, collapsed, onToggleCollapse, onOpenKnowledge }) {
+    function SessionSidePanel({ sessionId, collapsed, onToggleCollapse }) {
         const { theme } = useUnistyles();
         const [activeTab, setActiveTab] = React.useState<TabKey>("files");
         const [previewingFile, setPreviewingFile] = React.useState<string | null>(null);
+        const [showKnowledgeSheet, setShowKnowledgeSheet] = React.useState(false);
+        const [knowledgeSheetInitialTab, setKnowledgeSheetInitialTab] = React.useState<SessionKnowledgeTab>("changes");
         const inputContext = React.useContext(InputContext);
+        const project = useProjectForSession(sessionId);
 
         const handleFilePress = React.useCallback((fullPath: string) => {
             setPreviewingFile(fullPath);
@@ -56,6 +61,11 @@ export const SessionSidePanel = React.memo<SessionSidePanelProps>(
             },
             [inputContext],
         );
+
+        const handleOpenKnowledge = React.useCallback((tab: SessionKnowledgeTab) => {
+            setKnowledgeSheetInitialTab(tab);
+            setShowKnowledgeSheet(true);
+        }, []);
 
         // Git status for changes tab badge
         const projectGitStatus = useSessionProjectGitStatus(sessionId);
@@ -214,13 +224,21 @@ export const SessionSidePanel = React.memo<SessionSidePanelProps>(
                             {activeTab === "summary" && (
                                 <SidePanelSummaryTab
                                     sessionId={sessionId}
-                                    onOpenKnowledge={onOpenKnowledge}
+                                    onOpenKnowledge={handleOpenKnowledge}
                                 />
                             )}
                             {activeTab === "terminal" && (
                                 <SidePanelTerminalTab sessionId={sessionId} />
                             )}
                         </View>
+                        <SessionKnowledgeSheet
+                            visible={showKnowledgeSheet}
+                            onClose={() => setShowKnowledgeSheet(false)}
+                            projectServerId={project?.serverId ?? undefined}
+                            sessionId={sessionId}
+                            initialTab={knowledgeSheetInitialTab}
+                            maxHeight="84%"
+                        />
                     </>
                 )}
             </View>

@@ -941,6 +941,20 @@ export const pl: TranslationStructure = {
       breakdownTitle: "Podział tokenów",
       breakdownMessage:
         "↓ Odczyt cache – tokeny ponownie użyte z poprzedniego cache kontekstu. Znacznie redukuje koszty.\n\nin Wejście – nowe tokeny w tej turze (wiadomość + wyniki narzędzi).\n\nout Wyjście – tokeny wygenerowane przez model w tej turze.\n\n↑ Zapis do cache – tokeny zapisane do cache w tej turze, wielokrotnego użytku w następnej turze.",
+      systemLabel: "System",
+      userLabel: "Użytkownik",
+      assistantLabel: "Asystent",
+      toolCallLabel: "Wywołanie narzędzia",
+      toolResultLabel: "Wynik narzędzia",
+      attachmentLabel: "Załącznik",
+      expandBreakdown: "Rozwiń podział tokenów",
+      collapseBreakdown: "Zwiń podział tokenów",
+      sourceLabel: "Źródło",
+      sourceSdkCategories: "Kategorie SDK",
+      sourceFallback: "Awaryjny messageBreakdown",
+      sourceInfoTitle: "Źródło podziału",
+      sourceSdkCategoriesMessage: "Ten podział pochodzi bezpośrednio z kategorii dostarczonych przez SDK. To preferowane źródło i może zawierać bardziej szczegółowe grupy, takie jak prompt systemowy lub niestandardowe kategorie.",
+      sourceFallbackMessage: "W tej turze kategorie z SDK nie były dostępne, więc panel przechodzi na fallback oparty na messageBreakdown. Ten fallback jest bardziej zgrubny i może pomijać dane systemowe, pamięć podręczną oraz inne kategorie niezwiązane z wiadomościami.",
     },
     suggestion: {
       fileLabel: "PLIK",
@@ -2553,6 +2567,7 @@ export const pl: TranslationStructure = {
         `Zresetować "${name}" do wbudowanych ustawień domyślnych? Twoje dostosowania zostaną utracone.`,
       confirm: "Resetuj",
     },
+    saveFailed: "Nie udało się zapisać profilu. Spróbuj ponownie.",
   },
 
   git: {
@@ -3612,6 +3627,7 @@ export const pl: TranslationStructure = {
     defaultProfileSection: "Domyślny profil uruchamiania",
     defaultProfileDesc: "Wybierz profil backendu AI do skanowania kondycji i trybu pętli. Jeśli wybrany profil nie jest skonfigurowany na tej maszynie, uruchomienie zakończy się błędem.",
     defaultProfileNone: "Brak skonfigurowanych profili. Dodaj profile w Ustawienia → Profile.",
+    defaultProfileMissing: ({ profileName }: { profileName: string }) => `Wybrany profil „${profileName}” nie jest już dostępny na tym urządzeniu. Wybierz go ponownie w ustawieniach Supervisor.`,
     defaultProfileDefault: "Domyślny (ustawienia CLI)",
 
     notificationsSection: "Powiadomienia",

@@ -31,6 +31,7 @@ import {
 } from "@/app/events/eventRouter";
 import { fetchIssueLabelsFromProvider } from "./webhookFetchLabels";
 import { checkDailyRunLimit } from "@/modules/supervisorLimits";
+import { auth } from "@/app/auth/auth";
 
 /**
  * Extract the repository URL from a webhook body.
@@ -693,6 +694,14 @@ async function handlePushSupervisorTrigger(
         ? project.supervisorEnabledDimensions.split(",").map((d) => d.trim()).filter(Boolean)
         : undefined;
 
+      const callbackToken = await auth.createSupervisorCallbackToken({
+        userId: project.accountId,
+        projectId: project.id,
+        machineId: project.machineId,
+        purpose: "run-status",
+        runId: run.id,
+      });
+
       // Emit trigger with changed files
       eventRouter.emitEphemeral({
         userId: project.accountId,
@@ -702,6 +711,7 @@ async function handlePushSupervisorTrigger(
           trigger: "push",
           machineId: project.machineId,
           repoPath: project.path,
+          callbackToken,
           mode: project.supervisorMode ?? undefined,
           dimensions,
           changedFiles,

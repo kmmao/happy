@@ -61,10 +61,25 @@ describe("resolveMessageModeMeta", () => {
     const meta = resolveMessageModeMeta({
       permissionMode: "default",
       modelMode: "default",
+      pinnedModelId: null,
       metadata: null,
     } as any);
 
     expect(meta.model).toBeNull();
+  });
+
+  it("uses the session-pinned model id before any current profile mapping", () => {
+    const meta = resolveMessageModeMeta({
+      permissionMode: "default",
+      modelMode: "sonnet",
+      pinnedModelId: "MiniMax-M2.7",
+      modelMappings: {
+        sonnet: "different-model-now",
+      },
+      metadata: null,
+    } as any);
+
+    expect(meta.model).toBe("MiniMax-M2.7");
   });
 
   it("resolves thinking mode as adaptive", () => {

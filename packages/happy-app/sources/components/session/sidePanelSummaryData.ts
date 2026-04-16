@@ -1,11 +1,13 @@
 import type { SessionKnowledgeAccessEntry } from "@/hooks/useSessionKnowledgeAccesses";
 import type { SessionKnowledgeEntry } from "@/hooks/useSessionKnowledge";
+import type { SessionKnowledgeTab } from "@/components/knowledge/sessionKnowledgeLoadState";
 
 export interface KnowledgeSummaryRow {
     icon: string;
     label: string;
     value: string;
     isInteractive: boolean;
+    targetTab?: SessionKnowledgeTab;
 }
 
 export type KnowledgeSummaryTranslationKey =
@@ -64,6 +66,7 @@ export function buildKnowledgeSummaryRows({
                 t,
             ),
             isInteractive: true,
+            targetTab: "changes",
         });
     }
 
@@ -79,6 +82,7 @@ export function buildKnowledgeSummaryRows({
                 t,
             ),
             isInteractive: true,
+            targetTab: "references",
         });
     }
 

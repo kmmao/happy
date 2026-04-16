@@ -9,6 +9,11 @@ import { run as runRipgrep } from "@/modules/ripgrep/index";
 import { run as runDifftastic } from "@/modules/difftastic/index";
 import { RpcHandlerManager } from "../../api/rpc/RpcHandlerManager";
 import { validatePath } from "./pathSecurity";
+import type { ResolvedRuntimeProfile } from "@kmmao/happy-wire";
+import {
+  findSensitiveEnvVarReferences,
+  summarizeShellCommandForLog,
+} from "@/utils/securityRedaction";
 
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
@@ -184,6 +189,8 @@ export interface SpawnSessionOptions {
   forkSourceId?: string;
   /** Profile ID from GUI — if it matches a locally configured profile, operator-only env vars are trusted */
   profileId?: string;
+  /** Unified runtime profile contract resolved by App/Server before session spawn. */
+  runtimeProfile?: ResolvedRuntimeProfile;
   automationContext?: {
     kind: "supervisor" | "webhook" | "agent_loop" | "task";
     trigger?: string;
@@ -244,8 +251,6 @@ export function registerCommonHandlers(
     { pattern: /\bdeclare\s+-x\b/i, reason: "declare -x is blocked for security" },
     // Reading process environment from procfs or equivalent
     { pattern: /\/proc\/[^/]*\/environ/i, reason: "reading /proc/environ is blocked for security" },
-    // Echoing specific secret env vars
-    { pattern: /\$\{?\s*(ANTHROPIC_AUTH_TOKEN|ANTHROPIC_API_KEY|ANTHROPIC_BASE_URL|OPENAI_API_KEY|OPENAI_BASE_URL|DATABASE_URL|REDIS_URL|JWT_SECRET|ENCRYPTION_KEY|AWS_SECRET_ACCESS_KEY|GOOGLE_API_KEY|GEMINI_API_KEY|TOGETHER_API_KEY|GITHUB_CLIENT_SECRET|CLAUDE_CODE_OAUTH_TOKEN)\b/i, reason: "accessing sensitive environment variables is blocked" },
     // Reading common credential files
     { pattern: /\.(env|env\.local|env\.prod|env\.production|env\.dev)\b/i, reason: "reading .env files is blocked for security" },
     { pattern: /\.aws\/credentials/i, reason: "reading AWS credentials is blocked for security" },
@@ -262,6 +267,10 @@ export function registerCommonHandlers(
         return reason;
       }
     }
+    const sensitiveEnvVars = findSensitiveEnvVarReferences(command);
+    if (sensitiveEnvVars.length > 0) {
+      return `accessing sensitive environment variables is blocked (${sensitiveEnvVars.join(", ")})`;
+    }
     return null;
   }
 
@@ -269,12 +278,15 @@ export function registerCommonHandlers(
   rpcHandlerManager.registerHandler<BashRequest, BashResponse>(
     "bash",
     async (data) => {
-      logger.debug("Shell command request:", data.command);
+      const commandSummary = summarizeShellCommandForLog(data.command);
+      logger.debug("Shell command request:", commandSummary.preview);
 
       // Security: Block commands that could leak secrets
       const blockedReason = checkBlockedBashCommand(data.command);
       if (blockedReason) {
-        logger.warn(`[SECURITY] Blocked bash RPC command: ${blockedReason}`, { command: data.command });
+        logger.warn(`[SECURITY] Blocked bash RPC command: ${blockedReason}`, {
+          command: commandSummary.preview,
+        });
         return { success: false, error: blockedReason };
       }
 

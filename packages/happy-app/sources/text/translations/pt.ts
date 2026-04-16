@@ -930,6 +930,20 @@ export const pt: TranslationStructure = {
       breakdownTitle: "Detalhamento de tokens",
       breakdownMessage:
         "↓ Leitura de cache – Tokens reutilizados do cache de contexto anterior. Reduz significativamente os custos.\n\nin Entrada – Novos tokens enviados neste turno (sua mensagem + resultados de ferramentas).\n\nout Saída – Tokens gerados pelo modelo neste turno.\n\n↑ Escrita de cache – Tokens escritos no cache neste turno, reutilizáveis como leitura de cache no próximo turno.",
+      systemLabel: "Sistema",
+      userLabel: "Usuário",
+      assistantLabel: "Assistente",
+      toolCallLabel: "Chamada de ferramenta",
+      toolResultLabel: "Resultado da ferramenta",
+      attachmentLabel: "Anexo",
+      expandBreakdown: "Expandir detalhamento de tokens",
+      collapseBreakdown: "Recolher detalhamento de tokens",
+      sourceLabel: "Origem",
+      sourceSdkCategories: "Categorias do SDK",
+      sourceFallback: "Fallback de messageBreakdown",
+      sourceInfoTitle: "Origem do detalhamento",
+      sourceSdkCategoriesMessage: "Este detalhamento vem diretamente das categorias fornecidas pelo SDK. Esta é a origem preferida e pode incluir grupos mais granulares, como prompt do sistema ou categorias personalizadas.",
+      sourceFallbackMessage: "As categorias do SDK não estavam disponíveis neste turno, então este painel usa o fallback via messageBreakdown. Esse fallback é mais grosseiro e pode omitir dados de sistema, cache ou outras categorias que não sejam de mensagens.",
     },
     suggestion: {
       fileLabel: "ARQUIVO",
@@ -2518,6 +2532,7 @@ export const pt: TranslationStructure = {
         `Redefinir "${name}" para os padrões integrados? Suas personalizações serão perdidas.`,
       confirm: "Redefinir",
     },
+    saveFailed: "Falha ao salvar o perfil. Tente novamente.",
   },
 
   feed: {
@@ -3593,6 +3608,7 @@ export const pt: TranslationStructure = {
     defaultProfileSection: "Perfil de execução padrão",
     defaultProfileDesc: "Selecione o perfil de backend de IA para verificações de saúde e modo de loop. Se o perfil selecionado não estiver configurado nesta máquina, a execução falhará.",
     defaultProfileNone: "Nenhum perfil configurado. Adicione perfis em Configurações → Perfis.",
+    defaultProfileMissing: ({ profileName }: { profileName: string }) => `O perfil selecionado \"${profileName}\" não está mais disponível neste dispositivo. Selecione-o novamente nas configurações do Supervisor.`,
     defaultProfileDefault: "Padrão (configurações CLI)",
 
     notificationsSection: "Notificações",

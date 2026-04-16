@@ -9,6 +9,7 @@ import { Prisma } from "@prisma/client";
 import { log } from "@/utils/log";
 import { parseAutoApproveSeverities } from "@/modules/supervisorConfig";
 import { parseConcurrencyConfig } from "./supervisorRunRoutes";
+import { auth } from "@/app/auth/auth";
 
 /**
  * Supervisor config and action-reprocessing routes.
@@ -249,6 +250,13 @@ export function supervisorRoutes(app: Fastify) {
             // Trigger fix for each approved action
             const { maxAnalysis, maxFix } = parseConcurrencyConfig(project.supervisorConfig);
             for (const action of pendingActions) {
+                const callbackToken = await auth.createSupervisorCallbackToken({
+                    userId,
+                    projectId: id,
+                    machineId: project.machineId,
+                    purpose: "fix-status",
+                    actionId: action.id,
+                });
                 eventRouter.emitEphemeral({
                     userId,
                     payload: buildSupervisorTriggerEphemeral({
@@ -257,6 +265,7 @@ export function supervisorRoutes(app: Fastify) {
                         trigger: "fix",
                         machineId: project.machineId,
                         repoPath: project.path,
+                        callbackToken,
                         mode,
                         fixAction: {
                             title: action.title,

@@ -73,6 +73,7 @@ export function getSessionDisplayModelLabel(session: Session): string | null {
   const candidate =
     getPrimaryUsageModelKey(session) ||
     session.resolvedModelId ||
+    session.pinnedModelId ||
     session.metadata?.currentModelCode ||
     (session.modelMode && session.modelMode !== "default" ? session.modelMode : null) ||
     null;

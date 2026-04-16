@@ -53,9 +53,22 @@ export type Fastify = FastifyInstance<
 declare module 'fastify' {
     interface FastifyRequest {
         userId: string;
+        machineId?: string;
+        supervisorCallbackAuth?: {
+            userId: string;
+            projectId: string;
+            machineId: string;
+            scope: "supervisor-callback";
+            purpose: "run-status" | "fix-status";
+            runId?: string;
+            actionId?: string;
+            expiresAt: number;
+            jti: string;
+        };
         startTime?: number;
     }
     interface FastifyInstance {
         authenticate: any;
+        authenticateMachineScopedCallback: any;
     }
 }

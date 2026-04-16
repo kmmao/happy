@@ -13,7 +13,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { Text } from "@/components/StyledText";
 import { Ionicons } from "@expo/vector-icons";
-import { machineBash, machineKillProcess } from "@/sync/ops";
+import { machineBash, machineCleanRunawayProcesses, machineKillProcess } from "@/sync/ops";
 import { Modal } from "@/modal";
 import { layout } from "@/components/layout";
 import { t } from "@/text";
@@ -332,14 +332,11 @@ export default React.memo(function DiagnosticsPage() {
 
         setIsCleaning(true);
         try {
-            const result = await machineBash(machineId!, "happy doctor clean", "/");
+            const result = await machineCleanRunawayProcesses(machineId!);
             if (result.success) {
-                // Parse "Cleaned up N runaway processes" from stdout
-                const match = (result.stdout ?? "").match(/(\d+)/);
-                const killed = match ? parseInt(match[1], 10) : 0;
                 Modal.alert(
                     t("common.success"),
-                    t("diagnostics.cleanSuccess", { killed }),
+                    t("diagnostics.cleanSuccess", { killed: result.killed }),
                 );
                 await scan();
             } else {

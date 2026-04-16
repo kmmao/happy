@@ -1,5 +1,5 @@
 import { buildRpcReadyEphemeral, eventRouter } from "@/app/events/eventRouter";
-import { log } from "@/utils/log";
+import { debug, log } from "@/utils/log";
 import { Socket } from "socket.io";
 
 /** Long-running RPC methods that need more than 30 seconds to complete. */
@@ -26,6 +26,17 @@ function getForwardTimeout(qualifiedMethod: string): number {
 function getScopeId(qualifiedMethod: string): string | null {
   const colonIndex = qualifiedMethod.indexOf(":");
   return colonIndex > 0 ? qualifiedMethod.substring(0, colonIndex) : null;
+}
+
+function getRpcScopeFromSocket(socket: Socket | undefined): "machine" | "session" | null {
+  const clientType = socket?.handshake?.auth?.clientType;
+  if (clientType === "machine-scoped") {
+    return "machine";
+  }
+  if (clientType === "session-scoped") {
+    return "session";
+  }
+  return null;
 }
 
 export interface RpcHandlerOptions {
@@ -96,7 +107,7 @@ export function rpcHandler(options: RpcHandlerOptions) {
   socket.on("rpc-register", async (data: any, ack?: (response: any) => void) => {
     try {
       const { method } = data;
-      log(
+      debug(
         { module: "websocket-rpc" },
         `RPC register request: method=${method} userId=${userId} socketId=${socket.id} clientType=${clientType}`,
       );
@@ -116,7 +127,7 @@ export function rpcHandler(options: RpcHandlerOptions) {
       // Evict stale socket if present (disconnected but not yet cleaned up)
       const existing = rpcListeners.get(method);
       if (existing && existing !== socket && !existing.connected) {
-        log(
+        debug(
           { module: "websocket-rpc" },
           `Replacing stale RPC listener for ${method} (old socket ${existing.id} disconnected)`,
         );
@@ -204,11 +215,12 @@ export function rpcHandler(options: RpcHandlerOptions) {
             `Evicting stale RPC listener for ${method} (socket ${targetSocket.id} disconnected)`,
           );
           rpcListeners.delete(method);
-          // Broadcast rpc-ready:false — use "machine" scope since machine-scoped
-          // methods are the most common stale case (daemon reconnect)
+          // Broadcast the actual stale scope so user-scoped clients don't keep
+          // treating a dead session RPC listener as ready.
           const scopeId = getScopeId(method);
-          if (scopeId) {
-            broadcastRpcReady(userId, "machine", scopeId, false);
+          const staleScope = getRpcScopeFromSocket(targetSocket);
+          if (scopeId && staleScope) {
+            broadcastRpcReady(userId, staleScope, scopeId, false);
           }
           targetSocket = undefined;
         }
@@ -240,7 +252,7 @@ export function rpcHandler(options: RpcHandlerOptions) {
 
         // Log RPC call initiation
         const startTime = Date.now();
-        log(
+        debug(
           { module: "websocket-rpc" },
           `RPC call: ${method} from socket ${socket.id} -> target ${targetSocket.id}`,
         );
@@ -255,7 +267,7 @@ export function rpcHandler(options: RpcHandlerOptions) {
             });
 
           const duration = Date.now() - startTime;
-          log({ module: "websocket-rpc" }, `RPC ok: ${method} (${duration}ms)`);
+          debug({ module: "websocket-rpc" }, `RPC ok: ${method} (${duration}ms)`);
 
           // Forward the response back to the caller via callback
           if (callback) {

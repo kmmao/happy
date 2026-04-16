@@ -16,13 +16,13 @@ import { TranslationStructure } from "../_default";
 function plural({
   count,
   singular,
-  plural,
+  plural: pluralForm,
 }: {
   count: number;
   singular: string;
   plural: string;
 }): string {
-  return count === 1 ? singular : plural;
+  return count === 1 ? singular : pluralForm;
 }
 
 export const ja: TranslationStructure = {
@@ -230,6 +230,7 @@ export const ja: TranslationStructure = {
         `「${name}」を組み込みのデフォルトにリセットしますか？カスタマイズ内容は失われます。`,
       confirm: "リセット",
     },
+    saveFailed: "プロファイルの保存に失敗しました。もう一度お試しください。",
   },
 
   status: {
@@ -1027,6 +1028,20 @@ export const ja: TranslationStructure = {
       breakdownTitle: "トークン内訳",
       breakdownMessage:
         "↓ キャッシュ読み取り – 前回のコンテキストキャッシュから再利用されたトークン。コストを大幅削減。\n\nin 入力 – 今回のターンで送信された新しいトークン（メッセージ＋ツール結果）。\n\nout 出力 – 今回のターンでモデルが生成したトークン。\n\n↑ キャッシュ書き込み – 今回のターンでキャッシュに書き込まれたトークン。次のターンで再利用可能。",
+      systemLabel: "システム",
+      userLabel: "ユーザー",
+      assistantLabel: "アシスタント",
+      toolCallLabel: "ツール呼び出し",
+      toolResultLabel: "ツール結果",
+      attachmentLabel: "添付",
+      expandBreakdown: "トークン内訳を展開",
+      collapseBreakdown: "トークン内訳を折りたたむ",
+      sourceLabel: "ソース",
+      sourceSdkCategories: "SDK カテゴリ",
+      sourceFallback: "messageBreakdown フォールバック",
+      sourceInfoTitle: "内訳のソース",
+      sourceSdkCategoriesMessage: "この内訳は SDK が提供したカテゴリ分類を直接使っています。通常はこちらが優先されるソースで、システムプロンプトやカスタム分類のような、より細かい区分を含む場合があります。",
+      sourceFallbackMessage: "このターンでは SDK のカテゴリ分類が取得できなかったため、このパネルは messageBreakdown にフォールバックしています。このフォールバックは粒度が粗く、システム、キャッシュ、その他の非メッセージ区分を含まない場合があります。",
     },
     suggestion: {
       fileLabel: "ファイル",
@@ -3564,6 +3579,7 @@ export const ja: TranslationStructure = {
     defaultProfileSection: "デフォルト実行プロファイル",
     defaultProfileDesc: "ヘルススキャンとループモードに使用するAIバックエンドプロファイルを選択します。選択したプロファイルがこのマシンに設定されていない場合、実行はエラーで失敗します。",
     defaultProfileNone: "プロファイルが設定されていません。設定 → プロファイルで追加してください。",
+    defaultProfileMissing: ({ profileName }: { profileName: string }) => `選択したプロファイル「${profileName}」はこの端末では利用できなくなっています。Supervisor設定で再選択してください。`,
     defaultProfileDefault: "デフォルト（CLI設定）",
 
     notificationsSection: "通知",

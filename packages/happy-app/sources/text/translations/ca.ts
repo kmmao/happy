@@ -933,6 +933,20 @@ export const ca: TranslationStructure = {
       breakdownTitle: "Desglose de tokens",
       breakdownMessage:
         "↓ Lectura de caché – Tokens reutilitzats de la caché de context anterior. Redueix el cost significativament.\n\nin Entrada – Nous tokens enviats en aquest torn (el teu missatge + resultats d'eines).\n\nout Sortida – Tokens generats pel model en aquest torn.\n\n↑ Escriptura de caché – Tokens escrits a la caché en aquest torn, reutilitzables com a lectura de caché en el següent.",
+      systemLabel: "Sistema",
+      userLabel: "Usuari",
+      assistantLabel: "Assistent",
+      toolCallLabel: "Crida d'eina",
+      toolResultLabel: "Resultat d'eina",
+      attachmentLabel: "Adjunt",
+      expandBreakdown: "Expandeix el desglossament de tokens",
+      collapseBreakdown: "Redueix el desglossament de tokens",
+      sourceLabel: "Origen",
+      sourceSdkCategories: "Categories de l'SDK",
+      sourceFallback: "Fallback de messageBreakdown",
+      sourceInfoTitle: "Origen del desglossament",
+      sourceSdkCategoriesMessage: "Aquest desglossament prové directament de les categories proporcionades per l'SDK. És la font preferida i pot incloure grups més detallats, com ara el prompt del sistema o categories personalitzades.",
+      sourceFallbackMessage: "Les categories de l'SDK no estaven disponibles en aquest torn, així que aquest panell recorre al fallback de messageBreakdown. Aquest fallback és més groller i pot ometre dades del sistema, memòria cau o altres categories que no siguin missatges.",
     },
     suggestion: {
       fileLabel: "FITXER",
@@ -2523,6 +2537,7 @@ export const ca: TranslationStructure = {
         `Restablir "${name}" als valors predeterminats? Les teves personalitzacions es perdran.`,
       confirm: "Restablir",
     },
+    saveFailed: "No s'ha pogut desar el perfil. Torna-ho a provar.",
   },
 
   feed: {
@@ -3596,6 +3611,7 @@ export const ca: TranslationStructure = {
     defaultProfileSection: "Perfil d'execució per defecte",
     defaultProfileDesc: "Seleccioneu el perfil de backend d'IA per a les exploracions de salut i el mode bucle. Si el perfil seleccionat no està configurat en aquesta màquina, l'execució fallarà amb un error.",
     defaultProfileNone: "No hi ha perfils configurats. Afegiu perfils a Configuració → Perfils.",
+    defaultProfileMissing: ({ profileName }: { profileName: string }) => `El perfil seleccionat \"${profileName}\" ja no està disponible en aquest dispositiu. Torneu-lo a seleccionar a la configuració de Supervisor.`,
     defaultProfileDefault: "Predeterminat (configuració CLI)",
 
     notificationsSection: "Notificacions",

@@ -17,6 +17,18 @@ interface TaskResultTokenPayload {
     jti: string;
 }
 
+interface SupervisorCallbackTokenPayload {
+    userId: string;
+    projectId: string;
+    machineId: string;
+    scope: "supervisor-callback";
+    purpose: "run-status" | "fix-status";
+    runId?: string;
+    actionId?: string;
+    expiresAt: number;
+    jti: string;
+}
+
 interface AuthTokens {
     generator: Awaited<ReturnType<typeof privacyKit.createPersistentTokenGenerator>>;
     verifier: Awaited<ReturnType<typeof privacyKit.createPersistentTokenVerifier>>;
@@ -204,6 +216,74 @@ class AuthModule {
             scope: "task-result",
             expiresAt: extras.expiresAt,
             jti: extras.jti as string,
+        };
+    }
+
+    async createSupervisorCallbackToken(input: {
+        userId: string;
+        projectId: string;
+        machineId: string;
+        purpose: "run-status" | "fix-status";
+        runId?: string;
+        actionId?: string;
+        expiresInMs?: number;
+    }): Promise<string> {
+        const expiresAt = Date.now() + (input.expiresInMs ?? 6 * 60 * 60 * 1000);
+        const jti = crypto.randomUUID();
+        return await this.createToken(input.userId, {
+            purpose: input.purpose,
+            projectId: input.projectId,
+            machineId: input.machineId,
+            runId: input.runId,
+            actionId: input.actionId,
+            scope: "supervisor-callback",
+            expiresAt,
+            jti,
+        });
+    }
+
+    async verifySupervisorCallbackToken(token: string): Promise<SupervisorCallbackTokenPayload | null> {
+        const verified = await this.verifyToken(token);
+        if (!verified) {
+            return null;
+        }
+
+        const extras = verified.extras as {
+            purpose?: string;
+            projectId?: string;
+            machineId?: string;
+            runId?: string;
+            actionId?: string;
+            scope?: string;
+            expiresAt?: number;
+            jti?: string;
+        } | undefined;
+        if (extras?.scope !== "supervisor-callback") {
+            return null;
+        }
+        if ((extras.purpose !== "run-status" && extras.purpose !== "fix-status") || !extras.projectId || !extras.machineId || typeof extras.expiresAt !== "number" || !extras.jti) {
+            return null;
+        }
+        if (extras.expiresAt < Date.now()) {
+            return null;
+        }
+        if (extras.purpose === "run-status" && !extras.runId) {
+            return null;
+        }
+        if (extras.purpose === "fix-status" && !extras.actionId) {
+            return null;
+        }
+
+        return {
+            userId: verified.userId,
+            projectId: extras.projectId,
+            machineId: extras.machineId,
+            scope: "supervisor-callback",
+            purpose: extras.purpose,
+            runId: extras.runId,
+            actionId: extras.actionId,
+            expiresAt: extras.expiresAt,
+            jti: extras.jti,
         };
     }
 

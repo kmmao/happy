@@ -129,6 +129,7 @@ class ApiSocket {
     const LONG_TIMEOUT = 300_000; // 5 minutes
     const longRunningMethods = [
       "bash",
+      "doctor-clean",
       "ripgrep",
       "difftastic",
       "getDirectoryTree",

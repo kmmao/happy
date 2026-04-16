@@ -1,5 +1,20 @@
 import { AIBackendProfile } from "./settings";
 
+export const mergeProfilesForDisplay = (
+  remoteProfiles: AIBackendProfile[],
+  localProfiles: AIBackendProfile[],
+): AIBackendProfile[] => {
+  const mergedProfiles = new Map<string, AIBackendProfile>(
+    localProfiles.map((profile) => [profile.id, profile]),
+  );
+
+  remoteProfiles.forEach((profile) => {
+    mergedProfiles.set(profile.id, profile);
+  });
+
+  return Array.from(mergedProfiles.values());
+};
+
 /**
  * Documentation and expected values for built-in profiles.
  * These help users understand what environment variables to set and their expected values.

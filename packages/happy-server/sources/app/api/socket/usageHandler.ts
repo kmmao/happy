@@ -2,7 +2,7 @@ import { Socket } from "socket.io";
 import { AsyncLock } from "@/utils/lock";
 import { db } from "@/storage/db";
 import { buildUsageEphemeral, eventRouter } from "@/app/events/eventRouter";
-import { log } from "@/utils/log";
+import { debug, log } from "@/utils/log";
 
 export function usageHandler(userId: string, socket: Socket) {
   const receiveUsageLock = new AsyncLock();
@@ -92,7 +92,7 @@ export function usageHandler(userId: string, socket: Socket) {
               },
             });
 
-            log(
+            debug(
               { module: "websocket" },
               `Usage report saved: key=${key}, sessionId=${sessionId || "none"}, userId=${userId}`,
             );

@@ -2,6 +2,7 @@ import * as React from 'react';
 import { Platform } from 'react-native';
 import { CameraView } from 'expo-camera';
 import { useAuth } from '@/auth/AuthContext';
+import { hasCredentialSecret } from '@/auth/authCredentials';
 import { decodeBase64 } from '@/encryption/base64';
 import { encryptBox } from '@/encryption/libsodium';
 import { authAccountApprove } from '@/auth/authAccountApprove';
@@ -30,8 +31,14 @@ export function useConnectAccount(options?: UseConnectAccountOptions) {
         try {
             const tail = url.slice('happy:///account?'.length);
             const publicKey = decodeBase64(tail, 'base64url');
-            const response = encryptBox(decodeBase64(auth.credentials!.secret, 'base64url'), publicKey);
-            await authAccountApprove(auth.credentials!.token, publicKey, response);
+            if (!auth.credentials) {
+                throw new Error('missing credentials for account approval');
+            }
+            if (!hasCredentialSecret(auth.credentials)) {
+                throw new Error('current credentials cannot approve account link without secret');
+            }
+            const response = encryptBox(decodeBase64(auth.credentials.secret, 'base64url'), publicKey);
+            await authAccountApprove(auth.credentials.token, publicKey, response);
             
             Modal.alert(t('common.success'), t('modals.deviceLinkedSuccessfully'), [
                 { 

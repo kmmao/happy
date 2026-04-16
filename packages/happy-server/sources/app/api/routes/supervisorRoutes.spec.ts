@@ -19,6 +19,7 @@ type ProjectRecord = {
     supervisorNotifyPrefs: string | null;
     supervisorNextRunAt: Date | null;
     fixStrategy: string | null;
+    repoUrl: string | null;
 };
 
 type RunRecord = {
@@ -44,9 +45,11 @@ type RunRecord = {
 };
 
 const {
-    state,
     dbMock,
     emitEphemeralMock,
+    buildSupervisorTriggerEphemeralMock,
+    resolveSupervisorProfileMock,
+    authCreateSupervisorCallbackTokenMock,
     resetState,
     seedProject,
     seedRun,
@@ -54,14 +57,12 @@ const {
     const state = {
         projects: [] as ProjectRecord[],
         runs: [] as RunRecord[],
-        actions: [] as any[],
         nextRunId: 1,
     };
 
     const resetState = () => {
         state.projects = [];
         state.runs = [];
-        state.actions = [];
         state.nextRunId = 1;
     };
 
@@ -82,6 +83,7 @@ const {
             supervisorNotifyPrefs: input.supervisorNotifyPrefs ?? null,
             supervisorNextRunAt: input.supervisorNextRunAt ?? null,
             fixStrategy: input.fixStrategy ?? null,
+            repoUrl: input.repoUrl ?? null,
         });
     };
 
@@ -123,9 +125,13 @@ const {
         project: {
             findFirst: vi.fn(async (args: any) => {
                 const where = args?.where ?? {};
-                const p = state.projects.find(
-                    (p) => p.id === where.id && p.accountId === where.accountId,
-                );
+                const p = state.projects.find((p) => p.id === where.id && p.accountId === where.accountId);
+                if (!p) return null;
+                return selectFields(p as unknown as Record<string, unknown>, args?.select);
+            }),
+            findUnique: vi.fn(async (args: any) => {
+                const where = args?.where ?? {};
+                const p = state.projects.find((p) => p.id === where.id);
                 if (!p) return null;
                 return selectFields(p as unknown as Record<string, unknown>, args?.select);
             }),
@@ -139,6 +145,9 @@ const {
                 }
                 return p;
             }),
+        },
+        webhookRoute: {
+            findFirst: vi.fn(async () => null),
         },
         supervisorRun: {
             findFirst: vi.fn(async (args: any) => {
@@ -166,9 +175,7 @@ const {
                 if (args?.take) rows = rows.slice(0, args.take);
                 return rows.map((r) => selectFields(r as unknown as Record<string, unknown>, args?.select));
             }),
-            findUnique: vi.fn(async (args: any) => {
-                return state.runs.find((r) => r.id === args?.where?.id) ?? null;
-            }),
+            findUnique: vi.fn(async (args: any) => state.runs.find((r) => r.id === args?.where?.id) ?? null),
             count: vi.fn(async (args: any) => {
                 const where = args?.where ?? {};
                 return state.runs.filter((r) => {
@@ -228,9 +235,11 @@ const {
             }),
         },
         supervisorAction: {
+            findFirst: vi.fn(async () => null),
             findMany: vi.fn(async () => []),
             createMany: vi.fn(async () => ({ count: 0 })),
             update: vi.fn(async () => ({})),
+            updateMany: vi.fn(async () => ({ count: 0 })),
         },
         session: {
             updateMany: vi.fn(async () => ({ count: 0 })),
@@ -239,8 +248,30 @@ const {
     };
 
     const emitEphemeralMock = vi.fn();
+    const buildSupervisorTriggerEphemeralMock = vi.fn((args: Record<string, unknown>) => ({ t: "supervisor-trigger", ...args }));
+    const resolveSupervisorProfileMock = vi.fn(async (): Promise<{
+        runtimeProfile?: {
+            profileId?: string;
+            profileName?: string;
+            source: string;
+            trust: string;
+            environmentVariables: Record<string, string>;
+        };
+    }> => ({
+        runtimeProfile: undefined,
+    }));
+    const authCreateSupervisorCallbackTokenMock = vi.fn(async () => "callback-token");
 
-    return { state, dbMock, emitEphemeralMock, resetState, seedProject, seedRun };
+    return {
+        dbMock,
+        emitEphemeralMock,
+        buildSupervisorTriggerEphemeralMock,
+        resolveSupervisorProfileMock,
+        authCreateSupervisorCallbackTokenMock,
+        resetState,
+        seedProject,
+        seedRun,
+    };
 });
 
 vi.mock("@/storage/db", () => ({ db: dbMock }));
@@ -260,13 +291,47 @@ vi.mock("@/app/presence/sessionCache", () => ({
 }));
 vi.mock("@/app/events/eventRouter", () => ({
     eventRouter: { emitEphemeral: emitEphemeralMock },
-    buildSupervisorTriggerEphemeral: vi.fn((...args: unknown[]) => ({ t: "supervisor-trigger", args })),
+    buildSupervisorTriggerEphemeral: buildSupervisorTriggerEphemeralMock,
     buildSupervisorStatusEphemeral: vi.fn((...args: unknown[]) => ({ t: "supervisor-status", args })),
     buildSessionActivityEphemeral: vi.fn((...args: unknown[]) => ({ t: "session-activity", args })),
+}));
+vi.mock("@/modules/supervisorProfileResolver", () => ({
+    resolveSupervisorProfile: resolveSupervisorProfileMock,
+    parseDefaultProfileId: vi.fn((config: string | null) => {
+        if (!config) return null;
+        try {
+            const parsed = JSON.parse(config) as { defaultProfileId?: string | null };
+            return parsed.defaultProfileId ?? null;
+        } catch {
+            return null;
+        }
+    }),
+}));
+vi.mock("@/app/auth/auth", () => ({
+    auth: {
+        createSupervisorCallbackToken: authCreateSupervisorCallbackTokenMock,
+    },
+}));
+vi.mock("@/app/webhook/webhookProviderApi", () => ({
+    createIssueOnProvider: vi.fn(async () => null),
+}));
+vi.mock("@/modules/encrypt", () => ({
+    decryptString: vi.fn(() => "decrypted-token"),
+}));
+vi.mock("@/modules/knowledgeContributor", () => ({
+    contributeSupervisorKnowledge: vi.fn(async () => {}),
+}));
+vi.mock("@/modules/inboxCreate", () => ({
+    inboxCreate: vi.fn(async () => {}),
+}));
+vi.mock("@/modules/pushSend", () => ({
+    pushSupervisorNotification: vi.fn(async () => {}),
 }));
 
 import { supervisorRoutes } from "./supervisorRoutes";
 import { supervisorRunRoutes } from "./supervisorRunRoutes";
+import { supervisorActionRoutes } from "./supervisorActionRoutes";
+import { handleAutoApproval } from "../socket/supervisorRunStatusHandler";
 
 async function createApp() {
     const app = fastify();
@@ -281,9 +346,11 @@ async function createApp() {
         }
         request.userId = userId;
     });
+    typed.decorate("authenticateMachineScopedCallback", async () => {});
 
     supervisorRoutes(typed);
     supervisorRunRoutes(typed);
+    supervisorActionRoutes(typed);
     await typed.ready();
     return typed;
 }
@@ -294,6 +361,20 @@ describe("supervisorRoutes", () => {
     beforeEach(() => {
         resetState();
         emitEphemeralMock.mockClear();
+        buildSupervisorTriggerEphemeralMock.mockClear();
+        resolveSupervisorProfileMock.mockReset();
+        resolveSupervisorProfileMock.mockResolvedValue({
+            runtimeProfile: undefined,
+        });
+        authCreateSupervisorCallbackTokenMock.mockClear();
+        dbMock.supervisorAction.findFirst.mockReset();
+        dbMock.supervisorAction.findFirst.mockResolvedValue(null);
+        dbMock.supervisorAction.findMany.mockReset();
+        dbMock.supervisorAction.findMany.mockResolvedValue([]);
+        dbMock.supervisorAction.updateMany.mockReset();
+        dbMock.supervisorAction.updateMany.mockResolvedValue({ count: 0 });
+        dbMock.webhookRoute.findFirst.mockReset();
+        dbMock.webhookRoute.findFirst.mockResolvedValue(null);
     });
 
     afterEach(async () => {
@@ -317,6 +398,51 @@ describe("supervisorRoutes", () => {
             expect(body.run.status).toBe("pending");
             expect(body.run.projectId).toBe("proj-1");
             expect(emitEphemeralMock).toHaveBeenCalledTimes(1);
+        });
+
+        it("emits resolved profile on manual run trigger", async () => {
+            seedProject({
+                id: "proj-1",
+                accountId: "user-1",
+                machineId: "machine-1",
+                supervisorConfig: JSON.stringify({ defaultProfileId: "profile-1" }),
+            });
+            resolveSupervisorProfileMock.mockResolvedValueOnce({
+                runtimeProfile: {
+                    profileId: "profile-1",
+                    profileName: "Profile 1",
+                    source: "account-profile",
+                    trust: "trusted",
+                    environmentVariables: { OPENAI_API_KEY: "sk-test" },
+                },
+            });
+            app = await createApp();
+
+            const res = await app.inject({
+                method: "POST",
+                url: "/v1/projects/proj-1/supervisor/run",
+                headers: { "x-user-id": "user-1" },
+                payload: {},
+            });
+
+            expect(res.statusCode).toBe(200);
+            expect(resolveSupervisorProfileMock).toHaveBeenCalledWith("user-1", "profile-1");
+            expect(authCreateSupervisorCallbackTokenMock).toHaveBeenCalledWith({
+                userId: "user-1",
+                projectId: "proj-1",
+                machineId: "machine-1",
+                purpose: "run-status",
+                runId: "run-1",
+            });
+            expect(buildSupervisorTriggerEphemeralMock).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    callbackToken: "callback-token",
+                    runtimeProfile: expect.objectContaining({
+                        profileId: "profile-1",
+                        environmentVariables: { OPENAI_API_KEY: "sk-test" },
+                    }),
+                }),
+            );
         });
 
         it("returns 404 for non-existent project", async () => {
@@ -483,6 +609,126 @@ describe("supervisorRoutes", () => {
             });
 
             expect(res.statusCode).toBe(404);
+        });
+    });
+
+    describe("profile inheritance for fixes", () => {
+        it("emits resolved profile when manual fix trigger is created", async () => {
+            seedProject({
+                id: "proj-1",
+                accountId: "user-1",
+                supervisorConfig: JSON.stringify({ defaultProfileId: "profile-1", analyzeAutoFix: true }),
+                fixStrategy: "pr",
+            });
+            dbMock.supervisorAction.findFirst.mockResolvedValueOnce({
+                id: "action-1",
+                runId: "run-1",
+                projectId: "proj-1",
+                accountId: "user-1",
+                confidence: 0.9,
+                approval: "approved",
+                fixStatus: null,
+                fixMode: null,
+                fixSessionId: null,
+                issueUrl: null,
+                lastSeenRunId: null,
+                title: "Fix thing",
+                description: "desc",
+                suggestedFix: "suggest",
+                category: "deps",
+                severity: "high",
+                createdAt: new Date("2026-04-16T00:00:00.000Z"),
+                updatedAt: new Date("2026-04-16T00:00:00.000Z"),
+            } as any);
+            resolveSupervisorProfileMock.mockResolvedValueOnce({
+                runtimeProfile: {
+                    profileId: "profile-1",
+                    profileName: "Profile 1",
+                    source: "account-profile",
+                    trust: "trusted",
+                    environmentVariables: { ANTHROPIC_API_KEY: "test-key" },
+                },
+            });
+            app = await createApp();
+
+            const res = await app.inject({
+                method: "POST",
+                url: "/v1/projects/proj-1/supervisor/actions/action-1/fix",
+                headers: { "x-user-id": "user-1" },
+                payload: { mode: "analyze-first" },
+            });
+
+            if (res.statusCode !== 200) {
+                throw new Error(res.body);
+            }
+            expect(resolveSupervisorProfileMock).toHaveBeenCalledWith("user-1", "profile-1");
+            expect(authCreateSupervisorCallbackTokenMock).toHaveBeenCalledWith({
+                userId: "user-1",
+                projectId: "proj-1",
+                machineId: "default-machine",
+                purpose: "fix-status",
+                actionId: "action-1",
+            });
+            expect(buildSupervisorTriggerEphemeralMock).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    callbackToken: "callback-token",
+                    runtimeProfile: expect.objectContaining({
+                        profileId: "profile-1",
+                        environmentVariables: { ANTHROPIC_API_KEY: "test-key" },
+                    }),
+                    fixMode: "analyze-first",
+                    analyzeAutoFix: true,
+                }),
+            );
+        });
+
+        it("emits resolved profile when auto approval triggers fix", async () => {
+            seedProject({
+                id: "proj-1",
+                accountId: "user-1",
+                supervisorMode: "auto",
+                machineId: "machine-1",
+                path: "/repo",
+                supervisorConfig: JSON.stringify({
+                    defaultProfileId: "profile-1",
+                    autoApprove: { auto: ["high"] },
+                    concurrency: { maxAnalysisSessions: 2, maxFixSessions: 1 },
+                }),
+                fixStrategy: "pr",
+            });
+            dbMock.supervisorAction.findMany.mockResolvedValueOnce([
+                {
+                    id: "action-1",
+                    severity: "high",
+                    title: "Fix thing",
+                    description: "desc",
+                    suggestedFix: "suggest",
+                    category: "deps",
+                },
+            ] as any);
+            resolveSupervisorProfileMock.mockResolvedValueOnce({
+                runtimeProfile: {
+                    profileId: "profile-1",
+                    profileName: "Profile 1",
+                    source: "account-profile",
+                    trust: "trusted",
+                    environmentVariables: { OPENAI_API_KEY: "sk-test" },
+                },
+            });
+
+            await handleAutoApproval("user-1", "proj-1", "run-1");
+
+            expect(resolveSupervisorProfileMock).toHaveBeenCalledWith("user-1", "profile-1");
+            expect(buildSupervisorTriggerEphemeralMock).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    runtimeProfile: expect.objectContaining({
+                        profileId: "profile-1",
+                        environmentVariables: { OPENAI_API_KEY: "sk-test" },
+                    }),
+                    runId: "action-1",
+                    trigger: "fix",
+                }),
+            );
         });
     });
 });

@@ -7,6 +7,10 @@ interface EnvironmentVariables {
     [varName: string]: string | null;
 }
 
+const VALID_ENV_VAR_NAME = /^[A-Z_][A-Z0-9_]*$/;
+const SENSITIVE_ENV_NAME_PATTERN =
+    /(^|_)(AUTH_TOKEN|API_KEY|TOKEN|SECRET|PASSWORD|PRIVATE_KEY|SESSION_KEY|ENCRYPTION_KEY|ACCESS_KEY|CLIENT_SECRET)$/;
+
 /**
  * Resolves ${VAR} substitution in a profile environment variable value.
  *
@@ -85,4 +89,24 @@ export function extractEnvVarReferences(
         }
     });
     return Array.from(refs);
+}
+
+/**
+ * Best-effort detection for environment variables that should never be fetched
+ * over machineBash just to render UI hints.
+ */
+export function isSensitiveEnvVarName(varName: string): boolean {
+    return SENSITIVE_ENV_NAME_PATTERN.test(varName);
+}
+
+/**
+ * Keep only syntactically valid, non-sensitive variable names for remote lookup.
+ * Sensitive names are intentionally excluded so the app never asks the daemon
+ * to echo them back across RPC.
+ */
+export function filterEnvVarNamesForRemoteLookup(varNames: string[]): string[] {
+    const uniqueNames = Array.from(new Set(varNames));
+    return uniqueNames.filter((name) => (
+        VALID_ENV_VAR_NAME.test(name) && !isSensitiveEnvVarName(name)
+    ));
 }

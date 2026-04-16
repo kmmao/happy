@@ -14,6 +14,7 @@ import { useUnistyles } from "react-native-unistyles";
 import { t } from "@/text";
 import { GitBrowseTab } from "@/components/git/GitBrowseTab";
 import { SessionKnowledgeSheet } from "@/components/knowledge/SessionKnowledgeSheet";
+import type { SessionKnowledgeTab } from "@/components/knowledge/sessionKnowledgeLoadState";
 import { useProjectForSession, useSession } from "@/sync/storage";
 import { SidePanelGitPanel } from "./SidePanelGitPanel";
 import { SidePanelSummaryTab } from "./SidePanelSummaryTab";
@@ -46,6 +47,7 @@ export const MobileSessionPanelSheet = React.memo<MobileSessionPanelSheetProps>(
         const [activeTab, setActiveTab] = React.useState<MobileSessionPanelTab>("files");
         const [previewingFile, setPreviewingFile] = React.useState<string | null>(null);
         const [showKnowledgeSheet, setShowKnowledgeSheet] = React.useState(false);
+        const [knowledgeSheetInitialTab, setKnowledgeSheetInitialTab] = React.useState<SessionKnowledgeTab>("changes");
         const inputContext = React.useContext(InputContext);
         const project = useProjectForSession(sessionId);
         const session = useSession(sessionId);
@@ -64,6 +66,11 @@ export const MobileSessionPanelSheet = React.memo<MobileSessionPanelSheetProps>(
 
         const handleFilePress = React.useCallback((fullPath: string) => {
             setPreviewingFile(fullPath);
+        }, []);
+
+        const handleOpenKnowledge = React.useCallback((tab: SessionKnowledgeTab) => {
+            setKnowledgeSheetInitialTab(tab);
+            setShowKnowledgeSheet(true);
         }, []);
 
         const renderContent = () => {
@@ -94,7 +101,7 @@ export const MobileSessionPanelSheet = React.memo<MobileSessionPanelSheetProps>(
                     return (
                         <SidePanelSummaryTab
                             sessionId={sessionId}
-                            onOpenKnowledge={() => setShowKnowledgeSheet(true)}
+                            onOpenKnowledge={handleOpenKnowledge}
                         />
                     );
                 case "code":
@@ -248,6 +255,7 @@ export const MobileSessionPanelSheet = React.memo<MobileSessionPanelSheetProps>(
                     onClose={() => setShowKnowledgeSheet(false)}
                     projectServerId={project?.serverId ?? undefined}
                     sessionId={sessionId}
+                    initialTab={knowledgeSheetInitialTab}
                 />
             </>
         );

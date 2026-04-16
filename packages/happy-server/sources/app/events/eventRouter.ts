@@ -4,6 +4,7 @@ import { GitHubProfile } from "@/app/api/types";
 import { AccountProfile } from "@/types";
 import { getPublicUrl } from "@/storage/files";
 import type { SessionMessageContent, WorldSuggestionUpdated } from "@kmmao/happy-wire";
+import type { ResolvedRuntimeProfile } from "@kmmao/happy-wire";
 
 import * as privacyKit from "privacy-kit";
 
@@ -1089,6 +1090,7 @@ export interface SupervisorTriggerOptions {
   trigger: string;
   machineId: string;
   repoPath: string;
+  callbackToken?: string;
   mode?: string;
   dimensions?: string[];
   changedFiles?: string[];
@@ -1104,10 +1106,8 @@ export interface SupervisorTriggerOptions {
   maxFindings?: number;
   narrative?: string;
   laws?: string;
-  /** AI backend profile ID to use for this run. If set but not found on CLI, run is aborted. */
-  profileId?: string;
-  /** Pre-resolved environment variables from the AI backend profile. */
-  profileEnvironmentVariables?: Record<string, string>;
+  /** Unified runtime profile resolved by App/Server before dispatch. */
+  runtimeProfile?: ResolvedRuntimeProfile;
 }
 
 export function buildSupervisorTriggerEphemeral(opts: SupervisorTriggerOptions): EphemeralPayload {
@@ -1295,4 +1295,3 @@ export function buildTaskCancelEphemeral(opts: { taskId: string; sessionId?: str
     ...opts,
   };
 }
-

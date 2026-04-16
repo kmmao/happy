@@ -48,6 +48,7 @@ import { expandEnvironmentVariables } from "@/utils/expandEnvVars";
 import { cleanupFixWorktree, getFixWorktreeInfo } from "@/supervisor/handleSupervisorTrigger";
 import { AutomationStore } from "@/automation/AutomationStore";
 import { GuardianSessionRegistry } from "@/automation/GuardianSessionRegistry";
+import { resolveGuardianSession } from "./resolveGuardianSession";
 import { AutomationAuditStore } from "@/automation/AutomationAuditStore";
 import { deriveAutomationAuditStats, deriveAutomationGuardianUsage } from "@/automation/AutomationAudit";
 import { AutomationScheduler } from "@/automation/AutomationScheduler";
@@ -68,6 +69,12 @@ import { diagnoseAndReportFixStatus } from "@/supervisor/diagnoseFixStatus";
 import { detectTailscale, detectTailscaleServe } from "@/utils/tailscale";
 import { TunnelManager, TailscaleProvider, UpnpProvider, CaddyProvider } from "@/tunnel";
 import { createCodexHomeOverlay } from "@/codex-shared/codexHomeOverlay";
+import { filterGuiEnvironmentVariables, isTrustedProfileEnvironment } from "./profileEnvironmentTrust";
+import { normalizeResolvedRuntimeProfile } from "@kmmao/happy-wire";
+import {
+  getFilteredDaemonEnvironment,
+  resolveStartupScriptEnvironment,
+} from "./startupScriptEnvironment";
 
 
 const execFileAsync = promisify(execFileCb);
@@ -653,8 +660,19 @@ export async function startDaemon(): Promise<void> {
         happySessionId,
         forkSourceId,
         automationContext,
+        runtimeProfile: requestedRuntimeProfile,
       } = options;
+      const runtimeProfile = normalizeResolvedRuntimeProfile(
+        requestedRuntimeProfile,
+      );
       let directoryCreated = false;
+
+      if (requestedRuntimeProfile && !runtimeProfile) {
+        return {
+          type: "error",
+          errorMessage: "Runtime profile payload is invalid or unsupported",
+        };
+      }
 
       try {
         await fs.access(directory);
@@ -735,56 +753,34 @@ export async function startDaemon(): Promise<void> {
         // IMPORTANT: Distinguish between undefined (no profile selected) and {} (profile selected but empty)
         // When GUI explicitly provides environmentVariables (even empty {}), NEVER fallback to CLI local profile
         let profileEnv: Record<string, string> = {};
-        const guiProfileProvided = options.environmentVariables !== undefined;
-
-        // ── Security: Sensitive env var keys that ONLY the daemon operator may set ──
-        // Remote (GUI/mobile) users must NEVER override these — doing so enables
-        // SSRF (redirect API traffic) or credential theft.
-        const OPERATOR_ONLY_ENV_VARS = new Set([
-          // Anthropic
-          "ANTHROPIC_BASE_URL",
-          "ANTHROPIC_AUTH_TOKEN",
-          "ANTHROPIC_API_KEY",
-          // OpenAI / Codex
-          "OPENAI_API_KEY",
-          "OPENAI_BASE_URL",
-          "AZURE_OPENAI_API_KEY",
-          "AZURE_OPENAI_ENDPOINT",
-          // Google / Gemini
-          "GOOGLE_API_KEY",
-          "GEMINI_API_KEY",
-          // Other providers
-          "TOGETHER_API_KEY",
-          "CODEX_HOME",
-          // OAuth
-          "CLAUDE_CODE_OAUTH_TOKEN",
-          // Server internals that must never leak
-          "DATABASE_URL",
-          "REDIS_URL",
-          "JWT_SECRET",
-          "ENCRYPTION_KEY",
-          "GITHUB_CLIENT_SECRET",
-          "AWS_SECRET_ACCESS_KEY",
-          "AWS_ACCESS_KEY_ID",
-        ]);
+        const guiProfileProvided =
+          runtimeProfile !== undefined ||
+          options.environmentVariables !== undefined;
 
         // ── Trust check: Does the GUI provide a profileId? ──
         // If profileId is present, the request came from the App's profile system
         // (built-in or user-configured). The RPC channel is E2E encrypted, so only
         // authorized App users can send requests. Trust the profile and allow
         // operator-only env vars (ANTHROPIC_BASE_URL, etc.) to pass through.
-        // Without profileId, ad-hoc env vars are still filtered for safety.
-        const profileTrusted = !!options.profileId;
+        // Supervisor-triggered runs also qualify here because the server already
+        // resolved the selected profile into env vars before asking the daemon to spawn.
+        // Without either trust signal, ad-hoc env vars are still filtered for safety.
+        const profileTrusted = isTrustedProfileEnvironment(options);
         if (profileTrusted) {
           logger.info(
-            `[DAEMON RUN] Profile ${options.profileId} provided — trusted (E2E encrypted channel), operator-only env vars allowed`,
+            runtimeProfile?.profileId || options.profileId
+              ? `[DAEMON RUN] Profile ${runtimeProfile?.profileId ?? options.profileId} provided — trusted runtime profile, operator-only env vars allowed`
+              : `[DAEMON RUN] Trusted runtime profile env provided — operator-only env vars allowed`,
           );
         }
 
         // Layer 2a: Load profile API env vars from local settings when profileId is provided
         // This handles supervisor triggers where profileId is set but environmentVariables
         // only contains operational vars (HAPPY_INITIAL_PROMPT_FILE etc.), not API config.
-        if (options.profileId) {
+        const runtimeProfileEnvCount = Object.keys(
+          runtimeProfile?.environmentVariables ?? {},
+        ).length;
+        if (options.profileId && runtimeProfileEnvCount === 0) {
           try {
             const profileVars = await getProfileEnvironmentVariablesForAgent(
               options.profileId,
@@ -814,22 +810,14 @@ export async function startDaemon(): Promise<void> {
           // Security: Only strip operator-only keys when the daemon operator has already
           // set them in process.env AND the profile is NOT trusted (not in local settings).
           // Trusted profiles (configured by operator) are allowed to override operator-only vars.
-          const raw = options.environmentVariables!;
-          const stripped: string[] = [];
-          const guiVars = Object.fromEntries(
-            Object.entries(raw).filter((entry): entry is [string, string] => {
-              if (entry[1] === undefined) return false;
-              if (
-                !profileTrusted &&
-                OPERATOR_ONLY_ENV_VARS.has(entry[0]) &&
-                process.env[entry[0]]
-              ) {
-                stripped.push(entry[0]);
-                return false;
-              }
-              return true;
-            }),
-          );
+          const raw = {
+            ...(runtimeProfile?.environmentVariables ?? {}),
+            ...(options.environmentVariables ?? {}),
+          };
+          const {
+            environmentVariables: guiVars,
+            stripped,
+          } = filterGuiEnvironmentVariables(raw, options);
           if (stripped.length > 0) {
             logger.warn(
               `[DAEMON RUN] Security: Stripped ${stripped.length} operator-only env vars from GUI profile (daemon already has them, profile untrusted): ${stripped.join(", ")}`,
@@ -907,6 +895,47 @@ export async function startDaemon(): Promise<void> {
           `[DAEMON RUN] After variable expansion: ${Object.keys(extraEnv).join(", ")}`,
         );
 
+        const filteredDaemonEnv = getFilteredDaemonEnvironment();
+        let sessionScopedEnv = { ...extraEnv };
+        const startupBashScript = runtimeProfile?.startupBashScript?.trim();
+        if (startupBashScript) {
+          try {
+            const startupScriptEnv = await resolveStartupScriptEnvironment({
+              cwd: directory,
+              startupBashScript,
+              baseEnv: {
+                ...filteredDaemonEnv,
+                ...sessionScopedEnv,
+              },
+            });
+            sessionScopedEnv = {
+              ...sessionScopedEnv,
+              ...startupScriptEnv,
+              ...authEnv,
+            };
+            logger.info(
+              `[DAEMON RUN] Applied startup bash script from runtime profile${runtimeProfile?.profileId ? ` ${runtimeProfile.profileId}` : ""}`,
+            );
+            if (Object.keys(startupScriptEnv).length > 0) {
+              logger.debug(
+                `[DAEMON RUN] Startup script updated env vars: ${Object.keys(startupScriptEnv).join(", ")}`,
+              );
+            }
+          } catch (error) {
+            const errorMessage = `Startup bash script failed: ${error instanceof Error ? error.message : String(error)}`;
+            logger.warn(`[DAEMON RUN] ${errorMessage}`);
+            return {
+              type: "error",
+              errorMessage,
+            };
+          }
+        }
+
+        const finalSessionEnv = {
+          ...filteredDaemonEnv,
+          ...sessionScopedEnv,
+        };
+
         // Fail-fast validation: Check that any auth variables present are fully expanded
         // Only validate variables that are actually set (different agents need different auth)
         const potentialAuthVars = [
@@ -918,7 +947,7 @@ export async function startDaemon(): Promise<void> {
           "TOGETHER_API_KEY",
         ];
         const unexpandedAuthVars = potentialAuthVars.filter((varName) => {
-          const value = extraEnv[varName];
+          const value = finalSessionEnv[varName];
           // Only fail if variable IS SET and contains unexpanded ${VAR} references
           return value && typeof value === "string" && value.includes("${");
         });
@@ -926,7 +955,7 @@ export async function startDaemon(): Promise<void> {
         if (unexpandedAuthVars.length > 0) {
           // Extract the specific missing variable names from unexpanded references
           const missingVarDetails = unexpandedAuthVars.map((authVar) => {
-            const value = extraEnv[authVar];
+            const value = finalSessionEnv[authVar];
             const unresolvedMatch = value?.match(
               /\$\{([A-Z_][A-Z0-9_]*)(:-[^}]*)?\}/,
             );
@@ -950,7 +979,7 @@ export async function startDaemon(): Promise<void> {
 
         // Get tmux session name from environment variables (now set by profile system)
         // Empty string means "use current/most recent session" (tmux default behavior)
-        let tmuxSessionName: string | undefined = extraEnv.TMUX_SESSION_NAME;
+        let tmuxSessionName: string | undefined = sessionScopedEnv.TMUX_SESSION_NAME;
 
         // If tmux is not available or session name is explicitly undefined, fall back to regular spawning
         // Note: Empty string is valid (means use current/most recent tmux session)
@@ -993,7 +1022,7 @@ export async function startDaemon(): Promise<void> {
             : "";
           // Build --claude-env args for tmux command so profile env vars survive
           // Claude Code SDK settings.json overrides
-          const claudeEnvArgs = Object.entries(extraEnv)
+          const claudeEnvArgs = Object.entries(sessionScopedEnv)
             .map(([key, value]) => {
               // Escape single quotes in values for shell safety
               const escaped = value.replace(/'/g, "'\\''");
@@ -1008,24 +1037,6 @@ export async function startDaemon(): Promise<void> {
           // 2. Regular spawn uses env: { ...process.env, ...extraEnv }
           // 3. tmux needs explicit environment via -e flags to ensure all variables are available
           const windowName = `happy-${Date.now()}-${agent}`;
-          const tmuxEnv: Record<string, string> = {};
-
-          // Add all daemon environment variables (filtering out undefined and server-only secrets)
-          const TMUX_SERVER_ONLY_ENV_VARS = new Set([
-            "DATABASE_URL", "REDIS_URL", "JWT_SECRET", "ENCRYPTION_KEY",
-            "GITHUB_CLIENT_SECRET", "AWS_SECRET_ACCESS_KEY", "AWS_ACCESS_KEY_ID",
-            "AWS_SESSION_TOKEN", "STRIPE_SECRET_KEY", "SENDGRID_API_KEY",
-            "S3_ACCESS_KEY", "S3_SECRET_KEY",
-          ]);
-          for (const [key, value] of Object.entries(process.env)) {
-            if (value !== undefined && !TMUX_SERVER_ONLY_ENV_VARS.has(key)) {
-              tmuxEnv[key] = value;
-            }
-          }
-
-          // Add extra environment variables (these should already be filtered)
-          Object.assign(tmuxEnv, extraEnv);
-
           const tmuxResult = await tmux.spawnInTmux(
             [fullCommand],
             {
@@ -1033,7 +1044,7 @@ export async function startDaemon(): Promise<void> {
               windowName: windowName,
               cwd: directory,
             },
-            tmuxEnv,
+            finalSessionEnv,
           ); // Pass complete environment for tmux session
 
           if (tmuxResult.success) {
@@ -1160,33 +1171,15 @@ export async function startDaemon(): Promise<void> {
           // Pass profile env vars via --claude-env so they survive
           // Claude Code SDK settings.json overrides (SDK reads ~/.claude/settings.json
           // and may overwrite process.env values set by the profile)
-          for (const [key, value] of Object.entries(extraEnv)) {
+          for (const [key, value] of Object.entries(sessionScopedEnv)) {
             args.push("--claude-env", `${key}=${value}`);
           }
-
-          // Security: Strip server-internal secrets from child process environment
-          // so that Claude tool calls cannot leak operator infrastructure credentials.
-          // API keys needed by the session are already in extraEnv (from profile).
-          const SERVER_ONLY_ENV_VARS = new Set([
-            "DATABASE_URL", "REDIS_URL", "JWT_SECRET", "ENCRYPTION_KEY",
-            "GITHUB_CLIENT_SECRET", "AWS_SECRET_ACCESS_KEY", "AWS_ACCESS_KEY_ID",
-            "AWS_SESSION_TOKEN", "STRIPE_SECRET_KEY", "SENDGRID_API_KEY",
-            "S3_ACCESS_KEY", "S3_SECRET_KEY",
-          ]);
-          const filteredDaemonEnv = Object.fromEntries(
-            Object.entries(process.env).filter(
-              ([key]) => !SERVER_ONLY_ENV_VARS.has(key),
-            ),
-          );
 
           const happyProcess = spawnHappyCLI(args, {
             cwd: directory,
             detached: true, // Sessions stay alive when daemon stops
             stdio: ["ignore", "pipe", "pipe"], // Capture stdout/stderr for debugging
-            env: {
-              ...filteredDaemonEnv,
-              ...extraEnv,
-            },
+            env: finalSessionEnv,
           });
 
           happyProcess.stdout?.on("data", (data) => {
@@ -2304,9 +2297,31 @@ export async function startDaemon(): Promise<void> {
           emitSupervisorFixStatus,
           serverUrl: configuration.serverUrl,
           resolveGuardianSessionId: (data) => {
-            const resolved = guardianSessionRegistry.resolveForSupervisor(data);
+            const rawResolved = guardianSessionRegistry.resolveForSupervisor(data);
+            const guardianKey = data.loopId ? `loop:${data.loopId}` : `project:${data.projectId}`;
+            const resolved = resolveGuardianSession({
+              candidateSessionId: rawResolved,
+              isSessionTracked: (sessionId) => Boolean(findTrackedSessionByHappySessionId(sessionId)),
+              forgetSession: (sessionId) => {
+                void guardianSessionRegistry.forgetSession(sessionId).catch((error) => {
+                  logger.debug(`[DAEMON RUN] Failed to forget stale guardian session ${sessionId}: ${error}`);
+                });
+              },
+              onStaleSession: (sessionId) => {
+                void recordAutomationAuditEvent({
+                  kind: "guardian_cleared",
+                  projectId: data.projectId,
+                  runId: data.runId,
+                  loopId: data.loopId,
+                  trigger: data.trigger,
+                  sessionId,
+                  guardianKey,
+                  guardianSessionId: sessionId,
+                  message: `Forgot stale guardian session ${sessionId}`,
+                });
+              },
+            });
             if (resolved) {
-              const guardianKey = data.loopId ? `loop:${data.loopId}` : `project:${data.projectId}`;
               void recordAutomationAuditEvent({
                 kind: "guardian_reused",
                 projectId: data.projectId,
@@ -2341,7 +2356,28 @@ export async function startDaemon(): Promise<void> {
           spawnSession,
           resolveGuardianSessionId: (data) => {
             const guardianKey = `agent-loop:${data.loopId}`;
-            const resolved = guardianSessionRegistry.resolveByKey(guardianKey);
+            const rawResolved = guardianSessionRegistry.resolveByKey(guardianKey);
+            const resolved = resolveGuardianSession({
+              candidateSessionId: rawResolved,
+              isSessionTracked: (sessionId) => Boolean(findTrackedSessionByHappySessionId(sessionId)),
+              forgetSession: (sessionId) => {
+                void guardianSessionRegistry.forgetSession(sessionId).catch((error) => {
+                  logger.debug(`[DAEMON RUN] Failed to forget stale agent-loop guardian session ${sessionId}: ${error}`);
+                });
+              },
+              onStaleSession: (sessionId) => {
+                void recordAutomationAuditEvent({
+                  kind: "guardian_cleared",
+                  projectId: data.projectId,
+                  loopId: data.loopId,
+                  trigger: `agent_loop:${data.trigger}`,
+                  sessionId,
+                  guardianKey,
+                  guardianSessionId: sessionId,
+                  message: `Forgot stale agent-loop guardian session ${sessionId}`,
+                });
+              },
+            });
             if (resolved) {
               void recordAutomationAuditEvent({
                 kind: "guardian_reused",

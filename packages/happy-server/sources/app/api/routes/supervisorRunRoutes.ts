@@ -15,6 +15,8 @@ import { activityCache } from "@/app/presence/sessionCache";
 import { onRunCompleted as loopOnRunCompleted } from "@/modules/supervisorLoopEngine";
 import { log } from "@/utils/log";
 import { handleAutoApproval } from "@/app/api/socket/supervisorRunStatusHandler";
+import { resolveSupervisorProfile, parseDefaultProfileId } from "@/modules/supervisorProfileResolver";
+import { auth } from "@/app/auth/auth";
 
 /**
  * Supervisor run routes: trigger, list, detail, cancel, and status updates.
@@ -40,7 +42,6 @@ export function supervisorRunRoutes(app: Fastify) {
                             featureDirection: z.string().max(1000).optional(),
                         }).optional(),
                         profileId: z.string().optional(),
-                        profileEnvironmentVariables: z.record(z.string(), z.string()).optional(),
                     })
                     .optional(),
             },
@@ -134,6 +135,16 @@ export function supervisorRunRoutes(app: Fastify) {
             const concurrency = parseConcurrencyConfig(project.supervisorConfig);
             const maxFindings = parseMaxFindings(project.supervisorConfig);
 
+            const requestedProfileId = request.body?.profileId ?? parseDefaultProfileId(project.supervisorConfig);
+            const resolvedProfile = await resolveSupervisorProfile(userId, requestedProfileId);
+            const callbackToken = await auth.createSupervisorCallbackToken({
+                userId,
+                projectId: id,
+                machineId,
+                purpose: "run-status",
+                runId: run.id,
+            });
+
             eventRouter.emitEphemeral({
                 userId,
                 payload: buildSupervisorTriggerEphemeral({
@@ -152,8 +163,8 @@ export function supervisorRunRoutes(app: Fastify) {
                     maxConcurrentAnalysis: concurrency.maxAnalysis,
                     maxConcurrentFix: concurrency.maxFix,
                     maxFindings,
-                    profileId: request.body?.profileId,
-                    profileEnvironmentVariables: request.body?.profileEnvironmentVariables as Record<string, string> | undefined,
+                    callbackToken,
+                    runtimeProfile: resolvedProfile.runtimeProfile,
                 }),
                 recipientFilter: {
                     type: "machine-scoped-only",
@@ -357,12 +368,10 @@ export function supervisorRunRoutes(app: Fastify) {
     );
 
     // POST /v1/projects/:id/supervisor/runs/:runId/status — CLI callback to update run status
-    // NOTE: Currently uses standard authenticate. Phase 4 should add machine-scoped auth
-    // to prevent App clients from spoofing CLI status callbacks.
     app.post(
         "/v1/projects/:id/supervisor/runs/:runId/status",
         {
-            preHandler: app.authenticate,
+            preHandler: app.authenticateMachineScopedCallback,
             schema: {
                 params: z.object({
                     id: z.string(),
@@ -392,8 +401,42 @@ export function supervisorRunRoutes(app: Fastify) {
             },
         },
         async (request, reply) => {
-            const userId = request.userId;
+            const callbackAuth = request.supervisorCallbackAuth;
             const { id, runId } = request.params;
+            if (!callbackAuth || callbackAuth.purpose !== "run-status" || callbackAuth.projectId !== id || callbackAuth.runId !== runId) {
+                return reply.code(403).send({ error: "Callback token mismatch" });
+            }
+
+            const userId = callbackAuth.userId;
+            const machineId = callbackAuth.machineId;
+
+            const run = await db.supervisorRun.findFirst({
+                where: {
+                    id: runId,
+                    projectId: id,
+                    accountId: userId,
+                },
+                select: {
+                    id: true,
+                    sessionId: true,
+                    project: {
+                        select: {
+                            machineId: true,
+                        },
+                    },
+                },
+            });
+
+            if (!run) {
+                return reply
+                    .code(404)
+                    .send({ error: "Supervisor run not found" });
+            }
+
+            if (!machineId || run.project.machineId !== machineId) {
+                return reply.code(403).send({ error: "Machine mismatch" });
+            }
+
             const {
                 status,
                 artifactId,
@@ -408,6 +451,20 @@ export function supervisorRunRoutes(app: Fastify) {
                 reportContent,
                 actions: reportedActions,
             } = request.body;
+
+            if (sessionId) {
+                const matchedSession = await db.session.findFirst({
+                    where: {
+                        id: sessionId,
+                        accountId: userId,
+                        projectId: id,
+                    },
+                    select: { id: true },
+                });
+                if (!matchedSession) {
+                    return reply.code(403).send({ error: "Invalid session for machine" });
+                }
+            }
 
             // Atomic: only update if status is still pending/running
             const data: Prisma.SupervisorRunUpdateManyMutationInput = {

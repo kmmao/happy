@@ -29,6 +29,7 @@ export function resolveMessageModeMeta(
     Session,
     | "permissionMode"
     | "modelMode"
+    | "pinnedModelId"
     | "modelMappings"
     | "metadata"
     | "thinkingMode"
@@ -47,10 +48,12 @@ export function resolveMessageModeMeta(
         : "default";
 
   const modelMode = session.modelMode || "default";
-  // Apply model mappings: e.g., "opus" → "MiniMax-M2.7" if profile has modelMappings
-  const rawModel = modelMode !== "default" ? modelMode : null;
+  // Use the session-pinned model first so profile/model mapping changes cannot
+  // silently retarget an existing session after creation.
+  const rawModel =
+    session.pinnedModelId ?? (modelMode !== "default" ? modelMode : null);
   const model =
-    rawModel && session.modelMappings?.[rawModel]
+    rawModel && session.pinnedModelId == null && session.modelMappings?.[rawModel]
       ? session.modelMappings[rawModel]
       : rawModel;
 

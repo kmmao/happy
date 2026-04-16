@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { useShallow } from "zustand/react/shallow";
-import { Session, Machine, GitStatus } from "./storageTypes";
+import { Session, Machine, GitStatus, type SessionPreferences } from "./storageTypes";
 import { createReducer, reducer, ReducerState, BackgroundTaskEntry } from "./reducer/reducer";
 import { Message } from "./typesMessage";
 import { NormalizedMessage } from "./typesRaw";
@@ -38,6 +38,8 @@ import {
   saveSessionCustomModels,
   loadSessionProfiles,
   saveSessionProfiles,
+  loadPendingSessionPreferences,
+  savePendingSessionPreferences,
   deleteSessionBookmarks,
 } from "./persistence";
 import type { PermissionModeKey } from "@/components/PermissionModeSelector";
@@ -49,6 +51,12 @@ import { projectManager } from "./projectManager";
 import { DecryptedArtifact } from "./artifactTypes";
 import { FeedItem } from "./feedTypes";
 import { hasUnreadMessages as computeHasUnreadMessages } from "./unread";
+import { resolvePinnedModelIdFromSelection } from "./pinnedModel";
+import {
+  areSessionPreferencesEqual,
+  buildSessionPreferencesSnapshot,
+  overlayPendingSessionPreferences,
+} from "./sessionPreferencesState";
 
 // Debounce timer for realtimeMode changes
 let realtimeModeDebounceTimer: ReturnType<typeof setTimeout> | null = null;
@@ -205,6 +213,7 @@ interface StorageState {
   markSessionViewed: (sessionId: string) => void;
   updateSessionPermissionMode: (sessionId: string, mode: string) => void;
   updateSessionModelMode: (sessionId: string, mode: string) => void;
+  updateSessionPinnedModelId: (sessionId: string, modelId: string | null) => void;
   updateSessionCustomModels: (
     sessionId: string,
     customModels: Array<{
@@ -225,6 +234,11 @@ interface StorageState {
     sessionId: string,
     settings: SessionSdkSettings,
   ) => void;
+  getPendingSessionPreferences: (sessionId: string) => SessionPreferences | null;
+  clearPendingSessionPreferencesIfMatch: (
+    sessionId: string,
+    preferences: SessionPreferences,
+  ) => boolean;
   updateSessionPreferencesVersion: (sessionId: string, version: number) => void;
   // Artifact methods
   applyArtifacts: (artifacts: DecryptedArtifact[], replace?: boolean) => void;
@@ -395,7 +409,19 @@ export const storage = create<StorageState>()((set, get) => {
   let sessionModelMappings = loadSessionModelMappings();
   let sessionCustomModels = loadSessionCustomModels();
   let sessionProfiles = loadSessionProfiles();
+  let pendingSessionPreferences = loadPendingSessionPreferences();
   let sessionLastViewed = loadSessionLastViewed();
+
+  const stagePendingSessionPreferences = (sessionId: string) => {
+    const session = get().sessions[sessionId];
+    if (!session) return;
+    pendingSessionPreferences = {
+      ...pendingSessionPreferences,
+      [sessionId]: buildSessionPreferencesSnapshot(session),
+    };
+    savePendingSessionPreferences(pendingSessionPreferences);
+  };
+
   return {
     settings,
     settingsVersion: version,
@@ -626,6 +652,11 @@ export const storage = create<StorageState>()((set, get) => {
             savedCustomModelsAll[session.id] ??
             null;
 
+          const resolvedPinnedModelId =
+            state.sessions[session.id]?.pinnedModelId ??
+            session.pinnedModelId ??
+            null;
+
           // Resolve profile info: prefer existing in-memory, then server preferences, then saved MMKV
           const resolvedProfileId =
             state.sessions[session.id]?.profileId ??
@@ -654,7 +685,7 @@ export const storage = create<StorageState>()((set, get) => {
           const preservedResolvedModelId =
             state.sessions[session.id]?.resolvedModelId ?? session.resolvedModelId;
 
-          mergedSessions[session.id] = {
+          const mergedSession = {
             ...session,
             thinking: preservedThinking,
             thinkingAt: preservedThinkingAt,
@@ -663,6 +694,7 @@ export const storage = create<StorageState>()((set, get) => {
             draft: existingDraft || savedDraft || session.draft || null,
             permissionMode: resolvedPermissionMode,
             modelMode: resolvedModelMode,
+            pinnedModelId: resolvedPinnedModelId,
             modelMappings: resolvedModelMappings,
             customModels: resolvedCustomModels,
             profileId: resolvedProfileId,
@@ -679,6 +711,11 @@ export const storage = create<StorageState>()((set, get) => {
               resolvedModelId: preservedResolvedModelId,
             }),
           };
+
+          mergedSessions[session.id] = overlayPendingSessionPreferences(
+            mergedSession,
+            pendingSessionPreferences[session.id],
+          );
         });
 
         // Build active set from all sessions (including existing ones)
@@ -835,6 +872,7 @@ export const storage = create<StorageState>()((set, get) => {
     applyMessages: (sessionId: string, messages: NormalizedMessage[]) => {
       let changed = new Set<string>();
       let hasReadyEvent = false;
+      let pinnedModelIdChanged = false;
       set((state) => {
         // Resolve session messages state
         const existingSession = state.sessionMessages[sessionId] || {
@@ -887,6 +925,12 @@ export const storage = create<StorageState>()((set, get) => {
           session;
 
         if (needsUpdate) {
+          const nextPinnedModelId =
+            session.pinnedModelId ??
+            existingSession.reducerState.resolvedModelId ??
+            null;
+          pinnedModelIdChanged =
+            nextPinnedModelId !== (session.pinnedModelId ?? null);
           updatedSessions = {
             ...state.sessions,
             [sessionId]: {
@@ -903,6 +947,9 @@ export const storage = create<StorageState>()((set, get) => {
               // Copy actual model ID from turn-end events
               ...(existingSession.reducerState.resolvedModelId && {
                 resolvedModelId: existingSession.reducerState.resolvedModelId,
+              }),
+              ...(nextPinnedModelId && {
+                pinnedModelId: nextPinnedModelId,
               }),
             },
           };
@@ -933,13 +980,18 @@ export const storage = create<StorageState>()((set, get) => {
         };
       });
 
+      if (pinnedModelIdChanged) {
+        stagePendingSessionPreferences(sessionId);
+        onPreferencesChanged?.(sessionId);
+      }
+
       return { changed: Array.from(changed), hasReadyEvent };
     },
-    applyMessagesLoaded: (sessionId: string) =>
+    applyMessagesLoaded: (sessionId: string) => {
+      let pinnedModelIdChanged = false;
       set((state) => {
         const existingSession = state.sessionMessages[sessionId];
         let result: StorageState;
-
         if (!existingSession) {
           // First time loading - check for AgentState
           const session = state.sessions[sessionId];
@@ -969,12 +1021,19 @@ export const storage = create<StorageState>()((set, get) => {
           // Extract latestUsage and resolvedModelId from reducerState if available and update session
           let updatedSessions = state.sessions;
           if (session && (reducerState.latestUsage || reducerState.resolvedModelId)) {
+            const nextPinnedModelId =
+              session.pinnedModelId ??
+              reducerState.resolvedModelId ??
+              null;
+            pinnedModelIdChanged =
+              nextPinnedModelId !== (session.pinnedModelId ?? null);
             updatedSessions = {
               ...state.sessions,
               [sessionId]: {
                 ...session,
                 ...(reducerState.latestUsage && { latestUsage: { ...reducerState.latestUsage } }),
                 ...(reducerState.resolvedModelId && { resolvedModelId: reducerState.resolvedModelId }),
+                ...(nextPinnedModelId && { pinnedModelId: nextPinnedModelId }),
               },
             };
           }
@@ -1006,7 +1065,13 @@ export const storage = create<StorageState>()((set, get) => {
         }
 
         return result;
-      }),
+      });
+
+      if (pinnedModelIdChanged) {
+        stagePendingSessionPreferences(sessionId);
+        onPreferencesChanged?.(sessionId);
+      }
+    },
     restoreMessagesFromCache: (
       sessionId: string,
       cached: { messages: readonly Message[]; lastSeq: number },
@@ -1347,12 +1412,17 @@ export const storage = create<StorageState>()((set, get) => {
           sessions: updatedSessions,
         };
       });
+      stagePendingSessionPreferences(sessionId);
       onPreferencesChanged?.(sessionId);
     },
     updateSessionModelMode: (sessionId: string, mode: string) => {
       set((state) => {
         const session = state.sessions[sessionId];
         if (!session) return state;
+        const nextPinnedModelId = resolvePinnedModelIdFromSelection(
+          mode,
+          session.modelMappings,
+        );
 
         // Update the session with the new model mode
         const updatedSessions = {
@@ -1360,6 +1430,7 @@ export const storage = create<StorageState>()((set, get) => {
           [sessionId]: {
             ...session,
             modelMode: mode,
+            pinnedModelId: nextPinnedModelId,
           },
         };
 
@@ -1378,7 +1449,33 @@ export const storage = create<StorageState>()((set, get) => {
           sessions: updatedSessions,
         };
       });
+      stagePendingSessionPreferences(sessionId);
       onPreferencesChanged?.(sessionId);
+    },
+    updateSessionPinnedModelId: (sessionId: string, modelId: string | null) => {
+      let changed = false;
+      set((state) => {
+        const session = state.sessions[sessionId];
+        if (!session || (session.pinnedModelId ?? null) === modelId) {
+          return state;
+        }
+        changed = true;
+
+        return {
+          ...state,
+          sessions: {
+            ...state.sessions,
+            [sessionId]: {
+              ...session,
+              pinnedModelId: modelId,
+            },
+          },
+        };
+      });
+      if (changed) {
+        stagePendingSessionPreferences(sessionId);
+        onPreferencesChanged?.(sessionId);
+      }
     },
     updateSessionCustomModels: (
       sessionId: string,
@@ -1417,6 +1514,7 @@ export const storage = create<StorageState>()((set, get) => {
           sessions: updatedSessions,
         };
       });
+      stagePendingSessionPreferences(sessionId);
       onPreferencesChanged?.(sessionId);
     },
     updateSessionModelMappings: (
@@ -1452,6 +1550,7 @@ export const storage = create<StorageState>()((set, get) => {
           sessions: updatedSessions,
         };
       });
+      stagePendingSessionPreferences(sessionId);
       onPreferencesChanged?.(sessionId);
     },
     updateSessionProfile: (
@@ -1491,6 +1590,7 @@ export const storage = create<StorageState>()((set, get) => {
           sessions: updatedSessions,
         };
       });
+      stagePendingSessionPreferences(sessionId);
       onPreferencesChanged?.(sessionId);
     },
     updateSessionSdkSettings: (
@@ -1545,7 +1645,23 @@ export const storage = create<StorageState>()((set, get) => {
           sessions: updatedSessions,
         };
       });
+      stagePendingSessionPreferences(sessionId);
       onPreferencesChanged?.(sessionId);
+    },
+    getPendingSessionPreferences: (sessionId: string) =>
+      pendingSessionPreferences[sessionId] ?? null,
+    clearPendingSessionPreferencesIfMatch: (
+      sessionId: string,
+      preferences: SessionPreferences,
+    ) => {
+      const current = pendingSessionPreferences[sessionId];
+      if (!current || !areSessionPreferencesEqual(current, preferences)) {
+        return false;
+      }
+      const { [sessionId]: _cleared, ...remaining } = pendingSessionPreferences;
+      pendingSessionPreferences = remaining;
+      savePendingSessionPreferences(pendingSessionPreferences);
+      return true;
     },
     updateSessionPreferencesVersion: (sessionId: string, version: number) =>
       set((state) => {
@@ -1717,6 +1833,11 @@ export const storage = create<StorageState>()((set, get) => {
         const customModels = loadSessionCustomModels();
         delete customModels[sessionId];
         saveSessionCustomModels(customModels);
+
+        const { [sessionId]: _pendingPrefs, ...remainingPendingPrefs } =
+          pendingSessionPreferences;
+        pendingSessionPreferences = remainingPendingPrefs;
+        savePendingSessionPreferences(pendingSessionPreferences);
 
         delete sessionLastViewed[sessionId];
         saveSessionLastViewed(sessionLastViewed);

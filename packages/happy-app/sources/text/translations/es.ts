@@ -934,6 +934,20 @@ export const es: TranslationStructure = {
       breakdownTitle: "Desglose de tokens",
       breakdownMessage:
         "↓ Lectura de caché – Tokens reutilizados de la caché de contexto anterior. Reduce el costo significativamente.\n\nin Entrada – Nuevos tokens enviados en este turno (tu mensaje + resultados de herramientas).\n\nout Salida – Tokens generados por el modelo en este turno.\n\n↑ Escritura de caché – Tokens escritos en caché en este turno, reutilizables como lectura de caché en el siguiente.",
+      systemLabel: "Sistema",
+      userLabel: "Usuario",
+      assistantLabel: "Asistente",
+      toolCallLabel: "Llamada de herramienta",
+      toolResultLabel: "Resultado de herramienta",
+      attachmentLabel: "Adjunto",
+      expandBreakdown: "Expandir desglose de tokens",
+      collapseBreakdown: "Contraer desglose de tokens",
+      sourceLabel: "Origen",
+      sourceSdkCategories: "Categorías del SDK",
+      sourceFallback: "Fallback de messageBreakdown",
+      sourceInfoTitle: "Origen del desglose",
+      sourceSdkCategoriesMessage: "Este desglose proviene directamente de las categorías proporcionadas por el SDK. Es la fuente preferida y puede incluir grupos más granulares, como el prompt del sistema o categorías personalizadas.",
+      sourceFallbackMessage: "Las categorías del SDK no estuvieron disponibles en este turno, así que este panel recurre al fallback de messageBreakdown. Ese fallback es más grueso y puede omitir datos del sistema, caché u otras categorías que no sean mensajes.",
     },
     suggestion: {
       fileLabel: "ARCHIVO",
@@ -2532,6 +2546,7 @@ export const es: TranslationStructure = {
         `¿Restablecer "${name}" a los valores predeterminados? Se perderán tus personalizaciones.`,
       confirm: "Restablecer",
     },
+    saveFailed: "Error al guardar el perfil. Inténtalo de nuevo.",
   },
 
   git: {
@@ -3591,6 +3606,7 @@ export const es: TranslationStructure = {
     defaultProfileSection: "Perfil de ejecución predeterminado",
     defaultProfileDesc: "Selecciona el perfil de backend de IA para los análisis de salud y el modo bucle. Si el perfil seleccionado no está configurado en esta máquina, la ejecución fallará con un error.",
     defaultProfileNone: "No hay perfiles configurados. Añade perfiles en Ajustes → Perfiles.",
+    defaultProfileMissing: ({ profileName }: { profileName: string }) => `El perfil seleccionado \"${profileName}\" ya no está disponible en este dispositivo. Vuelve a seleccionarlo en la configuración de Supervisor.`,
     defaultProfileDefault: "Predeterminado (configuración CLI)",
 
     notificationsSection: "Notificaciones",

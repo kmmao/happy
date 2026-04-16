@@ -1,6 +1,7 @@
 import Constants from "expo-constants";
 import { apiSocket } from "@/sync/apiSocket";
 import { AuthCredentials } from "@/auth/tokenStorage";
+import { hasCredentialSecret } from "@/auth/authCredentials";
 import { Encryption } from "@/sync/encryption/encryption";
 import { SessionEncryption } from "@/sync/encryption/sessionEncryption";
 import { decodeBase64 } from "@/encryption/base64";
@@ -75,6 +76,10 @@ import {
   settingsDefaults,
   settingsParse,
 } from "./settings";
+import {
+  mergeServerSettingsWithLocalProfiles,
+  stripManagedAccountProfileSettings,
+} from "./accountProfileSettings";
 import { profileParse } from "./profile";
 import {
   loadPendingSettings,
@@ -118,6 +123,8 @@ import {
   saveMessageCache,
   deleteMessageCache,
 } from "./messageCache";
+import { fetchAccountProfiles } from "./apiAccountProfiles";
+import { mergeAccountProfiles } from "@/utils/mergeAccountProfiles";
 import {
   fetchProjects,
   resolveProject,
@@ -168,6 +175,7 @@ class Sync {
   private cacheWriteTimers = new Map<string, ReturnType<typeof setTimeout>>();
   private settingsSync: InvalidateSync;
   private profileSync: InvalidateSync;
+  private accountProfilesSync: InvalidateSync;
   private purchasesSync: InvalidateSync;
   private machinesSync: InvalidateSync;
   private pushTokenSync: InvalidateSync;
@@ -263,6 +271,7 @@ class Sync {
     this.sessionsSync = new InvalidateSync(this.fetchSessions);
     this.settingsSync = new InvalidateSync(this.syncSettings);
     this.profileSync = new InvalidateSync(this.fetchProfile);
+    this.accountProfilesSync = new InvalidateSync(this.syncAccountProfiles);
     this.purchasesSync = new InvalidateSync(this.syncPurchases);
     this.machinesSync = new InvalidateSync(this.fetchMachines);
     this.nativeUpdateSync = new InvalidateSync(this.fetchNativeUpdate);
@@ -304,6 +313,7 @@ class Sync {
         log.log("📱 App became active");
         this.purchasesSync.invalidate();
         this.profileSync.invalidate();
+        this.accountProfilesSync.invalidate();
         this.machinesSync.invalidate();
         this.pushTokenSync.invalidate();
         this.sessionsSync.invalidate();
@@ -343,6 +353,9 @@ class Sync {
 
     // Await profile sync to have fresh profile
     await this.profileSync.awaitQueue();
+
+    // Await account profile sync so selectors see server-backed profiles immediately
+    await this.accountProfilesSync.awaitQueue();
 
     // Await purchases sync to have fresh purchases
     await this.purchasesSync.awaitQueue();
@@ -393,6 +406,7 @@ class Sync {
     this.sessionsSync.invalidate();
     this.settingsSync.invalidate();
     this.profileSync.invalidate();
+    this.accountProfilesSync.invalidate();
     this.purchasesSync.invalidate();
     this.machinesSync.invalidate();
     this.pushTokenSync.invalidate();
@@ -1061,6 +1075,7 @@ class Sync {
           ? {
               permissionMode: preferences.permissionMode,
               modelMode: preferences.modelMode,
+              pinnedModelId: preferences.pinnedModelId,
               customModels: preferences.customModels,
               modelMappings: preferences.modelMappings,
               profileId: preferences.profileId,
@@ -1104,6 +1119,7 @@ class Sync {
       const hasLocalData =
         (session.permissionMode && session.permissionMode !== "default") ||
         (session.modelMode && session.modelMode !== "default") ||
+        session.pinnedModelId ||
         session.customModels ||
         session.modelMappings ||
         session.profileId ||
@@ -1290,6 +1306,7 @@ class Sync {
         const preferences = {
           permissionMode: session.permissionMode,
           modelMode: session.modelMode,
+          pinnedModelId: session.pinnedModelId,
           customModels: session.customModels,
           modelMappings: session.modelMappings,
           profileId: session.profileId,
@@ -1314,6 +1331,9 @@ class Sync {
         });
 
         if (result.result === "success" && result.version !== undefined) {
+          storage
+            .getState()
+            .clearPendingSessionPreferencesIfMatch(sessionId, preferences);
           // Update preferencesVersion in storage
           storage
             .getState()
@@ -1644,14 +1664,25 @@ class Sync {
     const API_ENDPOINT = getServerUrl();
     const maxRetries = 3;
     let retryCount = 0;
+    const syncablePendingSettings = stripManagedAccountProfileSettings(
+      this.pendingSettings,
+    );
+
+    if (
+      Object.keys(syncablePendingSettings).length !==
+      Object.keys(this.pendingSettings).length
+    ) {
+      this.pendingSettings = syncablePendingSettings;
+      savePendingSettings(syncablePendingSettings);
+    }
 
     // Apply pending settings
-    if (Object.keys(this.pendingSettings).length > 0) {
+    if (Object.keys(syncablePendingSettings).length > 0) {
       while (retryCount < maxRetries) {
         let version = storage.getState().settingsVersion;
         let settings = applySettings(
           storage.getState().settings,
-          this.pendingSettings,
+          syncablePendingSettings,
         );
         const response = await fetch(`${API_ENDPOINT}/v1/account/settings`, {
           method: "POST",
@@ -1688,9 +1719,9 @@ class Sync {
             : { ...settingsDefaults };
 
           // Merge: server base + our pending changes (our changes win)
-          const mergedSettings = applySettings(
-            serverSettings,
-            this.pendingSettings,
+          const mergedSettings = mergeServerSettingsWithLocalProfiles(
+            applySettings(serverSettings, syncablePendingSettings),
+            storage.getState().settings.profiles,
           );
 
           // Update local storage with merged result at server's version
@@ -1704,7 +1735,7 @@ class Sync {
           }
 
           // Log and retry
-          log.log(`settings version-mismatch, retrying: serverVersion=${data.currentVersion}, retry=${retryCount + 1}, pendingKeys=${Object.keys(this.pendingSettings).join(",")}`);
+          log.log(`settings version-mismatch, retrying: serverVersion=${data.currentVersion}, retry=${retryCount + 1}, pendingKeys=${Object.keys(syncablePendingSettings).join(",")}`);
           retryCount++;
           continue;
         } else {
@@ -1744,6 +1775,10 @@ class Sync {
     } else {
       parsedSettings = { ...settingsDefaults };
     }
+    parsedSettings = mergeServerSettingsWithLocalProfiles(
+      parsedSettings,
+      storage.getState().settings.profiles,
+    );
 
     // Apply settings to storage
     storage.getState().applySettings(parsedSettings, data.settingsVersion);
@@ -1756,6 +1791,21 @@ class Sync {
         tracking.optIn();
       }
     }
+  };
+
+  private syncAccountProfiles = async () => {
+    if (!this.credentials) return;
+
+    const remoteProfiles = await fetchAccountProfiles(this.credentials);
+    const currentLocalProfiles = storage.getState().settings.profiles ?? [];
+    const mergedProfiles = mergeAccountProfiles({
+      localProfiles: currentLocalProfiles,
+      remoteProfiles,
+    });
+
+    storage.getState().applySettingsLocal({
+      profiles: mergedProfiles.profiles,
+    });
   };
 
   private fetchProfile = async () => {
@@ -2244,6 +2294,24 @@ class Sync {
     // Subscribe to connection state changes
     apiSocket.onReconnected(() => {
       log.log("🔌 Socket reconnected");
+      const syncState = storage.getState();
+      const sessionsToReset = Object.values(syncState.sessions).map((session) => {
+        const { presence: _presence, ...rest } = session;
+        return {
+          ...rest,
+          rpcReady: false,
+        };
+      });
+      if (sessionsToReset.length > 0) {
+        syncState.applySessions(sessionsToReset);
+      }
+      const machinesToReset = Object.values(syncState.machines).map((machine) => ({
+        ...machine,
+        rpcReady: false,
+      }));
+      if (machinesToReset.length > 0) {
+        syncState.applyMachines(machinesToReset);
+      }
       this.sessionsSync.invalidate();
       this.machinesSync.invalidate();
       log.log("🔌 Socket reconnected: Invalidating artifacts sync");
@@ -2251,7 +2319,7 @@ class Sync {
       this.friendsSync.invalidate();
       this.friendRequestsSync.invalidate();
       this.feedSync.invalidate();
-      const sessionsData = storage.getState().sessionsData;
+      const sessionsData = syncState.sessionsData;
       if (sessionsData) {
         for (const item of sessionsData) {
           if (typeof item !== "string") {
@@ -2926,6 +2994,10 @@ export async function syncRestore(credentials: AuthCredentials) {
 }
 
 async function syncInit(credentials: AuthCredentials, restore: boolean) {
+  if (!hasCredentialSecret(credentials)) {
+    throw new Error("Auth credentials do not include a sync secret");
+  }
+
   // Initialize sync engine
   const secretKey = decodeBase64(credentials.secret, "base64url");
   if (secretKey.length !== 32) {

@@ -18,6 +18,7 @@ import { projectPath } from '@/projectPath'
 import { logger } from '@/ui/logger'
 import packageJson from '../../package.json'
 import type { AutomationJob } from '@/automation/types'
+import { sanitizeProcessArgv } from '@/utils/securityRedaction'
 
 /**
  * Get relevant environment information for debugging
@@ -32,7 +33,7 @@ export function getEnvironmentInfo(): Record<string, any> {
         NODE_ENV: process.env.NODE_ENV,
         DEBUG: process.env.DEBUG,
         workingDirectory: process.cwd(),
-        processArgv: process.argv,
+        processArgv: sanitizeProcessArgv(process.argv),
         happyDir: configuration?.happyHomeDir,
         serverUrl: configuration?.serverUrl,
         logsDir: configuration?.logsDir,

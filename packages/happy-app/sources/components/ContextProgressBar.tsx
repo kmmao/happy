@@ -9,6 +9,12 @@ import {
     getContextWindowSize,
 } from "@/utils/formatUsage";
 import type { AnimatedTokensCostValue } from "./AnimatedTokensCost";
+import {
+    getContextBreakdownItems,
+    getContextBreakdownSource,
+    type ContextUsageData,
+} from "./contextBreakdown";
+import { ContextBreakdownPanel } from "./ContextBreakdownPanel";
 
 export const getContextWarning = (
     contextSize: number,
@@ -61,22 +67,7 @@ export const getProgressBarColor = (
     return theme.colors.success;
 };
 
-export type ContextUsageData = {
-    totalTokens: number;
-    maxTokens: number;
-    percentage: number;
-    model?: string;
-    categories?: Array<{ name: string; tokens: number; color?: string }>;
-    isAutoCompactEnabled?: boolean;
-    autoCompactThreshold?: number;
-    messageBreakdown?: {
-        toolCallTokens: number;
-        toolResultTokens: number;
-        attachmentTokens: number;
-        assistantMessageTokens: number;
-        userMessageTokens: number;
-    };
-};
+export type { ContextUsageData } from "./contextBreakdown";
 
 export const ContextProgressBar: React.FC<{
     contextSize: number;
@@ -88,6 +79,14 @@ export const ContextProgressBar: React.FC<{
     extraSummary?: AnimatedTokensCostValue | null;
 }> = ({ contextSize, alwaysShow, modelCode, sdkContextWindow, theme, sdkContextUsage, extraSummary }) => {
     const hasPreciseData = sdkContextUsage && sdkContextUsage.maxTokens > 0;
+    const breakdownItems = React.useMemo(
+        () => getContextBreakdownItems(sdkContextUsage, t),
+        [sdkContextUsage],
+    );
+    const breakdownSource = React.useMemo(
+        () => getContextBreakdownSource(sdkContextUsage),
+        [sdkContextUsage],
+    );
     const percentageUsed = hasPreciseData
         ? Math.min(100, sdkContextUsage.percentage)
         : (() => {
@@ -161,6 +160,11 @@ export const ContextProgressBar: React.FC<{
                     </Text>
                 ) : null}
             </Text>
+            <ContextBreakdownPanel
+                items={breakdownItems}
+                source={breakdownSource}
+                theme={theme}
+            />
         </View>
     );
 };

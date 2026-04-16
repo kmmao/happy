@@ -4,27 +4,57 @@ import { encodeBase64 } from "../encryption/base64";
 import { getServerUrl } from "@/sync/serverConfig";
 import { log } from '@/log';
 
-interface AuthRequestStatus {
+export interface AuthRequestStatus {
     status: 'not_found' | 'pending' | 'authorized';
     supportsV2: boolean;
 }
 
-export async function authApprove(token: string, publicKey: Uint8Array, answerV1: Uint8Array, answerV2: Uint8Array) {
+export interface AuthApprovalResponses {
+    responseV1?: Uint8Array | null;
+    responseV2?: Uint8Array | null;
+}
+
+export async function getTerminalAuthRequestStatus(publicKey: Uint8Array): Promise<AuthRequestStatus> {
     const API_ENDPOINT = getServerUrl();
     const publicKeyBase64 = encodeBase64(publicKey);
-    
-    // First, check the auth request status
     const statusResponse = await axios.get<AuthRequestStatus>(
         `${API_ENDPOINT}/v1/auth/request/status`,
         {
             params: {
-                publicKey: publicKeyBase64
-            }
-        }
+                publicKey: publicKeyBase64,
+            },
+        },
     );
-    
-    const { status, supportsV2 } = statusResponse.data;
-    
+    return statusResponse.data;
+}
+
+function selectApprovalResponse(
+    status: AuthRequestStatus,
+    responses: AuthApprovalResponses,
+): string {
+    if (status.supportsV2) {
+        if (!responses.responseV2) {
+            throw new Error("missing V2 response for terminal auth approval");
+        }
+        return encodeBase64(responses.responseV2);
+    }
+
+    if (!responses.responseV1) {
+        throw new Error("missing V1 response for terminal auth approval");
+    }
+
+    return encodeBase64(responses.responseV1);
+}
+
+export async function authApprove(
+    token: string,
+    publicKey: Uint8Array,
+    responses: AuthApprovalResponses,
+) {
+    const API_ENDPOINT = getServerUrl();
+    const publicKeyBase64 = encodeBase64(publicKey);
+    const { status, supportsV2 } = await getTerminalAuthRequestStatus(publicKey);
+
     // Handle different status cases
     if (status === 'not_found') {
         // Already authorized, no need to approve again
@@ -40,9 +70,10 @@ export async function authApprove(token: string, publicKey: Uint8Array, answerV1
     
     // Handle pending status
     if (status === 'pending') {
+        const response = selectApprovalResponse({ status, supportsV2 }, responses);
         await axios.post(`${API_ENDPOINT}/v1/auth/response`, {
             publicKey: publicKeyBase64,
-            response: supportsV2 ? encodeBase64(answerV2) : encodeBase64(answerV1)
+            response,
         }, {
             headers: {
                 'Authorization': `Bearer ${token}`,

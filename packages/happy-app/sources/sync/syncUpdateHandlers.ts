@@ -433,6 +433,9 @@ export async function handleUpdateSessionUpdate(
         metadataUpdate: body.metadata,
         preferences,
         preferencesUpdate: preferencesData,
+        pendingPreferences: storage
+            .getState()
+            .getPendingSessionPreferences(session.id),
     });
 
     if (body.metadata && metadataDecryptFailed) {
@@ -446,10 +449,7 @@ export async function handleUpdateSessionUpdate(
         updatedSession,
     ]);
 
-    // Invalidate git status when agent state changes
     if (body.agentState) {
-        gitStatusSync.invalidate(body.id);
-
         // Check for new permission requests and notify voice assistant
         if (agentState?.requests && Object.keys(agentState.requests).length > 0) {
             const requestIds = Object.keys(agentState.requests);

@@ -6,6 +6,7 @@ import React, {
   ReactNode,
 } from "react";
 import { TokenStorage, AuthCredentials } from "@/auth/tokenStorage";
+import { hasCredentialSecret } from "@/auth/authCredentials";
 import { syncCreate } from "@/sync/sync";
 import { clearPersistence } from "@/sync/persistence";
 import { trackLogout } from "@/track";
@@ -26,7 +27,9 @@ export function AuthProvider({
   children: ReactNode;
   initialCredentials: AuthCredentials | null;
 }) {
-  const [isAuthenticated, setIsAuthenticated] = useState(!!initialCredentials);
+  const [isAuthenticated, setIsAuthenticated] = useState(
+    hasCredentialSecret(initialCredentials),
+  );
   const [credentials, setCredentials] = useState<AuthCredentials | null>(
     initialCredentials,
   );

@@ -13,7 +13,6 @@ import { Typography } from "@/constants/Typography";
 import { t } from "@/text";
 import { Project } from "@/sync/projectManager";
 import { TokenStorage } from "@/auth/tokenStorage";
-import { getProfileEnvironmentVariables } from "@/sync/settings";
 import { getBuiltInProfile } from "@/sync/profileUtils";
 import { onProjectEvent } from "@/utils/projectEvents";
 import { useHappyAction } from "@/hooks/useHappyAction";
@@ -29,7 +28,6 @@ import {
     fetchSupervisorRuns,
     cancelSupervisorRun,
     SupervisorAlreadyRunningError,
-    type SupervisorAction,
     fetchSupervisorActions,
     type SupervisorCostSummary,
     fetchSupervisorCost,
@@ -80,9 +78,6 @@ export const ProjectHealthTab = React.memo(
         const router = useRouter();
         const [runs, setRuns] = React.useState<SupervisorRun[]>([]);
         const [total, setTotal] = React.useState(0);
-        const [pendingActions, setPendingActions] = React.useState<
-            SupervisorAction[]
-        >([]);
         const [pendingActionsTotal, setPendingActionsTotal] =
             React.useState(0);
         const [costSummary, setCostSummary] =
@@ -109,17 +104,18 @@ export const ProjectHealthTab = React.memo(
 
         const serverId = project.serverId;
 
-        // Resolve profile environment variables for a given profileId
-        const resolveProfileEnvVars = React.useCallback((profileId: string | null): Record<string, string> | undefined => {
-            if (!profileId) return undefined;
-            // Try built-in profile first
+        const resolveProfileName = React.useCallback((profileId: string | null): string | null => {
+            if (!profileId) return null;
             const builtIn = getBuiltInProfile(profileId);
-            if (builtIn) return getProfileEnvironmentVariables(builtIn);
-            // Try user-defined profile from settings
+            if (builtIn) return builtIn.name;
             const userProfiles = storage.getState().settings.profiles ?? [];
             const userProfile = userProfiles.find((p) => p.id === profileId);
-            if (userProfile) return getProfileEnvironmentVariables(userProfile);
-            return undefined;
+            return userProfile?.name ?? null;
+        }, []);
+
+        const isBuiltInProfile = React.useCallback((profileId: string | null): boolean => {
+            if (!profileId) return false;
+            return getBuiltInProfile(profileId) != null;
         }, []);
 
         // Read defaultProfileId from supervisorConfig JSON
@@ -132,6 +128,13 @@ export const ProjectHealthTab = React.memo(
                 return null;
             }
         }, [project.supervisorConfig]);
+
+        const missingDefaultProfileName = React.useMemo(() => {
+            if (!defaultProfileId) return null;
+            const builtIn = getBuiltInProfile(defaultProfileId);
+            if (builtIn) return null;
+            return resolveProfileName(defaultProfileId) ?? defaultProfileId;
+        }, [defaultProfileId, resolveProfileName]);
 
         const loadData = React.useCallback(async () => {
             if (!serverId) return;
@@ -168,7 +171,6 @@ export const ProjectHealthTab = React.memo(
                     ]);
                 setRuns(runsResult.runs);
                 setTotal(runsResult.total);
-                setPendingActions(actionsResult.actions);
                 setPendingActionsTotal(actionsResult.total);
                 setCostSummary(costResult);
                 setTrendData(trendResult);
@@ -422,11 +424,7 @@ export const ProjectHealthTab = React.memo(
                 const credentials = await TokenStorage.getCredentials();
                 if (!credentials) return;
                 try {
-                    const envVars = resolveProfileEnvVars(defaultProfileId);
-                    const run = await triggerSupervisorRun(credentials, serverId, {
-                        ...(defaultProfileId ? { profileId: defaultProfileId } : {}),
-                        ...(envVars ? { profileEnvironmentVariables: envVars } : {}),
-                    });
+                    const run = await triggerSupervisorRun(credentials, serverId, {});
                     // Optimistic: add the new run to the list immediately
                     setRuns((prev) => [run, ...prev]);
                 } catch (e) {
@@ -435,7 +433,7 @@ export const ProjectHealthTab = React.memo(
                     }
                     throw e;
                 }
-            }, [serverId, defaultProfileId]),
+            }, [serverId, defaultProfileId, isBuiltInProfile]),
         );
 
         const handleLoopStarted = React.useCallback((loop: SupervisorLoop) => {
@@ -590,6 +588,21 @@ export const ProjectHealthTab = React.memo(
                                 </View>
                             ) : null}
                         </Pressable>
+
+                        {missingDefaultProfileName && (
+                            <View style={styles.missingProfileBanner}>
+                                <Ionicons
+                                    name="alert-circle-outline"
+                                    size={16}
+                                    color="#FF9500"
+                                />
+                                <Text style={styles.missingProfileBannerText}>
+                                    {t("supervisor.defaultProfileMissing", {
+                                        profileName: missingDefaultProfileName,
+                                    })}
+                                </Text>
+                            </View>
+                        )}
 
                         {/* Action buttons */}
                         <View style={styles.actionRow}>
@@ -935,7 +948,7 @@ export const ProjectHealthTab = React.memo(
                                     run={run}
                                     isLast={index === Math.min(healthRuns.length, 3) - 1}
                                     onPress={
-                                        run.status === "completed" && serverId
+                                        run.status !== "pending" && run.status !== "running" && serverId
                                             ? () =>
                                                   router.push({
                                                       pathname:
@@ -1065,6 +1078,23 @@ const styles = StyleSheet.create((theme) => ({
     autonomyActionText: {
         ...Typography.default("semiBold"),
         fontSize: 12,
+    },
+    missingProfileBanner: {
+        flexDirection: "row",
+        alignItems: "flex-start",
+        gap: 8,
+        paddingHorizontal: 12,
+        paddingVertical: 10,
+        borderRadius: 10,
+        backgroundColor: "#FF950014",
+        marginTop: 12,
+    },
+    missingProfileBannerText: {
+        ...Typography.default(),
+        flex: 1,
+        fontSize: 12,
+        lineHeight: 18,
+        color: theme.colors.text,
     },
     actionRow: {
         flexDirection: "row",

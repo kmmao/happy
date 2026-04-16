@@ -1,4 +1,5 @@
 import type { Session, Metadata, SessionPreferences } from "./storageTypes";
+import { overlayPendingSessionPreferences } from "./sessionPreferencesState";
 
 type MetadataUpdate = {
   version: number;
@@ -18,6 +19,7 @@ type MergeUpdatedSessionInput = {
   metadataUpdate?: MetadataUpdate;
   preferences: SessionPreferences | null;
   preferencesUpdate?: PreferencesUpdate;
+  pendingPreferences?: SessionPreferences | null;
 };
 
 type MergeUpdatedSessionResult = {
@@ -49,6 +51,7 @@ export function mergeUpdatedSession(
       ? {
           permissionMode: input.preferences.permissionMode,
           modelMode: input.preferences.modelMode,
+          pinnedModelId: input.preferences.pinnedModelId,
           customModels: input.preferences.customModels,
           modelMappings: input.preferences.modelMappings,
           profileId: input.preferences.profileId,
@@ -57,6 +60,7 @@ export function mergeUpdatedSession(
           thinkingBudget: input.preferences.thinkingBudget,
           effortLevel: input.preferences.effortLevel,
           maxBudgetUsd: input.preferences.maxBudgetUsd,
+          taskBudgetTokens: input.preferences.taskBudgetTokens,
         }
       : {}),
     updatedAt: input.updatedAt,
@@ -64,7 +68,10 @@ export function mergeUpdatedSession(
   };
 
   return {
-    updatedSession,
+    updatedSession: overlayPendingSessionPreferences(
+      updatedSession,
+      input.pendingPreferences,
+    ),
     metadataDecryptFailed,
   };
 }

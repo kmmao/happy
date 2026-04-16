@@ -41,6 +41,10 @@ import type {
   SpawnSessionOptions,
   SpawnSessionResult,
 } from "@/modules/common/registerCommonHandlers";
+import {
+  normalizeResolvedRuntimeProfile,
+  type ResolvedRuntimeProfile,
+} from "@kmmao/happy-wire";
 
 export interface SupervisorHandlerDeps {
   readonly spawnSession: (
@@ -136,6 +140,7 @@ export async function handleSupervisorTrigger(
   data: SupervisorTriggerData,
   deps: SupervisorHandlerDeps,
 ): Promise<{ success: boolean; errorMessage?: string; sessionId?: string }> {
+  const runtimeProfile = normalizeResolvedRuntimeProfile(data.runtimeProfile);
   const {
     runId,
     projectId,
@@ -164,6 +169,12 @@ export async function handleSupervisorTrigger(
     logger.debug(
       `[SUPERVISOR] Loop ${loopId} iteration ${loopIteration ?? "?"}: trigger=${trigger} run=${runId}`,
     );
+  }
+
+  if (data.runtimeProfile && !runtimeProfile) {
+    const errorMessage = "Supervisor runtime profile payload is invalid or unsupported";
+    logger.warn(`[SUPERVISOR] ${errorMessage}`);
+    return { success: false, errorMessage };
   }
 
   // Apply concurrency limits from server config (if provided)
@@ -195,11 +206,15 @@ export async function handleSupervisorTrigger(
   // Validate profileId if specified — fail fast with a clear error rather than silently ignoring
   // Built-in profile IDs (hardcoded in App's profileUtils) are always valid
   const BUILT_IN_PROFILE_IDS = new Set(["anthropic", "deepseek", "zai", "openai", "azure-openai", "minimax", "kimi"]);
-  if (data.profileId && !BUILT_IN_PROFILE_IDS.has(data.profileId)) {
+  if (
+    runtimeProfile?.profileId &&
+    runtimeProfile.source === "local-profile" &&
+    !BUILT_IN_PROFILE_IDS.has(runtimeProfile.profileId)
+  ) {
     const settings = await readSettings();
-    const profileExists = settings.profiles.some((p) => p.id === data.profileId);
+    const profileExists = settings.profiles.some((p) => p.id === runtimeProfile.profileId);
     if (!profileExists) {
-      const errorMessage = `Profile "${data.profileId}" is not configured on this machine. Please check the supervisor settings and ensure the selected profile exists.`;
+      const errorMessage = `Profile "${runtimeProfile.profileId}" is not configured on this machine. Please check the supervisor settings and ensure the selected profile exists.`;
       logger.info(`[SUPERVISOR] ${errorMessage}`);
       processingRuns.delete(runId);
       if (trigger === "fix") {
@@ -272,6 +287,7 @@ export async function handleSupervisorTrigger(
       // Fix trigger uses worktree — no preflight needed
       dispatchedSessionId = await handleFixTrigger(
         data,
+        runtimeProfile,
         fixAction,
         fixStrategy ?? "direct",
         fixMode ?? "fix",
@@ -343,12 +359,14 @@ export async function handleSupervisorTrigger(
       if (trigger === "research") {
         dispatchedSessionId = await handleResearchTrigger(
           data,
+          runtimeProfile,
           researchParams,
           deps,
         );
       } else {
         dispatchedSessionId = await handleAnalysisTrigger(
           data,
+          runtimeProfile,
           mode,
           dimensions,
           changedFiles,
@@ -410,6 +428,7 @@ export async function handleSupervisorTrigger(
 
 async function handleAnalysisTrigger(
   data: SupervisorTriggerData,
+  runtimeProfile: ResolvedRuntimeProfile | undefined,
   mode: string | undefined,
   dimensions: readonly string[] | undefined,
   changedFiles: readonly string[] | undefined,
@@ -458,7 +477,8 @@ async function handleAnalysisTrigger(
     approvedNewDirectoryCreation: false,
     agent: "claude",
     happySessionId: guardianSessionId,
-    profileId: data.profileId,
+    profileId: runtimeProfile?.profileId,
+    runtimeProfile,
     automationContext: {
       kind: "supervisor",
       trigger,
@@ -468,7 +488,7 @@ async function handleAnalysisTrigger(
       dedupeKey: `supervisor:${runId}`,
     },
     environmentVariables: {
-      ...data.profileEnvironmentVariables,
+      ...runtimeProfile?.environmentVariables,
       HAPPY_INITIAL_PROMPT_FILE: promptFilePath,
       HAPPY_SUPERVISOR_GUARDIAN_SESSION: guardianSessionId ?? "",
       HAPPY_SUPERVISOR_RUN_ID: runId,
@@ -510,6 +530,7 @@ async function handleAnalysisTrigger(
 
 async function handleResearchTrigger(
   data: SupervisorTriggerData,
+  runtimeProfile: ResolvedRuntimeProfile | undefined,
   researchParams: string | undefined,
   deps: SupervisorHandlerDeps,
 ): Promise<string | undefined> {
@@ -545,7 +566,8 @@ async function handleResearchTrigger(
     approvedNewDirectoryCreation: false,
     agent: "claude",
     happySessionId: guardianSessionId,
-    profileId: data.profileId,
+    profileId: runtimeProfile?.profileId,
+    runtimeProfile,
     automationContext: {
       kind: "supervisor",
       trigger,
@@ -555,7 +577,7 @@ async function handleResearchTrigger(
       dedupeKey: `supervisor:${runId}`,
     },
     environmentVariables: {
-      ...data.profileEnvironmentVariables,
+      ...runtimeProfile?.environmentVariables,
       HAPPY_INITIAL_PROMPT_FILE: promptFilePath,
       HAPPY_SUPERVISOR_GUARDIAN_SESSION: guardianSessionId ?? "",
       HAPPY_SUPERVISOR_RUN_ID: runId,
@@ -597,6 +619,7 @@ async function handleResearchTrigger(
 
 async function handleFixTrigger(
   data: SupervisorTriggerData,
+  runtimeProfile: ResolvedRuntimeProfile | undefined,
   fixAction: NonNullable<SupervisorTriggerData["fixAction"]>,
   fixStrategy: "direct" | "pr",
   fixMode: "fix" | "analyze-first",
@@ -674,7 +697,8 @@ async function handleFixTrigger(
     directory: worktreeResult.worktreePath,
     approvedNewDirectoryCreation: true,
     agent: "claude",
-    profileId: data.profileId,
+    profileId: runtimeProfile?.profileId,
+    runtimeProfile,
     automationContext: {
       kind: "supervisor",
       trigger,
@@ -684,7 +708,7 @@ async function handleFixTrigger(
       dedupeKey: `supervisor:${actionId}`,
     },
     environmentVariables: {
-      ...data.profileEnvironmentVariables,
+      ...runtimeProfile?.environmentVariables,
       HAPPY_INITIAL_PROMPT_FILE: promptFilePath,
       HAPPY_SUPERVISOR_ACTION_ID: actionId,
       HAPPY_SUPERVISOR_PROJECT_ID: projectId,

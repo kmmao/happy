@@ -10,8 +10,9 @@ import { Fastify } from "./types";
 import { authRoutes } from "./routes/authRoutes";
 import { pushRoutes } from "./routes/pushRoutes";
 import { sessionRoutes } from "./routes/sessionRoutes";
-import { connectRoutes } from "./routes/connectRoutes";
 import { accountRoutes } from "./routes/accountRoutes";
+import { connectRoutes } from "./routes/connectRoutes";
+import { accountProfileRoutes } from "./routes/accountProfileRoutes";
 import { startSocket } from "./socket";
 import { machinesRoutes } from "./routes/machinesRoutes";
 import { devRoutes } from "./routes/devRoutes";
@@ -73,6 +74,7 @@ export async function startApi() {
   // Start API
   const app = fastify({
     loggerInstance: logger,
+    disableRequestLogging: true,
     bodyLimit: 1024 * 1024, // 1MB default
   });
   const allowedOrigins = process.env.ALLOWED_ORIGINS
@@ -141,8 +143,8 @@ export async function startApi() {
   // Routes
   authRoutes(typed);
   pushRoutes(typed);
-  sessionRoutes(typed);
   accountRoutes(typed);
+  accountProfileRoutes(typed);
   connectRoutes(typed);
   webhookRoutes(typed); // Must be after connectRoutes (reuses rawBody parser)
   machinesRoutes(typed);
@@ -160,6 +162,7 @@ export async function startApi() {
   supervisorActionRoutes(typed);
   supervisorAnalyticsRoutes(typed);
   supervisorLoopRoutes(typed);
+  sessionRoutes(typed);
   v3SessionRoutes(typed);
   provisionRoutes(typed);
   knowledgeRoutes(typed);

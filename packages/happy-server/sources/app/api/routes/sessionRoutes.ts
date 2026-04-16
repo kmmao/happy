@@ -9,6 +9,50 @@ import { allocateUserSeq } from "@/storage/seq";
 import { sessionDelete } from "@/app/session/sessionDelete";
 import { activityCache } from "@/app/presence/sessionCache";
 
+type SessionResponseRecord = {
+    id: string;
+    tag: string;
+    seq: number;
+    metadata: string;
+    metadataVersion: number;
+    agentState: string | null;
+    agentStateVersion: number;
+    dataEncryptionKey: Uint8Array | null;
+    active: boolean;
+    lastActiveAt: Date;
+    createdAt: Date;
+    updatedAt: Date;
+};
+
+function hasPrismaErrorCode(error: unknown, code: string): boolean {
+    return typeof error === "object"
+        && error !== null
+        && "code" in error
+        && (error as { code?: string }).code === code;
+}
+
+function buildSessionResponse(session: SessionResponseRecord) {
+    return {
+        session: {
+            id: session.id,
+            tag: session.tag,
+            seq: session.seq,
+            metadata: session.metadata,
+            metadataVersion: session.metadataVersion,
+            agentState: session.agentState,
+            agentStateVersion: session.agentStateVersion,
+            dataEncryptionKey: session.dataEncryptionKey
+                ? Buffer.from(session.dataEncryptionKey).toString("base64")
+                : null,
+            active: session.active,
+            activeAt: session.lastActiveAt.getTime(),
+            createdAt: session.createdAt.getTime(),
+            updatedAt: session.updatedAt.getTime(),
+            lastMessage: null,
+        },
+    };
+}
+
 /**
  * Resolve (find-or-create) a Project by accountId + machineId + path,
  * then link the given session to it. No-op if machineId or path is missing.
@@ -323,43 +367,47 @@ export function sessionRoutes(app: Fastify) {
         });
         if (!existing) {
           // Session not found — create a new one with the requested ID.
-          // This supports the fork flow where the App pre-allocates a UUID
-          // before spawning, so the process command includes --happy-session-id
-          // and diagnostics can navigate to the forked session.
-          const updSeq = await allocateUserSeq(userId);
-          const created = await db.session.create({
-            data: {
-              id: sessionId,
-              accountId: userId,
-              tag: tag,
-              metadata: metadata,
-              dataEncryptionKey: dataEncryptionKey
-                ? new Uint8Array(Buffer.from(dataEncryptionKey, "base64"))
-                : undefined,
-            },
-          });
-          await resolveAndLinkProject(userId, created.id, machineId, path);
-          const updatePayload = buildNewSessionUpdate(created, updSeq, randomKeyNaked(12));
-          eventRouter.emitUpdate({ userId, payload: updatePayload, recipientFilter: { type: "user-scoped-only" } });
-          return reply.send({
-            session: {
-              id: created.id,
-              tag: created.tag,
-              seq: created.seq,
-              metadata: created.metadata,
-              metadataVersion: created.metadataVersion,
-              agentState: created.agentState,
-              agentStateVersion: created.agentStateVersion,
-              dataEncryptionKey: created.dataEncryptionKey
-                ? Buffer.from(created.dataEncryptionKey).toString("base64")
-                : null,
-              active: created.active,
-              activeAt: created.lastActiveAt.getTime(),
-              createdAt: created.createdAt.getTime(),
-              updatedAt: created.updatedAt.getTime(),
-              lastMessage: null,
-            },
-          });
+          // For sessionId-driven reconnect/fork pre-allocation we must not reuse
+          // the sentinel "reconnect" tag, otherwise the next fork collides on the
+          // (accountId, tag) unique index and the server throws 500.
+          try {
+            const created = await db.session.create({
+              data: {
+                id: sessionId,
+                accountId: userId,
+                tag: sessionId,
+                metadata: metadata,
+                dataEncryptionKey: dataEncryptionKey
+                  ? new Uint8Array(Buffer.from(dataEncryptionKey, "base64"))
+                  : undefined,
+              },
+            });
+            await resolveAndLinkProject(userId, created.id, machineId, path);
+            const updSeq = await allocateUserSeq(userId);
+            const updatePayload = buildNewSessionUpdate(created, updSeq, randomKeyNaked(12));
+            eventRouter.emitUpdate({ userId, payload: updatePayload, recipientFilter: { type: "user-scoped-only" } });
+            return reply.send(buildSessionResponse(created));
+          } catch (error) {
+            if (!hasPrismaErrorCode(error, "P2002")) {
+              throw error;
+            }
+
+            const conflicted = await db.session.findFirst({
+              where: { id: sessionId, accountId: userId },
+            });
+            if (!conflicted) {
+              throw error;
+            }
+
+            log(
+              { module: "session-create", sessionId, userId, tag },
+              `Recovered from duplicate pre-allocated session create for ${sessionId}`,
+            );
+            if (!conflicted.projectId) {
+              await resolveAndLinkProject(userId, conflicted.id, machineId, path);
+            }
+            return reply.send(buildSessionResponse(conflicted));
+          }
         }
 
         log(
@@ -407,25 +455,7 @@ export function sessionRoutes(app: Fastify) {
           recipientFilter: { type: "user-scoped-only" },
         });
 
-        return reply.send({
-          session: {
-            id: updated.id,
-            tag: updated.tag,
-            seq: updated.seq,
-            metadata: updated.metadata,
-            metadataVersion: updated.metadataVersion,
-            agentState: updated.agentState,
-            agentStateVersion: updated.agentStateVersion,
-            dataEncryptionKey: updated.dataEncryptionKey
-              ? Buffer.from(updated.dataEncryptionKey).toString("base64")
-              : null,
-            active: updated.active,
-            activeAt: updated.lastActiveAt.getTime(),
-            createdAt: updated.createdAt.getTime(),
-            updatedAt: updated.updatedAt.getTime(),
-            lastMessage: null,
-          },
-        });
+        return reply.send(buildSessionResponse(updated));
       }
 
       const session = await db.session.findFirst({
@@ -445,93 +475,80 @@ export function sessionRoutes(app: Fastify) {
           await resolveAndLinkProject(userId, session.id, machineId, path);
         }
 
-        return reply.send({
-          session: {
-            id: session.id,
-            tag: session.tag,
-            seq: session.seq,
-            metadata: session.metadata,
-            metadataVersion: session.metadataVersion,
-            agentState: session.agentState,
-            agentStateVersion: session.agentStateVersion,
-            dataEncryptionKey: session.dataEncryptionKey
-              ? Buffer.from(session.dataEncryptionKey).toString("base64")
-              : null,
-            active: session.active,
-            activeAt: session.lastActiveAt.getTime(),
-            createdAt: session.createdAt.getTime(),
-            updatedAt: session.updatedAt.getTime(),
-            lastMessage: null,
-          },
-        });
+        return reply.send(buildSessionResponse(session));
       } else {
-        // Resolve seq
-        const updSeq = await allocateUserSeq(userId);
+        try {
+          // Create session
+          log(
+            { module: "session-create", userId, tag },
+            `Creating new session for user ${userId} with tag ${tag}`,
+          );
+          const session = await db.session.create({
+            data: {
+              accountId: userId,
+              tag: tag,
+              metadata: metadata,
+              dataEncryptionKey: dataEncryptionKey
+                ? new Uint8Array(Buffer.from(dataEncryptionKey, "base64"))
+                : undefined,
+            },
+          });
+          log(
+            { module: "session-create", sessionId: session.id, userId },
+            `Session created: ${session.id}`,
+          );
 
-        // Create session
-        log(
-          { module: "session-create", userId, tag },
-          `Creating new session for user ${userId} with tag ${tag}`,
-        );
-        const session = await db.session.create({
-          data: {
-            accountId: userId,
-            tag: tag,
-            metadata: metadata,
-            dataEncryptionKey: dataEncryptionKey
-              ? new Uint8Array(Buffer.from(dataEncryptionKey, "base64"))
-              : undefined,
-          },
-        });
-        log(
-          { module: "session-create", sessionId: session.id, userId },
-          `Session created: ${session.id}`,
-        );
+          // Auto-resolve project if machineId + path provided
+          await resolveAndLinkProject(userId, session.id, machineId, path);
 
-        // Auto-resolve project if machineId + path provided
-        await resolveAndLinkProject(userId, session.id, machineId, path);
-
-        // Emit new session update
-        const updatePayload = buildNewSessionUpdate(
-          session,
-          updSeq,
-          randomKeyNaked(12),
-        );
-        log(
-          {
-            module: "session-create",
+          // Emit new session update
+          const updSeq = await allocateUserSeq(userId);
+          const updatePayload = buildNewSessionUpdate(
+            session,
+            updSeq,
+            randomKeyNaked(12),
+          );
+          log(
+            {
+              module: "session-create",
+              userId,
+              sessionId: session.id,
+              updateType: "new-session",
+              updatePayload: JSON.stringify(updatePayload),
+            },
+            `Emitting new-session update to user-scoped connections`,
+          );
+          eventRouter.emitUpdate({
             userId,
-            sessionId: session.id,
-            updateType: "new-session",
-            updatePayload: JSON.stringify(updatePayload),
-          },
-          `Emitting new-session update to user-scoped connections`,
-        );
-        eventRouter.emitUpdate({
-          userId,
-          payload: updatePayload,
-          recipientFilter: { type: "user-scoped-only" },
-        });
+            payload: updatePayload,
+            recipientFilter: { type: "user-scoped-only" },
+          });
 
-        return reply.send({
-          session: {
-            id: session.id,
-            tag: session.tag,
-            seq: session.seq,
-            metadata: session.metadata,
-            metadataVersion: session.metadataVersion,
-            agentState: session.agentState,
-            agentStateVersion: session.agentStateVersion,
-            dataEncryptionKey: session.dataEncryptionKey
-              ? Buffer.from(session.dataEncryptionKey).toString("base64")
-              : null,
-            active: session.active,
-            activeAt: session.lastActiveAt.getTime(),
-            createdAt: session.createdAt.getTime(),
-            updatedAt: session.updatedAt.getTime(),
-            lastMessage: null,
-          },
-        });
+          return reply.send(buildSessionResponse(session));
+        } catch (error) {
+          if (!hasPrismaErrorCode(error, "P2002")) {
+            throw error;
+          }
+
+          const conflicted = await db.session.findFirst({
+            where: {
+              accountId: userId,
+              tag: tag,
+            },
+          });
+          if (!conflicted) {
+            throw error;
+          }
+
+          log(
+            { module: "session-create", sessionId: conflicted.id, userId, tag },
+            `Recovered from duplicate session create for tag ${tag}`,
+          );
+          if (!conflicted.projectId) {
+            await resolveAndLinkProject(userId, conflicted.id, machineId, path);
+          }
+          return reply.send(buildSessionResponse(conflicted));
+        }
       }
     },
   );

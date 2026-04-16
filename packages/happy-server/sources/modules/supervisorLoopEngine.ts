@@ -16,6 +16,12 @@ import {
 } from "@/app/events/eventRouter";
 import { computeHealthScore, countSeverities } from "@/modules/supervisorScoring";
 import { checkDailyRunLimit, incrementDailyRunCount } from "@/modules/supervisorLimits";
+import { auth } from "@/app/auth/auth";
+import {
+    BUILT_IN_AI_BACKEND_PROFILE_IDS,
+    normalizeResolvedRuntimeProfile,
+    type ResolvedRuntimeProfile,
+} from "@/types/aiBackendProfile";
 
 // ── Types ──
 
@@ -26,8 +32,7 @@ export interface LoopConfig {
     autoApproveThreshold: number;
     maxConsecutiveFailures?: number;
     maxDurationMinutes?: number;
-    profileId?: string;
-    profileEnvironmentVariables?: Record<string, string>;
+    runtimeProfile?: ResolvedRuntimeProfile;
 }
 
 export type LoopExitReason =
@@ -42,6 +47,29 @@ export type LoopExitReason =
 interface ExitCheck {
     shouldExit: boolean;
     reason: LoopExitReason | null;
+}
+
+const BUILT_IN_PROFILE_ID_SET = BUILT_IN_AI_BACKEND_PROFILE_IDS as ReadonlySet<string>;
+
+function isBuiltInProfileId(profileId: string): boolean {
+    return BUILT_IN_PROFILE_ID_SET.has(profileId);
+}
+
+function getStoredLoopRuntimeProfile(
+    profileId: string | null,
+    storedRuntimeProfile: unknown,
+): ResolvedRuntimeProfile | undefined {
+    return normalizeResolvedRuntimeProfile(storedRuntimeProfile, {
+        allowLegacyEnvironmentVariables: true,
+        profileId,
+        profileName: profileId,
+        source:
+            profileId && isBuiltInProfileId(profileId)
+                ? "built-in-profile"
+                : "account-profile",
+        trust: "trusted",
+        isBuiltIn: profileId ? isBuiltInProfileId(profileId) : undefined,
+    });
 }
 
 // ── Pure Functions ──
@@ -159,8 +187,8 @@ export async function startLoop(
                 autoApproveThreshold: config.autoApproveThreshold,
                 maxConsecutiveFailures: config.maxConsecutiveFailures ?? 2,
                 maxDurationMinutes: config.maxDurationMinutes ?? 240,
-                profileId: config.profileId ?? null,
-                profileEnvironmentVariables: config.profileEnvironmentVariables ?? undefined,
+                profileId: config.runtimeProfile?.profileId ?? null,
+                runtimeProfile: config.runtimeProfile ?? undefined,
             },
         });
 
@@ -192,6 +220,13 @@ export async function startLoop(
         : undefined;
 
     const concurrency = parseConcurrencyConfig(project.supervisorConfig);
+    const callbackToken = await auth.createSupervisorCallbackToken({
+        userId: accountId,
+        projectId,
+        machineId: project.machineId,
+        purpose: "run-status",
+        runId: loop.firstRunId,
+    });
 
     eventRouter.emitEphemeral({
         userId: accountId,
@@ -201,14 +236,14 @@ export async function startLoop(
             trigger: "manual",
             machineId: project.machineId,
             repoPath: project.path,
+            callbackToken,
             mode: project.supervisorMode ?? undefined,
             dimensions,
             customRules: project.supervisorCustomRules ?? undefined,
             maxConcurrentAnalysis: concurrency.maxAnalysis,
             maxConcurrentFix: concurrency.maxFix,
             maxFindings: concurrency.maxFindings,
-            profileId: config.profileId,
-            profileEnvironmentVariables: config.profileEnvironmentVariables,
+            runtimeProfile: config.runtimeProfile,
         }),
         recipientFilter: {
             type: "machine-scoped-only",
@@ -541,6 +576,17 @@ async function decideNextStep(
 
     // Trigger fix for each approved action
     for (const action of approvableActions) {
+        const runtimeProfile = getStoredLoopRuntimeProfile(
+            loop.profileId ?? null,
+            loop.runtimeProfile,
+        );
+        const callbackToken = await auth.createSupervisorCallbackToken({
+            userId,
+            projectId,
+            machineId: project.machineId,
+            purpose: "fix-status",
+            actionId: action.id,
+        });
         eventRouter.emitEphemeral({
             userId,
             payload: buildSupervisorTriggerEphemeral({
@@ -549,6 +595,7 @@ async function decideNextStep(
                 trigger: "fix",
                 machineId: project.machineId,
                 repoPath: project.path,
+                callbackToken,
                 mode: "auto",
                 fixAction: {
                     title: action.title,
@@ -560,8 +607,7 @@ async function decideNextStep(
                 fixStrategy: "direct", // Loop always uses direct strategy
                 maxConcurrentAnalysis: concurrency.maxAnalysis,
                 maxConcurrentFix: concurrency.maxFix,
-                profileId: loop.profileId ?? undefined,
-                profileEnvironmentVariables: (loop.profileEnvironmentVariables as Record<string, string> | null) ?? undefined,
+                runtimeProfile,
             }),
             recipientFilter: {
                 type: "machine-scoped-only",
@@ -656,6 +702,14 @@ async function triggerNextAnalysis(
         orderBy: { createdAt: "desc" },
     });
 
+    const callbackToken = await auth.createSupervisorCallbackToken({
+        userId,
+        projectId,
+        machineId: project.machineId,
+        purpose: "run-status",
+        runId: run.id,
+    });
+
     eventRouter.emitEphemeral({
         userId,
         payload: buildSupervisorTriggerEphemeral({
@@ -664,14 +718,17 @@ async function triggerNextAnalysis(
             trigger: "manual",
             machineId: project.machineId,
             repoPath: project.path,
+            callbackToken,
             mode: project.supervisorMode ?? undefined,
             dimensions,
             customRules: project.supervisorCustomRules ?? undefined,
             existingActions,
             maxConcurrentAnalysis: concurrency.maxAnalysis,
             maxConcurrentFix: concurrency.maxFix,
-            profileId: loop.profileId ?? undefined,
-            profileEnvironmentVariables: (loop.profileEnvironmentVariables as Record<string, string> | null) ?? undefined,
+            runtimeProfile: getStoredLoopRuntimeProfile(
+                loop.profileId ?? null,
+                loop.runtimeProfile,
+            ),
         }),
         recipientFilter: {
             type: "machine-scoped-only",

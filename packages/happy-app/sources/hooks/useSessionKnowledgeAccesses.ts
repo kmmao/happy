@@ -20,6 +20,7 @@ export interface SessionKnowledgeAccessEntry {
     category: string | null;
     status: string;
     title: string;
+    content: string;
     tags: string[];
     confidence: string;
     sessionId: string | null;

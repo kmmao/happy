@@ -19,11 +19,15 @@ import {
 import { ItemList } from "@/components/ItemList";
 import { useSessionKnowledge } from "@/hooks/useSessionKnowledge";
 import { useSessionKnowledgeAccesses } from "@/hooks/useSessionKnowledgeAccesses";
-import { buildKnowledgeSummaryRows, type KnowledgeSummaryTranslate } from "./sidePanelSummaryData";
+import {
+    buildKnowledgeSummaryRows,
+    type KnowledgeSummaryTranslate,
+} from "./sidePanelSummaryData";
+import type { SessionKnowledgeTab } from "@/components/knowledge/sessionKnowledgeLoadState";
 
 interface SidePanelSummaryTabProps {
     sessionId: string;
-    onOpenKnowledge?: () => void;
+    onOpenKnowledge?: (tab: SessionKnowledgeTab) => void;
 }
 
 export const SidePanelSummaryTab = React.memo<SidePanelSummaryTabProps>(
@@ -57,6 +61,7 @@ export const SidePanelSummaryTab = React.memo<SidePanelSummaryTabProps>(
             label: string;
             value: string;
             isInteractive?: boolean;
+            targetTab?: SessionKnowledgeTab;
         }> = [];
 
         if (displayPath) {
@@ -237,7 +242,7 @@ export const SidePanelSummaryTab = React.memo<SidePanelSummaryTabProps>(
                         return (
                             <Pressable
                                 key={row.label}
-                                onPress={onOpenKnowledge}
+                                onPress={() => onOpenKnowledge(row.targetTab ?? "changes")}
                                 style={sharedStyle}
                             >
                                 {content}

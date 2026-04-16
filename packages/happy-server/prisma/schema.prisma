@@ -66,7 +66,29 @@ model Account {
     WorldSuggestion     WorldSuggestion[]
     WorldMember         WorldMember[]
     WorldAuditLog       WorldAuditLog[]
+    AiBackendProfile    AiBackendProfile[]
 }
+
+model AiBackendProfile {
+    id              String   @id @default(cuid())
+    accountId       String
+    account         Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+    profileKey      String
+    name            String
+    description     String?
+    isBuiltIn       Boolean  @default(false)
+    encryptedPayload Bytes
+    revision        Int      @default(1)
+    archivedAt      DateTime?
+    createdAt       DateTime @default(now())
+    updatedAt       DateTime @updatedAt
+
+    @@index([accountId])
+    @@index([accountId, archivedAt])
+    @@unique([accountId, profileKey])
+    @@unique([accountId, name])
+}
+
 
 model TerminalAuthRequest {
     id                String   @id @default(cuid())
@@ -521,8 +543,8 @@ model SupervisorLoop {
 
     // AI backend profile to use for all runs in this loop
     profileId               String?
-    /// [ProfileEnvVars]
-    profileEnvironmentVariables Json?
+    /// [ResolvedRuntimeProfile]
+    runtimeProfile          Json?     @map("profileEnvironmentVariables")
 
     createdAt               DateTime  @default(now())
     updatedAt               DateTime  @updatedAt

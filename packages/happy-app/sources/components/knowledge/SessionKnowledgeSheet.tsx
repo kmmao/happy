@@ -31,6 +31,8 @@ interface SessionKnowledgeSheetProps {
     onClose: () => void;
     projectServerId: string | undefined;
     sessionId: string;
+    maxHeight?: `${number}%` | number;
+    initialTab?: SessionKnowledgeTab;
 }
 
 function formatTime(timestamp: number): string {
@@ -51,6 +53,7 @@ const EntryRow = React.memo<EntryRowProps>(({ activeTab, entry, onPress }) => {
     const { theme } = useUnistyles();
     const typeColor = TYPE_COLORS[entry.entryType] ?? theme.colors.textSecondary;
     const statusColor = STATUS_COLORS[entry.status] ?? theme.colors.textSecondary;
+    const contentPreview = typeof entry.content === "string" ? entry.content.trim() : "";
 
     return (
         <Pressable
@@ -78,6 +81,11 @@ const EntryRow = React.memo<EntryRowProps>(({ activeTab, entry, onPress }) => {
             <Text style={[styles.entryTitle, { color: theme.colors.text }]} numberOfLines={2}>
                 {entry.title}
             </Text>
+            {contentPreview.length > 0 && (
+                <Text style={[styles.entryContent, { color: theme.colors.textSecondary }]} numberOfLines={4}>
+                    {contentPreview}
+                </Text>
+            )}
             {entry.tags.length > 0 && (
                 <View style={styles.tagsRow}>
                     {entry.tags.slice(0, 3).map((tag, index) => (
@@ -102,15 +110,21 @@ const EntryRow = React.memo<EntryRowProps>(({ activeTab, entry, onPress }) => {
 });
 
 export const SessionKnowledgeSheet = React.memo<SessionKnowledgeSheetProps>(
-    ({ visible, onClose, projectServerId, sessionId }) => {
+    ({ visible, onClose, projectServerId, sessionId, maxHeight = "84%", initialTab = "changes" }) => {
         const { theme } = useUnistyles();
         const insets = useSafeAreaInsets();
         const router = useRouter();
         const opacity = React.useRef(new Animated.Value(0)).current;
         const [shouldRender, setShouldRender] = React.useState(false);
-        const [activeTab, setActiveTab] = React.useState<SessionKnowledgeTab>("changes");
+        const [activeTab, setActiveTab] = React.useState<SessionKnowledgeTab>(initialTab);
         const [hasLoadedChanges, setHasLoadedChanges] = React.useState(false);
         const [hasLoadedReferences, setHasLoadedReferences] = React.useState(false);
+
+        React.useEffect(() => {
+            if (visible) {
+                setActiveTab(initialTab);
+            }
+        }, [initialTab, visible]);
 
         React.useEffect(() => {
             if (!visible) return;
@@ -170,6 +184,10 @@ export const SessionKnowledgeSheet = React.memo<SessionKnowledgeSheetProps>(
         const isChangesTab = activeTab === "changes";
         const loading = isChangesTab ? changesLoading : accessesLoading;
         const isEmpty = isChangesTab ? entries.length === 0 : accesses.length === 0;
+        const headerTitle = isChangesTab
+            ? t("session.knowledgeChanges")
+            : t("session.knowledgeTabReferences");
+        const currentCount = isChangesTab ? entries.length : accesses.length;
 
         return (
             <Animated.View style={[styles.overlay, { opacity }]}>
@@ -180,6 +198,8 @@ export const SessionKnowledgeSheet = React.memo<SessionKnowledgeSheetProps>(
                         {
                             backgroundColor: theme.colors.surface,
                             maxWidth: layout.maxWidth,
+                            height: maxHeight,
+                            maxHeight,
                             paddingBottom: Math.max(20, insets.bottom + 8),
                         },
                     ]}
@@ -187,8 +207,13 @@ export const SessionKnowledgeSheet = React.memo<SessionKnowledgeSheetProps>(
                     <View style={styles.header}>
                         <Ionicons name="bulb-outline" size={18} color={theme.colors.primary} />
                         <Text style={[styles.headerTitle, { color: theme.colors.text }]}>
-                            {t("session.knowledgeChanges")}
+                            {headerTitle}
                         </Text>
+                        <View style={[styles.headerCountBadge, { backgroundColor: theme.colors.primary + "20" }]}>
+                            <Text style={[styles.headerCountText, { color: theme.colors.primary }]}>
+                                {currentCount}
+                            </Text>
+                        </View>
                         <Pressable onPress={onClose} hitSlop={8}>
                             <Ionicons name="close" size={20} color={theme.colors.textSecondary} />
                         </Pressable>
@@ -208,13 +233,17 @@ export const SessionKnowledgeSheet = React.memo<SessionKnowledgeSheetProps>(
                             ]}>
                                 {t("session.knowledgeTabChanges")}
                             </Text>
-                            {entries.length > 0 && (
-                                <View style={[styles.tabBadge, { backgroundColor: theme.colors.primary + "20" }]}>
-                                    <Text style={[styles.tabBadgeText, { color: theme.colors.primary }]}>
-                                        {entries.length}
-                                    </Text>
-                                </View>
-                            )}
+                            <View style={[
+                                styles.tabBadge,
+                                { backgroundColor: (isChangesTab ? theme.colors.primary : theme.colors.textSecondary) + "20" },
+                            ]}>
+                                <Text style={[
+                                    styles.tabBadgeText,
+                                    { color: isChangesTab ? theme.colors.primary : theme.colors.textSecondary },
+                                ]}>
+                                    {entries.length}
+                                </Text>
+                            </View>
                         </Pressable>
                         <Pressable
                             style={[
@@ -229,13 +258,17 @@ export const SessionKnowledgeSheet = React.memo<SessionKnowledgeSheetProps>(
                             ]}>
                                 {t("session.knowledgeTabReferences")}
                             </Text>
-                            {accesses.length > 0 && (
-                                <View style={[styles.tabBadge, { backgroundColor: theme.colors.primary + "20" }]}>
-                                    <Text style={[styles.tabBadgeText, { color: theme.colors.primary }]}>
-                                        {accesses.length}
-                                    </Text>
-                                </View>
-                            )}
+                            <View style={[
+                                styles.tabBadge,
+                                { backgroundColor: (!isChangesTab ? theme.colors.primary : theme.colors.textSecondary) + "20" },
+                            ]}>
+                                <Text style={[
+                                    styles.tabBadgeText,
+                                    { color: !isChangesTab ? theme.colors.primary : theme.colors.textSecondary },
+                                ]}>
+                                    {accesses.length}
+                                </Text>
+                            </View>
                         </Pressable>
                     </View>
 
@@ -318,6 +351,15 @@ const styles = StyleSheet.create({
         fontSize: 16,
         flex: 1,
     },
+    headerCountBadge: {
+        paddingHorizontal: 8,
+        paddingVertical: 2,
+        borderRadius: 999,
+    },
+    headerCountText: {
+        ...Typography.default("semiBold"),
+        fontSize: 11,
+    },
     tabBar: {
         flexDirection: "row",
         marginHorizontal: 16,
@@ -337,9 +379,11 @@ const styles = StyleSheet.create({
         fontSize: 13,
     },
     tabBadge: {
-        paddingHorizontal: 5,
+        minWidth: 22,
+        paddingHorizontal: 6,
         paddingVertical: 1,
         borderRadius: 10,
+        alignItems: "center",
     },
     tabBadgeText: {
         ...Typography.default("semiBold"),
@@ -361,6 +405,7 @@ const styles = StyleSheet.create({
         paddingBottom: 8,
     },
     centerContainer: {
+        flex: 1,
         alignItems: "center",
         justifyContent: "center",
         paddingVertical: 40,
@@ -408,6 +453,11 @@ const styles = StyleSheet.create({
     entryTitle: {
         ...Typography.default("semiBold"),
         fontSize: 13,
+        lineHeight: 18,
+    },
+    entryContent: {
+        ...Typography.default("regular"),
+        fontSize: 12,
         lineHeight: 18,
     },
     tagsRow: {

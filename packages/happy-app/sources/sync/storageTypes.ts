@@ -235,6 +235,7 @@ export type AgentState = z.infer<typeof AgentStateSchema>;
 export const SessionPreferencesSchema = z.object({
   permissionMode: z.string().nullish(),
   modelMode: z.string().nullish(),
+  pinnedModelId: z.string().nullish(),
   customModels: z
     .array(
       z.object({
@@ -282,6 +283,7 @@ export interface Session {
   draft?: string | null; // Local draft message, not synced to server
   permissionMode?: string | null; // Local permission mode key, not synced to server
   modelMode?: string | null; // Local model key, not synced to server
+  pinnedModelId?: string | null; // Session-pinned model ID used for outgoing requests to avoid profile drift
   customModels?: Array<{
     id: string;
     name: string;

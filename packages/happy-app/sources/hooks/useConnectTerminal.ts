@@ -2,9 +2,10 @@ import * as React from 'react';
 import { Platform } from 'react-native';
 import { CameraView } from 'expo-camera';
 import { useAuth } from '@/auth/AuthContext';
+import { getCredentialContentDataKey, hasCredentialSecret } from '@/auth/authCredentials';
 import { decodeBase64 } from '@/encryption/base64';
 import { encryptBox } from '@/encryption/libsodium';
-import { authApprove } from '@/auth/authApprove';
+import { authApprove, type AuthApprovalResponses } from '@/auth/authApprove';
 import { useCheckScannerPermissions } from '@/hooks/useCheckCameraPermissions';
 import { Modal } from '@/modal';
 import { t } from '@/text';
@@ -31,12 +32,33 @@ export function useConnectTerminal(options?: UseConnectTerminalOptions) {
         try {
             const tail = url.slice('happy://terminal?'.length);
             const publicKey = decodeBase64(tail, 'base64url');
-            const responseV1 = encryptBox(decodeBase64(auth.credentials!.secret, 'base64url'), publicKey);
-            let responseV2Bundle = new Uint8Array(sync.encryption.contentDataKey.length + 1);
-            responseV2Bundle[0] = 0;
-            responseV2Bundle.set(sync.encryption.contentDataKey, 1);
-            const responseV2 = encryptBox(responseV2Bundle, publicKey);
-            await authApprove(auth.credentials!.token, publicKey, responseV1, responseV2);
+            const responses: AuthApprovalResponses = {};
+
+            if (!auth.credentials) {
+                throw new Error('missing credentials for terminal approval');
+            }
+
+            if (hasCredentialSecret(auth.credentials)) {
+                responses.responseV1 = encryptBox(
+                    decodeBase64(auth.credentials.secret, 'base64url'),
+                    publicKey,
+                );
+            }
+
+            const contentDataKey = sync.encryption?.contentDataKey
+                ?? getCredentialContentDataKey(auth.credentials);
+            if (contentDataKey) {
+                const responseV2Bundle = new Uint8Array(contentDataKey.length + 1);
+                responseV2Bundle[0] = 0;
+                responseV2Bundle.set(contentDataKey, 1);
+                responses.responseV2 = encryptBox(responseV2Bundle, publicKey);
+            }
+
+            if (!responses.responseV1 && !responses.responseV2) {
+                throw new Error('current credentials cannot approve terminal connection');
+            }
+
+            await authApprove(auth.credentials.token, publicKey, responses);
             
             Modal.alert(t('common.success'), t('modals.terminalConnectedSuccessfully'), [
                 { 

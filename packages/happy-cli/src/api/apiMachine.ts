@@ -26,12 +26,17 @@ import type { AgentLoopBootstrapProfile } from "@/automation/AgentLoopBootstrapS
 import type { AutoDreamCreateInput, AutoDreamMutationResult, AutoDreamUpdateInput } from "@/automation/AutoDreamCoordinator";
 import type { AutoDreamProfile } from "@/automation/AutoDreamStore";
 import type { AgentLoopSuggestInput, AgentLoopSuggestion } from "@/automation/AgentLoopSuggestion";
+import {
+  normalizeResolvedRuntimeProfile,
+  type ResolvedRuntimeProfile,
+} from "@kmmao/happy-wire";
 import { encodeBase64, decodeBase64, encrypt, decrypt } from "./encryption";
 import { backoff } from "@/utils/time";
 import { RpcHandlerManager } from "./rpc/RpcHandlerManager";
 import { detectTailscale, detectTailscaleServe, type TailscaleInfo } from "@/utils/tailscale";
 import type { TunnelManager } from "@/tunnel";
 import { TerminalManager } from "@/terminal/TerminalManager";
+import { killRunawayHappyProcesses } from "@/daemon/doctor";
 
 
 interface ServerToDaemonEvents {
@@ -282,10 +287,8 @@ export type SupervisorTriggerData = {
   /** Loop association — present when this run/fix is part of a loop. */
   loopId?: string;
   loopIteration?: number;
-  /** AI backend profile ID to use for this run. If set but not found locally, run is aborted. */
-  profileId?: string;
-  /** Pre-resolved environment variables from the AI backend profile. Sent by App since CLI may not have the profile config locally. */
-  profileEnvironmentVariables?: Record<string, string>;
+  /** Unified runtime profile resolved by App/Server before dispatch. */
+  runtimeProfile?: ResolvedRuntimeProfile;
 };
 
 export type SupervisorRunStatusData = {
@@ -433,11 +436,13 @@ export class ApiMachineClient {
           happySessionId,
           forkSourceId,
           profileId,
+          runtimeProfile,
         } = params || {};
         const safeParams = {
           ...params,
           token: typeof token === "string" ? "[REDACTED]" : token,
           environmentVariables: environmentVariables ? "[REDACTED_ENV_VARS]" : environmentVariables,
+          runtimeProfile: runtimeProfile ? "[REDACTED_RUNTIME_PROFILE]" : runtimeProfile,
         };
         logger.debug(
           `[API MACHINE] Spawning session with params: ${JSON.stringify(safeParams)}`,
@@ -445,6 +450,13 @@ export class ApiMachineClient {
 
         if (!directory) {
           throw new Error("Directory is required");
+        }
+
+        const normalizedRuntimeProfile = normalizeResolvedRuntimeProfile(
+          runtimeProfile,
+        );
+        if (runtimeProfile && !normalizedRuntimeProfile) {
+          throw new Error("Runtime profile payload is invalid or unsupported");
         }
 
         const result = await spawnSession({
@@ -457,7 +469,8 @@ export class ApiMachineClient {
           environmentVariables,
           happySessionId,
           forkSourceId,
-          profileId,
+          profileId: profileId ?? normalizedRuntimeProfile?.profileId,
+          runtimeProfile: normalizedRuntimeProfile,
         });
 
         switch (result.type) {
@@ -528,6 +541,15 @@ export class ApiMachineClient {
 
     this.rpcHandlerManager.registerHandler("automation-audit-clear", async () => {
       return clearAutomationAudit();
+    });
+
+    this.rpcHandlerManager.registerHandler("doctor-clean", async () => {
+      const result = await killRunawayHappyProcesses();
+      return {
+        success: true,
+        killed: result.killed,
+        errors: result.errors,
+      };
     });
 
     this.rpcHandlerManager.registerHandler("killswitch-set", async (params: any) => {

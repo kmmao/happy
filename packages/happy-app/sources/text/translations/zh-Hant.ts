@@ -897,6 +897,20 @@ export const zhHant: TranslationStructure = {
       breakdownTitle: "Token 明細",
       breakdownMessage:
         "↓ 快取讀取 – 從上輪上下文快取復用的 token，可大幅降低費用。\n\nin 輸入 – 本輪傳送的新 token（你的訊息 + 工具結果）。\n\nout 輸出 – 模型本輪產生的 token。\n\n↑ 快取寫入 – 本輪寫入快取的 token，下輪可作為快取讀取復用。",
+      systemLabel: "系統",
+      userLabel: "使用者",
+      assistantLabel: "助手",
+      toolCallLabel: "工具呼叫",
+      toolResultLabel: "工具結果",
+      attachmentLabel: "附件",
+      expandBreakdown: "展開 Token 明細",
+      collapseBreakdown: "收起 Token 明細",
+      sourceLabel: "來源",
+      sourceSdkCategories: "SDK categories",
+      sourceFallback: "messageBreakdown fallback",
+      sourceInfoTitle: "來源說明",
+      sourceSdkCategoriesMessage: "目前明細直接來自 SDK 提供的 categories。這通常是首選來源，粒度更細，可能包含 system prompt 或自訂 bucket。",
+      sourceFallbackMessage: "目前回合沒有 SDK categories，所以這裡退回使用 messageBreakdown。它只提供較粗的訊息級拆分，可能缺少 system、cache 或其他非訊息 bucket。",
     },
     suggestion: {
       fileLabel: "檔案",
@@ -2462,6 +2476,7 @@ export const zhHant: TranslationStructure = {
         `將「${name}」重設為內建預設值？您的自訂設定將遺失。`,
       confirm: "重設",
     },
+    saveFailed: "儲存設定檔失敗，請重試。",
   },
 
   git: {
@@ -3496,6 +3511,7 @@ export const zhHant: TranslationStructure = {
     defaultProfileSection: "預設執行配置檔",
     defaultProfileDesc: "選擇健康掃描和循環模式使用的 AI 後端配置檔。若選擇的配置檔在本機未設定，執行將報錯終止。",
     defaultProfileNone: "尚無配置檔。請前往設定 → 配置檔 新增。",
+    defaultProfileMissing: ({ profileName }: { profileName: string }) => `所選配置檔「${profileName}」已在目前裝置上失效，請前往 Supervisor 設定重新選擇。`,
     defaultProfileDefault: "預設（CLI 設定）",
 
     notificationsSection: "通知",

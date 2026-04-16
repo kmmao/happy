@@ -1,8 +1,17 @@
 import { useState, useEffect, useMemo } from 'react';
 import { machineBash } from '@/sync/ops';
+import {
+    filterEnvVarNamesForRemoteLookup,
+    isSensitiveEnvVarName,
+} from './envVarUtils';
 
 // Re-export pure utility functions from envVarUtils for backwards compatibility
-export { resolveEnvVarSubstitution, extractEnvVarReferences } from './envVarUtils';
+export {
+    resolveEnvVarSubstitution,
+    extractEnvVarReferences,
+    filterEnvVarNamesForRemoteLookup,
+    isSensitiveEnvVarName,
+} from './envVarUtils';
 
 interface EnvironmentVariables {
     [varName: string]: string | null; // null = variable not set in daemon environment
@@ -14,7 +23,8 @@ interface UseEnvironmentVariablesResult {
 }
 
 /**
- * Queries environment variable values from the daemon's process environment.
+ * Queries non-sensitive environment variable values from the daemon's process
+ * environment. Secret-like names are intentionally skipped and returned as null.
  *
  * IMPORTANT: This queries the daemon's ACTUAL environment (where CLI runs),
  * NOT a new shell session. This ensures ${VAR} substitutions in profiles
@@ -58,13 +68,19 @@ export function useEnvironmentVariables(
         const fetchVars = async () => {
             const results: EnvironmentVariables = {};
 
-            // SECURITY: Validate all variable names to prevent bash injection
-            // Only accept valid environment variable names: [A-Z_][A-Z0-9_]*
-            const validVarNames = varNames.filter(name => /^[A-Z_][A-Z0-9_]*$/.test(name));
+            // SECURITY: Never ask the daemon to echo sensitive variables back
+            // across RPC just to power UI hints.
+            const lookupVarNames = filterEnvVarNamesForRemoteLookup(varNames);
+            const skippedSensitiveVarNames = Array.from(new Set(varNames)).filter(
+                (name) => isSensitiveEnvVarName(name),
+            );
 
-            if (validVarNames.length === 0) {
-                // No valid variables to query
-                setVariables({});
+            skippedSensitiveVarNames.forEach((name) => {
+                results[name] = null;
+            });
+
+            if (lookupVarNames.length === 0) {
+                setVariables(results);
                 setIsLoading(false);
                 return;
             }
@@ -72,7 +88,7 @@ export function useEnvironmentVariables(
             // Build batched command: query all variables in single bash invocation
             // Format: echo "VAR1=$VAR1" && echo "VAR2=$VAR2" && ...
             // Using echo with variable expansion ensures we get daemon's environment
-            const command = validVarNames
+            const command = lookupVarNames
                 .map(name => `echo "${name}=$${name}"`)
                 .join(' && ');
 
@@ -94,14 +110,14 @@ export function useEnvironmentVariables(
                     });
 
                     // Ensure all requested variables have entries (even if missing from output)
-                    validVarNames.forEach(name => {
+                    lookupVarNames.forEach(name => {
                         if (!(name in results)) {
                             results[name] = null;
                         }
                     });
                 } else {
                     // Bash command failed - mark all variables as not set
-                    validVarNames.forEach(name => {
+                    lookupVarNames.forEach(name => {
                         results[name] = null;
                     });
                 }
@@ -109,7 +125,7 @@ export function useEnvironmentVariables(
                 if (cancelled) return;
 
                 // RPC error (network, encryption, etc.) - mark all as not set
-                validVarNames.forEach(name => {
+                lookupVarNames.forEach(name => {
                     results[name] = null;
                 });
             }

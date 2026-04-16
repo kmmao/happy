@@ -6,6 +6,7 @@ import * as Fonts from "expo-font";
 import * as Notifications from "expo-notifications";
 import { FontAwesome } from "@expo/vector-icons";
 import { AuthCredentials, TokenStorage } from "@/auth/tokenStorage";
+import { hasCredentialSecret } from "@/auth/authCredentials";
 import { AuthProvider } from "@/auth/AuthContext";
 import {
   DarkTheme,
@@ -219,12 +220,16 @@ export default function RootLayout() {
               if (packed.t) {
                 const provisionCredentials: AuthCredentials = {
                   token: packed.t,
-                  secret: packed.s || "", // Account encryption secret from provision token
+                  ...(packed.s ? { secret: packed.s } : {}), // Secret-backed credentials enable full sync restore
                 };
                 await TokenStorage.setCredentials(provisionCredentials);
                 // Clean URL to avoid re-processing on refresh
                 window.history.replaceState({}, "", window.location.pathname);
-                await syncRestore(provisionCredentials);
+                if (hasCredentialSecret(provisionCredentials)) {
+                  await syncRestore(provisionCredentials);
+                } else {
+                  log.warn("Provision credentials missing sync secret; skipping sync restore");
+                }
                 setInitState({ credentials: provisionCredentials });
                 return;
               }
@@ -236,7 +241,11 @@ export default function RootLayout() {
 
         const credentials = await TokenStorage.getCredentials();
         if (credentials) {
-          await syncRestore(credentials);
+          if (hasCredentialSecret(credentials)) {
+            await syncRestore(credentials);
+          } else {
+            log.warn("Stored credentials missing sync secret; app remains in limited auth mode");
+          }
         }
 
         setInitState({ credentials });

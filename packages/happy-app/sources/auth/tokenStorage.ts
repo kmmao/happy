@@ -15,7 +15,11 @@ let credentialsCache: string | null = null;
 
 export interface AuthCredentials {
     token: string;
-    secret: string;
+    secret?: string | null;
+    encryption?: {
+        publicKey: string;
+        machineKey?: string | null;
+    } | null;
 }
 
 export const TokenStorage = {

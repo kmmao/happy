@@ -897,6 +897,20 @@ export const zhHans: TranslationStructure = {
       breakdownTitle: "Token 明细",
       breakdownMessage:
         "↓ 缓存读取 – 从上轮上下文缓存复用的 token，可大幅降低费用。\n\nin 输入 – 本轮发送的新 token（你的消息 + 工具结果）。\n\nout 输出 – 模型本轮生成的 token。\n\n↑ 缓存写入 – 本轮写入缓存的 token，下轮可作为缓存读取复用。",
+      systemLabel: "系统",
+      userLabel: "用户",
+      assistantLabel: "助手",
+      toolCallLabel: "工具调用",
+      toolResultLabel: "工具结果",
+      attachmentLabel: "附件",
+      expandBreakdown: "展开 Token 明细",
+      collapseBreakdown: "收起 Token 明细",
+      sourceLabel: "来源",
+      sourceSdkCategories: "SDK categories",
+      sourceFallback: "messageBreakdown fallback",
+      sourceInfoTitle: "来源说明",
+      sourceSdkCategoriesMessage: "当前明细直接来自 SDK 提供的 categories。这通常是首选来源，粒度更细，可能包含 system prompt 或自定义 bucket。",
+      sourceFallbackMessage: "当前回合没有 SDK categories，所以这里退回使用 messageBreakdown。它只提供较粗的消息级拆分，可能缺少 system、cache 或其他非消息 bucket。",
     },
     suggestion: {
       fileLabel: "文件",
@@ -2450,6 +2464,7 @@ export const zhHans: TranslationStructure = {
         `将"${name}"重置为内置默认值？您的自定义设置将丢失。`,
       confirm: "重置",
     },
+    saveFailed: "保存配置文件失败，请重试。",
   },
 
   feed: {
@@ -3493,6 +3508,7 @@ export const zhHans: TranslationStructure = {
     defaultProfileSection: "默认运行配置文件",
     defaultProfileDesc: "选择健康扫描和循环模式使用的 AI 后端配置文件。若选择的配置文件在本机未配置，运行将报错终止。",
     defaultProfileNone: "暂无配置文件。请前往设置 → 配置文件 添加。",
+    defaultProfileMissing: ({ profileName }: { profileName: string }) => `所选配置文件“${profileName}”已在当前设备上失效，请前往 Supervisor 设置重新选择。`,
     defaultProfileDefault: "默认（CLI 配置）",
     notificationsSection: "通知",
     notifAnalysisComplete: "分析完成",

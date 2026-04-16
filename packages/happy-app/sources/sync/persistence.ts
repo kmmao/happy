@@ -1,5 +1,6 @@
 import { MMKV } from "react-native-mmkv";
 import { z } from "zod";
+import { SessionPreferencesSchema, type SessionPreferences } from "./storageTypes";
 import {
   Settings,
   settingsDefaults,
@@ -71,6 +72,33 @@ export function loadPendingSettings(): Partial<Settings> {
 
 export function savePendingSettings(settings: Partial<Settings>) {
   mmkv.set("pending-settings", JSON.stringify(settings));
+}
+
+const PendingSessionPreferencesMapSchema = z.record(
+  z.string(),
+  SessionPreferencesSchema,
+);
+
+export function loadPendingSessionPreferences(): Record<
+  string,
+  SessionPreferences
+> {
+  const raw = mmkv.getString("pending-session-preferences");
+  if (raw) {
+    try {
+      return PendingSessionPreferencesMapSchema.parse(JSON.parse(raw));
+    } catch (e) {
+      log.error("Failed to parse pending session preferences", e);
+      return {};
+    }
+  }
+  return {};
+}
+
+export function savePendingSessionPreferences(
+  preferences: Record<string, SessionPreferences>,
+) {
+  mmkv.set("pending-session-preferences", JSON.stringify(preferences));
 }
 
 export function loadLocalSettings(): LocalSettings {
