@@ -1050,9 +1050,9 @@ export const pt: TranslationStructure = {
     effort: {
       title: "NÍVEL DE ESFORÇO",
       low: "Baixo",
-      lowDesc: "Tarefas simples sensíveis a orçamento ou latência",
+      lowDesc: "Mais rápido e econômico, apenas para consultas simples",
       medium: "Médio",
-      mediumDesc: "Tarefas simples sensíveis a orçamento ou latência",
+      mediumDesc: "Equilíbrio padrão para tarefas diárias",
       high: "Alto",
       highDesc: "Equilíbrio entre qualidade e custo, ideal para alta concorrência",
       xhigh: "XHigh",

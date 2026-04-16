@@ -45,7 +45,7 @@ describe("reasoningEffort", () => {
                 currentModelCode: null,
                 metadata: null,
             }),
-        ).toEqual(["high", "max", "medium", "low"]);
+        ).toEqual(["max", "high", "medium", "low"]);
     });
 
     it("shows the effort selector for Codex when the active model supports it", () => {

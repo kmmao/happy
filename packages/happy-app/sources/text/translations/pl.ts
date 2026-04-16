@@ -1061,9 +1061,9 @@ export const pl: TranslationStructure = {
     effort: {
       title: "POZIOM WYSIŁKU",
       low: "Niski",
-      lowDesc: "Proste zadania wrażliwe na budżet lub opóźnienia",
+      lowDesc: "Najszybsze i najtańsze, tylko dla prostych zapytań",
       medium: "Średni",
-      mediumDesc: "Proste zadania wrażliwe na budżet lub opóźnienia",
+      mediumDesc: "Domyślna równowaga dla codziennych zadań",
       high: "Wysoki",
       highDesc: "Równowaga jakości i kosztów, dobry przy wysokiej współbieżności",
       xhigh: "XHigh",

@@ -1,5 +1,21 @@
 # Changelog
 
+## 2.13.0 - 2026-04-17
+
+Claude Agent SDK upgrade with Opus 4.7, new XHigh effort tier, and smarter session events for memory recall and API request status.
+
+### Claude Models & Effort
+- Added Opus 4.7 as a selectable model (Latest, 1M context default)
+- Merged 200K/1M variants: Sonnet and Opus now default to 1M context (legacy `-1m` keys preserved for pinned sessions)
+- Added XHigh reasoning effort tier (Opus 4.7 only) with native SDK support — no longer silently remapped to Max
+- Rewrote effort level descriptions across all 9 languages to clarify real task fit (Low vs Medium now have distinct guidance)
+- Only exposes XHigh when the active model reports native support; other Claude models fall back to Max/High/Medium/Low
+
+### Session Events
+- Added memory recall event: App now shows which memories were surfaced into a turn ("Recalled N notes")
+- Added Requesting status ping before each API call (surfaced as a lightweight session event)
+- Added support for shouldQuery=false messages that append to the transcript without triggering an assistant turn
+
 ## 2.12.0 - 2026-03-30
 
 Dev environment management with live log streaming, project-level Knowledge Base configuration with lifecycle UI, task display overhaul with colored badges and collapsible results, and extensive background task stability fixes.

@@ -1010,9 +1010,9 @@ export const zhHans: TranslationStructure = {
     effort: {
       title: "推理强度",
       low: "低",
-      lowDesc: "预算敏感或对实时性要求高的简单任务",
+      lowDesc: "响应最快、成本最低，适合极简查询",
       medium: "中",
-      mediumDesc: "预算敏感或对实时性要求高的简单任务",
+      mediumDesc: "默认平衡推理深度，适合日常任务",
       high: "高",
       highDesc: "智能与成本间的平衡，适合并发任务较多的场景",
       xhigh: "超高",

@@ -1010,9 +1010,9 @@ export const zhHant: TranslationStructure = {
     effort: {
       title: "推理強度",
       low: "低",
-      lowDesc: "預算敏感或對即時性要求高的簡單任務",
+      lowDesc: "回應最快、成本最低，適合極簡查詢",
       medium: "中",
-      mediumDesc: "預算敏感或對即時性要求高的簡單任務",
+      mediumDesc: "預設平衡推理深度，適合日常任務",
       high: "高",
       highDesc: "智能與成本間的平衡，適合並發任務較多的場景",
       xhigh: "超高",

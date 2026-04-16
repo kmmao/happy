@@ -1050,9 +1050,9 @@ export const en: TranslationStructure = {
     effort: {
       title: "EFFORT LEVEL",
       low: "Low",
-      lowDesc: "Budget-sensitive or latency-critical simple tasks",
+      lowDesc: "Fastest, cheapest — trivial queries only",
       medium: "Medium",
-      mediumDesc: "Budget-sensitive or latency-critical simple tasks",
+      mediumDesc: "Balanced default for everyday tasks",
       high: "High",
       highDesc: "Balance of quality and cost, good for high concurrency",
       xhigh: "XHigh",

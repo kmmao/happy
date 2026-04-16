@@ -1148,9 +1148,9 @@ export const ja: TranslationStructure = {
     effort: {
       title: "推論レベル",
       low: "低",
-      lowDesc: "予算や応答速度を重視する簡単なタスク",
+      lowDesc: "最速・最安、ごく簡単なクエリ向け",
       medium: "中",
-      mediumDesc: "予算や応答速度を重視する簡単なタスク",
+      mediumDesc: "日常タスクに適した標準的な推論深度",
       high: "高",
       highDesc: "品質とコストのバランス、高並列に最適",
       xhigh: "超高",

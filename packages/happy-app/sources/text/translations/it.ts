@@ -1159,9 +1159,9 @@ export const it: TranslationStructure = {
     effort: {
       title: "LIVELLO DI SFORZO",
       low: "Basso",
-      lowDesc: "Attività semplici sensibili al budget o alla latenza",
+      lowDesc: "Più veloce ed economico, solo per query semplici",
       medium: "Medio",
-      mediumDesc: "Attività semplici sensibili al budget o alla latenza",
+      mediumDesc: "Equilibrio predefinito per le attività quotidiane",
       high: "Alto",
       highDesc: "Equilibrio tra qualità e costo, ideale per alta concorrenza",
       xhigh: "XHigh",

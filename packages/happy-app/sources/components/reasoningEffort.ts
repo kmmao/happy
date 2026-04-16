@@ -2,8 +2,11 @@ import type { Metadata } from "@/sync/storageTypes";
 import type { ReasoningProps } from "./AgentInputTypes";
 
 // Effort ordering: max > xhigh > high > medium > low
-// xhigh is Opus 4.7 only (SDK 0.2.111+); falls back to 'high' on other models
-const CLAUDE_EFFORT_LEVELS = ["max", "xhigh", "high", "medium", "low"] as const;
+// xhigh is Opus 4.7 only (SDK 0.2.111+). When CLI reports supportedEffortLevels
+// on a model (e.g. Opus 4.7), xhigh is surfaced via the dynamic path below.
+// The static fallback deliberately omits xhigh so non-Opus-4.7 models don't
+// expose an option the SDK will reject.
+const CLAUDE_EFFORT_LEVELS = ["max", "high", "medium", "low"] as const;
 const CODEX_EFFORT_LEVELS = ["xhigh", "high", "medium", "low"] as const;
 const ALL_EFFORT_LEVELS = [
     "max",

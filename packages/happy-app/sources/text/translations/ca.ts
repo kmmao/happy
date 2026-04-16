@@ -1053,9 +1053,9 @@ export const ca: TranslationStructure = {
     effort: {
       title: "NIVELL D'ESFORÇ",
       low: "Baix",
-      lowDesc: "Tasques simples sensibles al pressupost o a la latència",
+      lowDesc: "Més ràpid i econòmic, només per a consultes trivials",
       medium: "Mitjà",
-      mediumDesc: "Tasques simples sensibles al pressupost o a la latència",
+      mediumDesc: "Equilibri per defecte per a tasques quotidianes",
       high: "Alt",
       highDesc: "Equilibri entre qualitat i cost, ideal per a alta concurrència",
       xhigh: "XHigh",
