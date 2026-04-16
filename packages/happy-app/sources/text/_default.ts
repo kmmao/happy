@@ -968,10 +968,12 @@ export const en = {
     rpcState: {
       disconnected: "Disconnected",
       reconnecting: "Reconnecting",
+      rpcPending: "RPC Pending",
       rpcReady: "RPC Ready",
     },
     inputDisabledDisconnected: "Session disconnected. Waiting to reconnect…",
-    inputDisabledReconnecting: "RPC reconnecting. Input will unlock when ready…",
+    inputDisabledReconnecting: "Realtime connection is reconnecting. Input will unlock when it recovers…",
+    inputDisabledRpcPending: "RPC is still getting ready. Input will unlock when ready…",
     model: {
       title: "MODEL",
       configureInCli: "Configure models in CLI settings",

@@ -1,4 +1,4 @@
-export type SessionRpcVisualState = "disconnected" | "reconnecting" | "rpcReady";
+export type SessionRpcVisualState = "disconnected" | "reconnecting" | "rpcPending" | "rpcReady";
 
 interface ResolveSessionRpcVisualStateParams {
     readonly presence: "online" | number | undefined;
@@ -15,8 +15,12 @@ export function resolveSessionRpcVisualState({
         return "disconnected";
     }
 
-    if (realtimeStatus === "connecting" || !rpcReady) {
+    if (realtimeStatus === "connecting") {
         return "reconnecting";
+    }
+
+    if (!rpcReady) {
+        return "rpcPending";
     }
 
     return "rpcReady";

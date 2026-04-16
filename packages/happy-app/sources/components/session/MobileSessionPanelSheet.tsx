@@ -30,6 +30,7 @@ import {
 } from "./mobileSessionPanelStyle";
 import { getSessionName } from "@/utils/sessionUtils";
 import {
+    getSessionPanelTabDefinitions,
     getSessionPanelTabs,
     resolveSessionPanelActiveTab,
     type SessionPanelTab,
@@ -54,13 +55,17 @@ export const MobileSessionPanelSheet = React.memo<MobileSessionPanelSheetProps>(
         const project = useProjectForSession(sessionId);
         const session = useSession(sessionId);
         const sessionTitle = session ? getSessionName(session) : "Panel";
+        const tabDefinitions = React.useMemo(() => getSessionPanelTabDefinitions(enablePreviewTab), [enablePreviewTab]);
         const tabs = React.useMemo(() => getSessionPanelTabs(enablePreviewTab), [enablePreviewTab]);
         const layoutConfig = React.useMemo(() => getMobilePanelLayoutConfig(), []);
         const tabChipMinWidth = React.useMemo(() => getMobilePanelTabChipMinWidth(), []);
+        const effectiveActiveTab = resolveSessionPanelActiveTab(activeTab, tabs);
 
         React.useEffect(() => {
-            setActiveTab((currentTab) => resolveSessionPanelActiveTab(currentTab, tabs));
-        }, [tabs]);
+            if (effectiveActiveTab !== activeTab) {
+                setActiveTab(effectiveActiveTab);
+            }
+        }, [activeTab, effectiveActiveTab]);
 
         const handleReference = React.useCallback(
             (path: string) => {
@@ -90,7 +95,7 @@ export const MobileSessionPanelSheet = React.memo<MobileSessionPanelSheetProps>(
                 );
             }
 
-            switch (activeTab) {
+            switch (effectiveActiveTab) {
                 case "files":
                     return (
                         <GitBrowseTab
@@ -117,15 +122,6 @@ export const MobileSessionPanelSheet = React.memo<MobileSessionPanelSheetProps>(
                 case "terminal":
                     return <SidePanelTerminalTab sessionId={sessionId} />;
             }
-        };
-
-        const labelMap: Record<SessionPanelTab, string> = {
-            changes: t("sidePanel.changes"),
-            files: t("sidePanel.files"),
-            code: t("sidePanel.code"),
-            preview: t("sidePanel.preview"),
-            summary: t("sidePanel.summary"),
-            terminal: t("sidePanel.terminal"),
         };
 
         return (
@@ -210,12 +206,11 @@ export const MobileSessionPanelSheet = React.memo<MobileSessionPanelSheetProps>(
                                             alignItems: "center",
                                         }}
                                     >
-                                        {tabs.map((tab) => {
-                                            const isActive = tab === activeTab;
-                                            const label = labelMap[tab];
+                                        {tabDefinitions.map((tab) => {
+                                            const isActive = tab.key === effectiveActiveTab;
                                             return (
                                                 <View
-                                                    key={tab}
+                                                    key={tab.key}
                                                     style={{
                                                         minWidth: tabChipMinWidth,
                                                         paddingHorizontal: 14,
@@ -233,7 +228,7 @@ export const MobileSessionPanelSheet = React.memo<MobileSessionPanelSheetProps>(
                                                     }}
                                                 >
                                                     <Text
-                                                        onPress={() => setActiveTab(tab)}
+                                                        onPress={() => setActiveTab(tab.key)}
                                                         style={{
                                                             fontSize: 13,
                                                             color: isActive
@@ -242,7 +237,7 @@ export const MobileSessionPanelSheet = React.memo<MobileSessionPanelSheetProps>(
                                                             ...Typography.default(isActive ? "semiBold" : "regular"),
                                                         }}
                                                     >
-                                                        {label}
+                                                        {t(tab.labelKey)}
                                                     </Text>
                                                 </View>
                                             );

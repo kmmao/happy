@@ -984,10 +984,12 @@ export const ca: TranslationStructure = {
     rpcState: {
       disconnected: "Desconnectat",
       reconnecting: "Reconnectant",
+      rpcPending: "RPC preparant-se",
       rpcReady: "RPC a punt",
     },
     inputDisabledDisconnected: "Sessió desconnectada. Esperant la reconnexió…",
-    inputDisabledReconnecting: "RPC reconnectant. L'entrada es desbloquejarà quan estigui a punt…",
+    inputDisabledReconnecting: "La connexió en temps real s'està reconnectant. L'entrada es desbloquejarà quan es recuperi…",
+    inputDisabledRpcPending: "L'RPC encara s'està preparant. L'entrada es desbloquejarà quan estigui a punt…",
     model: {
       title: "MODEL",
       configureInCli: "Configura els models a la configuració del CLI",

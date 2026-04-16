@@ -25,6 +25,7 @@ import { SidePanelPreviewTab } from "./SidePanelPreviewTab";
 import { SidePanelSummaryTab } from "./SidePanelSummaryTab";
 import { SidePanelTerminalTab } from "./SidePanelTerminalTab";
 import {
+    getSessionPanelTabDefinitions,
     getSessionPanelTabs,
     resolveSessionPanelActiveTab,
     type SessionPanelTab,
@@ -41,15 +42,6 @@ interface SessionSidePanelProps {
     onToggleCollapse: () => void;
     width?: number;
 }
-
-const SESSION_PANEL_TAB_LABELS: Record<SessionPanelTab, string> = {
-    changes: t("sidePanel.changes"),
-    files: t("sidePanel.files"),
-    code: t("sidePanel.code"),
-    preview: t("sidePanel.preview"),
-    summary: t("sidePanel.summary"),
-    terminal: t("sidePanel.terminal"),
-};
 
 export const SessionSidePanel = React.memo<SessionSidePanelProps>(
     function SessionSidePanel({ sessionId, collapsed, onToggleCollapse }) {
@@ -94,14 +86,21 @@ export const SessionSidePanel = React.memo<SessionSidePanelProps>(
             return { totalAdded, totalRemoved };
         }, [gitStatus, submodules]);
 
+        const tabDefinitions = React.useMemo(
+            () => getSessionPanelTabDefinitions(enablePreviewTab),
+            [enablePreviewTab],
+        );
         const tabs = React.useMemo(
             () => getSessionPanelTabs(enablePreviewTab),
             [enablePreviewTab],
         );
+        const effectiveActiveTab = resolveSessionPanelActiveTab(activeTab, tabs);
 
         React.useEffect(() => {
-            setActiveTab((currentTab) => resolveSessionPanelActiveTab(currentTab, tabs));
-        }, [tabs]);
+            if (effectiveActiveTab !== activeTab) {
+                setActiveTab(effectiveActiveTab);
+            }
+        }, [activeTab, effectiveActiveTab]);
 
         if (collapsed) {
             return (
@@ -149,17 +148,17 @@ export const SessionSidePanel = React.memo<SessionSidePanelProps>(
                                 backgroundColor: theme.colors.surfaceHigh,
                             }}
                         >
-                            {tabs.map((tab) => (
+                            {tabDefinitions.map((tab) => (
                                 <Pressable
-                                    key={tab}
-                                    onPress={() => setActiveTab(tab)}
+                                    key={tab.key}
+                                    onPress={() => setActiveTab(tab.key)}
                                     style={{
                                         flex: 1,
                                         paddingVertical: 10,
                                         alignItems: "center",
                                         borderBottomWidth: 2,
                                         borderBottomColor:
-                                            activeTab === tab
+                                            effectiveActiveTab === tab.key
                                                 ? theme.colors.textLink
                                                 : "transparent",
                                         flexDirection: "row",
@@ -170,17 +169,17 @@ export const SessionSidePanel = React.memo<SessionSidePanelProps>(
                                     <Text
                                         style={{
                                             fontSize: 13,
-                                            fontWeight: activeTab === tab ? "600" : "400",
+                                            fontWeight: effectiveActiveTab === tab.key ? "600" : "400",
                                             color:
-                                                activeTab === tab
+                                                effectiveActiveTab === tab.key
                                                     ? theme.colors.textLink
                                                     : theme.colors.textSecondary,
                                             ...Typography.default(),
                                         }}
                                     >
-                                        {SESSION_PANEL_TAB_LABELS[tab]}
+                                        {t(tab.labelKey)}
                                     </Text>
-                                    {tab === "changes" && changesInfo && (
+                                    {tab.key === "changes" && changesInfo && (
                                         <View style={{ flexDirection: "row", gap: 2 }}>
                                             <Text style={{ fontSize: 10, fontWeight: "600", color: theme.colors.gitAddedText }}>
                                                 +{changesInfo.totalAdded}
@@ -209,7 +208,7 @@ export const SessionSidePanel = React.memo<SessionSidePanelProps>(
                         </View>
 
                         <View style={{ flex: 1 }}>
-                            {activeTab === "files" && (
+                            {effectiveActiveTab === "files" && (
                                 <GitBrowseTab
                                     key={sessionId}
                                     sessionId={sessionId}
@@ -218,25 +217,25 @@ export const SessionSidePanel = React.memo<SessionSidePanelProps>(
                                     onReference={handleReference}
                                 />
                             )}
-                            {activeTab === "changes" && (
+                            {effectiveActiveTab === "changes" && (
                                 <SidePanelGitPanel
                                     sessionId={sessionId}
                                     onFilePress={handleFilePress}
                                 />
                             )}
-                            {activeTab === "code" && (
+                            {effectiveActiveTab === "code" && (
                                 <SidePanelCodeTab sessionId={sessionId} />
                             )}
-                            {activeTab === "preview" && (
+                            {effectiveActiveTab === "preview" && (
                                 <SidePanelPreviewTab sessionId={sessionId} />
                             )}
-                            {activeTab === "summary" && (
+                            {effectiveActiveTab === "summary" && (
                                 <SidePanelSummaryTab
                                     sessionId={sessionId}
                                     onOpenKnowledge={handleOpenKnowledge}
                                 />
                             )}
-                            {activeTab === "terminal" && (
+                            {effectiveActiveTab === "terminal" && (
                                 <SidePanelTerminalTab sessionId={sessionId} />
                             )}
                         </View>

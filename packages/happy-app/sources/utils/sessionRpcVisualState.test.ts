@@ -16,7 +16,7 @@ describe("resolveSessionRpcVisualState", () => {
         })).toBe("disconnected");
     });
 
-    it("socket 连接中或 rpc 尚未就绪时返回 reconnecting", () => {
+    it("socket 连接中时返回 reconnecting，rpc 尚未就绪时返回 rpcPending", () => {
         expect(resolveSessionRpcVisualState({
             presence: "online",
             realtimeStatus: "connecting",
@@ -27,7 +27,7 @@ describe("resolveSessionRpcVisualState", () => {
             presence: "online",
             realtimeStatus: "connected",
             rpcReady: false,
-        })).toBe("reconnecting");
+        })).toBe("rpcPending");
     });
 
     it("在线且 rpcReady 时返回 rpcReady", () => {

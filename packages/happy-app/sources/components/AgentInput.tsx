@@ -13,6 +13,7 @@ import {
   Modal as RNModal,
   Easing,
 } from "react-native";
+import { BlurView } from "expo-blur";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { layout } from "./layout";
@@ -44,7 +45,7 @@ import { useAnimatedTokensCostValue } from "./AnimatedTokensCost";
 import { GitBrowseTab } from "./git/GitBrowseTab";
 
 import type { AgentInputProps } from "./AgentInputTypes";
-import { stylesheet, FAVORITE_CHIP_GRADIENTS } from "./AgentInputStyles";
+import { stylesheet, FAVORITE_CHIP_GRADIENTS, getFavoriteSlashChipGlassStyle, getFloatingGlassChipStyle } from "./AgentInputStyles";
 import { ContextProgressBar } from "./ContextProgressBar";
 import { AttachButton, type AttachAction } from "./AttachButton";
 import { AgentInputSettingsOverlay } from "./AgentInputSettingsOverlay";
@@ -130,6 +131,8 @@ export const AgentInput = React.memo(
           return t("agentInput.rpcState.disconnected");
         case "reconnecting":
           return t("agentInput.rpcState.reconnecting");
+        case "rpcPending":
+          return t("agentInput.rpcState.rpcPending");
         case "rpcReady":
           return t("agentInput.rpcState.rpcReady");
         default:
@@ -140,6 +143,7 @@ export const AgentInput = React.memo(
     const modelSummaryVisualState = React.useMemo(() => {
       switch (props.modelSummaryRpcState) {
         case "reconnecting":
+        case "rpcPending":
           return {
             borderColor: `${theme.colors.accentOrange}55`,
             backgroundColor: `${theme.colors.accentOrange}12`,
@@ -1472,201 +1476,304 @@ export const AgentInput = React.memo(
                 contentContainerStyle={{
                   paddingHorizontal: 8,
                   paddingTop: 6,
-                  paddingBottom: 2,
+                  paddingBottom: 6,
                   gap: 6,
                 }}
               >
-                {favoriteSlashCommands.map((cmd, index) => (
-                  <Pressable
-                    key={cmd}
-                    onPress={() => {
-                      hapticsLight();
-                      props.commands?.onCommandSelect?.(cmd);
-                    }}
-                    style={({ pressed }) => ({
-                      borderRadius: 16,
-                      overflow: "hidden",
-                      opacity: pressed ? 0.7 : 1,
-                    })}
-                  >
-                    <LinearGradient
-                      colors={
-                        FAVORITE_CHIP_GRADIENTS[
-                          index % FAVORITE_CHIP_GRADIENTS.length
-                        ]
-                      }
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 1, y: 0 }}
-                      style={{
-                        paddingHorizontal: 10,
-                        paddingVertical: 5,
-                        borderRadius: 16,
+                {favoriteSlashCommands.map((cmd, index) => {
+                  const glassStyle = getFavoriteSlashChipGlassStyle();
+                  const gradient = FAVORITE_CHIP_GRADIENTS[
+                    index % FAVORITE_CHIP_GRADIENTS.length
+                  ];
+                  const accentColor = gradient[0];
+                  return (
+                    <Pressable
+                      key={cmd}
+                      onPress={() => {
+                        hapticsLight();
+                        props.commands?.onCommandSelect?.(cmd);
                       }}
+                      style={({ pressed }) => ({
+                        ...glassStyle.container,
+                        opacity: pressed ? 0.9 : 1,
+                        borderColor: theme.dark
+                          ? `${accentColor}22`
+                          : `${accentColor}26`,
+                        backgroundColor:
+                          Platform.OS === "web"
+                            ? theme.dark
+                              ? `${accentColor}10`
+                              : `${accentColor}18`
+                            : theme.dark
+                              ? `${accentColor}0A`
+                              : `${accentColor}14`,
+                        shadowColor: "#000000",
+                        shadowOffset: { width: 0, height: 4 },
+                        shadowOpacity: theme.dark
+                          ? (pressed ? 0.10 : 0.16)
+                          : (pressed ? 0.05 : 0.08),
+                        shadowRadius: 8,
+                        elevation: pressed ? 1 : 2,
+                      })}
                     >
-                      <Text
-                        style={{
-                          fontSize: 12,
-                          color: "#fff",
-                          ...Typography.default("semiBold"),
-                        }}
-                        numberOfLines={1}
+                      <BlurView
+                        intensity={Platform.OS === "ios" ? 34 : 14}
+                        tint={theme.dark ? "dark" : "light"}
+                        style={glassStyle.blur}
                       >
-                        /{cmd.includes(":") ? cmd.split(":").pop() : cmd}
-                      </Text>
-                    </LinearGradient>
-                  </Pressable>
-                ))}
+                        <LinearGradient
+                          colors={theme.dark
+                            ? [
+                                `${accentColor}1A`,
+                                `${accentColor}10`,
+                                "rgba(255,255,255,0.02)",
+                              ]
+                            : [
+                                "rgba(255,255,255,0.58)",
+                                `${accentColor}14`,
+                                "rgba(255,255,255,0.14)",
+                              ]}
+                          locations={[0, 0.42, 1]}
+                          start={{ x: 0, y: 0 }}
+                          end={{ x: 1, y: 0.1 }}
+                          style={glassStyle.content}
+                        >
+                          <View
+                            style={{
+                              width: 8,
+                              height: 8,
+                              borderRadius: 999,
+                              backgroundColor: accentColor,
+                              opacity: theme.dark ? 0.9 : 0.7,
+                            }}
+                          />
+                          <Text
+                            style={{
+                              fontSize: 12,
+                              color: theme.colors.text,
+                              ...Typography.default("semiBold"),
+                            }}
+                            numberOfLines={1}
+                          >
+                            {cmd.includes(":") ? cmd.split(":").pop() : cmd}
+                          </Text>
+                        </LinearGradient>
+                      </BlurView>
+                    </Pressable>
+                  );
+                })}
               </ScrollView>
             )}
 
             {/* Continue chip — shown when max turns reached and no prompt suggestion */}
             {props.needsContinue &&
               props.onContinuePress &&
-              !props.promptSuggestion && (
-                <Pressable
-                  onPress={() => {
-                    hapticsLight();
-                    props.onContinuePress?.();
-                  }}
-                  style={({ pressed }) => ({
-                    flexDirection: "row",
-                    alignItems: "center",
-                    marginHorizontal: 8,
-                    marginTop: 8,
-                    marginBottom: 4,
-                    paddingHorizontal: 12,
-                    paddingVertical: 8,
-                    backgroundColor: pressed
-                      ? theme.colors.surfacePressed
-                      : `${theme.colors.permission.plan}10`,
-                    borderRadius: 12,
-                    borderWidth: 1,
-                    borderColor: `${theme.colors.permission.plan}30`,
-                    gap: 8,
-                  })}
-                >
-                  <Ionicons
-                    name="play-circle-outline"
-                    size={14}
-                    color={theme.colors.permission.plan}
-                  />
-                  <Text
-                    style={{
-                      flex: 1,
-                      fontSize: 13,
-                      color: theme.colors.text,
-                      ...Typography.default(),
+              !props.promptSuggestion && (() => {
+                const glassStyle = getFloatingGlassChipStyle();
+                const accentColor = theme.colors.permission.plan;
+                return (
+                  <Pressable
+                    onPress={() => {
+                      hapticsLight();
+                      props.onContinuePress?.();
                     }}
-                    numberOfLines={1}
+                    style={({ pressed }) => ({
+                      ...glassStyle.container,
+                      opacity: pressed ? 0.88 : 1,
+                      borderColor: theme.dark
+                        ? `${accentColor}66`
+                        : `${accentColor}44`,
+                      backgroundColor:
+                        Platform.OS === "web"
+                          ? theme.dark
+                            ? "rgba(255,255,255,0.16)"
+                            : "rgba(255,255,255,0.72)"
+                          : theme.dark
+                            ? "rgba(255,255,255,0.10)"
+                            : "rgba(255,255,255,0.56)",
+                      shadowColor: accentColor,
+                      shadowOffset: { width: 0, height: 8 },
+                      shadowOpacity: pressed ? 0.12 : 0.22,
+                      shadowRadius: 14,
+                      elevation: pressed ? 1 : 3,
+                    })}
                   >
-                    {t("agentInput.continue")}
-                  </Text>
-                  <Ionicons
-                    name="arrow-up-circle"
-                    size={18}
-                    color={theme.colors.permission.plan}
-                  />
-                </Pressable>
-              )}
+                    <BlurView
+                      intensity={Platform.OS === "ios" ? 52 : 24}
+                      tint={theme.dark ? "dark" : "light"}
+                      style={glassStyle.blur}
+                    >
+                      <LinearGradient
+                        colors={theme.dark
+                          ? ["rgba(255,255,255,0.18)", `${accentColor}22`, `${accentColor}0A`]
+                          : ["rgba(255,255,255,0.82)", `${accentColor}1A`, `${accentColor}08`]}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 1 }}
+                        style={glassStyle.content}
+                      >
+                        <Ionicons
+                          name="play-circle-outline"
+                          size={14}
+                          color={accentColor}
+                        />
+                        <Text
+                          style={{
+                            flex: 1,
+                            fontSize: 13,
+                            color: theme.colors.text,
+                            ...Typography.default(),
+                          }}
+                          numberOfLines={1}
+                        >
+                          {t("agentInput.continue")}
+                        </Text>
+                        <Ionicons
+                          name="arrow-up-circle"
+                          size={18}
+                          color={accentColor}
+                        />
+                      </LinearGradient>
+                    </BlurView>
+                  </Pressable>
+                );
+              })()}
 
             {/* Requires-action chip — surfaces generic SDK user action state */}
             {props.requiresAction &&
               props.onRequiresActionPress &&
               !props.promptSuggestion &&
-              !props.needsContinue && (
+              !props.needsContinue && (() => {
+                const glassStyle = getFloatingGlassChipStyle();
+                const accentColor = theme.colors.accentOrange;
+                return (
+                  <Pressable
+                    onPress={() => {
+                      hapticsLight();
+                      props.onRequiresActionPress?.();
+                    }}
+                    style={({ pressed }) => ({
+                      ...glassStyle.container,
+                      opacity: pressed ? 0.88 : 1,
+                      borderColor: theme.dark
+                        ? `${accentColor}66`
+                        : `${accentColor}44`,
+                      backgroundColor:
+                        Platform.OS === "web"
+                          ? theme.dark
+                            ? "rgba(255,255,255,0.16)"
+                            : "rgba(255,255,255,0.72)"
+                          : theme.dark
+                            ? "rgba(255,255,255,0.10)"
+                            : "rgba(255,255,255,0.56)",
+                      shadowColor: accentColor,
+                      shadowOffset: { width: 0, height: 8 },
+                      shadowOpacity: pressed ? 0.12 : 0.22,
+                      shadowRadius: 14,
+                      elevation: pressed ? 1 : 3,
+                    })}
+                  >
+                    <BlurView
+                      intensity={Platform.OS === "ios" ? 52 : 24}
+                      tint={theme.dark ? "dark" : "light"}
+                      style={glassStyle.blur}
+                    >
+                      <LinearGradient
+                        colors={theme.dark
+                          ? ["rgba(255,255,255,0.18)", `${accentColor}22`, `${accentColor}0A`]
+                          : ["rgba(255,255,255,0.82)", `${accentColor}1A`, `${accentColor}08`]}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 1 }}
+                        style={glassStyle.content}
+                      >
+                        <Ionicons
+                          name="alert-circle-outline"
+                          size={14}
+                          color={accentColor}
+                        />
+                        <Text
+                          style={{
+                            flex: 1,
+                            fontSize: 13,
+                            color: theme.colors.text,
+                            ...Typography.default(),
+                          }}
+                          numberOfLines={1}
+                        >
+                          {t("agentInput.requiresAction")}
+                        </Text>
+                        <Ionicons
+                          name="chevron-down"
+                          size={18}
+                          color={accentColor}
+                        />
+                      </LinearGradient>
+                    </BlurView>
+                  </Pressable>
+                );
+              })()}
+
+            {/* Prompt suggestion chip */}
+            {props.promptSuggestion && props.onPromptSuggestionPress && (() => {
+              const glassStyle = getFloatingGlassChipStyle();
+              const accentColor = theme.colors.textLink;
+              return (
                 <Pressable
                   onPress={() => {
                     hapticsLight();
-                    props.onRequiresActionPress?.();
+                    props.onPromptSuggestionPress?.(props.promptSuggestion!);
                   }}
                   style={({ pressed }) => ({
-                    flexDirection: "row",
-                    alignItems: "center",
-                    marginHorizontal: 8,
-                    marginTop: 8,
-                    marginBottom: 4,
-                    paddingHorizontal: 12,
-                    paddingVertical: 8,
-                    backgroundColor: pressed
-                      ? theme.colors.surfacePressed
-                      : `${theme.colors.accentOrange}10`,
-                    borderRadius: 12,
-                    borderWidth: 1,
-                    borderColor: `${theme.colors.accentOrange}30`,
-                    gap: 8,
+                    ...glassStyle.container,
+                    opacity: pressed ? 0.82 : 1,
+                    borderColor: `${accentColor}38`,
+                    backgroundColor:
+                      Platform.OS === "web"
+                        ? `${theme.colors.surface}B8`
+                        : `${theme.colors.surface}7A`,
+                    shadowColor: accentColor,
+                    shadowOffset: { width: 0, height: 6 },
+                    shadowOpacity: pressed ? 0.08 : 0.16,
+                    shadowRadius: 12,
+                    elevation: pressed ? 1 : 2,
                   })}
                 >
-                  <Ionicons
-                    name="alert-circle-outline"
-                    size={14}
-                    color={theme.colors.accentOrange}
-                  />
-                  <Text
-                    style={{
-                      flex: 1,
-                      fontSize: 13,
-                      color: theme.colors.text,
-                      ...Typography.default(),
-                    }}
-                    numberOfLines={1}
+                  <BlurView
+                    intensity={Platform.OS === "ios" ? 36 : 18}
+                    tint={theme.dark ? "dark" : "light"}
+                    style={glassStyle.blur}
                   >
-                    {t("agentInput.requiresAction")}
-                  </Text>
-                  <Ionicons
-                    name="chevron-down"
-                    size={18}
-                    color={theme.colors.accentOrange}
-                  />
+                    <LinearGradient
+                      colors={[`${accentColor}18`, `${accentColor}08`]}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                      style={glassStyle.content}
+                    >
+                      <Ionicons
+                        name="sparkles-outline"
+                        size={14}
+                        color={accentColor}
+                      />
+                      <Text
+                        style={{
+                          flex: 1,
+                          fontSize: 13,
+                          color: theme.colors.text,
+                          ...Typography.default(),
+                        }}
+                        numberOfLines={2}
+                      >
+                        {props.promptSuggestion}
+                      </Text>
+                      <Ionicons
+                        name="arrow-up-circle"
+                        size={18}
+                        color={accentColor}
+                      />
+                    </LinearGradient>
+                  </BlurView>
                 </Pressable>
-              )}
-
-            {/* Prompt suggestion chip */}
-            {props.promptSuggestion && props.onPromptSuggestionPress && (
-              <Pressable
-                onPress={() => {
-                  hapticsLight();
-                  props.onPromptSuggestionPress?.(props.promptSuggestion!);
-                }}
-                style={({ pressed }) => ({
-                  flexDirection: "row",
-                  alignItems: "center",
-                  marginHorizontal: 8,
-                  marginTop: 8,
-                  marginBottom: 4,
-                  paddingHorizontal: 12,
-                  paddingVertical: 8,
-                  backgroundColor: pressed
-                    ? theme.colors.surfacePressed
-                    : `${theme.colors.textLink}10`,
-                  borderRadius: 12,
-                  borderWidth: 1,
-                  borderColor: `${theme.colors.textLink}30`,
-                  gap: 8,
-                })}
-              >
-                <Ionicons
-                  name="sparkles-outline"
-                  size={14}
-                  color={theme.colors.textLink}
-                />
-                <Text
-                  style={{
-                    flex: 1,
-                    fontSize: 13,
-                    color: theme.colors.text,
-                    ...Typography.default(),
-                  }}
-                  numberOfLines={2}
-                >
-                  {props.promptSuggestion}
-                </Text>
-                <Ionicons
-                  name="arrow-up-circle"
-                  size={18}
-                  color={theme.colors.textLink}
-                />
-              </Pressable>
-            )}
+              );
+            })()}
 
             {/* Input field */}
             <View

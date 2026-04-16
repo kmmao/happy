@@ -992,10 +992,12 @@ export const pl: TranslationStructure = {
     rpcState: {
       disconnected: "Rozłączony",
       reconnecting: "Ponowne łączenie",
+      rpcPending: "Przygotowywanie RPC",
       rpcReady: "RPC gotowe",
     },
     inputDisabledDisconnected: "Sesja jest rozłączona. Oczekiwanie na ponowne połączenie…",
-    inputDisabledReconnecting: "RPC ponownie się łączy. Pole odblokuje się po gotowości…",
+    inputDisabledReconnecting: "Trwa ponowne łączenie w czasie rzeczywistym. Pole odblokuje się po odzyskaniu połączenia…",
+    inputDisabledRpcPending: "RPC nadal się przygotowuje. Pole odblokuje się, gdy będzie gotowe…",
     model: {
       title: "MODEL",
       configureInCli: "Skonfiguruj modele w ustawieniach CLI",

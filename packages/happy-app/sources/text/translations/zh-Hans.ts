@@ -941,10 +941,12 @@ export const zhHans: TranslationStructure = {
     rpcState: {
       disconnected: "已断开",
       reconnecting: "重连中",
+      rpcPending: "RPC 准备中",
       rpcReady: "RPC 就绪",
     },
     inputDisabledDisconnected: "会话已断开，等待重新连接…",
-    inputDisabledReconnecting: "RPC 重连中，就绪后会自动解锁输入…",
+    inputDisabledReconnecting: "正在重新建立实时连接，恢复后会自动解锁输入…",
+    inputDisabledRpcPending: "RPC 正在准备中，就绪后会自动解锁输入…",
     model: {
       title: "模型",
       configureInCli: "在 CLI 设置中配置模型",

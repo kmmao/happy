@@ -11,7 +11,52 @@ export const FAVORITE_CHIP_GRADIENTS: [string, string][] = [
     ["#8b5cf6", "#a855f7"], // violet -> purple
 ];
 
-export const stylesheet = StyleSheet.create((theme, runtime) => ({
+export function getFavoriteSlashChipGlassStyle() {
+    return {
+        container: {
+            borderRadius: 18,
+            borderWidth: 1,
+            overflow: "hidden" as const,
+        },
+        blur: {
+            borderRadius: 18,
+            overflow: "hidden" as const,
+        },
+        content: {
+            flexDirection: "row" as const,
+            alignItems: "center" as const,
+            gap: 6,
+            paddingHorizontal: 12,
+            paddingVertical: 7,
+        },
+    };
+}
+
+export function getFloatingGlassChipStyle() {
+    return {
+        container: {
+            marginHorizontal: 8,
+            marginTop: 8,
+            marginBottom: 4,
+            borderRadius: 14,
+            borderWidth: 1,
+            overflow: "hidden" as const,
+        },
+        blur: {
+            borderRadius: 14,
+            overflow: "hidden" as const,
+        },
+        content: {
+            flexDirection: "row" as const,
+            alignItems: "center" as const,
+            gap: 8,
+            paddingHorizontal: 12,
+            paddingVertical: 8,
+        },
+    };
+}
+
+export const stylesheet = StyleSheet.create((theme) => ({
     container: {
         alignItems: "center",
         paddingBottom: 8,
@@ -41,7 +86,6 @@ export const stylesheet = StyleSheet.create((theme, runtime) => ({
         minHeight: 40,
     },
 
-    // Overlay styles
     autocompleteOverlay: {
         position: "absolute",
         bottom: "100%",
@@ -111,7 +155,6 @@ export const stylesheet = StyleSheet.create((theme, runtime) => ({
         marginHorizontal: 16,
     },
 
-    // Selection styles
     selectionItem: {
         flexDirection: "row",
         alignItems: "center",
@@ -154,7 +197,6 @@ export const stylesheet = StyleSheet.create((theme, runtime) => ({
         color: theme.colors.text,
     },
 
-    // Status styles
     statusContainer: {
         flexDirection: "row",
         alignItems: "center",
@@ -184,7 +226,6 @@ export const stylesheet = StyleSheet.create((theme, runtime) => ({
         ...Typography.default(),
     },
 
-    // Button styles
     actionButtonsContainer: {
         flexDirection: "row",
         alignItems: "center",
@@ -242,3 +283,4 @@ export const stylesheet = StyleSheet.create((theme, runtime) => ({
         color: theme.colors.button.primary.tint,
     },
 }));
+

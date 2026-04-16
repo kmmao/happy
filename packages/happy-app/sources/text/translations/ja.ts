@@ -1079,10 +1079,12 @@ export const ja: TranslationStructure = {
     rpcState: {
       disconnected: "切断",
       reconnecting: "再接続中",
+      rpcPending: "RPC 準備中",
       rpcReady: "RPC 準備完了",
     },
     inputDisabledDisconnected: "セッションは切断されています。再接続を待っています…",
-    inputDisabledReconnecting: "RPC を再接続中です。準備完了後に入力が有効になります…",
+    inputDisabledReconnecting: "リアルタイム接続を再確立中です。復旧後に入力が有効になります…",
+    inputDisabledRpcPending: "RPC を準備中です。準備完了後に入力が有効になります…",
     model: {
       title: "モデル",
       configureInCli: "CLIの設定でモデルを構成",

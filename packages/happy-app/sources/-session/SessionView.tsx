@@ -663,6 +663,9 @@ function SessionViewInner({
     if (modelSummaryRpcState === "reconnecting") {
       return t("agentInput.inputDisabledReconnecting");
     }
+    if (modelSummaryRpcState === "rpcPending") {
+      return t("agentInput.inputDisabledRpcPending");
+    }
     if (modelSummaryRpcState === "disconnected") {
       return t("agentInput.inputDisabledDisconnected");
     }

@@ -985,10 +985,12 @@ export const es: TranslationStructure = {
     rpcState: {
       disconnected: "Desconectado",
       reconnecting: "Reconectando",
+      rpcPending: "RPC preparándose",
       rpcReady: "RPC listo",
     },
     inputDisabledDisconnected: "Sesión desconectada. Esperando reconexión…",
-    inputDisabledReconnecting: "RPC reconectando. La entrada se habilitará cuando esté lista…",
+    inputDisabledReconnecting: "La conexión en tiempo real se está restableciendo. La entrada se habilitará cuando se recupere…",
+    inputDisabledRpcPending: "RPC todavía se está preparando. La entrada se habilitará cuando esté lista…",
     model: {
       title: "MODELO",
       configureInCli: "Configurar modelos en la configuración del CLI",

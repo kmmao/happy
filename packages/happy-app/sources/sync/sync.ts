@@ -131,6 +131,7 @@ import {
   linkSessionsToProject,
   deleteProject as apiDeleteProject,
 } from "./apiProjects";
+import { resolveFetchedSessionRpcReady } from "./fetchSessionRpcReady";
 
 type V3GetSessionMessagesResponse = {
   messages: ApiMessage[];
@@ -1085,7 +1086,9 @@ class Sync {
       // Put it all together
       const processedSession = {
         ...session,
-        rpcReady: false,
+        rpcReady: resolveFetchedSessionRpcReady(
+          storage.getState().sessions[session.id],
+        ),
         thinking: false,
         thinkingAt: 0,
         metadata,

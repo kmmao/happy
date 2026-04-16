@@ -993,10 +993,12 @@ export const ru: TranslationStructure = {
     rpcState: {
       disconnected: "Отключено",
       reconnecting: "Переподключение",
+      rpcPending: "RPC подготавливается",
       rpcReady: "RPC готов",
     },
     inputDisabledDisconnected: "Сессия отключена. Ожидание переподключения…",
-    inputDisabledReconnecting: "RPC переподключается. Ввод разблокируется после готовности…",
+    inputDisabledReconnecting: "Соединение в реальном времени переподключается. Ввод разблокируется после восстановления…",
+    inputDisabledRpcPending: "RPC всё ещё подготавливается. Ввод разблокируется, когда он будет готов…",
     model: {
       title: "МОДЕЛЬ",
       configureInCli: "Настройте модели в настройках CLI",
