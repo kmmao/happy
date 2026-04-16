@@ -20,6 +20,7 @@ import type {
   SDKToolProgressMessage,
   SDKPromptSuggestionMessage,
   SDKSessionStateChangedMessage,
+  SDKMemoryRecallMessage,
 } from "@anthropic-ai/claude-agent-sdk";
 import { createSdkMcpServer } from "@anthropic-ai/claude-agent-sdk";
 import { z } from "zod";
@@ -678,7 +679,7 @@ export async function claudeRemoteLauncher(
       }
     }
 
-    // Forward status events to App (compacting, compact_boundary, etc.)
+    // Forward status events to App (compacting, requesting, compact_boundary, etc.)
     if (message.type === "system") {
       const statusMsg = message as SDKStatusMsg;
       if (statusMsg.subtype === "status") {
@@ -686,6 +687,13 @@ export async function claudeRemoteLauncher(
           session.client.sendSessionEvent({
             type: "message",
             message: "Compacting context...",
+          });
+        } else if (statusMsg.status === "requesting") {
+          // SDK 0.2.108+: emitted before each API request when includePartialMessages is on.
+          // Surfaced to App as a lightweight status ping; App decides how to render.
+          session.client.sendSessionEvent({
+            type: "message",
+            message: "Requesting...",
           });
         }
       } else if ((message as SDKCompactMsg).subtype === "compact_boundary") {
@@ -749,6 +757,30 @@ export async function claudeRemoteLauncher(
         summary: m.summary,
       });
       session.client.sendSessionProtocolMessage(envelope);
+    }
+
+    // Forward memory recall to App as a session event (SDK 0.2.105+).
+    // The supervisor surfaces relevant memory files into the turn; we only log
+    // which memories were recalled so users can see "what I looked up".
+    if (
+      message.type === "system" &&
+      (message as SDKMemoryRecallMessage).subtype === "memory_recall"
+    ) {
+      const m = message as SDKMemoryRecallMessage;
+      const count = m.memories?.length ?? 0;
+      if (count > 0) {
+        const summary =
+          m.mode === "synthesize"
+            ? `Recalled ${count} memory ${count === 1 ? "note" : "notes"} (synthesized)`
+            : `Recalled ${count} memory ${count === 1 ? "file" : "files"}`;
+        session.client.sendSessionEvent({
+          type: "message",
+          message: summary,
+        });
+        logger.debug(
+          `[remote] memory_recall (${m.mode}): ${m.memories.map((mem) => mem.path).join(", ")}`,
+        );
+      }
     }
 
     // Forward Task notification to session protocol

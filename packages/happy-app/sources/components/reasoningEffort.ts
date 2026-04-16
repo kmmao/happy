@@ -1,12 +1,14 @@
 import type { Metadata } from "@/sync/storageTypes";
 import type { ReasoningProps } from "./AgentInputTypes";
 
-const CLAUDE_EFFORT_LEVELS = ["high", "max", "medium", "low"] as const;
+// Effort ordering: max > xhigh > high > medium > low
+// xhigh is Opus 4.7 only (SDK 0.2.111+); falls back to 'high' on other models
+const CLAUDE_EFFORT_LEVELS = ["max", "xhigh", "high", "medium", "low"] as const;
 const CODEX_EFFORT_LEVELS = ["xhigh", "high", "medium", "low"] as const;
 const ALL_EFFORT_LEVELS = [
+    "max",
     "xhigh",
     "high",
-    "max",
     "medium",
     "low",
 ] as const;

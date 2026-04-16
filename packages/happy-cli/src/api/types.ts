@@ -329,6 +329,7 @@ export const MessageMetaSchema = z.object({
   effort: z.enum(["low", "medium", "high", "max", "xhigh"]).nullable().optional(), // Effort level (null = reset)
   continue: z.boolean().optional(), // Continue from last conversation without new prompt (one-time flag)
   locale: z.string().optional(), // User's preferred UI language (e.g. 'en', 'zh-Hans', 'ja')
+  shouldQuery: z.boolean().optional(), // When false, append message without triggering assistant turn (SDK 0.2.110+)
   requestDiagnostics: z
     .object({
       version: z.literal(1),

@@ -37,6 +37,11 @@ export interface EnhancedMode {
   continue?: boolean;
   /** User's preferred UI language (e.g. 'en', 'zh-Hans', 'ja') */
   locale?: string;
+  /**
+   * When false, append this message to the transcript without triggering an
+   * assistant turn. Defaults to true. Requires SDK 0.2.110+.
+   */
+  shouldQuery?: boolean;
   /** Enable beta features (e.g. 1M context window) */
   betas?: SdkBeta[];
   /** Agent name for the main thread */

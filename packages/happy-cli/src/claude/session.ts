@@ -13,6 +13,15 @@ export class Session {
   readonly queue: MessageQueue2<EnhancedMode>;
   readonly claudeEnvVars?: Record<string, string>;
   claudeArgs?: string[]; // Made mutable to allow filtering
+  /**
+   * MCP server configs passed through to the SDK.
+   * Kept as `any` to allow all SDK config shapes (stdio, sse, http, sdk).
+   *
+   * SDK 0.2.111+ supports per-tool `permission_policy` on remote servers:
+   *   { type: 'http', url, tools: [{ name, permission_policy: 'always_allow' | 'always_ask' | 'always_deny' }] }
+   * Upstream config producers can set `tools` on any entry to enforce
+   * per-tool auto-allow/deny without wrapping every call with `canCallTool`.
+   */
   readonly mcpServers: Record<string, any>;
   readonly allowedTools?: string[];
   readonly sandboxConfig?: SandboxConfig;

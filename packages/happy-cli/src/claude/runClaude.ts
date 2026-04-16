@@ -617,13 +617,10 @@ export async function runClaude(
       );
     }
 
-    // Resolve effort
+    // Resolve effort (SDK 0.2.112+ natively supports 'xhigh' for Opus 4.7)
     let messageEffort = currentEffort;
     if (message.meta?.hasOwnProperty("effort")) {
-      messageEffort =
-        message.meta.effort === "xhigh"
-          ? "max"
-          : (message.meta.effort ?? undefined);
+      messageEffort = message.meta.effort ?? undefined;
       currentEffort = messageEffort;
       logger.debug(`[loop] effort updated: ${messageEffort ?? "none"}`);
     }
@@ -640,6 +637,14 @@ export async function runClaude(
     const messageContinue = !!message.meta?.continue;
     if (messageContinue) {
       logger.debug("[loop] continue flag detected on message");
+    }
+
+    // Resolve shouldQuery (one-time flag, defaults to true).
+    // When false, the message is appended without triggering an assistant turn.
+    const messageShouldQuery =
+      message.meta?.shouldQuery === false ? false : undefined;
+    if (messageShouldQuery === false) {
+      logger.debug("[loop] shouldQuery=false — message will not trigger a turn");
     }
 
     // Check for special commands before processing
@@ -743,6 +748,7 @@ export async function runClaude(
       effort: messageEffort,
       locale: messageLocale,
       ...(messageContinue && { continue: true }),
+      ...(messageShouldQuery === false && { shouldQuery: false }),
       ...(sdkPlugins.length > 0 && { plugins: sdkPlugins }),
       ...(perfSocketReceivedAt && { _perfSocketReceivedAt: perfSocketReceivedAt }),
     };

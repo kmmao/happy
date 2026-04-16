@@ -57,13 +57,17 @@ const GEMINI_MODEL_FALLBACKS: ModelMode[] = [
   },
 ];
 
-// Known Claude model pricing for enriching CLI-reported descriptions
+// Known Claude model pricing for enriching CLI-reported descriptions.
+// Sonnet/Opus default to 1M context — the -1m keys are kept for back-compat
+// of already-persisted sessions but no longer surfaced as separate options.
 const CLAUDE_MODEL_PRICING: Record<string, string> = {
-  "sonnet": "$3/$15 \u00B7 200K",
-  "sonnet-1m": "$3/$15 \u00B7 1M",
+  "sonnet": "$3/$15",
+  "sonnet-1m": "$3/$15",
   "haiku": "$1/$5 \u00B7 200K",
-  "opus": "$5/$25 \u00B7 200K",
-  "opus-1m": "$5/$25 \u00B7 1M",
+  "opus": "$5/$25",
+  "opus-1m": "$5/$25",
+  "opus-4-7": "$5/$25",
+  "opus-4-7-1m": "$5/$25",
 };
 
 function enrichDescription(code: string, description: string | null | undefined): string | null {
@@ -189,22 +193,17 @@ export function getClaudeModelModes(): ModelMode[] {
     {
       key: "sonnet",
       name: "Sonnet",
-      description: "Sonnet 4.6 \u00B7 $3/$15 \u00B7 200K",
+      description: "Sonnet 4.6 \u00B7 $3/$15",
     },
     {
-      key: "sonnet-1m",
-      name: "Sonnet (1M)",
-      description: "Sonnet 4.6 \u00B7 $3/$15 \u00B7 1M",
+      key: "opus-4-7",
+      name: "Opus 4.7",
+      description: "Opus 4.7 \u00B7 Latest \u00B7 $5/$25",
     },
     {
       key: "opus",
       name: "Opus",
-      description: "Opus 4.6 \u00B7 $5/$25 \u00B7 200K",
-    },
-    {
-      key: "opus-1m",
-      name: "Opus (1M)",
-      description: "Opus 4.6 \u00B7 $5/$25 \u00B7 1M",
+      description: "Opus 4.6 \u00B7 $5/$25",
     },
     {
       key: "haiku",

@@ -34,15 +34,21 @@ export function resolveModelKey(
   if (modelKey === "default") return undefined;
 
   switch (modelKey) {
-    // Extended context variants need explicit IDs with [Nm] suffix
-    // because the SDK doesn't recognize App-level "-1m" keys.
+    // Sonnet/Opus now default to 1M context in the App — map the short keys
+    // to the explicit [1m] SDK IDs. Old `-1m` keys are preserved for backward
+    // compatibility with sessions pinned before the 200K/1M merge.
+    case "sonnet":
     case "sonnet-1m":
       return "claude-sonnet-4-6[1m]";
+    case "opus":
     case "opus-1m":
       return "claude-opus-4-6[1m]";
-    // All other keys (opus, sonnet, haiku, opusplan, etc.) pass through
-    // to the SDK which resolves them using ANTHROPIC_DEFAULT_*_MODEL
-    // env vars — enabling third-party provider model mapping.
+    case "opus-4-7":
+    case "opus-4-7-1m":
+      return "claude-opus-4-7[1m]";
+    // Remaining keys (haiku, opusplan, etc.) pass through to the SDK which
+    // resolves them via ANTHROPIC_DEFAULT_*_MODEL env vars — enabling
+    // third-party provider model mapping.
     default:
       return modelKey;
   }
@@ -601,6 +607,7 @@ export async function claudeRemote(opts: {
           message: { role: "user", content: next.message },
           parent_tool_use_id: null,
           session_id: undefined,
+          ...(next.mode.shouldQuery === false && { shouldQuery: false }),
         });
       }
 
