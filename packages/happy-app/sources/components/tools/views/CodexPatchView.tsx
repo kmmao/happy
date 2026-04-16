@@ -138,6 +138,7 @@ export const CodexPatchView = React.memo<CodexPatchViewProps>(
                       showPlusMinusSymbols
                       collapsible
                       language={entry.language}
+                      visibleLineCount={isFullView ? undefined : 5}
                     />
                   </View>
                 )}

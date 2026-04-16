@@ -17,11 +17,12 @@ export const WriteView = React.memo<ToolViewProps>(({ tool }) => {
     return (
         <>
             <ToolSectionView fullWidth>
-                <ToolDiffView 
-                    oldText={''} 
-                    newText={contents} 
+                <ToolDiffView
+                    oldText={''}
+                    newText={contents}
                     showLineNumbers={showLineNumbersInToolViews}
                     showPlusMinusSymbols={showLineNumbersInToolViews}
+                    visibleLineCount={5}
                 />
             </ToolSectionView>
         </>

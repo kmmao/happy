@@ -5,15 +5,15 @@ import { Ionicons } from '@expo/vector-icons';
 import { ToolCall } from '@/sync/typesMessage';
 import { ToolSectionView } from '../ToolSectionView';
 import { ToolDiffView } from '@/components/tools/ToolDiffView';
-import { Metadata } from '@/sync/storageTypes';
 import { useSetting } from '@/sync/storage';
 import { t } from '@/text';
 import { DiffStatsBar } from '@/components/diff/DiffStatsBar';
 import { getCodexDiffStats, parseCodexUnifiedDiff } from '../codexDiffUtils';
+import { Metadata } from '@/sync/storageTypes';
 
 interface CodexDiffViewProps {
     tool: ToolCall;
-    metadata: Metadata | null;
+    metadata?: Metadata | null;
     scrollViewRef?: React.RefObject<ScrollView | null>;
 }
 
@@ -31,12 +31,11 @@ function formatToolDuration(tool: ToolCall): string | null {
     return `${Math.floor(seconds / 60)}m ${Math.round(seconds % 60)}s`;
 }
 
-export const CodexDiffView = React.memo<CodexDiffViewProps>(({ tool, metadata, scrollViewRef }) => {
+export const CodexDiffView = React.memo<CodexDiffViewProps>(({ tool, scrollViewRef }) => {
     const { theme } = useUnistyles();
     const showLineNumbersInToolViews = useSetting('showLineNumbersInToolViews');
     const { input } = tool;
 
-    // Parse the unified diff
     let oldText = '';
     let newText = '';
     let fileName: string | undefined;
@@ -57,7 +56,7 @@ export const CodexDiffView = React.memo<CodexDiffViewProps>(({ tool, metadata, s
     const isFullView = !!scrollViewRef;
     const durationText = React.useMemo(() => formatToolDuration(tool), [tool]);
     const [expanded, setExpanded] = React.useState(isFullView);
-    const displayName = fileName ? (fileName.split("/").pop() || fileName) : t('tools.names.viewDiff');
+    const displayName = fileName ? (fileName.split('/').pop() || fileName) : t('tools.names.viewDiff');
     const showPath = !!fileName && fileName !== displayName;
 
     React.useEffect(() => {
@@ -66,9 +65,7 @@ export const CodexDiffView = React.memo<CodexDiffViewProps>(({ tool, metadata, s
 
     return (
         <ToolSectionView fullWidth>
-            <View
-                style={styles.item}
-            >
+            <View style={styles.item}>
                 <Pressable style={styles.cardHeader} onPress={() => setExpanded((v) => !v)}>
                     <View style={styles.cardHeaderLeft}>
                         <View style={styles.fileIconWrap}>
@@ -111,11 +108,12 @@ export const CodexDiffView = React.memo<CodexDiffViewProps>(({ tool, metadata, s
                             { borderTopColor: theme.colors.divider },
                         ]}
                     >
-                        <ToolDiffView 
-                            oldText={oldText} 
-                            newText={newText} 
+                        <ToolDiffView
+                            oldText={oldText}
+                            newText={newText}
                             showLineNumbers={showLineNumbersInToolViews}
                             showPlusMinusSymbols={showLineNumbersInToolViews}
+                            visibleLineCount={isFullView ? undefined : 5}
                         />
                     </View>
                 )}
@@ -179,3 +177,4 @@ const styles = StyleSheet.create((theme) => ({
         paddingTop: 8,
     },
 }));
+

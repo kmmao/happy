@@ -16,15 +16,15 @@ import { getDiffStatsLight } from "@/components/diff/calculateDiff";
 import { getLanguageFromPath } from "@/components/diff/syntaxTokenizer";
 import { DiffStatsBar } from "@/components/diff/DiffStatsBar";
 import { ToolDiffView } from "@/components/tools/ToolDiffView";
+import {
+    createFileChangeEditEntry,
+    getFileChangeEditKey,
+} from "@/components/tools/fileChangeEditKey";
 
 interface FileChange {
     filePath: string;
     displayPath: string;
-    edits: Array<{
-        oldText: string;
-        newText: string;
-        toolName: string;
-    }>;
+    edits: Array<ReturnType<typeof createFileChangeEditEntry>>;
     totalAdditions: number;
     totalDeletions: number;
 }
@@ -40,6 +40,31 @@ function collectToolCalls(messages: readonly Message[]): ToolCallMessage[] {
         }
     }
     return result;
+}
+
+function appendFileChangeEdit(
+    changeMap: Map<string, FileChange>,
+    filePath: string,
+    displayPath: string,
+    edit: ReturnType<typeof createFileChangeEditEntry>,
+    additions: number,
+    deletions: number,
+): void {
+    const existing = changeMap.get(filePath);
+    if (existing) {
+        existing.edits.push(edit);
+        existing.totalAdditions += additions;
+        existing.totalDeletions += deletions;
+        return;
+    }
+
+    changeMap.set(filePath, {
+        filePath,
+        displayPath,
+        edits: [edit],
+        totalAdditions: additions,
+        totalDeletions: deletions,
+    });
 }
 
 function extractFileChanges(
@@ -64,63 +89,45 @@ function extractFileChanges(
             const newStr = trimIdent(input.new_string || "");
             if (!oldStr && !newStr) continue;
 
-            const existing = changeMap.get(filePath);
             const stats = getDiffStatsLight(oldStr, newStr);
-            if (existing) {
-                existing.edits.push({ oldText: oldStr, newText: newStr, toolName: "Edit" });
-                existing.totalAdditions += stats.additions;
-                existing.totalDeletions += stats.deletions;
-            } else {
-                changeMap.set(filePath, {
-                    filePath,
-                    displayPath,
-                    edits: [{ oldText: oldStr, newText: newStr, toolName: "Edit" }],
-                    totalAdditions: stats.additions,
-                    totalDeletions: stats.deletions,
-                });
-            }
+            appendFileChangeEdit(
+                changeMap,
+                filePath,
+                displayPath,
+                createFileChangeEditEntry(msg.id, "Edit", oldStr, newStr, 0),
+                stats.additions,
+                stats.deletions,
+            );
         } else if (name === "MultiEdit") {
             const edits = Array.isArray(input.edits) ? input.edits : [];
-            for (const edit of edits) {
+            for (const [index, edit] of edits.entries()) {
                 const oldStr = trimIdent(edit.old_string || "");
                 const newStr = trimIdent(edit.new_string || "");
                 if (!oldStr && !newStr) continue;
 
-                const existing = changeMap.get(filePath);
                 const stats = getDiffStatsLight(oldStr, newStr);
-                if (existing) {
-                    existing.edits.push({ oldText: oldStr, newText: newStr, toolName: "MultiEdit" });
-                    existing.totalAdditions += stats.additions;
-                    existing.totalDeletions += stats.deletions;
-                } else {
-                    changeMap.set(filePath, {
-                        filePath,
-                        displayPath,
-                        edits: [{ oldText: oldStr, newText: newStr, toolName: "MultiEdit" }],
-                        totalAdditions: stats.additions,
-                        totalDeletions: stats.deletions,
-                    });
-                }
+                appendFileChangeEdit(
+                    changeMap,
+                    filePath,
+                    displayPath,
+                    createFileChangeEditEntry(msg.id, "MultiEdit", oldStr, newStr, index),
+                    stats.additions,
+                    stats.deletions,
+                );
             }
         } else if (name === "Write") {
             const content = typeof input.content === "string" ? input.content : "";
             if (!content) continue;
 
-            const existing = changeMap.get(filePath);
             const stats = getDiffStatsLight("", content);
-            if (existing) {
-                existing.edits.push({ oldText: "", newText: content, toolName: "Write" });
-                existing.totalAdditions += stats.additions;
-                existing.totalDeletions += stats.deletions;
-            } else {
-                changeMap.set(filePath, {
-                    filePath,
-                    displayPath,
-                    edits: [{ oldText: "", newText: content, toolName: "Write" }],
-                    totalAdditions: stats.additions,
-                    totalDeletions: stats.deletions,
-                });
-            }
+            appendFileChangeEdit(
+                changeMap,
+                filePath,
+                displayPath,
+                createFileChangeEditEntry(msg.id, "Write", "", content, 0),
+                stats.additions,
+                stats.deletions,
+            );
         }
     }
 
@@ -165,8 +172,8 @@ const FileChangeItem = React.memo(({ change }: { change: FileChange }) => {
             </Pressable>
             {expanded && (
                 <View style={styles.diffContainer}>
-                    {change.edits.map((edit, index) => (
-                        <View key={index} style={styles.diffBlock}>
+                    {change.edits.map((edit) => (
+                        <View key={getFileChangeEditKey(edit)} style={styles.diffBlock}>
                             <ToolDiffView
                                 oldText={edit.oldText}
                                 newText={edit.newText}

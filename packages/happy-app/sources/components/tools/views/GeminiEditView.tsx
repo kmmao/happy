@@ -62,11 +62,12 @@ export const GeminiEditView = React.memo<ToolViewProps>(({ tool }) => {
     return (
         <>
             <ToolSectionView fullWidth>
-                <ToolDiffView 
-                    oldText={oldString} 
-                    newText={newString} 
+                <ToolDiffView
+                    oldText={oldString}
+                    newText={newString}
                     showLineNumbers={showLineNumbersInToolViews}
                     showPlusMinusSymbols={showLineNumbersInToolViews}
+                    visibleLineCount={5}
                 />
             </ToolSectionView>
         </>
