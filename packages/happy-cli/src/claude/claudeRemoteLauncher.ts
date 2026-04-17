@@ -766,6 +766,68 @@ export async function claudeRemoteLauncher(
       }
     }
 
+    // Attribute file-editing tool calls to the current progress list so the
+    // App can render per-list file change summaries. Only stores tool_use id
+    // refs; diff content lives in the original message and is resolved on
+    // the consumer side.
+    if (message.type === "assistant") {
+      try {
+        const aMsg = message as SDKAssistantMessage;
+        const blocks = Array.isArray(aMsg.message.content)
+          ? aMsg.message.content
+          : [];
+        const fileEditIds: string[] = [];
+        for (const c of blocks) {
+          if (c.type !== "tool_use") continue;
+          if (
+            c.name !== "Edit" &&
+            c.name !== "Write" &&
+            c.name !== "MultiEdit" &&
+            c.name !== "NotebookEdit"
+          )
+            continue;
+          if (typeof c.id === "string" && c.id.length > 0) {
+            fileEditIds.push(c.id);
+          }
+        }
+        if (fileEditIds.length > 0) {
+          session.client.updateMetadata((m) => {
+            const prior = m.progress;
+            const lists = prior?.lists ? [...prior.lists] : [];
+            const currentId = prior?.currentListId;
+            if (!currentId) return m;
+            const currentIdx = lists.findIndex((l) => l.id === currentId);
+            if (currentIdx < 0) return m;
+            const current = lists[currentIdx]!;
+            const existing = current.toolCallIds ?? [];
+            const existingSet = new Set(existing);
+            const toAppend = fileEditIds.filter((id) => !existingSet.has(id));
+            if (toAppend.length === 0) return m;
+            const now = Date.now();
+            const nextLists = lists.map((l, i) =>
+              i === currentIdx
+                ? {
+                    ...l,
+                    toolCallIds: [...existing, ...toAppend],
+                    updatedAt: now,
+                  }
+                : l,
+            );
+            return {
+              ...m,
+              progress: {
+                ...prior,
+                lists: nextLists,
+                updatedAt: now,
+              },
+            };
+          });
+        }
+      } catch (err) {
+        logger.debug(`[progress-mirror] Error attributing file edits: ${err}`);
+      }
+    }
+
     // Report session timeline events (fire-and-forget)
     if (reportSessionEvent) {
       reportSessionEvent(message);

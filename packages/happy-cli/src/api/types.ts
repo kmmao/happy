@@ -450,6 +450,13 @@ export type Metadata = {
       startedAt: number;
       updatedAt: number;
       archivedAt?: number;
+      /**
+       * tool_use.id refs for file-editing tools (Edit/Write/MultiEdit/
+       * NotebookEdit) that ran while this list was active. Consumers
+       * resolve these against the session message stream to render
+       * per-list file change summaries.
+       */
+      toolCallIds?: string[];
     }>;
     currentListId?: string;
     // Legacy flat fields — kept for backward compat with older App/CLI:

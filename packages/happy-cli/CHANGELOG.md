@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.71.39 - 2026-04-18
+
+- Added per-list file change attribution: Edit/Write/MultiEdit/NotebookEdit tool calls now record their `tool_use.id` into the currently active progress list's `toolCallIds`. The App can render a per-list file change summary (file count, edits, line adds/deletes) that matches the existing side panel "代码" tab style, so users can see which tab touched which files. Requires `@kmmao/happy-wire@^0.11.9`.
+
 ## 0.71.38 - 2026-04-18
 
 - Fixed auto-mirror TodoWrite list boundary detection: now reads SDK-native `oldTodos`/`newTodos` from `user.tool_use_result` instead of `assistant.tool_use.input.todos`. New lists are detected by content-set intersection (zero overlap = new list) rather than the old `priorAllDone` gate, so starting a brand-new topic while the previous list still has in-progress items correctly archives the old list (preserving its un-completed state) and opens a fresh one.
