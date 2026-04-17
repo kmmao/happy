@@ -457,6 +457,12 @@ export type Metadata = {
        * per-list file change summaries.
        */
       toolCallIds?: string[];
+      /**
+       * Timestamp at which an auto-summary trigger was dispatched for this
+       * list's completion transition. Dedup flag so the auto-summary hook
+       * fires at most once per list lifecycle.
+       */
+      summaryGeneratedAt?: number;
     }>;
     currentListId?: string;
     // Legacy flat fields — kept for backward compat with older App/CLI:

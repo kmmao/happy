@@ -415,6 +415,26 @@ export class ApiSessionClient extends EventEmitter {
     }
   }
 
+  /**
+   * Inject a synthetic user-role message into the session from the CLI itself.
+   * The message rides the same Socket.IO path as happy-agent's `sendMessage`
+   * and happy-app's user input — server persists + broadcasts it back, which
+   * this CLI then routes to `pendingMessageCallback`, triggering a normal
+   * Agent turn.
+   *
+   * Pass `meta.displayText = ""` to hide the bubble in the App while the
+   * Agent still sees the underlying `text`. Used by the auto-summary hook to
+   * force a summary-update turn without polluting visible chat history.
+   */
+  sendSyntheticUserMessage(text: string, meta: Record<string, unknown> = {}) {
+    const content = {
+      role: "user",
+      content: { type: "text", text },
+      meta: { sentFrom: "happy-cli-synthetic", ...meta },
+    };
+    this.enqueueMessage(content);
+  }
+
   private authHeaders() {
     return {
       Authorization: `Bearer ${this.token}`,

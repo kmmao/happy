@@ -195,6 +195,14 @@ function UserTextBlock(props: { message: UserTextMessage; sessionId: string }) {
       ? parsed.text
       : props.message.displayText || props.message.text;
 
+  // Hidden synthetic messages (e.g. auto-summary triggers from the CLI) send
+  // an empty `displayText` so the Agent sees the underlying prompt but the
+  // chat surface stays clean. Short-circuit the whole block so the row-spacing
+  // container doesn't leave a phantom gap.
+  if (displayText.length === 0 && parsed.imagePaths.length === 0) {
+    return null;
+  }
+
   const bookmarked = isBookmarked(displayText);
 
   return (

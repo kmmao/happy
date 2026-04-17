@@ -1,4 +1,4 @@
-发布 happy-agent (@kmmao/happy-agent) 到 npm
+发布 happy-agent (@kmmao/happy-agent) 到 npm 并更新本地全局安装
 
 ## 流程
 
@@ -67,13 +67,24 @@ cd packages/happy-agent && npm publish --access public --ignore-scripts
 ```
 - 确认发布成功（输出中有 `+ @kmmao/happy-agent@X.Y.Z`）
 
-### 6. 验证
-- 确认发布：`npm view @kmmao/happy-agent version`
-- 提醒用户更新：`npm install -g @kmmao/happy-agent`
+### 6. 更新本地全局安装
+```bash
+npm uninstall -g @kmmao/happy-agent happy-agent 2>/dev/null; npm install -g ./packages/happy-agent
+```
+- 先卸载所有可能的旧名称（避免产生重复条目），再从本地源码重新安装
+- 重新构建以确保 dist 中版本号同步：`yarn workspace @kmmao/happy-agent build`
+- 验证版本：`happy-agent --version`
+- 验证只有一条全局记录：`npm list -g --depth=0 | grep happy-agent`
+
+### 7. 验证
+- 确认 npm 发布成功：`npm view @kmmao/happy-agent version`
+- 确认本地全局安装版本正确：`happy-agent --version`
+- 提醒用户其他机器需要执行：`npm update -g @kmmao/happy-agent`
 
 ## 注意事项
 - 发布前必须确保 typecheck 和 test 全部通过
 - 如果测试失败，先修复再发布，不要跳过测试
 - `--ignore-scripts` 避免 prepublishOnly 在发布时重复执行
 - happy-wire 必须在 agent 之前发布，agent 运行时依赖 wire
-- happy-agent 无本地守护进程，发布后无需额外的本地安装步骤
+- 当前目录可能在子包下，注意使用绝对路径或回到仓库根目录
+- happy-agent 无本地守护进程，本地全局安装只是便于 CLI 调用（`happy-agent ...`），无需重启流程

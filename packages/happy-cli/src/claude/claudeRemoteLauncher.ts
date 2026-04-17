@@ -661,6 +661,11 @@ export async function claudeRemoteLauncher(
                   )
                 : newTodos;
 
+              // Set inside updateMetadata if the checklist just transitioned
+              // from "had pending/in_progress" → "all completed". Drives the
+              // post-callback synthetic user-message injection below.
+              let shouldTriggerAutoSummary = false;
+
               session.client.updateMetadata((m) => {
                 const now = Date.now();
                 const prior = m.progress;
@@ -716,6 +721,22 @@ export async function claudeRemoteLauncher(
                   // Update-in-place: replace todos, preserve stage/blockers.
                   // Refresh label when the first todo's content changed, so
                   // a mid-list reorder doesn't leave a stale chip title.
+                  //
+                  // Completion-transition detection: if oldTodos had any
+                  // unfinished item and mirrored is fully completed, stamp
+                  // `summaryGeneratedAt` on the list so the auto-summary
+                  // trigger runs exactly once for this list's lifecycle.
+                  const oldHadIncomplete = oldTodos.some(
+                    (t) => t.status !== "completed",
+                  );
+                  const newAllCompleted =
+                    mirrored.length > 0 &&
+                    mirrored.every((t) => t.status === "completed");
+                  const alreadyStamped =
+                    currentList?.summaryGeneratedAt !== undefined;
+                  const shouldStamp =
+                    oldHadIncomplete && newAllCompleted && !alreadyStamped;
+                  if (shouldStamp) shouldTriggerAutoSummary = true;
                   nextLists = lists.map((l, i) => {
                     if (i !== currentIdx) return l;
                     const firstChanged =
@@ -727,6 +748,9 @@ export async function claudeRemoteLauncher(
                       todos: mirrored,
                       updatedAt: now,
                       label: firstChanged ? label : (l.label ?? label),
+                      summaryGeneratedAt: shouldStamp
+                        ? now
+                        : l.summaryGeneratedAt,
                     };
                   });
                 }
@@ -758,6 +782,33 @@ export async function claudeRemoteLauncher(
                   },
                 };
               });
+
+              // Auto-summary trigger: inject a synthetic user-role message so
+              // the Agent is forced to run a new turn and decide whether to
+              // call `mcp__happy__update_session_summary`. `displayText: ""`
+              // hides the bubble in the App — the Agent still sees the text
+              // since it drives the turn via SDK query().
+              if (shouldTriggerAutoSummary) {
+                try {
+                  session.client.sendSyntheticUserMessage(
+                    "[Auto-triggered by checklist completion]\n" +
+                      "The session's active checklist just transitioned from having pending/in_progress items to fully completed. " +
+                      "If the session summary needs updating to reflect what was accomplished, call mcp__happy__update_session_summary now. " +
+                      "If the summary is already accurate, acknowledge briefly without calling.",
+                    {
+                      displayText: "",
+                      sentFrom: "happy-cli-auto-summary",
+                    },
+                  );
+                  logger.debug(
+                    "[progress-mirror] auto-summary trigger dispatched",
+                  );
+                } catch (injectErr) {
+                  logger.debug(
+                    `[progress-mirror] auto-summary trigger failed: ${injectErr}`,
+                  );
+                }
+              }
             }
           }
         }
