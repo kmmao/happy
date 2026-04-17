@@ -754,6 +754,18 @@ export const ja: TranslationStructure = {
     progressTimeMinutes: ({ n }: { n: number }) => `${n} 分前`,
     progressTimeHours: ({ n }: { n: number }) => `${n} 時間前`,
     progressTimeDays: ({ n }: { n: number }) => `${n} 日前`,
+    progressDurationLabel: "セッション時間",
+    progressLastActiveLabel: "最終アクティブ",
+    progressToolsPerTurnLabel: "ツール/ターン",
+    progressDurationShort: ({ seconds }: { seconds: number }) => {
+      if (seconds < 60) return `${seconds}秒`;
+      if (seconds < 3600) return `${Math.floor(seconds / 60)}分`;
+      const h = Math.floor(seconds / 3600);
+      const m = Math.floor((seconds % 3600) / 60);
+      return m > 0 ? `${h}時間${m}分` : `${h}時間`;
+    },
+    progressToolMixTitle: "ツール構成",
+    progressToolMixOther: "その他",
     progressSummarySection: "セッション概要",
     progressSummaryGoal: "目標",
     progressSummaryCurrentFocus: "現在の焦点",

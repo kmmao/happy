@@ -871,6 +871,18 @@ export const ru: TranslationStructure = {
     progressTimeMinutes: ({ n }: { n: number }) => `${n} мин назад`,
     progressTimeHours: ({ n }: { n: number }) => `${n} ч назад`,
     progressTimeDays: ({ n }: { n: number }) => `${n} дн назад`,
+    progressDurationLabel: "Duration",
+    progressLastActiveLabel: "Last active",
+    progressToolsPerTurnLabel: "Tools / turn",
+    progressDurationShort: ({ seconds }: { seconds: number }) => {
+      if (seconds < 60) return `${seconds}s`;
+      if (seconds < 3600) return `${Math.floor(seconds / 60)}m`;
+      const h = Math.floor(seconds / 3600);
+      const m = Math.floor((seconds % 3600) / 60);
+      return m > 0 ? `${h}h ${m}m` : `${h}h`;
+    },
+    progressToolMixTitle: "Tool mix",
+    progressToolMixOther: "Other",
     progressSummarySection: "Обзор сессии",
     progressSummaryGoal: "Цель",
     progressSummaryCurrentFocus: "Фокус",

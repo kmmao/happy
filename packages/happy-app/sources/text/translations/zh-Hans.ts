@@ -628,6 +628,18 @@ export const zhHans: TranslationStructure = {
     progressTimeMinutes: ({ n }: { n: number }) => `${n} 分钟前`,
     progressTimeHours: ({ n }: { n: number }) => `${n} 小时前`,
     progressTimeDays: ({ n }: { n: number }) => `${n} 天前`,
+    progressDurationLabel: "会话时长",
+    progressLastActiveLabel: "最近活跃",
+    progressToolsPerTurnLabel: "每轮工具",
+    progressDurationShort: ({ seconds }: { seconds: number }) => {
+      if (seconds < 60) return `${seconds} 秒`;
+      if (seconds < 3600) return `${Math.floor(seconds / 60)} 分钟`;
+      const h = Math.floor(seconds / 3600);
+      const m = Math.floor((seconds % 3600) / 60);
+      return m > 0 ? `${h} 小时 ${m} 分钟` : `${h} 小时`;
+    },
+    progressToolMixTitle: "工具类型",
+    progressToolMixOther: "其他",
     progressSummarySection: "会话概要",
     progressSummaryGoal: "目标",
     progressSummaryCurrentFocus: "当前焦点",

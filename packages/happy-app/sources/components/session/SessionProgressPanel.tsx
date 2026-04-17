@@ -1,6 +1,7 @@
 import * as React from "react";
-import { Pressable, ScrollView, Text, View } from "react-native";
+import { Pressable, ScrollView, Text, View, type ViewStyle, type StyleProp } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
+import { BlurView } from "expo-blur";
 import { Ionicons } from "@expo/vector-icons";
 
 import { Typography } from "@/constants/Typography";
@@ -23,27 +24,181 @@ import {
     type FileChange,
 } from "./SidePanelCodeTab";
 import { DiffStatsBar } from "@/components/diff/DiffStatsBar";
+import Svg, { Path } from "react-native-svg";
 import { Message, ToolCallMessage } from "@/sync/typesMessage";
 
 interface SessionProgressPanelProps {
     sessionId: string;
 }
 
-const STATUS_META: Record<ProgressTodo["status"], { icon: keyof typeof Ionicons.glyphMap; colorKey: "success" | "accentBlue" | "textSecondary" }> = {
-    completed: { icon: "checkbox", colorKey: "success" },
+const STATUS_META: Record<ProgressTodo["status"], { icon: keyof typeof Ionicons.glyphMap; colorKey: "accentPurple" | "accentBlue" | "textSecondary" }> = {
+    completed: { icon: "checkbox", colorKey: "accentPurple" },
     in_progress: { icon: "ellipse", colorKey: "accentBlue" },
     pending: { icon: "square-outline", colorKey: "textSecondary" },
 };
 
-const MAX_FILES_VISIBLE = 8;
-const MAX_COMMANDS_VISIBLE = 6;
+const FOOTPRINT_CHART_BUCKETS = 24;
+const FOOTPRINT_CHART_HEIGHT = 88;
+const TOOL_MIX_TOP_N = 6;
+/** Palette used by ToolMixBar; falls back if theme keys are missing. */
+const TOOL_MIX_PALETTE = [
+    "#60A5FA", // blue
+    "#A78BFA", // violet
+    "#34D399", // emerald
+    "#F59E0B", // amber
+    "#F472B6", // pink
+    "#22D3EE", // cyan
+];
+const TOOL_MIX_OTHER_COLOR = "#94A3B8"; // slate
 
-function truncateMiddle(value: string, max = 48): string {
-    if (value.length <= max) return value;
-    const head = Math.ceil((max - 1) / 2);
-    const tail = max - 1 - head;
-    return `${value.slice(0, head)}…${value.slice(value.length - tail)}`;
+interface RhythmStats {
+    durationSec: number;
+    lastActiveAt: number | null;
 }
+
+function computeRhythm(messages: readonly Message[]): RhythmStats {
+    if (messages.length === 0) return { durationSec: 0, lastActiveAt: null };
+    let minTs = Infinity;
+    let maxTs = -Infinity;
+    const walk = (m: Message) => {
+        if (m.createdAt < minTs) minTs = m.createdAt;
+        if (m.createdAt > maxTs) maxTs = m.createdAt;
+        if (m.kind === "tool-call") for (const c of m.children) walk(c);
+    };
+    for (const m of messages) walk(m);
+    if (!isFinite(minTs) || !isFinite(maxTs)) {
+        return { durationSec: 0, lastActiveAt: null };
+    }
+    return {
+        durationSec: Math.max(0, Math.floor((maxTs - minTs) / 1000)),
+        lastActiveAt: maxTs,
+    };
+}
+
+interface ToolMixSegment {
+    name: string;
+    count: number;
+}
+interface ToolMix {
+    segments: ToolMixSegment[];
+    otherCount: number;
+    total: number;
+}
+
+function computeToolMix(messages: readonly Message[], topN: number): ToolMix {
+    const counts = new Map<string, number>();
+    const walk = (m: Message) => {
+        if (m.kind === "tool-call") {
+            const name = m.tool.name || "unknown";
+            counts.set(name, (counts.get(name) ?? 0) + 1);
+            for (const c of m.children) walk(c);
+        }
+    };
+    for (const m of messages) walk(m);
+    const sorted = [...counts.entries()]
+        .map(([name, count]) => ({ name, count }))
+        .sort((a, b) => b.count - a.count);
+    const top = sorted.slice(0, topN);
+    const otherCount = sorted
+        .slice(topN)
+        .reduce((sum, s) => sum + s.count, 0);
+    const total = sorted.reduce((sum, s) => sum + s.count, 0);
+    return { segments: top, otherCount, total };
+}
+
+interface ActivityBucket {
+    user: number;
+    agent: number;
+    tool: number;
+}
+
+/**
+ * Bucket messages into `count` equal time slices between the session's first
+ * and last messages, counting user-text / agent-text / tool-call kinds per
+ * bucket. Result powers the three sparklines in the 足迹 panel.
+ */
+function buildActivitySeries(
+    messages: readonly Message[],
+    count: number,
+): ActivityBucket[] {
+    const buckets: ActivityBucket[] = Array.from({ length: count }, () => ({
+        user: 0,
+        agent: 0,
+        tool: 0,
+    }));
+    if (messages.length === 0) return buckets;
+
+    // Walk the message tree to find first/last createdAt and collect leaves.
+    type Leaf = { createdAt: number; kind: Message["kind"] };
+    const leaves: Leaf[] = [];
+    const walk = (msg: Message) => {
+        leaves.push({ createdAt: msg.createdAt, kind: msg.kind });
+        if (msg.kind === "tool-call") {
+            for (const child of msg.children) walk(child);
+        }
+    };
+    for (const m of messages) walk(m);
+    if (leaves.length === 0) return buckets;
+
+    let minTs = leaves[0].createdAt;
+    let maxTs = leaves[0].createdAt;
+    for (const leaf of leaves) {
+        if (leaf.createdAt < minTs) minTs = leaf.createdAt;
+        if (leaf.createdAt > maxTs) maxTs = leaf.createdAt;
+    }
+    const span = Math.max(1, maxTs - minTs);
+
+    for (const leaf of leaves) {
+        const ratio = (leaf.createdAt - minTs) / span;
+        const idx = Math.min(count - 1, Math.floor(ratio * count));
+        if (leaf.kind === "user-text") buckets[idx].user += 1;
+        else if (leaf.kind === "agent-text") buckets[idx].agent += 1;
+        else if (leaf.kind === "tool-call") buckets[idx].tool += 1;
+    }
+    return buckets;
+}
+
+interface GlassCardProps {
+    children: React.ReactNode;
+    style?: StyleProp<ViewStyle>;
+    intensity?: number;
+}
+
+/**
+ * Frosted-glass surface used to wrap each progress section.
+ * BlurView backs a semi-transparent overlay so theme colors bleed through
+ * while retaining legibility in both light and dark modes.
+ */
+const GlassCard = React.memo<GlassCardProps>(function GlassCard({
+    children,
+    style,
+    intensity = 28,
+}) {
+    const { theme } = useUnistyles();
+    const tint = theme.dark ? "dark" : "light";
+    return (
+        <View
+            style={[
+                styles.glassCard,
+                { borderColor: theme.colors.divider },
+                style,
+            ]}
+        >
+            <BlurView
+                intensity={intensity}
+                tint={tint}
+                style={StyleSheet.absoluteFill}
+            />
+            <View
+                style={[
+                    StyleSheet.absoluteFill,
+                    { backgroundColor: theme.colors.surfaceHigh + (theme.dark ? "55" : "80") },
+                ]}
+            />
+            <View style={styles.glassCardBody}>{children}</View>
+        </View>
+    );
+});
 
 function formatRelativeTime(updatedAt: number | null, nowMs: number): string {
     if (updatedAt === null) return "";
@@ -157,9 +312,26 @@ export const SessionProgressPanel = React.memo<SessionProgressPanelProps>(
         const counts = React.useMemo(() => countTodoProgress(checklist.todos), [checklist.todos]);
         const summary = session?.metadata?.sessionSummary;
 
-        const [showAllFiles, setShowAllFiles] = React.useState(false);
-        const [showAllCommands, setShowAllCommands] = React.useState(false);
         const [showListFiles, setShowListFiles] = React.useState(false);
+
+        // Per-bucket activity curves (user turns / agent turns / tool calls).
+        // Bucketing spans the full session timeline into a fixed count so the
+        // three sparklines share an X axis and can be visually compared.
+        const activitySeries = React.useMemo(
+            () => buildActivitySeries(messages, FOOTPRINT_CHART_BUCKETS),
+            [messages],
+        );
+        const rhythm = React.useMemo(
+            () => computeRhythm(messages),
+            [messages],
+        );
+        const toolMix = React.useMemo(
+            () => computeToolMix(messages, TOOL_MIX_TOP_N),
+            [messages],
+        );
+        const toolsPerTurn = data.agentTurns > 0
+            ? data.toolCalls / data.agentTurns
+            : 0;
 
         // Per-list file changes: resolve the active/pinned list's toolCallIds
         // against the session message stream and aggregate into FileChange[].
@@ -197,14 +369,8 @@ export const SessionProgressPanel = React.memo<SessionProgressPanelProps>(
             [listFileChanges],
         );
 
-        const visibleFiles = showAllFiles ? data.files : data.files.slice(0, MAX_FILES_VISIBLE);
-        const visibleCommands = showAllCommands
-            ? data.commands
-            : data.commands.slice(0, MAX_COMMANDS_VISIBLE);
-
         const hasTodos = checklist.todos.length > 0;
-        const hasFootprint =
-            data.files.length > 0 || data.commands.length > 0 || data.toolCalls > 0;
+        const hasFootprint = data.toolCalls > 0 || data.userTurns > 0 || data.agentTurns > 0;
 
         return (
             <ScrollView
@@ -221,7 +387,7 @@ export const SessionProgressPanel = React.memo<SessionProgressPanelProps>(
                     nowMs={nowMs}
                 />
 
-                <View style={styles.section}>
+                <GlassCard style={styles.section}>
                     <View style={styles.sectionHeader}>
                         <Ionicons
                             name="list-outline"
@@ -286,14 +452,14 @@ export const SessionProgressPanel = React.memo<SessionProgressPanelProps>(
                                     style={[
                                         styles.progressFill,
                                         {
-                                            backgroundColor: theme.colors.success,
+                                            backgroundColor: theme.colors.accentPurple,
                                             width: `${Math.round(counts.completionRatio * 100)}%`,
                                         },
                                     ]}
                                 />
                             </View>
                             <View style={styles.progressLegend}>
-                                <LegendDot color={theme.colors.success} label={t("session.progressLegendCompleted", { n: counts.completed })} />
+                                <LegendDot color={theme.colors.accentPurple} label={t("session.progressLegendCompleted", { n: counts.completed })} />
                                 <LegendDot color={theme.colors.accentBlue} label={t("session.progressLegendInProgress", { n: counts.inProgress })} />
                                 <LegendDot color={theme.colors.textSecondary} label={t("session.progressLegendPending", { n: counts.pending })} />
                             </View>
@@ -305,8 +471,6 @@ export const SessionProgressPanel = React.memo<SessionProgressPanelProps>(
                                         styles.todoText,
                                         {
                                             color: todo.status === "completed" ? color : theme.colors.text,
-                                            textDecorationLine:
-                                                todo.status === "completed" ? ("line-through" as const) : undefined,
                                         },
                                     ];
                                     const displayContent =
@@ -426,9 +590,9 @@ export const SessionProgressPanel = React.memo<SessionProgressPanelProps>(
                             </Text>
                         </View>
                     )}
-                </View>
+                </GlassCard>
 
-                <View style={styles.section}>
+                <GlassCard style={styles.section}>
                     <View style={styles.sectionHeader}>
                         <Ionicons
                             name="footsteps-outline"
@@ -442,107 +606,24 @@ export const SessionProgressPanel = React.memo<SessionProgressPanelProps>(
 
                     {hasFootprint ? (
                         <>
-                            <View style={styles.statRow}>
-                                <StatPill
-                                    icon="person-outline"
-                                    label={t("session.progressUserTurns", { n: data.userTurns })}
+                            <FootprintChart
+                                series={activitySeries}
+                                userTurns={data.userTurns}
+                                agentTurns={data.agentTurns}
+                                toolCalls={data.toolCalls}
+                            />
+                            <RhythmRow
+                                durationSec={rhythm.durationSec}
+                                lastActiveAt={rhythm.lastActiveAt}
+                                toolsPerTurn={toolsPerTurn}
+                                nowMs={nowMs}
+                            />
+                            {toolMix.total > 0 && (
+                                <ToolMixBar
+                                    segments={toolMix.segments}
+                                    otherCount={toolMix.otherCount}
+                                    total={toolMix.total}
                                 />
-                                <StatPill
-                                    icon="sparkles-outline"
-                                    label={t("session.progressAgentTurns", { n: data.agentTurns })}
-                                />
-                                <StatPill
-                                    icon="hammer-outline"
-                                    label={t("session.progressToolCalls", { n: data.toolCalls })}
-                                />
-                            </View>
-
-                            {data.files.length > 0 && (
-                                <View style={styles.subSection}>
-                                    <Text style={[styles.subSectionTitle, { color: theme.colors.textSecondary }]}>
-                                        {t("session.progressFilesTitle", { n: data.files.length })}
-                                    </Text>
-                                    {visibleFiles.map((file) => (
-                                        <View key={file.path} style={styles.footprintRow}>
-                                            <Ionicons
-                                                name="document-text-outline"
-                                                size={12}
-                                                color={theme.colors.textSecondary}
-                                                style={styles.footprintIcon}
-                                            />
-                                            <Text
-                                                style={[styles.footprintPath, { color: theme.colors.text }]}
-                                                numberOfLines={1}
-                                            >
-                                                {truncateMiddle(file.path)}
-                                            </Text>
-                                            {file.edits > 1 && (
-                                                <Text style={[styles.footprintMeta, { color: theme.colors.textSecondary }]}>
-                                                    ×{file.edits}
-                                                </Text>
-                                            )}
-                                        </View>
-                                    ))}
-                                    {data.files.length > MAX_FILES_VISIBLE && (
-                                        <Pressable
-                                            onPress={() => setShowAllFiles((prev) => !prev)}
-                                            hitSlop={6}
-                                            style={styles.expandButton}
-                                        >
-                                            <Text style={[styles.expandText, { color: theme.colors.textLink }]}>
-                                                {showAllFiles
-                                                    ? t("session.progressCollapse")
-                                                    : t("session.progressShowAll", {
-                                                        n: data.files.length - MAX_FILES_VISIBLE,
-                                                    })}
-                                            </Text>
-                                        </Pressable>
-                                    )}
-                                </View>
-                            )}
-
-                            {data.commands.length > 0 && (
-                                <View style={styles.subSection}>
-                                    <Text style={[styles.subSectionTitle, { color: theme.colors.textSecondary }]}>
-                                        {t("session.progressCommandsTitle", { n: data.commands.length })}
-                                    </Text>
-                                    {visibleCommands.map((cmd) => (
-                                        <View key={cmd.command} style={styles.footprintRow}>
-                                            <Ionicons
-                                                name="terminal-outline"
-                                                size={12}
-                                                color={theme.colors.textSecondary}
-                                                style={styles.footprintIcon}
-                                            />
-                                            <Text
-                                                style={[styles.footprintCommand, { color: theme.colors.text }]}
-                                                numberOfLines={1}
-                                            >
-                                                {truncateMiddle(cmd.command, 60)}
-                                            </Text>
-                                            {cmd.count > 1 && (
-                                                <Text style={[styles.footprintMeta, { color: theme.colors.textSecondary }]}>
-                                                    ×{cmd.count}
-                                                </Text>
-                                            )}
-                                        </View>
-                                    ))}
-                                    {data.commands.length > MAX_COMMANDS_VISIBLE && (
-                                        <Pressable
-                                            onPress={() => setShowAllCommands((prev) => !prev)}
-                                            hitSlop={6}
-                                            style={styles.expandButton}
-                                        >
-                                            <Text style={[styles.expandText, { color: theme.colors.textLink }]}>
-                                                {showAllCommands
-                                                    ? t("session.progressCollapse")
-                                                    : t("session.progressShowAll", {
-                                                        n: data.commands.length - MAX_COMMANDS_VISIBLE,
-                                                    })}
-                                            </Text>
-                                        </Pressable>
-                                    )}
-                                </View>
                             )}
                         </>
                     ) : (
@@ -552,7 +633,7 @@ export const SessionProgressPanel = React.memo<SessionProgressPanelProps>(
                             </Text>
                         </View>
                     )}
-                </View>
+                </GlassCard>
             </ScrollView>
         );
     },
@@ -642,7 +723,7 @@ const SummaryCard = React.memo<SummaryCardProps>(function SummaryCard({
     );
 
     return (
-        <View style={[styles.summaryCard, { backgroundColor: theme.colors.surfaceHigh, borderColor: theme.colors.divider }]}>
+        <GlassCard style={styles.summaryCard}>
             <View style={styles.summaryHeader}>
                 <Ionicons name="book-outline" size={14} color={theme.colors.primary} />
                 <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
@@ -717,7 +798,7 @@ const SummaryCard = React.memo<SummaryCardProps>(function SummaryCard({
                     {t("session.progressSummaryEmpty")}
                 </Text>
             )}
-        </View>
+        </GlassCard>
     );
 });
 
@@ -792,18 +873,275 @@ const LegendDot = React.memo<LegendDotProps>(({ color, label }) => (
     </View>
 ));
 
-interface StatPillProps {
-    icon: keyof typeof Ionicons.glyphMap;
-    label: string;
+interface FootprintChartProps {
+    series: readonly ActivityBucket[];
+    userTurns: number;
+    agentTurns: number;
+    toolCalls: number;
 }
-const StatPill = React.memo<StatPillProps>(({ icon, label }) => {
+
+/**
+ * Build a smooth filled path through `values` (length N), normalized by `max`.
+ * X spans 0..width evenly; Y inverted so higher values sit near the top.
+ * Returns both the stroke path (line) and fill path (line closed to baseline).
+ */
+function buildSparklinePath(
+    values: readonly number[],
+    max: number,
+    width: number,
+    height: number,
+    padBottom: number,
+): { stroke: string; fill: string } {
+    if (values.length === 0 || max <= 0) {
+        return { stroke: "", fill: "" };
+    }
+    const usableHeight = height - padBottom;
+    const step = values.length > 1 ? width / (values.length - 1) : 0;
+    const points: Array<[number, number]> = values.map((v, i) => {
+        const x = i * step;
+        const ratio = Math.max(0, Math.min(1, v / max));
+        const y = usableHeight - ratio * usableHeight + 2;
+        return [x, y];
+    });
+    if (points.length === 1) {
+        const [x, y] = points[0];
+        const stroke = `M ${x} ${y}`;
+        return { stroke, fill: "" };
+    }
+
+    // Monotone-ish smoothing: use catmull-rom → cubic bezier.
+    const stroke = points
+        .map(([x, y], i) => {
+            if (i === 0) return `M ${x.toFixed(2)} ${y.toFixed(2)}`;
+            const [px, py] = points[i - 1];
+            const cx = (px + x) / 2;
+            return `C ${cx.toFixed(2)} ${py.toFixed(2)} ${cx.toFixed(2)} ${y.toFixed(2)} ${x.toFixed(2)} ${y.toFixed(2)}`;
+        })
+        .join(" ");
+    const last = points[points.length - 1];
+    const first = points[0];
+    const fill = `${stroke} L ${last[0].toFixed(2)} ${height} L ${first[0].toFixed(2)} ${height} Z`;
+    return { stroke, fill };
+}
+
+const FootprintChart = React.memo<FootprintChartProps>(function FootprintChart({
+    series,
+    userTurns,
+    agentTurns,
+    toolCalls,
+}) {
+    const { theme } = useUnistyles();
+    const [width, setWidth] = React.useState(0);
+
+    const userMax = Math.max(1, ...series.map((b) => b.user));
+    const agentMax = Math.max(1, ...series.map((b) => b.agent));
+    const toolMax = Math.max(1, ...series.map((b) => b.tool));
+    const h = FOOTPRINT_CHART_HEIGHT;
+
+    const userPath = buildSparklinePath(
+        series.map((b) => b.user),
+        userMax,
+        width,
+        h,
+        4,
+    );
+    const agentPath = buildSparklinePath(
+        series.map((b) => b.agent),
+        agentMax,
+        width,
+        h,
+        4,
+    );
+    const toolPath = buildSparklinePath(
+        series.map((b) => b.tool),
+        toolMax,
+        width,
+        h,
+        4,
+    );
+
+    const userColor = theme.colors.textSecondary;
+    const agentColor = theme.colors.accentBlue;
+    const toolColor = theme.colors.accentPurple;
+
+    const hasData = userTurns > 0 || agentTurns > 0 || toolCalls > 0;
+
+    return (
+        <View style={styles.chartBlock}>
+            <View
+                style={[styles.chartSurface, { borderColor: theme.colors.divider }]}
+                onLayout={(e) => setWidth(e.nativeEvent.layout.width)}
+            >
+                {width > 0 && hasData && (
+                    <Svg width={width} height={h} pointerEvents="none">
+                        <Path d={toolPath.fill} fill={toolColor + "22"} />
+                        <Path d={toolPath.stroke} stroke={toolColor} strokeWidth={1.5} fill="none" />
+                        <Path d={agentPath.fill} fill={agentColor + "22"} />
+                        <Path d={agentPath.stroke} stroke={agentColor} strokeWidth={1.5} fill="none" />
+                        <Path d={userPath.fill} fill={userColor + "1F"} />
+                        <Path d={userPath.stroke} stroke={userColor} strokeWidth={1.5} fill="none" />
+                    </Svg>
+                )}
+            </View>
+            <View style={styles.chartLegend}>
+                <ChartLegendItem color={userColor} label={t("session.progressUserTurns", { n: userTurns })} />
+                <ChartLegendItem color={agentColor} label={t("session.progressAgentTurns", { n: agentTurns })} />
+                <ChartLegendItem color={toolColor} label={t("session.progressToolCalls", { n: toolCalls })} />
+            </View>
+        </View>
+    );
+});
+
+const ChartLegendItem = React.memo<{ color: string; label: string }>(function ChartLegendItem({
+    color,
+    label,
+}) {
+    return (
+        <View style={styles.chartLegendItem}>
+            <View style={[styles.chartLegendDot, { backgroundColor: color }]} />
+            <Text style={[styles.chartLegendLabel, { color }]}>{label}</Text>
+        </View>
+    );
+});
+
+interface RhythmRowProps {
+    durationSec: number;
+    lastActiveAt: number | null;
+    toolsPerTurn: number;
+    nowMs: number;
+}
+
+/**
+ * Three compact stat cards answering questions the sparkline can't:
+ * how long has this session been running, when was it last active, and what
+ * is the tool intensity per agent turn.
+ */
+const RhythmRow = React.memo<RhythmRowProps>(function RhythmRow({
+    durationSec,
+    lastActiveAt,
+    toolsPerTurn,
+    nowMs,
+}) {
+    const { theme } = useUnistyles();
+    const durationText = durationSec > 0
+        ? t("session.progressDurationShort", { seconds: durationSec })
+        : "—";
+    const lastActiveText = lastActiveAt !== null
+        ? formatRelativeTime(lastActiveAt, nowMs)
+        : "—";
+    const toolsPerTurnText = toolsPerTurn > 0
+        ? toolsPerTurn >= 10
+            ? toolsPerTurn.toFixed(0)
+            : toolsPerTurn.toFixed(1)
+        : "—";
+
+    return (
+        <View style={styles.rhythmRow}>
+            <RhythmCell
+                label={t("session.progressDurationLabel")}
+                value={durationText}
+                color={theme.colors.text}
+            />
+            <RhythmCell
+                label={t("session.progressLastActiveLabel")}
+                value={lastActiveText}
+                color={theme.colors.text}
+            />
+            <RhythmCell
+                label={t("session.progressToolsPerTurnLabel")}
+                value={toolsPerTurnText}
+                color={theme.colors.text}
+            />
+        </View>
+    );
+});
+
+interface RhythmCellProps {
+    label: string;
+    value: string;
+    color: string;
+}
+const RhythmCell = React.memo<RhythmCellProps>(function RhythmCell({ label, value, color }) {
     const { theme } = useUnistyles();
     return (
-        <View style={[styles.statPill, { backgroundColor: theme.colors.surfaceHighest }]}>
-            <Ionicons name={icon} size={12} color={theme.colors.textSecondary} />
-            <Text style={[styles.statPillText, { color: theme.colors.textSecondary }]}>
+        <View style={[styles.rhythmCell, { borderColor: theme.colors.divider }]}>
+            <Text style={[styles.rhythmLabel, { color: theme.colors.textSecondary }]} numberOfLines={1}>
                 {label}
             </Text>
+            <Text style={[styles.rhythmValue, { color }]} numberOfLines={1}>
+                {value}
+            </Text>
+        </View>
+    );
+});
+
+interface ToolMixBarProps {
+    segments: readonly ToolMixSegment[];
+    otherCount: number;
+    total: number;
+}
+
+/**
+ * Horizontal stacked bar showing composition of tool calls by tool name.
+ * Top N tools get distinct palette colors; the rest collapse into a grey
+ * "other" segment. Legend lists each segment with its count.
+ */
+const ToolMixBar = React.memo<ToolMixBarProps>(function ToolMixBar({
+    segments,
+    otherCount,
+    total,
+}) {
+    const { theme } = useUnistyles();
+    if (total <= 0) return null;
+    const entries: Array<{ name: string; count: number; color: string; isOther: boolean }> = segments.map(
+        (seg, i) => ({
+            name: seg.name,
+            count: seg.count,
+            color: TOOL_MIX_PALETTE[i % TOOL_MIX_PALETTE.length],
+            isOther: false,
+        }),
+    );
+    if (otherCount > 0) {
+        entries.push({
+            name: t("session.progressToolMixOther"),
+            count: otherCount,
+            color: TOOL_MIX_OTHER_COLOR,
+            isOther: true,
+        });
+    }
+    return (
+        <View style={styles.toolMixBlock}>
+            <Text style={[styles.subSectionTitle, { color: theme.colors.textSecondary, marginTop: 0, marginBottom: 4 }]}>
+                {t("session.progressToolMixTitle")}
+            </Text>
+            <View style={[styles.toolMixBar, { backgroundColor: theme.colors.surfaceHighest }]}>
+                {entries.map((entry) => {
+                    const flex = entry.count / total;
+                    if (flex <= 0) return null;
+                    return (
+                        <View
+                            key={entry.name}
+                            style={{ flex, backgroundColor: entry.color }}
+                        />
+                    );
+                })}
+            </View>
+            <View style={styles.toolMixLegend}>
+                {entries.map((entry) => (
+                    <View key={`lg-${entry.name}`} style={styles.toolMixLegendItem}>
+                        <View style={[styles.toolMixLegendDot, { backgroundColor: entry.color }]} />
+                        <Text
+                            style={[styles.toolMixLegendName, { color: theme.colors.text }]}
+                            numberOfLines={1}
+                        >
+                            {entry.name}
+                        </Text>
+                        <Text style={[styles.toolMixLegendCount, { color: theme.colors.textSecondary }]}>
+                            {entry.count}
+                        </Text>
+                    </View>
+                ))}
+            </View>
         </View>
     );
 });
@@ -963,23 +1301,6 @@ const styles = StyleSheet.create({
         fontSize: 12,
         textAlign: "center",
     },
-    statRow: {
-        flexDirection: "row",
-        flexWrap: "wrap",
-        gap: 6,
-    },
-    statPill: {
-        flexDirection: "row",
-        alignItems: "center",
-        gap: 4,
-        paddingHorizontal: 8,
-        paddingVertical: 4,
-        borderRadius: 999,
-    },
-    statPillText: {
-        ...Typography.default("semiBold"),
-        fontSize: 11,
-    },
     subSection: {
         gap: 4,
     },
@@ -991,29 +1312,6 @@ const styles = StyleSheet.create({
         marginTop: 4,
         marginBottom: 2,
     },
-    footprintRow: {
-        flexDirection: "row",
-        alignItems: "center",
-        gap: 6,
-        paddingVertical: 2,
-    },
-    footprintIcon: {
-        marginRight: 0,
-    },
-    footprintPath: {
-        ...Typography.mono("regular"),
-        fontSize: 11,
-        flex: 1,
-    },
-    footprintCommand: {
-        ...Typography.mono("regular"),
-        fontSize: 11,
-        flex: 1,
-    },
-    footprintMeta: {
-        ...Typography.default("regular"),
-        fontSize: 10,
-    },
     expandButton: {
         paddingVertical: 4,
     },
@@ -1022,10 +1320,103 @@ const styles = StyleSheet.create({
         fontSize: 11,
     },
     summaryCard: {
+        gap: 8,
+    },
+    glassCard: {
+        borderRadius: 14,
+        borderWidth: 1,
+        overflow: "hidden",
+    },
+    glassCardBody: {
         padding: 12,
+        gap: 8,
+    },
+    chartBlock: {
+        gap: 8,
+        marginTop: 4,
+    },
+    chartSurface: {
         borderRadius: 10,
         borderWidth: 1,
+        overflow: "hidden",
+    },
+    chartLegend: {
+        flexDirection: "row",
+        flexWrap: "wrap",
+        gap: 12,
+    },
+    chartLegendItem: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 6,
+    },
+    chartLegendDot: {
+        width: 8,
+        height: 2,
+        borderRadius: 1,
+    },
+    chartLegendLabel: {
+        ...Typography.default("semiBold"),
+        fontSize: 11,
+    },
+    rhythmRow: {
+        flexDirection: "row",
         gap: 8,
+        marginTop: 4,
+    },
+    rhythmCell: {
+        flex: 1,
+        borderWidth: 1,
+        borderRadius: 10,
+        paddingVertical: 8,
+        paddingHorizontal: 10,
+        gap: 2,
+    },
+    rhythmLabel: {
+        ...Typography.default("semiBold"),
+        fontSize: 10,
+        textTransform: "uppercase",
+        letterSpacing: 0.4,
+    },
+    rhythmValue: {
+        ...Typography.default("semiBold"),
+        fontSize: 14,
+    },
+    toolMixBlock: {
+        gap: 6,
+        marginTop: 4,
+    },
+    toolMixBar: {
+        flexDirection: "row",
+        height: 8,
+        borderRadius: 4,
+        overflow: "hidden",
+    },
+    toolMixLegend: {
+        flexDirection: "row",
+        flexWrap: "wrap",
+        rowGap: 4,
+        columnGap: 12,
+        marginTop: 4,
+    },
+    toolMixLegendItem: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 5,
+    },
+    toolMixLegendDot: {
+        width: 8,
+        height: 8,
+        borderRadius: 2,
+    },
+    toolMixLegendName: {
+        ...Typography.mono("regular"),
+        fontSize: 11,
+        maxWidth: 120,
+    },
+    toolMixLegendCount: {
+        ...Typography.default("regular"),
+        fontSize: 10,
     },
     summaryHeader: {
         flexDirection: "row",

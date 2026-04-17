@@ -32,7 +32,7 @@ export interface FileChange {
     totalDeletions: number;
 }
 
-function collectToolCalls(messages: readonly Message[]): ToolCallMessage[] {
+export function collectToolCalls(messages: readonly Message[]): ToolCallMessage[] {
     const result: ToolCallMessage[] = [];
     for (const msg of messages) {
         if (msg.kind === "tool-call") {

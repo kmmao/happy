@@ -19,7 +19,7 @@ This folder documents how Happy works internally, with a focus on protocol, back
 - sdk-features.md: SDK feature capability matrix across agent backends and the Happy system.
 - sdk-upgrade-checklist.md: Claude Agent SDK 升级集成入口，包含集成面、重点核对项与最小回归矩阵。
 - mcp-plugins.md: MCP servers and Claude Code plugins used in the development environment.
-- mcp-progress.md: Live Progress/Summary 数据链路 — MCP 主路 + TodoWrite 降级 + App 渲染，含端到端流程图与 FAQ。
+- mcp-progress.md: Live Progress/Summary 数据链路 — MCP 显式 + CLI TodoWrite auto-mirror + App 扫描兜底，含端到端流程图、生效矩阵与 FAQ。
 - release-guide.md: Release workflow, ordering dependencies, and commands for each package after upstream merges.
 - claude-mem.md: Cross-session memory system plugin for Claude Code.
 - UPSTREAM_TRACKING.md: Upstream PR tracking for the slopus/happy fork.
