@@ -59,6 +59,28 @@ describe("mapClaudeLogMessageToSessionEnvelopes", () => {
     });
   });
 
+  it("skips empty thinking blocks (Opus 4.7 display=omitted default)", () => {
+    const result = mapClaudeLogMessageToSessionEnvelopes(
+      {
+        type: "assistant",
+        uuid: "a-omitted",
+        message: {
+          role: "assistant",
+          content: [
+            { type: "thinking", thinking: "", signature: "sig-abc" },
+            { type: "text", text: "answer" },
+          ],
+        },
+        timestamp: "2025-01-01T00:00:01.000Z",
+      } as any,
+      { currentTurnId: null },
+    );
+
+    expect(result.envelopes).toHaveLength(2);
+    expect(result.envelopes[0].ev.t).toBe("turn-start");
+    expect(result.envelopes[1].ev).toEqual({ t: "text", text: "answer" });
+  });
+
   it("maps tool use and tool result blocks to tool-call lifecycle", () => {
     const started = mapClaudeLogMessageToSessionEnvelopes(
       {

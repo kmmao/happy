@@ -8,6 +8,7 @@
 import * as React from "react";
 import { TokenStorage } from "@/auth/tokenStorage";
 import { getServerUrl } from "@/sync/serverConfig";
+import { useSessionKnowledgeAccessRevision } from "@/sync/storage";
 import { backoff } from "@/utils/time";
 import {
     shouldApplyKnowledgeRequestResult,
@@ -109,6 +110,14 @@ export function useSessionKnowledgeAccesses(
     React.useEffect(() => {
         void refresh();
     }, [refresh]);
+
+    // Refetch when the server pushes a knowledge-access-update ephemeral
+    // (applyTurnHit changed turnsRemaining / hitCount or a new entry was injected).
+    const accessRevision = useSessionKnowledgeAccessRevision(sessionId ?? "");
+    React.useEffect(() => {
+        if (accessRevision === 0) return;
+        void refresh();
+    }, [accessRevision, refresh]);
 
     return { accesses, loading, refresh };
 }

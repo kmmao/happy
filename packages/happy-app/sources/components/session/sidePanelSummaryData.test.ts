@@ -64,21 +64,21 @@ describe("buildKnowledgeSummaryRows", () => {
             t: testTranslate,
         });
 
-        expect(findRow(rows, "Knowledge")).toEqual({
+        expect(findRow(rows, "Knowledge")).toMatchObject({
             icon: "database",
             label: "Knowledge",
             value: "3 captured · latest: Latest fix",
             isInteractive: true,
         });
-        expect(findRow(rows, "Knowledge Used")).toEqual({
+        expect(findRow(rows, "Knowledge Used")).toMatchObject({
             icon: "link",
             label: "Knowledge Used",
-            value: "1 referenced · latest: Referenced convention",
+            value: "1 referenced · latest: Referenced convention · 0 hit · 0 hot",
             isInteractive: true,
         });
     });
 
-    it("returns no rows when there is no knowledge activity", () => {
+    it("always renders the referenced row (zero state) so users see current activity", () => {
         const rows = buildKnowledgeSummaryRows({
             knowledgeCount: 0,
             capturedEntries: [],
@@ -86,10 +86,16 @@ describe("buildKnowledgeSummaryRows", () => {
             t: testTranslate,
         });
 
-        expect(rows).toEqual([]);
+        expect(rows).toHaveLength(1);
+        expect(rows[0]).toMatchObject({
+            icon: "link",
+            label: "Knowledge Used",
+            value: "0 referenced",
+            isInteractive: true,
+        });
     });
 
-    it("uses entry lengths when realtime count is unavailable", () => {
+    it("renders captured row alongside zero-state referenced row", () => {
         const rows = buildKnowledgeSummaryRows({
             knowledgeCount: 0,
             capturedEntries: [
@@ -103,13 +109,43 @@ describe("buildKnowledgeSummaryRows", () => {
             t: testTranslate,
         });
 
-        expect(rows).toEqual([
-            {
-                icon: "database",
-                label: "Knowledge",
-                value: "1 captured · latest: Only captured item",
-                isInteractive: true,
-            },
-        ]);
+        expect(rows).toHaveLength(2);
+        expect(findRow(rows, "Knowledge")).toMatchObject({
+            icon: "database",
+            value: "1 captured · latest: Only captured item",
+        });
+        expect(findRow(rows, "Knowledge Used")).toMatchObject({
+            icon: "link",
+            value: "0 referenced",
+        });
+    });
+
+    it("appends TTL hit/hot suffix when server reports TTL fields", () => {
+        const rows = buildKnowledgeSummaryRows({
+            knowledgeCount: 0,
+            capturedEntries: [],
+            referencedEntries: [
+                {
+                    id: "a",
+                    title: "Hot entry",
+                    createdAt: 100,
+                    hitCount: 2,
+                    hotStatus: "hot",
+                },
+                {
+                    id: "b",
+                    title: "Evicted entry",
+                    createdAt: 110,
+                    hitCount: 0,
+                    hotStatus: "evicted",
+                },
+            ],
+            t: testTranslate,
+        });
+
+        const used = findRow(rows, "Knowledge Used");
+        expect(used?.value).toContain("2 referenced");
+        expect(used?.value).toContain("1 hit");
+        expect(used?.value).toContain("1 hot");
     });
 });

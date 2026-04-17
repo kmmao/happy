@@ -7,7 +7,11 @@ import { parseProfileContent, safeParseJsonArray } from "@/modules/knowledgeSeri
 import { storeKnowledgeEmbedding } from "@/modules/knowledgeEmbedding";
 import { trackKnowledgeCreation } from "@/modules/knowledgeAutoProfile";
 import { refineKnowledgeEntry } from "@/modules/knowledgeRefiner";
-import { buildKnowledgeCountEphemeral, eventRouter } from "@/app/events/eventRouter";
+import {
+    buildKnowledgeAccessUpdateEphemeral,
+    buildKnowledgeCountEphemeral,
+    eventRouter,
+} from "@/app/events/eventRouter";
 import { inTx } from "@/storage/inTx";
 import { addRelations, type KnowledgeRelationType } from "@/modules/knowledgeRelation";
 import { resolveKnowledgeConfig } from "@/modules/knowledgeConfigResolver";
@@ -266,7 +270,16 @@ export function knowledgeHandler(userId: string, socket: Socket) {
                     sid,
                     projectId,
                     entries.map((e) => ({ id: e.id, confidence: e.confidence })),
-                );
+                ).then(() => {
+                    // Signal the App to refresh injected/referenced views.
+                    eventRouter.emitEphemeral({
+                        userId,
+                        payload: buildKnowledgeAccessUpdateEphemeral({ sessionId: sid }),
+                        recipientFilter: { type: "user-scoped-only" },
+                    });
+                }).catch((err) => {
+                    log({ module: "knowledge" }, `Error recording access: ${err}`);
+                });
             }
 
             // Fetch action items: warning/decision entries + high-confidence not recently accessed
@@ -347,6 +360,21 @@ export function knowledgeHandler(userId: string, socket: Socket) {
                 { module: "knowledge" },
                 `Turn-end ${sid}: hit=${summary.hit} miss=${summary.miss} evicted=${summary.evicted}`,
             );
+
+            // Push an ephemeral signal so the App invalidates knowledge access caches
+            // and re-fetches turnsRemaining / hitCount for the Summary + References UI.
+            if (summary.hit > 0 || summary.miss > 0 || summary.evicted > 0) {
+                eventRouter.emitEphemeral({
+                    userId,
+                    payload: buildKnowledgeAccessUpdateEphemeral({
+                        sessionId: sid,
+                        hit: summary.hit,
+                        miss: summary.miss,
+                        evicted: summary.evicted,
+                    }),
+                    recipientFilter: { type: "user-scoped-only" },
+                });
+            }
         } catch (err) {
             log({ module: "knowledge" }, `Error handling knowledge-turn-end: ${err}`);
         }

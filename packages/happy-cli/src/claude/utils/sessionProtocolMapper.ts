@@ -595,6 +595,12 @@ function mapClaudeLogMessageToSessionEnvelopesInternal(
       }
 
       if (block.type === "thinking" && typeof block.thinking === "string") {
+        // Opus 4.7+ defaults to thinking.display="omitted" — the API returns
+        // an empty `thinking` field plus a signature. Skip empty blocks so the
+        // App doesn't render an orphan "Thinking" header with no content.
+        if (block.thinking.length === 0) {
+          continue;
+        }
         envelopes.push(
           createEnvelope(
             "agent",

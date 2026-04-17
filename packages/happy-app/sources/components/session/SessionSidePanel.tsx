@@ -12,10 +12,12 @@ import { InputContext } from "@/hooks/useInputContext";
 import {
     useProjectForSession,
     useSessionGitStatus,
+    useSessionKnowledgeCount,
     useSessionProjectGitStatus,
     useSessionProjectSubmodules,
     useSetting,
 } from "@/sync/storage";
+import { useSessionKnowledgeAccesses } from "@/hooks/useSessionKnowledgeAccesses";
 import { t } from "@/text";
 import { aggregateLineChanges } from "@/utils/gitStatusUtils";
 import { SidePanelCodeTab } from "./SidePanelCodeTab";
@@ -85,6 +87,18 @@ export const SessionSidePanel = React.memo<SessionSidePanelProps>(
             if (totalAdded === 0 && totalRemoved === 0) return null;
             return { totalAdded, totalRemoved };
         }, [gitStatus, submodules]);
+
+        const knowledgeCount = useSessionKnowledgeCount(sessionId);
+        const { accesses } = useSessionKnowledgeAccesses(
+            project?.serverId ?? undefined,
+            sessionId,
+        );
+        const summaryInfo = React.useMemo(() => {
+            const captured = knowledgeCount;
+            const referenced = accesses.length;
+            if (captured === 0 && referenced === 0) return null;
+            return { captured, referenced };
+        }, [knowledgeCount, accesses.length]);
 
         const tabDefinitions = React.useMemo(
             () => getSessionPanelTabDefinitions(enablePreviewTab),
@@ -188,6 +202,11 @@ export const SessionSidePanel = React.memo<SessionSidePanelProps>(
                                                 -{changesInfo.totalRemoved}
                                             </Text>
                                         </View>
+                                    )}
+                                    {tab.key === "summary" && summaryInfo && (
+                                        <Text style={{ fontSize: 10, fontWeight: "600", color: theme.colors.textSecondary }}>
+                                            {summaryInfo.captured}·{summaryInfo.referenced}
+                                        </Text>
                                     )}
                                 </Pressable>
                             ))}

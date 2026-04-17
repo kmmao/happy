@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
     computeTurnHitPlan,
+    decideReinjectAction,
     getInitialTurnBudget,
     type TurnHitRow,
 } from "./knowledgeAccess";
@@ -21,6 +22,44 @@ describe("knowledgeAccess", () => {
 
         it("falls back to medium budget for unknown confidence", () => {
             expect(getInitialTurnBudget("mystery")).toEqual({ initialTurns: 5, maxTurns: 10 });
+        });
+    });
+
+    describe("decideReinjectAction", () => {
+        it("creates a row when no previous access exists", () => {
+            expect(decideReinjectAction(null)).toBe("create");
+        });
+
+        it("reactivates only when the previous row is evicted", () => {
+            expect(
+                decideReinjectAction({
+                    hotStatus: "evicted",
+                    turnsRemaining: 0,
+                    initialTurns: 7,
+                }),
+            ).toBe("reactivate");
+        });
+
+        it("is a noop when the previous row is hot at full TTL", () => {
+            expect(
+                decideReinjectAction({
+                    hotStatus: "hot",
+                    turnsRemaining: 7,
+                    initialTurns: 7,
+                }),
+            ).toBe("noop");
+        });
+
+        it("is a noop when the previous row is hot but already decremented", () => {
+            // This is the 7/14-stuck regression guard:
+            // a partially-decayed hot row must NOT be reset to initialTurns.
+            expect(
+                decideReinjectAction({
+                    hotStatus: "hot",
+                    turnsRemaining: 3,
+                    initialTurns: 7,
+                }),
+            ).toBe("noop");
         });
     });
 

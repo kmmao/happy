@@ -1678,8 +1678,10 @@ export async function claudeRemoteLauncher(
             }
 
             // Per-turn hit detection: which injected knowledge entries were referenced
-            // by the assistant in this turn? Substring match on tags + exact title catches
-            // real usage without an extra LLM pass. Server uses this to tick TTL counters.
+            // by the assistant in this turn? Substring match on full title, title words,
+            // and tags catches real usage without an extra LLM pass. Server uses this
+            // to tick TTL counters. Emit even when hitIds is empty so the server can
+            // decrement misses on every turn.
             try {
               if (turnCollector && knowledgeEntries.size > 0) {
                 const assistantText = turnCollector.getAssistantTextSnapshot().toLowerCase();
@@ -1688,13 +1690,26 @@ export async function claudeRemoteLauncher(
                   for (const entry of knowledgeEntries.values()) {
                     let matched = false;
                     const lowerTitle = entry.title.toLowerCase();
-                    if (lowerTitle.length >= 8 && assistantText.includes(lowerTitle)) {
+                    if (lowerTitle.length >= 6 && assistantText.includes(lowerTitle)) {
                       matched = true;
+                    }
+                    // Match any significant title word (>=4 chars, alphanumeric) so partial
+                    // paraphrases still register as a hit without reaching a full-title match.
+                    if (!matched) {
+                      const titleWords = lowerTitle
+                        .split(/[^\p{L}\p{N}]+/u)
+                        .filter((w) => w.length >= 4);
+                      for (const word of titleWords) {
+                        if (assistantText.includes(word)) {
+                          matched = true;
+                          break;
+                        }
+                      }
                     }
                     if (!matched) {
                       for (const tag of entry.tags) {
                         const lowerTag = tag.toLowerCase();
-                        if (lowerTag.length >= 3 && assistantText.includes(lowerTag)) {
+                        if (lowerTag.length >= 2 && assistantText.includes(lowerTag)) {
                           matched = true;
                           break;
                         }

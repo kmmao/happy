@@ -2585,6 +2585,19 @@ class Sync {
       }));
     }
 
+    // Handle knowledge-access-update: bump per-session revision so hooks
+    // (useSessionKnowledge, useSessionKnowledgeAccesses) refetch and show
+    // fresh turnsRemaining / hitCount / references.
+    if (updateData.type === "knowledge-access-update") {
+      storage.setState((prev) => ({
+        sessionKnowledgeAccessRevision: {
+          ...prev.sessionKnowledgeAccessRevision,
+          [updateData.sessionId]:
+            (prev.sessionKnowledgeAccessRevision[updateData.sessionId] ?? 0) + 1,
+        },
+      }));
+    }
+
     // Handle task-log: forward log chunks to task-log listeners
     if (updateData.type === "task-log") {
       for (const listener of this.taskLogListeners) {

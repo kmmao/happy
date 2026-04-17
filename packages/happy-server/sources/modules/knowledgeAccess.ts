@@ -34,6 +34,28 @@ interface AccessEntry {
     confidence: string;
 }
 
+export type AccessReinjectDecision = "create" | "reactivate" | "noop";
+
+/**
+ * Pure reinjection decision: what should happen to an existing access row
+ * when fetch-knowledge surfaces the same entry again.
+ *
+ * - No previous row → create a fresh one (seeds initialTurns).
+ * - Evicted row → reactivate (migrate-out countdown failed, give it another shot).
+ * - Hot row, any turnsRemaining → noop.
+ *
+ * CRITICAL: an active row must NOT be reset here. If we reset turnsRemaining
+ * to initialTurns on every re-injection, applyTurnHit's decrements get
+ * clobbered on the next fetch and the App sees a flat 7/14 forever.
+ */
+export function decideReinjectAction(
+    prev: { hotStatus: string; turnsRemaining: number; initialTurns: number } | null,
+): AccessReinjectDecision {
+    if (!prev) return "create";
+    if (prev.hotStatus === "evicted") return "reactivate";
+    return "noop";
+}
+
 /**
  * Fire-and-forget: record that a session accessed a set of knowledge entries.
  * On first access seeds turn budget; on re-access re-activates hot status and tops up turns.
@@ -62,12 +84,10 @@ export async function recordKnowledgeAccess(
     const toCreate: AccessEntry[] = [];
     const toReactivate: AccessEntry[] = [];
     for (const entry of normalized) {
-        const prev = existingMap.get(entry.id);
-        if (!prev) {
-            toCreate.push(entry);
-        } else if (prev.hotStatus === "evicted" || prev.turnsRemaining < prev.initialTurns) {
-            toReactivate.push(entry);
-        }
+        const prev = existingMap.get(entry.id) ?? null;
+        const decision = decideReinjectAction(prev);
+        if (decision === "create") toCreate.push(entry);
+        else if (decision === "reactivate") toReactivate.push(entry);
     }
 
     const ops: Promise<unknown>[] = [];

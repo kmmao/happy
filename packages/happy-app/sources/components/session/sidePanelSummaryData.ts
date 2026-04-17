@@ -75,39 +75,36 @@ export function buildKnowledgeSummaryRows({
         });
     }
 
-    if (referencedEntries.length > 0) {
-        // Base "N injected" line (existing semantics: count of entries the session has injected).
-        let value = appendLatestTitle(
-            t("sidePanel.knowledgeReferencedValue", {
-                count: referencedEntries.length,
-            }),
-            getLatestTitle(referencedEntries),
-            t,
-        );
+    // Always render the Referenced row so users can see session knowledge state at
+    // a glance (including the zero state). TTL suffixes (hit/hot) only appear when
+    // the server provides those fields.
+    const hitCount = referencedEntries.filter((e) => (e.hitCount ?? 0) > 0).length;
+    const hotCount = referencedEntries.filter((e) => e.hotStatus === "hot").length;
+    const hasTtlStats = referencedEntries.some(
+        (e) => e.hitCount !== undefined || e.hotStatus !== undefined,
+    );
 
-        // Enrich with TTL-by-turn stats when the server provides them:
-        //   Hit  = entries whose assistant text matched at least once in a turn
-        //   Hot  = entries still in the session hot set (turnsRemaining > 0)
-        const hitCount = referencedEntries.filter((e) => (e.hitCount ?? 0) > 0).length;
-        const hotCount = referencedEntries.filter((e) => e.hotStatus === "hot").length;
-        const hasTtlStats = referencedEntries.some(
-            (e) => e.hitCount !== undefined || e.hotStatus !== undefined,
-        );
-        if (hasTtlStats) {
-            value =
-                value +
-                t("sidePanel.knowledgeHitSuffix", { count: hitCount }) +
-                t("sidePanel.knowledgeHotSuffix", { count: hotCount });
-        }
-
-        rows.push({
-            icon: "link",
-            label: t("sidePanel.knowledgeReferenced"),
-            value,
-            isInteractive: true,
-            targetTab: "references",
-        });
+    let referencedValue = appendLatestTitle(
+        t("sidePanel.knowledgeReferencedValue", {
+            count: referencedEntries.length,
+        }),
+        getLatestTitle(referencedEntries),
+        t,
+    );
+    if (hasTtlStats || referencedEntries.length > 0) {
+        referencedValue =
+            referencedValue +
+            t("sidePanel.knowledgeHitSuffix", { count: hitCount }) +
+            t("sidePanel.knowledgeHotSuffix", { count: hotCount });
     }
+
+    rows.push({
+        icon: "link",
+        label: t("sidePanel.knowledgeReferenced"),
+        value: referencedValue,
+        isInteractive: true,
+        targetTab: "references",
+    });
 
     return rows;
 }

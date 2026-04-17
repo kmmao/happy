@@ -345,6 +345,14 @@ export type EphemeralEvent =
       count: number;
     }
   | {
+      type: "knowledge-access-update";
+      sessionId: string;
+      at: number;
+      hit?: number;
+      miss?: number;
+      evicted?: number;
+    }
+  | {
       type: "task-log";
       sessionId: string;
       taskId: string;
@@ -1171,6 +1179,22 @@ export function buildKnowledgeCountEphemeral(
     type: "knowledge-count",
     id: sessionId,
     count,
+  };
+}
+
+export function buildKnowledgeAccessUpdateEphemeral(opts: {
+  sessionId: string;
+  hit?: number;
+  miss?: number;
+  evicted?: number;
+}): EphemeralPayload {
+  return {
+    type: "knowledge-access-update",
+    sessionId: opts.sessionId,
+    at: Date.now(),
+    hit: opts.hit,
+    miss: opts.miss,
+    evicted: opts.evicted,
   };
 }
 

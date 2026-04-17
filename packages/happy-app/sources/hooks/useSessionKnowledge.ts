@@ -8,6 +8,10 @@
 import * as React from "react";
 import { TokenStorage } from "@/auth/tokenStorage";
 import { getServerUrl } from "@/sync/serverConfig";
+import {
+    useSessionKnowledgeAccessRevision,
+    useSessionKnowledgeCount,
+} from "@/sync/storage";
 import { backoff } from "@/utils/time";
 import {
     shouldApplyKnowledgeRequestResult,
@@ -101,6 +105,14 @@ export function useSessionKnowledge(
     React.useEffect(() => {
         void refresh();
     }, [refresh]);
+
+    // Refetch when server signals new knowledge entries or access changes.
+    const knowledgeCount = useSessionKnowledgeCount(sessionId ?? "");
+    const accessRevision = useSessionKnowledgeAccessRevision(sessionId ?? "");
+    React.useEffect(() => {
+        if (knowledgeCount === 0 && accessRevision === 0) return;
+        void refresh();
+    }, [knowledgeCount, accessRevision, refresh]);
 
     return { entries, loading, refresh };
 }

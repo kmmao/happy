@@ -101,6 +101,12 @@ const HotBadge = React.memo<HotBadgeProps>(({ entry }) => {
                 accessibilityRole="button"
                 accessibilityLabel={t("session.knowledgeBadgeTooltipTitle")}
             >
+                <Ionicons
+                    name="close-circle-outline"
+                    size={11}
+                    color={EVICTED_BADGE_COLOR}
+                    style={styles.hotBadgeIcon}
+                />
                 <Text style={[styles.hotBadgeText, { color: EVICTED_BADGE_COLOR }]}>
                     {t("session.knowledgeBadgeEvicted")}
                 </Text>
@@ -123,6 +129,12 @@ const HotBadge = React.memo<HotBadgeProps>(({ entry }) => {
             accessibilityRole="button"
             accessibilityLabel={t("session.knowledgeBadgeTooltipTitle")}
         >
+            <Ionicons
+                name="timer-outline"
+                size={11}
+                color={color}
+                style={styles.hotBadgeIcon}
+            />
             <Text style={[styles.hotBadgeText, { color }]}>
                 {label}
             </Text>
@@ -528,9 +540,15 @@ const styles = StyleSheet.create({
         textTransform: "uppercase",
     },
     hotBadge: {
+        flexDirection: "row",
+        alignItems: "center",
         paddingHorizontal: 6,
         paddingVertical: 2,
         borderRadius: 4,
+        gap: 3,
+    },
+    hotBadgeIcon: {
+        marginRight: 0,
     },
     hotBadgeText: {
         ...Typography.default("semiBold"),
