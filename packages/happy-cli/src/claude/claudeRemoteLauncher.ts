@@ -661,10 +661,46 @@ export async function claudeRemoteLauncher(
                   )
                 : newTodos;
 
-              // Set inside updateMetadata if the checklist just transitioned
-              // from "had pending/in_progress" → "all completed". Drives the
-              // post-callback synthetic user-message injection below.
+              // Detect the "list fully completed" transition BEFORE calling
+              // updateMetadata. The updater handler runs inside an async lock
+              // and wouldn't give us a synchronous result — so we snapshot
+              // the current metadata via getMetadata() and compute everything
+              // we need here. The handler below then consumes the flag via
+              // closure to stamp `summaryGeneratedAt`.
+              const currentMetadataSnapshot = session.client.getMetadata();
+              const priorProgressSnapshot = currentMetadataSnapshot?.progress;
+              const priorListsSnapshot = priorProgressSnapshot?.lists ?? [];
+              const priorCurrentIdSnapshot = priorProgressSnapshot?.currentListId;
+              const priorCurrentListSnapshot = priorCurrentIdSnapshot
+                ? priorListsSnapshot.find((l) => l.id === priorCurrentIdSnapshot)
+                : undefined;
+              const oldKeysSnapshot = new Set(
+                oldTodos.map((t) => t.content),
+              );
+              const newKeysSnapshot = new Set(
+                mirrored.map((t) => t.content),
+              );
+              let intersectionSnapshot = 0;
+              for (const k of newKeysSnapshot)
+                if (oldKeysSnapshot.has(k)) intersectionSnapshot += 1;
+              const isBoundarySnapshot =
+                oldKeysSnapshot.size === 0 ||
+                intersectionSnapshot === 0 ||
+                !priorCurrentListSnapshot;
+
               let shouldTriggerAutoSummary = false;
+              if (!isBoundarySnapshot) {
+                const oldHadIncomplete = oldTodos.some(
+                  (t) => t.status !== "completed",
+                );
+                const newAllCompleted =
+                  mirrored.length > 0 &&
+                  mirrored.every((t) => t.status === "completed");
+                const alreadyStamped =
+                  priorCurrentListSnapshot?.summaryGeneratedAt !== undefined;
+                shouldTriggerAutoSummary =
+                  oldHadIncomplete && newAllCompleted && !alreadyStamped;
+              }
 
               session.client.updateMetadata((m) => {
                 const now = Date.now();
@@ -720,23 +756,10 @@ export async function claudeRemoteLauncher(
                 } else {
                   // Update-in-place: replace todos, preserve stage/blockers.
                   // Refresh label when the first todo's content changed, so
-                  // a mid-list reorder doesn't leave a stale chip title.
-                  //
-                  // Completion-transition detection: if oldTodos had any
-                  // unfinished item and mirrored is fully completed, stamp
-                  // `summaryGeneratedAt` on the list so the auto-summary
-                  // trigger runs exactly once for this list's lifecycle.
-                  const oldHadIncomplete = oldTodos.some(
-                    (t) => t.status !== "completed",
-                  );
-                  const newAllCompleted =
-                    mirrored.length > 0 &&
-                    mirrored.every((t) => t.status === "completed");
-                  const alreadyStamped =
-                    currentList?.summaryGeneratedAt !== undefined;
-                  const shouldStamp =
-                    oldHadIncomplete && newAllCompleted && !alreadyStamped;
-                  if (shouldStamp) shouldTriggerAutoSummary = true;
+                  // a mid-list reorder doesn't leave a stale chip title. The
+                  // `shouldTriggerAutoSummary` flag was pre-computed outside
+                  // this handler (see snapshot block above); we just consume
+                  // it here to stamp `summaryGeneratedAt` once.
                   nextLists = lists.map((l, i) => {
                     if (i !== currentIdx) return l;
                     const firstChanged =
@@ -748,7 +771,7 @@ export async function claudeRemoteLauncher(
                       todos: mirrored,
                       updatedAt: now,
                       label: firstChanged ? label : (l.label ?? label),
-                      summaryGeneratedAt: shouldStamp
+                      summaryGeneratedAt: shouldTriggerAutoSummary
                         ? now
                         : l.summaryGeneratedAt,
                     };

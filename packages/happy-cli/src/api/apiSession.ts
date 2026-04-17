@@ -426,6 +426,16 @@ export class ApiSessionClient extends EventEmitter {
    * Agent still sees the underlying `text`. Used by the auto-summary hook to
    * force a summary-update turn without polluting visible chat history.
    */
+  /**
+   * Read-only snapshot of the current metadata. Used by callers that need to
+   * base a decision on the current state BEFORE calling `updateMetadata` (the
+   * updater handler itself runs inside an async lock, so it doesn't help
+   * callers that need the pre-state synchronously).
+   */
+  getMetadata(): Metadata | null {
+    return this.metadata;
+  }
+
   sendSyntheticUserMessage(text: string, meta: Record<string, unknown> = {}) {
     const content = {
       role: "user",
