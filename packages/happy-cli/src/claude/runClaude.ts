@@ -267,6 +267,15 @@ export async function runClaude(
         }
         if (!resp) throw new Error("Server unavailable");
         const session = api.sessionSyncClient(resp);
+        // On reconnect, server preserves the existing metadata blob (agent
+        // state like progress / sessionSummary / summary). Merge our fresh
+        // startup fields on top so this new CLI process is reflected without
+        // wiping accumulated state. Local `metadata` holds only startup
+        // fields, so spreading it over `existing` updates those and leaves
+        // agent-driven fields untouched.
+        if (options.happySessionId) {
+          session.updateMetadata((existing) => ({ ...existing, ...metadata }));
+        }
         const scanner = await createSessionScanner({
           sessionId: null,
           workingDirectory,
@@ -325,6 +334,16 @@ export async function runClaude(
 
   // Create realtime session FIRST (before SDK metadata extraction)
   const session = api.sessionSyncClient(response);
+
+  // On reconnect, server preserves the existing metadata blob (agent state
+  // like progress / sessionSummary / summary / tools / slashCommands).
+  // Merge our fresh startup fields on top so this new CLI process is
+  // reflected without wiping accumulated state across daemon restarts and
+  // `npm upgrade`. Local `metadata` holds only startup fields, so spreading
+  // it over `existing` updates those and leaves agent-driven fields intact.
+  if (options.happySessionId) {
+    session.updateMetadata((existing) => ({ ...existing, ...metadata }));
+  }
 
   // Set initial model mode key for usage tracking (e.g., "sonnet-1m")
   session.setModelModeKey(options.model);

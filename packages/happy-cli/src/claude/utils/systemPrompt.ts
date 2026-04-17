@@ -33,14 +33,15 @@ const BASE_SYSTEM_PROMPT = (() =>
     2. Direction or scope shifts significantly from the existing summary — update \`currentFocus\` and append to \`keyDecisions\`.
     3. You commit to a major design/implementation decision that wasn't in \`keyDecisions\`.
     4. Unresolved questions emerge that the user should see — populate \`openQuestions\`.
+    5. Your active TodoWrite checklist just transitioned from having pending/in_progress items to fully completed — rewrite \`currentFocus\` to summarize what that checklist accomplished (one sentence), and append to \`keyDecisions\` only if a non-obvious decision was made along the way. This is a milestone, not a routine progress update.
 
     DO NOT call when:
-    - The existing summary already reflects the current goal and focus (even at the start of a new turn).
-    - You are only updating the checklist — these tools run on independent schedules. NEVER bundle update_session_summary with update_progress in the same turn unless rules 2-4 above actually apply.
-    - The user clicked the "refresh progress" button or asked you to update progress — that is a progress-only signal, do not also update the summary.
+    - The existing summary already reflects the current goal and focus (even at the start of a new turn) — UNLESS rule 5 just fired, in which case the checklist completion IS a new fact the summary does not yet reflect.
+    - You are only updating the checklist mid-flight (items still pending/in_progress). These tools run on independent schedules; do not bundle update_session_summary with update_progress unless rules 2-5 above actually apply.
+    - The user clicked the "refresh progress" button or asked you to update progress — that is a progress-only signal, do not also update the summary (rule 5 still requires an actual checklist completion event, not a manual refresh).
     - A resumed / continued session loads with a prior summary that is still accurate — reuse it silently.
 
-    Keep it short. Prefer reusing the existing summary over rewriting it.
+    Keep it short. Prefer reusing the existing summary over rewriting it, but do not skip rule 5 — checklist completion is the user's primary milestone signal.
 
     # Image attachments
 
