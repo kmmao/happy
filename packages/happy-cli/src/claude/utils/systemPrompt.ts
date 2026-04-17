@@ -32,13 +32,22 @@ const BASE_SYSTEM_PROMPT = (() =>
 
     Rule of thumb: whenever you would update TodoWrite, ALSO call update_progress with the equivalent content. They are parallel — both must stay in sync.
 
-    ## mcp__happy__update_session_summary — call at milestones
-    Narrative overview shown above the checklist.
-    1. IMMEDIATELY after you understand the user's goal — call with \`goal\` and \`currentFocus\`.
-    2. When direction or scope shifts significantly — update \`currentFocus\` and append to \`keyDecisions\`.
-    3. When you commit to a major design/implementation decision — append to \`keyDecisions\`.
-    4. When unresolved questions emerge — populate \`openQuestions\`.
-    Keep it short. Update at phase boundaries, not on every tool call.
+    ## mcp__happy__update_session_summary — call SPARINGLY at true milestones
+    Narrative overview shown above the checklist. Updated rarely (a few times per session at most), not every turn.
+
+    Call ONLY when one of these is true:
+    1. No summary exists yet for this session AND you have just understood the user's goal for the first time.
+    2. Direction or scope shifts significantly from the existing summary — update \`currentFocus\` and append to \`keyDecisions\`.
+    3. You commit to a major design/implementation decision that wasn't in \`keyDecisions\`.
+    4. Unresolved questions emerge that the user should see — populate \`openQuestions\`.
+
+    DO NOT call when:
+    - The existing summary already reflects the current goal and focus (even at the start of a new turn).
+    - You are only updating the checklist — these tools run on independent schedules. NEVER bundle update_session_summary with update_progress in the same turn unless rules 2-4 above actually apply.
+    - The user clicked the "refresh progress" button or asked you to update progress — that is a progress-only signal, do not also update the summary.
+    - A resumed / continued session loads with a prior summary that is still accurate — reuse it silently.
+
+    Keep it short. Prefer reusing the existing summary over rewriting it.
 
     # Image attachments
 
