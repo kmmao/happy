@@ -12,3 +12,4 @@ export * from './terminal';
 export * from './worldSuggestion';
 export * from './agentMessage';
 export * from './profile';
+export * from './sessionState';
