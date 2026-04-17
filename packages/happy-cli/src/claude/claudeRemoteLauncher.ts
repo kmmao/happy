@@ -600,6 +600,61 @@ export async function claudeRemoteLauncher(
       logger.debug(`[knowledge] Error collecting turn data: ${err}`);
     }
 
+    // Auto-mirror TodoWrite → metadata.progress so the App's Progress tab
+    // stays fresh even if the Agent never calls mcp__happy__update_progress.
+    // This runs in-process on the CLI side — no extra turn, no token cost.
+    // Explicit update_progress calls still win for currentStage / blockers
+    // (those fields are preserved across mirrors).
+    if (message.type === "assistant") {
+      try {
+        const aMsg = message as SDKAssistantMessage;
+        const blocks = Array.isArray(aMsg.message.content)
+          ? aMsg.message.content
+          : [];
+        for (const c of blocks) {
+          if (c.type !== "tool_use" || c.name !== "TodoWrite") continue;
+          const raw = (c.input as Record<string, unknown> | undefined)?.todos;
+          if (!Array.isArray(raw)) continue;
+
+          const mirrored: Array<{
+            content: string;
+            status: "pending" | "in_progress" | "completed";
+          }> = [];
+          for (const item of raw) {
+            if (!item || typeof item !== "object") continue;
+            const record = item as Record<string, unknown>;
+            const content = record.content;
+            const status = record.status;
+            if (typeof content !== "string" || content.length === 0) continue;
+            if (
+              status !== "pending" &&
+              status !== "in_progress" &&
+              status !== "completed"
+            )
+              continue;
+            mirrored.push({ content, status });
+          }
+
+          if (mirrored.length > 0) {
+            session.client.updateMetadata((m) => ({
+              ...m,
+              progress: {
+                todos: mirrored,
+                currentStage: m.progress?.currentStage,
+                blockers: m.progress?.blockers,
+                updatedAt: Date.now(),
+              },
+            }));
+            logger.debug(
+              `[progress-mirror] Mirrored ${mirrored.length} todos from TodoWrite`,
+            );
+          }
+        }
+      } catch (err) {
+        logger.debug(`[progress-mirror] Error mirroring TodoWrite: ${err}`);
+      }
+    }
+
     // Report session timeline events (fire-and-forget)
     if (reportSessionEvent) {
       reportSessionEvent(message);
