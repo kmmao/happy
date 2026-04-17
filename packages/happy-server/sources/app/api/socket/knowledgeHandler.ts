@@ -282,14 +282,16 @@ export function knowledgeHandler(userId: string, socket: Socket) {
                 });
             }
 
-            // Fetch action items: warning/decision entries + high-confidence not recently accessed
+            // Fetch action items: warning/decision entries + high-confidence not recently accessed.
+            // Exclude evicted ids (manual migrate-out or TTL-zero) so they aren't pushed either.
             const fourteenDaysAgo = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000);
             const mainEntryIds = entries.map((e) => e.id);
+            const excludedIds = [...new Set([...mainEntryIds, ...evictedIds])];
             const actionItems = await db.projectKnowledge.findMany({
                 where: {
                     projectId,
                     status: "active",
-                    ...(mainEntryIds.length > 0 ? { id: { notIn: mainEntryIds } } : {}),
+                    ...(excludedIds.length > 0 ? { id: { notIn: excludedIds } } : {}),
                     OR: [
                         { entryType: { in: ["warning", "decision"] } },
                         {

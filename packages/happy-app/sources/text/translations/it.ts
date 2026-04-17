@@ -740,6 +740,19 @@ export const it: TranslationStructure = {
     knowledgeAccessesEmpty: "Nessun riferimento alla conoscenza in questa sessione",
     knowledgeAccessGoToSource: "Vai alla sessione sorgente",
     knowledgeBadgeEvicted: "espulsa",
+    knowledgeTabArchive: "Archivio",
+    knowledgeArchiveSubtitle: "Voci referenziate in questa sessione e archiviate o sostituite globalmente",
+    knowledgeArchiveEmpty: "Nessuna voce archiviata referenziata in questa sessione",
+    knowledgeTabEvicted: "Espulse",
+    knowledgeEvictedSubtitle: "Voci espulse da questa sessione — tocca «Reinserisci» per ripristinarle",
+    knowledgeEvictedEmpty: "Nessuna voce espulsa",
+    knowledgeReinjectAction: "Reinserisci",
+    knowledgeEvictAction: "Espelli",
+    knowledgeEvictConfirmTitle: "Espellere questa voce?",
+    knowledgeEvictConfirmBody: "Non verrà più iniettata in questa sessione. Il conto alla rovescia si azzera solo se ricompare in un fetch futuro.",
+    knowledgeBadgeHotLabel: ({ turns, max, hits }: { turns: number; max: number; hits: number }) =>
+      hits > 0 ? `${turns}/${max} turni · ${hits} hit` : `${turns}/${max} turni`,
+    knowledgeBadgeHotHitsOnly: ({ hits }: { hits: number }) => `${hits} hit`,
     knowledgeBadgeTooltipTitle: "Budget di turni",
     knowledgeBadgeTooltipHot: ({ turns, max, hits }: { turns: number; max: number; hits: number }) =>
       `Restano ${turns}/${max} turni. Referenziata ${hits}× in questa sessione. Hit +1 (cap ${max}), miss −1, a 0 viene espulsa dall'iniezione.`,
@@ -1325,7 +1338,7 @@ export const it: TranslationStructure = {
   sidePanel: {
     files: "File",
     changes: "Modifiche",
-    summary: "Riepilogo",
+    knowledge: "Conoscenza",
     preview: "Anteprima",
     code: "Codice",
     terminal: "Terminale",

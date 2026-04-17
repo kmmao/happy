@@ -726,6 +726,19 @@ export const ja: TranslationStructure = {
     knowledgeAccessesEmpty: "このセッションで参照されたナレッジはありません",
     knowledgeAccessGoToSource: "元のセッションへ移動",
     knowledgeBadgeEvicted: "除外",
+    knowledgeTabArchive: "アーカイブ",
+    knowledgeArchiveSubtitle: "このセッションで参照済みかつグローバルにアーカイブ／置換された項目",
+    knowledgeArchiveEmpty: "このセッションにアーカイブ済みの参照はありません",
+    knowledgeTabEvicted: "除外済み",
+    knowledgeEvictedSubtitle: "このセッションから除外された項目 — 「再注入」で復元できます",
+    knowledgeEvictedEmpty: "除外された項目はまだありません",
+    knowledgeReinjectAction: "再注入",
+    knowledgeEvictAction: "除外",
+    knowledgeEvictConfirmTitle: "この項目を除外しますか？",
+    knowledgeEvictConfirmBody: "本セッションには今後注入されません。次回 fetch で再ヒットした場合のみカウントダウンがリセットされます。",
+    knowledgeBadgeHotLabel: ({ turns, max, hits }: { turns: number; max: number; hits: number }) =>
+      hits > 0 ? `残り ${turns}/${max} ターン · 命中 ${hits}` : `残り ${turns}/${max} ターン`,
+    knowledgeBadgeHotHitsOnly: ({ hits }: { hits: number }) => `命中 ${hits}`,
     knowledgeBadgeTooltipTitle: "ターン予算",
     knowledgeBadgeTooltipHot: ({ turns, max, hits }: { turns: number; max: number; hits: number }) =>
       `残り ${turns}/${max} ターン。このセッションで ${hits} 回参照。命中で +1（上限 ${max}）、不命中で −1、0 になると注入から除外。`,
@@ -1313,7 +1326,7 @@ export const ja: TranslationStructure = {
   sidePanel: {
     files: "ファイル",
     changes: "変更",
-    summary: "概要",
+    knowledge: "ナレッジ",
     preview: "プレビュー",
     code: "コード",
     terminal: "ターミナル",

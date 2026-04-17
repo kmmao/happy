@@ -42,6 +42,12 @@ interface SessionKnowledgeSheetProps {
     sessionId: string;
     maxHeight?: `${number}%` | number;
     initialTab?: SessionKnowledgeTab;
+    /**
+     * When true, renders the tabs + entry list inline (no overlay, no backdrop,
+     * no animated chrome). The caller controls layout. `visible` / `onClose` /
+     * `maxHeight` are ignored in inline mode.
+     */
+    inline?: boolean;
 }
 
 function formatTime(timestamp: number): string {
@@ -56,6 +62,8 @@ interface EntryRowProps {
     activeTab: SessionKnowledgeTab;
     entry: SessionKnowledgeEntry | SessionKnowledgeAccessEntry;
     onPress?: () => void;
+    onEvict?: () => void;
+    onReinject?: () => void;
 }
 
 interface HotBadgeProps {
@@ -115,11 +123,16 @@ const HotBadge = React.memo<HotBadgeProps>(({ entry }) => {
     }
 
     const color = hitCount > 0 ? HOT_BADGE_COLOR_USED : HOT_BADGE_COLOR_FRESH;
-    const budget = turnsRemaining !== undefined && maxTurns !== undefined
-        ? `${turnsRemaining}/${maxTurns}`
-        : null;
-    const hitText = hitCount > 0 ? ` · ${hitCount}×` : "";
-    const label = budget ? `${budget}${hitText}` : `${hitCount}×`;
+    // Use localised "7/14 轮 · 2 次" style labels so users can read the budget
+    // at a glance without having to long-press for the tooltip.
+    const label =
+        turnsRemaining !== undefined && maxTurns !== undefined
+            ? t("session.knowledgeBadgeHotLabel", {
+                turns: turnsRemaining,
+                max: maxTurns,
+                hits: hitCount,
+            })
+            : t("session.knowledgeBadgeHotHitsOnly", { hits: hitCount });
 
     return (
         <Pressable
@@ -142,11 +155,12 @@ const HotBadge = React.memo<HotBadgeProps>(({ entry }) => {
     );
 });
 
-const EntryRow = React.memo<EntryRowProps>(({ activeTab, entry, onPress }) => {
+const EntryRow = React.memo<EntryRowProps>(({ activeTab, entry, onPress, onEvict, onReinject }) => {
     const { theme } = useUnistyles();
     const typeColor = TYPE_COLORS[entry.entryType] ?? theme.colors.textSecondary;
     const statusColor = STATUS_COLORS[entry.status] ?? theme.colors.textSecondary;
     const contentPreview = typeof entry.content === "string" ? entry.content.trim() : "";
+    const showHotBadge = activeTab !== "changes";
 
     return (
         <Pressable
@@ -167,7 +181,7 @@ const EntryRow = React.memo<EntryRowProps>(({ activeTab, entry, onPress }) => {
                         </Text>
                     </View>
                 )}
-                {activeTab === "references" && <HotBadge entry={entry} />}
+                {showHotBadge && <HotBadge entry={entry} />}
                 <Text style={[styles.entryTime, { color: theme.colors.textSecondary }]}>
                     {formatTime(getSessionKnowledgeDisplayTimestamp({ activeTab, entry }))}
                 </Text>
@@ -191,20 +205,63 @@ const EntryRow = React.memo<EntryRowProps>(({ activeTab, entry, onPress }) => {
                     ))}
                 </View>
             )}
-            {onPress && (
-                <View style={styles.sourceRow}>
-                    <Ionicons name="arrow-forward-outline" size={12} color={theme.colors.textSecondary} />
-                    <Text style={[styles.sourceText, { color: theme.colors.textSecondary }]}>
-                        {t("session.knowledgeAccessGoToSource")}
-                    </Text>
-                </View>
-            )}
+            <View style={styles.actionsRow}>
+                {onPress && (
+                    <View style={styles.sourceRow}>
+                        <Ionicons name="arrow-forward-outline" size={12} color={theme.colors.textSecondary} />
+                        <Text style={[styles.sourceText, { color: theme.colors.textSecondary }]}>
+                            {t("session.knowledgeAccessGoToSource")}
+                        </Text>
+                    </View>
+                )}
+                {onEvict && (
+                    <Pressable
+                        onPress={(event) => {
+                            // Stop bubbling so the outer Pressable (navigate to source
+                            // session) doesn't also fire on the same tap. Works on both
+                            // React Native native and Web (SyntheticEvent).
+                            const maybeEvent = event as unknown as { stopPropagation?: () => void };
+                            if (typeof maybeEvent?.stopPropagation === "function") {
+                                maybeEvent.stopPropagation();
+                            }
+                            onEvict();
+                        }}
+                        hitSlop={8}
+                        style={[styles.evictButton, { borderColor: EVICTED_BADGE_COLOR }]}
+                        accessibilityRole="button"
+                    >
+                        <Ionicons name="log-out-outline" size={12} color={EVICTED_BADGE_COLOR} />
+                        <Text style={[styles.evictButtonText, { color: EVICTED_BADGE_COLOR }]}>
+                            {t("session.knowledgeEvictAction")}
+                        </Text>
+                    </Pressable>
+                )}
+                {onReinject && (
+                    <Pressable
+                        onPress={(event) => {
+                            const maybeEvent = event as unknown as { stopPropagation?: () => void };
+                            if (typeof maybeEvent?.stopPropagation === "function") {
+                                maybeEvent.stopPropagation();
+                            }
+                            onReinject();
+                        }}
+                        hitSlop={8}
+                        style={[styles.evictButton, { borderColor: HOT_BADGE_COLOR_FRESH }]}
+                        accessibilityRole="button"
+                    >
+                        <Ionicons name="refresh-outline" size={12} color={HOT_BADGE_COLOR_FRESH} />
+                        <Text style={[styles.evictButtonText, { color: HOT_BADGE_COLOR_FRESH }]}>
+                            {t("session.knowledgeReinjectAction")}
+                        </Text>
+                    </Pressable>
+                )}
+            </View>
         </Pressable>
     );
 });
 
 export const SessionKnowledgeSheet = React.memo<SessionKnowledgeSheetProps>(
-    ({ visible, onClose, projectServerId, sessionId, maxHeight = "84%", initialTab = "changes" }) => {
+    ({ visible, onClose, projectServerId, sessionId, maxHeight = "84%", initialTab = "changes", inline = false }) => {
         const { theme } = useUnistyles();
         const insets = useSafeAreaInsets();
         const router = useRouter();
@@ -214,23 +271,26 @@ export const SessionKnowledgeSheet = React.memo<SessionKnowledgeSheetProps>(
         const [hasLoadedChanges, setHasLoadedChanges] = React.useState(false);
         const [hasLoadedReferences, setHasLoadedReferences] = React.useState(false);
 
-        React.useEffect(() => {
-            if (visible) {
-                setActiveTab(initialTab);
-            }
-        }, [initialTab, visible]);
+        // Inline mode: always-visible, skip overlay chrome + animation state.
+        const effectiveVisible = inline ? true : visible;
 
         React.useEffect(() => {
-            if (!visible) return;
+            if (effectiveVisible) {
+                setActiveTab(initialTab);
+            }
+        }, [initialTab, effectiveVisible]);
+
+        React.useEffect(() => {
+            if (!effectiveVisible) return;
             if (activeTab === "changes") {
                 setHasLoadedChanges(true);
                 return;
             }
             setHasLoadedReferences(true);
-        }, [activeTab, visible]);
+        }, [activeTab, effectiveVisible]);
 
         const loadState = getSessionKnowledgeLoadState({
-            visible,
+            visible: effectiveVisible,
             activeTab,
             hasLoadedChanges,
             hasLoadedReferences,
@@ -241,12 +301,55 @@ export const SessionKnowledgeSheet = React.memo<SessionKnowledgeSheetProps>(
             loadState.shouldLoadChanges ? sessionId : undefined,
         );
 
-        const { accesses, loading: accessesLoading } = useSessionKnowledgeAccesses(
+        const { accesses, loading: accessesLoading, evict, reinject } = useSessionKnowledgeAccesses(
             loadState.shouldLoadReferences ? projectServerId : undefined,
             loadState.shouldLoadReferences ? sessionId : undefined,
         );
 
+        // Three-way split of this session's access rows:
+        //   - hotAccesses: live injection pool (hotStatus=hot, status=active)
+        //   - evictedAccesses: manually kicked out or TTL-zero (hotStatus=evicted,
+        //     status=active) → can be revived with reinject
+        //   - archivedAccesses: globally archived/superseded (status!=active) →
+        //     read-only, cannot be revived at session level
+        const { hotAccesses, evictedAccesses, archivedAccesses } = React.useMemo(() => {
+            const hot: SessionKnowledgeAccessEntry[] = [];
+            const evicted: SessionKnowledgeAccessEntry[] = [];
+            const archived: SessionKnowledgeAccessEntry[] = [];
+            for (const access of accesses) {
+                if (access.status !== "active") {
+                    archived.push(access);
+                } else if (access.hotStatus === "evicted") {
+                    evicted.push(access);
+                } else {
+                    hot.push(access);
+                }
+            }
+            return { hotAccesses: hot, evictedAccesses: evicted, archivedAccesses: archived };
+        }, [accesses]);
+
+        // One-tap evict — no confirmation modal. Restoring from the Evicted
+        // tab with the Re-inject button provides the undo path.
+        const handleEvict = React.useCallback(
+            (entry: SessionKnowledgeAccessEntry) => {
+                void evict(entry.id);
+            },
+            [evict],
+        );
+
+        const handleReinject = React.useCallback(
+            (entry: SessionKnowledgeAccessEntry) => {
+                void reinject(entry.id);
+            },
+            [reinject],
+        );
+
         React.useEffect(() => {
+            if (inline) {
+                // Inline mode: always mounted, no animation needed.
+                setShouldRender(true);
+                return undefined;
+            }
             let anim: Animated.CompositeAnimation;
             if (visible) {
                 setShouldRender(true);
@@ -265,23 +368,143 @@ export const SessionKnowledgeSheet = React.memo<SessionKnowledgeSheetProps>(
                 anim.start(() => setShouldRender(false));
             }
             return () => anim?.stop();
-        }, [visible, opacity]);
+        }, [inline, visible, opacity]);
 
         const handleAccessEntryPress = React.useCallback((entry: SessionKnowledgeAccessEntry) => {
             if (!entry.sessionId) return;
-            onClose();
+            if (!inline) onClose();
             router.push(`/session/${entry.sessionId}` as any);
-        }, [onClose, router]);
+        }, [inline, onClose, router]);
 
-        if (!shouldRender) return null;
+        if (!inline && !shouldRender) return null;
 
         const isChangesTab = activeTab === "changes";
+        const isReferencesTab = activeTab === "references";
+        const isEvictedTab = activeTab === "evicted";
+        const isArchiveTab = activeTab === "archive";
+
+        const activeEntries: Array<SessionKnowledgeEntry | SessionKnowledgeAccessEntry> =
+            isChangesTab ? entries
+                : isReferencesTab ? hotAccesses
+                    : isEvictedTab ? evictedAccesses
+                        : archivedAccesses;
         const loading = isChangesTab ? changesLoading : accessesLoading;
-        const isEmpty = isChangesTab ? entries.length === 0 : accesses.length === 0;
+        const isEmpty = activeEntries.length === 0;
         const headerTitle = isChangesTab
             ? t("session.knowledgeChanges")
-            : t("session.knowledgeTabReferences");
-        const currentCount = isChangesTab ? entries.length : accesses.length;
+            : isEvictedTab
+                ? t("session.knowledgeTabEvicted")
+                : isArchiveTab
+                    ? t("session.knowledgeTabArchive")
+                    : t("session.knowledgeTabReferences");
+        const currentCount = activeEntries.length;
+
+        const body = (
+            <>
+                {!inline && (
+                    <View style={styles.header}>
+                        <Ionicons name="bulb-outline" size={18} color={theme.colors.primary} />
+                        <Text style={[styles.headerTitle, { color: theme.colors.text }]}>
+                            {headerTitle}
+                        </Text>
+                        <View style={[styles.headerCountBadge, { backgroundColor: theme.colors.primary + "20" }]}>
+                            <Text style={[styles.headerCountText, { color: theme.colors.primary }]}>
+                                {currentCount}
+                            </Text>
+                        </View>
+                        <Pressable onPress={onClose} hitSlop={8}>
+                            <Ionicons name="close" size={20} color={theme.colors.textSecondary} />
+                        </Pressable>
+                    </View>
+                )}
+
+                <View style={[styles.tabBar, { borderBottomColor: theme.colors.surfaceHighest }]}>
+                        {([
+                            { key: "changes", label: t("session.knowledgeTabChanges"), count: entries.length, active: isChangesTab },
+                            { key: "references", label: t("session.knowledgeTabReferences"), count: hotAccesses.length, active: isReferencesTab },
+                            { key: "evicted", label: t("session.knowledgeTabEvicted"), count: evictedAccesses.length, active: isEvictedTab },
+                            { key: "archive", label: t("session.knowledgeTabArchive"), count: archivedAccesses.length, active: isArchiveTab },
+                        ] as const).map((tab) => (
+                            <Pressable
+                                key={tab.key}
+                                style={[
+                                    styles.tab,
+                                    tab.active && { borderBottomColor: theme.colors.primary, borderBottomWidth: 2 },
+                                ]}
+                                onPress={() => setActiveTab(tab.key)}
+                            >
+                                <Text style={[
+                                    styles.tabText,
+                                    { color: tab.active ? theme.colors.primary : theme.colors.textSecondary },
+                                ]}>
+                                    {tab.label}
+                                </Text>
+                                <View style={[
+                                    styles.tabBadge,
+                                    { backgroundColor: (tab.active ? theme.colors.primary : theme.colors.textSecondary) + "20" },
+                                ]}>
+                                    <Text style={[
+                                        styles.tabBadgeText,
+                                        { color: tab.active ? theme.colors.primary : theme.colors.textSecondary },
+                                    ]}>
+                                        {tab.count}
+                                    </Text>
+                                </View>
+                            </Pressable>
+                        ))}
+                    </View>
+
+                    <Text style={[styles.subtitle, { color: theme.colors.textSecondary }]}>
+                        {isChangesTab
+                            ? t("session.knowledgeChangesSubtitle")
+                            : isEvictedTab
+                                ? t("session.knowledgeEvictedSubtitle")
+                                : isArchiveTab
+                                    ? t("session.knowledgeArchiveSubtitle")
+                                    : t("session.knowledgeAccessesSubtitle")}
+                    </Text>
+
+                    {loading && isEmpty ? (
+                        <View style={styles.centerContainer}>
+                            <ActivityIndicator size="small" color={theme.colors.primary} />
+                        </View>
+                    ) : isEmpty ? (
+                        <View style={styles.centerContainer}>
+                            <Ionicons name="document-outline" size={32} color={theme.colors.textSecondary} />
+                            <Text style={[styles.emptyText, { color: theme.colors.textSecondary }]}>
+                                {isChangesTab
+                                    ? t("session.knowledgeChangesEmpty")
+                                    : isEvictedTab
+                                        ? t("session.knowledgeEvictedEmpty")
+                                        : isArchiveTab
+                                            ? t("session.knowledgeArchiveEmpty")
+                                            : t("session.knowledgeAccessesEmpty")}
+                            </Text>
+                        </View>
+                    ) : (
+                        <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
+                            {isChangesTab
+                                ? entries.map((entry) => (
+                                    <EntryRow key={entry.id} entry={entry} activeTab={activeTab} />
+                                ))
+                                : (activeEntries as SessionKnowledgeAccessEntry[]).map((entry) => (
+                                    <EntryRow
+                                        key={entry.id}
+                                        entry={entry}
+                                        onPress={entry.sessionId ? () => handleAccessEntryPress(entry) : undefined}
+                                        onEvict={isReferencesTab ? () => handleEvict(entry) : undefined}
+                                        onReinject={isEvictedTab ? () => handleReinject(entry) : undefined}
+                                        activeTab={activeTab}
+                                    />
+                                ))}
+                        </ScrollView>
+                    )}
+            </>
+        );
+
+        if (inline) {
+            return <View style={styles.inlineContainer}>{body}</View>;
+        }
 
         return (
             <Animated.View style={[styles.overlay, { opacity }]}>
@@ -298,109 +521,7 @@ export const SessionKnowledgeSheet = React.memo<SessionKnowledgeSheetProps>(
                         },
                     ]}
                 >
-                    <View style={styles.header}>
-                        <Ionicons name="bulb-outline" size={18} color={theme.colors.primary} />
-                        <Text style={[styles.headerTitle, { color: theme.colors.text }]}>
-                            {headerTitle}
-                        </Text>
-                        <View style={[styles.headerCountBadge, { backgroundColor: theme.colors.primary + "20" }]}>
-                            <Text style={[styles.headerCountText, { color: theme.colors.primary }]}>
-                                {currentCount}
-                            </Text>
-                        </View>
-                        <Pressable onPress={onClose} hitSlop={8}>
-                            <Ionicons name="close" size={20} color={theme.colors.textSecondary} />
-                        </Pressable>
-                    </View>
-
-                    <View style={[styles.tabBar, { borderBottomColor: theme.colors.surfaceHighest }]}>
-                        <Pressable
-                            style={[
-                                styles.tab,
-                                isChangesTab && { borderBottomColor: theme.colors.primary, borderBottomWidth: 2 },
-                            ]}
-                            onPress={() => setActiveTab("changes")}
-                        >
-                            <Text style={[
-                                styles.tabText,
-                                { color: isChangesTab ? theme.colors.primary : theme.colors.textSecondary },
-                            ]}>
-                                {t("session.knowledgeTabChanges")}
-                            </Text>
-                            <View style={[
-                                styles.tabBadge,
-                                { backgroundColor: (isChangesTab ? theme.colors.primary : theme.colors.textSecondary) + "20" },
-                            ]}>
-                                <Text style={[
-                                    styles.tabBadgeText,
-                                    { color: isChangesTab ? theme.colors.primary : theme.colors.textSecondary },
-                                ]}>
-                                    {entries.length}
-                                </Text>
-                            </View>
-                        </Pressable>
-                        <Pressable
-                            style={[
-                                styles.tab,
-                                !isChangesTab && { borderBottomColor: theme.colors.primary, borderBottomWidth: 2 },
-                            ]}
-                            onPress={() => setActiveTab("references")}
-                        >
-                            <Text style={[
-                                styles.tabText,
-                                { color: !isChangesTab ? theme.colors.primary : theme.colors.textSecondary },
-                            ]}>
-                                {t("session.knowledgeTabReferences")}
-                            </Text>
-                            <View style={[
-                                styles.tabBadge,
-                                { backgroundColor: (!isChangesTab ? theme.colors.primary : theme.colors.textSecondary) + "20" },
-                            ]}>
-                                <Text style={[
-                                    styles.tabBadgeText,
-                                    { color: !isChangesTab ? theme.colors.primary : theme.colors.textSecondary },
-                                ]}>
-                                    {accesses.length}
-                                </Text>
-                            </View>
-                        </Pressable>
-                    </View>
-
-                    <Text style={[styles.subtitle, { color: theme.colors.textSecondary }]}>
-                        {isChangesTab
-                            ? t("session.knowledgeChangesSubtitle")
-                            : t("session.knowledgeAccessesSubtitle")}
-                    </Text>
-
-                    {loading && isEmpty ? (
-                        <View style={styles.centerContainer}>
-                            <ActivityIndicator size="small" color={theme.colors.primary} />
-                        </View>
-                    ) : isEmpty ? (
-                        <View style={styles.centerContainer}>
-                            <Ionicons name="document-outline" size={32} color={theme.colors.textSecondary} />
-                            <Text style={[styles.emptyText, { color: theme.colors.textSecondary }]}>
-                                {isChangesTab
-                                    ? t("session.knowledgeChangesEmpty")
-                                    : t("session.knowledgeAccessesEmpty")}
-                            </Text>
-                        </View>
-                    ) : (
-                        <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
-                            {isChangesTab
-                                ? entries.map((entry) => (
-                                    <EntryRow key={entry.id} entry={entry} activeTab={activeTab} />
-                                ))
-                                : accesses.map((entry) => (
-                                    <EntryRow
-                                        key={entry.id}
-                                        entry={entry}
-                                        onPress={entry.sessionId ? () => handleAccessEntryPress(entry) : undefined}
-                                        activeTab={activeTab}
-                                    />
-                                ))}
-                        </ScrollView>
-                    )}
+                    {body}
                 </View>
             </Animated.View>
         );
@@ -408,6 +529,9 @@ export const SessionKnowledgeSheet = React.memo<SessionKnowledgeSheetProps>(
 );
 
 const styles = StyleSheet.create({
+    inlineContainer: {
+        flex: 1,
+    },
     overlay: {
         position: "absolute",
         top: 0,
@@ -587,10 +711,29 @@ const styles = StyleSheet.create({
         flexDirection: "row",
         alignItems: "center",
         gap: 4,
-        marginTop: 2,
     },
     sourceText: {
         ...Typography.default("regular"),
+        fontSize: 10,
+    },
+    actionsRow: {
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "space-between",
+        marginTop: 4,
+        gap: 8,
+    },
+    evictButton: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 4,
+        paddingHorizontal: 8,
+        paddingVertical: 3,
+        borderRadius: 6,
+        borderWidth: 1,
+    },
+    evictButtonText: {
+        ...Typography.default("semiBold"),
         fontSize: 10,
     },
 });

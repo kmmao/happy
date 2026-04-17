@@ -843,6 +843,19 @@ export const ru: TranslationStructure = {
     knowledgeAccessesEmpty: "В этой сессии нет ссылок на знания",
     knowledgeAccessGoToSource: "Перейти к исходной сессии",
     knowledgeBadgeEvicted: "исключено",
+    knowledgeTabArchive: "Архив",
+    knowledgeArchiveSubtitle: "Записи сессии, заархивированные или заменённые на глобальном уровне",
+    knowledgeArchiveEmpty: "В сессии нет ссылок на заархивированные записи",
+    knowledgeTabEvicted: "Исключённые",
+    knowledgeEvictedSubtitle: "Записи, исключённые из сессии — нажмите «Вернуть», чтобы восстановить",
+    knowledgeEvictedEmpty: "Пока нет исключённых записей",
+    knowledgeReinjectAction: "Вернуть",
+    knowledgeEvictAction: "Исключить",
+    knowledgeEvictConfirmTitle: "Исключить эту запись?",
+    knowledgeEvictConfirmBody: "Больше не будет инжектироваться в этой сессии. Счётчик сбрасывается только при повторном попадании через fetch.",
+    knowledgeBadgeHotLabel: ({ turns, max, hits }: { turns: number; max: number; hits: number }) =>
+      hits > 0 ? `осталось ${turns}/${max} · попад. ${hits}` : `осталось ${turns}/${max}`,
+    knowledgeBadgeHotHitsOnly: ({ hits }: { hits: number }) => `попад. ${hits}`,
     knowledgeBadgeTooltipTitle: "Бюджет ходов",
     knowledgeBadgeTooltipHot: ({ turns, max, hits }: { turns: number; max: number; hits: number }) =>
       `Осталось ${turns}/${max} ходов. В сессии использовано ${hits} раз. Попадание +1 (предел ${max}), промах −1, 0 → исключение из инъекции.`,
@@ -1227,7 +1240,7 @@ export const ru: TranslationStructure = {
   sidePanel: {
     files: "Файлы",
     changes: "Изменения",
-    summary: "Сводка",
+    knowledge: "Знания",
     preview: "Просмотр",
     code: "Код",
     terminal: "Терминал",

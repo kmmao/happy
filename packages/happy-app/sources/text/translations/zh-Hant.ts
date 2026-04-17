@@ -602,6 +602,19 @@ export const zhHant: TranslationStructure = {
     knowledgeAccessesEmpty: "本會話暫無引用的知識",
     knowledgeAccessGoToSource: "跳轉到來源會話",
     knowledgeBadgeEvicted: "已遷出",
+    knowledgeTabArchive: "歸檔",
+    knowledgeArchiveSubtitle: "本會話引用過、但已被全域歸檔或取代的條目",
+    knowledgeArchiveEmpty: "本會話沒有引用過已歸檔的條目",
+    knowledgeTabEvicted: "已遷出",
+    knowledgeEvictedSubtitle: "從本會話遷出的條目 — 點擊「重新注入」可恢復",
+    knowledgeEvictedEmpty: "暫無遷出條目",
+    knowledgeReinjectAction: "重新注入",
+    knowledgeEvictAction: "遷出",
+    knowledgeEvictConfirmTitle: "確定遷出此條目？",
+    knowledgeEvictConfirmBody: "此後本會話將不再注入此條目。下次 fetch 重新命中才會重置倒數。",
+    knowledgeBadgeHotLabel: ({ turns, max, hits }: { turns: number; max: number; hits: number }) =>
+      hits > 0 ? `剩 ${turns}/${max} 輪 · 命中 ${hits}` : `剩 ${turns}/${max} 輪`,
+    knowledgeBadgeHotHitsOnly: ({ hits }: { hits: number }) => `命中 ${hits}`,
     knowledgeBadgeTooltipTitle: "回合預算",
     knowledgeBadgeTooltipHot: ({ turns, max, hits }: { turns: number; max: number; hits: number }) =>
       `剩餘 ${turns}/${max} 回合，本會話共引用 ${hits} 次。命中 +1（上限 ${max}），未命中 −1，歸零即遷出注入。`,
@@ -1174,7 +1187,7 @@ export const zhHant: TranslationStructure = {
   sidePanel: {
     files: "檔案",
     changes: "變更",
-    summary: "摘要",
+    knowledge: "知識庫",
     preview: "預覽",
     code: "程式碼",
     terminal: "終端",

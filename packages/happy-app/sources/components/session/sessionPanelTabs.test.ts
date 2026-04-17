@@ -7,10 +7,10 @@ import {
 } from "./sessionPanelTabs";
 
 describe("sessionPanelTabs", () => {
-    it("returns summary first and changes second", () => {
+    it("returns knowledge first and changes second", () => {
         const tabs = getSessionPanelTabs(true);
 
-        expect(tabs[0]).toBe("summary");
+        expect(tabs[0]).toBe("knowledge");
         expect(tabs[1]).toBe("changes");
     });
 
@@ -21,7 +21,7 @@ describe("sessionPanelTabs", () => {
 
     it("returns shared label keys for each tab", () => {
         expect(getSessionPanelTabDefinitions(true)).toEqual([
-            { key: "summary", labelKey: "sidePanel.summary" },
+            { key: "knowledge", labelKey: "sidePanel.knowledge" },
             { key: "changes", labelKey: "sidePanel.changes" },
             { key: "files", labelKey: "sidePanel.files" },
             { key: "code", labelKey: "sidePanel.code" },
@@ -33,12 +33,12 @@ describe("sessionPanelTabs", () => {
     it("falls back to the first available tab when current tab is unavailable", () => {
         expect(
             resolveSessionPanelActiveTab("preview", getSessionPanelTabs(false)),
-        ).toBe("summary");
+        ).toBe("knowledge");
     });
 
     it("keeps current tab when still available", () => {
         expect(
-            resolveSessionPanelActiveTab("summary", getSessionPanelTabs(true)),
-        ).toBe("summary");
+            resolveSessionPanelActiveTab("knowledge", getSessionPanelTabs(true)),
+        ).toBe("knowledge");
     });
 });

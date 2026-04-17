@@ -631,6 +631,19 @@ export const ca: TranslationStructure = {
     knowledgeAccessesEmpty: "Sense referències de coneixement en aquesta sessió",
     knowledgeAccessGoToSource: "Anar a la sessió d'origen",
     knowledgeBadgeEvicted: "exclosa",
+    knowledgeTabArchive: "Arxiu",
+    knowledgeArchiveSubtitle: "Entrades referenciades en aquesta sessió i arxivades o substituïdes globalment",
+    knowledgeArchiveEmpty: "No hi ha entrades arxivades referenciades en aquesta sessió",
+    knowledgeTabEvicted: "Excloses",
+    knowledgeEvictedSubtitle: "Entrades excloses d'aquesta sessió — prem «Reinjectar» per recuperar-les",
+    knowledgeEvictedEmpty: "Encara no hi ha entrades excloses",
+    knowledgeReinjectAction: "Reinjectar",
+    knowledgeEvictAction: "Excloure",
+    knowledgeEvictConfirmTitle: "Excloure aquesta entrada?",
+    knowledgeEvictConfirmBody: "Deixarà d'injectar-se en aquesta sessió. El compte enrere només es reinicia si torna a aparèixer en un fetch posterior.",
+    knowledgeBadgeHotLabel: ({ turns, max, hits }: { turns: number; max: number; hits: number }) =>
+      hits > 0 ? `${turns}/${max} torns · ${hits} encert${hits === 1 ? "" : "s"}` : `${turns}/${max} torns`,
+    knowledgeBadgeHotHitsOnly: ({ hits }: { hits: number }) => `${hits} encert${hits === 1 ? "" : "s"}`,
     knowledgeBadgeTooltipTitle: "Pressupost de torns",
     knowledgeBadgeTooltipHot: ({ turns, max, hits }: { turns: number; max: number; hits: number }) =>
       `Queden ${turns}/${max} torns. Referenciada ${hits}× en aquesta sessió. Encert +1 (topall ${max}), fallada −1, en arribar a 0 s'exclou de la injecció.`,
@@ -1216,7 +1229,7 @@ export const ca: TranslationStructure = {
   sidePanel: {
     files: "Fitxers",
     changes: "Canvis",
-    summary: "Resum",
+    knowledge: "Coneixement",
     preview: "Previsualització",
     code: "Codi",
     terminal: "Terminal",

@@ -629,6 +629,19 @@ export const pt: TranslationStructure = {
     knowledgeAccessesEmpty: "Sem referências de conhecimento nesta sessão",
     knowledgeAccessGoToSource: "Ir para a sessão de origem",
     knowledgeBadgeEvicted: "removida",
+    knowledgeTabArchive: "Arquivo",
+    knowledgeArchiveSubtitle: "Entradas referenciadas nesta sessão e arquivadas ou substituídas globalmente",
+    knowledgeArchiveEmpty: "Nenhuma entrada arquivada referenciada nesta sessão",
+    knowledgeTabEvicted: "Removidas",
+    knowledgeEvictedSubtitle: "Entradas removidas desta sessão — toque em «Reinjetar» para restaurá-las",
+    knowledgeEvictedEmpty: "Ainda não há entradas removidas",
+    knowledgeReinjectAction: "Reinjetar",
+    knowledgeEvictAction: "Remover",
+    knowledgeEvictConfirmTitle: "Remover esta entrada?",
+    knowledgeEvictConfirmBody: "Ela deixará de ser injetada nesta sessão. A contagem regressiva só é reiniciada se reaparecer em um fetch futuro.",
+    knowledgeBadgeHotLabel: ({ turns, max, hits }: { turns: number; max: number; hits: number }) =>
+      hits > 0 ? `${turns}/${max} turnos · ${hits} acerto${hits === 1 ? "" : "s"}` : `${turns}/${max} turnos`,
+    knowledgeBadgeHotHitsOnly: ({ hits }: { hits: number }) => `${hits} acerto${hits === 1 ? "" : "s"}`,
     knowledgeBadgeTooltipTitle: "Orçamento de turnos",
     knowledgeBadgeTooltipHot: ({ turns, max, hits }: { turns: number; max: number; hits: number }) =>
       `Restam ${turns}/${max} turnos. Referenciada ${hits}× nesta sessão. Acerto +1 (limite ${max}), falha −1, ao chegar a 0 é removida da injeção.`,
@@ -1214,7 +1227,7 @@ export const pt: TranslationStructure = {
   sidePanel: {
     files: "Arquivos",
     changes: "Alterações",
-    summary: "Resumo",
+    knowledge: "Conhecimento",
     preview: "Pré-visualização",
     code: "Código",
     terminal: "Terminal",

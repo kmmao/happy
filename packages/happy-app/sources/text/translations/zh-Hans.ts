@@ -602,6 +602,19 @@ export const zhHans: TranslationStructure = {
     knowledgeAccessesEmpty: "本会话暂无引用的知识",
     knowledgeAccessGoToSource: "跳转到来源会话",
     knowledgeBadgeEvicted: "已迁出",
+    knowledgeTabArchive: "归档",
+    knowledgeArchiveSubtitle: "本会话引用过，但已被全局归档或取代的条目",
+    knowledgeArchiveEmpty: "本会话没有引用过已归档的条目",
+    knowledgeTabEvicted: "已迁出",
+    knowledgeEvictedSubtitle: "从本会话迁出的条目 — 点击「重新注入」可恢复",
+    knowledgeEvictedEmpty: "暂无迁出条目",
+    knowledgeReinjectAction: "重新注入",
+    knowledgeEvictAction: "迁出",
+    knowledgeEvictConfirmTitle: "确定迁出此条目？",
+    knowledgeEvictConfirmBody: "此后本会话将不再注入该条目。下次 fetch 重新命中才会重置倒计时。",
+    knowledgeBadgeHotLabel: ({ turns, max, hits }: { turns: number; max: number; hits: number }) =>
+      hits > 0 ? `剩 ${turns}/${max} 轮 · 命中 ${hits}` : `剩 ${turns}/${max} 轮`,
+    knowledgeBadgeHotHitsOnly: ({ hits }: { hits: number }) => `命中 ${hits}`,
     knowledgeBadgeTooltipTitle: "回合预算",
     knowledgeBadgeTooltipHot: ({ turns, max, hits }: { turns: number; max: number; hits: number }) =>
       `剩余 ${turns}/${max} 回合，本会话共引用 ${hits} 次。命中 +1（上限 ${max}），未命中 −1，归零即迁出注入。`,
@@ -1174,7 +1187,7 @@ export const zhHans: TranslationStructure = {
   sidePanel: {
     files: "文件",
     changes: "变更",
-    summary: "摘要",
+    knowledge: "知识库",
     preview: "预览",
     code: "代码",
     terminal: "终端",

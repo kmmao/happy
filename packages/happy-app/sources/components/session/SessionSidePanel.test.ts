@@ -6,7 +6,7 @@ describe("getSessionPanelTabs", () => {
     it("places summary first and changes second", () => {
         const tabs = getSessionPanelTabs(true);
 
-        expect(tabs[0]).toBe("summary");
+        expect(tabs[0]).toBe("knowledge");
         expect(tabs[1]).toBe("changes");
     });
 

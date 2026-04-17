@@ -13,6 +13,8 @@ import { refineKnowledgeEntry } from "@/modules/knowledgeRefiner";
 import { addRelations, type KnowledgeRelationType } from "@/modules/knowledgeRelation";
 import { inboxCreate } from "@/modules/inboxCreate";
 import {
+    getEvictedKnowledgeIds,
+    getInitialTurnBudget,
     getSessionHotStats,
     getSessionKnowledgeAccesses,
     recordKnowledgeAccess,
@@ -697,16 +699,29 @@ export function knowledgeRoutes(app: Fastify) {
             // Determine how many entries to fetch
             const entryLimit = effectiveMode === "full" ? 20 : 5;
 
+            // Mirror the socket handler's exclusion policy so REST clients also
+            // skip per-session evicted entries (manual or TTL-driven).
+            const evictedIds = sessionId
+                ? await getEvictedKnowledgeIds(sessionId)
+                : new Set<string>();
+            const evictedFilter =
+                evictedIds.size > 0 ? { id: { notIn: [...evictedIds] } } : {};
+
             let entries;
             if (contextHints && contextHints.length > 0) {
                 // Try semantic search first, fall back to keyword matching
-                const semanticEntries = await trySemanticInjection(id, contextHints, entryLimit);
+                const semanticEntries = await trySemanticInjection(
+                    id,
+                    contextHints,
+                    entryLimit,
+                    evictedIds,
+                );
                 if (semanticEntries) {
                     entries = semanticEntries;
                 } else {
                     // Keyword-based relevance search (fallback)
                     const allActive = await db.projectKnowledge.findMany({
-                        where: { projectId: id, status: "active" },
+                        where: { projectId: id, status: "active", ...evictedFilter },
                         orderBy: [{ pinned: "desc" }, { createdAt: "desc" }],
                         take: 100,
                     });
@@ -723,7 +738,7 @@ export function knowledgeRoutes(app: Fastify) {
                 }
             } else {
                 entries = await db.projectKnowledge.findMany({
-                    where: { projectId: id, status: "active" },
+                    where: { projectId: id, status: "active", ...evictedFilter },
                     orderBy: [{ pinned: "desc" }, { createdAt: "desc" }],
                     take: entryLimit,
                 });
@@ -752,11 +767,12 @@ export function knowledgeRoutes(app: Fastify) {
             // Fetch action items: warning/decision + high-confidence not recently accessed
             const fourteenDaysAgo = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000);
             const mainEntryIds = entries.map((e) => e.id);
+            const excludedIds = [...new Set([...mainEntryIds, ...evictedIds])];
             const actionItems = await db.projectKnowledge.findMany({
                 where: {
                     projectId: id,
                     status: "active",
-                    ...(mainEntryIds.length > 0 ? { id: { notIn: mainEntryIds } } : {}),
+                    ...(excludedIds.length > 0 ? { id: { notIn: excludedIds } } : {}),
                     OR: [
                         { entryType: { in: ["warning", "decision"] } },
                         {
@@ -894,6 +910,103 @@ export function knowledgeRoutes(app: Fastify) {
         },
     );
 
+    // ─── Manual re-injection: user-driven revival of an evicted entry ───
+    // Resets the KnowledgeAccess row back to hot with a fresh turn budget so
+    // the next fetch-knowledge call will include it again. The budget is seeded
+    // from the underlying ProjectKnowledge.confidence so high-confidence entries
+    // get their full 7-turn allowance.
+    app.post(
+        "/v1/projects/:id/knowledge/accesses/reinject",
+        {
+            preHandler: app.authenticate,
+            schema: {
+                params: z.object({ id: z.string() }),
+                body: z.object({
+                    sessionId: z.string().min(1),
+                    knowledgeId: z.string().min(1),
+                }),
+            },
+        },
+        async (request, reply) => {
+            const userId = request.userId;
+            const { id } = request.params;
+            const { sessionId, knowledgeId } = request.body;
+
+            const project = await db.project.findFirst({
+                where: { id, accountId: userId },
+                select: { id: true },
+            });
+            if (!project) {
+                return reply.code(404).send({ error: "Project not found" });
+            }
+
+            const knowledge = await db.projectKnowledge.findFirst({
+                where: { id: knowledgeId, projectId: id },
+                select: { confidence: true },
+            });
+            if (!knowledge) {
+                return reply.code(404).send({ error: "Knowledge entry not found" });
+            }
+
+            const { initialTurns } = getInitialTurnBudget(knowledge.confidence);
+            const updated = await db.knowledgeAccess.updateMany({
+                where: { sessionId, knowledgeId, projectId: id },
+                data: {
+                    hotStatus: "hot",
+                    turnsRemaining: initialTurns,
+                    at: new Date(),
+                },
+            });
+
+            if (updated.count === 0) {
+                return reply.code(404).send({ error: "Access row not found" });
+            }
+
+            return reply.send({ reinjected: true });
+        },
+    );
+
+    // ─── Manual eviction: user-driven migrate-out of a knowledge entry ───
+    // Sets hotStatus=evicted on the matching KnowledgeAccess row so the server
+    // stops injecting it into future fetch-knowledge responses for this session.
+    app.post(
+        "/v1/projects/:id/knowledge/accesses/evict",
+        {
+            preHandler: app.authenticate,
+            schema: {
+                params: z.object({ id: z.string() }),
+                body: z.object({
+                    sessionId: z.string().min(1),
+                    knowledgeId: z.string().min(1),
+                }),
+            },
+        },
+        async (request, reply) => {
+            const userId = request.userId;
+            const { id } = request.params;
+            const { sessionId, knowledgeId } = request.body;
+
+            const project = await db.project.findFirst({
+                where: { id, accountId: userId },
+                select: { id: true },
+            });
+            if (!project) {
+                return reply.code(404).send({ error: "Project not found" });
+            }
+
+            const updated = await db.knowledgeAccess.updateMany({
+                where: { sessionId, knowledgeId, projectId: id },
+                data: { hotStatus: "evicted", turnsRemaining: 0 },
+            });
+
+            if (updated.count === 0) {
+                return reply.code(404).send({ error: "Access row not found" });
+            }
+
+            return reply.send({ evicted: true });
+        },
+    );
+
     // ─── Session-scoped hot-set stats (Injected / Referenced / Hot / Evicted) ───
     app.get(
         "/v1/projects/:id/knowledge/hot-stats",
@@ -931,6 +1044,7 @@ async function trySemanticInjection(
     projectId: string,
     contextHints: string[],
     limit: number,
+    evictedIds: Set<string> = new Set(),
 ): Promise<Awaited<ReturnType<typeof db.projectKnowledge.findMany>> | null> {
     try {
         const queryText = truncateForEmbedding(contextHints.join(" "));
@@ -940,8 +1054,10 @@ async function trySemanticInjection(
         const similar = await findSimilarByEmbedding(projectId, queryEmbedding, limit);
         if (similar.length === 0) return null;
 
-        // Fetch full entries for the matched IDs
-        const ids = similar.map((s) => s.id);
+        // Drop evicted ids before fetching full rows.
+        const ids = similar.map((s) => s.id).filter((id) => !evictedIds.has(id));
+        if (ids.length === 0) return null;
+
         const entries = await db.projectKnowledge.findMany({
             where: { id: { in: ids }, status: "active" },
             orderBy: [{ pinned: "desc" }, { createdAt: "desc" }],

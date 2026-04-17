@@ -633,6 +633,19 @@ export const es: TranslationStructure = {
     knowledgeAccessesEmpty: "Sin referencias de conocimiento en esta sesión",
     knowledgeAccessGoToSource: "Ir a la sesión de origen",
     knowledgeBadgeEvicted: "excluida",
+    knowledgeTabArchive: "Archivo",
+    knowledgeArchiveSubtitle: "Entradas referenciadas en esta sesión y archivadas o reemplazadas globalmente",
+    knowledgeArchiveEmpty: "No hay entradas archivadas referenciadas en esta sesión",
+    knowledgeTabEvicted: "Excluidas",
+    knowledgeEvictedSubtitle: "Entradas excluidas de esta sesión — pulsa «Reinyectar» para recuperarlas",
+    knowledgeEvictedEmpty: "No hay entradas excluidas",
+    knowledgeReinjectAction: "Reinyectar",
+    knowledgeEvictAction: "Excluir",
+    knowledgeEvictConfirmTitle: "¿Excluir esta entrada?",
+    knowledgeEvictConfirmBody: "Dejará de inyectarse en esta sesión. La cuenta atrás sólo se reinicia si vuelve a aparecer en un fetch futuro.",
+    knowledgeBadgeHotLabel: ({ turns, max, hits }: { turns: number; max: number; hits: number }) =>
+      hits > 0 ? `${turns}/${max} turnos · ${hits} acierto${hits === 1 ? "" : "s"}` : `${turns}/${max} turnos`,
+    knowledgeBadgeHotHitsOnly: ({ hits }: { hits: number }) => `${hits} acierto${hits === 1 ? "" : "s"}`,
     knowledgeBadgeTooltipTitle: "Presupuesto de turnos",
     knowledgeBadgeTooltipHot: ({ turns, max, hits }: { turns: number; max: number; hits: number }) =>
       `Quedan ${turns}/${max} turnos. Referenciada ${hits}× en esta sesión. Acierto +1 (tope ${max}), fallo −1, al llegar a 0 se excluye de la inyección.`,
@@ -1217,7 +1230,7 @@ export const es: TranslationStructure = {
   sidePanel: {
     files: "Archivos",
     changes: "Cambios",
-    summary: "Resumen",
+    knowledge: "Conocimiento",
     preview: "Vista previa",
     code: "Código",
     terminal: "Terminal",

@@ -11,7 +11,7 @@ export function getSessionKnowledgeDisplayTimestamp({
     activeTab,
     entry,
 }: SessionKnowledgeDisplayTimestampInput): number {
-    if (activeTab === "references" && "accessedAt" in entry) {
+    if (activeTab !== "changes" && "accessedAt" in entry) {
         return entry.accessedAt;
     }
     return entry.createdAt;

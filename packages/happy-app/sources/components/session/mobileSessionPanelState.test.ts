@@ -29,7 +29,7 @@ describe("mobileSessionPanelState", () => {
 
     it("uses the shared tab definition for mobile ordering", () => {
         expect(getSessionPanelTabs(true)).toEqual([
-            "summary",
+            "knowledge",
             "changes",
             "files",
             "code",
@@ -40,7 +40,7 @@ describe("mobileSessionPanelState", () => {
 
     it("uses the shared preview gating for mobile", () => {
         expect(getSessionPanelTabs(false)).toEqual([
-            "summary",
+            "knowledge",
             "changes",
             "files",
             "code",

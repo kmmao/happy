@@ -13,9 +13,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useUnistyles } from "react-native-unistyles";
 import { t } from "@/text";
 import { GitBrowseTab } from "@/components/git/GitBrowseTab";
-import { SessionKnowledgeSheet } from "@/components/knowledge/SessionKnowledgeSheet";
-import type { SessionKnowledgeTab } from "@/components/knowledge/sessionKnowledgeLoadState";
-import { useProjectForSession, useSession, useSetting } from "@/sync/storage";
+import { useSession, useSetting } from "@/sync/storage";
 import { SidePanelGitPanel } from "./SidePanelGitPanel";
 import { SidePanelSummaryTab } from "./SidePanelSummaryTab";
 import { SidePanelTerminalTab } from "./SidePanelTerminalTab";
@@ -47,12 +45,9 @@ export const MobileSessionPanelSheet = React.memo<MobileSessionPanelSheetProps>(
         const { theme } = useUnistyles();
         const insets = useSafeAreaInsets();
         const enablePreviewTab = useSetting("enablePreviewTab");
-        const [activeTab, setActiveTab] = React.useState<SessionPanelTab>("summary");
+        const [activeTab, setActiveTab] = React.useState<SessionPanelTab>("knowledge");
         const [previewingFile, setPreviewingFile] = React.useState<string | null>(null);
-        const [showKnowledgeSheet, setShowKnowledgeSheet] = React.useState(false);
-        const [knowledgeSheetInitialTab, setKnowledgeSheetInitialTab] = React.useState<SessionKnowledgeTab>("changes");
         const inputContext = React.useContext(InputContext);
-        const project = useProjectForSession(sessionId);
         const session = useSession(sessionId);
         const sessionTitle = session ? getSessionName(session) : "Panel";
         const tabDefinitions = React.useMemo(() => getSessionPanelTabDefinitions(enablePreviewTab), [enablePreviewTab]);
@@ -79,11 +74,6 @@ export const MobileSessionPanelSheet = React.memo<MobileSessionPanelSheetProps>(
             setPreviewingFile(fullPath);
         }, []);
 
-        const handleOpenKnowledge = React.useCallback((tab: SessionKnowledgeTab) => {
-            setKnowledgeSheetInitialTab(tab);
-            setShowKnowledgeSheet(true);
-        }, []);
-
         const renderContent = () => {
             if (previewingFile) {
                 return (
@@ -108,13 +98,8 @@ export const MobileSessionPanelSheet = React.memo<MobileSessionPanelSheetProps>(
                     );
                 case "changes":
                     return <SidePanelGitPanel sessionId={sessionId} />;
-                case "summary":
-                    return (
-                        <SidePanelSummaryTab
-                            sessionId={sessionId}
-                            onOpenKnowledge={handleOpenKnowledge}
-                        />
-                    );
+                case "knowledge":
+                    return <SidePanelSummaryTab sessionId={sessionId} />;
                 case "code":
                     return <SidePanelCodeTab sessionId={sessionId} />;
                 case "preview":
@@ -252,13 +237,6 @@ export const MobileSessionPanelSheet = React.memo<MobileSessionPanelSheetProps>(
                         </View>
                     </View>
                 </Modal>
-                <SessionKnowledgeSheet
-                    visible={showKnowledgeSheet}
-                    onClose={() => setShowKnowledgeSheet(false)}
-                    projectServerId={project?.serverId ?? undefined}
-                    sessionId={sessionId}
-                    initialTab={knowledgeSheetInitialTab}
-                />
             </>
         );
     },

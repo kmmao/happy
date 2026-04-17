@@ -631,6 +631,20 @@ export const en: TranslationStructure = {
     knowledgeAccessesEmpty: "No knowledge referenced in this session",
     knowledgeAccessGoToSource: "Go to source session",
     knowledgeBadgeEvicted: "evicted",
+    knowledgeTabArchive: "Archive",
+    knowledgeArchiveSubtitle: "Entries from this session that are globally archived or superseded",
+    knowledgeArchiveEmpty: "No archived entries referenced this session",
+    knowledgeTabEvicted: "Evicted",
+    knowledgeEvictedSubtitle: "Entries migrated out of this session — tap Re-inject to revive",
+    knowledgeEvictedEmpty: "No entries migrated out yet",
+    knowledgeReinjectAction: "Re-inject",
+    knowledgeEvictAction: "Evict",
+    knowledgeEvictConfirmTitle: "Evict this entry?",
+    knowledgeEvictConfirmBody:
+      "It will stop being injected in this session. The countdown resets only if it re-enters via a future fetch.",
+    knowledgeBadgeHotLabel: ({ turns, max, hits }: { turns: number; max: number; hits: number }) =>
+      hits > 0 ? `${turns}/${max} turns · ${hits} hit` : `${turns}/${max} turns`,
+    knowledgeBadgeHotHitsOnly: ({ hits }: { hits: number }) => `${hits} hit`,
     knowledgeBadgeTooltipTitle: "Turn budget",
     knowledgeBadgeTooltipHot: ({ turns, max, hits }: { turns: number; max: number; hits: number }) =>
       `${turns}/${max} turns remaining. Referenced ${hits}× this session. Each turn: hit → +1 (cap ${max}), miss → −1, reaches 0 → evicted from injection.`,
@@ -1213,7 +1227,7 @@ export const en: TranslationStructure = {
   sidePanel: {
     files: "Files",
     changes: "Changes",
-    summary: "Summary",
+    knowledge: "Knowledge",
     preview: "Preview",
     code: "Code",
     terminal: "Terminal",

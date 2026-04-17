@@ -3,7 +3,7 @@ export type SessionPanelTab =
     | "changes"
     | "code"
     | "preview"
-    | "summary"
+    | "knowledge"
     | "terminal";
 
 export type SessionPanelTabTranslationKey =
@@ -11,7 +11,7 @@ export type SessionPanelTabTranslationKey =
     | "sidePanel.changes"
     | "sidePanel.code"
     | "sidePanel.preview"
-    | "sidePanel.summary"
+    | "sidePanel.knowledge"
     | "sidePanel.terminal";
 
 export interface SessionPanelTabDefinition {
@@ -29,7 +29,7 @@ export function getSessionPanelTabDefinitions(
     enablePreviewTab: boolean,
 ): SessionPanelTabDefinition[] {
     return [
-        { key: "summary", labelKey: "sidePanel.summary" },
+        { key: "knowledge", labelKey: "sidePanel.knowledge" },
         { key: "changes", labelKey: "sidePanel.changes" },
         { key: "files", labelKey: "sidePanel.files" },
         { key: "code", labelKey: "sidePanel.code" },
@@ -44,5 +44,5 @@ export function resolveSessionPanelActiveTab(
     currentTab: SessionPanelTab,
     tabs: readonly SessionPanelTab[],
 ): SessionPanelTab {
-    return tabs.includes(currentTab) ? currentTab : (tabs[0] ?? "summary");
+    return tabs.includes(currentTab) ? currentTab : (tabs[0] ?? "knowledge");
 }

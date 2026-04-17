@@ -641,6 +641,19 @@ export const pl: TranslationStructure = {
     knowledgeAccessesEmpty: "Brak odniesień do wiedzy w tej sesji",
     knowledgeAccessGoToSource: "Przejdź do sesji źródłowej",
     knowledgeBadgeEvicted: "usunięta",
+    knowledgeTabArchive: "Archiwum",
+    knowledgeArchiveSubtitle: "Wpisy z tej sesji, które zostały zarchiwizowane lub zastąpione globalnie",
+    knowledgeArchiveEmpty: "Brak zarchiwizowanych wpisów w tej sesji",
+    knowledgeTabEvicted: "Usunięte",
+    knowledgeEvictedSubtitle: "Wpisy usunięte z tej sesji — naciśnij «Przywróć», aby je odzyskać",
+    knowledgeEvictedEmpty: "Brak usuniętych wpisów",
+    knowledgeReinjectAction: "Przywróć",
+    knowledgeEvictAction: "Usuń",
+    knowledgeEvictConfirmTitle: "Usunąć ten wpis?",
+    knowledgeEvictConfirmBody: "Nie będzie już wstrzykiwany w tej sesji. Odliczanie zresetuje się tylko wtedy, gdy wpis pojawi się ponownie w przyszłym fetch.",
+    knowledgeBadgeHotLabel: ({ turns, max, hits }: { turns: number; max: number; hits: number }) =>
+      hits > 0 ? `${turns}/${max} tur · traf. ${hits}` : `${turns}/${max} tur`,
+    knowledgeBadgeHotHitsOnly: ({ hits }: { hits: number }) => `traf. ${hits}`,
     knowledgeBadgeTooltipTitle: "Budżet tur",
     knowledgeBadgeTooltipHot: ({ turns, max, hits }: { turns: number; max: number; hits: number }) =>
       `Pozostało ${turns}/${max} tur. Przywołana ${hits}× w tej sesji. Trafienie +1 (limit ${max}), chybienie −1, po dojściu do 0 zostaje usunięta z iniekcji.`,
@@ -1227,7 +1240,7 @@ export const pl: TranslationStructure = {
   sidePanel: {
     files: "Pliki",
     changes: "Zmiany",
-    summary: "Podsumowanie",
+    knowledge: "Wiedza",
     preview: "Podgląd",
     code: "Kod",
     terminal: "Terminal",

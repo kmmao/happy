@@ -119,5 +119,98 @@ export function useSessionKnowledgeAccesses(
         void refresh();
     }, [accessRevision, refresh]);
 
-    return { accesses, loading, refresh };
+    /**
+     * Manually evict a knowledge entry from this session's hot set.
+     * Optimistically marks the local row as evicted for instant feedback, then
+     * calls the server to persist. On failure refresh() rolls state back from
+     * authoritative data.
+     */
+    const evict = React.useCallback(
+        async (knowledgeId: string): Promise<boolean> => {
+            if (!projectServerId || !sessionId) return false;
+            const credentials = await TokenStorage.getCredentials();
+            if (!credentials) return false;
+
+            setAccesses((prev) =>
+                prev.map((entry) =>
+                    entry.id === knowledgeId
+                        ? { ...entry, hotStatus: "evicted", turnsRemaining: 0 }
+                        : entry,
+                ),
+            );
+
+            try {
+                const response = await fetch(
+                    `${getServerUrl()}/v1/projects/${projectServerId}/knowledge/accesses/evict`,
+                    {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json",
+                            Authorization: `Bearer ${credentials.token}`,
+                        },
+                        body: JSON.stringify({ sessionId, knowledgeId }),
+                    },
+                );
+                if (!response.ok) {
+                    await refresh();
+                    return false;
+                }
+                return true;
+            } catch {
+                await refresh();
+                return false;
+            }
+        },
+        [projectServerId, sessionId, refresh],
+    );
+
+    /**
+     * Revive a previously-evicted entry: flip hotStatus back to "hot" and
+     * reseed turnsRemaining from confidence. Optimistically updates local
+     * state; on server failure refresh() pulls authoritative data back.
+     */
+    const reinject = React.useCallback(
+        async (knowledgeId: string): Promise<boolean> => {
+            if (!projectServerId || !sessionId) return false;
+            const credentials = await TokenStorage.getCredentials();
+            if (!credentials) return false;
+
+            setAccesses((prev) =>
+                prev.map((entry) =>
+                    entry.id === knowledgeId
+                        ? {
+                            ...entry,
+                            hotStatus: "hot",
+                            turnsRemaining: entry.initialTurns ?? entry.turnsRemaining,
+                        }
+                        : entry,
+                ),
+            );
+
+            try {
+                const response = await fetch(
+                    `${getServerUrl()}/v1/projects/${projectServerId}/knowledge/accesses/reinject`,
+                    {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json",
+                            Authorization: `Bearer ${credentials.token}`,
+                        },
+                        body: JSON.stringify({ sessionId, knowledgeId }),
+                    },
+                );
+                if (!response.ok) {
+                    await refresh();
+                    return false;
+                }
+                return true;
+            } catch {
+                await refresh();
+                return false;
+            }
+        },
+        [projectServerId, sessionId, refresh],
+    );
+
+    return { accesses, loading, refresh, evict, reinject };
 }
