@@ -646,6 +646,7 @@ export const pt: TranslationStructure = {
     progressAgentTurns: ({ n }: { n: number }) => `${n} turnos do agente`,
     progressToolCalls: ({ n }: { n: number }) => `${n} chamadas de ferramentas`,
     progressFilesTitle: ({ n }: { n: number }) => `Arquivos modificados (${n})`,
+    progressListFilesTitle: ({ n }: { n: number }) => `Arquivos nesta lista (${n})`,
     progressCommandsTitle: ({ n }: { n: number }) => `Comandos executados (${n})`,
     progressShowAll: ({ n }: { n: number }) => `Mostrar mais ${n}`,
     progressCollapse: "Recolher",

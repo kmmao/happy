@@ -24,7 +24,7 @@ import {
     getFileChangeEditKey,
 } from "@/components/tools/fileChangeEditKey";
 
-interface FileChange {
+export interface FileChange {
     filePath: string;
     displayPath: string;
     edits: Array<ReturnType<typeof createFileChangeEditEntry>>;
@@ -70,7 +70,7 @@ function appendFileChangeEdit(
     });
 }
 
-function extractFileChanges(
+export function extractFileChanges(
     toolCalls: readonly ToolCallMessage[],
     metadata: Metadata | null,
 ): FileChange[] {
@@ -137,7 +137,7 @@ function extractFileChanges(
     return Array.from(changeMap.values());
 }
 
-const FileChangeItem = React.memo(({ change }: { change: FileChange }) => {
+export const FileChangeItem = React.memo(({ change }: { change: FileChange }) => {
     const { theme } = useUnistyles();
     const [expanded, setExpanded] = React.useState(false);
     const language = getLanguageFromPath(change.filePath);

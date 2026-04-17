@@ -72,6 +72,10 @@ export const MetadataSchema = z.object({
             startedAt: z.number(),
             updatedAt: z.number(),
             archivedAt: z.number().optional(),
+            // tool_use.id refs for Edit/Write/MultiEdit/NotebookEdit that
+            // ran while this list was active. Resolved against session
+            // messages to render per-list file change summaries.
+            toolCallIds: z.array(z.string()).optional(),
           }),
         )
         .optional(),

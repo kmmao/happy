@@ -617,6 +617,7 @@ export const zhHans: TranslationStructure = {
     progressAgentTurns: ({ n }: { n: number }) => `Agent ${n} 轮`,
     progressToolCalls: ({ n }: { n: number }) => `${n} 次工具调用`,
     progressFilesTitle: ({ n }: { n: number }) => `修改文件（${n}）`,
+    progressListFilesTitle: ({ n }: { n: number }) => `此列表修改文件（${n}）`,
     progressCommandsTitle: ({ n }: { n: number }) => `运行命令（${n}）`,
     progressShowAll: ({ n }: { n: number }) => `显示剩余 ${n} 项`,
     progressCollapse: "收起",

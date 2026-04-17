@@ -634,6 +634,7 @@ export const en = {
     progressAgentTurns: ({ n }: { n: number }) => `${n} agent turn${n === 1 ? "" : "s"}`,
     progressToolCalls: ({ n }: { n: number }) => `${n} tool call${n === 1 ? "" : "s"}`,
     progressFilesTitle: ({ n }: { n: number }) => `Files touched (${n})`,
+    progressListFilesTitle: ({ n }: { n: number }) => `Files changed in this list (${n})`,
     progressCommandsTitle: ({ n }: { n: number }) => `Commands run (${n})`,
     progressShowAll: ({ n }: { n: number }) => `Show ${n} more`,
     progressCollapse: "Collapse",

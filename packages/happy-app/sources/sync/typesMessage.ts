@@ -2,6 +2,8 @@ import { AgentEvent } from "./typesRaw";
 import { MessageMeta } from "./typesMessageMeta";
 
 export type ToolCall = {
+  /** SDK tool_use.id. Absent for tool calls synthesized locally from permission requests. */
+  id?: string;
   name: string;
   state: "running" | "completed" | "error";
   input: any;

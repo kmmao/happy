@@ -743,6 +743,7 @@ export const ja: TranslationStructure = {
     progressAgentTurns: ({ n }: { n: number }) => `エージェント ${n} 回`,
     progressToolCalls: ({ n }: { n: number }) => `ツール呼び出し ${n} 回`,
     progressFilesTitle: ({ n }: { n: number }) => `変更ファイル（${n}）`,
+    progressListFilesTitle: ({ n }: { n: number }) => `このリストの変更ファイル（${n}）`,
     progressCommandsTitle: ({ n }: { n: number }) => `実行コマンド（${n}）`,
     progressShowAll: ({ n }: { n: number }) => `残り ${n} 件を表示`,
     progressCollapse: "折りたたむ",

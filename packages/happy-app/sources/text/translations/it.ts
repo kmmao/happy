@@ -757,6 +757,7 @@ export const it: TranslationStructure = {
     progressAgentTurns: ({ n }: { n: number }) => `${n} turni agente`,
     progressToolCalls: ({ n }: { n: number }) => `${n} chiamate a strumenti`,
     progressFilesTitle: ({ n }: { n: number }) => `File modificati (${n})`,
+    progressListFilesTitle: ({ n }: { n: number }) => `File in questa lista (${n})`,
     progressCommandsTitle: ({ n }: { n: number }) => `Comandi eseguiti (${n})`,
     progressShowAll: ({ n }: { n: number }) => `Mostra altri ${n}`,
     progressCollapse: "Comprimi",

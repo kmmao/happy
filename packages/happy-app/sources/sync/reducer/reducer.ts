@@ -873,6 +873,7 @@ export function reducer(
             const permission = state.permissions.get(c.id);
 
             let toolCall: ToolCall = {
+              id: c.id,
               name: c.name,
               state: "running" as const,
               input: permission ? permission.arguments : c.input, // Use permission args if available
@@ -1219,6 +1220,7 @@ export function reducer(
 
           let mid = allocateId();
           let toolCall: ToolCall = {
+            id: c.id,
             name: c.name,
             state: "running" as const,
             input: c.input,

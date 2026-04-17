@@ -17,6 +17,13 @@ import {
     type ChecklistTab,
     type ProgressTodo,
 } from "./sessionProgressData";
+import {
+    extractFileChanges,
+    FileChangeItem,
+    type FileChange,
+} from "./SidePanelCodeTab";
+import { DiffStatsBar } from "@/components/diff/DiffStatsBar";
+import { Message, ToolCallMessage } from "@/sync/typesMessage";
 
 interface SessionProgressPanelProps {
     sessionId: string;
@@ -152,6 +159,43 @@ export const SessionProgressPanel = React.memo<SessionProgressPanelProps>(
 
         const [showAllFiles, setShowAllFiles] = React.useState(false);
         const [showAllCommands, setShowAllCommands] = React.useState(false);
+        const [showListFiles, setShowListFiles] = React.useState(false);
+
+        // Per-list file changes: resolve the active/pinned list's toolCallIds
+        // against the session message stream and aggregate into FileChange[].
+        // Empty when metadata has no toolCallIds (older CLI) or no messages.
+        const listFileChanges = React.useMemo<FileChange[]>(() => {
+            const listId = checklist.listId;
+            if (!listId) return [];
+            const list = session?.metadata?.progress?.lists?.find(
+                (l) => l.id === listId,
+            );
+            const ids = list?.toolCallIds;
+            if (!ids || ids.length === 0) return [];
+            const idSet = new Set(ids);
+            const scoped: ToolCallMessage[] = [];
+            const walk = (msg: Message) => {
+                if (msg.kind === "tool-call") {
+                    const toolId = msg.tool.id;
+                    if (toolId && idSet.has(toolId)) scoped.push(msg);
+                    for (const child of msg.children) walk(child);
+                }
+            };
+            for (const m of messages) walk(m);
+            return extractFileChanges(scoped, session?.metadata ?? null);
+        }, [
+            checklist.listId,
+            session?.metadata,
+            messages,
+        ]);
+        const listFileTotalAdditions = React.useMemo(
+            () => listFileChanges.reduce((sum, f) => sum + f.totalAdditions, 0),
+            [listFileChanges],
+        );
+        const listFileTotalDeletions = React.useMemo(
+            () => listFileChanges.reduce((sum, f) => sum + f.totalDeletions, 0),
+            [listFileChanges],
+        );
 
         const visibleFiles = showAllFiles ? data.files : data.files.slice(0, MAX_FILES_VISIBLE);
         const visibleCommands = showAllCommands
@@ -319,6 +363,59 @@ export const SessionProgressPanel = React.memo<SessionProgressPanelProps>(
                                             {`• ${blocker}`}
                                         </Text>
                                     ))}
+                                </View>
+                            )}
+                            {listFileChanges.length > 0 && (
+                                <View style={styles.listFilesBlock}>
+                                    <Pressable
+                                        onPress={() => setShowListFiles((prev) => !prev)}
+                                        hitSlop={6}
+                                        style={[
+                                            styles.listFilesHeader,
+                                            { borderColor: theme.colors.divider },
+                                        ]}
+                                        accessibilityRole="button"
+                                        accessibilityState={{ expanded: showListFiles }}
+                                    >
+                                        <Ionicons
+                                            name={
+                                                showListFiles
+                                                    ? "chevron-down"
+                                                    : "chevron-forward"
+                                            }
+                                            size={12}
+                                            color={theme.colors.textSecondary}
+                                        />
+                                        <Text
+                                            style={[
+                                                styles.listFilesHeaderTitle,
+                                                { color: theme.colors.text },
+                                            ]}
+                                        >
+                                            {t("session.progressListFilesTitle", {
+                                                n: listFileChanges.length,
+                                            })}
+                                        </Text>
+                                        <DiffStatsBar
+                                            additions={listFileTotalAdditions}
+                                            deletions={listFileTotalDeletions}
+                                        />
+                                    </Pressable>
+                                    {showListFiles && (
+                                        <View
+                                            style={[
+                                                styles.listFilesBody,
+                                                { borderColor: theme.colors.divider },
+                                            ]}
+                                        >
+                                            {listFileChanges.map((change) => (
+                                                <FileChangeItem
+                                                    key={change.filePath}
+                                                    change={change}
+                                                />
+                                            ))}
+                                        </View>
+                                    )}
                                 </View>
                             )}
                         </>
@@ -960,5 +1057,25 @@ const styles = StyleSheet.create({
         ...Typography.default("regular"),
         fontSize: 12,
         lineHeight: 16,
+    },
+    listFilesBlock: {
+        gap: 0,
+        marginTop: 8,
+    },
+    listFilesHeader: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 6,
+        paddingVertical: 8,
+        paddingHorizontal: 0,
+        borderTopWidth: 1,
+    },
+    listFilesHeaderTitle: {
+        ...Typography.default("semiBold"),
+        fontSize: 12,
+        flex: 1,
+    },
+    listFilesBody: {
+        borderTopWidth: 1,
     },
 });

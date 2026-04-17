@@ -648,6 +648,7 @@ export const ca: TranslationStructure = {
     progressAgentTurns: ({ n }: { n: number }) => `${n} torns d'agent`,
     progressToolCalls: ({ n }: { n: number }) => `${n} crides a eines`,
     progressFilesTitle: ({ n }: { n: number }) => `Fitxers modificats (${n})`,
+    progressListFilesTitle: ({ n }: { n: number }) => `Fitxers en aquesta llista (${n})`,
     progressCommandsTitle: ({ n }: { n: number }) => `Ordres executades (${n})`,
     progressShowAll: ({ n }: { n: number }) => `Mostra'n ${n} més`,
     progressCollapse: "Replega",

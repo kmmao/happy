@@ -860,6 +860,7 @@ export const ru: TranslationStructure = {
     progressAgentTurns: ({ n }: { n: number }) => `${n} ходов агента`,
     progressToolCalls: ({ n }: { n: number }) => `${n} вызовов инструментов`,
     progressFilesTitle: ({ n }: { n: number }) => `Изменённые файлы (${n})`,
+    progressListFilesTitle: ({ n }: { n: number }) => `Файлы в этом списке (${n})`,
     progressCommandsTitle: ({ n }: { n: number }) => `Выполненные команды (${n})`,
     progressShowAll: ({ n }: { n: number }) => `Показать ещё ${n}`,
     progressCollapse: "Свернуть",
