@@ -68,6 +68,13 @@ export const sessionProgressListSchema = z.object({
    * file change summaries without duplicating diff content into metadata.
    */
   toolCallIds: z.array(z.string()).optional(),
+  /**
+   * Timestamp at which an auto-summary was triggered for this list's
+   * completion (all todos completed → all completed transition). Dedup flag
+   * so the CLI hook only fires ONE synthetic summary-trigger message per
+   * list lifecycle, even if subsequent TodoWrite calls keep it all done.
+   */
+  summaryGeneratedAt: z.number().optional(),
 });
 export type SessionProgressList = z.infer<typeof sessionProgressListSchema>;
 
