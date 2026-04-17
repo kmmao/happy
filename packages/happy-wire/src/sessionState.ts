@@ -61,6 +61,13 @@ export const sessionProgressListSchema = z.object({
   updatedAt: z.number(),
   /** When this list stopped being active (got pushed to history). */
   archivedAt: z.number().optional(),
+  /**
+   * Tool-call message IDs for file-editing tools (Edit/Write/MultiEdit/
+   * NotebookEdit) that ran while this list was the active one. Consumers
+   * resolve these against the session message stream to render per-list
+   * file change summaries without duplicating diff content into metadata.
+   */
+  toolCallIds: z.array(z.string()).optional(),
 });
 export type SessionProgressList = z.infer<typeof sessionProgressListSchema>;
 
