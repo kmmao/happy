@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.71.38 - 2026-04-18
+
+- Fixed auto-mirror TodoWrite list boundary detection: now reads SDK-native `oldTodos`/`newTodos` from `user.tool_use_result` instead of `assistant.tool_use.input.todos`. New lists are detected by content-set intersection (zero overlap = new list) rather than the old `priorAllDone` gate, so starting a brand-new topic while the previous list still has in-progress items correctly archives the old list (preserving its un-completed state) and opens a fresh one.
+- Auto-mirror now refreshes list label when the first todo content changes (previously label stayed frozen on first creation, causing stale chip titles).
+- `verificationNudgeNeeded` from SDK is now carried into `metadata.progress.lists[].todos[].verificationNudgeNeeded` so the App can surface verification prompts.
+
 ## 0.56.1 - 2026-04-03
 
 - Fixed machine WebSocket RPC: register `bootstrap-profile-*` handlers so the mobile app can list/create/update Bootstrap profiles (was returning `RPC method not available`).

@@ -601,153 +601,165 @@ export async function claudeRemoteLauncher(
       logger.debug(`[knowledge] Error collecting turn data: ${err}`);
     }
 
-    // Auto-mirror TodoWrite → metadata.progress. Data-driven path: SDK gives
-    // us the full list each call (including activeForm), we partition it into
-    // task-list generations using a boundary heuristic on prior state.
-    // Zero Agent prompting needed — hook is the primary source of truth for
-    // `progress.lists`. Explicit update_progress MCP calls still work for
-    // stage/blockers/explicit listId override.
-    if (message.type === "assistant") {
+    // Auto-mirror TodoWrite → metadata.progress. Reads SDK-native
+    // `TodoWriteOutput` off `user.tool_use_result` (shape: oldTodos, newTodos,
+    // verificationNudgeNeeded). Boundary detection = content-set intersection
+    // of oldTodos vs newTodos: zero overlap → start a new list. This survives
+    // the case where the prior list still has in_progress/pending items when
+    // the agent pivots to a brand-new topic (which the old priorAllDone gate
+    // silently overwrote).
+    if (message.type === "user") {
       try {
-        const aMsg = message as SDKAssistantMessage;
-        const blocks = Array.isArray(aMsg.message.content)
-          ? aMsg.message.content
-          : [];
-        for (const c of blocks) {
-          if (c.type !== "tool_use" || c.name !== "TodoWrite") continue;
-          const raw = (c.input as Record<string, unknown> | undefined)?.todos;
-          if (!Array.isArray(raw)) continue;
-
-          type MirroredTodo = {
-            content: string;
-            status: "pending" | "in_progress" | "completed";
-            activeForm?: string;
-          };
-          const mirrored: MirroredTodo[] = [];
-          for (const item of raw) {
-            if (!item || typeof item !== "object") continue;
-            const record = item as Record<string, unknown>;
-            const content = record.content;
-            const status = record.status;
-            if (typeof content !== "string" || content.length === 0) continue;
-            if (
-              status !== "pending" &&
-              status !== "in_progress" &&
-              status !== "completed"
-            )
-              continue;
-            const activeForm = record.activeForm;
-            mirrored.push({
-              content,
-              status,
-              activeForm:
-                typeof activeForm === "string" && activeForm.length > 0
-                  ? activeForm
-                  : undefined,
-            });
-          }
-          if (mirrored.length === 0) continue;
-
-          session.client.updateMetadata((m) => {
-            const now = Date.now();
-            const prior = m.progress;
-            const lists = prior?.lists ? [...prior.lists] : [];
-            const currentId = prior?.currentListId;
-            const currentIdx = currentId
-              ? lists.findIndex((l) => l.id === currentId)
-              : -1;
-            const currentList = currentIdx >= 0 ? lists[currentIdx] : undefined;
-
-            // Boundary heuristic: prior list fully completed + low overlap
-            // with the new todos → start a fresh list. Overlap by exact
-            // content match; threshold 30%.
-            const priorTodos = currentList?.todos ?? [];
-            const priorAllDone =
-              priorTodos.length > 0 &&
-              priorTodos.every((t) => t.status === "completed");
-            let overlap = 0;
-            if (priorAllDone) {
-              const oldContents = new Set(priorTodos.map((t) => t.content));
-              overlap = mirrored.filter((t) => oldContents.has(t.content)).length;
-            }
-            const overlapRatio = mirrored.length > 0
-              ? overlap / mirrored.length
-              : 0;
-            const isBoundary = priorAllDone && overlapRatio < 0.3;
-
-            const label = mirrored[0]
-              ? mirrored[0].content.length > 32
-                ? mirrored[0].content.slice(0, 31) + "…"
-                : mirrored[0].content
-              : undefined;
-
-            let nextLists = lists;
-            let nextCurrentId = currentId;
-
-            if (isBoundary || currentIdx < 0) {
-              // Archive prior list (if any), append a fresh one.
-              if (currentIdx >= 0 && currentList) {
-                nextLists = lists.map((l, i) =>
-                  i === currentIdx ? { ...l, archivedAt: now } : l,
-                );
+        const uMsg = message as SDKUserMessage;
+        const rawResult = uMsg.tool_use_result;
+        if (rawResult && typeof rawResult === "object") {
+          const r = rawResult as Record<string, unknown>;
+          const oldRaw = r.oldTodos;
+          const newRaw = r.newTodos;
+          if (Array.isArray(oldRaw) && Array.isArray(newRaw)) {
+            type MirroredTodo = {
+              content: string;
+              status: "pending" | "in_progress" | "completed";
+              activeForm?: string;
+              verificationNudgeNeeded?: boolean;
+            };
+            const sanitize = (list: readonly unknown[]): MirroredTodo[] => {
+              const out: MirroredTodo[] = [];
+              for (const item of list) {
+                if (!item || typeof item !== "object") continue;
+                const rec = item as Record<string, unknown>;
+                const content = rec.content;
+                const status = rec.status;
+                if (typeof content !== "string" || content.length === 0) continue;
+                if (
+                  status !== "pending" &&
+                  status !== "in_progress" &&
+                  status !== "completed"
+                )
+                  continue;
+                const activeForm = rec.activeForm;
+                out.push({
+                  content,
+                  status,
+                  activeForm:
+                    typeof activeForm === "string" && activeForm.length > 0
+                      ? activeForm
+                      : undefined,
+                });
               }
-              const newId = randomUUID();
-              nextLists = [
-                ...nextLists,
-                {
-                  id: newId,
-                  label,
-                  todos: mirrored,
-                  startedAt: now,
-                  updatedAt: now,
-                },
-              ];
-              nextCurrentId = newId;
-            } else {
-              // Update-in-place: replace todos, preserve stage/blockers/label.
-              nextLists = lists.map((l, i) =>
-                i === currentIdx
-                  ? {
+              return out;
+            };
+            const oldTodos = sanitize(oldRaw);
+            const newTodos = sanitize(newRaw);
+            if (newTodos.length > 0) {
+              const verificationNudgeNeeded = r.verificationNudgeNeeded === true;
+              const mirrored: MirroredTodo[] = verificationNudgeNeeded
+                ? newTodos.map((t) =>
+                    t.status === "completed"
+                      ? { ...t, verificationNudgeNeeded: true }
+                      : t,
+                  )
+                : newTodos;
+
+              session.client.updateMetadata((m) => {
+                const now = Date.now();
+                const prior = m.progress;
+                const lists = prior?.lists ? [...prior.lists] : [];
+                const currentId = prior?.currentListId;
+                const currentIdx = currentId
+                  ? lists.findIndex((l) => l.id === currentId)
+                  : -1;
+                const currentList = currentIdx >= 0 ? lists[currentIdx] : undefined;
+
+                // Boundary: SDK oldTodos and newTodos share zero content.
+                // oldTodos empty (first TodoWrite) also counts as boundary so
+                // we always allocate a list on the first mirror.
+                const oldKeys = new Set(oldTodos.map((t) => t.content));
+                const newKeys = new Set(mirrored.map((t) => t.content));
+                let intersection = 0;
+                for (const k of newKeys) if (oldKeys.has(k)) intersection += 1;
+                const isBoundary = oldKeys.size === 0 || intersection === 0;
+                logger.debug(
+                  `[progress-mirror] ${mirrored.length} todos (boundary=${isBoundary ? "yes" : "no"}, old=${oldTodos.length}, intersect=${intersection})`,
+                );
+
+                const label = mirrored[0]
+                  ? mirrored[0].content.length > 32
+                    ? mirrored[0].content.slice(0, 31) + "…"
+                    : mirrored[0].content
+                  : undefined;
+
+                let nextLists = lists;
+                let nextCurrentId = currentId;
+
+                if (isBoundary || currentIdx < 0) {
+                  // Archive prior list (if any, even with un-completed items
+                  // — preserves last-known state in history), start fresh.
+                  if (currentIdx >= 0 && currentList) {
+                    nextLists = lists.map((l, i) =>
+                      i === currentIdx ? { ...l, archivedAt: now } : l,
+                    );
+                  }
+                  const newId = randomUUID();
+                  nextLists = [
+                    ...nextLists,
+                    {
+                      id: newId,
+                      label,
+                      todos: mirrored,
+                      startedAt: now,
+                      updatedAt: now,
+                    },
+                  ];
+                  nextCurrentId = newId;
+                } else {
+                  // Update-in-place: replace todos, preserve stage/blockers.
+                  // Refresh label when the first todo's content changed, so
+                  // a mid-list reorder doesn't leave a stale chip title.
+                  nextLists = lists.map((l, i) => {
+                    if (i !== currentIdx) return l;
+                    const firstChanged =
+                      !!mirrored[0] &&
+                      !!l.todos[0] &&
+                      mirrored[0].content !== l.todos[0].content;
+                    return {
                       ...l,
                       todos: mirrored,
                       updatedAt: now,
-                      // Only backfill label if absent; don't clobber user/agent choice.
-                      label: l.label ?? label,
-                    }
-                  : l,
-              );
+                      label: firstChanged ? label : (l.label ?? label),
+                    };
+                  });
+                }
+
+                // Cap at 20 lists — drop the earliest archived one if over.
+                if (nextLists.length > 20) {
+                  const dropIdx = nextLists.findIndex((l) => l.archivedAt);
+                  if (dropIdx >= 0) {
+                    nextLists = nextLists.filter((_, i) => i !== dropIdx);
+                  } else {
+                    nextLists = nextLists.slice(-20);
+                  }
+                }
+
+                const activeList =
+                  nextLists.find((l) => l.id === nextCurrentId) ??
+                  nextLists[nextLists.length - 1];
+
+                return {
+                  ...m,
+                  progress: {
+                    lists: nextLists,
+                    currentListId: nextCurrentId,
+                    // Keep legacy flat mirror in sync for older readers.
+                    todos: activeList?.todos ?? mirrored,
+                    currentStage: activeList?.currentStage,
+                    blockers: activeList?.blockers,
+                    updatedAt: now,
+                  },
+                };
+              });
             }
-
-            // Cap at 20 lists — drop the earliest archived one if over.
-            if (nextLists.length > 20) {
-              const dropIdx = nextLists.findIndex((l) => l.archivedAt);
-              if (dropIdx >= 0) {
-                nextLists = nextLists.filter((_, i) => i !== dropIdx);
-              } else {
-                nextLists = nextLists.slice(-20);
-              }
-            }
-
-            const activeList =
-              nextLists.find((l) => l.id === nextCurrentId) ??
-              nextLists[nextLists.length - 1];
-
-            return {
-              ...m,
-              progress: {
-                lists: nextLists,
-                currentListId: nextCurrentId,
-                // Keep legacy flat mirror in sync for older readers.
-                todos: activeList?.todos ?? mirrored,
-                currentStage: activeList?.currentStage,
-                blockers: activeList?.blockers,
-                updatedAt: now,
-              },
-            };
-          });
-          logger.debug(
-            `[progress-mirror] Mirrored ${mirrored.length} todos from TodoWrite`,
-          );
+          }
         }
       } catch (err) {
         logger.debug(`[progress-mirror] Error mirroring TodoWrite: ${err}`);
