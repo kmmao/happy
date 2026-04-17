@@ -11,8 +11,10 @@ import { t } from "@/text";
 import {
     computeSessionProgress,
     countTodoProgress,
+    getChecklistTabs,
     resolveChecklist,
     type ChecklistSource,
+    type ChecklistTab,
     type ProgressTodo,
 } from "./sessionProgressData";
 
@@ -124,9 +126,26 @@ export const SessionProgressPanel = React.memo<SessionProgressPanelProps>(
         }, []);
 
         const data = React.useMemo(() => computeSessionProgress(messages), [messages]);
+        const tabs = React.useMemo(
+            () => getChecklistTabs(session?.metadata?.progress),
+            [session?.metadata?.progress],
+        );
+        // Let the user pin a specific list to view; null means "follow active".
+        const [pinnedListId, setPinnedListId] = React.useState<string | null>(null);
+        // Reset pin if the pinned list disappears (e.g. archive cap dropped it).
+        React.useEffect(() => {
+            if (pinnedListId && !tabs.some((t) => t.id === pinnedListId)) {
+                setPinnedListId(null);
+            }
+        }, [tabs, pinnedListId]);
         const checklist = React.useMemo(
-            () => resolveChecklist(session?.metadata?.progress, data),
-            [session?.metadata?.progress, data],
+            () =>
+                resolveChecklist(
+                    session?.metadata?.progress,
+                    data,
+                    pinnedListId ?? undefined,
+                ),
+            [session?.metadata?.progress, data, pinnedListId],
         );
         const counts = React.useMemo(() => countTodoProgress(checklist.todos), [checklist.todos]);
         const summary = session?.metadata?.sessionSummary;
@@ -197,9 +216,21 @@ export const SessionProgressPanel = React.memo<SessionProgressPanelProps>(
                             </Text>
                         </Pressable>
                     </View>
+                    {tabs.length > 1 && (
+                        <ChecklistTabRow
+                            tabs={tabs}
+                            selectedId={checklist.listId ?? null}
+                            onSelect={(id) =>
+                                setPinnedListId((prev) =>
+                                    prev === id ? null : id,
+                                )
+                            }
+                        />
+                    )}
                     {hasTodos && checklist.updatedAt !== null && (
                         <Text style={[styles.timeHint, { color: theme.colors.textSecondary }]}>
                             {formatRelativeTime(checklist.updatedAt, nowMs)}
+                            {checklist.label ? ` · ${checklist.label}` : ""}
                             {checklist.currentStage ? ` · ${checklist.currentStage}` : ""}
                         </Text>
                     )}
@@ -234,6 +265,13 @@ export const SessionProgressPanel = React.memo<SessionProgressPanelProps>(
                                                 todo.status === "completed" ? ("line-through" as const) : undefined,
                                         },
                                     ];
+                                    const displayContent =
+                                        todo.status === "in_progress" && todo.activeForm
+                                            ? todo.activeForm
+                                            : todo.content;
+                                    const showNudge =
+                                        todo.status === "completed" &&
+                                        todo.verificationNudgeNeeded === true;
                                     return (
                                         <Pressable
                                             key={`${index}-${todo.content}`}
@@ -248,7 +286,16 @@ export const SessionProgressPanel = React.memo<SessionProgressPanelProps>(
                                                 color={color}
                                                 style={styles.todoIcon}
                                             />
-                                            <Text style={textStyle}>{todo.content}</Text>
+                                            <Text style={textStyle}>{displayContent}</Text>
+                                            {showNudge && (
+                                                <Ionicons
+                                                    name="alert-circle-outline"
+                                                    size={14}
+                                                    color={theme.colors.warning ?? theme.colors.accentOrange ?? color}
+                                                    style={styles.todoNudgeIcon}
+                                                    accessibilityLabel={t("session.progressTodoNudgeLabel")}
+                                                />
+                                            )}
                                             <Ionicons
                                                 name="ellipsis-horizontal"
                                                 size={14}
@@ -413,6 +460,61 @@ export const SessionProgressPanel = React.memo<SessionProgressPanelProps>(
         );
     },
 );
+
+interface ChecklistTabRowProps {
+    tabs: readonly ChecklistTab[];
+    selectedId: string | null;
+    onSelect: (id: string) => void;
+}
+
+const ChecklistTabRow = React.memo<ChecklistTabRowProps>(function ChecklistTabRow({
+    tabs,
+    selectedId,
+    onSelect,
+}) {
+    const { theme } = useUnistyles();
+    return (
+        <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.tabRow}
+        >
+            {tabs.map((tab) => {
+                const active = tab.id === selectedId ||
+                    (selectedId === null && tab.active);
+                const color = active ? theme.colors.textLink : theme.colors.textSecondary;
+                const bg = active
+                    ? theme.colors.textLink + "1F"
+                    : theme.colors.surfaceHighest;
+                const border = active
+                    ? theme.colors.textLink + "55"
+                    : "transparent";
+                return (
+                    <Pressable
+                        key={tab.id}
+                        onPress={() => onSelect(tab.id)}
+                        style={[
+                            styles.tabChip,
+                            { backgroundColor: bg, borderColor: border },
+                        ]}
+                        accessibilityRole="button"
+                        accessibilityState={{ selected: active }}
+                    >
+                        <Text
+                            style={[styles.tabChipText, { color }]}
+                            numberOfLines={1}
+                        >
+                            {tab.label}
+                        </Text>
+                        <Text style={[styles.tabChipCount, { color }]}>
+                            {`${tab.completed}/${tab.total}`}
+                        </Text>
+                    </Pressable>
+                );
+            })}
+        </ScrollView>
+    );
+});
 
 interface SummaryCardProps {
     summary:
@@ -711,6 +813,34 @@ const styles = StyleSheet.create({
     todoMenuIcon: {
         alignSelf: "center",
         opacity: 0.6,
+    },
+    todoNudgeIcon: {
+        alignSelf: "center",
+        marginRight: 4,
+    },
+    tabRow: {
+        flexDirection: "row",
+        gap: 6,
+        paddingVertical: 6,
+    },
+    tabChip: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 6,
+        paddingHorizontal: 10,
+        paddingVertical: 5,
+        borderRadius: 999,
+        borderWidth: 1,
+        maxWidth: 200,
+    },
+    tabChipText: {
+        ...Typography.default("semiBold"),
+        fontSize: 11,
+        maxWidth: 140,
+    },
+    tabChipCount: {
+        ...Typography.default("regular"),
+        fontSize: 10,
     },
     todoText: {
         ...Typography.default("regular"),

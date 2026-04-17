@@ -638,7 +638,8 @@ export const zhHant: TranslationStructure = {
     progressSummaryCollapse: "收合詳情",
     progressRefreshActionLabel: "重新整理",
     progressRefreshPrompt:
-      "請呼叫 mcp__happy__update_progress 工具同步當前真實進度：列出此時所有 todos 以及各自的準確狀態（completed / in_progress / pending），覆蓋任何舊清單。如果尚無清單，請先規劃再呼叫工具。",
+      "請查看目前工作狀態，用 TodoWrite 重寫清單以符合實際：每一條任務標註準確狀態（completed / in_progress / pending），in_progress 的項請填寫 activeForm。如果尚無清單，請先規劃再寫。",
+    progressTodoNudgeLabel: "建議驗證",
     progressSummaryRefreshLabel: "更新",
     progressSummaryRefreshPrompt:
       "請呼叫 mcp__happy__update_session_summary 工具記錄當前會話概要：目標（goal）、當前焦點（currentFocus）、關鍵決策（keyDecisions，如有）、待決問題（openQuestions，如有）、影響範圍（impactScope，如有）。保持準確且簡潔。",

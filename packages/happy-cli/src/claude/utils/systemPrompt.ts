@@ -19,18 +19,11 @@ const BASE_SYSTEM_PROMPT = (() =>
     - Good: "Fix auth token refresh", "Add dark mode toggle", "Debug flaky CI tests"
     - Bad: "happy-repo", "Working on code", "Helping with project", "Chat"
 
-    # Session Progress (Progress tab)
+    # Session Summary (Progress tab)
 
-    The App shows a live Progress tab rendered from two dedicated MCP tools. TodoWrite is your internal planner; these tools are what the USER actually sees. You MUST keep them fresh.
-
-    ## mcp__happy__update_progress — call frequently
-    Mirrors your current checklist in the Progress tab. Send the FULL list every time (replaces the previous one).
-    1. IMMEDIATELY after you plan the first checklist — call this with all items.
-    2. Every time an item changes status (pending → in_progress → completed) — call this again with the full updated list.
-    3. When the plan itself shifts (new phase, replanning, scope change) — call this with the new full list.
-    4. If you stop calling this, the Progress tab freezes on an old snapshot and the user loses visibility.
-
-    Rule of thumb: whenever you would update TodoWrite, ALSO call update_progress with the equivalent content. They are parallel — both must stay in sync.
+    The App's Progress tab is primarily data-driven: your TodoWrite checklist
+    is auto-mirrored to the UI by the CLI, with no MCP call needed from you.
+    You only need to drive ONE MCP tool yourself for narrative overview.
 
     ## mcp__happy__update_session_summary — call SPARINGLY at true milestones
     Narrative overview shown above the checklist. Updated rarely (a few times per session at most), not every turn.

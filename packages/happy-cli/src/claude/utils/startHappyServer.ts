@@ -69,26 +69,121 @@ export async function startHappyServer(client: ApiSessionClient) {
 
   // Handler that writes a structured progress checklist into session metadata.
   // The App subscribes to metadata updates and re-renders the Progress tab.
+  //
+  // Most of the time the auto-mirror hook (see claudeRemoteLauncher) handles
+  // checklist sync from TodoWrite directly. This MCP path is an optional
+  // Agent-driven override for richer fields (currentStage, blockers) and
+  // explicit list boundary control via `listId: "new" | "<uuid>"`.
   const progressHandler = async (input: {
     todos: Array<{
       content: string;
       status: "pending" | "in_progress" | "completed";
+      activeForm?: string;
       stage?: string;
     }>;
     currentStage?: string;
     blockers?: string[];
+    listId?: string;
+    label?: string;
   }) => {
-    logger.debug("[happyMCP] update_progress todos=", input.todos?.length);
+    logger.debug(
+      "[happyMCP] update_progress todos=",
+      input.todos?.length,
+      "listId=",
+      input.listId,
+    );
     try {
-      client.updateMetadata((metadata) => ({
-        ...metadata,
-        progress: {
-          todos: input.todos ?? [],
-          currentStage: input.currentStage,
-          blockers: input.blockers,
-          updatedAt: Date.now(),
-        },
+      const sanitizedTodos = (input.todos ?? []).map((t) => ({
+        content: t.content,
+        status: t.status,
+        activeForm: t.activeForm,
+        stage: t.stage,
       }));
+      client.updateMetadata((metadata) => {
+        const now = Date.now();
+        const prior = metadata.progress;
+        const lists = prior?.lists ? [...prior.lists] : [];
+        const priorCurrentId = prior?.currentListId;
+
+        // Resolve target list:
+        //   - listId === "new" → create fresh list (archive prior current)
+        //   - listId matches existing → update that one
+        //   - unspecified → update currentListId (or create first list)
+        let targetId: string;
+        let nextLists = lists;
+
+        if (input.listId === "new") {
+          if (priorCurrentId) {
+            nextLists = nextLists.map((l) =>
+              l.id === priorCurrentId ? { ...l, archivedAt: now } : l,
+            );
+          }
+          targetId = randomUUID();
+          nextLists = [
+            ...nextLists,
+            {
+              id: targetId,
+              label: input.label,
+              todos: sanitizedTodos,
+              currentStage: input.currentStage,
+              blockers: input.blockers,
+              startedAt: now,
+              updatedAt: now,
+            },
+          ];
+        } else {
+          const explicitIdx = input.listId
+            ? nextLists.findIndex((l) => l.id === input.listId)
+            : priorCurrentId
+              ? nextLists.findIndex((l) => l.id === priorCurrentId)
+              : -1;
+          if (explicitIdx >= 0) {
+            targetId = nextLists[explicitIdx]!.id;
+            nextLists = nextLists.map((l, i) =>
+              i === explicitIdx
+                ? {
+                    ...l,
+                    todos: sanitizedTodos,
+                    currentStage: input.currentStage ?? l.currentStage,
+                    blockers: input.blockers ?? l.blockers,
+                    label: input.label ?? l.label,
+                    updatedAt: now,
+                  }
+                : l,
+            );
+          } else {
+            targetId = randomUUID();
+            nextLists = [
+              ...nextLists,
+              {
+                id: targetId,
+                label: input.label,
+                todos: sanitizedTodos,
+                currentStage: input.currentStage,
+                blockers: input.blockers,
+                startedAt: now,
+                updatedAt: now,
+              },
+            ];
+          }
+        }
+
+        const active =
+          nextLists.find((l) => l.id === targetId) ??
+          nextLists[nextLists.length - 1];
+
+        return {
+          ...metadata,
+          progress: {
+            lists: nextLists,
+            currentListId: targetId,
+            todos: active?.todos ?? sanitizedTodos,
+            currentStage: active?.currentStage,
+            blockers: active?.blockers,
+            updatedAt: now,
+          },
+        };
+      });
       return { success: true as const };
     } catch (error) {
       return { success: false as const, error: String(error) };
@@ -194,7 +289,7 @@ export async function startHappyServer(client: ApiSessionClient) {
       "update_progress",
       {
         description:
-          'Write the live progress checklist the App shows in the Progress tab. Send the FULL list on every call — the previous list is replaced. Call this after planning, after each status change, and when the plan itself shifts (e.g. moving to a new phase). Prefer this over TodoWrite for user-facing progress: this tool is what the App renders.',
+          'Optional override for the App\'s Progress tab. In most cases your TodoWrite calls are auto-mirrored, so you do NOT need to call this. Use it only when you want to set extra fields the CLI hook does not capture (currentStage, blockers) or to force a new list boundary with `listId: "new"`.',
         title: "Update Session Progress",
         inputSchema: {
           todos: z
@@ -204,6 +299,10 @@ export async function startHappyServer(client: ApiSessionClient) {
                 status: z
                   .enum(["pending", "in_progress", "completed"])
                   .describe("Current status of the task"),
+                activeForm: z
+                  .string()
+                  .optional()
+                  .describe("Imperative-present form shown when status is in_progress"),
                 stage: z
                   .string()
                   .optional()
@@ -219,6 +318,16 @@ export async function startHappyServer(client: ApiSessionClient) {
             .array(z.string())
             .optional()
             .describe("Optional list of things blocking progress"),
+          listId: z
+            .string()
+            .optional()
+            .describe(
+              "Target list id. 'new' forces a fresh list (archiving the prior active one). A specific uuid targets an existing list. Omit to update the active list.",
+            ),
+          label: z
+            .string()
+            .optional()
+            .describe("Short human-readable name for this task list"),
         } as Record<string, any>,
       },
       async (args: any) => {

@@ -671,7 +671,8 @@ export const es: TranslationStructure = {
     progressSummaryCollapse: "Contraer detalles",
     progressRefreshActionLabel: "Actualizar",
     progressRefreshPrompt:
-      "Por favor llama a mcp__happy__update_progress para sincronizar la lista en vivo: envía la lista completa de todos con estados exactos (completed / in_progress / pending), reemplazando cualquier entrada obsoleta. Si aún no hay plan, esbózalo primero y luego llama a la herramienta.",
+      "Revisa el estado actual del trabajo y reescribe tu TodoWrite para reflejar la realidad: cada tarea con su estado exacto (completed / in_progress / pending). Para in_progress incluye activeForm. Si aún no hay plan, esbózalo primero.",
+    progressTodoNudgeLabel: "Verificación sugerida",
     progressSummaryRefreshLabel: "Actualizar",
     progressSummaryRefreshPrompt:
       "Por favor llama a mcp__happy__update_session_summary para registrar el resumen de la sesión: goal, currentFocus, keyDecisions (si hay), openQuestions (si hay), impactScope (si hay). Preciso y conciso.",

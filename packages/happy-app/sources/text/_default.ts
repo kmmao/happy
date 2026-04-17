@@ -655,7 +655,8 @@ export const en = {
     progressSummaryCollapse: "Collapse details",
     progressRefreshActionLabel: "Refresh",
     progressRefreshPrompt:
-      "Please call mcp__happy__update_progress to sync the live checklist: send the full current list of todos with accurate statuses (completed / in_progress / pending), replacing any stale entries. If no plan exists yet, draft one first and then call the tool.",
+      "Please review the current state of the work and rewrite your TodoWrite checklist to reflect reality: every task with its accurate status (completed / in_progress / pending). Include an activeForm for any in_progress item. If no plan exists yet, draft one first.",
+    progressTodoNudgeLabel: "Verification suggested",
     progressSummaryRefreshLabel: "Update",
     progressSummaryRefreshPrompt:
       "Please call mcp__happy__update_session_summary to record the current session summary with: goal, currentFocus, keyDecisions (if any), openQuestions (if any), impactScope (if any). Keep it accurate and concise.",

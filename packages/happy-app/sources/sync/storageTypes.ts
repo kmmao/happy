@@ -51,13 +51,43 @@ export const MetadataSchema = z.object({
     .optional(),
   progress: z
     .object({
-      todos: z.array(
-        z.object({
-          content: z.string(),
-          status: z.enum(["pending", "in_progress", "completed"]),
-          stage: z.string().optional(),
-        }),
-      ),
+      // Multi-list shape (new). A session can contain multiple task list
+      // generations; auto-mirror hook partitions them at task boundaries.
+      lists: z
+        .array(
+          z.object({
+            id: z.string(),
+            label: z.string().optional(),
+            todos: z.array(
+              z.object({
+                content: z.string(),
+                status: z.enum(["pending", "in_progress", "completed"]),
+                activeForm: z.string().optional(),
+                stage: z.string().optional(),
+                verificationNudgeNeeded: z.boolean().optional(),
+              }),
+            ),
+            currentStage: z.string().optional(),
+            blockers: z.array(z.string()).optional(),
+            startedAt: z.number(),
+            updatedAt: z.number(),
+            archivedAt: z.number().optional(),
+          }),
+        )
+        .optional(),
+      currentListId: z.string().optional(),
+      // Legacy flat fields — still populated for backward compat.
+      todos: z
+        .array(
+          z.object({
+            content: z.string(),
+            status: z.enum(["pending", "in_progress", "completed"]),
+            activeForm: z.string().optional(),
+            stage: z.string().optional(),
+            verificationNudgeNeeded: z.boolean().optional(),
+          }),
+        )
+        .optional(),
       currentStage: z.string().optional(),
       blockers: z.array(z.string()).optional(),
       updatedAt: z.number(),

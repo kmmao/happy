@@ -423,14 +423,42 @@ export type Metadata = {
     updatedAt: number;
   };
   /**
-   * Live progress checklist written by the Agent via the MCP
-   * `update_progress` tool. Full rewrite on each update.
+   * Live progress state surfaced in the App's Progress tab.
+   *
+   * Two write paths:
+   *   1. CLI auto-mirror hook (claudeRemoteLauncher onMessage) — watches
+   *      SDK's TodoWrite tool_result and writes to the current list.
+   *   2. MCP `update_progress` tool — optional Agent-driven writes for
+   *      richer fields (stage, blockers, explicit listId).
+   *
+   * Legacy top-level `todos` is kept in sync with `lists[currentListId]`
+   * so older readers still see a flat checklist.
    */
   progress?: {
-    todos: Array<{
+    lists?: Array<{
+      id: string;
+      label?: string;
+      todos: Array<{
+        content: string;
+        status: "pending" | "in_progress" | "completed";
+        activeForm?: string;
+        stage?: string;
+        verificationNudgeNeeded?: boolean;
+      }>;
+      currentStage?: string;
+      blockers?: string[];
+      startedAt: number;
+      updatedAt: number;
+      archivedAt?: number;
+    }>;
+    currentListId?: string;
+    // Legacy flat fields — kept for backward compat with older App/CLI:
+    todos?: Array<{
       content: string;
       status: "pending" | "in_progress" | "completed";
+      activeForm?: string;
       stage?: string;
+      verificationNudgeNeeded?: boolean;
     }>;
     currentStage?: string;
     blockers?: string[];

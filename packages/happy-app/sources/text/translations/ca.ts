@@ -669,7 +669,8 @@ export const ca: TranslationStructure = {
     progressSummaryCollapse: "Replega detalls",
     progressRefreshActionLabel: "Actualitza",
     progressRefreshPrompt:
-      "Si us plau, crida mcp__happy__update_progress per sincronitzar la llista en viu: envia la llista completa de todos amb els estats correctes (completed / in_progress / pending), substituint les entrades obsoletes. Si encara no hi ha pla, esbossa'n un primer i després crida l'eina.",
+      "Revisa l'estat actual de la feina i reescriu la teva llista TodoWrite per reflectir la realitat: cada tasca amb l'estat exacte (completed / in_progress / pending). Per a in_progress inclou activeForm. Si encara no hi ha pla, esbossa'n un primer.",
+    progressTodoNudgeLabel: "Verificació suggerida",
     progressSummaryRefreshLabel: "Actualitza",
     progressSummaryRefreshPrompt:
       "Si us plau, crida mcp__happy__update_session_summary per registrar el resum de la sessió: goal, currentFocus, keyDecisions (si n'hi ha), openQuestions (si n'hi ha), impactScope (si n'hi ha). Precís i concís.",

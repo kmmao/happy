@@ -764,7 +764,8 @@ export const ja: TranslationStructure = {
     progressSummaryCollapse: "詳細を閉じる",
     progressRefreshActionLabel: "更新",
     progressRefreshPrompt:
-      "mcp__happy__update_progress ツールを呼び出して現在の進捗を同期してください：現時点のすべての todos と正確なステータス（completed / in_progress / pending）を送信し、古いリストを置き換えてください。まだ計画がなければ、先に計画してからツールを呼び出してください。",
+      "現在の作業状態を確認し、TodoWrite で実際の状態に合わせてチェックリストを書き直してください：各タスクに正確なステータス（completed / in_progress / pending）を付け、in_progress のものには activeForm を記入してください。まだ計画がなければ、先に作成してください。",
+    progressTodoNudgeLabel: "検証推奨",
     progressSummaryRefreshLabel: "更新",
     progressSummaryRefreshPrompt:
       "mcp__happy__update_session_summary ツールを呼び出して現在のセッション概要を記録してください：goal / currentFocus / keyDecisions（あれば）/ openQuestions（あれば）/ impactScope（あれば）。正確かつ簡潔に。",

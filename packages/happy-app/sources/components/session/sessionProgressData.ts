@@ -6,6 +6,10 @@ export type ProgressTodoStatus = "pending" | "in_progress" | "completed";
 export interface ProgressTodo {
     content: string;
     status: ProgressTodoStatus;
+    /** SDK-native imperative-present form shown for in_progress status. */
+    activeForm?: string;
+    /** SDK signal: item marked completed without sufficient verification. */
+    verificationNudgeNeeded?: boolean;
     priority?: "high" | "medium" | "low";
     id?: string;
 }
@@ -85,6 +89,9 @@ function extractTodos(tool: ToolCall): ProgressTodo[] | null {
             ? fromInput
             : null;
     if (!source) return null;
+    const verificationNudgeNeeded = Boolean(
+        (tool.result as Record<string, unknown> | undefined)?.verificationNudgeNeeded,
+    );
     const todos: ProgressTodo[] = [];
     for (const raw of source) {
         if (!raw || typeof raw !== "object") continue;
@@ -94,9 +101,15 @@ function extractTodos(tool: ToolCall): ProgressTodo[] | null {
         if (status !== "pending" && status !== "in_progress" && status !== "completed") continue;
         const priority = (raw as Record<string, unknown>).priority;
         const id = (raw as Record<string, unknown>).id;
+        const activeForm = (raw as Record<string, unknown>).activeForm;
         todos.push({
             content,
             status,
+            activeForm: typeof activeForm === "string" && activeForm.length > 0
+                ? activeForm
+                : undefined,
+            verificationNudgeNeeded:
+                verificationNudgeNeeded && status === "completed" ? true : undefined,
             priority:
                 priority === "high" || priority === "medium" || priority === "low"
                     ? priority
@@ -197,40 +210,116 @@ export type ChecklistSource = "mcp" | "todowrite" | "none";
 
 export interface ResolvedChecklist {
     source: ChecklistSource;
+    /** Stable id when source is "mcp" and metadata has lists; undefined otherwise. */
+    listId?: string;
     todos: ProgressTodo[];
     updatedAt: number | null;
+    label?: string;
     currentStage?: string;
     blockers?: string[];
+}
+
+export interface ChecklistTab {
+    id: string;
+    label: string;
+    /** True when this is the currently active list (defaults to last if unset). */
+    active: boolean;
+    completed: number;
+    total: number;
+    updatedAt: number;
+    archivedAt?: number;
+}
+
+type MetadataProgress = NonNullable<Metadata["progress"]>;
+
+type MetadataProgressList = NonNullable<MetadataProgress["lists"]>[number];
+
+function mapMetadataTodo(todo: MetadataProgressList["todos"][number]): ProgressTodo {
+    return {
+        content: todo.content,
+        status: todo.status,
+        activeForm: todo.activeForm,
+        verificationNudgeNeeded: todo.verificationNudgeNeeded,
+    };
+}
+
+function normalizeLegacyTodos(
+    todos: NonNullable<MetadataProgress["todos"]>,
+): ProgressTodo[] {
+    return todos.map((todo) => ({
+        content: todo.content,
+        status: todo.status,
+        activeForm: todo.activeForm,
+        verificationNudgeNeeded: todo.verificationNudgeNeeded,
+    }));
+}
+
+function deriveLabelFromTodos(todos: readonly ProgressTodo[]): string | undefined {
+    const first = todos[0]?.content;
+    if (!first) return undefined;
+    const max = 32;
+    return first.length <= max ? first : first.slice(0, max - 1) + "…";
+}
+
+function pickActiveList(
+    lists: readonly MetadataProgressList[],
+    currentListId: string | undefined,
+): MetadataProgressList | undefined {
+    if (currentListId) {
+        const match = lists.find((l) => l.id === currentListId);
+        if (match) return match;
+    }
+    // Default: last non-archived list, else the last one overall.
+    for (let i = lists.length - 1; i >= 0; i--) {
+        const list = lists[i]!;
+        if (!list.archivedAt) return list;
+    }
+    return lists[lists.length - 1];
 }
 
 /**
  * Pick the authoritative checklist source for the Progress tab.
  *
  * Priority:
- *   1. MCP-sourced `metadata.progress` (written by Agent via update_progress)
- *   2. Latest TodoWrite in message history (fallback when Agent hasn't
- *      started using the MCP tool yet, e.g. Codex or older CLI)
- *   3. Empty
- *
- * We intentionally do not fall back to markdown checklist parsing — it was
- * considered but the MCP contract is meant to supersede all heuristics. If
- * the Agent is silent, the user presses the manual "refresh" button instead.
+ *   1. MCP-sourced multi-list `metadata.progress.lists[currentListId]`
+ *   2. MCP-sourced legacy flat `metadata.progress.todos`
+ *   3. Latest TodoWrite in message history (fallback when CLI auto-mirror /
+ *      MCP haven't populated metadata yet)
+ *   4. Empty
  */
 export function resolveChecklist(
     metadataProgress: Metadata["progress"] | null | undefined,
     messagesAggregate: Pick<SessionProgressData, "todos" | "todosUpdatedAt">,
+    /** Optional: render a specific list from metadata.progress.lists. */
+    preferredListId?: string,
 ): ResolvedChecklist {
-    if (metadataProgress && metadataProgress.todos.length > 0) {
-        return {
-            source: "mcp",
-            todos: metadataProgress.todos.map((todo) => ({
-                content: todo.content,
-                status: todo.status,
-            })),
-            updatedAt: metadataProgress.updatedAt,
-            currentStage: metadataProgress.currentStage,
-            blockers: metadataProgress.blockers,
-        };
+    if (metadataProgress) {
+        const lists = metadataProgress.lists;
+        if (lists && lists.length > 0) {
+            const targetId = preferredListId ?? metadataProgress.currentListId;
+            const active = pickActiveList(lists, targetId);
+            if (active && active.todos.length > 0) {
+                const todos = active.todos.map(mapMetadataTodo);
+                return {
+                    source: "mcp",
+                    listId: active.id,
+                    todos,
+                    updatedAt: active.updatedAt,
+                    label: active.label ?? deriveLabelFromTodos(todos),
+                    currentStage: active.currentStage,
+                    blockers: active.blockers,
+                };
+            }
+        }
+        if (metadataProgress.todos && metadataProgress.todos.length > 0) {
+            return {
+                source: "mcp",
+                todos: normalizeLegacyTodos(metadataProgress.todos),
+                updatedAt: metadataProgress.updatedAt,
+                currentStage: metadataProgress.currentStage,
+                blockers: metadataProgress.blockers,
+            };
+        }
     }
     if (messagesAggregate.todos && messagesAggregate.todos.length > 0) {
         return {
@@ -244,6 +333,34 @@ export function resolveChecklist(
         todos: [],
         updatedAt: null,
     };
+}
+
+/**
+ * Build the tab-row data for the Progress panel. Returns empty array when
+ * metadata.progress has no multi-list shape (caller falls back to single
+ * checklist view).
+ */
+export function getChecklistTabs(
+    metadataProgress: Metadata["progress"] | null | undefined,
+): ChecklistTab[] {
+    const lists = metadataProgress?.lists;
+    if (!lists || lists.length === 0) return [];
+    const activeId =
+        metadataProgress?.currentListId ??
+        pickActiveList(lists, undefined)?.id;
+    return lists.map((list) => {
+        const todos = list.todos;
+        const completed = todos.filter((t) => t.status === "completed").length;
+        return {
+            id: list.id,
+            label: list.label ?? deriveLabelFromTodos(todos.map(mapMetadataTodo)) ?? list.id,
+            active: list.id === activeId,
+            completed,
+            total: todos.length,
+            updatedAt: list.updatedAt,
+            archivedAt: list.archivedAt,
+        };
+    });
 }
 
 export interface TodoProgressCounts {

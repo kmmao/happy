@@ -881,7 +881,8 @@ export const ru: TranslationStructure = {
     progressSummaryCollapse: "Свернуть детали",
     progressRefreshActionLabel: "Обновить",
     progressRefreshPrompt:
-      "Пожалуйста, вызовите mcp__happy__update_progress, чтобы синхронизировать живой чек-лист: отправьте полный текущий список todos с актуальными статусами (completed / in_progress / pending), заменив устаревшие записи. Если плана ещё нет, сначала составьте его, затем вызовите инструмент.",
+      "Пожалуйста, проверьте текущее состояние работы и перепишите ваш TodoWrite, чтобы он соответствовал реальности: каждая задача с точным статусом (completed / in_progress / pending). Для in_progress укажите activeForm. Если плана ещё нет, сначала составьте его.",
+    progressTodoNudgeLabel: "Рекомендуется проверка",
     progressSummaryRefreshLabel: "Обновить",
     progressSummaryRefreshPrompt:
       "Пожалуйста, вызовите mcp__happy__update_session_summary, чтобы записать текущий обзор сессии: goal, currentFocus, keyDecisions (если есть), openQuestions (если есть), impactScope (если есть). Точно и кратко.",

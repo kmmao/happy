@@ -4,6 +4,7 @@ import type { Message, ToolCall } from "@/sync/typesMessage";
 import {
     computeSessionProgress,
     countTodoProgress,
+    getChecklistTabs,
     resolveChecklist,
 } from "./sessionProgressData";
 
@@ -331,5 +332,141 @@ describe("countTodoProgress", () => {
             total: 4,
             completionRatio: 0.5,
         });
+    });
+});
+
+
+describe("resolveChecklist with multi-list metadata", () => {
+    it("prefers lists[currentListId] over legacy flat todos", () => {
+        const result = resolveChecklist(
+            {
+                lists: [
+                    {
+                        id: "list-1",
+                        label: "Phase 1",
+                        todos: [
+                            { content: "X", status: "completed" },
+                            { content: "Y", status: "in_progress", activeForm: "Doing Y" },
+                        ],
+                        startedAt: 1000,
+                        updatedAt: 1500,
+                    },
+                ],
+                currentListId: "list-1",
+                todos: [{ content: "legacy", status: "pending" }],
+                updatedAt: 1500,
+            },
+            { todos: null, todosUpdatedAt: null },
+        );
+        expect(result.source).toBe("mcp");
+        expect(result.listId).toBe("list-1");
+        expect(result.label).toBe("Phase 1");
+        expect(result.todos).toHaveLength(2);
+        expect(result.todos[1]!.activeForm).toBe("Doing Y");
+    });
+
+    it("honors preferredListId to pin a specific list", () => {
+        const result = resolveChecklist(
+            {
+                lists: [
+                    {
+                        id: "a",
+                        todos: [{ content: "old", status: "completed" }],
+                        startedAt: 1,
+                        updatedAt: 2,
+                        archivedAt: 3,
+                    },
+                    {
+                        id: "b",
+                        todos: [{ content: "current", status: "in_progress" }],
+                        startedAt: 10,
+                        updatedAt: 20,
+                    },
+                ],
+                currentListId: "b",
+                updatedAt: 20,
+            },
+            { todos: null, todosUpdatedAt: null },
+            "a",
+        );
+        expect(result.listId).toBe("a");
+        expect(result.todos[0]!.content).toBe("old");
+    });
+
+    it("falls back to last non-archived list when currentListId missing", () => {
+        const result = resolveChecklist(
+            {
+                lists: [
+                    {
+                        id: "a",
+                        todos: [{ content: "archived", status: "completed" }],
+                        startedAt: 1,
+                        updatedAt: 2,
+                        archivedAt: 3,
+                    },
+                    {
+                        id: "b",
+                        todos: [{ content: "alive", status: "pending" }],
+                        startedAt: 10,
+                        updatedAt: 20,
+                    },
+                ],
+                updatedAt: 20,
+            },
+            { todos: null, todosUpdatedAt: null },
+        );
+        expect(result.listId).toBe("b");
+    });
+});
+
+describe("getChecklistTabs", () => {
+    it("returns empty when no multi-list metadata present", () => {
+        expect(getChecklistTabs(undefined)).toEqual([]);
+        expect(
+            getChecklistTabs({
+                todos: [{ content: "x", status: "pending" }],
+                updatedAt: 100,
+            }),
+        ).toEqual([]);
+    });
+
+    it("flags the current list as active and counts completion", () => {
+        const tabs = getChecklistTabs({
+            lists: [
+                {
+                    id: "a",
+                    label: "First",
+                    todos: [
+                        { content: "x", status: "completed" },
+                        { content: "y", status: "completed" },
+                    ],
+                    startedAt: 1,
+                    updatedAt: 2,
+                    archivedAt: 3,
+                },
+                {
+                    id: "b",
+                    label: "Second",
+                    todos: [
+                        { content: "p", status: "completed" },
+                        { content: "q", status: "in_progress" },
+                        { content: "r", status: "pending" },
+                    ],
+                    startedAt: 10,
+                    updatedAt: 20,
+                },
+            ],
+            currentListId: "b",
+            updatedAt: 20,
+        });
+        expect(tabs).toHaveLength(2);
+        expect(tabs[0]!.id).toBe("a");
+        expect(tabs[0]!.active).toBe(false);
+        expect(tabs[0]!.completed).toBe(2);
+        expect(tabs[0]!.total).toBe(2);
+        expect(tabs[1]!.id).toBe("b");
+        expect(tabs[1]!.active).toBe(true);
+        expect(tabs[1]!.completed).toBe(1);
+        expect(tabs[1]!.total).toBe(3);
     });
 });
