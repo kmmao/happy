@@ -67,6 +67,61 @@ export async function startHappyServer(client: ApiSessionClient) {
     }
   };
 
+  // Handler that writes a structured progress checklist into session metadata.
+  // The App subscribes to metadata updates and re-renders the Progress tab.
+  const progressHandler = async (input: {
+    todos: Array<{
+      content: string;
+      status: "pending" | "in_progress" | "completed";
+      stage?: string;
+    }>;
+    currentStage?: string;
+    blockers?: string[];
+  }) => {
+    logger.debug("[happyMCP] update_progress todos=", input.todos?.length);
+    try {
+      client.updateMetadata((metadata) => ({
+        ...metadata,
+        progress: {
+          todos: input.todos ?? [],
+          currentStage: input.currentStage,
+          blockers: input.blockers,
+          updatedAt: Date.now(),
+        },
+      }));
+      return { success: true as const };
+    } catch (error) {
+      return { success: false as const, error: String(error) };
+    }
+  };
+
+  // Handler that writes a narrative session summary into session metadata.
+  const summaryHandler = async (input: {
+    goal: string;
+    currentFocus?: string;
+    keyDecisions?: string[];
+    openQuestions?: string[];
+    impactScope?: string[];
+  }) => {
+    logger.debug("[happyMCP] update_session_summary goal=", input.goal);
+    try {
+      client.updateMetadata((metadata) => ({
+        ...metadata,
+        sessionSummary: {
+          goal: input.goal,
+          currentFocus: input.currentFocus,
+          keyDecisions: input.keyDecisions,
+          openQuestions: input.openQuestions,
+          impactScope: input.impactScope,
+          updatedAt: Date.now(),
+        },
+      }));
+      return { success: true as const };
+    } catch (error) {
+      return { success: false as const, error: String(error) };
+    }
+  };
+
   //
   // Create a per-request MCP server factory
   // @modelcontextprotocol/sdk >= 1.26.0 forbids reusing a stateless
@@ -135,6 +190,108 @@ export async function startHappyServer(client: ApiSessionClient) {
       },
     );
 
+    mcp.registerTool(
+      "update_progress",
+      {
+        description:
+          'Write the live progress checklist the App shows in the Progress tab. Send the FULL list on every call — the previous list is replaced. Call this after planning, after each status change, and when the plan itself shifts (e.g. moving to a new phase). Prefer this over TodoWrite for user-facing progress: this tool is what the App renders.',
+        title: "Update Session Progress",
+        inputSchema: {
+          todos: z
+            .array(
+              z.object({
+                content: z.string().describe("Concise description of the task"),
+                status: z
+                  .enum(["pending", "in_progress", "completed"])
+                  .describe("Current status of the task"),
+                stage: z
+                  .string()
+                  .optional()
+                  .describe("Optional phase/stage label, e.g. 'Phase 2'"),
+              }),
+            )
+            .describe("The full checklist — always send every item, not a delta"),
+          currentStage: z
+            .string()
+            .optional()
+            .describe("Optional overall stage name for the checklist"),
+          blockers: z
+            .array(z.string())
+            .optional()
+            .describe("Optional list of things blocking progress"),
+        } as Record<string, any>,
+      },
+      async (args: any) => {
+        const response = await progressHandler(args);
+        if (response.success) {
+          const count = Array.isArray(args?.todos) ? args.todos.length : 0;
+          return {
+            content: [
+              { type: "text", text: `Progress updated (${count} items).` },
+            ],
+            isError: false,
+          };
+        }
+        return {
+          content: [
+            {
+              type: "text",
+              text: `Failed to update progress: ${response.error || "Unknown error"}`,
+            },
+          ],
+          isError: true,
+        };
+      },
+    );
+
+    mcp.registerTool(
+      "update_session_summary",
+      {
+        description:
+          "Write a narrative session summary the App shows above the progress checklist. Call at milestones, not per task: after first understanding the goal, when scope shifts significantly, when key decisions are made, or when moving to a new phase. Full rewrite each call.",
+        title: "Update Session Summary",
+        inputSchema: {
+          goal: z
+            .string()
+            .describe("What the user ultimately wants to accomplish"),
+          currentFocus: z
+            .string()
+            .optional()
+            .describe("Brief description of the active task or phase"),
+          keyDecisions: z
+            .array(z.string())
+            .optional()
+            .describe("Important choices already made this session"),
+          openQuestions: z
+            .array(z.string())
+            .optional()
+            .describe("Unresolved questions or pending decisions"),
+          impactScope: z
+            .array(z.string())
+            .optional()
+            .describe("Modules/files/areas affected by this session's work"),
+        } as Record<string, any>,
+      },
+      async (args: any) => {
+        const response = await summaryHandler(args);
+        if (response.success) {
+          return {
+            content: [{ type: "text", text: "Session summary updated." }],
+            isError: false,
+          };
+        }
+        return {
+          content: [
+            {
+              type: "text",
+              text: `Failed to update session summary: ${response.error || "Unknown error"}`,
+            },
+          ],
+          isError: true,
+        };
+      },
+    );
+
     return mcp;
   }
 
@@ -175,7 +332,12 @@ export async function startHappyServer(client: ApiSessionClient) {
 
   return {
     url: baseUrl.toString(),
-    toolNames: ["change_title", "query_project_knowledge"],
+    toolNames: [
+      "change_title",
+      "query_project_knowledge",
+      "update_progress",
+      "update_session_summary",
+    ],
     stop: () => {
       logger.debug(`[happyMCP] server:stop sessionId=${client.sessionId}`);
       server.close();

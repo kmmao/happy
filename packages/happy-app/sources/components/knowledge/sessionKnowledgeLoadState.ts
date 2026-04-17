@@ -1,4 +1,9 @@
-export type SessionKnowledgeTab = "changes" | "references" | "evicted" | "archive";
+export type SessionKnowledgeTab =
+    | "progress"
+    | "changes"
+    | "references"
+    | "evicted"
+    | "archive";
 
 interface SessionKnowledgeLoadStateInput {
     visible: boolean;

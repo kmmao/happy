@@ -422,6 +422,32 @@ export type Metadata = {
     text: string;
     updatedAt: number;
   };
+  /**
+   * Live progress checklist written by the Agent via the MCP
+   * `update_progress` tool. Full rewrite on each update.
+   */
+  progress?: {
+    todos: Array<{
+      content: string;
+      status: "pending" | "in_progress" | "completed";
+      stage?: string;
+    }>;
+    currentStage?: string;
+    blockers?: string[];
+    updatedAt: number;
+  };
+  /**
+   * Narrative session summary written by the Agent via the MCP
+   * `update_session_summary` tool at milestones.
+   */
+  sessionSummary?: {
+    goal: string;
+    currentFocus?: string;
+    keyDecisions?: string[];
+    openQuestions?: string[];
+    impactScope?: string[];
+    updatedAt: number;
+  };
   machineId?: string;
   claudeSessionId?: string; // Claude Code session ID
   tools?: string[];

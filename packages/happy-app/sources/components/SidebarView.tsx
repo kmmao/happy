@@ -2,11 +2,12 @@ import {
   useSocketStatus,
   useFriendRequests,
   useSettings,
+  useHasUnreadMessages,
 } from "@/sync/storage";
 import * as React from "react";
-import { Text, View, Pressable } from "react-native";
+import { Text, View, Pressable, ScrollView } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useRouter } from "expo-router";
+import { useRouter, usePathname } from "expo-router";
 import { useHeaderHeight } from "@/utils/responsive";
 import { useIsTablet } from "@/utils/responsive";
 import { Typography } from "@/constants/Typography";
@@ -21,6 +22,15 @@ import { t } from "@/text";
 import { useInboxHasContent } from "@/hooks/useInboxHasContent";
 import { Ionicons } from "@expo/vector-icons";
 import { useSidebarState } from "./SidebarStateContext";
+import { Avatar } from "./Avatar";
+import { useVisibleSessionListViewData } from "@/hooks/useVisibleSessionListViewData";
+import { useNavigateToSession } from "@/hooks/useNavigateToSession";
+import {
+  getSessionAvatarId,
+  getSessionProviderKey,
+  useSessionStatus,
+} from "@/utils/sessionUtils";
+import type { Session } from "@/sync/storageTypes";
 
 const stylesheet = StyleSheet.create((theme) => ({
   container: {
@@ -190,13 +200,82 @@ const stylesheet = StyleSheet.create((theme) => ({
     right: 0,
     alignItems: "center",
   },
+  railSessionsScroll: {
+    flex: 1,
+    alignSelf: "stretch",
+  },
+  railSessionsContent: {
+    alignItems: "center",
+    paddingVertical: 4,
+    gap: 6,
+  },
+  railSessionButton: {
+    width: 40,
+    height: 40,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 10,
+  },
+  railSessionButtonSelected: {
+    backgroundColor: theme.colors.surfaceSelected,
+  },
+  railNewSessionButton: {
+    width: 36,
+    height: 36,
+    alignItems: "center",
+    justifyContent: "center",
+    position: "relative",
+  },
 }));
+
+const RailSessionIcon = React.memo(
+  ({
+    session,
+    selected,
+    onPress,
+  }: {
+    session: Session;
+    selected: boolean;
+    onPress: () => void;
+  }) => {
+    const styles = stylesheet;
+    const { theme } = useUnistyles();
+    const sessionStatus = useSessionStatus(session);
+    const avatarId = React.useMemo(
+      () => getSessionAvatarId(session),
+      [session],
+    );
+    const hasUnread = useHasUnreadMessages(session.id);
+
+    return (
+      <Pressable
+        onPress={onPress}
+        hitSlop={4}
+        style={[
+          styles.railSessionButton,
+          selected && styles.railSessionButtonSelected,
+        ]}
+      >
+        <Avatar
+          id={avatarId}
+          size={28}
+          monochrome={!sessionStatus.isConnected}
+          flavor={session.metadata?.flavor}
+          provider={getSessionProviderKey(session)}
+          hasUnreadMessages={hasUnread}
+          glowColor={selected ? theme.colors.accentPurple : null}
+        />
+      </Pressable>
+    );
+  },
+);
 
 export const SidebarView = React.memo(() => {
   const styles = stylesheet;
   const { theme } = useUnistyles();
   const safeArea = useSafeAreaInsets();
   const router = useRouter();
+  const pathname = usePathname();
   const headerHeight = useHeaderHeight();
   const isTablet = useIsTablet();
   const socketStatus = useSocketStatus();
@@ -205,6 +284,27 @@ export const SidebarView = React.memo(() => {
   const inboxHasContent = useInboxHasContent();
   const settings = useSettings();
   const { collapsed, toggleCollapsed } = useSidebarState();
+  const sessionListViewData = useVisibleSessionListViewData();
+  const navigateToSession = useNavigateToSession();
+
+  const railSessions = React.useMemo<Session[]>(() => {
+    if (!sessionListViewData) return [];
+    const result: Session[] = [];
+    for (const item of sessionListViewData) {
+      if (item.type === "active-sessions") {
+        result.push(...item.sessions);
+      } else if (item.type === "session") {
+        result.push(item.session);
+      }
+    }
+    return result;
+  }, [sessionListViewData]);
+
+  const selectedSessionId = React.useMemo(() => {
+    if (!pathname.startsWith("/session/")) return undefined;
+    const parts = pathname.split("/");
+    return parts[2];
+  }, [pathname]);
 
   const connectionStatus = React.useMemo(() => {
     const { status } = socketStatus;
@@ -335,13 +435,32 @@ export const SidebarView = React.memo(() => {
             />
           </Pressable>
 
-          <View style={{ flex: 1 }} />
+          {railSessions.length > 0 && <View style={styles.railDivider} />}
 
-          {/* New session */}
+          {/* Sessions list - scrollable so user can switch sessions while collapsed */}
+          <ScrollView
+            style={styles.railSessionsScroll}
+            contentContainerStyle={styles.railSessionsContent}
+            showsVerticalScrollIndicator={false}
+          >
+            {railSessions.map((session) => (
+              <RailSessionIcon
+                key={session.id}
+                session={session}
+                selected={selectedSessionId === session.id}
+                onPress={() => navigateToSession(session.id)}
+              />
+            ))}
+          </ScrollView>
+
+          {/* New session - pinned to bottom */}
           <Pressable
             onPress={handleNewSession}
             hitSlop={8}
-            style={[styles.railButton, { marginBottom: safeArea.bottom + 12 }]}
+            style={[
+              styles.railNewSessionButton,
+              { marginBottom: safeArea.bottom + 12, marginTop: 4 },
+            ]}
           >
             <Ionicons
               name="add-outline"

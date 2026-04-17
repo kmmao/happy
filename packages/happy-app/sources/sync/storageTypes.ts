@@ -49,6 +49,30 @@ export const MetadataSchema = z.object({
       updatedAt: z.number(),
     })
     .optional(),
+  progress: z
+    .object({
+      todos: z.array(
+        z.object({
+          content: z.string(),
+          status: z.enum(["pending", "in_progress", "completed"]),
+          stage: z.string().optional(),
+        }),
+      ),
+      currentStage: z.string().optional(),
+      blockers: z.array(z.string()).optional(),
+      updatedAt: z.number(),
+    })
+    .optional(),
+  sessionSummary: z
+    .object({
+      goal: z.string(),
+      currentFocus: z.string().optional(),
+      keyDecisions: z.array(z.string()).optional(),
+      openQuestions: z.array(z.string()).optional(),
+      impactScope: z.array(z.string()).optional(),
+      updatedAt: z.number(),
+    })
+    .optional(),
   machineId: z.string().optional(),
   claudeSessionId: z.string().optional(), // Claude Code session ID
   tools: z.array(z.string()).optional(),
