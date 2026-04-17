@@ -418,11 +418,18 @@ export function sessionRoutes(app: Fastify) {
         // Resolve seq for the update event
         const updSeq = await allocateUserSeq(userId);
 
-        // Update metadata, encryption key, and reactivate
+        // Reactivate the session and rotate the encryption key if provided.
+        // IMPORTANT: Do not overwrite `metadata` here. The encrypted blob
+        // accumulates agent-driven state (progress / sessionSummary /
+        // summary / tools / ...) that outlives any single CLI process, and
+        // reconnects triggered by daemon restarts or `npm upgrade` ship
+        // only a fresh set of startup fields (path / version / pid / ...).
+        // Overwriting would wipe all agent-accumulated state. CLI merges
+        // its startup fields over the preserved blob via the
+        // `update-metadata` socket event (optimistic concurrency).
         const updated = await db.session.update({
           where: { id: sessionId },
           data: {
-            metadata,
             ...(dataEncryptionKey
               ? {
                   dataEncryptionKey: new Uint8Array(
