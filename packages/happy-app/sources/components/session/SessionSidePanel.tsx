@@ -47,7 +47,7 @@ export const SessionSidePanel = React.memo<SessionSidePanelProps>(
     function SessionSidePanel({ sessionId, collapsed, onToggleCollapse }) {
         const { theme } = useUnistyles();
         const enablePreviewTab = useSetting("enablePreviewTab");
-        const [activeTab, setActiveTab] = React.useState<SessionPanelTab>("changes");
+        const [activeTab, setActiveTab] = React.useState<SessionPanelTab>("summary");
         const [previewingFile, setPreviewingFile] = React.useState<string | null>(null);
         const [showKnowledgeSheet, setShowKnowledgeSheet] = React.useState(false);
         const [knowledgeSheetInitialTab, setKnowledgeSheetInitialTab] = React.useState<SessionKnowledgeTab>("changes");

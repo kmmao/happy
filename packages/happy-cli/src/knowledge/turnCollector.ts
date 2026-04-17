@@ -167,4 +167,12 @@ export class TurnCollector {
   getPendingCount(): number {
     return this.pendingTurns.length;
   }
+
+  /**
+   * Return the assistant text accumulated during the current/last turn.
+   * Used by per-turn hit detection against injected knowledge entries.
+   */
+  getAssistantTextSnapshot(): string {
+    return this.assistantText;
+  }
 }

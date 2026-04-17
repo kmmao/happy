@@ -3,11 +3,11 @@ import { describe, expect, it } from "vitest";
 import { getSessionPanelTabs } from "./sessionPanelTabs";
 
 describe("getSessionPanelTabs", () => {
-    it("places changes first and files second", () => {
+    it("places summary first and changes second", () => {
         const tabs = getSessionPanelTabs(true);
 
-        expect(tabs[0]).toBe("changes");
-        expect(tabs[1]).toBe("files");
+        expect(tabs[0]).toBe("summary");
+        expect(tabs[1]).toBe("changes");
     });
 
     it("hides preview tab when experiment is disabled", () => {

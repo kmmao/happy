@@ -15,7 +15,9 @@ export type KnowledgeSummaryTranslationKey =
     | "sidePanel.knowledgeReferenced"
     | "sidePanel.knowledgeCapturedValue"
     | "sidePanel.knowledgeReferencedValue"
-    | "sidePanel.knowledgeLatestPrefix";
+    | "sidePanel.knowledgeLatestPrefix"
+    | "sidePanel.knowledgeHitSuffix"
+    | "sidePanel.knowledgeHotSuffix";
 
 export type KnowledgeSummaryTranslate = (
     key: KnowledgeSummaryTranslationKey,
@@ -25,7 +27,10 @@ export type KnowledgeSummaryTranslate = (
 interface KnowledgeSummaryInput {
     knowledgeCount: number;
     capturedEntries: Pick<SessionKnowledgeEntry, "id" | "title" | "createdAt">[];
-    referencedEntries: Pick<SessionKnowledgeAccessEntry, "id" | "title" | "createdAt">[];
+    referencedEntries: Pick<
+        SessionKnowledgeAccessEntry,
+        "id" | "title" | "createdAt" | "hitCount" | "hotStatus"
+    >[];
     t: KnowledgeSummaryTranslate;
 }
 
@@ -71,16 +76,34 @@ export function buildKnowledgeSummaryRows({
     }
 
     if (referencedEntries.length > 0) {
+        // Base "N injected" line (existing semantics: count of entries the session has injected).
+        let value = appendLatestTitle(
+            t("sidePanel.knowledgeReferencedValue", {
+                count: referencedEntries.length,
+            }),
+            getLatestTitle(referencedEntries),
+            t,
+        );
+
+        // Enrich with TTL-by-turn stats when the server provides them:
+        //   Hit  = entries whose assistant text matched at least once in a turn
+        //   Hot  = entries still in the session hot set (turnsRemaining > 0)
+        const hitCount = referencedEntries.filter((e) => (e.hitCount ?? 0) > 0).length;
+        const hotCount = referencedEntries.filter((e) => e.hotStatus === "hot").length;
+        const hasTtlStats = referencedEntries.some(
+            (e) => e.hitCount !== undefined || e.hotStatus !== undefined,
+        );
+        if (hasTtlStats) {
+            value =
+                value +
+                t("sidePanel.knowledgeHitSuffix", { count: hitCount }) +
+                t("sidePanel.knowledgeHotSuffix", { count: hotCount });
+        }
+
         rows.push({
             icon: "link",
             label: t("sidePanel.knowledgeReferenced"),
-            value: appendLatestTitle(
-                t("sidePanel.knowledgeReferencedValue", {
-                    count: referencedEntries.length,
-                }),
-                getLatestTitle(referencedEntries),
-                t,
-            ),
+            value,
             isInteractive: true,
             targetTab: "references",
         });

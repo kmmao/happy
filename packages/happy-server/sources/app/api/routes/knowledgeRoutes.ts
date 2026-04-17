@@ -12,7 +12,11 @@ import { trackKnowledgeCreation } from "@/modules/knowledgeAutoProfile";
 import { refineKnowledgeEntry } from "@/modules/knowledgeRefiner";
 import { addRelations, type KnowledgeRelationType } from "@/modules/knowledgeRelation";
 import { inboxCreate } from "@/modules/inboxCreate";
-import { recordKnowledgeAccess, getSessionKnowledgeAccesses } from "@/modules/knowledgeAccess";
+import {
+    getSessionHotStats,
+    getSessionKnowledgeAccesses,
+    recordKnowledgeAccess,
+} from "@/modules/knowledgeAccess";
 import { resolveKnowledgeConfig } from "@/modules/knowledgeConfigResolver";
 
 // Inline Zod schemas (mirrors @kmmao/happy-wire/knowledge.ts)
@@ -729,7 +733,11 @@ export function knowledgeRoutes(app: Fastify) {
             if (entries.length > 0) {
                 const ids = entries.map((e) => e.id);
                 if (sessionId) {
-                    void recordKnowledgeAccess(sessionId, id, ids);
+                    void recordKnowledgeAccess(
+                        sessionId,
+                        id,
+                        entries.map((e) => ({ id: e.id, confidence: e.confidence })),
+                    );
                 } else {
                     void db.projectKnowledge.updateMany({
                         where: { id: { in: ids } },
@@ -870,13 +878,46 @@ export function knowledgeRoutes(app: Fastify) {
             const accesses = await getSessionKnowledgeAccesses(id, sessionId);
 
             return reply.send({
-                accesses: accesses.map(({ knowledge, at }) => ({
-                    ...knowledge,
-                    tags: safeParseJsonArray(knowledge.tags),
-                    createdAt: knowledge.createdAt.getTime(),
-                    accessedAt: at.getTime(),
+                accesses: accesses.map((row) => ({
+                    ...row.knowledge,
+                    tags: safeParseJsonArray(row.knowledge.tags),
+                    createdAt: row.knowledge.createdAt.getTime(),
+                    accessedAt: row.at.getTime(),
+                    hitCount: row.hitCount,
+                    turnsRemaining: row.turnsRemaining,
+                    maxTurns: row.maxTurns,
+                    initialTurns: row.initialTurns,
+                    hotStatus: row.hotStatus,
+                    lastHitAt: row.lastHitAt ? row.lastHitAt.getTime() : null,
                 })),
             });
+        },
+    );
+
+    // ─── Session-scoped hot-set stats (Injected / Referenced / Hot / Evicted) ───
+    app.get(
+        "/v1/projects/:id/knowledge/hot-stats",
+        {
+            preHandler: app.authenticate,
+            schema: {
+                params: z.object({ id: z.string() }),
+                querystring: z.object({ sessionId: z.string() }),
+            },
+        },
+        async (request, reply) => {
+            const userId = request.userId;
+            const { id } = request.params;
+            const { sessionId } = request.query;
+
+            const project = await db.project.findFirst({
+                where: { id, accountId: userId },
+            });
+            if (!project) {
+                return reply.code(404).send({ error: "Project not found" });
+            }
+
+            const stats = await getSessionHotStats(sessionId);
+            return reply.send(stats);
         },
     );
 

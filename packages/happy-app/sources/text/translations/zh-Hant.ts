@@ -601,6 +601,12 @@ export const zhHant: TranslationStructure = {
     knowledgeAccessesSubtitle: "本會話中 AI 引用的知識條目",
     knowledgeAccessesEmpty: "本會話暫無引用的知識",
     knowledgeAccessGoToSource: "跳轉到來源會話",
+    knowledgeBadgeEvicted: "已遷出",
+    knowledgeBadgeTooltipTitle: "回合預算",
+    knowledgeBadgeTooltipHot: ({ turns, max, hits }: { turns: number; max: number; hits: number }) =>
+      `剩餘 ${turns}/${max} 回合，本會話共引用 ${hits} 次。命中 +1（上限 ${max}），未命中 −1，歸零即遷出注入。`,
+    knowledgeBadgeTooltipEvicted:
+      "倒數歸零 — 該條目已從本會話注入中移出。再次命中或新的相關話題會重新啟用它。",
     recommendationsTitle: "本次會話建議處理",
     recommendationsTapHint: "點擊填入輸入框",
     autoOptionSendLabel: "自動",
@@ -1191,6 +1197,8 @@ export const zhHant: TranslationStructure = {
     knowledgeReferenced: "知識引用",
     knowledgeReferencedValue: ({ count }: { count: number }) => `${count} 條`,
     knowledgeLatestPrefix: "最新",
+    knowledgeHitSuffix: ({ count }: { count: number }) => ` · 命中 ${count}`,
+    knowledgeHotSuffix: ({ count }: { count: number }) => ` · 活躍 ${count}`,
   },
 
   settingsVoice: {

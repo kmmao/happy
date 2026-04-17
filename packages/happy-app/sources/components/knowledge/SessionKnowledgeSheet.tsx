@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { Typography } from "@/constants/Typography";
 import { t } from "@/text";
+import { Modal } from "@/modal";
 import { layout } from "@/components/layout";
 import { useSessionKnowledge, type SessionKnowledgeEntry } from "@/hooks/useSessionKnowledge";
 import { useSessionKnowledgeAccesses, type SessionKnowledgeAccessEntry } from "@/hooks/useSessionKnowledgeAccesses";
@@ -25,6 +26,14 @@ const STATUS_COLORS: Record<string, string> = {
     superseded: "#F97316",
     archived: "#9CA3AF",
 };
+
+// Session TTL badge colors:
+//   - hot + never hit   → blue (fresh, waiting to be referenced)
+//   - hot + has hits    → orange (proven useful, banking turns)
+//   - evicted           → grey (countdown hit zero, not injected anymore)
+const HOT_BADGE_COLOR_FRESH = "#3B82F6";
+const HOT_BADGE_COLOR_USED = "#F97316";
+const EVICTED_BADGE_COLOR = "#9CA3AF";
 
 interface SessionKnowledgeSheetProps {
     visible: boolean;
@@ -48,6 +57,78 @@ interface EntryRowProps {
     entry: SessionKnowledgeEntry | SessionKnowledgeAccessEntry;
     onPress?: () => void;
 }
+
+interface HotBadgeProps {
+    entry: SessionKnowledgeEntry | SessionKnowledgeAccessEntry;
+}
+
+function isAccessEntry(
+    entry: SessionKnowledgeEntry | SessionKnowledgeAccessEntry,
+): entry is SessionKnowledgeAccessEntry {
+    return "hotStatus" in entry || "turnsRemaining" in entry;
+}
+
+const HotBadge = React.memo<HotBadgeProps>(({ entry }) => {
+    if (!isAccessEntry(entry)) return null;
+    const hotStatus = entry.hotStatus;
+    const turnsRemaining = entry.turnsRemaining;
+    const maxTurns = entry.maxTurns;
+    const hitCount = entry.hitCount ?? 0;
+
+    // Backward compat: if server didn't include TTL fields, skip the badge entirely.
+    if (hotStatus === undefined && turnsRemaining === undefined) return null;
+
+    // Long-press opens an inline explanation so users understand why an entry
+    // is "hot" vs "evicted" and how the turn-based countdown works.
+    const showTooltip = () => {
+        const title = t("session.knowledgeBadgeTooltipTitle");
+        const body = hotStatus === "evicted"
+            ? t("session.knowledgeBadgeTooltipEvicted")
+            : t("session.knowledgeBadgeTooltipHot", {
+                turns: turnsRemaining ?? 0,
+                max: maxTurns ?? 0,
+                hits: hitCount,
+            });
+        Modal.alert(title, body);
+    };
+
+    if (hotStatus === "evicted") {
+        return (
+            <Pressable
+                onLongPress={showTooltip}
+                delayLongPress={300}
+                style={[styles.hotBadge, { backgroundColor: EVICTED_BADGE_COLOR + "20" }]}
+                accessibilityRole="button"
+                accessibilityLabel={t("session.knowledgeBadgeTooltipTitle")}
+            >
+                <Text style={[styles.hotBadgeText, { color: EVICTED_BADGE_COLOR }]}>
+                    {t("session.knowledgeBadgeEvicted")}
+                </Text>
+            </Pressable>
+        );
+    }
+
+    const color = hitCount > 0 ? HOT_BADGE_COLOR_USED : HOT_BADGE_COLOR_FRESH;
+    const budget = turnsRemaining !== undefined && maxTurns !== undefined
+        ? `${turnsRemaining}/${maxTurns}`
+        : null;
+    const hitText = hitCount > 0 ? ` · ${hitCount}×` : "";
+    const label = budget ? `${budget}${hitText}` : `${hitCount}×`;
+
+    return (
+        <Pressable
+            onLongPress={showTooltip}
+            delayLongPress={300}
+            style={[styles.hotBadge, { backgroundColor: color + "20" }]}
+            accessibilityRole="button"
+            accessibilityLabel={t("session.knowledgeBadgeTooltipTitle")}
+        >
+            <Text style={[styles.hotBadgeText, { color }]}>
+                {label}
+            </Text>
+        </Pressable>
+    );
+});
 
 const EntryRow = React.memo<EntryRowProps>(({ activeTab, entry, onPress }) => {
     const { theme } = useUnistyles();
@@ -74,6 +155,7 @@ const EntryRow = React.memo<EntryRowProps>(({ activeTab, entry, onPress }) => {
                         </Text>
                     </View>
                 )}
+                {activeTab === "references" && <HotBadge entry={entry} />}
                 <Text style={[styles.entryTime, { color: theme.colors.textSecondary }]}>
                     {formatTime(getSessionKnowledgeDisplayTimestamp({ activeTab, entry }))}
                 </Text>
@@ -444,6 +526,15 @@ const styles = StyleSheet.create({
         ...Typography.default("semiBold"),
         fontSize: 10,
         textTransform: "uppercase",
+    },
+    hotBadge: {
+        paddingHorizontal: 6,
+        paddingVertical: 2,
+        borderRadius: 4,
+    },
+    hotBadgeText: {
+        ...Typography.default("semiBold"),
+        fontSize: 10,
     },
     entryTime: {
         ...Typography.default("regular"),

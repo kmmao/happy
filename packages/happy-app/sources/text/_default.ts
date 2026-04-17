@@ -616,6 +616,12 @@ export const en = {
     knowledgeAccessesSubtitle: "Knowledge entries referenced by AI in this session",
     knowledgeAccessesEmpty: "No knowledge referenced in this session",
     knowledgeAccessGoToSource: "Go to source session",
+    knowledgeBadgeEvicted: "evicted",
+    knowledgeBadgeTooltipTitle: "Turn budget",
+    knowledgeBadgeTooltipHot: ({ turns, max, hits }: { turns: number; max: number; hits: number }) =>
+      `${turns}/${max} turns remaining. Referenced ${hits}× this session. Each turn: hit → +1 (cap ${max}), miss → −1, reaches 0 → evicted from injection.`,
+    knowledgeBadgeTooltipEvicted:
+      "Countdown reached zero — this entry is no longer injected in the current session. Re-reference or a new relevant turn will re-activate it.",
     recommendationsTitle: "Suggested for This Session",
     recommendationsTapHint: "Tap to add to input",
     autoOptionSendLabel: "Auto",
@@ -1219,6 +1225,8 @@ export const en = {
     knowledgeReferencedValue: ({ count }: { count: number }) =>
       `${count} ${count === 1 ? "entry" : "entries"}`,
     knowledgeLatestPrefix: "Latest",
+    knowledgeHitSuffix: ({ count }: { count: number }) => ` · ${count} hit`,
+    knowledgeHotSuffix: ({ count }: { count: number }) => ` · ${count} hot`,
   },
 
   settingsVoice: {

@@ -26,6 +26,13 @@ export interface SessionKnowledgeAccessEntry {
     sessionId: string | null;
     createdAt: number;
     accessedAt: number;
+    // Session TTL-by-turn fields (present on server ≥ 2026-04-17; optional for backward compat).
+    hitCount?: number;
+    turnsRemaining?: number;
+    maxTurns?: number;
+    initialTurns?: number;
+    hotStatus?: "hot" | "evicted";
+    lastHitAt?: number | null;
 }
 
 interface AccessesResponse {

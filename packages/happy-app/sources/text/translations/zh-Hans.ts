@@ -601,6 +601,12 @@ export const zhHans: TranslationStructure = {
     knowledgeAccessesSubtitle: "本会话中 AI 引用的知识条目",
     knowledgeAccessesEmpty: "本会话暂无引用的知识",
     knowledgeAccessGoToSource: "跳转到来源会话",
+    knowledgeBadgeEvicted: "已迁出",
+    knowledgeBadgeTooltipTitle: "回合预算",
+    knowledgeBadgeTooltipHot: ({ turns, max, hits }: { turns: number; max: number; hits: number }) =>
+      `剩余 ${turns}/${max} 回合，本会话共引用 ${hits} 次。命中 +1（上限 ${max}），未命中 −1，归零即迁出注入。`,
+    knowledgeBadgeTooltipEvicted:
+      "倒计时归零 — 该条目已从本会话注入中移出。再次命中或新的相关话题会重新激活它。",
     recommendationsTitle: "本次会话建议处理",
     recommendationsTapHint: "点击填入输入框",
     autoOptionSendLabel: "自动",
@@ -1191,6 +1197,8 @@ export const zhHans: TranslationStructure = {
     knowledgeReferenced: "知识引用",
     knowledgeReferencedValue: ({ count }: { count: number }) => `${count} 条`,
     knowledgeLatestPrefix: "最新",
+    knowledgeHitSuffix: ({ count }: { count: number }) => ` · 命中 ${count}`,
+    knowledgeHotSuffix: ({ count }: { count: number }) => ` · 活跃 ${count}`,
   },
 
   settingsVoice: {

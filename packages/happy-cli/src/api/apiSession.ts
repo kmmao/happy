@@ -991,6 +991,18 @@ export class ApiSessionClient extends EventEmitter {
   }
 
   /**
+   * Report per-turn knowledge hits. hitIds are ProjectKnowledge ids the CLI detected
+   * as referenced by the assistant this turn. Server uses this to tick the TTL-by-turn
+   * counters on KnowledgeAccess rows and evict cold entries.
+   */
+  emitKnowledgeTurnEnd(hitIds: string[]) {
+    this.socket.volatile.emit("knowledge-turn-end", {
+      sid: this.sessionId,
+      hitIds,
+    });
+  }
+
+  /**
    * Fetch knowledge context from server for injection into session.
    * Uses socket.io emitWithAck (already authenticated).
    * Returns null on timeout or error.

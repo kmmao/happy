@@ -640,6 +640,12 @@ export const pl: TranslationStructure = {
     knowledgeAccessesSubtitle: "Wpisy wiedzy, do których odwoływał się AI w tej sesji",
     knowledgeAccessesEmpty: "Brak odniesień do wiedzy w tej sesji",
     knowledgeAccessGoToSource: "Przejdź do sesji źródłowej",
+    knowledgeBadgeEvicted: "usunięta",
+    knowledgeBadgeTooltipTitle: "Budżet tur",
+    knowledgeBadgeTooltipHot: ({ turns, max, hits }: { turns: number; max: number; hits: number }) =>
+      `Pozostało ${turns}/${max} tur. Przywołana ${hits}× w tej sesji. Trafienie +1 (limit ${max}), chybienie −1, po dojściu do 0 zostaje usunięta z iniekcji.`,
+    knowledgeBadgeTooltipEvicted:
+      "Licznik doszedł do zera — ten wpis nie jest już wstrzykiwany w bieżącej sesji. Ponowne odwołanie lub istotna tura go reaktywuje.",
     recommendationsTitle: "Sugerowane dla tej sesji",
     recommendationsTapHint: "Dotknij, aby dodać do pola tekstowego",
     autoOptionSendLabel: "Auto",
@@ -1246,6 +1252,8 @@ export const pl: TranslationStructure = {
     knowledgeReferencedValue: ({ count }: { count: number }) =>
       `${count} ${count === 1 ? "wpis" : "wpisów"}`,
     knowledgeLatestPrefix: "Najnowsze",
+    knowledgeHitSuffix: ({ count }: { count: number }) => ` · ${count} traf.`,
+    knowledgeHotSuffix: ({ count }: { count: number }) => ` · ${count} akt.`,
   },
 
   settingsVoice: {

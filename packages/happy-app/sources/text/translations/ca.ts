@@ -630,6 +630,12 @@ export const ca: TranslationStructure = {
     knowledgeAccessesSubtitle: "Entrades de coneixement referenciades per AI en aquesta sessió",
     knowledgeAccessesEmpty: "Sense referències de coneixement en aquesta sessió",
     knowledgeAccessGoToSource: "Anar a la sessió d'origen",
+    knowledgeBadgeEvicted: "exclosa",
+    knowledgeBadgeTooltipTitle: "Pressupost de torns",
+    knowledgeBadgeTooltipHot: ({ turns, max, hits }: { turns: number; max: number; hits: number }) =>
+      `Queden ${turns}/${max} torns. Referenciada ${hits}× en aquesta sessió. Encert +1 (topall ${max}), fallada −1, en arribar a 0 s'exclou de la injecció.`,
+    knowledgeBadgeTooltipEvicted:
+      "El compte enrere ha arribat a zero — aquesta entrada ja no s'injecta en la sessió actual. Una nova referència o un torn rellevant la reactivarà.",
     recommendationsTitle: "Suggerit per a aquesta sessió",
     recommendationsTapHint: "Toca per afegir a l'entrada",
     autoOptionSendLabel: "Auto",
@@ -1235,6 +1241,8 @@ export const ca: TranslationStructure = {
     knowledgeReferencedValue: ({ count }: { count: number }) =>
       `${count} ${count === 1 ? "entrada" : "entrades"}`,
     knowledgeLatestPrefix: "Últim",
+    knowledgeHitSuffix: ({ count }: { count: number }) => ` · ${count} encert${count === 1 ? "" : "s"}`,
+    knowledgeHotSuffix: ({ count }: { count: number }) => ` · ${count} activ${count === 1 ? "a" : "es"}`,
   },
 
   settingsVoice: {

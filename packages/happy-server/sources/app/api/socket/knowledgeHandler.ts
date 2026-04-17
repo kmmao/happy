@@ -11,13 +11,24 @@ import { buildKnowledgeCountEphemeral, eventRouter } from "@/app/events/eventRou
 import { inTx } from "@/storage/inTx";
 import { addRelations, type KnowledgeRelationType } from "@/modules/knowledgeRelation";
 import { resolveKnowledgeConfig } from "@/modules/knowledgeConfigResolver";
-import { recordKnowledgeAccess } from "@/modules/knowledgeAccess";
+import {
+    applyTurnHit,
+    getEvictedKnowledgeIds,
+    recordKnowledgeAccess,
+} from "@/modules/knowledgeAccess";
 
 // Zod schemas for socket knowledge events (defense-in-depth)
 const FetchKnowledgeSchema = z.object({
     sid: z.string().min(1),
     mode: z.enum(["auto", "full", "minimal"]).default("auto"),
     contextHints: z.array(z.string().max(200)).max(20).optional(),
+});
+
+// Per-turn hit report from CLI. hitIds are ProjectKnowledge ids the CLI detected
+// as referenced during the turn (tag/file/title match against assistant output).
+const KnowledgeTurnEndSchema = z.object({
+    sid: z.string().min(1),
+    hitIds: z.array(z.string().min(1)).max(100).default([]),
 });
 
 const SubmitKnowledgeSchema = z.object({
@@ -212,11 +223,18 @@ export function knowledgeHandler(userId: string, socket: Socket) {
             // Determine entry limit based on stored mode
             const entryLimit = effectiveMode === "full" ? 20 : 5;
 
+            // Skip entries that have already been evicted in this session (migrate-out countdown hit zero).
+            const evictedIds = await getEvictedKnowledgeIds(sid);
+
             let entries;
             if (contextHints && contextHints.length > 0) {
                 // Keyword-based relevance scoring
                 const allActive = await db.projectKnowledge.findMany({
-                    where: { projectId, status: "active" },
+                    where: {
+                        projectId,
+                        status: "active",
+                        ...(evictedIds.size > 0 ? { id: { notIn: [...evictedIds] } } : {}),
+                    },
                     orderBy: [{ pinned: "desc" }, { createdAt: "desc" }],
                     take: 100,
                 });
@@ -232,7 +250,11 @@ export function knowledgeHandler(userId: string, socket: Socket) {
                 entries = scored.slice(0, entryLimit).map((s) => s.entry);
             } else {
                 entries = await db.projectKnowledge.findMany({
-                    where: { projectId, status: "active" },
+                    where: {
+                        projectId,
+                        status: "active",
+                        ...(evictedIds.size > 0 ? { id: { notIn: [...evictedIds] } } : {}),
+                    },
                     orderBy: [{ pinned: "desc" }, { createdAt: "desc" }],
                     take: entryLimit,
                 });
@@ -240,8 +262,11 @@ export function knowledgeHandler(userId: string, socket: Socket) {
 
             // Fire-and-forget: record access log (writes knowledgeAccess records + bumps counters)
             if (entries.length > 0) {
-                const ids = entries.map((e) => e.id);
-                void recordKnowledgeAccess(sid, projectId, ids);
+                void recordKnowledgeAccess(
+                    sid,
+                    projectId,
+                    entries.map((e) => ({ id: e.id, confidence: e.confidence })),
+                );
             }
 
             // Fetch action items: warning/decision entries + high-confidence not recently accessed
@@ -295,6 +320,35 @@ export function knowledgeHandler(userId: string, socket: Socket) {
         } catch (err) {
             log({ module: "knowledge" }, `Error fetching knowledge: ${err}`);
             if (callback) callback({ profile: null, entries: [] });
+        }
+    });
+
+    // Per-turn hit report: CLI tells us which injected entries were actually referenced
+    // by the assistant in the finished turn. Hits top up the turn budget; misses tick down.
+    // When a row's turnsRemaining hits 0 it is evicted from future injections in this session.
+    socket.on("knowledge-turn-end", async (data: unknown) => {
+        try {
+            const parsed = KnowledgeTurnEndSchema.safeParse(data);
+            if (!parsed.success) {
+                log({ module: "knowledge" }, `Invalid knowledge-turn-end: ${parsed.error.message.slice(0, 200)}`);
+                return;
+            }
+            const { sid, hitIds } = parsed.data;
+
+            // Confirm the session belongs to this user before mutating state.
+            const session = await db.session.findFirst({
+                where: { id: sid, accountId: userId },
+                select: { id: true },
+            });
+            if (!session) return;
+
+            const summary = await applyTurnHit(sid, hitIds);
+            log(
+                { module: "knowledge" },
+                `Turn-end ${sid}: hit=${summary.hit} miss=${summary.miss} evicted=${summary.evicted}`,
+            );
+        } catch (err) {
+            log({ module: "knowledge" }, `Error handling knowledge-turn-end: ${err}`);
         }
     });
 }

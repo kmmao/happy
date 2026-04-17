@@ -802,9 +802,20 @@ model KnowledgeAccess {
     projectId   String
     at          DateTime @default(now())
 
+    // Session-scoped TTL-by-turn (Phase: migrate-out countdown)
+    // initialTurns = starting budget at injection; maxTurns = cap for +1 growth; turnsRemaining = live counter.
+    // hotStatus: "hot" = still injected in-session, "evicted" = countdown hit zero, entry skipped in future turns.
+    initialTurns    Int      @default(5)
+    maxTurns        Int      @default(10)
+    turnsRemaining  Int      @default(5)
+    hitCount        Int      @default(0)
+    hotStatus       String   @default("hot") // hot | evicted
+    lastHitAt       DateTime?
+
     @@unique([sessionId, knowledgeId])
     @@index([knowledgeId])
     @@index([projectId, sessionId])
+    @@index([sessionId, hotStatus])
 }
 
 model ProjectProfile {

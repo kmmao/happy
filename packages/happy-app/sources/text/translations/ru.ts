@@ -842,6 +842,12 @@ export const ru: TranslationStructure = {
     knowledgeAccessesSubtitle: "Записи знаний, на которые ссылался AI в этой сессии",
     knowledgeAccessesEmpty: "В этой сессии нет ссылок на знания",
     knowledgeAccessGoToSource: "Перейти к исходной сессии",
+    knowledgeBadgeEvicted: "исключено",
+    knowledgeBadgeTooltipTitle: "Бюджет ходов",
+    knowledgeBadgeTooltipHot: ({ turns, max, hits }: { turns: number; max: number; hits: number }) =>
+      `Осталось ${turns}/${max} ходов. В сессии использовано ${hits} раз. Попадание +1 (предел ${max}), промах −1, 0 → исключение из инъекции.`,
+    knowledgeBadgeTooltipEvicted:
+      "Счётчик обнулился — запись больше не инжектируется в текущую сессию. Повторное упоминание или новый релевантный ход снова её активируют.",
     recommendationsTitle: "Рекомендовано для этой сессии",
     recommendationsTapHint: "Нажмите, чтобы добавить в поле ввода",
     autoOptionSendLabel: "Авто",
@@ -1246,6 +1252,8 @@ export const ru: TranslationStructure = {
     knowledgeReferencedValue: ({ count }: { count: number }) =>
       `${count} ${count === 1 ? "запись" : "записей"}`,
     knowledgeLatestPrefix: "Последнее",
+    knowledgeHitSuffix: ({ count }: { count: number }) => ` · попад. ${count}`,
+    knowledgeHotSuffix: ({ count }: { count: number }) => ` · актив. ${count}`,
   },
 
   settingsVoice: {

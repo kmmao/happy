@@ -14,7 +14,9 @@ const testTranslate = (
         | "sidePanel.knowledgeReferenced"
         | "sidePanel.knowledgeCapturedValue"
         | "sidePanel.knowledgeReferencedValue"
-        | "sidePanel.knowledgeLatestPrefix",
+        | "sidePanel.knowledgeLatestPrefix"
+        | "sidePanel.knowledgeHitSuffix"
+        | "sidePanel.knowledgeHotSuffix",
     params?: { count?: number },
 ): string => {
     const count = String(params?.count ?? "");
@@ -29,6 +31,10 @@ const testTranslate = (
             return `${count} referenced`;
         case "sidePanel.knowledgeLatestPrefix":
             return "latest";
+        case "sidePanel.knowledgeHitSuffix":
+            return ` · ${count} hit`;
+        case "sidePanel.knowledgeHotSuffix":
+            return ` · ${count} hot`;
     }
 };
 

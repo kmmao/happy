@@ -632,6 +632,12 @@ export const es: TranslationStructure = {
     knowledgeAccessesSubtitle: "Entradas de conocimiento referenciadas por AI en esta sesión",
     knowledgeAccessesEmpty: "Sin referencias de conocimiento en esta sesión",
     knowledgeAccessGoToSource: "Ir a la sesión de origen",
+    knowledgeBadgeEvicted: "excluida",
+    knowledgeBadgeTooltipTitle: "Presupuesto de turnos",
+    knowledgeBadgeTooltipHot: ({ turns, max, hits }: { turns: number; max: number; hits: number }) =>
+      `Quedan ${turns}/${max} turnos. Referenciada ${hits}× en esta sesión. Acierto +1 (tope ${max}), fallo −1, al llegar a 0 se excluye de la inyección.`,
+    knowledgeBadgeTooltipEvicted:
+      "La cuenta atrás llegó a cero — esta entrada ya no se inyecta en la sesión actual. Una nueva referencia o un turno relevante la reactivará.",
     recommendationsTitle: "Sugerido para esta sesión",
     recommendationsTapHint: "Toca para añadir al input",
     autoOptionSendLabel: "Auto",
@@ -1236,6 +1242,8 @@ export const es: TranslationStructure = {
     knowledgeReferencedValue: ({ count }: { count: number }) =>
       `${count} ${count === 1 ? "entrada" : "entradas"}`,
     knowledgeLatestPrefix: "Último",
+    knowledgeHitSuffix: ({ count }: { count: number }) => ` · ${count} acierto${count === 1 ? "" : "s"}`,
+    knowledgeHotSuffix: ({ count }: { count: number }) => ` · ${count} activa${count === 1 ? "" : "s"}`,
   },
 
   settingsVoice: {

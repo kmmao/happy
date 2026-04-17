@@ -29,13 +29,13 @@ export function getSessionPanelTabDefinitions(
     enablePreviewTab: boolean,
 ): SessionPanelTabDefinition[] {
     return [
+        { key: "summary", labelKey: "sidePanel.summary" },
         { key: "changes", labelKey: "sidePanel.changes" },
         { key: "files", labelKey: "sidePanel.files" },
         { key: "code", labelKey: "sidePanel.code" },
         ...(enablePreviewTab
             ? ([{ key: "preview", labelKey: "sidePanel.preview" }] as const)
             : []),
-        { key: "summary", labelKey: "sidePanel.summary" },
         { key: "terminal", labelKey: "sidePanel.terminal" },
     ];
 }
@@ -44,5 +44,5 @@ export function resolveSessionPanelActiveTab(
     currentTab: SessionPanelTab,
     tabs: readonly SessionPanelTab[],
 ): SessionPanelTab {
-    return tabs.includes(currentTab) ? currentTab : (tabs[0] ?? "changes");
+    return tabs.includes(currentTab) ? currentTab : (tabs[0] ?? "summary");
 }

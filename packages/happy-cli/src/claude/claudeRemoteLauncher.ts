@@ -189,7 +189,8 @@ export async function claudeRemoteLauncher(
   let knowledgeInjected = false; // Track whether knowledge was already injected
   let knowledgeContext: string | null = null; // Cached knowledge for system prompt
   let pendingKnowledgeRefresh = false; // Whether a per-turn refresh is pending
-  let knowledgeEntryIds = new Set<string>(); // IDs of already-injected knowledge entries
+  // Injected knowledge entries (id → metadata). Used both for dedup and for per-turn hit detection.
+  let knowledgeEntries = new Map<string, { id: string; title: string; tags: string[] }>();
   let pendingFileHint: string | null = null; // File-based knowledge hint for next message
   let currentTurnFilePaths = new Set<string>(); // Files edited in the current turn
 
@@ -220,7 +221,7 @@ export async function claudeRemoteLauncher(
       if (result && (result.profile || result.entries.length > 0)) {
         knowledgeContext = formatKnowledgeForInjection(result);
         for (const e of result.entries) {
-          knowledgeEntryIds.add(e.id);
+          knowledgeEntries.set(e.id, { id: e.id, title: e.title, tags: e.tags });
         }
         logger.debug(`[knowledge] Pre-fetched context: ${knowledgeContext!.length} chars, ${result.entries.length} entries`);
       }
@@ -1136,7 +1137,7 @@ export async function claudeRemoteLauncher(
         // Reset knowledge injection state for the new session (/clear creates a new session)
         knowledgeInjected = false;
         knowledgeContext = null;
-        knowledgeEntryIds = new Set<string>();
+        knowledgeEntries = new Map();
         pendingKnowledgeRefresh = false;
         pendingFileHint = null;
         currentTurnFilePaths = new Set<string>();
@@ -1508,11 +1509,11 @@ export async function claudeRemoteLauncher(
                   ]);
                   syncKnowledgeConfig(refreshResult?.knowledgeConfig);
                   if (refreshResult && refreshResult.entries.length > 0) {
-                    const newEntries = refreshResult.entries.filter((e) => !knowledgeEntryIds.has(e.id));
+                    const newEntries = refreshResult.entries.filter((e) => !knowledgeEntries.has(e.id));
                     logger.debug(`[knowledge] Per-turn refresh: ${refreshResult.entries.length} total, ${newEntries.length} new`);
                     if (newEntries.length > 0) {
                       for (const e of newEntries) {
-                        knowledgeEntryIds.add(e.id);
+                        knowledgeEntries.set(e.id, { id: e.id, title: e.title, tags: e.tags });
                       }
                       // Prepend a lightweight hint — Claude uses query_project_knowledge to get details
                       const titles = newEntries.map((e) => `"${e.title}"`).join(", ");
@@ -1676,6 +1677,41 @@ export async function claudeRemoteLauncher(
               logger.debug(`[knowledge] Error in onReady turn processing: ${err}`);
             }
 
+            // Per-turn hit detection: which injected knowledge entries were referenced
+            // by the assistant in this turn? Substring match on tags + exact title catches
+            // real usage without an extra LLM pass. Server uses this to tick TTL counters.
+            try {
+              if (turnCollector && knowledgeEntries.size > 0) {
+                const assistantText = turnCollector.getAssistantTextSnapshot().toLowerCase();
+                if (assistantText.length > 0) {
+                  const hitIds: string[] = [];
+                  for (const entry of knowledgeEntries.values()) {
+                    let matched = false;
+                    const lowerTitle = entry.title.toLowerCase();
+                    if (lowerTitle.length >= 8 && assistantText.includes(lowerTitle)) {
+                      matched = true;
+                    }
+                    if (!matched) {
+                      for (const tag of entry.tags) {
+                        const lowerTag = tag.toLowerCase();
+                        if (lowerTag.length >= 3 && assistantText.includes(lowerTag)) {
+                          matched = true;
+                          break;
+                        }
+                      }
+                    }
+                    if (matched) hitIds.push(entry.id);
+                  }
+                  session.client.emitKnowledgeTurnEnd(hitIds);
+                  logger.debug(
+                    `[knowledge] Turn-end hits: ${hitIds.length}/${knowledgeEntries.size} (injected entries)`,
+                  );
+                }
+              }
+            } catch (err) {
+              logger.debug(`[knowledge] Error detecting turn hits: ${err}`);
+            }
+
             // File-aware knowledge hint: check edited files against knowledge base
             // Fire-and-forget — result stored for next message prefix
             if (knowledgeEnabled && currentTurnFilePaths.size > 0) {
@@ -1686,8 +1722,11 @@ export async function claudeRemoteLauncher(
                 session.client.fetchKnowledge("auto", fileHints).then((result) => {
                   syncKnowledgeConfig(result?.knowledgeConfig);
                   if (!result || result.entries.length === 0) return;
-                  const newEntries = result.entries.filter((e) => !knowledgeEntryIds.has(e.id));
+                  const newEntries = result.entries.filter((e) => !knowledgeEntries.has(e.id));
                   if (newEntries.length === 0) return;
+                  for (const e of newEntries) {
+                    knowledgeEntries.set(e.id, { id: e.id, title: e.title, tags: e.tags });
+                  }
                   const fileNames = editedPaths.map((p) => p.split("/").pop()).filter(Boolean).join(", ");
                   const titles = newEntries.slice(0, 3).map((e) => `"${e.title}"`).join(", ");
                   pendingFileHint = `[File knowledge hint: you edited ${fileNames} — ${newEntries.length} related knowledge ${newEntries.length === 1 ? "entry" : "entries"} found (${titles}). Use query_project_knowledge if relevant.]\n\n`;

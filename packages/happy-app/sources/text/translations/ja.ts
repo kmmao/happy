@@ -725,6 +725,12 @@ export const ja: TranslationStructure = {
     knowledgeAccessesSubtitle: "このセッションで AI が参照したナレッジ",
     knowledgeAccessesEmpty: "このセッションで参照されたナレッジはありません",
     knowledgeAccessGoToSource: "元のセッションへ移動",
+    knowledgeBadgeEvicted: "除外",
+    knowledgeBadgeTooltipTitle: "ターン予算",
+    knowledgeBadgeTooltipHot: ({ turns, max, hits }: { turns: number; max: number; hits: number }) =>
+      `残り ${turns}/${max} ターン。このセッションで ${hits} 回参照。命中で +1（上限 ${max}）、不命中で −1、0 になると注入から除外。`,
+    knowledgeBadgeTooltipEvicted:
+      "カウントダウンがゼロに到達しました。この項目は現セッションの注入から外れています。再参照または新たな関連ターンで再有効化されます。",
     recommendationsTitle: "このセッションで提案された課題",
     recommendationsTapHint: "タップして入力欄に追加",
     autoOptionSendLabel: "自動",
@@ -1330,6 +1336,8 @@ export const ja: TranslationStructure = {
     knowledgeReferenced: "ナレッジ参照",
     knowledgeReferencedValue: ({ count }: { count: number }) => `${count} 件`,
     knowledgeLatestPrefix: "最新",
+    knowledgeHitSuffix: ({ count }: { count: number }) => ` · 命中 ${count}`,
+    knowledgeHotSuffix: ({ count }: { count: number }) => ` · アクティブ ${count}`,
   },
 
   settingsVoice: {

@@ -218,6 +218,10 @@ export interface ClientToServerEvents {
       affectedFiles: string[];
     };
   }) => void;
+  "knowledge-turn-end": (data: {
+    sid: string;
+    hitIds: string[];
+  }) => void;
   "fetch-knowledge": (
     data: {
       sid: string;
