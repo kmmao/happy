@@ -9,6 +9,10 @@ describe("DaemonStateSchema", () => {
       httpPort: 4567,
       startedAt: Date.now(),
       startedWithCliVersion: "1.2.3",
+      cliInstall: {
+        source: "npm-global",
+        canSelfUpgrade: true,
+      },
       automation: {
         updatedAt: Date.now(),
         counts: {
@@ -99,5 +103,6 @@ describe("DaemonStateSchema", () => {
     expect(parsed.automation?.counts.running).toBe(3);
     expect(parsed.automation?.recentJobs[0]?.id).toBe("job-1");
     expect(parsed.automation?.auditStats?.guardianReuseCount).toBe(1);
+    expect(parsed.cliInstall?.source).toBe("npm-global");
   });
 });

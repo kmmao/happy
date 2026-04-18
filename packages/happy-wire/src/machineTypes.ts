@@ -270,6 +270,21 @@ export const BriefMessageSchema = z.object({
 
 export type BriefMessage = z.infer<typeof BriefMessageSchema>;
 
+export const CliInstallSourceSchema = z.enum([
+  "npm-global",
+  "local-source",
+  "unknown",
+]);
+
+export type CliInstallSource = z.infer<typeof CliInstallSourceSchema>;
+
+export const CliInstallInfoSchema = z.object({
+  source: CliInstallSourceSchema,
+  canSelfUpgrade: z.boolean(),
+});
+
+export type CliInstallInfo = z.infer<typeof CliInstallInfoSchema>;
+
 export const DaemonStateSchema = z.object({
   status: z.union([
     z.enum(["running", "shutting-down"]),
@@ -291,6 +306,7 @@ export const DaemonStateSchema = z.object({
   tunnels: TunnelStateSchema.optional(),
   automation: AutomationStateSchema.optional(),
   recentBriefs: z.array(BriefMessageSchema).optional(),
+  cliInstall: CliInstallInfoSchema.optional(),
   killed: z.boolean().optional(),
 });
 
