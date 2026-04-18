@@ -1680,6 +1680,8 @@ export class CodexAppServerClient {
       }
       case "turn/plan/updated": {
         const notification = params as {
+          threadId?: string | null;
+          turnId?: string | null;
           explanation?: string | null;
           plan?: Array<{
             title?: string | null;
@@ -1689,6 +1691,8 @@ export class CodexAppServerClient {
         };
         this.handler?.({
           type: "turn_plan_updated",
+          threadId: notification.threadId ?? null,
+          turnId: notification.turnId ?? null,
           explanation: notification.explanation ?? null,
           plan: notification.plan ?? [],
         });

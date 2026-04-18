@@ -37,6 +37,7 @@ import { detectTailscale, detectTailscaleServe, type TailscaleInfo } from "@/uti
 import type { TunnelManager } from "@/tunnel";
 import { TerminalManager } from "@/terminal/TerminalManager";
 import { killRunawayHappyProcesses } from "@/daemon/doctor";
+import { upgradeSelf } from "@/daemon/upgradeSelf";
 
 
 interface ServerToDaemonEvents {
@@ -719,6 +720,15 @@ export class ApiMachineClient {
         message:
           "Daemon stop request acknowledged, starting shutdown sequence...",
       };
+    });
+
+    this.rpcHandlerManager.registerHandler("upgrade-self", async (params: any) => {
+      const { targetVersion } = params || {};
+      logger.debug("[API MACHINE] Received upgrade-self RPC request", {
+        targetVersion,
+      });
+
+      return upgradeSelf({ targetVersion });
     });
 
     // Register tunnel RPC handlers

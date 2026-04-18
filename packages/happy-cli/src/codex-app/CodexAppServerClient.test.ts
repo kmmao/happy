@@ -1035,6 +1035,8 @@ describe("CodexAppServerClient", () => {
       `${JSON.stringify({
         method: "turn/plan/updated",
         params: {
+          threadId: "thread-1",
+          turnId: "turn-plan-1",
           explanation: "Plan updated",
           plan: [
             { step: "Inspect logs", status: "completed" },
@@ -1047,6 +1049,17 @@ describe("CodexAppServerClient", () => {
 
     await new Promise((resolve) => setImmediate(resolve));
 
+    expect(events).toContainEqual({
+      type: "turn_plan_updated",
+      threadId: "thread-1",
+      turnId: "turn-plan-1",
+      explanation: "Plan updated",
+      plan: [
+        { step: "Inspect logs", status: "completed" },
+        { step: "Patch parser", status: "in_progress" },
+        { step: "Verify UI", status: "pending" },
+      ],
+    });
     expect(events).toContainEqual({
       type: "service_message",
       text: [

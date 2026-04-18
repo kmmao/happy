@@ -81,13 +81,19 @@ import {
 } from "./messageMode";
 import {
   buildAutoProgressSyntheticPrompt,
+  buildAutoSummarySyntheticPrompt,
   HAPPY_AUTO_PROGRESS_SOURCE,
+  HAPPY_AUTO_SUMMARY_SOURCE,
   isHappyAutomationSource,
   isHappyProgressToolName,
   isHappySummaryToolName,
   shouldTriggerCodexAutoProgress,
 } from "@/utils/progressAutomation";
 import { hasLegacyCodexPlanPreview } from "@/utils/legacyCodexPlanPreview";
+import {
+  appendCodexToolCallIdToPlanList,
+  mirrorCodexPlanToProgress,
+} from "./utils/codexPlanProgress";
 
 type ReadyEventOptions = {
   pending: unknown;
@@ -1085,6 +1091,37 @@ export async function runCodex(opts: {
       reasoningProcessor.complete(msg.text);
     }
     if (msg.type === "turn_plan_updated") {
+      if (typeof msg.turnId === "string" && msg.turnId.length > 0) {
+        let mirroredWroteProgress = false;
+        let mirroredShouldTriggerAutoSummary = false;
+        session.updateMetadata((currentMetadata) => {
+          const mirrored = mirrorCodexPlanToProgress(currentMetadata, {
+            turnId: msg.turnId,
+            plan: Array.isArray(msg.plan) ? msg.plan : [],
+          });
+          mirroredWroteProgress = mirrored.wroteProgress;
+          mirroredShouldTriggerAutoSummary =
+            mirrored.shouldTriggerAutoSummary;
+          return mirrored.metadata;
+        });
+        if (mirroredWroteProgress) {
+          currentTurnAutomation = {
+            ...currentTurnAutomation,
+            wroteProgress: true,
+          };
+        }
+        if (mirroredShouldTriggerAutoSummary) {
+          try {
+            session.sendSyntheticUserMessage(buildAutoSummarySyntheticPrompt(), {
+              displayText: "",
+              sentFrom: HAPPY_AUTO_SUMMARY_SOURCE,
+            });
+            logger.debug("[Codex] auto-summary trigger dispatched");
+          } catch (error) {
+            logger.debug(`[Codex] auto-summary trigger failed: ${error}`);
+          }
+        }
+      }
       currentTurnAutomation = {
         ...currentTurnAutomation,
         sawPlanUpdate: true,
@@ -1110,41 +1147,13 @@ export async function runCodex(opts: {
         typeof msg.call_id === "string" && msg.call_id.length > 0
           ? msg.call_id
           : null;
-      if (toolCallId) {
+      const activeTurnId = currentTurnId;
+      if (toolCallId && activeTurnId) {
         session.updateMetadata((currentMetadata) => {
-          const prior = currentMetadata.progress;
-          const currentListId = prior?.currentListId;
-          const lists = prior?.lists;
-          if (!currentListId || !lists || lists.length === 0) {
-            return currentMetadata;
-          }
-          const currentIdx = lists.findIndex((list) => list.id === currentListId);
-          if (currentIdx < 0) {
-            return currentMetadata;
-          }
-          const currentList = lists[currentIdx]!;
-          const existingToolCallIds = currentList.toolCallIds ?? [];
-          if (existingToolCallIds.includes(toolCallId)) {
-            return currentMetadata;
-          }
-          const now = Date.now();
-          const nextLists = lists.map((list, index) =>
-            index === currentIdx
-              ? {
-                  ...list,
-                  toolCallIds: [...existingToolCallIds, toolCallId],
-                  updatedAt: now,
-                }
-              : list,
-          );
-          return {
-            ...currentMetadata,
-            progress: {
-              ...prior,
-              lists: nextLists,
-              updatedAt: now,
-            },
-          };
+          return appendCodexToolCallIdToPlanList(currentMetadata, {
+            turnId: activeTurnId,
+            toolCallId,
+          });
         });
       }
     }

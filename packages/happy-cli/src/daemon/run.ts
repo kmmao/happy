@@ -71,6 +71,7 @@ import { TunnelManager, TailscaleProvider, UpnpProvider, CaddyProvider } from "@
 import { createCodexHomeOverlay } from "@/codex-shared/codexHomeOverlay";
 import { filterGuiEnvironmentVariables, isTrustedProfileEnvironment } from "./profileEnvironmentTrust";
 import { normalizeResolvedRuntimeProfile } from "@kmmao/happy-wire";
+import { detectCliInstallInfo } from "./cliInstallInfo";
 import {
   getFilteredDaemonEnvironment,
   resolveStartupScriptEnvironment,
@@ -1873,6 +1874,8 @@ export async function startDaemon(): Promise<void> {
     const tunnelManager = new TunnelManager([new TailscaleProvider(), new UpnpProvider(), new CaddyProvider()]);
     const tunnelState = await tunnelManager.detectAll();
     logger.debug(`[DAEMON RUN] Tunnels: ${tunnelState.providers.length} providers, ${tunnelState.providers.reduce((n, p) => n + p.entries.length, 0)} entries`);
+    const cliInstall = await detectCliInstallInfo();
+    logger.debug(`[DAEMON RUN] CLI install source: ${cliInstall.source}, self-upgrade: ${cliInstall.canSelfUpgrade}`);
 
     // Prepare initial daemon state
     const initialDaemonState: DaemonState = {
@@ -1885,6 +1888,7 @@ export async function startDaemon(): Promise<void> {
       tailscale: tailscaleInfo,
       tunnels: tunnelState,
       automation: getAutomationStateSummary(),
+      cliInstall,
     };
 
     // Create API client
