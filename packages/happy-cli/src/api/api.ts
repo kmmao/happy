@@ -380,8 +380,10 @@ export class ApiClient {
   }
 
   /**
-   * Reconnect to an existing session by its Happy session ID.
-   * Generates a new encryption key and updates the server's dataEncryptionKey.
+   * Internal reconnect handshake for an existing Happy session ID.
+   * This is transport/session continuity, not a user-facing restore/unarchive action.
+   * Generates a new encryption key and updates the server's dataEncryptionKey
+   * only when the previous key is unavailable.
    */
   async reconnectSession(opts: {
     sessionId: string;

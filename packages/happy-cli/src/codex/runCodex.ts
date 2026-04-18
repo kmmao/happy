@@ -66,6 +66,7 @@ import {
   mapCodexProcessorMessageToSessionEnvelopes,
 } from "./utils/sessionProtocolMapper";
 import { collectCodexLocalSurface } from "./localSurface";
+import { resolveCodexResumeThreadId } from "./utils/resolveCodexResumeThreadId";
 import {
   buildCodexContextUsage,
   codexBreakdownToUsage,
@@ -1413,10 +1414,9 @@ export async function runCodex(opts: {
 
     let resolvedBackend: ResolvedCodexBackend;
     let fallbackReason: string | undefined;
-    const resumeThreadId =
-      existingHappySession?.metadata.codex?.resolvedBackend === "codex-app-server"
-        ? existingHappySession.metadata.codex.threadId ?? null
-        : null;
+    const resumeThreadId = resolveCodexResumeThreadId(
+      existingHappySession?.metadata,
+    );
     if (requestedBackend === "codex-mcp-legacy") {
       client = instantiateLegacyClient();
       resolvedBackend = "codex-mcp-legacy";

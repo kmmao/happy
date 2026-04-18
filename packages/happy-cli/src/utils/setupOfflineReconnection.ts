@@ -15,6 +15,65 @@ import { configuration } from '@/configuration';
 import { createOfflineSessionStub } from '@/utils/offlineSessionStub';
 import { startOfflineReconnection } from '@/utils/serverConnectionErrors';
 
+function mergeOptionalObject<T extends Record<string, unknown>>(
+  existing: T | undefined,
+  startup: T | undefined,
+): T | undefined {
+  if (!existing && !startup) {
+    return undefined;
+  }
+
+  return {
+    ...(existing ?? {}),
+    ...(startup ?? {}),
+  } as T;
+}
+
+function mergeReconnectMetadata(
+  existing: Metadata,
+  startup: Metadata,
+): Metadata {
+  const mergedCodex =
+    existing.codex || startup.codex
+      ? {
+          ...(existing.codex ?? {}),
+          ...(startup.codex ?? {}),
+          config: mergeOptionalObject(
+            existing.codex?.config,
+            startup.codex?.config,
+          ),
+          account: mergeOptionalObject(
+            existing.codex?.account,
+            startup.codex?.account,
+          ),
+          rateLimits: mergeOptionalObject(
+            existing.codex?.rateLimits,
+            startup.codex?.rateLimits,
+          ),
+        }
+      : undefined;
+
+  return {
+    ...existing,
+    ...startup,
+    ...(mergedCodex ? { codex: mergedCodex } : {}),
+  };
+}
+
+function syncReconnectMetadata(
+  session: ApiSessionClient,
+  metadata: Metadata,
+  happySessionId?: string,
+): void {
+  if (!happySessionId) {
+    return;
+  }
+
+  session.updateMetadata((existing) =>
+    mergeReconnectMetadata(existing, metadata),
+  );
+}
+
 /**
  * Options for setting up offline reconnection.
  */
@@ -121,6 +180,7 @@ export function setupOfflineReconnection(opts: SetupOfflineReconnectionOptions):
                     : await api.getOrCreateSession({ tag: sessionTag, metadata, state, machineId, path });
                 if (!resp) throw new Error('Server unavailable');
                 const realSession = api.sessionSyncClient(resp);
+                syncReconnectMetadata(realSession, metadata, happySessionId);
                 // Notify caller to swap the session reference
                 onSessionSwap(realSession);
                 return realSession;
@@ -133,6 +193,7 @@ export function setupOfflineReconnection(opts: SetupOfflineReconnectionOptions):
         return { session, reconnectionHandle, isOffline: true };
     } else {
         session = api.sessionSyncClient(response);
+        syncReconnectMetadata(session, metadata, happySessionId);
         return { session, reconnectionHandle: null, isOffline: false };
     }
 }
