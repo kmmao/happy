@@ -381,6 +381,9 @@ export const ja: TranslationStructure = {
     wrapLinesInDiffs: "差分で行を折り返し",
     wrapLinesInDiffsDescription:
       "差分表示で水平スクロールの代わりに長い行を折り返す",
+    expandDiffsByDefault: "デフォルトでコード差分を展開",
+    expandDiffsByDefaultDescription:
+      "5 行のプレビューではなく、完全な差分内容を表示",
     alwaysShowContextSize: "常にコンテキストサイズを表示",
     alwaysShowContextSizeDescription:
       "上限に近づいていなくてもコンテキスト使用量を表示",
@@ -1391,6 +1394,9 @@ export const ja: TranslationStructure = {
   },
 
   sidePanel: {
+    session: "セッション",
+    sessionProgress: "進捗",
+    sessionCode: "コード",
     files: "ファイル",
     changes: "変更",
     knowledge: "ナレッジ",

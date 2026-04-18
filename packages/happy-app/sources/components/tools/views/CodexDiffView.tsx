@@ -34,6 +34,7 @@ function formatToolDuration(tool: ToolCall): string | null {
 export const CodexDiffView = React.memo<CodexDiffViewProps>(({ tool, scrollViewRef }) => {
     const { theme } = useUnistyles();
     const showLineNumbersInToolViews = useSetting('showLineNumbersInToolViews');
+    const expandDiffsByDefault = useSetting('expandDiffsByDefault');
     const { input } = tool;
 
     let oldText = '';
@@ -113,7 +114,7 @@ export const CodexDiffView = React.memo<CodexDiffViewProps>(({ tool, scrollViewR
                             newText={newText}
                             showLineNumbers={showLineNumbersInToolViews}
                             showPlusMinusSymbols={showLineNumbersInToolViews}
-                            visibleLineCount={isFullView ? undefined : 5}
+                            visibleLineCount={isFullView || expandDiffsByDefault ? undefined : 5}
                         />
                     </View>
                 )}

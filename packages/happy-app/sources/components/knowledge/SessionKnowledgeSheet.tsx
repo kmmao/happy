@@ -10,7 +10,6 @@ import { Modal } from "@/modal";
 import { layout } from "@/components/layout";
 import { useSessionKnowledge, type SessionKnowledgeEntry } from "@/hooks/useSessionKnowledge";
 import { useSessionKnowledgeAccesses, type SessionKnowledgeAccessEntry } from "@/hooks/useSessionKnowledgeAccesses";
-import { SessionProgressPanel } from "@/components/session/SessionProgressPanel";
 import { getSessionKnowledgeDisplayTimestamp } from "./sessionKnowledgeDisplayTimestamp";
 import { getSessionKnowledgeLoadState, type SessionKnowledgeTab } from "./sessionKnowledgeLoadState";
 
@@ -379,7 +378,6 @@ export const SessionKnowledgeSheet = React.memo<SessionKnowledgeSheetProps>(
 
         if (!inline && !shouldRender) return null;
 
-        const isProgressTab = activeTab === "progress";
         const isChangesTab = activeTab === "changes";
         const isReferencesTab = activeTab === "references";
         const isEvictedTab = activeTab === "evicted";
@@ -393,16 +391,14 @@ export const SessionKnowledgeSheet = React.memo<SessionKnowledgeSheetProps>(
                             : [];
         const loading = isChangesTab ? changesLoading : accessesLoading;
         const isEmpty = activeEntries.length === 0;
-        const headerTitle = isProgressTab
-            ? t("session.knowledgeTabProgress")
-            : isChangesTab
-                ? t("session.knowledgeChanges")
-                : isEvictedTab
-                    ? t("session.knowledgeTabEvicted")
-                    : isArchiveTab
-                        ? t("session.knowledgeTabArchive")
-                        : t("session.knowledgeTabReferences");
-        const currentCount = isProgressTab ? 0 : activeEntries.length;
+        const headerTitle = isChangesTab
+            ? t("session.knowledgeChanges")
+            : isEvictedTab
+                ? t("session.knowledgeTabEvicted")
+                : isArchiveTab
+                    ? t("session.knowledgeTabArchive")
+                    : t("session.knowledgeTabReferences");
+        const currentCount = activeEntries.length;
 
         const body = (
             <>
@@ -412,13 +408,11 @@ export const SessionKnowledgeSheet = React.memo<SessionKnowledgeSheetProps>(
                         <Text style={[styles.headerTitle, { color: theme.colors.text }]}>
                             {headerTitle}
                         </Text>
-                        {!isProgressTab && (
-                            <View style={[styles.headerCountBadge, { backgroundColor: theme.colors.primary + "20" }]}>
-                                <Text style={[styles.headerCountText, { color: theme.colors.primary }]}>
-                                    {currentCount}
-                                </Text>
-                            </View>
-                        )}
+                        <View style={[styles.headerCountBadge, { backgroundColor: theme.colors.primary + "20" }]}>
+                            <Text style={[styles.headerCountText, { color: theme.colors.primary }]}>
+                                {currentCount}
+                            </Text>
+                        </View>
                         <Pressable onPress={onClose} hitSlop={8}>
                             <Ionicons name="close" size={20} color={theme.colors.textSecondary} />
                         </Pressable>
@@ -427,7 +421,6 @@ export const SessionKnowledgeSheet = React.memo<SessionKnowledgeSheetProps>(
 
                 <View style={[styles.tabBar, { borderBottomColor: theme.colors.surfaceHighest }]}>
                         {([
-                            { key: "progress", label: t("session.knowledgeTabProgress"), count: null, active: isProgressTab },
                             { key: "changes", label: t("session.knowledgeTabChanges"), count: entries.length, active: isChangesTab },
                             { key: "references", label: t("session.knowledgeTabReferences"), count: hotAccesses.length, active: isReferencesTab },
                             { key: "evicted", label: t("session.knowledgeTabEvicted"), count: evictedAccesses.length, active: isEvictedTab },
@@ -464,9 +457,6 @@ export const SessionKnowledgeSheet = React.memo<SessionKnowledgeSheetProps>(
                         ))}
                     </View>
 
-                    {isProgressTab ? (
-                        <SessionProgressPanel sessionId={sessionId} />
-                    ) : (<>
                     <Text style={[styles.subtitle, { color: theme.colors.textSecondary }]}>
                         {isChangesTab
                             ? t("session.knowledgeChangesSubtitle")
@@ -512,7 +502,6 @@ export const SessionKnowledgeSheet = React.memo<SessionKnowledgeSheetProps>(
                                 ))}
                         </ScrollView>
                     )}
-                    </>)}
             </>
         );
 

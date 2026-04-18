@@ -64,6 +64,11 @@ export const SettingsSchema = z.object({
   wrapLinesInDiffs: z
     .boolean()
     .describe("Whether to wrap long lines in diff views"),
+  expandDiffsByDefault: z
+    .boolean()
+    .describe(
+      "Whether code diffs in conversations start fully expanded (vs. a 5-line preview)",
+    ),
   analyticsOptOut: z
     .boolean()
     .describe("Whether to opt out of anonymous analytics"),
@@ -407,6 +412,7 @@ export const settingsDefaults: Settings = {
   showLineNumbers: true,
   showLineNumbersInToolViews: false,
   wrapLinesInDiffs: false,
+  expandDiffsByDefault: true,
   analyticsOptOut: false,
   experiments: false,
   showAgentActivity: true,

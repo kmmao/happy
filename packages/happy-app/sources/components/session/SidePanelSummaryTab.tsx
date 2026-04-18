@@ -33,7 +33,6 @@ export const SidePanelSummaryTab = React.memo<SidePanelSummaryTabProps>(
                     onClose={() => undefined}
                     projectServerId={projectServerId}
                     sessionId={sessionId}
-                    initialTab="progress"
                 />
             </View>
         );

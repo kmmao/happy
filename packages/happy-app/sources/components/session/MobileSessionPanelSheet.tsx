@@ -13,11 +13,12 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useUnistyles } from "react-native-unistyles";
 import { t } from "@/text";
 import { GitBrowseTab } from "@/components/git/GitBrowseTab";
-import { useSession, useSetting } from "@/sync/storage";
+import { useProjectForSession, useSession, useSetting } from "@/sync/storage";
+import { useProjectKnowledgeConfig } from "@/hooks/useProjectKnowledgeConfig";
 import { SidePanelGitPanel } from "./SidePanelGitPanel";
+import { SidePanelSessionTab } from "./SidePanelSessionTab";
 import { SidePanelSummaryTab } from "./SidePanelSummaryTab";
 import { SidePanelTerminalTab } from "./SidePanelTerminalTab";
-import { SidePanelCodeTab } from "./SidePanelCodeTab";
 import { SidePanelPreviewTab } from "./SidePanelPreviewTab";
 import { SidePanelFilePreview } from "./SidePanelFilePreview";
 import { buildFileReferenceText } from "./sessionSidePanelReference";
@@ -45,13 +46,26 @@ export const MobileSessionPanelSheet = React.memo<MobileSessionPanelSheetProps>(
         const { theme } = useUnistyles();
         const insets = useSafeAreaInsets();
         const enablePreviewTab = useSetting("enablePreviewTab");
-        const [activeTab, setActiveTab] = React.useState<SessionPanelTab>("knowledge");
+        const [activeTab, setActiveTab] = React.useState<SessionPanelTab>("session");
         const [previewingFile, setPreviewingFile] = React.useState<string | null>(null);
         const inputContext = React.useContext(InputContext);
         const session = useSession(sessionId);
         const sessionTitle = session ? getSessionName(session) : "Panel";
-        const tabDefinitions = React.useMemo(() => getSessionPanelTabDefinitions(enablePreviewTab), [enablePreviewTab]);
-        const tabs = React.useMemo(() => getSessionPanelTabs(enablePreviewTab), [enablePreviewTab]);
+        const project = useProjectForSession(sessionId);
+        const { config: knowledgeConfig } = useProjectKnowledgeConfig(
+            project?.serverId ?? undefined,
+        );
+        // Default to true while the config is still loading so the tab does not
+        // flicker out; once the GET lands, the real project setting takes over.
+        const knowledgeBaseEnabled = knowledgeConfig?.enabled ?? true;
+        const tabDefinitions = React.useMemo(
+            () => getSessionPanelTabDefinitions({ enablePreviewTab, knowledgeBaseEnabled }),
+            [enablePreviewTab, knowledgeBaseEnabled],
+        );
+        const tabs = React.useMemo(
+            () => getSessionPanelTabs({ enablePreviewTab, knowledgeBaseEnabled }),
+            [enablePreviewTab, knowledgeBaseEnabled],
+        );
         const layoutConfig = React.useMemo(() => getMobilePanelLayoutConfig(), []);
         const tabChipMinWidth = React.useMemo(() => getMobilePanelTabChipMinWidth(), []);
         const effectiveActiveTab = resolveSessionPanelActiveTab(activeTab, tabs);
@@ -100,8 +114,8 @@ export const MobileSessionPanelSheet = React.memo<MobileSessionPanelSheetProps>(
                     return <SidePanelGitPanel sessionId={sessionId} />;
                 case "knowledge":
                     return <SidePanelSummaryTab sessionId={sessionId} />;
-                case "code":
-                    return <SidePanelCodeTab sessionId={sessionId} />;
+                case "session":
+                    return <SidePanelSessionTab sessionId={sessionId} />;
                 case "preview":
                     return <SidePanelPreviewTab sessionId={sessionId} />;
                 case "terminal":

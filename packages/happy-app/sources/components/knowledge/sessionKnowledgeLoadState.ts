@@ -1,5 +1,4 @@
 export type SessionKnowledgeTab =
-    | "progress"
     | "changes"
     | "references"
     | "evicted"

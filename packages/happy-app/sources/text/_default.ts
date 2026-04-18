@@ -273,6 +273,9 @@ export const en = {
     wrapLinesInDiffs: "Wrap Lines in Diffs",
     wrapLinesInDiffsDescription:
       "Wrap long lines instead of horizontal scrolling in diff views",
+    expandDiffsByDefault: "Expand Code Diffs by Default",
+    expandDiffsByDefaultDescription:
+      "Show full diff content instead of a 5-line preview",
     alwaysShowContextSize: "Always Show Context Size",
     alwaysShowContextSizeDescription:
       "Display context usage even when not near limit",
@@ -1280,6 +1283,9 @@ export const en = {
   },
 
   sidePanel: {
+    session: "Session",
+    sessionProgress: "Progress",
+    sessionCode: "Code",
     files: "Files",
     changes: "Changes",
     knowledge: "Knowledge",

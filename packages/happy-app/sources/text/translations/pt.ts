@@ -278,6 +278,9 @@ export const pt: TranslationStructure = {
     wrapLinesInDiffs: "Quebrar linhas nos diffs",
     wrapLinesInDiffsDescription:
       "Quebrar linhas longas ao invés de rolagem horizontal nas visualizações de diffs",
+    expandDiffsByDefault: "Expandir diffs de código por padrão",
+    expandDiffsByDefaultDescription:
+      "Mostrar o conteúdo completo do diff em vez de uma prévia de 5 linhas",
     alwaysShowContextSize: "Sempre mostrar tamanho do contexto",
     alwaysShowContextSizeDescription:
       "Exibir uso do contexto mesmo quando não estiver próximo do limite",
@@ -1292,6 +1295,9 @@ export const pt: TranslationStructure = {
   },
 
   sidePanel: {
+    session: "Sessão",
+    sessionProgress: "Progresso",
+    sessionCode: "Código",
     files: "Arquivos",
     changes: "Alterações",
     knowledge: "Conhecimento",

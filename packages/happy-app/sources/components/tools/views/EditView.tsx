@@ -9,6 +9,7 @@ import { getLanguageFromPath } from "@/components/diff/syntaxTokenizer";
 
 export const EditView = React.memo<ToolViewProps>(({ tool }) => {
   const showLineNumbersInToolViews = useSetting("showLineNumbersInToolViews");
+  const expandDiffsByDefault = useSetting("expandDiffsByDefault");
 
   let oldString = "";
   let newString = "";
@@ -32,7 +33,7 @@ export const EditView = React.memo<ToolViewProps>(({ tool }) => {
           showPlusMinusSymbols={showLineNumbersInToolViews}
           collapsible
           language={language}
-          visibleLineCount={5}
+          visibleLineCount={expandDiffsByDefault ? undefined : 5}
         />
       </ToolSectionView>
     </>

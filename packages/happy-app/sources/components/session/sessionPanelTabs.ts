@@ -1,15 +1,15 @@
 export type SessionPanelTab =
+    | "session"
     | "files"
     | "changes"
-    | "code"
     | "preview"
     | "knowledge"
     | "terminal";
 
 export type SessionPanelTabTranslationKey =
+    | "sidePanel.session"
     | "sidePanel.files"
     | "sidePanel.changes"
-    | "sidePanel.code"
     | "sidePanel.preview"
     | "sidePanel.knowledge"
     | "sidePanel.terminal";
@@ -19,20 +19,28 @@ export interface SessionPanelTabDefinition {
     labelKey: SessionPanelTabTranslationKey;
 }
 
+export interface SessionPanelTabOptions {
+    enablePreviewTab: boolean;
+    knowledgeBaseEnabled: boolean;
+}
+
 export function getSessionPanelTabs(
-    enablePreviewTab: boolean,
+    options: SessionPanelTabOptions,
 ): SessionPanelTab[] {
-    return getSessionPanelTabDefinitions(enablePreviewTab).map((tab) => tab.key);
+    return getSessionPanelTabDefinitions(options).map((tab) => tab.key);
 }
 
 export function getSessionPanelTabDefinitions(
-    enablePreviewTab: boolean,
+    options: SessionPanelTabOptions,
 ): SessionPanelTabDefinition[] {
+    const { enablePreviewTab, knowledgeBaseEnabled } = options;
     return [
-        { key: "knowledge", labelKey: "sidePanel.knowledge" },
+        { key: "session", labelKey: "sidePanel.session" },
+        ...(knowledgeBaseEnabled
+            ? ([{ key: "knowledge", labelKey: "sidePanel.knowledge" }] as const)
+            : []),
         { key: "changes", labelKey: "sidePanel.changes" },
         { key: "files", labelKey: "sidePanel.files" },
-        { key: "code", labelKey: "sidePanel.code" },
         ...(enablePreviewTab
             ? ([{ key: "preview", labelKey: "sidePanel.preview" }] as const)
             : []),
@@ -44,5 +52,5 @@ export function resolveSessionPanelActiveTab(
     currentTab: SessionPanelTab,
     tabs: readonly SessionPanelTab[],
 ): SessionPanelTab {
-    return tabs.includes(currentTab) ? currentTab : (tabs[0] ?? "knowledge");
+    return tabs.includes(currentTab) ? currentTab : (tabs[0] ?? "session");
 }

@@ -28,22 +28,46 @@ describe("mobileSessionPanelState", () => {
     });
 
     it("uses the shared tab definition for mobile ordering", () => {
-        expect(getSessionPanelTabs(true)).toEqual([
+        expect(
+            getSessionPanelTabs({
+                enablePreviewTab: true,
+                knowledgeBaseEnabled: true,
+            }),
+        ).toEqual([
+            "session",
             "knowledge",
             "changes",
             "files",
-            "code",
             "preview",
             "terminal",
         ]);
     });
 
     it("uses the shared preview gating for mobile", () => {
-        expect(getSessionPanelTabs(false)).toEqual([
+        expect(
+            getSessionPanelTabs({
+                enablePreviewTab: false,
+                knowledgeBaseEnabled: true,
+            }),
+        ).toEqual([
+            "session",
             "knowledge",
             "changes",
             "files",
-            "code",
+            "terminal",
+        ]);
+    });
+
+    it("drops the knowledge tab when the project knowledge base is disabled", () => {
+        expect(
+            getSessionPanelTabs({
+                enablePreviewTab: false,
+                knowledgeBaseEnabled: false,
+            }),
+        ).toEqual([
+            "session",
+            "changes",
+            "files",
             "terminal",
         ]);
     });

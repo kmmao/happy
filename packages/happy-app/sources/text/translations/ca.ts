@@ -279,6 +279,9 @@ export const ca: TranslationStructure = {
     wrapLinesInDiffs: "Ajusta les línies a les diferències",
     wrapLinesInDiffsDescription:
       "Ajusta les línies llargues en lloc de desplaçament horitzontal a les vistes de diferències",
+    expandDiffsByDefault: "Expandeix les diferències de codi per defecte",
+    expandDiffsByDefaultDescription:
+      "Mostra el contingut complet en lloc d'una previsualització de 5 línies",
     alwaysShowContextSize: "Mostra sempre la mida del context",
     alwaysShowContextSizeDescription:
       "Mostra l'ús del context fins i tot quan no estigui prop del límit",
@@ -1294,6 +1297,9 @@ export const ca: TranslationStructure = {
   },
 
   sidePanel: {
+    session: "Sessió",
+    sessionProgress: "Progrés",
+    sessionCode: "Codi",
     files: "Fitxers",
     changes: "Canvis",
     knowledge: "Coneixement",

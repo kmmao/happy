@@ -244,6 +244,9 @@ export const ru: TranslationStructure = {
     wrapLinesInDiffs: "Перенос строк в различиях",
     wrapLinesInDiffsDescription:
       "Переносить длинные строки вместо горизонтальной прокрутки в представлениях различий",
+    expandDiffsByDefault: "Разворачивать код-диффы по умолчанию",
+    expandDiffsByDefaultDescription:
+      "Показывать полный дифф вместо предпросмотра из 5 строк",
     alwaysShowContextSize: "Всегда показывать размер контекста",
     alwaysShowContextSizeDescription:
       "Отображать использование контекста даже когда не близко к лимиту",
@@ -1305,6 +1308,9 @@ export const ru: TranslationStructure = {
   },
 
   sidePanel: {
+    session: "Сессия",
+    sessionProgress: "Прогресс",
+    sessionCode: "Код",
     files: "Файлы",
     changes: "Изменения",
     knowledge: "Знания",

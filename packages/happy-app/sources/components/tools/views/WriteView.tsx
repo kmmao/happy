@@ -7,6 +7,7 @@ import { useSetting } from '@/sync/storage';
 
 export const WriteView = React.memo<ToolViewProps>(({ tool }) => {
     const showLineNumbersInToolViews = useSetting('showLineNumbersInToolViews');
+    const expandDiffsByDefault = useSetting('expandDiffsByDefault');
 
     let contents: string = '<no contents>';
     const parsed = knownTools.Write.input.safeParse(tool.input);
@@ -22,7 +23,7 @@ export const WriteView = React.memo<ToolViewProps>(({ tool }) => {
                     newText={contents}
                     showLineNumbers={showLineNumbersInToolViews}
                     showPlusMinusSymbols={showLineNumbersInToolViews}
-                    visibleLineCount={5}
+                    visibleLineCount={expandDiffsByDefault ? undefined : 5}
                 />
             </ToolSectionView>
         </>

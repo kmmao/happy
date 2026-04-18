@@ -16,12 +16,13 @@ import {
     useSetting,
 } from "@/sync/storage";
 import { useSessionKnowledgeAccesses } from "@/hooks/useSessionKnowledgeAccesses";
+import { useProjectKnowledgeConfig } from "@/hooks/useProjectKnowledgeConfig";
 import { t } from "@/text";
 import { aggregateLineChanges } from "@/utils/gitStatusUtils";
-import { SidePanelCodeTab } from "./SidePanelCodeTab";
 import { SidePanelFilePreview } from "./SidePanelFilePreview";
 import { SidePanelGitPanel } from "./SidePanelGitPanel";
 import { SidePanelPreviewTab } from "./SidePanelPreviewTab";
+import { SidePanelSessionTab } from "./SidePanelSessionTab";
 import { SidePanelSummaryTab } from "./SidePanelSummaryTab";
 import { SidePanelTerminalTab } from "./SidePanelTerminalTab";
 import {
@@ -47,10 +48,16 @@ export const SessionSidePanel = React.memo<SessionSidePanelProps>(
     function SessionSidePanel({ sessionId, collapsed, onToggleCollapse }) {
         const { theme } = useUnistyles();
         const enablePreviewTab = useSetting("enablePreviewTab");
-        const [activeTab, setActiveTab] = React.useState<SessionPanelTab>("knowledge");
+        const [activeTab, setActiveTab] = React.useState<SessionPanelTab>("session");
         const [previewingFile, setPreviewingFile] = React.useState<string | null>(null);
         const inputContext = React.useContext(InputContext);
         const project = useProjectForSession(sessionId);
+        const { config: knowledgeConfig } = useProjectKnowledgeConfig(
+            project?.serverId ?? undefined,
+        );
+        // Default to true while config is loading so the tab does not flicker
+        // out; once the GET returns, the flag reflects the real project setting.
+        const knowledgeBaseEnabled = knowledgeConfig?.enabled ?? true;
 
         const handleFilePress = React.useCallback((fullPath: string) => {
             setPreviewingFile(fullPath);
@@ -92,12 +99,12 @@ export const SessionSidePanel = React.memo<SessionSidePanelProps>(
         }, [knowledgeCount, accesses.length]);
 
         const tabDefinitions = React.useMemo(
-            () => getSessionPanelTabDefinitions(enablePreviewTab),
-            [enablePreviewTab],
+            () => getSessionPanelTabDefinitions({ enablePreviewTab, knowledgeBaseEnabled }),
+            [enablePreviewTab, knowledgeBaseEnabled],
         );
         const tabs = React.useMemo(
-            () => getSessionPanelTabs(enablePreviewTab),
-            [enablePreviewTab],
+            () => getSessionPanelTabs({ enablePreviewTab, knowledgeBaseEnabled }),
+            [enablePreviewTab, knowledgeBaseEnabled],
         );
         const effectiveActiveTab = resolveSessionPanelActiveTab(activeTab, tabs);
 
@@ -233,8 +240,8 @@ export const SessionSidePanel = React.memo<SessionSidePanelProps>(
                                     onFilePress={handleFilePress}
                                 />
                             )}
-                            {effectiveActiveTab === "code" && (
-                                <SidePanelCodeTab sessionId={sessionId} />
+                            {effectiveActiveTab === "session" && (
+                                <SidePanelSessionTab sessionId={sessionId} />
                             )}
                             {effectiveActiveTab === "preview" && (
                                 <SidePanelPreviewTab sessionId={sessionId} />

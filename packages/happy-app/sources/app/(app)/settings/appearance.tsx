@@ -32,6 +32,9 @@ function AppearanceSettingsScreen() {
     useSettingMutable("showLineNumbersInToolViews");
   const [wrapLinesInDiffs, setWrapLinesInDiffs] =
     useSettingMutable("wrapLinesInDiffs");
+  const [expandDiffsByDefault, setExpandDiffsByDefault] = useSettingMutable(
+    "expandDiffsByDefault",
+  );
   const [alwaysShowContextSize, setAlwaysShowContextSize] = useSettingMutable(
     "alwaysShowContextSize",
   );
@@ -267,6 +270,19 @@ function AppearanceSettingsScreen() {
             <Switch
               value={wrapLinesInDiffs}
               onValueChange={setWrapLinesInDiffs}
+            />
+          }
+        />
+        <Item
+          title={t("settingsAppearance.expandDiffsByDefault")}
+          subtitle={t("settingsAppearance.expandDiffsByDefaultDescription")}
+          icon={
+            <Ionicons name="expand-outline" size={29} color="#5856D6" />
+          }
+          rightElement={
+            <Switch
+              value={expandDiffsByDefault}
+              onValueChange={setExpandDiffsByDefault}
             />
           }
         />

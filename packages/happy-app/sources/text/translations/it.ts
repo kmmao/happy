@@ -387,6 +387,9 @@ export const it: TranslationStructure = {
     wrapLinesInDiffs: "A capo nelle differenze",
     wrapLinesInDiffsDescription:
       "A capo delle righe lunghe invece dello scorrimento orizzontale nelle viste diff",
+    expandDiffsByDefault: "Espandi i diff di codice per impostazione predefinita",
+    expandDiffsByDefaultDescription:
+      "Mostra il contenuto diff completo anziché un'anteprima di 5 righe",
     alwaysShowContextSize: "Mostra sempre dimensione contesto",
     alwaysShowContextSizeDescription:
       "Mostra l'uso del contesto anche quando non è vicino al limite",
@@ -1403,6 +1406,9 @@ export const it: TranslationStructure = {
   },
 
   sidePanel: {
+    session: "Sessione",
+    sessionProgress: "Progresso",
+    sessionCode: "Codice",
     files: "File",
     changes: "Modifiche",
     knowledge: "Conoscenza",

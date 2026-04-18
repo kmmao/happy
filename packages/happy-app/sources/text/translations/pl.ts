@@ -289,6 +289,9 @@ export const pl: TranslationStructure = {
     wrapLinesInDiffs: "Zawijanie linii w różnicach",
     wrapLinesInDiffsDescription:
       "Zawijaj długie linie zamiast przewijania poziomego w widokach różnic",
+    expandDiffsByDefault: "Domyślnie rozwijaj różnice kodu",
+    expandDiffsByDefaultDescription:
+      "Pokazuj pełną zawartość różnic zamiast podglądu 5 linii",
     alwaysShowContextSize: "Zawsze pokazuj rozmiar kontekstu",
     alwaysShowContextSizeDescription:
       "Wyświetlaj użycie kontekstu nawet gdy nie jest blisko limitu",
@@ -1305,6 +1308,9 @@ export const pl: TranslationStructure = {
   },
 
   sidePanel: {
+    session: "Sesja",
+    sessionProgress: "Postęp",
+    sessionCode: "Kod",
     files: "Pliki",
     changes: "Zmiany",
     knowledge: "Wiedza",

@@ -279,6 +279,9 @@ export const es: TranslationStructure = {
     wrapLinesInDiffs: "Ajustar líneas en diferencias",
     wrapLinesInDiffsDescription:
       "Ajustar líneas largas en lugar de desplazamiento horizontal en vistas de diferencias",
+    expandDiffsByDefault: "Expandir diferencias de código por defecto",
+    expandDiffsByDefaultDescription:
+      "Mostrar el contenido completo en lugar de una vista previa de 5 líneas",
     alwaysShowContextSize: "Mostrar siempre tamaño del contexto",
     alwaysShowContextSizeDescription:
       "Mostrar uso del contexto incluso cuando no esté cerca del límite",
@@ -1295,6 +1298,9 @@ export const es: TranslationStructure = {
   },
 
   sidePanel: {
+    session: "Sesión",
+    sessionProgress: "Progreso",
+    sessionCode: "Código",
     files: "Archivos",
     changes: "Cambios",
     knowledge: "Conocimiento",

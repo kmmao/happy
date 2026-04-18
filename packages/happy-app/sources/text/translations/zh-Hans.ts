@@ -270,6 +270,8 @@ export const zhHans: TranslationStructure = {
     showLineNumbersInToolViewsDescription: "在工具视图差异中显示行号",
     wrapLinesInDiffs: "在差异中换行",
     wrapLinesInDiffsDescription: "在差异视图中换行显示长行而不是水平滚动",
+    expandDiffsByDefault: "默认展开代码差异",
+    expandDiffsByDefaultDescription: "显示完整差异内容，而不是仅 5 行预览",
     alwaysShowContextSize: "始终显示上下文大小",
     alwaysShowContextSizeDescription: "即使未接近限制时也显示上下文使用情况",
     avatarStyle: "头像风格",
@@ -1250,6 +1252,9 @@ export const zhHans: TranslationStructure = {
   },
 
   sidePanel: {
+    session: "会话",
+    sessionProgress: "进度",
+    sessionCode: "代码",
     files: "文件",
     changes: "变更",
     knowledge: "知识库",

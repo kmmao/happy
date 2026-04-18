@@ -7,6 +7,7 @@ import { ToolSectionView } from "../ToolSectionView";
 import { Metadata } from "@/sync/storageTypes";
 import { resolvePath } from "@/utils/pathUtils";
 import { ToolDiffView } from "@/components/tools/ToolDiffView";
+import { useSetting } from "@/sync/storage";
 import { DiffStatsBar } from "@/components/diff/DiffStatsBar";
 import { getLanguageFromPath } from "@/components/diff/syntaxTokenizer";
 import { getCodexPatchEntries } from "../codexPatchUtils";
@@ -34,6 +35,7 @@ function formatToolDuration(tool: ToolCall): string | null {
 export const CodexPatchView = React.memo<CodexPatchViewProps>(
   ({ tool, metadata, scrollViewRef }) => {
     const { theme } = useUnistyles();
+    const expandDiffsByDefault = useSetting("expandDiffsByDefault");
     const entries = React.useMemo(
       () =>
         getCodexPatchEntries(tool.input?.changes).map((entry, index) => {
@@ -138,7 +140,7 @@ export const CodexPatchView = React.memo<CodexPatchViewProps>(
                       showPlusMinusSymbols
                       collapsible
                       language={entry.language}
-                      visibleLineCount={isFullView ? undefined : 5}
+                      visibleLineCount={isFullView || expandDiffsByDefault ? undefined : 5}
                     />
                   </View>
                 )}
