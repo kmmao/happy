@@ -1,8 +1,9 @@
 /**
  * Happy MCP STDIO Bridge
  *
- * Minimal STDIO MCP server exposing Happy tools like `change_title`
- * and `query_project_knowledge`.
+ * Minimal STDIO MCP server exposing Happy tools like `change_title`,
+ * `query_project_knowledge`, `update_progress`, and
+ * `update_session_summary`.
  * On invocation it forwards the tool call to an existing Happy HTTP MCP server
  * using the StreamableHTTPClientTransport.
  *
@@ -16,7 +17,10 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
-import { z } from "zod";
+import {
+  HAPPY_MCP_TOOL_NAMES,
+  HAPPY_MCP_TOOL_SPECS,
+} from "@kmmao/happy-wire";
 
 function parseArgs(argv: string[]): { url: string | null } {
   let url: string | null = null;
@@ -58,6 +62,29 @@ async function main() {
     return client;
   }
 
+  const forwardTool =
+    (toolName: string, failureLabel: string) =>
+    async (args: any) => {
+      try {
+        const client = await ensureHttpClient();
+        const response = await client.callTool({
+          name: toolName,
+          arguments: args,
+        });
+        return response as any;
+      } catch (error) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: `${failureLabel}: ${error instanceof Error ? error.message : String(error)}`,
+            },
+          ],
+          isError: true,
+        };
+      }
+    };
+
   // Create STDIO MCP server
   const server = new McpServer({
     name: "Happy MCP Bridge",
@@ -65,68 +92,18 @@ async function main() {
   });
 
   // Register tools and forward to the HTTP MCP server
-  server.registerTool(
-    "change_title",
-    {
-      description: "Change the title of the current chat session",
-      title: "Change Chat Title",
-      inputSchema: {
-        title: z.string().describe("The new title for the chat session"),
-      } as Record<string, any>,
-    },
-    async (args: any) => {
-      try {
-        const client = await ensureHttpClient();
-        const response = await client.callTool({
-          name: "change_title",
-          arguments: args,
-        });
-        // Pass-through response from HTTP server
-        return response as any;
-      } catch (error) {
-        return {
-          content: [
-            {
-              type: "text",
-              text: `Failed to change chat title: ${error instanceof Error ? error.message : String(error)}`,
-            },
-          ],
-          isError: true,
-        };
-      }
-    },
-  );
-
-  server.registerTool(
-    "query_project_knowledge",
-    {
-      description: "Search the current project's knowledge base",
-      title: "Query Project Knowledge",
-      inputSchema: {
-        query: z.string().describe("Search query describing what you want to know"),
-      } as Record<string, any>,
-    },
-    async (args: any) => {
-      try {
-        const client = await ensureHttpClient();
-        const response = await client.callTool({
-          name: "query_project_knowledge",
-          arguments: args,
-        });
-        return response as any;
-      } catch (error) {
-        return {
-          content: [
-            {
-              type: "text",
-              text: `Knowledge query failed: ${error instanceof Error ? error.message : String(error)}`,
-            },
-          ],
-          isError: true,
-        };
-      }
-    },
-  );
+  for (const toolName of HAPPY_MCP_TOOL_NAMES) {
+    const spec = HAPPY_MCP_TOOL_SPECS[toolName];
+    server.registerTool(
+      toolName,
+      {
+        description: spec.description,
+        title: spec.title,
+        inputSchema: spec.inputSchema as Record<string, any>,
+      },
+      forwardTool(toolName, spec.failureLabel),
+    );
+  }
 
   // Start STDIO transport
   const stdio = new StdioServerTransport();

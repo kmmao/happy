@@ -1687,6 +1687,11 @@ export class CodexAppServerClient {
             status?: string | null;
           }>;
         };
+        this.handler?.({
+          type: "turn_plan_updated",
+          explanation: notification.explanation ?? null,
+          plan: notification.plan ?? [],
+        });
         const lines = [
           notification.explanation || "Plan updated",
           ...(notification.plan || []).map((step) => formatPlanLine(step)),

@@ -1,6 +1,9 @@
 import { render } from "ink";
 import React from "react";
+import { Client as McpClient } from "@modelcontextprotocol/sdk/client/index.js";
+import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { ApiClient } from "@/api/api";
+import { normalizeHappyMcpToolName } from "@kmmao/happy-wire";
 import {
   CodexMcpClient,
   getInstalledCodexVersion,
@@ -54,7 +57,10 @@ import {
   type RequestedCodexBackend,
   type ResolvedCodexBackend,
 } from "@/codex-shared/backendSelection";
-import { resolveCodexRuntimeConfigFromEnv } from "@/codex-shared/configResolution";
+import {
+  LOCKED_CODEX_MODEL,
+  resolveCodexRuntimeConfigFromEnv,
+} from "@/codex-shared/configResolution";
 import {
   mapCodexMcpMessageToSessionEnvelopes,
   mapCodexProcessorMessageToSessionEnvelopes,
@@ -73,6 +79,15 @@ import {
   resolveCodexMessageMode,
   type CodexMessageMode,
 } from "./messageMode";
+import {
+  buildAutoProgressSyntheticPrompt,
+  HAPPY_AUTO_PROGRESS_SOURCE,
+  isHappyAutomationSource,
+  isHappyProgressToolName,
+  isHappySummaryToolName,
+  shouldTriggerCodexAutoProgress,
+} from "@/utils/progressAutomation";
+import { hasLegacyCodexPlanPreview } from "@/utils/legacyCodexPlanPreview";
 
 type ReadyEventOptions = {
   pending: unknown;
@@ -86,6 +101,59 @@ type CodexControlHandlerRegistrar = Pick<
   ApiSessionClient["rpcHandlerManager"],
   "registerHandler"
 >;
+
+type CodexTurnAutomationState = {
+  sawPlanUpdate: boolean;
+  sawFileChanges: boolean;
+  sawDiffUpdate: boolean;
+  wroteProgress: boolean;
+  wroteSummary: boolean;
+};
+
+function createCodexTurnAutomationState(): CodexTurnAutomationState {
+  return {
+    sawPlanUpdate: false,
+    sawFileChanges: false,
+    sawDiffUpdate: false,
+    wroteProgress: false,
+    wroteSummary: false,
+  };
+}
+
+function pickToolNameFromCodexMessage(message: Record<string, unknown>): string | null {
+  const topLevelCandidates = [
+    message.name,
+    message.toolName,
+    message.tool,
+    message.tool_name,
+  ];
+  for (const candidate of topLevelCandidates) {
+    if (typeof candidate === "string" && candidate.length > 0) {
+      return candidate;
+    }
+  }
+
+  const nestedArgs = [message.input, message.args, message.arguments];
+  for (const candidate of nestedArgs) {
+    if (!candidate || typeof candidate !== "object") {
+      continue;
+    }
+    const record = candidate as Record<string, unknown>;
+    const nestedCandidates = [
+      record.toolName,
+      record.requestedToolName,
+      record.tool,
+      record.tool_name,
+      record.name,
+    ];
+    for (const nested of nestedCandidates) {
+      if (typeof nested === "string" && nested.length > 0) {
+        return nested;
+      }
+    }
+  }
+  return null;
+}
 
 /**
  * Notify connected clients when Codex finishes processing and the queue is idle.
@@ -399,6 +467,11 @@ export async function runCodex(opts: {
     const socketToQueueMs = perfSocketReceivedAt
       ? perfQueuedAt - perfSocketReceivedAt
       : undefined;
+    const sentFrom =
+      typeof message.meta?.sentFrom === "string" &&
+      message.meta.sentFrom.length > 0
+        ? message.meta.sentFrom
+        : "user";
     const resolvedMode = resolveCodexMessageMode({
       current: {
         permissionMode: currentPermissionMode,
@@ -448,14 +521,16 @@ export async function runCodex(opts: {
     }
 
     messageQueue.push(message.content.text, resolvedMode.mode, message.localKey, {
-      priority: "user",
+      priority: isHappyAutomationSource(sentFrom) ? "background" : "user",
       kind: "prompt",
-      source: "user",
+      source: sentFrom,
       ...(socketToQueueMs !== undefined ? { socketToQueueMs } : {}),
     });
   });
   let thinking = false;
   let currentTurnId: string | null = null;
+  let currentTurnPromptSource: string | null = null;
+  let currentTurnAutomation = createCodexTurnAutomationState();
   let codexStartedSubagents = new Set<string>();
   let codexActiveSubagents = new Set<string>();
   let codexProviderSubagentToSessionSubagent = new Map<string, string>();
@@ -835,7 +910,10 @@ export async function runCodex(opts: {
       session.sendProviderUsageData("codex-session", usage);
     }
 
-    const contextUsage = buildCodexContextUsage(snapshot);
+    const contextUsage = buildCodexContextUsage(
+      snapshot,
+      currentModel ?? LOCKED_CODEX_MODEL,
+    );
     if (contextUsage) {
       session.sendSessionProtocolMessage(
         createEnvelope(
@@ -935,9 +1013,20 @@ export async function runCodex(opts: {
       return;
     }
 
+    let shouldSendReady = false;
+
     // Add messages to the ink UI buffer based on message type
     if (msg.type === "agent_message") {
       messageBuffer.addMessage(msg.message, "assistant");
+      if (
+        typeof msg.message === "string" &&
+        hasLegacyCodexPlanPreview(msg.message)
+      ) {
+        currentTurnAutomation = {
+          ...currentTurnAutomation,
+          sawPlanUpdate: true,
+        };
+      }
     } else if (msg.type === "service_message") {
       messageBuffer.addMessage(msg.text, "system");
     } else if (msg.type === "agent_reasoning_delta") {
@@ -960,13 +1049,14 @@ export async function runCodex(opts: {
       messageBuffer.addMessage("Starting task...", "status");
     } else if (msg.type === "task_complete") {
       messageBuffer.addMessage("Task completed", "status");
-      sendReady();
+      shouldSendReady = true;
     } else if (msg.type === "turn_aborted") {
       messageBuffer.addMessage("Turn aborted", "status");
-      sendReady();
+      shouldSendReady = true;
     }
 
     if (msg.type === "task_started") {
+      currentTurnAutomation = createCodexTurnAutomationState();
       if (!thinking) {
         logger.debug("thinking started");
         thinking = true;
@@ -994,14 +1084,69 @@ export async function runCodex(opts: {
       // Complete the reasoning section - tool results or reasoning messages sent via callback
       reasoningProcessor.complete(msg.text);
     }
+    if (msg.type === "turn_plan_updated") {
+      currentTurnAutomation = {
+        ...currentTurnAutomation,
+        sawPlanUpdate: true,
+      };
+    }
     if (msg.type === "patch_apply_begin") {
       // Handle the start of a patch operation
-      let { auto_approved, changes } = msg;
+      let { changes } = msg;
+
+      const changeCount = Object.keys(changes).length;
+      if (changeCount > 0) {
+        currentTurnAutomation = {
+          ...currentTurnAutomation,
+          sawFileChanges: true,
+        };
+      }
 
       // Add UI feedback for patch operation
-      const changeCount = Object.keys(changes).length;
       const filesMsg = changeCount === 1 ? "1 file" : `${changeCount} files`;
       messageBuffer.addMessage(`Modifying ${filesMsg}...`, "tool");
+
+      const toolCallId =
+        typeof msg.call_id === "string" && msg.call_id.length > 0
+          ? msg.call_id
+          : null;
+      if (toolCallId) {
+        session.updateMetadata((currentMetadata) => {
+          const prior = currentMetadata.progress;
+          const currentListId = prior?.currentListId;
+          const lists = prior?.lists;
+          if (!currentListId || !lists || lists.length === 0) {
+            return currentMetadata;
+          }
+          const currentIdx = lists.findIndex((list) => list.id === currentListId);
+          if (currentIdx < 0) {
+            return currentMetadata;
+          }
+          const currentList = lists[currentIdx]!;
+          const existingToolCallIds = currentList.toolCallIds ?? [];
+          if (existingToolCallIds.includes(toolCallId)) {
+            return currentMetadata;
+          }
+          const now = Date.now();
+          const nextLists = lists.map((list, index) =>
+            index === currentIdx
+              ? {
+                  ...list,
+                  toolCallIds: [...existingToolCallIds, toolCallId],
+                  updatedAt: now,
+                }
+              : list,
+          );
+          return {
+            ...currentMetadata,
+            progress: {
+              ...prior,
+              lists: nextLists,
+              updatedAt: now,
+            },
+          };
+        });
+      }
     }
     if (msg.type === "patch_apply_end") {
       // Handle the end of a patch operation
@@ -1022,11 +1167,46 @@ export async function runCodex(opts: {
     if (msg.type === "turn_diff") {
       // Handle turn_diff messages and track unified_diff changes
       if (msg.unified_diff) {
+        currentTurnAutomation = {
+          ...currentTurnAutomation,
+          sawDiffUpdate: true,
+        };
         diffProcessor.processDiff(msg.unified_diff);
       }
     }
 
     if (msg.type === "tool-call" || msg.type === "tool-call-result") {
+      const toolName = pickToolNameFromCodexMessage(msg as Record<string, unknown>);
+      if (
+        msg.type === "tool-call-result" &&
+        typeof msg.output?.content === "string" &&
+        hasLegacyCodexPlanPreview(msg.output.content)
+      ) {
+        currentTurnAutomation = {
+          ...currentTurnAutomation,
+          sawPlanUpdate: true,
+        };
+      }
+      if (
+        msg.type === "tool-call-result" &&
+        msg.output?.status === "completed" &&
+        isHappyProgressToolName(toolName)
+      ) {
+        currentTurnAutomation = {
+          ...currentTurnAutomation,
+          wroteProgress: true,
+        };
+      }
+      if (
+        msg.type === "tool-call-result" &&
+        msg.output?.status === "completed" &&
+        isHappySummaryToolName(toolName)
+      ) {
+        currentTurnAutomation = {
+          ...currentTurnAutomation,
+          wroteSummary: true,
+        };
+      }
       const envelopes = mapCodexProcessorMessageToSessionEnvelopes(msg as any, {
         currentTurnId,
         startedSubagents: codexStartedSubagents,
@@ -1046,7 +1226,8 @@ export async function runCodex(opts: {
       msg.type !== "agent_reasoning_delta" &&
       msg.type !== "agent_reasoning" &&
       msg.type !== "agent_reasoning_section_break" &&
-      msg.type !== "turn_diff"
+      msg.type !== "turn_diff" &&
+      msg.type !== "turn_plan_updated"
     ) {
       const mapped = mapCodexMcpMessageToSessionEnvelopes(msg, {
         currentTurnId,
@@ -1064,6 +1245,36 @@ export async function runCodex(opts: {
         session.sendSessionProtocolMessage(envelope);
       }
     }
+
+    if (
+      msg.type === "task_complete" &&
+      shouldTriggerCodexAutoProgress({
+        source: currentTurnPromptSource,
+        sawPlanUpdate: currentTurnAutomation.sawPlanUpdate,
+        sawFileChanges: currentTurnAutomation.sawFileChanges,
+        sawDiffUpdate: currentTurnAutomation.sawDiffUpdate,
+        wroteProgress: currentTurnAutomation.wroteProgress,
+      })
+    ) {
+      try {
+        session.sendSyntheticUserMessage(buildAutoProgressSyntheticPrompt(), {
+          displayText: "",
+          sentFrom: HAPPY_AUTO_PROGRESS_SOURCE,
+        });
+        logger.debug("[Codex] auto-progress trigger dispatched");
+      } catch (error) {
+        logger.debug(`[Codex] auto-progress trigger failed: ${error}`);
+      }
+    }
+
+    if (shouldSendReady) {
+      emitReadyIfIdle({
+        pending: null,
+        queueSize: () => messageQueue.size(),
+        shouldExit,
+        sendReady,
+      });
+    }
   };
 
   // Start Happy MCP server (HTTP) and prepare STDIO bridge config for Codex
@@ -1075,11 +1286,101 @@ export async function runCodex(opts: {
       args: ["--url", happyServer.url],
     },
   } as const;
-  const happyTitleToolNames = new Set([
-    "change_title",
-    "happy__change_title",
-    "mcp__happy__change_title",
-  ]);
+  const callHappyTool = async (
+    toolName: string,
+    args: unknown,
+  ): Promise<{
+    contentItems: Array<
+      { type: "inputText"; text: string } | { type: "inputImage"; imageUrl: string }
+    >;
+    success: boolean;
+  }> => {
+    const normalizedToolName = normalizeHappyMcpToolName(toolName);
+    if (!normalizedToolName) {
+      return {
+        contentItems: [
+          {
+            type: "inputText" as const,
+            text: `Unsupported dynamic tool: ${toolName || "unknown"}`,
+          },
+        ],
+        success: false,
+      };
+    }
+
+    try {
+      const client = new McpClient(
+        { name: "happy-codex-app-forwarder", version: "1.0.0" },
+        { capabilities: {} },
+      );
+      const transport = new StreamableHTTPClientTransport(
+        new URL(happyServer.url),
+      );
+      await client.connect(transport);
+      const response = await client.callTool({
+        name: normalizedToolName,
+        arguments:
+          args && typeof args === "object"
+            ? (args as Record<string, unknown>)
+            : {},
+      });
+
+      const contentItems: Array<
+        { type: "inputText"; text: string } | { type: "inputImage"; imageUrl: string }
+      > = [];
+      if (Array.isArray(response.content)) {
+        for (const item of response.content) {
+          if (!item || typeof item !== "object") {
+            continue;
+          }
+          if (
+            (item as { type?: unknown }).type === "text" &&
+            typeof (item as { text?: unknown }).text === "string"
+          ) {
+            contentItems.push({
+              type: "inputText",
+              text: (item as { text: string }).text,
+            });
+            continue;
+          }
+          if (
+            (item as { type?: unknown }).type === "image" &&
+            typeof (item as { url?: unknown }).url === "string"
+          ) {
+            contentItems.push({
+              type: "inputImage",
+              imageUrl: (item as { url: string }).url,
+            });
+          }
+        }
+      }
+
+      return {
+        contentItems:
+          contentItems.length > 0
+            ? contentItems
+            : [
+                {
+                  type: "inputText" as const,
+                  text: response.isError
+                    ? `${normalizedToolName} failed.`
+                    : `${normalizedToolName} completed.`,
+                },
+              ],
+        success: !response.isError,
+      };
+    } catch (error) {
+      return {
+        contentItems: [
+          {
+            type: "inputText" as const,
+            text: `${normalizedToolName} failed: ${error instanceof Error ? error.message : String(error)}`,
+          },
+        ],
+        success: false,
+      };
+    }
+  };
   let first = true;
 
   try {
@@ -1094,66 +1395,9 @@ export async function runCodex(opts: {
       appServerClient.setPermissionHandler(permissionHandler);
       appServerClient.setElicitationHandler(handleElicitation);
       appServerClient.setChatGptAuthTokensProvider(loadOpenAiAuthTokens);
-      appServerClient.setDynamicToolHandler(async (request) => {
-        if (!happyTitleToolNames.has(request.tool)) {
-          return {
-            contentItems: [
-              {
-                type: "inputText" as const,
-                text: `Unsupported dynamic tool: ${request.tool || "unknown"}`,
-              },
-            ],
-            success: false,
-          };
-        }
-
-        const title =
-          request.arguments &&
-          typeof request.arguments === "object" &&
-          "title" in request.arguments &&
-          typeof (request.arguments as { title?: unknown }).title === "string"
-            ? (request.arguments as { title: string }).title.trim()
-            : "";
-
-        if (!title) {
-          return {
-            contentItems: [
-              {
-                type: "inputText" as const,
-                text: "Failed to change chat title: missing title",
-              },
-            ],
-            success: false,
-          };
-        }
-
-        try {
-          session.sendClaudeSessionMessage({
-            type: "summary",
-            summary: title,
-            leafUuid: randomUUID(),
-          });
-          return {
-            contentItems: [
-              {
-                type: "inputText" as const,
-                text: `Successfully changed chat title to: "${title}"`,
-              },
-            ],
-            success: true,
-          };
-        } catch (error) {
-          return {
-            contentItems: [
-              {
-                type: "inputText" as const,
-                text: `Failed to change chat title: ${error instanceof Error ? error.message : String(error)}`,
-              },
-            ],
-            success: false,
-          };
-        }
-      });
+      appServerClient.setDynamicToolHandler((request) =>
+        callHappyTool(request.tool, request.arguments),
+      );
       appServerClient.setHandler(onClientMessage);
       return appServerClient;
     };
@@ -1351,6 +1595,7 @@ export async function runCodex(opts: {
       mode: CodexMessageMode;
       isolate: boolean;
       hash: string;
+      source?: string;
       requestIds: string[];
       queueWaitMs?: number;
       socketToQueueMs?: number;
@@ -1366,6 +1611,7 @@ export async function runCodex(opts: {
         mode: CodexMessageMode;
         isolate: boolean;
         hash: string;
+        source?: string;
         requestIds: string[];
         queueWaitMs?: number;
         socketToQueueMs?: number;
@@ -1441,6 +1687,7 @@ export async function runCodex(opts: {
       // Display user messages in the UI
       messageBuffer.addMessage(message.message, "user");
       currentModeHash = message.hash;
+      currentTurnPromptSource = message.source ?? "user";
 
       try {
         // Map permission mode to approval policy and sandbox for startSession

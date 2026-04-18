@@ -3,6 +3,8 @@ export type CodexConfigMode =
   | "managed-profile"
   | "managed-overrides";
 
+export const LOCKED_CODEX_MODEL = "gpt-5.4";
+
 function normalizeCodexReasoningEffort(
   effort: string | undefined,
 ): string | undefined {
@@ -47,7 +49,7 @@ export function resolveCodexRuntimeConfigFromEnv(
     configMode,
     profileName: env.HAPPY_CODEX_PROFILE?.trim() || undefined,
     overrides: {
-      model: env.HAPPY_CODEX_MODEL?.trim() || undefined,
+      model: LOCKED_CODEX_MODEL,
       reasoningEffort: normalizeCodexReasoningEffort(
         env.HAPPY_CODEX_REASONING_EFFORT?.trim() || undefined,
       ),

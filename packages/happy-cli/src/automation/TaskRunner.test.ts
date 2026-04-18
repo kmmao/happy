@@ -99,4 +99,29 @@ describe("runTaskJob", () => {
 
     expect(promptPath.startsWith("~")).toBe(false);
   });
+
+  it("forces Codex automation tasks onto GPT-5.4", async () => {
+    const spawnSession = vi.fn(async () => ({
+      type: "success" as const,
+      sessionId: "session-codex",
+    }));
+
+    await runTaskJob(
+      {
+        type: "task-trigger",
+        taskId: "task-codex",
+        prompt: "Investigate the failure",
+        directory: "/tmp",
+        priority: "user",
+        agentType: "codex",
+        modelOverride: "gpt-5.4-mini",
+      },
+      {
+        spawnSession,
+      },
+    );
+
+    const call = (spawnSession.mock.calls as unknown as any[][])[0]?.[0] as any;
+    expect(call.environmentVariables.OPENAI_MODEL).toBe("gpt-5.4");
+  });
 });

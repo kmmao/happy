@@ -76,6 +76,21 @@ describe('resolveCodexMessageMode', () => {
     });
     expect(result.next.reasoningEffort).toBeUndefined();
   });
+
+  it('normalizes any non-5.4 Codex model back to GPT-5.4', () => {
+    const result = resolveCodexMessageMode({
+      current: {
+        permissionMode: 'default',
+        model: 'gpt-5.3-codex',
+      },
+      meta: {
+        model: 'gpt-5.4-mini',
+      } as MessageMeta,
+    });
+
+    expect(result.mode.model).toBe('gpt-5.4');
+    expect(result.next.model).toBe('gpt-5.4');
+  });
 });
 
 describe('hashCodexMode', () => {
@@ -110,4 +125,3 @@ describe('hashCodexMode', () => {
     );
   });
 });
-

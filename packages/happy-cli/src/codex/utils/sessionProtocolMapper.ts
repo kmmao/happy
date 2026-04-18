@@ -28,7 +28,12 @@ type LegacyToolLikeMessage = {
   type: "tool-call" | "tool-call-result";
   callId: string;
   name?: string;
+  toolName?: string;
+  tool?: string;
+  tool_name?: string;
   input?: unknown;
+  args?: unknown;
+  arguments?: unknown;
   output?: {
     content?: string;
     status?: "completed" | "canceled";
@@ -136,6 +141,53 @@ function pickCallId(message: Record<string, unknown>): string {
     return callId;
   }
   return randomUUID();
+}
+
+function pickToolName(message: LegacyToolLikeMessage): string {
+  if (typeof message.name === "string" && message.name.length > 0) {
+    return message.name;
+  }
+  if (typeof message.toolName === "string" && message.toolName.length > 0) {
+    return message.toolName;
+  }
+  if (typeof message.tool === "string" && message.tool.length > 0) {
+    return message.tool;
+  }
+  if (
+    typeof message.tool_name === "string" &&
+    message.tool_name.length > 0
+  ) {
+    return message.tool_name;
+  }
+
+  const candidateArgs = [message.input, message.args, message.arguments];
+  for (const candidate of candidateArgs) {
+    if (!candidate || typeof candidate !== "object") {
+      continue;
+    }
+
+    const record = candidate as Record<string, unknown>;
+    const nestedToolNameCandidates = [
+      record.toolName,
+      record.requestedToolName,
+      record.tool,
+      record.tool_name,
+      record.name,
+    ];
+    for (const nestedToolName of nestedToolNameCandidates) {
+      if (typeof nestedToolName === "string" && nestedToolName.length > 0) {
+        return nestedToolName;
+      }
+    }
+  }
+  return "unknown";
+}
+
+function pickToolArgs(message: LegacyToolLikeMessage): Record<string, unknown> {
+  const input = message.input ?? message.args ?? message.arguments;
+  return input && typeof input === "object"
+    ? (input as Record<string, unknown>)
+    : {};
 }
 
 function summarizeCommand(command: unknown): string | null {
@@ -709,16 +761,17 @@ export function mapCodexProcessorMessageToSessionEnvelopes(
   }
 
   if (message.type === "tool-call") {
+    const toolName = pickToolName(toolLikeMessage);
+    const toolArgs = pickToolArgs(toolLikeMessage);
     const description =
-      typeof (toolLikeMessage.input as { description?: unknown } | undefined)
-        ?.description === "string"
-        ? (toolLikeMessage.input as { description: string }).description
+      typeof (toolArgs as { description?: unknown } | undefined)?.description ===
+      "string"
+        ? (toolArgs as { description: string }).description
         : null;
     const title =
-      typeof (toolLikeMessage.input as { title?: unknown } | undefined)
-        ?.title === "string"
-        ? (toolLikeMessage.input as { title: string }).title
-        : `${toolLikeMessage.name || "Tool"} call`;
+      typeof (toolArgs as { title?: unknown } | undefined)?.title === "string"
+        ? (toolArgs as { title: string }).title
+        : `${toolName || "Tool"} call`;
 
     return [
       createEnvelope(
@@ -726,13 +779,10 @@ export function mapCodexProcessorMessageToSessionEnvelopes(
         {
           t: "tool-call-start",
           call: toolLikeMessage.callId,
-          name: toolLikeMessage.name || "unknown",
+          name: toolName,
           title,
           description: description || title,
-          args: (toolLikeMessage.input &&
-          typeof toolLikeMessage.input === "object"
-            ? toolLikeMessage.input
-            : {}) as Record<string, unknown>,
+          args: toolArgs,
         },
         opts,
       ),

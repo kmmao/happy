@@ -229,6 +229,41 @@ describe('mapCodexMcpMessageToSessionEnvelopes', () => {
         expect(result.envelopes).toHaveLength(0);
         expect(result.currentTurnId).toBe('turn-1');
     });
+
+    it('preserves official Codex patch fileChange payloads on patch_apply_begin', () => {
+        const result = mapCodexMcpMessageToSessionEnvelopes(
+            {
+                type: 'patch_apply_begin',
+                call_id: 'patch-1',
+                auto_approved: true,
+                changes: {
+                    '/repo/src/example.ts': {
+                        path: '/repo/src/example.ts',
+                        kind: { type: 'update' },
+                        diff: '@@ -1 +1 @@\n-old\n+new',
+                    },
+                },
+            },
+            { currentTurnId: 'turn-1' }
+        );
+
+        expect(result.envelopes).toHaveLength(1);
+        expect(result.envelopes[0].ev.t).toBe('tool-call-start');
+        if (result.envelopes[0].ev.t === 'tool-call-start') {
+            expect(result.envelopes[0].ev.call).toBe('patch-1');
+            expect(result.envelopes[0].ev.name).toBe('CodexPatch');
+            expect(result.envelopes[0].ev.args).toEqual({
+                auto_approved: true,
+                changes: {
+                    '/repo/src/example.ts': {
+                        path: '/repo/src/example.ts',
+                        kind: { type: 'update' },
+                        diff: '@@ -1 +1 @@\n-old\n+new',
+                    },
+                },
+            });
+        }
+    });
 });
 
 describe('mapCodexProcessorMessageToSessionEnvelopes', () => {
@@ -257,6 +292,50 @@ describe('mapCodexProcessorMessageToSessionEnvelopes', () => {
             expect(endEvents[0].ev.thinking).toBe(true);
         }
         expect(endEvents[1].ev).toEqual({ t: 'tool-call-end', call: 'reasoning-1' });
+    });
+
+    it('maps Codex app-server style tool-call fields without dropping tool identity', () => {
+        const events = mapCodexProcessorMessageToSessionEnvelopes({
+            type: 'tool-call',
+            callId: 'codex-diff-1',
+            toolName: 'CodexDiff',
+            args: {
+                unified_diff: '--- a/src/app.ts\n+++ b/src/app.ts\n@@\n-old\n+new',
+            },
+        } as any, { currentTurnId: 'turn-1' });
+
+        expect(events).toHaveLength(1);
+        expect(events[0].ev.t).toBe('tool-call-start');
+        if (events[0].ev.t === 'tool-call-start') {
+            expect(events[0].ev.call).toBe('codex-diff-1');
+            expect(events[0].ev.name).toBe('CodexDiff');
+            expect(events[0].ev.args).toEqual({
+                unified_diff: '--- a/src/app.ts\n+++ b/src/app.ts\n@@\n-old\n+new',
+            });
+        }
+    });
+
+    it('maps generic tool-call payloads that use tool/arguments fields', () => {
+        const events = mapCodexProcessorMessageToSessionEnvelopes({
+            type: 'tool-call',
+            callId: 'dynamic-1',
+            tool: 'mcp__happy__change_title',
+            arguments: {
+                title: '新标题',
+            },
+        } as any, { currentTurnId: 'turn-1' });
+
+        expect(events).toHaveLength(1);
+        expect(events[0].ev.t).toBe('tool-call-start');
+        if (events[0].ev.t === 'tool-call-start') {
+            expect(events[0].ev.call).toBe('dynamic-1');
+            expect(events[0].ev.name).toBe('mcp__happy__change_title');
+            expect(events[0].ev.title).toBe('新标题');
+            expect(events[0].ev.description).toBe('新标题');
+            expect(events[0].ev.args).toEqual({
+                title: '新标题',
+            });
+        }
     });
 
     it('maps reasoning text to thinking text event', () => {

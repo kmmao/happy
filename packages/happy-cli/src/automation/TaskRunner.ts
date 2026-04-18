@@ -2,6 +2,7 @@ import { unlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { homedir } from "node:os";
 import { randomUUID } from "node:crypto";
+import { LOCKED_CODEX_MODEL } from "@/codex-shared/configResolution";
 import { logger } from "@/ui/logger";
 import type {
   SpawnSessionOptions,
@@ -122,7 +123,7 @@ export async function runTaskJob(
       ...(deps.serverUrl ? { HAPPY_TASK_REPORT_URL: `${deps.serverUrl.replace(/\/$/, "")}/v1/tasks/result` } : {}),
       // Per-role model override: inject into the spawned agent's environment
       ...(data.modelOverride && agentType === "claude" ? { ANTHROPIC_MODEL: data.modelOverride } : {}),
-      ...(data.modelOverride && agentType === "codex" ? { OPENAI_MODEL: data.modelOverride } : {}),
+      ...(agentType === "codex" ? { OPENAI_MODEL: LOCKED_CODEX_MODEL } : {}),
     },
   });
 

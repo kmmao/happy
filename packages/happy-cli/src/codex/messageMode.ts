@@ -1,4 +1,5 @@
 import type { MessageMeta, PermissionMode } from "@/api/types";
+import { LOCKED_CODEX_MODEL } from "@/codex-shared/configResolution";
 import { hashObject } from "@/utils/deterministicJson";
 
 function normalizeCodexReasoningEffort(
@@ -9,6 +10,14 @@ function normalizeCodexReasoningEffort(
   }
 
   return effort;
+}
+
+function normalizeCodexModel(model: string | null | undefined): string | undefined {
+  if (!model) {
+    return undefined;
+  }
+
+  return LOCKED_CODEX_MODEL;
 }
 
 export interface CodexMessageModeState {
@@ -45,9 +54,9 @@ export function resolveCodexMessageMode(params: {
     permissionMode = meta.permissionMode as PermissionMode;
   }
 
-  let model = current.model;
+  let model = normalizeCodexModel(current.model);
   if (meta && Object.prototype.hasOwnProperty.call(meta, "model")) {
-    model = meta.model || undefined;
+    model = normalizeCodexModel(meta.model ?? undefined);
   }
 
   let reasoningEffort = normalizeCodexReasoningEffort(current.reasoningEffort);

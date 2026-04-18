@@ -1,4 +1,7 @@
 import type { Usage } from "@/api/types";
+import { LOCKED_CODEX_MODEL } from "@/codex-shared/configResolution";
+
+const LOCKED_CODEX_CONTEXT_WINDOW = 900_000;
 
 type CodexTokenUsageBreakdown = {
   totalTokens: number;
@@ -165,12 +168,18 @@ export function codexBreakdownToUsage(
 
 export function buildCodexContextUsage(
   snapshot: CodexTokenUsageSnapshot,
+  modelCode?: string | null,
 ): {
   totalTokens: number;
   maxTokens: number;
   percentage: number;
 } | null {
-  if (!snapshot.modelContextWindow || snapshot.modelContextWindow <= 0) {
+  const maxTokens =
+    modelCode === LOCKED_CODEX_MODEL
+      ? LOCKED_CODEX_CONTEXT_WINDOW
+      : snapshot.modelContextWindow;
+
+  if (!maxTokens || maxTokens <= 0) {
     return null;
   }
 
@@ -179,8 +188,7 @@ export function buildCodexContextUsage(
 
   return {
     totalTokens: estimatedContextTokens,
-    maxTokens: snapshot.modelContextWindow,
-    percentage:
-      (estimatedContextTokens / snapshot.modelContextWindow) * 100,
+    maxTokens,
+    percentage: (estimatedContextTokens / maxTokens) * 100,
   };
 }

@@ -64,6 +64,26 @@ describe("CodexPermissionHandler", () => {
     });
   });
 
+  it("auto-approves Happy progress updates in default mode", async () => {
+    const { session, getAgentState } = createMockSession();
+    const handler = new CodexPermissionHandler(session);
+
+    const result = await handler.handleToolCall(
+      "progress-call-1",
+      "mcp__happy__update_progress",
+      {
+        todos: [{ content: "修复 MCP 工具链", status: "in_progress" }],
+      },
+    );
+
+    expect(result).toEqual({ decision: "approved" });
+    expect(getAgentState().completedRequests?.["progress-call-1"]).toMatchObject({
+      tool: "mcp__happy__update_progress",
+      status: "approved",
+      decision: "approved",
+    });
+  });
+
   it("auto-approves generic permissions in yolo mode for the whole session", async () => {
     const { session, getAgentState } = createMockSession();
     const handler = new CodexPermissionHandler(session);

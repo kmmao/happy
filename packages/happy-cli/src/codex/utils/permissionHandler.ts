@@ -9,6 +9,11 @@ import { logger } from "@/ui/logger";
 import { ApiSessionClient } from "@/api/apiSession";
 import type { PermissionMode } from "@/api/types";
 import {
+  HAPPY_MCP_AUTO_APPROVE_TOOL_NAMES,
+  shouldAutoApproveHappyMcpReason,
+  shouldAutoApproveHappyMcpToolName,
+} from "@kmmao/happy-wire";
+import {
   BasePermissionHandler,
   PermissionResult,
   PendingRequest,
@@ -17,13 +22,7 @@ import {
 // Re-export types for backwards compatibility
 export type { PermissionResult, PendingRequest };
 
-const ALWAYS_AUTO_APPROVE_NAMES = [
-  "change_title",
-  "happy__change_title",
-  "mcp__happy__change_title",
-];
-
-const ALWAYS_AUTO_APPROVE_IDS = ["change_title"];
+const ALWAYS_AUTO_APPROVE_IDS = [...HAPPY_MCP_AUTO_APPROVE_TOOL_NAMES];
 
 function getReason(input: unknown): string {
   if (
@@ -61,21 +60,17 @@ export class CodexPermissionHandler extends BasePermissionHandler {
     toolCallId: string,
     input: unknown,
   ): boolean {
-    const lowerToolName = toolName.toLowerCase();
     const lowerToolCallId = toolCallId.toLowerCase();
     const reason = getReason(input);
 
     if (
-      ALWAYS_AUTO_APPROVE_NAMES.some((name) => lowerToolName.includes(name)) ||
+      shouldAutoApproveHappyMcpToolName(toolName) ||
       ALWAYS_AUTO_APPROVE_IDS.some((id) => lowerToolCallId.includes(id))
     ) {
       return true;
     }
 
-    return (
-      reason.includes("happy") &&
-      (reason.includes("title update") || reason.includes("title updates"))
-    );
+    return shouldAutoApproveHappyMcpReason(reason);
   }
 
   private shouldAutoApprove(

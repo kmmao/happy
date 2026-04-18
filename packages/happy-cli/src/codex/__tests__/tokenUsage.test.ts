@@ -39,10 +39,10 @@ describe("codex token usage helpers", () => {
       output_tokens: 25,
       cache_read_input_tokens: 50,
     });
-    expect(buildCodexContextUsage(snapshot!)).toEqual({
+    expect(buildCodexContextUsage(snapshot!, "gpt-5.4")).toEqual({
       totalTokens: 150,
-      maxTokens: 258400,
-      percentage: (150 / 258400) * 100,
+      maxTokens: 900000,
+      percentage: (150 / 900000) * 100,
     });
   });
 
@@ -74,6 +74,40 @@ describe("codex token usage helpers", () => {
     expect(snapshot?.total.cachedInputTokens).toBe(200);
     expect(snapshot?.last.reasoningOutputTokens).toBe(10);
     expect(getCodexTokenUsageSignature(snapshot!)).toContain("turn-app-server");
+    expect(buildCodexContextUsage(snapshot!, "gpt-5.4")).toEqual({
+      totalTokens: 190,
+      maxTokens: 900000,
+      percentage: (190 / 900000) * 100,
+    });
+  });
+
+  it("keeps SDK-reported context windows for non GPT-5.4 models", () => {
+    const snapshot = extractCodexTokenUsageSnapshot({
+      type: "token_count",
+      tokenUsage: {
+        total: {
+          totalTokens: 1000,
+          inputTokens: 700,
+          cachedInputTokens: 200,
+          outputTokens: 80,
+          reasoningOutputTokens: 20,
+        },
+        last: {
+          totalTokens: 220,
+          inputTokens: 150,
+          cachedInputTokens: 40,
+          outputTokens: 20,
+          reasoningOutputTokens: 10,
+        },
+        modelContextWindow: 950000,
+      },
+    });
+
+    expect(buildCodexContextUsage(snapshot!, "gpt-5.4-mini")).toEqual({
+      totalTokens: 190,
+      maxTokens: 950000,
+      percentage: (190 / 950000) * 100,
+    });
   });
 
   it("ignores token_count payloads without concrete usage info", () => {

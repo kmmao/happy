@@ -6,7 +6,9 @@ describe("resolveCodexRuntimeConfigFromEnv", () => {
     expect(resolveCodexRuntimeConfigFromEnv({})).toEqual({
       configMode: "inherit",
       profileName: undefined,
-      overrides: {},
+      overrides: {
+        model: "gpt-5.4",
+      },
     });
   });
 
@@ -19,7 +21,9 @@ describe("resolveCodexRuntimeConfigFromEnv", () => {
     ).toEqual({
       configMode: "managed-profile",
       profileName: "happy_max",
-      overrides: {},
+      overrides: {
+        model: "gpt-5.4",
+      },
     });
   });
 
@@ -52,7 +56,23 @@ describe("resolveCodexRuntimeConfigFromEnv", () => {
       configMode: "managed-overrides",
       profileName: undefined,
       overrides: {
+        model: "gpt-5.4",
         reasoningEffort: "xhigh",
+      },
+    });
+  });
+
+  it("ignores non-5.4 Codex model overrides from the environment", () => {
+    expect(
+      resolveCodexRuntimeConfigFromEnv({
+        HAPPY_CODEX_CONFIG_MODE: "managed-overrides",
+        HAPPY_CODEX_MODEL: "gpt-5.4-mini",
+      }),
+    ).toEqual({
+      configMode: "managed-overrides",
+      profileName: undefined,
+      overrides: {
+        model: "gpt-5.4",
       },
     });
   });

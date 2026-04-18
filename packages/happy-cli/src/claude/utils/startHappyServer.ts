@@ -7,10 +7,19 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { createServer } from "node:http";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { AddressInfo } from "node:net";
-import { z } from "zod";
 import { logger } from "@/ui/logger";
 import { ApiSessionClient } from "@/api/apiSession";
 import { randomUUID } from "node:crypto";
+import {
+  buildAutoSummarySyntheticPrompt,
+  didChecklistTransitionToCompleted,
+  HAPPY_AUTO_SUMMARY_SOURCE,
+} from "@/utils/progressAutomation";
+import {
+  HAPPY_MCP_TOOL_NAMES,
+  HAPPY_MCP_TOOL_SPECS,
+  type HappyMcpCanonicalToolName,
+} from "@kmmao/happy-wire";
 
 type McpTextResponse = {
   content: Array<{ type: "text"; text: string }>;
@@ -99,6 +108,7 @@ export async function startHappyServer(client: ApiSessionClient) {
         activeForm: t.activeForm,
         stage: t.stage,
       }));
+      let shouldTriggerAutoSummary = false;
       client.updateMetadata((metadata) => {
         const now = Date.now();
         const prior = metadata.progress;
@@ -111,6 +121,9 @@ export async function startHappyServer(client: ApiSessionClient) {
         //   - unspecified → update currentListId (or create first list)
         let targetId: string;
         let nextLists = lists;
+        let priorTargetTodos = prior?.todos ?? [];
+        let priorTargetSummaryGeneratedAt: number | undefined;
+        let targetCanTriggerSummary = false;
 
         if (input.listId === "new") {
           if (priorCurrentId) {
@@ -138,7 +151,11 @@ export async function startHappyServer(client: ApiSessionClient) {
               ? nextLists.findIndex((l) => l.id === priorCurrentId)
               : -1;
           if (explicitIdx >= 0) {
-            targetId = nextLists[explicitIdx]!.id;
+            const target = nextLists[explicitIdx]!;
+            targetId = target.id;
+            priorTargetTodos = target.todos;
+            priorTargetSummaryGeneratedAt = target.summaryGeneratedAt;
+            targetCanTriggerSummary = targetId === priorCurrentId;
             nextLists = nextLists.map((l, i) =>
               i === explicitIdx
                 ? {
@@ -168,6 +185,20 @@ export async function startHappyServer(client: ApiSessionClient) {
           }
         }
 
+        if (
+          targetCanTriggerSummary &&
+          didChecklistTransitionToCompleted({
+            priorTodos: priorTargetTodos,
+            nextTodos: sanitizedTodos,
+            alreadyGenerated: priorTargetSummaryGeneratedAt !== undefined,
+          })
+        ) {
+          shouldTriggerAutoSummary = true;
+          nextLists = nextLists.map((l) =>
+            l.id === targetId ? { ...l, summaryGeneratedAt: now } : l,
+          );
+        }
+
         const active =
           nextLists.find((l) => l.id === targetId) ??
           nextLists[nextLists.length - 1];
@@ -184,6 +215,12 @@ export async function startHappyServer(client: ApiSessionClient) {
           },
         };
       });
+      if (shouldTriggerAutoSummary) {
+        client.sendSyntheticUserMessage(buildAutoSummarySyntheticPrompt(), {
+          displayText: "",
+          sentFrom: HAPPY_AUTO_SUMMARY_SOURCE,
+        });
+      }
       return { success: true as const };
     } catch (error) {
       return { success: false as const, error: String(error) };
@@ -231,17 +268,23 @@ export async function startHappyServer(client: ApiSessionClient) {
       version: "1.0.0",
     });
 
-    mcp.registerTool(
-      "change_title",
-      {
-        description:
-          'Set or update the chat session title. Titles should be short (under 50 chars) and action-oriented, e.g. "Fix auth token refresh".',
-        title: "Change Chat Title",
-        inputSchema: {
-          title: z.string().describe("The new title for the chat session"),
-        } as Record<string, any>,
-      },
-      async (args: any) => {
+    const registerHappyTool = (
+      name: HappyMcpCanonicalToolName,
+      handler: (args: any) => Promise<{ content: Array<{ type: "text"; text: string }>; isError: boolean }>,
+    ) => {
+      const spec = HAPPY_MCP_TOOL_SPECS[name];
+      mcp.registerTool(
+        name,
+        {
+          description: spec.description,
+          title: spec.title,
+          inputSchema: spec.inputSchema as Record<string, any>,
+        },
+        handler,
+      );
+    };
+
+    registerHappyTool("change_title", async (args: any) => {
         const response = await handler(args.title);
         logger.debug("[happyMCP] Response:", response);
 
@@ -266,71 +309,14 @@ export async function startHappyServer(client: ApiSessionClient) {
             isError: true,
           };
         }
-      },
-    );
+      });
 
-    mcp.registerTool(
-      "query_project_knowledge",
-      {
-        description:
-          "Search the project knowledge base for relevant context, past decisions, known pitfalls, and conventions.",
-        title: "Query Project Knowledge",
-        inputSchema: {
-          query: z.string().describe("Search query describing what you want to know"),
-        } as Record<string, any>,
-      },
-      async (args: any) => {
+    registerHappyTool("query_project_knowledge", async (args: any) => {
         const query = typeof args.query === "string" ? args.query : "";
         return queryProjectKnowledge(client, query);
-      },
-    );
+      });
 
-    mcp.registerTool(
-      "update_progress",
-      {
-        description:
-          'Optional override for the App\'s Progress tab. In most cases your TodoWrite calls are auto-mirrored, so you do NOT need to call this. Use it only when you want to set extra fields the CLI hook does not capture (currentStage, blockers) or to force a new list boundary with `listId: "new"`.',
-        title: "Update Session Progress",
-        inputSchema: {
-          todos: z
-            .array(
-              z.object({
-                content: z.string().describe("Concise description of the task"),
-                status: z
-                  .enum(["pending", "in_progress", "completed"])
-                  .describe("Current status of the task"),
-                activeForm: z
-                  .string()
-                  .optional()
-                  .describe("Imperative-present form shown when status is in_progress"),
-                stage: z
-                  .string()
-                  .optional()
-                  .describe("Optional phase/stage label, e.g. 'Phase 2'"),
-              }),
-            )
-            .describe("The full checklist — always send every item, not a delta"),
-          currentStage: z
-            .string()
-            .optional()
-            .describe("Optional overall stage name for the checklist"),
-          blockers: z
-            .array(z.string())
-            .optional()
-            .describe("Optional list of things blocking progress"),
-          listId: z
-            .string()
-            .optional()
-            .describe(
-              "Target list id. 'new' forces a fresh list (archiving the prior active one). A specific uuid targets an existing list. Omit to update the active list.",
-            ),
-          label: z
-            .string()
-            .optional()
-            .describe("Short human-readable name for this task list"),
-        } as Record<string, any>,
-      },
-      async (args: any) => {
+    registerHappyTool("update_progress", async (args: any) => {
         const response = await progressHandler(args);
         if (response.success) {
           const count = Array.isArray(args?.todos) ? args.todos.length : 0;
@@ -350,38 +336,9 @@ export async function startHappyServer(client: ApiSessionClient) {
           ],
           isError: true,
         };
-      },
-    );
+      });
 
-    mcp.registerTool(
-      "update_session_summary",
-      {
-        description:
-          "Write a narrative session summary the App shows above the progress checklist. Call at milestones, not per task: after first understanding the goal, when scope shifts significantly, when key decisions are made, or when moving to a new phase. Full rewrite each call.",
-        title: "Update Session Summary",
-        inputSchema: {
-          goal: z
-            .string()
-            .describe("What the user ultimately wants to accomplish"),
-          currentFocus: z
-            .string()
-            .optional()
-            .describe("Brief description of the active task or phase"),
-          keyDecisions: z
-            .array(z.string())
-            .optional()
-            .describe("Important choices already made this session"),
-          openQuestions: z
-            .array(z.string())
-            .optional()
-            .describe("Unresolved questions or pending decisions"),
-          impactScope: z
-            .array(z.string())
-            .optional()
-            .describe("Modules/files/areas affected by this session's work"),
-        } as Record<string, any>,
-      },
-      async (args: any) => {
+    registerHappyTool("update_session_summary", async (args: any) => {
         const response = await summaryHandler(args);
         if (response.success) {
           return {
@@ -398,8 +355,7 @@ export async function startHappyServer(client: ApiSessionClient) {
           ],
           isError: true,
         };
-      },
-    );
+      });
 
     return mcp;
   }
@@ -441,12 +397,7 @@ export async function startHappyServer(client: ApiSessionClient) {
 
   return {
     url: baseUrl.toString(),
-    toolNames: [
-      "change_title",
-      "query_project_knowledge",
-      "update_progress",
-      "update_session_summary",
-    ],
+    toolNames: [...HAPPY_MCP_TOOL_NAMES],
     stop: () => {
       logger.debug(`[happyMCP] server:stop sessionId=${client.sessionId}`);
       server.close();

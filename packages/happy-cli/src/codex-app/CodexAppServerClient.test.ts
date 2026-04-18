@@ -1,6 +1,7 @@
 import { EventEmitter } from "node:events";
 import { PassThrough } from "node:stream";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { HAPPY_MCP_TOOL_NAMES } from "@kmmao/happy-wire";
 import { CodexAppServerClient } from "./CodexAppServerClient";
 
 type FakeRpcMessage = {
@@ -186,10 +187,12 @@ class FakeProcess extends EventEmitter {
               {
                 name: "happy",
                 authStatus: "unsupported",
-                tools: {
-                  happy__change_title: {},
-                  happy__query_project_knowledge: {},
-                },
+                tools: Object.fromEntries(
+                  HAPPY_MCP_TOOL_NAMES.map((toolName) => [
+                    `happy__${toolName}`,
+                    {},
+                  ]),
+                ),
                 resources: [],
                 resourceTemplates: [],
               },
@@ -438,7 +441,7 @@ describe("CodexAppServerClient", () => {
       {
         name: "happy",
         authStatus: "unsupported",
-        toolCount: 2,
+        toolCount: HAPPY_MCP_TOOL_NAMES.length,
       },
     ]);
 
