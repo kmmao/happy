@@ -3,6 +3,10 @@ import { ToolCall, Message } from "@/sync/typesMessage";
 import { resolvePath } from "@/utils/pathUtils";
 import * as z from "zod";
 import { Ionicons, Octicons } from "@expo/vector-icons";
+import {
+  getHappyMcpToolAction as getSharedHappyMcpToolAction,
+  getHappyMcpToolTitle as getSharedHappyMcpToolTitle,
+} from "@kmmao/happy-wire";
 import React from "react";
 import { t } from "@/text";
 import { getDiffStatsLight } from "@/components/diff/calculateDiff";
@@ -11,6 +15,10 @@ import {
   getCodexCommandPreview,
   getCodexParsedCommandSummary,
 } from "./codexCommandUtils";
+import {
+  formatCodexBashDescription,
+  formatCodexBashTitle,
+} from "./codexBashPresentation";
 import { getCodexDiffStats, parseCodexUnifiedDiff } from "./codexDiffUtils";
 import { getCodexPatchEntries, getCodexPatchTotals } from "./codexPatchUtils";
 import { formatMCPTitle } from "./views/MCPToolView";
@@ -131,60 +139,44 @@ function extractGeminiEditPayload(input: any): {
 }
 
 function formatHappyMcpToolTitle(toolName: string): string {
-  const normalized = toolName.trim();
-  switch (normalized) {
-    case "change_title":
-    case "happy__change_title":
-    case "mcp__happy__change_title":
-      return "Change Title";
-    case "query_project_knowledge":
-    case "happy__query_project_knowledge":
-    case "mcp__happy__query_project_knowledge":
-      return "Project Knowledge";
-    case "save_memory":
-    case "happy__save_memory":
-    case "mcp__happy__save_memory":
-      return "Save Memory";
-    default:
-      return normalized.startsWith("mcp__")
-        ? formatMCPTitle(normalized)
-        : normalized;
+  const sharedTitle = getSharedHappyMcpToolTitle(toolName);
+  if (sharedTitle) {
+    return sharedTitle;
   }
+  const normalized = toolName.trim();
+  if (
+    normalized === "save_memory" ||
+    normalized === "happy__save_memory" ||
+    normalized === "mcp__happy__save_memory"
+  ) {
+    return "Save Memory";
+  }
+  return normalized.startsWith("mcp__")
+    ? formatMCPTitle(normalized)
+    : normalized;
 }
 
 function formatHappyMcpToolAction(
   toolName: string,
   mode: "dynamic" | "permission" | "fallback",
 ): string {
-  const normalized = toolName.trim();
-  switch (normalized) {
-    case "change_title":
-    case "happy__change_title":
-    case "mcp__happy__change_title":
-      return mode === "permission"
-        ? "Waiting for approval to update chat title"
-        : mode === "dynamic"
-          ? "Updating chat title"
-          : "Update chat title";
-    case "query_project_knowledge":
-    case "happy__query_project_knowledge":
-    case "mcp__happy__query_project_knowledge":
-      return mode === "permission"
-        ? "Waiting for approval to search project knowledge"
-        : mode === "dynamic"
-          ? "Searching project knowledge"
-          : "Search project knowledge";
-    case "save_memory":
-    case "happy__save_memory":
-    case "mcp__happy__save_memory":
-      return mode === "permission"
-        ? "Waiting for approval to save memory"
-        : mode === "dynamic"
-          ? "Saving memory"
-          : "Save memory";
-    default:
-      return mode === "permission" ? "Permission request" : "Tool call";
+  const sharedAction = getSharedHappyMcpToolAction(toolName, mode);
+  if (sharedAction) {
+    return sharedAction;
   }
+  const normalized = toolName.trim();
+  if (
+    normalized === "save_memory" ||
+    normalized === "happy__save_memory" ||
+    normalized === "mcp__happy__save_memory"
+  ) {
+    return mode === "permission"
+      ? "Waiting for approval to save memory"
+      : mode === "dynamic"
+        ? "Saving memory"
+        : "Save memory";
+  }
+  return mode === "permission" ? "Permission request" : "Tool call";
 }
 
 export const sessionCompactToolNames = new Set([
@@ -952,17 +944,9 @@ export const knownTools = {
         opts.tool.input,
         opts.metadata,
       );
-      if (summary?.type === "read" && summary.displayName) {
-        return summary.displayName;
-      }
-      if (summary?.type === "write" && summary.displayName) {
-        return summary.displayName;
-      }
-      if (summary?.type === "search") {
-        return t("tools.names.searchContent");
-      }
-      if (summary?.type === "list_files") {
-        return t("tools.names.listFiles");
+      const semanticTitle = formatCodexBashTitle(summary);
+      if (semanticTitle) {
+        return semanticTitle;
       }
       return t("tools.names.terminal");
     },
@@ -1014,6 +998,9 @@ export const knownTools = {
         if (summary.type === "list_files" && summary.resolvedPath) {
           return summary.resolvedPath;
         }
+        if (summary.workspace) {
+          return summary.workspace;
+        }
         if (summary.command) {
           return summary.command;
         }
@@ -1032,23 +1019,9 @@ export const knownTools = {
         opts.tool.input,
         opts.metadata,
       );
-      if (summary?.type === "read" && summary.displayName) {
-        return t("tools.desc.readingFile", { file: summary.displayName });
-      }
-      if (summary?.type === "write" && summary.displayName) {
-        return t("tools.desc.writingFile", { file: summary.displayName });
-      }
-      if (summary?.type === "search") {
-        if (summary.query) {
-          return t("tools.desc.searchPattern", { pattern: summary.query });
-        }
-        return t("tools.names.searchContent");
-      }
-      if (summary?.type === "list_files") {
-        if (summary.displayName) {
-          return t("tools.desc.searchPath", { basename: summary.displayName });
-        }
-        return t("tools.names.listFiles");
+      const semanticDescription = formatCodexBashDescription(summary);
+      if (semanticDescription) {
+        return semanticDescription;
       }
       return t("tools.names.terminal");
     },
@@ -1202,7 +1175,7 @@ export const knownTools = {
     },
   },
   mcp__happy__query_project_knowledge: {
-    title: "Project Knowledge",
+    title: formatHappyMcpToolTitle("mcp__happy__query_project_knowledge"),
     icon: ICON_READ,
     minimal: true,
     noStatus: true,
@@ -1220,6 +1193,44 @@ export const knownTools = {
         return opts.tool.input.query;
       }
       return "Search project knowledge";
+    },
+  },
+  mcp__happy__update_progress: {
+    title: formatHappyMcpToolTitle("mcp__happy__update_progress"),
+    icon: ICON_TODO,
+    minimal: true,
+    noStatus: true,
+    input: z.object({}).partial().passthrough(),
+    extractDescription: (opts: {
+      metadata: Metadata | null;
+      tool: ToolCall;
+    }) => {
+      if (Array.isArray(opts.tool.input?.todos)) {
+        return `Update checklist (${opts.tool.input.todos.length} items)`;
+      }
+      return formatHappyMcpToolAction(
+        "mcp__happy__update_progress",
+        "fallback",
+      );
+    },
+  },
+  mcp__happy__update_session_summary: {
+    title: formatHappyMcpToolTitle("mcp__happy__update_session_summary"),
+    icon: ICON_EDIT,
+    minimal: true,
+    noStatus: true,
+    input: z.object({}).partial().passthrough(),
+    extractDescription: (opts: {
+      metadata: Metadata | null;
+      tool: ToolCall;
+    }) => {
+      if (typeof opts.tool.input?.goal === "string" && opts.tool.input.goal) {
+        return opts.tool.input.goal;
+      }
+      return formatHappyMcpToolAction(
+        "mcp__happy__update_session_summary",
+        "fallback",
+      );
     },
   },
   mcp__happy__save_memory: {

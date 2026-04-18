@@ -7,9 +7,12 @@ import { ToolSectionView } from '../ToolSectionView';
 import { ToolDiffView } from '@/components/tools/ToolDiffView';
 import { useSetting } from '@/sync/storage';
 import { t } from '@/text';
-import { DiffStatsBar } from '@/components/diff/DiffStatsBar';
+import { CodexDiffStats } from '@/components/session/codex/CodexDiffStats';
+import { buildCodexDiffPalette } from '@/components/session/codex/codexDiffPalette';
 import { getCodexDiffStats, parseCodexUnifiedDiff } from '../codexDiffUtils';
 import { Metadata } from '@/sync/storageTypes';
+import { getLanguageFromPath } from '@/components/diff/syntaxTokenizer';
+import { buildCodexToolViewTheme } from './codexToolViewTheme';
 
 interface CodexDiffViewProps {
     tool: ToolCall;
@@ -35,17 +38,27 @@ export const CodexDiffView = React.memo<CodexDiffViewProps>(({ tool, scrollViewR
     const { theme } = useUnistyles();
     const showLineNumbersInToolViews = useSetting('showLineNumbersInToolViews');
     const expandDiffsByDefault = useSetting('expandDiffsByDefault');
+    const chrome = React.useMemo(
+        () => buildCodexToolViewTheme(theme.colors.codex),
+        [theme.colors.codex],
+    );
+    const diffPalette = React.useMemo(
+        () => buildCodexDiffPalette(theme.colors.codex),
+        [theme.colors.codex],
+    );
     const { input } = tool;
 
     let oldText = '';
     let newText = '';
     let fileName: string | undefined;
+    let language: string | null = null;
 
     if (input?.unified_diff && typeof input.unified_diff === 'string') {
         const parsed = parseCodexUnifiedDiff(input.unified_diff);
         oldText = parsed.oldText;
         newText = parsed.newText;
         fileName = parsed.fileName;
+        language = parsed.fileName ? getLanguageFromPath(parsed.fileName) : null;
     }
 
     const diffStats = React.useMemo(
@@ -65,40 +78,78 @@ export const CodexDiffView = React.memo<CodexDiffViewProps>(({ tool, scrollViewR
     }, [isFullView, tool.createdAt]);
 
     return (
-        <ToolSectionView fullWidth>
-            <View style={styles.item}>
-                <Pressable style={styles.cardHeader} onPress={() => setExpanded((v) => !v)}>
+        <ToolSectionView fullWidth provider="codex">
+            <View
+                style={[
+                    styles.item,
+                    {
+                        borderColor: chrome.cardBorder,
+                        backgroundColor: chrome.cardBg,
+                        borderRadius: theme.codex.radius.card,
+                    },
+                    !expanded && styles.itemCollapsed,
+                ]}
+            >
+                <Pressable
+                    style={({ pressed }) => [
+                        styles.cardHeader,
+                        {
+                            paddingHorizontal: theme.codex.spacing.cardPadding + 4,
+                            paddingVertical: theme.codex.spacing.cardPadding - 2,
+                            gap: theme.codex.spacing.sectionGap,
+                        },
+                        pressed && { backgroundColor: chrome.cardBgHover },
+                    ]}
+                    onPress={() => setExpanded((v) => !v)}
+                >
                     <View style={styles.cardHeaderLeft}>
-                        <View style={styles.fileIconWrap}>
+                        <View
+                            style={[
+                                styles.fileIconWrap,
+                                {
+                                    backgroundColor: chrome.iconBg,
+                                    borderColor: chrome.iconBorder,
+                                    borderRadius: theme.codex.radius.diff - 2,
+                                },
+                            ]}
+                        >
                             <Ionicons
                                 name="git-compare-outline"
                                 size={18}
-                                color={theme.colors.text}
+                                color={chrome.iconColor}
                             />
                         </View>
                         <View style={styles.fileMeta}>
-                            <Text style={styles.fileName} numberOfLines={1}>
+                            <Text
+                                style={[styles.fileName, { color: chrome.title }]}
+                                numberOfLines={1}
+                            >
                                 {displayName}
                             </Text>
                             {showPath && (
-                                <Text style={styles.filePath} numberOfLines={1}>
+                                <Text
+                                    style={[styles.filePath, { color: chrome.subtitle }]}
+                                    numberOfLines={1}
+                                >
                                     {fileName}
                                 </Text>
                             )}
                         </View>
                     </View>
                     <View style={styles.cardHeaderRight}>
-                        <DiffStatsBar
+                        <CodexDiffStats
                             additions={diffStats.additions}
                             deletions={diffStats.deletions}
                         />
                         {!isFullView && durationText && (
-                            <Text style={styles.durationText}>{durationText}</Text>
+                            <Text style={[styles.durationText, { color: chrome.meta }]}>
+                                {durationText}
+                            </Text>
                         )}
                         <Ionicons
                             name={expanded ? 'chevron-down' : 'chevron-forward'}
                             size={16}
-                            color={theme.colors.textSecondary}
+                            color={chrome.subtitle}
                         />
                     </View>
                 </Pressable>
@@ -106,7 +157,10 @@ export const CodexDiffView = React.memo<CodexDiffViewProps>(({ tool, scrollViewR
                     <View
                         style={[
                             styles.diffWrap,
-                            { borderTopColor: theme.colors.divider },
+                            {
+                                borderTopColor: chrome.divider,
+                                paddingTop: theme.codex.spacing.diffPadding - 2,
+                            },
                         ]}
                     >
                         <ToolDiffView
@@ -114,7 +168,9 @@ export const CodexDiffView = React.memo<CodexDiffViewProps>(({ tool, scrollViewR
                             newText={newText}
                             showLineNumbers={showLineNumbersInToolViews}
                             showPlusMinusSymbols={showLineNumbersInToolViews}
+                            language={language}
                             visibleLineCount={isFullView || expandDiffsByDefault ? undefined : 5}
+                            palette={diffPalette}
                         />
                     </View>
                 )}
@@ -126,14 +182,15 @@ export const CodexDiffView = React.memo<CodexDiffViewProps>(({ tool, scrollViewR
 const styles = StyleSheet.create((theme) => ({
     item: {
         overflow: 'hidden',
+        borderWidth: 1,
+    },
+    itemCollapsed: {
+        borderBottomWidth: 0,
     },
     cardHeader: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        gap: 12,
-        paddingHorizontal: 16,
-        paddingVertical: 10,
     },
     cardHeaderLeft: {
         flex: 1,
@@ -149,9 +206,9 @@ const styles = StyleSheet.create((theme) => ({
     fileIconWrap: {
         width: 28,
         height: 28,
-        borderRadius: 8,
         alignItems: 'center',
         justifyContent: 'center',
+        borderWidth: theme.codex.borderWidth.soft,
     },
     fileMeta: {
         flex: 1,
@@ -160,22 +217,17 @@ const styles = StyleSheet.create((theme) => ({
     fileName: {
         fontSize: 15,
         fontWeight: '700',
-        color: theme.colors.text,
     },
     filePath: {
         marginTop: 2,
         fontSize: 12,
-        color: theme.colors.textSecondary,
     },
     durationText: {
         fontSize: 13,
-        color: theme.colors.textSecondary,
         fontVariant: ['tabular-nums'],
     },
     diffWrap: {
         borderTopWidth: 1,
         marginTop: 4,
-        paddingTop: 8,
     },
 }));
-

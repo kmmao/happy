@@ -7,6 +7,9 @@ import { Deferred } from "@/components/Deferred";
 import { ToolFullView } from "@/components/tools/ToolFullView";
 import { ToolHeader } from "@/components/tools/ToolHeader";
 import { ToolStatusIndicator } from "@/components/tools/ToolStatusIndicator";
+import { buildToolHeaderTheme } from "@/components/tools/toolChromeTheme";
+import { getToolProvider } from "@/components/tools/toolProvider";
+import { Metadata } from "@/sync/storageTypes";
 import { Message } from "@/sync/typesMessage";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { Typography } from "@/constants/Typography";
@@ -84,23 +87,46 @@ export default React.memo(() => {
   return (
     <>
       {message && message.kind === "tool-call" && message.tool && (
-        <Stack.Screen
-          options={{
-            headerTitle: () => <ToolHeader tool={message.tool} />,
-            headerRight: () => <ToolStatusIndicator tool={message.tool} />,
-            headerStyle: {
-              backgroundColor: theme.colors.header.background,
-            },
-            headerTintColor: theme.colors.header.tint,
-            headerShadowVisible: false,
-          }}
-        />
+        (() => {
+          const toolProvider = getToolProvider({
+            toolName: message.tool.name,
+            metadata: session?.metadata ?? null,
+          });
+          const headerTheme = buildToolHeaderTheme(toolProvider, theme);
+
+          return (
+            <Stack.Screen
+              options={{
+                headerTitle: () => (
+                  <ToolHeader
+                    tool={message.tool}
+                    metadata={session?.metadata ?? null}
+                    provider={toolProvider}
+                  />
+                ),
+                headerRight: () => (
+                  <ToolStatusIndicator
+                    tool={message.tool}
+                    metadata={session?.metadata ?? null}
+                    provider={toolProvider}
+                  />
+                ),
+                headerStyle: {
+                  backgroundColor: headerTheme.navigationBackground,
+                },
+                headerTintColor: headerTheme.navigationTint,
+                headerShadowVisible: false,
+              }}
+            />
+          );
+        })()
       )}
       <Deferred>
         <FullView
           message={message}
           sessionId={sessionId!}
           messageId={messageId!}
+          metadata={session?.metadata ?? null}
         />
       </Deferred>
     </>
@@ -111,6 +137,7 @@ function FullView(props: {
   message: Message;
   sessionId: string;
   messageId: string;
+  metadata: Metadata | null;
 }) {
   const { theme } = useUnistyles();
   const styles = stylesheet;
@@ -119,6 +146,7 @@ function FullView(props: {
     return (
       <ToolFullView
         tool={props.message.tool}
+        metadata={props.metadata}
         messages={props.message.children}
       />
     );

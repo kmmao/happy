@@ -47,6 +47,7 @@ import {
   getAvailablePermissionModes,
   getDefaultModelKey,
   getDefaultPermissionModeKey,
+  LOCKED_CODEX_MODEL,
   resolveCurrentOption,
 } from "@/components/modelModeOptions";
 import {
@@ -106,6 +107,17 @@ import { createResolvedRuntimeProfile } from "@kmmao/happy-wire";
 // Simple temporary state for passing selections back from picker screens
 let onMachineSelected: (machineId: string) => void = () => {};
 let onProfileSaved: (profile: AIBackendProfile) => void = () => {};
+
+function filterSelectableModelsForNewSession(
+  agentType: "claude" | "codex" | "gemini",
+  models: ModelMode[],
+): ModelMode[] {
+  if (agentType !== "codex") {
+    return models;
+  }
+
+  return models.filter((model) => model.key === LOCKED_CODEX_MODEL);
+}
 
 export const callbacks = {
   onMachineSelected: (machineId: string) => {
@@ -290,6 +302,10 @@ function NewSessionWizard() {
     ),
     [agentType, cachedMetadata, profileCustomModels],
   );
+  const selectableModels = React.useMemo(
+    () => filterSelectableModelsForNewSession(agentType, availableModels),
+    [agentType, availableModels],
+  );
 
   const [permissionMode, setPermissionMode] = React.useState<PermissionMode>(
     () => {
@@ -304,7 +320,10 @@ function NewSessionWizard() {
   );
 
   const [modelMode, setModelMode] = React.useState<ModelMode | null>(() => {
-    const models = getAvailableModels(agentType, null, t);
+    const models = filterSelectableModelsForNewSession(
+      agentType,
+      getAvailableModels(agentType, null, t),
+    );
     return resolveCurrentOption(models, [
       lastUsedModelMode,
       getDefaultModelKey(agentType),
@@ -327,14 +346,14 @@ function NewSessionWizard() {
 
   React.useEffect(() => {
     setModelMode((current) => {
-      const resolved = resolveCurrentOption(availableModels, [
+      const resolved = resolveCurrentOption(selectableModels, [
         current?.key,
         lastUsedModelMode,
         getDefaultModelKey(agentType),
       ]);
       return resolved ?? current;
     });
-  }, [availableModels, agentType, lastUsedModelMode]);
+  }, [selectableModels, agentType, lastUsedModelMode]);
 
   const handlePermissionModeChange = React.useCallback(
     (mode: PermissionMode) => {
@@ -817,6 +836,10 @@ function NewSessionWizard() {
           t,
           nextProfileCustomModels,
         );
+        const nextSelectableModels = filterSelectableModelsForNewSession(
+          nextAgentType,
+          nextAvailableModels,
+        );
 
         // Set session type from profile's default
         if (profile.defaultSessionType) {
@@ -832,7 +855,7 @@ function NewSessionWizard() {
         }
         const profileModelMode = resolveProfileDefaultModelMode(
           profile,
-          nextAvailableModels,
+          nextSelectableModels,
         );
         if (profileModelMode) {
           setModelMode(profileModelMode);
@@ -866,14 +889,14 @@ function NewSessionWizard() {
 
   // Ensure model mode is valid for current agent, falling back when needed.
   React.useEffect(() => {
-    const resolvedModelMode = resolveCurrentOption(availableModels, [
+    const resolvedModelMode = resolveCurrentOption(selectableModels, [
       modelMode?.key,
       getDefaultModelKey(agentType),
     ]);
     if (resolvedModelMode?.key !== modelMode?.key) {
       setModelMode(resolvedModelMode);
     }
-  }, [agentType, modelMode?.key, availableModels]);
+  }, [agentType, modelMode?.key, selectableModels]);
 
   // Scroll to section helpers - for AgentInput button clicks
   const scrollToSection = React.useCallback(
@@ -1762,7 +1785,7 @@ function NewSessionWizard() {
                 availableModes={availableModes}
                 onPermissionModeChange={handlePermissionModeChange}
                 modelMode={modelMode}
-                availableModels={availableModels}
+                availableModels={selectableModels}
                 onModelModeChange={handleModelModeChange}
                 reasoning={{
                   thinkingMode,
@@ -2737,7 +2760,7 @@ function NewSessionWizard() {
               availableModes={availableModes}
               onPermissionModeChange={handleAgentInputPermissionChange}
               modelMode={modelMode}
-              availableModels={availableModels}
+              availableModels={selectableModels}
               onModelModeChange={handleModelModeChange}
               reasoning={{
                 thinkingMode,

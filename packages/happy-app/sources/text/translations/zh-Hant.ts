@@ -640,7 +640,7 @@ export const zhHant: TranslationStructure = {
       const m = Math.floor((seconds % 3600) / 60);
       return m > 0 ? `${h} 小時 ${m} 分鐘` : `${h} 小時`;
     },
-    progressToolMixTitle: "工具類型",
+    progressToolMixTitle: "操作類型",
     progressToolMixOther: "其他",
     progressSummarySection: "會話概要",
     progressSummaryGoal: "目標",
@@ -654,6 +654,8 @@ export const zhHant: TranslationStructure = {
     progressRefreshActionLabel: "重新整理",
     progressRefreshPrompt:
       "請查看目前工作狀態，用 TodoWrite 重寫清單以符合實際：每一條任務標註準確狀態（completed / in_progress / pending），in_progress 的項請填寫 activeForm。如果尚無清單，請先規劃再寫。",
+    progressRefreshPromptCodex:
+      "請查看目前工作狀態，呼叫 mcp__happy__update_progress 重寫清單以符合實際：每一條任務標註準確狀態（completed / in_progress / pending），必要時補充 currentStage 或 blockers。如果尚無清單，請先建立第一版。只有在真正進入新階段時才使用 listId: \"new\"。",
     progressTodoNudgeLabel: "建議驗證",
     progressSummaryRefreshLabel: "更新",
     progressSummaryRefreshPrompt:
@@ -868,7 +870,7 @@ export const zhHant: TranslationStructure = {
       requiredVersion: string;
     }) =>
       `已安裝版本 ${currentVersion}。請更新到 ${requiredVersion} 或更高版本`,
-    updateCliInstructions: "請執行 npm install -g happy-coder@latest",
+    updateCliInstructions: "請執行 npm install -g @kmmao/happy-coder@latest",
     resumeSession: "恢復會話",
     resumeSessionSubtitle: "在同一台機器上恢復此會話的完整上下文",
     forkSession: "分叉工作階段",
@@ -1151,6 +1153,11 @@ export const zhHant: TranslationStructure = {
       readFile: "讀取檔案",
       editFile: "編輯檔案",
       writeFile: "寫入檔案",
+      verify: "驗證",
+      test: "測試",
+      git: "Git",
+      package: "依賴",
+      run: "運行",
       fetchUrl: "獲取 URL",
       readNotebook: "讀取 Notebook",
       editNotebook: "編輯 Notebook",
@@ -1615,7 +1622,7 @@ export const zhHant: TranslationStructure = {
     launchNewSessionInDirectory: "在目錄中啟動新工作階段",
     offlineUnableToSpawn: "裝置離線時無法啟動",
     offlineHelp:
-      "• 確保您的電腦在線上\n• 執行 `happy daemon status` 進行診斷\n• 您是否在執行最新的 CLI 版本？請使用 `npm install -g happy-coder@latest` 升級",
+      "• 確保您的電腦在線上\n• 執行 `happy daemon status` 進行診斷\n• 您是否在執行最新的 CLI 版本？請使用 `npm install -g @kmmao/happy-coder@latest` 升級",
     daemon: "守護程序",
     status: "狀態",
     stopDaemon: "停止守護程序",
@@ -2102,6 +2109,10 @@ export const zhHant: TranslationStructure = {
       `將 @kmmao/happy-coder 升級到 v${version}？升級完成後守護程序將自動重啟。`,
     upgradeCliSuccess: "CLI 升級成功。守護程序將在 60 秒內自動重啟。",
     upgradeCliFailed: "CLI 升級失敗",
+    upgradeCliUnavailableTitle: "無法一鍵升級",
+    upgradeCliUnavailableLegacy: "目前 CLI 版本太舊，不支援一鍵升級。請先手動執行 npm install -g @kmmao/happy-coder@latest，再重試。",
+    upgradeCliUnavailableLocalSource: "這台機器上的 Happy 來自本地原始碼或 link 工作流，請在你的本地倉庫 / build 流程中升級，不要在 App 裡點一鍵升級。",
+    upgradeCliUnavailableUnknown: "這台機器不是受支援的 npm 全域安裝，App 無法安全替它自我升級。若確認合適，請手動升級。",
     stopDaemonTitle: "停止守護程式？",
     stopDaemonMessage: "在您重新啟動守護程式之前，將無法在此機器上建立新工作階段。目前的工作階段不受影響。",
     stopDaemonButton: "停止守護程式",

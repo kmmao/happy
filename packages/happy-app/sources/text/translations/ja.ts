@@ -781,6 +781,8 @@ export const ja: TranslationStructure = {
     progressRefreshActionLabel: "更新",
     progressRefreshPrompt:
       "現在の作業状態を確認し、TodoWrite で実際の状態に合わせてチェックリストを書き直してください：各タスクに正確なステータス（completed / in_progress / pending）を付け、in_progress のものには activeForm を記入してください。まだ計画がなければ、先に作成してください。",
+    progressRefreshPromptCodex:
+      "Please review the current work state and call mcp__happy__update_progress to rewrite the checklist so it matches reality: every task with an accurate status (completed / in_progress / pending). Include currentStage or blockers when useful. If no checklist exists yet, create the first one. Use listId: \"new\" only when you are starting a genuinely new phase.",
     progressTodoNudgeLabel: "検証推奨",
     progressSummaryRefreshLabel: "更新",
     progressSummaryRefreshPrompt:
@@ -1001,7 +1003,7 @@ export const ja: TranslationStructure = {
     }) =>
       `バージョン ${currentVersion} がインストールされています。${requiredVersion} 以降に更新してください`,
     updateCliInstructions:
-      "npm install -g happy-coder@latest を実行してください",
+      "npm install -g @kmmao/happy-coder@latest を実行してください",
     resumeSession: "セッションを再開",
     resumeSessionSubtitle:
       "同じマシンで完全なコンテキストを使ってセッションを再開",
@@ -1302,6 +1304,11 @@ export const ja: TranslationStructure = {
       readFile: "ファイル読み取り",
       editFile: "ファイル編集",
       writeFile: "ファイル書き込み",
+      verify: "Verify",
+      test: "Tests",
+      git: "Git",
+      package: "Package",
+      run: "Run",
       fetchUrl: "URL取得",
       readNotebook: "ノートブック読み取り",
       editNotebook: "ノートブック編集",
@@ -1763,7 +1770,7 @@ export const ja: TranslationStructure = {
     launchNewSessionInDirectory: "ディレクトリで新しいセッションを起動",
     offlineUnableToSpawn: "マシンがオフラインのためランチャーは無効です",
     offlineHelp:
-      "• コンピューターがオンラインであることを確認してください\n• `happy daemon status`を実行して診断してください\n• 最新のCLIバージョンを使用していますか？`npm install -g happy-coder@latest`でアップグレードしてください",
+      "• コンピューターがオンラインであることを確認してください\n• `happy daemon status`を実行して診断してください\n• 最新のCLIバージョンを使用していますか？`npm install -g @kmmao/happy-coder@latest`でアップグレードしてください",
     daemon: "デーモン",
     status: "ステータス",
     stopDaemon: "デーモンを停止",
@@ -2251,6 +2258,10 @@ export const ja: TranslationStructure = {
       `@kmmao/happy-coder を v${version} にアップグレードしますか？アップグレード後、デーモンは自動的に再起動します。`,
     upgradeCliSuccess: "CLI のアップグレードが完了しました。デーモンは 60 秒以内に自動的に再起動します。",
     upgradeCliFailed: "CLI のアップグレードに失敗しました",
+    upgradeCliUnavailableTitle: "One-tap upgrade unavailable",
+    upgradeCliUnavailableLegacy: "This CLI is too old to support one-tap upgrades. Run npm install -g @kmmao/happy-coder@latest manually once, then try again.",
+    upgradeCliUnavailableLocalSource: "This machine is running Happy from a local checkout or link workflow. Upgrade it from your local repo/build flow instead of the app.",
+    upgradeCliUnavailableUnknown: "This machine is not using a supported npm global install, so the app cannot safely self-upgrade it. Upgrade it manually if appropriate.",
     stopDaemonTitle: "デーモンを停止しますか？",
     stopDaemonMessage: "デーモンを再起動するまで、このマシンで新しいセッションを開始できません。現在のセッションは影響を受けません。",
     stopDaemonButton: "デーモンを停止",

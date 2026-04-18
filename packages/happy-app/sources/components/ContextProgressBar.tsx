@@ -78,7 +78,15 @@ export const ContextProgressBar: React.FC<{
     sdkContextUsage?: ContextUsageData | null;
     extraSummary?: AnimatedTokensCostValue | null;
 }> = ({ contextSize, alwaysShow, modelCode, sdkContextWindow, theme, sdkContextUsage, extraSummary }) => {
-    const hasPreciseData = sdkContextUsage && sdkContextUsage.maxTokens > 0;
+    const hasPreciseData = Boolean(sdkContextUsage && sdkContextUsage.maxTokens > 0);
+    const usedTokens = hasPreciseData ? sdkContextUsage!.totalTokens : contextSize;
+    const resolvedContextWindow = (() => {
+        const reportedWindow = hasPreciseData
+            ? sdkContextUsage!.maxTokens
+            : sdkContextWindow;
+        const knownWindowSize = getContextWindowSize(modelCode, reportedWindow);
+        return usedTokens > knownWindowSize ? 1_000_000 : knownWindowSize;
+    })();
     const breakdownItems = React.useMemo(
         () => getContextBreakdownItems(sdkContextUsage, t),
         [sdkContextUsage],
@@ -87,13 +95,7 @@ export const ContextProgressBar: React.FC<{
         () => getContextBreakdownSource(sdkContextUsage),
         [sdkContextUsage],
     );
-    const percentageUsed = hasPreciseData
-        ? Math.min(100, sdkContextUsage.percentage)
-        : (() => {
-            const knownWindowSize = getContextWindowSize(modelCode, sdkContextWindow);
-            const contextWindowSize = contextSize > knownWindowSize ? 1_000_000 : knownWindowSize;
-            return Math.min(100, (contextSize / contextWindowSize) * 100);
-        })();
+    const percentageUsed = Math.min(100, (usedTokens / resolvedContextWindow) * 100);
     const percentageRemaining = Math.max(0, 100 - percentageUsed);
     const shouldShow = alwaysShow || percentageRemaining <= 10;
 
@@ -102,13 +104,7 @@ export const ContextProgressBar: React.FC<{
     }
 
     const barColor = getProgressBarColor(percentageRemaining, theme);
-    const usedTokens = hasPreciseData ? sdkContextUsage.totalTokens : contextSize;
-    const maxTokens = hasPreciseData
-        ? sdkContextUsage.maxTokens
-        : (() => {
-            const knownWindowSize = getContextWindowSize(modelCode, sdkContextWindow);
-            return contextSize > knownWindowSize ? 1_000_000 : knownWindowSize;
-        })();
+    const maxTokens = resolvedContextWindow;
     const label = `${Math.round(percentageRemaining)}% left · ${formatTokenCountShort(usedTokens)}/${formatTokenCountShort(maxTokens)}`;
 
     return (

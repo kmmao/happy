@@ -1007,10 +1007,9 @@ export async function machineRemoveAutoDreamProfile(
 }
 
 /**
- * Upgrade the CLI on a specific machine by running npm install -g.
- * Uses the bash RPC with a 3-minute timeout since npm install can be slow.
- * After success the daemon's heartbeat will detect the version mismatch
- * and auto-restart within ~60 seconds.
+ * Upgrade the CLI on a specific machine via a dedicated daemon RPC.
+ * The daemon owns the install + restart flow so App no longer has to
+ * assemble shell commands or care about platform-specific behavior.
  */
 const VERSION_RE = /^\d+\.\d+\.\d+(-[\w.]+)?$/;
 
@@ -1021,12 +1020,66 @@ export async function machineUpgradeCli(
   if (!VERSION_RE.test(targetVersion)) {
     return { success: false, error: `Invalid version format: ${targetVersion}` };
   }
-  return machineBash(
-    machineId,
-    `npm install -g @kmmao/happy-coder@${targetVersion}`,
-    "/",
-    180_000, // 3 minutes — npm install can be slow
-  );
+  try {
+    return await apiSocket.machineRPC<
+      MachineBashResult,
+      {
+        targetVersion: string;
+      }
+    >(machineId, "upgrade-self", { targetVersion });
+  } catch (error) {
+    return {
+      success: false,
+      stdout: "",
+      stderr: getErrorMessage(error),
+      exitCode: -1,
+      error: getErrorMessage(error),
+    };
+  }
+}
+
+export async function waitForMachineCliVersion(
+  machineId: string,
+  targetVersion: string,
+  opts?: {
+    timeoutMs?: number;
+    pollIntervalMs?: number;
+  },
+): Promise<boolean> {
+  const timeoutMs = opts?.timeoutMs ?? 75_000;
+  const pollIntervalMs = opts?.pollIntervalMs ?? 3_000;
+  const deadline = Date.now() + timeoutMs;
+
+  const hasTargetVersion = () =>
+    storage.getState().machines[machineId]?.daemonState?.startedWithCliVersion ===
+    targetVersion;
+
+  if (hasTargetVersion()) {
+    return true;
+  }
+
+  while (Date.now() < deadline) {
+    try {
+      await sync.refreshMachines();
+    } catch {
+      // Best-effort polling — keep waiting until timeout
+    }
+
+    if (hasTargetVersion()) {
+      return true;
+    }
+
+    const remainingMs = deadline - Date.now();
+    if (remainingMs <= 0) {
+      break;
+    }
+
+    await new Promise((resolve) =>
+      setTimeout(resolve, Math.min(pollIntervalMs, remainingMs)),
+    );
+  }
+
+  return hasTargetVersion();
 }
 
 /**

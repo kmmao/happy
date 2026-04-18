@@ -696,6 +696,8 @@ export const pl: TranslationStructure = {
     progressRefreshActionLabel: "Odśwież",
     progressRefreshPrompt:
       "Sprawdź aktualny stan pracy i przepisz listę TodoWrite, by odzwierciedlała rzeczywistość: każde zadanie z poprawnym statusem (completed / in_progress / pending). Dla in_progress podaj activeForm. Jeśli planu jeszcze nie ma, najpierw go naszkicuj.",
+    progressRefreshPromptCodex:
+      "Please review the current work state and call mcp__happy__update_progress to rewrite the checklist so it matches reality: every task with an accurate status (completed / in_progress / pending). Include currentStage or blockers when useful. If no checklist exists yet, create the first one. Use listId: \"new\" only when you are starting a genuinely new phase.",
     progressTodoNudgeLabel: "Zalecana weryfikacja",
     progressSummaryRefreshLabel: "Aktualizuj",
     progressSummaryRefreshPrompt:
@@ -914,7 +916,7 @@ export const pl: TranslationStructure = {
       requiredVersion: string;
     }) =>
       `Zainstalowana wersja ${currentVersion}. Zaktualizuj do ${requiredVersion} lub nowszej`,
-    updateCliInstructions: "Proszę uruchomić npm install -g happy-coder@latest",
+    updateCliInstructions: "Proszę uruchomić npm install -g @kmmao/happy-coder@latest",
     resumeSession: "Wznów sesję",
     resumeSessionSubtitle:
       "Wznów tę sesję z pełnym kontekstem na tej samej maszynie",
@@ -1202,6 +1204,11 @@ export const pl: TranslationStructure = {
       readFile: "Czytaj plik",
       editFile: "Edytuj plik",
       writeFile: "Zapisz plik",
+      verify: "Verify",
+      test: "Tests",
+      git: "Git",
+      package: "Package",
+      run: "Run",
       fetchUrl: "Pobierz URL",
       readNotebook: "Czytaj notatnik",
       editNotebook: "Edytuj notatnik",
@@ -1682,7 +1689,7 @@ export const pl: TranslationStructure = {
   machine: {
     offlineUnableToSpawn: "Launcher wyłączony, gdy maszyna jest offline",
     offlineHelp:
-      "• Upewnij się, że komputer jest online\n• Uruchom `happy daemon status`, aby zdiagnozować\n• Czy używasz najnowszej wersji CLI? Zaktualizuj poleceniem `npm install -g happy-coder@latest`",
+      "• Upewnij się, że komputer jest online\n• Uruchom `happy daemon status`, aby zdiagnozować\n• Czy używasz najnowszej wersji CLI? Zaktualizuj poleceniem `npm install -g @kmmao/happy-coder@latest`",
     launchNewSessionInDirectory: "Uruchom nową sesję w katalogu",
     daemon: "Daemon",
     status: "Status",
@@ -2171,6 +2178,10 @@ export const pl: TranslationStructure = {
       `Zaktualizować @kmmao/happy-coder do v${version}? Demon zostanie automatycznie uruchomiony ponownie po aktualizacji.`,
     upgradeCliSuccess: "CLI zaktualizowano pomyślnie. Demon zostanie automatycznie uruchomiony ponownie w ciągu 60 sekund.",
     upgradeCliFailed: "Aktualizacja CLI nie powiodła się",
+    upgradeCliUnavailableTitle: "One-tap upgrade unavailable",
+    upgradeCliUnavailableLegacy: "This CLI is too old to support one-tap upgrades. Run npm install -g @kmmao/happy-coder@latest manually once, then try again.",
+    upgradeCliUnavailableLocalSource: "This machine is running Happy from a local checkout or link workflow. Upgrade it from your local repo/build flow instead of the app.",
+    upgradeCliUnavailableUnknown: "This machine is not using a supported npm global install, so the app cannot safely self-upgrade it. Upgrade it manually if appropriate.",
     stopDaemonTitle: "Zatrzymać demona?",
     stopDaemonMessage: "Nie będziesz mógł tworzyć nowych sesji na tej maszynie, dopóki nie uruchomisz ponownie demona. Bieżące sesje pozostaną aktywne.",
     stopDaemonButton: "Zatrzymaj demona",

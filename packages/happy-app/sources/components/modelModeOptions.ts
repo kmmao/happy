@@ -21,6 +21,8 @@ export type AgentFlavor =
   | null
   | undefined;
 
+export const LOCKED_CODEX_MODEL = "gpt-5.4";
+
 type Translate = (key: any) => string;
 
 type MetadataOption = {
@@ -221,53 +223,8 @@ export function getClaudeModelModes(): ModelMode[] {
 export function getCodexModelModes(translate: Translate): ModelMode[] {
   return [
     {
-      key: "default",
-      name: "Default",
-      description: "Use Codex default settings",
-    },
-    {
-      key: "gpt-5.4",
+      key: LOCKED_CODEX_MODEL,
       name: translate("agentInput.codexModel.gpt54"),
-      description: null,
-    },
-    {
-      key: "gpt-5.4-pro",
-      name: translate("agentInput.codexModel.gpt54Pro"),
-      description: null,
-    },
-    {
-      key: "gpt-5.4-mini",
-      name: translate("agentInput.codexModel.gpt54Mini"),
-      description: null,
-    },
-    {
-      key: "gpt-5.3-codex",
-      name: translate("agentInput.codexModel.gpt53Codex"),
-      description: null,
-    },
-    {
-      key: "gpt-5.3-codex-spark",
-      name: translate("agentInput.codexModel.gpt53CodexSpark"),
-      description: null,
-    },
-    {
-      key: "gpt-5.2-codex",
-      name: translate("agentInput.codexModel.gpt52Codex"),
-      description: null,
-    },
-    {
-      key: "gpt-5.1-codex-max",
-      name: translate("agentInput.codexModel.gpt51CodexMax"),
-      description: null,
-    },
-    {
-      key: "gpt-5.1-codex",
-      name: translate("agentInput.codexModel.gpt51Codex"),
-      description: null,
-    },
-    {
-      key: "gpt-5-codex",
-      name: translate("agentInput.codexModel.gpt5Codex"),
       description: null,
     },
   ];
@@ -333,6 +290,10 @@ export function getAvailableModels(
   translate: Translate,
   customModels?: CustomModel[] | null,
 ): ModelMode[] {
+  if (flavor === "codex") {
+    return getHardcodedModelModes(flavor, translate);
+  }
+
   // For Claude: always use hardcoded models (ignore CLI's "Default (recommended)" wrapper)
   // This ensures consistent UI with "Use CLI configured model" description and proper Sonnet option
   if (flavor === "claude" || flavor === undefined) {
@@ -359,21 +320,12 @@ export function getAvailableModels(
   // Priority 1 (non-Claude): CLI dynamically reported models
   const metadataModels = dedupeModeOptions(mapMetadataOptions(metadata?.models));
   if (metadataModels.length > 0) {
-    if (flavor === "codex") {
-      return dedupeModeOptions([
-        { key: "default", name: "Default", description: "Use Codex default settings" },
-        ...metadataModels,
-      ]);
-    }
     return metadataModels;
   }
 
   // Priority 2 (non-Claude): Profile custom models
   if (customModels && customModels.length > 0) {
-    const defaultOption =
-      flavor === "codex"
-        ? { key: "default", name: "Default", description: "Use Codex default settings" }
-        : { key: "default", name: "Default", description: "Use CLI settings" };
+    const defaultOption = { key: "default", name: "Default", description: "Use CLI settings" };
     return dedupeModeOptions([
       defaultOption,
       ...customModels.map((m) => ({
@@ -430,7 +382,7 @@ export function resolveCurrentOption<T extends ModeOption>(
 
 export function getDefaultModelKey(flavor: AgentFlavor): string {
   if (flavor === "codex") {
-    return "default";
+    return LOCKED_CODEX_MODEL;
   }
   if (flavor === "gemini") {
     return "gemini-3-flash-preview";

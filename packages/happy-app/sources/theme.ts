@@ -1,4 +1,9 @@
 import { Platform } from "react-native";
+import {
+  codexDarkColors,
+  codexLightColors,
+  sharedCodexTokens,
+} from "./themeCodex";
 
 // Shared spacing, sizing constants (DRY - used by both themes)
 const sharedSpacing = {
@@ -241,9 +246,11 @@ export const lightTheme = {
       error: "#FF5555",
       emptyOutput: "#6272A4",
     },
+    codex: codexLightColors,
   },
 
   ...sharedSpacing,
+  codex: sharedCodexTokens,
 };
 
 export const darkTheme = {
@@ -459,9 +466,11 @@ export const darkTheme = {
       error: "#FF6B6B",
       emptyOutput: "#7B7B93",
     },
+    codex: codexDarkColors,
   },
 
   ...sharedSpacing,
+  codex: sharedCodexTokens,
 } satisfies typeof lightTheme;
 
 export type Theme = typeof lightTheme;

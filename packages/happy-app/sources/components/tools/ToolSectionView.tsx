@@ -1,17 +1,51 @@
 import * as React from 'react';
 import { Text, View } from 'react-native';
-import { StyleSheet } from 'react-native-unistyles';
+import { StyleSheet, useUnistyles } from 'react-native-unistyles';
+import {
+    buildToolSectionTheme,
+    type ToolSectionProvider,
+} from './toolSectionTheme';
 
 interface ToolSectionViewProps {
     title?: string;
     fullWidth?: boolean;
     children: React.ReactNode;
+    provider?: ToolSectionProvider;
 }
 
-export const ToolSectionView = React.memo<ToolSectionViewProps>(({ title, children, fullWidth }) => {
+export const ToolSectionView = React.memo<ToolSectionViewProps>(({
+    title,
+    children,
+    fullWidth,
+    provider = 'default',
+}) => {
+    const { theme } = useUnistyles();
+    const sectionTheme = buildToolSectionTheme(provider, theme);
+
     return (
-        <View style={[styles.section, fullWidth && styles.fullWidthSection]}>
-            {title && <Text style={styles.sectionTitle}>{title}</Text>}
+        <View
+            style={[
+                styles.section,
+                { marginBottom: sectionTheme.sectionMarginBottom },
+                fullWidth && { marginHorizontal: -sectionTheme.fullWidthOffset },
+            ]}
+        >
+            {title && (
+                <Text
+                    style={[
+                        styles.sectionTitle,
+                        {
+                            color: sectionTheme.titleColor,
+                            marginBottom: sectionTheme.titleMarginBottom,
+                            marginHorizontal: sectionTheme.fullWidthOffset,
+                            textTransform: sectionTheme.titleTransform,
+                            letterSpacing: sectionTheme.titleLetterSpacing,
+                        },
+                    ]}
+                >
+                    {title}
+                </Text>
+            )}
             <View style={fullWidth ? styles.fullWidthContent : undefined}>
                 {children}
             </View>
@@ -19,13 +53,9 @@ export const ToolSectionView = React.memo<ToolSectionViewProps>(({ title, childr
     );
 });
 
-const styles = StyleSheet.create((theme) => ({
+const styles = StyleSheet.create(() => ({
     section: {
-        marginBottom: 12,
         overflow: 'visible',
-    },
-    fullWidthSection: {
-        marginHorizontal: -12, // Compensate for parent padding
     },
     fullWidthContent: {
         // No negative margins needed since we're moving the whole section
@@ -33,9 +63,5 @@ const styles = StyleSheet.create((theme) => ({
     sectionTitle: {
         fontSize: 13,
         fontWeight: '600',
-        color: theme.colors.textSecondary,
-        marginBottom: 6,
-        marginHorizontal: 12, // Add padding back for title when full width
-        textTransform: 'uppercase',
     },
 }));

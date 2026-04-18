@@ -2,6 +2,7 @@ import * as React from "react";
 import { Session } from "@/sync/storageTypes";
 import { Message } from "@/sync/typesMessage";
 import { t } from "@/text";
+import { getSessionDisplayModelLabel } from "@/utils/sessionModelLabel";
 
 export type SessionState =
   | "disconnected"
@@ -465,6 +466,25 @@ export function getSessionProviderLabel(session: Session): string {
       }
       return key.charAt(0).toUpperCase() + key.slice(1);
   }
+}
+
+/**
+ * Returns the human-readable AI provider string shown in session lists.
+ * Includes the normalized model label when it adds useful information.
+ */
+export function getSessionProviderDisplayLabel(session: Session): string {
+  const provider = getSessionProviderLabel(session);
+  const model = getSessionDisplayModelLabel(session);
+
+  if (!model) {
+    return provider;
+  }
+
+  if (provider.trim().toLowerCase() === model.trim().toLowerCase()) {
+    return provider;
+  }
+
+  return `${provider} · ${model}`;
 }
 
 /**

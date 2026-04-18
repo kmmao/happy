@@ -321,7 +321,7 @@ function SessionInfoContent({ session }: { session: Session }) {
   }, []);
 
   const handleCopyUpdateCommand = useCallback(async () => {
-    const updateCommand = "npm install -g happy-coder@latest";
+    const updateCommand = "npm install -g @kmmao/happy-coder@latest";
     try {
       await Clipboard.setStringAsync(updateCommand);
       Modal.alert(t("common.success"), updateCommand);

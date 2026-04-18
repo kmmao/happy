@@ -1,17 +1,24 @@
 import * as React from 'react';
 import { View, Text } from 'react-native';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
-import { Ionicons, Octicons } from '@expo/vector-icons';
+import { Octicons } from '@expo/vector-icons';
 import { ToolCall } from '@/sync/typesMessage';
 import { ToolSectionView } from '../ToolSectionView';
 import { CommandView } from '@/components/CommandView';
 import { Metadata } from '@/sync/storageTypes';
 import { t } from '@/text';
+import { buildCodexToolViewTheme } from './codexToolViewTheme';
 import {
     getCodexCommandText,
     getCodexParsedCommandSummaries,
     getCodexParsedCommandSummary,
+    type CodexParsedCommandSummary,
 } from '../codexCommandUtils';
+import {
+    formatCodexBashDescription,
+    getCodexBashIconName,
+    getCodexBashMetaLabels,
+} from '../codexBashPresentation';
 
 interface CodexBashViewProps {
     tool: ToolCall;
@@ -20,9 +27,12 @@ interface CodexBashViewProps {
 
 export const CodexBashView = React.memo<CodexBashViewProps>(({ tool, metadata }) => {
     const { theme } = useUnistyles();
+    const chrome = React.useMemo(
+        () => buildCodexToolViewTheme(theme.colors.codex),
+        [theme.colors.codex],
+    );
     const { input, result, state } = tool;
 
-    // Parse the input structure
     const command = input?.command;
     const summary = React.useMemo(
         () => getCodexParsedCommandSummary(input, metadata),
@@ -32,167 +42,122 @@ export const CodexBashView = React.memo<CodexBashViewProps>(({ tool, metadata })
         () => getCodexParsedCommandSummaries(input, metadata),
         [input, metadata],
     );
-    const operationType = summary?.type ?? 'unknown';
     const commandStr = summary?.command || getCodexCommandText(command) || null;
 
-    const getIconForType = React.useCallback((type: string) => {
-        switch (type) {
-            case 'read':
-                return <Octicons name="eye" size={18} color={theme.colors.textSecondary} />;
-            case 'write':
-                return <Octicons name="file-diff" size={18} color={theme.colors.textSecondary} />;
-            case 'search':
-            case 'list_files':
-                return <Octicons name="search" size={18} color={theme.colors.textSecondary} />;
-            default:
-                return <Octicons name="terminal" size={18} color={theme.colors.textSecondary} />;
+    const renderMetaLabels = React.useCallback((item: CodexParsedCommandSummary) => {
+        const labels = getCodexBashMetaLabels(item);
+        if (labels.length === 0) {
+            return null;
         }
-    }, [theme.colors.textSecondary]);
 
-    const getOperationText = React.useCallback((item: (typeof summaries)[number]) => {
-        switch (item.type) {
-            case 'read':
-                return item.resolvedPath
-                    ? t('tools.desc.readingFile', { file: item.resolvedPath })
-                    : item.command;
-            case 'write':
-                return item.resolvedPath
-                    ? t('tools.desc.writingFile', { file: item.resolvedPath })
-                    : item.command;
-            case 'search':
-                return item.query
-                    ? t('tools.desc.searchPattern', { pattern: item.query })
-                    : t('tools.names.searchContent');
-            case 'list_files':
-                return item.displayName
-                    ? t('tools.desc.searchPath', { basename: item.displayName })
-                    : t('tools.names.listFiles');
-            default:
-                return item.command;
-        }
-    }, []);
+        return (
+            <View style={styles.metaRow}>
+                {labels.map((label, index) => (
+                    <View
+                        key={`${label}-${index}`}
+                        style={[
+                            styles.metaChip,
+                            {
+                                backgroundColor: chrome.chipBg,
+                                borderColor: chrome.chipBorder,
+                            },
+                        ]}
+                    >
+                        <Text style={[styles.metaChipText, { color: chrome.chipText }]}>
+                            {label}
+                        </Text>
+                    </View>
+                ))}
+            </View>
+        );
+    }, [chrome.chipBg, chrome.chipBorder, chrome.chipText]);
+
+    const renderSemanticCard = React.useCallback((item: CodexParsedCommandSummary, key: string) => {
+        const operationText =
+            formatCodexBashDescription(item) ??
+            item.command ??
+            t('tools.names.terminal');
+
+        return (
+            <View key={key} style={styles.commandItem}>
+                <View style={styles.iconRow}>
+                    <Octicons
+                        name={getCodexBashIconName(item) as any}
+                        size={18}
+                        color={chrome.subtitle}
+                    />
+                    <Text style={styles.operationText}>{operationText}</Text>
+                </View>
+                {renderMetaLabels(item)}
+                {item.command ? (
+                    <Text style={styles.commandText}>{item.command}</Text>
+                ) : null}
+            </View>
+        );
+    }, [chrome.subtitle, renderMetaLabels]);
 
     if (summaries.length > 1) {
         return (
-            <ToolSectionView>
-                <View style={styles.readContainer}>
+            <ToolSectionView provider="codex">
+                <View
+                    style={[
+                        styles.cardContainer,
+                        {
+                            backgroundColor: chrome.cardBg,
+                            borderColor: chrome.cardBorder,
+                            borderRadius: theme.codex.radius.card,
+                        },
+                    ]}
+                >
                     <View style={styles.summaryList}>
-                        {summaries.map((item, index) => {
-                            const operationText = getOperationText(item);
-                            if (!operationText) {
-                                return null;
-                            }
-
-                            return (
-                                <View key={`${item.type}-${item.command ?? item.resolvedPath ?? index}`} style={styles.commandItem}>
-                                    <View style={styles.iconRow}>
-                                        {getIconForType(item.type)}
-                                        <Text style={styles.operationText}>{operationText}</Text>
-                                    </View>
-                                    {item.command && (
-                                        <Text style={styles.commandText}>{item.command}</Text>
-                                    )}
-                                </View>
-                            );
-                        })}
+                        {summaries.map((item, index) =>
+                            renderSemanticCard(
+                                item,
+                                `${item.type}-${item.command ?? item.resolvedPath ?? item.displayName ?? index}`,
+                            ),
+                        )}
                     </View>
                 </View>
             </ToolSectionView>
         );
     }
 
-    // Format the display based on operation type
-    if (operationType === 'read' && summary?.resolvedPath) {
+    if (summary && summary.type !== 'unknown') {
         return (
-            <ToolSectionView>
-                <View style={styles.readContainer}>
-                    <View style={styles.iconRow}>
-                        {getIconForType(operationType)}
-                        <Text style={styles.operationText}>
-                            {t('tools.desc.readingFile', { file: summary.resolvedPath })}
-                        </Text>
-                    </View>
-                    {commandStr && (
-                        <Text style={styles.commandText}>{commandStr}</Text>
-                    )}
+            <ToolSectionView provider="codex">
+                <View
+                    style={[
+                        styles.cardContainer,
+                        {
+                            backgroundColor: chrome.cardBg,
+                            borderColor: chrome.cardBorder,
+                            borderRadius: theme.codex.radius.card,
+                        },
+                    ]}
+                >
+                    {renderSemanticCard(summary, 'primary')}
                 </View>
-            </ToolSectionView>
-        );
-    } else if (operationType === 'write' && summary?.resolvedPath) {
-        return (
-            <ToolSectionView>
-                <View style={styles.readContainer}>
-                    <View style={styles.iconRow}>
-                        {getIconForType(operationType)}
-                        <Text style={styles.operationText}>
-                            {t('tools.desc.writingFile', { file: summary.resolvedPath })}
-                        </Text>
-                    </View>
-                    {commandStr && (
-                        <Text style={styles.commandText}>{commandStr}</Text>
-                    )}
-                </View>
-            </ToolSectionView>
-        );
-    } else if (operationType === 'search') {
-        const operationText = summary?.query
-            ? t('tools.desc.searchPattern', { pattern: summary.query })
-            : t('tools.names.searchContent');
-
-        return (
-            <ToolSectionView>
-                <View style={styles.readContainer}>
-                    <View style={styles.iconRow}>
-                        {getIconForType(operationType)}
-                        <Text style={styles.operationText}>{operationText}</Text>
-                    </View>
-                    {commandStr && (
-                        <Text style={styles.commandText}>{commandStr}</Text>
-                    )}
-                </View>
-            </ToolSectionView>
-        );
-    } else if (operationType === 'list_files') {
-        const operationText = summary?.displayName
-            ? t('tools.desc.searchPath', { basename: summary.displayName })
-            : t('tools.names.listFiles');
-
-        return (
-            <ToolSectionView>
-                <View style={styles.readContainer}>
-                    <View style={styles.iconRow}>
-                        {getIconForType(operationType)}
-                        <Text style={styles.operationText}>{operationText}</Text>
-                    </View>
-                    {commandStr && (
-                        <Text style={styles.commandText}>{commandStr}</Text>
-                    )}
-                </View>
-            </ToolSectionView>
-        );
-    } else {
-        // Display as a regular command
-        const commandDisplay = commandStr || '';
-        
-        return (
-            <ToolSectionView>
-                <CommandView 
-                    command={commandDisplay}
-                    stdout={null}
-                    stderr={null}
-                    error={state === 'error' && typeof result === 'string' ? result : null}
-                    hideEmptyOutput
-                />
             </ToolSectionView>
         );
     }
+
+    return (
+        <ToolSectionView provider="codex">
+            <CommandView
+                command={commandStr || ''}
+                stdout={null}
+                stderr={null}
+                error={state === 'error' && typeof result === 'string' ? result : null}
+                hideEmptyOutput
+            />
+        </ToolSectionView>
+    );
 });
 
 const styles = StyleSheet.create((theme) => ({
-    readContainer: {
+    cardContainer: {
         padding: 12,
-        backgroundColor: theme.colors.surfaceHigh,
-        borderRadius: 8,
+        borderWidth: theme.codex.borderWidth.soft,
     },
     summaryList: {
         gap: 12,
@@ -207,13 +172,28 @@ const styles = StyleSheet.create((theme) => ({
     },
     operationText: {
         fontSize: 14,
-        color: theme.colors.text,
+        color: theme.colors.codex.textPrimary,
         fontWeight: '500',
+        flex: 1,
+    },
+    metaRow: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 6,
+    },
+    metaChip: {
+        borderWidth: theme.codex.borderWidth.soft,
+        borderRadius: 999,
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+    },
+    metaChipText: {
+        fontSize: 11,
+        fontWeight: '600',
     },
     commandText: {
         fontSize: 12,
-        color: theme.colors.textSecondary,
+        color: theme.colors.codex.textSecondary,
         fontFamily: 'monospace',
-        marginTop: 8,
     },
 }));

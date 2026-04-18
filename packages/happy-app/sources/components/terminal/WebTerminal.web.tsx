@@ -14,6 +14,7 @@ import { Text } from "@/components/StyledText";
 import { Typography } from "@/constants/Typography";
 import { Ionicons } from "@expo/vector-icons";
 import { useUnistyles } from "react-native-unistyles";
+import { Asset } from "expo-asset";
 import { apiSocket } from "@/sync/apiSocket";
 import {
     machineTerminalSpawn,
@@ -21,8 +22,10 @@ import {
     machineTerminalResize,
     machineTerminalInput,
     machineUpgradeCli,
+    waitForMachineCliVersion,
 } from "@/sync/ops";
 import { useMachine } from "@/sync/storage";
+import { resolveCliSelfUpgradeSupport } from "@/hooks/cliSelfUpgradeSupport";
 import { useCliVersionCheck } from "@/hooks/useCliVersionCheck";
 import { t } from "@/text";
 
@@ -58,6 +61,7 @@ function WebTerminalComponent({ machineId, cwd, sessionId, terminalId: terminalI
     const machine = useMachine(machineId);
     const currentCliVersion = machine?.daemonState?.startedWithCliVersion;
     const { latestVersion, hasUpdate } = useCliVersionCheck(currentCliVersion);
+    const cliSelfUpgradeSupport = resolveCliSelfUpgradeSupport(machine);
 
     // Explicitly close the PTY — called only by user action or shell exit, not on unmount
     const closeTerminal = useCallback(() => {
@@ -93,6 +97,23 @@ function WebTerminalComponent({ machineId, cwd, sessionId, terminalId: terminalI
                 document.head.appendChild(link);
             }
 
+            // Symbols Nerd Font (mono) patches PUA glyphs like  (git branch, U+E0A0)
+            // used by oh-my-zsh / starship / powerline prompts. System fonts (SF Mono / Menlo)
+            // don't carry these codepoints; unicode-range limits this font to symbol ranges
+            // so regular text still renders with the primary font.
+            if (!document.querySelector('style[data-nerd-font]')) {
+                const nerdFontUri = Asset.fromModule(require("@/assets/fonts/SymbolsNerdFontMono-Regular.ttf")).uri;
+                const style = document.createElement("style");
+                style.setAttribute("data-nerd-font", "true");
+                style.textContent = "@font-face {"
+                    + " font-family: 'Symbols Nerd Font';"
+                    + " src: url('" + nerdFontUri + "') format('truetype');"
+                    + " font-display: swap;"
+                    + " unicode-range: U+23FB-23FE, U+2B58, U+E000-E00A, U+E0A0-E0A3, U+E0B0-E0D4, U+E200-E2A9, U+E300-E3E3, U+E5FA-E6B7, U+E700-E8EF, U+EA60-EC1E, U+ED00-EFCE, U+F000-F2FF, U+F300-F381, U+F400-F533, U+F0001-F1AF0;"
+                    + " }";
+                document.head.appendChild(style);
+            }
+
             if (!mounted || !containerRef.current) return;
 
             const bg = theme.colors.groupped?.background ?? "#000000";
@@ -101,7 +122,7 @@ function WebTerminalComponent({ machineId, cwd, sessionId, terminalId: terminalI
             const terminal = new Terminal({
                 cursorBlink: true,
                 fontSize: 14,
-                fontFamily: "'SF Mono', 'Menlo', 'Monaco', 'Courier New', monospace",
+                fontFamily: "'SF Mono', 'Menlo', 'Monaco', 'Courier New', 'Symbols Nerd Font', monospace",
                 theme: {
                     background: isDark ? "#1a1a2e" : "#ffffff",
                     foreground: isDark ? "#e0e0e0" : "#1a1a1a",
@@ -247,17 +268,24 @@ function WebTerminalComponent({ machineId, cwd, sessionId, terminalId: terminalI
         setIsUpdating(true);
         setUpdateMsg(t("webTerminal.updating"));
         try {
-            const result = await machineUpgradeCli(machineId, latestVersion);
+            const result = await machineUpgradeCli(
+                machineId,
+                latestVersion,
+            );
             if (!result.success) {
                 setUpdateMsg(result.error ?? t("webTerminal.updateFailed"));
                 setIsUpdating(false);
                 return;
             }
             setUpdateMsg(t("webTerminal.updateWaiting"));
-            setTimeout(() => {
+            const upgraded = await waitForMachineCliVersion(machineId, latestVersion);
+            if (!upgraded) {
+                setUpdateMsg(t("webTerminal.updateFailed"));
                 setIsUpdating(false);
-                handleRetry();
-            }, 65_000);
+                return;
+            }
+            setIsUpdating(false);
+            handleRetry();
         } catch {
             setUpdateMsg(t("webTerminal.updateFailed"));
             setIsUpdating(false);
@@ -305,7 +333,7 @@ function WebTerminalComponent({ machineId, cwd, sessionId, terminalId: terminalI
                         {t("webTerminal.retry")}
                     </button>
                 )}
-                {hasUpdate && latestVersion && !isUpdating && (
+                {hasUpdate && latestVersion && cliSelfUpgradeSupport.canSelfUpgrade && !isUpdating && (
                     <button
                         onClick={handleUpdateCli}
                         style={{ ...btnBase, background: "transparent", color: theme.colors.textSecondary, border: `1px solid ${theme.colors.divider}` }}

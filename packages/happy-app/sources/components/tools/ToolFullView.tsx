@@ -7,6 +7,7 @@ import {
   Platform,
   useWindowDimensions,
 } from "react-native";
+import * as Clipboard from "expo-clipboard";
 import { Ionicons } from "@expo/vector-icons";
 import { ToolCall, Message } from "@/sync/typesMessage";
 import { CodeView } from "../CodeView";
@@ -16,7 +17,9 @@ import { layout } from "../layout";
 import { useLocalSetting, useLocalSettingMutable } from "@/sync/storage";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { t } from "@/text";
+import { buildToolFullViewTheme } from "@/components/tools/toolChromeTheme";
 import { ToolSimpleContent } from "./ToolSimpleContent";
+import { getToolProvider } from "@/components/tools/toolProvider";
 
 interface ToolFullViewProps {
   tool: ToolCall;
@@ -37,6 +40,11 @@ export const ToolFullView = React.memo(function ToolFullView({
     useLocalSettingMutable("toolDetailMode");
   const scrollViewRef = React.useRef<ScrollView>(null);
   const { theme } = useUnistyles();
+  const toolProvider = getToolProvider({
+    toolName: tool.name,
+    metadata,
+  });
+  const fullViewTheme = buildToolFullViewTheme(toolProvider, theme);
 
   // For tools with specialized full views (Bash, Edit, MultiEdit),
   // always use the specialized view — they are already intuitive.
@@ -51,6 +59,7 @@ export const ToolFullView = React.memo(function ToolFullView({
       ref={scrollViewRef}
       style={[
         styles.container,
+        { backgroundColor: fullViewTheme.background },
         { paddingHorizontal: screenWidth > 700 ? 16 : 0 },
       ]}
     >
@@ -62,7 +71,7 @@ export const ToolFullView = React.memo(function ToolFullView({
               style={[
                 styles.segmentContainer,
                 {
-                  backgroundColor: theme.colors.surfaceHighest,
+                  backgroundColor: fullViewTheme.modeTrackBackground,
                 },
               ]}
             >
@@ -71,7 +80,7 @@ export const ToolFullView = React.memo(function ToolFullView({
                 style={[
                   styles.segment,
                   toolDetailMode === "simple" && {
-                    backgroundColor: theme.colors.surface,
+                    backgroundColor: fullViewTheme.modeActiveBackground,
                   },
                 ]}
               >
@@ -81,8 +90,8 @@ export const ToolFullView = React.memo(function ToolFullView({
                     {
                       color:
                         toolDetailMode === "simple"
-                          ? theme.colors.textLink
-                          : theme.colors.textSecondary,
+                          ? fullViewTheme.modeActiveText
+                          : fullViewTheme.modeInactiveText,
                     },
                   ]}
                 >
@@ -94,7 +103,7 @@ export const ToolFullView = React.memo(function ToolFullView({
                 style={[
                   styles.segment,
                   toolDetailMode === "developer" && {
-                    backgroundColor: theme.colors.surface,
+                    backgroundColor: fullViewTheme.modeActiveBackground,
                   },
                 ]}
               >
@@ -104,8 +113,8 @@ export const ToolFullView = React.memo(function ToolFullView({
                     {
                       color:
                         toolDetailMode === "developer"
-                          ? theme.colors.textLink
-                          : theme.colors.textSecondary,
+                          ? fullViewTheme.modeActiveText
+                          : fullViewTheme.modeInactiveText,
                     },
                   ]}
                 >
@@ -125,7 +134,11 @@ export const ToolFullView = React.memo(function ToolFullView({
             scrollViewRef={scrollViewRef}
           />
         ) : isSimpleMode ? (
-          <ToolSimpleContent tool={tool} metadata={metadata || null} />
+          <ToolSimpleContent
+            tool={tool}
+            metadata={metadata || null}
+            provider={toolProvider}
+          />
         ) : (
           <>
             {/* Generic fallback for tools without specialized views */}
@@ -136,21 +149,42 @@ export const ToolFullView = React.memo(function ToolFullView({
                   <Ionicons
                     name="information-circle"
                     size={20}
-                    color="#5856D6"
+                    color={fullViewTheme.infoIconColor}
                   />
-                  <Text style={styles.sectionTitle}>
+                  <Text
+                    style={[
+                      styles.sectionTitle,
+                      { color: fullViewTheme.sectionTitleColor },
+                    ]}
+                  >
                     {t("tools.fullView.description")}
                   </Text>
                 </View>
-                <Text style={styles.description}>{tool.description}</Text>
+                <Text
+                  style={[
+                    styles.description,
+                    { color: fullViewTheme.descriptionColor },
+                  ]}
+                >
+                  {tool.description}
+                </Text>
               </View>
             )}
             {/* Input Parameters */}
             {tool.input && (
               <View style={styles.section}>
                 <View style={styles.sectionHeader}>
-                  <Ionicons name="log-in" size={20} color="#5856D6" />
-                  <Text style={styles.sectionTitle}>
+                  <Ionicons
+                    name="log-in"
+                    size={20}
+                    color={fullViewTheme.inputIconColor}
+                  />
+                  <Text
+                    style={[
+                      styles.sectionTitle,
+                      { color: fullViewTheme.sectionTitleColor },
+                    ]}
+                  >
                     {t("tools.fullView.inputParams")}
                   </Text>
                 </View>
@@ -162,8 +196,17 @@ export const ToolFullView = React.memo(function ToolFullView({
             {tool.state === "completed" && tool.result && (
               <View style={styles.section}>
                 <View style={styles.sectionHeader}>
-                  <Ionicons name="log-out" size={20} color="#34C759" />
-                  <Text style={styles.sectionTitle}>
+                  <Ionicons
+                    name="log-out"
+                    size={20}
+                    color={fullViewTheme.outputIconColor}
+                  />
+                  <Text
+                    style={[
+                      styles.sectionTitle,
+                      { color: fullViewTheme.sectionTitleColor },
+                    ]}
+                  >
                     {t("tools.fullView.output")}
                   </Text>
                 </View>
@@ -181,13 +224,37 @@ export const ToolFullView = React.memo(function ToolFullView({
             {tool.state === "error" && tool.result && (
               <View style={styles.section}>
                 <View style={styles.sectionHeader}>
-                  <Ionicons name="close-circle" size={20} color="#FF3B30" />
-                  <Text style={styles.sectionTitle}>
+                  <Ionicons
+                    name="close-circle"
+                    size={20}
+                    color={fullViewTheme.errorIconColor}
+                  />
+                  <Text
+                    style={[
+                      styles.sectionTitle,
+                      { color: fullViewTheme.sectionTitleColor },
+                    ]}
+                  >
                     {t("tools.fullView.error")}
                   </Text>
                 </View>
-                <View style={styles.errorContainer}>
-                  <Text style={styles.errorText}>{String(tool.result)}</Text>
+                <View
+                  style={[
+                    styles.errorContainer,
+                    {
+                      backgroundColor: fullViewTheme.errorBackground,
+                      borderColor: fullViewTheme.errorBorder,
+                    },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.errorText,
+                      { color: fullViewTheme.errorText },
+                    ]}
+                  >
+                    {String(tool.result)}
+                  </Text>
                 </View>
               </View>
             )}
@@ -199,12 +266,22 @@ export const ToolFullView = React.memo(function ToolFullView({
                   <Ionicons
                     name="checkmark-circle-outline"
                     size={48}
-                    color="#34C759"
+                    color={fullViewTheme.emptyIconColor}
                   />
-                  <Text style={styles.emptyOutputText}>
+                  <Text
+                    style={[
+                      styles.emptyOutputText,
+                      { color: fullViewTheme.sectionTitleColor },
+                    ]}
+                  >
                     {t("tools.fullView.completed")}
                   </Text>
-                  <Text style={styles.emptyOutputSubtext}>
+                  <Text
+                    style={[
+                      styles.emptyOutputSubtext,
+                      { color: fullViewTheme.descriptionColor },
+                    ]}
+                  >
                     {t("tools.fullView.noOutput")}
                   </Text>
                 </View>
@@ -215,42 +292,121 @@ export const ToolFullView = React.memo(function ToolFullView({
 
         {/* Raw JSON View (Dev Mode Only) */}
         {devModeEnabled && (
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Ionicons name="code-slash" size={20} color="#FF9500" />
-              <Text style={styles.sectionTitle}>
-                {t("tools.fullView.rawJsonDevMode")}
-              </Text>
-            </View>
-            <CodeView
-              code={JSON.stringify(
-                {
-                  name: tool.name,
-                  state: tool.state,
-                  description: tool.description,
-                  input: tool.input,
-                  result: tool.result,
-                  createdAt: tool.createdAt,
-                  startedAt: tool.startedAt,
-                  completedAt: tool.completedAt,
-                  permission: tool.permission,
-                  messages,
-                },
-                null,
-                2,
-              )}
-            />
-          </View>
+          <RawJsonSection
+            tool={tool}
+            messages={messages}
+            fullViewTheme={fullViewTheme}
+          />
         )}
       </View>
     </ScrollView>
   );
 });
 
+interface RawJsonSectionProps {
+  tool: ToolCall;
+  messages: Message[];
+  fullViewTheme: ReturnType<typeof buildToolFullViewTheme>;
+}
+
+const RawJsonSection = React.memo(function RawJsonSection({
+  tool,
+  messages,
+  fullViewTheme,
+}: RawJsonSectionProps) {
+  const [copied, setCopied] = React.useState(false);
+
+  const jsonString = React.useMemo(
+    () =>
+      JSON.stringify(
+        {
+          name: tool.name,
+          state: tool.state,
+          description: tool.description,
+          input: tool.input,
+          result: tool.result,
+          createdAt: tool.createdAt,
+          startedAt: tool.startedAt,
+          completedAt: tool.completedAt,
+          permission: tool.permission,
+          messages,
+        },
+        null,
+        2,
+      ),
+    [tool, messages],
+  );
+
+  const handleCopy = React.useCallback(async () => {
+    try {
+      await Clipboard.setStringAsync(jsonString);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      // Clipboard can fail on unsupported web contexts; surface nothing
+    }
+  }, [jsonString]);
+
+  return (
+    <View style={styles.section}>
+      <View style={styles.sectionHeader}>
+        <Ionicons
+          name="code-slash"
+          size={20}
+          color={fullViewTheme.rawIconColor}
+        />
+        <Text
+          style={[
+            styles.sectionTitle,
+            { color: fullViewTheme.sectionTitleColor },
+          ]}
+        >
+          {t("tools.fullView.rawJsonDevMode")}
+        </Text>
+        <Pressable
+          onPress={handleCopy}
+          disabled={copied}
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel={copied ? t("common.copied") : t("common.copy")}
+          style={({ pressed }) => [
+            styles.copyButton,
+            {
+              backgroundColor: fullViewTheme.copyButtonBackground,
+              borderColor: copied
+                ? fullViewTheme.copiedColor
+                : fullViewTheme.copyButtonBorder,
+            },
+            pressed && !copied && styles.copyButtonPressed,
+          ]}
+        >
+          <Ionicons
+            name={copied ? "checkmark" : "copy-outline"}
+            size={14}
+            color={copied ? fullViewTheme.copiedColor : fullViewTheme.rawIconColor}
+          />
+          <Text
+            style={[
+              styles.copyButtonText,
+              {
+                color: copied
+                  ? fullViewTheme.copiedColor
+                  : fullViewTheme.copyButtonText,
+              },
+            ]}
+          >
+            {copied ? t("common.copied") : t("common.copy")}
+          </Text>
+        </Pressable>
+      </View>
+      <CodeView code={jsonString} />
+    </View>
+  );
+});
+
 const styles = StyleSheet.create((theme) => ({
   container: {
     flex: 1,
-    backgroundColor: theme.colors.surface,
     paddingTop: 12,
   },
   contentWrapper: {
@@ -291,15 +447,30 @@ const styles = StyleSheet.create((theme) => ({
     marginBottom: 12,
     gap: 8,
   },
+  copyButton: {
+    marginLeft: "auto",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 6,
+    borderWidth: 1,
+  },
+  copyButtonPressed: {
+    opacity: 0.7,
+  },
+  copyButtonText: {
+    fontSize: 12,
+    fontWeight: "600",
+  },
   sectionTitle: {
     fontSize: 17,
     fontWeight: "600",
-    color: theme.colors.text,
   },
   description: {
     fontSize: 14,
     lineHeight: 20,
-    color: theme.colors.textSecondary,
   },
   toolId: {
     fontSize: 12,
@@ -307,15 +478,12 @@ const styles = StyleSheet.create((theme) => ({
     color: theme.colors.textSecondary,
   },
   errorContainer: {
-    backgroundColor: theme.colors.box.error.background,
     borderRadius: 8,
     padding: 16,
     borderWidth: 1,
-    borderColor: theme.colors.box.error.border,
   },
   errorText: {
     fontSize: 14,
-    color: theme.colors.box.error.text,
     lineHeight: 20,
   },
   emptyOutputContainer: {
@@ -326,11 +494,9 @@ const styles = StyleSheet.create((theme) => ({
   emptyOutputText: {
     fontSize: 16,
     fontWeight: "600",
-    color: theme.colors.text,
   },
   emptyOutputSubtext: {
     fontSize: 14,
-    color: theme.colors.textSecondary,
   },
 }));
 

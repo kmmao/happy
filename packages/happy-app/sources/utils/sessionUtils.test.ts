@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import {
     formatApiRetryStatus,
     getLatestUserRequestPreview,
+    getSessionProviderDisplayLabel,
     getSessionStatusState,
     getSessionSubtitle,
     formatPathRelativeToHome,
@@ -18,6 +19,9 @@ vi.mock('@/text', () => ({
             'status.unknown': 'Unknown',
             'session.startedByDaemon': 'daemon',
             'session.startedByTerminal': 'Terminal',
+            'agentInput.agent.codex': 'Codex',
+            'agentInput.agent.claude': 'Claude',
+            'agentInput.agent.gemini': 'Gemini',
             'status.apiRetry': (values) => values?.isRateLimit
                 ? `Waiting for rate limit reset (${String(values?.retryDelaySeconds)}s)…`
                 : `retrying API (${String(values?.attempt)}/${String(values?.maxRetries)})…`,
@@ -139,6 +143,36 @@ describe('sessionUtils', () => {
         it('returns Unknown when metadata is missing', () => {
             const session = createSession({ metadata: null } as Partial<Session>);
             expect(getSessionSubtitle(session)).toBe('Unknown');
+        });
+    });
+
+    describe('getSessionProviderDisplayLabel', () => {
+        it('combines provider and normalized model label for session list display', () => {
+            const session = createSession({
+                metadata: {
+                    path: '/home/user/projects/my-app',
+                    host: 'localhost',
+                    homeDir: '/home/user',
+                    flavor: 'codex',
+                    currentModelCode: 'gpt-5.4-20260101',
+                },
+            } as Partial<Session>);
+
+            expect(getSessionProviderDisplayLabel(session)).toBe('Codex · GPT-5');
+        });
+
+        it('avoids repeating the model when it matches the provider label', () => {
+            const session = createSession({
+                metadata: {
+                    path: '/home/user/projects/my-app',
+                    host: 'localhost',
+                    homeDir: '/home/user',
+                    flavor: 'codex',
+                    currentModelCode: 'codex-20260101',
+                },
+            } as Partial<Session>);
+
+            expect(getSessionProviderDisplayLabel(session)).toBe('Codex');
         });
     });
 

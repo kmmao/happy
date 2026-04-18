@@ -187,8 +187,8 @@ export Z_AI_HAIKU_MODEL="GLM-4.5-Air"`,
           },
           {
             name: "OPENAI_SMALL_FAST_MODEL",
-            expectedValue: "gpt-5.4-mini",
-            description: "Fast model for quick responses",
+            expectedValue: "gpt-5.4",
+            description: "Pinned model for Codex and quick responses",
             isSecret: false,
           },
         ],
@@ -196,7 +196,7 @@ export Z_AI_HAIKU_MODEL="GLM-4.5-Air"`,
 export OPENAI_BASE_URL="https://api.openai.com/v1"
 export OPENAI_API_KEY="sk-YOUR_OPENAI_API_KEY"
 export OPENAI_MODEL="gpt-5.4"
-export OPENAI_SMALL_FAST_MODEL="gpt-5.4-mini"`,
+export OPENAI_SMALL_FAST_MODEL="gpt-5.4"`,
       };
     case "azure-openai":
       return {
@@ -474,9 +474,9 @@ export const getBuiltInProfile = (id: string): AIBackendProfile | null => {
           { name: "OPENAI_BASE_URL", value: "https://api.openai.com/v1" },
           { name: "OPENAI_MODEL", value: "gpt-5.4" },
           { name: "OPENAI_API_TIMEOUT_MS", value: "600000" },
-          { name: "OPENAI_SMALL_FAST_MODEL", value: "gpt-5.4-mini" },
+          { name: "OPENAI_SMALL_FAST_MODEL", value: "gpt-5.4" },
           { name: "API_TIMEOUT_MS", value: "600000" },
-          { name: "CODEX_SMALL_FAST_MODEL", value: "gpt-5.4-mini" },
+          { name: "CODEX_SMALL_FAST_MODEL", value: "gpt-5.4" },
         ],
         compatibility: { claude: false, codex: true, gemini: false },
         isBuiltIn: true,

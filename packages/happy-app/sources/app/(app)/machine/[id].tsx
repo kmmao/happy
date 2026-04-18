@@ -15,7 +15,13 @@ import { Typography } from "@/constants/Typography";
 import { useSessions, useMachine } from "@/sync/storage";
 import { Ionicons, Octicons } from "@expo/vector-icons";
 import type { Session } from "@/sync/storageTypes";
-import { machineStopDaemon, machineUpdateMetadata, machineBash, machineUpgradeCli } from "@/sync/ops";
+import {
+  machineStopDaemon,
+  machineUpdateMetadata,
+  machineBash,
+  machineUpgradeCli,
+  waitForMachineCliVersion,
+} from "@/sync/ops";
 import { Modal } from "@/modal";
 import {
   formatPathRelativeToHome,
@@ -28,6 +34,7 @@ import { useUnistyles, StyleSheet } from "react-native-unistyles";
 import { t } from "@/text";
 import { useNavigateToSession } from "@/hooks/useNavigateToSession";
 import { useCliVersionCheck } from "@/hooks/useCliVersionCheck";
+import { resolveCliSelfUpgradeSupport } from "@/hooks/cliSelfUpgradeSupport";
 import { machineSpawnNewSession } from "@/sync/ops";
 import { resolveAbsolutePath } from "@/utils/pathUtils";
 import {
@@ -127,6 +134,19 @@ function MachineDetailScreen() {
 
   const currentCliVersion = machine?.daemonState?.startedWithCliVersion as string | undefined;
   const { latestVersion, hasUpdate } = useCliVersionCheck(currentCliVersion);
+  const cliSelfUpgradeSupport = resolveCliSelfUpgradeSupport(machine);
+  const showUpgradeButton =
+    hasUpdate &&
+    !!latestVersion &&
+    !!machine &&
+    isMachineOnline(machine) &&
+    cliSelfUpgradeSupport.canSelfUpgrade;
+  const showUpgradeInfo =
+    hasUpdate &&
+    !!latestVersion &&
+    !!machine &&
+    isMachineOnline(machine) &&
+    !cliSelfUpgradeSupport.canSelfUpgrade;
 
   // Check if Docker is available on this machine
   React.useEffect(() => {
@@ -227,13 +247,26 @@ function MachineDetailScreen() {
           onPress: async () => {
             setIsUpgradingCli(true);
             try {
-              const result = await machineUpgradeCli(machineId!, latestVersion);
+              const result = await machineUpgradeCli(
+                machineId!,
+                latestVersion,
+              );
               if (result.success) {
-                Modal.alert(
-                  t("common.success"),
-                  t("machine.upgradeCliSuccess"),
+                const upgraded = await waitForMachineCliVersion(
+                  machineId!,
+                  latestVersion,
                 );
-                await sync.refreshMachines();
+                if (upgraded) {
+                  Modal.alert(
+                    t("common.success"),
+                    t("machine.upgradeCliSuccess"),
+                  );
+                } else {
+                  Modal.alert(
+                    t("common.error"),
+                    t("machine.upgradeCliFailed"),
+                  );
+                }
               } else {
                 Modal.alert(
                   t("common.error"),
@@ -251,6 +284,20 @@ function MachineDetailScreen() {
           },
         },
       ],
+    );
+  };
+
+  const handleShowUpgradeUnavailable = () => {
+    const reason = cliSelfUpgradeSupport.reason;
+    const message =
+      reason === "local-source"
+        ? t("machine.upgradeCliUnavailableLocalSource")
+        : reason === "legacy-cli"
+          ? t("machine.upgradeCliUnavailableLegacy")
+          : t("machine.upgradeCliUnavailableUnknown");
+    Modal.alert(
+      t("machine.upgradeCliUnavailableTitle"),
+      message,
     );
   };
 
@@ -491,13 +538,18 @@ function MachineDetailScreen() {
               </Text>
             )}
             <View style={styles.daemonActions}>
-              {hasUpdate && latestVersion && isMachineOnline(machine) && (
+              {showUpgradeButton && (
                 <Pressable onPress={handleUpgradeCli} disabled={isUpgradingCli} hitSlop={8}>
                   {isUpgradingCli ? (
                     <ActivityIndicator size="small" color={theme.colors.textSecondary} />
                   ) : (
                     <Ionicons name="cloud-download-outline" size={18} color={theme.colors.textLink} />
                   )}
+                </Pressable>
+              )}
+              {showUpgradeInfo && (
+                <Pressable onPress={handleShowUpgradeUnavailable} hitSlop={8}>
+                  <Ionicons name="information-circle-outline" size={18} color={theme.colors.textSecondary} />
                 </Pressable>
               )}
               {daemonStatus !== "stopped" && (

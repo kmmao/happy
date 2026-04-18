@@ -8,9 +8,11 @@ import { Metadata } from "@/sync/storageTypes";
 import { resolvePath } from "@/utils/pathUtils";
 import { ToolDiffView } from "@/components/tools/ToolDiffView";
 import { useSetting } from "@/sync/storage";
-import { DiffStatsBar } from "@/components/diff/DiffStatsBar";
 import { getLanguageFromPath } from "@/components/diff/syntaxTokenizer";
+import { CodexDiffStats } from "@/components/session/codex/CodexDiffStats";
+import { buildCodexDiffPalette } from "@/components/session/codex/codexDiffPalette";
 import { getCodexPatchEntries } from "../codexPatchUtils";
+import { buildCodexToolViewTheme } from "./codexToolViewTheme";
 
 interface CodexPatchViewProps {
   tool: ToolCall;
@@ -36,6 +38,14 @@ export const CodexPatchView = React.memo<CodexPatchViewProps>(
   ({ tool, metadata, scrollViewRef }) => {
     const { theme } = useUnistyles();
     const expandDiffsByDefault = useSetting("expandDiffsByDefault");
+    const chrome = React.useMemo(
+      () => buildCodexToolViewTheme(theme.colors.codex),
+      [theme.colors.codex],
+    );
+    const diffPalette = React.useMemo(
+      () => buildCodexDiffPalette(theme.colors.codex),
+      [theme.colors.codex],
+    );
     const entries = React.useMemo(
       () =>
         getCodexPatchEntries(tool.input?.changes).map((entry, index) => {
@@ -76,8 +86,8 @@ export const CodexPatchView = React.memo<CodexPatchViewProps>(
     };
 
     return (
-      <ToolSectionView fullWidth>
-        <View style={styles.list}>
+      <ToolSectionView fullWidth provider="codex">
+        <View style={[styles.list, { gap: theme.codex.spacing.sectionGap }]}>
           {entries.map((entry) => {
             const fileName =
               entry.resolvedPath.split("/").pop() || entry.resolvedPath;
@@ -86,43 +96,78 @@ export const CodexPatchView = React.memo<CodexPatchViewProps>(
             return (
               <View
                 key={`${entry.index}-${entry.resolvedPath}`}
-                style={styles.item}
+                style={[
+                  styles.item,
+                  {
+                    borderColor: chrome.cardBorder,
+                    backgroundColor: chrome.cardBg,
+                    borderRadius: theme.codex.radius.card,
+                  },
+                  !expanded && styles.itemCollapsed,
+                ]}
               >
                 <Pressable
-                  style={styles.cardHeader}
+                  style={({ pressed }) => [
+                    styles.cardHeader,
+                    {
+                      paddingHorizontal: theme.codex.spacing.cardPadding + 4,
+                      paddingVertical: theme.codex.spacing.cardPadding - 2,
+                      gap: theme.codex.spacing.sectionGap,
+                    },
+                    pressed && { backgroundColor: chrome.cardBgHover },
+                  ]}
                   onPress={() => toggleEntry(entry.index)}
                 >
                   <View style={styles.cardHeaderLeft}>
-                    <View style={styles.fileIconWrap}>
+                    <View
+                      style={[
+                        styles.fileIconWrap,
+                        {
+                          backgroundColor: chrome.iconBg,
+                          borderColor: chrome.iconBorder,
+                          borderRadius: theme.codex.radius.diff - 2,
+                        },
+                      ]}
+                    >
                       <Ionicons
                         name="document-text-outline"
                         size={18}
-                        color={theme.colors.text}
+                        color={chrome.iconColor}
                       />
                     </View>
                     <View style={styles.fileMeta}>
-                      <Text style={styles.fileName} numberOfLines={1}>
+                      <Text
+                        style={[styles.fileName, { color: chrome.title }]}
+                        numberOfLines={1}
+                      >
                         {fileName}
                       </Text>
                       {entry.resolvedPath !== fileName && (
-                        <Text style={styles.filePath} numberOfLines={1}>
+                        <Text
+                          style={[styles.filePath, { color: chrome.subtitle }]}
+                          numberOfLines={1}
+                        >
                           {entry.resolvedPath}
                         </Text>
                       )}
                     </View>
                   </View>
                   <View style={styles.cardHeaderRight}>
-                    <DiffStatsBar
+                    <CodexDiffStats
                       additions={entry.additions}
                       deletions={entry.deletions}
                     />
                     {!isFullView && entries.length === 1 && durationText && (
-                      <Text style={styles.durationText}>{durationText}</Text>
+                      <Text
+                        style={[styles.durationText, { color: chrome.meta }]}
+                      >
+                        {durationText}
+                      </Text>
                     )}
                     <Ionicons
                       name={expanded ? "chevron-down" : "chevron-forward"}
                       size={16}
-                      color={theme.colors.textSecondary}
+                      color={chrome.subtitle}
                     />
                   </View>
                 </Pressable>
@@ -130,7 +175,10 @@ export const CodexPatchView = React.memo<CodexPatchViewProps>(
                   <View
                     style={[
                       styles.diffWrap,
-                      { borderTopColor: theme.colors.divider },
+                      {
+                        borderTopColor: chrome.divider,
+                        paddingTop: theme.codex.spacing.diffPadding - 2,
+                      },
                     ]}
                   >
                     <ToolDiffView
@@ -141,6 +189,7 @@ export const CodexPatchView = React.memo<CodexPatchViewProps>(
                       collapsible
                       language={entry.language}
                       visibleLineCount={isFullView || expandDiffsByDefault ? undefined : 5}
+                      palette={diffPalette}
                     />
                   </View>
                 )}
@@ -155,18 +204,18 @@ export const CodexPatchView = React.memo<CodexPatchViewProps>(
 
 const styles = StyleSheet.create((theme) => ({
   list: {
-    gap: 12,
   },
   item: {
     overflow: "hidden",
+    borderWidth: 1,
+  },
+  itemCollapsed: {
+    borderBottomWidth: 0,
   },
   cardHeader: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    gap: 12,
   },
   cardHeaderLeft: {
     flex: 1,
@@ -182,9 +231,9 @@ const styles = StyleSheet.create((theme) => ({
   fileIconWrap: {
     width: 28,
     height: 28,
-    borderRadius: 8,
     alignItems: "center",
     justifyContent: "center",
+    borderWidth: theme.codex.borderWidth.soft,
   },
   fileMeta: {
     flex: 1,
@@ -193,21 +242,17 @@ const styles = StyleSheet.create((theme) => ({
   fileName: {
     fontSize: 15,
     fontWeight: "700",
-    color: theme.colors.text,
   },
   filePath: {
     marginTop: 2,
     fontSize: 12,
-    color: theme.colors.textSecondary,
   },
   durationText: {
     fontSize: 13,
-    color: theme.colors.textSecondary,
     fontVariant: ["tabular-nums"],
   },
   diffWrap: {
     borderTopWidth: 1,
     marginTop: 4,
-    paddingTop: 8,
   },
 }));

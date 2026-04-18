@@ -1,9 +1,7 @@
 import * as React from "react";
 import {
     Modal,
-    Platform,
     Pressable,
-    ScrollView,
     View,
 } from "react-native";
 import { Text } from "@/components/StyledText";
@@ -21,6 +19,7 @@ import { SidePanelSummaryTab } from "./SidePanelSummaryTab";
 import { SidePanelTerminalTab } from "./SidePanelTerminalTab";
 import { SidePanelPreviewTab } from "./SidePanelPreviewTab";
 import { SidePanelFilePreview } from "./SidePanelFilePreview";
+import { SessionGlassTabBar, type SessionGlassTabBarItem } from "./SessionGlassTabBar";
 import { buildFileReferenceText } from "./sessionSidePanelReference";
 import { InputContext } from "@/hooks/useInputContext";
 import {
@@ -69,6 +68,14 @@ export const MobileSessionPanelSheet = React.memo<MobileSessionPanelSheetProps>(
         const layoutConfig = React.useMemo(() => getMobilePanelLayoutConfig(), []);
         const tabChipMinWidth = React.useMemo(() => getMobilePanelTabChipMinWidth(), []);
         const effectiveActiveTab = resolveSessionPanelActiveTab(activeTab, tabs);
+        const mobileTabs = React.useMemo<SessionGlassTabBarItem[]>(
+            () =>
+                tabDefinitions.map((tab) => ({
+                    key: tab.key,
+                    label: t(tab.labelKey),
+                })),
+            [tabDefinitions],
+        );
 
         React.useEffect(() => {
             if (effectiveActiveTab !== activeTab) {
@@ -189,59 +196,19 @@ export const MobileSessionPanelSheet = React.memo<MobileSessionPanelSheetProps>(
                                 <View
                                     style={{
                                         backgroundColor: theme.colors.surface,
-                                        borderBottomWidth: Platform.select({ ios: 0.33, default: 1 }),
-                                        borderBottomColor: theme.colors.divider,
                                         minHeight: layoutConfig.tabBarMinHeight,
                                         justifyContent: "center",
+                                        paddingHorizontal: 10,
+                                        paddingVertical: 6,
                                     }}
                                 >
-                                    <ScrollView
-                                        horizontal
-                                        showsHorizontalScrollIndicator={false}
-                                        contentContainerStyle={{
-                                            paddingHorizontal: 12,
-                                            paddingVertical: 8,
-                                            gap: layoutConfig.tabGap,
-                                            alignItems: "center",
-                                        }}
-                                    >
-                                        {tabDefinitions.map((tab) => {
-                                            const isActive = tab.key === effectiveActiveTab;
-                                            return (
-                                                <View
-                                                    key={tab.key}
-                                                    style={{
-                                                        minWidth: tabChipMinWidth,
-                                                        paddingHorizontal: 14,
-                                                        paddingVertical: 10,
-                                                        borderRadius: layoutConfig.tabBorderRadius,
-                                                        backgroundColor: isActive
-                                                            ? theme.colors.textLink + "1F"
-                                                            : theme.colors.surfaceHigh,
-                                                        borderWidth: 1,
-                                                        borderColor: isActive
-                                                            ? theme.colors.textLink + "55"
-                                                            : theme.colors.divider,
-                                                        alignItems: "center",
-                                                        justifyContent: "center",
-                                                    }}
-                                                >
-                                                    <Text
-                                                        onPress={() => setActiveTab(tab.key)}
-                                                        style={{
-                                                            fontSize: 13,
-                                                            color: isActive
-                                                                ? theme.colors.textLink
-                                                                : theme.colors.textSecondary,
-                                                            ...Typography.default(isActive ? "semiBold" : "regular"),
-                                                        }}
-                                                    >
-                                                        {t(tab.labelKey)}
-                                                    </Text>
-                                                </View>
-                                            );
-                                        })}
-                                    </ScrollView>
+                                    <SessionGlassTabBar
+                                        tabs={mobileTabs}
+                                        activeTab={effectiveActiveTab}
+                                        onChange={(tabKey) => setActiveTab(tabKey as SessionPanelTab)}
+                                        scrollable
+                                        tabMinWidth={tabChipMinWidth}
+                                    />
                                 </View>
                             )}
 

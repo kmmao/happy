@@ -1285,67 +1285,45 @@ export function NewSessionWizard({
                     {
                       value: "gpt-5.4",
                       label: "GPT-5.4",
-                      description: "Latest general-purpose model",
+                      description: "Locked Codex model",
                       icon: "diamond-outline",
-                    },
-                    {
-                      value: "gpt-5.4-pro",
-                      label: "GPT-5.4 Pro",
-                      description: "Most capable for complex tasks",
-                      icon: "sparkles-outline",
-                    },
-                    {
-                      value: "gpt-5.4-mini",
-                      label: "GPT-5.4 Mini",
-                      description: "Fast and cost-efficient",
-                      icon: "flash-outline",
-                    },
-                    {
-                      value: "gpt-5.3-codex",
-                      label: "GPT-5.3 Codex",
-                      description: "Most capable coding model",
-                      icon: "diamond-outline",
-                    },
-                    {
-                      value: "gpt-5.3-codex-spark",
-                      label: "GPT-5.3 Codex Spark",
-                      description: "Ultra-fast real-time coding",
-                      icon: "flash-outline",
-                    },
-                    {
-                      value: "gpt-5.2-codex",
-                      label: "GPT-5.2 Codex",
-                      description: "Balanced coding assistance",
-                      icon: "cube-outline",
                     },
                   ] as const)
-              ).map((option, index, array) => (
-                <Item
-                  key={option.value}
-                  title={option.label}
-                  subtitle={option.description}
-                  leftElement={
-                    <Ionicons
-                      name={option.icon}
-                      size={24}
-                      color={theme.colors.textSecondary}
-                    />
-                  }
-                  rightElement={
-                    modelMode === option.value ? (
+              ).map((option, index, array) => {
+                const isSelected =
+                  modelMode === option.value ||
+                  (agentType === "codex" &&
+                    modelMode === "default" &&
+                    option.value === "gpt-5.4");
+
+                return (
+                  <Item
+                    key={option.value}
+                    title={option.label}
+                    subtitle={option.description}
+                    leftElement={
                       <Ionicons
-                        name="checkmark-circle"
-                        size={20}
-                        color={theme.colors.button.primary.background}
+                        name={option.icon}
+                        size={24}
+                        color={theme.colors.textSecondary}
                       />
-                    ) : null
-                  }
-                  onPress={() => setModelMode(option.value)}
-                  showChevron={false}
-                  selected={modelMode === option.value}
-                  showDivider={index < array.length - 1}
-                />
-              ))}
+                    }
+                    rightElement={
+                      isSelected ? (
+                        <Ionicons
+                          name="checkmark-circle"
+                          size={20}
+                          color={theme.colors.button.primary.background}
+                        />
+                      ) : null
+                    }
+                    onPress={() => setModelMode(option.value)}
+                    showChevron={false}
+                    selected={isSelected}
+                    showDivider={index < array.length - 1}
+                  />
+                );
+              })}
             </ItemGroup>
           </View>
         );

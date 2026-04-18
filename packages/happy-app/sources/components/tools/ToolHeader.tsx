@@ -4,13 +4,24 @@ import { Ionicons } from '@expo/vector-icons';
 import { ToolCall } from '@/sync/typesMessage';
 import { knownTools } from '@/components/tools/knownTools';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
+import { type Metadata } from '@/sync/storageTypes';
+import { buildToolHeaderTheme } from '@/components/tools/toolChromeTheme';
+import {
+    getToolProvider,
+    type ToolProvider,
+} from '@/components/tools/toolProvider';
 
 interface ToolHeaderProps {
     tool: ToolCall;
+    metadata?: Metadata | null;
+    provider?: ToolProvider;
 }
 
-export function ToolHeader({ tool }: ToolHeaderProps) {
+export function ToolHeader({ tool, metadata = null, provider }: ToolHeaderProps) {
     const { theme } = useUnistyles();
+    const resolvedProvider =
+        provider ?? getToolProvider({ toolName: tool.name, metadata });
+    const headerTheme = buildToolHeaderTheme(resolvedProvider, theme);
     const knownTool = tool.name in knownTools
         ? knownTools[tool.name as keyof typeof knownTools]
         : undefined;
@@ -19,18 +30,20 @@ export function ToolHeader({ tool }: ToolHeaderProps) {
     let toolTitle = tool.name;
     if (knownTool?.title) {
         if (typeof knownTool.title === 'function') {
-            toolTitle = knownTool.title({ tool, metadata: null });
+            toolTitle = knownTool.title({ tool, metadata });
         } else {
             toolTitle = knownTool.title;
         }
     }
 
-    const icon = knownTool?.icon ? knownTool.icon(18, theme.colors.header.tint) : <Ionicons name="construct-outline" size={18} color={theme.colors.header.tint} />;
+    const icon = knownTool?.icon
+        ? knownTool.icon(18, headerTheme.iconColor)
+        : <Ionicons name="construct-outline" size={18} color={headerTheme.iconColor} />;
 
     // Extract subtitle using the same logic as ToolView
     let subtitle = null;
     if (knownTool && 'extractSubtitle' in knownTool && typeof knownTool.extractSubtitle === 'function') {
-        const extractedSubtitle = knownTool.extractSubtitle({ tool, metadata: null });
+        const extractedSubtitle = knownTool.extractSubtitle({ tool, metadata });
         if (typeof extractedSubtitle === 'string' && extractedSubtitle) {
             subtitle = extractedSubtitle;
         }
@@ -41,10 +54,20 @@ export function ToolHeader({ tool }: ToolHeaderProps) {
             <View style={styles.titleContainer}>
                 <View style={styles.titleRow}>
                     {icon}
-                    <Text style={styles.title} numberOfLines={1}>{toolTitle}</Text>
+                    <Text
+                        style={[styles.title, { color: headerTheme.titleColor }]}
+                        numberOfLines={1}
+                    >
+                        {toolTitle}
+                    </Text>
                 </View>
                 {subtitle && (
-                    <Text style={styles.subtitle} numberOfLines={1}>{subtitle}</Text>
+                    <Text
+                        style={[styles.subtitle, { color: headerTheme.subtitleColor }]}
+                        numberOfLines={1}
+                    >
+                        {subtitle}
+                    </Text>
                 )}
             </View>
         </View>
@@ -74,13 +97,11 @@ const styles = StyleSheet.create((theme) => ({
     title: {
         fontSize: 14,
         fontWeight: '500',
-        color: theme.colors.text,
         textAlign: 'center',
         flexShrink: 1,
     },
     subtitle: {
         fontSize: 11,
-        color: theme.colors.textSecondary,
         textAlign: 'center',
         marginTop: 2,
     },

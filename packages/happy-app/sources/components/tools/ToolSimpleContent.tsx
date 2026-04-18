@@ -10,9 +10,8 @@ import {
   getCodexCommandPreview,
   getCodexParsedCommandSummary,
 } from "./codexCommandUtils";
-const COLOR_SUCCESS = "#34C759";
-const COLOR_ERROR = "#FF3B30";
-const COLOR_WARNING = "#FF9500";
+import { buildToolSimpleContentTheme } from "./toolChromeTheme";
+import { getToolProvider, type ToolProvider } from "./toolProvider";
 
 /**
  * Extract a short display name from a file path.
@@ -43,6 +42,12 @@ type InfoRow = {
   readonly color?: string;
 };
 
+interface SimpleContentStatusColors {
+  successColor: string;
+  errorColor: string;
+  runningColor: string;
+}
+
 /**
  * Generate simple view content based on tool type.
  * Returns a title and an array of key-value info rows.
@@ -50,6 +55,7 @@ type InfoRow = {
 function generateSimpleContent(
   tool: ToolCall,
   metadata: Metadata | null,
+  statusColors: SimpleContentStatusColors,
 ): { title: string; rows: readonly InfoRow[] } {
   const rows: InfoRow[] = [];
 
@@ -64,23 +70,24 @@ function generateSimpleContent(
   };
 
   // Common: add status
-  const addStatus = (successColor: string, errorColor: string) => {
+  const addStatus = () => {
     if (tool.state === "completed") {
       rows.push({
         label: t("tools.fullView.simple.status"),
         value: t("tools.fullView.simple.succeeded"),
-        color: successColor,
+        color: statusColors.successColor,
       });
     } else if (tool.state === "error") {
       rows.push({
         label: t("tools.fullView.simple.status"),
         value: t("tools.fullView.simple.failed"),
-        color: errorColor,
+        color: statusColors.errorColor,
       });
     } else {
       rows.push({
         label: t("tools.fullView.simple.status"),
         value: t("tools.fullView.simple.running"),
+        color: statusColors.runningColor,
       });
     }
   };
@@ -98,7 +105,7 @@ function generateSimpleContent(
         label: t("tools.fullView.simple.fileName"),
         value: resolved || filePath,
       });
-      addStatus(COLOR_SUCCESS, COLOR_ERROR);
+      addStatus();
       addDuration();
       return { title, rows };
     }
@@ -118,7 +125,7 @@ function generateSimpleContent(
         label: t("tools.fullView.simple.fileName"),
         value: resolved || filePath,
       });
-      addStatus(COLOR_SUCCESS, COLOR_ERROR);
+      addStatus();
       addDuration();
       return { title, rows };
     }
@@ -192,7 +199,7 @@ function generateSimpleContent(
           value: command,
         });
       }
-      addStatus(COLOR_SUCCESS, COLOR_ERROR);
+      addStatus();
       addDuration();
       return { title, rows };
     }
@@ -209,7 +216,7 @@ function generateSimpleContent(
           value: pattern,
         });
       }
-      addStatus(COLOR_SUCCESS, COLOR_ERROR);
+      addStatus();
       addDuration();
       return { title, rows };
     }
@@ -226,7 +233,7 @@ function generateSimpleContent(
           value: pattern,
         });
       }
-      addStatus(COLOR_SUCCESS, COLOR_ERROR);
+      addStatus();
       addDuration();
       return { title, rows };
     }
@@ -254,7 +261,7 @@ function generateSimpleContent(
           value: desc,
         });
       }
-      addStatus(COLOR_SUCCESS, COLOR_ERROR);
+      addStatus();
       addDuration();
       return { title, rows };
     }
@@ -271,7 +278,7 @@ function generateSimpleContent(
           value: query,
         });
       }
-      addStatus(COLOR_SUCCESS, COLOR_ERROR);
+      addStatus();
       addDuration();
       return { title, rows };
     }
@@ -291,7 +298,7 @@ function generateSimpleContent(
           value: url,
         });
       }
-      addStatus(COLOR_SUCCESS, COLOR_ERROR);
+      addStatus();
       addDuration();
       return { title, rows };
     }
@@ -301,7 +308,7 @@ function generateSimpleContent(
       const title = t("tools.fullView.simple.updateTodos", {
         count: todos.length,
       });
-      addStatus(COLOR_SUCCESS, COLOR_ERROR);
+      addStatus();
       addDuration();
       return { title, rows };
     }
@@ -320,7 +327,7 @@ function generateSimpleContent(
         label: t("tools.fullView.simple.fileName"),
         value: resolved || filePath,
       });
-      addStatus(COLOR_SUCCESS, COLOR_ERROR);
+      addStatus();
       addDuration();
       return { title, rows };
     }
@@ -340,7 +347,7 @@ function generateSimpleContent(
           value: tool.description,
         });
       }
-      addStatus(COLOR_SUCCESS, COLOR_ERROR);
+      addStatus();
       addDuration();
       return { title, rows };
     }
@@ -350,14 +357,32 @@ function generateSimpleContent(
 interface ToolSimpleContentProps {
   tool: ToolCall;
   metadata: Metadata | null;
+  provider?: ToolProvider;
 }
 
 export const ToolSimpleContent = React.memo<ToolSimpleContentProps>(
-  ({ tool, metadata }) => {
+  ({ tool, metadata, provider }) => {
     const { theme } = useUnistyles();
+    const toolProvider =
+      provider ?? getToolProvider({ toolName: tool.name, metadata });
+    const contentTheme = React.useMemo(
+      () => buildToolSimpleContentTheme(toolProvider, theme),
+      [toolProvider, theme],
+    );
     const { title, rows } = React.useMemo(
-      () => generateSimpleContent(tool, metadata),
-      [tool, metadata],
+      () =>
+        generateSimpleContent(tool, metadata, {
+          successColor: contentTheme.statusCompletedColor,
+          errorColor: contentTheme.statusErrorColor,
+          runningColor: contentTheme.statusRunningColor,
+        }),
+      [
+        contentTheme.statusCompletedColor,
+        contentTheme.statusErrorColor,
+        contentTheme.statusRunningColor,
+        metadata,
+        tool,
+      ],
     );
 
     return (
@@ -366,11 +391,21 @@ export const ToolSimpleContent = React.memo<ToolSimpleContentProps>(
         <View
           style={[
             styles.titleCard,
-            { backgroundColor: theme.colors.surfaceHighest },
+            {
+              backgroundColor: contentTheme.titleCardBackground,
+              borderColor: contentTheme.borderColor ?? "transparent",
+              borderRadius: contentTheme.borderRadius,
+              borderWidth: contentTheme.borderWidth,
+            },
           ]}
         >
-          <StatusIcon state={tool.state} />
-          <Text style={[styles.title, { color: theme.colors.text }]}>
+          <StatusIcon
+            state={tool.state}
+            completedColor={contentTheme.statusCompletedColor}
+            errorColor={contentTheme.statusErrorColor}
+            runningColor={contentTheme.statusRunningColor}
+          />
+          <Text style={[styles.title, { color: contentTheme.titleColor }]}>
             {title}
           </Text>
         </View>
@@ -380,7 +415,12 @@ export const ToolSimpleContent = React.memo<ToolSimpleContentProps>(
           <View
             style={[
               styles.infoCard,
-              { backgroundColor: theme.colors.surfaceHigh },
+              {
+                backgroundColor: contentTheme.infoCardBackground,
+                borderColor: contentTheme.borderColor ?? "transparent",
+                borderRadius: contentTheme.borderRadius,
+                borderWidth: contentTheme.borderWidth,
+              },
             ]}
           >
             {rows.map((row, index) => (
@@ -390,7 +430,8 @@ export const ToolSimpleContent = React.memo<ToolSimpleContentProps>(
                   styles.infoRow,
                   index < rows.length - 1 && {
                     borderBottomWidth: StyleSheet.hairlineWidth,
-                    borderBottomColor: theme.colors.divider,
+                    borderBottomColor:
+                      contentTheme.borderColor ?? theme.colors.divider,
                   },
                 ]}
               >
@@ -399,7 +440,7 @@ export const ToolSimpleContent = React.memo<ToolSimpleContentProps>(
                     style={[
                       styles.infoLabel,
                       {
-                        color: theme.colors.textSecondary,
+                        color: contentTheme.labelColor,
                       },
                     ]}
                   >
@@ -410,7 +451,7 @@ export const ToolSimpleContent = React.memo<ToolSimpleContentProps>(
                   style={[
                     styles.infoValue,
                     {
-                      color: row.color || theme.colors.text,
+                      color: row.color || contentTheme.valueColor,
                     },
                     !row.label && { flex: 1 },
                   ]}
@@ -429,19 +470,25 @@ export const ToolSimpleContent = React.memo<ToolSimpleContentProps>(
 
 function StatusIcon({
   state,
+  completedColor,
+  errorColor,
+  runningColor,
 }: {
   state: ToolCall["state"];
+  completedColor: string;
+  errorColor: string;
+  runningColor: string;
 }): React.ReactElement | null {
   switch (state) {
     case "completed":
       return (
-        <Ionicons name="checkmark-circle" size={28} color={COLOR_SUCCESS} />
+        <Ionicons name="checkmark-circle" size={28} color={completedColor} />
       );
     case "error":
-      return <Ionicons name="alert-circle" size={28} color={COLOR_ERROR} />;
+      return <Ionicons name="alert-circle" size={28} color={errorColor} />;
     case "running":
       return (
-        <Ionicons name="hourglass-outline" size={28} color={COLOR_WARNING} />
+        <Ionicons name="hourglass-outline" size={28} color={runningColor} />
       );
     default:
       return null;

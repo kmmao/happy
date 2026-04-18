@@ -640,7 +640,7 @@ export const zhHans: TranslationStructure = {
       const m = Math.floor((seconds % 3600) / 60);
       return m > 0 ? `${h} 小时 ${m} 分钟` : `${h} 小时`;
     },
-    progressToolMixTitle: "工具类型",
+    progressToolMixTitle: "操作类型",
     progressToolMixOther: "其他",
     progressSummarySection: "会话概要",
     progressSummaryGoal: "目标",
@@ -654,6 +654,8 @@ export const zhHans: TranslationStructure = {
     progressRefreshActionLabel: "刷新",
     progressRefreshPrompt:
       "请查看当前工作状态，用 TodoWrite 重写清单以匹配真实状况：每一条任务标注准确状态（completed / in_progress / pending），in_progress 的项请填写 activeForm。如果此前还没有清单，请先规划再写。",
+    progressRefreshPromptCodex:
+      "请查看当前工作状态，调用 mcp__happy__update_progress 重写清单以匹配真实状况：每一条任务标注准确状态（completed / in_progress / pending），必要时补充 currentStage 或 blockers。如果此前还没有清单，请先创建第一版。只有在真正进入新阶段时才使用 listId: \"new\"。",
     progressTodoNudgeLabel: "建议验证",
     progressSummaryRefreshLabel: "更新",
     progressSummaryRefreshPrompt:
@@ -868,7 +870,7 @@ export const zhHans: TranslationStructure = {
       requiredVersion: string;
     }) =>
       `已安装版本 ${currentVersion}。请更新到 ${requiredVersion} 或更高版本`,
-    updateCliInstructions: "请运行 npm install -g happy-coder@latest",
+    updateCliInstructions: "请运行 npm install -g @kmmao/happy-coder@latest",
     resumeSession: "恢复会话",
     resumeSessionSubtitle: "在同一台机器上恢复此会话的完整上下文",
     forkSession: "分叉会话",
@@ -1151,6 +1153,11 @@ export const zhHans: TranslationStructure = {
       readFile: "读取文件",
       editFile: "编辑文件",
       writeFile: "写入文件",
+      verify: "验证",
+      test: "测试",
+      git: "Git",
+      package: "依赖",
+      run: "运行",
       fetchUrl: "获取 URL",
       readNotebook: "读取 Notebook",
       editNotebook: "编辑 Notebook",
@@ -1614,7 +1621,7 @@ export const zhHans: TranslationStructure = {
     launchNewSessionInDirectory: "在目录中启动新会话",
     offlineUnableToSpawn: "设备离线时无法启动",
     offlineHelp:
-      "• 确保您的计算机在线\n• 运行 `happy daemon status` 进行诊断\n• 您是否在运行最新的 CLI 版本？请使用 `npm install -g happy-coder@latest` 升级",
+      "• 确保您的计算机在线\n• 运行 `happy daemon status` 进行诊断\n• 您是否在运行最新的 CLI 版本？请使用 `npm install -g @kmmao/happy-coder@latest` 升级",
     daemon: "守护进程",
     status: "状态",
     stopDaemon: "停止守护进程",
@@ -2101,6 +2108,10 @@ export const zhHans: TranslationStructure = {
       `将 @kmmao/happy-coder 升级到 v${version}？升级完成后守护进程将自动重启。`,
     upgradeCliSuccess: "CLI 升级成功。守护进程将在 60 秒内自动重启。",
     upgradeCliFailed: "CLI 升级失败",
+    upgradeCliUnavailableTitle: "无法一键升级",
+    upgradeCliUnavailableLegacy: "当前 CLI 版本太老，不支持一键升级。请先手动运行 npm install -g @kmmao/happy-coder@latest，之后再试。",
+    upgradeCliUnavailableLocalSource: "这台机器上的 Happy 来自本地源码或 link 工作流，请在你的本地仓库 / build 流程里升级，不要在 App 里点一键升级。",
+    upgradeCliUnavailableUnknown: "这台机器不是受支持的 npm 全局安装，App 无法安全地替它自升级。若确认合适，请手动升级。",
     stopDaemonTitle: "停止守护进程？",
     stopDaemonMessage: "在您重新启动守护进程之前，将无法在此机器上创建新会话。当前会话不受影响。",
     stopDaemonButton: "停止守护进程",

@@ -11,7 +11,11 @@ import { Project } from "@/sync/projectManager";
 import { storage, useMachine } from "@/sync/storage";
 import { useShallow } from "zustand/react/shallow";
 import { Session } from "@/sync/storageTypes";
-import { useSessionStatus, getSessionName } from "@/utils/sessionUtils";
+import {
+    useSessionStatus,
+    getSessionName,
+    getSessionProviderDisplayLabel,
+} from "@/utils/sessionUtils";
 import { useRouter } from "expo-router";
 import { t } from "@/text";
 import { Modal } from "@/modal";
@@ -27,9 +31,12 @@ const SessionRow = React.memo(({ session, showDivider }: { session: Session; sho
     const router = useRouter();
     const status = useSessionStatus(session);
     const machine = useMachine(session.metadata?.machineId ?? "");
-    const { theme } = useUnistyles();
     const swipeableRef = React.useRef<Swipeable | null>(null);
     const isSwipeOpen = React.useRef(false);
+    const providerLabel = React.useMemo(
+        () => getSessionProviderDisplayLabel(session),
+        [session],
+    );
     const [archiving, performArchive] = useHappyAction(async () => {
         const result = await sessionKill(session.id);
         if (!result.success) {
@@ -143,7 +150,8 @@ const SessionRow = React.memo(({ session, showDivider }: { session: Session; sho
             <RectButton onPress={handlePress} enabled={!isBusy}>
                 <Item
                     title={getSessionName(session)}
-                    subtitle={status.statusText}
+                    subtitle={`${providerLabel}\n${status.statusText}`}
+                    subtitleLines={0}
                     icon={
                         <View
                             style={[

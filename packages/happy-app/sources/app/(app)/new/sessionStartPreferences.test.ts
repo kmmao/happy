@@ -25,7 +25,7 @@ describe("applySessionStartPreferences", () => {
             },
             profile: {
                 id: "openai",
-                name: "OpenAI (GPT-4/Codex)",
+                name: "OpenAI (GPT-5.4)",
             },
         });
 
@@ -49,7 +49,7 @@ describe("applySessionStartPreferences", () => {
         );
         expect(storage.updateSessionProfile).toHaveBeenCalledWith("session-1", {
             profileId: "openai",
-            profileName: "OpenAI (GPT-4/Codex)",
+            profileName: "OpenAI (GPT-5.4)",
         });
     });
 

@@ -2,13 +2,22 @@ import * as React from 'react';
 import { View, Text } from 'react-native';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 import { Typography } from '@/constants/Typography';
+import {
+    buildDiffStatsTheme,
+    type DiffStatsProvider,
+} from '@/components/diff/diffStatsTheme';
 
 interface DiffStatsBarProps {
     additions: number;
     deletions: number;
+    provider?: DiffStatsProvider;
 }
 
-export const DiffStatsBar = React.memo<DiffStatsBarProps>(({ additions, deletions }) => {
+export const DiffStatsBar = React.memo<DiffStatsBarProps>(({
+    additions,
+    deletions,
+    provider = 'default',
+}) => {
     const { theme } = useUnistyles();
     const total = additions + deletions;
 
@@ -18,27 +27,38 @@ export const DiffStatsBar = React.memo<DiffStatsBarProps>(({ additions, deletion
 
     const addRatio = additions / total;
     const delRatio = deletions / total;
+    const providerTheme = buildDiffStatsTheme(provider, theme);
 
     return (
-        <View style={styles.container}>
-            <Text style={[styles.additions, { color: theme.colors.diff.success }]}>
+        <View style={[styles.container, { marginLeft: providerTheme.marginLeft }]}>
+            <Text style={[styles.additions, { color: providerTheme.additionsColor }]}>
                 +{additions}
             </Text>
-            <Text style={[styles.deletions, { color: theme.colors.diff.error }]}>
+            <Text style={[styles.deletions, { color: providerTheme.deletionsColor }]}>
                 -{deletions}
             </Text>
-            <View style={styles.bar}>
+            <View
+                style={[
+                    styles.bar,
+                    providerTheme.trackColor
+                        ? {
+                            backgroundColor: providerTheme.trackColor,
+                            borderRadius: providerTheme.radius,
+                        }
+                        : null,
+                ]}
+            >
                 {additions > 0 && (
                     <View
                         style={[
                             styles.barSegment,
                             {
                                 flex: addRatio,
-                                backgroundColor: theme.colors.diff.success,
-                                borderTopLeftRadius: 3,
-                                borderBottomLeftRadius: 3,
-                                borderTopRightRadius: deletions === 0 ? 3 : 0,
-                                borderBottomRightRadius: deletions === 0 ? 3 : 0,
+                                backgroundColor: providerTheme.additionsColor,
+                                borderTopLeftRadius: providerTheme.radius,
+                                borderBottomLeftRadius: providerTheme.radius,
+                                borderTopRightRadius: deletions === 0 ? providerTheme.radius : 0,
+                                borderBottomRightRadius: deletions === 0 ? providerTheme.radius : 0,
                             },
                         ]}
                     />
@@ -49,11 +69,11 @@ export const DiffStatsBar = React.memo<DiffStatsBarProps>(({ additions, deletion
                             styles.barSegment,
                             {
                                 flex: delRatio,
-                                backgroundColor: theme.colors.diff.error,
-                                borderTopRightRadius: 3,
-                                borderBottomRightRadius: 3,
-                                borderTopLeftRadius: additions === 0 ? 3 : 0,
-                                borderBottomLeftRadius: additions === 0 ? 3 : 0,
+                                backgroundColor: providerTheme.deletionsColor,
+                                borderTopRightRadius: providerTheme.radius,
+                                borderBottomRightRadius: providerTheme.radius,
+                                borderTopLeftRadius: additions === 0 ? providerTheme.radius : 0,
+                                borderBottomLeftRadius: additions === 0 ? providerTheme.radius : 0,
                             },
                         ]}
                     />
@@ -68,7 +88,6 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         gap: 4,
-        marginLeft: 8,
     },
     additions: {
         ...Typography.mono(),

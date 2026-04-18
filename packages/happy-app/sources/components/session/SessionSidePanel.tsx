@@ -1,7 +1,7 @@
 import * as React from "react";
 import { Platform, Pressable, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { useUnistyles } from "react-native-unistyles";
+import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
 import { Text } from "@/components/StyledText";
 import { GitBrowseTab } from "@/components/git/GitBrowseTab";
@@ -25,12 +25,14 @@ import { SidePanelPreviewTab } from "./SidePanelPreviewTab";
 import { SidePanelSessionTab } from "./SidePanelSessionTab";
 import { SidePanelSummaryTab } from "./SidePanelSummaryTab";
 import { SidePanelTerminalTab } from "./SidePanelTerminalTab";
+import { SessionGlassTabBar, type SessionGlassTabBarItem } from "./SessionGlassTabBar";
 import {
     getSessionPanelTabDefinitions,
     getSessionPanelTabs,
     resolveSessionPanelActiveTab,
     type SessionPanelTab,
 } from "./sessionPanelTabs";
+import { formatCompactTabNumber } from "./sessionTabNumberFormat";
 import { buildFileReferenceText } from "./sessionSidePanelReference";
 
 export const SIDE_PANEL_WIDTH = 360;
@@ -114,6 +116,58 @@ export const SessionSidePanel = React.memo<SessionSidePanelProps>(
             }
         }, [activeTab, effectiveActiveTab]);
 
+        const topTabs = React.useMemo<SessionGlassTabBarItem[]>(
+            () =>
+                tabDefinitions.map((tab) => ({
+                    key: tab.key,
+                    label: t(tab.labelKey),
+                    secondary:
+                        tab.key === "changes" && changesInfo ? (
+                            <View
+                                style={styles.metricSecondaryRow}
+                            >
+                                <Text
+                                    adjustsFontSizeToFit
+                                    minimumFontScale={0.72}
+                                    numberOfLines={1}
+                                    style={[
+                                        styles.metricDelta,
+                                        { color: theme.colors.gitAddedText },
+                                    ]}
+                                >
+                                    +{formatCompactTabNumber(changesInfo.totalAdded)}
+                                </Text>
+                                <Text
+                                    adjustsFontSizeToFit
+                                    minimumFontScale={0.72}
+                                    numberOfLines={1}
+                                    style={[
+                                        styles.metricDelta,
+                                        { color: theme.colors.gitRemovedText },
+                                    ]}
+                                >
+                                    -{formatCompactTabNumber(changesInfo.totalRemoved)}
+                                </Text>
+                            </View>
+                        ) : tab.key === "knowledge" && summaryInfo ? (
+                            <View style={styles.metricSecondaryRow}>
+                                <Text
+                                    adjustsFontSizeToFit
+                                    minimumFontScale={0.72}
+                                    numberOfLines={1}
+                                    style={[
+                                        styles.metricSummary,
+                                        { color: theme.colors.textSecondary },
+                                    ]}
+                                >
+                                    {summaryInfo.captured}·{summaryInfo.referenced}
+                                </Text>
+                            </View>
+                        ) : undefined,
+                })),
+            [changesInfo, summaryInfo, tabDefinitions, theme],
+        );
+
         if (collapsed) {
             return (
                 <Pressable
@@ -152,76 +206,29 @@ export const SessionSidePanel = React.memo<SessionSidePanelProps>(
                 ) : (
                     <>
                         <View
-                            style={{
-                                flexDirection: "row",
-                                alignItems: "center",
-                                borderBottomWidth: Platform.select({ ios: 0.33, default: 1 }),
-                                borderBottomColor: theme.colors.divider,
-                                backgroundColor: theme.colors.surfaceHigh,
-                            }}
+                            style={[
+                                styles.headerWrap,
+                                { backgroundColor: theme.colors.surface },
+                            ]}
                         >
-                            {tabDefinitions.map((tab) => (
-                                <Pressable
-                                    key={tab.key}
-                                    onPress={() => setActiveTab(tab.key)}
-                                    style={{
-                                        flex: 1,
-                                        paddingVertical: 10,
-                                        alignItems: "center",
-                                        borderBottomWidth: 2,
-                                        borderBottomColor:
-                                            effectiveActiveTab === tab.key
-                                                ? theme.colors.textLink
-                                                : "transparent",
-                                        flexDirection: "row",
-                                        justifyContent: "center",
-                                        gap: 4,
-                                    }}
-                                >
-                                    <Text
-                                        style={{
-                                            fontSize: 13,
-                                            fontWeight: effectiveActiveTab === tab.key ? "600" : "400",
-                                            color:
-                                                effectiveActiveTab === tab.key
-                                                    ? theme.colors.textLink
-                                                    : theme.colors.textSecondary,
-                                            ...Typography.default(),
-                                        }}
+                            <SessionGlassTabBar
+                                tabs={topTabs}
+                                activeTab={effectiveActiveTab}
+                                onChange={(tabKey) => setActiveTab(tabKey as SessionPanelTab)}
+                                trailingAccessory={(
+                                    <Pressable
+                                        onPress={onToggleCollapse}
+                                        hitSlop={6}
+                                        style={styles.collapseButton}
                                     >
-                                        {t(tab.labelKey)}
-                                    </Text>
-                                    {tab.key === "changes" && changesInfo && (
-                                        <View style={{ flexDirection: "row", gap: 2 }}>
-                                            <Text style={{ fontSize: 10, fontWeight: "600", color: theme.colors.gitAddedText }}>
-                                                +{changesInfo.totalAdded}
-                                            </Text>
-                                            <Text style={{ fontSize: 10, fontWeight: "600", color: theme.colors.gitRemovedText }}>
-                                                -{changesInfo.totalRemoved}
-                                            </Text>
-                                        </View>
-                                    )}
-                                    {tab.key === "knowledge" && summaryInfo && (
-                                        <Text style={{ fontSize: 10, fontWeight: "600", color: theme.colors.textSecondary }}>
-                                            {summaryInfo.captured}·{summaryInfo.referenced}
-                                        </Text>
-                                    )}
-                                </Pressable>
-                            ))}
-                            <Pressable
-                                onPress={onToggleCollapse}
-                                hitSlop={6}
-                                style={{
-                                    paddingHorizontal: 10,
-                                    paddingVertical: 10,
-                                }}
-                            >
-                                <Ionicons
-                                    name="chevron-forward"
-                                    size={16}
-                                    color={theme.colors.textSecondary}
-                                />
-                            </Pressable>
+                                        <Ionicons
+                                            name="chevron-forward"
+                                            size={16}
+                                            color={theme.colors.textSecondary}
+                                        />
+                                    </Pressable>
+                                )}
+                            />
                         </View>
 
                         <View style={{ flex: 1 }}>
@@ -259,3 +266,45 @@ export const SessionSidePanel = React.memo<SessionSidePanelProps>(
         );
     },
 );
+
+const styles = StyleSheet.create(() => ({
+    headerWrap: {
+        paddingHorizontal: 6,
+        paddingTop: 6,
+        paddingBottom: 4,
+    },
+    collapseButton: {
+        width: 18,
+        height: 18,
+        alignItems: "center",
+        justifyContent: "center",
+    },
+    metricSecondaryRow: {
+        width: "100%",
+        minWidth: 0,
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 3,
+        maxWidth: "100%",
+        opacity: 0.94,
+    },
+    metricDelta: {
+        fontSize: 8,
+        lineHeight: 9,
+        includeFontPadding: false,
+        textAlign: "center",
+        flexShrink: 1,
+        letterSpacing: -0.1,
+        ...Typography.mono("semiBold"),
+    },
+    metricSummary: {
+        fontSize: 8,
+        lineHeight: 9,
+        includeFontPadding: false,
+        textAlign: "center",
+        flexShrink: 1,
+        letterSpacing: -0.1,
+        ...Typography.default("semiBold"),
+    },
+}));

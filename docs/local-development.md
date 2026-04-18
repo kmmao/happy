@@ -577,13 +577,13 @@ export Z_AI_AUTH_TOKEN=sk-yyy
 export OPENAI_API_KEY=sk-zzz
 ```
 
-**步骤 2**：App 内选择内置 Profile「OpenAI (GPT-5.3)」，或创建自定义 Profile，添加：
+**步骤 2**：App 内选择内置 Profile「OpenAI (GPT-5.4)」，或创建自定义 Profile，添加：
 
 | 变量 | 值 |
 |------|-----|
-| `ANTHROPIC_AUTH_TOKEN` | `${OPENAI_API_KEY}` |
-| `ANTHROPIC_BASE_URL` | `${OPENAI_BASE_URL:-https://api.openai.com/v1}` |
-| `ANTHROPIC_MODEL` | `${OPENAI_MODEL:-gpt-5.3}` |
+| `OPENAI_API_KEY` | `${OPENAI_API_KEY}` |
+| `OPENAI_BASE_URL` | `${OPENAI_BASE_URL:-https://api.openai.com/v1}` |
+| `OPENAI_MODEL` | `${OPENAI_MODEL:-gpt-5.4}` |
 
 ### 自定义 Profile（任意兼容 API）
 

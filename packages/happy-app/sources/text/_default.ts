@@ -658,7 +658,7 @@ export const en = {
       const m = Math.floor((seconds % 3600) / 60);
       return m > 0 ? `${h}h ${m}m` : `${h}h`;
     },
-    progressToolMixTitle: "Tool mix",
+    progressToolMixTitle: "Operation mix",
     progressToolMixOther: "Other",
     progressSummarySection: "Summary",
     progressSummaryGoal: "Goal",
@@ -672,6 +672,8 @@ export const en = {
     progressRefreshActionLabel: "Refresh",
     progressRefreshPrompt:
       "Please review the current state of the work and rewrite your TodoWrite checklist to reflect reality: every task with its accurate status (completed / in_progress / pending). Include an activeForm for any in_progress item. If no plan exists yet, draft one first.",
+    progressRefreshPromptCodex:
+      "Please review the current work state and call mcp__happy__update_progress to rewrite the checklist so it matches reality: every task with an accurate status (completed / in_progress / pending). Include currentStage or blockers when useful. If no checklist exists yet, create the first one. Use listId: \"new\" only when you are starting a genuinely new phase.",
     progressTodoNudgeLabel: "Verification suggested",
     progressSummaryRefreshLabel: "Update",
     progressSummaryRefreshPrompt:
@@ -890,7 +892,7 @@ export const en = {
       requiredVersion: string;
     }) =>
       `Version ${currentVersion} installed. Update to ${requiredVersion} or later`,
-    updateCliInstructions: "Please run npm install -g happy-coder@latest",
+    updateCliInstructions: "Please run npm install -g @kmmao/happy-coder@latest",
     resumeSession: "Resume Session",
     resumeSessionSubtitle:
       "Resume this session with full context on the same machine",
@@ -1178,6 +1180,11 @@ export const en = {
       readFile: "Read File",
       editFile: "Edit File",
       writeFile: "Write File",
+      verify: "Verify",
+      test: "Tests",
+      git: "Git",
+      package: "Package",
+      run: "Run",
       fetchUrl: "Fetch URL",
       readNotebook: "Read Notebook",
       editNotebook: "Edit Notebook",
@@ -1668,7 +1675,7 @@ export const en = {
     launchNewSessionInDirectory: "Launch New Session in Directory",
     offlineUnableToSpawn: "Launcher disabled while machine is offline",
     offlineHelp:
-      "• Make sure your computer is online\n• Run `happy daemon status` to diagnose\n• Are you running the latest CLI version? Upgrade with `npm install -g happy-coder@latest`",
+      "• Make sure your computer is online\n• Run `happy daemon status` to diagnose\n• Are you running the latest CLI version? Upgrade with `npm install -g @kmmao/happy-coder@latest`",
     daemon: "Daemon",
     status: "Status",
     stopDaemon: "Stop Daemon",
@@ -2157,6 +2164,10 @@ export const en = {
       `Upgrade @kmmao/happy-coder to v${version}? The daemon will restart automatically after upgrade.`,
     upgradeCliSuccess: "CLI upgraded successfully. The daemon will restart automatically within 60 seconds.",
     upgradeCliFailed: "CLI upgrade failed",
+    upgradeCliUnavailableTitle: "One-tap upgrade unavailable",
+    upgradeCliUnavailableLegacy: "This CLI is too old to support one-tap upgrades. Run npm install -g @kmmao/happy-coder@latest manually once, then try again.",
+    upgradeCliUnavailableLocalSource: "This machine is running Happy from a local checkout or link workflow. Upgrade it from your local repo/build flow instead of the app.",
+    upgradeCliUnavailableUnknown: "This machine is not using a supported npm global install, so the app cannot safely self-upgrade it. Upgrade it manually if appropriate.",
     stopDaemonTitle: "Stop Daemon?",
     stopDaemonMessage: "You will not be able to spawn new sessions on this machine until you restart the daemon on your computer again. Your current sessions will stay alive.",
     stopDaemonButton: "Stop Daemon",

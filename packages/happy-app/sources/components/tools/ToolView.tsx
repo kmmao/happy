@@ -27,6 +27,10 @@ import { formatMCPTitle } from "./views/MCPToolView";
 import { useSetting } from "@/sync/storage";
 import { t } from "@/text";
 import { DiffStatsBar } from "@/components/diff/DiffStatsBar";
+import {
+  buildToolCardTheme,
+} from "@/components/tools/toolChromeTheme";
+import { getToolProvider } from "@/components/tools/toolProvider";
 import * as Clipboard from "expo-clipboard";
 import { Modal } from "@/modal/ModalManager";
 import { sessionAllow } from "@/sync/ops";
@@ -37,6 +41,7 @@ import {
   getCodexCommandText,
   getCodexParsedCommandSummary,
 } from "./codexCommandUtils";
+import { getCodexBashIconName } from "./codexBashPresentation";
 import { shouldHideToolCall } from "./shouldHideToolCall";
 
 interface ToolViewProps {
@@ -65,6 +70,11 @@ export const ToolView = React.memo<ToolViewProps>((props) => {
   const useMergedInlineToolView =
     tool.name === "CodexDiff" ||
     (tool.name === "CodexPatch" && patchEntryCount === 1);
+  const toolProvider = getToolProvider({
+    toolName: tool.name,
+    metadata: props.metadata,
+  });
+  const cardTheme = buildToolCardTheme(toolProvider, theme);
 
   // Create default onPress handler for navigation
   const handlePress = React.useCallback(() => {
@@ -323,31 +333,23 @@ export const ToolView = React.memo<ToolViewProps>((props) => {
     minimal = true;
   }
 
-  // Special handling for CodexBash to determine icon based on parsed_cmd
-  if (
-    tool.name === "CodexBash" &&
-    tool.input?.parsed_cmd &&
-    Array.isArray(tool.input.parsed_cmd) &&
-    tool.input.parsed_cmd.length > 0
-  ) {
+  // Special handling for CodexBash to determine icon from semantic summary
+  if (tool.name === "CodexBash") {
     const parsedSummary = getCodexParsedCommandSummary(
       tool.input,
       props.metadata,
     );
-    if (parsedSummary?.type === "read") {
-      icon = <Octicons name="eye" size={18} color={theme.colors.text} />;
-    } else if (parsedSummary?.type === "write") {
-      icon = <Octicons name="file-diff" size={18} color={theme.colors.text} />;
-    } else if (
-      parsedSummary?.type === "search" ||
-      parsedSummary?.type === "list_files"
-    ) {
-      icon = <Octicons name="search" size={18} color={theme.colors.text} />;
-    } else {
-      icon = <Octicons name="terminal" size={18} color={theme.colors.text} />;
+    if (parsedSummary) {
+      icon = (
+        <Octicons
+          name={getCodexBashIconName(parsedSummary) as any}
+          size={18}
+          color={cardTheme.iconColor}
+        />
+      );
     }
   } else if (knownTool && typeof knownTool.icon === "function") {
-    icon = knownTool.icon(18, theme.colors.text);
+    icon = knownTool.icon(18, cardTheme.iconColor);
   }
 
   if (knownTool && typeof knownTool.noStatus === "boolean") {
@@ -387,7 +389,7 @@ export const ToolView = React.memo<ToolViewProps>((props) => {
       <Ionicons
         name="remove-circle-outline"
         size={20}
-        color={theme.colors.textSecondary}
+        color={cardTheme.mutedStatusColor}
       />
     );
   } else if (isToolUseError) {
@@ -395,7 +397,7 @@ export const ToolView = React.memo<ToolViewProps>((props) => {
       <Ionicons
         name="remove-circle-outline"
         size={20}
-        color={theme.colors.textSecondary}
+        color={cardTheme.mutedStatusColor}
       />
     );
     hideDefaultError = true;
@@ -407,7 +409,7 @@ export const ToolView = React.memo<ToolViewProps>((props) => {
           statusIcon = (
             <ActivityIndicator
               size="small"
-              color={theme.colors.text}
+              color={cardTheme.runningColor}
               style={{ transform: [{ scaleX: 0.8 }, { scaleY: 0.8 }] }}
             />
           );
@@ -420,7 +422,7 @@ export const ToolView = React.memo<ToolViewProps>((props) => {
           <Ionicons
             name="alert-circle-outline"
             size={20}
-            color={theme.colors.warning}
+            color={cardTheme.errorColor}
           />
         );
         break;
@@ -432,12 +434,23 @@ export const ToolView = React.memo<ToolViewProps>((props) => {
       <DiffStatsBar
         additions={diffStats.additions}
         deletions={diffStats.deletions}
+        provider={toolProvider}
       />
     ) : null;
 
   if (useMergedInlineToolView && SpecificToolView) {
     return (
-      <View style={styles.container}>
+      <View
+        style={[
+          styles.container,
+          {
+            backgroundColor: cardTheme.containerBackground,
+            borderRadius: cardTheme.borderRadius,
+            borderColor: cardTheme.borderColor ?? undefined,
+            borderWidth: cardTheme.borderWidth,
+          },
+        ]}
+      >
         <View style={styles.mergedToolContent}>
           <SpecificToolView
             tool={tool}
@@ -464,10 +477,23 @@ export const ToolView = React.memo<ToolViewProps>((props) => {
   }
 
   return (
-    <View style={styles.container}>
+    <View
+      style={[
+        styles.container,
+        {
+          backgroundColor: cardTheme.containerBackground,
+          borderRadius: cardTheme.borderRadius,
+          borderColor: cardTheme.borderColor ?? undefined,
+          borderWidth: cardTheme.borderWidth,
+        },
+      ]}
+    >
       {isPressable ? (
         <TouchableOpacity
-          style={styles.header}
+          style={[
+            styles.header,
+            { backgroundColor: cardTheme.headerBackground },
+          ]}
           onPress={handlePress}
           onLongPress={handleLongPress}
           activeOpacity={0.8}
@@ -475,26 +501,37 @@ export const ToolView = React.memo<ToolViewProps>((props) => {
           <View style={styles.headerLeft}>
             <View style={styles.iconContainer}>{icon}</View>
             <View style={styles.titleContainer}>
-              <Text style={styles.toolName}>
+              <Text style={[styles.toolName, { color: cardTheme.titleColor }]}>
                 {toolTitle}
                 {status ? (
                   <Text style={styles.status}>{` ${status}`}</Text>
                 ) : null}
               </Text>
               {description && (
-                <Text style={styles.toolDescription}>{description}</Text>
+                <Text
+                  style={[
+                    styles.toolDescription,
+                    { color: cardTheme.subtitleColor },
+                  ]}
+                >
+                  {description}
+                </Text>
               )}
             </View>
             {statsBar}
             {tool.state === "running" ? (
               <View style={styles.elapsedContainer}>
-                <ElapsedView from={tool.createdAt} />
+                <ElapsedView
+                  from={tool.createdAt}
+                  color={cardTheme.elapsedColor}
+                />
               </View>
             ) : tool.completedAt ? (
               <View style={styles.elapsedContainer}>
                 <CompletedDurationView
                   from={tool.createdAt}
                   to={tool.completedAt}
+                  color={cardTheme.elapsedColor}
                 />
               </View>
             ) : null}
@@ -502,30 +539,47 @@ export const ToolView = React.memo<ToolViewProps>((props) => {
           </View>
         </TouchableOpacity>
       ) : (
-        <Pressable style={styles.header} onLongPress={handleLongPress}>
+        <Pressable
+          style={[
+            styles.header,
+            { backgroundColor: cardTheme.headerBackground },
+          ]}
+          onLongPress={handleLongPress}
+        >
           <View style={styles.headerLeft}>
             <View style={styles.iconContainer}>{icon}</View>
             <View style={styles.titleContainer}>
-              <Text style={styles.toolName}>
+              <Text style={[styles.toolName, { color: cardTheme.titleColor }]}>
                 {toolTitle}
                 {status ? (
                   <Text style={styles.status}>{` ${status}`}</Text>
                 ) : null}
               </Text>
               {description && (
-                <Text style={styles.toolDescription}>{description}</Text>
+                <Text
+                  style={[
+                    styles.toolDescription,
+                    { color: cardTheme.subtitleColor },
+                  ]}
+                >
+                  {description}
+                </Text>
               )}
             </View>
             {statsBar}
             {tool.state === "running" ? (
               <View style={styles.elapsedContainer}>
-                <ElapsedView from={tool.createdAt} />
+                <ElapsedView
+                  from={tool.createdAt}
+                  color={cardTheme.elapsedColor}
+                />
               </View>
             ) : tool.completedAt ? (
               <View style={styles.elapsedContainer}>
                 <CompletedDurationView
                   from={tool.createdAt}
                   to={tool.completedAt}
+                  color={cardTheme.elapsedColor}
                 />
               </View>
             ) : null}
@@ -592,13 +646,19 @@ export const ToolView = React.memo<ToolViewProps>((props) => {
                 typeof tool.input === "object" &&
                 Object.keys(tool.input).length === 0
               ) && (
-                <ToolSectionView title={t("toolView.input")}>
+                <ToolSectionView
+                  title={t("toolView.input")}
+                  provider={toolProvider}
+                >
                   <CodeView code={JSON.stringify(tool.input, null, 2)} />
                 </ToolSectionView>
               )}
 
             {tool.state === "completed" && tool.result && (
-              <ToolSectionView title={t("toolView.output")}>
+              <ToolSectionView
+                title={t("toolView.output")}
+                provider={toolProvider}
+              >
                 <CodeView
                   code={
                     typeof tool.result === "string"
@@ -632,13 +692,13 @@ export const ToolView = React.memo<ToolViewProps>((props) => {
   );
 });
 
-function ElapsedView(props: { from: number }) {
-  const { from } = props;
+function ElapsedView(props: { from: number; color: string }) {
+  const { from, color } = props;
   const elapsed = useElapsedTime(from);
-  return <Text style={styles.elapsedText}>{elapsed.toFixed(1)}s</Text>;
+  return <Text style={[styles.elapsedText, { color }]}>{elapsed.toFixed(1)}s</Text>;
 }
 
-function CompletedDurationView(props: { from: number; to: number }) {
+function CompletedDurationView(props: { from: number; to: number; color: string }) {
   const seconds = (props.to - props.from) / 1000;
   const text =
     seconds < 1
@@ -646,13 +706,11 @@ function CompletedDurationView(props: { from: number; to: number }) {
       : seconds < 60
         ? `${seconds.toFixed(1)}s`
         : `${Math.floor(seconds / 60)}m ${Math.round(seconds % 60)}s`;
-  return <Text style={styles.elapsedText}>{text}</Text>;
+  return <Text style={[styles.elapsedText, { color: props.color }]}>{text}</Text>;
 }
 
 const styles = StyleSheet.create((theme) => ({
   container: {
-    backgroundColor: theme.colors.surfaceHigh,
-    borderRadius: 8,
     marginVertical: 4,
     overflow: "hidden",
   },
@@ -661,7 +719,6 @@ const styles = StyleSheet.create((theme) => ({
     alignItems: "center",
     justifyContent: "space-between",
     padding: 12,
-    backgroundColor: theme.colors.surfaceHighest,
   },
   headerLeft: {
     flexDirection: "row",
@@ -683,7 +740,6 @@ const styles = StyleSheet.create((theme) => ({
   },
   elapsedText: {
     fontSize: 13,
-    color: theme.colors.textSecondary,
     fontFamily: Platform.select({
       ios: "Menlo",
       android: "monospace",
@@ -693,7 +749,6 @@ const styles = StyleSheet.create((theme) => ({
   toolName: {
     fontSize: 14,
     fontWeight: "500",
-    color: theme.colors.text,
   },
   status: {
     fontWeight: "400",
@@ -702,7 +757,6 @@ const styles = StyleSheet.create((theme) => ({
   },
   toolDescription: {
     fontSize: 13,
-    color: theme.colors.textSecondary,
     marginTop: 2,
   },
   content: {

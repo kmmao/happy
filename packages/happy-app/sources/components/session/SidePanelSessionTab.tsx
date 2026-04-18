@@ -1,11 +1,10 @@
 import * as React from "react";
-import { Platform, Pressable, View } from "react-native";
-import { useUnistyles } from "react-native-unistyles";
+import { View } from "react-native";
+import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
-import { Text } from "@/components/StyledText";
-import { Typography } from "@/constants/Typography";
 import { t } from "@/text";
 import { SessionProgressPanel } from "./SessionProgressPanel";
+import { SessionGlassTabBar, type SessionGlassTabBarItem } from "./SessionGlassTabBar";
 import { SidePanelCodeTab } from "./SidePanelCodeTab";
 
 type SessionSubTab = "progress" | "code";
@@ -28,49 +27,25 @@ export const SidePanelSessionTab = React.memo<SidePanelSessionTabProps>(
     function SidePanelSessionTab({ sessionId }) {
         const { theme } = useUnistyles();
         const [activeSubTab, setActiveSubTab] = React.useState<SessionSubTab>("progress");
+        const subTabs: SessionGlassTabBarItem[] = SUB_TABS.map((tab) => ({
+            key: tab.key,
+            label: t(tab.labelKey),
+        }));
 
         return (
             <View style={{ flex: 1, backgroundColor: theme.colors.surface }}>
                 <View
-                    style={{
-                        flexDirection: "row",
-                        alignItems: "center",
-                        borderBottomWidth: Platform.select({ ios: 0.33, default: 1 }),
-                        borderBottomColor: theme.colors.divider,
-                        backgroundColor: theme.colors.surfaceHigh,
-                    }}
+                    style={[
+                        styles.headerWrap,
+                        { backgroundColor: theme.colors.surface },
+                    ]}
                 >
-                    {SUB_TABS.map((tab) => {
-                        const active = activeSubTab === tab.key;
-                        return (
-                            <Pressable
-                                key={tab.key}
-                                onPress={() => setActiveSubTab(tab.key)}
-                                style={{
-                                    flex: 1,
-                                    paddingVertical: 8,
-                                    alignItems: "center",
-                                    borderBottomWidth: 2,
-                                    borderBottomColor: active
-                                        ? theme.colors.textLink
-                                        : "transparent",
-                                }}
-                            >
-                                <Text
-                                    style={{
-                                        fontSize: 12,
-                                        fontWeight: active ? "600" : "400",
-                                        color: active
-                                            ? theme.colors.textLink
-                                            : theme.colors.textSecondary,
-                                        ...Typography.default(),
-                                    }}
-                                >
-                                    {t(tab.labelKey)}
-                                </Text>
-                            </Pressable>
-                        );
-                    })}
+                    <SessionGlassTabBar
+                        tabs={subTabs}
+                        activeTab={activeSubTab}
+                        onChange={(tabKey) => setActiveSubTab(tabKey as SessionSubTab)}
+                        compact
+                    />
                 </View>
 
                 <View style={{ flex: 1 }}>
@@ -85,3 +60,11 @@ export const SidePanelSessionTab = React.memo<SidePanelSessionTabProps>(
         );
     },
 );
+
+const styles = StyleSheet.create(() => ({
+    headerWrap: {
+        paddingHorizontal: 6,
+        paddingTop: 0,
+        paddingBottom: 4,
+    },
+}));

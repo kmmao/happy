@@ -18,12 +18,22 @@ import {
     type ChecklistTab,
     type ProgressTodo,
 } from "./sessionProgressData";
+import { getProgressRefreshPromptKey } from "./sessionProgressPrompts";
+import {
+    FileChangeItem,
+} from "./SidePanelCodeTab";
 import {
     extractFileChanges,
-    FileChangeItem,
     type FileChange,
-} from "./SidePanelCodeTab";
+} from "./sidePanelCodeData";
 import { DiffStatsBar } from "@/components/diff/DiffStatsBar";
+import { CodexPlanSection } from "@/components/session/codex/CodexPlanSection";
+import {
+    resolveCodexPlanData,
+} from "@/components/session/codex/codexProgressPresentation";
+import { CodexSummarySection } from "@/components/session/codex/CodexSummarySection";
+import type { ToolMixSemanticKind, ToolMixSegment } from "@/components/session/toolMixData";
+import { computeToolMix } from "@/components/session/toolMixData";
 import Svg, { Path } from "react-native-svg";
 import { Message, ToolCallMessage } from "@/sync/typesMessage";
 
@@ -75,35 +85,42 @@ function computeRhythm(messages: readonly Message[]): RhythmStats {
     };
 }
 
-interface ToolMixSegment {
-    name: string;
-    count: number;
-}
-interface ToolMix {
-    segments: ToolMixSegment[];
-    otherCount: number;
-    total: number;
+function getSemanticToolMixLabel(kind: ToolMixSemanticKind): string {
+    switch (kind) {
+        case "read":
+            return t("tools.names.readFile");
+        case "write":
+            return t("tools.names.writeFile");
+        case "search":
+            return t("tools.names.search");
+        case "list_files":
+            return t("tools.names.listFiles");
+        case "verify":
+            return t("tools.names.verify");
+        case "test":
+            return t("tools.names.test");
+        case "git":
+            return t("tools.names.git");
+        case "package":
+            return t("tools.names.package");
+        case "run":
+            return t("tools.names.run");
+        case "patch":
+            return t("tools.names.applyChanges");
+        case "diff":
+            return t("tools.names.viewDiff");
+        case "unknown":
+            return t("status.unknown");
+        default:
+            return t("status.unknown");
+    }
 }
 
-function computeToolMix(messages: readonly Message[], topN: number): ToolMix {
-    const counts = new Map<string, number>();
-    const walk = (m: Message) => {
-        if (m.kind === "tool-call") {
-            const name = m.tool.name || "unknown";
-            counts.set(name, (counts.get(name) ?? 0) + 1);
-            for (const c of m.children) walk(c);
-        }
-    };
-    for (const m of messages) walk(m);
-    const sorted = [...counts.entries()]
-        .map(([name, count]) => ({ name, count }))
-        .sort((a, b) => b.count - a.count);
-    const top = sorted.slice(0, topN);
-    const otherCount = sorted
-        .slice(topN)
-        .reduce((sum, s) => sum + s.count, 0);
-    const total = sorted.reduce((sum, s) => sum + s.count, 0);
-    return { segments: top, otherCount, total };
+function getToolMixSegmentLabel(segment: ToolMixSegment): string {
+    if (segment.kind === "semantic") {
+        return getSemanticToolMixLabel(segment.name as ToolMixSemanticKind);
+    }
+    return String(segment.name);
 }
 
 interface ActivityBucket {
@@ -215,10 +232,15 @@ export const SessionProgressPanel = React.memo<SessionProgressPanelProps>(
         const { messages } = useSessionMessages(sessionId);
         const session = useSession(sessionId);
         const appendToInput = useAppendToInput();
+        const isCodex = session?.metadata?.flavor?.toLowerCase() === "codex";
+        const progressRefreshPromptKey = React.useMemo(
+            () => getProgressRefreshPromptKey(session?.metadata?.flavor),
+            [session?.metadata?.flavor],
+        );
 
         const handleRefreshProgress = React.useCallback(() => {
-            appendToInput(t("session.progressRefreshPrompt"));
-        }, [appendToInput]);
+            appendToInput(t(progressRefreshPromptKey));
+        }, [appendToInput, progressRefreshPromptKey]);
 
         const handleRefreshSummary = React.useCallback(() => {
             appendToInput(t("session.progressSummaryRefreshPrompt"));
@@ -311,6 +333,10 @@ export const SessionProgressPanel = React.memo<SessionProgressPanelProps>(
         );
         const counts = React.useMemo(() => countTodoProgress(checklist.todos), [checklist.todos]);
         const summary = session?.metadata?.sessionSummary;
+        const codexPlan = React.useMemo(
+            () => resolveCodexPlanData(checklist, messages),
+            [checklist, messages],
+        );
 
         const [showListFiles, setShowListFiles] = React.useState(false);
 
@@ -326,8 +352,8 @@ export const SessionProgressPanel = React.memo<SessionProgressPanelProps>(
             [messages],
         );
         const toolMix = React.useMemo(
-            () => computeToolMix(messages, TOOL_MIX_TOP_N),
-            [messages],
+            () => computeToolMix(messages, TOOL_MIX_TOP_N, session?.metadata ?? null),
+            [messages, session?.metadata],
         );
         const toolsPerTurn = data.agentTurns > 0
             ? data.toolCalls / data.agentTurns
@@ -381,216 +407,244 @@ export const SessionProgressPanel = React.memo<SessionProgressPanelProps>(
                     {t("session.progressSubtitle")}
                 </Text>
 
-                <SummaryCard
-                    summary={summary}
-                    onRefresh={handleRefreshSummary}
-                    nowMs={nowMs}
-                />
-
-                <GlassCard style={styles.section}>
-                    <View style={styles.sectionHeader}>
-                        <Ionicons
-                            name="list-outline"
-                            size={14}
-                            color={theme.colors.textSecondary}
+                {isCodex ? (
+                    <>
+                        <CodexSummarySection
+                            summary={summary}
+                            onRefresh={handleRefreshSummary}
+                            nowMs={nowMs}
                         />
-                        <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
-                            {t("session.progressTodosSection")}
-                        </Text>
-                        {hasTodos && (
-                            <>
-                                <SourceBadge source={checklist.source} />
-                                <Text style={[styles.sectionCount, { color: theme.colors.textSecondary }]}>
-                                    {t("session.progressTodosCount", {
-                                        done: counts.completed,
-                                        total: counts.total,
-                                    })}
-                                </Text>
-                            </>
-                        )}
-                        <Pressable
-                            onPress={handleRefreshProgress}
-                            hitSlop={8}
-                            style={[styles.refreshButton, { borderColor: theme.colors.textLink + "55" }]}
-                            accessibilityRole="button"
-                            accessibilityLabel={t("session.progressRefreshActionLabel")}
-                        >
-                            <Ionicons
-                                name="refresh-outline"
-                                size={12}
-                                color={theme.colors.textLink}
-                                style={styles.refreshIcon}
-                            />
-                            <Text style={[styles.refreshText, { color: theme.colors.textLink }]}>
-                                {t("session.progressRefreshActionLabel")}
-                            </Text>
-                        </Pressable>
-                    </View>
-                    {tabs.length > 1 && (
-                        <ChecklistTabRow
+                        <CodexPlanSection
+                            plan={codexPlan}
+                            onRefresh={handleRefreshProgress}
+                            onTodoTap={handleTodoTap}
+                            nowMs={nowMs}
+                            listFileChanges={listFileChanges}
+                            listFileTotalAdditions={listFileTotalAdditions}
+                            listFileTotalDeletions={listFileTotalDeletions}
                             tabs={tabs}
-                            selectedId={checklist.listId ?? null}
-                            onSelect={(id) =>
+                            selectedListId={pinnedListId}
+                            onSelectList={(id) =>
                                 setPinnedListId((prev) =>
                                     prev === id ? null : id,
                                 )
                             }
                         />
-                    )}
-                    {hasTodos && checklist.updatedAt !== null && (
-                        <Text style={[styles.timeHint, { color: theme.colors.textSecondary }]}>
-                            {formatRelativeTime(checklist.updatedAt, nowMs)}
-                            {checklist.label ? ` · ${checklist.label}` : ""}
-                            {checklist.currentStage ? ` · ${checklist.currentStage}` : ""}
-                        </Text>
-                    )}
+                    </>
+                ) : (
+                    <>
+                        <SummaryCard
+                            summary={summary}
+                            onRefresh={handleRefreshSummary}
+                            nowMs={nowMs}
+                        />
 
-                    {hasTodos ? (
-                        <>
-                            <View style={[styles.progressTrack, { backgroundColor: theme.colors.surfaceHighest }]}>
-                                <View
-                                    style={[
-                                        styles.progressFill,
-                                        {
-                                            backgroundColor: theme.colors.accentPurple,
-                                            width: `${Math.round(counts.completionRatio * 100)}%`,
-                                        },
-                                    ]}
+                        <GlassCard style={styles.section}>
+                            <View style={styles.sectionHeader}>
+                                <Ionicons
+                                    name="list-outline"
+                                    size={14}
+                                    color={theme.colors.textSecondary}
                                 />
-                            </View>
-                            <View style={styles.progressLegend}>
-                                <LegendDot color={theme.colors.accentPurple} label={t("session.progressLegendCompleted", { n: counts.completed })} />
-                                <LegendDot color={theme.colors.accentBlue} label={t("session.progressLegendInProgress", { n: counts.inProgress })} />
-                                <LegendDot color={theme.colors.textSecondary} label={t("session.progressLegendPending", { n: counts.pending })} />
-                            </View>
-                            <View style={styles.todoList}>
-                                {checklist.todos.map((todo, index) => {
-                                    const meta = STATUS_META[todo.status];
-                                    const color = theme.colors[meta.colorKey];
-                                    const textStyle = [
-                                        styles.todoText,
-                                        {
-                                            color: todo.status === "completed" ? color : theme.colors.text,
-                                        },
-                                    ];
-                                    const displayContent =
-                                        todo.status === "in_progress" && todo.activeForm
-                                            ? todo.activeForm
-                                            : todo.content;
-                                    const showNudge =
-                                        todo.status === "completed" &&
-                                        todo.verificationNudgeNeeded === true;
-                                    return (
-                                        <Pressable
-                                            key={`${index}-${todo.content}`}
-                                            onPress={() => handleTodoTap(todo)}
-                                            style={styles.todoRow}
-                                            accessibilityRole="button"
-                                            accessibilityLabel={todo.content}
-                                        >
-                                            <Ionicons
-                                                name={meta.icon}
-                                                size={16}
-                                                color={color}
-                                                style={styles.todoIcon}
-                                            />
-                                            <Text style={textStyle}>{displayContent}</Text>
-                                            {showNudge && (
-                                                <Ionicons
-                                                    name="alert-circle-outline"
-                                                    size={14}
-                                                    color={theme.colors.warning ?? theme.colors.accentOrange ?? color}
-                                                    style={styles.todoNudgeIcon}
-                                                    accessibilityLabel={t("session.progressTodoNudgeLabel")}
-                                                />
-                                            )}
-                                            <Ionicons
-                                                name="ellipsis-horizontal"
-                                                size={14}
-                                                color={theme.colors.textSecondary}
-                                                style={styles.todoMenuIcon}
-                                            />
-                                        </Pressable>
-                                    );
-                                })}
-                            </View>
-                            {checklist.blockers && checklist.blockers.length > 0 && (
-                                <View style={styles.blockersBlock}>
-                                    <Text style={[styles.subSectionTitle, { color: theme.colors.warning ?? theme.colors.textSecondary }]}>
-                                        {t("session.progressBlockersTitle", { n: checklist.blockers.length })}
-                                    </Text>
-                                    {checklist.blockers.map((blocker, i) => (
-                                        <Text
-                                            key={`${i}-${blocker}`}
-                                            style={[styles.blockerItem, { color: theme.colors.text }]}
-                                        >
-                                            {`• ${blocker}`}
-                                        </Text>
-                                    ))}
-                                </View>
-                            )}
-                            {listFileChanges.length > 0 && (
-                                <View style={styles.listFilesBlock}>
-                                    <Pressable
-                                        onPress={() => setShowListFiles((prev) => !prev)}
-                                        hitSlop={6}
-                                        style={[
-                                            styles.listFilesHeader,
-                                            { borderColor: theme.colors.divider },
-                                        ]}
-                                        accessibilityRole="button"
-                                        accessibilityState={{ expanded: showListFiles }}
-                                    >
-                                        <Ionicons
-                                            name={
-                                                showListFiles
-                                                    ? "chevron-down"
-                                                    : "chevron-forward"
-                                            }
-                                            size={12}
-                                            color={theme.colors.textSecondary}
-                                        />
-                                        <Text
-                                            style={[
-                                                styles.listFilesHeaderTitle,
-                                                { color: theme.colors.text },
-                                            ]}
-                                        >
-                                            {t("session.progressListFilesTitle", {
-                                                n: listFileChanges.length,
+                                <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
+                                    {t("session.progressTodosSection")}
+                                </Text>
+                                {hasTodos && (
+                                    <>
+                                        <SourceBadge source={checklist.source} />
+                                        <Text style={[styles.sectionCount, { color: theme.colors.textSecondary }]}>
+                                            {t("session.progressTodosCount", {
+                                                done: counts.completed,
+                                                total: counts.total,
                                             })}
                                         </Text>
-                                        <DiffStatsBar
-                                            additions={listFileTotalAdditions}
-                                            deletions={listFileTotalDeletions}
-                                        />
-                                    </Pressable>
-                                    {showListFiles && (
+                                    </>
+                                )}
+                                <Pressable
+                                    onPress={handleRefreshProgress}
+                                    hitSlop={8}
+                                    style={[styles.refreshButton, { borderColor: theme.colors.textLink + "55" }]}
+                                    accessibilityRole="button"
+                                    accessibilityLabel={t("session.progressRefreshActionLabel")}
+                                >
+                                    <Ionicons
+                                        name="refresh-outline"
+                                        size={12}
+                                        color={theme.colors.textLink}
+                                        style={styles.refreshIcon}
+                                    />
+                                    <Text style={[styles.refreshText, { color: theme.colors.textLink }]}>
+                                        {t("session.progressRefreshActionLabel")}
+                                    </Text>
+                                </Pressable>
+                            </View>
+                            {tabs.length > 1 && (
+                                <ChecklistTabRow
+                                    tabs={tabs}
+                                    selectedId={checklist.listId ?? null}
+                                    onSelect={(id) =>
+                                        setPinnedListId((prev) =>
+                                            prev === id ? null : id,
+                                        )
+                                    }
+                                />
+                            )}
+                            {hasTodos && checklist.updatedAt !== null && (
+                                <Text style={[styles.timeHint, { color: theme.colors.textSecondary }]}>
+                                    {formatRelativeTime(checklist.updatedAt, nowMs)}
+                                    {checklist.label ? ` · ${checklist.label}` : ""}
+                                    {checklist.currentStage ? ` · ${checklist.currentStage}` : ""}
+                                </Text>
+                            )}
+
+                            {hasTodos ? (
+                                <>
+                                    <View style={[styles.progressTrack, { backgroundColor: theme.colors.surfaceHighest }]}>
                                         <View
                                             style={[
-                                                styles.listFilesBody,
-                                                { borderColor: theme.colors.divider },
+                                                styles.progressFill,
+                                                {
+                                                    backgroundColor: theme.colors.accentPurple,
+                                                    width: `${Math.round(counts.completionRatio * 100)}%`,
+                                                },
                                             ]}
-                                        >
-                                            {listFileChanges.map((change) => (
-                                                <FileChangeItem
-                                                    key={change.filePath}
-                                                    change={change}
-                                                />
+                                        />
+                                    </View>
+                                    <View style={styles.progressLegend}>
+                                        <LegendDot color={theme.colors.accentPurple} label={t("session.progressLegendCompleted", { n: counts.completed })} />
+                                        <LegendDot color={theme.colors.accentBlue} label={t("session.progressLegendInProgress", { n: counts.inProgress })} />
+                                        <LegendDot color={theme.colors.textSecondary} label={t("session.progressLegendPending", { n: counts.pending })} />
+                                    </View>
+                                    <View style={styles.todoList}>
+                                        {checklist.todos.map((todo, index) => {
+                                            const meta = STATUS_META[todo.status];
+                                            const color = theme.colors[meta.colorKey];
+                                            const textStyle = [
+                                                styles.todoText,
+                                                {
+                                                    color: todo.status === "completed" ? color : theme.colors.text,
+                                                },
+                                            ];
+                                            const displayContent =
+                                                todo.status === "in_progress" && todo.activeForm
+                                                    ? todo.activeForm
+                                                    : todo.content;
+                                            const showNudge =
+                                                todo.status === "completed" &&
+                                                todo.verificationNudgeNeeded === true;
+                                            return (
+                                                <Pressable
+                                                    key={`${index}-${todo.content}`}
+                                                    onPress={() => handleTodoTap(todo)}
+                                                    style={styles.todoRow}
+                                                    accessibilityRole="button"
+                                                    accessibilityLabel={todo.content}
+                                                >
+                                                    <Ionicons
+                                                        name={meta.icon}
+                                                        size={16}
+                                                        color={color}
+                                                        style={styles.todoIcon}
+                                                    />
+                                                    <Text style={textStyle}>{displayContent}</Text>
+                                                    {showNudge && (
+                                                        <Ionicons
+                                                            name="alert-circle-outline"
+                                                            size={14}
+                                                            color={theme.colors.warning ?? theme.colors.accentOrange ?? color}
+                                                            style={styles.todoNudgeIcon}
+                                                            accessibilityLabel={t("session.progressTodoNudgeLabel")}
+                                                        />
+                                                    )}
+                                                    <Ionicons
+                                                        name="ellipsis-horizontal"
+                                                        size={14}
+                                                        color={theme.colors.textSecondary}
+                                                        style={styles.todoMenuIcon}
+                                                    />
+                                                </Pressable>
+                                            );
+                                        })}
+                                    </View>
+                                    {checklist.blockers && checklist.blockers.length > 0 && (
+                                        <View style={styles.blockersBlock}>
+                                            <Text style={[styles.subSectionTitle, { color: theme.colors.warning ?? theme.colors.textSecondary }]}>
+                                                {t("session.progressBlockersTitle", { n: checklist.blockers.length })}
+                                            </Text>
+                                            {checklist.blockers.map((blocker, i) => (
+                                                <Text
+                                                    key={`${i}-${blocker}`}
+                                                    style={[styles.blockerItem, { color: theme.colors.text }]}
+                                                >
+                                                    {`• ${blocker}`}
+                                                </Text>
                                             ))}
                                         </View>
                                     )}
+                                    {listFileChanges.length > 0 && (
+                                        <View style={styles.listFilesBlock}>
+                                            <Pressable
+                                                onPress={() => setShowListFiles((prev) => !prev)}
+                                                hitSlop={6}
+                                                style={[
+                                                    styles.listFilesHeader,
+                                                    { borderColor: theme.colors.divider },
+                                                ]}
+                                                accessibilityRole="button"
+                                                accessibilityState={{ expanded: showListFiles }}
+                                            >
+                                                <Ionicons
+                                                    name={
+                                                        showListFiles
+                                                            ? "chevron-down"
+                                                            : "chevron-forward"
+                                                    }
+                                                    size={12}
+                                                    color={theme.colors.textSecondary}
+                                                />
+                                                <Text
+                                                    style={[
+                                                        styles.listFilesHeaderTitle,
+                                                        { color: theme.colors.text },
+                                                    ]}
+                                                >
+                                                    {t("session.progressListFilesTitle", {
+                                                        n: listFileChanges.length,
+                                                    })}
+                                                </Text>
+                                                <DiffStatsBar
+                                                    additions={listFileTotalAdditions}
+                                                    deletions={listFileTotalDeletions}
+                                                />
+                                            </Pressable>
+                                            {showListFiles && (
+                                                <View
+                                                    style={[
+                                                        styles.listFilesBody,
+                                                        { borderColor: theme.colors.divider },
+                                                    ]}
+                                                >
+                                                    {listFileChanges.map((change) => (
+                                                        <FileChangeItem
+                                                            key={change.filePath}
+                                                            change={change}
+                                                        />
+                                                    ))}
+                                                </View>
+                                            )}
+                                        </View>
+                                    )}
+                                </>
+                            ) : (
+                                <View style={styles.emptyBlock}>
+                                    <Text style={[styles.emptyText, { color: theme.colors.textSecondary }]}>
+                                        {t("session.progressTodosEmpty")}
+                                    </Text>
                                 </View>
                             )}
-                        </>
-                    ) : (
-                        <View style={styles.emptyBlock}>
-                            <Text style={[styles.emptyText, { color: theme.colors.textSecondary }]}>
-                                {t("session.progressTodosEmpty")}
-                            </Text>
-                        </View>
-                    )}
-                </GlassCard>
+                        </GlassCard>
+                    </>
+                )}
 
                 <GlassCard style={styles.section}>
                     <View style={styles.sectionHeader}>
@@ -1082,8 +1136,8 @@ interface ToolMixBarProps {
 }
 
 /**
- * Horizontal stacked bar showing composition of tool calls by tool name.
- * Top N tools get distinct palette colors; the rest collapse into a grey
+ * Horizontal stacked bar showing composition of tool calls by semantic action.
+ * Top N segments get distinct palette colors; the rest collapse into a grey
  * "other" segment. Legend lists each segment with its count.
  */
 const ToolMixBar = React.memo<ToolMixBarProps>(function ToolMixBar({
@@ -1095,7 +1149,7 @@ const ToolMixBar = React.memo<ToolMixBarProps>(function ToolMixBar({
     if (total <= 0) return null;
     const entries: Array<{ name: string; count: number; color: string; isOther: boolean }> = segments.map(
         (seg, i) => ({
-            name: seg.name,
+            name: getToolMixSegmentLabel(seg),
             count: seg.count,
             color: TOOL_MIX_PALETTE[i % TOOL_MIX_PALETTE.length],
             isOther: false,

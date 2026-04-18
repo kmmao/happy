@@ -1,6 +1,6 @@
 import * as React from "react";
 import { ScrollView, View } from "react-native";
-import { DiffView } from "@/components/diff/DiffView";
+import { DiffView, type DiffPalette } from "@/components/diff/DiffView";
 import { useSetting } from "@/sync/storage";
 import { getDiffPreviewMaxHeight } from "./toolDiffPreview";
 
@@ -15,6 +15,7 @@ interface ToolDiffViewProps {
   viewMode?: "unified" | "split";
   expandedContext?: boolean;
   visibleLineCount?: number;
+  palette?: DiffPalette;
 }
 
 export const ToolDiffView = React.memo<ToolDiffViewProps>(
@@ -29,6 +30,7 @@ export const ToolDiffView = React.memo<ToolDiffViewProps>(
     viewMode = "unified",
     expandedContext = false,
     visibleLineCount,
+    palette,
   }) => {
     const wrapLines = useSetting("wrapLinesInDiffs");
     const maxHeight = getDiffPreviewMaxHeight(visibleLineCount);
@@ -46,6 +48,7 @@ export const ToolDiffView = React.memo<ToolDiffViewProps>(
         language={language}
         viewMode={viewMode}
         expandedContext={expandedContext}
+        palette={palette}
         style={{ flex: 1, ...style }}
       />
     );

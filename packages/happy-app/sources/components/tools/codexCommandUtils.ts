@@ -52,7 +52,26 @@ export type CodexParsedCommandKind =
   | "write"
   | "search"
   | "list_files"
+  | "verify"
+  | "test"
+  | "git"
+  | "package"
+  | "run"
   | "unknown";
+
+export type CodexPackageManager = "yarn" | "pnpm" | "npm" | "bun" | null;
+
+export type CodexTestRunner =
+  | "vitest"
+  | "jest"
+  | "pytest"
+  | "cargo"
+  | "go"
+  | "yarn"
+  | "pnpm"
+  | "npm"
+  | "bun"
+  | null;
 
 export type CodexParsedCommand = {
   type: CodexParsedCommandKind;
@@ -60,6 +79,12 @@ export type CodexParsedCommand = {
   name: string | null;
   path: string | null;
   query: string | null;
+  subType?: string | null;
+  manager?: CodexPackageManager;
+  runner?: CodexTestRunner;
+  workspace?: string | null;
+  rangeStart?: number | null;
+  rangeEnd?: number | null;
 };
 
 export type CodexParsedCommandSummary = {
@@ -68,6 +93,12 @@ export type CodexParsedCommandSummary = {
   query: string | null;
   resolvedPath: string | null;
   displayName: string | null;
+  subType?: string | null;
+  manager?: CodexPackageManager;
+  runner?: CodexTestRunner;
+  workspace?: string | null;
+  rangeStart?: number | null;
+  rangeEnd?: number | null;
   extraCount: number;
 };
 
@@ -76,11 +107,625 @@ function normalizeParsedCommandType(value: unknown): CodexParsedCommandKind {
     value === "read" ||
     value === "write" ||
     value === "search" ||
-    value === "list_files"
+    value === "list_files" ||
+    value === "verify" ||
+    value === "test" ||
+    value === "git" ||
+    value === "package" ||
+    value === "run"
   ) {
     return value;
   }
   return "unknown";
+}
+
+function stripQuotes(value: string): string {
+  if (
+    (value.startsWith('"') && value.endsWith('"')) ||
+    (value.startsWith("'") && value.endsWith("'"))
+  ) {
+    return value.slice(1, -1);
+  }
+  return value;
+}
+
+function tokenizeCommand(command: string): string[] {
+  const matches = command.match(/"[^"]*"|'[^']*'|\S+/g);
+  if (!matches) {
+    return [];
+  }
+  return matches.map(stripQuotes);
+}
+
+function getLastNonFlagToken(tokens: string[]): string | null {
+  for (let index = tokens.length - 1; index >= 0; index -= 1) {
+    const token = tokens[index];
+    if (!token.startsWith("-")) {
+      return token;
+    }
+  }
+  return null;
+}
+
+function getPositionalTokens(tokens: string[]): string[] {
+  return tokens.filter((token) => !token.startsWith("-"));
+}
+
+function inferReadCommand(command: string): Partial<CodexParsedCommand> | null {
+  const tokens = tokenizeCommand(command);
+  const executable = tokens[0];
+  if (!executable) {
+    return null;
+  }
+
+  if (executable === "sed" && tokens[1] === "-n") {
+    const rangeToken = tokens[2] ?? "";
+    const path = tokens[3] ?? null;
+    const rangeMatch = rangeToken.match(/^(\d+),(\d+)p$/);
+    return {
+      type: "read",
+      path,
+      rangeStart: rangeMatch ? Number(rangeMatch[1]) : null,
+      rangeEnd: rangeMatch ? Number(rangeMatch[2]) : null,
+    };
+  }
+
+  if (
+    executable === "cat" ||
+    executable === "head" ||
+    executable === "tail" ||
+    executable === "less"
+  ) {
+    return {
+      type: "read",
+      path: getLastNonFlagToken(tokens.slice(1)),
+    };
+  }
+
+  return null;
+}
+
+function inferSearchCommand(command: string): Partial<CodexParsedCommand> | null {
+  const tokens = tokenizeCommand(command);
+  const executable = tokens[0];
+  if (
+    executable !== "rg" &&
+    executable !== "grep" &&
+    executable !== "ag" &&
+    executable !== "ack"
+  ) {
+    return null;
+  }
+
+  const positional = getPositionalTokens(tokens.slice(1));
+  const query = positional[0] ?? null;
+  const path = positional.length > 1 ? positional[positional.length - 1] : null;
+
+  return {
+    type: "search",
+    query,
+    path,
+  };
+}
+
+function inferListFilesCommand(command: string): Partial<CodexParsedCommand> | null {
+  const tokens = tokenizeCommand(command);
+  const executable = tokens[0];
+  if (!executable) {
+    return null;
+  }
+
+  if (executable === "find") {
+    let path: string | null = null;
+    let query: string | null = null;
+
+    for (let index = 1; index < tokens.length; index += 1) {
+      const token = tokens[index];
+      if (!path && !token.startsWith("-")) {
+        path = token;
+        continue;
+      }
+      if (
+        (token === "-name" || token === "-iname" || token === "-path") &&
+        typeof tokens[index + 1] === "string"
+      ) {
+        query = tokens[index + 1];
+      }
+    }
+
+    return {
+      type: "list_files",
+      path,
+      query,
+    };
+  }
+
+  if (executable === "fd" || executable === "fdfind") {
+    const positional = getPositionalTokens(tokens.slice(1));
+    return {
+      type: "list_files",
+      query: positional[0] ?? null,
+      path: positional[1] ?? null,
+    };
+  }
+
+  if (executable === "ls" || executable === "tree") {
+    return {
+      type: "list_files",
+      path: getLastNonFlagToken(tokens.slice(1)),
+    };
+  }
+
+  return null;
+}
+
+function inferWriteCommand(command: string): Partial<CodexParsedCommand> | null {
+  const tokens = tokenizeCommand(command);
+  const executable = tokens[0];
+  if (!executable) {
+    return null;
+  }
+
+  const redirectMatch = command.match(/(?:^|[^\S\r\n])(?:>|>>)\s*([^\s]+)\s*$/);
+  if (redirectMatch?.[1]) {
+    return {
+      type: "write",
+      path: stripQuotes(redirectMatch[1]),
+    };
+  }
+
+  if (executable === "tee") {
+    return {
+      type: "write",
+      path: getLastNonFlagToken(tokens.slice(1)),
+    };
+  }
+
+  if (
+    (executable === "mv" || executable === "cp" || executable === "touch") &&
+    tokens[1]
+  ) {
+    return {
+      type: "write",
+      path: executable === "touch" ? tokens[1] : tokens[2] ?? null,
+      name: executable === "touch" ? null : tokens[1] ?? null,
+    };
+  }
+
+  return null;
+}
+
+function inferGitCommand(command: string): Partial<CodexParsedCommand> | null {
+  const tokens = tokenizeCommand(command);
+  if (tokens[0] !== "git") {
+    return null;
+  }
+
+  const operation = tokens[1] ?? "other";
+  let subType = "other";
+  if (operation === "status") {
+    subType = "status";
+  } else if (operation === "diff") {
+    subType = "diff";
+  } else if (operation === "log") {
+    subType = "log";
+  } else if (operation === "show") {
+    subType = "show";
+  } else if (operation === "blame") {
+    subType = "blame";
+  } else if (
+    operation === "rev-parse" ||
+    operation === "branch" ||
+    operation === "symbolic-ref"
+  ) {
+    subType = "ref";
+  }
+
+  return {
+    type: "git",
+    subType,
+    name: subType,
+  };
+}
+
+function inferTestCommand(command: string): Partial<CodexParsedCommand> | null {
+  const tokens = tokenizeCommand(command);
+  const executable = tokens[0];
+  if (!executable) {
+    return null;
+  }
+
+  if (executable === "vitest" || executable === "jest" || executable === "pytest") {
+    return {
+      type: "test",
+      runner: executable,
+      name: executable,
+    };
+  }
+
+  if (executable === "cargo" && tokens[1] === "test") {
+    return {
+      type: "test",
+      runner: "cargo",
+      name: "cargo",
+    };
+  }
+
+  if (executable === "go" && tokens[1] === "test") {
+    return {
+      type: "test",
+      runner: "go",
+      name: "go",
+    };
+  }
+
+  return null;
+}
+
+function inferVerifyCommand(command: string): Partial<CodexParsedCommand> | null {
+  const tokens = tokenizeCommand(command);
+  const executable = tokens[0];
+  if (!executable) {
+    return null;
+  }
+
+  if (executable === "tsc") {
+    return {
+      type: "verify",
+      subType: "typecheck",
+      name: "typecheck",
+    };
+  }
+
+  if (
+    executable === "eslint" ||
+    executable === "biome" ||
+    (executable === "prettier" && tokens.includes("--check"))
+  ) {
+    return {
+      type: "verify",
+      subType: executable === "prettier" ? "format_check" : "lint",
+      name: executable === "prettier" ? "format_check" : "lint",
+    };
+  }
+
+  if (executable === "cargo" && tokens[1] === "check") {
+    return {
+      type: "verify",
+      subType: "build",
+      name: "build",
+    };
+  }
+
+  if (executable === "go" && tokens[1] === "vet") {
+    return {
+      type: "verify",
+      subType: "check",
+      name: "check",
+    };
+  }
+
+  return null;
+}
+
+type PackageInvocation = {
+  manager: NonNullable<CodexPackageManager>;
+  workspace: string | null;
+  args: string[];
+};
+
+function getPackageInvocation(command: string): PackageInvocation | null {
+  const tokens = tokenizeCommand(command);
+  const manager = tokens[0];
+  if (
+    manager !== "yarn" &&
+    manager !== "pnpm" &&
+    manager !== "npm" &&
+    manager !== "bun"
+  ) {
+    return null;
+  }
+
+  let workspace: string | null = null;
+  let index = 1;
+
+  if (manager === "yarn") {
+    if (tokens[1] === "workspace" && tokens[2]) {
+      workspace = tokens[2];
+      index = 3;
+    } else if (tokens[1] === "run") {
+      index = 2;
+    }
+  } else if (manager === "npm") {
+    if (tokens[1] === "run") {
+      index = 2;
+    }
+  } else if (manager === "pnpm") {
+    while (index < tokens.length) {
+      const token = tokens[index];
+      if (
+        (token === "-F" || token === "--filter" || token === "--dir" || token === "-C") &&
+        tokens[index + 1]
+      ) {
+        if (!workspace) {
+          workspace = tokens[index + 1];
+        }
+        index += 2;
+        continue;
+      }
+      if (token.startsWith("--filter=")) {
+        if (!workspace) {
+          workspace = token.slice("--filter=".length);
+        }
+        index += 1;
+        continue;
+      }
+      if (token === "run") {
+        index += 1;
+        break;
+      }
+      if (token.startsWith("-")) {
+        index += 1;
+        continue;
+      }
+      break;
+    }
+  } else if (manager === "bun" && tokens[1] === "run") {
+    index = 2;
+  }
+
+  return {
+    manager,
+    workspace,
+    args: tokens.slice(index),
+  };
+}
+
+function inferFromPackageInvocation(
+  invocation: PackageInvocation,
+): Partial<CodexParsedCommand> | null {
+  const { manager, workspace, args } = invocation;
+  const primary = args[0] ?? null;
+  const nestedCommand = args.join(" ");
+
+  if (!primary) {
+    return {
+      type: "package",
+      subType: workspace ? "workspace_run" : "other",
+      manager,
+      workspace,
+      name: workspace ? "workspace_run" : "other",
+    };
+  }
+
+  if (
+    primary === "add" ||
+    primary === "install" ||
+    primary === "i"
+  ) {
+    return {
+      type: "package",
+      subType: "install",
+      manager,
+      workspace,
+      name: "install",
+    };
+  }
+
+  if (
+    primary === "remove" ||
+    primary === "rm" ||
+    primary === "uninstall"
+  ) {
+    return {
+      type: "package",
+      subType: "remove",
+      manager,
+      workspace,
+      name: "remove",
+    };
+  }
+
+  if (
+    primary === "test" ||
+    primary === "vitest" ||
+    primary === "jest" ||
+    primary === "pytest"
+  ) {
+    return {
+      type: "test",
+      runner: manager,
+      manager,
+      workspace,
+      name: manager,
+    };
+  }
+
+  if (
+    primary === "typecheck" ||
+    primary === "lint" ||
+    primary === "check" ||
+    primary === "build"
+  ) {
+    return {
+      type: "verify",
+      subType: primary === "typecheck" ? "typecheck" : primary,
+      manager,
+      workspace,
+      name: workspace ?? (primary === "typecheck" ? "typecheck" : primary),
+    };
+  }
+
+  if (
+    primary === "dev" ||
+    primary === "start" ||
+    primary === "serve" ||
+    primary === "preview"
+  ) {
+    return {
+      type: "run",
+      subType: primary,
+      manager,
+      workspace,
+      name: primary,
+    };
+  }
+
+  if (primary === "exec" && args[1]) {
+    const inferred = inferCommandDetails(args.slice(1).join(" "));
+    if (inferred) {
+      return {
+        ...inferred,
+        manager,
+        workspace,
+      };
+    }
+  }
+
+  const nestedVerify = inferVerifyCommand(nestedCommand);
+  if (nestedVerify) {
+    return {
+      ...nestedVerify,
+      manager,
+      workspace,
+      name: workspace ?? nestedVerify.name ?? nestedVerify.subType ?? null,
+    };
+  }
+
+  const nestedTest = inferTestCommand(nestedCommand);
+  if (nestedTest) {
+    return {
+      ...nestedTest,
+      manager,
+      workspace,
+      runner: nestedTest.runner ?? manager,
+      name: workspace ?? nestedTest.name ?? manager,
+    };
+  }
+
+  return {
+    type: "package",
+    subType: workspace ? "workspace_run" : "run",
+    manager,
+    workspace,
+    name: workspace ? "workspace_run" : "run",
+  };
+}
+
+function inferRunCommand(command: string): Partial<CodexParsedCommand> | null {
+  const tokens = tokenizeCommand(command);
+  const executable = tokens[0];
+  if (!executable) {
+    return null;
+  }
+
+  if (executable === "expo" && tokens[1] === "start") {
+    return {
+      type: "run",
+      subType: "start",
+      name: "start",
+    };
+  }
+
+  if (
+    executable === "node" ||
+    executable === "python" ||
+    executable === "python3" ||
+    executable === "tsx" ||
+    executable === "ts-node" ||
+    executable === "docker" ||
+    executable === "docker-compose"
+  ) {
+    return {
+      type: "run",
+      subType: executable === "docker" || executable === "docker-compose" ? "server" : "script",
+      name: executable === "docker" || executable === "docker-compose" ? "server" : "script",
+    };
+  }
+
+  return null;
+}
+
+function inferCommandDetails(command: string): Partial<CodexParsedCommand> | null {
+  const normalizedCommand = getCodexCommandText(command);
+  if (!normalizedCommand) {
+    return null;
+  }
+
+  const packageInvocation = getPackageInvocation(normalizedCommand);
+  if (packageInvocation) {
+    const packageInferred = inferFromPackageInvocation(packageInvocation);
+    if (packageInferred) {
+      return packageInferred;
+    }
+  }
+
+  return (
+    inferGitCommand(normalizedCommand) ||
+    inferTestCommand(normalizedCommand) ||
+    inferVerifyCommand(normalizedCommand) ||
+    inferReadCommand(normalizedCommand) ||
+    inferSearchCommand(normalizedCommand) ||
+    inferListFilesCommand(normalizedCommand) ||
+    inferWriteCommand(normalizedCommand) ||
+    inferRunCommand(normalizedCommand) || {
+      type: "unknown",
+    }
+  );
+}
+
+function parseCommandEntry(
+  entry: unknown,
+  fallbackCommand: string | null,
+): CodexParsedCommand {
+  const entryCommand =
+    typeof entry === "object" && entry && typeof (entry as { cmd?: unknown }).cmd === "string"
+      ? (entry as { cmd: string }).cmd
+      : fallbackCommand;
+  const inferred = entryCommand ? inferCommandDetails(entryCommand) : null;
+  const explicitType = normalizeParsedCommandType(
+    typeof entry === "object" && entry ? (entry as { type?: unknown }).type : null,
+  );
+
+  return {
+    type: explicitType !== "unknown" ? explicitType : inferred?.type ?? "unknown",
+    cmd: entryCommand,
+    name:
+      typeof entry === "object" && entry && typeof (entry as { name?: unknown }).name === "string"
+        ? (entry as { name: string }).name
+        : inferred?.name ?? null,
+    path:
+      typeof entry === "object" && entry && typeof (entry as { path?: unknown }).path === "string"
+        ? (entry as { path: string }).path
+        : inferred?.path ?? null,
+    query:
+      typeof entry === "object" && entry && typeof (entry as { query?: unknown }).query === "string"
+        ? (entry as { query: string }).query
+        : inferred?.query ?? null,
+    subType: inferred?.subType ?? null,
+    manager: inferred?.manager ?? null,
+    runner: inferred?.runner ?? null,
+    workspace: inferred?.workspace ?? null,
+    rangeStart: inferred?.rangeStart ?? null,
+    rangeEnd: inferred?.rangeEnd ?? null,
+  };
+}
+
+function getSummaryRawPath(parsedCommand: CodexParsedCommand): string | null {
+  if (parsedCommand.path) {
+    return parsedCommand.path;
+  }
+
+  if (
+    (parsedCommand.type === "read" ||
+      parsedCommand.type === "write" ||
+      parsedCommand.type === "list_files") &&
+    parsedCommand.name
+  ) {
+    return parsedCommand.name;
+  }
+
+  return null;
 }
 
 export function getCodexParsedCommands(input: unknown): CodexParsedCommand[] {
@@ -88,43 +733,49 @@ export function getCodexParsedCommands(input: unknown): CodexParsedCommand[] {
     return [];
   }
 
+  const command = getCodexCommandText((input as { command?: unknown }).command);
   const parsedCmd = (input as { parsed_cmd?: unknown }).parsed_cmd;
-  if (!Array.isArray(parsedCmd)) {
+  if (Array.isArray(parsedCmd) && parsedCmd.length > 0) {
+    return parsedCmd.map((entry) => parseCommandEntry(entry, command));
+  }
+
+  if (!command) {
     return [];
   }
 
-  return parsedCmd.map((entry) => ({
-    type: normalizeParsedCommandType(
-      typeof entry === "object" && entry ? (entry as { type?: unknown }).type : null,
-    ),
-    cmd:
-      typeof entry === "object" && entry && typeof (entry as { cmd?: unknown }).cmd === "string"
-        ? (entry as { cmd: string }).cmd
-        : null,
-    name:
-      typeof entry === "object" && entry && typeof (entry as { name?: unknown }).name === "string"
-        ? (entry as { name: string }).name
-        : null,
-    path:
-      typeof entry === "object" && entry && typeof (entry as { path?: unknown }).path === "string"
-        ? (entry as { path: string }).path
-        : null,
-    query:
-      typeof entry === "object" && entry && typeof (entry as { query?: unknown }).query === "string"
-        ? (entry as { query: string }).query
-        : null,
-  }));
+  const inferred = inferCommandDetails(command);
+
+  return [
+    {
+      type: inferred?.type ?? "unknown",
+      cmd: command,
+      name: inferred?.name ?? null,
+      path: inferred?.path ?? null,
+      query: inferred?.query ?? null,
+      subType: inferred?.subType ?? null,
+      manager: inferred?.manager ?? null,
+      runner: inferred?.runner ?? null,
+      workspace: inferred?.workspace ?? null,
+      rangeStart: inferred?.rangeStart ?? null,
+      rangeEnd: inferred?.rangeEnd ?? null,
+    },
+  ];
 }
 
 export function summarizeCodexParsedCommand(
   parsedCommand: CodexParsedCommand,
   metadata: Metadata | null,
 ): CodexParsedCommandSummary {
-  const rawPath = parsedCommand.path ?? parsedCommand.name;
+  const rawPath = getSummaryRawPath(parsedCommand);
   const resolvedPath = rawPath ? resolvePath(rawPath, metadata) : null;
-  const displayName = resolvedPath
+  const displayName: string | null = resolvedPath
     ? resolvedPath.split("/").pop() || resolvedPath
-    : parsedCommand.name;
+    : parsedCommand.name ??
+      parsedCommand.workspace ??
+      parsedCommand.runner ??
+      parsedCommand.subType ??
+      parsedCommand.manager ??
+      null;
 
   return {
     type: parsedCommand.type,
@@ -132,6 +783,16 @@ export function summarizeCodexParsedCommand(
     query: parsedCommand.query,
     resolvedPath,
     displayName,
+    ...(parsedCommand.subType ? { subType: parsedCommand.subType } : {}),
+    ...(parsedCommand.manager ? { manager: parsedCommand.manager } : {}),
+    ...(parsedCommand.runner ? { runner: parsedCommand.runner } : {}),
+    ...(parsedCommand.workspace ? { workspace: parsedCommand.workspace } : {}),
+    ...(typeof parsedCommand.rangeStart === "number"
+      ? { rangeStart: parsedCommand.rangeStart }
+      : {}),
+    ...(typeof parsedCommand.rangeEnd === "number"
+      ? { rangeEnd: parsedCommand.rangeEnd }
+      : {}),
     extraCount: 0,
   };
 }

@@ -6,6 +6,7 @@ import {
   getCodexModelModes,
   getClaudePermissionModes,
   getDefaultModelKey,
+  LOCKED_CODEX_MODEL,
   mapMetadataOptions,
   resolveCurrentOption,
 } from "./modelModeOptions";
@@ -40,24 +41,12 @@ describe("modelModeOptions", () => {
 
   it("builds codex model fallbacks with translated labels", () => {
     const models = getCodexModelModes(translate);
-    expect(models.map((model) => model.key)).toEqual([
-      "default",
-      "gpt-5.4",
-      "gpt-5.4-pro",
-      "gpt-5.4-mini",
-      "gpt-5.3-codex",
-      "gpt-5.3-codex-spark",
-      "gpt-5.2-codex",
-      "gpt-5.1-codex-max",
-      "gpt-5.1-codex",
-      "gpt-5-codex",
-    ]);
+    expect(models.map((model) => model.key)).toEqual([LOCKED_CODEX_MODEL]);
     expect(models[0]).toEqual({
-      key: "default",
-      name: "Default",
-      description: "Use Codex default settings",
+      key: LOCKED_CODEX_MODEL,
+      name: "tr:agentInput.codexModel.gpt54",
+      description: null,
     });
-    expect(models[1].name).toBe("tr:agentInput.codexModel.gpt54");
   });
 
   it("prefers metadata models over hardcoded fallbacks", () => {
@@ -84,11 +73,16 @@ describe("modelModeOptions", () => {
     ]);
   });
 
-  it("prepends a codex default option before metadata models", () => {
+  it("pins Codex to GPT-5.4 even when metadata reports other models", () => {
     const models = getAvailableModels(
       "codex",
       {
         models: [
+          {
+            code: "gpt-5.4-mini",
+            value: "GPT-5.4 Mini",
+            description: "Legacy metadata",
+          },
           {
             code: "gpt-5.4",
             value: "GPT-5.4",
@@ -101,14 +95,28 @@ describe("modelModeOptions", () => {
 
     expect(models).toEqual([
       {
-        key: "default",
-        name: "Default",
-        description: "Use Codex default settings",
+        key: "gpt-5.4",
+        name: "tr:agentInput.codexModel.gpt54",
+        description: null,
       },
+    ]);
+  });
+
+  it("ignores Codex custom model lists and keeps GPT-5.4 only", () => {
+    const models = getAvailableModels(
+      "codex",
+      null,
+      translate,
+      [
+        { id: "gpt-5.4-mini", name: "GPT-5.4 Mini", description: "legacy" },
+      ],
+    );
+
+    expect(models).toEqual([
       {
         key: "gpt-5.4",
-        name: "GPT-5.4",
-        description: "From metadata",
+        name: "tr:agentInput.codexModel.gpt54",
+        description: null,
       },
     ]);
   });
@@ -211,7 +219,7 @@ describe("modelModeOptions", () => {
     expect(resolveCurrentOption(options, ["missing"])).toBeNull();
   });
 
-  it("uses default as the codex fallback model key", () => {
-    expect(getDefaultModelKey("codex")).toBe("default");
+  it("uses GPT-5.4 as the codex fallback model key", () => {
+    expect(getDefaultModelKey("codex")).toBe("gpt-5.4");
   });
 });

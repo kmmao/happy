@@ -54,13 +54,18 @@ flowchart LR
 
 ## 2. Codex / OpenAI 系
 
-| 位置 | 作用 | 如何追加 |
+> **当前策略（2026-04-18 起）**：Happy 内部把 Codex 统一锁定到 **`gpt-5.4`**。  
+> 所以未来如果要调整 Codex 模型，不是“多加一个选项”那么简单，而是要把前端展示、运行时透传、自动化任务注入一起改掉。
+
+| 位置 | 作用 | 若未来要改锁定模型，需要改什么 |
 |------|------|----------|
-| [packages/happy-app/sources/sync/profileUtils.ts](../packages/happy-app/sources/sync/profileUtils.ts) | `openai` / `azure-openai` 的 OPENAI_MODEL、OPENAI_SMALL_FAST_MODEL、CODEX_SMALL_FAST_MODEL 等 | 改对应 case 的 `environmentVariables` 中 model 相关值（如 `gpt-5-codex-high` → 新 ID） |
-| [packages/happy-app/sources/components/PermissionModeSelector.tsx](../packages/happy-app/sources/components/PermissionModeSelector.tsx) | `ModelMode` 包含 `gpt-5-codex-high/medium/low`、`gpt-5-minimal`、`gpt-5-low/medium/high` | 新档位：在类型里追加新字面量 |
-| [packages/happy-app/sources/app/(app)/new/index.tsx](../packages/happy-app/sources/app/(app)/new/index.tsx) | `validCodexModes`、默认 `gpt-5-codex-high` | 新 Codex 模式：加入 `validCodexModes`（约 371、724 行）；改默认则改 384、740 行 |
-| [packages/happy-app/sources/components/NewSessionWizard.tsx](../packages/happy-app/sources/components/NewSessionWizard.tsx) | 新建会话 UI 中 Codex 的模型选项（当前仅 high/medium/low 三项） | 若要在向导里多一个选项：在「Model Mode」的 codex 分支数组（约 1633–1636 行）追加 `{ value, label, description, icon }` |
-| [packages/happy-app/sources/text/translations/*.ts](../packages/happy-app/sources/text/translations/) 与 [_default.ts](../packages/happy-app/sources/text/_default.ts) | 展示名：如 `gpt5CodexLow`、`gpt5CodexMedium`、`gpt5CodexHigh` | 新展示名：在 `_default.ts` 与各语言文件里加对应 key（如 `gpt5CodexNew`） |
+| [packages/happy-cli/src/codex-shared/configResolution.ts](../packages/happy-cli/src/codex-shared/configResolution.ts) | Codex 运行时默认 model override，决定 happy-cli 最终传给 Codex 的模型 | 修改 `LOCKED_CODEX_MODEL` |
+| [packages/happy-cli/src/codex/messageMode.ts](../packages/happy-cli/src/codex/messageMode.ts) | 会话内消息级 model 选择归一化，防止 App / 旧 session / metadata 把模型切走 | 保持任意 Codex model 都收敛到锁定值 |
+| [packages/happy-cli/src/automation/TaskRunner.ts](../packages/happy-cli/src/automation/TaskRunner.ts) | 自动任务 / world role 派发时注入给 Codex 的环境变量 | 保持 Codex 任务只注入锁定模型 |
+| [packages/happy-app/sources/components/modelModeOptions.ts](../packages/happy-app/sources/components/modelModeOptions.ts) | App 中 Codex 的模型选项与默认值来源 | 保持锁定模型为默认项 |
+| [packages/happy-app/sources/app/(app)/new/index.tsx](../packages/happy-app/sources/app/(app)/new/index.tsx) | 新建会话页面的 Codex 可选模型过滤 | 保持新会话 UI 只暴露锁定模型 |
+| [packages/happy-app/sources/components/NewSessionWizard.tsx](../packages/happy-app/sources/components/NewSessionWizard.tsx) | 旧版向导里的 Codex 模型列表 | 同步只展示锁定模型 |
+| [packages/happy-app/sources/sync/profileUtils.ts](../packages/happy-app/sources/sync/profileUtils.ts) | 内置 OpenAI/Azure OpenAI Profile 默认环境变量 | `OPENAI_MODEL` / `OPENAI_SMALL_FAST_MODEL` / `CODEX_SMALL_FAST_MODEL` 都应与锁定模型一致 |
 
 ---
 

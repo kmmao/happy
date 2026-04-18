@@ -71,7 +71,7 @@ export function getProfileRequiredFields(
                 {
                     key: "AZURE_OPENAI_DEPLOYMENT_NAME",
                     label: "Deployment Name",
-                    placeholder: "gpt-4-turbo",
+                    placeholder: "gpt-5.4",
                 },
             ];
         case "zai":
@@ -108,7 +108,7 @@ export function getProfileRequiredFields(
                 {
                     key: "AZURE_OPENAI_DEPLOYMENT_NAME",
                     label: "Deployment Name",
-                    placeholder: "gpt-4-turbo",
+                    placeholder: "gpt-5.4",
                 },
             ];
         case "azure-openai-codex":
@@ -127,7 +127,7 @@ export function getProfileRequiredFields(
                 {
                     key: "AZURE_OPENAI_DEPLOYMENT_NAME",
                     label: "Deployment Name",
-                    placeholder: "gpt-4-turbo",
+                    placeholder: "gpt-5.4",
                 },
             ];
         default:
@@ -169,11 +169,11 @@ export const BUILT_IN_PROFILES: AIBackendProfile[] = [
     },
     {
         id: "openai",
-        name: "OpenAI (GPT-4/Codex)",
-        description: "OpenAI GPT-4 and Codex models",
+        name: "OpenAI (GPT-5.4)",
+        description: "OpenAI GPT-5.4 for Codex sessions",
         openaiConfig: {
             baseUrl: "https://api.openai.com/v1",
-            model: "gpt-4-turbo",
+            model: "gpt-5.4",
         },
         environmentVariables: [],
         compatibility: { claude: false, codex: true, gemini: false },
@@ -184,12 +184,12 @@ export const BUILT_IN_PROFILES: AIBackendProfile[] = [
     },
     {
         id: "azure-openai-codex",
-        name: "Azure OpenAI (Codex)",
-        description: "Microsoft Azure OpenAI for Codex agents",
+        name: "Azure OpenAI (GPT-5.4)",
+        description: "Microsoft Azure OpenAI for GPT-5.4 Codex sessions",
         azureOpenAIConfig: {
             endpoint: "https://your-resource.openai.azure.com/",
             apiVersion: "2024-02-15-preview",
-            deploymentName: "gpt-4-turbo",
+            deploymentName: "gpt-5.4",
         },
         environmentVariables: [],
         compatibility: { claude: false, codex: true, gemini: false },
@@ -235,7 +235,7 @@ export const BUILT_IN_PROFILES: AIBackendProfile[] = [
         description: "Microsoft Azure AI services",
         openaiConfig: {
             baseUrl: "https://api.openai.azure.com",
-            model: "gpt-4-turbo",
+            model: "gpt-5.4",
         },
         environmentVariables: [],
         compatibility: { claude: false, codex: true, gemini: false },

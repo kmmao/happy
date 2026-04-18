@@ -15,6 +15,28 @@ import {
   SyntaxToken,
 } from "@/components/diff/syntaxTokenizer";
 
+export interface DiffPalette {
+  surface: string;
+  diff: {
+    outline: string;
+    addedBg: string;
+    addedText: string;
+    removedBg: string;
+    removedText: string;
+    contextBg: string;
+    contextText: string;
+    lineNumberBg: string;
+    lineNumberText: string;
+    hunkHeaderBg: string;
+    hunkHeaderText: string;
+    leadingSpaceDot: string;
+    inlineAddedBg: string;
+    inlineAddedText: string;
+    inlineRemovedBg: string;
+    inlineRemovedText: string;
+  };
+}
+
 interface DiffViewProps {
   oldText: string;
   newText: string;
@@ -32,6 +54,7 @@ interface DiffViewProps {
   language?: string | null;
   viewMode?: "unified" | "split";
   expandedContext?: boolean;
+  palette?: DiffPalette;
 }
 
 export const DiffView: React.FC<DiffViewProps> = ({
@@ -50,10 +73,14 @@ export const DiffView: React.FC<DiffViewProps> = ({
   language = null,
   viewMode = "unified",
   expandedContext = false,
+  palette,
 }) => {
-  // Always use light theme colors
   const { theme } = useUnistyles();
-  const colors = theme.colors.diff;
+  const resolvedPalette = palette ?? {
+    surface: theme.colors.surface,
+    diff: theme.colors.diff,
+  };
+  const colors = resolvedPalette.diff;
 
   // Collapsible hunk state
   const [collapsedHunks, setCollapsedHunks] = useState<Set<number>>(new Set());
@@ -78,7 +105,7 @@ export const DiffView: React.FC<DiffViewProps> = ({
 
   // Styles
   const containerStyle: ViewStyle = {
-    backgroundColor: theme.colors.surface,
+    backgroundColor: resolvedPalette.surface,
     borderWidth: 0,
     flex: 1,
     ...style,

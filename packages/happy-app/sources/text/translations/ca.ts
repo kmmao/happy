@@ -686,6 +686,8 @@ export const ca: TranslationStructure = {
     progressRefreshActionLabel: "Actualitza",
     progressRefreshPrompt:
       "Revisa l'estat actual de la feina i reescriu la teva llista TodoWrite per reflectir la realitat: cada tasca amb l'estat exacte (completed / in_progress / pending). Per a in_progress inclou activeForm. Si encara no hi ha pla, esbossa'n un primer.",
+    progressRefreshPromptCodex:
+      "Please review the current work state and call mcp__happy__update_progress to rewrite the checklist so it matches reality: every task with an accurate status (completed / in_progress / pending). Include currentStage or blockers when useful. If no checklist exists yet, create the first one. Use listId: \"new\" only when you are starting a genuinely new phase.",
     progressTodoNudgeLabel: "Verificació suggerida",
     progressSummaryRefreshLabel: "Actualitza",
     progressSummaryRefreshPrompt:
@@ -906,7 +908,7 @@ export const ca: TranslationStructure = {
     }) =>
       `Versió ${currentVersion} instal·lada. Actualitzeu a ${requiredVersion} o posterior`,
     updateCliInstructions:
-      "Si us plau executeu npm install -g happy-coder@latest",
+      "Si us plau executeu npm install -g @kmmao/happy-coder@latest",
     resumeSession: "Reprendre sessió",
     resumeSessionSubtitle:
       "Reprendre aquesta sessió amb el context complet a la mateixa màquina",
@@ -1192,6 +1194,11 @@ export const ca: TranslationStructure = {
       readFile: "Llegeix fitxer",
       editFile: "Edita fitxer",
       writeFile: "Escriu fitxer",
+      verify: "Verify",
+      test: "Tests",
+      git: "Git",
+      package: "Package",
+      run: "Run",
       fetchUrl: "Obté URL",
       readNotebook: "Llegeix quadern",
       editNotebook: "Edita quadern",
@@ -1673,7 +1680,7 @@ export const ca: TranslationStructure = {
     offlineUnableToSpawn:
       "El llançador està desactivat mentre la màquina està fora de línia",
     offlineHelp:
-      "• Assegura't que l'ordinador estigui en línia\n• Executa `happy daemon status` per diagnosticar\n• Fas servir l'última versió del CLI? Actualitza amb `npm install -g happy-coder@latest`",
+      "• Assegura't que l'ordinador estigui en línia\n• Executa `happy daemon status` per diagnosticar\n• Fas servir l'última versió del CLI? Actualitza amb `npm install -g @kmmao/happy-coder@latest`",
     launchNewSessionInDirectory: "Inicia una nova sessió al directori",
     daemon: "Dimoni",
     status: "Estat",
@@ -2162,6 +2169,10 @@ export const ca: TranslationStructure = {
       `Actualitzar @kmmao/happy-coder a v${version}? El dimoni es reiniciarà automàticament després de l'actualització.`,
     upgradeCliSuccess: "CLI actualitzat correctament. El dimoni es reiniciarà automàticament en 60 segons.",
     upgradeCliFailed: "Error en actualitzar CLI",
+    upgradeCliUnavailableTitle: "One-tap upgrade unavailable",
+    upgradeCliUnavailableLegacy: "This CLI is too old to support one-tap upgrades. Run npm install -g @kmmao/happy-coder@latest manually once, then try again.",
+    upgradeCliUnavailableLocalSource: "This machine is running Happy from a local checkout or link workflow. Upgrade it from your local repo/build flow instead of the app.",
+    upgradeCliUnavailableUnknown: "This machine is not using a supported npm global install, so the app cannot safely self-upgrade it. Upgrade it manually if appropriate.",
     stopDaemonTitle: "Aturar el dimoni?",
     stopDaemonMessage: "No podreu crear noves sessions en aquesta màquina fins que reinicieu el dimoni. Les sessions actuals continuaran actives.",
     stopDaemonButton: "Aturar dimoni",
