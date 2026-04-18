@@ -15,12 +15,15 @@ import { StatusDot } from "@/components/StatusDot";
 import { Typography } from "@/constants/Typography";
 import { useElapsedTime } from "@/hooks/useElapsedTime";
 import {
+  getRpcSummaryStatusLabel,
+  getRpcSummaryVisualState,
+} from "@/components/rpcSummaryVisualState";
+import {
   formatDurationMs,
   formatTokenCountShort,
   getContextWindowSize,
 } from "@/utils/formatUsage";
-
-const COMPACT_LAYOUT_BREAKPOINT = 520;
+import type { SessionRpcVisualState } from "@/utils/sessionRpcVisualState";
 
 const stylesheet = StyleSheet.create((theme) => ({
   container: {
@@ -34,43 +37,98 @@ const stylesheet = StyleSheet.create((theme) => ({
   inner: {
     maxWidth: layout.maxWidth,
     width: "100%",
-    flexDirection: "row" as const,
-    justifyContent: "space-between" as const,
-    alignItems: "flex-end" as const,
-    paddingHorizontal: 16,
-  },
-  innerCompact: {
     flexDirection: "column" as const,
-    alignItems: "flex-end" as const,
-    justifyContent: "flex-start" as const,
+    alignItems: "stretch" as const,
+    paddingHorizontal: 16,
     gap: 8,
   },
-  column: {
+  buttonsRow: {
     flexDirection: "row" as const,
     alignItems: "center" as const,
     gap: 6,
-  },
-  columnCompact: {
-    alignSelf: "flex-end" as const,
-  },
-  statusColumn: {
-    alignItems: "flex-start" as const,
-    gap: 2,
-    flex: 1,
-  },
-  statusColumnCompact: {
-    flex: 0,
-    alignItems: "flex-end" as const,
+    alignSelf: "stretch" as const,
     width: "100%",
+    justifyContent: "flex-end" as const,
+    flexWrap: "wrap" as const,
+  },
+  statusWrap: {
+    alignSelf: "flex-end" as const,
+    width: "100%",
+    alignItems: "flex-end" as const,
+    gap: 6,
+  },
+  statusShell: {
+    flexDirection: "row" as const,
+    alignItems: "flex-end" as const,
+    justifyContent: "flex-end" as const,
+    gap: 10,
+    maxWidth: "100%",
+  },
+  statusCard: {
+    borderRadius: 14,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    gap: 4,
+    shadowOffset: { width: 0, height: 0 },
+    shadowRadius: 8,
+    shadowOpacity: 0.08,
+    elevation: 2,
   },
   statusLine: {
     flexDirection: "row" as const,
     alignItems: "center" as const,
-    gap: 4,
-  },
-  statusLineCompact: {
     justifyContent: "flex-end" as const,
-    alignSelf: "flex-end" as const,
+    gap: 6,
+    minWidth: 0,
+  },
+  statusStatsLine: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    justifyContent: "flex-end" as const,
+    gap: 10,
+    minWidth: 0,
+  },
+  statusInlineGroup: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: 6,
+    minWidth: 0,
+    flexShrink: 1,
+  },
+  activityText: {
+    textAlign: "left" as const,
+    fontSize: 10,
+    flexShrink: 1,
+    ...Typography.default(),
+  },
+  statusLineText: {
+    flexShrink: 1,
+    textAlign: "right" as const,
+    fontSize: 10,
+    ...Typography.default(),
+  },
+  statusSummaryLine: {
+    fontSize: 10,
+    textAlign: "right" as const,
+    flexShrink: 1,
+    ...Typography.default("semiBold"),
+  },
+  summaryCapsuleLine: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    justifyContent: "flex-end" as const,
+    gap: 6,
+    minWidth: 0,
+  },
+  summaryPill: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: 5,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 999,
+    flexShrink: 0,
   },
 
   button: {
@@ -119,6 +177,8 @@ export interface InputFABStatusInfo {
   permissionLabel?: string;
   permissionColor?: string;
   modelLabel?: string;
+  rpcState?: SessionRpcVisualState;
+  modelSummaryText?: string | null;
   contextSize?: number;
   contextWindow?: number;
   totalSessionTokens?: number;
@@ -176,7 +236,6 @@ export const InputFAB = React.memo(function InputFAB({
   const styles = stylesheet;
   const opacity = React.useRef(new Animated.Value(visible ? 1 : 0)).current;
   const [shouldRender, setShouldRender] = React.useState(visible);
-  const isCompactLayout = width <= COMPACT_LAYOUT_BREAKPOINT;
 
   React.useEffect(() => {
     if (visible) {
@@ -229,28 +288,18 @@ export const InputFAB = React.memo(function InputFAB({
       style={[styles.container, { opacity }]}
       onLayout={handleLayout}
     >
-      <View
-        style={[
-          styles.inner,
-          isCompactLayout && styles.innerCompact,
-        ]}
-      >
+      <View style={styles.inner}>
         {statusInfo ? (
           <CompactStatus
             info={statusInfo}
             theme={theme}
-            compact={isCompactLayout}
+            maxWidth={Math.min(width - 32, 420)}
           />
         ) : (
           <View />
         )}
 
-        <View
-          style={[
-            styles.column,
-            isCompactLayout && styles.columnCompact,
-          ]}
-        >
+        <View style={styles.buttonsRow}>
           <FABButton
             icon="sparkles"
             onPress={onOptionsPress ?? noop}
@@ -342,13 +391,23 @@ export const InputFAB = React.memo(function InputFAB({
 const CompactStatus = React.memo(function CompactStatus({
   info,
   theme,
-  compact,
+  maxWidth,
 }: {
   info: InputFABStatusInfo;
   theme: ReturnType<typeof useUnistyles>["theme"];
-  compact: boolean;
+  maxWidth: number;
 }) {
   const styles = stylesheet;
+  const rpcVisualState = React.useMemo(
+    () => getRpcSummaryVisualState(info.rpcState, theme.colors),
+    [info.rpcState, theme.colors],
+  );
+  const rpcStatusLabel = React.useMemo(
+    () => getRpcSummaryStatusLabel({ rpcState: info.rpcState, translate: t }),
+    [info.rpcState],
+  );
+  const modelSummaryText = info.modelSummaryText?.trim() || null;
+  const showSummaryCapsule = Boolean(rpcStatusLabel || modelSummaryText);
 
   const currentTurnElapsedSec = useElapsedTime(
     info.isThinking ? info.turnStartedAt : undefined,
@@ -411,17 +470,18 @@ const CompactStatus = React.memo(function CompactStatus({
       ? `Σ${formatTokenCountShort(sessionTokens)}${costSuffix}${elapsedSuffix}`
       : null;
 
-  const segments: { text: string; color: string }[] = [
-    { text: info.statusText, color: info.statusColor },
-  ];
-  if (info.permissionLabel) {
-    segments.push({
+  const detailSegments: { text: string; color: string }[] = [];
+  if (!showSummaryCapsule && info.permissionLabel) {
+    detailSegments.push({
       text: info.permissionLabel,
       color: info.permissionColor ?? theme.colors.textSecondary,
     });
   }
-  if (info.modelLabel) {
-    segments.push({ text: info.modelLabel, color: theme.colors.textSecondary });
+  if (!showSummaryCapsule && info.modelLabel) {
+    detailSegments.push({
+      text: info.modelLabel,
+      color: theme.colors.textSecondary,
+    });
   }
 
   const separatorStyle = {
@@ -430,71 +490,129 @@ const CompactStatus = React.memo(function CompactStatus({
     ...Typography.default(),
   } as const;
 
-  return (
-    <View
-      style={[
-        styles.statusColumn,
-        compact && styles.statusColumnCompact,
-      ]}
-    >
-      <View
-        style={[
-          styles.statusLine,
-          compact && styles.statusLineCompact,
-        ]}
-      >
-        <StatusDot
-          color={info.statusDotColor}
-          isPulsing={info.isPulsing}
-          size={5}
-        />
-        {segments.map((seg, i) => (
-          <React.Fragment key={i}>
-            {i > 0 && <Text style={separatorStyle}>·</Text>}
-            <Text
-              style={{
-                fontSize: 10,
-                color: seg.color,
-                ...Typography.default(),
-              }}
-              numberOfLines={1}
-            >
-              {seg.text}
-            </Text>
-          </React.Fragment>
-        ))}
-      </View>
+  const showStatusCard = Boolean(
+    showSummaryCapsule ||
+      detailSegments.length > 0 ||
+      shouldShowContext ||
+      sessionTokensLabel,
+  );
+  const showExternalStatus = Boolean(info.statusText);
 
-      {shouldShowContext ? (
-        <Text
-          style={{
-            fontSize: 9,
-            color: barColor,
-            textAlign: compact ? "right" : "left",
-            alignSelf: compact ? "flex-end" : "auto",
-            ...Typography.default(),
-          }}
-          numberOfLines={1}
-        >
-          {contextLabel}
-        </Text>
-      ) : sessionTokensLabel ? (
-        <Text
-          style={{
-            fontSize: 9,
-            color: theme.colors.textSecondary,
-            textAlign: compact ? "right" : "left",
-            alignSelf: compact ? "flex-end" : "auto",
-            ...Typography.default(),
-          }}
-          numberOfLines={1}
-        >
-          {sessionTokensLabel}
-        </Text>
+  return (
+    <View style={styles.statusWrap}>
+      {showExternalStatus || showStatusCard ? (
+        <View style={styles.statusShell}>
+          {showExternalStatus ? (
+            <View style={styles.statusInlineGroup}>
+              <StatusDot
+                color={info.statusDotColor}
+                isPulsing={info.isPulsing}
+                size={5}
+              />
+              <Text
+                numberOfLines={1}
+                style={[styles.activityText, { color: info.statusColor }]}
+              >
+                {info.statusText}
+              </Text>
+            </View>
+          ) : null}
+
+          {showStatusCard ? (
+            <View
+              style={[
+                styles.statusCard,
+                {
+                  maxWidth,
+                  borderColor: rpcVisualState.borderColor,
+                  backgroundColor: rpcVisualState.backgroundColor,
+                  shadowColor: rpcVisualState.glowColor,
+                },
+              ]}
+            >
+              {showSummaryCapsule ? (
+                <View style={styles.summaryCapsuleLine}>
+                  {rpcStatusLabel ? (
+                    <View
+                      style={[
+                        styles.summaryPill,
+                        { backgroundColor: rpcVisualState.pillBackgroundColor },
+                      ]}
+                    >
+                      <StatusDot
+                        color={rpcVisualState.pillDotColor}
+                        isPulsing={info.rpcState === "reconnecting"}
+                        size={5}
+                      />
+                      <Text
+                        style={{
+                          fontSize: 10,
+                          color: rpcVisualState.pillTextColor,
+                          ...Typography.default("semiBold"),
+                        }}
+                        numberOfLines={1}
+                      >
+                        {rpcStatusLabel}
+                      </Text>
+                    </View>
+                  ) : null}
+                  {modelSummaryText ? (
+                    <Text
+                      numberOfLines={1}
+                      style={[
+                        styles.statusLineText,
+                        { color: rpcVisualState.summaryTextColor },
+                      ]}
+                    >
+                      {modelSummaryText}
+                    </Text>
+                  ) : null}
+                </View>
+              ) : null}
+
+              {!showSummaryCapsule && detailSegments.length > 0 ? (
+                <View style={styles.statusLine}>
+                  <Text numberOfLines={1} style={styles.statusLineText}>
+                    {detailSegments.map((seg, i) => (
+                      <Text key={`${seg.text}-${i}`} style={{ color: seg.color }}>
+                        {i > 0 ? <Text style={separatorStyle}> · </Text> : null}
+                        {seg.text}
+                      </Text>
+                    ))}
+                  </Text>
+                </View>
+              ) : null}
+
+              {shouldShowContext ? (
+                <View style={styles.statusStatsLine}>
+                  <Text
+                    style={[styles.statusSummaryLine, { color: barColor }]}
+                    numberOfLines={1}
+                  >
+                    {contextLabel}
+                  </Text>
+                </View>
+              ) : sessionTokensLabel ? (
+                <View style={styles.statusStatsLine}>
+                  <Text
+                    style={[
+                      styles.statusSummaryLine,
+                      { color: rpcVisualState.summaryTextColor },
+                    ]}
+                    numberOfLines={1}
+                  >
+                    {sessionTokensLabel}
+                  </Text>
+                </View>
+              ) : null}
+            </View>
+          ) : null}
+        </View>
       ) : null}
     </View>
   );
 });
+
 
 interface FABButtonProps {
   icon: React.ComponentProps<typeof Ionicons>["name"];

@@ -78,7 +78,8 @@ export function resolveSessionUpgradeContext(
 
     if (flavor === "codex") {
         const threadId = session.metadata?.codex?.threadId;
-        if (!threadId) {
+        const resolvedBackend = session.metadata?.codex?.resolvedBackend;
+        if (!threadId || resolvedBackend === "codex-mcp-legacy") {
             return null;
         }
 

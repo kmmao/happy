@@ -16,7 +16,7 @@ describe("sessionResumeGuard", () => {
     await expect(
       runWithSessionResumeGuard("session-1", async () => "duplicate"),
     ).rejects.toMatchObject({
-      message: "该会话正在恢复中，请稍候。",
+      message: "该会话正在重新激活中，请稍候。",
       name: "RetryableError",
     });
 

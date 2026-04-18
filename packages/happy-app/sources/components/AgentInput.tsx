@@ -50,6 +50,11 @@ import { ContextProgressBar } from "./ContextProgressBar";
 import { AttachButton, type AttachAction } from "./AttachButton";
 import { AgentInputSettingsOverlay } from "./AgentInputSettingsOverlay";
 import { getReasoningSummaryLabels } from "./reasoningEffort";
+import {
+  buildRpcSummaryText,
+  getRpcSummaryStatusLabel,
+  getRpcSummaryVisualState,
+} from "./rpcSummaryVisualState";
 import { log } from '@/log';
 
 export type {
@@ -125,66 +130,19 @@ export const AgentInput = React.memo(
       [isSandboxEnabled],
     );
 
-    const modelSummaryStatusLabel = React.useMemo(() => {
-      switch (props.modelSummaryRpcState) {
-        case "disconnected":
-          return t("agentInput.rpcState.disconnected");
-        case "reconnecting":
-          return t("agentInput.rpcState.reconnecting");
-        case "rpcPending":
-          return t("agentInput.rpcState.rpcPending");
-        case "rpcReady":
-          return t("agentInput.rpcState.rpcReady");
-        default:
-          return null;
-      }
-    }, [props.modelSummaryRpcState]);
+    const modelSummaryStatusLabel = React.useMemo(
+      () =>
+        getRpcSummaryStatusLabel({
+          rpcState: props.modelSummaryRpcState,
+          translate: t,
+        }),
+      [props.modelSummaryRpcState],
+    );
 
-    const modelSummaryVisualState = React.useMemo(() => {
-      switch (props.modelSummaryRpcState) {
-        case "reconnecting":
-        case "rpcPending":
-          return {
-            borderColor: `${theme.colors.accentOrange}55`,
-            backgroundColor: `${theme.colors.accentOrange}12`,
-            glowColor: theme.colors.accentOrange,
-            pillBackgroundColor: `${theme.colors.accentOrange}18`,
-            pillTextColor: theme.colors.accentOrange,
-            pillDotColor: theme.colors.accentOrange,
-            summaryTextColor: theme.colors.text,
-          };
-        case "rpcReady":
-          return {
-            borderColor: `${theme.colors.success}45`,
-            backgroundColor: `${theme.colors.success}10`,
-            glowColor: theme.colors.success,
-            pillBackgroundColor: `${theme.colors.success}18`,
-            pillTextColor: theme.colors.success,
-            pillDotColor: theme.colors.success,
-            summaryTextColor: theme.colors.text,
-          };
-        case "disconnected":
-          return {
-            borderColor: theme.colors.divider,
-            backgroundColor: theme.colors.surfacePressed,
-            glowColor: theme.colors.textSecondary,
-            pillBackgroundColor: `${theme.colors.textSecondary}14`,
-            pillTextColor: theme.colors.textSecondary,
-            pillDotColor: theme.colors.textSecondary,
-            summaryTextColor: theme.colors.textSecondary,
-          };
-        default:
-          return {
-            borderColor: "transparent",
-            backgroundColor: `${theme.colors.surfacePressed}CC`,
-            glowColor: theme.colors.shadow.color,
-            pillBackgroundColor: `${theme.colors.surfacePressed}CC`,
-            pillTextColor: theme.colors.textSecondary,
-            pillDotColor: theme.colors.textSecondary,
-            summaryTextColor: theme.colors.textSecondary,
-          };
-      }
-    }, [props.modelSummaryRpcState, theme.colors]);
+    const modelSummaryVisualState = React.useMemo(
+      () => getRpcSummaryVisualState(props.modelSummaryRpcState, theme.colors),
+      [props.modelSummaryRpcState, theme.colors],
+    );
 
     React.useEffect(() => {
       let animation: Animated.CompositeAnimation | null = null;
@@ -1172,23 +1130,21 @@ export const AgentInput = React.memo(
                       ...Typography.default(),
                     }}
                   >
-                    {[
-                      displayPermissionMode
+                    {buildRpcSummaryText({
+                      permissionLabel: displayPermissionMode
                         ? withSandboxSuffix(
                             displayPermissionMode.name,
                             permissionModeKey,
                           )
                         : null,
-                      props.effectiveModelLabel ?? props.modelMode?.name,
-                      ...getReasoningSummaryLabels({
+                      modelLabel: props.effectiveModelLabel ?? props.modelMode?.name,
+                      reasoningLabels: getReasoningSummaryLabels({
                         isCodex,
                         isGemini,
                         reasoning: props.reasoning,
                         translate: t,
                       }),
-                    ]
-                      .filter(Boolean)
-                      .join(" · ")}
+                    })}
                   </Text>
                   {!!props.onModelModeChange && availableModels.length > 0 && (
                     <Ionicons

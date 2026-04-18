@@ -2205,13 +2205,14 @@ export async function sessionDelete(
 }
 
 /**
- * Restore an archived session back to active state
+ * Remove an archived session from the archived list without restarting it.
+ * This is a state-only unarchive, not a runtime resume.
  */
-export async function sessionRestore(
+export async function sessionUnarchive(
   sessionId: string,
 ): Promise<{ success: boolean; message?: string }> {
   try {
-    const response = await apiSocket.request(`/v1/sessions/${sessionId}/restore`, {
+    const response = await apiSocket.request(`/v1/sessions/${sessionId}/unarchive`, {
       method: "PATCH",
     });
 
@@ -2231,6 +2232,11 @@ export async function sessionRestore(
     };
   }
 }
+
+/**
+ * Legacy alias — prefer sessionUnarchive() for clarity.
+ */
+export const sessionRestore = sessionUnarchive;
 
 // Export types for external use
 export type {

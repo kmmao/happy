@@ -839,6 +839,7 @@ export const en = {
     codexBackendAppServer: "Codex App Server",
     codexBackendLegacyMcp: "Codex Legacy MCP",
     codexBackendVersion: "Codex Backend Version",
+    codexThreadId: "Codex Thread ID",
     codexFallbackReason: "Codex Fallback Reason",
     codexConfigMode: "Codex Config Mode",
     codexConfigModeInherit: "Inherit local Codex config",
@@ -896,6 +897,9 @@ export const en = {
     resumeSession: "Resume Session",
     resumeSessionSubtitle:
       "Resume this session with full context on the same machine",
+    unarchiveSession: "Unarchive Session",
+    unarchiveSessionSubtitle:
+      "Move this session back to active sessions without restarting it",
     forkSession: "Fork Session",
     forkSessionSubtitle:
       "Create a new session branching from this point with full context",
@@ -917,6 +921,7 @@ export const en = {
     failedToDeleteSession: "Failed to delete session",
     restoreSession: "Restore",
     failedToRestoreSession: "Failed to restore session",
+    failedToUnarchiveSession: "Failed to unarchive session",
     sessionDeleted: "Session deleted successfully",
     deleteAllArchivedSessions: "Delete All Archived Sessions",
     deleteAllArchivedWarning: ({ count }: { count: number }) =>

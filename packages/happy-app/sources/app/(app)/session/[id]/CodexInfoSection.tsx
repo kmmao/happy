@@ -5,6 +5,7 @@ import { ItemGroup } from "@/components/ItemGroup";
 import { t } from "@/text";
 import type { Session } from "@/sync/storageTypes";
 import {
+    formatCodexThreadIdPreview,
     formatCodexReasoningEffortMetadata,
     formatCodexReasoningSummaryMetadata,
     hasCodexMetadataSection,
@@ -148,6 +149,22 @@ export function CodexInfoSection({ session }: { session: Session }) {
                     icon={
                         <Ionicons
                             name="layers-outline"
+                            size={29}
+                            color="#5856D6"
+                        />
+                    }
+                    showChevron={false}
+                />
+            )}
+            {session.metadata.codex?.threadId && (
+                <Item
+                    title={t("sessionInfo.codexThreadId")}
+                    subtitle={formatCodexThreadIdPreview(
+                        session.metadata.codex.threadId,
+                    )}
+                    icon={
+                        <Ionicons
+                            name="git-branch-outline"
                             size={29}
                             color="#5856D6"
                         />

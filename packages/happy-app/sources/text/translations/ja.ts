@@ -948,6 +948,7 @@ export const ja: TranslationStructure = {
     codexBackendAppServer: "Codex App Server",
     codexBackendLegacyMcp: "Codex Legacy MCP",
     codexBackendVersion: "Codexバックエンドのバージョン",
+    codexThreadId: "Codex Thread ID",
     codexFallbackReason: "Codexフォールバック理由",
     codexConfigMode: "Codex設定モード",
     codexConfigModeInherit: "ローカルCodex設定を継承",
@@ -1007,6 +1008,9 @@ export const ja: TranslationStructure = {
     resumeSession: "セッションを再開",
     resumeSessionSubtitle:
       "同じマシンで完全なコンテキストを使ってセッションを再開",
+    unarchiveSession: "セッションをアーカイブ解除",
+    unarchiveSessionSubtitle:
+      "再起動せずにこのセッションをアクティブ一覧へ戻す",
     forkSession: "セッションをフォーク",
     forkSessionSubtitle: "この時点からフルコンテキストで新しいセッションを分岐",
     forkSessionSuccess: "セッションのフォークに成功しました",
@@ -1027,6 +1031,7 @@ export const ja: TranslationStructure = {
     failedToDeleteSession: "セッションの削除に失敗しました",
     restoreSession: "復元",
     failedToRestoreSession: "セッションの復元に失敗しました",
+    failedToUnarchiveSession: "セッションのアーカイブ解除に失敗しました",
     sessionDeleted: "セッションが正常に削除されました",
     deleteAllArchivedSessions: "アーカイブ済みセッションをすべて削除",
     deleteAllArchivedWarning: ({ count }: { count: number }) =>

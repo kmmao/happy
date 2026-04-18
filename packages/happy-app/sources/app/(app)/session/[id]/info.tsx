@@ -27,8 +27,8 @@ import {
 import * as Clipboard from "expo-clipboard";
 import { Modal } from "@/modal";
 import { sessionKill, sessionDelete, machineSpawnNewSession, sessionForkSession } from "@/sync/ops";
-import { handleSessionResumeResult } from "@/sync/sessionResumeFlow";
-import { runWithSessionResumeGuard } from "@/sync/sessionResumeGuard";
+import { reactivateArchivedSession } from "@/sync/sessionResumeFlow";
+import { runWithSessionReactivationGuard } from "@/sync/sessionResumeGuard";
 import { setSessionForkSource } from "@/sync/apiProjects";
 import { useAuth } from "@/auth/AuthContext";
 import { useUnistyles } from "react-native-unistyles";
@@ -49,6 +49,7 @@ import {
   buildForkSessionStartPreferences,
 } from "@/app/(app)/new/sessionStartPreferences";
 import { buildSessionRespawnProfile } from "@/hooks/sessionUpgradeProfile";
+import { resolveSessionReactivationContext } from "@/hooks/sessionResumeSupport";
 import { sync } from "@/sync/sync";
 import { CodexInfoSection } from "./CodexInfoSection";
 import { SessionMetadataSection } from "./SessionMetadataSection";
@@ -110,17 +111,12 @@ function SessionInfoContent({ session }: { session: Session }) {
   const navigateToSession = useNavigateToSession();
   const { messages } = useSessionMessages(session.id);
 
-  // Resume preconditions: session has claudeSessionId, machineId, path, and flavor is claude or undefined
   const machine = useMachine(session.metadata?.machineId ?? "");
-  const canResume =
+  const reactivationContext = resolveSessionReactivationContext(session, machine);
+  const reactivationMode = reactivationContext?.mode;
+  const canReactivate =
     !sessionStatus.isConnected &&
-    !session.active &&
-    !!session.metadata?.claudeSessionId &&
-    !!session.metadata?.machineId &&
-    !!session.metadata?.path &&
-    (!session.metadata?.flavor || session.metadata.flavor === "claude") &&
-    !!machine &&
-    isMachineOnline(machine);
+    reactivationContext !== null;
 
   // Fork preconditions: session has claudeSessionId, machineId, path, session is active, and machine online
   const canFork =
@@ -226,27 +222,43 @@ function SessionInfoContent({ session }: { session: Session }) {
     ]);
   }, [performDelete, session.metadata?.worktree]);
 
-  // Use HappyAction for resume - reconnects to the same Happy session with --resume
-  const [resumingSession, performResume] = useHappyAction(async () => {
-    await runWithSessionResumeGuard(session.id, async () => {
+  // Use HappyAction for archived-session reactivation.
+  const [reactivatingSession, performReactivation] = useHappyAction(async () => {
+    if (!reactivationContext) {
+      throw new HappyError(
+        t("machine.failedToStartSession"),
+        false,
+      );
+    }
+    await runWithSessionReactivationGuard(session.id, async () => {
       const worktree = session.metadata?.worktree;
       const spawnProfile = buildSessionRespawnProfile(
         session,
         storage.getState().settings.profiles ?? [],
       );
-      const createResumeRequest = (directory?: string) =>
-        machineSpawnNewSession({
-          machineId: session.metadata!.machineId!,
-          directory: directory ?? session.metadata!.path!,
-          claudeSessionId: session.metadata!.claudeSessionId!,
-          happySessionId: session.id,
-          agent: "claude",
-          ...spawnProfile,
-        });
+      const createResumeRequest = (
+        directory?: string,
+        approvedNewDirectoryCreation: boolean = false,
+      ) => {
+        if (reactivationContext.mode !== "resume") {
+          throw new HappyError(
+            t("machine.failedToStartSession"),
+            false,
+          );
+        }
 
-      const result = await createResumeRequest();
-      await handleSessionResumeResult({
-        result,
+        return {
+          ...reactivationContext.resumeContext!.baseSpawnOptions,
+          directory:
+            directory ?? reactivationContext.resumeContext!.baseSpawnOptions.directory,
+          approvedNewDirectoryCreation,
+          ...spawnProfile,
+        };
+      };
+
+      await reactivateArchivedSession({
+        sessionId: session.id,
+        mode: reactivationContext.mode,
         onSuccess: () => router.back(),
         requestDirectoryApproval: (directory) =>
           Modal.confirm(
@@ -254,11 +266,19 @@ function SessionInfoContent({ session }: { session: Session }) {
             t("machine.createDirectoryMessage", { directory }),
             { cancelText: t("common.cancel"), confirmText: t("common.create") },
           ),
-        retryWithApprovedDirectoryCreation: (directory) => createResumeRequest(directory),
         createError: (message) => new HappyError(message, false),
-        getStartSessionFallbackMessage: () => t("machine.failedToStartSession"),
+        getStartSessionFallbackMessage: () =>
+          reactivationContext.mode === "unarchive"
+            ? t("sessionInfo.failedToUnarchiveSession")
+            : t("machine.failedToStartSession"),
+        createResumeRequest,
         mapRetryDirectory: (directory) => {
-          if (worktree?.isWorktree && worktree.parentRepoPath && directory === session.metadata!.path!) {
+          if (
+            reactivationContext.mode === "resume"
+            && worktree?.isWorktree
+            && worktree.parentRepoPath
+            && directory === reactivationContext.resumeContext!.baseSpawnOptions.directory
+          ) {
             return worktree.parentRepoPath;
           }
           return directory;
@@ -267,9 +287,9 @@ function SessionInfoContent({ session }: { session: Session }) {
     });
   });
 
-  const handleResumeSession = useCallback(() => {
-    performResume();
-  }, [performResume]);
+  const handleReactivateSession = useCallback(() => {
+    performReactivation();
+  }, [performReactivation]);
 
   // Fork session — create a new session branching from the current one
   const [forkingSession, performFork] = useHappyAction(async () => {
@@ -554,12 +574,27 @@ function SessionInfoContent({ session }: { session: Session }) {
               onPress={handleArchiveSession}
             />
           )}
-          {canResume && (
+          {canReactivate && (
             <Item
-              title={t("sessionInfo.resumeSession")}
-              subtitle={t("sessionInfo.resumeSessionSubtitle")}
-              icon={<Ionicons name="play-outline" size={29} color="#34C759" />}
-              onPress={handleResumeSession}
+              title={
+                reactivationMode === "resume"
+                  ? t("sessionInfo.resumeSession")
+                  : t("sessionInfo.unarchiveSession")
+              }
+              subtitle={
+                reactivationMode === "resume"
+                  ? t("sessionInfo.resumeSessionSubtitle")
+                  : t("sessionInfo.unarchiveSessionSubtitle")
+              }
+              icon={
+                <Ionicons
+                  name={reactivationMode === "resume" ? "play-outline" : "arrow-up-circle-outline"}
+                  size={29}
+                  color="#34C759"
+                />
+              }
+              disabled={reactivatingSession}
+              onPress={handleReactivateSession}
             />
           )}
           {canFork && (

@@ -56,6 +56,14 @@ export function formatCodexReasoningSummaryMetadata(
     return resolveCodexEffectiveReasoningSummary(session);
 }
 
+export function formatCodexThreadIdPreview(threadId: string): string {
+    if (threadId.length <= 20) {
+        return threadId;
+    }
+
+    return `${threadId.substring(0, 8)}...${threadId.substring(threadId.length - 8)}`;
+}
+
 export function hasCodexMetadataSection(
     session: Pick<Session, "effortLevel" | "metadata">,
 ): boolean {
@@ -75,6 +83,7 @@ export function hasCodexMetadataSection(
             codex.configMode ||
             codex.fallbackReason ||
             codex.config?.profile ||
+            codex.threadId ||
             codex.account?.type ||
             codex.account?.planType ||
             resolveCodexEffectiveReasoningEffort(session) ||

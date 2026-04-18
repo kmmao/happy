@@ -44,6 +44,7 @@ import {
 import { NetworkServicesSummaryItem } from "@/components/machine/NetworkServicesSection";
 import { MachineNavigationSummaryItem } from "@/components/machine/MachineNavigationSummaryItem";
 import { AgentLoopsSummaryItem, AutomationSummaryItem } from "@/components/machine/AutomationSummarySection";
+import { SessionProviderTag } from "@/components/session/SessionProviderTag";
 
 const styles = StyleSheet.create((theme) => ({
   pathInputContainer: {
@@ -112,6 +113,12 @@ const styles = StyleSheet.create((theme) => ({
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
+  },
+  previousSessionRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    maxWidth: 220,
   },
 }));
 
@@ -799,8 +806,16 @@ function MachineDetailScreen() {
                 title={getSessionName(session)}
                 subtitle={getSessionSubtitle(session)}
                 onPress={() => navigateToSession(session.id)}
+                showChevron={false}
                 rightElement={
-                  <Ionicons name="chevron-forward" size={20} color="#C7C7CC" />
+                  <View style={styles.previousSessionRight}>
+                    <SessionProviderTag session={session} includeModel />
+                    <Ionicons
+                      name="chevron-forward"
+                      size={20}
+                      color={theme.colors.groupped.chevron}
+                    />
+                  </View>
                 }
               />
             ))}

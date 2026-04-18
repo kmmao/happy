@@ -853,6 +853,7 @@ export const ca: TranslationStructure = {
     codexBackendAppServer: "Codex App Server",
     codexBackendLegacyMcp: "Codex Legacy MCP",
     codexBackendVersion: "Versió del backend de Codex",
+    codexThreadId: "ID del fil de Codex",
     codexFallbackReason: "Motiu del fallback de Codex",
     codexConfigMode: "Mode de configuració de Codex",
     codexConfigModeInherit: "Hereta la configuració local de Codex",
@@ -912,6 +913,9 @@ export const ca: TranslationStructure = {
     resumeSession: "Reprendre sessió",
     resumeSessionSubtitle:
       "Reprendre aquesta sessió amb el context complet a la mateixa màquina",
+    unarchiveSession: "Desarxiva la sessió",
+    unarchiveSessionSubtitle:
+      "Torna aquesta sessió a la llista activa sense reiniciar-la",
     forkSession: "Bifurcar sessió",
     forkSessionSubtitle: "Crear una nova sessió bifurcada des d'aquest punt amb context complet",
     forkSessionSuccess: "Sessió bifurcada correctament",
@@ -932,6 +936,7 @@ export const ca: TranslationStructure = {
     failedToDeleteSession: "Error en eliminar la sessió",
     restoreSession: "Restaurar",
     failedToRestoreSession: "Error en restaurar la sessió",
+    failedToUnarchiveSession: "Error en desarxivar la sessió",
     sessionDeleted: "Sessió eliminada amb èxit",
     deleteAllArchivedSessions: "Elimina totes les sessions arxivades",
     deleteAllArchivedWarning: ({ count }: { count: number }) =>

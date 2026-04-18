@@ -13,7 +13,7 @@ function createSocket(
                 clientType,
             },
         },
-    } as Socket;
+    } as unknown as Socket;
 }
 
 describe("listRpcReadyScopes", () => {

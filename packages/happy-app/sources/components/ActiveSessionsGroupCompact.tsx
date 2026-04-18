@@ -56,22 +56,7 @@ import {
   ISSUE_STATUS_COLORS,
   ISSUE_STATUS_LABELS,
 } from "@/constants/issueStatusColors";
-import { getSessionDisplayModelLabel } from "@/utils/sessionModelLabel";
-
-function buildSessionModelDebugLabel(session: Session): string | null {
-  const parts = [
-    session.modelMode ? `mode=${session.modelMode}` : null,
-    session.resolvedModelId ? `resolved=${session.resolvedModelId}` : null,
-    session.metadata?.currentModelCode
-      ? `current=${session.metadata.currentModelCode}`
-      : null,
-    Object.keys(session.latestUsage?.modelUsage ?? {}).length > 0
-      ? `usage=${Object.keys(session.latestUsage?.modelUsage ?? {}).join(",")}`
-      : null,
-  ].filter(Boolean);
-
-  return parts.length > 0 ? parts.join(" | ") : null;
-}
+import { SessionProviderTag } from "@/components/session/SessionProviderTag";
 
 const stylesheet = StyleSheet.create((theme, runtime) => ({
   container: {
@@ -830,8 +815,8 @@ const CompactSessionRow = React.memo(
                 </Text>
               ) : null}
             </View>
-            <View style={styles.sessionMetaRow}>
-              {sessionProfileLabel ? (
+            {sessionProfileLabel ? (
+              <View style={styles.sessionMetaRow}>
                 <View style={styles.sessionMetaItem}>
                   <Text style={styles.sessionMetaLabel}>
                     {t("sessionInfo.profile")}
@@ -840,19 +825,8 @@ const CompactSessionRow = React.memo(
                     {sessionProfileLabel}
                   </Text>
                 </View>
-              ) : null}
-              <View style={styles.sessionMetaItem}>
-                <Text style={styles.sessionMetaLabel}>
-                  {t("sessionInfo.aiProvider")}
-                </Text>
-                <Text style={styles.sessionMetaValue} numberOfLines={1}>
-                  {getSessionProviderLabel(session)}
-                </Text>
-                <Text style={[styles.requestPreviewText, { color: "#FF3B30" }]} numberOfLines={2}>
-                  {buildSessionModelDebugLabel(session) ?? "debug:no-model-fields"}
-                </Text>
               </View>
-            </View>
+            ) : null}
 
             {/* Request preview */}
             {latestRequestPreview ? (
@@ -891,6 +865,10 @@ const CompactSessionRow = React.memo(
                     : t("sessionInfo.tagMain")}
                 </Text>
               </View>
+              <SessionProviderTag
+                session={session}
+                includeModel
+              />
               {(machine?.metadata?.displayName || session.metadata?.host) && (
                 <View style={styles.tag}>
                   <Text style={styles.tagText}>

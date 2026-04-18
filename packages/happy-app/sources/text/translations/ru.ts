@@ -642,6 +642,7 @@ export const ru: TranslationStructure = {
     codexBackendAppServer: "Codex App Server",
     codexBackendLegacyMcp: "Codex Legacy MCP",
     codexBackendVersion: "Версия бэкенда Codex",
+    codexThreadId: "ID треда Codex",
     codexFallbackReason: "Причина fallback Codex",
     codexConfigMode: "Режим конфигурации Codex",
     codexConfigModeInherit: "Наследовать локальную конфигурацию Codex",
@@ -701,6 +702,9 @@ export const ru: TranslationStructure = {
     resumeSession: "Возобновить сессию",
     resumeSessionSubtitle:
       "Возобновить сессию с полным контекстом на той же машине",
+    unarchiveSession: "Разархивировать сессию",
+    unarchiveSessionSubtitle:
+      "Вернуть эту сессию в активный список без перезапуска",
     forkSession: "Разветвить сессию",
     forkSessionSubtitle: "Создать новую сессию, ответвлённую от этой точки с полным контекстом",
     forkSessionSuccess: "Сессия успешно разветвлена",
@@ -721,6 +725,7 @@ export const ru: TranslationStructure = {
     failedToDeleteSession: "Не удалось удалить сессию",
     restoreSession: "Восстановить",
     failedToRestoreSession: "Не удалось восстановить сессию",
+    failedToUnarchiveSession: "Не удалось разархивировать сессию",
     sessionDeleted: "Сессия успешно удалена",
     deleteAllArchivedSessions: "Удалить все архивные сессии",
     deleteAllArchivedWarning: ({ count }: { count: number }) =>

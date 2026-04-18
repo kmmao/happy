@@ -26,7 +26,6 @@ import {
   getSessionAvatarId,
   formatLastSeen,
   getSessionProviderKey,
-  getSessionProviderLabel,
 } from "@/utils/sessionUtils";
 import { Avatar } from "./Avatar";
 import { ActiveSessionsGroup } from "./ActiveSessionsGroup";
@@ -48,19 +47,20 @@ import { useRouter } from "expo-router";
 import { Item } from "./Item";
 import { ItemGroup } from "./ItemGroup";
 import { useHappyAction } from "@/hooks/useHappyAction";
-import { sessionDelete, machineSpawnNewSession } from "@/sync/ops";
+import { sessionDelete } from "@/sync/ops";
 import { buildSessionRespawnProfile } from "@/hooks/sessionUpgradeProfile";
-import { handleSessionResumeResult } from "@/sync/sessionResumeFlow";
-import { runWithSessionResumeGuard } from "@/sync/sessionResumeGuard";
+import { resolveSessionReactivationContext } from "@/hooks/sessionResumeSupport";
+import { reactivateArchivedSession } from "@/sync/sessionResumeFlow";
+import { runWithSessionReactivationGuard } from "@/sync/sessionResumeGuard";
 import { HappyError } from "@/utils/errors";
 import { Modal } from "@/modal";
 import { useAutoOptionSendEnabled } from "@/hooks/useAutoOptionSendEnabled";
-import { isMachineOnline } from "@/utils/machineUtils";
 import { useIssueSessionBySessionId } from "@/sync/issueSessionStore";
 import {
   ISSUE_STATUS_COLORS,
   ISSUE_STATUS_LABELS,
 } from "@/constants/issueStatusColors";
+import { SessionProviderTag } from "@/components/session/SessionProviderTag";
 
 const stylesheet = StyleSheet.create((theme) => ({
   container: {
@@ -633,35 +633,45 @@ const SessionItem = React.memo(
     }, [performDelete, issueLink]);
 
     const machine = useMachine(session.metadata?.machineId ?? "");
-    const canResume =
-      !session.active &&
-      !!session.metadata?.claudeSessionId &&
-      !!session.metadata?.machineId &&
-      !!session.metadata?.path &&
-      (!session.metadata?.flavor || session.metadata.flavor === "claude") &&
-      !!machine &&
-      isMachineOnline(machine);
+    const reactivationContext = resolveSessionReactivationContext(session, machine);
+    const reactivationMode = reactivationContext?.mode;
+    const canReactivate = reactivationContext !== null;
 
-    const [resumingSession, performResume] = useHappyAction(async () => {
-      await runWithSessionResumeGuard(session.id, async () => {
+    const [reactivatingSession, performReactivation] = useHappyAction(async () => {
+      if (!reactivationContext) {
+        throw new HappyError(
+          t("machine.failedToStartSession"),
+          false,
+        );
+      }
+      await runWithSessionReactivationGuard(session.id, async () => {
         const spawnProfile = buildSessionRespawnProfile(
           session,
           storage.getState().settings.profiles ?? [],
         );
-        const createResumeRequest = (approvedNewDirectoryCreation: boolean = false) =>
-          machineSpawnNewSession({
-            machineId: session.metadata!.machineId!,
-            directory: session.metadata!.path!,
-            approvedNewDirectoryCreation,
-            claudeSessionId: session.metadata!.claudeSessionId!,
-            happySessionId: session.id,
-            agent: "claude",
-            ...spawnProfile,
-          });
+        const createResumeRequest = (
+          directory?: string,
+          approvedNewDirectoryCreation: boolean = false,
+        ) => {
+          if (reactivationContext.mode !== "resume") {
+            throw new HappyError(
+              t("machine.failedToStartSession"),
+              false,
+            );
+          }
 
-        const result = await createResumeRequest();
-        await handleSessionResumeResult({
-          result,
+          return {
+            ...reactivationContext.resumeContext!.baseSpawnOptions,
+            directory:
+              directory ?? reactivationContext.resumeContext!.baseSpawnOptions.directory,
+            approvedNewDirectoryCreation,
+            ...spawnProfile,
+          };
+        };
+
+        await reactivateArchivedSession({
+          sessionId: session.id,
+          mode: reactivationContext.mode,
           onSuccess: () => navigateToSession(session.id),
           requestDirectoryApproval: (directory) =>
             Modal.confirm(
@@ -669,17 +679,20 @@ const SessionItem = React.memo(
               t("machine.createDirectoryMessage", { directory }),
               { cancelText: t("common.cancel"), confirmText: t("common.create") },
             ),
-          retryWithApprovedDirectoryCreation: () => createResumeRequest(true),
           createError: (message) => new HappyError(message, false),
-          getStartSessionFallbackMessage: () => t("machine.failedToStartSession"),
+          getStartSessionFallbackMessage: () =>
+            reactivationContext.mode === "unarchive"
+              ? t("sessionInfo.failedToUnarchiveSession")
+              : t("machine.failedToStartSession"),
+          createResumeRequest,
         });
       });
     });
 
-    const handleResume = React.useCallback(() => {
+    const handleReactivate = React.useCallback(() => {
       swipeableRef.current?.close();
-      performResume();
-    }, [performResume]);
+      performReactivation();
+    }, [performReactivation]);
 
     const avatarId = React.useMemo(() => {
       return getSessionAvatarId(session);
@@ -808,14 +821,7 @@ const SessionItem = React.memo(
 
               {/* Subtitle line */}
               <Text style={styles.sessionSubtitle} numberOfLines={1}>
-                {[
-                  sessionSubtitle,
-                  session.metadata?.currentModelCode
-                    ?.replace(/-\d{8}$/, "")
-                    .replace(/^claude-/, ""),
-                ]
-                  .filter(Boolean)
-                  .join(" · ")}
+                {sessionSubtitle}
               </Text>
 
               {/* Status line with dot and usage */}
@@ -883,11 +889,10 @@ const SessionItem = React.memo(
                   : t("sessionInfo.tagMain")}
               </Text>
             </View>
-            <View style={styles.tag}>
-              <Text style={styles.tagText}>
-                {getSessionProviderLabel(session)}
-              </Text>
-            </View>
+            <SessionProviderTag
+              session={session}
+              includeModel
+            />
             {(machine?.metadata?.displayName || session.metadata?.host) && (
               <View style={styles.tag}>
                 <Text style={styles.tagText}>
@@ -931,19 +936,25 @@ const SessionItem = React.memo(
             : {},
     ];
 
-    const isBusy = deletingSession || resumingSession;
+    const isBusy = deletingSession || reactivatingSession;
 
     const renderRightActions = () => (
       <View style={{ flexDirection: "row" }}>
-        {canResume && (
+        {canReactivate && (
           <Pressable
             style={styles.swipeActionResume}
-            onPress={handleResume}
+            onPress={handleReactivate}
             disabled={isBusy}
           >
-            <Ionicons name="play-outline" size={20} color={theme.colors.button.primary.tint} />
+            <Ionicons
+              name={reactivationMode === "resume" ? "play-outline" : "arrow-up-circle-outline"}
+              size={20}
+              color={theme.colors.button.primary.tint}
+            />
             <Text style={styles.swipeActionText} numberOfLines={2}>
-              {t("sessionInfo.resumeSession")}
+              {reactivationMode === "resume"
+                ? t("sessionInfo.resumeSession")
+                : t("sessionInfo.unarchiveSession")}
             </Text>
           </Pressable>
         )}

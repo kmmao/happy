@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+    formatCodexThreadIdPreview,
     formatCodexReasoningEffortMetadata,
     formatCodexReasoningSummaryMetadata,
     hasCodexMetadataSection,
@@ -134,6 +135,20 @@ describe("formatCodexReasoningSummaryMetadata", () => {
     });
 });
 
+describe("formatCodexThreadIdPreview", () => {
+    it("returns a shortened preview for long thread ids", () => {
+        expect(
+            formatCodexThreadIdPreview(
+                "019d9fc6-b35c-7042-aedf-afa668e6eda0",
+            ),
+        ).toBe("019d9fc6...68e6eda0");
+    });
+
+    it("keeps short thread ids unchanged", () => {
+        expect(formatCodexThreadIdPreview("thread-1")).toBe("thread-1");
+    });
+});
+
 describe("hasCodexMetadataSection", () => {
     it("returns true for codex sessions with codex-specific metadata", () => {
         expect(
@@ -184,5 +199,19 @@ describe("hasCodexMetadataSection", () => {
                 },
             } as any),
         ).toBe(false);
+    });
+
+    it("returns true when a codex session has a thread id to display", () => {
+        expect(
+            hasCodexMetadataSection({
+                effortLevel: null,
+                metadata: {
+                    flavor: "codex",
+                    codex: {
+                        threadId: "019d9fc6-b35c-7042-aedf-afa668e6eda0",
+                    },
+                },
+            } as any),
+        ).toBe(true);
     });
 });

@@ -14,7 +14,6 @@ import { Session } from "@/sync/storageTypes";
 import {
     useSessionStatus,
     getSessionName,
-    getSessionProviderDisplayLabel,
 } from "@/utils/sessionUtils";
 import { useRouter } from "expo-router";
 import { t } from "@/text";
@@ -22,6 +21,7 @@ import { Modal } from "@/modal";
 import { sessionDelete, sessionKill } from "@/sync/ops";
 import { useHappyAction } from "@/hooks/useHappyAction";
 import { HappyError } from "@/utils/errors";
+import { SessionProviderTag } from "@/components/session/SessionProviderTag";
 
 interface ProjectSessionsTabProps {
     project: Project;
@@ -33,10 +33,6 @@ const SessionRow = React.memo(({ session, showDivider }: { session: Session; sho
     const machine = useMachine(session.metadata?.machineId ?? "");
     const swipeableRef = React.useRef<Swipeable | null>(null);
     const isSwipeOpen = React.useRef(false);
-    const providerLabel = React.useMemo(
-        () => getSessionProviderDisplayLabel(session),
-        [session],
-    );
     const [archiving, performArchive] = useHappyAction(async () => {
         const result = await sessionKill(session.id);
         if (!result.success) {
@@ -150,7 +146,7 @@ const SessionRow = React.memo(({ session, showDivider }: { session: Session; sho
             <RectButton onPress={handlePress} enabled={!isBusy}>
                 <Item
                     title={getSessionName(session)}
-                    subtitle={`${providerLabel}\n${status.statusText}`}
+                    subtitle={status.statusText}
                     subtitleLines={0}
                     icon={
                         <View
@@ -183,6 +179,7 @@ const SessionRow = React.memo(({ session, showDivider }: { session: Session; sho
                                         : t("sessionInfo.tagMain")}
                                 </Text>
                             </View>
+                            <SessionProviderTag session={session} includeModel />
                             {(machine?.metadata?.displayName || session.metadata?.host) && (
                                 <View style={styles.sessionTag}>
                                     <Text style={styles.sessionTagMetaText}>
@@ -506,7 +503,11 @@ const styles = StyleSheet.create((theme) => ({
     tagsRow: {
         flexDirection: "row",
         alignItems: "center",
+        justifyContent: "flex-end",
+        flexWrap: "wrap",
         gap: 4,
+        flexShrink: 1,
+        maxWidth: 260,
     },
     swipeActionDelete: {
         width: 80,

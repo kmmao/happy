@@ -1,6 +1,7 @@
 import { eventRouter, buildNewSessionUpdate, buildNewProjectUpdate } from "@/app/events/eventRouter";
 import { type Fastify } from "../types";
 import { db } from "@/storage/db";
+import type { FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 import { Prisma } from "@prisma/client";
 import { log } from "@/utils/log";
@@ -360,7 +361,8 @@ export function sessionRoutes(app: Fastify) {
       const userId = request.userId;
       const { tag, metadata, dataEncryptionKey, sessionId, machineId, path } = request.body;
 
-      // Reconnect to existing session by ID (for resume / fork pre-allocation)
+      // Internal reconnect to an existing Happy session by ID
+      // (used by runtime resume and fork pre-allocation, not by simple unarchive).
       if (sessionId) {
         const existing = await db.session.findFirst({
           where: { id: sessionId, accountId: userId },
@@ -692,18 +694,14 @@ export function sessionRoutes(app: Fastify) {
     },
   );
 
-  // Restore archived session
-  app.patch(
-    "/v1/sessions/:sessionId/restore",
-    {
-      schema: {
-        params: z.object({
-          sessionId: z.string(),
-        }),
-      },
-      preHandler: app.authenticate,
-    },
-    async (request, reply) => {
+  const unarchiveSessionHandler = async (
+    request: FastifyRequest<{
+      Params: {
+        sessionId: string;
+      };
+    }>,
+    reply: FastifyReply,
+  ) => {
       const userId = request.userId;
       const { sessionId } = request.params;
 
@@ -747,7 +745,34 @@ export function sessionRoutes(app: Fastify) {
       });
 
       return reply.send({ success: true });
+  };
+
+  // Unarchive session without restarting the underlying agent process.
+  app.patch(
+    "/v1/sessions/:sessionId/unarchive",
+    {
+      schema: {
+        params: z.object({
+          sessionId: z.string(),
+        }),
+      },
+      preHandler: app.authenticate,
     },
+    unarchiveSessionHandler,
+  );
+
+  // Legacy alias kept for backward compatibility.
+  app.patch(
+    "/v1/sessions/:sessionId/restore",
+    {
+      schema: {
+        params: z.object({
+          sessionId: z.string(),
+        }),
+      },
+      preHandler: app.authenticate,
+    },
+    unarchiveSessionHandler,
   );
 
   // Set fork source — records which parent session this was forked from

@@ -9,6 +9,7 @@ import {
   getSessionSubtitle,
   getSessionAvatarId,
   formatLastSeen,
+  getSessionProviderKey,
 } from "@/utils/sessionUtils";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StyleSheet } from "react-native-unistyles";
@@ -17,6 +18,7 @@ import { layout } from "@/components/layout";
 import { useNavigateToSession } from "@/hooks/useNavigateToSession";
 import { Pressable } from "react-native";
 import { t } from "@/text";
+import { SessionProviderTag } from "@/components/session/SessionProviderTag";
 
 interface SessionHistoryItem {
   type: "session" | "date-header";
@@ -75,11 +77,18 @@ const styles = StyleSheet.create((theme) => ({
     flex: 1,
     marginLeft: 16,
   },
+  sessionTitleRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: 12,
+    marginBottom: 2,
+  },
   sessionTitle: {
     fontSize: 15,
     fontWeight: "500",
     color: theme.colors.text,
-    marginBottom: 2,
+    flex: 1,
     ...Typography.default("semiBold"),
   },
   sessionSubtitle: {
@@ -204,6 +213,7 @@ function SessionHistory() {
         const sessionName = getSessionName(session);
         const sessionSubtitle = getSessionSubtitle(session);
         const avatarId = getSessionAvatarId(session);
+        const providerKey = getSessionProviderKey(session);
 
         // Determine card styling based on position within date group
         const prevItem = index > 0 ? groupedItems[index - 1] : null;
@@ -228,11 +238,19 @@ function SessionHistory() {
             ]}
             onPress={() => navigateToSession(session.id)}
           >
-            <Avatar id={avatarId} size={48} />
+            <Avatar
+              id={avatarId}
+              size={48}
+              flavor={session.metadata?.flavor}
+              provider={providerKey}
+            />
             <View style={styles.sessionContent}>
-              <Text style={styles.sessionTitle} numberOfLines={1}>
-                {sessionName}
-              </Text>
+              <View style={styles.sessionTitleRow}>
+                <Text style={styles.sessionTitle} numberOfLines={1}>
+                  {sessionName}
+                </Text>
+                <SessionProviderTag session={session} includeModel />
+              </View>
               <Text style={styles.sessionSubtitle} numberOfLines={1}>
                 {sessionSubtitle}
               </Text>

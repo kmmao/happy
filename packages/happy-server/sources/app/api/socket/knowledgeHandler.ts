@@ -82,6 +82,13 @@ export function knowledgeHandler(userId: string, socket: Socket) {
 
             const projectId = session.projectId;
 
+            // Short-circuit when knowledge base is disabled for this project.
+            // Drop the submission so nothing is written.
+            const knowledgeConfig = await resolveKnowledgeConfig(projectId);
+            if (!knowledgeConfig.enabled) {
+                return;
+            }
+
             // Mem0-style dedup: check for similar active entries
             const action = await consolidate(projectId, {
                 title: entry.title,
@@ -210,6 +217,13 @@ export function knowledgeHandler(userId: string, socket: Socket) {
             // Resolve project-level config first — use stored mode, not client-sent mode
             const knowledgeConfig = await resolveKnowledgeConfig(projectId);
             const effectiveMode = knowledgeConfig.mode;
+
+            // Short-circuit when knowledge base is disabled for this project.
+            // Return empty payload so CLI/App don't inject or display anything.
+            if (!knowledgeConfig.enabled) {
+                callback({ profile: null, entries: [], actionItems: [], knowledgeConfig });
+                return;
+            }
 
             // Get profile (L1)
             const profileRecord = await db.projectProfile.findUnique({
@@ -353,9 +367,16 @@ export function knowledgeHandler(userId: string, socket: Socket) {
             // Confirm the session belongs to this user before mutating state.
             const session = await db.session.findFirst({
                 where: { id: sid, accountId: userId },
-                select: { id: true },
+                select: { id: true, projectId: true },
             });
             if (!session) return;
+
+            // Short-circuit when knowledge base is disabled for this project.
+            // Skip turn-hit accounting entirely when the feature is off.
+            if (session.projectId) {
+                const knowledgeConfig = await resolveKnowledgeConfig(session.projectId);
+                if (!knowledgeConfig.enabled) return;
+            }
 
             const summary = await applyTurnHit(sid, hitIds);
             log(

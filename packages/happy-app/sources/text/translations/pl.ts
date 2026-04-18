@@ -862,6 +862,7 @@ export const pl: TranslationStructure = {
     codexBackendAppServer: "Codex App Server",
     codexBackendLegacyMcp: "Codex Legacy MCP",
     codexBackendVersion: "Wersja backendu Codex",
+    codexThreadId: "ID wątku Codex",
     codexFallbackReason: "Powód fallbacku Codex",
     codexConfigMode: "Tryb konfiguracji Codex",
     codexConfigModeInherit: "Dziedzicz lokalną konfigurację Codex",
@@ -920,6 +921,9 @@ export const pl: TranslationStructure = {
     resumeSession: "Wznów sesję",
     resumeSessionSubtitle:
       "Wznów tę sesję z pełnym kontekstem na tej samej maszynie",
+    unarchiveSession: "Przywróć sesję",
+    unarchiveSessionSubtitle:
+      "Przenieś tę sesję z powrotem do aktywnych bez ponownego uruchamiania",
     forkSession: "Rozwidl sesję",
     forkSessionSubtitle: "Utwórz nową sesję rozgałęzioną od tego punktu z pełnym kontekstem",
     forkSessionSuccess: "Sesja rozwidlona pomyślnie",
@@ -940,6 +944,7 @@ export const pl: TranslationStructure = {
     failedToDeleteSession: "Nie udało się usunąć sesji",
     restoreSession: "Przywróć",
     failedToRestoreSession: "Nie udało się przywrócić sesji",
+    failedToUnarchiveSession: "Nie udało się przywrócić sesji z archiwum",
     sessionDeleted: "Sesja została pomyślnie usunięta",
     deleteAllArchivedSessions: "Usuń wszystkie zarchiwizowane sesje",
     deleteAllArchivedWarning: ({ count }: { count: number }) =>

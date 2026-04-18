@@ -113,6 +113,9 @@ import { autoOptionSendService } from "@/sync/autoOptionSendService";
 import { log } from '@/log';
 import { shouldShowMobileSessionPanelButton } from "@/components/session/mobileSessionPanelState";
 import { resolveSessionRpcVisualState } from "@/utils/sessionRpcVisualState";
+import { buildRpcSummaryText } from "@/components/rpcSummaryVisualState";
+import { getReasoningSummaryLabels } from "@/components/reasoningEffort";
+import { hackMode } from "@/sync/modeHacks";
 
 
 function hasPendingAskUserQuestion(messages: readonly Message[]): boolean {
@@ -674,6 +677,8 @@ function SessionViewInner({
   const sessionUsage = useSessionUsage(sessionId);
   const contextUsage = useSessionContextUsage(sessionId);
   const isRunning = isSessionRunning(session);
+  const isCodex = flavor === "codex";
+  const isGemini = flavor === "gemini";
   const requiresAction = session.sdkSessionState === "requires_action";
 
   const sessionStateLogKey = React.useMemo(() => JSON.stringify({
@@ -1061,21 +1066,89 @@ function SessionViewInner({
     [latestOptions.items.length, autoOptionSend.enabled, autoOptionSend.status, autoOptionSend.remainingMs, handleAutoOptionSendToggle],
   );
 
+  const effectiveModelLabel = React.useMemo(
+    () =>
+      modelMode?.key && modelMode.key !== "default"
+        ? undefined
+        : session.resolvedModelId
+          ? formatModelName(session.resolvedModelId)
+          : session.pinnedModelId
+            ? formatModelName(session.pinnedModelId)
+            : undefined,
+    [
+      modelMode?.key,
+      session.pinnedModelId,
+      session.resolvedModelId,
+    ],
+  );
+
+  const displayPermissionLabel = React.useMemo(() => {
+    if (!permissionMode) {
+      return null;
+    }
+
+    const label = hackMode(permissionMode).name;
+    const sandbox = session.metadata?.sandbox as unknown;
+    const isSandboxEnabled = !sandbox
+      ? false
+      : typeof sandbox === "object" && sandbox !== null && "enabled" in sandbox
+        ? Boolean((sandbox as { enabled?: unknown }).enabled)
+        : true;
+
+    if (!isSandboxEnabled) {
+      return label;
+    }
+
+    if (permissionMode.key === "bypassPermissions" || permissionMode.key === "yolo") {
+      return `${label} (sandboxed)`;
+    }
+
+    return label;
+  }, [permissionMode, session.metadata?.sandbox]);
+
+  const fabModelSummaryText = React.useMemo(
+    () =>
+      buildRpcSummaryText({
+        permissionLabel: displayPermissionLabel,
+        modelLabel:
+          modelMode?.key && modelMode.key !== "default"
+            ? modelMode.name
+            : effectiveModelLabel,
+        reasoningLabels: getReasoningSummaryLabels({
+          isCodex,
+          isGemini,
+          reasoning: {
+            effortLevel: session.effortLevel,
+            thinkingMode: session.thinkingMode,
+          },
+          translate: t,
+        }),
+      }),
+    [
+      displayPermissionLabel,
+      effectiveModelLabel,
+      isCodex,
+      isGemini,
+      modelMode?.key,
+      modelMode?.name,
+      session.effortLevel,
+      session.thinkingMode,
+    ],
+  );
+
   const fabStatusInfo = React.useMemo<InputFABStatusInfo>(
     () => ({
       statusText: sessionStatus.statusText,
       statusColor: sessionStatus.statusColor,
       statusDotColor: sessionStatus.statusDotColor,
       isPulsing: sessionStatus.isPulsing ?? false,
-      permissionLabel: permissionMode?.name,
+      permissionLabel: displayPermissionLabel ?? permissionMode?.name,
       permissionColor,
+      rpcState: modelSummaryRpcState,
       modelLabel: modelMode?.key && modelMode.key !== "default"
         ? modelMode.name
-        : session.resolvedModelId
-          ? formatModelName(session.resolvedModelId)
-          : session.pinnedModelId
-            ? formatModelName(session.pinnedModelId)
-          : modelMode?.name,
+        : effectiveModelLabel ?? modelMode?.name,
+      modelSummaryText: fabModelSummaryText,
       contextSize: usageSource?.contextSize,
       contextWindow: usageSource?.contextWindow,
       totalSessionTokens:
@@ -1096,9 +1169,14 @@ function SessionViewInner({
       sessionStatus.statusColor,
       sessionStatus.statusDotColor,
       sessionStatus.isPulsing,
+      displayPermissionLabel,
       permissionMode?.name,
       permissionColor,
+      modelSummaryRpcState,
+      effectiveModelLabel,
+      fabModelSummaryText,
       effectiveModelCode,
+      modelMode?.key,
       modelMode?.name,
       usageSource,
       alwaysShowContextSize,
@@ -1185,15 +1263,7 @@ function SessionViewInner({
         availableModes={availableModes}
         contentMaxWidth={contentMaxWidth}
         modelMode={modelMode}
-        effectiveModelLabel={
-          modelMode?.key && modelMode.key !== "default"
-            ? undefined
-            : session.resolvedModelId
-              ? formatModelName(session.resolvedModelId)
-              : session.pinnedModelId
-                ? formatModelName(session.pinnedModelId)
-              : undefined
-        }
+        effectiveModelLabel={effectiveModelLabel}
         availableModels={availableModels}
         onModelModeChange={updateModelMode}
         reasoning={{

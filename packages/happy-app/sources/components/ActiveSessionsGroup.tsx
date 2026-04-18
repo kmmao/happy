@@ -56,8 +56,8 @@ import {
   ISSUE_STATUS_COLORS,
   ISSUE_STATUS_LABELS,
 } from "@/constants/issueStatusColors";
-import { getSessionDisplayModelLabel } from "@/utils/sessionModelLabel";
 import { useAutoOptionSendEnabled } from "@/hooks/useAutoOptionSendEnabled";
+import { SessionProviderTag } from "@/components/session/SessionProviderTag";
 
 const stylesheet = StyleSheet.create((theme, runtime) => ({
   container: {
@@ -843,8 +843,8 @@ const CompactSessionRow = React.memo(
             </View>
           </View>
 
-          <View style={styles.sessionMetaRow}>
-            {sessionProfileLabel ? (
+          {sessionProfileLabel ? (
+            <View style={styles.sessionMetaRow}>
               <View style={styles.sessionMetaItem}>
                 <Text style={styles.sessionMetaLabel}>
                   {t("sessionInfo.profile")}
@@ -853,21 +853,8 @@ const CompactSessionRow = React.memo(
                   {sessionProfileLabel}
                 </Text>
               </View>
-            ) : null}
-            <View style={styles.sessionMetaItem}>
-              <Text style={styles.sessionMetaLabel}>
-                {t("sessionInfo.aiProvider")}
-              </Text>
-              <Text style={styles.sessionMetaValue} numberOfLines={1}>
-                {[
-                  getSessionProviderLabel(session),
-                  getSessionDisplayModelLabel(session),
-                ]
-                  .filter(Boolean)
-                  .join(" · ")}
-              </Text>
             </View>
-          </View>
+          ) : null}
 
           {/* Middle row: status + usage (full width) */}
           <View style={styles.statusMiddleRow}>
@@ -933,6 +920,10 @@ const CompactSessionRow = React.memo(
                   : t("sessionInfo.tagMain")}
               </Text>
             </View>
+            <SessionProviderTag
+              session={session}
+              includeModel
+            />
             {(machine?.metadata?.displayName || session.metadata?.host) && (
               <View style={styles.tag}>
                 <Text style={styles.tagText}>

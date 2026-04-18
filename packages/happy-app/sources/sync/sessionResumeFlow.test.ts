@@ -1,5 +1,12 @@
-import { describe, expect, it, vi } from "vitest";
-import { handleSessionResumeResult } from "./sessionResumeFlow";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import {
+  handleSessionResumeResult,
+  reactivateArchivedSession,
+} from "./sessionResumeFlow";
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 describe("handleSessionResumeResult", () => {
   it("navigates immediately when resume succeeds", async () => {
@@ -140,5 +147,63 @@ describe("handleSessionResumeResult", () => {
         getStartSessionFallbackMessage: () => "fallback",
       }),
     ).rejects.toThrow("resume failed");
+  });
+});
+
+describe("reactivateArchivedSession", () => {
+  it("unarchives when runtime resume is unavailable", async () => {
+    const onSuccess = vi.fn();
+    const unarchiveSession = vi.fn().mockResolvedValue({ success: true });
+    const spawnSession = vi.fn();
+
+    await reactivateArchivedSession({
+      sessionId: "session-1",
+      mode: "unarchive",
+      onSuccess,
+      requestDirectoryApproval: vi.fn(),
+      createError: (message) => new Error(message),
+      getStartSessionFallbackMessage: () => "fallback",
+      unarchiveSession,
+      spawnSession,
+    });
+
+    expect(unarchiveSession).toHaveBeenCalledOnce();
+    expect(unarchiveSession).toHaveBeenCalledWith("session-1");
+    expect(spawnSession).not.toHaveBeenCalled();
+    expect(onSuccess).toHaveBeenCalledOnce();
+  });
+
+  it("spawns and resumes when runtime resume is available", async () => {
+    const onSuccess = vi.fn();
+    const spawnSession = vi
+      .fn()
+      .mockResolvedValue({ type: "success", sessionId: "session-1" });
+
+    await reactivateArchivedSession({
+      sessionId: "session-1",
+      mode: "resume",
+      createResumeRequest: () => ({
+        machineId: "machine-1",
+        directory: "/repo",
+        happySessionId: "session-1",
+        agent: "claude",
+        claudeSessionId: "claude-session-1",
+      }),
+      onSuccess,
+      requestDirectoryApproval: vi.fn(),
+      createError: (message) => new Error(message),
+      getStartSessionFallbackMessage: () => "fallback",
+      spawnSession,
+    });
+
+    expect(spawnSession).toHaveBeenCalledOnce();
+    expect(spawnSession).toHaveBeenCalledWith({
+      machineId: "machine-1",
+      directory: "/repo",
+      happySessionId: "session-1",
+      agent: "claude",
+      claudeSessionId: "claude-session-1",
+    });
+    expect(onSuccess).toHaveBeenCalledOnce();
   });
 });
