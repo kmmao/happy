@@ -32,6 +32,10 @@ import {
 import { fetchIssueLabelsFromProvider } from "./webhookFetchLabels";
 import { checkDailyRunLimit } from "@/modules/supervisorLimits";
 import { auth } from "@/app/auth/auth";
+import {
+  parseDefaultProfileId,
+  resolveSupervisorProfile,
+} from "@/modules/supervisorProfileResolver";
 
 /**
  * Extract the repository URL from a webhook body.
@@ -616,6 +620,7 @@ async function handlePushSupervisorTrigger(
       supervisorMode: true,
       supervisorEnabledDimensions: true,
       supervisorCustomRules: true,
+      supervisorConfig: true,
     },
     take: 1000,
   });
@@ -701,6 +706,11 @@ async function handlePushSupervisorTrigger(
         purpose: "run-status",
         runId: run.id,
       });
+      const requestedProfileId = parseDefaultProfileId(project.supervisorConfig);
+      const resolvedProfile = await resolveSupervisorProfile(
+        project.accountId,
+        requestedProfileId,
+      );
 
       // Emit trigger with changed files
       eventRouter.emitEphemeral({
@@ -716,6 +726,7 @@ async function handlePushSupervisorTrigger(
           dimensions,
           changedFiles,
           customRules: project.supervisorCustomRules ?? undefined,
+          runtimeProfile: resolvedProfile.runtimeProfile,
         }),
         recipientFilter: {
           type: "machine-scoped-only",

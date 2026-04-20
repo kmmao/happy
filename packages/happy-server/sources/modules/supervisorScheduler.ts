@@ -6,6 +6,10 @@ import {
 } from "@/app/events/eventRouter";
 import { checkDailyRunLimit, incrementDailyRunCount } from "./supervisorLimits";
 import { auth } from "@/app/auth/auth";
+import {
+    parseDefaultProfileId,
+    resolveSupervisorProfile,
+} from "./supervisorProfileResolver";
 
 const DEFAULT_SCHEDULE_INTERVAL_HOURS = 24;
 
@@ -191,6 +195,12 @@ export async function checkAndTriggerScheduledRuns(
                 // ignore malformed config and proceed with defaults
             }
 
+            const requestedProfileId = parseDefaultProfileId(project.supervisorConfig);
+            const resolvedProfile = await resolveSupervisorProfile(
+                userId,
+                requestedProfileId,
+            );
+
             const callbackToken = await auth.createSupervisorCallbackToken({
                 userId,
                 projectId: project.id,
@@ -212,6 +222,7 @@ export async function checkAndTriggerScheduledRuns(
                     dimensions,
                     customRules: project.supervisorCustomRules ?? undefined,
                     maxFindings,
+                    runtimeProfile: resolvedProfile.runtimeProfile,
                 }),
                 recipientFilter: {
                     type: "machine-scoped-only",

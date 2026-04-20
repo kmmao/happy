@@ -10,6 +10,10 @@ import { log } from "@/utils/log";
 import { parseAutoApproveSeverities } from "@/modules/supervisorConfig";
 import { parseConcurrencyConfig } from "./supervisorRunRoutes";
 import { auth } from "@/app/auth/auth";
+import {
+    parseDefaultProfileId,
+    resolveSupervisorProfile,
+} from "@/modules/supervisorProfileResolver";
 
 /**
  * Supervisor config and action-reprocessing routes.
@@ -249,6 +253,11 @@ export function supervisorRoutes(app: Fastify) {
 
             // Trigger fix for each approved action
             const { maxAnalysis, maxFix } = parseConcurrencyConfig(project.supervisorConfig);
+            const requestedProfileId = parseDefaultProfileId(project.supervisorConfig);
+            const resolvedProfile = await resolveSupervisorProfile(
+                userId,
+                requestedProfileId,
+            );
             for (const action of pendingActions) {
                 const callbackToken = await auth.createSupervisorCallbackToken({
                     userId,
@@ -277,6 +286,7 @@ export function supervisorRoutes(app: Fastify) {
                         fixStrategy: project.fixStrategy ?? undefined,
                         maxConcurrentAnalysis: maxAnalysis,
                         maxConcurrentFix: maxFix,
+                        runtimeProfile: resolvedProfile.runtimeProfile,
                     }),
                     recipientFilter: {
                         type: "machine-scoped-only",

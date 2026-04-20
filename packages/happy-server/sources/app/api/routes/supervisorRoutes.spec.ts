@@ -237,9 +237,13 @@ const {
         supervisorAction: {
             findFirst: vi.fn(async () => null),
             findMany: vi.fn(async () => []),
+            count: vi.fn(async () => 0),
             createMany: vi.fn(async () => ({ count: 0 })),
             update: vi.fn(async () => ({})),
             updateMany: vi.fn(async () => ({ count: 0 })),
+        },
+        supervisorLoop: {
+            findFirst: vi.fn(async () => null),
         },
         session: {
             updateMany: vi.fn(async () => ({ count: 0 })),
@@ -371,8 +375,12 @@ describe("supervisorRoutes", () => {
         dbMock.supervisorAction.findFirst.mockResolvedValue(null);
         dbMock.supervisorAction.findMany.mockReset();
         dbMock.supervisorAction.findMany.mockResolvedValue([]);
+        dbMock.supervisorAction.count.mockReset();
+        dbMock.supervisorAction.count.mockResolvedValue(0);
         dbMock.supervisorAction.updateMany.mockReset();
         dbMock.supervisorAction.updateMany.mockResolvedValue({ count: 0 });
+        dbMock.supervisorLoop.findFirst.mockReset();
+        dbMock.supervisorLoop.findFirst.mockResolvedValue(null);
         dbMock.webhookRoute.findFirst.mockReset();
         dbMock.webhookRoute.findFirst.mockResolvedValue(null);
     });
@@ -727,6 +735,66 @@ describe("supervisorRoutes", () => {
                     }),
                     runId: "action-1",
                     trigger: "fix",
+                }),
+            );
+        });
+
+        it("emits resolved profile when reprocess triggers fixes", async () => {
+            seedProject({
+                id: "proj-1",
+                accountId: "user-1",
+                machineId: "machine-1",
+                path: "/repo",
+                supervisorConfig: JSON.stringify({
+                    defaultProfileId: "profile-1",
+                    autoApprove: { autoSeverities: ["high"] },
+                    concurrency: { maxAnalysisSessions: 2, maxFixSessions: 1 },
+                }),
+                fixStrategy: "pr",
+            });
+            dbMock.supervisorAction.findMany.mockResolvedValueOnce([
+                {
+                    id: "action-1",
+                    severity: "high",
+                    title: "Fix thing",
+                    description: "desc",
+                    suggestedFix: "suggest",
+                    category: "deps",
+                },
+            ] as any);
+            dbMock.supervisorAction.count.mockResolvedValueOnce(0);
+            resolveSupervisorProfileMock.mockResolvedValueOnce({
+                runtimeProfile: {
+                    profileId: "profile-1",
+                    profileName: "Profile 1",
+                    source: "account-profile",
+                    trust: "trusted",
+                    environmentVariables: { OPENAI_API_KEY: "sk-test" },
+                },
+            });
+            app = await createApp();
+
+            const res = await app.inject({
+                method: "POST",
+                url: "/v1/projects/proj-1/supervisor/actions/reprocess",
+                headers: { "x-user-id": "user-1" },
+                payload: { mode: "auto" },
+            });
+
+            if (res.statusCode !== 200) {
+                throw new Error(res.body);
+            }
+            expect(resolveSupervisorProfileMock).toHaveBeenCalledWith("user-1", "profile-1");
+            expect(buildSupervisorTriggerEphemeralMock).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    projectId: "proj-1",
+                    runId: "action-1",
+                    trigger: "fix",
+                    callbackToken: "callback-token",
+                    runtimeProfile: expect.objectContaining({
+                        profileId: "profile-1",
+                        environmentVariables: { OPENAI_API_KEY: "sk-test" },
+                    }),
                 }),
             );
         });
