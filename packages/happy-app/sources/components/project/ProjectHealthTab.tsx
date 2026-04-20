@@ -45,7 +45,6 @@ import {
 import { ItemGroup } from "@/components/ItemGroup";
 import { useRouter } from "expo-router";
 import { sync } from "@/sync/sync";
-import { sessionKill } from "@/sync/ops";
 import { useSession, useSettings } from "@/sync/storage";
 import { SupervisorSummaryCard } from "./SupervisorSummaryCard";
 import { SupervisorTrendChart } from "./SupervisorTrendChart";
@@ -335,22 +334,6 @@ export const ProjectHealthTab = React.memo(
                 ),
             [healthRuns],
         );
-
-        // Archive the supervisor session when a run completes
-        const prevActiveRunIdRef = React.useRef<string | null>(null);
-        React.useEffect(() => {
-            const prevId = prevActiveRunIdRef.current;
-            const currentId = activeRun?.id ?? null;
-            prevActiveRunIdRef.current = currentId;
-
-            // Active run just finished (was non-null, now null)
-            if (prevId && !currentId) {
-                const finishedRun = healthRuns.find((r) => r.id === prevId);
-                if (finishedRun?.status === "completed" && finishedRun.sessionId) {
-                    sessionKill(finishedRun.sessionId).catch(() => {});
-                }
-            }
-        }, [activeRun, healthRuns]);
 
         // Check if the active run's linked session still exists
         const activeRunSession = useSession(activeRun?.sessionId ?? "");

@@ -261,8 +261,7 @@ rm -f /tmp/research-result-${options.runId}.json
 Use the HAPPY_SUPERVISOR_CALLBACK_TOKEN environment variable (already set) for authentication.
 Escape all special characters properly in the JSON. For newlines in reportContent, use \\n.
 
-### Step 2: Exit the session
-After successfully reporting results, send the text "/exit" to end this session.
+After reporting, stop and wait. Do not send "/exit" — the user may want to inspect or continue this session.
 
 If the curl command fails, report failure instead:
 \`\`\`

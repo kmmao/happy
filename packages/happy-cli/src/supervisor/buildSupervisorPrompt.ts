@@ -211,8 +211,7 @@ rm -f /tmp/supervisor-result-${options.runId}.json
 
 **Important**: The JSON body must contain \`"status": "completed"\` and the \`"actions"\` array with your findings. Use the HAPPY_SUPERVISOR_CALLBACK_TOKEN environment variable (already set) for authentication.
 
-### Step 2: Exit the session
-After successfully reporting results, send the text "/exit" to end this session.
+After reporting, stop and wait. Do not send "/exit" — the user may want to inspect or continue this session.
 
 If the curl command fails, report failure instead:
 \`\`\`
