@@ -194,6 +194,237 @@ export type ResolvedRuntimeProfile = z.infer<
   typeof ResolvedRuntimeProfileSchema
 >;
 
+/**
+ * Shared built-in profile defaults used across App / Server / CLI.
+ * Keep this as the single source of truth so non-App flows (scheduler/webhook)
+ * can still resolve the full runtime semantics for built-in profiles.
+ */
+export function getBuiltInAIBackendProfile(
+  id: string,
+): AIBackendProfile | null {
+  switch (id) {
+    case "anthropic":
+      return {
+        id: "anthropic",
+        name: "Anthropic (Default)",
+        anthropicConfig: {},
+        environmentVariables: [],
+        defaultPermissionMode: "default",
+        compatibility: { claude: true, codex: false, gemini: false },
+        isBuiltIn: true,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        version: "1.0.0",
+      };
+    case "deepseek":
+      return {
+        id: "deepseek",
+        name: "DeepSeek (Reasoner)",
+        anthropicConfig: {},
+        environmentVariables: [
+          {
+            name: "ANTHROPIC_BASE_URL",
+            value: "${DEEPSEEK_BASE_URL:-https://api.deepseek.com/anthropic}",
+          },
+          { name: "ANTHROPIC_AUTH_TOKEN", value: "${DEEPSEEK_AUTH_TOKEN}" },
+          {
+            name: "API_TIMEOUT_MS",
+            value: "${DEEPSEEK_API_TIMEOUT_MS:-600000}",
+          },
+          {
+            name: "ANTHROPIC_MODEL",
+            value: "${DEEPSEEK_MODEL:-deepseek-reasoner}",
+          },
+          {
+            name: "ANTHROPIC_SMALL_FAST_MODEL",
+            value: "${DEEPSEEK_SMALL_FAST_MODEL:-deepseek-chat}",
+          },
+          {
+            name: "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC",
+            value: "${DEEPSEEK_CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC:-1}",
+          },
+        ],
+        defaultPermissionMode: "default",
+        compatibility: { claude: true, codex: false, gemini: false },
+        isBuiltIn: true,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        version: "1.0.0",
+      };
+    case "zai":
+      return {
+        id: "zai",
+        name: "Z.AI (GLM-4.6)",
+        anthropicConfig: {},
+        environmentVariables: [
+          {
+            name: "ANTHROPIC_BASE_URL",
+            value: "${Z_AI_BASE_URL:-https://api.z.ai/api/anthropic}",
+          },
+          { name: "ANTHROPIC_AUTH_TOKEN", value: "${Z_AI_AUTH_TOKEN}" },
+          { name: "API_TIMEOUT_MS", value: "${Z_AI_API_TIMEOUT_MS:-3000000}" },
+          { name: "ANTHROPIC_MODEL", value: "${Z_AI_MODEL:-GLM-4.6}" },
+          {
+            name: "ANTHROPIC_DEFAULT_OPUS_MODEL",
+            value: "${Z_AI_OPUS_MODEL:-GLM-4.6}",
+          },
+          {
+            name: "ANTHROPIC_DEFAULT_SONNET_MODEL",
+            value: "${Z_AI_SONNET_MODEL:-GLM-4.6}",
+          },
+          {
+            name: "ANTHROPIC_DEFAULT_HAIKU_MODEL",
+            value: "${Z_AI_HAIKU_MODEL:-GLM-4.5-Air}",
+          },
+        ],
+        defaultPermissionMode: "default",
+        compatibility: { claude: true, codex: false, gemini: false },
+        isBuiltIn: true,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        version: "1.0.0",
+      };
+    case "openai":
+      return {
+        id: "openai",
+        name: "OpenAI (GPT-5.4)",
+        openaiConfig: {},
+        environmentVariables: [
+          { name: "OPENAI_BASE_URL", value: "https://api.openai.com/v1" },
+          { name: "OPENAI_MODEL", value: "gpt-5.4" },
+          { name: "OPENAI_API_TIMEOUT_MS", value: "600000" },
+          { name: "OPENAI_SMALL_FAST_MODEL", value: "gpt-5.4" },
+          { name: "API_TIMEOUT_MS", value: "600000" },
+          { name: "CODEX_SMALL_FAST_MODEL", value: "gpt-5.4" },
+        ],
+        compatibility: { claude: false, codex: true, gemini: false },
+        isBuiltIn: true,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        version: "1.0.0",
+      };
+    case "azure-openai":
+      return {
+        id: "azure-openai",
+        name: "Azure OpenAI",
+        azureOpenAIConfig: {},
+        environmentVariables: [
+          { name: "AZURE_OPENAI_API_VERSION", value: "2024-02-15-preview" },
+          { name: "AZURE_OPENAI_DEPLOYMENT_NAME", value: "gpt-5.4" },
+          { name: "OPENAI_API_TIMEOUT_MS", value: "600000" },
+          { name: "API_TIMEOUT_MS", value: "600000" },
+        ],
+        compatibility: { claude: false, codex: true, gemini: false },
+        isBuiltIn: true,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        version: "1.0.0",
+      };
+    case "minimax":
+      return {
+        id: "minimax",
+        name: "MiniMax (M2.7)",
+        anthropicConfig: {},
+        environmentVariables: [
+          {
+            name: "ANTHROPIC_BASE_URL",
+            value: "${MINIMAX_BASE_URL:-https://api.minimaxi.com/anthropic}",
+          },
+          {
+            name: "ANTHROPIC_AUTH_TOKEN",
+            value: "${MINIMAX_AUTH_TOKEN}",
+          },
+          {
+            name: "API_TIMEOUT_MS",
+            value: "${MINIMAX_API_TIMEOUT_MS:-3000000}",
+          },
+          {
+            name: "ANTHROPIC_MODEL",
+            value: "${MINIMAX_MODEL:-MiniMax-M2.7}",
+          },
+          {
+            name: "ANTHROPIC_SMALL_FAST_MODEL",
+            value: "${MINIMAX_SMALL_FAST_MODEL:-MiniMax-M2.7-highspeed}",
+          },
+          {
+            name: "ANTHROPIC_DEFAULT_OPUS_MODEL",
+            value: "${MINIMAX_OPUS_MODEL:-MiniMax-M2.7}",
+          },
+          {
+            name: "ANTHROPIC_DEFAULT_SONNET_MODEL",
+            value: "${MINIMAX_SONNET_MODEL:-MiniMax-M2.7}",
+          },
+          {
+            name: "ANTHROPIC_DEFAULT_HAIKU_MODEL",
+            value: "${MINIMAX_HAIKU_MODEL:-MiniMax-M2.7-highspeed}",
+          },
+          {
+            name: "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC",
+            value: "1",
+          },
+        ],
+        defaultPermissionMode: "default",
+        compatibility: { claude: true, codex: false, gemini: false },
+        isBuiltIn: true,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        version: "1.0.0",
+      };
+    case "kimi":
+      return {
+        id: "kimi",
+        name: "Kimi (K2.5)",
+        anthropicConfig: {},
+        environmentVariables: [
+          {
+            name: "ANTHROPIC_BASE_URL",
+            value: "${KIMI_BASE_URL:-https://api.moonshot.ai/anthropic}",
+          },
+          {
+            name: "ANTHROPIC_AUTH_TOKEN",
+            value: "${KIMI_AUTH_TOKEN}",
+          },
+          {
+            name: "API_TIMEOUT_MS",
+            value: "${KIMI_API_TIMEOUT_MS:-3000000}",
+          },
+          {
+            name: "ANTHROPIC_MODEL",
+            value: "${KIMI_MODEL:-kimi-k2.5}",
+          },
+          {
+            name: "ANTHROPIC_SMALL_FAST_MODEL",
+            value: "${KIMI_SMALL_FAST_MODEL:-kimi-k2.5}",
+          },
+          {
+            name: "ANTHROPIC_DEFAULT_OPUS_MODEL",
+            value: "${KIMI_OPUS_MODEL:-kimi-k2.5}",
+          },
+          {
+            name: "ANTHROPIC_DEFAULT_SONNET_MODEL",
+            value: "${KIMI_SONNET_MODEL:-kimi-k2.5}",
+          },
+          {
+            name: "ANTHROPIC_DEFAULT_HAIKU_MODEL",
+            value: "${KIMI_HAIKU_MODEL:-kimi-k2.5}",
+          },
+          {
+            name: "ENABLE_TOOL_SEARCH",
+            value: "${KIMI_ENABLE_TOOL_SEARCH:-false}",
+          },
+        ],
+        defaultPermissionMode: "default",
+        compatibility: { claude: true, codex: false, gemini: false },
+        isBuiltIn: true,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        version: "1.0.0",
+      };
+    default:
+      return null;
+  }
+}
+
 export function validateProfileForAgent(
   profile: AIBackendProfile,
   agent: "claude" | "codex" | "gemini",

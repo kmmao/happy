@@ -1,6 +1,5 @@
 import {
     eventRouter,
-    buildSupervisorTriggerEphemeral,
 } from "@/app/events/eventRouter";
 import { type Fastify } from "../types";
 import { db } from "@/storage/db";
@@ -9,11 +8,7 @@ import { Prisma } from "@prisma/client";
 import { log } from "@/utils/log";
 import { parseAutoApproveSeverities } from "@/modules/supervisorConfig";
 import { parseConcurrencyConfig } from "./supervisorRunRoutes";
-import { auth } from "@/app/auth/auth";
-import {
-    parseDefaultProfileId,
-    resolveSupervisorProfile,
-} from "@/modules/supervisorProfileResolver";
+import { emitConfiguredSupervisorFixTrigger } from "@/modules/supervisorFixTrigger";
 
 /**
  * Supervisor config and action-reprocessing routes.
@@ -253,44 +248,24 @@ export function supervisorRoutes(app: Fastify) {
 
             // Trigger fix for each approved action
             const { maxAnalysis, maxFix } = parseConcurrencyConfig(project.supervisorConfig);
-            const requestedProfileId = parseDefaultProfileId(project.supervisorConfig);
-            const resolvedProfile = await resolveSupervisorProfile(
-                userId,
-                requestedProfileId,
-            );
             for (const action of pendingActions) {
-                const callbackToken = await auth.createSupervisorCallbackToken({
+                await emitConfiguredSupervisorFixTrigger({
                     userId,
                     projectId: id,
-                    machineId: project.machineId,
-                    purpose: "fix-status",
                     actionId: action.id,
-                });
-                eventRouter.emitEphemeral({
-                    userId,
-                    payload: buildSupervisorTriggerEphemeral({
-                        projectId: id,
-                        runId: action.id,
-                        trigger: "fix",
-                        machineId: project.machineId,
-                        repoPath: project.path,
-                        callbackToken,
-                        mode,
-                        fixAction: {
-                            title: action.title,
-                            description: action.description,
-                            suggestedFix: action.suggestedFix,
-                            category: action.category,
-                            severity: action.severity,
-                        },
-                        fixStrategy: project.fixStrategy ?? undefined,
-                        maxConcurrentAnalysis: maxAnalysis,
-                        maxConcurrentFix: maxFix,
-                        runtimeProfile: resolvedProfile.runtimeProfile,
-                    }),
-                    recipientFilter: {
-                        type: "machine-scoped-only",
-                        machineId: project.machineId,
+                    machineId: project.machineId,
+                    repoPath: project.path,
+                    supervisorConfig: project.supervisorConfig,
+                    fixStrategy: project.fixStrategy,
+                    mode,
+                    maxConcurrentAnalysis: maxAnalysis,
+                    maxConcurrentFix: maxFix,
+                    fixAction: {
+                        title: action.title,
+                        description: action.description,
+                        suggestedFix: action.suggestedFix,
+                        category: action.category,
+                        severity: action.severity,
                     },
                 });
             }

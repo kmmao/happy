@@ -2,14 +2,9 @@ import { db } from "@/storage/db";
 import { log } from "@/utils/log";
 import {
     eventRouter,
-    buildSupervisorTriggerEphemeral,
 } from "@/app/events/eventRouter";
 import { checkDailyRunLimit, incrementDailyRunCount } from "./supervisorLimits";
-import { auth } from "@/app/auth/auth";
-import {
-    parseDefaultProfileId,
-    resolveSupervisorProfile,
-} from "./supervisorProfileResolver";
+import { emitConfiguredSupervisorRunTrigger } from "./supervisorRunTrigger";
 
 const DEFAULT_SCHEDULE_INTERVAL_HOURS = 24;
 
@@ -195,39 +190,18 @@ export async function checkAndTriggerScheduledRuns(
                 // ignore malformed config and proceed with defaults
             }
 
-            const requestedProfileId = parseDefaultProfileId(project.supervisorConfig);
-            const resolvedProfile = await resolveSupervisorProfile(
-                userId,
-                requestedProfileId,
-            );
-
-            const callbackToken = await auth.createSupervisorCallbackToken({
+            await emitConfiguredSupervisorRunTrigger({
                 userId,
                 projectId: project.id,
-                machineId,
-                purpose: "run-status",
                 runId: claimed.run.id,
-            });
-
-            eventRouter.emitEphemeral({
-                userId,
-                payload: buildSupervisorTriggerEphemeral({
-                    projectId: project.id,
-                    runId: claimed.run.id,
-                    trigger: "scheduled",
-                    machineId,
-                    repoPath: project.path,
-                    callbackToken,
-                    mode: project.supervisorMode ?? undefined,
-                    dimensions,
-                    customRules: project.supervisorCustomRules ?? undefined,
-                    maxFindings,
-                    runtimeProfile: resolvedProfile.runtimeProfile,
-                }),
-                recipientFilter: {
-                    type: "machine-scoped-only",
-                    machineId,
-                },
+                trigger: "scheduled",
+                machineId,
+                repoPath: project.path,
+                supervisorConfig: project.supervisorConfig,
+                mode: project.supervisorMode ?? undefined,
+                dimensions,
+                customRules: project.supervisorCustomRules ?? undefined,
+                maxFindings,
             });
 
             log(

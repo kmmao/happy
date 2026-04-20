@@ -13,7 +13,7 @@ import { Typography } from "@/constants/Typography";
 import { t } from "@/text";
 import { Project } from "@/sync/projectManager";
 import { TokenStorage } from "@/auth/tokenStorage";
-import { getBuiltInProfile } from "@/sync/profileUtils";
+import { DEFAULT_PROFILES } from "@/sync/profileUtils";
 import { onProjectEvent } from "@/utils/projectEvents";
 import { useHappyAction } from "@/hooks/useHappyAction";
 import {
@@ -46,7 +46,7 @@ import { ItemGroup } from "@/components/ItemGroup";
 import { useRouter } from "expo-router";
 import { sync } from "@/sync/sync";
 import { sessionKill } from "@/sync/ops";
-import { useSession, storage } from "@/sync/storage";
+import { useSession, useSettings } from "@/sync/storage";
 import { SupervisorSummaryCard } from "./SupervisorSummaryCard";
 import { SupervisorTrendChart } from "./SupervisorTrendChart";
 import { SupervisorRunHistoryItem } from "./SupervisorRunHistoryItem";
@@ -57,7 +57,12 @@ import { SupervisorLoopStatusCard } from "./SupervisorLoopStatusCard";
 import { SupervisorLoopConfigPanel } from "./SupervisorLoopConfigPanel";
 import { DayRangeSelector } from "./DayRangeSelector";
 import { SupervisorLoopHistoryItem } from "./SupervisorLoopHistoryItem";
-import { getSupervisorDefaultProfileId } from "./supervisorProfileSelection";
+import {
+    getSupervisorAvailableProfiles,
+    getMissingSupervisorProfileName,
+    getSupervisorDefaultProfileId,
+} from "./supervisorProfileSelection";
+import { buildSupervisorRequestProfile } from "./supervisorRequestProfile";
 
 
 interface ProjectHealthTabProps {
@@ -102,22 +107,25 @@ export const ProjectHealthTab = React.memo(
         const [analyticsDays, setAnalyticsDays] = React.useState(3);
         const analyticsDaysRef = React.useRef(3);
         const [analyticsLoading, setAnalyticsLoading] = React.useState(false);
+        const settings = useSettings();
 
         const serverId = project.serverId;
-
-        const resolveProfileName = React.useCallback((profileId: string | null): string | null => {
-            if (!profileId) return null;
-            const builtIn = getBuiltInProfile(profileId);
-            if (builtIn) return builtIn.name;
-            const userProfiles = storage.getState().settings.profiles ?? [];
-            const userProfile = userProfiles.find((p) => p.id === profileId);
-            return userProfile?.name ?? null;
-        }, []);
-
-        const isBuiltInProfile = React.useCallback((profileId: string | null): boolean => {
-            if (!profileId) return false;
-            return getBuiltInProfile(profileId) != null;
-        }, []);
+        const allProfiles = React.useMemo(() => {
+            const userProfiles = settings.profiles ?? [];
+            const builtInProfiles = DEFAULT_PROFILES.map((profile) => ({
+                id: profile.id,
+                name: profile.name,
+                isBuiltIn: true as const,
+            }));
+            const userDefinedProfiles = userProfiles.map((profile) => ({
+                id: profile.id,
+                name: profile.name,
+            }));
+            return getSupervisorAvailableProfiles(
+                builtInProfiles,
+                userDefinedProfiles,
+            );
+        }, [settings.profiles]);
 
         // Read defaultProfileId from supervisorConfig JSON
         const defaultProfileId = React.useMemo<string | null>(() => {
@@ -125,11 +133,32 @@ export const ProjectHealthTab = React.memo(
         }, [project.supervisorConfig]);
 
         const missingDefaultProfileName = React.useMemo(() => {
-            if (!defaultProfileId) return null;
-            const builtIn = getBuiltInProfile(defaultProfileId);
-            if (builtIn) return null;
-            return resolveProfileName(defaultProfileId) ?? defaultProfileId;
-        }, [defaultProfileId, resolveProfileName]);
+            return getMissingSupervisorProfileName(defaultProfileId, allProfiles);
+        }, [allProfiles, defaultProfileId]);
+        const runRequestProfile = React.useMemo(
+            () =>
+                buildSupervisorRequestProfile(
+                    defaultProfileId,
+                    settings.profiles ?? [],
+                ),
+            [defaultProfileId, settings.profiles],
+        );
+        const attemptedProfileRefreshRef = React.useRef<string | null>(null);
+
+        React.useEffect(() => {
+            if (!defaultProfileId || !missingDefaultProfileName) {
+                return;
+            }
+
+            if (attemptedProfileRefreshRef.current === defaultProfileId) {
+                return;
+            }
+
+            attemptedProfileRefreshRef.current = defaultProfileId;
+            sync.refreshAccountProfiles().catch(() => {
+                // Best-effort: keep existing banner if refresh fails
+            });
+        }, [defaultProfileId, missingDefaultProfileName]);
 
         const loadData = React.useCallback(async () => {
             if (!serverId) return;
@@ -419,7 +448,11 @@ export const ProjectHealthTab = React.memo(
                 const credentials = await TokenStorage.getCredentials();
                 if (!credentials) return;
                 try {
-                    const run = await triggerSupervisorRun(credentials, serverId, {});
+                    const run = await triggerSupervisorRun(
+                        credentials,
+                        serverId,
+                        runRequestProfile,
+                    );
                     // Optimistic: add the new run to the list immediately
                     setRuns((prev) => [run, ...prev]);
                 } catch (e) {
@@ -428,7 +461,7 @@ export const ProjectHealthTab = React.memo(
                     }
                     throw e;
                 }
-            }, [serverId, defaultProfileId, isBuiltInProfile]),
+            }, [serverId, runRequestProfile]),
         );
 
         const handleLoopStarted = React.useCallback((loop: SupervisorLoop) => {

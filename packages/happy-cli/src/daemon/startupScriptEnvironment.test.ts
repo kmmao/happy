@@ -19,6 +19,25 @@ describe("getFilteredDaemonEnvironment", () => {
       OPENAI_API_KEY: "sk-test",
     });
   });
+
+  it("can also strip operator-only auth vars when explicit profile isolation is required", () => {
+    const filtered = getFilteredDaemonEnvironment(
+      {
+        PATH: "/usr/bin",
+        OPENAI_API_KEY: "sk-test",
+        ANTHROPIC_AUTH_TOKEN: "token",
+        CUSTOM_FLAG: "1",
+      },
+      {
+        excludeOperatorOnlyVars: true,
+      },
+    );
+
+    expect(filtered).toEqual({
+      PATH: "/usr/bin",
+      CUSTOM_FLAG: "1",
+    });
+  });
 });
 
 describe("resolveStartupScriptEnvironment", () => {

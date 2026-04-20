@@ -2690,6 +2690,33 @@ export const ru: TranslationStructure = {
       confirm: "Сбросить",
     },
     saveFailed: "Не удалось сохранить профиль. Попробуйте снова.",
+    syncTitle: "Account sync",
+    syncRefresh: "Refresh",
+    syncSignedOut: "You're signed out. Profiles stay on this device until you log in again.",
+    syncRefreshing: "Refreshing profiles from your account...",
+    syncReady: "Profile definitions are up to date on this device.",
+    syncError: "Latest sync failed. Local profiles are still available.",
+    syncCountSynced: ({ count }: { count: number }) => `${count} synced`,
+    syncCountPending: ({ count }: { count: number }) => `${count} pending upload`,
+    syncCountLocalOnly: ({ count }: { count: number }) => `${count} local only`,
+    syncAction: "Sync",
+    syncDetails:
+      "Profile contents sync through the dedicated account profiles API. The selected default profile ID still syncs through normal account settings. When the same profile changes on two devices, the latest save retries against the newest revision and wins for that profile.",
+    builtInSection: "Built-in templates",
+    builtInSectionDescription:
+      "Editing a built-in template creates an override with the same ID. Copy it below if you want an independent custom profile instead.",
+    customSection: "Custom profiles",
+    customSectionDescription:
+      "These profiles are fully yours. Use them for project-specific env vars, tmux defaults, and startup scripts.",
+    customEmpty:
+      "No custom profiles yet. Create a blank profile or copy one of the built-in templates.",
+    createDescription:
+      "Blank profiles start from scratch. Template copies create a separate custom profile and leave the built-in template untouched.",
+    badgeBuiltIn: "Built-in",
+    badgeOverride: "Override",
+    badgeSynced: "Synced",
+    badgePending: "Pending",
+    badgeLocalOnly: "Local only",
   },
 
   git: {

@@ -2,18 +2,13 @@ import { type Fastify } from "../types";
 import { db } from "@/storage/db";
 import { z } from "zod";
 import {
-    eventRouter,
-    buildSupervisorTriggerEphemeral,
     buildSupervisorStatusEphemeral,
+    eventRouter,
 } from "@/app/events/eventRouter";
 import { pushSupervisorNotification } from "@/modules/pushSend";
 import { onFixCompleted as loopOnFixCompleted } from "@/modules/supervisorLoopEngine";
 import { log } from "@/utils/log";
-import {
-    resolveSupervisorProfile,
-    parseDefaultProfileId,
-} from "@/modules/supervisorProfileResolver";
-import { auth } from "@/app/auth/auth";
+import { emitConfiguredSupervisorFixTrigger } from "@/modules/supervisorFixTrigger";
 
 /**
  * Supervisor action routes for the approval workflow.
@@ -476,42 +471,22 @@ export function supervisorActionRoutes(app: Fastify) {
                 request.body?.machineId || project.machineId;
             const repoPath = request.body?.repoPath || project.path;
 
-            // Emit a fix trigger event to CLI
-            // Reuse supervisor-trigger with a "fix" trigger type
-            const requestedProfileId = parseDefaultProfileId(project.supervisorConfig);
-            const resolvedProfile = await resolveSupervisorProfile(userId, requestedProfileId);
-            const callbackToken = await auth.createSupervisorCallbackToken({
+            await emitConfiguredSupervisorFixTrigger({
                 userId,
                 projectId: id,
-                machineId,
-                purpose: "fix-status",
                 actionId,
-            });
-
-            eventRouter.emitEphemeral({
-                userId,
-                payload: buildSupervisorTriggerEphemeral({
-                    projectId: id,
-                    runId: actionId, // Use actionId as the "runId" for fix sessions
-                    trigger: "fix",
-                    machineId,
-                    repoPath,
-                    fixAction: {
-                        title: action.title,
-                        description: action.description,
-                        suggestedFix: action.suggestedFix,
-                        category: action.category,
-                        severity: action.severity,
-                    },
-                    fixStrategy: project.fixStrategy ?? undefined,
-                    fixMode,
-                    analyzeAutoFix,
-                    callbackToken,
-                    runtimeProfile: resolvedProfile.runtimeProfile,
-                }),
-                recipientFilter: {
-                    type: "machine-scoped-only",
-                    machineId,
+                machineId,
+                repoPath,
+                supervisorConfig: project.supervisorConfig,
+                fixStrategy: project.fixStrategy,
+                fixMode,
+                analyzeAutoFix,
+                fixAction: {
+                    title: action.title,
+                    description: action.description,
+                    suggestedFix: action.suggestedFix,
+                    category: action.category,
+                    severity: action.severity,
                 },
             });
 

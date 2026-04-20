@@ -2595,6 +2595,32 @@ export const zhHant: TranslationStructure = {
       confirm: "重設",
     },
     saveFailed: "儲存設定檔失敗，請重試。",
+    syncTitle: "帳號同步",
+    syncRefresh: "重新整理",
+    syncSignedOut: "你目前未登入，設定檔只會保留在這台裝置上；重新登入後才會繼續同步。",
+    syncRefreshing: "正在從帳號重新整理設定檔...",
+    syncReady: "這台裝置上的設定檔定義已是最新狀態。",
+    syncError: "最近一次同步失敗，但本地設定檔仍可繼續使用。",
+    syncCountSynced: ({ count }: { count: number }) => `${count} 個已同步`,
+    syncCountPending: ({ count }: { count: number }) => `${count} 個待上傳`,
+    syncCountLocalOnly: ({ count }: { count: number }) => `${count} 個僅本地`,
+    syncAction: "同步到帳號",
+    syncDetails:
+      "設定檔內容會透過獨立的帳號設定檔 API 同步；預設選取的設定檔 ID 仍走一般帳號設定同步。同一個設定檔如果在兩台裝置同時修改，儲存時會根據最新 revision 自動重試，並以最後一次儲存為準。",
+    builtInSection: "內建範本",
+    builtInSectionDescription:
+      "直接編輯內建範本會建立同 ID 的覆寫版本；如果你想保留範本本身，請在下方複製成獨立的自訂設定檔。",
+    customSection: "自訂設定檔",
+    customSectionDescription:
+      "這些設定檔完全由你掌控，適合放專案專用環境變數、tmux 預設值與啟動腳本。",
+    customEmpty: "還沒有自訂設定檔。你可以新增空白設定檔，或複製一個內建範本。",
+    createDescription:
+      "空白設定檔適合從零開始；複製範本會建立獨立的自訂設定檔，不會改動內建範本本身。",
+    badgeBuiltIn: "內建",
+    badgeOverride: "已覆寫",
+    badgeSynced: "已同步",
+    badgePending: "待上傳",
+    badgeLocalOnly: "僅本地",
   },
 
   git: {

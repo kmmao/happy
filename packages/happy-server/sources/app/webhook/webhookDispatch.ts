@@ -26,16 +26,11 @@ import type {
 } from "./webhookParsers";
 import {
   buildSessionActivityEphemeral,
-  buildSupervisorTriggerEphemeral,
   eventRouter,
 } from "@/app/events/eventRouter";
 import { fetchIssueLabelsFromProvider } from "./webhookFetchLabels";
 import { checkDailyRunLimit } from "@/modules/supervisorLimits";
-import { auth } from "@/app/auth/auth";
-import {
-  parseDefaultProfileId,
-  resolveSupervisorProfile,
-} from "@/modules/supervisorProfileResolver";
+import { emitConfiguredSupervisorRunTrigger } from "@/modules/supervisorRunTrigger";
 
 /**
  * Extract the repository URL from a webhook body.
@@ -699,39 +694,19 @@ async function handlePushSupervisorTrigger(
         ? project.supervisorEnabledDimensions.split(",").map((d) => d.trim()).filter(Boolean)
         : undefined;
 
-      const callbackToken = await auth.createSupervisorCallbackToken({
+      // Emit trigger with changed files
+      await emitConfiguredSupervisorRunTrigger({
         userId: project.accountId,
         projectId: project.id,
-        machineId: project.machineId,
-        purpose: "run-status",
         runId: run.id,
-      });
-      const requestedProfileId = parseDefaultProfileId(project.supervisorConfig);
-      const resolvedProfile = await resolveSupervisorProfile(
-        project.accountId,
-        requestedProfileId,
-      );
-
-      // Emit trigger with changed files
-      eventRouter.emitEphemeral({
-        userId: project.accountId,
-        payload: buildSupervisorTriggerEphemeral({
-          projectId: project.id,
-          runId: run.id,
-          trigger: "push",
-          machineId: project.machineId,
-          repoPath: project.path,
-          callbackToken,
-          mode: project.supervisorMode ?? undefined,
-          dimensions,
-          changedFiles,
-          customRules: project.supervisorCustomRules ?? undefined,
-          runtimeProfile: resolvedProfile.runtimeProfile,
-        }),
-        recipientFilter: {
-          type: "machine-scoped-only",
-          machineId: project.machineId,
-        },
+        trigger: "push",
+        machineId: project.machineId,
+        repoPath: project.path,
+        supervisorConfig: project.supervisorConfig,
+        mode: project.supervisorMode ?? undefined,
+        dimensions,
+        changedFiles,
+        customRules: project.supervisorCustomRules ?? undefined,
       });
 
       log(

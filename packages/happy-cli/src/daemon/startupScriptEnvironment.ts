@@ -4,6 +4,7 @@ import { mkdir, unlink, writeFile } from "fs/promises";
 import { join } from "path";
 import { randomUUID } from "crypto";
 import { tmpdir } from "os";
+import { OPERATOR_ONLY_ENV_VARS } from "./operatorOnlyEnvironment";
 
 const execFileAsync = promisify(execFile);
 const bashExecutable = process.env.BASH || "/bin/bash";
@@ -32,10 +33,16 @@ const STARTUP_SCRIPT_IGNORED_ENV_VARS = new Set([
 
 export function getFilteredDaemonEnvironment(
   sourceEnv: NodeJS.ProcessEnv = process.env,
+  options?: {
+    excludeOperatorOnlyVars?: boolean;
+  },
 ): Record<string, string> {
   return Object.fromEntries(
     Object.entries(sourceEnv).filter(
-      ([key, value]) => value !== undefined && !SERVER_ONLY_ENV_VARS.has(key),
+      ([key, value]) =>
+        value !== undefined &&
+        !SERVER_ONLY_ENV_VARS.has(key) &&
+        !(options?.excludeOperatorOnlyVars && OPERATOR_ONLY_ENV_VARS.has(key)),
     ),
   ) as Record<string, string>;
 }

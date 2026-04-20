@@ -1,5 +1,6 @@
 import type { Session, Metadata, SessionPreferences } from "./storageTypes";
 import { overlayPendingSessionPreferences } from "./sessionPreferencesState";
+import { recoverSessionMetadataAfterDecrypt } from "./sessionMetadataRecovery";
 
 type MetadataUpdate = {
   version: number;
@@ -30,20 +31,24 @@ type MergeUpdatedSessionResult = {
 export function mergeUpdatedSession(
   input: MergeUpdatedSessionInput,
 ): MergeUpdatedSessionResult {
-  const metadataDecryptFailed = Boolean(
-    input.metadataUpdate && !input.metadata,
-  );
+  const metadataRecovery = input.metadataUpdate
+    ? recoverSessionMetadataAfterDecrypt({
+        existingSession: input.session,
+        decryptedMetadata: input.metadata,
+        incomingMetadataVersion: input.metadataUpdate.version,
+      })
+    : {
+        metadata: input.metadata,
+        metadataVersion: input.session.metadataVersion,
+        metadataDecryptFailed: false,
+      };
 
   const updatedSession: Session = {
     ...input.session,
     agentState: input.agentState,
     agentStateVersion: input.agentStateVersion,
-    metadata: metadataDecryptFailed ? input.session.metadata : input.metadata,
-    metadataVersion: metadataDecryptFailed
-      ? input.session.metadataVersion
-      : input.metadataUpdate
-        ? input.metadataUpdate.version
-        : input.session.metadataVersion,
+    metadata: metadataRecovery.metadata,
+    metadataVersion: metadataRecovery.metadataVersion,
     preferencesVersion: input.preferencesUpdate
       ? input.preferencesUpdate.version
       : input.session.preferencesVersion,
@@ -72,6 +77,6 @@ export function mergeUpdatedSession(
       updatedSession,
       input.pendingPreferences,
     ),
-    metadataDecryptFailed,
+    metadataDecryptFailed: metadataRecovery.metadataDecryptFailed,
   };
 }

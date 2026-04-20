@@ -12,14 +12,17 @@ import { t } from "@/text";
 import { useHappyAction } from "@/hooks/useHappyAction";
 import { TokenStorage } from "@/auth/tokenStorage";
 import { type SupervisorLoop, type LoopConfig, startSupervisorLoop } from "@/sync/apiSupervisor";
-import { useSettings, storage } from "@/sync/storage";
-import { DEFAULT_PROFILES, getBuiltInProfile } from "@/sync/profileUtils";
+import { useSettings } from "@/sync/storage";
+import { DEFAULT_PROFILES } from "@/sync/profileUtils";
 import { sync } from "@/sync/sync";
 import {
     createSupervisorProfileSelectionState,
+    getSupervisorAvailableProfiles,
+    getMissingSupervisorProfileName,
     selectSupervisorProfile,
     syncSupervisorProfileSelectionState,
 } from "./supervisorProfileSelection";
+import { buildSupervisorRequestProfile } from "./supervisorRequestProfile";
 
 interface SupervisorLoopConfigPanelProps {
     readonly projectId: string;
@@ -105,9 +108,19 @@ export const SupervisorLoopConfigPanel = React.memo(
         const settings = useSettings();
         const allProfiles = React.useMemo(() => {
             const userProfiles = settings.profiles ?? [];
-            const builtIn = DEFAULT_PROFILES.map((p) => ({ id: p.id, name: p.name, isBuiltIn: true as const }));
-            const userList = userProfiles.map((p) => ({ id: p.id, name: p.name, isBuiltIn: false as const }));
-            return [...builtIn, ...userList];
+            const builtInProfiles = DEFAULT_PROFILES.map((profile) => ({
+                id: profile.id,
+                name: profile.name,
+                isBuiltIn: true as const,
+            }));
+            const userDefinedProfiles = userProfiles.map((profile) => ({
+                id: profile.id,
+                name: profile.name,
+            }));
+            return getSupervisorAvailableProfiles(
+                builtInProfiles,
+                userDefinedProfiles,
+            );
         }, [settings.profiles]);
 
         const [maxIterations, setMaxIterations] = React.useState(5);
@@ -145,21 +158,17 @@ export const SupervisorLoopConfigPanel = React.memo(
             );
         }, []);
 
-        const resolveProfileName = React.useCallback((profileId: string | null): string | null => {
-            if (!profileId) return null;
-            const builtIn = getBuiltInProfile(profileId);
-            if (builtIn) return builtIn.name;
-            const userProfiles = storage.getState().settings.profiles ?? [];
-            const userProfile = userProfiles.find((p) => p.id === profileId);
-            return userProfile?.name ?? null;
-        }, []);
-
         const missingSelectedProfileName = React.useMemo(() => {
-            if (!selectedProfileId) return null;
-            const builtIn = getBuiltInProfile(selectedProfileId);
-            if (builtIn) return null;
-            return resolveProfileName(selectedProfileId) ?? selectedProfileId;
-        }, [selectedProfileId, resolveProfileName]);
+            return getMissingSupervisorProfileName(selectedProfileId, allProfiles);
+        }, [allProfiles, selectedProfileId]);
+        const selectedRequestProfile = React.useMemo(
+            () =>
+                buildSupervisorRequestProfile(
+                    selectedProfileId,
+                    settings.profiles ?? [],
+                ),
+            [selectedProfileId, settings.profiles],
+        );
 
         const [startLoading, doStart] = useHappyAction(
             React.useCallback(async () => {
@@ -169,11 +178,11 @@ export const SupervisorLoopConfigPanel = React.memo(
                     maxIterations,
                     autoApproveThreshold,
                     ...(costCapEnabled ? { costCapUsd } : {}),
-                    ...(selectedProfileId ? { profileId: selectedProfileId } : {}),
+                    ...selectedRequestProfile,
                 };
                 const loop = await startSupervisorLoop(credentials, projectId, config);
                 onStarted(loop);
-            }, [projectId, maxIterations, autoApproveThreshold, costCapEnabled, costCapUsd, selectedProfileId, onStarted]),
+            }, [projectId, maxIterations, autoApproveThreshold, costCapEnabled, costCapUsd, selectedRequestProfile, onStarted]),
         );
 
         return (

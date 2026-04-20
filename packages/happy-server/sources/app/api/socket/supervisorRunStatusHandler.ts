@@ -23,8 +23,7 @@ import { decryptString } from "@/modules/encrypt";
 import { onRunCompleted as loopOnRunCompleted } from "@/modules/supervisorLoopEngine";
 import { contributeSupervisorKnowledge } from "@/modules/knowledgeContributor";
 import { inboxCreate } from "@/modules/inboxCreate";
-import { auth } from "@/app/auth/auth";
-import { parseDefaultProfileId, resolveSupervisorProfile } from "@/modules/supervisorProfileResolver";
+import { emitConfiguredSupervisorFixTrigger } from "@/modules/supervisorFixTrigger";
 
 const supervisorActionSchema = z.object({
     severity: z.enum(["critical", "high", "medium", "low"]),
@@ -539,9 +538,6 @@ export async function handleAutoApproval(
             } catch { /* ignore */ }
         }
 
-        const requestedProfileId = parseDefaultProfileId(project.supervisorConfig);
-        const resolvedProfile = await resolveSupervisorProfile(userId, requestedProfileId);
-
         // Trigger fix for each approved action
         log({ module: "supervisor" }, `handleAutoApproval: triggering ${actions.length} fix events for project ${projectId}`);
         for (const action of actions) {
@@ -580,40 +576,24 @@ export async function handleAutoApproval(
                 }
             }
 
-            const callbackToken = await auth.createSupervisorCallbackToken({
+            await emitConfiguredSupervisorFixTrigger({
                 userId,
                 projectId,
-                machineId: project.machineId,
-                purpose: "fix-status",
                 actionId: action.id,
-            });
-
-            eventRouter.emitEphemeral({
-                userId,
-                payload: buildSupervisorTriggerEphemeral({
-                    projectId,
-                    runId: action.id, // Use actionId as the runId for fix sessions
-                    trigger: "fix",
-                    machineId: project.machineId,
-                    repoPath: project.path,
-                    callbackToken,
-                    mode,
-                    fixAction: {
-                        title: action.title,
-                        description: action.description,
-                        suggestedFix: action.suggestedFix,
-                        category: action.category,
-                        severity: action.severity,
-                        issueNumber,
-                    },
-                    fixStrategy: project.fixStrategy ?? undefined,
-                    maxConcurrentAnalysis,
-                    maxConcurrentFix,
-                    runtimeProfile: resolvedProfile.runtimeProfile,
-                }),
-                recipientFilter: {
-                    type: "machine-scoped-only",
-                    machineId: project.machineId,
+                machineId: project.machineId,
+                repoPath: project.path,
+                supervisorConfig: project.supervisorConfig,
+                fixStrategy: project.fixStrategy,
+                mode,
+                maxConcurrentAnalysis,
+                maxConcurrentFix,
+                fixAction: {
+                    title: action.title,
+                    description: action.description,
+                    suggestedFix: action.suggestedFix,
+                    category: action.category,
+                    severity: action.severity,
+                    issueNumber,
                 },
             });
         }

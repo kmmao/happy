@@ -76,6 +76,10 @@ import {
   getFilteredDaemonEnvironment,
   resolveStartupScriptEnvironment,
 } from "./startupScriptEnvironment";
+import {
+  getExplicitProfileFallbackError,
+  shouldIsolateProfileFromDaemonDefaults,
+} from "./profileRuntimeGuard";
 
 
 const execFileAsync = promisify(execFileCb);
@@ -866,6 +870,21 @@ export async function startDaemon(): Promise<void> {
           }
         }
 
+        const startupBashScript = runtimeProfile?.startupBashScript?.trim();
+        const explicitProfileFallbackError = getExplicitProfileFallbackError({
+          profileId: options.profileId,
+          runtimeProfile,
+          resolvedProfileEnv: profileEnv,
+          startupBashScript,
+        });
+        if (explicitProfileFallbackError) {
+          logger.warn(`[DAEMON RUN] ${explicitProfileFallbackError}`);
+          return {
+            type: "error",
+            errorMessage: explicitProfileFallbackError,
+          };
+        }
+
         // Final merge: Profile vars first, then auth (auth takes precedence to protect authentication)
         let extraEnv = { ...profileEnv, ...authEnv };
 
@@ -896,9 +915,13 @@ export async function startDaemon(): Promise<void> {
           `[DAEMON RUN] After variable expansion: ${Object.keys(extraEnv).join(", ")}`,
         );
 
-        const filteredDaemonEnv = getFilteredDaemonEnvironment();
+        const filteredDaemonEnv = getFilteredDaemonEnvironment(process.env, {
+          excludeOperatorOnlyVars: shouldIsolateProfileFromDaemonDefaults({
+            profileId: options.profileId,
+            runtimeProfile,
+          }),
+        });
         let sessionScopedEnv = { ...extraEnv };
-        const startupBashScript = runtimeProfile?.startupBashScript?.trim();
         if (startupBashScript) {
           try {
             const startupScriptEnv = await resolveStartupScriptEnvironment({

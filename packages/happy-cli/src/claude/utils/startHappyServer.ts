@@ -12,9 +12,9 @@ import { ApiSessionClient } from "@/api/apiSession";
 import { randomUUID } from "node:crypto";
 import {
   buildAutoSummarySyntheticPrompt,
-  didChecklistTransitionToCompleted,
   HAPPY_AUTO_SUMMARY_SOURCE,
 } from "@/utils/progressAutomation";
+import { applyHappyProgressUpdate } from "@/utils/happyProgressMetadata";
 import {
   HAPPY_MCP_TOOL_NAMES,
   HAPPY_MCP_TOOL_SPECS,
@@ -110,110 +110,16 @@ export async function startHappyServer(client: ApiSessionClient) {
       }));
       let shouldTriggerAutoSummary = false;
       client.updateMetadata((metadata) => {
-        const now = Date.now();
-        const prior = metadata.progress;
-        const lists = prior?.lists ? [...prior.lists] : [];
-        const priorCurrentId = prior?.currentListId;
-
-        // Resolve target list:
-        //   - listId === "new" → create fresh list (archive prior current)
-        //   - listId matches existing → update that one
-        //   - unspecified → update currentListId (or create first list)
-        let targetId: string;
-        let nextLists = lists;
-        let priorTargetTodos = prior?.todos ?? [];
-        let priorTargetSummaryGeneratedAt: number | undefined;
-        let targetCanTriggerSummary = false;
-
-        if (input.listId === "new") {
-          if (priorCurrentId) {
-            nextLists = nextLists.map((l) =>
-              l.id === priorCurrentId ? { ...l, archivedAt: now } : l,
-            );
-          }
-          targetId = randomUUID();
-          nextLists = [
-            ...nextLists,
-            {
-              id: targetId,
-              label: input.label,
-              todos: sanitizedTodos,
-              currentStage: input.currentStage,
-              blockers: input.blockers,
-              startedAt: now,
-              updatedAt: now,
-            },
-          ];
-        } else {
-          const explicitIdx = input.listId
-            ? nextLists.findIndex((l) => l.id === input.listId)
-            : priorCurrentId
-              ? nextLists.findIndex((l) => l.id === priorCurrentId)
-              : -1;
-          if (explicitIdx >= 0) {
-            const target = nextLists[explicitIdx]!;
-            targetId = target.id;
-            priorTargetTodos = target.todos;
-            priorTargetSummaryGeneratedAt = target.summaryGeneratedAt;
-            targetCanTriggerSummary = targetId === priorCurrentId;
-            nextLists = nextLists.map((l, i) =>
-              i === explicitIdx
-                ? {
-                    ...l,
-                    todos: sanitizedTodos,
-                    currentStage: input.currentStage ?? l.currentStage,
-                    blockers: input.blockers ?? l.blockers,
-                    label: input.label ?? l.label,
-                    updatedAt: now,
-                  }
-                : l,
-            );
-          } else {
-            targetId = randomUUID();
-            nextLists = [
-              ...nextLists,
-              {
-                id: targetId,
-                label: input.label,
-                todos: sanitizedTodos,
-                currentStage: input.currentStage,
-                blockers: input.blockers,
-                startedAt: now,
-                updatedAt: now,
-              },
-            ];
-          }
-        }
-
-        if (
-          targetCanTriggerSummary &&
-          didChecklistTransitionToCompleted({
-            priorTodos: priorTargetTodos,
-            nextTodos: sanitizedTodos,
-            alreadyGenerated: priorTargetSummaryGeneratedAt !== undefined,
-          })
-        ) {
-          shouldTriggerAutoSummary = true;
-          nextLists = nextLists.map((l) =>
-            l.id === targetId ? { ...l, summaryGeneratedAt: now } : l,
-          );
-        }
-
-        const active =
-          nextLists.find((l) => l.id === targetId) ??
-          nextLists[nextLists.length - 1];
-
-        return {
-          ...metadata,
-          progress: {
-            lists: nextLists,
-            currentListId: targetId,
-            todos: active?.todos ?? sanitizedTodos,
-            currentStage: active?.currentStage,
-            blockers: active?.blockers,
-            updatedAt: now,
-          },
-        };
+        const result = applyHappyProgressUpdate(metadata, {
+          todos: sanitizedTodos,
+          currentStage: input.currentStage,
+          blockers: input.blockers,
+          listId: input.listId,
+          label: input.label,
+          createId: randomUUID,
+        });
+        shouldTriggerAutoSummary = result.shouldTriggerAutoSummary;
+        return result.metadata;
       });
       if (shouldTriggerAutoSummary) {
         client.sendSyntheticUserMessage(buildAutoSummarySyntheticPrompt(), {

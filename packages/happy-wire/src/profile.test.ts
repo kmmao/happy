@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   AIBackendProfileSchema,
   createResolvedRuntimeProfile,
+  getBuiltInAIBackendProfile,
   normalizeResolvedRuntimeProfile,
   RESOLVED_RUNTIME_PROFILE_SCHEMA_VERSION,
   isTrustedRuntimeProfile,
@@ -66,6 +67,28 @@ describe("createResolvedRuntimeProfile", () => {
       defaultSessionType: "worktree",
       defaultPermissionMode: "plan",
       defaultModelMode: "custom-model",
+    });
+  });
+});
+
+describe("getBuiltInAIBackendProfile", () => {
+  it("returns the full shared built-in profile definition", () => {
+    const profile = getBuiltInAIBackendProfile("openai");
+
+    expect(profile).toMatchObject({
+      id: "openai",
+      name: "OpenAI (GPT-5.4)",
+      isBuiltIn: true,
+      compatibility: {
+        claude: false,
+        codex: true,
+        gemini: false,
+      },
+      environmentVariables: expect.arrayContaining([
+        { name: "OPENAI_BASE_URL", value: "https://api.openai.com/v1" },
+        { name: "OPENAI_MODEL", value: "gpt-5.4" },
+        { name: "CODEX_SMALL_FAST_MODEL", value: "gpt-5.4" },
+      ]),
     });
   });
 });

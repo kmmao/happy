@@ -132,6 +132,7 @@ import {
   deleteProject as apiDeleteProject,
 } from "./apiProjects";
 import { resolveFetchedSessionRpcReady } from "./fetchSessionRpcReady";
+import { recoverSessionMetadataAfterDecrypt } from "./sessionMetadataRecovery";
 
 type V3GetSessionMessagesResponse = {
   messages: ApiMessage[];
@@ -1055,10 +1056,20 @@ class Sync {
       }
 
       // Decrypt metadata using session-specific encryption
-      let metadata = await sessionEncryption.decryptMetadata(
+      const decryptedMetadata = await sessionEncryption.decryptMetadata(
         session.metadataVersion,
         session.metadata,
       );
+      const metadataRecovery = recoverSessionMetadataAfterDecrypt({
+        existingSession: storage.getState().sessions[session.id],
+        decryptedMetadata,
+        incomingMetadataVersion: session.metadataVersion,
+      });
+      if (metadataRecovery.metadataDecryptFailed) {
+        log.warn(
+          `Failed to decrypt fetched session metadata for ${session.id} version ${session.metadataVersion}; preserving existing metadata when available`,
+        );
+      }
 
       // Decrypt agent state using session-specific encryption
       let agentState = await sessionEncryption.decryptAgentState(
@@ -1079,7 +1090,8 @@ class Sync {
         ),
         thinking: false,
         thinkingAt: 0,
-        metadata,
+        metadata: metadataRecovery.metadata,
+        metadataVersion: metadataRecovery.metadataVersion,
         agentState,
         preferencesVersion: session.preferencesVersion ?? 0,
         // Spread server preferences into session fields if available

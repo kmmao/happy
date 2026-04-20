@@ -12,7 +12,8 @@ import {
     resumeLoop,
     stopLoop,
 } from "@/modules/supervisorLoopEngine";
-import { resolveSupervisorProfile, parseDefaultProfileId } from "@/modules/supervisorProfileResolver";
+import { resolveConfiguredSupervisorProfile } from "@/modules/supervisorConfiguredProfile";
+import { ResolvedRuntimeProfileSchema } from "@/types/aiBackendProfile";
 
 export function supervisorLoopRoutes(app: Fastify) {
     // POST /v1/projects/:id/supervisor/loop — Start a new loop
@@ -30,6 +31,7 @@ export function supervisorLoopRoutes(app: Fastify) {
                     maxConsecutiveFailures: z.number().int().min(1).max(10).default(2),
                     maxDurationMinutes: z.number().int().min(10).max(480).default(240),
                     profileId: z.string().optional(),
+                    runtimeProfile: ResolvedRuntimeProfileSchema.optional(),
                 }),
             },
         },
@@ -45,12 +47,19 @@ export function supervisorLoopRoutes(app: Fastify) {
                 return reply.code(404).send({ error: "Project not found" });
             }
 
-            const requestedProfileId = request.body.profileId ?? parseDefaultProfileId(project.supervisorConfig);
-            const resolvedProfile = await resolveSupervisorProfile(userId, requestedProfileId);
+            const requestedProfile = await resolveConfiguredSupervisorProfile({
+                userId,
+                supervisorConfig: project.supervisorConfig,
+                profileId: request.body.profileId,
+                runtimeProfile: request.body.runtimeProfile,
+            });
+            if (!requestedProfile.ok) {
+                return reply.code(400).send({ error: requestedProfile.error });
+            }
 
             const result = await startLoop(id, userId, {
                 ...request.body,
-                runtimeProfile: resolvedProfile.runtimeProfile,
+                runtimeProfile: requestedProfile.resolvedProfile.runtimeProfile,
             });
 
             if ("error" in result) {

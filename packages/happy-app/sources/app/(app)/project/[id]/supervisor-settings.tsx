@@ -16,7 +16,11 @@ import { SEVERITY_COLORS, SEVERITY_KEY_MAP } from "@/components/project/supervis
 import { useSettings } from "@/sync/storage";
 import { DEFAULT_PROFILES } from "@/sync/profileUtils";
 import { sync } from "@/sync/sync";
-import { getSupervisorDefaultProfileId } from "@/components/project/supervisorProfileSelection";
+import {
+    getMissingSupervisorProfileName,
+    getSupervisorAvailableProfiles,
+    getSupervisorDefaultProfileId,
+} from "@/components/project/supervisorProfileSelection";
 
 type SupervisorMode = "suggest" | "semi-auto" | "auto";
 
@@ -83,12 +87,21 @@ function SupervisorSettingsScreen() {
     const { theme } = useUnistyles();
 
     const settings = useSettings();
-    // Merge built-in profiles with user-defined profiles
     const allProfiles = React.useMemo(() => {
         const userProfiles = settings.profiles ?? [];
-        const builtIn = DEFAULT_PROFILES.map((p) => ({ id: p.id, name: p.name, isBuiltIn: true as const }));
-        const userList = userProfiles.map((p) => ({ id: p.id, name: p.name, isBuiltIn: false as const }));
-        return [...builtIn, ...userList];
+        const builtInProfiles = DEFAULT_PROFILES.map((profile) => ({
+            id: profile.id,
+            name: profile.name,
+            isBuiltIn: true as const,
+        }));
+        const userDefinedProfiles = userProfiles.map((profile) => ({
+            id: profile.id,
+            name: profile.name,
+        }));
+        return getSupervisorAvailableProfiles(
+            builtInProfiles,
+            userDefinedProfiles,
+        );
     }, [settings.profiles]);
     const [profilePickerOpen, setProfilePickerOpen] = React.useState(false);
 
@@ -98,20 +111,9 @@ function SupervisorSettingsScreen() {
     const [saving, setSaving] = React.useState(false);
     const [profileRefreshing, setProfileRefreshing] = React.useState(false);
 
-    const resolveProfileName = React.useCallback((profileId: string | null): string | null => {
-        if (!profileId) return null;
-        const builtIn = DEFAULT_PROFILES.find((p) => p.id === profileId);
-        if (builtIn) return builtIn.name;
-        const userProfile = (settings.profiles ?? []).find((p) => p.id === profileId);
-        return userProfile?.name ?? null;
-    }, [settings.profiles]);
-
     const missingDefaultProfileName = React.useMemo(() => {
-        if (!config.defaultProfileId) return null;
-        const exists = allProfiles.some((p) => p.id === config.defaultProfileId);
-        if (exists) return null;
-        return resolveProfileName(config.defaultProfileId) ?? config.defaultProfileId;
-    }, [allProfiles, config.defaultProfileId, resolveProfileName]);
+        return getMissingSupervisorProfileName(config.defaultProfileId, allProfiles);
+    }, [allProfiles, config.defaultProfileId]);
 
     React.useLayoutEffect(() => {
         navigation.setOptions({

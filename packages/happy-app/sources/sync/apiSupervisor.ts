@@ -1,4 +1,5 @@
 import { AuthCredentials } from "@/auth/tokenStorage";
+import { type ResolvedRuntimeProfile } from "@kmmao/happy-wire";
 import { backoff } from "@/utils/time";
 import { NonRetryableError } from "@/utils/time";
 import { getServerUrl } from "./serverConfig";
@@ -65,6 +66,7 @@ export async function triggerSupervisorRun(
             featureDirection?: string;
         };
         profileId?: string;
+        runtimeProfile?: ResolvedRuntimeProfile;
     },
 ): Promise<SupervisorRun> {
     const API_ENDPOINT = getServerUrl();
@@ -286,6 +288,7 @@ export interface LoopConfig {
     maxConsecutiveFailures?: number;
     maxDurationMinutes?: number;
     profileId?: string;
+    runtimeProfile?: ResolvedRuntimeProfile;
 }
 
 export async function startSupervisorLoop(

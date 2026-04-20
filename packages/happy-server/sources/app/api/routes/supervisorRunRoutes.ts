@@ -1,6 +1,5 @@
 import {
     eventRouter,
-    buildSupervisorTriggerEphemeral,
     buildSupervisorStatusEphemeral,
     buildSessionActivityEphemeral,
 } from "@/app/events/eventRouter";
@@ -15,8 +14,11 @@ import { activityCache } from "@/app/presence/sessionCache";
 import { onRunCompleted as loopOnRunCompleted } from "@/modules/supervisorLoopEngine";
 import { log } from "@/utils/log";
 import { handleAutoApproval } from "@/app/api/socket/supervisorRunStatusHandler";
-import { resolveSupervisorProfile, parseDefaultProfileId } from "@/modules/supervisorProfileResolver";
-import { auth } from "@/app/auth/auth";
+import {
+    emitResolvedSupervisorRunTrigger,
+    resolveConfiguredSupervisorRunProfile,
+} from "@/modules/supervisorRunTrigger";
+import { ResolvedRuntimeProfileSchema } from "@/types/aiBackendProfile";
 
 /**
  * Supervisor run routes: trigger, list, detail, cancel, and status updates.
@@ -42,6 +44,7 @@ export function supervisorRunRoutes(app: Fastify) {
                             featureDirection: z.string().max(1000).optional(),
                         }).optional(),
                         profileId: z.string().optional(),
+                        runtimeProfile: ResolvedRuntimeProfileSchema.optional(),
                     })
                     .optional(),
             },
@@ -57,6 +60,16 @@ export function supervisorRunRoutes(app: Fastify) {
 
             if (!project) {
                 return reply.code(404).send({ error: "Project not found" });
+            }
+
+            const resolvedRunProfile = await resolveConfiguredSupervisorRunProfile({
+                userId,
+                supervisorConfig: project.supervisorConfig,
+                profileId: request.body?.profileId,
+                runtimeProfile: request.body?.runtimeProfile,
+            });
+            if (!resolvedRunProfile.ok) {
+                return reply.code(400).send({ error: resolvedRunProfile.error });
             }
 
             // Check daily run limit
@@ -135,41 +148,41 @@ export function supervisorRunRoutes(app: Fastify) {
             const concurrency = parseConcurrencyConfig(project.supervisorConfig);
             const maxFindings = parseMaxFindings(project.supervisorConfig);
 
-            const requestedProfileId = request.body?.profileId ?? parseDefaultProfileId(project.supervisorConfig);
-            const resolvedProfile = await resolveSupervisorProfile(userId, requestedProfileId);
-            const callbackToken = await auth.createSupervisorCallbackToken({
+            await emitResolvedSupervisorRunTrigger({
                 userId,
                 projectId: id,
-                machineId,
-                purpose: "run-status",
                 runId: run.id,
-            });
-
-            eventRouter.emitEphemeral({
-                userId,
-                payload: buildSupervisorTriggerEphemeral({
-                    projectId: id,
-                    runId: run.id,
-                    trigger: triggerType,
-                    machineId,
-                    repoPath,
-                    mode: triggerType === "research" ? undefined : (project.supervisorMode ?? undefined),
-                    dimensions: triggerType === "research" ? undefined : parseDimensions(project.supervisorEnabledDimensions),
-                    customRules: triggerType === "research" ? undefined : (project.supervisorCustomRules ?? undefined),
-                    narrative: triggerType === "research" ? undefined : (project.narrative ?? undefined),
-                    laws: triggerType === "research" ? undefined : (project.laws ?? undefined),
-                    researchParams: researchParams ? JSON.stringify(researchParams) : undefined,
-                    existingActions,
-                    maxConcurrentAnalysis: concurrency.maxAnalysis,
-                    maxConcurrentFix: concurrency.maxFix,
-                    maxFindings,
-                    callbackToken,
-                    runtimeProfile: resolvedProfile.runtimeProfile,
-                }),
-                recipientFilter: {
-                    type: "machine-scoped-only",
-                    machineId,
-                },
+                trigger: triggerType,
+                machineId,
+                repoPath,
+                resolvedProfile: resolvedRunProfile.resolvedProfile,
+                mode:
+                    triggerType === "research"
+                        ? undefined
+                        : (project.supervisorMode ?? undefined),
+                dimensions:
+                    triggerType === "research"
+                        ? undefined
+                        : parseDimensions(project.supervisorEnabledDimensions),
+                customRules:
+                    triggerType === "research"
+                        ? undefined
+                        : (project.supervisorCustomRules ?? undefined),
+                narrative:
+                    triggerType === "research"
+                        ? undefined
+                        : (project.narrative ?? undefined),
+                laws:
+                    triggerType === "research"
+                        ? undefined
+                        : (project.laws ?? undefined),
+                researchParams: researchParams
+                    ? JSON.stringify(researchParams)
+                    : undefined,
+                existingActions,
+                maxConcurrentAnalysis: concurrency.maxAnalysis,
+                maxConcurrentFix: concurrency.maxFix,
+                maxFindings,
             });
 
             return reply.send({

@@ -36,9 +36,11 @@ import {
 import { kvGet } from "@/sync/apiKv";
 import { kvSetWithRetry } from "@/sync/kvConflictRetry";
 import { encodeBase64, decodeBase64 } from "@/encryption/base64";
+import { useSettings } from "@/sync/storage";
 import { useElapsedSeconds, type DimensionProgress } from "./supervisorUtils";
 import { resolveDimensionLabel } from "./supervisorDimensionLabels";
 import { SupervisorProgressView } from "./SupervisorProgressView";
+import { buildDefaultSupervisorRequestProfile } from "./supervisorRequestProfile";
 
 /** Encode a UTF-8 string to standard base64 (server KV stores Bytes). */
 function toBase64(str: string): string {
@@ -96,6 +98,7 @@ export const ProjectResearchTab = React.memo(
     ({ project, onSyncStatusChange }: ProjectResearchTabProps) => {
         const { theme } = useUnistyles();
         const serverId = project.serverId;
+        const settings = useSettings();
 
         const [runs, setRuns] = React.useState<SupervisorRun[]>([]);
         const [loading, setLoading] = React.useState(true);
@@ -355,6 +358,14 @@ export const ProjectResearchTab = React.memo(
                 RESEARCH_DIMENSIONS.filter((d) => dimensions[d]).join(","),
             [dimensions],
         );
+        const runRequestProfile = React.useMemo(
+            () =>
+                buildDefaultSupervisorRequestProfile(
+                    project.supervisorConfig,
+                    settings.profiles ?? [],
+                ),
+            [project.supervisorConfig, settings.profiles],
+        );
 
         const [triggerLoading, doTrigger] = useHappyAction(
             React.useCallback(async () => {
@@ -363,6 +374,7 @@ export const ProjectResearchTab = React.memo(
                 if (!credentials) return;
                 try {
                     const run = await triggerSupervisorRun(credentials, serverId, {
+                        ...runRequestProfile,
                         trigger: "research",
                         researchParams: {
                             knownCompetitors: knownCompetitors.trim() || undefined,
@@ -381,7 +393,7 @@ export const ProjectResearchTab = React.memo(
                     }
                     throw e;
                 }
-            }, [serverId, knownCompetitors, selectedDimensions, additionalNotes, customRules, featureDirection, loadData]),
+            }, [serverId, runRequestProfile, knownCompetitors, selectedDimensions, additionalNotes, customRules, featureDirection, loadData]),
         );
 
         const [cancelLoading, doCancel] = useHappyAction(

@@ -453,6 +453,79 @@ describe("supervisorRoutes", () => {
             );
         });
 
+        it("accepts a trusted built-in runtimeProfile payload on manual run trigger", async () => {
+            seedProject({
+                id: "proj-1",
+                accountId: "user-1",
+                machineId: "machine-1",
+            });
+            resolveSupervisorProfileMock.mockResolvedValueOnce({
+                runtimeProfile: {
+                    profileId: "openai",
+                    profileName: "OpenAI (GPT-5.4)",
+                    source: "built-in-profile",
+                    trust: "trusted",
+                    environmentVariables: { OPENAI_BASE_URL: "https://api.openai.com/v1" },
+                },
+            });
+            app = await createApp();
+
+            const res = await app.inject({
+                method: "POST",
+                url: "/v1/projects/proj-1/supervisor/run",
+                headers: { "x-user-id": "user-1" },
+                payload: {
+                    runtimeProfile: {
+                        profileId: "openai",
+                        profileName: "OpenAI (GPT-5.4)",
+                        source: "built-in-profile",
+                        trust: "trusted",
+                        isBuiltIn: true,
+                        environmentVariables: {
+                            OPENAI_BASE_URL: "https://api.openai.com/v1",
+                        },
+                    },
+                },
+            });
+
+            expect(res.statusCode).toBe(200);
+            expect(resolveSupervisorProfileMock).toHaveBeenCalledWith("user-1", "openai");
+            expect(buildSupervisorTriggerEphemeralMock).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    runtimeProfile: expect.objectContaining({
+                        profileId: "openai",
+                    }),
+                }),
+            );
+        });
+
+        it("rejects non-built-in runtimeProfile payloads on manual run trigger", async () => {
+            seedProject({
+                id: "proj-1",
+                accountId: "user-1",
+                machineId: "machine-1",
+            });
+            app = await createApp();
+
+            const res = await app.inject({
+                method: "POST",
+                url: "/v1/projects/proj-1/supervisor/run",
+                headers: { "x-user-id": "user-1" },
+                payload: {
+                    runtimeProfile: {
+                        profileId: "profile-1",
+                        profileName: "Profile 1",
+                        source: "account-profile",
+                        trust: "trusted",
+                        environmentVariables: {},
+                    },
+                },
+            });
+
+            expect(res.statusCode).toBe(400);
+            expect(resolveSupervisorProfileMock).not.toHaveBeenCalled();
+        });
+
         it("returns 404 for non-existent project", async () => {
             app = await createApp();
 

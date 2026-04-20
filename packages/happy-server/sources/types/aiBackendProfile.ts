@@ -4,6 +4,7 @@ export {
   BuiltInAIBackendProfileIdSchema,
   createResolvedRuntimeProfile,
   DefaultPermissionModeSchema,
+  getBuiltInAIBackendProfile,
   getProfileEnvironmentVariables,
   isTrustedRuntimeProfile,
   normalizeResolvedRuntimeProfile,

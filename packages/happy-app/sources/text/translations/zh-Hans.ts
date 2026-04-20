@@ -2583,6 +2583,32 @@ export const zhHans: TranslationStructure = {
       confirm: "重置",
     },
     saveFailed: "保存配置文件失败，请重试。",
+    syncTitle: "账号同步",
+    syncRefresh: "刷新",
+    syncSignedOut: "你当前未登录，配置文件只保存在这台设备上；重新登录后才会继续同步。",
+    syncRefreshing: "正在从账号刷新配置文件...",
+    syncReady: "这台设备上的配置文件定义已经是最新状态。",
+    syncError: "最近一次同步失败，但本地配置文件仍可继续使用。",
+    syncCountSynced: ({ count }: { count: number }) => `${count} 个已同步`,
+    syncCountPending: ({ count }: { count: number }) => `${count} 个待上传`,
+    syncCountLocalOnly: ({ count }: { count: number }) => `${count} 个仅本地`,
+    syncAction: "同步到账号",
+    syncDetails:
+      "配置文件内容会走独立的账号配置文件接口同步；默认选中的配置文件 ID 仍然走普通账号设置同步。同一个配置文件如果在两台设备同时改动，保存时会基于最新 revision 自动重试，并以最后一次保存为准。",
+    builtInSection: "内置模板",
+    builtInSectionDescription:
+      "直接编辑内置模板会生成同 ID 的覆盖版本；如果你想保留模板本身，请在下面复制成独立的自定义配置。",
+    customSection: "自定义配置",
+    customSectionDescription:
+      "这些配置完全归你管理，适合放项目专属环境变量、tmux 默认值和启动脚本。",
+    customEmpty: "还没有自定义配置。你可以新建空白配置，或者复制一个内置模板。",
+    createDescription:
+      "空白配置适合从零开始；复制模板会生成独立的自定义配置，不会改动内置模板本身。",
+    badgeBuiltIn: "内置",
+    badgeOverride: "已覆盖",
+    badgeSynced: "已同步",
+    badgePending: "待上传",
+    badgeLocalOnly: "仅本地",
   },
 
   feed: {

@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => {
       webNotifications: false,
       webNotificationsPersistent: false,
     },
+    getPendingSessionPreferences: vi.fn(() => null),
   };
 
   return {

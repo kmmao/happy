@@ -7,6 +7,7 @@ import {
 } from "@/modules/aiBackendProfileEnv";
 import {
   createResolvedRuntimeProfile,
+  getBuiltInAIBackendProfile,
   RESOLVED_RUNTIME_PROFILE_SCHEMA_VERSION,
   type ResolvedRuntimeProfile,
 } from "@/types/aiBackendProfile";
@@ -69,6 +70,17 @@ export async function resolveSupervisorProfile(
   }
 
   if (isBuiltInProfileId(profileId)) {
+    const builtInProfile = getBuiltInAIBackendProfile(profileId);
+    if (builtInProfile) {
+      return {
+        runtimeProfile: createResolvedRuntimeProfile(builtInProfile, {
+          source: "built-in-profile",
+          trust: "trusted",
+        }),
+        profileName: builtInProfile.name,
+      };
+    }
+
     return {
       runtimeProfile: {
         schemaVersion: RESOLVED_RUNTIME_PROFILE_SCHEMA_VERSION,
