@@ -1,5 +1,61 @@
 # 更新日志
 
+## 2.14.0 - 2026-04-21
+
+重新设计的 Session 进度面板（Glass UI）、统一侧栏与独立 Code Changes 视图、按轮次的 Knowledge 生命周期与 hot/evicted 徽章、无需重启的归档恢复，以及全新重构的 AI Profile 设置 UI。
+
+### Session 进度面板
+- 新增重新设计的进度面板 — Glass UI、活动时间轴，MCP 来源的 checklist/summary 同步到 Progress 标签
+- 新增多列表进度支持 — `activeForm` 标签 + 从 Claude todo 流中提取的验证提示
+- 新增每个列表的文件变更汇总 — 聚合 Edit/Write 命中数到进度面板
+- 新增 checklist 完成后自动触发 summary — CLI 在所有项完成时让 Agent 通过 MCP 同步
+- 新增 checklist 项按状态弹出菜单（verify / continue / report issue）— 将模板化提示词回填到输入框
+
+### Session 侧栏
+- 合并 Progress 和 Code 标签为统一的 **session** 标签；项目知识库关闭时自动隐藏 Knowledge 标签
+- 新增 **Code Changes** 视图 — 按文件统计条 + 可展开 diff
+- 新增独立 Codex 工具视图（plan preview、patch、diff）和 Codex 进度面板
+- 新增 **默认展开 Diff** 外观设置 — 应用到 Edit/Write/GeminiEdit/CodexPatch
+- 新增 InputFAB 纵向布局 — 独立按钮行，更易触达
+
+### 知识库
+- 新增按 Session 轮次的 Knowledge 条目生命周期 — 冷条目自动驱逐，命中频繁的条目延长寿命
+- 新增 References 的 HotBadge — 显示预算/命中数（fresh / proven / evicted），长按查看说明
+- 新增 4 标签 Knowledge 控制台 — Changes / References / Evicted / Archive，支持一键 Evict 与 Re-inject
+- 新增实时 knowledge-access 更新 — 命中瞬间 Summary 和 References 即刻刷新
+- 新增 Summary 行 `· N hit · M hot` 后缀（当 TTL 数据存在时）
+- 调整 Summary 标签到桌面端和移动端的首位
+- 修复 References 永远卡在 7/14 的问题 — 对 active 行的 re-injection 不再重置 TTL
+
+### 归档与会话生命周期
+- 新增无需重启的 unarchive 流程 — resume 或 unarchive 模式恢复归档会话，无需重建连接
+- 新增 SessionProviderTag + 共享 `rpcSummaryVisualState` Helper — 提供商徽章样式统一
+- 新增 Codex 信息面板中的 `codexThreadId` 展示
+
+### AI Profile 与 Supervisor
+- 重构 Profile 设置 UI — 基于共享内置档案（Anthropic / DeepSeek / Z.AI），编辑更清晰
+- 新增 Supervisor request-profile 流程与 session 元数据恢复 — 提升 Supervisor 运行韧性
+- 统一 Supervisor 触发分发（Scheduler + Webhook）— 定时和 Push 驱动的运行共用同一套 Profile 解析路径
+
+### 移除
+- 移除 Request Timing Diagnostics — 该功能从未为 Claude 会话采集到数据（CLI 挂在 turn-end envelope 上，App 读取的却是从不发出的 `ready` 事件）。App/CLI/Wire 三端整条链路完全移除
+
+## 2.13.0 - 2026-04-17
+
+Claude Agent SDK 升级至 Opus 4.7，新增 XHigh 推理强度档位，以及更智能的会话事件（记忆召回和 API 请求状态）。
+
+### Claude 模型与推理强度
+- 新增 Opus 4.7 作为可选模型（Latest，默认 1M 上下文）
+- 合并 200K/1M 两个变体 — Sonnet 和 Opus 默认使用 1M 上下文（保留 `-1m` 键以兼容已绑定的会话）
+- 新增 XHigh 推理强度档位（仅 Opus 4.7）— 原生 SDK 支持，不再被静默降级为 Max
+- 重写全部 9 种语言的推理强度档位描述 — 明确 Low 和 Medium 的任务适用场景区分
+- 智能降级 — 仅在当前模型原生支持时显示 XHigh，其他 Claude 模型自动回退到 Max/High/Medium/Low
+
+### 会话事件
+- 新增记忆召回事件 — App 显示哪些记忆被注入了本轮对话（"Recalled N notes"）
+- 新增 Requesting 状态提示 — 每次 API 调用前显示轻量级会话事件
+- 新增 shouldQuery=false 消息支持 — 仅追加到对话记录，不触发 Assistant 轮次
+
 ## 2.12.0 - 2026-03-30
 
 Dev 开发环境管理与实时日志流、知识库项目级配置与生命周期管理 UI、任务展示全面优化（彩色徽章 + 折叠结果）、大量后台任务稳定性修复。

@@ -1,5 +1,45 @@
 # Changelog
 
+## 2.14.0 - 2026-04-21
+
+Redesigned session progress panel with glass UI, a unified side-panel with dedicated code-changes view, per-turn knowledge lifespan with hot/evicted badges, unarchive without restart, and a rebuilt AI profile settings UI.
+
+### Session Progress Panel
+- Added redesigned progress panel with glass UI, activity timeline, and MCP-sourced checklist/summary synced into the Progress tab
+- Added multi-list progress with `activeForm` labels and a verification nudge surfaced from Claude's todo stream
+- Added per-list file change summary aggregating Edit/Write hits into the progress panel
+- Added auto-summary trigger on checklist completion (CLI prompts the agent to sync via MCP when all items are done)
+- Added per-status tap menu on checklist items (verify / continue / report issue) that templates a prompt back to the input
+
+### Session Side Panel
+- Merged Progress and Code tabs into a single **session** tab and hid the Knowledge tab when the project knowledge base is disabled
+- Added **Code Changes** view with per-file stats bar and expandable diffs
+- Added dedicated Codex tool views (plan preview, patch, diff) and a Codex progress panel
+- Added **Expand diffs by default** appearance setting applied across Edit/Write/GeminiEdit/CodexPatch
+- Added a new column layout for the InputFAB with a dedicated buttons row for better reach
+
+### Knowledge Base
+- Added per-session turn-based lifespan for injected knowledge entries — cold entries evict automatically while proven-useful ones bank extra turns
+- Added HotBadge on References showing budget/hit count (fresh / proven / evicted) with long-press explanations
+- Added a 4-tab knowledge console — Changes / References / Evicted / Archive — with one-tap Evict and Re-inject actions
+- Added realtime knowledge-access updates so Summary and References refresh the moment an entry is hit
+- Added `· N hit · M hot` suffix on the Summary row when TTL data is present
+- Reordered Summary to the first tab position across desktop and mobile panels
+- Fixed References sticking at 7/14 forever — re-injection no longer resets TTL on an active row
+
+### Archive & Session Lifecycle
+- Added unarchive-without-restart flow — reactivate an archived session in resume or unarchive mode without rebuilding the connection
+- Added SessionProviderTag and reusable `rpcSummaryVisualState` helpers for consistent provider badges
+- Added `codexThreadId` in the Codex info panel
+
+### AI Profiles & Supervisor
+- Rebuilt profile settings UI around shared built-ins (Anthropic / DeepSeek / Z.AI) with clearer editing
+- Added supervisor request-profile flow and session metadata recovery for resilient supervisor runs
+- Unified supervisor trigger dispatch (scheduler + webhook) so scheduled and push-driven runs share the same profile resolution path
+
+### Removed
+- Removed Request Timing Diagnostics — the feature never collected data for Claude sessions (CLI attached to turn-end envelopes, App read from never-emitted `ready` events). Pipeline removed entirely across App/CLI/Wire
+
 ## 2.13.0 - 2026-04-17
 
 Claude Agent SDK upgrade with Opus 4.7, new XHigh effort tier, and smarter session events for memory recall and API request status.
