@@ -1,5 +1,8 @@
 import { EventEmitter } from "node:events";
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
 import { PassThrough } from "node:stream";
+import { fileURLToPath } from "node:url";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { HAPPY_MCP_TOOL_NAMES } from "@kmmao/happy-wire";
 import { CodexAppServerClient } from "./CodexAppServerClient";
@@ -11,6 +14,83 @@ type FakeRpcMessage = {
   result?: any;
   error?: any;
 };
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+function loadFixture<T>(name: string): T {
+  const fixturePath = join(__dirname, "__fixtures__", name);
+  return JSON.parse(readFileSync(fixturePath, "utf8")) as T;
+}
+
+async function flushNotifications(): Promise<void> {
+  await new Promise((resolve) => setImmediate(resolve));
+  await new Promise((resolve) => setImmediate(resolve));
+}
+
+async function replayServerNotifications(
+  process: FakeProcess,
+  notifications: FakeRpcMessage[],
+): Promise<void> {
+  for (const notification of notifications) {
+    process.stdout.write(`${JSON.stringify(notification)}\n`);
+  }
+  await flushNotifications();
+}
+
+function normalizeContractEvent(event: any): any {
+  if (!event || typeof event !== "object") {
+    return event;
+  }
+
+  if (
+    event.type === "tool-call" &&
+    typeof event.callId === "string" &&
+    /^codex-diff-\d+$/.test(event.callId)
+  ) {
+    return {
+      ...event,
+      callId: "<generated-codex-diff>",
+    };
+  }
+
+  if (
+    event.type === "tool-call-result" &&
+    typeof event.callId === "string" &&
+    /^codex-diff-\d+$/.test(event.callId)
+  ) {
+    return {
+      ...event,
+      callId: "<generated-codex-diff>",
+    };
+  }
+
+  if (event.type === "metadata_refresh") {
+    return {
+      type: "metadata_refresh",
+      capabilities: {
+        config: event.capabilities?.config
+          ? {
+              model: event.capabilities.config.model,
+              profile: event.capabilities.config.profile,
+              approvalPolicy: event.capabilities.config.approvalPolicy,
+              sandboxMode: event.capabilities.config.sandboxMode,
+            }
+          : null,
+        account: event.capabilities?.account ?? null,
+        rateLimits: event.capabilities?.rateLimits ?? null,
+        skills: Array.isArray(event.capabilities?.skills)
+          ? event.capabilities.skills.map((skill: any) => skill.name)
+          : [],
+        mcpServers: Array.isArray(event.capabilities?.mcpServers)
+          ? event.capabilities.mcpServers.map((server: any) => server.name)
+          : [],
+      },
+    };
+  }
+
+  return event;
+}
 
 class FakeProcess extends EventEmitter {
   stdout = new PassThrough();
@@ -1069,6 +1149,300 @@ describe("CodexAppServerClient", () => {
         "[pending] Verify UI",
       ].join("\n"),
     });
+  });
+
+  it("replays raw app-server core notifications into stable client events", async () => {
+    const events: any[] = [];
+    const client = new CodexAppServerClient();
+    client.setHandler((event) => events.push(event));
+
+    await client.connect();
+    const notifications = loadFixture<FakeRpcMessage[]>(
+      "notification_contract_core.json",
+    );
+    await replayServerNotifications(fakeProcesses[0], notifications);
+
+    expect(events.map(normalizeContractEvent)).toEqual([
+      { type: "task_started" },
+      {
+        type: "text_delta",
+        stream: "item-msg-1",
+        delta: "hello from app-server",
+      },
+      {
+        type: "text_delta",
+        stream: "item-reason-1",
+        delta: "thinking chunk",
+        thinking: true,
+      },
+      {
+        type: "text_delta",
+        stream: "item-reason-1",
+        delta: "summary chunk",
+        thinking: true,
+      },
+      { type: "agent_reasoning_section_break" },
+      {
+        type: "turn_plan_updated",
+        threadId: "thread-1",
+        turnId: "turn-fixture-1",
+        explanation: "Plan updated",
+        plan: [
+          { step: "Inspect logs", status: "completed" },
+          { step: "Patch parser", status: "inProgress" },
+        ],
+      },
+      {
+        type: "service_message",
+        text: [
+          "Plan updated",
+          "[completed] Inspect logs",
+          "[inProgress] Patch parser",
+        ].join("\n"),
+      },
+      {
+        type: "tool-call",
+        callId: "<generated-codex-diff>",
+        toolName: "CodexDiff",
+        args: {
+          unified_diff: "--- a/src/app.ts\n+++ b/src/app.ts\n@@\n-old\n+new",
+        },
+      },
+      {
+        type: "tool-call-result",
+        callId: "<generated-codex-diff>",
+        name: "CodexDiff",
+        output: {
+          status: "completed",
+        },
+      },
+      {
+        type: "token_count",
+        threadId: "thread-1",
+        turnId: "turn-fixture-1",
+        tokenUsage: {
+          last: {
+            cachedInputTokens: 0,
+            inputTokens: 123,
+            outputTokens: 45,
+            reasoningOutputTokens: 7,
+            totalTokens: 175,
+          },
+          total: {
+            cachedInputTokens: 0,
+            inputTokens: 123,
+            outputTokens: 45,
+            reasoningOutputTokens: 7,
+            totalTokens: 175,
+          },
+        },
+      },
+      {
+        type: "metadata_patch",
+        patch: {
+          currentModelCode: "gpt-5.4-mini",
+        },
+      },
+      {
+        type: "service_message",
+        text: "Codex rerouted model from gpt-5.4 to gpt-5.4-mini",
+      },
+      {
+        type: "service_message",
+        text: "Config warning\nprofile missing optional key",
+      },
+      {
+        type: "turn_aborted",
+        status: "failed",
+        reason: "tool failed",
+      },
+    ]);
+  });
+
+  it("replays raw app-server item notifications into stable client events", async () => {
+    const events: any[] = [];
+    const client = new CodexAppServerClient();
+    client.setHandler((event) => events.push(event));
+
+    await client.connect();
+    const notifications = loadFixture<FakeRpcMessage[]>(
+      "notification_contract_items.json",
+    );
+    await replayServerNotifications(fakeProcesses[0], notifications);
+
+    expect(events.map(normalizeContractEvent)).toEqual([
+      {
+        type: "exec_command_begin",
+        call_id: "cmd-1",
+        command: "bash -lc ls",
+        cwd: "/repo",
+      },
+      {
+        type: "exec_command_end",
+        call_id: "cmd-1",
+        output: "permission denied",
+        success: false,
+        error: "permission denied",
+      },
+      {
+        type: "patch_apply_begin",
+        call_id: "patch-1",
+        changes: {
+          "/repo/src/app.ts": {
+            path: "/repo/src/app.ts",
+            kind: { type: "update" },
+            diff: "@@ -1 +1 @@\n-old\n+new",
+          },
+        },
+      },
+      {
+        type: "patch_apply_end",
+        call_id: "patch-1",
+        success: false,
+        stderr: "File change declined",
+      },
+      {
+        type: "tool-call",
+        callId: "dynamic-1",
+        toolName: "mcp__happy__change_title",
+        args: {
+          title: "新标题",
+          requestedToolName: "mcp__happy__change_title",
+          toolName: "mcp__happy__change_title",
+        },
+      },
+      {
+        type: "tool-call-result",
+        callId: "dynamic-1",
+        name: "mcp__happy__change_title",
+        output: {
+          content: "title updated",
+          status: "completed",
+        },
+      },
+      {
+        type: "tool-call",
+        callId: "mcp-1",
+        toolName: "mcp__happy__change_title",
+        args: { title: "标题" },
+      },
+      {
+        type: "tool-call",
+        callId: "mcp-1",
+        toolName: "mcp__happy__change_title",
+        args: {
+          title: "mcp__happy__change_title",
+          description: "waiting for permission review",
+        },
+      },
+      {
+        type: "tool-call-result",
+        callId: "mcp-1",
+        name: "mcp__happy__change_title",
+        output: {
+          content: "user rejected MCP tool call",
+          status: "canceled",
+        },
+      },
+      {
+        type: "service_message",
+        text: "Review started",
+      },
+      {
+        type: "service_message",
+        text: "Review completed",
+      },
+    ]);
+  });
+
+  it("refreshes capabilities when receiving raw account update notifications", async () => {
+    const events: any[] = [];
+    const client = new CodexAppServerClient();
+    client.setHandler((event) => events.push(event));
+
+    await client.connect();
+    await replayServerNotifications(fakeProcesses[0], [
+      {
+        method: "account/updated",
+        params: {},
+      },
+    ]);
+
+    expect(events.map(normalizeContractEvent)).toEqual([
+      {
+        type: "metadata_refresh",
+        capabilities: {
+          config: {
+            model: "gpt-5.4",
+            profile: "default",
+            approvalPolicy: "on-request",
+            sandboxMode: "workspace-write",
+          },
+          account: {
+            type: "chatgpt",
+            email: "dev@example.com",
+            planType: "plus",
+            requiresOpenaiAuth: false,
+          },
+          rateLimits: {
+            limitId: "codex",
+            limitName: "Codex",
+            planType: "plus",
+            hasCredits: true,
+          },
+          skills: ["repo-notes"],
+          mcpServers: ["happy"],
+        },
+      },
+    ]);
+  });
+
+  it("replays richer upstream-like notifications from README and suite samples", async () => {
+    const events: any[] = [];
+    const client = new CodexAppServerClient();
+    client.setHandler((event) => events.push(event));
+
+    await client.connect();
+    const notifications = loadFixture<FakeRpcMessage[]>(
+      "notification_contract_upstream_rich.json",
+    );
+    await replayServerNotifications(fakeProcesses[0], notifications);
+
+    expect(events.map(normalizeContractEvent)).toEqual([
+      { type: "task_started" },
+      {
+        type: "tool-call",
+        callId: "call_dynamic_1",
+        toolName: "change_title",
+        args: {
+          title: "新标题",
+          requestedToolName: "change_title",
+          toolName: "change_title",
+        },
+      },
+      {
+        type: "tool-call-result",
+        callId: "call_dynamic_1",
+        name: "change_title",
+        output: {
+          content: "dynamic-ok\n[image] data:image/png;base64,AAA",
+          status: "completed",
+        },
+      },
+      {
+        type: "service_message",
+        text: "current changes",
+      },
+      {
+        type: "service_message",
+        text: "Looks solid overall...\n\n- Prefer Stylize helpers — app.rs:10-20\n  ...",
+      },
+      {
+        type: "turn_aborted",
+        status: "interrupted",
+        reason: "interrupted",
+      },
+    ]);
   });
 
   it("responds to dynamic tool calls through the dynamic tool handler", async () => {

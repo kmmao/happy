@@ -1,0 +1,30 @@
+[
+  { "type": "task_started" },
+  { "type": "agent_message", "message": "I'll inspect the parser and then search the repo." },
+  {
+    "type": "exec_command_begin",
+    "call_id": "call-search-1",
+    "command": ["/bin/zsh", "-lc", "rg -n \"sessionProtocol\" src -S"],
+    "cwd": "/repo",
+    "parsed_cmd": [
+      {
+        "type": "search",
+        "cmd": "rg -n \"sessionProtocol\" src -S",
+        "query": "sessionProtocol",
+        "path": "src"
+      }
+    ]
+  },
+  {
+    "type": "agent_message",
+    "message": "subagent summary",
+    "parent_call_id": "provider-subagent-1"
+  },
+  {
+    "type": "service_message",
+    "text": "Plan updated",
+    "parent_call_id": "provider-subagent-1"
+  },
+  { "type": "exec_command_end", "call_id": "call-search-1" },
+  { "type": "task_complete" }
+]

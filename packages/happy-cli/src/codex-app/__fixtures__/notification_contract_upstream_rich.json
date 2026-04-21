@@ -1,0 +1,95 @@
+[
+  {
+    "method": "turn/started",
+    "params": {
+      "threadId": "thr_up_1",
+      "turn": {
+        "id": "turn_up_1",
+        "items": [],
+        "status": "inProgress",
+        "error": null,
+        "startedAt": 0,
+        "completedAt": null,
+        "durationMs": null
+      }
+    }
+  },
+  {
+    "method": "item/started",
+    "params": {
+      "threadId": "thr_up_1",
+      "turnId": "turn_up_1",
+      "item": {
+        "type": "dynamicToolCall",
+        "id": "call_dynamic_1",
+        "namespace": "happy",
+        "tool": "change_title",
+        "arguments": { "title": "新标题" },
+        "status": "inProgress",
+        "contentItems": null,
+        "success": null,
+        "durationMs": null
+      }
+    }
+  },
+  {
+    "method": "item/completed",
+    "params": {
+      "threadId": "thr_up_1",
+      "turnId": "turn_up_1",
+      "item": {
+        "type": "dynamicToolCall",
+        "id": "call_dynamic_1",
+        "namespace": "happy",
+        "tool": "change_title",
+        "arguments": { "title": "新标题" },
+        "status": "completed",
+        "contentItems": [
+          { "type": "inputText", "text": "dynamic-ok" },
+          { "type": "inputImage", "imageUrl": "data:image/png;base64,AAA" }
+        ],
+        "success": true,
+        "durationMs": 12
+      }
+    }
+  },
+  {
+    "method": "item/started",
+    "params": {
+      "threadId": "thr_up_1",
+      "turnId": "turn_up_1",
+      "item": {
+        "type": "enteredReviewMode",
+        "id": "turn_900",
+        "review": "current changes"
+      }
+    }
+  },
+  {
+    "method": "item/completed",
+    "params": {
+      "threadId": "thr_up_1",
+      "turnId": "turn_up_1",
+      "item": {
+        "type": "exitedReviewMode",
+        "id": "turn_900",
+        "review": "Looks solid overall...\n\n- Prefer Stylize helpers — app.rs:10-20\n  ..."
+      }
+    }
+  },
+  {
+    "method": "turn/completed",
+    "params": {
+      "threadId": "thr_up_1",
+      "turn": {
+        "id": "turn_up_1",
+        "items": [],
+        "status": "interrupted",
+        "error": null,
+        "startedAt": 0,
+        "completedAt": 1,
+        "durationMs": 1
+      }
+    }
+  }
+]

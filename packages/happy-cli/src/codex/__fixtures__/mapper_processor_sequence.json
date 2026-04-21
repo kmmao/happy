@@ -1,0 +1,24 @@
+[
+  {
+    "type": "tool-call",
+    "callId": "dynamic-2",
+    "tool": "mcp__happy__change_title",
+    "arguments": {
+      "title": "新标题"
+    }
+  },
+  {
+    "type": "tool-call-result",
+    "callId": "dynamic-2",
+    "name": "mcp__happy__change_title",
+    "output": {
+      "content": "title updated",
+      "status": "completed"
+    }
+  },
+  {
+    "type": "reasoning",
+    "message": "Need to reconcile app-server and legacy MCP output before emitting final session envelopes.",
+    "id": "legacy-reasoning-1"
+  }
+]

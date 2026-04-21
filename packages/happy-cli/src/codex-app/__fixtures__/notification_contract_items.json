@@ -1,0 +1,172 @@
+[
+  {
+    "method": "item/started",
+    "params": {
+      "threadId": "thread-1",
+      "turnId": "turn-fixture-2",
+      "item": {
+        "type": "commandExecution",
+        "id": "cmd-1",
+        "command": "bash -lc ls",
+        "commandActions": [],
+        "cwd": "/repo",
+        "status": "inProgress"
+      }
+    }
+  },
+  {
+    "method": "item/completed",
+    "params": {
+      "threadId": "thread-1",
+      "turnId": "turn-fixture-2",
+      "item": {
+        "type": "commandExecution",
+        "id": "cmd-1",
+        "command": "bash -lc ls",
+        "commandActions": [],
+        "cwd": "/repo",
+        "status": "failed",
+        "aggregatedOutput": "permission denied"
+      }
+    }
+  },
+  {
+    "method": "item/started",
+    "params": {
+      "threadId": "thread-1",
+      "turnId": "turn-fixture-2",
+      "item": {
+        "type": "fileChange",
+        "id": "patch-1",
+        "changes": [
+          {
+            "path": "/repo/src/app.ts",
+            "kind": { "type": "update" },
+            "diff": "@@ -1 +1 @@\n-old\n+new"
+          }
+        ],
+        "status": "inProgress"
+      }
+    }
+  },
+  {
+    "method": "item/completed",
+    "params": {
+      "threadId": "thread-1",
+      "turnId": "turn-fixture-2",
+      "item": {
+        "type": "fileChange",
+        "id": "patch-1",
+        "changes": [
+          {
+            "path": "/repo/src/app.ts",
+            "kind": { "type": "update" },
+            "diff": "@@ -1 +1 @@\n-old\n+new"
+          }
+        ],
+        "status": "declined"
+      }
+    }
+  },
+  {
+    "method": "item/started",
+    "params": {
+      "threadId": "thread-1",
+      "turnId": "turn-fixture-2",
+      "item": {
+        "type": "dynamicToolCall",
+        "id": "dynamic-1",
+        "tool": "mcp__happy__change_title",
+        "arguments": { "title": "新标题" },
+        "status": "inProgress"
+      }
+    }
+  },
+  {
+    "method": "item/completed",
+    "params": {
+      "threadId": "thread-1",
+      "turnId": "turn-fixture-2",
+      "item": {
+        "type": "dynamicToolCall",
+        "id": "dynamic-1",
+        "tool": "mcp__happy__change_title",
+        "arguments": { "title": "新标题" },
+        "status": "completed",
+        "success": true,
+        "contentItems": [
+          { "type": "inputText", "text": "title updated" }
+        ]
+      }
+    }
+  },
+  {
+    "method": "item/started",
+    "params": {
+      "threadId": "thread-1",
+      "turnId": "turn-fixture-2",
+      "item": {
+        "type": "mcpToolCall",
+        "id": "mcp-1",
+        "server": "happy",
+        "tool": "change_title",
+        "arguments": { "title": "标题" },
+        "status": "inProgress",
+        "result": null,
+        "error": null,
+        "durationMs": null
+      }
+    }
+  },
+  {
+    "method": "item/mcpToolCall/progress",
+    "params": {
+      "threadId": "thread-1",
+      "turnId": "turn-fixture-2",
+      "itemId": "mcp-1",
+      "message": "waiting for permission review"
+    }
+  },
+  {
+    "method": "item/completed",
+    "params": {
+      "threadId": "thread-1",
+      "turnId": "turn-fixture-2",
+      "item": {
+        "type": "mcpToolCall",
+        "id": "mcp-1",
+        "server": "happy",
+        "tool": "change_title",
+        "arguments": { "title": "标题" },
+        "status": "failed",
+        "result": null,
+        "error": { "message": "user rejected MCP tool call" },
+        "durationMs": 8
+      }
+    }
+  },
+  {
+    "method": "item/started",
+    "params": {
+      "threadId": "thread-1",
+      "turnId": "turn-fixture-2",
+      "item": {
+        "type": "enteredReviewMode",
+        "id": "turn_900",
+        "review": "Review started"
+      }
+    }
+  },
+  {
+    "method": "item/completed",
+    "params": {
+      "threadId": "thread-1",
+      "turnId": "turn-fixture-2",
+      "item": {
+        "type": "exitedReviewMode",
+        "id": "turn_900",
+        "review": "Review completed"
+      }
+    }
+  }
+]

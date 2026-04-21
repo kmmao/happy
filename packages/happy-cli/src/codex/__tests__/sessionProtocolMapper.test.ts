@@ -1,9 +1,20 @@
 import { describe, expect, it } from 'vitest';
 import { createId, isCuid } from '@paralleldrive/cuid2';
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import {
     mapCodexMcpMessageToSessionEnvelopes,
     mapCodexProcessorMessageToSessionEnvelopes,
 } from '../utils/sessionProtocolMapper';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+function loadFixture<T>(name: string): T {
+    const fixturePath = join(__dirname, '..', '__fixtures__', name);
+    return JSON.parse(readFileSync(fixturePath, 'utf8')) as T;
+}
 
 describe('mapCodexMcpMessageToSessionEnvelopes', () => {
     it('starts and ends turns for task lifecycle events', () => {
@@ -264,6 +275,128 @@ describe('mapCodexMcpMessageToSessionEnvelopes', () => {
             });
         }
     });
+
+    it('replays MCP fixture sequences into stable session envelope shapes', () => {
+        const fixture = loadFixture<Array<Record<string, unknown>>>(
+            'mapper_mcp_sequence.json',
+        );
+
+        let state = {
+            currentTurnId: null as string | null,
+            startedSubagents: new Set<string>(),
+            activeSubagents: new Set<string>(),
+            providerSubagentToSessionSubagent: new Map<string, string>(),
+        };
+
+        const envelopes = fixture.flatMap((message) => {
+            const mapped = mapCodexMcpMessageToSessionEnvelopes(message, state);
+            state = {
+                currentTurnId: mapped.currentTurnId,
+                startedSubagents: mapped.startedSubagents,
+                activeSubagents: mapped.activeSubagents,
+                providerSubagentToSessionSubagent:
+                    mapped.providerSubagentToSessionSubagent,
+            };
+            return mapped.envelopes;
+        });
+
+        expect(envelopes).toHaveLength(9);
+
+        const turnId = envelopes[0]?.turn;
+        expect(typeof turnId).toBe('string');
+        expect(turnId).toBeTruthy();
+
+        const subagentId = envelopes[3]?.subagent;
+        expect(typeof subagentId).toBe('string');
+        expect(isCuid(subagentId!)).toBe(true);
+        expect(subagentId).not.toBe('provider-subagent-1');
+
+        expect(
+            envelopes.map((envelope) => ({
+                turnMatches: envelope.turn === turnId,
+                subagent: envelope.subagent === subagentId ? 'generated-subagent' : null,
+                event:
+                    envelope.ev.t === 'tool-call-start'
+                        ? {
+                              t: envelope.ev.t,
+                              call: envelope.ev.call,
+                              name: envelope.ev.name,
+                              title: envelope.ev.title,
+                              description: envelope.ev.description,
+                          }
+                        : envelope.ev.t === 'tool-call-end'
+                          ? {
+                                t: envelope.ev.t,
+                                call: envelope.ev.call,
+                            }
+                          : envelope.ev,
+            })),
+        ).toEqual([
+            {
+                turnMatches: true,
+                subagent: null,
+                event: { t: 'turn-start' },
+            },
+            {
+                turnMatches: true,
+                subagent: null,
+                event: {
+                    t: 'text',
+                    text: "I'll inspect the parser and then search the repo.",
+                },
+            },
+            {
+                turnMatches: true,
+                subagent: null,
+                event: {
+                    t: 'tool-call-start',
+                    call: 'call-search-1',
+                    name: 'Grep',
+                    title: 'grep(pattern: sessionProtocol)',
+                    description: 'Search(pattern: sessionProtocol)',
+                },
+            },
+            {
+                turnMatches: true,
+                subagent: 'generated-subagent',
+                event: { t: 'start' },
+            },
+            {
+                turnMatches: true,
+                subagent: 'generated-subagent',
+                event: {
+                    t: 'text',
+                    text: 'subagent summary',
+                },
+            },
+            {
+                turnMatches: true,
+                subagent: 'generated-subagent',
+                event: {
+                    t: 'service',
+                    text: 'Plan updated',
+                },
+            },
+            {
+                turnMatches: true,
+                subagent: null,
+                event: {
+                    t: 'tool-call-end',
+                    call: 'call-search-1',
+                },
+            },
+            {
+                turnMatches: true,
+                subagent: 'generated-subagent',
+                event: { t: 'stop' },
+            },
+            {
+                turnMatches: true,
+                subagent: null,
+                event: { t: 'turn-end', status: 'completed' },
+            },
+        ]);
+    });
 });
 
 describe('mapCodexProcessorMessageToSessionEnvelopes', () => {
@@ -351,5 +484,63 @@ describe('mapCodexProcessorMessageToSessionEnvelopes', () => {
             text: 'Working through options',
             thinking: true,
         });
+    });
+
+    it('replays processor fixture sequences into stable session envelope shapes', () => {
+        const fixture = loadFixture<Array<any>>('mapper_processor_sequence.json');
+
+        const events = fixture.flatMap((message) =>
+            mapCodexProcessorMessageToSessionEnvelopes(message, {
+                currentTurnId: 'turn-fixture-1',
+            }),
+        );
+
+        expect(events).toHaveLength(4);
+        expect(events.every((event) => event.turn === 'turn-fixture-1')).toBe(true);
+
+        expect(
+            events.map((event) =>
+                event.ev.t === 'tool-call-start'
+                    ? {
+                          t: event.ev.t,
+                          call: event.ev.call,
+                          name: event.ev.name,
+                          title: event.ev.title,
+                          description: event.ev.description,
+                          args: event.ev.args,
+                      }
+                    : event.ev.t === 'tool-call-end'
+                      ? {
+                            t: event.ev.t,
+                            call: event.ev.call,
+                        }
+                      : event.ev,
+            ),
+        ).toEqual([
+            {
+                t: 'tool-call-start',
+                call: 'dynamic-2',
+                name: 'mcp__happy__change_title',
+                title: '新标题',
+                description: '新标题',
+                args: {
+                    title: '新标题',
+                },
+            },
+            {
+                t: 'text',
+                text: 'title updated',
+                thinking: true,
+            },
+            {
+                t: 'tool-call-end',
+                call: 'dynamic-2',
+            },
+            {
+                t: 'text',
+                text: 'Need to reconcile app-server and legacy MCP output before emitting final session envelopes.',
+                thinking: true,
+            },
+        ]);
     });
 });

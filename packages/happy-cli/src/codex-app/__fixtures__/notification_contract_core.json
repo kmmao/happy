@@ -1,0 +1,134 @@
+[
+  {
+    "method": "turn/started",
+    "params": {
+      "threadId": "thread-1",
+      "turn": {
+        "id": "turn-fixture-1",
+        "items": [],
+        "status": "inProgress"
+      }
+    }
+  },
+  {
+    "method": "item/agentMessage/delta",
+    "params": {
+      "threadId": "thread-1",
+      "turnId": "turn-fixture-1",
+      "itemId": "item-msg-1",
+      "delta": "hello from app-server"
+    }
+  },
+  {
+    "method": "item/reasoning/textDelta",
+    "params": {
+      "threadId": "thread-1",
+      "turnId": "turn-fixture-1",
+      "itemId": "item-reason-1",
+      "contentIndex": 0,
+      "delta": "thinking chunk"
+    }
+  },
+  {
+    "method": "item/reasoning/summaryTextDelta",
+    "params": {
+      "threadId": "thread-1",
+      "turnId": "turn-fixture-1",
+      "itemId": "item-reason-1",
+      "summaryIndex": 0,
+      "delta": "summary chunk"
+    }
+  },
+  {
+    "method": "item/reasoning/summaryPartAdded",
+    "params": {
+      "threadId": "thread-1",
+      "turnId": "turn-fixture-1",
+      "itemId": "item-reason-1",
+      "summaryIndex": 0
+    }
+  },
+  {
+    "method": "turn/plan/updated",
+    "params": {
+      "threadId": "thread-1",
+      "turnId": "turn-fixture-1",
+      "explanation": "Plan updated",
+      "plan": [
+        { "step": "Inspect logs", "status": "completed" },
+        { "step": "Patch parser", "status": "inProgress" }
+      ]
+    }
+  },
+  {
+    "method": "turn/diff/updated",
+    "params": {
+      "threadId": "thread-1",
+      "turnId": "turn-fixture-1",
+      "diff": "--- a/src/app.ts\n+++ b/src/app.ts\n@@\n-old\n+new"
+    }
+  },
+  {
+    "method": "turn/diff/updated",
+    "params": {
+      "threadId": "thread-1",
+      "turnId": "turn-fixture-1",
+      "diff": "--- a/src/app.ts\n+++ b/src/app.ts\n@@\n-old\n+new"
+    }
+  },
+  {
+    "method": "thread/tokenUsage/updated",
+    "params": {
+      "threadId": "thread-1",
+      "turnId": "turn-fixture-1",
+      "tokenUsage": {
+        "last": {
+          "cachedInputTokens": 0,
+          "inputTokens": 123,
+          "outputTokens": 45,
+          "reasoningOutputTokens": 7,
+          "totalTokens": 175
+        },
+        "total": {
+          "cachedInputTokens": 0,
+          "inputTokens": 123,
+          "outputTokens": 45,
+          "reasoningOutputTokens": 7,
+          "totalTokens": 175
+        }
+      }
+    }
+  },
+  {
+    "method": "model/rerouted",
+    "params": {
+      "threadId": "thread-1",
+      "turnId": "turn-fixture-1",
+      "fromModel": "gpt-5.4",
+      "toModel": "gpt-5.4-mini",
+      "reason": "highRiskCyberActivity"
+    }
+  },
+  {
+    "method": "configWarning",
+    "params": {
+      "summary": "Config warning",
+      "details": "profile missing optional key"
+    }
+  },
+  {
+    "method": "turn/completed",
+    "params": {
+      "threadId": "thread-1",
+      "turn": {
+        "id": "turn-fixture-1",
+        "status": "failed",
+        "error": { "message": "tool failed" },
+        "items": [],
+        "startedAt": 0,
+        "completedAt": 1,
+        "durationMs": 1
+      }
+    }
+  }
+]

@@ -1843,6 +1843,10 @@ export class CodexAppServerClient {
             ? (item.arguments as Record<string, unknown>)
             : cachedMetadata?.arguments ?? {};
         if (phase === "started") {
+          this.dynamicToolMetadata.set(callId, {
+            toolName,
+            arguments: toolArguments,
+          });
           this.handler?.({
             type: "tool-call",
             callId,
