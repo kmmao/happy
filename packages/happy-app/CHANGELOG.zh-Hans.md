@@ -2,7 +2,7 @@
 
 ## 2.14.0 - 2026-04-21
 
-重新设计的 Session 进度面板（Glass UI）、统一侧栏与独立 Code Changes 视图、按轮次的 Knowledge 生命周期与 hot/evicted 徽章、无需重启的归档恢复，以及全新重构的 AI Profile 设置 UI。
+重新设计的 Session 进度面板（Glass UI）、统一侧栏与独立 Code Changes 视图、按轮次的 Knowledge 生命周期与 hot/evicted 徽章、无需重启的归档恢复、全新重构的 AI Profile 设置 UI，以及对核心页面 loading / error / empty 三态的最终视觉统一。
 
 ### Session 进度面板
 - 新增重新设计的进度面板 — Glass UI、活动时间轴，MCP 来源的 checklist/summary 同步到 Progress 标签
@@ -17,6 +17,14 @@
 - 新增独立 Codex 工具视图（plan preview、patch、diff）和 Codex 进度面板
 - 新增 **默认展开 Diff** 外观设置 — 应用到 Edit/Write/GeminiEdit/CodexPatch
 - 新增 InputFAB 纵向布局 — 独立按钮行，更易触达
+
+### 视觉一致性
+- 新增共享三态视图组件 — 将 loading / error / empty 统一应用到 sessions、inbox、usage、preview、timeline、process manager 和 OpenClaw
+- 统一 OpenClaw 会话页路由和标签包装组件 — 不再各写一套状态 UI 导致视觉漂移
+- 修复 usage 面板与图表的本地化兜底文案 — 空态/错误态不再回退到硬编码英文
+- 将同一套三态系统继续扩展到 project / git / friends / artifacts 页面，包括 world 子页、knowledge evolution、issues、PRs 以及 artifact 详情/编辑页
+- 新增共享 collection-state helper — 远程列表页不再各自复制一套略有偏差的 loading/error/empty 分支判断
+- 修复 artifact 详情深链加载问题 — 本地 storage 为空时会主动拉取数据，不再一进页面就直接报错
 
 ### 知识库
 - 新增按 Session 轮次的 Knowledge 条目生命周期 — 冷条目自动驱逐，命中频繁的条目延长寿命

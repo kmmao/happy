@@ -2,7 +2,7 @@
 
 ## 2.14.0 - 2026-04-21
 
-Redesigned session progress panel with glass UI, a unified side-panel with dedicated code-changes view, per-turn knowledge lifespan with hot/evicted badges, unarchive without restart, and a rebuilt AI profile settings UI.
+Redesigned session progress panel with glass UI, a unified side-panel with dedicated code-changes view, per-turn knowledge lifespan with hot/evicted badges, unarchive without restart, a rebuilt AI profile settings UI, and final visual polish for loading / error / empty states across core app surfaces.
 
 ### Session Progress Panel
 - Added redesigned progress panel with glass UI, activity timeline, and MCP-sourced checklist/summary synced into the Progress tab
@@ -17,6 +17,14 @@ Redesigned session progress panel with glass UI, a unified side-panel with dedic
 - Added dedicated Codex tool views (plan preview, patch, diff) and a Codex progress panel
 - Added **Expand diffs by default** appearance setting applied across Edit/Write/GeminiEdit/CodexPatch
 - Added a new column layout for the InputFAB with a dedicated buttons row for better reach
+
+### Visual Consistency
+- Added a shared tri-state state view for loading / error / empty surfaces and applied it across sessions, inbox, usage, preview, timeline, process manager, and OpenClaw
+- Unified the OpenClaw sessions route and tab wrapper so they share the same state presentation instead of drifting apart
+- Fixed localized usage fallbacks so the chart and usage panel no longer drop back to hardcoded English empty/error copy
+- Extended the same tri-state system across project, git, friends, and artifacts surfaces including world tabs, knowledge evolution, issues, PRs, and artifact detail/edit screens
+- Added a shared collection-state helper so remote list pages stop reimplementing slightly different loading/error/empty branching
+- Fixed artifact detail deep-link loading so the page now fetches missing artifact data instead of failing immediately when storage is cold
 
 ### Knowledge Base
 - Added per-session turn-based lifespan for injected knowledge entries — cold entries evict automatically while proven-useful ones bank extra turns
