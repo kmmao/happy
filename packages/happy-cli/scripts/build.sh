@@ -16,8 +16,10 @@ PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 cd "$PROJECT_DIR"
 
 # 1. Type check first — no file changes, safe to do while daemon is running
+# Use the repo-local TypeScript binary directly so Yarn builds don't emit
+# noisy npm "Unknown env config" warnings through npx.
 echo "[build] Type checking..."
-npx tsc --noEmit
+"$PROJECT_DIR/node_modules/.bin/tsc" --noEmit
 
 # 2. Build into a temp directory (dist_next)
 echo "[build] Building to dist_next..."

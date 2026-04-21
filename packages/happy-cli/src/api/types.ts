@@ -278,14 +278,13 @@ import {
 } from "@kmmao/happy-wire";
 import type {
   MachineMetadata,
-  TailscaleInfo,
   DaemonState,
 } from "@kmmao/happy-wire";
 
 export const MachineMetadataSchema = _MachineMetadataSchema;
 export const TailscaleInfoSchema = _TailscaleInfoSchema;
 export const DaemonStateSchema = _DaemonStateSchema;
-export type { MachineMetadata, TailscaleInfo, DaemonState };
+export type { MachineMetadata, TailscaleInfo, DaemonState } from "@kmmao/happy-wire";
 
 export type Machine = {
   id: string;
