@@ -5,19 +5,8 @@ import { Typography } from "@/constants/Typography";
 import { Project } from "@/sync/projectManager";
 import { layout } from "@/components/layout";
 import { t } from "@/text";
-import { TokenStorage } from "@/auth/tokenStorage";
 import { Ionicons } from "@expo/vector-icons";
-import { Modal } from "@/modal";
 import { useRouter } from "expo-router";
-import {
-    fetchGoals,
-    cancelGoal,
-    decomposeGoal,
-    deleteGoal,
-    replanGoal,
-    type GoalSummary,
-} from "@/sync/apiProjects";
-import { sync } from "@/sync/sync";
 import {
     STATUS_COLORS,
     type GoalFilterKey,
@@ -26,6 +15,10 @@ import {
 } from "./worldGoalConstants";
 import { GoalCard } from "./GoalCard";
 import { GoalCreateSheet } from "./GoalCreateSheet";
+import { SharedStateView } from "@/components/SharedStateView";
+import { deriveWorldTabCollectionScreenState } from "./worldTabCollectionViewModel";
+import { useWorldGoalsData } from "@/hooks/useWorldGoalsData";
+import { useWorldGoalsCrud } from "@/hooks/useWorldGoalsCrud";
 
 interface WorldGoalsTabProps {
     project: Project;
@@ -35,131 +28,33 @@ interface WorldGoalsTabProps {
 export const WorldGoalsTab = React.memo(
     ({ project, isActive }: WorldGoalsTabProps) => {
         const { theme } = useUnistyles();
-        const [goals, setGoals] = React.useState<GoalSummary[]>([]);
-        const [loading, setLoading] = React.useState(false);
+        const {
+            goals,
+            setGoals,
+            loading,
+            error: loadError,
+            refresh: loadGoals,
+        } = useWorldGoalsData(project.serverId, isActive);
+        const {
+            createGoal,
+            cancelGoal,
+            deleteGoal,
+            decomposeGoal,
+            replanGoal,
+        } = useWorldGoalsCrud({
+            projectServerId: project.serverId,
+            machineId: project.key.machineId,
+            setGoals,
+        });
         const [showCreate, setShowCreate] = React.useState(false);
         const [nowTs, setNowTs] = React.useState(Date.now());
         const [filter, setFilter] = React.useState<GoalFilterKey>("all");
-
-        const loadGoals = React.useCallback(async () => {
-            if (!project.serverId) return;
-            setLoading(true);
-            try {
-                const credentials = await TokenStorage.getCredentials();
-                if (!credentials) return;
-                const fetched = await fetchGoals(credentials, project.serverId);
-                setGoals(fetched);
-            } catch {
-                // best effort
-            } finally {
-                setLoading(false);
-            }
-        }, [project.serverId]);
-
-        React.useEffect(() => {
-            if (isActive) {
-                void loadGoals();
-            }
-        }, [isActive, loadGoals]);
 
         React.useEffect(() => {
             if (!isActive) return;
             const timer = setInterval(() => setNowTs(Date.now()), 1000);
             return () => clearInterval(timer);
         }, [isActive]);
-
-        React.useEffect(() => {
-            if (!isActive || !project.serverId) return;
-
-            return sync.onGoalProgress((event) => {
-                if (event.projectId !== project.serverId) return;
-
-                let shouldRefresh = false;
-                setGoals((prev) => prev.map((goal) => {
-                    if (goal.id !== event.goalId) return goal;
-                    shouldRefresh = [
-                        goal.status === "planning" && event.status === "in_progress",
-                        goal.status === "planning" && event.status === "blocked",
-                        goal.status === "in_progress" && event.status === "completed",
-                    ].some(Boolean);
-                    return {
-                        ...goal,
-                        status: event.status,
-                        progress: event.progress,
-                    };
-                }));
-
-                if (shouldRefresh) {
-                    void loadGoals();
-                }
-            });
-        }, [isActive, loadGoals, project.serverId]);
-
-        const handleCancel = React.useCallback(async (goal: GoalSummary) => {
-            const confirmed = await Modal.confirm(
-                t("goals.cancelGoal"),
-                t("goals.cancelGoalConfirm"),
-            );
-            if (!confirmed) return;
-            try {
-                const credentials = await TokenStorage.getCredentials();
-                if (!credentials || !project.serverId) return;
-                const updated = await cancelGoal(credentials, project.serverId, goal.id);
-                setGoals((prev) => prev.map((g) => (g.id === updated.id ? updated : g)));
-                Modal.toast(t("goals.cancelled"));
-            } catch {
-                Modal.toast(t("goals.createError"));
-            }
-        }, [project.serverId]);
-
-        const handleDelete = React.useCallback(async (goal: GoalSummary) => {
-            const confirmed = await Modal.confirm(
-                t("goals.deleteGoal"),
-                t("goals.deleteGoalConfirm"),
-            );
-            if (!confirmed) return;
-            try {
-                const credentials = await TokenStorage.getCredentials();
-                if (!credentials || !project.serverId) return;
-                await deleteGoal(credentials, project.serverId, goal.id);
-                setGoals((prev) => prev.filter((g) => g.id !== goal.id));
-                Modal.toast(t("goals.deleted"));
-            } catch {
-                Modal.toast(t("goals.createError"));
-            }
-        }, [project.serverId]);
-
-        const handleDecompose = React.useCallback(async (goal: GoalSummary) => {
-            if (!project.serverId) return;
-            try {
-                const credentials = await TokenStorage.getCredentials();
-                if (!credentials) return;
-                const updated = await decomposeGoal(credentials, project.serverId, goal.id);
-                setGoals((prev) => prev.map((g) => (g.id === updated.id ? updated : g)));
-                Modal.toast(t("goals.decomposeTriggered"));
-            } catch {
-                Modal.toast(t("goals.decomposeError"));
-            }
-        }, [project.serverId]);
-
-        const handleReplan = React.useCallback(async (goal: GoalSummary) => {
-            const confirmed = await Modal.confirm(
-                t("goals.replan"),
-                t("goals.replanConfirm"),
-            );
-            if (!confirmed) return;
-            try {
-                const credentials = await TokenStorage.getCredentials();
-                if (!credentials || !project.serverId) return;
-                await replanGoal(credentials, project.serverId, goal.id);
-                setGoals((prev) => prev.map((g) =>
-                    g.id === goal.id ? { ...g, status: "planning", progress: 0 } : g,
-                ));
-                Modal.toast(t("goals.replanTriggered"));
-            } catch {
-                Modal.toast(t("goals.replanError"));
-            }
-        }, [project.serverId]);
 
         const router = useRouter();
 
@@ -171,12 +66,6 @@ export const WorldGoalsTab = React.memo(
             if (!isSafeId(sessionId)) return;
             router.push(`/session/${sessionId}` as any);
         }, [router]);
-
-        const handleCreated = React.useCallback((goal: GoalSummary) => {
-            setGoals((prev) => [goal, ...prev]);
-            setShowCreate(false);
-            Modal.toast(t("goals.created"));
-        }, []);
 
         const summary = React.useMemo(() => ({
             total: goals.length,
@@ -201,6 +90,17 @@ export const WorldGoalsTab = React.memo(
             }
             return goals;
         }, [filter, goals]);
+
+        const goalsScreenState = React.useMemo(
+            () =>
+                deriveWorldTabCollectionScreenState({
+                    loading,
+                    error: loadError,
+                    totalCount: goals.length,
+                    visibleCount: filteredGoals.length,
+                }),
+            [filteredGoals.length, goals.length, loadError, loading],
+        );
 
         return (
             <View style={styles.container}>
@@ -258,26 +158,48 @@ export const WorldGoalsTab = React.memo(
                         </View>
                     ) : null}
 
-                    {loading && goals.length === 0 ? (
-                        <ActivityIndicator style={{ marginTop: 40 }} />
-                    ) : filteredGoals.length === 0 ? (
-                        <View style={styles.emptyContainer}>
-                            <Ionicons name="flag-outline" size={48} color={theme.colors.textSecondary} />
-                            <Text style={styles.emptyText}>{t("goals.emptyGoals")}</Text>
-                            <Text style={styles.emptyHint}>{t("goals.emptyGoalsHint")}</Text>
-                        </View>
+                    {goalsScreenState.screenKind === "loading" ? (
+                        <SharedStateView
+                            inline
+                            kind="loading"
+                            title={t("common.loading")}
+                        />
+                    ) : goalsScreenState.screenKind === "error" ? (
+                        <SharedStateView
+                            inline
+                            kind="error"
+                            title={t("common.error")}
+                            description={goalsScreenState.requestState.error ?? undefined}
+                            onAction={() => {
+                                void loadGoals();
+                            }}
+                        />
+                    ) : goalsScreenState.screenKind === "empty" ? (
+                        <SharedStateView
+                            inline
+                            kind="empty"
+                            title={t("goals.emptyGoals")}
+                            description={t("goals.emptyGoalsHint")}
+                            icon={
+                                <Ionicons
+                                    name="flag-outline"
+                                    size={48}
+                                    color={theme.colors.textSecondary}
+                                />
+                            }
+                        />
                     ) : (
                         filteredGoals.map((goal) => (
                             <GoalCard
                                 key={goal.id}
                                 goal={goal}
                                 nowTs={nowTs}
-                                onDecompose={handleDecompose}
-                                onCancel={handleCancel}
-                                onDelete={handleDelete}
+                                onDecompose={decomposeGoal}
+                                onCancel={cancelGoal}
+                                onDelete={deleteGoal}
                                 onOpenGoal={handleOpenGoal}
                                 onViewSession={handleViewSession}
-                                onReplan={handleReplan}
+                                onReplan={replanGoal}
                             />
                         ))
                     )}
@@ -285,8 +207,13 @@ export const WorldGoalsTab = React.memo(
 
                 {showCreate && (
                     <GoalCreateSheet
-                        project={project}
-                        onCreated={handleCreated}
+                        onSave={async (input) => {
+                            const didCreate = await createGoal(input);
+                            if (didCreate) {
+                                setShowCreate(false);
+                            }
+                            return didCreate;
+                        }}
                         onClose={() => setShowCreate(false)}
                     />
                 )}

@@ -4,16 +4,13 @@ import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { Typography } from "@/constants/Typography";
 import { Ionicons } from "@expo/vector-icons";
 import { t } from "@/text";
-import { TokenStorage } from "@/auth/tokenStorage";
-import { Modal } from "@/modal";
-import { Project } from "@/sync/projectManager";
-import { createGoal, type GoalSummary } from "@/sync/apiProjects";
+import type { CreateWorldGoalInput } from "@/hooks/useWorldGoalsCrud";
 import { PRIORITY_COLORS, priorityLabel } from "./worldGoalConstants";
 import { formSheetStyles as fs } from "@/components/formSheetStyles";
+import { projectFormSheetStyles as pfs } from "./projectFormSheetStyles";
 
 interface GoalCreateSheetProps {
-    project: Project;
-    onCreated: (goal: GoalSummary) => void;
+    onSave: (input: CreateWorldGoalInput) => Promise<boolean>;
     onClose: () => void;
 }
 
@@ -21,8 +18,7 @@ type PriorityKey = "urgent" | "normal" | "low";
 const PRIORITIES: readonly PriorityKey[] = ["urgent", "normal", "low"];
 
 export const GoalCreateSheet = React.memo(function GoalCreateSheet({
-    project,
-    onCreated,
+    onSave,
     onClose,
 }: GoalCreateSheetProps) {
     const { theme } = useUnistyles();
@@ -35,38 +31,35 @@ export const GoalCreateSheet = React.memo(function GoalCreateSheet({
     const [descFocused, setDescFocused] = React.useState(false);
 
     const handleSave = React.useCallback(async () => {
-        if (!title.trim() || !project.serverId) return;
+        if (!title.trim()) return;
         setSaving(true);
         try {
-            const credentials = await TokenStorage.getCredentials();
-            if (!credentials) return;
-            const goal = await createGoal(credentials, project.serverId, {
+            const didSave = await onSave({
                 title: title.trim(),
                 description: description.trim() || undefined,
                 priority,
-                machineId: project.key.machineId,
                 autoDecompose,
             });
-            onCreated(goal);
-        } catch {
-            Modal.toast(t("goals.createError"));
+            if (didSave) {
+                onClose();
+            }
         } finally {
             setSaving(false);
         }
-    }, [title, description, priority, autoDecompose, project.serverId, project.key.machineId, onCreated]);
+    }, [title, description, priority, autoDecompose, onSave, onClose]);
 
     const canSave = title.trim().length > 0 && !saving;
 
     return (
-        <View style={local.modalOverlay}>
-            <Pressable style={local.modalBackdrop} onPress={onClose} />
+        <View style={pfs.modalOverlay}>
+            <Pressable style={[pfs.modalBackdrop, local.modalBackdrop]} onPress={onClose} />
             <ScrollView
-                style={local.modalScroll}
-                contentContainerStyle={local.modalScrollContent}
+                style={pfs.modalScroll}
+                contentContainerStyle={pfs.modalScrollContent}
                 showsVerticalScrollIndicator={false}
                 keyboardShouldPersistTaps="handled"
             >
-                <View style={local.modalContent}>
+                <View style={[pfs.modalContent, local.modalContent]}>
                     {/* ── Header ── */}
                     <View style={fs.header}>
                         <Text style={fs.headerTitle}>{t("goals.createGoal")}</Text>
@@ -219,39 +212,10 @@ export const GoalCreateSheet = React.memo(function GoalCreateSheet({
 
 /** Styles specific to GoalCreateSheet (overlay container + priority segments) */
 const local = StyleSheet.create((theme) => ({
-    modalOverlay: {
-        position: "absolute" as const,
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        justifyContent: "flex-start" as const,
-        alignItems: "center" as const,
-        zIndex: 100,
-    },
     modalBackdrop: {
-        position: "absolute" as const,
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
         backgroundColor: "transparent",
     },
-    modalScroll: {
-        width: "90%" as const,
-        maxWidth: 440,
-        maxHeight: "100%" as const,
-    },
-    modalScrollContent: {
-        flexGrow: 1,
-        justifyContent: "flex-start" as const,
-        paddingTop: 16,
-        paddingBottom: 16,
-    },
     modalContent: {
-        backgroundColor: theme.colors.surface,
-        borderRadius: 16,
-        padding: 20,
         gap: 20,
     },
     actionsSection: {
