@@ -11,6 +11,11 @@ import { ProjectCard } from "./ProjectCard";
 import { Modal } from "@/modal";
 import { sync } from "@/sync/sync";
 import { t } from "@/text";
+import {
+    SharedGroupHeader,
+    SharedGroupHeaderAction,
+} from "@/components/SharedGroupHeader";
+import { SharedStateView } from "@/components/SharedStateView";
 
 export const ProjectListView = React.memo(() => {
     const projects = useProjects();
@@ -61,18 +66,18 @@ export const ProjectListView = React.memo(() => {
 
     if (projects.length === 0) {
         return (
-            <View style={styles.emptyContainer}>
-                <Ionicons
-                    name="folder-open-outline"
-                    size={64}
-                    color={theme.colors.textSecondary}
-                />
-                <Text style={styles.emptyTitle}>
-                    {t("projects.emptyTitle")}
-                </Text>
-                <Text style={styles.emptySubtitle}>
-                    {t("projects.emptySubtitle")}
-                </Text>
+            <SharedStateView
+                kind="empty"
+                icon={
+                    <Ionicons
+                        name="folder-open-outline"
+                        size={64}
+                        color={theme.colors.textSecondary}
+                    />
+                }
+                title={t("projects.emptyTitle")}
+                description={t("projects.emptySubtitle")}
+            >
                 <Pressable
                     style={({ pressed }) => [styles.addButton, { opacity: pressed ? 0.7 : 1 }]}
                     onPress={handleAddProject}
@@ -88,26 +93,24 @@ export const ProjectListView = React.memo(() => {
                         {t("projects.addProject")}
                     </Text>
                 </Pressable>
-            </View>
+            </SharedStateView>
         );
     }
 
     const groupTitle = React.useMemo(
         () => (
-            <View style={styles.groupHeader}>
-                <Text style={styles.groupHeaderTitle}>
-                    {t("projects.allProjects")}
-                </Text>
-                <Pressable onPress={handleAddProject} hitSlop={10} style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })} accessibilityLabel={t("projects.addProject")} accessibilityRole="button">
-                    <Ionicons
-                        name="add-circle-outline"
-                        size={22}
-                        color={theme.colors.header.tint}
+            <SharedGroupHeader
+                title={t("projects.allProjects")}
+                trailing={
+                    <SharedGroupHeaderAction
+                        icon="add-circle-outline"
+                        label={t("projects.addProject")}
+                        onPress={handleAddProject}
                     />
-                </Pressable>
-            </View>
+                }
+            />
         ),
-        [handleAddProject, theme],
+        [handleAddProject],
     );
 
     return (
@@ -132,38 +135,6 @@ export const ProjectListView = React.memo(() => {
 });
 
 const styles = StyleSheet.create((theme) => ({
-    emptyContainer: {
-        flex: 1,
-        justifyContent: "center",
-        alignItems: "center",
-        paddingHorizontal: 32,
-        backgroundColor: theme.colors.groupped.background,
-    },
-    emptyTitle: {
-        ...Typography.default("semiBold"),
-        fontSize: 18,
-        color: theme.colors.text,
-        marginTop: 16,
-        textAlign: "center",
-    },
-    emptySubtitle: {
-        ...Typography.default(),
-        fontSize: 14,
-        color: theme.colors.textSecondary,
-        marginTop: 8,
-        textAlign: "center",
-    },
-    groupHeader: {
-        flexDirection: "row",
-        justifyContent: "space-between",
-        alignItems: "center",
-    },
-    groupHeaderTitle: {
-        ...Typography.default("semiBold"),
-        fontSize: 13,
-        color: theme.colors.textSecondary,
-        textTransform: "uppercase",
-    },
     addButton: {
         flexDirection: "row",
         alignItems: "center",

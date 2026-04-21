@@ -1,0 +1,45 @@
+import { Ionicons } from "@expo/vector-icons";
+import { ProjectDetailTabKey } from "./projectDetailTabs";
+import { UiTabTone } from "@/components/tabTone";
+
+export interface ProjectDetailTabPresentation {
+    icon: keyof typeof Ionicons.glyphMap;
+    tone: UiTabTone;
+}
+
+const PRESENTATIONS: Record<ProjectDetailTabKey, ProjectDetailTabPresentation> = {
+    world: {
+        icon: "earth-outline",
+        tone: "teal",
+    },
+    team: {
+        icon: "people-outline",
+        tone: "orange",
+    },
+    goals: {
+        icon: "flag-outline",
+        tone: "magenta",
+    },
+    sessions: {
+        icon: "chatbubble-ellipses-outline",
+        tone: "neutral",
+    },
+    health: {
+        icon: "pulse-outline",
+        tone: "green",
+    },
+    research: {
+        icon: "search-outline",
+        tone: "blue",
+    },
+    knowledge: {
+        icon: "library-outline",
+        tone: "purple",
+    },
+};
+
+export function resolveProjectDetailTabPresentation(
+    key: ProjectDetailTabKey,
+): ProjectDetailTabPresentation {
+    return PRESENTATIONS[key];
+}

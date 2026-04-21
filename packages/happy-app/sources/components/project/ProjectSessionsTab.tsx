@@ -1,7 +1,7 @@
 import * as React from "react";
 import { View, Text, Pressable } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
-import { Swipeable, RectButton } from "react-native-gesture-handler";
+import { Swipeable } from "react-native-gesture-handler";
 import { Item } from "@/components/Item";
 import { ItemGroup } from "@/components/ItemGroup";
 import { ItemList } from "@/components/ItemList";
@@ -22,6 +22,15 @@ import { sessionDelete, sessionKill } from "@/sync/ops";
 import { useHappyAction } from "@/hooks/useHappyAction";
 import { HappyError } from "@/utils/errors";
 import { SessionProviderTag } from "@/components/session/SessionProviderTag";
+import {
+    resolveProjectSessionScopeTone,
+    resolveProjectSessionTextBadges,
+} from "./projectSessionBadges";
+import {
+    SharedGroupHeader,
+    SharedGroupHeaderAction,
+} from "@/components/SharedGroupHeader";
+import { SharedStateView } from "@/components/SharedStateView";
 
 interface ProjectSessionsTabProps {
     project: Project;
@@ -29,6 +38,7 @@ interface ProjectSessionsTabProps {
 
 const SessionRow = React.memo(({ session, showDivider }: { session: Session; showDivider?: boolean }) => {
     const router = useRouter();
+    const { theme } = useUnistyles();
     const status = useSessionStatus(session);
     const machine = useMachine(session.metadata?.machineId ?? "");
     const swipeableRef = React.useRef<Swipeable | null>(null);
@@ -133,6 +143,19 @@ const SessionRow = React.memo(({ session, showDivider }: { session: Session; sho
         router.push(`/session/${session.id}`);
     }, [router, session.id]);
 
+    const scopeTone = React.useMemo(
+        () => resolveProjectSessionScopeTone(session),
+        [session],
+    );
+    const textBadges = React.useMemo(
+        () =>
+            resolveProjectSessionTextBadges({
+                session,
+                machineLabel: machine?.metadata?.displayName ?? null,
+            }),
+        [machine?.metadata?.displayName, session],
+    );
+
     return (
         <Swipeable
             ref={swipeableRef}
@@ -143,25 +166,58 @@ const SessionRow = React.memo(({ session, showDivider }: { session: Session; sho
             onSwipeableWillOpen={() => { isSwipeOpen.current = true; }}
             onSwipeableClose={() => { isSwipeOpen.current = false; }}
         >
-            <RectButton onPress={handlePress} enabled={!isBusy}>
-                <Item
-                    title={getSessionName(session)}
-                    subtitle={status.statusText}
-                    subtitleLines={0}
-                    icon={
+            <Pressable
+                onPress={handlePress}
+                disabled={isBusy}
+                style={({ pressed }) => [
+                    styles.sessionRow,
+                    showDivider && styles.sessionRowDivider,
+                    pressed && styles.sessionRowPressed,
+                    isBusy && styles.sessionRowBusy,
+                ]}
+            >
+                <View style={styles.sessionRowMain}>
+                    <View style={styles.sessionDotColumn}>
                         <View
                             style={[
                                 styles.statusDot,
                                 { backgroundColor: status.statusDotColor },
                             ]}
                         />
-                    }
-                    rightElement={
+                    </View>
+                    <View style={styles.sessionContent}>
+                        <View style={styles.sessionHeader}>
+                            <View style={styles.sessionTitleBlock}>
+                                <Text
+                                    style={[
+                                        styles.sessionTitle,
+                                        !status.isConnected && styles.sessionTitleMuted,
+                                    ]}
+                                    numberOfLines={2}
+                                >
+                                    {getSessionName(session)}
+                                </Text>
+                                <Text
+                                    style={styles.sessionSubtitle}
+                                    numberOfLines={1}
+                                >
+                                    {status.statusText}
+                                </Text>
+                            </View>
+                            {session.active ? (
+                                <Ionicons
+                                    name="chevron-forward"
+                                    size={18}
+                                    color={theme.colors.groupped.chevron}
+                                    style={styles.chevron}
+                                />
+                            ) : null}
+                        </View>
                         <View style={styles.tagsRow}>
                             <View
                                 style={[
                                     styles.sessionTag,
-                                    session.metadata?.worktree?.isWorktree
+                                    scopeTone === "branch"
                                         ? styles.sessionTagBranch
                                         : styles.sessionTagMain,
                                 ]}
@@ -169,38 +225,48 @@ const SessionRow = React.memo(({ session, showDivider }: { session: Session; sho
                                 <Text
                                     style={[
                                         styles.sessionTagText,
-                                        session.metadata?.worktree?.isWorktree
+                                        scopeTone === "branch"
                                             ? styles.sessionTagBranchText
                                             : styles.sessionTagMainText,
                                     ]}
                                 >
-                                    {session.metadata?.worktree?.isWorktree
+                                    {scopeTone === "branch"
                                         ? t("sessionInfo.tagBranch")
                                         : t("sessionInfo.tagMain")}
                                 </Text>
                             </View>
                             <SessionProviderTag session={session} includeModel />
-                            {(machine?.metadata?.displayName || session.metadata?.host) && (
-                                <View style={styles.sessionTag}>
-                                    <Text style={styles.sessionTagMetaText}>
-                                        {machine?.metadata?.displayName || session.metadata?.host}
+                            {textBadges.map((badge) => (
+                                <View
+                                    key={`${session.id}-${badge.kind}-${badge.value}`}
+                                    style={[
+                                        styles.sessionTag,
+                                        badge.kind === "branchName" && styles.branchNameTag,
+                                    ]}
+                                >
+                                    {badge.kind === "branchName" ? (
+                                        <Ionicons
+                                            name="git-branch-outline"
+                                            size={11}
+                                            color={theme.colors.text}
+                                        />
+                                    ) : null}
+                                    <Text
+                                        style={[
+                                            styles.sessionTagMetaText,
+                                            badge.kind === "branchName" &&
+                                                styles.branchNameTagText,
+                                        ]}
+                                        numberOfLines={1}
+                                    >
+                                        {badge.value}
                                     </Text>
                                 </View>
-                            )}
-                            {session.metadata?.version && (
-                                <View style={styles.sessionTag}>
-                                    <Text style={styles.sessionTagMetaText}>
-                                        {session.metadata.version}
-                                    </Text>
-                                </View>
-                            )}
+                            ))}
                         </View>
-                    }
-                    showChevron={session.active}
-                    showDivider={showDivider}
-                    loading={isBusy}
-                />
-            </RectButton>
+                    </View>
+                </View>
+            </Pressable>
         </Swipeable>
     );
 });
@@ -330,15 +396,17 @@ export const ProjectSessionsTab = React.memo(
 
         if (sessions.length === 0) {
             return (
-                <View style={styles.emptyContainer}>
-                    <Ionicons
-                        name="chatbubble-outline"
-                        size={48}
-                        color={theme.colors.textSecondary}
-                    />
-                    <Text style={styles.emptyText}>
-                        {t("projects.noSessions")}
-                    </Text>
+                <SharedStateView
+                    kind="empty"
+                    icon={
+                        <Ionicons
+                            name="chatbubble-outline"
+                            size={48}
+                            color={theme.colors.textSecondary}
+                        />
+                    }
+                    title={t("projects.noSessions")}
+                >
                     <Pressable
                         style={styles.newSessionButton}
                         onPress={handleNewSession}
@@ -348,7 +416,7 @@ export const ProjectSessionsTab = React.memo(
                             {t("newSession.title")}
                         </Text>
                     </Pressable>
-                </View>
+                </SharedStateView>
             );
         }
 
@@ -356,24 +424,16 @@ export const ProjectSessionsTab = React.memo(
             <ItemList>
                 <ItemGroup
                     title={
-                        <View style={styles.archivedHeader}>
-                            <Text style={styles.archivedHeaderTitle}>
-                                {t("projects.activeSessions")}
-                            </Text>
-                            <Pressable
-                                onPress={handleNewSession}
-                                hitSlop={8}
-                                style={({ pressed }) => [
-                                    styles.archivedHeaderButton,
-                                    pressed && { opacity: 0.5 },
-                                ]}
-                            >
-                                <Ionicons name="add-circle-outline" size={14} color={theme.colors.header.tint} />
-                                <Text style={[styles.archivedHeaderButtonText, { color: theme.colors.header.tint }]}>
-                                    {t("newSession.title")}
-                                </Text>
-                            </Pressable>
-                        </View>
+                        <SharedGroupHeader
+                            title={t("projects.activeSessions")}
+                            trailing={
+                                <SharedGroupHeaderAction
+                                    icon="add-circle-outline"
+                                    label={t("newSession.title")}
+                                    onPress={handleNewSession}
+                                />
+                            }
+                        />
                     }
                 >
                     {activeSessions.length > 0 ? (
@@ -390,43 +450,29 @@ export const ProjectSessionsTab = React.memo(
                 {archivedSessions.length > 0 && (
                     <ItemGroup
                         title={
-                            <View style={styles.archivedHeader}>
-                                <Text style={styles.archivedHeaderTitle}>
-                                    {t("projects.archivedSessions")}
-                                </Text>
-                                <View style={styles.archivedHeaderActions}>
+                            <SharedGroupHeader
+                                title={t("projects.archivedSessions")}
+                                trailing={
+                                    <View style={styles.archivedHeaderActions}>
                                     {archivedBranchSessions.length > 0 && (
-                                        <Pressable
+                                        <SharedGroupHeaderAction
+                                            icon="git-branch-outline"
+                                            label={t("projects.clearBranch")}
                                             onPress={handleDeleteArchivedBranchSessions}
                                             disabled={deletingArchivedBranch || deletingArchived}
-                                            hitSlop={8}
-                                            style={({ pressed }) => [
-                                                styles.archivedHeaderButton,
-                                                pressed && { opacity: 0.5 },
-                                            ]}
-                                        >
-                                            <Ionicons name="git-branch-outline" size={14} color={theme.colors.accentPurple} />
-                                            <Text style={styles.archivedHeaderButtonBranchText}>
-                                                {t("projects.clearBranch")}
-                                            </Text>
-                                        </Pressable>
+                                            tone="purple"
+                                        />
                                     )}
-                                    <Pressable
+                                    <SharedGroupHeaderAction
+                                        icon="trash-outline"
+                                        label={t("projects.clearAll")}
                                         onPress={handleDeleteArchivedSessions}
                                         disabled={deletingArchived || deletingArchivedBranch}
-                                        hitSlop={8}
-                                        style={({ pressed }) => [
-                                            styles.archivedHeaderButton,
-                                            pressed && { opacity: 0.5 },
-                                        ]}
-                                    >
-                                        <Ionicons name="trash-outline" size={14} color={theme.colors.deleteAction} />
-                                        <Text style={[styles.archivedHeaderButtonText, { color: theme.colors.deleteAction }]}>
-                                            {t("projects.clearAll")}
-                                        </Text>
-                                    </Pressable>
-                                </View>
-                            </View>
+                                        tone="danger"
+                                    />
+                                    </View>
+                                }
+                            />
                         }
                     >
                         {archivedSessions.map((session) => (
@@ -440,19 +486,6 @@ export const ProjectSessionsTab = React.memo(
 );
 
 const styles = StyleSheet.create((theme) => ({
-    emptyContainer: {
-        flex: 1,
-        justifyContent: "center",
-        alignItems: "center",
-        padding: 32,
-        gap: 12,
-    },
-    emptyText: {
-        ...Typography.default(),
-        fontSize: 14,
-        color: theme.colors.textSecondary,
-        textAlign: "center",
-    },
     newSessionButton: {
         flexDirection: "row",
         alignItems: "center",
@@ -468,16 +501,79 @@ const styles = StyleSheet.create((theme) => ({
         fontSize: 14,
         color: "#FFFFFF",
     },
+    sessionRow: {
+        paddingHorizontal: 14,
+        paddingVertical: 12,
+        backgroundColor: theme.colors.surface,
+    },
+    sessionRowDivider: {
+        borderBottomWidth: StyleSheet.hairlineWidth,
+        borderBottomColor: theme.colors.divider,
+    },
+    sessionRowPressed: {
+        backgroundColor: theme.colors.surfacePressedOverlay,
+    },
+    sessionRowBusy: {
+        opacity: 0.6,
+    },
+    sessionRowMain: {
+        flexDirection: "row",
+        alignItems: "flex-start",
+        gap: 10,
+    },
+    sessionDotColumn: {
+        width: 12,
+        alignItems: "center",
+        paddingTop: 6,
+    },
     statusDot: {
         width: 8,
         height: 8,
         borderRadius: 4,
     },
+    sessionContent: {
+        flex: 1,
+        minWidth: 0,
+        gap: 10,
+    },
+    sessionHeader: {
+        flexDirection: "row",
+        alignItems: "flex-start",
+        gap: 8,
+    },
+    sessionTitleBlock: {
+        flex: 1,
+        minWidth: 0,
+    },
+    sessionTitle: {
+        fontSize: 15,
+        lineHeight: 20,
+        color: theme.colors.text,
+        ...Typography.default("semiBold"),
+    },
+    sessionTitleMuted: {
+        color: theme.colors.textSecondary,
+    },
+    sessionSubtitle: {
+        marginTop: 4,
+        fontSize: 12,
+        lineHeight: 16,
+        color: theme.colors.textSecondary,
+        ...Typography.default(),
+    },
+    chevron: {
+        marginTop: 2,
+        color: theme.colors.groupped.chevron,
+    },
     sessionTag: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 4,
         paddingHorizontal: 6,
-        paddingVertical: 1,
-        borderRadius: 4,
-        marginRight: 4,
+        paddingVertical: 4,
+        borderRadius: 999,
+        backgroundColor: theme.colors.groupped.background,
+        maxWidth: "100%",
     },
     sessionTagBranch: {
         backgroundColor: "rgba(88, 86, 214, 0.12)",
@@ -499,15 +595,20 @@ const styles = StyleSheet.create((theme) => ({
         fontSize: 10,
         color: theme.colors.textSecondary,
         ...Typography.default(),
+        flexShrink: 1,
+    },
+    branchNameTag: {
+        backgroundColor: theme.colors.surfaceHighest,
+    },
+    branchNameTagText: {
+        color: theme.colors.text,
+        ...Typography.default("semiBold"),
     },
     tagsRow: {
         flexDirection: "row",
         alignItems: "center",
-        justifyContent: "flex-end",
         flexWrap: "wrap",
-        gap: 4,
-        flexShrink: 1,
-        maxWidth: 260,
+        gap: 6,
     },
     swipeActionDelete: {
         width: 80,
@@ -532,25 +633,33 @@ const styles = StyleSheet.create((theme) => ({
     },
     archivedHeader: {
         flexDirection: "row",
-        alignItems: "center",
+        alignItems: "flex-start",
         justifyContent: "space-between",
+        gap: 12,
     },
     archivedHeaderTitle: {
         fontSize: 13,
         color: theme.colors.groupped.sectionTitle,
         textTransform: "uppercase",
         letterSpacing: 0.5,
-        ...Typography.default(),
+        ...Typography.default("semiBold"),
     },
     archivedHeaderActions: {
         flexDirection: "row",
         alignItems: "center",
+        justifyContent: "flex-end",
+        flexWrap: "wrap",
         gap: 12,
+        flexShrink: 1,
     },
     archivedHeaderButton: {
         flexDirection: "row",
         alignItems: "center",
-        gap: 3,
+        gap: 4,
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+        borderRadius: 999,
+        backgroundColor: theme.colors.surface,
     },
     archivedHeaderButtonText: {
         fontSize: 12,
