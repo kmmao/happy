@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
     getFavoriteSlashChipGlassStyle,
     getFloatingGlassChipStyle,
-} from "./AgentInputStyles";
+} from "./agentInputGlassStyles";
 
 describe("AgentInputStyles glass helpers", () => {
     it("returns favorite command chip glass styles with rounded blur container", () => {

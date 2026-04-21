@@ -1,6 +1,10 @@
 import { Platform } from "react-native";
 import { Typography } from "@/constants/Typography";
 import { StyleSheet } from "react-native-unistyles";
+import {
+    getFavoriteSlashChipGlassStyle,
+    getFloatingGlassChipStyle,
+} from "./agentInputGlassStyles";
 
 export const FAVORITE_CHIP_GRADIENTS: [string, string][] = [
     ["#6366f1", "#8b5cf6"], // indigo -> violet
@@ -11,50 +15,10 @@ export const FAVORITE_CHIP_GRADIENTS: [string, string][] = [
     ["#8b5cf6", "#a855f7"], // violet -> purple
 ];
 
-export function getFavoriteSlashChipGlassStyle() {
-    return {
-        container: {
-            borderRadius: 18,
-            borderWidth: 1,
-            overflow: "hidden" as const,
-        },
-        blur: {
-            borderRadius: 18,
-            overflow: "hidden" as const,
-        },
-        content: {
-            flexDirection: "row" as const,
-            alignItems: "center" as const,
-            gap: 6,
-            paddingHorizontal: 12,
-            paddingVertical: 7,
-        },
-    };
-}
-
-export function getFloatingGlassChipStyle() {
-    return {
-        container: {
-            marginHorizontal: 8,
-            marginTop: 8,
-            marginBottom: 4,
-            borderRadius: 14,
-            borderWidth: 1,
-            overflow: "hidden" as const,
-        },
-        blur: {
-            borderRadius: 14,
-            overflow: "hidden" as const,
-        },
-        content: {
-            flexDirection: "row" as const,
-            alignItems: "center" as const,
-            gap: 8,
-            paddingHorizontal: 12,
-            paddingVertical: 8,
-        },
-    };
-}
+export {
+    getFavoriteSlashChipGlassStyle,
+    getFloatingGlassChipStyle,
+};
 
 export const stylesheet = StyleSheet.create((theme) => ({
     container: {
@@ -283,4 +247,3 @@ export const stylesheet = StyleSheet.create((theme) => ({
         color: theme.colors.button.primary.tint,
     },
 }));
-
