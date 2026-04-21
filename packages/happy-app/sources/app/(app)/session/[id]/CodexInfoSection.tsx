@@ -14,6 +14,10 @@ import {
     resolveCodexSurfaceSections,
     type CodexSurfaceSection,
 } from "@/sync/codexSurface";
+import {
+    resolveCodexBackendModeLabel,
+    resolveCodexConfigModeLabel,
+} from "@/sync/codexConfigPresentation";
 
 function formatCodexBackendMetadata(
     codex:
@@ -24,10 +28,18 @@ function formatCodexBackendMetadata(
 ): string | null {
     const resolvedBackend = codex?.resolvedBackend;
     if (resolvedBackend === "codex-app-server") {
-        return t("sessionInfo.codexBackendAppServer");
+        return resolveCodexBackendModeLabel(
+            "codex-app-server",
+            t,
+            "session",
+        );
     }
     if (resolvedBackend === "codex-mcp-legacy") {
-        return t("sessionInfo.codexBackendLegacyMcp");
+        return resolveCodexBackendModeLabel(
+            "codex-mcp-legacy",
+            t,
+            "session",
+        );
     }
     return null;
 }
@@ -41,13 +53,21 @@ function formatCodexRequestedBackendMetadata(
 ): string | null {
     const requestedBackend = codex?.requestedBackend;
     if (requestedBackend === "auto") {
-        return t("sessionInfo.codexBackendAuto");
+        return resolveCodexBackendModeLabel("auto", t, "session");
     }
     if (requestedBackend === "codex-app-server") {
-        return t("sessionInfo.codexBackendAppServer");
+        return resolveCodexBackendModeLabel(
+            "codex-app-server",
+            t,
+            "session",
+        );
     }
     if (requestedBackend === "codex-mcp-legacy") {
-        return t("sessionInfo.codexBackendLegacyMcp");
+        return resolveCodexBackendModeLabel(
+            "codex-mcp-legacy",
+            t,
+            "session",
+        );
     }
     return null;
 }
@@ -61,13 +81,21 @@ function formatCodexConfigModeMetadata(
 ): string | null {
     const configMode = codex?.configMode;
     if (configMode === "inherit") {
-        return t("sessionInfo.codexConfigModeInherit");
+        return resolveCodexConfigModeLabel("inherit", t, "session");
     }
     if (configMode === "managed-profile") {
-        return t("sessionInfo.codexConfigModeManagedProfile");
+        return resolveCodexConfigModeLabel(
+            "managed-profile",
+            t,
+            "session",
+        );
     }
     if (configMode === "managed-overrides") {
-        return t("sessionInfo.codexConfigModeManagedOverrides");
+        return resolveCodexConfigModeLabel(
+            "managed-overrides",
+            t,
+            "session",
+        );
     }
     return null;
 }

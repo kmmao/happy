@@ -27,6 +27,10 @@ import {
 } from "@/sync/apiAccountProfiles";
 import { sync } from "@/sync/sync";
 import { storage, useSetting, useSettingMutable } from "@/sync/storage";
+import {
+  resolveCodexBackendModeLabel,
+  resolveCodexConfigModeLabel,
+} from "@/sync/codexConfigPresentation";
 import { getProfileConfigSummary } from "@/utils/profileConfigSummary";
 import { mergeAccountProfiles } from "@/utils/mergeAccountProfiles";
 import {
@@ -490,10 +494,36 @@ function ProfileManager({
 
   const renderProfileSummary = React.useCallback(
     (profile: AIBackendProfile) => {
-      return (
-        getProfileConfigSummary(profile, { includeTmux: true }) ||
-        t("profiles.defaultModel")
-      );
+      const parts: string[] = [];
+
+      if (profile.codexConfig?.backendMode) {
+        parts.push(
+          resolveCodexBackendModeLabel(
+            profile.codexConfig.backendMode,
+            t,
+            "profile",
+          ),
+        );
+      }
+
+      if (profile.codexConfig?.configMode) {
+        parts.push(
+          resolveCodexConfigModeLabel(
+            profile.codexConfig.configMode,
+            t,
+            "profile",
+          ),
+        );
+      }
+
+      const configSummary = getProfileConfigSummary(profile, {
+        includeTmux: true,
+      });
+      if (configSummary) {
+        parts.push(configSummary);
+      }
+
+      return parts.join(" · ") || t("profiles.defaultModel");
     },
     [],
   );

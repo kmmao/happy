@@ -20,6 +20,10 @@ import { getBuiltInProfileDocumentation } from "@/sync/profileUtils";
 import { EnvironmentVariablesList } from "@/components/EnvironmentVariablesList";
 import { log } from '@/log';
 import { buildProfileForSave } from "./profileSavePayload";
+import {
+  getCodexBackendModeOptions,
+  getCodexConfigModeOptions,
+} from "@/sync/codexConfigPresentation";
 
 export interface ProfileEditFormProps {
   profile: AIBackendProfile;
@@ -112,6 +116,14 @@ export function ProfileEditForm({
     React.useState(profile.codexConfig?.approvalPolicy || "");
   const [codexOverrideSandboxMode, setCodexOverrideSandboxMode] =
     React.useState(profile.codexConfig?.sandboxMode || "");
+  const codexBackendOptions = React.useMemo(
+    () => getCodexBackendModeOptions(t),
+    [],
+  );
+  const codexConfigOptions = React.useMemo(
+    () => getCodexConfigModeOptions(t),
+    [],
+  );
 
   const handleSave = () => {
     if (!name.trim()) {
@@ -455,20 +467,7 @@ export function ProfileEditForm({
               {t("profiles.codexBackendMode")}
             </Text>
             <View style={{ gap: 8, marginBottom: 16 }}>
-              {([
-                {
-                  value: "auto" as const,
-                  label: t("profiles.codexBackendAuto"),
-                },
-                {
-                  value: "codex-app-server" as const,
-                  label: t("profiles.codexBackendAppServer"),
-                },
-                {
-                  value: "codex-mcp-legacy" as const,
-                  label: t("profiles.codexBackendLegacy"),
-                },
-              ]).map((option) => {
+              {codexBackendOptions.map((option) => {
                 const isSelected = codexBackendMode === option.value;
                 return (
                   <Pressable
@@ -508,20 +507,7 @@ export function ProfileEditForm({
               {t("profiles.codexConfigMode")}
             </Text>
             <View style={{ gap: 8, marginBottom: 16 }}>
-              {([
-                {
-                  value: "inherit" as const,
-                  label: t("profiles.codexConfigInherit"),
-                },
-                {
-                  value: "managed-profile" as const,
-                  label: t("profiles.codexConfigManagedProfile"),
-                },
-                {
-                  value: "managed-overrides" as const,
-                  label: t("profiles.codexConfigManagedOverrides"),
-                },
-              ]).map((option) => {
+              {codexConfigOptions.map((option) => {
                 const isSelected = codexConfigMode === option.value;
                 return (
                   <Pressable
