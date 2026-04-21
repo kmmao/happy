@@ -33,6 +33,10 @@ import {
   createIssue as apiCreateIssue,
   editIssue as apiEditIssue,
 } from "./issueFetch";
+import {
+  deriveCollectionViewState,
+  type CollectionViewState,
+} from "@/utils/collectionViewState";
 
 //
 // State
@@ -711,4 +715,34 @@ export function useAggregatedClosedCount(
 
 export function useAggregatedHasMore(projectKeys: readonly string[]): boolean {
   return issueStore((s) => projectKeys.some((k) => s.hasMoreByProject[k]));
+}
+
+export interface AggregatedIssueListState {
+  readonly issues: readonly AggregatedIssue[];
+  readonly loading: boolean;
+  readonly error: string | null;
+  readonly state: CollectionViewState;
+}
+
+export function useAggregatedIssueListState(
+  projectKeys: readonly string[],
+): AggregatedIssueListState {
+  const issues = useAggregatedIssues(projectKeys);
+  const loading = useAggregatedLoading(projectKeys);
+  const error = useAggregatedError(projectKeys);
+
+  return React.useMemo(() => {
+    const state = deriveCollectionViewState({
+      loading,
+      error,
+      count: issues.length,
+    });
+
+    return {
+      issues,
+      loading,
+      error: state.error,
+      state,
+    };
+  }, [issues, loading, error]);
 }

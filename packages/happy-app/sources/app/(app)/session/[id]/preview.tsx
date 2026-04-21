@@ -12,7 +12,6 @@ import {
   View,
   ScrollView,
   Pressable,
-  ActivityIndicator,
   TextInput,
   Platform,
 } from "react-native";
@@ -26,6 +25,7 @@ import { usePreview, type DetectedPort } from "@/hooks/usePreview";
 import { useHiddenProcesses } from "@/hooks/useHiddenProcesses";
 import { useSession } from "@/sync/storage";
 import { layout } from "@/components/layout";
+import { SharedStateView } from "@/components/SharedStateView";
 
 type DiffTab = "before" | "after" | "diff";
 
@@ -98,60 +98,53 @@ export default React.memo(function PreviewPage() {
       : null;
     const portsFound = state.status === "detecting-ports" ? state.portsFound ?? 0 : 0;
     return (
-      <View style={styles.centered}>
-        <ActivityIndicator size="large" color={theme.colors.text} />
-        <Text style={styles.statusText}>{t("preview.detectingPorts")}</Text>
-        {phaseKey && (
-          <Text style={styles.phaseText}>
-            {t(phaseKey)}
-            {portsFound > 0 ? ` · ${t("preview.portsFoundCount", { count: portsFound })}` : ""}
-          </Text>
-        )}
-      </View>
+      <SharedStateView
+        kind="loading"
+        title={t("preview.detectingPorts")}
+        description={
+          phaseKey
+            ? `${t(phaseKey)}${portsFound > 0 ? ` · ${t("preview.portsFoundCount", { count: portsFound })}` : ""}`
+            : undefined
+        }
+      />
     );
   }
 
   // Tool unavailable
   if (state.status === "unavailable") {
     return (
-      <View style={styles.centered}>
-        <Ionicons
-          name="cube-outline"
-          size={48}
-          color={theme.colors.textSecondary}
-        />
-        <Text style={[styles.statusText, { fontWeight: "600", fontSize: 17 }]}>
-          {t("preview.unavailableTitle")}
-        </Text>
-        <Text
-          style={[
-            styles.urlText,
-            { textAlign: "center", paddingHorizontal: 32 },
-          ]}
-        >
-          {t("preview.unavailableHint")}
-        </Text>
-      </View>
+      <SharedStateView
+        kind="empty"
+        title={t("preview.unavailableTitle")}
+        description={t("preview.unavailableHint")}
+        icon={
+          <Ionicons
+            name="cube-outline"
+            size={36}
+            color={theme.colors.textSecondary}
+          />
+        }
+      />
     );
   }
 
   if (state.status === "capturing") {
     return (
-      <View style={styles.centered}>
-        <ActivityIndicator size="large" color={theme.colors.text} />
-        <Text style={styles.statusText}>{t("preview.capturing")}</Text>
-        <Text style={styles.urlText}>{state.url}</Text>
-      </View>
+      <SharedStateView
+        kind="loading"
+        title={t("preview.capturing")}
+        description={state.url}
+      />
     );
   }
 
   if (state.status === "comparing") {
     return (
-      <View style={styles.centered}>
-        <ActivityIndicator size="large" color={theme.colors.text} />
-        <Text style={styles.statusText}>{t("preview.comparing")}</Text>
-        <Text style={styles.urlText}>{state.url}</Text>
-      </View>
+      <SharedStateView
+        kind="loading"
+        title={t("preview.comparing")}
+        description={state.url}
+      />
     );
   }
 
@@ -225,14 +218,18 @@ export default React.memo(function PreviewPage() {
 
         {/* Empty state hint — only when no screenshot/comparison yet */}
         {state.status === "ports-detected" && (
-          <View style={styles.emptyHint}>
-            <Ionicons
-              name="camera-outline"
-              size={36}
-              color={theme.colors.textSecondary}
-            />
-            <Text style={styles.emptyHintText}>{t("preview.emptyHint")}</Text>
-          </View>
+          <SharedStateView
+            inline
+            kind="empty"
+            title={t("preview.emptyHint")}
+            icon={
+              <Ionicons
+                name="camera-outline"
+                size={28}
+                color={theme.colors.textSecondary}
+              />
+            }
+          />
         )}
 
         {/* Diff comparison result (Layer 2) */}
@@ -300,17 +297,12 @@ export default React.memo(function PreviewPage() {
 
         {/* Error state */}
         {state.status === "error" && (
-          <View style={styles.errorSection}>
-            <Ionicons
-              name="warning-outline"
-              size={32}
-              color={theme.colors.textDestructive}
-            />
-            <Text style={styles.errorText}>
-              {t("preview.screenshotFailed")}
-            </Text>
-            <Text style={styles.errorDetail}>{state.message}</Text>
-          </View>
+          <SharedStateView
+            inline
+            kind="error"
+            title={t("preview.screenshotFailed")}
+            description={state.message}
+          />
         )}
 
         {/* Baseline indicator + actions (Layer 2) */}

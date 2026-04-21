@@ -44,8 +44,6 @@ import { useNavigateToSession } from "@/hooks/useNavigateToSession";
 import { t } from "@/text";
 import { formatTokenCountShort } from "@/utils/formatUsage";
 import { useRouter } from "expo-router";
-import { Item } from "./Item";
-import { ItemGroup } from "./ItemGroup";
 import { useHappyAction } from "@/hooks/useHappyAction";
 import { sessionDelete } from "@/sync/ops";
 import { buildSessionRespawnProfile } from "@/hooks/sessionUpgradeProfile";
@@ -61,6 +59,11 @@ import {
   ISSUE_STATUS_LABELS,
 } from "@/constants/issueStatusColors";
 import { SessionProviderTag } from "@/components/session/SessionProviderTag";
+import {
+  resolveProjectSessionScopeTone,
+  resolveProjectSessionTextBadges,
+} from "@/components/project/projectSessionBadges";
+import { SharedGroupHeader } from "./SharedGroupHeader";
 
 const stylesheet = StyleSheet.create((theme) => ({
   container: {
@@ -77,7 +80,7 @@ const stylesheet = StyleSheet.create((theme) => ({
   headerSection: {
     backgroundColor: theme.colors.groupped.background,
     paddingHorizontal: 24,
-    paddingTop: 20,
+    paddingTop: 16,
     paddingBottom: 8,
   },
   headerText: {
@@ -88,9 +91,10 @@ const stylesheet = StyleSheet.create((theme) => ({
     ...Typography.default("semiBold"),
   },
   projectGroup: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    backgroundColor: theme.colors.surface,
+    paddingHorizontal: 24,
+    paddingTop: 14,
+    paddingBottom: 8,
+    backgroundColor: theme.colors.groupped.background,
   },
   projectGroupTitle: {
     fontSize: 13,
@@ -105,10 +109,9 @@ const stylesheet = StyleSheet.create((theme) => ({
     ...Typography.default(),
   },
   sessionItem: {
-    minHeight: 88,
     flexDirection: "column",
-    paddingHorizontal: 16,
-    paddingVertical: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
     backgroundColor: theme.colors.surface,
   },
   sessionTopRow: {
@@ -150,12 +153,13 @@ const stylesheet = StyleSheet.create((theme) => ({
   sessionContent: {
     flex: 1,
     marginLeft: 12,
-    justifyContent: "center",
+    minWidth: 0,
+    gap: 8,
   },
   sessionTitleRow: {
     flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 2,
+    alignItems: "flex-start",
+    gap: 8,
   },
   sessionTitle: {
     fontSize: 15,
@@ -170,15 +174,15 @@ const stylesheet = StyleSheet.create((theme) => ({
     color: theme.colors.textSecondary,
   },
   sessionSubtitle: {
-    fontSize: 13,
+    fontSize: 12,
+    lineHeight: 16,
     color: theme.colors.textSecondary,
-    marginBottom: 4,
     ...Typography.default(),
   },
   requestPreview: {
     fontSize: 11,
+    lineHeight: 14,
     color: theme.colors.textSecondary,
-    marginTop: 4,
     ...Typography.default(),
   },
   requestPreviewAuto: {
@@ -192,20 +196,22 @@ const stylesheet = StyleSheet.create((theme) => ({
     alignItems: "center",
     flexWrap: "wrap",
     gap: 6,
-    marginTop: 6,
   },
   tag: {
     flexDirection: "row",
     alignItems: "center",
+    gap: 4,
     paddingHorizontal: 6,
-    paddingVertical: 1,
-    borderRadius: 4,
+    paddingVertical: 4,
+    borderRadius: 999,
     backgroundColor: theme.colors.groupped.background,
+    maxWidth: "100%",
   },
   tagText: {
     fontSize: 10,
     color: theme.colors.textSecondary,
     ...Typography.default(),
+    flexShrink: 1,
   },
   tagBranch: {
     backgroundColor: `${theme.colors.accentPurple}1F`,
@@ -257,9 +263,8 @@ const stylesheet = StyleSheet.create((theme) => ({
     color: theme.colors.accentBlue,
   },
   sessionTimestamp: {
-    fontSize: 12,
+    fontSize: 11,
     color: theme.colors.textSecondary,
-    marginLeft: 8,
     ...Typography.default(),
   },
   statusRow: {
@@ -272,7 +277,7 @@ const stylesheet = StyleSheet.create((theme) => ({
     alignItems: "center",
   },
   usageText: {
-    fontSize: 11,
+    fontSize: 10,
     color: theme.colors.textSecondary,
     ...Typography.default(),
   },
@@ -280,13 +285,12 @@ const stylesheet = StyleSheet.create((theme) => ({
     alignItems: "center",
     justifyContent: "center",
     height: 16,
-    marginTop: 2,
-    marginRight: 4,
+    marginRight: 6,
   },
   statusText: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: "500",
-    lineHeight: 16,
+    lineHeight: 14,
     ...Typography.default(),
   },
   avatarContainer: {
@@ -305,6 +309,16 @@ const stylesheet = StyleSheet.create((theme) => ({
   },
   draftIconOverlay: {
     color: theme.colors.textSecondary,
+  },
+  sessionItemPressed: {
+    backgroundColor: theme.colors.surfacePressedOverlay,
+  },
+  branchNameTag: {
+    backgroundColor: theme.colors.surfaceHighest,
+  },
+  branchNameTagText: {
+    color: theme.colors.text,
+    ...Typography.default("semiBold"),
   },
   artifactsSection: {
     paddingHorizontal: 16,
@@ -416,7 +430,7 @@ export function SessionsList() {
         case "header":
           return (
             <View style={styles.headerSection}>
-              <Text style={styles.headerText}>{item.title}</Text>
+              <SharedGroupHeader title={item.title} variant="section" />
             </View>
           );
 
@@ -441,12 +455,15 @@ export function SessionsList() {
         case "project-group":
           return (
             <View style={styles.projectGroup}>
-              <Text style={styles.projectGroupTitle}>{item.displayPath}</Text>
-              <Text style={styles.projectGroupSubtitle}>
-                {item.machine.metadata?.displayName ||
+              <SharedGroupHeader
+                title={item.displayPath}
+                subtitle={
+                  item.machine.metadata?.displayName ||
                   item.machine.metadata?.host ||
-                  item.machine.id}
-              </Text>
+                  item.machine.id
+                }
+                variant="context"
+              />
             </View>
           );
 
@@ -702,6 +719,18 @@ const SessionItem = React.memo(
     const latestRequestPreview = React.useMemo(() => {
       return getLatestUserRequestPreview(messages);
     }, [messages]);
+    const scopeTone = React.useMemo(
+      () => resolveProjectSessionScopeTone(session),
+      [session],
+    );
+    const textBadges = React.useMemo(
+      () =>
+        resolveProjectSessionTextBadges({
+          session,
+          machineLabel: machine?.metadata?.displayName ?? null,
+        }),
+      [machine?.metadata?.displayName, session],
+    );
 
     const itemContent = (
       <View>
@@ -716,7 +745,7 @@ const SessionItem = React.memo(
                 : isLast
                   ? styles.sessionItemLast
                   : {},
-            { opacity: pressed ? 0.7 : 1 },
+            pressed && styles.sessionItemPressed,
           ]}
           onPressIn={() => {
             if (isTablet) {
@@ -871,7 +900,7 @@ const SessionItem = React.memo(
             <View
               style={[
                 styles.tag,
-                session.metadata?.worktree?.isWorktree
+                scopeTone === "branch"
                   ? styles.tagBranch
                   : styles.tagMain,
               ]}
@@ -879,12 +908,12 @@ const SessionItem = React.memo(
               <Text
                 style={[
                   styles.tagText,
-                  session.metadata?.worktree?.isWorktree
+                  scopeTone === "branch"
                     ? styles.tagBranchText
                     : styles.tagMainText,
                 ]}
               >
-                {session.metadata?.worktree?.isWorktree
+                {scopeTone === "branch"
                   ? t("sessionInfo.tagBranch")
                   : t("sessionInfo.tagMain")}
               </Text>
@@ -893,20 +922,32 @@ const SessionItem = React.memo(
               session={session}
               includeModel
             />
-            {(machine?.metadata?.displayName || session.metadata?.host) && (
-              <View style={styles.tag}>
-                <Text style={styles.tagText}>
-                  {machine?.metadata?.displayName || session.metadata?.host}
+            {textBadges.map((badge) => (
+              <View
+                key={`${session.id}-${badge.kind}-${badge.value}`}
+                style={[
+                  styles.tag,
+                  badge.kind === "branchName" && styles.branchNameTag,
+                ]}
+              >
+                {badge.kind === "branchName" ? (
+                  <Ionicons
+                    name="git-branch-outline"
+                    size={11}
+                    color={theme.colors.text}
+                  />
+                ) : null}
+                <Text
+                  style={[
+                    styles.tagText,
+                    badge.kind === "branchName" && styles.branchNameTagText,
+                  ]}
+                  numberOfLines={1}
+                >
+                  {badge.value}
                 </Text>
               </View>
-            )}
-            {session.metadata?.version && (
-              <View style={styles.tag}>
-                <Text style={styles.tagText}>
-                  {session.metadata.version}
-                </Text>
-              </View>
-            )}
+            ))}
             {isAutoOptionSend && (
               <View style={[styles.tag, styles.autoSendBadge]}>
                 <Ionicons

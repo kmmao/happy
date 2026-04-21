@@ -57,6 +57,11 @@ import {
   ISSUE_STATUS_LABELS,
 } from "@/constants/issueStatusColors";
 import { SessionProviderTag } from "@/components/session/SessionProviderTag";
+import {
+  resolveProjectSessionScopeTone,
+  resolveProjectSessionTextBadges,
+} from "@/components/project/projectSessionBadges";
+import { SharedGroupHeader } from "./SharedGroupHeader";
 
 const stylesheet = StyleSheet.create((theme, runtime) => ({
   container: {
@@ -120,11 +125,10 @@ const stylesheet = StyleSheet.create((theme, runtime) => ({
     marginTop: 1,
   },
   sessionRow: {
-    minHeight: 56,
     flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 16,
-    paddingVertical: 8,
+    alignItems: "flex-start",
+    paddingHorizontal: 14,
+    paddingVertical: 12,
     backgroundColor: theme.colors.surface,
   },
   sessionRowWithBorder: {
@@ -136,11 +140,12 @@ const stylesheet = StyleSheet.create((theme, runtime) => ({
   },
   sessionContent: {
     flex: 1,
-    justifyContent: "center",
+    minWidth: 0,
+    gap: 8,
   },
   sessionTitleRow: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
   },
   sessionMetaRow: {
     flexDirection: "row",
@@ -175,8 +180,9 @@ const stylesheet = StyleSheet.create((theme, runtime) => ({
   },
   sessionTitle: {
     fontSize: 15,
+    lineHeight: 20,
     flex: 1,
-    ...Typography.default("regular"),
+    ...Typography.default("semiBold"),
   },
   sessionTitleConnected: {
     color: theme.colors.text,
@@ -273,28 +279,30 @@ const stylesheet = StyleSheet.create((theme, runtime) => ({
     alignItems: "center",
     flexWrap: "wrap",
     gap: 6,
-    marginTop: 2,
   },
   tag: {
     flexDirection: "row",
     alignItems: "center",
+    gap: 4,
     paddingHorizontal: 6,
-    paddingVertical: 1,
-    borderRadius: 4,
+    paddingVertical: 4,
+    borderRadius: 999,
     backgroundColor: theme.colors.groupped.background,
+    maxWidth: "100%",
   },
   tagText: {
     fontSize: 10,
     color: theme.colors.textSecondary,
     ...Typography.default(),
+    flexShrink: 1,
   },
   upgradeBadge: {
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: "rgba(255, 159, 10, 0.15)",
-    paddingHorizontal: 4,
-    height: 16,
-    borderRadius: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 4,
+    borderRadius: 999,
     gap: 2,
   },
   upgradeBadgeText: {
@@ -321,10 +329,9 @@ const stylesheet = StyleSheet.create((theme, runtime) => ({
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: theme.colors.surfaceHighest,
-    paddingHorizontal: 4,
-    height: 16,
-    borderRadius: 4,
-    marginLeft: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 4,
+    borderRadius: 999,
     gap: 2,
   },
   worktreeBadgeText: {
@@ -333,6 +340,13 @@ const stylesheet = StyleSheet.create((theme, runtime) => ({
     color: theme.colors.textSecondary,
     ...Typography.default(),
     maxWidth: 80,
+  },
+  branchNameTag: {
+    backgroundColor: theme.colors.surfaceHighest,
+  },
+  branchNameTagText: {
+    color: theme.colors.text,
+    ...Typography.default("semiBold"),
   },
   issueRow: {
     flexDirection: "row",
@@ -490,35 +504,33 @@ export function ActiveSessionsGroupCompact({
           <View key={projectPath}>
             {/* Section header on grouped background */}
             <View style={styles.sectionHeader}>
-              <View style={styles.sectionHeaderLeft}>
-                {avatarId && firstSession && (
-                  <View style={styles.sectionHeaderAvatar}>
+              <SharedGroupHeader
+                title={
+                  projectAliasMap.has(projectPath)
+                    ? projectAliasMap.get(projectPath) ?? projectGroup.displayPath
+                    : projectGroup.displayPath
+                }
+                subtitle={
+                  projectAliasMap.has(projectPath)
+                    ? projectGroup.displayPath
+                    : undefined
+                }
+                variant="context"
+                leading={
+                  avatarId && firstSession ? (
                     <ProjectHeaderAvatar
                       avatarId={avatarId}
                       flavor={firstSession.metadata?.flavor}
                       sessionId={firstSession.id}
                     />
-                  </View>
-                )}
-                {projectAliasMap.has(projectPath) ? (
-                  <View style={styles.sectionHeaderNameGroup}>
-                    <Text style={styles.sectionHeaderAlias} numberOfLines={1}>
-                      {projectAliasMap.get(projectPath)}
-                    </Text>
-                    <Text style={styles.sectionHeaderSubpath} numberOfLines={1}>
-                      {projectGroup.displayPath}
-                    </Text>
-                  </View>
-                ) : (
-                  <Text style={styles.sectionHeaderPath}>
-                    {projectGroup.displayPath}
-                  </Text>
-                )}
-              </View>
-              {/* Show git status instead of machine name */}
-              {firstSession ? (
-                <ProjectGitStatus sessionId={firstSession.id} />
-              ) : null}
+                  ) : undefined
+                }
+                trailing={
+                  firstSession ? (
+                    <ProjectGitStatus sessionId={firstSession.id} />
+                  ) : undefined
+                }
+              />
             </View>
 
             {/* Card with just the sessions */}
@@ -712,6 +724,18 @@ const CompactSessionRow = React.memo(
     const latestRequestPreview = React.useMemo(() => {
       return getLatestUserRequestPreview(messages);
     }, [messages]);
+    const scopeTone = React.useMemo(
+      () => resolveProjectSessionScopeTone(session),
+      [session],
+    );
+    const textBadges = React.useMemo(
+      () =>
+        resolveProjectSessionTextBadges({
+          session,
+          machineLabel: machine?.metadata?.displayName ?? null,
+        }),
+      [machine?.metadata?.displayName, session],
+    );
 
     const itemContent = (
       <View>
@@ -794,18 +818,6 @@ const CompactSessionRow = React.memo(
               >
                 {sessionName}
               </Text>
-              {session.metadata?.worktree?.isWorktree && (
-                <View style={styles.worktreeBadge}>
-                  <Ionicons
-                    name="git-branch-outline"
-                    size={10}
-                    color={styles.worktreeBadgeText.color}
-                  />
-                  <Text style={styles.worktreeBadgeText} numberOfLines={1}>
-                    {session.metadata.worktree.branchName}
-                  </Text>
-                </View>
-              )}
               {session.latestUsage ? (
                 <Text style={styles.usageLabel}>
                   {formatTokenCountShort(
@@ -847,7 +859,7 @@ const CompactSessionRow = React.memo(
               <View
                 style={[
                   styles.tag,
-                  session.metadata?.worktree?.isWorktree
+                  scopeTone === "branch"
                     ? styles.tagBranch
                     : styles.tagMain,
                 ]}
@@ -855,12 +867,12 @@ const CompactSessionRow = React.memo(
                 <Text
                   style={[
                     styles.tagText,
-                    session.metadata?.worktree?.isWorktree
+                    scopeTone === "branch"
                       ? styles.tagBranchText
                       : styles.tagMainText,
                   ]}
                 >
-                  {session.metadata?.worktree?.isWorktree
+                  {scopeTone === "branch"
                     ? t("sessionInfo.tagBranch")
                     : t("sessionInfo.tagMain")}
                 </Text>
@@ -869,27 +881,58 @@ const CompactSessionRow = React.memo(
                 session={session}
                 includeModel
               />
-              {(machine?.metadata?.displayName || session.metadata?.host) && (
-                <View style={styles.tag}>
-                  <Text style={styles.tagText}>
-                    {machine?.metadata?.displayName || session.metadata?.host}
+              {textBadges.map((badge) => (
+                <View
+                  key={`${session.id}-${badge.kind}-${badge.value}`}
+                  style={[
+                    styles.tag,
+                    badge.kind === "branchName" && styles.branchNameTag,
+                    badge.kind === "version" &&
+                      needsUpgrade &&
+                      styles.upgradeBadge,
+                  ]}
+                >
+                  {badge.kind === "branchName" ? (
+                    <Ionicons
+                      name="git-branch-outline"
+                      size={11}
+                      color={theme.colors.text}
+                    />
+                  ) : null}
+                  <Text
+                    style={[
+                      styles.tagText,
+                      badge.kind === "branchName" && styles.branchNameTagText,
+                      badge.kind === "version" &&
+                        needsUpgrade &&
+                        styles.upgradeBadgeText,
+                    ]}
+                    numberOfLines={1}
+                  >
+                    {badge.value}
                   </Text>
-                </View>
-              )}
-              {session.metadata?.version && (
-                <View style={[styles.tag, needsUpgrade && styles.upgradeBadge]}>
-                  <Text style={[styles.tagText, needsUpgrade && styles.upgradeBadgeText]}>
-                    {session.metadata.version}
-                  </Text>
-                  {needsUpgrade && (
+                  {badge.kind === "version" && needsUpgrade ? (
                     <Ionicons
                       name="arrow-up-circle-outline"
                       size={10}
                       color={styles.upgradeBadgeText.color}
                     />
-                  )}
+                  ) : null}
                 </View>
-              )}
+              ))}
+              {session.metadata?.worktree?.isWorktree &&
+                !textBadges.some((badge) => badge.kind === "branchName") && (
+                  <View style={styles.worktreeBadge}>
+                    <Ionicons
+                      name="git-branch-outline"
+                      size={10}
+                      color={styles.worktreeBadgeText.color}
+                    />
+                    <Text style={styles.worktreeBadgeText} numberOfLines={1}>
+                      {session.metadata.worktree.branchName}
+                    </Text>
+                  </View>
+                )}
             </View>
 
             {/* Issue info line */}

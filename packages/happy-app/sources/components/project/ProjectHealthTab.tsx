@@ -56,6 +56,7 @@ import { SupervisorLoopStatusCard } from "./SupervisorLoopStatusCard";
 import { SupervisorLoopConfigPanel } from "./SupervisorLoopConfigPanel";
 import { DayRangeSelector } from "./DayRangeSelector";
 import { SupervisorLoopHistoryItem } from "./SupervisorLoopHistoryItem";
+import { SharedStateView } from "@/components/SharedStateView";
 import {
     getSupervisorAvailableProfiles,
     getMissingSupervisorProfileName,
@@ -536,19 +537,18 @@ export const ProjectHealthTab = React.memo(
         // Not synced to server yet
         if (!serverId) {
             return (
-                <View style={styles.emptyContainer}>
-                    <Ionicons
-                        name="pulse-outline"
-                        size={64}
-                        color={theme.colors.textSecondary}
-                    />
-                    <Text style={styles.emptyTitle}>
-                        {t("supervisor.title")}
-                    </Text>
-                    <Text style={styles.emptySubtitle}>
-                        {t("supervisor.notSynced")}
-                    </Text>
-                </View>
+                <SharedStateView
+                    kind="empty"
+                    icon={
+                        <Ionicons
+                            name="pulse-outline"
+                            size={64}
+                            color={theme.colors.textSecondary}
+                        />
+                    }
+                    title={t("supervisor.title")}
+                    description={t("supervisor.notSynced")}
+                />
             );
         }
 

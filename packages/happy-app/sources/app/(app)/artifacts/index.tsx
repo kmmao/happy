@@ -11,6 +11,8 @@ import { t } from '@/text';
 import { layout } from '@/components/layout';
 import { sync } from '@/sync/sync';
 import { FAB } from '@/components/FAB';
+import { SharedStateView } from '@/components/SharedStateView';
+import { resolveSharedCollectionState } from '@/components/sharedCollectionState';
 // Date formatting
 
 const stylesheet = StyleSheet.create((theme) => ({
@@ -122,37 +124,49 @@ const stylesheet = StyleSheet.create((theme) => ({
 function ArtifactsScreen() {
     const { theme } = useUnistyles();
     const styles = stylesheet;
-    const safeArea = useSafeAreaInsets();
     const router = useRouter();
     const artifacts = useArtifacts();
     const [isLoading, setIsLoading] = React.useState(false);
+    const [loadError, setLoadError] = React.useState<string | null>(null);
+
+    const loadArtifacts = React.useCallback(async () => {
+        try {
+            const credentials = sync.getCredentials();
+            if (!credentials) {
+                setLoadError(t('errors.authenticationFailed'));
+                return;
+            }
+
+            setIsLoading(true);
+            setLoadError(null);
+            await sync.fetchArtifactsList();
+        } catch (_error) {
+            setLoadError(t('artifacts.error'));
+        } finally {
+            setIsLoading(false);
+        }
+    }, []);
     
     // Fetch artifacts on mount
     React.useEffect(() => {
         let cancelled = false;
 
         (async () => {
-            try {
-                const credentials = sync.getCredentials();
-                if (!credentials) {
-                    return;
-                }
-
-                setIsLoading(true);
-                await sync.fetchArtifactsList();
-            } catch (_error) {
-                // Fetch failed silently — user can retry
-            } finally {
-                if (!cancelled) {
-                    setIsLoading(false);
-                }
+            if (!cancelled) {
+                await loadArtifacts();
             }
         })();
 
         return () => {
             cancelled = true;
         };
-    }, []);
+    }, [loadArtifacts]);
+
+    const artifactsState = resolveSharedCollectionState({
+        loading: isLoading,
+        error: loadError,
+        count: artifacts.length,
+    });
 
     const renderItem = React.useCallback(({ item, index }: { item: DecryptedArtifact; index: number }) => {
         const isFirst = index === 0;
@@ -198,34 +212,41 @@ function ArtifactsScreen() {
     const keyExtractor = React.useCallback((item: DecryptedArtifact) => item.id, []);
 
     const ListEmptyComponent = React.useCallback(() => {
-        if (isLoading) {
+        if (artifactsState === 'loading') {
             return (
-                <View style={styles.loadingContainer}>
-                    <ActivityIndicator size="large" />
-                    <Text style={[styles.emptyDescription, { marginTop: 16 }]}>
-                        {t('artifacts.loading')}
-                    </Text>
-                </View>
+                <SharedStateView kind="loading" title={t('artifacts.loading')} />
+            );
+        }
+
+        if (artifactsState === 'error') {
+            return (
+                <SharedStateView
+                    kind="error"
+                    title={t('common.error')}
+                    description={loadError ?? t('artifacts.error')}
+                    onAction={() => {
+                        void loadArtifacts();
+                    }}
+                />
             );
         }
 
         return (
-            <View style={styles.emptyContainer}>
-                <Ionicons 
-                    name="document-text-outline" 
-                    size={64} 
-                    style={styles.emptyIcon}
-                    color={theme.colors.textSecondary}
-                />
-                <Text style={styles.emptyTitle}>
-                    {t('artifacts.empty')}
-                </Text>
-                <Text style={styles.emptyDescription}>
-                    {t('artifacts.emptyDescription')}
-                </Text>
-            </View>
+            <SharedStateView
+                kind="empty"
+                icon={
+                    <Ionicons 
+                        name="document-text-outline" 
+                        size={64} 
+                        style={styles.emptyIcon}
+                        color={theme.colors.textSecondary}
+                    />
+                }
+                title={t('artifacts.empty')}
+                description={t('artifacts.emptyDescription')}
+            />
         );
-    }, [isLoading, styles]);
+    }, [artifactsState, loadError, loadArtifacts, styles, theme.colors.textSecondary]);
 
     return (
         <View style={styles.container}>

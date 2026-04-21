@@ -39,6 +39,7 @@ import { MemberStatsSection } from "./MemberStatsSection";
 import { RoleCollaborationSection } from "./RoleCollaborationSection";
 import { SuggestionCard } from "./SuggestionCard";
 import { WorldConfigSection } from "./WorldConfigSection";
+import { SharedStateView } from "@/components/SharedStateView";
 import {
     applySuggestionStatusUpdate,
     getSuggestionTypeLabelKey,
@@ -241,19 +242,24 @@ export const WorldOverviewTab = React.memo(
 
         if (loading && !data) {
             return (
-                <View style={styles.centerContainer}>
-                    <ActivityIndicator />
-                </View>
+                <SharedStateView kind="loading" title={t("common.loading")} />
             );
         }
 
         if (!data) {
             return (
-                <View style={styles.centerContainer}>
-                    <Ionicons name="globe-outline" size={48} color={theme.colors.textSecondary} />
-                    <Text style={styles.emptyText}>{t("world.noDataYet")}</Text>
-                    <Text style={styles.emptyHint}>{t("world.noDataHint")}</Text>
-                </View>
+                <SharedStateView
+                    kind="empty"
+                    title={t("world.noDataYet")}
+                    description={t("world.noDataHint")}
+                    icon={
+                        <Ionicons
+                            name="globe-outline"
+                            size={48}
+                            color={theme.colors.textSecondary}
+                        />
+                    }
+                />
             );
         }
 

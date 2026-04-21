@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { View, Text, ScrollView, Pressable, ActivityIndicator } from 'react-native';
+import { View, Text, ScrollView, Pressable } from 'react-native';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 import { useAcceptedFriends, useFriendRequests, useRequestedFriends, useFeedItems, useFeedLoaded, useFriendsLoaded, useRealtimeStatus } from '@/sync/storage';
 import { UserCard } from '@/components/UserCard';
@@ -18,6 +18,7 @@ import { FeedItemCard } from './FeedItemCard';
 import { VoiceAssistantStatusBar } from './VoiceAssistantStatusBar';
 import { useInboxData } from '@/hooks/useInboxData';
 import { ServerInboxItem } from '@/sync/apiInbox';
+import { SharedStateView } from '@/components/SharedStateView';
 
 // --- Inbox item card ---
 
@@ -195,9 +196,7 @@ export const InboxView = React.memo(({}: InboxViewProps) => {
             <View style={styles.container}>
                 {tabletHeader}
                 <UpdateBanner />
-                <View style={styles.emptyContainer}>
-                    <ActivityIndicator size="large" color={theme.colors.textSecondary} />
-                </View>
+                <SharedStateView kind="loading" title={t('common.loading')} />
             </View>
         );
     }
@@ -207,16 +206,19 @@ export const InboxView = React.memo(({}: InboxViewProps) => {
             <View style={styles.container}>
                 {tabletHeader}
                 <UpdateBanner />
-                <View style={styles.emptyContainer}>
-                    <Image
-                        source={require('@/assets/images/brutalist/Brutalism 10.png')}
-                        contentFit="contain"
-                        style={[{ width: 64, height: 64 }, styles.emptyIcon]}
-                        tintColor={theme.colors.textSecondary}
-                    />
-                    <Text style={styles.emptyTitle}>{t('inbox.emptyTitle')}</Text>
-                    <Text style={styles.emptyDescription}>{t('inbox.emptyDescription')}</Text>
-                </View>
+                <SharedStateView
+                    kind="empty"
+                    icon={
+                        <Image
+                            source={require('@/assets/images/brutalist/Brutalism 10.png')}
+                            contentFit="contain"
+                            style={[{ width: 64, height: 64 }, styles.emptyIcon]}
+                            tintColor={theme.colors.textSecondary}
+                        />
+                    }
+                    title={t('inbox.emptyTitle')}
+                    description={t('inbox.emptyDescription')}
+                />
             </View>
         );
     }
@@ -332,21 +334,7 @@ const styles = StyleSheet.create((theme) => ({
         padding: 24,
     },
     emptyIcon: {
-        marginBottom: 16,
-    },
-    emptyTitle: {
-        fontSize: 20,
-        ...Typography.default('semiBold'),
-        color: theme.colors.text,
-        marginBottom: 8,
-        textAlign: 'center',
-    },
-    emptyDescription: {
-        fontSize: 16,
-        ...Typography.default(),
-        color: theme.colors.textSecondary,
-        textAlign: 'center',
-        lineHeight: 22,
+        marginBottom: 0,
     },
     sectionHeader: {
         fontSize: 14,

@@ -14,6 +14,7 @@ import { ProjectProfileCard } from "./ProjectProfileCard";
 import { ProjectKnowledgeConfigCard } from "./ProjectKnowledgeConfigCard";
 import { layout } from "@/components/layout";
 import { useProject } from "@/hooks/useProjects";
+import { SharedStateView } from "@/components/SharedStateView";
 
 interface ProjectKnowledgeTabProps {
     projectId: string;
@@ -454,19 +455,18 @@ export const ProjectKnowledgeTab = React.memo<ProjectKnowledgeTabProps>(
 
         const EmptyComponent = React.useMemo(
             () => (
-                <View style={styles.emptyContainer}>
-                    <Ionicons
-                        name="bulb-outline"
-                        size={48}
-                        color={theme.colors.textSecondary}
-                    />
-                    <Text style={[styles.emptyTitle, { color: theme.colors.text }]}>
-                        {t("projects.knowledgeEmpty")}
-                    </Text>
-                    <Text style={[styles.emptySubtitle, { color: theme.colors.textSecondary }]}>
-                        {t("projects.knowledgeEmptySubtitle")}
-                    </Text>
-                </View>
+                <SharedStateView
+                    kind="empty"
+                    icon={
+                        <Ionicons
+                            name="bulb-outline"
+                            size={48}
+                            color={theme.colors.textSecondary}
+                        />
+                    }
+                    title={t("projects.knowledgeEmpty")}
+                    description={t("projects.knowledgeEmptySubtitle")}
+                />
             ),
             [theme],
         );

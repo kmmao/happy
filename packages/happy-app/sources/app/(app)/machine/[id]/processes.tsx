@@ -9,7 +9,7 @@
  */
 
 import * as React from "react";
-import { View, ScrollView, Pressable, ActivityIndicator } from "react-native";
+import { View, ScrollView, Pressable } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { Text } from "@/components/StyledText";
@@ -22,6 +22,7 @@ import { t } from "@/text";
 import type { DetectedPort } from "@/hooks/portDetection";
 import { useMachine } from "@/sync/storage";
 import { buildPreviewUrl } from "@/utils/previewUrl";
+import { SharedStateView } from "@/components/SharedStateView";
 
 export default React.memo(function ProcessesPage() {
     const { id: machineId } = useLocalSearchParams<{ id: string }>();
@@ -100,12 +101,10 @@ export default React.memo(function ProcessesPage() {
 
     if (isScanning && allWebProcesses.length === 0) {
         return (
-            <View style={styles.centered}>
-                <ActivityIndicator size="large" color={theme.colors.text} />
-                <Text style={styles.statusText}>
-                    {t("processManager.scanning")}
-                </Text>
-            </View>
+            <SharedStateView
+                kind="loading"
+                title={t("processManager.scanning")}
+            />
         );
     }
 
@@ -209,23 +208,27 @@ export default React.memo(function ProcessesPage() {
 
                 {/* Empty state */}
                 {visibleProcesses.length === 0 && (
-                    <View style={styles.emptyState}>
-                        <Ionicons
-                            name={showHidden ? "eye-off-outline" : "checkmark-circle-outline"}
-                            size={48}
-                            color={theme.colors.textSecondary}
-                        />
-                        <Text style={styles.emptyTitle}>
-                            {showHidden
+                    <SharedStateView
+                        inline
+                        kind="empty"
+                        title={
+                            showHidden
                                 ? t("processManager.noHiddenProcesses")
-                                : t("processManager.noProcesses")}
-                        </Text>
-                        <Text style={styles.emptySubtitle}>
-                            {showHidden
+                                : t("processManager.noProcesses")
+                        }
+                        description={
+                            showHidden
                                 ? t("processManager.noHiddenProcessesHint")
-                                : t("processManager.noProcessesHint")}
-                        </Text>
-                    </View>
+                                : t("processManager.noProcessesHint")
+                        }
+                        icon={
+                            <Ionicons
+                                name={showHidden ? "eye-off-outline" : "checkmark-circle-outline"}
+                                size={36}
+                                color={theme.colors.textSecondary}
+                            />
+                        }
+                    />
                 )}
 
                 {/* Process list */}

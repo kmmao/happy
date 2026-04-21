@@ -6,30 +6,12 @@ import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 import { useAllMachines } from '@/sync/storage';
 import { isMachineOnline } from '@/utils/machineUtils';
 import { useRouter } from 'expo-router';
+import { SharedEmptyState } from '@/components/SharedEmptyState';
+import { t } from '@/text';
 
 const stylesheet = StyleSheet.create((theme) => ({
-    container: {
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-        paddingHorizontal: 48,
-    },
     iconContainer: {
         marginBottom: 24,
-    },
-    titleText: {
-        fontSize: 20,
-        color: theme.colors.textSecondary,
-        textAlign: 'center',
-        marginBottom: 8,
-        ...Typography.default('regular'),
-    },
-    descriptionText: {
-        fontSize: 16,
-        color: theme.colors.textSecondary,
-        textAlign: 'center',
-        marginBottom: 24,
-        ...Typography.default(),
     },
     button: {
         backgroundColor: theme.colors.button.primary.background,
@@ -38,10 +20,6 @@ const stylesheet = StyleSheet.create((theme) => ({
         borderRadius: 12,
         flexDirection: 'row',
         alignItems: 'center',
-    },
-    buttonDisabled: {
-        backgroundColor: theme.colors.textSecondary,
-        opacity: 0.6,
     },
     buttonIcon: {
         marginRight: 8,
@@ -69,43 +47,34 @@ export function EmptySessionsTablet() {
     };
     
     return (
-        <View style={styles.container}>
-            <Ionicons 
-                name="terminal-outline" 
-                size={64} 
-                color={theme.colors.textSecondary}
-                style={styles.iconContainer}
-            />
-            
-            <Text style={styles.titleText}>
-                No active sessions
-            </Text>
-            
+        <SharedEmptyState
+            icon={
+                <Ionicons 
+                    name="terminal-outline" 
+                    size={64} 
+                    color={theme.colors.textSecondary}
+                    style={styles.iconContainer}
+                />
+            }
+            title={t("projects.noSessions")}
+            description={hasOnlineMachines ? undefined : t("newSession.noMachinesFound")}
+        >
             {hasOnlineMachines ? (
-                <>
-                    <Text style={styles.descriptionText}>
-                        Start a new session on any of your connected machines.
+                <Pressable
+                    style={styles.button}
+                    onPress={handleStartNewSession}
+                >
+                    <Ionicons
+                        name="add"
+                        size={20}
+                        color={theme.colors.button.primary.tint}
+                        style={styles.buttonIcon}
+                    />
+                    <Text style={styles.buttonText}>
+                        {t("newSession.title")}
                     </Text>
-                    <Pressable
-                        style={styles.button}
-                        onPress={handleStartNewSession}
-                    >
-                        <Ionicons
-                            name="add"
-                            size={20}
-                            color={theme.colors.button.primary.tint}
-                            style={styles.buttonIcon}
-                        />
-                        <Text style={styles.buttonText}>
-                            Start New Session
-                        </Text>
-                    </Pressable>
-                </>
-            ) : (
-                <Text style={styles.descriptionText}>
-                    Open a new terminal on your computer to start session.
-                </Text>
-            )}
-        </View>
+                </Pressable>
+            ) : null}
+        </SharedEmptyState>
     );
 }

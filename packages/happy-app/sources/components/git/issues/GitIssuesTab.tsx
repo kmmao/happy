@@ -18,9 +18,7 @@ import { IssueCreateSheet } from "./IssueCreateSheet";
 import { IssueDetailSheet } from "./IssueDetailSheet";
 import {
   issueStore,
-  useAggregatedIssues,
-  useAggregatedLoading,
-  useAggregatedError,
+  useAggregatedIssueListState,
   useAggregatedOpenCount,
   useAggregatedClosedCount,
   useAggregatedHasMore,
@@ -39,6 +37,7 @@ import type {
 import { launchIssueSession } from "@/utils/launchIssueSession";
 import { useIssuePolling } from "@/hooks/useIssuePolling";
 import { useRouter } from "expo-router";
+import { SharedStateView } from "@/components/SharedStateView";
 
 interface GitIssuesTabProps {
   readonly sessionId: string;
@@ -141,9 +140,12 @@ export const GitIssuesTab = React.memo<GitIssuesTabProps>(
     );
     const multiRepo = allKeys.length > 1;
 
-    const issues = useAggregatedIssues(allKeys);
-    const loading = useAggregatedLoading(allKeys);
-    const error = useAggregatedError(allKeys);
+    const {
+      issues,
+      loading,
+      error,
+      state: issuesState,
+    } = useAggregatedIssueListState(allKeys);
     const filters = useIssueFilters();
     const openCount = useAggregatedOpenCount(allKeys);
     const closedCount = useAggregatedClosedCount(allKeys);
@@ -361,18 +363,12 @@ export const GitIssuesTab = React.memo<GitIssuesTabProps>(
     // No repos with remote URL at all
     if (allKeys.length === 0) {
       return (
-        <View style={styles.emptyContainer}>
-          <Text
-            style={{
-              fontSize: 15,
-              color: theme.colors.textSecondary,
-              textAlign: "center",
-              ...Typography.default(),
-            }}
-          >
-            {t("issues.noRepo")}
-          </Text>
-        </View>
+        <SharedStateView
+          inline
+          kind="empty"
+          icon={<Octicons name="repo" size={40} color={theme.colors.textSecondary} />}
+          title={t("issues.noRepo")}
+        />
       );
     }
 
@@ -391,57 +387,41 @@ export const GitIssuesTab = React.memo<GitIssuesTabProps>(
           onSortChange={handleSortChange}
         />
 
-        {loading && issues.length === 0 && (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="small" color={theme.colors.textLink} />
-            <Text
-              style={{
-                fontSize: 14,
-                color: theme.colors.textSecondary,
-                marginTop: 8,
-                ...Typography.default(),
-              }}
-            >
-              {t("issues.loading")}
-            </Text>
-          </View>
+        {issuesState.kind === "loading" && (
+          <SharedStateView
+            inline
+            kind="loading"
+            title={t("issues.loading")}
+          />
         )}
 
-        {error !== "" && issues.length === 0 && !loading && (
-          <View style={styles.emptyContainer}>
-            <Text
-              style={{
-                fontSize: 14,
-                color: theme.colors.box.warning.text,
-                textAlign: "center",
-                ...Typography.default(),
-              }}
-            >
-              {error}
-            </Text>
-          </View>
+        {issuesState.kind === "error" && (
+          <SharedStateView
+            inline
+            kind="error"
+            title={t("common.error")}
+            description={error ?? undefined}
+            onAction={handleRefresh}
+          />
         )}
 
-        {!loading && error === "" && issues.length === 0 && (
-          <View style={styles.emptyContainer}>
-            <Octicons
-              name="issue-opened"
-              size={40}
-              color={theme.colors.textSecondary + "60"}
-              style={{ marginBottom: 12 }}
-            />
-            <Text
-              style={{
-                fontSize: 15,
-                color: theme.colors.textSecondary,
-                textAlign: "center",
-                ...Typography.default(),
-              }}
-            >
-              {filters.state === "open"
+        {issuesState.kind === "empty" && (
+          <SharedStateView
+            inline
+            kind="empty"
+            icon={
+              <Octicons
+                name="issue-opened"
+                size={40}
+                color={theme.colors.textSecondary + "60"}
+              />
+            }
+            title={
+              filters.state === "open"
                 ? t("issues.noOpenIssues")
-                : t("issues.noClosedIssues")}
-            </Text>
+                : t("issues.noClosedIssues")
+            }
+          >
             {filters.state === "open" && (
               <Pressable
                 onPress={() => handleFilterChange("closed")}
@@ -490,7 +470,7 @@ export const GitIssuesTab = React.memo<GitIssuesTabProps>(
                 </Text>
               </Pressable>
             )}
-          </View>
+          </SharedStateView>
         )}
 
         {issues.length > 0 && (

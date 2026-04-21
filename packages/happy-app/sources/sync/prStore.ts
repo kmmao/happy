@@ -28,6 +28,10 @@ import {
     submitPRReview as apiSubmitReview,
     addPRComment as apiAddPRComment,
 } from "./prFetch";
+import {
+    deriveCollectionViewState,
+    type CollectionViewState,
+} from "@/utils/collectionViewState";
 
 //
 // State
@@ -552,4 +556,34 @@ export function useAggregatedPROpenCount(projectKeys: readonly string[]): number
 
 export function useAggregatedPRHasMore(projectKeys: readonly string[]): boolean {
     return prStore((s) => projectKeys.some((k) => s.hasMoreByProject[k]));
+}
+
+export interface AggregatedPRListState {
+    readonly prs: readonly AggregatedPR[];
+    readonly loading: boolean;
+    readonly error: string | null;
+    readonly state: CollectionViewState;
+}
+
+export function useAggregatedPRListState(
+    projectKeys: readonly string[],
+): AggregatedPRListState {
+    const prs = useAggregatedPRs(projectKeys);
+    const loading = useAggregatedPRLoading(projectKeys);
+    const error = useAggregatedPRError(projectKeys);
+
+    return React.useMemo(() => {
+        const state = deriveCollectionViewState({
+            loading,
+            error,
+            count: prs.length,
+        });
+
+        return {
+            prs,
+            loading,
+            error: state.error,
+            state,
+        };
+    }, [prs, loading, error]);
 }

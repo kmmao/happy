@@ -3,6 +3,8 @@ import { View, Pressable } from "react-native";
 import { Text } from "@/components/StyledText";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { UsageDataPoint } from "@/sync/apiUsage";
+import { SharedStateView } from "@/components/SharedStateView";
+import { t } from "@/text";
 
 interface UsageChartProps {
   data: UsageDataPoint[];
@@ -67,9 +69,7 @@ export const UsageChart: React.FC<UsageChartProps> = ({
 
   if (!data || data.length === 0) {
     return (
-      <View style={styles.emptyState}>
-        <Text style={styles.emptyText}>No usage data available</Text>
-      </View>
+      <SharedStateView inline kind="empty" title={t("usage.noData")} />
     );
   }
 

@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from "react";
 import {
   View,
-  ActivityIndicator,
   ScrollView,
   Pressable,
   Platform,
@@ -22,6 +21,7 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { HappyError } from "@/utils/errors";
 import { t } from "@/text";
+import { SharedStateView } from "@/components/SharedStateView";
 
 type TimePeriod = "today" | "7days" | "30days";
 
@@ -182,7 +182,7 @@ export const UsagePanel: React.FC<{ sessionId?: string }> = ({ sessionId }) => {
 
   const loadUsageData = async () => {
     if (!auth.credentials) {
-      setError("Not authenticated");
+      setError(t("errors.authenticationFailed"));
       return;
     }
 
@@ -202,7 +202,7 @@ export const UsagePanel: React.FC<{ sessionId?: string }> = ({ sessionId }) => {
       if (err instanceof HappyError) {
         setError(err.message);
       } else {
-        setError("Failed to load usage data");
+        setError(t("common.error"));
       }
     } finally {
       setLoading(false);
@@ -230,22 +230,36 @@ export const UsagePanel: React.FC<{ sessionId?: string }> = ({ sessionId }) => {
 
   if (loading) {
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#007AFF" />
-      </View>
+      <SharedStateView kind="loading" title={t("common.loading")} />
     );
   }
 
   if (error) {
     return (
-      <View style={styles.errorContainer}>
-        <Ionicons
-          name="alert-circle-outline"
-          size={48}
-          color={theme.colors.status.error}
-        />
-        <Text style={styles.errorText}>{error}</Text>
-      </View>
+      <SharedStateView
+        kind="error"
+        title={t("common.error")}
+        description={error}
+        onAction={() => {
+          void loadUsageData();
+        }}
+      />
+    );
+  }
+
+  if (usageData.length === 0) {
+    return (
+      <SharedStateView
+        kind="empty"
+        title={t("usage.noData")}
+        icon={
+          <Ionicons
+            name="bar-chart-outline"
+            size={36}
+            color={theme.colors.textSecondary}
+          />
+        }
+      />
     );
   }
 

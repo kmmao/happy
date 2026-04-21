@@ -25,6 +25,7 @@ import {
     provisionUpdateUrls,
     type ProvisionTokenItem,
 } from "@/sync/apiProvision";
+import { SharedEmptyState } from "@/components/SharedEmptyState";
 
 function findOnlineMachineId(): string | null {
     const machines = storage.getState().machines;
@@ -603,11 +604,12 @@ function ProvisionSettingsScreen() {
             {/* Empty state */}
             {!loading && tokens.length === 0 && (
                 <ItemGroup>
-                    <View style={styles.emptyContainer}>
-                        <Ionicons name="key-outline" size={48} color={theme.colors.textSecondary} />
-                        <Text style={styles.emptyTitle}>{t("provision.emptyTitle")}</Text>
-                        <Text style={styles.emptyDescription}>{t("provision.emptyDescription")}</Text>
-                    </View>
+                    <SharedEmptyState
+                        inline
+                        icon={<Ionicons name="key-outline" size={48} color={theme.colors.textSecondary} />}
+                        title={t("provision.emptyTitle")}
+                        description={t("provision.emptyDescription")}
+                    />
                 </ItemGroup>
             )}
 

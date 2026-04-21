@@ -1,9 +1,11 @@
 import * as React from 'react';
-import { View, ActivityIndicator } from 'react-native';
+import { View } from 'react-native';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 import { SessionsList } from './SessionsList';
 import { EmptyMainScreen } from './EmptyMainScreen';
+import { SharedStateView } from './SharedStateView';
 import { useVisibleSessionListViewData } from '@/hooks/useVisibleSessionListViewData';
+import { t } from '@/text';
 
 const stylesheet = StyleSheet.create((theme) => ({
     container: {
@@ -36,7 +38,7 @@ const stylesheet = StyleSheet.create((theme) => ({
 }));
 
 export const SessionsListWrapper = React.memo(() => {
-    const { theme } = useUnistyles();
+    useUnistyles();
     const sessionListViewData = useVisibleSessionListViewData();
     const styles = stylesheet;
 
@@ -44,9 +46,7 @@ export const SessionsListWrapper = React.memo(() => {
         return (
             <View style={styles.container}>
                 <View style={styles.loadingContainerWrapper}>
-                    <View style={styles.loadingContainer}>
-                        <ActivityIndicator size="small" color={theme.colors.textSecondary} />
-                    </View>
+                    <SharedStateView kind="loading" title={t("common.loading")} />
                 </View>
             </View>
         );

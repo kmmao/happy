@@ -1,5 +1,5 @@
 import * as React from "react";
-import { View, ScrollView, ActivityIndicator, Pressable } from "react-native";
+import { View, ScrollView } from "react-native";
 import { Text } from "@/components/StyledText";
 import { useLocalSearchParams } from "expo-router";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
@@ -8,6 +8,7 @@ import { Typography } from "@/constants/Typography";
 import { t } from "@/text";
 import { useSessionTimeline } from "@/hooks/useSessionTimeline";
 import { ServerSessionEvent } from "@/sync/apiSessionEvents";
+import { SharedStateView } from "@/components/SharedStateView";
 
 // Event type → icon mapping
 const EVENT_TYPE_ICONS: Record<string, { name: string; color: string }> = {
@@ -135,37 +136,35 @@ export default React.memo(function TimelinePage() {
 
     if (loading) {
         return (
-            <View style={styles.center}>
-                <ActivityIndicator size="large" color={theme.colors.textLink} />
-            </View>
+            <SharedStateView kind="loading" title={t("common.loading")} />
         );
     }
 
     if (error) {
         return (
-            <View style={styles.center}>
-                <Ionicons name="alert-circle-outline" size={48} color={theme.colors.textSecondary} />
-                <Text style={[styles.emptyText, { color: theme.colors.textSecondary }]}>
-                    {error}
-                </Text>
-                <Pressable onPress={refresh} style={[styles.retryButton, { borderColor: theme.colors.textLink }]}>
-                    <Text style={{ color: theme.colors.textLink }}>{t("common.retry")}</Text>
-                </Pressable>
-            </View>
+            <SharedStateView
+                kind="error"
+                title={t("common.error")}
+                description={error}
+                onAction={refresh}
+            />
         );
     }
 
     if (events.length === 0) {
         return (
-            <View style={styles.center}>
-                <Ionicons name="time-outline" size={48} color={theme.colors.textSecondary} />
-                <Text style={[styles.emptyTitle, { color: theme.colors.text }]}>
-                    {t("timeline.noEvents")}
-                </Text>
-                <Text style={[styles.emptyText, { color: theme.colors.textSecondary }]}>
-                    {t("timeline.noEventsDescription")}
-                </Text>
-            </View>
+            <SharedStateView
+                kind="empty"
+                title={t("timeline.noEvents")}
+                description={t("timeline.noEventsDescription")}
+                icon={
+                    <Ionicons
+                        name="time-outline"
+                        size={36}
+                        color={theme.colors.textSecondary}
+                    />
+                }
+            />
         );
     }
 

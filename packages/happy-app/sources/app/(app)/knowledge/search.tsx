@@ -9,6 +9,7 @@ import { useKnowledgeSearch, type KnowledgeSearchResult } from "@/hooks/useKnowl
 import { KnowledgeSearchResultCard } from "@/components/knowledge/KnowledgeSearchResultCard";
 import { layout } from "@/components/layout";
 import { projectManager } from "@/sync/projectManager";
+import { SharedEmptyState } from "@/components/SharedEmptyState";
 
 function KnowledgeSearchScreen() {
     const { theme } = useUnistyles();
@@ -49,24 +50,32 @@ function KnowledgeSearchScreen() {
         if (loading) return null;
         if (!query.trim()) {
             return (
-                <View style={styles.emptyContainer}>
-                    <Ionicons name="search-outline" size={48} color={theme.colors.textSecondary} />
-                    <Text style={[styles.emptyTitle, { color: theme.colors.text }]}>
-                        {t("projects.knowledgeSearchTitle")}
-                    </Text>
-                    <Text style={[styles.emptySubtitle, { color: theme.colors.textSecondary }]}>
-                        {t("projects.knowledgeSearchHint")}
-                    </Text>
-                </View>
+                <SharedEmptyState
+                    inline
+                    icon={
+                        <Ionicons
+                            name="search-outline"
+                            size={48}
+                            color={theme.colors.textSecondary}
+                        />
+                    }
+                    title={t("projects.knowledgeSearchTitle")}
+                    description={t("projects.knowledgeSearchHint")}
+                />
             );
         }
         return (
-            <View style={styles.emptyContainer}>
-                <Ionicons name="document-text-outline" size={48} color={theme.colors.textSecondary} />
-                <Text style={[styles.emptyTitle, { color: theme.colors.text }]}>
-                    {t("projects.knowledgeSearchEmpty")}
-                </Text>
-            </View>
+            <SharedEmptyState
+                inline
+                icon={
+                    <Ionicons
+                        name="document-text-outline"
+                        size={48}
+                        color={theme.colors.textSecondary}
+                    />
+                }
+                title={t("projects.knowledgeSearchEmpty")}
+            />
         );
     }, [loading, query, theme]);
 
@@ -135,22 +144,5 @@ const styles = StyleSheet.create((theme) => ({
     footerLoader: {
         paddingVertical: 20,
         alignItems: "center",
-    },
-    emptyContainer: {
-        alignItems: "center",
-        justifyContent: "center",
-        paddingVertical: 80,
-        gap: 8,
-    },
-    emptyTitle: {
-        ...Typography.default("semiBold"),
-        fontSize: 16,
-        marginTop: 8,
-    },
-    emptySubtitle: {
-        ...Typography.default("regular"),
-        fontSize: 13,
-        textAlign: "center",
-        paddingHorizontal: 40,
     },
 }));

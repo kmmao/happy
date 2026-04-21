@@ -12,6 +12,8 @@ import { ItemList } from '@/components/ItemList';
 import { ItemGroup } from '@/components/ItemGroup';
 import { useSearch } from '@/hooks/useSearch';
 import { log } from '@/log';
+import { Ionicons } from '@expo/vector-icons';
+import { SharedStateView } from '@/components/SharedStateView';
 
 function SearchFriendsScreen() {
     const { credentials } = useAuth();
@@ -107,10 +109,11 @@ function SearchFriendsScreen() {
                 >
                     <View style={styles.resultsSection}>
                         {isSearching && searchResults.length === 0 ? (
-                            <View style={styles.loadingContainer}>
-                                <ActivityIndicator size="large" color="#2BACCC" />
-                                <Text style={styles.loadingText}>{t('friends.searching')}</Text>
-                            </View>
+                            <SharedStateView
+                                inline
+                                kind="loading"
+                                title={t('friends.searching')}
+                            />
                         ) : searchResults.length > 0 ? (
                             <FlatList
                                 data={searchResults}
@@ -121,23 +124,21 @@ function SearchFriendsScreen() {
                                 contentContainerStyle={styles.resultsList}
                             />
                         ) : hasSearched ? (
-                            <View style={styles.noResultsContainer}>
-                                <Text style={styles.noResultsText}>
-                                    {t('friends.noUserFound')}
-                                </Text>
-                                <Text style={styles.noResultsHint}>
-                                    {t('friends.checkUsername')}
-                                </Text>
-                            </View>
+                            <SharedStateView
+                                inline
+                                kind="empty"
+                                icon={<Ionicons name="search-outline" size={40} color={styles.noResultsText.color} />}
+                                title={t('friends.noUserFound')}
+                                description={t('friends.checkUsername')}
+                            />
                         ) : (
-                            <View style={styles.helpContainer}>
-                                <Text style={styles.helpTitle}>
-                                    {t('friends.howToFind')}
-                                </Text>
-                                <Text style={styles.helpText}>
-                                    {t('friends.findInstructions')}
-                                </Text>
-                            </View>
+                            <SharedStateView
+                                inline
+                                kind="empty"
+                                icon={<Ionicons name="person-add-outline" size={40} color={styles.helpText.color} />}
+                                title={t('friends.howToFind')}
+                                description={t('friends.findInstructions')}
+                            />
                         )}
                     </View>
                 </ItemGroup>
@@ -207,7 +208,6 @@ const styles = StyleSheet.create((theme) => ({
     noResultsText: {
         fontSize: 16,
         color: theme.colors.textSecondary,
-        marginBottom: 8,
     },
     noResultsHint: {
         fontSize: 14,
@@ -222,7 +222,6 @@ const styles = StyleSheet.create((theme) => ({
         fontSize: 17,
         fontWeight: '600',
         color: theme.colors.text,
-        marginBottom: 16,
     },
     helpText: {
         fontSize: 15,

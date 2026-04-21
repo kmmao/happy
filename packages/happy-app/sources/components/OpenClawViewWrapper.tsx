@@ -1,8 +1,6 @@
 import * as React from 'react';
 import { View, RefreshControl } from 'react-native';
-import { Text } from '@/components/StyledText';
 import { useRouter } from 'expo-router';
-import { Typography } from '@/constants/Typography';
 import { RoundButton } from '@/components/RoundButton';
 import { Ionicons } from '@expo/vector-icons';
 import { ItemList } from '@/components/ItemList';
@@ -10,8 +8,10 @@ import { ItemGroup } from '@/components/ItemGroup';
 import { Item } from '@/components/Item';
 import { t } from '@/text';
 import { useUnistyles } from 'react-native-unistyles';
-import { useOpenClawStatus, useOpenClawSessions, OpenClawSocket } from '@/openclaw';
+import { useOpenClawStatus, useOpenClawSessions } from '@/openclaw';
 import type { OpenClawSession } from '@/openclaw';
+import { SharedEmptyState } from '@/components/SharedEmptyState';
+import { SharedStateView } from '@/components/SharedStateView';
 
 /**
  * Wrapper for OpenClaw view in the main tab bar.
@@ -21,58 +21,30 @@ export const OpenClawViewWrapper = React.memo(function OpenClawViewWrapper() {
     const router = useRouter();
     const { theme } = useUnistyles();
     const { isConnected, serverHost } = useOpenClawStatus();
-    const { sessions, loading, error, refresh } = useOpenClawSessions();
+    const { sessions, loading, error, state, refresh } = useOpenClawSessions();
 
     // Not connected - show connect prompt
     if (!isConnected) {
         return (
-            <ItemList>
-                <ItemGroup>
-                    <View style={{
-                        alignItems: 'center',
-                        paddingVertical: 32,
-                        paddingHorizontal: 16
-                    }}>
-                        <Ionicons
-                            name="cloud-offline-outline"
-                            size={64}
-                            color={theme.colors.textSecondary}
-                            style={{ marginBottom: 16 }}
-                        />
-                        <Text style={{
-                            ...Typography.default('semiBold'),
-                            fontSize: 18,
-                            textAlign: 'center',
-                            marginBottom: 8,
-                            color: theme.colors.text,
-                        }}>
-                            {t('openclaw.notConnected')}
-                        </Text>
-                        <Text style={{
-                            ...Typography.default(),
-                            fontSize: 14,
-                            color: theme.colors.textSecondary,
-                            textAlign: 'center',
-                            lineHeight: 20
-                        }}>
-                            {t('openclaw.notConnectedDescription')}
-                        </Text>
-                    </View>
-                </ItemGroup>
-
-                <ItemGroup>
-                    <View style={{
-                        paddingHorizontal: 16,
-                        paddingVertical: 16
-                    }}>
-                        <RoundButton
-                            title={t('openclaw.connectToGateway')}
-                            onPress={() => router.push('/(app)/openclaw/connect')}
-                            size="large"
-                        />
-                    </View>
-                </ItemGroup>
-            </ItemList>
+            <SharedEmptyState
+                icon={
+                    <Ionicons
+                        name="cloud-offline-outline"
+                        size={64}
+                        color={theme.colors.textSecondary}
+                    />
+                }
+                title={t('openclaw.notConnected')}
+                description={t('openclaw.notConnectedDescription')}
+            >
+                <View style={{ width: 240 }}>
+                    <RoundButton
+                        title={t('openclaw.connectToGateway')}
+                        onPress={() => router.push('/(app)/openclaw/connect')}
+                        size="large"
+                    />
+                </View>
+            </SharedEmptyState>
         );
     }
 
@@ -121,17 +93,23 @@ export const OpenClawViewWrapper = React.memo(function OpenClawViewWrapper() {
                 </View>
             </ItemGroup>
 
-            {/* Error State */}
-            {error && (
-                <ItemGroup>
-                    <Item
-                        title={t('common.error')}
-                        subtitle={error}
-                        icon={<Ionicons name="warning-outline" size={29} color="#FF3B30" />}
-                        showChevron={false}
-                    />
-                </ItemGroup>
-            )}
+            {state.kind === 'error' ? (
+                <SharedStateView
+                    inline
+                    kind="error"
+                    title={t('common.error')}
+                    description={error ?? undefined}
+                    onAction={refresh}
+                />
+            ) : null}
+
+            {state.kind === 'loading' ? (
+                <SharedStateView
+                    inline
+                    kind="loading"
+                    title={t('common.loading')}
+                />
+            ) : null}
 
             {/* Sessions List */}
             {sessions.length > 0 && (
@@ -149,29 +127,20 @@ export const OpenClawViewWrapper = React.memo(function OpenClawViewWrapper() {
             )}
 
             {/* Empty State */}
-            {!loading && !error && sessions.length === 0 && (
-                <ItemGroup>
-                    <View style={{
-                        alignItems: 'center',
-                        paddingVertical: 24,
-                        paddingHorizontal: 16
-                    }}>
+            {state.kind === 'empty' && (
+                <SharedStateView
+                    inline
+                    kind="empty"
+                    icon={
                         <Ionicons
                             name="chatbubbles-outline"
                             size={48}
                             color={theme.colors.textSecondary}
-                            style={{ marginBottom: 12 }}
                         />
-                        <Text style={{
-                            ...Typography.default(),
-                            fontSize: 14,
-                            color: theme.colors.textSecondary,
-                            textAlign: 'center',
-                        }}>
-                            {t('openclaw.noSessions')}
-                        </Text>
-                    </View>
-                </ItemGroup>
+                    }
+                    title={t('openclaw.noSessions')}
+                    description={t('openclaw.startConversation')}
+                />
             )}
 
             {/* Settings Link */}

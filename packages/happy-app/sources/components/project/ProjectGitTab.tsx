@@ -14,6 +14,7 @@ import { Modal } from "@/modal";
 import { fetchGitBranches } from "@/sync/gitBranches";
 import { BranchPickerModal } from "./BranchPickerModal";
 import type { GitHost } from "@/components/settings/git-hosts/types";
+import { SharedStateView } from "@/components/SharedStateView";
 
 interface ProjectGitTabProps {
     project: Project;
@@ -195,16 +196,17 @@ export const ProjectGitTab = React.memo(({ project }: ProjectGitTabProps) => {
 
     if (!gitStatus) {
         return (
-            <View style={styles.emptyContainer}>
-                <Ionicons
-                    name="git-branch-outline"
-                    size={48}
-                    color={theme.colors.textSecondary}
-                />
-                <Text style={styles.emptyText}>
-                    {t("projects.noGitInfo")}
-                </Text>
-            </View>
+            <SharedStateView
+                kind="empty"
+                icon={
+                    <Ionicons
+                        name="git-branch-outline"
+                        size={48}
+                        color={theme.colors.textSecondary}
+                    />
+                }
+                title={t("projects.noGitInfo")}
+            />
         );
     }
 

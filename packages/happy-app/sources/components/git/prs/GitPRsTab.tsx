@@ -17,9 +17,7 @@ import { PRCard } from "./PRCard";
 import { PRDetailSheet } from "./PRDetailSheet";
 import {
     prStore,
-    useAggregatedPRs,
-    useAggregatedPRLoading,
-    useAggregatedPRError,
+    useAggregatedPRListState,
     useAggregatedPROpenCount,
     useAggregatedPRHasMore,
     usePRFilters,
@@ -35,6 +33,7 @@ import type {
     PRSortDirection,
 } from "@/sync/prTypes";
 import { usePRPolling } from "@/hooks/usePRPolling";
+import { SharedStateView } from "@/components/SharedStateView";
 
 interface GitPRsTabProps {
     readonly sessionId: string;
@@ -133,9 +132,12 @@ export const GitPRsTab = React.memo<GitPRsTabProps>(
         );
         const multiRepo = allKeys.length > 1;
 
-        const prs = useAggregatedPRs(allKeys);
-        const loading = useAggregatedPRLoading(allKeys);
-        const error = useAggregatedPRError(allKeys);
+        const {
+            prs,
+            loading,
+            error,
+            state: prsState,
+        } = useAggregatedPRListState(allKeys);
         const filters = usePRFilters();
         const openCount = useAggregatedPROpenCount(allKeys);
         const hasMore = useAggregatedPRHasMore(allKeys);
@@ -305,18 +307,12 @@ export const GitPRsTab = React.memo<GitPRsTabProps>(
         // No repos with remote URL
         if (allKeys.length === 0) {
             return (
-                <View style={styles.emptyContainer}>
-                    <Text
-                        style={{
-                            fontSize: 15,
-                            color: theme.colors.textSecondary,
-                            textAlign: "center",
-                            ...Typography.default(),
-                        }}
-                    >
-                        {t("prs.noRepo")}
-                    </Text>
-                </View>
+                <SharedStateView
+                    inline
+                    kind="empty"
+                    icon={<Octicons name="repo" size={40} color={theme.colors.textSecondary} />}
+                    title={t("prs.noRepo")}
+                />
             );
         }
 
@@ -334,59 +330,43 @@ export const GitPRsTab = React.memo<GitPRsTabProps>(
                     onSortChange={handleSortChange}
                 />
 
-                {loading && prs.length === 0 && (
-                    <View style={styles.loadingContainer}>
-                        <ActivityIndicator size="small" color={theme.colors.textLink} />
-                        <Text
-                            style={{
-                                fontSize: 14,
-                                color: theme.colors.textSecondary,
-                                marginTop: 8,
-                                ...Typography.default(),
-                            }}
-                        >
-                            {t("prs.loading")}
-                        </Text>
-                    </View>
+                {prsState.kind === "loading" && (
+                    <SharedStateView
+                        inline
+                        kind="loading"
+                        title={t("prs.loading")}
+                    />
                 )}
 
-                {error !== "" && prs.length === 0 && !loading && (
-                    <View style={styles.emptyContainer}>
-                        <Text
-                            style={{
-                                fontSize: 14,
-                                color: theme.colors.box.warning.text,
-                                textAlign: "center",
-                                ...Typography.default(),
-                            }}
-                        >
-                            {error}
-                        </Text>
-                    </View>
+                {prsState.kind === "error" && (
+                    <SharedStateView
+                        inline
+                        kind="error"
+                        title={t("common.error")}
+                        description={error ?? undefined}
+                        onAction={handleRefresh}
+                    />
                 )}
 
-                {!loading && error === "" && prs.length === 0 && (
-                    <View style={styles.emptyContainer}>
-                        <Octicons
-                            name="git-pull-request"
-                            size={40}
-                            color={theme.colors.textSecondary + "60"}
-                            style={{ marginBottom: 12 }}
-                        />
-                        <Text
-                            style={{
-                                fontSize: 15,
-                                color: theme.colors.textSecondary,
-                                textAlign: "center",
-                                ...Typography.default(),
-                            }}
-                        >
-                            {filters.state === "open"
+                {prsState.kind === "empty" && (
+                    <SharedStateView
+                        inline
+                        kind="empty"
+                        icon={
+                            <Octicons
+                                name="git-pull-request"
+                                size={40}
+                                color={theme.colors.textSecondary + "60"}
+                            />
+                        }
+                        title={
+                            filters.state === "open"
                                 ? t("prs.noOpenPRs")
                                 : filters.state === "closed"
                                   ? t("prs.noClosedPRs")
-                                  : t("prs.noPRs")}
-                        </Text>
+                                  : t("prs.noPRs")
+                        }
+                    >
                         {filters.state === "open" && (
                             <Pressable
                                 onPress={() => handleFilterChange("closed")}
@@ -404,7 +384,7 @@ export const GitPRsTab = React.memo<GitPRsTabProps>(
                                 </Text>
                             </Pressable>
                         )}
-                    </View>
+                    </SharedStateView>
                 )}
 
                 {prs.length > 0 && (

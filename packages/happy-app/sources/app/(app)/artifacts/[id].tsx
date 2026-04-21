@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, ScrollView, ActivityIndicator, Pressable, Platform } from 'react-native';
+import { View, ScrollView, Pressable, Platform } from 'react-native';
 import { Text } from '@/components/StyledText';
 import { useArtifact } from '@/sync/storage';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
@@ -13,6 +13,7 @@ import { deleteArtifact } from '@/sync/apiArtifacts';
 import { storage } from '@/sync/storage';
 import { MarkdownView } from '@/components/markdown/MarkdownView';
 import { log } from '@/log';
+import { SharedStateView } from '@/components/SharedStateView';
 
 const stylesheet = StyleSheet.create((theme) => ({
     container: {
@@ -79,47 +80,51 @@ function ArtifactDetailScreen() {
     const { id } = useLocalSearchParams<{ id: string }>();
     const router = useRouter();
     const artifact = useArtifact(id);
-    const [isLoading, setIsLoading] = React.useState(!artifact?.body);
+    const shouldLoadArtifact = !artifact || artifact.body === undefined;
+    const [isLoading, setIsLoading] = React.useState(shouldLoadArtifact);
     const [isDeleting, setIsDeleting] = React.useState(false);
     const [error, setError] = React.useState<string | null>(null);
 
+    const loadArtifact = React.useCallback(async () => {
+        try {
+            setIsLoading(true);
+            setError(null);
+
+            const credentials = sync.getCredentials();
+            if (!credentials) {
+                throw new Error(t('errors.authenticationFailed'));
+            }
+
+            const fullArtifact = await sync.fetchArtifactWithBody(id);
+            if (!fullArtifact) {
+                throw new Error(t('artifacts.notFound'));
+            }
+
+            storage.getState().updateArtifact(fullArtifact);
+        } catch (err) {
+            log.error('Failed to load artifact:', err);
+            setError(err instanceof Error ? err.message : t('artifacts.error'));
+        } finally {
+            setIsLoading(false);
+        }
+    }, [id]);
+
     // Load full artifact with body if not already loaded
     React.useEffect(() => {
-        if (!artifact || artifact.body !== undefined) return;
+        if (!shouldLoadArtifact) return;
         
         let cancelled = false;
         
         (async () => {
-            try {
-                setIsLoading(true);
-                setError(null);
-                
-                const credentials = sync.getCredentials();
-                if (!credentials) {
-                    throw new Error('Not authenticated');
-                }
-                
-                // Fetch full artifact with body
-                const fullArtifact = await sync.fetchArtifactWithBody(id);
-                if (!cancelled && fullArtifact) {
-                    storage.getState().updateArtifact(fullArtifact);
-                }
-            } catch (err) {
-                if (!cancelled) {
-                    log.error('Failed to load artifact:', err);
-                    setError(t('artifacts.error'));
-                }
-            } finally {
-                if (!cancelled) {
-                    setIsLoading(false);
-                }
+            if (!cancelled) {
+                await loadArtifact();
             }
         })();
         
         return () => {
             cancelled = true;
         };
-    }, [id, artifact]);
+    }, [loadArtifact, shouldLoadArtifact]);
 
     const handleEdit = React.useCallback(() => {
         router.push(`/artifacts/edit/${id}`);
@@ -182,14 +187,13 @@ function ArtifactDetailScreen() {
                         headerTitle: t('artifacts.loading'),
                     }}
                 />
-                <View style={styles.loadingContainer}>
-                    <ActivityIndicator size="large" />
-                </View>
+                <SharedStateView kind="loading" title={t('artifacts.loading')} />
             </View>
         );
     }
 
     if (error || !artifact) {
+        const artifactError = error ?? t('artifacts.notFound');
         return (
             <View style={styles.container}>
                 <Stack.Screen 
@@ -198,16 +202,26 @@ function ArtifactDetailScreen() {
                         headerTitle: t('common.error'),
                     }}
                 />
-                <View style={styles.errorContainer}>
-                        <Ionicons 
-                            name="alert-circle-outline" 
-                            size={64} 
-                            style={styles.errorIcon}
-                        />
-                        <Text style={styles.errorText}>
-                            {error || t('artifacts.error')}
-                        </Text>
-                </View>
+                <SharedStateView
+                    kind="error"
+                    title={
+                        artifactError === t('artifacts.notFound')
+                            ? artifactError
+                            : t('common.error')
+                    }
+                    description={
+                        artifactError === t('artifacts.notFound')
+                            ? undefined
+                            : artifactError
+                    }
+                    onAction={
+                        artifactError === t('artifacts.notFound')
+                            ? undefined
+                            : () => {
+                                void loadArtifact();
+                            }
+                    }
+                />
             </View>
         );
     }

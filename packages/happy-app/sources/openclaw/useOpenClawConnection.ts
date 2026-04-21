@@ -5,6 +5,10 @@ import {
 } from "./OpenClawSocket";
 import { loadOpenClawConfig } from "./openclawStorage";
 import type { OpenClawChatEvent, OpenClawSession } from "./openclawTypes";
+import {
+  deriveCollectionViewState,
+  type CollectionViewState,
+} from "@/utils/collectionViewState";
 
 // Track if we've already attempted auto-connect this session
 let autoConnectAttempted = false;
@@ -93,13 +97,26 @@ export function useOpenClawSessions() {
       loadSessions();
     } else {
       setSessions([]);
+      setLoading(false);
+      setError(null);
     }
   }, [isConnected, loadSessions]);
+
+  const state = React.useMemo<CollectionViewState>(
+    () =>
+      deriveCollectionViewState({
+        loading,
+        error,
+        count: sessions.length,
+      }),
+    [error, loading, sessions.length],
+  );
 
   return {
     sessions,
     loading,
-    error,
+    error: state.error,
+    state,
     refresh: loadSessions,
   };
 }

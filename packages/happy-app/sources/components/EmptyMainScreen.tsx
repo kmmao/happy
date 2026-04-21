@@ -5,22 +5,10 @@ import { RoundButton } from "@/components/RoundButton";
 import { useConnectTerminal } from "@/hooks/useConnectTerminal";
 import { Modal } from "@/modal";
 import { t } from "@/text";
-import { StyleSheet, useUnistyles } from "react-native-unistyles";
+import { StyleSheet } from "react-native-unistyles";
+import { SharedEmptyState } from "@/components/SharedEmptyState";
 
 const stylesheet = StyleSheet.create((theme) => ({
-  container: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 32,
-  },
-  title: {
-    marginBottom: 16,
-    textAlign: "center",
-    fontSize: 24,
-    color: theme.colors.text,
-    ...Typography.default("semiBold"),
-  },
   terminalBlock: {
     backgroundColor: theme.colors.surfaceHighest,
     borderRadius: 8,
@@ -87,15 +75,13 @@ const stylesheet = StyleSheet.create((theme) => ({
 
 export function EmptyMainScreen() {
   const { connectTerminal, connectWithUrl, isLoading } = useConnectTerminal();
-  const { theme } = useUnistyles();
   const styles = stylesheet;
 
   return (
-    <View style={styles.container}>
-      {/* Terminal-style code block */}
-      <Text style={styles.title}>
-        {t("components.emptyMainScreen.readyToCode")}
-      </Text>
+    <SharedEmptyState
+      title={t("components.emptyMainScreen.readyToCode")}
+      variant="hero"
+    >
       <View style={styles.terminalBlock}>
         <Text style={[styles.terminalText, styles.terminalTextFirst]}>
           $ npm i -g @kmmao/happy-coder
@@ -165,6 +151,6 @@ export function EmptyMainScreen() {
           </View>
         </>
       )}
-    </View>
+    </SharedEmptyState>
   );
 }

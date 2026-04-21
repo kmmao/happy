@@ -11,6 +11,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useArtifact } from '@/sync/storage';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { log } from '@/log';
+import { SharedStateView } from '@/components/SharedStateView';
 
 const stylesheet = StyleSheet.create((theme) => ({
     container: {
@@ -216,9 +217,7 @@ function EditArtifactScreen() {
                         headerTitle: t('artifacts.loading'),
                     }}
                 />
-                <View style={styles.loadingContainer}>
-                    <ActivityIndicator size="large" />
-                </View>
+                <SharedStateView kind="loading" title={t('artifacts.loading')} />
             </View>
         );
     }
@@ -232,11 +231,7 @@ function EditArtifactScreen() {
                         headerTitle: t('common.error'),
                     }}
                 />
-                <View style={styles.errorContainer}>
-                    <Text style={styles.errorText}>
-                        {t('artifacts.notFound')}
-                    </Text>
-                </View>
+                <SharedStateView kind="error" title={t('artifacts.notFound')} />
             </View>
         );
     }

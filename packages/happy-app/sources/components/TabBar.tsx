@@ -2,18 +2,18 @@ import * as React from "react";
 import { View, Pressable, Text } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
-import { Image } from "expo-image";
+import { Ionicons } from "@expo/vector-icons";
 import { t } from "@/text";
 import { Typography } from "@/constants/Typography";
 import { layout } from "@/components/layout";
 import { useInboxHasContent } from "@/hooks/useInboxHasContent";
+import {
+  resolveAppTabPresentation,
+  type AppTabKey,
+} from "./appTabPresentation";
+import { resolveUiTabToneColors } from "./tabTone";
 
-export type TabType =
-  | "inbox"
-  | "sessions"
-  | "project"
-  | "openclaw"
-  | "settings";
+export type TabType = AppTabKey;
 
 interface TabBarProps {
   activeTab: TabType;
@@ -24,35 +24,69 @@ interface TabBarProps {
 
 const styles = StyleSheet.create((theme) => ({
   outerContainer: {
-    backgroundColor: theme.colors.surface,
+    backgroundColor: theme.colors.groupped.background,
     borderTopWidth: 1,
     borderTopColor: theme.colors.divider,
+    paddingTop: 8,
+    paddingHorizontal: 12,
   },
   innerContainer: {
     flexDirection: "row",
-    justifyContent: "space-around",
-    alignItems: "flex-start",
+    justifyContent: "space-between",
+    alignItems: "stretch",
     maxWidth: layout.maxWidth,
     width: "100%",
     alignSelf: "center",
+    backgroundColor: theme.colors.surface,
+    borderRadius: 18,
+    paddingHorizontal: 6,
+    paddingVertical: 4,
+    gap: 4,
+    shadowColor: theme.colors.shadow.color,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: theme.colors.shadow.opacity * 0.4,
+    shadowRadius: 10,
+    elevation: 2,
   },
   tab: {
     flex: 1,
     alignItems: "center",
-    paddingTop: 8,
-    paddingBottom: 4,
+    justifyContent: "center",
+    minHeight: 56,
+    borderRadius: 14,
+    paddingHorizontal: 6,
+    paddingVertical: 6,
+  },
+  tabActive: {
+    backgroundColor: theme.dark
+      ? theme.colors.accentPurple
+      : theme.colors.header.tint,
+  },
+  tabPressed: {
+    opacity: 0.9,
   },
   tabContent: {
     alignItems: "center",
     position: "relative",
   },
+  iconBadge: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  iconBadgeActive: {
+    backgroundColor: "rgba(255,255,255,0.16)",
+  },
   label: {
-    fontSize: 10,
-    marginTop: 3,
+    fontSize: 11,
+    marginTop: 4,
     ...Typography.default(),
+    textAlign: "center",
   },
   labelActive: {
-    color: theme.colors.text,
+    color: "#FFFFFF",
     ...Typography.default("semiBold"),
   },
   labelInactive: {
@@ -60,7 +94,7 @@ const styles = StyleSheet.create((theme) => ({
   },
   badge: {
     position: "absolute",
-    top: -4,
+    top: -5,
     right: -8,
     backgroundColor: theme.colors.status.error,
     borderRadius: 8,
@@ -69,6 +103,8 @@ const styles = StyleSheet.create((theme) => ({
     paddingHorizontal: 4,
     justifyContent: "center",
     alignItems: "center",
+    borderWidth: 1.5,
+    borderColor: theme.colors.surface,
   },
   badgeText: {
     color: "#FFFFFF",
@@ -77,12 +113,14 @@ const styles = StyleSheet.create((theme) => ({
   },
   indicatorDot: {
     position: "absolute",
-    top: 0,
-    right: -2,
+    top: -1,
+    right: -1,
     width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: theme.colors.text,
+    backgroundColor: theme.colors.header.tint,
+    borderWidth: 1.5,
+    borderColor: theme.colors.surface,
   },
 }));
 
@@ -97,32 +135,27 @@ export const TabBar = React.memo(
     const insets = useSafeAreaInsets();
     const inboxHasContent = useInboxHasContent();
 
-    const tabs: { key: TabType; icon: any; label: string }[] =
+    const tabs: { key: TabType; label: string }[] =
       React.useMemo(() => {
-        const allTabs: { key: TabType; icon: any; label: string }[] = [
+        const allTabs: { key: TabType; label: string }[] = [
           {
             key: "inbox",
-            icon: require("@/assets/images/brutalist/Brutalism 27.png"),
             label: t("tabs.inbox"),
           },
           {
             key: "sessions",
-            icon: require("@/assets/images/brutalist/Brutalism 15.png"),
             label: t("tabs.sessions"),
           },
           {
             key: "project",
-            icon: require("@/assets/images/brutalist/Brutalism 22.png"),
             label: t("tabs.project"),
           },
           {
             key: "openclaw",
-            icon: require("@/assets/images/brutalist/Brutalism 19.png"),
             label: t("tabs.openclaw"),
           },
           {
             key: "settings",
-            icon: require("@/assets/images/brutalist/Brutalism 9.png"),
             label: t("tabs.settings"),
           },
         ];
@@ -137,23 +170,37 @@ export const TabBar = React.memo(
         <View style={styles.innerContainer}>
           {tabs.map((tab) => {
             const isActive = activeTab === tab.key;
+            const presentation = resolveAppTabPresentation(tab.key);
+            const toneColors = resolveUiTabToneColors(presentation.tone, theme);
 
             return (
               <Pressable
                 key={tab.key}
-                style={styles.tab}
+                style={({ pressed }) => [
+                  styles.tab,
+                  isActive && styles.tabActive,
+                  pressed && styles.tabPressed,
+                ]}
                 onPress={() => onTabPress(tab.key)}
                 hitSlop={8}
+                accessibilityRole="tab"
+                accessibilityState={{ selected: isActive }}
               >
                 <View style={styles.tabContent}>
-                  <Image
-                    source={tab.icon}
-                    contentFit="contain"
-                    style={[{ width: 24, height: 24 }]}
-                    tintColor={
-                      isActive ? theme.colors.text : theme.colors.textSecondary
-                    }
-                  />
+                  <View
+                    style={[
+                      styles.iconBadge,
+                      isActive
+                        ? styles.iconBadgeActive
+                        : { backgroundColor: toneColors.backgroundColor },
+                    ]}
+                  >
+                    <Ionicons
+                      name={presentation.icon}
+                      size={18}
+                      color={isActive ? "#FFFFFF" : toneColors.textColor}
+                    />
+                  </View>
                   {tab.key === "inbox" && inboxBadgeCount > 0 && (
                     <View style={styles.badge}>
                       <Text style={styles.badgeText}>
