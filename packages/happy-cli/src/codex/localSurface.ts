@@ -2,24 +2,17 @@ import { access, readdir, readFile } from "node:fs/promises";
 import { constants } from "node:fs";
 import { homedir } from "node:os";
 import { basename, isAbsolute, join, resolve } from "node:path";
+import type {
+  CodexAgentSummary,
+  CodexPromptSummary,
+  CodexSkillSummary,
+} from "@kmmao/happy-wire";
 
-export interface CodexPromptSummary {
-  name: string;
-  path: string;
-  description?: string | null;
-}
-
-export interface CodexSkillSummary {
-  name: string;
-  description: string;
-  path: string;
-  enabled: boolean;
-}
-
-export interface CodexAgentSummary {
-  name: string;
-  path: string;
-}
+export type {
+  CodexAgentSummary,
+  CodexPromptSummary,
+  CodexSkillSummary,
+} from "@kmmao/happy-wire";
 
 export interface CodexLocalSurface {
   slashCommands: string[];

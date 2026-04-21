@@ -5,6 +5,14 @@ import type { CodexSessionConfig, CodexToolResponse } from "@/codex/types";
 import type { CodexPermissionHandler } from "@/codex/utils/permissionHandler";
 import type { SandboxConfig } from "@/persistence";
 import { initializeSandbox, wrapForMcpTransport } from "@/sandbox/manager";
+import type {
+  CodexAccount,
+  CodexExperimentalFeature,
+  CodexMcpServerSummary,
+  CodexRateLimits,
+  CodexRuntimeConfig,
+  CodexSkillSummary,
+} from "@kmmao/happy-wire";
 
 type JsonRpcRequest = {
   id?: string | number;
@@ -78,46 +86,12 @@ type AppServerModel = {
 
 type AppServerCapabilities = {
   models: AppServerModel[];
-  config: {
-    model: string | null;
-    profile: string | null;
-    approvalPolicy: string | null;
-    sandboxMode: string | null;
-    serviceTier: string | null;
-    reasoningEffort: string | null;
-    reasoningSummary: string | null;
-    verbosity: string | null;
-    webSearch: string | null;
-  } | null;
-  account: {
-    type: "apiKey" | "chatgpt" | null;
-    email: string | null;
-    planType: string | null;
-    requiresOpenaiAuth: boolean;
-  } | null;
-  rateLimits: {
-    limitId: string | null;
-    limitName: string | null;
-    planType: string | null;
-    hasCredits: boolean;
-  } | null;
-  experimentalFeatures: Array<{
-    name: string;
-    stage: string;
-    enabled: boolean;
-    defaultEnabled: boolean;
-  }>;
-  skills: Array<{
-    name: string;
-    description: string;
-    path: string;
-    enabled: boolean;
-  }>;
-  mcpServers: Array<{
-    name: string;
-    authStatus: string;
-    toolCount: number;
-  }>;
+  config: CodexRuntimeConfig | null;
+  account: CodexAccount | null;
+  rateLimits: CodexRateLimits | null;
+  experimentalFeatures: CodexExperimentalFeature[];
+  skills: CodexSkillSummary[];
+  mcpServers: CodexMcpServerSummary[];
 };
 
 type RawSupportedReasoningEffort =
