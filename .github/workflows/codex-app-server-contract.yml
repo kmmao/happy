@@ -1,0 +1,102 @@
+name: Codex App Server Contract
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  merge_group:
+  workflow_dispatch:
+
+jobs:
+  verify-codex-app-server-contract:
+    name: codex-app-server-contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect whether Codex contract verification is needed
+        id: changes
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          EVENT_NAME="${{ github.event_name }}"
+          SHOULD_RUN="false"
+
+          if [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
+            SHOULD_RUN="true"
+          else
+            case "$EVENT_NAME" in
+              pull_request)
+                BASE_SHA="${{ github.event.pull_request.base.sha }}"
+                HEAD_SHA="${{ github.sha }}"
+                ;;
+              push)
+                BASE_SHA="${{ github.event.before }}"
+                HEAD_SHA="${{ github.sha }}"
+                ;;
+              merge_group)
+                BASE_SHA="${{ github.event.merge_group.base_sha }}"
+                HEAD_SHA="${{ github.event.merge_group.head_sha }}"
+                ;;
+              *)
+                BASE_SHA=""
+                HEAD_SHA=""
+                ;;
+            esac
+
+            if [[ -z "${BASE_SHA:-}" || -z "${HEAD_SHA:-}" || "$BASE_SHA" == "0000000000000000000000000000000000000000" ]]; then
+              echo "Could not determine a safe diff range; defaulting to run verification."
+              SHOULD_RUN="true"
+            else
+              CHANGED_FILES="$(git diff --name-only "$BASE_SHA" "$HEAD_SHA" || true)"
+              echo "Changed files:"
+              echo "$CHANGED_FILES"
+
+              while IFS= read -r file; do
+                [[ -z "$file" ]] && continue
+                case "$file" in
+                  packages/happy-cli/src/codex-app/*|\
+                  packages/happy-cli/src/codex-app/**/*|\
+                  packages/happy-cli/scripts/generate-codex-app-server-notification-contract-subset.mjs|\
+                  packages/happy-cli/package.json|\
+                  package.json|\
+                  .github/workflows/codex-app-server-contract.yml)
+                    SHOULD_RUN="true"
+                    break
+                    ;;
+                esac
+              done <<< "$CHANGED_FILES"
+            fi
+          fi
+
+          echo "should_run=$SHOULD_RUN" >> "$GITHUB_OUTPUT"
+
+      - name: Skip when no Codex app-server contract files changed
+        if: steps.changes.outputs.should_run != 'true'
+        run: |
+          echo "No Codex app-server contract changes detected."
+          echo "Marking check successful without running verify."
+
+      - name: Setup Node
+        if: steps.changes.outputs.should_run == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: yarn
+          cache-dependency-path: yarn.lock
+
+      - name: Install dependencies
+        if: steps.changes.outputs.should_run == 'true'
+        run: yarn install --frozen-lockfile
+
+      - name: Verify Codex app-server contract baseline
+        if: steps.changes.outputs.should_run == 'true'
+        run: yarn codex:verify-app-server-contract

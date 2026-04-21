@@ -3,6 +3,8 @@
     "private": true,
     "scripts": {
         "cli": "yarn workspace happy-coder cli",
+        "codex:refresh-app-server-contract": "yarn workspace @kmmao/happy-coder generate:codex-app-server-notification-contract",
+        "codex:verify-app-server-contract": "yarn workspace @kmmao/happy-coder verify:codex-app-server-notification-contract",
         "release": "node ./scripts/release.cjs",
         "web": "yarn workspace happy-app web",
         "postinstall": "node ./scripts/postinstall.cjs"
