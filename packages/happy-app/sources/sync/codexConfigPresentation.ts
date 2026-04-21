@@ -1,3 +1,5 @@
+import type { CodexBackendMode, CodexConfigMode } from "@kmmao/happy-wire";
+
 type CodexPresentationTranslationKey =
     | "sessionInfo.codexBackendAuto"
     | "profiles.codexBackendAuto"
@@ -14,15 +16,9 @@ type CodexPresentationTranslationKey =
 
 type Translate = (key: CodexPresentationTranslationKey) => string;
 
-export type CodexBackendModeValue =
-    | "auto"
-    | "codex-app-server"
-    | "codex-mcp-legacy";
+export type CodexBackendModeValue = CodexBackendMode;
 
-export type CodexConfigModeValue =
-    | "inherit"
-    | "managed-profile"
-    | "managed-overrides";
+export type CodexConfigModeValue = CodexConfigMode;
 
 export type CodexPresentationContext = "session" | "profile";
 

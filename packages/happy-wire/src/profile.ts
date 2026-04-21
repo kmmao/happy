@@ -1,4 +1,8 @@
 import { z } from "zod";
+import {
+  CodexBackendModeSchema,
+  CodexConfigModeSchema,
+} from "./codexBackendSelection";
 
 function isTemplateAwareUrl(value: string): boolean {
   if (!value) return true;
@@ -85,12 +89,8 @@ export const TogetherAIConfigSchema = z.object({
 });
 
 export const CodexConfigSchema = z.object({
-  backendMode: z
-    .enum(["auto", "codex-app-server", "codex-mcp-legacy"])
-    .optional(),
-  configMode: z
-    .enum(["inherit", "managed-profile", "managed-overrides"])
-    .optional(),
+  backendMode: CodexBackendModeSchema.optional(),
+  configMode: CodexConfigModeSchema.optional(),
   codexProfileName: z.string().optional(),
   model: z.string().optional(),
   reasoningEffort: z.string().optional(),

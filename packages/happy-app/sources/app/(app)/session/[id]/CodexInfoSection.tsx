@@ -1,5 +1,11 @@
 import React from "react";
 import { Ionicons } from "@expo/vector-icons";
+import type {
+    CodexConfigMode,
+    CodexMetadata,
+    CodexRequestedBackend,
+    CodexResolvedBackend,
+} from "@kmmao/happy-wire";
 import { Item } from "@/components/Item";
 import { ItemGroup } from "@/components/ItemGroup";
 import { t } from "@/text";
@@ -20,13 +26,9 @@ import {
 } from "@/sync/codexConfigPresentation";
 
 function formatCodexBackendMetadata(
-    codex:
-        | {
-              resolvedBackend?: "codex-app-server" | "codex-mcp-legacy";
-          }
-        | undefined,
+    codex: Pick<CodexMetadata, "resolvedBackend"> | undefined,
 ): string | null {
-    const resolvedBackend = codex?.resolvedBackend;
+    const resolvedBackend: CodexResolvedBackend | undefined = codex?.resolvedBackend;
     if (resolvedBackend === "codex-app-server") {
         return resolveCodexBackendModeLabel(
             "codex-app-server",
@@ -45,13 +47,10 @@ function formatCodexBackendMetadata(
 }
 
 function formatCodexRequestedBackendMetadata(
-    codex:
-        | {
-              requestedBackend?: "auto" | "codex-app-server" | "codex-mcp-legacy";
-          }
-        | undefined,
+    codex: Pick<CodexMetadata, "requestedBackend"> | undefined,
 ): string | null {
-    const requestedBackend = codex?.requestedBackend;
+    const requestedBackend: CodexRequestedBackend | undefined =
+        codex?.requestedBackend;
     if (requestedBackend === "auto") {
         return resolveCodexBackendModeLabel("auto", t, "session");
     }
@@ -73,13 +72,9 @@ function formatCodexRequestedBackendMetadata(
 }
 
 function formatCodexConfigModeMetadata(
-    codex:
-        | {
-              configMode?: "inherit" | "managed-profile" | "managed-overrides";
-          }
-        | undefined,
+    codex: Pick<CodexMetadata, "configMode"> | undefined,
 ): string | null {
-    const configMode = codex?.configMode;
+    const configMode: CodexConfigMode | undefined = codex?.configMode;
     if (configMode === "inherit") {
         return resolveCodexConfigModeLabel("inherit", t, "session");
     }

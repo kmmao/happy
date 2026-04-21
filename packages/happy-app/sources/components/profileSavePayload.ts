@@ -1,4 +1,8 @@
 import type { AIBackendProfile } from "@/sync/settings";
+import type {
+  CodexBackendModeValue,
+  CodexConfigModeValue,
+} from "@/sync/codexConfigPresentation";
 
 interface BuildProfileForSaveOptions {
   profile: AIBackendProfile;
@@ -12,8 +16,8 @@ interface BuildProfileForSaveOptions {
   agentType: "claude" | "codex";
   defaultSessionType: "simple" | "worktree";
   defaultPermissionMode: NonNullable<AIBackendProfile["defaultPermissionMode"]>;
-  codexBackendMode: "auto" | "codex-app-server" | "codex-mcp-legacy";
-  codexConfigMode: "inherit" | "managed-profile" | "managed-overrides";
+  codexBackendMode: CodexBackendModeValue;
+  codexConfigMode: CodexConfigModeValue;
   codexProfileName: string;
   codexOverrideModel: string;
   codexOverrideReasoningEffort: string;

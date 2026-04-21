@@ -23,6 +23,8 @@ import { buildProfileForSave } from "./profileSavePayload";
 import {
   getCodexBackendModeOptions,
   getCodexConfigModeOptions,
+  type CodexBackendModeValue,
+  type CodexConfigModeValue,
 } from "@/sync/codexConfigPresentation";
 
 export interface ProfileEditFormProps {
@@ -82,12 +84,14 @@ export function ProfileEditForm({
       return "codex";
     return "claude"; // Default to Claude if both or neither
   });
-  const [codexBackendMode, setCodexBackendMode] = React.useState<
-    "auto" | "codex-app-server" | "codex-mcp-legacy"
-  >(profile.codexConfig?.backendMode || "auto");
-  const [codexConfigMode, setCodexConfigMode] = React.useState<
-    "inherit" | "managed-profile" | "managed-overrides"
-  >(profile.codexConfig?.configMode || "inherit");
+  const [codexBackendMode, setCodexBackendMode] =
+    React.useState<CodexBackendModeValue>(
+      profile.codexConfig?.backendMode || "auto",
+    );
+  const [codexConfigMode, setCodexConfigMode] =
+    React.useState<CodexConfigModeValue>(
+      profile.codexConfig?.configMode || "inherit",
+    );
   const [codexProfileName, setCodexProfileName] = React.useState(
     profile.codexConfig?.codexProfileName || "",
   );

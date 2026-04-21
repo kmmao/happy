@@ -1,31 +1,18 @@
 import * as z from "zod";
+import {
+  CodexConfigModeSchema,
+  CodexRequestedBackendSchema,
+  CodexResolvedBackendSchema,
+} from "./codexBackendSelection";
 
-export const CodexRequestedBackendSchema = z.enum([
-  "auto",
-  "codex-app-server",
-  "codex-mcp-legacy",
-]);
-
-export type CodexRequestedBackend = z.infer<
-  typeof CodexRequestedBackendSchema
->;
-
-export const CodexResolvedBackendSchema = z.enum([
-  "codex-app-server",
-  "codex-mcp-legacy",
-]);
-
-export type CodexResolvedBackend = z.infer<
-  typeof CodexResolvedBackendSchema
->;
-
-export const CodexConfigModeSchema = z.enum([
-  "inherit",
-  "managed-profile",
-  "managed-overrides",
-]);
-
-export type CodexConfigMode = z.infer<typeof CodexConfigModeSchema>;
+export {
+  type CodexConfigMode,
+  CodexConfigModeSchema,
+  type CodexRequestedBackend,
+  CodexRequestedBackendSchema,
+  type CodexResolvedBackend,
+  CodexResolvedBackendSchema,
+} from "./codexBackendSelection";
 
 export const CodexRuntimeConfigSchema = z.object({
   model: z.string().nullish(),

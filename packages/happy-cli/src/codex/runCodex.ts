@@ -3,7 +3,19 @@ import React from "react";
 import { Client as McpClient } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { ApiClient } from "@/api/api";
-import { normalizeHappyMcpToolName } from "@kmmao/happy-wire";
+import {
+  CODEX_APP_SERVER_BACKEND,
+  CODEX_MCP_LEGACY_BACKEND,
+  createEnvelope,
+  isCodexAppServerBackend,
+  isCodexLegacyBackend,
+  normalizeHappyMcpToolName,
+  resolveCodexResolvedBackend,
+  resolveCodexResumableThreadId,
+  resolveRequestedCodexBackend,
+  type CodexRequestedBackend as RequestedCodexBackend,
+  type CodexResolvedBackend as ResolvedCodexBackend,
+} from "@kmmao/happy-wire";
 import {
   CodexMcpClient,
   getInstalledCodexVersion,
@@ -51,12 +63,7 @@ import { connectionState } from "@/utils/serverConnectionErrors";
 import { setupOfflineReconnection } from "@/utils/setupOfflineReconnection";
 import type { ApiSessionClient } from "@/api/apiSession";
 import { resolveCodexExecutionPolicy } from "./executionPolicy";
-import {
-  resolveRequestedCodexBackend,
-  shouldFallbackToLegacyCodex,
-  type RequestedCodexBackend,
-  type ResolvedCodexBackend,
-} from "@/codex-shared/backendSelection";
+import { shouldFallbackToLegacyCodex } from "@/codex-shared/backendFallback";
 import {
   LOCKED_CODEX_MODEL,
   resolveCodexRuntimeConfigFromEnv,
@@ -66,14 +73,12 @@ import {
   mapCodexProcessorMessageToSessionEnvelopes,
 } from "./utils/sessionProtocolMapper";
 import { collectCodexLocalSurface } from "./localSurface";
-import { resolveCodexResumeThreadId } from "./utils/resolveCodexResumeThreadId";
 import {
   buildCodexContextUsage,
   codexBreakdownToUsage,
   extractCodexTokenUsageSnapshot,
   getCodexTokenUsageSignature,
 } from "./utils/tokenUsage";
-import { createEnvelope } from "@kmmao/happy-wire";
 import { codexBaseInstructions } from "./baseInstructions";
 import {
   hashCodexMode,
@@ -302,7 +307,7 @@ export async function runCodex(opts: {
     : null;
   const runtimeConfig = resolveCodexRuntimeConfigFromEnv();
   const requestedBackendBase: RequestedCodexBackend =
-    resolveRequestedCodexBackend();
+    resolveRequestedCodexBackend(process.env.HAPPY_CODEX_BACKEND);
   const requestedBackend: RequestedCodexBackend =
     requestedBackendBase === "auto"
       ? (existingHappySession?.metadata.codex?.resolvedBackend ??
@@ -345,13 +350,10 @@ export async function runCodex(opts: {
   rawMetadata.codex = {
     ...rawMetadata.codex,
     requestedBackend,
-    ...((requestedBackend === "codex-mcp-legacy" ||
-      (requestedBackend === "auto" && !supportsCodexAppServer()))
-      ? { resolvedBackend: "codex-mcp-legacy" as const }
-      : requestedBackend === "codex-app-server" ||
-          (requestedBackend === "auto" && supportsCodexAppServer())
-        ? { resolvedBackend: "codex-app-server" as const }
-        : {}),
+    resolvedBackend: resolveCodexResolvedBackend(
+      requestedBackend,
+      supportsCodexAppServer(),
+    ),
     configMode: runtimeConfig.configMode,
     ...(runtimeConfig.profileName
       ? {
@@ -1414,12 +1416,12 @@ export async function runCodex(opts: {
 
     let resolvedBackend: ResolvedCodexBackend;
     let fallbackReason: string | undefined;
-    const resumeThreadId = resolveCodexResumeThreadId(
-      existingHappySession?.metadata,
+    const resumeThreadId = resolveCodexResumableThreadId(
+      existingHappySession?.metadata.codex,
     );
-    if (requestedBackend === "codex-mcp-legacy") {
+    if (isCodexLegacyBackend(requestedBackend)) {
       client = instantiateLegacyClient();
-      resolvedBackend = "codex-mcp-legacy";
+      resolvedBackend = CODEX_MCP_LEGACY_BACKEND;
     } else {
       try {
         if (!supportsCodexAppServer()) {
@@ -1429,9 +1431,9 @@ export async function runCodex(opts: {
         logger.debug("[codex]: app-server client.connect begin");
         await client.connect();
         logger.debug("[codex]: app-server client.connect done");
-        resolvedBackend = "codex-app-server";
+        resolvedBackend = CODEX_APP_SERVER_BACKEND;
       } catch (error) {
-        if (requestedBackend === "codex-app-server") {
+        if (isCodexAppServerBackend(requestedBackend)) {
           throw error;
         }
         if (!shouldFallbackToLegacyCodex(error)) {
@@ -1441,7 +1443,7 @@ export async function runCodex(opts: {
           error instanceof Error ? error.message : "Codex app-server unavailable";
         logger.warn("[Codex] Falling back to legacy MCP backend", error);
         client = instantiateLegacyClient();
-        resolvedBackend = "codex-mcp-legacy";
+        resolvedBackend = CODEX_MCP_LEGACY_BACKEND;
         messageBuffer.addMessage(
           "Codex App Server unavailable, falling back to Legacy MCP",
           "status",
@@ -1475,7 +1477,7 @@ export async function runCodex(opts: {
       }
     }
 
-    if (resolvedBackend === "codex-app-server") {
+    if (isCodexAppServerBackend(resolvedBackend)) {
       const appServerClient = client as CodexAppServerClient;
       try {
         const authTokens = await loadOpenAiAuthTokens();
@@ -1813,7 +1815,7 @@ export async function runCodex(opts: {
             "start",
           );
           logger.debug("[Codex] startSession response:", startResponse);
-          if (client.backendKind === "codex-app-server") {
+          if (isCodexAppServerBackend(client.backendKind)) {
             const activeThreadId = client.getSessionId();
             const currentModelCode =
               (client as CodexAppServerClient).getCurrentModel() ??
@@ -1851,7 +1853,7 @@ export async function runCodex(opts: {
             "continue",
           );
           logger.debug("[Codex] continueSession response:", response);
-          if (client.backendKind === "codex-app-server") {
+          if (isCodexAppServerBackend(client.backendKind)) {
             const activeThreadId = client.getSessionId();
             const currentModelCode =
               (client as CodexAppServerClient).getCurrentModel() ??

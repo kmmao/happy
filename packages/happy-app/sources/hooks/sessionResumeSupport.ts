@@ -1,3 +1,4 @@
+import { resolveCodexResumableThreadId } from "@kmmao/happy-wire";
 import type { Machine, Session } from "@/sync/storageTypes";
 import { isMachineOnline } from "@/utils/machineUtils";
 
@@ -71,9 +72,8 @@ export function resolveSessionResumeContext(
         };
     }
 
-    const threadId = session.metadata?.codex?.threadId;
-    const resolvedBackend = session.metadata?.codex?.resolvedBackend;
-    if (!threadId || resolvedBackend === "codex-mcp-legacy") {
+    const threadId = resolveCodexResumableThreadId(session.metadata?.codex);
+    if (!threadId) {
         return null;
     }
 

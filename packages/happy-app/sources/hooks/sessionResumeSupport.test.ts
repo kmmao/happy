@@ -104,6 +104,34 @@ describe("resolveSessionResumeContext", () => {
         });
     });
 
+    it("returns Codex resume context when older metadata omitted resolvedBackend", () => {
+        const result = resolveSessionResumeContext(
+            createSession({
+                metadata: {
+                    version: "0.71.42",
+                    machineId: "machine-1",
+                    path: "/repo",
+                    host: "HomeMac",
+                    homeDir: "/Users/test",
+                    flavor: "codex",
+                    codex: {
+                        threadId: "thread_legacy_compatible",
+                    },
+                },
+            } as Partial<Session>),
+            createMachine(),
+        );
+
+        expect(result).toEqual({
+            baseSpawnOptions: {
+                machineId: "machine-1",
+                directory: "/repo",
+                happySessionId: "session-1",
+                agent: "codex",
+            },
+        });
+    });
+
     it("blocks Codex resume for explicit legacy backend sessions", () => {
         const result = resolveSessionResumeContext(
             createSession({

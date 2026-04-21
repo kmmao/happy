@@ -1,31 +1,3 @@
-export type RequestedCodexBackend =
-  | "auto"
-  | "codex-app-server"
-  | "codex-mcp-legacy";
-
-export type ResolvedCodexBackend = "codex-app-server" | "codex-mcp-legacy";
-
-export function resolveRequestedCodexBackend(
-  rawValue: string | undefined = process.env.HAPPY_CODEX_BACKEND,
-): RequestedCodexBackend {
-  switch ((rawValue || "").trim().toLowerCase()) {
-    case "":
-    case "auto":
-      return "auto";
-    case "app-server":
-    case "appserver":
-    case "codex-app-server":
-      return "codex-app-server";
-    case "legacy":
-    case "mcp":
-    case "mcp-legacy":
-    case "codex-mcp-legacy":
-      return "codex-mcp-legacy";
-    default:
-      return "auto";
-  }
-}
-
 function getErrorMessage(error: unknown): string {
   if (error instanceof Error) {
     return error.message;
