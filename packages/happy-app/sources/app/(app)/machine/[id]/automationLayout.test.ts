@@ -21,8 +21,9 @@ describe("automationLayout", () => {
         expect(cards).toEqual([
             { kind: "running", value: "4", accent: "#0A84FF" },
             { kind: "queued", value: "2", accent: "#FF9500" },
+            { kind: "completed", value: "0", accent: "#34C759" },
             { kind: "alerts", value: "4", accent: "#FF3B30" },
-            { kind: "guardians", value: "5", accent: undefined },
+            { kind: "guardians", value: "5" },
         ]);
     });
 

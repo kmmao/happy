@@ -98,6 +98,8 @@ describe("taskDetailViewModel", () => {
             canCancel: true,
             canRetry: false,
             canDelete: false,
+            canEdit: false,
+            canRestore: false,
             sessionHref: "/session/session-1",
         });
     });
@@ -111,6 +113,8 @@ describe("taskDetailViewModel", () => {
             canCancel: false,
             canRetry: true,
             canDelete: true,
+            canEdit: false,
+            canRestore: false,
             sessionHref: null,
         });
     });
@@ -120,6 +124,8 @@ describe("taskDetailViewModel", () => {
             canCancel: false,
             canRetry: false,
             canDelete: true,
+            canEdit: false,
+            canRestore: false,
             sessionHref: "/session/session-1",
         });
     });

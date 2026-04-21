@@ -44,7 +44,7 @@ export function parseCodexServicePreview(
   }
 
   const firstLine = trimmed.split("\n")[0];
-  if (/^warning/i.test(firstLine)) {
+  if (/\bwarning\b/i.test(firstLine)) {
     const rest = trimmed.split("\n").slice(1);
     return {
       kind: "warning",
