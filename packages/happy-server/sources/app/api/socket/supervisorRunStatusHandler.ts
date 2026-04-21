@@ -11,10 +11,7 @@ import { log } from "@/utils/log";
 import {
     eventRouter,
     buildSupervisorStatusEphemeral,
-    buildSupervisorTriggerEphemeral,
-    buildSessionActivityEphemeral,
 } from "@/app/events/eventRouter";
-import { activityCache } from "@/app/presence/sessionCache";
 import { pushSupervisorNotification } from "@/modules/pushSend";
 import { aggregateSessionUsage, scheduleDelayedCostAggregation } from "@/modules/supervisorUsage";
 import { createIssueOnProvider } from "@/app/webhook/webhookProviderApi";
@@ -306,21 +303,6 @@ export function supervisorRunStatusHandler(
                 // the completion event. Schedule multiple retry attempts.
                 if (resolvedSessionId) {
                     scheduleDelayedCostAggregation(data.runId, resolvedSessionId);
-                }
-
-                // Archive the supervisor session so it doesn't stay active
-                if (resolvedSessionId) {
-                    const now = Date.now();
-                    await db.session.updateMany({
-                        where: { id: resolvedSessionId, active: true },
-                        data: { lastActiveAt: new Date(now), active: false },
-                    });
-                    activityCache.invalidateSession(resolvedSessionId);
-                    eventRouter.emitEphemeral({
-                        userId,
-                        payload: buildSessionActivityEphemeral(resolvedSessionId, false, now, false),
-                        recipientFilter: { type: "user-scoped-only" },
-                    });
                 }
             }
 
