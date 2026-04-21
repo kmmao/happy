@@ -18,6 +18,7 @@ import { CodexDiffView } from "./CodexDiffView";
 import { AskUserQuestionView } from "./AskUserQuestionView";
 import { GeminiEditView } from "./GeminiEditView";
 import { GeminiExecuteView } from "./GeminiExecuteView";
+import { HappyUpdateProgressView } from "./HappyUpdateProgressView";
 
 export type ToolViewProps = {
   tool: ToolCall;
@@ -45,6 +46,7 @@ export const toolViewRegistry: Record<string, ToolViewComponent> = {
   Task: TaskView,
   Agent: TaskView,
   AskUserQuestion: AskUserQuestionView,
+  mcp__happy__update_progress: HappyUpdateProgressView,
   // Gemini tools (lowercase)
   edit: GeminiEditView,
   execute: GeminiExecuteView,
@@ -57,6 +59,7 @@ export const toolFullViewRegistry: Record<string, ToolViewComponent> = {
   CodexDiff: CodexDiffView,
   Edit: EditViewFull,
   MultiEdit: MultiEditViewFull,
+  mcp__happy__update_progress: HappyUpdateProgressView,
 };
 
 // Helper function to get the appropriate view component for a tool
@@ -88,3 +91,4 @@ export { TaskView } from "./TaskView";
 export { AskUserQuestionView } from "./AskUserQuestionView";
 export { GeminiEditView } from "./GeminiEditView";
 export { GeminiExecuteView } from "./GeminiExecuteView";
+export { HappyUpdateProgressView } from "./HappyUpdateProgressView";

@@ -17,8 +17,12 @@ import { ChatFooter } from "./ChatFooter";
 import { Message } from "@/sync/typesMessage";
 import { knownTools } from "./tools/knownTools";
 import { parseLegacyCodexDiffPreview } from "./tools/codexDiffCompat";
-
-type DisplayItem = Message;
+import {
+  buildChatDisplayItems,
+  isTurnTimelineDisplayItem,
+  type ChatDisplayItem,
+} from "./chatTimelineDisplay";
+import { TurnTimelineMessageView } from "./TurnTimelineMessageView";
 
 export interface ChatListHandle {
   scrollToBottom: () => void;
@@ -99,6 +103,7 @@ const ChatListInternal = React.memo(
     const flatListRef = React.useRef<FlatList>(null);
     const isAwayRef = React.useRef(false);
     const currentUserMsgIndexRef = React.useRef(-1);
+    const experiments = useSetting("experiments");
 
     // Pre-compute which agent-text messages should show an avatar.
     // In an inverted list, index+1 is the visually "previous" (above) message.
@@ -146,7 +151,7 @@ const ChatListInternal = React.memo(
     // Filter tool-call messages based on viewInline setting.
     // When viewInline is off, hide main agent tool calls (except special ones).
     const viewInline = useSetting("viewInline");
-    const displayItems: DisplayItem[] = React.useMemo(() => {
+    const displayItems: ChatDisplayItem[] = React.useMemo(() => {
       const visibleMessages = viewInline
         ? props.messages
         : (() => {
@@ -186,7 +191,7 @@ const ChatListInternal = React.memo(
             });
           })();
 
-      const dedupedMessages: DisplayItem[] = [];
+      const dedupedMessages: Message[] = [];
       for (const msg of visibleMessages) {
         if (msg.kind === "agent-text") {
           const preview = parseLegacyCodexDiffPreview(msg.text);
@@ -206,8 +211,10 @@ const ChatListInternal = React.memo(
         dedupedMessages.push(msg);
       }
 
-      return dedupedMessages;
-    }, [props.messages, viewInline]);
+      return buildChatDisplayItems(dedupedMessages, {
+        showThinkingTimeline: experiments,
+      });
+    }, [props.messages, viewInline, experiments]);
 
     // Collect user-text message indices in displayItems (not props.messages)
     // since the FlatList now uses displayItems as data.
@@ -222,20 +229,22 @@ const ChatListInternal = React.memo(
     // Map displayItems index → original messages index.
     // When viewInline is off, some messages are filtered out, so indices diverge.
     const displayToMsgIndex = React.useMemo(() => {
-      if (viewInline) {
-        // 1:1 mapping when all messages are shown
-        const map = new Map<number, number>();
-        for (let i = 0; i < displayItems.length; i++) {
-          map.set(i, i);
-        }
-        return map;
-      }
       const map = new Map<number, number>();
-      let diIdx = 0;
-      for (let mi = 0; mi < props.messages.length; mi++) {
-        if (diIdx < displayItems.length && displayItems[diIdx] === props.messages[mi]) {
-          map.set(diIdx, mi);
-          diIdx++;
+      let messageIndex = 0;
+      for (let displayIndex = 0; displayIndex < displayItems.length; displayIndex += 1) {
+        const item = displayItems[displayIndex]!;
+        if (isTurnTimelineDisplayItem(item)) {
+          continue;
+        }
+        while (
+          messageIndex < props.messages.length &&
+          props.messages[messageIndex] !== item
+        ) {
+          messageIndex += 1;
+        }
+        if (messageIndex < props.messages.length) {
+          map.set(displayIndex, messageIndex);
+          messageIndex += 1;
         }
       }
       return map;
@@ -356,9 +365,30 @@ const ChatListInternal = React.memo(
       },
     ]);
 
-    const keyExtractor = useCallback((item: DisplayItem) => item.id, []);
+    const keyExtractor = useCallback((item: ChatDisplayItem) => item.id, []);
     const renderItem = useCallback(
-      ({ item }: { item: DisplayItem }) => {
+      ({ item }: { item: ChatDisplayItem }) => {
+        if (isTurnTimelineDisplayItem(item)) {
+          const timelineHasAvatar = item.steps.some(
+            (step) =>
+              step.kind === "thinking" &&
+              (showAvatarMap.get(step.message.id) ?? false),
+          );
+          const timelineIsLatest = item.steps.some(
+            (step) => step.kind === "thinking" && step.message.id === latestAgentId,
+          );
+          return (
+            <TurnTimelineMessageView
+              item={item}
+              metadata={props.metadata}
+              sessionId={props.sessionId}
+              showAvatar={timelineHasAvatar}
+              isLatestAgent={timelineIsLatest}
+              permissionModeKey={props.permissionModeKey}
+            />
+          );
+        }
+
         const hasThinking =
           item.kind === "agent-event" &&
           item.event.type === "ready" &&
@@ -379,11 +409,11 @@ const ChatListInternal = React.memo(
       [
         props.metadata,
         props.sessionId,
+        props.permissionModeKey,
+        props.contentMaxWidth,
         showAvatarMap,
         latestAgentId,
         thinkingTurnIds,
-        props.permissionModeKey,
-        props.contentMaxWidth,
       ],
     );
     return (

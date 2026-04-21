@@ -15,6 +15,9 @@ Redesigned session progress panel with glass UI, a unified side-panel with dedic
 - Merged Progress and Code tabs into a single **session** tab and hid the Knowledge tab when the project knowledge base is disabled
 - Added **Code Changes** view with per-file stats bar and expandable diffs
 - Added dedicated Codex tool views (plan preview, patch, diff) and a Codex progress panel
+- Improved `Update Progress` tool cards with clearer explanation/focus/checklist hierarchy, collapsible long explanations, default checklist truncation with expand-all, a structured checklist timeline, explicit update time, duration badges, and optional token badges when real usage data is available
+- Improved chat rendering so turns with visible thinking plus tool calls can collapse into a single chronological timeline instead of two disconnected blocks
+- Improved turn timeline cards with the same default truncation/expand-all behavior as Progress cards while keeping unfinished tool steps visible by default
 - Added **Expand diffs by default** appearance setting applied across Edit/Write/GeminiEdit/CodexPatch
 - Added a new column layout for the InputFAB with a dedicated buttons row for better reach
 

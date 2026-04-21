@@ -1198,7 +1198,7 @@ export const knownTools = {
   mcp__happy__update_progress: {
     title: formatHappyMcpToolTitle("mcp__happy__update_progress"),
     icon: ICON_TODO,
-    minimal: true,
+    minimal: false,
     noStatus: true,
     input: z.object({}).partial().passthrough(),
     extractDescription: (opts: {
@@ -1212,6 +1212,24 @@ export const knownTools = {
         "mcp__happy__update_progress",
         "fallback",
       );
+    },
+    extractSubtitle: (opts: {
+      metadata: Metadata | null;
+      tool: ToolCall;
+    }) => {
+      if (
+        typeof opts.tool.input?.currentStage === "string" &&
+        opts.tool.input.currentStage.trim().length > 0
+      ) {
+        return opts.tool.input.currentStage.trim();
+      }
+      if (
+        typeof opts.tool.input?.label === "string" &&
+        opts.tool.input.label.trim().length > 0
+      ) {
+        return opts.tool.input.label.trim();
+      }
+      return null;
     },
   },
   mcp__happy__update_session_summary: {
