@@ -1,5 +1,5 @@
 import * as React from "react";
-import { Animated, Pressable, Text, View, ScrollView, ActivityIndicator } from "react-native";
+import { Animated, Pressable, Text, View, ScrollView } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -8,6 +8,7 @@ import { Typography } from "@/constants/Typography";
 import { t } from "@/text";
 import { Modal } from "@/modal";
 import { layout } from "@/components/layout";
+import { SharedStateView } from "@/components/SharedStateView";
 import { useSessionKnowledge, type SessionKnowledgeEntry } from "@/hooks/useSessionKnowledge";
 import { useSessionKnowledgeAccesses, type SessionKnowledgeAccessEntry } from "@/hooks/useSessionKnowledgeAccesses";
 import { getSessionKnowledgeDisplayTimestamp } from "./sessionKnowledgeDisplayTimestamp";
@@ -296,12 +297,24 @@ export const SessionKnowledgeSheet = React.memo<SessionKnowledgeSheetProps>(
             hasLoadedReferences,
         });
 
-        const { entries, loading: changesLoading } = useSessionKnowledge(
+        const {
+            entries,
+            error: changesError,
+            state: changesState,
+            refresh: refreshChanges,
+        } = useSessionKnowledge(
             loadState.shouldLoadChanges ? projectServerId : undefined,
             loadState.shouldLoadChanges ? sessionId : undefined,
         );
 
-        const { accesses, loading: accessesLoading, evict, reinject } = useSessionKnowledgeAccesses(
+        const {
+            accesses,
+            error: accessesError,
+            state: accessesState,
+            refresh: refreshAccesses,
+            evict,
+            reinject,
+        } = useSessionKnowledgeAccesses(
             loadState.shouldLoadReferences ? projectServerId : undefined,
             loadState.shouldLoadReferences ? sessionId : undefined,
         );
@@ -389,7 +402,8 @@ export const SessionKnowledgeSheet = React.memo<SessionKnowledgeSheetProps>(
                     : isEvictedTab ? evictedAccesses
                         : isArchiveTab ? archivedAccesses
                             : [];
-        const loading = isChangesTab ? changesLoading : accessesLoading;
+        const activeCollectionState = isChangesTab ? changesState : accessesState;
+        const activeError = isChangesTab ? changesError : accessesError;
         const isEmpty = activeEntries.length === 0;
         const headerTitle = isChangesTab
             ? t("session.knowledgeChanges")
@@ -399,6 +413,13 @@ export const SessionKnowledgeSheet = React.memo<SessionKnowledgeSheetProps>(
                     ? t("session.knowledgeTabArchive")
                     : t("session.knowledgeTabReferences");
         const currentCount = activeEntries.length;
+        const handleRefreshActiveTab = React.useCallback(() => {
+            if (isChangesTab) {
+                void refreshChanges();
+                return;
+            }
+            void refreshAccesses();
+        }, [isChangesTab, refreshAccesses, refreshChanges]);
 
         const body = (
             <>
@@ -467,23 +488,41 @@ export const SessionKnowledgeSheet = React.memo<SessionKnowledgeSheetProps>(
                                     : t("session.knowledgeAccessesSubtitle")}
                     </Text>
 
-                    {loading && isEmpty ? (
-                        <View style={styles.centerContainer}>
-                            <ActivityIndicator size="small" color={theme.colors.primary} />
-                        </View>
+                    {activeCollectionState.kind === "loading" && isEmpty ? (
+                        <SharedStateView
+                            inline
+                            kind="loading"
+                            title={t("common.loading")}
+                        />
+                    ) : activeCollectionState.kind === "error" && isEmpty ? (
+                        <SharedStateView
+                            inline
+                            kind="error"
+                            title={t("common.error")}
+                            description={activeError ?? undefined}
+                            onAction={handleRefreshActiveTab}
+                        />
                     ) : isEmpty ? (
-                        <View style={styles.centerContainer}>
-                            <Ionicons name="document-outline" size={32} color={theme.colors.textSecondary} />
-                            <Text style={[styles.emptyText, { color: theme.colors.textSecondary }]}>
-                                {isChangesTab
+                        <SharedStateView
+                            inline
+                            kind="empty"
+                            icon={
+                                <Ionicons
+                                    name="document-outline"
+                                    size={32}
+                                    color={theme.colors.textSecondary}
+                                />
+                            }
+                            title={
+                                isChangesTab
                                     ? t("session.knowledgeChangesEmpty")
                                     : isEvictedTab
                                         ? t("session.knowledgeEvictedEmpty")
                                         : isArchiveTab
                                             ? t("session.knowledgeArchiveEmpty")
-                                            : t("session.knowledgeAccessesEmpty")}
-                            </Text>
-                        </View>
+                                            : t("session.knowledgeAccessesEmpty")
+                            }
+                        />
                     ) : (
                         <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
                             {isChangesTab
@@ -624,17 +663,6 @@ const styles = StyleSheet.create({
         paddingHorizontal: 16,
         gap: 8,
         paddingBottom: 8,
-    },
-    centerContainer: {
-        flex: 1,
-        alignItems: "center",
-        justifyContent: "center",
-        paddingVertical: 40,
-        gap: 8,
-    },
-    emptyText: {
-        ...Typography.default("regular"),
-        fontSize: 13,
     },
     entryRow: {
         padding: 12,

@@ -11,6 +11,10 @@ import { getServerUrl } from "@/sync/serverConfig";
 import { useSessionKnowledgeAccessRevision } from "@/sync/storage";
 import { backoff } from "@/utils/time";
 import {
+    deriveCollectionViewState,
+    type CollectionViewState,
+} from "@/utils/collectionViewState";
+import {
     shouldApplyKnowledgeRequestResult,
     shouldResetSessionKnowledgeState,
 } from "./sessionKnowledgeState";
@@ -43,21 +47,48 @@ interface AccessesResponse {
 export function useSessionKnowledgeAccesses(
     projectServerId: string | undefined,
     sessionId: string | undefined,
-) {
+) : {
+    accesses: SessionKnowledgeAccessEntry[];
+    loading: boolean;
+    error: string | null;
+    state: CollectionViewState;
+    refresh: () => Promise<void>;
+    evict: (knowledgeId: string) => Promise<boolean>;
+    reinject: (knowledgeId: string) => Promise<boolean>;
+} {
     const [accesses, setAccesses] = React.useState<SessionKnowledgeAccessEntry[]>([]);
     const [loading, setLoading] = React.useState(false);
+    const [error, setError] = React.useState<string | null>(null);
     const mountedRef = React.useRef(true);
     const latestRequestTokenRef = React.useRef(0);
+    const latestStateKeyRef = React.useRef<string | null>(null);
 
     React.useEffect(() => {
         return () => { mountedRef.current = false; };
     }, []);
 
     React.useEffect(() => {
-        if (!shouldResetSessionKnowledgeState({ projectServerId, sessionId })) return;
-        latestRequestTokenRef.current += 1;
-        setAccesses([]);
-        setLoading(false);
+        const stateKey =
+            projectServerId && sessionId
+                ? `${projectServerId}:${sessionId}`
+                : null;
+
+        if (shouldResetSessionKnowledgeState({ projectServerId, sessionId })) {
+            latestRequestTokenRef.current += 1;
+            latestStateKeyRef.current = null;
+            setAccesses([]);
+            setLoading(false);
+            setError(null);
+            return;
+        }
+
+        if (latestStateKeyRef.current !== stateKey) {
+            latestRequestTokenRef.current += 1;
+            latestStateKeyRef.current = stateKey;
+            setAccesses([]);
+            setLoading(false);
+            setError(null);
+        }
     }, [projectServerId, sessionId]);
 
     const refresh = React.useCallback(async () => {
@@ -69,6 +100,7 @@ export function useSessionKnowledgeAccesses(
         const requestToken = latestRequestTokenRef.current + 1;
         latestRequestTokenRef.current = requestToken;
         setLoading(true);
+        setError(null);
         try {
             const result = await backoff(async () => {
                 const response = await fetch(
@@ -93,8 +125,19 @@ export function useSessionKnowledgeAccesses(
                 return;
             }
             setAccesses(result.accesses);
-        } catch {
-            // Keep empty state on failure
+        } catch (fetchError) {
+            if (!mountedRef.current) return;
+            if (!shouldApplyKnowledgeRequestResult({
+                requestToken,
+                latestRequestToken: latestRequestTokenRef.current,
+            })) {
+                return;
+            }
+            setError(
+                fetchError instanceof Error
+                    ? fetchError.message
+                    : "Failed to fetch knowledge accesses",
+            );
         } finally {
             if (!mountedRef.current) return;
             if (!shouldApplyKnowledgeRequestResult({
@@ -212,5 +255,23 @@ export function useSessionKnowledgeAccesses(
         [projectServerId, sessionId, refresh],
     );
 
-    return { accesses, loading, refresh, evict, reinject };
+    const state = React.useMemo(
+        () =>
+            deriveCollectionViewState({
+                loading,
+                error,
+                count: accesses.length,
+            }),
+        [accesses.length, error, loading],
+    );
+
+    return {
+        accesses,
+        loading,
+        error: state.error,
+        state,
+        refresh,
+        evict,
+        reinject,
+    };
 }

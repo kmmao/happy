@@ -22,6 +22,7 @@ import { ScrollToBottomButton } from "@/components/ScrollToBottomButton";
 import { OptionsPopover } from "@/components/OptionsPopover";
 import { SessionKnowledgeSheet } from "@/components/knowledge/SessionKnowledgeSheet";
 import { EmptyMessages } from "@/components/EmptyMessages";
+import { SharedStateView } from "@/components/SharedStateView";
 import { SessionRecommendationsCard } from "@/components/SessionRecommendationsCard";
 import { useProjectActionItems } from "@/hooks/useProjectActionItems";
 import { VoiceAssistantStatusBar } from "@/components/VoiceAssistantStatusBar";
@@ -508,7 +509,12 @@ function SessionViewInner({
   const { messages, isLoaded } = useSessionMessages(sessionId);
   const isConnected = session.presence === "online";
   const sessionProjectInner = useProjectForSession(sessionId);
-  const { actionItems } = useProjectActionItems(sessionProjectInner?.serverId ?? undefined);
+  const {
+    actionItems,
+    error: actionItemsError,
+    state: actionItemsState,
+    refresh: refreshActionItems,
+  } = useProjectActionItems(sessionProjectInner?.serverId ?? undefined);
   const backgroundTaskEntries = useBackgroundTaskEntries(sessionId);
   const { tasks: backgroundTasks, dismissTask: dismissBackgroundTask } = useBackgroundTasks(backgroundTaskEntries, isConnected);
   const [viewingTask, setViewingTask] = React.useState<BackgroundTask | null>(null);
@@ -1219,7 +1225,16 @@ function SessionViewInner({
     messages.length === 0 ? (
       <>
         {isLoaded ? (
-          actionItems.length > 0 ? (
+          actionItemsState.kind === "error" ? (
+            <SharedStateView
+              kind="error"
+              title={t("common.error")}
+              description={actionItemsError ?? undefined}
+              onAction={() => {
+                void refreshActionItems();
+              }}
+            />
+          ) : actionItems.length > 0 ? (
             <SessionRecommendationsCard
               actionItems={actionItems}
               onSelect={setMessage}

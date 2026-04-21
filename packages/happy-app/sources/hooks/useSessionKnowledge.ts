@@ -14,6 +14,10 @@ import {
 } from "@/sync/storage";
 import { backoff } from "@/utils/time";
 import {
+    deriveCollectionViewState,
+    type CollectionViewState,
+} from "@/utils/collectionViewState";
+import {
     shouldApplyKnowledgeRequestResult,
     shouldResetSessionKnowledgeState,
 } from "./sessionKnowledgeState";
@@ -38,21 +42,46 @@ interface KnowledgeListResponse {
 export function useSessionKnowledge(
     projectServerId: string | undefined,
     sessionId: string | undefined,
-) {
+) : {
+    entries: SessionKnowledgeEntry[];
+    loading: boolean;
+    error: string | null;
+    state: CollectionViewState;
+    refresh: () => Promise<void>;
+} {
     const [entries, setEntries] = React.useState<SessionKnowledgeEntry[]>([]);
     const [loading, setLoading] = React.useState(false);
+    const [error, setError] = React.useState<string | null>(null);
     const mountedRef = React.useRef(true);
     const latestRequestTokenRef = React.useRef(0);
+    const latestStateKeyRef = React.useRef<string | null>(null);
 
     React.useEffect(() => {
         return () => { mountedRef.current = false; };
     }, []);
 
     React.useEffect(() => {
-        if (!shouldResetSessionKnowledgeState({ projectServerId, sessionId })) return;
-        latestRequestTokenRef.current += 1;
-        setEntries([]);
-        setLoading(false);
+        const stateKey =
+            projectServerId && sessionId
+                ? `${projectServerId}:${sessionId}`
+                : null;
+
+        if (shouldResetSessionKnowledgeState({ projectServerId, sessionId })) {
+            latestRequestTokenRef.current += 1;
+            latestStateKeyRef.current = null;
+            setEntries([]);
+            setLoading(false);
+            setError(null);
+            return;
+        }
+
+        if (latestStateKeyRef.current !== stateKey) {
+            latestRequestTokenRef.current += 1;
+            latestStateKeyRef.current = stateKey;
+            setEntries([]);
+            setLoading(false);
+            setError(null);
+        }
     }, [projectServerId, sessionId]);
 
     const refresh = React.useCallback(async () => {
@@ -64,6 +93,7 @@ export function useSessionKnowledge(
         const requestToken = latestRequestTokenRef.current + 1;
         latestRequestTokenRef.current = requestToken;
         setLoading(true);
+        setError(null);
         try {
             const result = await backoff(async () => {
                 const response = await fetch(
@@ -88,8 +118,19 @@ export function useSessionKnowledge(
                 return;
             }
             setEntries(result.entries);
-        } catch {
-            // Keep empty state on failure
+        } catch (fetchError) {
+            if (!mountedRef.current) return;
+            if (!shouldApplyKnowledgeRequestResult({
+                requestToken,
+                latestRequestToken: latestRequestTokenRef.current,
+            })) {
+                return;
+            }
+            setError(
+                fetchError instanceof Error
+                    ? fetchError.message
+                    : "Failed to fetch session knowledge",
+            );
         } finally {
             if (!mountedRef.current) return;
             if (!shouldApplyKnowledgeRequestResult({
@@ -114,5 +155,15 @@ export function useSessionKnowledge(
         void refresh();
     }, [knowledgeCount, accessRevision, refresh]);
 
-    return { entries, loading, refresh };
+    const state = React.useMemo(
+        () =>
+            deriveCollectionViewState({
+                loading,
+                error,
+                count: entries.length,
+            }),
+        [entries.length, error, loading],
+    );
+
+    return { entries, loading, error: state.error, state, refresh };
 }

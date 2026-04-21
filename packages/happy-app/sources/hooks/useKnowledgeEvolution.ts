@@ -9,6 +9,10 @@ import * as React from "react";
 import { TokenStorage } from "@/auth/tokenStorage";
 import { getServerUrl } from "@/sync/serverConfig";
 import { backoff } from "@/utils/time";
+import {
+    deriveCollectionViewState,
+    type CollectionViewState,
+} from "@/utils/collectionViewState";
 
 export interface ChainEntry {
     id: string;
@@ -37,15 +41,30 @@ interface ChainResponse {
 export function useKnowledgeEvolution(
     projectServerId: string | undefined,
     entryId: string | undefined,
-) {
+) : {
+    chain: ChainEntry[];
+    relations: ChainRelation[];
+    loading: boolean;
+    error: string | null;
+    state: CollectionViewState;
+    refresh: () => Promise<void>;
+} {
     const [chain, setChain] = React.useState<ChainEntry[]>([]);
     const [relations, setRelations] = React.useState<ChainRelation[]>([]);
     const [loading, setLoading] = React.useState(false);
+    const [error, setError] = React.useState<string | null>(null);
     const mountedRef = React.useRef(true);
 
     React.useEffect(() => {
         return () => { mountedRef.current = false; };
     }, []);
+
+    React.useEffect(() => {
+        setChain([]);
+        setRelations([]);
+        setLoading(false);
+        setError(null);
+    }, [projectServerId, entryId]);
 
     const refresh = React.useCallback(async () => {
         if (!projectServerId || !entryId) return;
@@ -54,6 +73,7 @@ export function useKnowledgeEvolution(
 
         const API_ENDPOINT = getServerUrl();
         setLoading(true);
+        setError(null);
         try {
             const result = await backoff(async () => {
                 const response = await fetch(
@@ -73,8 +93,13 @@ export function useKnowledgeEvolution(
             if (!mountedRef.current) return;
             setChain(result.chain);
             setRelations(result.relations);
-        } catch {
-            // Keep empty state on failure
+        } catch (fetchError) {
+            if (!mountedRef.current) return;
+            setError(
+                fetchError instanceof Error
+                    ? fetchError.message
+                    : "Failed to fetch knowledge evolution",
+            );
         } finally {
             if (mountedRef.current) setLoading(false);
         }
@@ -84,5 +109,15 @@ export function useKnowledgeEvolution(
         void refresh();
     }, [refresh]);
 
-    return { chain, relations, loading, refresh };
+    const state = React.useMemo(
+        () =>
+            deriveCollectionViewState({
+                loading,
+                error,
+                count: chain.length,
+            }),
+        [chain.length, error, loading],
+    );
+
+    return { chain, relations, loading, error: state.error, state, refresh };
 }

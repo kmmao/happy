@@ -8,6 +8,7 @@ import { useKnowledgeEvolution } from "@/hooks/useKnowledgeEvolution";
 import { useHappyAction } from "@/hooks/useHappyAction";
 import { EvolutionTimeline } from "@/components/knowledge/EvolutionTimeline";
 import { layout } from "@/components/layout";
+import { SharedStateView } from "@/components/SharedStateView";
 
 interface KnowledgeEvolutionViewProps {
     projectServerId: string;
@@ -17,7 +18,7 @@ interface KnowledgeEvolutionViewProps {
 export const KnowledgeEvolutionView = React.memo<KnowledgeEvolutionViewProps>(
     ({ projectServerId, entryId }) => {
         const { theme } = useUnistyles();
-        const { chain, relations, loading, refresh } = useKnowledgeEvolution(
+        const { chain, relations, error, state, refresh } = useKnowledgeEvolution(
             projectServerId,
             entryId,
         );
@@ -26,29 +27,37 @@ export const KnowledgeEvolutionView = React.memo<KnowledgeEvolutionViewProps>(
             await refresh();
         });
 
-        if (loading && chain.length === 0) {
+        if (state.kind === "loading") {
             return (
-                <View style={styles.centerContainer}>
-                    <ActivityIndicator size="large" color={theme.colors.header.tint} />
-                </View>
+                <SharedStateView kind="loading" title={t("common.loading")} />
             );
         }
 
-        if (!loading && chain.length === 0) {
+        if (state.kind === "error") {
             return (
-                <View style={styles.centerContainer}>
-                    <Ionicons
-                        name="git-branch-outline"
-                        size={48}
-                        color={theme.colors.textSecondary}
-                    />
-                    <Text style={[styles.emptyTitle, { color: theme.colors.text }]}>
-                        {t("projects.knowledgeEvolutionEmpty")}
-                    </Text>
-                    <Text style={[styles.emptySubtitle, { color: theme.colors.textSecondary }]}>
-                        {t("projects.knowledgeEvolutionEmptySubtitle")}
-                    </Text>
-                </View>
+                <SharedStateView
+                    kind="error"
+                    title={t("common.error")}
+                    description={error ?? t("projects.knowledgeEvolutionEmptySubtitle")}
+                    onAction={doRefresh}
+                />
+            );
+        }
+
+        if (state.kind === "empty") {
+            return (
+                <SharedStateView
+                    kind="empty"
+                    title={t("projects.knowledgeEvolutionEmpty")}
+                    description={t("projects.knowledgeEvolutionEmptySubtitle")}
+                    icon={
+                        <Ionicons
+                            name="git-branch-outline"
+                            size={48}
+                            color={theme.colors.textSecondary}
+                        />
+                    }
+                />
             );
         }
 
