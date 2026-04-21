@@ -9,6 +9,8 @@ import {
     formatCodexReasoningEffortMetadata,
     formatCodexReasoningSummaryMetadata,
     hasCodexMetadataSection,
+    resolveCodexSurfaceSections,
+    type CodexSurfaceSection,
 } from "./codexMetadata";
 
 function formatCodexBackendMetadata(
@@ -102,6 +104,51 @@ function formatNamePreview(names: readonly string[], limit = 4): string {
     return `${visible}, +${names.length - limit}`;
 }
 
+function getCodexSurfaceSectionTitle(
+    section: CodexSurfaceSection,
+): string | null {
+    if (section.kind === "commands") {
+        return t("settingsPlugins.commands", {
+            count: section.count,
+        });
+    }
+    if (section.kind === "prompts") {
+        return `${t("kanban.templates.title")} (${section.count})`;
+    }
+    if (section.kind === "skills") {
+        return t("settingsPlugins.skills", {
+            count: section.count,
+        });
+    }
+    if (section.kind === "agents") {
+        return t("settingsPlugins.agents", {
+            count: section.count,
+        });
+    }
+    if (section.kind === "mcpServers") {
+        return t("settingsMcp.title");
+    }
+    return null;
+}
+
+function getCodexSurfaceSectionIcon(
+    section: CodexSurfaceSection,
+): keyof typeof Ionicons.glyphMap {
+    if (section.kind === "commands") {
+        return "terminal-outline";
+    }
+    if (section.kind === "prompts") {
+        return "document-text-outline";
+    }
+    if (section.kind === "skills") {
+        return "school-outline";
+    }
+    if (section.kind === "agents") {
+        return "people-outline";
+    }
+    return "git-network-outline";
+}
+
 export function CodexInfoSection({ session }: { session: Session }) {
     if (!hasCodexMetadataSection(session) || session.metadata?.flavor !== "codex") {
         return null;
@@ -109,6 +156,7 @@ export function CodexInfoSection({ session }: { session: Session }) {
 
     const codexReasoningEffort = formatCodexReasoningEffortMetadata(session, t);
     const codexReasoningSummary = formatCodexReasoningSummaryMetadata(session);
+    const codexSurfaceSections = resolveCodexSurfaceSections(session);
 
     return (
         <ItemGroup title={t("sessionInfo.codex")}>
@@ -270,78 +318,21 @@ export function CodexInfoSection({ session }: { session: Session }) {
                     showChevron={false}
                 />
             )}
-            {session.metadata.slashCommands &&
-                session.metadata.slashCommands.length > 0 && (
-                    <Item
-                        title={t("settingsPlugins.commands", {
-                            count: session.metadata.slashCommands.length,
-                        })}
-                        subtitle={formatNamePreview(session.metadata.slashCommands)}
-                        icon={
-                            <Ionicons
-                                name="terminal-outline"
-                                size={29}
-                                color="#5856D6"
-                            />
-                        }
-                        showChevron={false}
-                    />
-                )}
-            {session.metadata.codex?.skills &&
-                session.metadata.codex.skills.length > 0 && (
-                    <Item
-                        title={t("settingsPlugins.skills", {
-                            count: session.metadata.codex.skills.length,
-                        })}
-                        subtitle={formatNamePreview(
-                            session.metadata.codex.skills.map((skill) => skill.name),
-                        )}
-                        icon={
-                            <Ionicons
-                                name="school-outline"
-                                size={29}
-                                color="#5856D6"
-                            />
-                        }
-                        showChevron={false}
-                    />
-                )}
-            {session.metadata.codex?.agents &&
-                session.metadata.codex.agents.length > 0 && (
-                    <Item
-                        title={t("settingsPlugins.agents", {
-                            count: session.metadata.codex.agents.length,
-                        })}
-                        subtitle={formatNamePreview(
-                            session.metadata.codex.agents.map((agent) => agent.name),
-                        )}
-                        icon={
-                            <Ionicons
-                                name="people-outline"
-                                size={29}
-                                color="#5856D6"
-                            />
-                        }
-                        showChevron={false}
-                    />
-                )}
-            {session.metadata.codex?.mcpServers &&
-                session.metadata.codex.mcpServers.length > 0 && (
-                    <Item
-                        title={t("settingsMcp.title")}
-                        subtitle={formatNamePreview(
-                            session.metadata.codex.mcpServers.map((server) => server.name),
-                        )}
-                        icon={
-                            <Ionicons
-                                name="git-network-outline"
-                                size={29}
-                                color="#5856D6"
-                            />
-                        }
-                        showChevron={false}
-                    />
-                )}
+            {codexSurfaceSections.map((section) => (
+                <Item
+                    key={section.kind}
+                    title={getCodexSurfaceSectionTitle(section) ?? section.kind}
+                    subtitle={formatNamePreview(section.names)}
+                    icon={
+                        <Ionicons
+                            name={getCodexSurfaceSectionIcon(section)}
+                            size={29}
+                            color="#5856D6"
+                        />
+                    }
+                    showChevron={false}
+                />
+            ))}
         </ItemGroup>
     );
 }

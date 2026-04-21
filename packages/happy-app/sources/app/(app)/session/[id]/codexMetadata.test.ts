@@ -4,6 +4,7 @@ import {
     formatCodexReasoningEffortMetadata,
     formatCodexReasoningSummaryMetadata,
     hasCodexMetadataSection,
+    resolveCodexSurfaceSections,
     resolveCodexEffectiveReasoningEffort,
     resolveCodexEffectiveReasoningSummary,
 } from "./codexMetadata";
@@ -213,5 +214,83 @@ describe("hasCodexMetadataSection", () => {
                 },
             } as any),
         ).toBe(true);
+    });
+
+    it("returns true when a codex session only exposes prompt metadata", () => {
+        expect(
+            hasCodexMetadataSection({
+                effortLevel: null,
+                metadata: {
+                    flavor: "codex",
+                    codex: {
+                        prompts: [
+                            {
+                                name: "ecc-plan",
+                                path: "/Users/test/.codex/prompts/ecc-plan.md",
+                                description: "Plan a change",
+                            },
+                        ],
+                    },
+                },
+            } as any),
+        ).toBe(true);
+    });
+});
+
+describe("resolveCodexSurfaceSections", () => {
+    it("exposes prompt surfaces for codex sessions", () => {
+        expect(
+            resolveCodexSurfaceSections({
+                metadata: {
+                    flavor: "codex",
+                    codex: {
+                        prompts: [
+                            {
+                                name: "ecc-plan",
+                                path: "/Users/test/.codex/prompts/ecc-plan.md",
+                                description: "Plan a change",
+                            },
+                        ],
+                    },
+                },
+            } as any),
+        ).toEqual([
+            {
+                kind: "prompts",
+                names: ["ecc-plan"],
+                count: 1,
+            },
+        ]);
+    });
+
+    it("hides slashCommands that are only Codex prompt compatibility aliases", () => {
+        expect(
+            resolveCodexSurfaceSections({
+                metadata: {
+                    flavor: "codex",
+                    slashCommands: ["ecc-plan", "plan"],
+                    codex: {
+                        prompts: [
+                            {
+                                name: "ecc-plan",
+                                path: "/Users/test/.codex/prompts/ecc-plan.md",
+                                description: "Plan a change",
+                            },
+                        ],
+                    },
+                },
+            } as any),
+        ).toEqual([
+            {
+                kind: "prompts",
+                names: ["ecc-plan"],
+                count: 1,
+            },
+            {
+                kind: "commands",
+                names: ["plan"],
+                count: 1,
+            },
+        ]);
     });
 });
