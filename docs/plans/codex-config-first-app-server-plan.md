@@ -5,6 +5,37 @@
 - Checklist complete as of 2026-04-12
 - Remaining follow-up work is now maintenance / refinement rather than unchecked plan items
 
+## Alignment classification
+
+- Primary classification: `upstream-aligned`
+- Secondary classification: `compat`
+
+### Upstream baseline
+
+- Upstream source: `openai/codex`
+- Verified date: 2026-04-21
+- Upstream reference:
+  - focus area: `codex app-server` as rich client primary interface
+  - focus area: `~/.codex/config.toml` / profile-driven configuration
+  - focus area: legacy `mcp-server` as compatibility / fallback surface
+- Affected local area:
+  - `packages/happy-cli/src/codex/`
+  - `packages/happy-cli/src/codex-app/`
+  - `packages/happy-cli/src/codex-shared/`
+- Known deviation:
+  - Happy historically locked Codex model choice and simplified permission semantics
+  - Happy continues to carry legacy MCP fallback for compatibility
+- Follow-up intent:
+  - 主路径继续向 upstream-aligned 收敛
+  - legacy MCP 仅保留 compat 角色，不作为新能力承载面
+
+### Why this document is not pure upstream-aligned
+
+- 本计划虽然目标是“配置优先 + app-server 主路径”，但仍显式保留 `codex-mcp-legacy` 回退
+- 因此它不是纯粹的上游对齐文档，而是：
+  - **主策略**：upstream-aligned
+  - **兜底策略**：compat
+
 ## 背景
 
 当前 Happy 对 Codex 的接入核心是：

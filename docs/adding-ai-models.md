@@ -2,6 +2,35 @@
 
 本文说明在本仓库中追加或更新 AI 模型（Claude、Codex、Gemini 等）时需要在哪些地方修改，以及推荐的追加顺序。
 
+## Classification note
+
+这是一份**仓库内改动指南**，不是上游供应商行为说明书。
+
+- Claude / Gemini 部分：以本仓库当前实现为准
+- **Codex 部分当前分类：`happy-opinionated`**
+
+### Upstream baseline（Codex 部分）
+
+- Upstream source: `openai/codex`
+- Verified date: 2026-04-21
+- Upstream reference:
+  - `openai/codex` repo
+  - `codex app-server` / config/profile 当前能力
+- Affected local area:
+  - `packages/happy-cli/src/codex-shared/`
+  - `packages/happy-app/sources/components/modelModeOptions.ts`
+  - Codex 相关 profile / new session UI
+- Known deviation:
+  - 本仓库当前把 Codex 模型锁定到 `gpt-5.4`
+- Follow-up intent:
+  - 在正式解除或改成可配置之前，本文档继续描述 **Happy 当前产品策略**
+
+### Why Codex here is `happy-opinionated`
+
+- 本文档的 Codex 部分描述的是 **Happy 当前锁模型策略**
+- 它不是在描述 `openai/codex` 的默认模型发现行为
+- 所以读这份文档时，不应把“Happy 当前只暴露 `gpt-5.4`”误解成上游 Codex 的天然限制
+
 ## 如何引用本文档（下次更新模型时）
 
 **可直接对 AI 或执行者说：**
