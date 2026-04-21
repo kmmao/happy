@@ -4,6 +4,10 @@
  */
 
 import Fuse from "fuse.js";
+import {
+  resolveCodexCompatibilitySlashCommands,
+  resolveCodexPromptCommands,
+} from "./codexSurface";
 import { storage } from "./storage";
 
 export interface CommandItem {
@@ -96,19 +100,14 @@ function mergeSlashCommands(
 
 function mergeCodexPromptCommands(
   commands: CommandItem[],
-  prompts:
-    | Array<{
-        name: string;
-        description?: string | null;
-      }>
-    | undefined,
+  promptCommands: readonly CommandItem[],
 ): void {
-  for (const prompt of prompts ?? []) {
-    if (IGNORED_COMMANDS.includes(prompt.name)) continue;
-    if (!commands.find((command) => command.command === prompt.name)) {
+  for (const prompt of promptCommands) {
+    if (IGNORED_COMMANDS.includes(prompt.command)) continue;
+    if (!commands.find((command) => command.command === prompt.command)) {
       commands.push({
-        command: prompt.name,
-        description: prompt.description ?? undefined,
+        command: prompt.command,
+        description: prompt.description,
       });
     }
   }
@@ -123,10 +122,17 @@ function getCommandsFromSession(sessionId: string): CommandItem[] {
   if (!sessionId) {
     const commands: CommandItem[] = [...DEFAULT_COMMANDS];
     for (const session of Object.values(state.sessions)) {
-      if (session?.metadata?.slashCommands) {
-        mergeSlashCommands(commands, session.metadata.slashCommands, session.metadata.slashCommandDescriptions);
+      if (session?.metadata) {
+        mergeSlashCommands(
+          commands,
+          resolveCodexCompatibilitySlashCommands(session.metadata),
+          session.metadata.slashCommandDescriptions,
+        );
+        mergeCodexPromptCommands(
+          commands,
+          resolveCodexPromptCommands(session.metadata),
+        );
       }
-      mergeCodexPromptCommands(commands, session?.metadata?.codex?.prompts);
     }
     return commands;
   }
@@ -137,10 +143,17 @@ function getCommandsFromSession(sessionId: string): CommandItem[] {
   }
 
   const commands: CommandItem[] = [...DEFAULT_COMMANDS];
-  if (session.metadata.slashCommands) {
-    mergeSlashCommands(commands, session.metadata.slashCommands, session.metadata.slashCommandDescriptions);
+  if (session.metadata) {
+    mergeSlashCommands(
+      commands,
+      resolveCodexCompatibilitySlashCommands(session.metadata),
+      session.metadata.slashCommandDescriptions,
+    );
   }
-  mergeCodexPromptCommands(commands, session.metadata.codex?.prompts);
+  mergeCodexPromptCommands(
+    commands,
+    resolveCodexPromptCommands(session.metadata),
+  );
 
   return commands;
 }

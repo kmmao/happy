@@ -9,9 +9,11 @@ import {
     formatCodexReasoningEffortMetadata,
     formatCodexReasoningSummaryMetadata,
     hasCodexMetadataSection,
+} from "./codexMetadata";
+import {
     resolveCodexSurfaceSections,
     type CodexSurfaceSection,
-} from "./codexMetadata";
+} from "@/sync/codexSurface";
 
 function formatCodexBackendMetadata(
     codex:
@@ -156,7 +158,7 @@ export function CodexInfoSection({ session }: { session: Session }) {
 
     const codexReasoningEffort = formatCodexReasoningEffortMetadata(session, t);
     const codexReasoningSummary = formatCodexReasoningSummaryMetadata(session);
-    const codexSurfaceSections = resolveCodexSurfaceSections(session);
+    const codexSurfaceSections = resolveCodexSurfaceSections(session.metadata);
 
     return (
         <ItemGroup title={t("sessionInfo.codex")}>

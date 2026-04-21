@@ -80,7 +80,47 @@ describe("getAllCommands", () => {
     ).toEqual([
       {
         command: "ecc-plan",
-        description: "Slash metadata description",
+        description: "Prompt metadata description",
+      },
+    ]);
+  });
+
+  it("keeps non-prompt slash commands alongside Codex prompts", () => {
+    mockState = {
+      sessions: {
+        "codex-session": {
+          metadata: {
+            path: "/tmp/project",
+            host: "test-host",
+            flavor: "codex",
+            slashCommands: ["ecc-plan", "plan"],
+            slashCommandDescriptions: {
+              plan: "Generic planner command",
+            },
+            codex: {
+              prompts: [
+                {
+                  name: "ecc-plan",
+                  path: "/Users/test/.codex/prompts/ecc-plan.md",
+                  description: "Prompt metadata description",
+                },
+              ],
+            },
+          },
+        },
+      },
+    };
+
+    expect(getAllCommands("codex-session")).toEqual([
+      { command: "compact", description: "Compact the conversation history" },
+      { command: "clear", description: "Clear the conversation" },
+      {
+        command: "plan",
+        description: "Generic planner command",
+      },
+      {
+        command: "ecc-plan",
+        description: "Prompt metadata description",
       },
     ]);
   });

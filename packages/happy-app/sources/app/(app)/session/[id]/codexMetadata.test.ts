@@ -4,10 +4,10 @@ import {
     formatCodexReasoningEffortMetadata,
     formatCodexReasoningSummaryMetadata,
     hasCodexMetadataSection,
-    resolveCodexSurfaceSections,
     resolveCodexEffectiveReasoningEffort,
     resolveCodexEffectiveReasoningSummary,
 } from "./codexMetadata";
+import { resolveCodexSurfaceSections } from "@/sync/codexSurface";
 
 const translate = (key: string) => key;
 
@@ -241,17 +241,15 @@ describe("resolveCodexSurfaceSections", () => {
     it("exposes prompt surfaces for codex sessions", () => {
         expect(
             resolveCodexSurfaceSections({
-                metadata: {
-                    flavor: "codex",
-                    codex: {
-                        prompts: [
-                            {
-                                name: "ecc-plan",
-                                path: "/Users/test/.codex/prompts/ecc-plan.md",
-                                description: "Plan a change",
-                            },
-                        ],
-                    },
+                flavor: "codex",
+                codex: {
+                    prompts: [
+                        {
+                            name: "ecc-plan",
+                            path: "/Users/test/.codex/prompts/ecc-plan.md",
+                            description: "Plan a change",
+                        },
+                    ],
                 },
             } as any),
         ).toEqual([
@@ -266,18 +264,16 @@ describe("resolveCodexSurfaceSections", () => {
     it("hides slashCommands that are only Codex prompt compatibility aliases", () => {
         expect(
             resolveCodexSurfaceSections({
-                metadata: {
-                    flavor: "codex",
-                    slashCommands: ["ecc-plan", "plan"],
-                    codex: {
-                        prompts: [
-                            {
-                                name: "ecc-plan",
-                                path: "/Users/test/.codex/prompts/ecc-plan.md",
-                                description: "Plan a change",
-                            },
-                        ],
-                    },
+                flavor: "codex",
+                slashCommands: ["ecc-plan", "plan"],
+                codex: {
+                    prompts: [
+                        {
+                            name: "ecc-plan",
+                            path: "/Users/test/.codex/prompts/ecc-plan.md",
+                            description: "Plan a change",
+                        },
+                    ],
                 },
             } as any),
         ).toEqual([
