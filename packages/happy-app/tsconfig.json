@@ -7,7 +7,10 @@
       "@/*": [
         "./sources/*"
       ],
-      "hello-world": [ "../../hello-world" ]
+      "hello-world": [ "../../hello-world" ],
+      "@kmmao/happy-wire": [
+        "../happy-wire/src/index.ts"
+      ]
     },
     "jsx": "react-jsx",
     "esModuleInterop": true,

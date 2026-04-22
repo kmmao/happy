@@ -8,7 +8,7 @@
       "es2022"
     ],
     "jsx": "react",
-    "rootDir": "src",
+    "rootDir": "..",
     "declaration": true,
     "strict": true,
     "noImplicitAny": true,
@@ -32,6 +32,9 @@
     "paths": {
       "@/*": [
         "./src/*"
+      ],
+      "@kmmao/happy-wire": [
+        "../happy-wire/src/index.ts"
       ]
     }
   },

@@ -32,6 +32,7 @@ export default defineConfig({
     resolve: {
         alias: {
             '@': resolve('./src'),
+            '@kmmao/happy-wire': resolve('../happy-wire/src/index.ts'),
         },
     },
 })

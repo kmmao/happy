@@ -71,6 +71,9 @@
     "paths": {
       "@/*": [
         "./sources/*"
+      ],
+      "@kmmao/happy-wire": [
+        "../happy-wire/src/index.ts"
       ]
     }
   },

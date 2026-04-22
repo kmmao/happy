@@ -7,7 +7,7 @@
       "es2020",
       "es2022"
     ],
-    "rootDir": "src",
+    "rootDir": "..",
     "declaration": true,
     "strict": true,
     "noImplicitAny": true,
@@ -27,6 +27,9 @@
     "paths": {
       "@/*": [
         "./src/*"
+      ],
+      "@kmmao/happy-wire": [
+        "../happy-wire/src/index.ts"
       ]
     }
   },
