@@ -56,6 +56,34 @@ describe("extractFileChanges", () => {
     expect(changes[0]?.edits[0]?.toolName).toBe("Edit");
   });
 
+  it("extracts file-edit payloads even when they are synthesized without a completed tool result", () => {
+    const changes = extractFileChanges(
+      [
+        makeToolCallMessage({
+          id: "file-edit-1",
+          name: "file-edit",
+          state: "running",
+          payload: {
+            filePath: "/repo/src/from-acp.ts",
+            description: "Updated file via ACP fs-edit event",
+            oldContent: "export const ready = false;\n",
+            newContent: "export const ready = true;\n",
+          },
+        }),
+      ],
+      { path: "/repo", host: "machine" } as any,
+    );
+
+    expect(changes).toHaveLength(1);
+    expect(changes[0]).toMatchObject({
+      filePath: "/repo/src/from-acp.ts",
+      displayPath: "src/from-acp.ts",
+      totalAdditions: 1,
+      totalDeletions: 1,
+    });
+    expect(changes[0]?.edits[0]?.toolName).toBe("file-edit");
+  });
+
   it("extracts per-file changes from CodexPatch", () => {
     const changes = extractFileChanges(
       [
@@ -286,5 +314,44 @@ describe("extractFileChanges", () => {
     });
     expect(changes[0]?.edits).toHaveLength(1);
     expect(changes[0]?.edits[0]?.toolName).toBe("CodexPatch");
+  });
+
+  it("falls back to non-Codex file edits when CodexPatch exists but carries no diff payload", () => {
+    const changes = extractFileChanges(
+      [
+        makeToolCallMessage({
+          id: "patch-empty-1",
+          name: "CodexPatch",
+          payload: {
+            changes: {
+              "/repo/src/empty.ts": {
+                path: "/repo/src/empty.ts",
+                changeType: "modify",
+              },
+            },
+          },
+        }),
+        makeToolCallMessage({
+          id: "file-edit-2",
+          name: "file-edit",
+          state: "running",
+          payload: {
+            filePath: "/repo/src/fallback.ts",
+            oldContent: "const version = 1;\n",
+            newContent: "const version = 2;\n",
+          },
+        }),
+      ],
+      { path: "/repo", host: "machine" } as any,
+    );
+
+    expect(changes).toHaveLength(1);
+    expect(changes[0]).toMatchObject({
+      filePath: "/repo/src/fallback.ts",
+      displayPath: "src/fallback.ts",
+      totalAdditions: 1,
+      totalDeletions: 1,
+    });
+    expect(changes[0]?.edits[0]?.toolName).toBe("file-edit");
   });
 });

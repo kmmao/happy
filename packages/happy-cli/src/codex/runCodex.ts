@@ -538,6 +538,7 @@ export async function runCodex(opts: {
   });
   let thinking = false;
   let currentTurnId: string | null = null;
+  let currentPlanTurnId: string | null = null;
   let currentTurnPromptSource: string | null = null;
   let currentTurnAutomation = createCodexTurnAutomationState();
   let codexStartedSubagents = new Set<string>();
@@ -884,6 +885,22 @@ export async function runCodex(opts: {
     }
   });
   const diffProcessor = new DiffProcessor((message) => {
+    if (
+      message.type === "tool-call" &&
+      message.name === "CodexDiff" &&
+      typeof message.callId === "string" &&
+      message.callId.length > 0 &&
+      currentPlanTurnId
+    ) {
+      const activePlanTurnId = currentPlanTurnId;
+      session.updateMetadata((currentMetadata) =>
+        appendCodexToolCallIdToPlanList(currentMetadata, {
+          turnId: activePlanTurnId,
+          toolCallId: message.callId,
+        }),
+      );
+    }
+
     const envelopes = mapCodexProcessorMessageToSessionEnvelopes(message, {
       currentTurnId,
     });
@@ -1065,6 +1082,7 @@ export async function runCodex(opts: {
     }
 
     if (msg.type === "task_started") {
+      currentPlanTurnId = null;
       currentTurnAutomation = createCodexTurnAutomationState();
       if (!thinking) {
         logger.debug("thinking started");
@@ -1073,6 +1091,7 @@ export async function runCodex(opts: {
       }
     }
     if (msg.type === "task_complete" || msg.type === "turn_aborted") {
+      currentPlanTurnId = null;
       if (thinking) {
         logger.debug("thinking completed");
         thinking = false;
@@ -1095,6 +1114,7 @@ export async function runCodex(opts: {
     }
     if (msg.type === "turn_plan_updated") {
       if (typeof msg.turnId === "string" && msg.turnId.length > 0) {
+        currentPlanTurnId = msg.turnId;
         let mirroredWroteProgress = false;
         let mirroredShouldTriggerAutoSummary = false;
         session.updateMetadata((currentMetadata) => {
@@ -1150,11 +1170,11 @@ export async function runCodex(opts: {
         typeof msg.call_id === "string" && msg.call_id.length > 0
           ? msg.call_id
           : null;
-      const activeTurnId = currentTurnId;
-      if (toolCallId && activeTurnId) {
+      if (toolCallId && currentPlanTurnId) {
+        const activePlanTurnId = currentPlanTurnId;
         session.updateMetadata((currentMetadata) => {
           return appendCodexToolCallIdToPlanList(currentMetadata, {
-            turnId: activeTurnId,
+            turnId: activePlanTurnId,
             toolCallId,
           });
         });

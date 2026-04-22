@@ -9,7 +9,10 @@ import {
   extractCodexCodeTabData,
 } from "@/components/session/codex/codexCodeTabData";
 import { CodexTurnDiffSummary } from "@/components/session/codex/CodexTurnDiffSummary";
-import { collectToolCalls } from "@/components/session/sidePanelCodeData";
+import {
+  collectToolCalls,
+  extractFileChanges,
+} from "@/components/session/sidePanelCodeData";
 import { useSession, useSessionMessages } from "@/sync/storage";
 
 interface CodexCodeTabProps {
@@ -36,7 +39,15 @@ export const CodexCodeTab = React.memo<CodexCodeTabProps>(
 
     const data = React.useMemo(() => {
       const toolCalls = collectToolCalls(messages);
-      return extractCodexCodeTabData(toolCalls, metadata);
+      const codexData = extractCodexCodeTabData(toolCalls, metadata);
+      if (codexData.fileChanges.length > 0) {
+        return codexData;
+      }
+
+      return {
+        ...codexData,
+        fileChanges: extractFileChanges(toolCalls, metadata),
+      };
     }, [messages, metadata]);
 
     const fileChanges = React.useMemo(

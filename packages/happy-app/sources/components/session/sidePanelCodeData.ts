@@ -128,6 +128,58 @@ function appendLegacyEditChange(
   }
 }
 
+function appendFileEditChange(
+  changeMap: Map<string, FileChange>,
+  msg: ToolCallMessage,
+  metadata: Metadata | null,
+): void {
+  const input = msg.tool.input;
+  if (!input || typeof input !== "object") {
+    return;
+  }
+
+  const record = input as Record<string, unknown>;
+  const filePath =
+    typeof record.filePath === "string" && record.filePath.length > 0
+      ? record.filePath
+      : typeof record.file_path === "string" && record.file_path.length > 0
+        ? record.file_path
+        : typeof record.path === "string" && record.path.length > 0
+          ? record.path
+          : null;
+
+  if (!filePath) {
+    return;
+  }
+
+  const oldStr =
+    typeof record.oldContent === "string"
+      ? trimIdent(record.oldContent)
+      : typeof record.old_content === "string"
+        ? trimIdent(record.old_content)
+        : "";
+  const newStr =
+    typeof record.newContent === "string"
+      ? trimIdent(record.newContent)
+      : typeof record.new_content === "string"
+        ? trimIdent(record.new_content)
+        : "";
+
+  if (!oldStr && !newStr) {
+    return;
+  }
+
+  const stats = getDiffStatsLight(oldStr, newStr);
+  appendFileChangeEdit(
+    changeMap,
+    filePath,
+    resolvePath(filePath, metadata),
+    createFileChangeEditEntry(msg.id, "file-edit", oldStr, newStr, 0),
+    stats.additions,
+    stats.deletions,
+  );
+}
+
 function extractLegacyFileChanges(
   toolCalls: readonly ToolCallMessage[],
   metadata: Metadata | null,
@@ -136,7 +188,16 @@ function extractLegacyFileChanges(
 
   for (const msg of toolCalls) {
     const tool = msg.tool;
-    if (!tool || tool.state !== "completed") {
+    if (!tool) {
+      continue;
+    }
+
+    if (tool.name === "file-edit") {
+      appendFileEditChange(changeMap, msg, metadata);
+      continue;
+    }
+
+    if (tool.state !== "completed") {
       continue;
     }
 
@@ -158,7 +219,10 @@ export function extractFileChanges(
   metadata: Metadata | null,
 ): FileChange[] {
   if (hasCodexCodeData(toolCalls)) {
-    return extractCodexCodeTabData(toolCalls, metadata).fileChanges;
+    const codexChanges = extractCodexCodeTabData(toolCalls, metadata).fileChanges;
+    if (codexChanges.length > 0) {
+      return codexChanges;
+    }
   }
 
   return extractLegacyFileChanges(toolCalls, metadata);
