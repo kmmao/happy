@@ -30,6 +30,7 @@ import {
   type PermissionResult,
 } from "@/utils/BasePermissionHandler";
 import { connectionState } from "@/utils/serverConnectionErrors";
+import { appendToolCallIdToCurrentProgressList } from "@/utils/progressToolCallAttribution";
 import {
   extractConfigOptionsFromPayload,
   extractCurrentModeIdFromPayload,
@@ -994,7 +995,25 @@ export async function runAcp(opts: {
       logAcp(frontendMessage.kind, frontendMessage.text);
     }
 
-    sendEnvelopes(sessionManager.mapMessage(msg));
+    const envelopes = sessionManager.mapMessage(msg);
+
+    if (msg.type === "fs-edit") {
+      for (const envelope of envelopes) {
+        const ev = envelope.ev;
+        if (ev.t !== "tool-call-start" || ev.name !== "file-edit") {
+          continue;
+        }
+
+        session.updateMetadata((currentMetadata) =>
+          appendToolCallIdToCurrentProgressList(currentMetadata, {
+            toolCallId: ev.call,
+          }),
+        );
+        break;
+      }
+    }
+
+    sendEnvelopes(envelopes);
   };
 
   backend.onMessage(onBackendMessage);

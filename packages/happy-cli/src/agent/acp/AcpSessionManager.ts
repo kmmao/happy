@@ -21,6 +21,16 @@ function buildToolDescription(toolName: string): string {
   return `Running ${toolName}`;
 }
 
+function buildFsEditDescription(msg: Extract<AgentMessage, { type: "fs-edit" }>): string {
+  if (msg.description && msg.description.trim().length > 0) {
+    return msg.description.trim();
+  }
+  if (msg.path && msg.path.trim().length > 0) {
+    return `Edited ${msg.path.trim()}`;
+  }
+  return "File edit";
+}
+
 function parseThinkingPayload(payload: unknown): {
   text: string;
   streaming: boolean;
@@ -202,6 +212,37 @@ export class AcpSessionManager {
       const call = this.ensureSessionCallId(msg.callId);
       return [
         ...flushed,
+        createEnvelope(
+          "agent",
+          { t: "tool-call-end", call },
+          turnOptions(this.currentTurnId, this.nextTime()),
+        ),
+      ];
+    }
+
+    if (msg.type === "fs-edit") {
+      const flushed = this.flush();
+      const call = createId();
+      const args = {
+        filePath: msg.path,
+        description: msg.description,
+        diff: msg.diff,
+      };
+
+      return [
+        ...flushed,
+        createEnvelope(
+          "agent",
+          {
+            t: "tool-call-start",
+            call,
+            name: "file-edit",
+            title: "file-edit",
+            description: buildFsEditDescription(msg),
+            args,
+          },
+          turnOptions(this.currentTurnId, this.nextTime()),
+        ),
         createEnvelope(
           "agent",
           { t: "tool-call-end", call },

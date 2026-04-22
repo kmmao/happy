@@ -84,6 +84,37 @@ describe("extractFileChanges", () => {
     expect(changes[0]?.edits[0]?.toolName).toBe("file-edit");
   });
 
+  it("extracts file-edit payloads from diff-only ACP events", () => {
+    const changes = extractFileChanges(
+      [
+        makeToolCallMessage({
+          id: "file-edit-diff-1",
+          name: "file-edit",
+          state: "running",
+          payload: {
+            filePath: "/repo/src/diff-only.ts",
+            description: "Patch diff only",
+            diff: "@@ -1 +1,2 @@\n-const value = 1;\n+const value = 2;\n+const extra = true;",
+          },
+        }),
+      ],
+      { path: "/repo", host: "machine" } as any,
+    );
+
+    expect(changes).toHaveLength(1);
+    expect(changes[0]).toMatchObject({
+      filePath: "/repo/src/diff-only.ts",
+      displayPath: "src/diff-only.ts",
+      totalAdditions: 2,
+      totalDeletions: 1,
+    });
+    expect(changes[0]?.edits[0]).toMatchObject({
+      toolName: "file-edit",
+      oldText: "const value = 1;",
+      newText: "const value = 2;\nconst extra = true;",
+    });
+  });
+
   it("extracts per-file changes from CodexPatch", () => {
     const changes = extractFileChanges(
       [

@@ -322,12 +322,44 @@ describe('AcpSessionManager ignored messages', () => {
       { type: 'permission-request', id: 'p1', reason: 'ReadFile', payload: {} },
       { type: 'permission-response', id: 'p1', approved: true },
       { type: 'token-count', total: 1 },
-      { type: 'fs-edit', description: 'edit' },
       { type: 'terminal-output', data: 'stdout' },
     ];
 
     const envelopes = mapMany(mapper, messages);
     expect(envelopes).toHaveLength(0);
+  });
+});
+
+describe("AcpSessionManager fs-edit mapping", () => {
+  it("maps fs-edit into an immediately completed file-edit tool call", () => {
+    const mapper = new AcpSessionManager();
+    const start = mapper.startTurn()[0];
+
+    const envelopes = mapper.mapMessage({
+      type: "fs-edit",
+      description: "Updated parser file",
+      path: "/repo/src/parser.ts",
+      diff: "@@ -1 +1 @@\n-old\n+new",
+    });
+
+    expect(envelopes).toHaveLength(2);
+    expect(envelopes[0]?.turn).toBe(start.turn);
+    expect(envelopes[1]?.turn).toBe(start.turn);
+    expect(envelopes[0]?.ev.t).toBe("tool-call-start");
+    expect(envelopes[1]?.ev.t).toBe("tool-call-end");
+    if (
+      envelopes[0]?.ev.t === "tool-call-start" &&
+      envelopes[1]?.ev.t === "tool-call-end"
+    ) {
+      expect(envelopes[0].ev.name).toBe("file-edit");
+      expect(envelopes[0].ev.description).toBe("Updated parser file");
+      expect(envelopes[0].ev.args).toEqual({
+        filePath: "/repo/src/parser.ts",
+        description: "Updated parser file",
+        diff: "@@ -1 +1 @@\n-old\n+new",
+      });
+      expect(envelopes[1].ev.call).toBe(envelopes[0].ev.call);
+    }
   });
 });
 

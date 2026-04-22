@@ -8,6 +8,7 @@ import {
   createFileChangeEditEntry,
   type FileChangeEditEntry,
 } from "@/components/tools/fileChangeEditKey";
+import { getCodexPatchEntries } from "@/components/tools/codexPatchUtils";
 import { Metadata } from "@/sync/storageTypes";
 import { Message, ToolCallMessage } from "@/sync/typesMessage";
 import { resolvePath } from "@/utils/pathUtils";
@@ -158,23 +159,53 @@ function appendFileEditChange(
       : typeof record.old_content === "string"
         ? trimIdent(record.old_content)
         : "";
-  const newStr =
+  let newStr =
     typeof record.newContent === "string"
       ? trimIdent(record.newContent)
       : typeof record.new_content === "string"
         ? trimIdent(record.new_content)
         : "";
+  let effectiveOldStr = oldStr;
+  let effectiveNewStr = newStr;
 
-  if (!oldStr && !newStr) {
+  if (!effectiveOldStr && !effectiveNewStr) {
+    const diff =
+      typeof record.unified_diff === "string"
+        ? record.unified_diff
+        : typeof record.diff === "string"
+          ? record.diff
+          : "";
+    if (diff) {
+      const [entry] = getCodexPatchEntries({
+        [filePath]: {
+          path: filePath,
+          diff,
+          kind: { type: "update" },
+        },
+      });
+      if (entry) {
+        effectiveOldStr = trimIdent(entry.oldText);
+        effectiveNewStr = trimIdent(entry.newText);
+      }
+    }
+  }
+
+  if (!effectiveOldStr && !effectiveNewStr) {
     return;
   }
 
-  const stats = getDiffStatsLight(oldStr, newStr);
+  const stats = getDiffStatsLight(effectiveOldStr, effectiveNewStr);
   appendFileChangeEdit(
     changeMap,
     filePath,
     resolvePath(filePath, metadata),
-    createFileChangeEditEntry(msg.id, "file-edit", oldStr, newStr, 0),
+    createFileChangeEditEntry(
+      msg.id,
+      "file-edit",
+      effectiveOldStr,
+      effectiveNewStr,
+      0,
+    ),
     stats.additions,
     stats.deletions,
   );
