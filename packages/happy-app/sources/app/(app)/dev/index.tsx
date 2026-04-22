@@ -227,6 +227,12 @@ function DevScreen() {
           onPress={() => router.push("/dev/tools2")}
         />
         <Item
+          title="Progress Regression"
+          subtitle="Replay long progress, checklist, and timeline combinations"
+          icon={<Ionicons name="pulse-outline" size={28} color="#007AFF" />}
+          onPress={() => router.push("/dev/progress-regression")}
+        />
+        <Item
           title="Shimmer View"
           subtitle="Shimmer loading effects with masks"
           icon={<Ionicons name="sparkles-outline" size={28} color="#007AFF" />}

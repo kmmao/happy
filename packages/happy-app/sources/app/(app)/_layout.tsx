@@ -314,6 +314,12 @@ export default function RootLayout() {
         }}
       />
       <Stack.Screen
+        name="dev/progress-regression"
+        options={{
+          headerTitle: "Progress Regression",
+        }}
+      />
+      <Stack.Screen
         name="dev/shimmer-demo"
         options={{
           headerTitle: "Shimmer View Demo",
