@@ -2,6 +2,7 @@ import { describe, expectTypeOf, it } from "vitest";
 
 import type {
   SessionProgressState,
+  SessionSummaryRefreshState,
   SessionSummaryState,
 } from "@kmmao/happy-wire";
 
@@ -11,5 +12,6 @@ describe("Metadata shared session state types", () => {
   it("reuses happy-wire progress and summary types", () => {
     expectTypeOf<NonNullable<Metadata["progress"]>>().toEqualTypeOf<SessionProgressState>();
     expectTypeOf<NonNullable<Metadata["sessionSummary"]>>().toEqualTypeOf<SessionSummaryState>();
+    expectTypeOf<NonNullable<Metadata["sessionSummaryRefresh"]>>().toEqualTypeOf<SessionSummaryRefreshState>();
   });
 });

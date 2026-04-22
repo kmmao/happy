@@ -92,6 +92,10 @@ export function createSessionMetadata(
     lifecycleState: "running",
     lifecycleStateSince: Date.now(),
     flavor: opts.flavor,
+    sessionSummaryRefresh: {
+      protocolVersion: 1,
+      recent: [],
+    },
     ...(opts.flavor === "codex"
       ? {
           codex: {

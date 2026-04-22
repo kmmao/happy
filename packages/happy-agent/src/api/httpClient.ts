@@ -119,6 +119,7 @@ function decryptSession(raw: RawSession, creds: Credentials): DecryptedSession {
     active: raw.active,
     activeAt: raw.activeAt,
     metadata: decryptField(raw.metadata, encryption),
+    metadataVersion: raw.metadataVersion,
     agentState: decryptField(raw.agentState, encryption),
     dataEncryptionKey: raw.dataEncryptionKey,
     encryption,

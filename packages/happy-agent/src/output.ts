@@ -1,4 +1,5 @@
 import type { DecryptedSession, DecryptedMessage } from './api';
+import { extractSessionSummaryState } from './summary';
 
 // --- Types ---
 
@@ -7,6 +8,7 @@ type SessionMetadata = {
     host?: string;
     tag?: string;
     summary?: string | { text?: unknown; [key: string]: unknown };
+    sessionSummary?: unknown;
     lifecycleState?: string;
     [key: string]: unknown;
 };
@@ -22,6 +24,7 @@ type AgentState = {
 function formatTime(ts: number): string {
     if (!ts) return '-';
     const date = new Date(ts);
+    if (Number.isNaN(date.getTime())) return '-';
     const now = new Date();
     const diffMs = now.getTime() - date.getTime();
     const diffMin = Math.floor(diffMs / 60_000);
@@ -65,13 +68,22 @@ function toNonEmptyString(value: unknown): string | undefined {
     return typeof value === 'string' && value.trim().length > 0 ? value : undefined;
 }
 
-function extractSessionSummary(meta: SessionMetadata): string | undefined {
+function extractSessionName(meta: SessionMetadata): string | undefined {
     const direct = toNonEmptyString(meta.summary);
     if (direct) return direct;
     if (meta.summary != null && typeof meta.summary === 'object') {
         return toNonEmptyString((meta.summary as { text?: unknown }).text);
     }
     return undefined;
+}
+
+function formatMarkdownListSection(title: string, items: readonly string[]): string[] {
+    if (items.length === 0) return [];
+    return [
+        '',
+        `### ${title}`,
+        ...items.map((item) => `- ${normalizeListValue(item)}`),
+    ];
 }
 
 // --- Session list formatting ---
@@ -83,7 +95,7 @@ export function formatSessionTable(sessions: DecryptedSession[]): string {
 
     const sections = sessions.map((s, index) => {
         const meta = (s.metadata ?? {}) as SessionMetadata;
-        const name = normalizeListValue(extractSessionSummary(meta) ?? toNonEmptyString(meta.tag) ?? '-');
+        const name = normalizeListValue(extractSessionName(meta) ?? toNonEmptyString(meta.tag) ?? '-');
         const path = normalizeListValue(toNonEmptyString(meta.path) ?? '-');
         const status = s.active ? 'active' : 'inactive';
         const lastActive = normalizeListValue(formatLastActive(s.activeAt));
@@ -106,7 +118,7 @@ export function formatSessionStatus(session: DecryptedSession): string {
     const meta = (session.metadata ?? {}) as SessionMetadata;
     const state = (session.agentState ?? null) as AgentState | null;
     const tag = toNonEmptyString(meta.tag);
-    const summary = extractSessionSummary(meta);
+    const summary = extractSessionName(meta);
     const path = toNonEmptyString(meta.path);
     const host = toNonEmptyString(meta.host);
     const lifecycleState = toNonEmptyString(meta.lifecycleState);
@@ -135,6 +147,35 @@ export function formatSessionStatus(session: DecryptedSession): string {
     } else {
         lines.push('- Agent: no state');
     }
+
+    return lines.join('\n');
+}
+
+export function formatSessionNarrativeSummary(session: DecryptedSession): string {
+    const summary = extractSessionSummaryState(session.metadata);
+    const lines: string[] = [
+        '## Session Summary',
+        '',
+        `- Session ID: ${toMarkdownInline(session.id)}`,
+    ];
+
+    if (!summary) {
+        lines.push('- Status: missing');
+        lines.push(
+            `- Hint: Run ${toMarkdownInline(`happy-agent summary refresh ${session.id}`)} to request one.`,
+        );
+        return lines.join('\n');
+    }
+
+    lines.push(`- Updated: ${formatLastActive(summary.updatedAt)}`);
+    lines.push(`- Goal: ${normalizeListValue(summary.goal)}`);
+    if (summary.currentFocus) {
+        lines.push(`- Focus: ${normalizeListValue(summary.currentFocus)}`);
+    }
+
+    lines.push(...formatMarkdownListSection('Key Decisions', summary.keyDecisions ?? []));
+    lines.push(...formatMarkdownListSection('Open Questions', summary.openQuestions ?? []));
+    lines.push(...formatMarkdownListSection('Impact Scope', summary.impactScope ?? []));
 
     return lines.join('\n');
 }

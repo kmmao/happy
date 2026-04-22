@@ -15,6 +15,7 @@ import {
   HAPPY_AUTO_SUMMARY_SOURCE,
 } from "@/utils/progressAutomation";
 import { applyHappyProgressUpdate } from "@/utils/happyProgressMetadata";
+import { applySessionSummaryUpdate } from "@/utils/sessionSummaryMetadata";
 import {
   HAPPY_MCP_TOOL_NAMES,
   HAPPY_MCP_TOOL_SPECS,
@@ -140,20 +141,18 @@ export async function startHappyServer(client: ApiSessionClient) {
     keyDecisions?: string[];
     openQuestions?: string[];
     impactScope?: string[];
+    requestId?: string;
   }) => {
-    logger.debug("[happyMCP] update_session_summary goal=", input.goal);
+    logger.debug(
+      "[happyMCP] update_session_summary goal=",
+      input.goal,
+      "requestId=",
+      input.requestId,
+    );
     try {
-      client.updateMetadata((metadata) => ({
-        ...metadata,
-        sessionSummary: {
-          goal: input.goal,
-          currentFocus: input.currentFocus,
-          keyDecisions: input.keyDecisions,
-          openQuestions: input.openQuestions,
-          impactScope: input.impactScope,
-          updatedAt: Date.now(),
-        },
-      }));
+      client.updateMetadata((metadata) =>
+        applySessionSummaryUpdate(metadata, input),
+      );
       return { success: true as const };
     } catch (error) {
       return { success: false as const, error: String(error) };

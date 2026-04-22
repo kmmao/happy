@@ -115,3 +115,52 @@ export const sessionSummaryStateSchema = z.object({
   updatedAt: z.number(),
 });
 export type SessionSummaryState = z.infer<typeof sessionSummaryStateSchema>;
+
+/**
+ * Active request for request-level summary refresh confirmation.
+ *
+ * Kept outside `sessionSummary` itself because this is control-plane state,
+ * not user-visible narrative content.
+ */
+export const sessionSummaryRefreshActiveRequestSchema = z.object({
+  requestId: z.string().min(1),
+  requestedAt: z.number(),
+  requester: z.enum(["happy-agent", "app", "system"]),
+  command: z.literal("summary-refresh"),
+  requireSummary: z.boolean(),
+});
+export type SessionSummaryRefreshActiveRequest = z.infer<
+  typeof sessionSummaryRefreshActiveRequestSchema
+>;
+
+/**
+ * One resolved refresh request. `applied` means the runtime wrote the
+ * requested summary update; `superseded` means a newer request replaced it
+ * before it could complete.
+ */
+export const sessionSummaryRefreshRecentEntrySchema = z.object({
+  requestId: z.string().min(1),
+  status: z.enum(["applied", "superseded"]),
+  resolvedAt: z.number(),
+  summaryUpdatedAt: z.number().optional(),
+  supersededByRequestId: z.string().min(1).optional(),
+});
+export type SessionSummaryRefreshRecentEntry = z.infer<
+  typeof sessionSummaryRefreshRecentEntrySchema
+>;
+
+/**
+ * Control-plane state for request-level summary confirmation.
+ *
+ * Runtimes initialize this when they support the protocol. Clients can
+ * check `protocolVersion` up front instead of guessing support from
+ * timeouts. `recent` is intentionally small; runtimes should trim it.
+ */
+export const sessionSummaryRefreshStateSchema = z.object({
+  protocolVersion: z.literal(1),
+  active: sessionSummaryRefreshActiveRequestSchema.optional(),
+  recent: z.array(sessionSummaryRefreshRecentEntrySchema).optional(),
+});
+export type SessionSummaryRefreshState = z.infer<
+  typeof sessionSummaryRefreshStateSchema
+>;

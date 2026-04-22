@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { formatSessionTable, formatSessionStatus, formatMessageHistory, formatJson } from './output';
+import { formatSessionTable, formatSessionStatus, formatSessionNarrativeSummary, formatMessageHistory, formatJson } from './output';
 import type { DecryptedSession, DecryptedMessage } from './api';
 
 function makeSession(overrides: Partial<DecryptedSession> = {}): DecryptedSession {
@@ -11,6 +11,7 @@ function makeSession(overrides: Partial<DecryptedSession> = {}): DecryptedSessio
         active: true,
         activeAt: Date.now() - 60_000,
         metadata: { tag: 'test-session', path: '/home/user/project', summary: 'Test session' },
+        metadataVersion: 1,
         agentState: null,
         dataEncryptionKey: null,
         encryption: { key: new Uint8Array(32), variant: 'dataKey' as const },
@@ -204,6 +205,58 @@ describe('formatSessionStatus', () => {
         expect(output).not.toContain('Summary:');
         expect(output).not.toContain('Path:');
         expect(output).not.toContain('Host:');
+    });
+});
+
+describe('formatSessionNarrativeSummary', () => {
+    it('should display the narrative session summary fields', () => {
+        const session = makeSession({
+            metadata: {
+                tag: 'agent-session',
+                sessionSummary: {
+                    goal: 'Ship summary commands',
+                    currentFocus: 'Implement show and refresh',
+                    keyDecisions: ['Reuse metadata.sessionSummary'],
+                    openQuestions: ['Should refresh wait by default?'],
+                    impactScope: ['packages/happy-agent/src/index.ts'],
+                    updatedAt: 1700000000000,
+                },
+            },
+        });
+
+        const output = formatSessionNarrativeSummary(session);
+        expect(output).toContain('## Session Summary');
+        expect(output).toContain(`- Session ID: \`${session.id}\``);
+        expect(output).toContain('- Goal: Ship summary commands');
+        expect(output).toContain('- Focus: Implement show and refresh');
+        expect(output).toContain('### Key Decisions');
+        expect(output).toContain('- Reuse metadata.sessionSummary');
+        expect(output).toContain('### Open Questions');
+        expect(output).toContain('- Should refresh wait by default?');
+        expect(output).toContain('### Impact Scope');
+        expect(output).toContain('- packages/happy-agent/src/index.ts');
+    });
+
+    it('should show a helpful hint when no narrative summary exists', () => {
+        const session = makeSession({ metadata: { tag: 'agent-session' } });
+        const output = formatSessionNarrativeSummary(session);
+        expect(output).toContain('## Session Summary');
+        expect(output).toContain('- Status: missing');
+        expect(output).toContain(`happy-agent summary refresh ${session.id}`);
+    });
+
+    it('should ignore invalid sessionSummary shapes', () => {
+        const session = makeSession({
+            metadata: {
+                sessionSummary: {
+                    goal: '',
+                    updatedAt: 'bad-timestamp',
+                },
+            },
+        });
+        const output = formatSessionNarrativeSummary(session);
+        expect(output).toContain('- Status: missing');
+        expect(output).not.toContain('[object Object]');
     });
 });
 

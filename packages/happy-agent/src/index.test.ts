@@ -50,6 +50,7 @@ describe("happy-agent CLI", () => {
     expect(stdout).toContain("auth");
     expect(stdout).toContain("list");
     expect(stdout).toContain("status");
+    expect(stdout).toContain("summary");
     expect(stdout).toContain("create");
     expect(stdout).toContain("send");
     expect(stdout).toContain("history");
@@ -103,6 +104,44 @@ describe("happy-agent CLI", () => {
 
     it("should fail with auth error when not authenticated", () => {
       const { stderr, exitCode } = runCli("create", "--tag", "my-tag");
+      expect(exitCode).not.toBe(0);
+      expect(stderr).toContain("happy-agent auth login");
+    });
+  });
+
+  describe("summary command", () => {
+    it("should show summary help with show and refresh subcommands", () => {
+      const { stdout } = runCli("summary", "--help");
+      expect(stdout).toContain("Inspect or refresh session summaries");
+      expect(stdout).toContain("show");
+      expect(stdout).toContain("refresh");
+    });
+
+    it("should show summary show help with session-id and --json option", () => {
+      const { stdout } = runCli("summary", "show", "--help");
+      expect(stdout).toContain("Show the narrative session summary");
+      expect(stdout).toContain("session-id");
+      expect(stdout).toContain("--json");
+    });
+
+    it("should show summary refresh help with session-id, --wait, --timeout, and --json options", () => {
+      const { stdout } = runCli("summary", "refresh", "--help");
+      expect(stdout).toContain("Ask the agent to rewrite the session summary");
+      expect(stdout).toContain("session-id");
+      expect(stdout).toContain("--wait");
+      expect(stdout).toContain("--require-summary");
+      expect(stdout).toContain("--timeout");
+      expect(stdout).toContain("--json");
+    });
+
+    it("should fail summary show with auth error when not authenticated", () => {
+      const { stderr, exitCode } = runCli("summary", "show", "fake-session-id");
+      expect(exitCode).not.toBe(0);
+      expect(stderr).toContain("happy-agent auth login");
+    });
+
+    it("should fail summary refresh with auth error when not authenticated", () => {
+      const { stderr, exitCode } = runCli("summary", "refresh", "fake-session-id");
       expect(exitCode).not.toBe(0);
       expect(stderr).toContain("happy-agent auth login");
     });

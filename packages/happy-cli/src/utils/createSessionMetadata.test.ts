@@ -84,4 +84,16 @@ describe('createSessionMetadata', () => {
 
         expect(metadata.dangerouslySkipPermissions).toBe(true);
     });
+
+    it('initializes request-level summary refresh protocol state', () => {
+        const { metadata } = createSessionMetadata({
+            flavor: 'claude',
+            machineId: 'machine-6',
+        });
+
+        expect(metadata.sessionSummaryRefresh).toEqual({
+            protocolVersion: 1,
+            recent: [],
+        });
+    });
 });

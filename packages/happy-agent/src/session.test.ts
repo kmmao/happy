@@ -147,6 +147,12 @@ function makeSessionUpdate(
     };
 }
 
+function getEmittedEvent(event: string, index = 0): { event: string; args: unknown[] } {
+    const events = mockSocketInstance!.emittedEvents.filter((entry) => entry.event === event);
+    expect(events.length).toBeGreaterThan(index);
+    return events[index];
+}
+
 // --- Tests ---
 
 describe('SessionClient', () => {
@@ -217,6 +223,21 @@ describe('SessionClient', () => {
 
             const reason = await disconnected;
             expect(reason).toBe('client namespace disconnect');
+        });
+
+        it('seeds initial metadata and metadata version from options', () => {
+            const metadata = { path: '/seeded', progress: { step: 'initial' } };
+            const client = new SessionClient(
+                makeOptions({
+                    initialMetadata: metadata,
+                    initialMetadataVersion: 5,
+                }),
+            );
+
+            expect(client.getMetadata()).toEqual(metadata);
+            expect(client.getMetadataVersion()).toBe(5);
+
+            client.close();
         });
     });
 
@@ -679,6 +700,148 @@ describe('SessionClient', () => {
             expect(mockSocketInstance!.connected).toBe(true);
             client.close();
             expect(mockSocketInstance!.connected).toBe(false);
+        });
+    });
+
+    describe('updateMetadataWith', () => {
+        it('uses the seeded metadata version for the first metadata write', async () => {
+            const opts = makeOptions({
+                initialMetadata: { path: '/initial' },
+                initialMetadataVersion: 4,
+            });
+            const client = new SessionClient(opts);
+
+            const pending = client.updateMetadataWith((current) => ({
+                ...(current as Record<string, unknown>),
+                sessionSummaryRefresh: {
+                    active: { requestId: 'req-1' },
+                },
+            }));
+
+            const emitted = getEmittedEvent('update-metadata');
+            const payload = emitted.args[0] as {
+                sid: string;
+                expectedVersion: number;
+                metadata: string;
+            };
+            expect(payload.sid).toBe(opts.sessionId);
+            expect(payload.expectedVersion).toBe(4);
+
+            const callback = emitted.args[1] as (response: {
+                result: string;
+                version?: number;
+                metadata?: string;
+            }) => void;
+            callback({
+                result: 'success',
+                version: 5,
+                metadata: payload.metadata,
+            });
+
+            await pending;
+            expect(client.getMetadataVersion()).toBe(5);
+            expect(client.getMetadata()).toEqual({
+                path: '/initial',
+                sessionSummaryRefresh: {
+                    active: { requestId: 'req-1' },
+                },
+            });
+
+            client.close();
+        });
+
+        it('recomputes metadata against the latest server state after a version mismatch', async () => {
+            const opts = makeOptions({
+                initialMetadata: {
+                    path: '/initial',
+                    progress: { step: 'old' },
+                },
+                initialMetadataVersion: 1,
+            });
+            const client = new SessionClient(opts);
+
+            const pending = client.updateMetadataWith((current) => ({
+                ...(current as Record<string, unknown>),
+                sessionSummaryRefresh: {
+                    active: { requestId: 'req-2' },
+                },
+            }));
+
+            const firstAttempt = getEmittedEvent('update-metadata', 0);
+            const firstPayload = firstAttempt.args[0] as {
+                expectedVersion: number;
+                metadata: string;
+            };
+            expect(firstPayload.expectedVersion).toBe(1);
+
+            const firstCallback = firstAttempt.args[1] as (response: {
+                result: string;
+                version?: number;
+                metadata?: string;
+            }) => void;
+            const latestServerMetadata = {
+                path: '/initial',
+                progress: { step: 'new' },
+                bar: 2,
+            };
+            firstCallback({
+                result: 'version-mismatch',
+                version: 2,
+                metadata: encodeBase64(
+                    encrypt(
+                        opts.encryptionKey,
+                        opts.encryptionVariant,
+                        latestServerMetadata,
+                    ),
+                ),
+            });
+
+            await new Promise((resolve) => setTimeout(resolve, 250));
+
+            const secondAttempt = getEmittedEvent('update-metadata', 1);
+            const secondPayload = secondAttempt.args[0] as {
+                expectedVersion: number;
+                metadata: string;
+            };
+            expect(secondPayload.expectedVersion).toBe(2);
+            expect(
+                decrypt(
+                    opts.encryptionKey,
+                    opts.encryptionVariant,
+                    decodeBase64(secondPayload.metadata),
+                ),
+            ).toEqual({
+                path: '/initial',
+                progress: { step: 'new' },
+                bar: 2,
+                sessionSummaryRefresh: {
+                    active: { requestId: 'req-2' },
+                },
+            });
+
+            const secondCallback = secondAttempt.args[1] as (response: {
+                result: string;
+                version?: number;
+                metadata?: string;
+            }) => void;
+            secondCallback({
+                result: 'success',
+                version: 3,
+                metadata: secondPayload.metadata,
+            });
+
+            await pending;
+            expect(client.getMetadataVersion()).toBe(3);
+            expect(client.getMetadata()).toEqual({
+                path: '/initial',
+                progress: { step: 'new' },
+                bar: 2,
+                sessionSummaryRefresh: {
+                    active: { requestId: 'req-2' },
+                },
+            });
+
+            client.close();
         });
     });
 });

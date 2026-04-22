@@ -2,6 +2,7 @@ import { z } from "zod";
 import type {
   CodexMetadata,
   SessionProgressState,
+  SessionSummaryRefreshState,
   SessionSummaryState,
   Update,
   UpdateMachineBody,
@@ -445,6 +446,10 @@ export type Metadata = {
    * `update_session_summary` tool at milestones.
    */
   sessionSummary?: SessionSummaryState;
+  /**
+   * Request-level state for narrative summary refresh confirmation.
+   */
+  sessionSummaryRefresh?: SessionSummaryRefreshState;
   machineId?: string;
   claudeSessionId?: string; // Claude Code session ID
   tools?: string[];

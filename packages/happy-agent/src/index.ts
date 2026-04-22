@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { Command } from "commander";
+import { randomUUID } from "node:crypto";
 import { hostname } from "node:os";
 import { version } from "../package.json";
 import { loadConfig } from "./config";
@@ -57,10 +58,17 @@ export type { RpcHandler, RpcHandlerConfig } from "./api/rpc/types";
 import {
   formatSessionTable,
   formatSessionStatus,
+  formatSessionNarrativeSummary,
   formatMessageHistory,
   formatJson,
 } from "./output";
 import { startDaemon, stopDaemon, daemonStatus } from "./daemon/run";
+import {
+  buildActiveSummaryRefreshState,
+  buildSummaryRefreshPrompt,
+  extractSessionSummaryState,
+  waitForSummaryRefreshRecentApplied,
+} from "./summary";
 
 // --- Helpers ---
 
@@ -96,8 +104,59 @@ function createClient(
     encryptionVariant: session.encryption.variant,
     token: creds.token,
     serverUrl: config.serverUrl,
+    initialMetadata: session.metadata ?? null,
+    initialMetadataVersion: session.metadataVersion,
     initialAgentState: session.agentState ?? null,
   });
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function hydrateSessionLiveState(
+  session: DecryptedSession,
+  creds: Credentials,
+  config: Config,
+): Promise<boolean> {
+  const client = createClient(session, creds, config);
+
+  let liveData = false;
+  try {
+    // Wait for connection, then wait for a state-change event or a short timeout
+    await new Promise<void>((resolve) => {
+      let resolved = false;
+      const done = () => {
+        if (resolved) return;
+        resolved = true;
+        clearTimeout(timeout);
+        client.removeAllListeners("state-change");
+        client.removeAllListeners("connect_error");
+        resolve();
+      };
+
+      const timeout = setTimeout(done, 3000);
+
+      client.once(
+        "state-change",
+        (data: { metadata: unknown; agentState: unknown }) => {
+          session.metadata = data.metadata ?? session.metadata;
+          session.metadataVersion = client.getMetadataVersion();
+          session.agentState = data.agentState ?? session.agentState;
+          liveData = true;
+          done();
+        },
+      );
+
+      client.once("connect_error", () => {
+        done();
+      });
+    });
+  } finally {
+    client.close();
+  }
+
+  return liveData;
 }
 
 // --- CLI ---
@@ -165,42 +224,7 @@ program
     const config = loadConfig();
     const creds = requireCredentials(config);
     const session = await resolveSession(config, creds, sessionId);
-
-    const client = createClient(session, creds, config);
-
-    let liveData = false;
-    try {
-      // Wait for connection, then wait for a state-change event or a short timeout
-      await new Promise<void>((resolve) => {
-        let resolved = false;
-        const done = () => {
-          if (resolved) return;
-          resolved = true;
-          clearTimeout(timeout);
-          client.removeAllListeners("state-change");
-          client.removeAllListeners("connect_error");
-          resolve();
-        };
-
-        const timeout = setTimeout(done, 3000);
-
-        client.once(
-          "state-change",
-          (data: { metadata: unknown; agentState: unknown }) => {
-            session.metadata = data.metadata ?? session.metadata;
-            session.agentState = data.agentState ?? session.agentState;
-            liveData = true;
-            done();
-          },
-        );
-
-        client.once("connect_error", () => {
-          done();
-        });
-      });
-    } finally {
-      client.close();
-    }
+    const liveData = await hydrateSessionLiveState(session, creds, config);
 
     if (opts.json) {
       console.log(formatJson(session));
@@ -211,6 +235,176 @@ program
       console.log(formatSessionStatus(session));
     }
   });
+
+program
+  .command("summary")
+  .description("Inspect or refresh session summaries")
+  .addCommand(
+    new Command("show")
+      .description("Show the narrative session summary")
+      .argument("<session-id>", "Session ID or prefix")
+      .option("--json", "Output as JSON")
+      .action(async (sessionId: string, opts: { json?: boolean }) => {
+        const config = loadConfig();
+        const creds = requireCredentials(config);
+        const session = await resolveSession(config, creds, sessionId);
+        const liveData = await hydrateSessionLiveState(session, creds, config);
+        const summary = extractSessionSummaryState(session.metadata);
+
+        if (opts.json) {
+          console.log(
+            formatJson({
+              sessionId: session.id,
+              live: liveData,
+              summary,
+            }),
+          );
+        } else {
+          if (!liveData) {
+            console.log("> Note: showing cached summary (could not get live state).");
+          }
+          console.log(formatSessionNarrativeSummary(session));
+        }
+      }),
+  )
+  .addCommand(
+    new Command("refresh")
+      .description("Ask the agent to rewrite the session summary")
+      .argument("<session-id>", "Session ID or prefix")
+      .option("--wait", "Wait for agent to become idle")
+      .option(
+        "--require-summary",
+        "Wait until this refresh request is acknowledged in sessionSummaryRefresh.recent",
+      )
+      .option(
+        "--timeout <seconds>",
+        "Timeout in seconds when using --wait or --require-summary",
+        (v: string) => {
+          const n = parseInt(v, 10);
+          if (isNaN(n) || n <= 0)
+            throw new Error("--timeout must be a positive integer");
+          return n;
+        },
+        300,
+      )
+      .option("--json", "Output as JSON")
+      .action(
+        async (
+          sessionId: string,
+          opts: {
+            wait?: boolean;
+            requireSummary?: boolean;
+            timeout: number;
+            json?: boolean;
+          },
+        ) => {
+          const config = loadConfig();
+          const creds = requireCredentials(config);
+          const session = await resolveSession(config, creds, sessionId);
+          const timeoutMs = opts.timeout * 1000;
+          const requestId = `summary-refresh_${randomUUID()}`;
+          const requestedAt = Date.now();
+          let summaryConfirmed = false;
+
+          const client = createClient(session, creds, config);
+          try {
+            await client.waitForConnect();
+            if (opts.requireSummary) {
+              await client.updateMetadataWith((current) => {
+                const base =
+                  current != null &&
+                  typeof current === "object" &&
+                  !Array.isArray(current)
+                    ? (current as Record<string, unknown>)
+                    : {};
+                return {
+                  ...base,
+                  sessionSummaryRefresh: buildActiveSummaryRefreshState({
+                    metadata: current,
+                    requestId,
+                    requestedAt,
+                    requireSummary: true,
+                  }),
+                };
+              });
+            }
+
+            const summaryAckPromise = opts.requireSummary
+              ? waitForSummaryRefreshRecentApplied(client, {
+                  requestId,
+                  timeoutMs,
+                })
+              : null;
+
+            client.sendMessage(buildSummaryRefreshPrompt(requestId), {
+              sentFrom: "happy-agent-summary-refresh",
+              requestId,
+            });
+
+            if (summaryAckPromise) {
+              await summaryAckPromise;
+              summaryConfirmed = true;
+            }
+
+            if (opts.wait) {
+              await sleep(500);
+              await client.waitForIdle(timeoutMs);
+            } else if (!opts.requireSummary) {
+              await sleep(500);
+            }
+
+            const latestMetadata = client.getMetadata();
+            if (latestMetadata !== null) {
+              session.metadata = latestMetadata;
+            }
+            session.metadataVersion = client.getMetadataVersion();
+          } finally {
+            client.close();
+          }
+
+          const summary = extractSessionSummaryState(session.metadata);
+
+          if (opts.json) {
+            console.log(
+              formatJson({
+                sessionId: session.id,
+                requestId,
+                requested: true,
+                requiredSummary: opts.requireSummary === true,
+                summaryConfirmed,
+                waited: opts.wait === true,
+                summary:
+                  opts.wait === true || opts.requireSummary === true
+                    ? summary
+                    : undefined,
+              }),
+            );
+          } else if (opts.wait || opts.requireSummary) {
+            if (!summary) {
+              console.log(
+                opts.requireSummary
+                  ? "> Note: summary update was required, but no valid narrative summary is available."
+                  : "> Note: summary was requested, but the session has not recorded a narrative summary yet.",
+              );
+            }
+            console.log(formatSessionNarrativeSummary(session));
+          } else {
+            console.log(
+              [
+                "## Summary Refresh Requested",
+                "",
+                `- Session ID: \`${session.id}\``,
+                `- Request ID: \`${requestId}\``,
+                `- Required Summary Update: ${opts.requireSummary ? "yes" : "no"}`,
+                `- Summary Confirmed: ${summaryConfirmed ? "yes" : "no"}`,
+                `- Waited For Idle: ${opts.wait ? "yes" : "no"}`,
+                `- Hint: Run \`happy-agent summary show ${session.id}\` to inspect the updated summary.`,
+              ].join("\n"),
+            );
+          }
+        },
+      ),
+  );
 
 program
   .command("create")

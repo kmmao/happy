@@ -60,6 +60,25 @@ happy-agent status <session-id>
 happy-agent status <session-id> --json
 ```
 
+### Session summary
+
+```bash
+# Show the narrative session summary stored in metadata.sessionSummary
+happy-agent summary show <session-id>
+
+# Output the summary as JSON
+happy-agent summary show <session-id> --json
+
+# Ask the agent to rewrite the session summary
+happy-agent summary refresh <session-id>
+
+# Require a real summary update before returning
+happy-agent summary refresh <session-id> --require-summary
+
+# Wait for the agent to finish, then print the latest summary
+happy-agent summary refresh <session-id> --wait
+```
+
 ### Create a session
 
 ```bash

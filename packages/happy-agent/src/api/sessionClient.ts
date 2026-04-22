@@ -29,6 +29,8 @@ export type SessionClientOptions = {
   readonly encryptionVariant: EncryptionVariant;
   readonly token: string;
   readonly serverUrl: string;
+  readonly initialMetadata?: unknown | null;
+  readonly initialMetadataVersion?: number;
   readonly initialAgentState?: unknown | null;
   /** Working directory for RPC handlers (bash cwd, file operations). Defaults to process.cwd(). */
   readonly workingDirectory?: string;
@@ -59,6 +61,12 @@ export class SessionClient extends EventEmitter {
     this.sessionId = opts.sessionId;
     this.encryptionKey = opts.encryptionKey;
     this.encryptionVariant = opts.encryptionVariant;
+    if (opts.initialMetadata !== undefined) {
+      this.metadata = opts.initialMetadata;
+    }
+    if (opts.initialMetadataVersion !== undefined) {
+      this.metadataVersion = opts.initialMetadataVersion;
+    }
     if (opts.initialAgentState !== undefined) {
       this.agentState = opts.initialAgentState;
     }
@@ -120,6 +128,10 @@ export class SessionClient extends EventEmitter {
 
   getMetadata(): unknown | null {
     return this.metadata;
+  }
+
+  getMetadataVersion(): number {
+    return this.metadataVersion;
   }
 
   getAgentState(): unknown | null {
@@ -241,43 +253,58 @@ export class SessionClient extends EventEmitter {
   // New: OCC metadata/state updates
   // -----------------------------------------------------------------------
 
-  async updateMetadata(newMetadata: unknown): Promise<void> {
+  private async updateMetadataOnce(newMetadata: unknown): Promise<void> {
     const encrypted = encodeBase64(
       encrypt(this.encryptionKey, this.encryptionVariant, newMetadata),
     );
-    await withBackoff(
-      () =>
-        new Promise<void>((resolve, reject) => {
-          this.socket.emit(
-            "update-metadata",
-            {
-              sid: this.sessionId,
-              expectedVersion: this.metadataVersion,
-              metadata: encrypted,
-            },
-            (answer: { result: string; version?: number; metadata?: string }) => {
-              if (answer.result === "success" && answer.version !== undefined) {
-                this.metadataVersion = answer.version;
-                this.metadata = newMetadata;
-                resolve();
-              } else if (answer.result === "version-mismatch" && answer.version !== undefined) {
-                this.metadataVersion = answer.version;
-                if (answer.metadata) {
-                  this.metadata = decrypt(
-                    this.encryptionKey,
-                    this.encryptionVariant,
-                    decodeBase64(answer.metadata),
-                  );
-                }
-                reject(new Error("version-mismatch"));
-              } else {
-                reject(new Error(`update-metadata failed: ${answer.result}`));
-              }
-            },
-          );
-        }),
-      { maxRetries: 3, label: "updateMetadata" },
-    );
+    await new Promise<void>((resolve, reject) => {
+      this.socket.emit(
+        "update-metadata",
+        {
+          sid: this.sessionId,
+          expectedVersion: this.metadataVersion,
+          metadata: encrypted,
+        },
+        (answer: { result: string; version?: number; metadata?: string }) => {
+          if (answer.result === "success" && answer.version !== undefined) {
+            this.metadataVersion = answer.version;
+            this.metadata = newMetadata;
+            resolve();
+          } else if (
+            answer.result === "version-mismatch" &&
+            answer.version !== undefined
+          ) {
+            this.metadataVersion = answer.version;
+            if (answer.metadata) {
+              this.metadata = decrypt(
+                this.encryptionKey,
+                this.encryptionVariant,
+                decodeBase64(answer.metadata),
+              );
+            }
+            reject(new Error("version-mismatch"));
+          } else {
+            reject(new Error(`update-metadata failed: ${answer.result}`));
+          }
+        },
+      );
+    });
+  }
+
+  async updateMetadata(newMetadata: unknown): Promise<void> {
+    await withBackoff(() => this.updateMetadataOnce(newMetadata), {
+      maxRetries: 3,
+      label: "updateMetadata",
+    });
+  }
+
+  async updateMetadataWith(
+    handler: (metadata: unknown | null) => unknown,
+  ): Promise<void> {
+    await withBackoff(async () => {
+      const updated = handler(this.metadata);
+      await this.updateMetadataOnce(updated);
+    }, { maxRetries: 3, label: "updateMetadataWith" });
   }
 
   async updateAgentState(newState: unknown | null): Promise<void> {

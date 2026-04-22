@@ -3,6 +3,7 @@ import {
   HAPPY_MCP_AUTO_APPROVE_TOOL_NAMES,
   HAPPY_MCP_SILENT_SUCCESS_TOOL_NAMES,
   HAPPY_MCP_TOOL_NAMES,
+  HAPPY_MCP_TOOL_SPECS,
   getHappyMcpToolAction,
   getHappyMcpToolAliases,
   getHappyMcpToolTitle,
@@ -59,5 +60,14 @@ describe("happyMcp", () => {
     expect(
       shouldAutoApproveHappyMcpReason("Allow Happy MCP project knowledge lookup"),
     ).toBe(false);
+  });
+
+  it("allows update_session_summary to carry an optional requestId", () => {
+    const schema = HAPPY_MCP_TOOL_SPECS.update_session_summary.inputSchema;
+
+    expect(schema.requestId.safeParse(undefined).success).toBe(true);
+    expect(schema.requestId.safeParse("summary-refresh_123").success).toBe(
+      true,
+    );
   });
 });

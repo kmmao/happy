@@ -127,6 +127,12 @@ export const HAPPY_MCP_TOOL_SPECS: Record<
         .array(z.string())
         .optional()
         .describe("Modules/files/areas affected by this session's work"),
+      requestId: z
+        .string()
+        .optional()
+        .describe(
+          "Optional request identifier that runtimes may record in sessionSummaryRefresh recent history for request-level confirmation",
+        ),
     },
     hideSuccessfulCall: false,
     autoApproveByDefault: true,

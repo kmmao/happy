@@ -2,7 +2,7 @@
  * Acceptance tests for happy-agent CLI — Task 10 verification.
  *
  * Verifies:
- * 1. All 8 operations work: auth, create, send, stop, history, wait, status, list
+ * 1. All 10 operations work: auth, create, send, stop, history, wait, status, list, summary show, summary refresh
  * 2. --json flag works on all applicable commands
  * 3. Error handling: no credentials, server unreachable, invalid session ID
  * 4. Interop: sessions with dataKey encryption (happy-agent) and legacy encryption (happy-cli)
@@ -198,6 +198,41 @@ describe('Acceptance: All 8 CLI operations', () => {
 
         it('fails with auth error when not authenticated', () => {
             const { stderr, exitCode } = runCli('create', '--tag', 'test');
+            expect(exitCode).not.toBe(0);
+            expect(stderr).toContain('happy-agent auth login');
+        });
+    });
+
+    describe('4.5. summary commands', () => {
+        it('summary help shows show/refresh subcommands', () => {
+            const { stdout } = runCli('summary', '--help');
+            expect(stdout).toContain('show');
+            expect(stdout).toContain('refresh');
+        });
+
+        it('summary show help shows session-id and --json', () => {
+            const { stdout } = runCli('summary', 'show', '--help');
+            expect(stdout).toContain('session-id');
+            expect(stdout).toContain('--json');
+        });
+
+        it('summary show fails with auth error when not authenticated', () => {
+            const { stderr, exitCode } = runCli('summary', 'show', 'abc');
+            expect(exitCode).not.toBe(0);
+            expect(stderr).toContain('happy-agent auth login');
+        });
+
+        it('summary refresh help shows session-id, --wait, --timeout, --json', () => {
+            const { stdout } = runCli('summary', 'refresh', '--help');
+            expect(stdout).toContain('session-id');
+            expect(stdout).toContain('--wait');
+            expect(stdout).toContain('--require-summary');
+            expect(stdout).toContain('--timeout');
+            expect(stdout).toContain('--json');
+        });
+
+        it('summary refresh fails with auth error when not authenticated', () => {
+            const { stderr, exitCode } = runCli('summary', 'refresh', 'abc');
             expect(exitCode).not.toBe(0);
             expect(stderr).toContain('happy-agent auth login');
         });
@@ -490,6 +525,7 @@ describe('Acceptance: Output formatting', () => {
             active: raw.active,
             activeAt: raw.activeAt,
             metadata: { tag: 'my-project', path: '/home/user', summary: 'My Project' },
+            metadataVersion: raw.metadataVersion,
             agentState: null,
             dataEncryptionKey: raw.dataEncryptionKey,
             encryption,

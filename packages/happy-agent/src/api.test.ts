@@ -207,6 +207,7 @@ describe("api", () => {
       const { raw } = makeRawSessionWithDataKey(creds, metadata, agentState, {
         id: "sess-1",
         active: true,
+        metadataVersion: 7,
       });
 
       mockedAxios.get.mockResolvedValueOnce({
@@ -218,6 +219,7 @@ describe("api", () => {
       expect(sessions).toHaveLength(1);
       expect(sessions[0].id).toBe("sess-1");
       expect(sessions[0].metadata).toEqual(metadata);
+      expect(sessions[0].metadataVersion).toBe(7);
       expect(sessions[0].agentState).toEqual(agentState);
       expect(sessions[0].encryption.variant).toBe("dataKey");
     });
@@ -227,6 +229,7 @@ describe("api", () => {
       const raw = makeRawSessionLegacy(creds, metadata, null, {
         id: "sess-legacy",
         active: false,
+        metadataVersion: 3,
       });
 
       mockedAxios.get.mockResolvedValueOnce({
@@ -238,6 +241,7 @@ describe("api", () => {
       expect(sessions).toHaveLength(1);
       expect(sessions[0].id).toBe("sess-legacy");
       expect(sessions[0].metadata).toEqual(metadata);
+      expect(sessions[0].metadataVersion).toBe(3);
       expect(sessions[0].agentState).toBeNull();
       expect(sessions[0].encryption.variant).toBe("legacy");
     });
@@ -339,6 +343,7 @@ describe("api", () => {
       const { raw } = makeRawSessionWithDataKey(creds, metadata, null, {
         id: "active-1",
         active: true,
+        metadataVersion: 9,
       });
 
       mockedAxios.get.mockResolvedValueOnce({
@@ -350,6 +355,7 @@ describe("api", () => {
       expect(sessions).toHaveLength(1);
       expect(sessions[0].id).toBe("active-1");
       expect(sessions[0].metadata).toEqual(metadata);
+      expect(sessions[0].metadataVersion).toBe(9);
     });
   });
 
@@ -395,6 +401,7 @@ describe("api", () => {
 
       expect(result.id).toBe("new-session-id");
       expect(result.metadata).toEqual(metadata);
+      expect(result.metadataVersion).toBe(1);
       expect(result.sessionKey).toBeInstanceOf(Uint8Array);
       expect(result.sessionKey.length).toBe(32);
       expect(result.encryption.variant).toBe("dataKey");
@@ -427,6 +434,7 @@ describe("api", () => {
       });
 
       expect(result.id).toBe("existing-session");
+      expect(result.metadataVersion).toBe(raw.metadataVersion);
       // Note: the returned sessionKey is the one generated locally,
       // but the decrypted metadata comes from the server's existing session
       expect(result.metadata).toEqual(existingMetadata);
