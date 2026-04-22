@@ -47,6 +47,10 @@ yarn-error.*
 .claude/skills/
 .claude/todo.md
 logs/
+!packages/happy-app/sources/text/translations/logs/
+!packages/happy-app/sources/text/translations/logs/untranslated/
+!packages/happy-app/sources/text/translations/logs/untranslated/*.json
+!packages/happy-app/sources/text/translations/logs/untranslated/*.md
 .plan
 
 CLAUDE.local.md

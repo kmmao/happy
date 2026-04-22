@@ -25,6 +25,7 @@
     "check:i18n:strict": "tsx sources/scripts/compareTranslations.ts --fail-on-untranslated",
     "check:i18n:baseline:update": "tsx sources/scripts/compareTranslations.ts --update-baseline",
     "check:i18n:export": "tsx sources/scripts/compareTranslations.ts --export-untranslated",
+    "check:i18n:sync": "yarn check:i18n:baseline:update && yarn check:i18n:export",
     "postinstall": "patch-package && npx setup-skia-web public",
     "generate-theme": "tsx sources/theme.gen.ts",
     "// ==== Development/Preview/Production Variants ====": "",
