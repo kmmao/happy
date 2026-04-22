@@ -22,7 +22,7 @@
 - 新增共享三态视图组件 — 将 loading / error / empty 统一应用到 sessions、inbox、usage、preview、timeline、process manager 和 OpenClaw
 - 统一 OpenClaw 会话页路由和标签包装组件 — 不再各写一套状态 UI 导致视觉漂移
 - 修复 usage 面板与图表的本地化兜底文案 — 空态/错误态不再回退到硬编码英文
-- 将同一套三态系统继续扩展到 project / git / friends / artifacts 页面，包括 world 子页、knowledge evolution、issues、PRs 以及 artifact 详情/编辑页
+- 将同一套三态系统继续扩展到 project / git / friends / artifacts 页面，包括更多 project 子页、knowledge evolution、issues、PRs 以及 artifact 详情/编辑页
 - 新增共享 collection-state helper — 远程列表页不再各自复制一套略有偏差的 loading/error/empty 分支判断
 - 修复 artifact 详情深链加载问题 — 本地 storage 为空时会主动拉取数据，不再一进页面就直接报错
 
