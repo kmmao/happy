@@ -50,7 +50,7 @@
     "@socket.io/redis-streams-adapter": "^0.2.2",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/semver": "^7.7.0",
-    "axios": "^1.13.5",
+    "axios": "^1.15.2",
     "chalk": "4.1.2",
     "cron-parser": "^5.5.0",
     "date-fns": "^4.1.0",
