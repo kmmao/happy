@@ -69,5 +69,13 @@ __pycache__/
 # Service output/artifacts
 services/*/output/
 .history/
-# Added by code-review-graph
-.code-review-graph/
+
+# Local AI/editor config (keep untracked)
+.claude/settings.json
+.cursor/
+.cursorrules
+.kiro/
+.mcp.json
+.opencode.json
+.windsurfrules
+GEMINI.md
