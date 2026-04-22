@@ -8,8 +8,6 @@ import type {
 } from "@/modules/common/registerCommonHandlers";
 import type { AgentLoopTriggerData } from "./types";
 import { prepareAgentLoopPromptArtifacts } from "./AgentLoopMemory";
-import type { AgentRolePromptContext } from "./AgentRoleResolver";
-import { formatRoleIdentitySection } from "./AgentRoleResolver";
 
 export interface AgentLoopHandlerDeps {
   readonly spawnSession: (
@@ -18,7 +16,6 @@ export interface AgentLoopHandlerDeps {
   readonly resolveGuardianSessionId?: (data: AgentLoopTriggerData) => string | undefined;
   readonly rememberGuardianSession?: (data: AgentLoopTriggerData, sessionId: string) => Promise<void> | void;
   readonly onSessionStarted?: (data: AgentLoopTriggerData, sessionId: string) => Promise<void> | void;
-  readonly resolveRoleContext?: (roleId: string) => Promise<AgentRolePromptContext | undefined>;
 }
 
 async function writePromptFile(directory: string, loopId: string, prompt: string): Promise<string> {
@@ -41,16 +38,8 @@ export async function runAgentLoopJob(
 ): Promise<{ success: boolean; errorMessage?: string; sessionId?: string }> {
   const guardianSessionId = deps.resolveGuardianSessionId?.(data);
 
-  // Resolve role context if roleId is set
-  let roleSection: string | undefined;
-  if (data.roleId && deps.resolveRoleContext) {
-    const roleCtx = await deps.resolveRoleContext(data.roleId);
-    if (roleCtx) {
-      roleSection = formatRoleIdentitySection(roleCtx);
-    }
-  }
 
-  const artifacts = await prepareAgentLoopPromptArtifacts(data, roleSection);
+  const artifacts = await prepareAgentLoopPromptArtifacts(data);
   const promptFilePath = await writePromptFile(artifacts.supportDir, data.loopId, artifacts.prompt);
 
   logger.debug(
@@ -97,9 +86,6 @@ export async function runAgentLoopJob(
       HAPPY_AGENT_LOOP_ROLE_ID: data.roleId ?? "",
       HAPPY_AGENT_LOOP_ROLE_NAME: data.roleName ?? "",
       HAPPY_AGENT_LOOP_ROLE_TYPE: data.roleType ?? "",
-      ...(data.projectId ? {
-        HAPPY_DECISION_API_URL: `${process.env.HAPPY_SERVER_URL ?? ""}/v1/projects/${data.projectId}/decisions`,
-      } : {}),
       ...(data.environmentVariables ?? {}),
     },
   });

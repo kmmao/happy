@@ -167,19 +167,6 @@ function formatLoopContext(data: AgentLoopTriggerData): string {
     "- Before finishing, update memory.md with any durable changes.",
     "- Keep Current Focus and Reflection Summary accurate for the next wakeup.",
     "",
-    ...(data.projectId ? [
-      "## Decision Support",
-      "If you encounter a decision requiring human judgment, you can report it:",
-      "```",
-      `curl -s -X POST "$HAPPY_DECISION_API_URL" \\`,
-      `  -H "Authorization: Bearer $HAPPY_AGENT_LOOP_AUTH_TOKEN" \\`,
-      `  -H "Content-Type: application/json" \\`,
-      `  -d '{"question":"...","options":[{"id":"a","description":"..."},{"id":"b","description":"..."}],"precedentKey":"..."}'`,
-      "```",
-      "First check for existing precedents: `curl -s \"$HAPPY_DECISION_API_URL/match?precedentKey=<KEY>\" -H \"Authorization: Bearer $HAPPY_AGENT_LOOP_AUTH_TOKEN\"`",
-      "If matched, follow the precedent. If not, report and continue with your best judgment.",
-      "",
-    ] : []),
   ].join("\n");
 }
 

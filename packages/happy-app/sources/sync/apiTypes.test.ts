@@ -27,16 +27,6 @@ describe('ApiUpdateSchema', () => {
 });
 
 describe('ApiEphemeralUpdateSchema', () => {
-    it('accepts goal-progress payload', () => {
-        const parsed = ApiEphemeralUpdateSchema.safeParse({
-            type: 'goal-progress',
-            goalId: 'goal-1',
-            projectId: 'project-1',
-            status: 'in_progress',
-            progress: 42,
-        });
-        expect(parsed.success).toBe(true);
-    });
 
     it('keeps task-status-changed backward compatible when machineId is missing', () => {
         const parsed = ApiEphemeralUpdateSchema.safeParse({

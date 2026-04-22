@@ -69,10 +69,6 @@ export interface Project {
   supervisorPushTriggerEnabled?: boolean;
   /** User-defined custom analysis rules */
   supervisorCustomRules?: string | null;
-  /** Project narrative / vision (World Model) */
-  narrative?: string | null;
-  /** Project laws JSON array (World Model) */
-  laws?: string | null;
   /** Project creation timestamp */
   createdAt: number;
   /** Last update timestamp */
@@ -487,8 +483,6 @@ class ProjectManager {
       existing.supervisorEnabledDimensions = serverProject.supervisorEnabledDimensions;
       existing.supervisorPushTriggerEnabled = serverProject.supervisorPushTriggerEnabled;
       existing.supervisorCustomRules = serverProject.supervisorCustomRules;
-      existing.narrative = serverProject.narrative;
-      existing.laws = serverProject.laws;
       existing.updatedAt = Date.now();
       return existing;
     }
@@ -510,8 +504,6 @@ class ProjectManager {
       supervisorEnabledDimensions: serverProject.supervisorEnabledDimensions,
       supervisorPushTriggerEnabled: serverProject.supervisorPushTriggerEnabled,
       supervisorCustomRules: serverProject.supervisorCustomRules,
-      narrative: serverProject.narrative,
-      laws: serverProject.laws,
       createdAt: serverProject.createdAt,
       updatedAt: serverProject.updatedAt,
     };
@@ -588,8 +580,6 @@ class ProjectManager {
           project.supervisorEnabledDimensions = sp.supervisorEnabledDimensions;
           project.supervisorPushTriggerEnabled = sp.supervisorPushTriggerEnabled;
           project.supervisorCustomRules = sp.supervisorCustomRules;
-          project.narrative = sp.narrative;
-          project.laws = sp.laws;
         }
       } else {
         // Server-only project (no active sessions locally)
@@ -610,8 +600,6 @@ class ProjectManager {
           supervisorEnabledDimensions: sp.supervisorEnabledDimensions,
           supervisorPushTriggerEnabled: sp.supervisorPushTriggerEnabled,
           supervisorCustomRules: sp.supervisorCustomRules,
-          narrative: sp.narrative,
-          laws: sp.laws,
           createdAt: sp.createdAt,
           updatedAt: sp.updatedAt,
         };

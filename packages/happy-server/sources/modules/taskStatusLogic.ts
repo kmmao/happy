@@ -1,8 +1,8 @@
-export type TaskStatus = "queued" | "dispatching" | "running" | "completed" | "failed" | "cancelled" | "waiting_decision";
+export type TaskStatus = "queued" | "dispatching" | "running" | "completed" | "failed" | "cancelled";
 export type TaskOutcome = "completed" | "failed" | "blocked";
 
 const TERMINAL_TASK_STATUSES = new Set<TaskStatus>(["completed", "failed", "cancelled"]);
-const TASK_STATUS_PROGRESS: Record<Exclude<TaskStatus, "completed" | "failed" | "cancelled" | "waiting_decision">, number> = {
+const TASK_STATUS_PROGRESS: Record<Exclude<TaskStatus, "completed" | "failed" | "cancelled">, number> = {
     queued: 0,
     dispatching: 1,
     running: 2,

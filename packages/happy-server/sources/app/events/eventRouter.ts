@@ -3,7 +3,7 @@ import { log } from "@/utils/log";
 import { GitHubProfile } from "@/app/api/types";
 import { AccountProfile } from "@/types";
 import { getPublicUrl } from "@/storage/files";
-import type { SessionMessageContent, WorldSuggestionUpdated } from "@kmmao/happy-wire";
+import type { SessionMessageContent } from "@kmmao/happy-wire";
 import type { ResolvedRuntimeProfile } from "@kmmao/happy-wire";
 
 import * as privacyKit from "privacy-kit";
@@ -427,33 +427,6 @@ export type EphemeralEvent =
       machineId: string;
       terminalId: string;
       data: string;
-    }
-  | {
-      type: "goal-created";
-      goalId: string;
-      projectId: string;
-      title: string;
-    }
-  | {
-      type: "goal-progress";
-      goalId: string;
-      projectId: string;
-      status: string;
-      progress: number;
-    }
-  | {
-      type: "agent-message";
-      messageId: string;
-      projectId: string;
-      fromRole: string;
-      toRole: string | null;
-      msgType: string;
-    }
-  | {
-      type: "world-suggestion-updated";
-      projectId: string;
-      suggestionId: string;
-      status: string;
     }
   | {
       type: "task-cancel";
@@ -1112,8 +1085,6 @@ export interface SupervisorTriggerOptions {
   maxConcurrentAnalysis?: number;
   maxConcurrentFix?: number;
   maxFindings?: number;
-  narrative?: string;
-  laws?: string;
   /** Unified runtime profile resolved by App/Server before dispatch. */
   runtimeProfile?: ResolvedRuntimeProfile;
 }
@@ -1270,48 +1241,9 @@ export function buildSessionEventCreatedEphemeral(event: {
   };
 }
 
-export function buildGoalCreatedEphemeral(opts: {
-  goalId: string;
-  projectId: string;
-  title: string;
-}): EphemeralPayload {
-  return {
-    type: "goal-created",
-    ...opts,
-  };
-}
 
-export function buildGoalProgressEphemeral(opts: {
-  goalId: string;
-  projectId: string;
-  status: string;
-  progress: number;
-}): EphemeralPayload {
-  return {
-    type: "goal-progress",
-    ...opts,
-  };
-}
 
-export function buildAgentMessageEphemeral(opts: {
-  messageId: string;
-  projectId: string;
-  fromRole: string;
-  toRole: string | null;
-  msgType: string;
-}): EphemeralPayload {
-  return {
-    type: "agent-message",
-    ...opts,
-  };
-}
 
-export function buildWorldSuggestionUpdatedEphemeral(opts: Omit<WorldSuggestionUpdated, "type">): WorldSuggestionUpdated {
-  return {
-    type: "world-suggestion-updated",
-    ...opts,
-  };
-}
 
 export function buildTaskCancelEphemeral(opts: { taskId: string; sessionId?: string }): EphemeralPayload {
   return {

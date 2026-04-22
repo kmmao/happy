@@ -426,12 +426,6 @@ export default function RootLayout() {
         }}
       />
       <Stack.Screen
-        name="project/[id]/goal/[goalId]"
-        options={{
-          headerBackTitle: t("common.back"),
-        }}
-      />
-      <Stack.Screen
         name="knowledge/search"
         options={{
           headerTitle: t("projects.knowledgeSearchTitle"),

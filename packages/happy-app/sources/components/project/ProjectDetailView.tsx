@@ -7,9 +7,6 @@ import { ProjectSessionsTab } from "./ProjectSessionsTab";
 import { ProjectHealthTab } from "./ProjectHealthTab";
 import { ProjectResearchTab, type ResearchSyncStatus } from "./ProjectResearchTab";
 import { ProjectKnowledgeTab } from "./ProjectKnowledgeTab";
-import { WorldGoalsTab } from "./WorldGoalsTab";
-import { WorldTeamTab } from "./WorldTeamTab";
-import { WorldOverviewTab } from "./WorldOverviewTab";
 import { layout } from "@/components/layout";
 import { t } from "@/text";
 import { useSetting } from "@/sync/storage";
@@ -23,9 +20,6 @@ import { resolveProjectDetailTabPresentation } from "./projectDetailTabPresentat
 type TabKey = ProjectDetailTabKey;
 
 const TAB_LABELS: Record<TabKey, () => string> = {
-    world: () => t("projects.tabWorld"),
-    team: () => t("projects.tabGroups"),
-    goals: () => t("projects.tabGoals"),
     sessions: () => t("projects.tabSessions"),
     health: () => t("projects.tabHealth"),
     research: () => t("projects.tabResearch"),
@@ -46,23 +40,21 @@ export const ProjectDetailView = React.memo(
         const [researchSyncStatus, setResearchSyncStatus] =
             React.useState<ResearchSyncStatus>("idle");
         const knowledgeBaseEnabled = useSetting("knowledgeBase");
-        const worldModelEnabled = useSetting("worldModel");
 
         React.useEffect(() => {
             const nextTab = resolveProjectDetailInitialTab({
                 requestedTab: initialTab,
-                worldModelEnabled,
                 knowledgeBaseEnabled,
             });
             setActiveTab(nextTab);
-        }, [initialTab, worldModelEnabled, knowledgeBaseEnabled]);
+        }, [initialTab, knowledgeBaseEnabled]);
 
         const tabs: { key: TabKey; label: string }[] = React.useMemo(
             () => {
-                const tabKeys = resolveProjectDetailTabs({ worldModelEnabled, knowledgeBaseEnabled });
+                const tabKeys = resolveProjectDetailTabs({ knowledgeBaseEnabled });
                 return tabKeys.map((key) => ({ key, label: TAB_LABELS[key]() }));
             },
-            [worldModelEnabled, knowledgeBaseEnabled],
+            [knowledgeBaseEnabled],
         );
         const useCompactTabs = !isTablet && (tabs.length >= 5 || viewportWidth < 420);
 
@@ -200,37 +192,6 @@ export const ProjectDetailView = React.memo(
                             <ProjectKnowledgeTab projectId={project.id} isActive={activeTab === "knowledge"} />
                         </View>
                     )}
-                    {worldModelEnabled && (
-                        <>
-                            <View
-                                style={
-                                    activeTab === "world"
-                                        ? styles.tabVisible
-                                        : styles.tabHidden
-                                }
-                            >
-                                <WorldOverviewTab project={project} isActive={activeTab === "world"} />
-                            </View>
-                            <View
-                                style={
-                                    activeTab === "team"
-                                        ? styles.tabVisible
-                                        : styles.tabHidden
-                                }
-                            >
-                                <WorldTeamTab project={project} isActive={activeTab === "team"} />
-                            </View>
-                            <View
-                                style={
-                                    activeTab === "goals"
-                                        ? styles.tabVisible
-                                        : styles.tabHidden
-                                }
-                            >
-                                <WorldGoalsTab project={project} isActive={activeTab === "goals"} />
-                            </View>
-                        </>
-                    )}
                 </View>
             </View>
         );
@@ -278,69 +239,67 @@ const styles = StyleSheet.create((theme) => ({
         borderRadius: 9,
     },
     segmentButtonCompact: {
-        paddingHorizontal: 11,
-        minHeight: 34,
+        paddingVertical: 7,
+        paddingHorizontal: 10,
     },
     segmentButtonActive: {
-        backgroundColor: theme.dark ? theme.colors.accentPurple : theme.colors.header.tint,
+        backgroundColor: theme.colors.header.tint,
     },
     segmentButtonPressed: {
-        opacity: 0.9,
+        opacity: 0.88,
     },
     segmentLabelRow: {
         flexDirection: "row",
         alignItems: "center",
-        gap: 6,
-        minWidth: 0,
+        gap: 8,
     },
     segmentIconBadge: {
-        width: 20,
-        height: 20,
-        borderRadius: 10,
+        width: 24,
+        height: 24,
+        borderRadius: 999,
         alignItems: "center",
         justifyContent: "center",
     },
     segmentIconBadgeCompact: {
-        width: 18,
-        height: 18,
-        borderRadius: 9,
+        width: 22,
+        height: 22,
     },
     segmentIconBadgeActive: {
-        backgroundColor: "rgba(255,255,255,0.16)",
+        backgroundColor: "rgba(255,255,255,0.18)",
     },
     segmentText: {
-        ...Typography.default(),
+        ...Typography.default("semiBold"),
         fontSize: 13,
         color: theme.colors.textSecondary,
-        flexShrink: 1,
     },
     segmentTextCompact: {
         fontSize: 12,
     },
     segmentTextActive: {
-        ...Typography.default("semiBold"),
         color: "#FFFFFF",
     },
     syncDot: {
-        width: 6,
-        height: 6,
-        borderRadius: 3,
-    },
-    syncDotOverlay: {
-        position: "absolute",
-        top: -1,
-        right: -1,
+        width: 8,
+        height: 8,
+        borderRadius: 999,
         borderWidth: 1.5,
         borderColor: theme.colors.surface,
     },
+    syncDotOverlay: {
+        position: "absolute",
+        right: -1,
+        top: -1,
+    },
     content: {
         flex: 1,
+        width: "100%",
+        maxWidth: layout.maxWidth,
+        alignSelf: "center",
     },
     tabVisible: {
         flex: 1,
     },
     tabHidden: {
-        flex: 1,
         display: "none",
     },
 }));

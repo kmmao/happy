@@ -8,18 +8,6 @@ export interface ProjectDetailTabPresentation {
 }
 
 const PRESENTATIONS: Record<ProjectDetailTabKey, ProjectDetailTabPresentation> = {
-    world: {
-        icon: "earth-outline",
-        tone: "teal",
-    },
-    team: {
-        icon: "people-outline",
-        tone: "orange",
-    },
-    goals: {
-        icon: "flag-outline",
-        tone: "magenta",
-    },
     sessions: {
         icon: "chatbubble-ellipses-outline",
         tone: "neutral",

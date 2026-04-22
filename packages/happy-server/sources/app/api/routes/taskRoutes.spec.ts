@@ -18,14 +18,13 @@ type TaskRecord = {
     errorMessage: string | null;
     dispatchedAt: Date | null;
     completedAt: Date | null;
-    goalId: string | null;
     triggerType: string;
     triggerRef: string | null;
     createdAt: Date;
     updatedAt: Date;
 };
 
-const { state, dbMock, resetState, seedTask, goalProgressUpdateMock, authMock, worldSuggestionRefreshMock } = vi.hoisted(() => {
+const { state, dbMock, resetState, seedTask, authMock } = vi.hoisted(() => {
     const state = {
         tasks: [] as TaskRecord[],
         repeatKeys: new Map<string, { key: string; value: string; expiresAt: Date; createdAt: Date }>(),
@@ -53,7 +52,6 @@ const { state, dbMock, resetState, seedTask, goalProgressUpdateMock, authMock, w
             errorMessage: input.errorMessage ?? null,
             dispatchedAt: input.dispatchedAt ?? null,
             completedAt: input.completedAt ?? null,
-            goalId: input.goalId ?? "goal-1",
             triggerType: input.triggerType ?? "manual",
             triggerRef: input.triggerRef ?? null,
             createdAt: input.createdAt ?? now,
@@ -154,10 +152,7 @@ const { state, dbMock, resetState, seedTask, goalProgressUpdateMock, authMock, w
         createTaskResultToken: vi.fn(async ({ taskId }: { taskId: string }) => `task-token-for-${taskId}`),
     };
 
-    const goalProgressUpdateMock = vi.fn();
-    const worldSuggestionRefreshMock = vi.fn(async () => ({ created: 0, unchanged: 0, total: 0 }));
-
-    return { state, dbMock, resetState, seedTask, goalProgressUpdateMock, authMock, worldSuggestionRefreshMock };
+    return { state, dbMock, resetState, seedTask, authMock };
 });
 
 vi.mock("@/storage/db", () => ({ db: dbMock }));
@@ -166,12 +161,6 @@ vi.mock("@/app/events/eventRouter", () => ({
     eventRouter: { emitEphemeral: vi.fn() },
     buildTaskTriggerEphemeral: vi.fn((payload: unknown) => payload),
     buildTaskStatusChangedEphemeral: vi.fn((payload: unknown) => payload),
-}));
-vi.mock("@/modules/goalProgressUpdate", () => ({
-    goalProgressUpdate: goalProgressUpdateMock,
-}));
-vi.mock("@/modules/worldSuggestionGenerate", () => ({
-    worldSuggestionRefresh: worldSuggestionRefreshMock,
 }));
 vi.mock("@/app/auth/auth", () => ({
     auth: authMock,
@@ -343,7 +332,6 @@ describe("taskRoutes POST /v1/tasks/status", () => {
             accountId: "user-1",
             machineId: "machine-1",
             status: "running",
-            goalId: "goal-1",
         });
         app = await createApp();
 
@@ -377,7 +365,6 @@ describe("taskRoutes POST /v1/tasks/status", () => {
             status: "failed",
             completedAt,
             errorMessage: "original failure",
-            goalId: "goal-1",
         });
         app = await createApp();
 
@@ -398,7 +385,6 @@ describe("taskRoutes POST /v1/tasks/status", () => {
         expect(state.tasks[0]?.completedAt?.getTime()).toBe(completedAt.getTime());
         expect(state.tasks[0]?.errorMessage).toBe("original failure");
         expect(dbMock.task.update).toHaveBeenCalledTimes(0);
-        expect(goalProgressUpdateMock).not.toHaveBeenCalled();
     });
 });
 
@@ -420,7 +406,6 @@ describe("taskRoutes POST /v1/tasks/result", () => {
             accountId: "user-1",
             machineId: "machine-1",
             status: "running",
-            goalId: "goal-1",
         });
         authMock.verifyTaskResultToken.mockImplementationOnce(async () => ({
             userId: "user-1",
@@ -455,7 +440,6 @@ describe("taskRoutes POST /v1/tasks/result", () => {
             accountId: "user-1",
             machineId: "machine-1",
             status: "running",
-            goalId: "goal-1",
         });
         authMock.verifyTaskResultToken.mockImplementationOnce(async () => ({
             userId: "user-1",
@@ -485,7 +469,6 @@ describe("taskRoutes POST /v1/tasks/result", () => {
             accountId: "user-1",
             machineId: "machine-1",
             status: "running",
-            goalId: "goal-1",
         });
         authMock.verifyTaskResultToken.mockImplementationOnce(async () => ({
             userId: "user-1",
@@ -520,7 +503,6 @@ describe("taskRoutes POST /v1/tasks/result", () => {
             accountId: "user-1",
             machineId: "machine-1",
             status: "running",
-            goalId: "goal-1",
             sessionId: "session-1",
         });
         authMock.verifyTaskResultToken.mockImplementationOnce(async () => ({
@@ -558,7 +540,6 @@ describe("taskRoutes POST /v1/tasks/result", () => {
             accountId: "user-1",
             machineId: "machine-1",
             status: "running",
-            goalId: "goal-1",
             sessionId: "session-1",
         });
         authMock.verifyTaskResultToken.mockImplementation(async () => ({
@@ -602,7 +583,6 @@ describe("taskRoutes POST /v1/tasks/result", () => {
             accountId: "user-1",
             machineId: "machine-1",
             status: "running",
-            goalId: "goal-1",
             errorMessage: null,
         });
         authMock.verifyTaskResultToken.mockImplementationOnce(async () => ({
@@ -637,7 +617,6 @@ describe("taskRoutes POST /v1/tasks/result", () => {
             accountId: "user-1",
             machineId: "machine-1",
             status: "running",
-            goalId: "goal-1",
             errorMessage: null,
         });
         authMock.verifyTaskResultToken.mockImplementationOnce(async () => ({
@@ -676,7 +655,6 @@ describe("taskRoutes POST /v1/tasks/result", () => {
             accountId: "user-1",
             machineId: "machine-1",
             status: "running",
-            goalId: "goal-1",
             sessionId: "session-existing",
         });
         authMock.verifyTaskResultToken.mockImplementationOnce(async () => ({
@@ -714,7 +692,6 @@ describe("taskRoutes POST /v1/tasks/result", () => {
             accountId: "user-1",
             machineId: "machine-1",
             status: "running",
-            goalId: "goal-1",
         });
         authMock.verifyTaskResultToken.mockImplementationOnce(async () => ({
             userId: "user-1",
@@ -741,69 +718,6 @@ describe("taskRoutes POST /v1/tasks/result", () => {
     });
 });
 
-describe("taskRoutes auto-resolve dependency_blocked on task completion", () => {
-    let app: Fastify;
-
-    beforeEach(() => {
-        resetState();
-        vi.clearAllMocks();
-    });
-
-    afterEach(async () => {
-        if (app) await app.close();
-    });
-
-    it("calls agentMessage.updateMany to resolve dependency_blocked when task reaches terminal status", async () => {
-        seedTask({
-            id: "task-1",
-            accountId: "user-1",
-            machineId: "machine-1",
-            status: "running",
-            projectId: "project-1",
-        });
-        app = await createApp();
-
-        const res = await app.inject({
-            method: "POST",
-            url: "/v1/tasks/status",
-            headers: { "x-user-id": "user-1" },
-            payload: { taskId: "task-1", status: "completed" },
-        });
-
-        expect(res.statusCode).toBe(200);
-        expect(dbMock.agentMessage.updateMany).toHaveBeenCalledWith(
-            expect.objectContaining({
-                where: expect.objectContaining({
-                    relatedTaskId: "task-1",
-                    msgType: "dependency_blocked",
-                    status: { not: "resolved" },
-                }),
-                data: { status: "resolved" },
-            }),
-        );
-    });
-
-    it("does NOT call agentMessage.updateMany when task is not in terminal state", async () => {
-        seedTask({
-            id: "task-2",
-            accountId: "user-1",
-            machineId: "machine-1",
-            status: "queued",
-            projectId: "project-1",
-        });
-        app = await createApp();
-
-        const res = await app.inject({
-            method: "POST",
-            url: "/v1/tasks/status",
-            headers: { "x-user-id": "user-1" },
-            payload: { taskId: "task-2", status: "running" },
-        });
-
-        expect(res.statusCode).toBe(200);
-        expect(dbMock.agentMessage.updateMany).not.toHaveBeenCalled();
-    });
-});
 
 describe("taskRoutes POST /v1/tasks/:id/retry", () => {
     let app: Fastify;
@@ -825,7 +739,6 @@ describe("taskRoutes POST /v1/tasks/:id/retry", () => {
             status: "failed",
             projectId: "project-1",
             directory: "/repo/.dev/worktree/task-1",
-            goalId: null,
         });
         app = await createApp();
 

@@ -47,18 +47,10 @@ import { skillRoutes } from "./routes/skillRoutes";
 import { triggerScheduleRoutes } from "./routes/triggerScheduleRoutes";
 import { webhookTriggerRoutes } from "./routes/webhookTriggerRoutes";
 import { inboxRoutes } from "./routes/inboxRoutes";
-import { agentRoleRoutes } from "./routes/agentRoleRoutes";
-import { decisionRoutes } from "./routes/decisionRoutes";
-import { goalRoutes } from "./routes/goalRoutes";
-import { worldDashboardRoutes } from "./routes/worldDashboardRoutes";
-import { worldSuggestionRoutes } from "./routes/worldSuggestionRoutes";
-import { agentMessageRoutes } from "./routes/agentMessageRoutes";
-import { worldMemberRoutes } from "./routes/worldMemberRoutes";
 import { sessionEventRoutes } from "./routes/sessionEventRoutes";
 import { isLocalStorage, getLocalFilesDir } from "@/storage/files";
 import { startKnowledgeLifecycleScheduler, stopKnowledgeLifecycleScheduler } from "@/modules/knowledgeLifecycleScheduler";
 import { startTaskStaleReaper, stopTaskStaleReaper } from "@/modules/taskStaleReaper";
-import { startDecisionExpiryScheduler, stopDecisionExpiryScheduler } from "@/modules/decisionExpiryScheduler";
 import * as path from "path";
 import * as fs from "fs";
 
@@ -177,13 +169,6 @@ export async function startApi() {
   webhookTriggerRoutes(typed);
   inboxRoutes(typed);
   sessionEventRoutes(typed);
-  agentRoleRoutes(typed);
-  decisionRoutes(typed);
-  goalRoutes(typed);
-  worldDashboardRoutes(typed);
-  worldSuggestionRoutes(typed);
-  agentMessageRoutes(typed);
-  worldMemberRoutes(typed);
 
   // Start HTTP
   const port = process.env.PORT ? parseInt(process.env.PORT, 10) : 3005;
@@ -205,12 +190,6 @@ export async function startApi() {
   startTaskStaleReaper();
   onShutdown("task-reaper", async () => {
     stopTaskStaleReaper();
-  });
-
-  // Start decision expiry scheduler (turn pending into expired suggestions)
-  startDecisionExpiryScheduler();
-  onShutdown("decision-expiry", async () => {
-    stopDecisionExpiryScheduler();
   });
 
   // End

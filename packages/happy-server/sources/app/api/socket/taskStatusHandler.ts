@@ -9,7 +9,6 @@ import { db } from "@/storage/db";
 import { log } from "@/utils/log";
 import { eventRouter, buildTaskStatusChangedEphemeral } from "@/app/events/eventRouter";
 import { inboxCreate } from "@/modules/inboxCreate";
-import { goalProgressUpdate } from "@/modules/goalProgressUpdate";
 import {
     normalizeTaskStatusReport,
     shouldApplyTaskStatus,
@@ -114,14 +113,6 @@ export function taskStatusHandler(socket: Socket, userId: string): void {
                 }),
                 recipientFilter: { type: "user-scoped-only" },
             });
-
-            // Update goal progress when task reaches terminal state
-            if (isTerminal && updated.goalId) {
-                void goalProgressUpdate({
-                    goalId: updated.goalId,
-                    accountId: userId,
-                });
-            }
 
             log({ module: "task" }, `task-status: task ${data.taskId} → ${resolvedStatus}`);
         } catch (error) {

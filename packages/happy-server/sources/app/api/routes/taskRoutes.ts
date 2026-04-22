@@ -8,7 +8,6 @@ import { type Fastify } from "../types";
 import { db } from "@/storage/db";
 import { z } from "zod";
 import { log } from "@/utils/log";
-import { goalProgressUpdate } from "@/modules/goalProgressUpdate";
 import { auth } from "@/app/auth/auth";
 import { inTx } from "@/storage/inTx";
 import { claimRepeatKey } from "@/storage/repeatKey";
@@ -16,12 +15,9 @@ import {
     normalizeTaskStatusReport,
     shouldApplyTaskStatus,
 } from "@/modules/taskStatusLogic";
-import { truncateText, TEXT_LIMITS } from "@/modules/worldConstants";
-import { worldSuggestionRefresh } from "@/modules/worldSuggestionGenerate";
-import { dispatchQueuedTasksForMember, dispatchQueuedTasksForImplicitOwner } from "@/modules/memberConcurrencyCheck";
 
 const TaskPrioritySchema = z.enum(["urgent", "user", "background"]);
-const TaskStatusSchema = z.enum(["queued", "dispatching", "running", "waiting_decision", "completed", "failed", "cancelled"]);
+const TaskStatusSchema = z.enum(["queued", "dispatching", "running", "completed", "failed", "cancelled"]);
 const TaskOutcomeSchema = z.enum(["completed", "failed", "blocked"]);
 
 const CreateTaskBodySchema = z.object({
@@ -54,6 +50,13 @@ const TaskResultReportSchema = z.object({
     sessionId: z.string().optional(),
     errorMessage: z.string().optional(),
 });
+
+const PROMPT_PREVIEW_LIMIT = 100;
+
+function truncateTaskPrompt(input: string, max: number): string {
+    if (input.length <= max) return input;
+    return input.slice(0, max - 3) + "...";
+}
 
 function isDirectoryUnderProject(projectPath: string, candidate: string): boolean {
     if (!candidate || candidate.includes("..")) {
@@ -629,38 +632,6 @@ export function taskRoutes(app: Fastify) {
                 recipientFilter: { type: "user-scoped-only" },
             });
 
-            if (updated.goalId) {
-                void goalProgressUpdate({
-                    goalId: updated.goalId,
-                    accountId: request.userId,
-                });
-            }
-            if (updated.projectId) {
-                void worldSuggestionRefresh(request.userId, updated.projectId);
-            }
-
-            // Auto-resolve dependency_blocked messages waiting on this task
-            void resolveBlockedMessagesByTask({ taskId, accountId: request.userId });
-
-            // Free up concurrency slot: dispatch next queued task for this member (or implicit owner)
-            const isTerminalOutcome = ["completed", "failed", "cancelled"].includes(resolvedStatus);
-            if (isTerminalOutcome && updated.projectId) {
-                if (updated.assignedMemberId) {
-                    void dispatchQueuedTasksForMember({
-                        memberId: updated.assignedMemberId,
-                        accountId: request.userId,
-                        machineId: updated.machineId,
-                    });
-                } else if (updated.roleType) {
-                    void dispatchQueuedTasksForImplicitOwner({
-                        accountId: request.userId,
-                        projectId: updated.projectId,
-                        machineId: updated.machineId,
-                        roleType: updated.roleType,
-                    });
-                }
-            }
-
             log({ module: "task" }, `Task ${taskId} outcome → ${outcome} (status=${resolvedStatus})`);
             return reply.send({ task: serializeTask(updated) });
         },
@@ -728,63 +699,12 @@ export function taskRoutes(app: Fastify) {
                 recipientFilter: { type: "user-scoped-only" },
             });
 
-            if (isTerminal && updated.goalId) {
-                void goalProgressUpdate({
-                    goalId: updated.goalId,
-                    accountId: request.userId,
-                });
-            }
-            if (isTerminal && updated.projectId) {
-                void worldSuggestionRefresh(request.userId, updated.projectId);
-            }
-
-            // Auto-resolve dependency_blocked messages waiting on this task
-            if (isTerminal) {
-                void resolveBlockedMessagesByTask({ taskId, accountId: request.userId });
-            }
-
-            // Free up concurrency slot: dispatch next queued task for this member (or implicit owner)
-            if (isTerminal && updated.projectId) {
-                if (updated.assignedMemberId) {
-                    void dispatchQueuedTasksForMember({
-                        memberId: updated.assignedMemberId,
-                        accountId: request.userId,
-                        machineId: updated.machineId,
-                    });
-                } else if (updated.roleType) {
-                    void dispatchQueuedTasksForImplicitOwner({
-                        accountId: request.userId,
-                        projectId: updated.projectId,
-                        machineId: updated.machineId,
-                        roleType: updated.roleType,
-                    });
-                }
-            }
-
             log({ module: "task" }, `Task ${taskId} status → ${resolvedStatus}`);
             return reply.send({ task: serializeTask(updated) });
         },
     );
 }
 
-/**
- * Batch-resolve dependency_blocked messages whose relatedTaskId matches the
- * just-completed/failed task. This self-heals the collaboration graph.
- */
-async function resolveBlockedMessagesByTask(input: {
-    taskId: string;
-    accountId: string;
-}): Promise<void> {
-    await db.agentMessage.updateMany({
-        where: {
-            accountId: input.accountId,
-            msgType: "dependency_blocked",
-            relatedTaskId: input.taskId,
-            status: { not: "resolved" },
-        },
-        data: { status: "resolved" },
-    });
-}
 
 function serializeTask(task: Record<string, unknown>): Record<string, unknown> {
     const t = task as {
@@ -806,9 +726,7 @@ function serializeTask(task: Record<string, unknown>): Record<string, unknown> {
         completedAt: Date | null;
         createdAt: Date;
         updatedAt: Date;
-        roleType?: string | null;
         title?: string | null;
-        waitingDecisionId?: string | null;
         skillBindings?: Array<{ skill: { name: string } }>;
     };
 
@@ -830,9 +748,7 @@ function serializeTask(task: Record<string, unknown>): Record<string, unknown> {
         createdAt: t.createdAt.getTime(),
         updatedAt: t.updatedAt.getTime(),
         title: t.title ?? null,
-        promptPreview: truncateText(t.prompt, TEXT_LIMITS.PROMPT_PREVIEW),
-        roleType: t.roleType ?? null,
-        waitingDecisionId: t.waitingDecisionId ?? null,
+        promptPreview: truncateTaskPrompt(t.prompt, PROMPT_PREVIEW_LIMIT),
         skillNames: t.skillBindings?.map((b) => b.skill.name) ?? [],
     };
 }

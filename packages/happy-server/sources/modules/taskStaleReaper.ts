@@ -8,10 +8,8 @@
 
 import { db } from "@/storage/db";
 import { log } from "@/utils/log";
-import { goalProgressUpdate } from "./goalProgressUpdate";
 import { eventRouter, buildTaskStatusChangedEphemeral } from "@/app/events/eventRouter";
 import { inboxCreate } from "./inboxCreate";
-import { worldSuggestionRefresh } from "./worldSuggestionGenerate";
 
 const REAP_INTERVAL_MS = 5 * 60_000; // 5 minutes
 const RUNNING_TIMEOUT_MS = parseInt(process.env.TASK_RUNNING_TIMEOUT_MS ?? `${60 * 60_000}`, 10); // 60 min
@@ -28,7 +26,7 @@ async function reapStaleTasks(): Promise<void> {
                 status: "running",
                 updatedAt: { lt: new Date(now.getTime() - RUNNING_TIMEOUT_MS) },
             },
-            select: { id: true, machineId: true, accountId: true, projectId: true, goalId: true, title: true },
+            select: { id: true, machineId: true, accountId: true, projectId: true, title: true },
         });
 
         const staleDispatching = await db.task.findMany({
@@ -36,7 +34,7 @@ async function reapStaleTasks(): Promise<void> {
                 status: "dispatching",
                 createdAt: { lt: new Date(now.getTime() - DISPATCHING_TIMEOUT_MS) },
             },
-            select: { id: true, machineId: true, accountId: true, projectId: true, goalId: true, title: true },
+            select: { id: true, machineId: true, accountId: true, projectId: true, title: true },
         });
 
         const staleTasks = [
@@ -90,16 +88,6 @@ async function reapStaleTasks(): Promise<void> {
                 refId: task.id,
                 groupKey: `task:${task.id}:failed`,
             });
-
-            if (task.goalId) {
-                void goalProgressUpdate({
-                    goalId: task.goalId,
-                    accountId: task.accountId,
-                });
-            }
-            if (task.projectId) {
-                void worldSuggestionRefresh(task.accountId, task.projectId);
-            }
         }
     } catch (err) {
         log({ module: "task-reaper", level: "error" }, `Reaper error: ${err}`);

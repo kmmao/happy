@@ -3,16 +3,7 @@ export type ProjectDetailTabKey =
     | "health"
     | "research"
     | "knowledge"
-    | "goals"
-    | "world"
-    | "team"
 ;
-
-const WORLD_MODEL_TABS: ProjectDetailTabKey[] = [
-    "world",
-    "team",
-    "goals",
-];
 
 const ALWAYS_TABS: ProjectDetailTabKey[] = [
     "sessions",
@@ -21,14 +12,9 @@ const ALWAYS_TABS: ProjectDetailTabKey[] = [
 ];
 
 export function resolveProjectDetailTabs(input: {
-    worldModelEnabled: boolean;
     knowledgeBaseEnabled: boolean;
 }): ProjectDetailTabKey[] {
-    const tabs: ProjectDetailTabKey[] = [];
-    if (input.worldModelEnabled) {
-        tabs.push(...WORLD_MODEL_TABS);
-    }
-    tabs.push(...ALWAYS_TABS);
+    const tabs: ProjectDetailTabKey[] = [...ALWAYS_TABS];
     if (input.knowledgeBaseEnabled) {
         tabs.push("knowledge");
     }
@@ -37,7 +23,6 @@ export function resolveProjectDetailTabs(input: {
 
 export function resolveProjectDetailInitialTab(input: {
     requestedTab?: string;
-    worldModelEnabled: boolean;
     knowledgeBaseEnabled: boolean;
 }): ProjectDetailTabKey {
     const allowedTabs = resolveProjectDetailTabs(input);

@@ -26,10 +26,6 @@ export interface SupervisorPromptOptions {
   readonly changedFiles?: readonly string[];
   /** User-defined custom analysis rules (appended to prompt). */
   readonly customRules?: string;
-  /** Project narrative / vision (World Model Phase 0). */
-  readonly narrative?: string;
-  /** Project laws JSON array (World Model Phase 0). [{id, category, description, enabled, severity}] */
-  readonly laws?: string;
   /** Existing pending/approved actions to avoid duplicating. */
   readonly existingActions?: ReadonlyArray<{
     category: string;
@@ -93,7 +89,6 @@ ${options.customRules.trim()}
 `
       : "";
 
-  const worldModelSection = buildWorldModelSection(options.narrative, options.laws);
 
   const existingActionsSection = buildExistingActionsSection(options.existingActions);
 
@@ -118,7 +113,7 @@ ${options.customRules.trim()}
 - Run ID: ${options.runId}
 - Trigger: ${options.trigger}
 - Repository: ${options.repoPath}
-${autoModeSection}${incrementalSection}${worldModelSection}${customRulesSection}${existingActionsSection}## Rules (CRITICAL)
+${autoModeSection}${incrementalSection}${customRulesSection}${existingActionsSection}## Rules (CRITICAL)
 1. **DO NOT modify any files.** This is a read-only analysis session.
 2. **DO NOT create commits, branches, or PRs.**
 3. **DO NOT run destructive commands** (rm, git reset, etc.).
@@ -222,9 +217,6 @@ curl -s -X POST "${reportUrl}" \\
   -d '{"status":"failed","errorMessage":"Failed to report results"}'
 \`\`\`
 
-${buildDecisionReportingSection(options.serverUrl, options.projectId)}
-${buildLawEvolutionSection(options.serverUrl, options.projectId, options.laws)}
-${buildAgentCommunicationSection(options.serverUrl, options.projectId)}
 Begin your analysis now.`;
 }
 
@@ -283,168 +275,5 @@ ${guidance}
 ${rows.join("\n")}
 
 **Remember**: If an existing finding says "X file is too large" and you find "Y file is too large", that is the SAME CLASS of issue — do NOT report it separately. Only report genuinely novel issues that represent a different category of concern.
-`;
-}
-
-interface Law {
-  id: string;
-  category: string;
-  description: string;
-  enabled: boolean;
-  severity: string;
-}
-
-const severityOrder: Record<string, number> = {
-  critical: 0,
-  high: 1,
-  medium: 2,
-  low: 3,
-};
-
-function buildWorldModelSection(
-  narrative: string | undefined,
-  lawsJson: string | undefined,
-): string {
-  const parts: string[] = [];
-
-  if (narrative && narrative.trim().length > 0) {
-    parts.push(`
-## Project Narrative
-${narrative.trim()}
-`);
-  }
-
-  if (lawsJson && lawsJson.trim().length > 0) {
-    let laws: Law[];
-    try {
-      laws = JSON.parse(lawsJson) as Law[];
-    } catch {
-      return parts.join("");
-    }
-
-    const enabledLaws = laws
-      .filter((l) => l.enabled)
-      .sort((a, b) => (severityOrder[a.severity] ?? 99) - (severityOrder[b.severity] ?? 99));
-
-    if (enabledLaws.length > 0) {
-      const rows = enabledLaws.map(
-        (l, i) => `| ${i + 1} | ${l.category} | ${l.severity} | ${l.description} |`,
-      );
-
-      parts.push(`
-## Project Laws (MANDATORY — check each law)
-The project owner has defined the following laws. You MUST check each enabled law
-and report a finding for any violation. Only report clear, evidence-based violations.
-
-| # | Category | Severity | Law |
-|---|----------|----------|-----|
-${rows.join("\n")}
-
-For each law violated, create a finding with:
-- category: the law's category (if it matches an enabled dimension) or the closest dimension
-- severity: the law's severity
-- title: "[Law Violation] <short description>"
-- description: What violates this law, where, and evidence you found
-`);
-    }
-  }
-
-  return parts.join("");
-}
-
-function buildDecisionReportingSection(serverUrl: string, projectId: string): string {
-  const decisionUrl = `${serverUrl}/v1/projects/${projectId}/decisions`;
-  const matchUrl = `${serverUrl}/v1/projects/${projectId}/decisions/match`;
-
-  return `
-## Decision Reporting (Optional)
-
-If you encounter a situation where:
-- Multiple equally valid approaches exist and the choice requires human judgment
-- The decision impacts project architecture, security policy, or direction
-- You are uncertain about trade-offs between options
-
-**First**, check if a precedent exists:
-\`\`\`
-curl -s "${matchUrl}?precedentKey=<KEY>" \\
-  -H "Authorization: Bearer $HAPPY_SUPERVISOR_CALLBACK_TOKEN"
-\`\`\`
-
-If the response contains \`"matched": true\`, follow the precedent's \`chosenOption\` and do NOT report a new decision.
-
-If no precedent found (\`"matched": false\`), report the decision:
-\`\`\`
-curl -s -X POST "${decisionUrl}" \\
-  -H "Authorization: Bearer $HAPPY_SUPERVISOR_CALLBACK_TOKEN" \\
-  -H "X-Happy-Machine-Id: $HAPPY_SUPERVISOR_MACHINE_ID" \\
-  -H "Content-Type: application/json" \\
-  -d '{"question":"<describe the decision>","options":[{"id":"a","description":"Option A","pros":"...","cons":"..."},{"id":"b","description":"Option B","pros":"...","cons":"..."}],"precedentKey":"<category-key>"}'
-\`\`\`
-
-Then **continue with your best judgment** — do NOT wait for a response. The project owner will adjudicate later, and the result becomes a precedent for future runs.
-`;
-}
-
-function buildLawEvolutionSection(serverUrl: string, projectId: string, lawsJson: string | undefined): string {
-  // Only inject law evolution when the project already has laws
-  if (!lawsJson || lawsJson.trim().length === 0) return "";
-
-  let hasLaws = false;
-  try {
-    const laws = JSON.parse(lawsJson) as unknown[];
-    hasLaws = Array.isArray(laws) && laws.length > 0;
-  } catch {
-    return "";
-  }
-  if (!hasLaws) return "";
-
-  const messageUrl = `${serverUrl}/v1/projects/${projectId}/agent-messages`;
-
-  return `
-## Law Evolution (Optional)
-
-If during your analysis you discover a **recurring pattern** that is NOT covered by any
-existing law above, and you believe it should become a permanent project rule, you MAY
-suggest a new law.
-
-To suggest a law:
-\`\`\`
-curl -s -X POST "${messageUrl}" \\
-  -H "Authorization: Bearer $HAPPY_SUPERVISOR_CALLBACK_TOKEN" \\
-  -H "X-Happy-Machine-Id: $HAPPY_SUPERVISOR_MACHINE_ID" \\
-  -H "Content-Type: application/json" \\
-  -d '{"fromRole":"guardian","msgType":"law_suggestion","content":"{\\"category\\":\\"<category>\\",\\"description\\":\\"<law description>\\",\\"severity\\":\\"<low|medium|high|critical>\\"}"}'
-\`\`\`
-
-**Rules for law suggestions:**
-- Only suggest laws based on **clear, repeated evidence** (not one-off issues)
-- Do NOT suggest laws that duplicate existing laws
-- Keep descriptions concise and actionable
-- The project owner will review and approve/reject via the Decision system
-`;
-}
-
-function buildAgentCommunicationSection(serverUrl: string, projectId: string): string {
-  const messageUrl = `${serverUrl}/v1/projects/${projectId}/agent-messages`;
-
-  return `
-## Agent Communication (Optional)
-
-If you need to report a finding to another role, or flag a conflict between competing
-approaches, send an AgentMessage:
-
-\`\`\`
-curl -s -X POST "${messageUrl}" \\
-  -H "Authorization: Bearer $HAPPY_SUPERVISOR_CALLBACK_TOKEN" \\
-  -H "X-Happy-Machine-Id: $HAPPY_SUPERVISOR_MACHINE_ID" \\
-  -H "Content-Type: application/json" \\
-  -d '{"fromRole":"<your-role>","toRole":"<target-role>","msgType":"request|report|conflict","content":"<message>"}'
-\`\`\`
-
-- **request**: Ask another role for assistance or input
-- **report**: Share findings or results with another role
-- **conflict**: Flag a disagreement (auto-escalates to Decision for the project owner)
-
-Only use this when genuinely needed. Most analyses complete without inter-agent communication.
 `;
 }

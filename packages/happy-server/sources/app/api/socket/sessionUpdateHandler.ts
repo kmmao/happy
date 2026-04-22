@@ -8,7 +8,6 @@ import {
     ClientConnection,
     eventRouter,
 } from "@/app/events/eventRouter";
-import { goalProgressUpdate } from "@/modules/goalProgressUpdate";
 import { inboxCreate } from "@/modules/inboxCreate";
 import { db } from "@/storage/db";
 import { allocateSessionSeq, allocateUserSeq } from "@/storage/seq";
@@ -335,12 +334,6 @@ export function sessionUpdateHandler(userId: string, socket: Socket, connection:
                     }),
                     recipientFilter: { type: "user-scoped-only" },
                 });
-                if (updated.goalId) {
-                    void goalProgressUpdate({
-                        goalId: updated.goalId,
-                        accountId: userId,
-                    });
-                }
             }
             if (inProgressTasks.length > 0) {
                 log(

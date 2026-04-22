@@ -59,13 +59,6 @@ model Account {
     TriggerSchedule     TriggerSchedule[]
     WebhookTrigger      WebhookTrigger[]
     InboxItem           InboxItem[]
-    AgentRole           AgentRole[]
-    Decision            Decision[]
-    Goal                Goal[]
-    AgentMessage        AgentMessage[]
-    WorldSuggestion     WorldSuggestion[]
-    WorldMember         WorldMember[]
-    WorldAuditLog       WorldAuditLog[]
     AiBackendProfile    AiBackendProfile[]
 }
 
@@ -88,7 +81,6 @@ model AiBackendProfile {
     @@unique([accountId, profileKey])
     @@unique([accountId, name])
 }
-
 
 model TerminalAuthRequest {
     id                String   @id @default(cuid())
@@ -466,10 +458,6 @@ model Project {
     // null = inherit hardcoded defaults (enabled:false, mode:auto, sensitivity:balanced)
     knowledgeConfig                   String?   // JSON: KnowledgeConfig
 
-    // World Model — Phase 0: narrative & laws
-    narrative                         String?   // Project vision/narrative (plaintext, injected into supervisor prompt)
-    laws                              String?   // JSON array: [{id, category, description, enabled, severity}]
-
     // Lifecycle
     archived        Boolean   @default(false)
     createdAt       DateTime  @default(now())
@@ -485,13 +473,6 @@ model Project {
     skills             Skill[]
     triggerSchedules   TriggerSchedule[]
     webhookTriggers    WebhookTrigger[]
-    agentRoles         AgentRole[]
-    decisions          Decision[]
-    goals              Goal[]
-    agentMessages      AgentMessage[]
-    worldSuggestions   WorldSuggestion[]
-    worldMembers       WorldMember[]
-    worldAuditLogs     WorldAuditLog[]
 
     @@unique([accountId, machineId, path])
     @@index([accountId])
@@ -850,7 +831,7 @@ model Task {
 
     // Execution
     priority        String    @default("user")     // urgent | user | background
-    status          String    @default("queued")    // queued | dispatching | running | waiting_decision | completed | failed | cancelled
+    status          String    @default("queued")    // queued | dispatching | running | completed | failed | cancelled
     attempt         Int       @default(0)
     maxAttempts     Int       @default(3)
 
@@ -867,18 +848,6 @@ model Task {
     // Skill bindings
     skillBindings   TaskSkillBinding[]
 
-    // Goal relation (Phase 3)
-    goalId          String?
-    goal            Goal?     @relation(fields: [goalId], references: [id], onDelete: SetNull)
-
-    // Role identity (e.g. "builder", "healer") assigned by the Planner
-    roleType        String?
-    // Member assignment — who is responsible for this task (WorldMember.id)
-    assignedMemberId String?
-
-    // Decision wait mechanism — task paused waiting for human adjudication
-    waitingDecisionId String?
-
     createdAt       DateTime  @default(now())
     updatedAt       DateTime  @updatedAt
 
@@ -886,11 +855,7 @@ model Task {
     @@index([accountId, machineId, status])
     @@index([machineId, status])
     @@index([projectId])
-    @@index([goalId])
-    @@index([goalId, status])
     @@index([accountId, createdAt(sort: Desc)])
-    @@index([waitingDecisionId])
-    @@index([assignedMemberId, status])
 }
 
 //
@@ -1072,277 +1037,6 @@ model SessionEvent {
     @@index([sessionId, eventType])
 }
 
-// World Model — Phase 1: Agent Roles
-model AgentRole {
-    id              String    @id @default(cuid())
-    accountId       String
-    account         Account   @relation(fields: [accountId], references: [id], onDelete: Cascade)
-    projectId       String
-    project         Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
-
-    name            String
-    type            String    @default("custom")    // guardian | builder | healer | chronicler | planner | custom
-    description     String?                         // Role description and behavior instructions (injected into prompt)
-    duties          String    @default("[]")        // JSON array of duty strings
-    skillIds        String    @default("[]")        // JSON array of Skill IDs to bind
-
-    /// @deprecated Capacity moved to WorldMember.maxConcurrency — this field is no longer used for scheduling
-    maxConcurrency  Int       @default(1)
-    enabled         Boolean   @default(true)
-
-    // Execution environment — null means inherit from CLI active profile
-    agentType       String?                         // "claude" | "codex" | "gemini" — null = inherit
-    modelOverride   String?                         // e.g. "claude-sonnet-4-20250514" — null = agent default
-
-    createdAt       DateTime  @default(now())
-    updatedAt       DateTime  @updatedAt
-
-    @@unique([accountId, projectId, name])
-    @@index([accountId, projectId, enabled])
-    @@index([projectId])
-}
-
-// World Model — WorldMember (Team Collaboration)
-model WorldMember {
-    id              String    @id @default(cuid())
-
-    // Ownership
-    accountId       String
-    account         Account   @relation(fields: [accountId], references: [id], onDelete: Cascade)
-    projectId       String
-    project         Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
-
-    // Identity
-    displayName     String?                         // Override Account.firstName for this project
-    role            String    @default("member")    // owner | admin | member | observer
-
-    // Expertise tags (used for Decision routing)
-    expertise       String    @default("[]")        // JSON: ["database", "frontend", "security", "devops"]
-
-    // Authority
-    lawAuthority    String    @default("suggest")   // create | suggest | readonly
-    decisionScope   String    @default("assigned")  // all | assigned | none
-    goalAuthority   String    @default("create")    // create | suggest | readonly
-
-    // Notification preference
-    notifyLevel     String    @default("all")       // all | critical | assigned | none
-
-    // Availability
-    availability    String    @default("active")    // active | away | delegate
-    delegateTo      String?                         // WorldMember.id to delegate to
-
-    // Task capacity (moved from AgentRole — capacity belongs to people, not templates)
-    maxConcurrency  Int       @default(3)           // Max concurrent task slots for this member
-    assignedRoleIds String    @default("[]")        // JSON: AgentRole.id[] — which roles this member can perform
-
-    // Execution environment override (member-level, takes precedence over role-level)
-    agentType       String?                         // Override role's agentType — null = inherit from role
-    modelOverride   String?                         // Override role's modelOverride — null = inherit from role
-
-    // Lifecycle
-    joinedAt        DateTime  @default(now())
-    updatedAt       DateTime  @updatedAt
-
-    @@unique([accountId, projectId])
-    @@index([projectId, role])
-    @@index([projectId, availability])
-}
-
-// World Model — Phase 2: Decisions (Adjudication)
-model Decision {
-    id              String    @id @default(cuid())
-    accountId       String
-    account         Account   @relation(fields: [accountId], references: [id], onDelete: Cascade)
-    projectId       String
-    project         Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
-
-    // Source
-    agentRole       String?                         // 发起角色名
-    sessionId       String?                         // 关联会话
-    loopId          String?                         // Agent Loop ID
-
-    // Content (plaintext — Server needs to do embedding match)
-    question        String                          // 问题描述
-    context         String?                         // 上下文信息
-    options         String                          // JSON: [{id, description, pros, cons}]
-
-    // State
-    status          String    @default("pending")   // pending | decided | expired | auto_resolved
-    chosenOption    String?                         // 选中的选项 ID
-    rationale       String?                         // 决策理由
-
-    // Precedent
-    knowledgeId     String?                         // 生成的 Knowledge 条目 ID
-    precedentKey    String?                         // 判例分类 key（用于匹配同类问题）
-
-    // Goal relation (Phase 3)
-    goalId          String?
-    goal            Goal?     @relation(fields: [goalId], references: [id], onDelete: SetNull)
-
-    // Member routing (WorldMember integration)
-    assignedTo      String?                         // WorldMember.id — currently assigned member
-    assignHistory   String    @default("[]")        // JSON: [{memberId, assignedAt, reason}]
-    opinions        String    @default("[]")        // JSON: [{memberId, accountId, chosenOption, rationale, createdAt}] — multi-member opinions before final adjudication
-
-    // Lifecycle
-    expiresAt       DateTime?
-    decidedAt       DateTime?
-    createdAt       DateTime  @default(now())
-    updatedAt       DateTime  @updatedAt
-
-    @@index([accountId, projectId, status])
-    @@index([projectId, precedentKey])
-    @@index([status, expiresAt])
-    @@index([goalId])
-    @@index([assignedTo, status])
-}
-
-// World Model — Phase 3: Goals (Goal Engine)
-model Goal {
-    id              String    @id @default(cuid())
-    accountId       String
-    account         Account   @relation(fields: [accountId], references: [id], onDelete: Cascade)
-    projectId       String
-    project         Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
-
-    // Content (plaintext — Server needs for prompt injection and progress tracking)
-    title           String
-    description     String?
-
-    // State
-    status          String    @default("planning")  // planning | in_progress | blocked | completed | cancelled
-    progress        Int       @default(0)           // 0-100
-
-    // Priority & deadline
-    priority        String    @default("normal")    // urgent | normal | low
-    deadline        DateTime?
-
-    // Hierarchy
-    parentGoalId    String?
-    parentGoal      Goal?     @relation("GoalHierarchy", fields: [parentGoalId], references: [id], onDelete: SetNull)
-    subGoals        Goal[]    @relation("GoalHierarchy")
-
-    // Execution
-    machineId       String                          // Target machine for task dispatch
-    createdBy       String    @default("user")      // user | planner_agent
-
-    // Planner task reference (the task that decomposes this goal)
-    plannerTaskId   String?
-
-    // Relations
-    tasks           Task[]
-    decisions       Decision[]
-
-    // Health tracking (Stage G)
-    blockedSince    DateTime?                       // 进入 blocked 状态的时间点
-    healthScore     Int?                            // 0-100，goalHealthEngine 计算
-    layer           String?                         // strategic | operational | execution
-
-    createdAt       DateTime  @default(now())
-    updatedAt       DateTime  @updatedAt
-
-    @@index([accountId, projectId, status])
-    @@index([projectId, status])
-    @@index([parentGoalId])
-    @@index([projectId, healthScore])
-}
-
-// World Model — Phase 4: Agent Messages (Inter-agent communication)
-model AgentMessage {
-    id          String   @id @default(cuid())
-    accountId   String
-    account     Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
-    projectId   String
-    project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
-
-    fromRole    String                          // Sender role name
-    toRole      String?                         // Receiver role name (null = broadcast)
-    toMemberId  String?                         // WorldMember.id — escalate to specific human
-    msgType     String                          // request | report | conflict | law_suggestion
-    content     String                          // Message content (plaintext)
-    status      String   @default("unread")     // unread | read | resolved
-
-    // Context references
-    sessionId       String?
-    decisionId      String?                         // If conflict escalated to Decision
-    relatedGoalId   String?                         // Goal this message relates to
-    relatedTaskId   String?                         // Task this message relates to
-    priority        String?  @default("normal")     // urgent | normal | low
-
-    createdAt   DateTime @default(now())
-    updatedAt   DateTime @updatedAt
-
-    @@index([accountId, projectId, status])
-    @@index([projectId, createdAt(sort: Desc)])
-    @@index([projectId, msgType])
-    @@index([projectId, relatedGoalId])
-    @@index([relatedTaskId, msgType])
-}
-
 //
 // World Suggestion — server-generated next-step proposals (Phase C)
 //
-
-model WorldSuggestion {
-    id              String    @id @default(cuid())
-    accountId       String
-    projectId       String
-    relatedGoalId   String?
-    relatedTaskId   String?
-    type            String    // suggested_goal | suggested_task | suggested_skill | suggested_decision
-    title           String
-    summary         String
-    reason          String
-    evidence        String    @default("[]")   // JSON: [{kind, id?, label}]
-    recommendedRole String?
-    payload         String    @default("{}")   // JSON: accept 时创建所需参数
-    requiresHuman   Boolean   @default(true)
-    status          String    @default("open") // open | processing | accepted | suspended | dismissed | expired
-    dedupeKey       String
-    bucket          String    @default("next_step") // next_step | needs_decision | needs_human_input
-    acceptSource    String?   // human | system_auto
-    acceptAudit     String?   // JSON: { rule, checks }
-    autoAcceptStatus String?  // skipped | failed
-    autoAcceptReasonCode String? // quota_exhausted | already_acted | accept_failed
-    autoAcceptFailureDetail String? // dispatch_failed | payload_invalid | auto_accept_failed
-    actedAt         DateTime?
-    createdAt       DateTime  @default(now())
-    updatedAt       DateTime  @updatedAt
-
-    account         Account   @relation(fields: [accountId], references: [id])
-    project         Project   @relation(fields: [projectId], references: [id])
-
-    @@index([projectId, status])
-    @@index([projectId, dedupeKey])
-    @@index([projectId, bucket])
-    @@index([projectId, relatedGoalId])
-    @@index([accountId])
-}
-
-// World Model — Audit Log (tracks who changed laws, narrative, roles, decisions)
-model WorldAuditLog {
-    id              String    @id @default(cuid())
-
-    // Who
-    accountId       String
-    account         Account   @relation(fields: [accountId], references: [id], onDelete: Cascade)
-    projectId       String
-    project         Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
-    memberId        String?                         // WorldMember.id — null for implicit owner
-
-    // What
-    action          String                          // law.create | law.update | law.delete | narrative.update | role.create | role.update | role.delete | decision.adjudicate | decision.reassign | member.add | member.update | member.remove
-    entityType      String                          // law | narrative | role | decision | member
-    entityId        String?                         // ID of affected entity (law id, role id, etc.)
-
-    // Detail
-    summary         String                          // Human-readable summary
-    before          String?                         // JSON snapshot before change (null for creates)
-    after           String?                         // JSON snapshot after change (null for deletes)
-
-    createdAt       DateTime  @default(now())
-
-    @@index([projectId, createdAt(sort: Desc)])
-    @@index([projectId, entityType, createdAt(sort: Desc)])
-    @@index([accountId, createdAt(sort: Desc)])
-}

@@ -36,19 +36,4 @@ describe("resolveProjectDetailTabPresentation", () => {
             tone: "purple",
         });
     });
-
-    it("keeps world-model tabs visually separate from project-ops tabs", () => {
-        expectPresentation("world", {
-            icon: "earth-outline",
-            tone: "teal",
-        });
-        expectPresentation("team", {
-            icon: "people-outline",
-            tone: "orange",
-        });
-        expectPresentation("goals", {
-            icon: "flag-outline",
-            tone: "magenta",
-        });
-    });
 });

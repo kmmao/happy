@@ -78,9 +78,6 @@ export const SettingsSchema = z.object({
     .describe(
       "Show real-time agent activity details in chat (thinking state, subagent info, tool descriptions)",
     ),
-  worldModel: z
-    .boolean()
-    .describe("Enable world model tabs in project detail (experimental)"),
   knowledgeBase: z
     .boolean()
     .describe("Enable project knowledge base (experimental)"),
@@ -416,7 +413,6 @@ export const settingsDefaults: Settings = {
   analyticsOptOut: false,
   experiments: false,
   showAgentActivity: true,
-  worldModel: false,
   knowledgeBase: false,
   knowledgeBaseMode: "auto" as const,
   knowledgeBaseSensitivity: "balanced" as const,

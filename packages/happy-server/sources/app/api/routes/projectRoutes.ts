@@ -167,15 +167,13 @@ export function projectRoutes(app: Fastify) {
                     metadata: z.string().nullish(),
                     repoUrl: z.string().nullish(),
                     archived: z.boolean().optional(),
-                    narrative: z.string().max(5000).nullish(),
-                    laws: z.string().max(10000).nullish(),
                 }),
             },
         },
         async (request, reply) => {
             const userId = request.userId;
             const { id } = request.params;
-            const { metadata, repoUrl, archived, narrative, laws } = request.body;
+            const { metadata, repoUrl, archived } = request.body;
 
             const existing = await db.project.findFirst({
                 where: { id, accountId: userId },
@@ -195,12 +193,6 @@ export function projectRoutes(app: Fastify) {
             }
             if (archived !== undefined) {
                 data.archived = archived;
-            }
-            if (narrative !== undefined) {
-                data.narrative = narrative;
-            }
-            if (laws !== undefined) {
-                data.laws = laws;
             }
 
             const updated = await db.project.update({
@@ -454,8 +446,6 @@ function serializeProject(project: {
     supervisorEnabledDimensions: string | null;
     supervisorPushTriggerEnabled: boolean;
     supervisorCustomRules: string | null;
-    narrative: string | null;
-    laws: string | null;
     archived: boolean;
     createdAt: Date;
     updatedAt: Date;
@@ -475,8 +465,6 @@ function serializeProject(project: {
         supervisorEnabledDimensions: project.supervisorEnabledDimensions,
         supervisorPushTriggerEnabled: project.supervisorPushTriggerEnabled,
         supervisorCustomRules: project.supervisorCustomRules,
-        narrative: project.narrative,
-        laws: project.laws,
         archived: project.archived,
         createdAt: project.createdAt.getTime(),
         updatedAt: project.updatedAt.getTime(),

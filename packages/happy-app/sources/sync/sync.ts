@@ -198,17 +198,6 @@ class Sync {
   }) => void>();
   private researchConfigListeners = new Set<(event: ResearchConfigChange) => void>();
   private taskLogListeners = new Set<(sessionId: string, taskId: string, chunk: string) => void>();
-  private goalProgressListeners = new Set<(event: {
-    goalId: string;
-    projectId: string;
-    status: string;
-    progress: number;
-  }) => void>();
-  private worldSuggestionUpdatedListeners = new Set<(event: {
-    projectId: string;
-    suggestionId: string;
-    status: string;
-  }) => void>();
   private taskStatusListeners = new Set<(event: {
     taskId: string;
     machineId?: string;
@@ -2617,18 +2606,6 @@ class Sync {
       }
     }
 
-    // Handle goal-progress: notify listeners for real-time goal progress updates
-    if (updateData.type === "goal-progress") {
-      for (const listener of this.goalProgressListeners) {
-        listener({
-          goalId: updateData.goalId,
-          projectId: updateData.projectId,
-          status: updateData.status,
-          progress: updateData.progress,
-        });
-      }
-    }
-
     // Handle task-status-changed: notify listeners for real-time task status updates
     if (updateData.type === "task-status-changed") {
       for (const listener of this.taskStatusListeners) {
@@ -2683,17 +2660,6 @@ class Sync {
       };
       for (const listener of this.supervisorLoopStatusListeners) {
         listener(loopEvent);
-      }
-    }
-
-    // Handle world-suggestion-updated: notify listeners for real-time suggestion status changes
-    if (updateData.type === "world-suggestion-updated") {
-      for (const listener of this.worldSuggestionUpdatedListeners) {
-        listener({
-          projectId: updateData.projectId,
-          suggestionId: updateData.suggestionId,
-          status: updateData.status,
-        });
       }
     }
 
@@ -2933,15 +2899,6 @@ class Sync {
     return () => { this.taskLogListeners.delete(listener); };
   }
 
-  onGoalProgress(listener: (event: {
-    goalId: string;
-    projectId: string;
-    status: string;
-    progress: number;
-  }) => void): () => void {
-    this.goalProgressListeners.add(listener);
-    return () => { this.goalProgressListeners.delete(listener); };
-  }
 
   onTaskStatusChanged(listener: (event: {
     taskId: string;
@@ -2990,14 +2947,6 @@ class Sync {
     return () => { this.sessionEventCreatedListeners.delete(listener); };
   }
 
-  onWorldSuggestionUpdated(listener: (event: {
-    projectId: string;
-    suggestionId: string;
-    status: string;
-  }) => void): () => void {
-    this.worldSuggestionUpdatedListeners.add(listener);
-    return () => { this.worldSuggestionUpdatedListeners.delete(listener); };
-  }
 
   destroy() {
     this.appStateSubscription?.remove();

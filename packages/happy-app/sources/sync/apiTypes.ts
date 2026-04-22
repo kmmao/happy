@@ -4,7 +4,6 @@ import {
   ApiUpdateMachineStateSchema,
   ApiUpdateNewMessageSchema,
   ApiUpdateSessionStateSchema,
-  WorldSuggestionUpdatedSchema as ApiEphemeralWorldSuggestionUpdatedSchema,
   type ApiMessage,
 } from "@kmmao/happy-wire";
 import { GitHubProfileSchema, ImageRefSchema } from "./profile";
@@ -330,13 +329,6 @@ export const ApiEphemeralTaskLogSchema = z.object({
     offset: z.number(),
 });
 
-export const ApiEphemeralGoalProgressSchema = z.object({
-    type: z.literal("goal-progress"),
-    goalId: z.string(),
-    projectId: z.string(),
-    status: z.string(),
-    progress: z.number(),
-});
 
 export const ApiEphemeralTaskStatusChangedSchema = z.object({
     type: z.literal("task-status-changed"),
@@ -398,12 +390,10 @@ export const ApiEphemeralUpdateSchema = z.union([
   ApiEphemeralKnowledgeCountSchema,
   ApiEphemeralKnowledgeAccessUpdateSchema,
   ApiEphemeralTaskLogSchema,
-  ApiEphemeralGoalProgressSchema,
   ApiEphemeralTaskStatusChangedSchema,
   ApiEphemeralInboxNewItemSchema,
   ApiEphemeralInboxUnreadCountSchema,
   ApiEphemeralSessionEventCreatedSchema,
-  ApiEphemeralWorldSuggestionUpdatedSchema,
 ]);
 
 export type ApiEphemeralActivityUpdate = z.infer<

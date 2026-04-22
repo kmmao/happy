@@ -41,8 +41,6 @@ interface EmitResolvedSupervisorRunTriggerInput {
     maxConcurrentAnalysis?: number;
     maxConcurrentFix?: number;
     maxFindings?: number;
-    narrative?: string;
-    laws?: string;
 }
 
 interface EmitConfiguredSupervisorRunTriggerInput
@@ -84,8 +82,6 @@ export async function emitResolvedSupervisorRunTrigger(
             maxConcurrentAnalysis: input.maxConcurrentAnalysis,
             maxConcurrentFix: input.maxConcurrentFix,
             maxFindings: input.maxFindings,
-            narrative: input.narrative,
-            laws: input.laws,
             runtimeProfile: input.resolvedProfile.runtimeProfile,
         }),
         recipientFilter: {

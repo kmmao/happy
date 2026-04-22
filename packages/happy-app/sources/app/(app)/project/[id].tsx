@@ -1,7 +1,7 @@
 import * as React from "react";
 import { View, Text } from "react-native";
 import { useLocalSearchParams, useNavigation } from "expo-router";
-import { StyleSheet, useUnistyles } from "react-native-unistyles";
+import { StyleSheet } from "react-native-unistyles";
 import { Typography } from "@/constants/Typography";
 import { useProject } from "@/hooks/useProjects";
 import { getProjectDisplayName } from "@/sync/projectManager";
@@ -34,7 +34,6 @@ function ProjectDetailScreen() {
 
     const initialTab = resolveProjectDetailInitialTab({
         requestedTab: tab,
-        worldModelEnabled: true,
         knowledgeBaseEnabled: true,
     });
 

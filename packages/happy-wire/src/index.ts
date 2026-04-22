@@ -9,8 +9,6 @@ export * from './skills';
 export * from './inbox';
 export * from './sessionEvents';
 export * from './terminal';
-export * from './worldSuggestion';
-export * from './agentMessage';
 export * from './profile';
 export * from './sessionState';
 export * from './happyMcp';
