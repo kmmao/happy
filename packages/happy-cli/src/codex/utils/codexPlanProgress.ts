@@ -1,5 +1,9 @@
 import type { Metadata } from "@/api/types";
 import { didChecklistTransitionToCompleted } from "@/utils/progressAutomation";
+import {
+  buildProgressStateFromLists,
+  capProgressLists,
+} from "@/utils/progressState";
 
 type ProgressState = Metadata["progress"];
 type ProgressCarrier = {
@@ -152,32 +156,19 @@ export function mirrorCodexPlanToProgress<T extends ProgressCarrier>(
     ];
   }
 
-  if (nextLists.length > 20) {
-    const dropIdx = nextLists.findIndex((list) => list.archivedAt);
-    if (dropIdx >= 0) {
-      nextLists = nextLists.filter((_, index) => index !== dropIdx);
-    } else {
-      nextLists = nextLists.slice(-20);
-    }
-  }
-
-  const activeList =
-    nextLists.find((list) => list.id === targetId) ??
-    nextLists[nextLists.length - 1];
+  nextLists = capProgressLists(nextLists);
 
   return {
     wroteProgress: true,
     shouldTriggerAutoSummary,
     metadata: {
       ...metadata,
-      progress: {
+      progress: buildProgressStateFromLists({
         lists: nextLists,
         currentListId: targetId,
-        todos: activeList?.todos ?? todos,
-        currentStage: activeList?.currentStage,
-        blockers: activeList?.blockers,
         updatedAt: now,
-      },
+        fallbackTodos: todos,
+      }),
     },
   };
 }
@@ -223,10 +214,13 @@ export function appendCodexToolCallIdToPlanList<T extends ProgressCarrier>(
 
   return {
     ...metadata,
-    progress: {
-      ...prior,
+    progress: buildProgressStateFromLists({
       lists: nextLists,
+      currentListId: prior?.currentListId,
       updatedAt: now,
-    },
+      fallbackTodos: prior?.todos,
+      fallbackCurrentStage: prior?.currentStage,
+      fallbackBlockers: prior?.blockers,
+    }),
   };
 }

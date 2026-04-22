@@ -3,6 +3,10 @@ import { randomUUID } from "node:crypto";
 import type { Metadata } from "@/api/types";
 import { didChecklistTransitionToCompleted } from "@/utils/progressAutomation";
 import { shouldStartNewProgressList } from "@/utils/progressListBoundary";
+import {
+  buildProgressStateFromLists,
+  capProgressLists,
+} from "@/utils/progressState";
 
 type ProgressState = NonNullable<Metadata["progress"]>;
 type ProgressList = NonNullable<ProgressState["lists"]>[number];
@@ -21,18 +25,6 @@ export interface ApplyHappyProgressUpdateInput {
 export interface ApplyHappyProgressUpdateResult<T extends Metadata> {
   metadata: T;
   shouldTriggerAutoSummary: boolean;
-}
-
-function capLists(lists: ProgressList[]): ProgressList[] {
-  if (lists.length <= 20) {
-    return lists;
-  }
-
-  const dropIdx = lists.findIndex((list) => list.archivedAt);
-  if (dropIdx >= 0) {
-    return lists.filter((_, index) => index !== dropIdx);
-  }
-  return lists.slice(-20);
 }
 
 export function applyHappyProgressUpdate<T extends Metadata>(
@@ -135,24 +127,20 @@ export function applyHappyProgressUpdate<T extends Metadata>(
     );
   }
 
-  nextLists = capLists(nextLists);
-
-  const active =
-    nextLists.find((list) => list.id === targetId) ??
-    nextLists[nextLists.length - 1];
+  nextLists = capProgressLists(nextLists);
 
   return {
     shouldTriggerAutoSummary,
     metadata: {
       ...metadata,
-      progress: {
+      progress: buildProgressStateFromLists({
         lists: nextLists,
         currentListId: targetId,
-        todos: active?.todos ?? input.todos,
-        currentStage: active?.currentStage,
-        blockers: active?.blockers,
         updatedAt: now,
-      },
+        fallbackTodos: input.todos,
+        fallbackCurrentStage: input.currentStage,
+        fallbackBlockers: input.blockers,
+      }),
     },
   };
 }

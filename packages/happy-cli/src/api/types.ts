@@ -1,5 +1,11 @@
 import { z } from "zod";
-import type { CodexMetadata, Update, UpdateMachineBody } from "@kmmao/happy-wire";
+import type {
+  CodexMetadata,
+  SessionProgressState,
+  SessionSummaryState,
+  Update,
+  UpdateMachineBody,
+} from "@kmmao/happy-wire";
 import { UsageSchema } from "@/claude/types";
 import type { SandboxConfig } from "@/persistence";
 
@@ -433,61 +439,12 @@ export type Metadata = {
    * Legacy top-level `todos` is kept in sync with `lists[currentListId]`
    * so older readers still see a flat checklist.
    */
-  progress?: {
-    lists?: Array<{
-      id: string;
-      label?: string;
-      todos: Array<{
-        content: string;
-        status: "pending" | "in_progress" | "completed";
-        activeForm?: string;
-        stage?: string;
-        verificationNudgeNeeded?: boolean;
-      }>;
-      currentStage?: string;
-      blockers?: string[];
-      startedAt: number;
-      updatedAt: number;
-      archivedAt?: number;
-      /**
-       * tool_use.id refs for file-editing tools (Edit/Write/MultiEdit/
-       * NotebookEdit) that ran while this list was active. Consumers
-       * resolve these against the session message stream to render
-       * per-list file change summaries.
-       */
-      toolCallIds?: string[];
-      /**
-       * Timestamp at which an auto-summary trigger was dispatched for this
-       * list's completion transition. Dedup flag so the auto-summary hook
-       * fires at most once per list lifecycle.
-       */
-      summaryGeneratedAt?: number;
-    }>;
-    currentListId?: string;
-    // Legacy flat fields — kept for backward compat with older App/CLI:
-    todos?: Array<{
-      content: string;
-      status: "pending" | "in_progress" | "completed";
-      activeForm?: string;
-      stage?: string;
-      verificationNudgeNeeded?: boolean;
-    }>;
-    currentStage?: string;
-    blockers?: string[];
-    updatedAt: number;
-  };
+  progress?: SessionProgressState;
   /**
    * Narrative session summary written by the Agent via the MCP
    * `update_session_summary` tool at milestones.
    */
-  sessionSummary?: {
-    goal: string;
-    currentFocus?: string;
-    keyDecisions?: string[];
-    openQuestions?: string[];
-    impactScope?: string[];
-    updatedAt: number;
-  };
+  sessionSummary?: SessionSummaryState;
   machineId?: string;
   claudeSessionId?: string; // Claude Code session ID
   tools?: string[];

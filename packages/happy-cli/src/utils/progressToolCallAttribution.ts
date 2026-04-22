@@ -1,4 +1,8 @@
 import type { Metadata } from "@/api/types";
+import {
+  buildProgressStateFromLists,
+  resolveCurrentProgressList,
+} from "@/utils/progressState";
 
 type ProgressState = Metadata["progress"];
 type ProgressCarrier = {
@@ -12,26 +16,6 @@ type AppendArgs = {
   now?: number;
 };
 
-function resolveCurrentListIndex(
-  lists: readonly ProgressList[],
-  currentListId: string | undefined,
-): number {
-  if (currentListId) {
-    const direct = lists.findIndex((list) => list.id === currentListId);
-    if (direct >= 0) {
-      return direct;
-    }
-  }
-
-  for (let index = lists.length - 1; index >= 0; index -= 1) {
-    if (!lists[index]?.archivedAt) {
-      return index;
-    }
-  }
-
-  return lists.length - 1;
-}
-
 export function appendToolCallIdToCurrentProgressList<T extends ProgressCarrier>(
   metadata: T,
   args: AppendArgs,
@@ -42,7 +26,10 @@ export function appendToolCallIdToCurrentProgressList<T extends ProgressCarrier>
     return metadata;
   }
 
-  const targetIdx = resolveCurrentListIndex(lists, prior?.currentListId);
+  const targetList = resolveCurrentProgressList(lists, prior?.currentListId);
+  const targetIdx = targetList
+    ? lists.findIndex((list) => list.id === targetList.id)
+    : -1;
   if (targetIdx < 0) {
     return metadata;
   }
@@ -70,10 +57,13 @@ export function appendToolCallIdToCurrentProgressList<T extends ProgressCarrier>
 
   return {
     ...metadata,
-    progress: {
-      ...prior,
+    progress: buildProgressStateFromLists({
       lists: nextLists,
+      currentListId: prior?.currentListId,
       updatedAt: now,
-    },
+      fallbackTodos: prior?.todos,
+      fallbackCurrentStage: prior?.currentStage,
+      fallbackBlockers: prior?.blockers,
+    }),
   };
 }

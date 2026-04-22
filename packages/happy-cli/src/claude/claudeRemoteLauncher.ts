@@ -45,6 +45,10 @@ import { executeShellCommand } from "@/utils/shellCommand";
 import { TurnCollector } from "@/knowledge";
 import type { TurnCollectorConfig } from "@/knowledge";
 import { ExecutionGuard } from "@/automation/ExecutionGuard";
+import {
+  buildProgressStateFromLists,
+  capProgressLists,
+} from "@/utils/progressState";
 
 interface PermissionsField {
   date: number;
@@ -778,31 +782,16 @@ export async function claudeRemoteLauncher(
                   });
                 }
 
-                // Cap at 20 lists — drop the earliest archived one if over.
-                if (nextLists.length > 20) {
-                  const dropIdx = nextLists.findIndex((l) => l.archivedAt);
-                  if (dropIdx >= 0) {
-                    nextLists = nextLists.filter((_, i) => i !== dropIdx);
-                  } else {
-                    nextLists = nextLists.slice(-20);
-                  }
-                }
-
-                const activeList =
-                  nextLists.find((l) => l.id === nextCurrentId) ??
-                  nextLists[nextLists.length - 1];
+                nextLists = capProgressLists(nextLists);
 
                 return {
                   ...m,
-                  progress: {
+                  progress: buildProgressStateFromLists({
                     lists: nextLists,
                     currentListId: nextCurrentId,
-                    // Keep legacy flat mirror in sync for older readers.
-                    todos: activeList?.todos ?? mirrored,
-                    currentStage: activeList?.currentStage,
-                    blockers: activeList?.blockers,
                     updatedAt: now,
-                  },
+                    fallbackTodos: mirrored,
+                  }),
                 };
               });
 
@@ -889,11 +878,14 @@ export async function claudeRemoteLauncher(
             );
             return {
               ...m,
-              progress: {
-                ...prior,
+              progress: buildProgressStateFromLists({
                 lists: nextLists,
+                currentListId: prior?.currentListId,
                 updatedAt: now,
-              },
+                fallbackTodos: prior?.todos,
+                fallbackCurrentStage: prior?.currentStage,
+                fallbackBlockers: prior?.blockers,
+              }),
             };
           });
         }
