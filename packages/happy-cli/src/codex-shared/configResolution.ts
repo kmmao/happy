@@ -4,6 +4,20 @@ export type CodexConfigMode =
   | "managed-overrides";
 
 export const LOCKED_CODEX_MODEL = "gpt-5.4";
+export const SUPPORTED_CODEX_MODELS = [
+  LOCKED_CODEX_MODEL,
+  "gpt-5.3-codex",
+] as const;
+
+function normalizeCodexModel(model: string | undefined): string | undefined {
+  if (!model) {
+    return undefined;
+  }
+
+  return SUPPORTED_CODEX_MODELS.includes(model as (typeof SUPPORTED_CODEX_MODELS)[number])
+    ? model
+    : LOCKED_CODEX_MODEL;
+}
 
 function normalizeCodexReasoningEffort(
   effort: string | undefined,
@@ -49,7 +63,7 @@ export function resolveCodexRuntimeConfigFromEnv(
     configMode,
     profileName: env.HAPPY_CODEX_PROFILE?.trim() || undefined,
     overrides: {
-      model: LOCKED_CODEX_MODEL,
+      model: normalizeCodexModel(env.HAPPY_CODEX_MODEL?.trim() || undefined),
       reasoningEffort: normalizeCodexReasoningEffort(
         env.HAPPY_CODEX_REASONING_EFFORT?.trim() || undefined,
       ),

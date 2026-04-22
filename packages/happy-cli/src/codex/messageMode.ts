@@ -1,5 +1,5 @@
 import type { MessageMeta, PermissionMode } from "@/api/types";
-import { LOCKED_CODEX_MODEL } from "@/codex-shared/configResolution";
+import { SUPPORTED_CODEX_MODELS } from "@/codex-shared/configResolution";
 import { hashObject } from "@/utils/deterministicJson";
 
 function normalizeCodexReasoningEffort(
@@ -17,7 +17,9 @@ function normalizeCodexModel(model: string | null | undefined): string | undefin
     return undefined;
   }
 
-  return LOCKED_CODEX_MODEL;
+  return SUPPORTED_CODEX_MODELS.includes(model as (typeof SUPPORTED_CODEX_MODELS)[number])
+    ? model
+    : undefined;
 }
 
 export interface CodexMessageModeState {

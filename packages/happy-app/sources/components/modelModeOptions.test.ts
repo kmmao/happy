@@ -41,12 +41,22 @@ describe("modelModeOptions", () => {
 
   it("builds codex model fallbacks with translated labels", () => {
     const models = getCodexModelModes(translate);
-    expect(models.map((model) => model.key)).toEqual([LOCKED_CODEX_MODEL]);
-    expect(models[0]).toEqual({
-      key: LOCKED_CODEX_MODEL,
-      name: "tr:agentInput.codexModel.gpt54",
-      description: null,
-    });
+    expect(models.map((model) => model.key)).toEqual([
+      LOCKED_CODEX_MODEL,
+      "gpt-5.3-codex",
+    ]);
+    expect(models).toEqual([
+      {
+        key: LOCKED_CODEX_MODEL,
+        name: "tr:agentInput.codexModel.gpt54",
+        description: null,
+      },
+      {
+        key: "gpt-5.3-codex",
+        name: "tr:agentInput.codexModel.gpt53Codex",
+        description: null,
+      },
+    ]);
   });
 
   it("prefers metadata models over hardcoded fallbacks", () => {
@@ -73,7 +83,7 @@ describe("modelModeOptions", () => {
     ]);
   });
 
-  it("pins Codex to GPT-5.4 even when metadata reports other models", () => {
+  it("uses hardcoded Codex options even when metadata reports other models", () => {
     const models = getAvailableModels(
       "codex",
       {
@@ -99,10 +109,15 @@ describe("modelModeOptions", () => {
         name: "tr:agentInput.codexModel.gpt54",
         description: null,
       },
+      {
+        key: "gpt-5.3-codex",
+        name: "tr:agentInput.codexModel.gpt53Codex",
+        description: null,
+      },
     ]);
   });
 
-  it("ignores Codex custom model lists and keeps GPT-5.4 only", () => {
+  it("ignores Codex custom model lists and keeps hardcoded options", () => {
     const models = getAvailableModels(
       "codex",
       null,
@@ -116,6 +131,11 @@ describe("modelModeOptions", () => {
       {
         key: "gpt-5.4",
         name: "tr:agentInput.codexModel.gpt54",
+        description: null,
+      },
+      {
+        key: "gpt-5.3-codex",
+        name: "tr:agentInput.codexModel.gpt53Codex",
         description: null,
       },
     ]);

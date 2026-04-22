@@ -77,7 +77,22 @@ describe('resolveCodexMessageMode', () => {
     expect(result.next.reasoningEffort).toBeUndefined();
   });
 
-  it('normalizes any non-5.4 Codex model back to GPT-5.4', () => {
+  it('keeps supported Codex models from current and message metadata', () => {
+    const result = resolveCodexMessageMode({
+      current: {
+        permissionMode: 'default',
+        model: 'gpt-5.3-codex',
+      },
+      meta: {
+        model: 'gpt-5.3-codex',
+      } as MessageMeta,
+    });
+
+    expect(result.mode.model).toBe('gpt-5.3-codex');
+    expect(result.next.model).toBe('gpt-5.3-codex');
+  });
+
+  it('clears unsupported Codex model overrides', () => {
     const result = resolveCodexMessageMode({
       current: {
         permissionMode: 'default',
@@ -88,8 +103,8 @@ describe('resolveCodexMessageMode', () => {
       } as MessageMeta,
     });
 
-    expect(result.mode.model).toBe('gpt-5.4');
-    expect(result.next.model).toBe('gpt-5.4');
+    expect(result.mode.model).toBeUndefined();
+    expect(result.next.model).toBeUndefined();
   });
 });
 

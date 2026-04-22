@@ -47,7 +47,7 @@ import {
   getAvailablePermissionModes,
   getDefaultModelKey,
   getDefaultPermissionModeKey,
-  LOCKED_CODEX_MODEL,
+  SUPPORTED_CODEX_MODELS,
   resolveCurrentOption,
 } from "@/components/modelModeOptions";
 import {
@@ -116,7 +116,11 @@ function filterSelectableModelsForNewSession(
     return models;
   }
 
-  return models.filter((model) => model.key === LOCKED_CODEX_MODEL);
+  return models.filter((model) =>
+    SUPPORTED_CODEX_MODELS.includes(
+      model.key as (typeof SUPPORTED_CODEX_MODELS)[number],
+    ),
+  );
 }
 
 export const callbacks = {

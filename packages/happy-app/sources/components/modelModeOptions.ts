@@ -22,6 +22,10 @@ export type AgentFlavor =
   | undefined;
 
 export const LOCKED_CODEX_MODEL = "gpt-5.4";
+export const SUPPORTED_CODEX_MODELS = [
+  LOCKED_CODEX_MODEL,
+  "gpt-5.3-codex",
+] as const;
 
 type Translate = (key: any) => string;
 
@@ -225,6 +229,11 @@ export function getCodexModelModes(translate: Translate): ModelMode[] {
     {
       key: LOCKED_CODEX_MODEL,
       name: translate("agentInput.codexModel.gpt54"),
+      description: null,
+    },
+    {
+      key: "gpt-5.3-codex",
+      name: translate("agentInput.codexModel.gpt53Codex"),
       description: null,
     },
   ];
