@@ -263,7 +263,9 @@ describe("resolveChecklist", () => {
             },
         );
         expect(result.source).toBe("mcp");
+        expect(result.listId).toBe("legacy-progress");
         expect(result.todos).toHaveLength(2);
+        expect(result.label).toBe("A");
         expect(result.currentStage).toBe("Phase 2");
         expect(result.updatedAt).toBe(1000);
     });
@@ -296,7 +298,47 @@ describe("resolveChecklist", () => {
                 todosUpdatedAt: 100,
             },
         );
-        expect(result.source).toBe("todowrite");
+        expect(result).toEqual({
+            source: "mcp",
+            listId: "legacy-progress",
+            todos: [],
+            updatedAt: 900,
+            label: undefined,
+            currentStage: undefined,
+            blockers: undefined,
+        });
+    });
+
+    it("keeps an explicitly empty active list instead of reviving stale TodoWrite data", () => {
+        const result = resolveChecklist(
+            {
+                lists: [
+                    {
+                        id: "list-1",
+                        label: "Current phase",
+                        todos: [],
+                        startedAt: 100,
+                        updatedAt: 200,
+                    },
+                ],
+                currentListId: "list-1",
+                updatedAt: 200,
+            },
+            {
+                todos: [{ content: "stale fallback", status: "in_progress" }],
+                todosUpdatedAt: 50,
+            },
+        );
+
+        expect(result).toEqual({
+            source: "mcp",
+            listId: "list-1",
+            todos: [],
+            updatedAt: 200,
+            label: "Current phase",
+            currentStage: undefined,
+            blockers: undefined,
+        });
     });
 });
 
@@ -422,12 +464,24 @@ describe("resolveChecklist with multi-list metadata", () => {
 describe("getChecklistTabs", () => {
     it("returns empty when no multi-list metadata present", () => {
         expect(getChecklistTabs(undefined)).toEqual([]);
+    });
+
+    it("normalizes legacy flat progress into a synthetic tab", () => {
         expect(
             getChecklistTabs({
                 todos: [{ content: "x", status: "pending" }],
                 updatedAt: 100,
             }),
-        ).toEqual([]);
+        ).toEqual([
+            {
+                id: "legacy-progress",
+                label: "x",
+                active: true,
+                completed: 0,
+                total: 1,
+                updatedAt: 100,
+            },
+        ]);
     });
 
     it("flags the current list as active and counts completion", () => {

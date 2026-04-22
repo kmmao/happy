@@ -2,6 +2,10 @@ import React from "react";
 import { Ionicons } from "@expo/vector-icons";
 import { Item } from "@/components/Item";
 import { ItemGroup } from "@/components/ItemGroup";
+import {
+    buildSessionSummaryRefreshDebugText,
+    resolveSessionSummaryRefreshDebugState,
+} from "@/components/session/sessionSummaryRefreshPresentation";
 import { t } from "@/text";
 import type { Session } from "@/sync/storageTypes";
 import {
@@ -85,6 +89,23 @@ export function SessionMetadataSection({
     if (!session.metadata) {
         return null;
     }
+
+    const summaryRefreshDebug = resolveSessionSummaryRefreshDebugState(
+        session.metadata.sessionSummaryRefresh,
+    );
+    const summaryRefreshSubtitle = summaryRefreshDebug
+        ? buildSessionSummaryRefreshDebugText(summaryRefreshDebug, {
+            relativeTimeLabel: new Date(
+                summaryRefreshDebug.timestamp,
+            ).toLocaleString(),
+            pending: (params) =>
+                t("session.progressSummaryRefreshPendingDebug", params),
+            applied: (params) =>
+                t("session.progressSummaryRefreshAppliedDebug", params),
+            superseded: (params) =>
+                t("session.progressSummaryRefreshSupersededDebug", params),
+        })
+        : null;
 
     return (
         <ItemGroup title={t("sessionInfo.metadata")}>
@@ -193,6 +214,15 @@ export function SessionMetadataSection({
                             color="#5856D6"
                         />
                     }
+                    showChevron={false}
+                />
+            )}
+            {summaryRefreshSubtitle && (
+                <Item
+                    title={t("sessionInfo.summaryRefresh")}
+                    subtitle={summaryRefreshSubtitle}
+                    detail={`v${session.metadata.sessionSummaryRefresh?.protocolVersion ?? 1}`}
+                    icon={<Ionicons name="refresh-outline" size={29} color="#5856D6" />}
                     showChevron={false}
                 />
             )}

@@ -692,16 +692,36 @@ export const es: TranslationStructure = {
     progressSummaryRefreshPrompt:
       "Por favor llama a mcp__happy__update_session_summary para registrar el resumen de la sesión: goal, currentFocus, keyDecisions (si hay), openQuestions (si hay), impactScope (si hay). Preciso y conciso.",
     progressSummaryEmpty: "Aún no hay resumen. Pulsa «Actualizar» para que el agente lo escriba.",
+    progressSummaryRefreshPendingDebug: ({ requestId, time }: { requestId: string; time: string }) =>
+      `Actualización del resumen pendiente · ${requestId} · ${time}`,
+    progressSummaryRefreshAppliedDebug: ({ requestId, time }: { requestId: string; time: string }) =>
+      `Última actualización del resumen aplicada · ${requestId} · ${time}`,
+    progressSummaryRefreshSupersededDebug: ({ requestId, time }: { requestId: string; time: string }) =>
+      `Última actualización del resumen reemplazada · ${requestId} · ${time}`,
     progressTodoActionMessage: "Elige una acción para este elemento",
     progressTodoActionVerify: "Verificar",
     progressTodoActionContinue: "Continuar",
     progressTodoActionIssue: "Reportar problema",
-    progressTodoPromptVerify: ({ content }: { content: string }) =>
-      `Por favor verifica si la tarea "${content}" realmente está completa. Lista las evidencias (archivos, pruebas, comandos). Si falta algo, llama a mcp__happy__update_progress para volver a marcarla como in_progress o pending.`,
-    progressTodoPromptContinue: ({ content }: { content: string }) =>
-      `Por favor trabaja ahora en "${content}" (continúa desde donde lo dejaste). Cuando haya progreso, llama a mcp__happy__update_progress para actualizar su estado.`,
-    progressTodoPromptIssue: ({ content }: { content: string }) =>
-      `La tarea "${content}" está marcada como completa, pero creo que no lo está. Razón: [añade la tuya]. Revísalo; si estás de acuerdo, llama a mcp__happy__update_progress para volver a in_progress o pending.`,
+    progressTodoPromptVerifyCompleted: ({ content }: { content: string }) =>
+      `Verifica si "${content}" está realmente completada. Cita evidencias (archivos, pruebas, comandos). Si no está completada, reescribe tu checklist de TodoWrite para reflejar la realidad.`,
+    progressTodoPromptVerifyActive: ({ content }: { content: string }) =>
+      `Verifica el estado actual de "${content}". Cita las evidencias más recientes (archivos, pruebas, comandos). Si el estado es incorrecto o hay bloqueos, reescribe tu checklist de TodoWrite para reflejar la realidad.`,
+    progressTodoPromptContinueTodoWrite: ({ content }: { content: string }) =>
+      `Sigue trabajando en "${content}" desde el estado actual. Cuando cambie el estado o aparezcan bloqueos, reescribe tu checklist de TodoWrite para que la pestaña Progress siga siendo precisa.`,
+    progressTodoPromptIssueCompleted: ({ content }: { content: string }) =>
+      `Creo que "${content}" se marcó como completada demasiado pronto. Revísala otra vez, explica qué falta y reescribe tu checklist de TodoWrite si el estado debe cambiar.`,
+    progressTodoPromptIssueActive: ({ content }: { content: string }) =>
+      `Creo que el estado actual de "${content}" es incorrecto o incompleto. Reevalúalo, explica el problema o bloqueo y reescribe tu checklist de TodoWrite si hace falta.`,
+    progressTodoPromptVerifyCompletedCodex: ({ content }: { content: string }) =>
+      `Verifica si "${content}" está realmente completada. Cita evidencias (archivos, pruebas, comandos). Si no está completada, llama a mcp__happy__update_progress para corregir el estado de la checklist.`,
+    progressTodoPromptVerifyActiveCodex: ({ content }: { content: string }) =>
+      `Verifica el estado actual de "${content}". Cita las evidencias más recientes (archivos, pruebas, comandos). Si el estado es incorrecto o hay bloqueos, llama a mcp__happy__update_progress para corregir la checklist, blockers o currentStage.`,
+    progressTodoPromptContinueCodex: ({ content }: { content: string }) =>
+      `Sigue trabajando en "${content}" desde el estado actual. Cuando cambie el estado o aparezcan bloqueos, llama a mcp__happy__update_progress para que la pestaña Progress siga siendo precisa.`,
+    progressTodoPromptIssueCompletedCodex: ({ content }: { content: string }) =>
+      `Creo que "${content}" se marcó como completada demasiado pronto. Revísala otra vez, explica qué falta y llama a mcp__happy__update_progress si el estado debe cambiar.`,
+    progressTodoPromptIssueActiveCodex: ({ content }: { content: string }) =>
+      `Creo que el estado actual de "${content}" es incorrecto o incompleto. Reevalúalo, explica el problema o bloqueo y llama a mcp__happy__update_progress si hace falta.`,
     knowledgeTabArchive: "Archivo",
     knowledgeArchiveSubtitle: "Entradas referenciadas en esta sesión y archivadas o reemplazadas globalmente",
     knowledgeArchiveEmpty: "No hay entradas archivadas referenciadas en esta sesión",
@@ -893,6 +913,7 @@ export const es: TranslationStructure = {
     agentState: "Estado del agente",
     controlledByUser: "Controlado por el usuario",
     pendingRequests: "Solicitudes pendientes",
+    summaryRefresh: "Actualización del resumen",
     activity: "Actividad",
     thinking: "Pensando",
     thinkingSince: "Pensando desde",

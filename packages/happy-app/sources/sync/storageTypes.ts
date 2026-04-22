@@ -1,5 +1,10 @@
 import { z } from "zod";
-import { CodexMetadataSchema } from "@kmmao/happy-wire";
+import {
+  CodexMetadataSchema,
+  sessionProgressStateSchema,
+  sessionSummaryRefreshStateSchema,
+  sessionSummaryStateSchema,
+} from "@kmmao/happy-wire";
 
 //
 // Agent states
@@ -50,64 +55,9 @@ export const MetadataSchema = z.object({
       updatedAt: z.number(),
     })
     .optional(),
-  progress: z
-    .object({
-      // Multi-list shape (new). A session can contain multiple task list
-      // generations; auto-mirror hook partitions them at task boundaries.
-      lists: z
-        .array(
-          z.object({
-            id: z.string(),
-            label: z.string().optional(),
-            todos: z.array(
-              z.object({
-                content: z.string(),
-                status: z.enum(["pending", "in_progress", "completed"]),
-                activeForm: z.string().optional(),
-                stage: z.string().optional(),
-                verificationNudgeNeeded: z.boolean().optional(),
-              }),
-            ),
-            currentStage: z.string().optional(),
-            blockers: z.array(z.string()).optional(),
-            startedAt: z.number(),
-            updatedAt: z.number(),
-            archivedAt: z.number().optional(),
-            // tool_use.id refs for Edit/Write/MultiEdit/NotebookEdit that
-            // ran while this list was active. Resolved against session
-            // messages to render per-list file change summaries.
-            toolCallIds: z.array(z.string()).optional(),
-          }),
-        )
-        .optional(),
-      currentListId: z.string().optional(),
-      // Legacy flat fields — still populated for backward compat.
-      todos: z
-        .array(
-          z.object({
-            content: z.string(),
-            status: z.enum(["pending", "in_progress", "completed"]),
-            activeForm: z.string().optional(),
-            stage: z.string().optional(),
-            verificationNudgeNeeded: z.boolean().optional(),
-          }),
-        )
-        .optional(),
-      currentStage: z.string().optional(),
-      blockers: z.array(z.string()).optional(),
-      updatedAt: z.number(),
-    })
-    .optional(),
-  sessionSummary: z
-    .object({
-      goal: z.string(),
-      currentFocus: z.string().optional(),
-      keyDecisions: z.array(z.string()).optional(),
-      openQuestions: z.array(z.string()).optional(),
-      impactScope: z.array(z.string()).optional(),
-      updatedAt: z.number(),
-    })
-    .optional(),
+  progress: sessionProgressStateSchema.optional(),
+  sessionSummary: sessionSummaryStateSchema.optional(),
+  sessionSummaryRefresh: sessionSummaryRefreshStateSchema.optional(),
   machineId: z.string().optional(),
   claudeSessionId: z.string().optional(), // Claude Code session ID
   tools: z.array(z.string()).optional(),

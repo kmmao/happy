@@ -92,6 +92,8 @@ export const CodexPlanSection = React.memo<CodexPlanSectionProps>(
         null,
       [tabs, selectedListId, plan.listId],
     );
+    const hasPlanState = plan.source !== "none";
+    const showMetaRow = hasPlanState || !!focusLabel || (tabs.length > 1 && !!selectedTab);
     const explanation = React.useMemo(() => {
       if (!plan.explanation) {
         return null;
@@ -254,63 +256,67 @@ export const CodexPlanSection = React.memo<CodexPlanSectionProps>(
           ) : null}
         </View>
 
-        {plan.todos.length > 0 ? (
-          <View
-            style={[
-              styles.body,
-              {
-                paddingHorizontal: theme.codex.spacing.cardPadding + 2,
-                paddingBottom: theme.codex.spacing.cardPadding + 2,
-                gap: theme.codex.spacing.sectionGap,
-              },
-            ]}
-          >
+        <View
+          style={[
+            styles.body,
+            {
+              paddingHorizontal: theme.codex.spacing.cardPadding + 2,
+              paddingBottom: theme.codex.spacing.cardPadding + 2,
+              gap: theme.codex.spacing.sectionGap,
+            },
+          ]}
+        >
+          {showMetaRow ? (
             <View style={styles.metaRow}>
-              <View
-                style={[
-                  styles.sourceChip,
-                  {
-                    borderColor: theme.colors.codex.chipBorder,
-                    backgroundColor: theme.colors.codex.chipBg,
-                    borderRadius: theme.codex.radius.chip,
-                    paddingHorizontal: theme.codex.spacing.chipX,
-                    paddingVertical: theme.codex.spacing.chipY,
-                  },
-                ]}
-              >
-                <Text
+              {hasPlanState ? (
+                <View
                   style={[
-                    styles.sourceChipText,
-                    { color: theme.colors.codex.chipText },
+                    styles.sourceChip,
+                    {
+                      borderColor: theme.colors.codex.chipBorder,
+                      backgroundColor: theme.colors.codex.chipBg,
+                      borderRadius: theme.codex.radius.chip,
+                      paddingHorizontal: theme.codex.spacing.chipX,
+                      paddingVertical: theme.codex.spacing.chipY,
+                    },
                   ]}
                 >
-                  {t(getCodexPlanSourceLabelKey(plan.source))}
-                </Text>
-              </View>
-              <View
-                style={[
-                  styles.countChip,
-                  {
-                    borderColor: theme.colors.codex.borderSoft,
-                    backgroundColor: theme.colors.codex.sectionBgElevated,
-                    borderRadius: theme.codex.radius.chip,
-                    paddingHorizontal: theme.codex.spacing.chipX,
-                    paddingVertical: theme.codex.spacing.chipY,
-                  },
-                ]}
-              >
-                <Text
+                  <Text
+                    style={[
+                      styles.sourceChipText,
+                      { color: theme.colors.codex.chipText },
+                    ]}
+                  >
+                    {t(getCodexPlanSourceLabelKey(plan.source))}
+                  </Text>
+                </View>
+              ) : null}
+              {hasPlanState ? (
+                <View
                   style={[
-                    styles.countChipText,
-                    { color: theme.colors.codex.textSecondary },
+                    styles.countChip,
+                    {
+                      borderColor: theme.colors.codex.borderSoft,
+                      backgroundColor: theme.colors.codex.sectionBgElevated,
+                      borderRadius: theme.codex.radius.chip,
+                      paddingHorizontal: theme.codex.spacing.chipX,
+                      paddingVertical: theme.codex.spacing.chipY,
+                    },
                   ]}
                 >
-                  {t("session.progressTodosCount", {
-                    done: counts.completed,
-                    total: counts.total,
-                  })}
-                </Text>
-              </View>
+                  <Text
+                    style={[
+                      styles.countChipText,
+                      { color: theme.colors.codex.textSecondary },
+                    ]}
+                  >
+                    {t("session.progressTodosCount", {
+                      done: counts.completed,
+                      total: counts.total,
+                    })}
+                  </Text>
+                </View>
+              ) : null}
               {focusLabel ? (
                 <View
                   style={[
@@ -364,92 +370,103 @@ export const CodexPlanSection = React.memo<CodexPlanSectionProps>(
                 </View>
               ) : null}
             </View>
+          ) : null}
 
-            {explanation ? (
-              <View
-                style={[
-                  styles.explanationCard,
-                  {
-                    borderColor: theme.colors.codex.borderSoft,
-                    backgroundColor: theme.colors.codex.sectionBgElevated,
-                    borderRadius: theme.codex.radius.card + 2,
-                    paddingHorizontal: theme.codex.spacing.cardPadding,
-                    paddingVertical: theme.codex.spacing.cardPadding - 2,
-                  },
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.explanationText,
-                    { color: theme.colors.codex.textSecondary },
-                  ]}
-                >
-                  {explanation}
-                </Text>
-              </View>
-            ) : null}
-
+          {explanation ? (
             <View
               style={[
-                styles.progressTrack,
-                { backgroundColor: theme.colors.codex.borderSoft },
+                styles.explanationCard,
+                {
+                  borderColor: theme.colors.codex.borderSoft,
+                  backgroundColor: theme.colors.codex.sectionBgElevated,
+                  borderRadius: theme.codex.radius.card + 2,
+                  paddingHorizontal: theme.codex.spacing.cardPadding,
+                  paddingVertical: theme.codex.spacing.cardPadding - 2,
+                },
               ]}
             >
+              <Text
+                style={[
+                  styles.explanationText,
+                  { color: theme.colors.codex.textSecondary },
+                ]}
+              >
+                {explanation}
+              </Text>
+            </View>
+          ) : null}
+
+          {plan.todos.length > 0 ? (
+            <>
               <View
                 style={[
-                  styles.progressFill,
-                  {
-                    backgroundColor: theme.colors.codex.accent,
-                    width: `${Math.round(counts.completionRatio * 100)}%`,
-                  },
+                  styles.progressTrack,
+                  { backgroundColor: theme.colors.codex.borderSoft },
                 ]}
-              />
-            </View>
+              >
+                <View
+                  style={[
+                    styles.progressFill,
+                    {
+                      backgroundColor: theme.colors.codex.accent,
+                      width: `${Math.round(counts.completionRatio * 100)}%`,
+                    },
+                  ]}
+                />
+              </View>
 
-            <View style={styles.todoList}>
-              {plan.todos.map((todo, index) => {
-                const meta = getTodoMeta(theme, todo.status);
-                const displayContent =
-                  todo.status === "in_progress" && todo.activeForm
-                    ? todo.activeForm
-                    : todo.content;
-                return (
-                  <Pressable
-                    key={`${index}-${todo.content}`}
-                    onPress={() => onTodoTap(todo)}
-                    style={[
-                      styles.todoRow,
-                      {
-                        borderColor: theme.colors.codex.borderSoft,
-                        backgroundColor: theme.colors.codex.sectionBgElevated,
-                        borderRadius: theme.codex.radius.card + 2,
-                        paddingHorizontal: theme.codex.spacing.cardPadding,
-                        paddingVertical: theme.codex.spacing.cardPadding - 2,
-                        gap: theme.codex.spacing.cardGap,
-                      },
-                    ]}
-                    accessibilityRole="button"
-                    accessibilityLabel={todo.content}
-                  >
-                    <Ionicons
-                      name={meta.icon}
-                      size={16}
-                      color={meta.color}
-                    />
-                    <Text
-                      style={[styles.todoText, { color: theme.colors.codex.textPrimary }]}
+              <View style={styles.todoList}>
+                {plan.todos.map((todo, index) => {
+                  const meta = getTodoMeta(theme, todo.status);
+                  const displayContent =
+                    todo.status === "in_progress" && todo.activeForm
+                      ? todo.activeForm
+                      : todo.content;
+                  return (
+                    <Pressable
+                      key={`${index}-${todo.content}`}
+                      onPress={() => onTodoTap(todo)}
+                      style={[
+                        styles.todoRow,
+                        {
+                          borderColor: theme.colors.codex.borderSoft,
+                          backgroundColor: theme.colors.codex.sectionBgElevated,
+                          borderRadius: theme.codex.radius.card + 2,
+                          paddingHorizontal: theme.codex.spacing.cardPadding,
+                          paddingVertical: theme.codex.spacing.cardPadding - 2,
+                          gap: theme.codex.spacing.cardGap,
+                        },
+                      ]}
+                      accessibilityRole="button"
+                      accessibilityLabel={todo.content}
                     >
-                      {displayContent}
-                    </Text>
-                    <Ionicons
-                      name="ellipsis-horizontal"
-                      size={14}
-                      color={theme.colors.codex.textMuted}
-                    />
-                  </Pressable>
-                );
-              })}
-            </View>
+                      <Ionicons
+                        name={meta.icon}
+                        size={16}
+                        color={meta.color}
+                      />
+                      <Text
+                        style={[styles.todoText, { color: theme.colors.codex.textPrimary }]}
+                      >
+                        {displayContent}
+                      </Text>
+                      <Ionicons
+                        name="ellipsis-horizontal"
+                        size={14}
+                        color={theme.colors.codex.textMuted}
+                      />
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </>
+          ) : (
+            <Text
+              style={[styles.emptyText, { color: theme.colors.codex.textSecondary }]}
+            >
+              {t("session.progressTodosEmpty")}
+            </Text>
+          )}
 
             {plan.blockers?.length ? (
               <View
@@ -518,14 +535,7 @@ export const CodexPlanSection = React.memo<CodexPlanSectionProps>(
                 </View>
               </View>
             ) : null}
-          </View>
-        ) : (
-          <Text
-            style={[styles.emptyText, { color: theme.colors.codex.textSecondary }]}
-          >
-            {t("session.progressTodosEmpty")}
-          </Text>
-        )}
+        </View>
       </View>
     );
   },

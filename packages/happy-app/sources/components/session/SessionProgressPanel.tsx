@@ -18,7 +18,15 @@ import {
     type ChecklistTab,
     type ProgressTodo,
 } from "./sessionProgressData";
-import { getProgressRefreshPromptKey } from "./sessionProgressPrompts";
+import {
+    getProgressRefreshPromptKey,
+} from "./sessionProgressPrompts";
+import { buildProgressTodoActionSheet } from "./sessionProgressTodoActions";
+import {
+    buildSessionSummaryRefreshDebugText,
+    resolveSessionSummaryRefreshDebugState,
+    type SessionSummaryRefreshDebugState,
+} from "./sessionSummaryRefreshPresentation";
 import {
     FileChangeItem,
 } from "./SidePanelCodeTab";
@@ -248,57 +256,14 @@ export const SessionProgressPanel = React.memo<SessionProgressPanelProps>(
 
         const handleTodoTap = React.useCallback(
             (todo: ProgressTodo) => {
-                const content = todo.content;
-                // Per-status action set — skip actions whose semantics don't fit:
-                //   completed:   verify + issue            (no "continue" on done)
-                //   in_progress: verify + continue + issue (full set)
-                //   pending:     continue + issue          (no "verify" — nothing done yet)
-                const showVerify = todo.status !== "pending";
-                const showContinue = todo.status !== "completed";
-
-                const buttons = [
-                    ...(showVerify
-                        ? [
-                              {
-                                  text: t("session.progressTodoActionVerify"),
-                                  onPress: () =>
-                                      appendToInput(
-                                          t("session.progressTodoPromptVerify", { content }),
-                                      ),
-                              },
-                          ]
-                        : []),
-                    ...(showContinue
-                        ? [
-                              {
-                                  text: t("session.progressTodoActionContinue"),
-                                  onPress: () =>
-                                      appendToInput(
-                                          t("session.progressTodoPromptContinue", { content }),
-                                      ),
-                              },
-                          ]
-                        : []),
-                    {
-                        text: t("session.progressTodoActionIssue"),
-                        style: "destructive" as const,
-                        onPress: () =>
-                            appendToInput(
-                                t("session.progressTodoPromptIssue", { content }),
-                            ),
-                    },
-                    {
-                        text: t("common.cancel"),
-                        style: "cancel" as const,
-                    },
-                ];
-                Modal.alert(
-                    content.length > 80 ? content.slice(0, 79) + "…" : content,
-                    t("session.progressTodoActionMessage"),
-                    buttons,
-                );
+                const sheet = buildProgressTodoActionSheet({
+                    todo,
+                    flavor: session?.metadata?.flavor,
+                    appendToInput,
+                });
+                Modal.alert(sheet.title, sheet.message, sheet.buttons);
             },
-            [appendToInput],
+            [appendToInput, session?.metadata?.flavor],
         );
 
         // Tick every 30s so relative time labels stay fresh without re-rendering
@@ -333,6 +298,13 @@ export const SessionProgressPanel = React.memo<SessionProgressPanelProps>(
         );
         const counts = React.useMemo(() => countTodoProgress(checklist.todos), [checklist.todos]);
         const summary = session?.metadata?.sessionSummary;
+        const summaryRefreshDebug = React.useMemo(
+            () =>
+                resolveSessionSummaryRefreshDebugState(
+                    session?.metadata?.sessionSummaryRefresh,
+                ),
+            [session?.metadata?.sessionSummaryRefresh],
+        );
         const codexPlan = React.useMemo(
             () => resolveCodexPlanData(checklist, messages),
             [checklist, messages],
@@ -396,6 +368,7 @@ export const SessionProgressPanel = React.memo<SessionProgressPanelProps>(
         );
 
         const hasTodos = checklist.todos.length > 0;
+        const hasChecklistState = checklist.source !== "none";
         const hasFootprint = data.toolCalls > 0 || data.userTurns > 0 || data.agentTurns > 0;
 
         return (
@@ -411,6 +384,7 @@ export const SessionProgressPanel = React.memo<SessionProgressPanelProps>(
                     <>
                         <CodexSummarySection
                             summary={summary}
+                            summaryRefreshDebug={summaryRefreshDebug}
                             onRefresh={handleRefreshSummary}
                             nowMs={nowMs}
                         />
@@ -435,6 +409,7 @@ export const SessionProgressPanel = React.memo<SessionProgressPanelProps>(
                     <>
                         <SummaryCard
                             summary={summary}
+                            summaryRefreshDebug={summaryRefreshDebug}
                             onRefresh={handleRefreshSummary}
                             nowMs={nowMs}
                         />
@@ -449,15 +424,17 @@ export const SessionProgressPanel = React.memo<SessionProgressPanelProps>(
                                 <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
                                     {t("session.progressTodosSection")}
                                 </Text>
-                                {hasTodos && (
+                                {hasChecklistState && (
                                     <>
                                         <SourceBadge source={checklist.source} />
-                                        <Text style={[styles.sectionCount, { color: theme.colors.textSecondary }]}>
-                                            {t("session.progressTodosCount", {
-                                                done: counts.completed,
-                                                total: counts.total,
-                                            })}
-                                        </Text>
+                                        {hasTodos && (
+                                            <Text style={[styles.sectionCount, { color: theme.colors.textSecondary }]}>
+                                                {t("session.progressTodosCount", {
+                                                    done: counts.completed,
+                                                    total: counts.total,
+                                                })}
+                                            </Text>
+                                        )}
                                     </>
                                 )}
                                 <Pressable
@@ -489,7 +466,7 @@ export const SessionProgressPanel = React.memo<SessionProgressPanelProps>(
                                     }
                                 />
                             )}
-                            {hasTodos && checklist.updatedAt !== null && (
+                            {checklist.updatedAt !== null && (
                                 <Text style={[styles.timeHint, { color: theme.colors.textSecondary }]}>
                                     {formatRelativeTime(checklist.updatedAt, nowMs)}
                                     {checklist.label ? ` · ${checklist.label}` : ""}
@@ -759,17 +736,40 @@ interface SummaryCardProps {
               updatedAt: number;
           }
         | undefined;
+    summaryRefreshDebug: SessionSummaryRefreshDebugState | null;
     onRefresh: () => void;
     nowMs: number;
 }
 
 const SummaryCard = React.memo<SummaryCardProps>(function SummaryCard({
     summary,
+    summaryRefreshDebug,
     onRefresh,
     nowMs,
 }) {
     const { theme } = useUnistyles();
     const [expanded, setExpanded] = React.useState(false);
+    const refreshDebugText = React.useMemo(
+        () =>
+            summaryRefreshDebug
+                ? buildSessionSummaryRefreshDebugText(summaryRefreshDebug, {
+                    relativeTimeLabel: formatRelativeTime(
+                        summaryRefreshDebug.timestamp,
+                        nowMs,
+                    ),
+                    pending: (params) =>
+                        t("session.progressSummaryRefreshPendingDebug", params),
+                    applied: (params) =>
+                        t("session.progressSummaryRefreshAppliedDebug", params),
+                    superseded: (params) =>
+                        t(
+                            "session.progressSummaryRefreshSupersededDebug",
+                            params,
+                        ),
+                })
+                : null,
+        [summaryRefreshDebug, nowMs],
+    );
     const hasDetails = !!summary && (
         (summary.keyDecisions && summary.keyDecisions.length > 0) ||
         (summary.openQuestions && summary.openQuestions.length > 0) ||
@@ -806,6 +806,16 @@ const SummaryCard = React.memo<SummaryCardProps>(function SummaryCard({
                     </Text>
                 </Pressable>
             </View>
+            {refreshDebugText && (
+                <Text
+                    style={[
+                        styles.summaryRefreshDebugText,
+                        { color: theme.colors.textSecondary },
+                    ]}
+                >
+                    {refreshDebugText}
+                </Text>
+            )}
             {summary ? (
                 <View style={styles.summaryBody}>
                     <SummaryLine label={t("session.progressSummaryGoal")} value={summary.goal} />
@@ -1476,6 +1486,12 @@ const styles = StyleSheet.create({
         flexDirection: "row",
         alignItems: "center",
         gap: 6,
+    },
+    summaryRefreshDebugText: {
+        ...Typography.mono("regular"),
+        fontSize: 11,
+        lineHeight: 15,
+        marginBottom: 8,
     },
     summaryBody: {
         gap: 4,

@@ -700,16 +700,36 @@ export const pl: TranslationStructure = {
     progressSummaryRefreshPrompt:
       "Proszę wywołać mcp__happy__update_session_summary, aby zapisać bieżące podsumowanie sesji: goal, currentFocus, keyDecisions (jeśli są), openQuestions (jeśli są), impactScope (jeśli jest). Dokładnie i zwięźle.",
     progressSummaryEmpty: "Brak podsumowania sesji. Naciśnij «Aktualizuj», aby agent je napisał.",
+    progressSummaryRefreshPendingDebug: ({ requestId, time }: { requestId: string; time: string }) =>
+      `Odświeżenie podsumowania oczekuje · ${requestId} · ${time}`,
+    progressSummaryRefreshAppliedDebug: ({ requestId, time }: { requestId: string; time: string }) =>
+      `Ostatnie odświeżenie podsumowania zastosowano · ${requestId} · ${time}`,
+    progressSummaryRefreshSupersededDebug: ({ requestId, time }: { requestId: string; time: string }) =>
+      `Ostatnie odświeżenie podsumowania zastąpiono · ${requestId} · ${time}`,
     progressTodoActionMessage: "Wybierz akcję dla tego elementu",
     progressTodoActionVerify: "Zweryfikuj",
     progressTodoActionContinue: "Kontynuuj",
     progressTodoActionIssue: "Zgłoś problem",
-    progressTodoPromptVerify: ({ content }: { content: string }) =>
-      `Proszę zweryfikować, czy zadanie "${content}" rzeczywiście zostało ukończone. Wypisz dowody (pliki, testy, komendy). Jeśli czegoś brakuje, wywołaj mcp__happy__update_progress, aby zmienić status z powrotem na in_progress lub pending.`,
-    progressTodoPromptContinue: ({ content }: { content: string }) =>
-      `Proszę teraz zająć się "${content}" (od miejsca, w którym przerwano). Gdy będą postępy, wywołuj mcp__happy__update_progress, aby aktualizować status.`,
-    progressTodoPromptIssue: ({ content }: { content: string }) =>
-      `Zadanie "${content}" oznaczono jako ukończone, ale moim zdaniem nie jest. Powód: [dopisz]. Sprawdź ponownie; jeśli się zgadzasz, wywołaj mcp__happy__update_progress, aby przywrócić status in_progress lub pending.`,
+    progressTodoPromptVerifyCompleted: ({ content }: { content: string }) =>
+      `Zweryfikuj, czy "${content}" jest naprawdę ukończone. Podaj dowody (pliki, testy, komendy). Jeśli nie jest ukończone, przepisz checklistę TodoWrite tak, aby status odpowiadał rzeczywistości.`,
+    progressTodoPromptVerifyActive: ({ content }: { content: string }) =>
+      `Zweryfikuj bieżący stan "${content}". Podaj najnowsze dowody (pliki, testy, komendy). Jeśli status jest błędny albo istnieją blokery, przepisz checklistę TodoWrite tak, aby odpowiadała rzeczywistości.`,
+    progressTodoPromptContinueTodoWrite: ({ content }: { content: string }) =>
+      `Kontynuuj pracę nad "${content}" od obecnego stanu. Gdy status się zmieni albo pojawią się blokery, przepisz checklistę TodoWrite, aby karta Progress była zgodna z rzeczywistością.`,
+    progressTodoPromptIssueCompleted: ({ content }: { content: string }) =>
+      `Uważam, że "${content}" zostało oznaczone jako ukończone zbyt wcześnie. Sprawdź to ponownie, wyjaśnij czego jeszcze brakuje i przepisz checklistę TodoWrite, jeśli status trzeba zmienić.`,
+    progressTodoPromptIssueActive: ({ content }: { content: string }) =>
+      `Uważam, że bieżący status "${content}" jest błędny albo niepełny. Oceń go ponownie, opisz problem lub bloker i przepisz checklistę TodoWrite, jeśli to potrzebne.`,
+    progressTodoPromptVerifyCompletedCodex: ({ content }: { content: string }) =>
+      `Zweryfikuj, czy "${content}" jest naprawdę ukończone. Podaj dowody (pliki, testy, komendy). Jeśli nie jest ukończone, wywołaj mcp__happy__update_progress, aby poprawić status checklisty.`,
+    progressTodoPromptVerifyActiveCodex: ({ content }: { content: string }) =>
+      `Zweryfikuj bieżący stan "${content}". Podaj najnowsze dowody (pliki, testy, komendy). Jeśli status jest błędny albo istnieją blokery, wywołaj mcp__happy__update_progress, aby poprawić checklistę, blockers lub currentStage.`,
+    progressTodoPromptContinueCodex: ({ content }: { content: string }) =>
+      `Kontynuuj pracę nad "${content}" od obecnego stanu. Gdy status się zmieni albo pojawią się blokery, wywołaj mcp__happy__update_progress, aby karta Progress była aktualna.`,
+    progressTodoPromptIssueCompletedCodex: ({ content }: { content: string }) =>
+      `Uważam, że "${content}" zostało oznaczone jako ukończone zbyt wcześnie. Sprawdź to ponownie, wyjaśnij czego jeszcze brakuje i wywołaj mcp__happy__update_progress, jeśli status trzeba zmienić.`,
+    progressTodoPromptIssueActiveCodex: ({ content }: { content: string }) =>
+      `Uważam, że bieżący status "${content}" jest błędny albo niepełny. Oceń go ponownie, opisz problem lub bloker i wywołaj mcp__happy__update_progress, jeśli to potrzebne.`,
     knowledgeTabArchive: "Archiwum",
     knowledgeArchiveSubtitle: "Wpisy z tej sesji, które zostały zarchiwizowane lub zastąpione globalnie",
     knowledgeArchiveEmpty: "Brak zarchiwizowanych wpisów w tej sesji",
@@ -901,6 +921,7 @@ export const pl: TranslationStructure = {
     agentState: "Stan agenta",
     controlledByUser: "Kontrolowany przez użytkownika",
     pendingRequests: "Oczekujące żądania",
+    summaryRefresh: "Odświeżenie podsumowania",
     activity: "Aktywność",
     thinking: "Myśli",
     thinkingSince: "Myśli od",

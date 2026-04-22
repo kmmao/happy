@@ -812,16 +812,36 @@ export const ja: TranslationStructure = {
     progressSummaryRefreshPrompt:
       "mcp__happy__update_session_summary ツールを呼び出して現在のセッション概要を記録してください：goal / currentFocus / keyDecisions（あれば）/ openQuestions（あれば）/ impactScope（あれば）。正確かつ簡潔に。",
     progressSummaryEmpty: "セッション概要はまだありません。「更新」をタップしてエージェントに書いてもらいます。",
+    progressSummaryRefreshPendingDebug: ({ requestId, time }: { requestId: string; time: string }) =>
+      `要約更新を待機中 · ${requestId} · ${time}`,
+    progressSummaryRefreshAppliedDebug: ({ requestId, time }: { requestId: string; time: string }) =>
+      `直近の要約更新は適用済み · ${requestId} · ${time}`,
+    progressSummaryRefreshSupersededDebug: ({ requestId, time }: { requestId: string; time: string }) =>
+      `直近の要約更新は置き換え済み · ${requestId} · ${time}`,
     progressTodoActionMessage: "この項目に対する操作を選択",
     progressTodoActionVerify: "検証",
     progressTodoActionContinue: "続行",
     progressTodoActionIssue: "問題あり",
-    progressTodoPromptVerify: ({ content }: { content: string }) =>
-      `タスク「${content}」が実際に完了しているか検証してください：関連ファイル・テスト・コマンドを証拠として提示してください。不足があれば mcp__happy__update_progress を呼び出して in_progress または pending に戻してください。`,
-    progressTodoPromptContinue: ({ content }: { content: string }) =>
-      `「${content}」を今取り組んでください（中断箇所から再開）。進捗があれば mcp__happy__update_progress を呼び出してステータスを更新してください。`,
-    progressTodoPromptIssue: ({ content }: { content: string }) =>
-      `タスク「${content}」は完了と記されていますが、実際には終わっていないと思います。理由：（追記してください）。確認のうえ同意であれば mcp__happy__update_progress を呼び出して in_progress または pending に戻してください。`,
+    progressTodoPromptVerifyCompleted: ({ content }: { content: string }) =>
+      `「${content}」が本当に完了しているか確認してください。証拠（ファイル、テスト、コマンド）を示してください。未完了なら、TodoWrite のチェックリストを書き直して実態に合わせてください。`,
+    progressTodoPromptVerifyActive: ({ content }: { content: string }) =>
+      `「${content}」の現在の状態を確認してください。最新の証拠（ファイル、テスト、コマンド）を示してください。状態が違う、またはブロッカーがあるなら、TodoWrite のチェックリストを書き直して実態に合わせてください。`,
+    progressTodoPromptContinueTodoWrite: ({ content }: { content: string }) =>
+      `「${content}」を現在の状態から続けて進めてください。状態が変わったりブロッカーが出たら、Progress tab が正確になるよう TodoWrite のチェックリストを書き直してください。`,
+    progressTodoPromptIssueCompleted: ({ content }: { content: string }) =>
+      `「${content}」は完了扱いが早すぎると思います。再確認して、何が足りないか説明し、状態を変えるべきなら TodoWrite のチェックリストを書き直してください。`,
+    progressTodoPromptIssueActive: ({ content }: { content: string }) =>
+      `「${content}」の現在の状態は不正確か不完全だと思います。再評価して、問題やブロッカーを説明し、必要なら TodoWrite のチェックリストを書き直してください。`,
+    progressTodoPromptVerifyCompletedCodex: ({ content }: { content: string }) =>
+      `「${content}」が本当に完了しているか確認してください。証拠（ファイル、テスト、コマンド）を示してください。未完了なら mcp__happy__update_progress を呼んでチェックリストの状態を修正してください。`,
+    progressTodoPromptVerifyActiveCodex: ({ content }: { content: string }) =>
+      `「${content}」の現在の状態を確認してください。最新の証拠（ファイル、テスト、コマンド）を示してください。状態が違う、またはブロッカーがあるなら、mcp__happy__update_progress を呼んでチェックリスト、blockers、currentStage を修正してください。`,
+    progressTodoPromptContinueCodex: ({ content }: { content: string }) =>
+      `「${content}」を現在の状態から続けて進めてください。状態が変わったりブロッカーが出たら、Progress tab が正確になるよう mcp__happy__update_progress を呼んでください。`,
+    progressTodoPromptIssueCompletedCodex: ({ content }: { content: string }) =>
+      `「${content}」は完了扱いが早すぎると思います。再確認して、何が足りないか説明し、状態を変えるべきなら mcp__happy__update_progress を呼んでください。`,
+    progressTodoPromptIssueActiveCodex: ({ content }: { content: string }) =>
+      `「${content}」の現在の状態は不正確か不完全だと思います。再評価して、問題やブロッカーを説明し、必要なら mcp__happy__update_progress を呼んでください。`,
     knowledgeTabArchive: "アーカイブ",
     knowledgeArchiveSubtitle: "このセッションで参照済みかつグローバルにアーカイブ／置換された項目",
     knowledgeArchiveEmpty: "このセッションにアーカイブ済みの参照はありません",
@@ -1014,6 +1034,7 @@ export const ja: TranslationStructure = {
     agentState: "エージェント状態",
     controlledByUser: "ユーザーによる制御",
     pendingRequests: "保留中のリクエスト",
+    summaryRefresh: "要約更新",
     activity: "アクティビティ",
     thinking: "思考中",
     thinkingSince: "思考開始時刻",

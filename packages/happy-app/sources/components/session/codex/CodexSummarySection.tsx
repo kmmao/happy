@@ -6,12 +6,17 @@ import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { Text } from "@/components/StyledText";
 import { t } from "@/text";
 import {
+  buildSessionSummaryRefreshDebugText,
+  type SessionSummaryRefreshDebugState,
+} from "../sessionSummaryRefreshPresentation";
+import {
   buildCodexSummaryEntries,
   type CodexSessionSummary,
 } from "./codexSummaryPresentation";
 
 interface CodexSummarySectionProps {
   summary: CodexSessionSummary | undefined;
+  summaryRefreshDebug: SessionSummaryRefreshDebugState | null;
   nowMs: number;
   onRefresh: () => void;
 }
@@ -56,9 +61,32 @@ const SummaryBulletList = React.memo(function SummaryBulletList({
 });
 
 export const CodexSummarySection = React.memo<CodexSummarySectionProps>(
-  function CodexSummarySection({ summary, nowMs, onRefresh }) {
+  function CodexSummarySection({
+    summary,
+    summaryRefreshDebug,
+    nowMs,
+    onRefresh,
+  }) {
     const { theme } = useUnistyles();
     const [expanded, setExpanded] = React.useState(false);
+    const refreshDebugText = React.useMemo(
+      () =>
+        summaryRefreshDebug
+          ? buildSessionSummaryRefreshDebugText(summaryRefreshDebug, {
+              relativeTimeLabel: formatRelativeTime(
+                summaryRefreshDebug.timestamp,
+                nowMs,
+              ),
+              pending: (params) =>
+                t("session.progressSummaryRefreshPendingDebug", params),
+              applied: (params) =>
+                t("session.progressSummaryRefreshAppliedDebug", params),
+              superseded: (params) =>
+                t("session.progressSummaryRefreshSupersededDebug", params),
+            })
+          : null,
+      [summaryRefreshDebug, nowMs],
+    );
     const summaryEntries = React.useMemo(
       () => (summary ? buildCodexSummaryEntries(summary) : []),
       [summary],
@@ -119,6 +147,16 @@ export const CodexSummarySection = React.memo<CodexSummarySectionProps>(
                   ]}
                 >
                   {formatRelativeTime(summary.updatedAt, nowMs)}
+                </Text>
+              ) : null}
+              {refreshDebugText ? (
+                <Text
+                  style={[
+                    styles.timeHint,
+                    { color: theme.colors.codex.textSecondary },
+                  ]}
+                >
+                  {refreshDebugText}
                 </Text>
               ) : null}
             </View>

@@ -677,16 +677,36 @@ export const en = {
       "Please call mcp__happy__update_session_summary to record the current session summary with: goal, currentFocus, keyDecisions (if any), openQuestions (if any), impactScope (if any). Keep it accurate and concise.",
     progressSummaryEmpty:
       "No session summary yet. Tap Update to ask the agent to write one.",
+    progressSummaryRefreshPendingDebug: ({ requestId, time }: { requestId: string; time: string }) =>
+      `Summary refresh pending · ${requestId} · ${time}`,
+    progressSummaryRefreshAppliedDebug: ({ requestId, time }: { requestId: string; time: string }) =>
+      `Last summary refresh applied · ${requestId} · ${time}`,
+    progressSummaryRefreshSupersededDebug: ({ requestId, time }: { requestId: string; time: string }) =>
+      `Last summary refresh superseded · ${requestId} · ${time}`,
     progressTodoActionMessage: "Choose an action for this item",
     progressTodoActionVerify: "Verify",
     progressTodoActionContinue: "Continue",
     progressTodoActionIssue: "Report issue",
-    progressTodoPromptVerify: ({ content }: { content: string }) =>
-      `Please verify the task "${content}" is actually complete. List the evidence (files, tests, commands). If anything is missing, call mcp__happy__update_progress to re-mark it as in_progress or pending.`,
-    progressTodoPromptContinue: ({ content }: { content: string }) =>
-      `Please now work on "${content}" (pick up from where you left off). When you make progress, call mcp__happy__update_progress to update its status.`,
-    progressTodoPromptIssue: ({ content }: { content: string }) =>
-      `The task "${content}" is marked complete, but I think it's not actually done. Reason: [add yours]. Please re-check; if you agree, call mcp__happy__update_progress to set it back to in_progress or pending.`,
+    progressTodoPromptVerifyCompleted: ({ content }: { content: string }) =>
+      `Please verify whether "${content}" is actually complete. Cite evidence (files, tests, commands). If it is not complete, rewrite your TodoWrite checklist so the status reflects reality.`,
+    progressTodoPromptVerifyActive: ({ content }: { content: string }) =>
+      `Please verify the current state of "${content}". Cite the latest evidence (files, tests, commands). If the status is wrong or blockers exist, rewrite your TodoWrite checklist so it reflects reality.`,
+    progressTodoPromptContinueTodoWrite: ({ content }: { content: string }) =>
+      `Please continue working on "${content}" from the current state. When the status changes or blockers appear, rewrite your TodoWrite checklist so the Progress tab stays accurate.`,
+    progressTodoPromptIssueCompleted: ({ content }: { content: string }) =>
+      `I think "${content}" was marked completed too early. Re-check it, explain what is still missing, and rewrite your TodoWrite checklist if the status should change.`,
+    progressTodoPromptIssueActive: ({ content }: { content: string }) =>
+      `I think the current status of "${content}" is wrong or incomplete. Re-evaluate it, explain the issue or blocker, and rewrite your TodoWrite checklist if needed.`,
+    progressTodoPromptVerifyCompletedCodex: ({ content }: { content: string }) =>
+      `Please verify whether "${content}" is actually complete. Cite evidence (files, tests, commands). If it is not complete, call mcp__happy__update_progress to correct the checklist status.`,
+    progressTodoPromptVerifyActiveCodex: ({ content }: { content: string }) =>
+      `Please verify the current state of "${content}". Cite the latest evidence (files, tests, commands). If the status is wrong or blockers exist, call mcp__happy__update_progress to correct the checklist, blockers, or currentStage.`,
+    progressTodoPromptContinueCodex: ({ content }: { content: string }) =>
+      `Please continue working on "${content}" from the current state. When the status changes or blockers appear, call mcp__happy__update_progress so the Progress tab stays accurate.`,
+    progressTodoPromptIssueCompletedCodex: ({ content }: { content: string }) =>
+      `I think "${content}" was marked completed too early. Re-check it, explain what is still missing, and call mcp__happy__update_progress if the status should change.`,
+    progressTodoPromptIssueActiveCodex: ({ content }: { content: string }) =>
+      `I think the current status of "${content}" is wrong or incomplete. Re-evaluate it, explain the issue or blocker, and call mcp__happy__update_progress if needed.`,
     knowledgeTabArchive: "Archive",
     knowledgeArchiveSubtitle: "Entries from this session that are globally archived or superseded",
     knowledgeArchiveEmpty: "No archived entries referenced this session",
@@ -877,6 +897,7 @@ export const en = {
     agentState: "Agent State",
     controlledByUser: "Controlled by User",
     pendingRequests: "Pending Requests",
+    summaryRefresh: "Summary Refresh",
     activity: "Activity",
     thinking: "Thinking",
     thinkingSince: "Thinking Since",

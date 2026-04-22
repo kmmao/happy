@@ -59,7 +59,7 @@ export function resolveCodexPlanData(
   checklist: ResolvedChecklist,
   messages: readonly Message[],
 ): CodexPlanData {
-  if (checklist.source !== "none" && checklist.todos.length > 0) {
+  if (checklist.source !== "none") {
     return {
       source: checklist.source,
       listId: checklist.listId,

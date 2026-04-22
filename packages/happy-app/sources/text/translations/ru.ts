@@ -681,6 +681,7 @@ export const ru: TranslationStructure = {
     agentState: "Состояние агента",
     controlledByUser: "Управляется пользователем",
     pendingRequests: "Ожидающие запросы",
+    summaryRefresh: "Обновление сводки",
     activity: "Активность",
     thinking: "Думает",
     thinkingSince: "Думает с",
@@ -907,16 +908,36 @@ export const ru: TranslationStructure = {
     progressSummaryRefreshPrompt:
       "Пожалуйста, вызовите mcp__happy__update_session_summary, чтобы записать текущий обзор сессии: goal, currentFocus, keyDecisions (если есть), openQuestions (если есть), impactScope (если есть). Точно и кратко.",
     progressSummaryEmpty: "Обзора сессии ещё нет. Нажмите «Обновить», чтобы агент его написал.",
+    progressSummaryRefreshPendingDebug: ({ requestId, time }: { requestId: string; time: string }) =>
+      `Обновление сводки ожидает выполнения · ${requestId} · ${time}`,
+    progressSummaryRefreshAppliedDebug: ({ requestId, time }: { requestId: string; time: string }) =>
+      `Последнее обновление сводки применено · ${requestId} · ${time}`,
+    progressSummaryRefreshSupersededDebug: ({ requestId, time }: { requestId: string; time: string }) =>
+      `Последнее обновление сводки заменено · ${requestId} · ${time}`,
     progressTodoActionMessage: "Выберите действие для этой задачи",
     progressTodoActionVerify: "Проверить",
     progressTodoActionContinue: "Продолжить",
     progressTodoActionIssue: "Сообщить о проблеме",
-    progressTodoPromptVerify: ({ content }: { content: string }) =>
-      `Пожалуйста, проверьте, действительно ли задача "${content}" завершена. Приведите доказательства (файлы, тесты, команды). Если чего-то не хватает, вызовите mcp__happy__update_progress, чтобы вернуть её в статус in_progress или pending.`,
-    progressTodoPromptContinue: ({ content }: { content: string }) =>
-      `Пожалуйста, продолжите работу над "${content}" (с места, где остановились). По мере прогресса вызывайте mcp__happy__update_progress для обновления статуса.`,
-    progressTodoPromptIssue: ({ content }: { content: string }) =>
-      `Задача "${content}" помечена как выполненная, но мне кажется, что она не завершена. Причина: [дополните]. Пожалуйста, перепроверьте; если согласны, вызовите mcp__happy__update_progress, чтобы вернуть статус in_progress или pending.`,
+    progressTodoPromptVerifyCompleted: ({ content }: { content: string }) =>
+      `Проверьте, действительно ли "${content}" завершена. Приведите доказательства (файлы, тесты, команды). Если она не завершена, перепишите checklist TodoWrite так, чтобы статус отражал реальность.`,
+    progressTodoPromptVerifyActive: ({ content }: { content: string }) =>
+      `Проверьте текущее состояние "${content}". Приведите самые свежие доказательства (файлы, тесты, команды). Если статус неверный или есть блокеры, перепишите checklist TodoWrite так, чтобы он отражал реальность.`,
+    progressTodoPromptContinueTodoWrite: ({ content }: { content: string }) =>
+      `Продолжайте работу над "${content}" с текущего состояния. Когда статус изменится или появятся блокеры, перепишите checklist TodoWrite, чтобы вкладка Progress оставалась точной.`,
+    progressTodoPromptIssueCompleted: ({ content }: { content: string }) =>
+      `Мне кажется, что "${content}" помечена завершённой слишком рано. Проверьте ещё раз, объясните, чего не хватает, и перепишите checklist TodoWrite, если статус нужно изменить.`,
+    progressTodoPromptIssueActive: ({ content }: { content: string }) =>
+      `Мне кажется, что текущий статус "${content}" неверный или неполный. Переоцените его, объясните проблему или блокер и перепишите checklist TodoWrite, если нужно.`,
+    progressTodoPromptVerifyCompletedCodex: ({ content }: { content: string }) =>
+      `Проверьте, действительно ли "${content}" завершена. Приведите доказательства (файлы, тесты, команды). Если она не завершена, вызовите mcp__happy__update_progress, чтобы исправить статус checklist.`,
+    progressTodoPromptVerifyActiveCodex: ({ content }: { content: string }) =>
+      `Проверьте текущее состояние "${content}". Приведите самые свежие доказательства (файлы, тесты, команды). Если статус неверный или есть блокеры, вызовите mcp__happy__update_progress, чтобы исправить checklist, blockers или currentStage.`,
+    progressTodoPromptContinueCodex: ({ content }: { content: string }) =>
+      `Продолжайте работу над "${content}" с текущего состояния. Когда статус изменится или появятся блокеры, вызовите mcp__happy__update_progress, чтобы вкладка Progress оставалась точной.`,
+    progressTodoPromptIssueCompletedCodex: ({ content }: { content: string }) =>
+      `Мне кажется, что "${content}" помечена завершённой слишком рано. Проверьте ещё раз, объясните, чего не хватает, и вызовите mcp__happy__update_progress, если статус нужно изменить.`,
+    progressTodoPromptIssueActiveCodex: ({ content }: { content: string }) =>
+      `Мне кажется, что текущий статус "${content}" неверный или неполный. Переоцените его, объясните проблему или блокер и вызовите mcp__happy__update_progress, если нужно.`,
     knowledgeTabArchive: "Архив",
     knowledgeArchiveSubtitle: "Записи сессии, заархивированные или заменённые на глобальном уровне",
     knowledgeArchiveEmpty: "В сессии нет ссылок на заархивированные записи",

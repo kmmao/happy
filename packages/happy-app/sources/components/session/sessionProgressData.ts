@@ -234,6 +234,8 @@ type MetadataProgress = NonNullable<Metadata["progress"]>;
 
 type MetadataProgressList = NonNullable<MetadataProgress["lists"]>[number];
 
+const LEGACY_PROGRESS_LIST_ID = "legacy-progress";
+
 function mapMetadataTodo(todo: MetadataProgressList["todos"][number]): ProgressTodo {
     return {
         content: todo.content,
@@ -261,6 +263,50 @@ function deriveLabelFromTodos(todos: readonly ProgressTodo[]): string | undefine
     return first.length <= max ? first : first.slice(0, max - 1) + "…";
 }
 
+function normalizeProgressLists(
+    metadataProgress: MetadataProgress,
+): {
+    lists: MetadataProgressList[];
+    currentListId: string | undefined;
+} {
+    const lists = metadataProgress.lists;
+    if (lists && lists.length > 0) {
+        return {
+            lists,
+            currentListId: metadataProgress.currentListId,
+        };
+    }
+
+    if (metadataProgress.todos !== undefined) {
+        const normalizedTodos = normalizeLegacyTodos(metadataProgress.todos);
+        return {
+            lists: [
+                {
+                    id: LEGACY_PROGRESS_LIST_ID,
+                    label: deriveLabelFromTodos(normalizedTodos),
+                    todos: metadataProgress.todos.map((todo) => ({
+                        content: todo.content,
+                        status: todo.status,
+                        activeForm: todo.activeForm,
+                        stage: todo.stage,
+                        verificationNudgeNeeded: todo.verificationNudgeNeeded,
+                    })),
+                    currentStage: metadataProgress.currentStage,
+                    blockers: metadataProgress.blockers,
+                    startedAt: metadataProgress.updatedAt,
+                    updatedAt: metadataProgress.updatedAt,
+                },
+            ],
+            currentListId: LEGACY_PROGRESS_LIST_ID,
+        };
+    }
+
+    return {
+        lists: [],
+        currentListId: undefined,
+    };
+}
+
 function pickActiveList(
     lists: readonly MetadataProgressList[],
     currentListId: string | undefined,
@@ -281,11 +327,11 @@ function pickActiveList(
  * Pick the authoritative checklist source for the Progress tab.
  *
  * Priority:
- *   1. MCP-sourced multi-list `metadata.progress.lists[currentListId]`
- *   2. MCP-sourced legacy flat `metadata.progress.todos`
- *   3. Latest TodoWrite in message history (fallback when CLI auto-mirror /
+ *   1. MCP-sourced `metadata.progress`, normalized into list form
+ *      (legacy flat `todos` becomes a synthetic single list)
+ *   2. Latest TodoWrite in message history (fallback when CLI auto-mirror /
  *      MCP haven't populated metadata yet)
- *   4. Empty
+ *   3. Empty
  */
 export function resolveChecklist(
     metadataProgress: Metadata["progress"] | null | undefined,
@@ -294,11 +340,11 @@ export function resolveChecklist(
     preferredListId?: string,
 ): ResolvedChecklist {
     if (metadataProgress) {
-        const lists = metadataProgress.lists;
-        if (lists && lists.length > 0) {
-            const targetId = preferredListId ?? metadataProgress.currentListId;
-            const active = pickActiveList(lists, targetId);
-            if (active && active.todos.length > 0) {
+        const normalized = normalizeProgressLists(metadataProgress);
+        if (normalized.lists.length > 0) {
+            const targetId = preferredListId ?? normalized.currentListId;
+            const active = pickActiveList(normalized.lists, targetId);
+            if (active) {
                 const todos = active.todos.map(mapMetadataTodo);
                 return {
                     source: "mcp",
@@ -310,11 +356,10 @@ export function resolveChecklist(
                     blockers: active.blockers,
                 };
             }
-        }
-        if (metadataProgress.todos && metadataProgress.todos.length > 0) {
+        } else {
             return {
                 source: "mcp",
-                todos: normalizeLegacyTodos(metadataProgress.todos),
+                todos: [],
                 updatedAt: metadataProgress.updatedAt,
                 currentStage: metadataProgress.currentStage,
                 blockers: metadataProgress.blockers,
@@ -343,10 +388,12 @@ export function resolveChecklist(
 export function getChecklistTabs(
     metadataProgress: Metadata["progress"] | null | undefined,
 ): ChecklistTab[] {
-    const lists = metadataProgress?.lists;
-    if (!lists || lists.length === 0) return [];
+    if (!metadataProgress) return [];
+    const normalized = normalizeProgressLists(metadataProgress);
+    const lists = normalized.lists;
+    if (lists.length === 0) return [];
     const activeId =
-        metadataProgress?.currentListId ??
+        normalized.currentListId ??
         pickActiveList(lists, undefined)?.id;
     return lists.map((list) => {
         const todos = list.todos;

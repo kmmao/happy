@@ -690,16 +690,36 @@ export const ca: TranslationStructure = {
     progressSummaryRefreshPrompt:
       "Si us plau, crida mcp__happy__update_session_summary per registrar el resum de la sessió: goal, currentFocus, keyDecisions (si n'hi ha), openQuestions (si n'hi ha), impactScope (si n'hi ha). Precís i concís.",
     progressSummaryEmpty: "Encara no hi ha resum. Prem «Actualitza» perquè l'agent l'escrigui.",
+    progressSummaryRefreshPendingDebug: ({ requestId, time }: { requestId: string; time: string }) =>
+      `Actualització del resum pendent · ${requestId} · ${time}`,
+    progressSummaryRefreshAppliedDebug: ({ requestId, time }: { requestId: string; time: string }) =>
+      `Darrera actualització del resum aplicada · ${requestId} · ${time}`,
+    progressSummaryRefreshSupersededDebug: ({ requestId, time }: { requestId: string; time: string }) =>
+      `Darrera actualització del resum substituïda · ${requestId} · ${time}`,
     progressTodoActionMessage: "Tria una acció per a aquest element",
     progressTodoActionVerify: "Verifica",
     progressTodoActionContinue: "Continua",
     progressTodoActionIssue: "Informa d'un problema",
-    progressTodoPromptVerify: ({ content }: { content: string }) =>
-      `Si us plau, verifica si la tasca "${content}" està realment completada. Enumera les proves (fitxers, tests, comandes). Si falta alguna cosa, crida mcp__happy__update_progress per tornar-la a in_progress o pending.`,
-    progressTodoPromptContinue: ({ content }: { content: string }) =>
-      `Si us plau, treballa ara en "${content}" (continua des d'on ho vas deixar). Quan hi hagi progrés, crida mcp__happy__update_progress per actualitzar l'estat.`,
-    progressTodoPromptIssue: ({ content }: { content: string }) =>
-      `La tasca "${content}" està marcada com a completada, però crec que no ho està. Motiu: [afegeix el teu]. Revisa-ho; si hi estàs d'acord, crida mcp__happy__update_progress per tornar-la a in_progress o pending.`,
+    progressTodoPromptVerifyCompleted: ({ content }: { content: string }) =>
+      `Verifica si "${content}" està realment completada. Cita proves (fitxers, proves, ordres). Si no està completada, reescriu la teva checklist de TodoWrite perquè reflecteixi la realitat.`,
+    progressTodoPromptVerifyActive: ({ content }: { content: string }) =>
+      `Verifica l'estat actual de "${content}". Cita les proves més recents (fitxers, proves, ordres). Si l'estat és incorrecte o hi ha bloquejos, reescriu la teva checklist de TodoWrite perquè reflecteixi la realitat.`,
+    progressTodoPromptContinueTodoWrite: ({ content }: { content: string }) =>
+      `Continua treballant en "${content}" des de l'estat actual. Quan l'estat canviï o apareguin bloquejos, reescriu la teva checklist de TodoWrite perquè la pestanya Progress continuï sent precisa.`,
+    progressTodoPromptIssueCompleted: ({ content }: { content: string }) =>
+      `Crec que "${content}" s'ha marcat com a completada massa aviat. Revisa-la de nou, explica què falta encara i reescriu la teva checklist de TodoWrite si l'estat ha de canviar.`,
+    progressTodoPromptIssueActive: ({ content }: { content: string }) =>
+      `Crec que l'estat actual de "${content}" és incorrecte o incomplet. Reavalua'l, explica el problema o bloqueig i reescriu la teva checklist de TodoWrite si cal.`,
+    progressTodoPromptVerifyCompletedCodex: ({ content }: { content: string }) =>
+      `Verifica si "${content}" està realment completada. Cita proves (fitxers, proves, ordres). Si no està completada, crida mcp__happy__update_progress per corregir l'estat de la checklist.`,
+    progressTodoPromptVerifyActiveCodex: ({ content }: { content: string }) =>
+      `Verifica l'estat actual de "${content}". Cita les proves més recents (fitxers, proves, ordres). Si l'estat és incorrecte o hi ha bloquejos, crida mcp__happy__update_progress per corregir la checklist, blockers o currentStage.`,
+    progressTodoPromptContinueCodex: ({ content }: { content: string }) =>
+      `Continua treballant en "${content}" des de l'estat actual. Quan l'estat canviï o apareguin bloquejos, crida mcp__happy__update_progress perquè la pestanya Progress continuï sent precisa.`,
+    progressTodoPromptIssueCompletedCodex: ({ content }: { content: string }) =>
+      `Crec que "${content}" s'ha marcat com a completada massa aviat. Revisa-la de nou, explica què falta encara i crida mcp__happy__update_progress si l'estat ha de canviar.`,
+    progressTodoPromptIssueActiveCodex: ({ content }: { content: string }) =>
+      `Crec que l'estat actual de "${content}" és incorrecte o incomplet. Reavalua'l, explica el problema o bloqueig i crida mcp__happy__update_progress si cal.`,
     knowledgeTabArchive: "Arxiu",
     knowledgeArchiveSubtitle: "Entrades referenciades en aquesta sessió i arxivades o substituïdes globalment",
     knowledgeArchiveEmpty: "No hi ha entrades arxivades referenciades en aquesta sessió",
@@ -892,6 +912,7 @@ export const ca: TranslationStructure = {
     agentState: "Estat de l'agent",
     controlledByUser: "Controlat per l'usuari",
     pendingRequests: "Sol·licituds pendents",
+    summaryRefresh: "Actualització del resum",
     activity: "Activitat",
     thinking: "Pensant",
     thinkingSince: "Pensant des de",

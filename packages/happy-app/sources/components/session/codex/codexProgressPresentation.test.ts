@@ -115,6 +115,39 @@ describe("codexProgressPresentation", () => {
     });
   });
 
+  it("keeps an explicitly empty checklist instead of reviving a stale legacy preview", () => {
+    const plan = resolveCodexPlanData(
+      createChecklist({
+        source: "mcp",
+        listId: "list-1",
+        label: "Current phase",
+        updatedAt: 30,
+        currentStage: "Waiting for confirmation",
+        todos: [],
+      }),
+      [
+        createAgentTextMessage(
+          [
+            "Old preview",
+            "[in_progress] stale fallback",
+          ].join("\n"),
+          10,
+        ),
+      ],
+    );
+
+    expect(plan).toEqual({
+      source: "mcp",
+      listId: "list-1",
+      todos: [],
+      updatedAt: 30,
+      label: "Current phase",
+      currentStage: "Waiting for confirmation",
+      blockers: undefined,
+      explanation: undefined,
+    });
+  });
+
   it("maps source labels for specialized plan chips", () => {
     expect(getCodexPlanSourceLabelKey("mcp")).toBe("session.progressSourceMcp");
     expect(getCodexPlanSourceLabelKey("todowrite")).toBe(

@@ -93,4 +93,79 @@ describe('MetadataSchema', () => {
 
         expect(result.success).toBe(true);
     });
+
+    it('preserves shared progress list fields like toolCallIds and summaryGeneratedAt', () => {
+        const result = MetadataSchema.safeParse({
+            ...baseMetadata,
+            progress: {
+                lists: [
+                    {
+                        id: 'list-1',
+                        label: 'Patch parser',
+                        todos: [
+                            {
+                                content: 'Patch parser',
+                                status: 'in_progress',
+                                activeForm: 'Patching parser',
+                            },
+                        ],
+                        currentStage: 'Phase 2',
+                        blockers: ['Need fixture'],
+                        startedAt: 100,
+                        updatedAt: 200,
+                        toolCallIds: ['tool-1'],
+                        summaryGeneratedAt: 300,
+                    },
+                ],
+                currentListId: 'list-1',
+                todos: [
+                    {
+                        content: 'Patch parser',
+                        status: 'in_progress',
+                    },
+                ],
+                updatedAt: 200,
+            },
+        });
+
+        expect(result.success).toBe(true);
+        if (!result.success) {
+            return;
+        }
+
+        expect(result.data.progress?.lists?.[0]?.toolCallIds).toEqual(['tool-1']);
+        expect(result.data.progress?.lists?.[0]?.summaryGeneratedAt).toBe(300);
+    });
+
+    it('accepts sessionSummaryRefresh protocol metadata', () => {
+        const result = MetadataSchema.safeParse({
+            ...baseMetadata,
+            sessionSummaryRefresh: {
+                protocolVersion: 1,
+                active: {
+                    requestId: 'summary-refresh_123',
+                    requestedAt: 100,
+                    requester: 'happy-agent',
+                    command: 'summary-refresh',
+                    requireSummary: true,
+                },
+                recent: [
+                    {
+                        requestId: 'summary-refresh_122',
+                        status: 'applied',
+                        resolvedAt: 90,
+                        summaryUpdatedAt: 90,
+                    },
+                ],
+            },
+        });
+
+        expect(result.success).toBe(true);
+        if (!result.success) {
+            return;
+        }
+
+        expect(result.data.sessionSummaryRefresh?.active?.requestId).toBe('summary-refresh_123');
+        expect(result.data.sessionSummaryRefresh?.recent?.[0]?.status).toBe('applied');
+    });
 });

@@ -658,16 +658,36 @@ export const zhHant: TranslationStructure = {
     progressSummaryRefreshPrompt:
       "請呼叫 mcp__happy__update_session_summary 工具記錄當前會話概要：目標（goal）、當前焦點（currentFocus）、關鍵決策（keyDecisions，如有）、待決問題（openQuestions，如有）、影響範圍（impactScope，如有）。保持準確且簡潔。",
     progressSummaryEmpty: "暫無會話概要。點擊「更新」讓 Agent 產生。",
+    progressSummaryRefreshPendingDebug: ({ requestId, time }: { requestId: string; time: string }) =>
+      `摘要刷新等待中 · ${requestId} · ${time}`,
+    progressSummaryRefreshAppliedDebug: ({ requestId, time }: { requestId: string; time: string }) =>
+      `最近一次摘要刷新已套用 · ${requestId} · ${time}`,
+    progressSummaryRefreshSupersededDebug: ({ requestId, time }: { requestId: string; time: string }) =>
+      `最近一次摘要刷新已被取代 · ${requestId} · ${time}`,
     progressTodoActionMessage: "選擇對這一項的操作",
     progressTodoActionVerify: "驗證",
     progressTodoActionContinue: "繼續",
     progressTodoActionIssue: "有問題",
-    progressTodoPromptVerify: ({ content }: { content: string }) =>
-      `請驗證任務"${content}"是否真正完成：列出相關檔案、測試、命令作為證據。如有缺口，請呼叫 mcp__happy__update_progress 重新標記為 in_progress 或 pending。`,
-    progressTodoPromptContinue: ({ content }: { content: string }) =>
-      `請現在處理"${content}"（從上次停下的地方繼續）。有進展時，請呼叫 mcp__happy__update_progress 更新狀態。`,
-    progressTodoPromptIssue: ({ content }: { content: string }) =>
-      `任務"${content}"標記為已完成，但我覺得還沒做完。原因：（請補充）。請複查後如同意，呼叫 mcp__happy__update_progress 重新標記為 in_progress 或 pending。`,
+    progressTodoPromptVerifyCompleted: ({ content }: { content: string }) =>
+      `請驗證「${content}」是否真的已完成。請提供證據（檔案、測試、命令）。如果其實尚未完成，請重寫你的 TodoWrite 清單，讓狀態反映真實情況。`,
+    progressTodoPromptVerifyActive: ({ content }: { content: string }) =>
+      `請驗證「${content}」目前的真實狀態。請提供最新證據（檔案、測試、命令）。如果狀態不準確或出現阻塞，請重寫你的 TodoWrite 清單，使其反映真實情況。`,
+    progressTodoPromptContinueTodoWrite: ({ content }: { content: string }) =>
+      `請從目前狀態繼續推進「${content}」。當狀態變化或出現阻塞時，請重寫你的 TodoWrite 清單，確保 Progress tab 保持準確。`,
+    progressTodoPromptIssueCompleted: ({ content }: { content: string }) =>
+      `我認為「${content}」被過早標記為已完成。請重新檢查，說明還缺少什麼；如果狀態需要變更，請重寫你的 TodoWrite 清單。`,
+    progressTodoPromptIssueActive: ({ content }: { content: string }) =>
+      `我認為「${content}」目前的狀態不準確或資訊不完整。請重新評估，說明問題或阻塞；如有需要，請重寫你的 TodoWrite 清單。`,
+    progressTodoPromptVerifyCompletedCodex: ({ content }: { content: string }) =>
+      `請驗證「${content}」是否真的已完成。請提供證據（檔案、測試、命令）。如果其實尚未完成，請呼叫 mcp__happy__update_progress 更正清單狀態。`,
+    progressTodoPromptVerifyActiveCodex: ({ content }: { content: string }) =>
+      `請驗證「${content}」目前的真實狀態。請提供最新證據（檔案、測試、命令）。如果狀態不準確或出現阻塞，請呼叫 mcp__happy__update_progress 更正清單、阻塞項或 currentStage。`,
+    progressTodoPromptContinueCodex: ({ content }: { content: string }) =>
+      `請從目前狀態繼續推進「${content}」。當狀態變化或出現阻塞時，請呼叫 mcp__happy__update_progress，確保 Progress tab 保持準確。`,
+    progressTodoPromptIssueCompletedCodex: ({ content }: { content: string }) =>
+      `我認為「${content}」被過早標記為已完成。請重新檢查，說明還缺少什麼；如果狀態需要變更，請呼叫 mcp__happy__update_progress。`,
+    progressTodoPromptIssueActiveCodex: ({ content }: { content: string }) =>
+      `我認為「${content}」目前的狀態不準確或資訊不完整。請重新評估，說明問題或阻塞；如有需要，請呼叫 mcp__happy__update_progress。`,
     knowledgeTabArchive: "歸檔",
     knowledgeArchiveSubtitle: "本會話引用過、但已被全域歸檔或取代的條目",
     knowledgeArchiveEmpty: "本會話沒有引用過已歸檔的條目",
@@ -855,6 +875,7 @@ export const zhHant: TranslationStructure = {
     agentState: "Agent 狀態",
     controlledByUser: "使用者控制",
     pendingRequests: "待處理請求",
+    summaryRefresh: "摘要刷新",
     activity: "活動",
     thinking: "思考中",
     thinkingSince: "思考開始時間",
