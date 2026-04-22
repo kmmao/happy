@@ -43,7 +43,7 @@ import {
   stopRealtimeSession,
 } from "@/realtime/RealtimeSession";
 import { gitStatusSync } from "@/sync/gitStatusSync";
-import { sessionAbort, sessionInterrupt, sessionStopTask, sessionBash } from "@/sync/ops";
+import { sessionInterrupt, sessionStopTask, sessionBash } from "@/sync/ops";
 import {
   storage,
   useIsDataReady,
@@ -106,11 +106,15 @@ import { useUnistyles } from "react-native-unistyles";
 import { Message } from "@/sync/typesMessage";
 import {
   buildOptionsHash,
-  getRecommendedOptionIndex,
+  rankAndSelectOptions,
   type SessionFollowUpOptionsSnapshot,
 } from "./autoOptionSend";
 import { getSessionContentMaxWidth } from "./sessionContentWidth";
 import { autoOptionSendService } from "@/sync/autoOptionSendService";
+import {
+  getAutoOptionFeedbackStats,
+  subscribeAutoOptionFeedback,
+} from "@/sync/autoOptionFeedback";
 import { log } from '@/log';
 import { shouldShowMobileSessionPanelButton } from "@/components/session/mobileSessionPanelState";
 import { resolveSessionRpcVisualState } from "@/utils/sessionRpcVisualState";
@@ -507,8 +511,27 @@ function SessionViewInner({
       ? Math.max(80, sessionColumnHeight - agentInputHeight - 8)
       : undefined;
   const { messages, isLoaded } = useSessionMessages(sessionId);
+  const selectedOptionForEditingRef = React.useRef<{
+    text: string;
+    optionsHash: string;
+  } | null>(null);
+  const [autoOptionFeedbackRevision, setAutoOptionFeedbackRevision] = React.useState(0);
+  const skipDismissOnCloseRef = React.useRef(false);
   const isConnected = session.presence === "online";
   const sessionProjectInner = useProjectForSession(sessionId);
+  const autoOptionFeedbackProjectId = sessionProjectInner?.id ?? `session:${sessionId}`;
+  const optionStatsResolver = React.useCallback(
+    (optionText: string) =>
+      getAutoOptionFeedbackStats(autoOptionFeedbackProjectId, optionText),
+    [autoOptionFeedbackProjectId],
+  );
+  React.useEffect(
+    () =>
+      subscribeAutoOptionFeedback(autoOptionFeedbackProjectId, () => {
+        setAutoOptionFeedbackRevision((prev) => prev + 1);
+      }),
+    [autoOptionFeedbackProjectId],
+  );
   const {
     actionItems,
     error: actionItemsError,
@@ -751,6 +774,22 @@ function SessionViewInner({
   // Floating options from AI reply at visible/navigated position (or latest)
   const effectiveAnchor = showScrollToBottom ? scrollAnchor : -1;
   const latestOptions = useLatestOptions(messages, effectiveAnchor);
+  const latestOptionsHash = React.useMemo(
+    () => buildOptionsHash(latestOptions.items),
+    [latestOptions.items],
+  );
+  const rankedLatestOptions = React.useMemo(
+    () =>
+      latestOptions.items.length < 2
+        ? null
+        : rankAndSelectOptions(latestOptions.items, optionStatsResolver),
+    [latestOptions.items, optionStatsResolver, autoOptionFeedbackRevision],
+  );
+  const recommendedOptionIndex = rankedLatestOptions?.recommendedIndex ?? null;
+  const recommendedOptionText =
+    recommendedOptionIndex !== null
+      ? latestOptions.items[recommendedOptionIndex] ?? null
+      : null;
   const hasPendingAskUserQuestionVisible = React.useMemo(
     () => hasPendingAskUserQuestion(messages),
     [messages],
@@ -761,10 +800,10 @@ function SessionViewInner({
       sourceType: "markdown-options",
       sourceMessageId: latestOptions.sourceMessageId,
       items: [...latestOptions.items],
-      recommendedIndex: getRecommendedOptionIndex(latestOptions.items),
-      optionsHash: buildOptionsHash(latestOptions.items),
+      recommendedIndex: recommendedOptionIndex,
+      optionsHash: latestOptionsHash,
     };
-  }, [latestOptions]);
+  }, [latestOptions, latestOptionsHash, recommendedOptionIndex]);
   // When the SDK sends a prompt-suggestion, override the text with the recommended
   // option from the options list (if one exists) so the input chip and the 推荐 badge
   // always point to the same option. The lifecycle (null ↔ non-null) is unchanged —
@@ -772,22 +811,28 @@ function SessionViewInner({
   // chip issues after the user sends a message.
   const promptSuggestion = React.useMemo(() => {
     if (!rawPromptSuggestion) return null;
-    const recIdx = getRecommendedOptionIndex(latestOptions.items);
-    if (recIdx !== null && latestOptions.items[recIdx]) {
-      return latestOptions.items[recIdx];
+    if (recommendedOptionText) {
+      return recommendedOptionText;
     }
     return rawPromptSuggestion;
-  }, [latestOptions.items, rawPromptSuggestion]);
+  }, [recommendedOptionText, rawPromptSuggestion]);
 
   const [showOptionsPopover, setShowOptionsPopover] = React.useState(false);
   const handleFloatingOptionPress = React.useCallback(
     (option: string) => {
+      autoOptionSendService.recordManualSend(
+        sessionId,
+        option,
+        latestOptionsHash,
+        false,
+        "manual",
+      );
       autoOptionSendService.toggle(sessionId, false);
       setShowOptionsPopover(false);
       sync.sendMessage(sessionId, option);
       trackMessageSent();
     },
-    [sessionId],
+    [sessionId, latestOptionsHash],
   );
 
   const { bookmarks, toggleBookmark } = useBookmarks();
@@ -811,16 +856,34 @@ function SessionViewInner({
 
   // Append option text to input for editing before sending
   const appendToInput = React.useCallback((text: string) => {
+    const isCurrentOption = latestOptions.items.includes(text);
+    if (isCurrentOption) {
+      selectedOptionForEditingRef.current = {
+        text,
+        optionsHash: latestOptionsHash,
+      };
+    }
+
     setMessage((prev) => {
       const trimmed = prev.trimEnd();
       return trimmed ? `${trimmed}\n${text}` : text;
     });
-  }, []);
+  }, [latestOptions.items, latestOptionsHash]);
 
   const inputContextValue = React.useMemo(
     () => ({ appendToInput }),
     [appendToInput],
   );
+
+  // Track option copied to input for edit-send attribution
+  React.useEffect(() => {
+    if (!message.trim()) return;
+    const selected = selectedOptionForEditingRef.current;
+    if (!selected) return;
+    if (!message.includes(selected.text)) {
+      selectedOptionForEditingRef.current = null;
+    }
+  }, [message]);
 
   // Keep outer InputContext.Provider (SessionView level) in sync so SessionSidePanel can use it
   React.useEffect(() => {
@@ -1326,6 +1389,18 @@ function SessionViewInner({
 
           if (!finalMessage) return;
 
+          const selected = selectedOptionForEditingRef.current;
+          if (selected && text.includes(selected.text)) {
+            autoOptionSendService.recordManualSend(
+              sessionId,
+              selected.text,
+              selected.optionsHash,
+              true,
+              "manual",
+            );
+            selectedOptionForEditingRef.current = null;
+          }
+
           const localIdForSend = randomUUID();
           // Mark as queued before sending if AI is currently thinking
           if (sessionStatus.state === "thinking") {
@@ -1544,8 +1619,30 @@ function SessionViewInner({
           visible={showOptionsPopover && latestOptions.items.length > 0}
           options={latestOptions.items}
           onOptionPress={handleFloatingOptionPress}
-          onClose={() => setShowOptionsPopover(false)}
-          title={
+          onCopyOption={(text) => {
+            skipDismissOnCloseRef.current = true;
+            selectedOptionForEditingRef.current = {
+              text,
+              optionsHash: latestOptionsHash,
+            };
+          }}
+          onClose={() => {
+            if (skipDismissOnCloseRef.current) {
+              skipDismissOnCloseRef.current = false;
+              setShowOptionsPopover(false);
+              return;
+            }
+            if (recommendedOptionText) {
+              autoOptionSendService.recordDismiss(
+                sessionId,
+                recommendedOptionText,
+                latestOptionsHash,
+              );
+            }
+            setShowOptionsPopover(false);
+          }}
+          title=
+{
             autoOptionSendControl.enabled && autoOptionSendControl.remainingMs != null
               ? t("session.autoOptionSendTitleCountdown", {
                   seconds: Math.max(
@@ -1555,7 +1652,7 @@ function SessionViewInner({
                 })
               : t("session.autoOptionSendTitle")
           }
-          recommendedIndex={getRecommendedOptionIndex(latestOptions.items)}
+          recommendedIndex={recommendedOptionIndex}
           recommendedRemainingMs={autoOptionSendControl.remainingMs}
         />
         <OptionsPopover

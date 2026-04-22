@@ -22,6 +22,7 @@ interface OptionsPopoverProps {
   onRemoveOption?: (text: string) => void;
   recommendedIndex?: number | null;
   recommendedRemainingMs?: number | null;
+  onCopyOption?: (text: string) => void;
 }
 
 function normalizeOption(option: string | OptionItem): OptionItem {
@@ -42,6 +43,7 @@ export const OptionsPopover = React.memo(
     onRemoveOption,
     recommendedIndex,
     recommendedRemainingMs,
+    onCopyOption,
   }: OptionsPopoverProps) => {
     const { theme } = useUnistyles();
     const appendToInput = useAppendToInput();
@@ -141,6 +143,7 @@ export const OptionsPopover = React.memo(
                     pressed && styles.removeButtonPressed,
                   ]}
                   onPress={() => {
+                    onCopyOption?.(option.text);
                     onClose();
                     appendToInput(option.text);
                   }}

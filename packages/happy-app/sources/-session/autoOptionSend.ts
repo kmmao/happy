@@ -8,12 +8,45 @@ export interface SessionFollowUpOptionsSnapshot {
   optionsHash: string;
 }
 
+export interface AutoOptionFeedbackStats {
+  send: number;
+  editSend: number;
+  timeoutIgnore: number;
+  dismiss: number;
+  total: number;
+}
+
+export type AutoOptionStatsResolver = (
+  optionText: string,
+) => AutoOptionFeedbackStats | undefined;
+
+export interface AutoOptionQualityScore {
+  score: number;
+  passed: boolean;
+  reasons: string[];
+}
+
+export interface RankedOption {
+  text: string;
+  index: number;
+  score: number;
+  passed: boolean;
+  reasons: string[];
+}
+
+export interface RankedOptionsResult {
+  ranked: RankedOption[];
+  recommendedIndex: number | null;
+}
+
 export interface AutoOptionCandidate {
   sourceMessageId: string | null;
   optionsHash: string;
   recommendedText: string;
   startedAt: number;
   durationMs: number;
+  qualityScore: number;
+  qualityReasons: string[];
 }
 
 export interface AutoOptionSendState {
@@ -38,6 +71,7 @@ export interface AutoOptionSendContext {
   now: number;
   durationMs: number;
   snapshot: SessionFollowUpOptionsSnapshot | null;
+  statsResolver?: AutoOptionStatsResolver;
 }
 
 export type AutoOptionSendEvent =
@@ -55,28 +89,34 @@ function normalizeOptionText(text: string): string {
   return text.trim().toLowerCase().replace(/\s+/g, " ");
 }
 
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(Math.max(value, min), max);
+}
+
+const MAX_OPTION_TEXT_LENGTH = 120;
+const PASS_SCORE_THRESHOLD = 70;
+const TOP_OPTIONS_LIMIT = 3;
+
 export const PURE_VIEW_ONLY_OPTION_PATTERNS = [
   "查看 diff",
   "看日志",
   "浏览输出",
 ] as const;
 
-/**
- * View-only verb prefixes (Chinese + English).
- * An option starting with any of these is considered "view-only"
- * UNLESS it also contains a follow-up action connector.
- */
 const VIEW_ONLY_VERB_PREFIXES = [
-  // Chinese
   "查看", "看一下", "看下", "浏览",
   "列出", "列举", "给我列",
   "检查", "审查",
   "显示", "展示",
   "看日志", "看 diff", "查看 diff",
-  // English
   "view ", "review ", "check ",
   "show ", "display ", "list ",
   "browse ", "inspect ",
+] as const;
+
+const ACTION_VERB_PREFIXES = [
+  "继续", "修复", "处理", "执行", "运行", "提交", "重试", "部署", "实现", "更新", "排查", "定位", "优化", "重构", "补充", "验证", "回滚", "合并",
+  "continue", "fix", "run", "execute", "implement", "update", "retry", "deploy", "commit", "refactor", "optimize", "verify", "test", "ship",
 ] as const;
 
 const FOLLOW_UP_ACTION_CONNECTORS = /(?:并|后|再|然后|并且|逐个| and | then | to fix)/i;
@@ -87,9 +127,7 @@ const PURE_VIEW_ONLY_OPTION_SET = new Set(
 
 function isPureViewOnlyOption(text: string): boolean {
   const normalized = normalizeOptionText(text);
-  // Exact match (legacy)
   if (PURE_VIEW_ONLY_OPTION_SET.has(normalized)) return true;
-  // Keyword prefix match: starts with a view-only verb AND has no follow-up action
   for (const prefix of VIEW_ONLY_VERB_PREFIXES) {
     if (normalized.startsWith(prefix.toLowerCase())) {
       return !FOLLOW_UP_ACTION_CONNECTORS.test(normalized);
@@ -98,11 +136,149 @@ function isPureViewOnlyOption(text: string): boolean {
   return false;
 }
 
-export function getRecommendedOptionIndex(items: string[]): number | null {
+function hasActionVerb(text: string): boolean {
+  const normalized = normalizeOptionText(text);
+  return ACTION_VERB_PREFIXES.some((prefix) =>
+    normalized.startsWith(prefix.toLowerCase()),
+  );
+}
+
+function scoreOption(
+  text: string,
+  index: number,
+  stats: AutoOptionFeedbackStats | undefined,
+): AutoOptionQualityScore {
+  const normalized = normalizeOptionText(text);
+
+  if (!normalized) {
+    return { score: 0, passed: false, reasons: ["empty"] };
+  }
+  if (normalized.length > MAX_OPTION_TEXT_LENGTH) {
+    return { score: 0, passed: false, reasons: ["too-long"] };
+  }
+  if (isPureViewOnlyOption(normalized)) {
+    return { score: 0, passed: false, reasons: ["view-only"] };
+  }
+
+  const reasons: string[] = [];
+  let score = 0;
+
+  if (index === 0) {
+    score += 30;
+    reasons.push("source-priority-1");
+  } else if (index === 1) {
+    score += 20;
+    reasons.push("source-priority-2");
+  } else if (index === 2) {
+    score += 12;
+    reasons.push("source-priority-3");
+  } else {
+    score += 6;
+    reasons.push("source-priority-tail");
+  }
+
+  if (hasActionVerb(normalized)) {
+    score += 28;
+    reasons.push("action-verb");
+  } else {
+    score += 12;
+    reasons.push("weak-action");
+  }
+
+  if (FOLLOW_UP_ACTION_CONNECTORS.test(normalized)) {
+    score += 18;
+    reasons.push("follow-up-connector");
+  }
+
+  if (normalized.length >= 10) {
+    score += 10;
+    reasons.push("specificity");
+  } else {
+    score += 4;
+    reasons.push("short");
+  }
+
+  if (stats && stats.total > 0) {
+    const successRate = (stats.send + stats.editSend) / stats.total;
+    const negativeRate = (stats.timeoutIgnore + stats.dismiss) / stats.total;
+    score += Math.round(successRate * 20 - negativeRate * 10);
+    reasons.push("history");
+  } else {
+    score += 20;
+    reasons.push("no-history-default");
+  }
+
+  const clamped = clamp(score, 0, 100);
+  return {
+    score: clamped,
+    passed: clamped >= PASS_SCORE_THRESHOLD,
+    reasons,
+  };
+}
+
+export function rankAndSelectOptions(
+  items: string[],
+  statsResolver?: AutoOptionStatsResolver,
+): RankedOptionsResult {
+  const seen = new Set<string>();
+  const rankedAll: RankedOption[] = [];
+
+  items.forEach((item, index) => {
+    const normalized = normalizeOptionText(item);
+    if (!normalized) return;
+    if (seen.has(normalized)) return;
+    seen.add(normalized);
+
+    const stats = statsResolver?.(item);
+    const quality = scoreOption(item, index, stats);
+    rankedAll.push({
+      text: item.trim(),
+      index,
+      score: quality.score,
+      passed: quality.passed,
+      reasons: quality.reasons,
+    });
+  });
+
+  rankedAll.sort((a, b) => {
+    if (b.score !== a.score) return b.score - a.score;
+    return a.index - b.index;
+  });
+
+  const firstItem = rankedAll.find((item) => item.index === 0) ?? null;
+  const firstItemPassed = firstItem?.passed === true;
+
+  const limited = rankedAll.slice(0, TOP_OPTIONS_LIMIT);
+  if (
+    firstItem &&
+    !limited.some((item) => item.index === firstItem.index)
+  ) {
+    if (limited.length < TOP_OPTIONS_LIMIT) {
+      limited.push(firstItem);
+    } else {
+      limited[limited.length - 1] = firstItem;
+    }
+  }
+
+  const recommendedIndex = firstItemPassed
+    ? limited.findIndex((item) => item.index === 0)
+    : -1;
+
+  return {
+    ranked: limited,
+    recommendedIndex: recommendedIndex >= 0 ? recommendedIndex : null,
+  };
+}
+
+
+export function getRecommendedOptionIndex(
+  items: string[],
+  statsResolver?: AutoOptionStatsResolver,
+): number | null {
   if (items.length < 2) return null;
-  const first = items[0]?.trim();
-  if (!first) return null;
-  return isPureViewOnlyOption(first) ? null : 0;
+  const result = rankAndSelectOptions(items, statsResolver);
+  if (result.recommendedIndex === null) return null;
+  return result.ranked[result.recommendedIndex]?.index ?? null;
 }
 
 function buildAutoSentKey(candidate: AutoOptionCandidate): string {
@@ -157,16 +333,21 @@ export function buildAutoOptionCandidate(
 ): AutoOptionCandidate | null {
   const snapshot = context.snapshot;
   if (!snapshot) return null;
-  if (getRecommendedOptionIndex(snapshot.items) !== 0) return null;
-  const recommendedText = snapshot.items[0]?.trim();
-  if (!recommendedText) return null;
+
+  const ranked = rankAndSelectOptions(snapshot.items, context.statsResolver);
+  if (ranked.recommendedIndex === null) return null;
+
+  const selected = ranked.ranked[ranked.recommendedIndex];
+  if (!selected?.text) return null;
 
   return {
     sourceMessageId: snapshot.sourceMessageId,
     optionsHash: snapshot.optionsHash,
-    recommendedText,
+    recommendedText: selected.text,
     startedAt: context.now,
     durationMs: context.durationMs,
+    qualityScore: selected.score,
+    qualityReasons: selected.reasons,
   };
 }
 
@@ -178,7 +359,10 @@ function canArm(context: AutoOptionSendContext): boolean {
   if (context.inputText.trim().length > 0) return false;
   if (context.hasPendingImages) return false;
   if (context.isSttListening) return false;
-  return getRecommendedOptionIndex(context.snapshot.items) === 0;
+  return (
+    getRecommendedOptionIndex(context.snapshot.items, context.statsResolver) !==
+    null
+  );
 }
 
 function canFire(
@@ -193,9 +377,14 @@ function canFire(
   if (context.inputText.trim().length > 0) return false;
   if (context.hasPendingImages) return false;
   if (context.isSttListening) return false;
-  if (getRecommendedOptionIndex(context.snapshot.items) !== 0) return false;
 
-  const currentText = context.snapshot.items[0]?.trim() ?? "";
+  const recIdx = getRecommendedOptionIndex(
+    context.snapshot.items,
+    context.statsResolver,
+  );
+  if (recIdx === null) return false;
+
+  const currentText = context.snapshot.items[recIdx]?.trim() ?? "";
   if (!currentText) return false;
   if (currentText !== state.candidate.recommendedText) return false;
   if (context.snapshot.optionsHash !== state.candidate.optionsHash) return false;

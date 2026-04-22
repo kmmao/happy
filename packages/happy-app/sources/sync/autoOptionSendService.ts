@@ -11,6 +11,8 @@ import {
     reduceAutoOptionSendEvent,
 } from "@/-session/autoOptionSend";
 import { type Message } from "@/sync/typesMessage";
+import { getAutoOptionFeedbackStats, recordAutoOptionFeedback } from "./autoOptionFeedback";
+import { projectManager } from "./projectManager";
 
 const DURATION_MS = 10_000;
 
@@ -187,6 +189,20 @@ class AutoOptionSendService {
             storage.getState().sessionMessages[sessionId]?.messages ?? [];
         const result = buildSnapshotFromMessages(messages);
         const context = this.buildContext(sessionId, result?.snapshot ?? null, messages, Date.now());
+
+        if (event.type === "context-invalidated" && event.reason === "options-missing" && state.candidate) {
+            this.recordFeedbackFromCandidate(
+                sessionId,
+                state.candidate.optionsHash,
+                state.candidate.recommendedText,
+                "timeout_ignore",
+                false,
+                "options-missing",
+                state.candidate.qualityScore,
+                Date.now() - state.candidate.startedAt,
+            );
+        }
+
         const next = reduceAutoOptionSendEvent(state, event, context);
         this.applyStateChange(sessionId, state, next);
     }
@@ -203,6 +219,59 @@ class AutoOptionSendService {
         return () => {
             this.listeners.get(sessionId)?.delete(cb);
         };
+    }
+
+    recordManualSend(
+        sessionId: string,
+        optionText: string,
+        optionsHash: string,
+        edited: boolean,
+        source: "auto" | "manual",
+    ): void {
+        const state = this.states.get(sessionId);
+        const scoreBefore = state?.candidate?.recommendedText === optionText
+            ? state.candidate.qualityScore
+            : null;
+        const latencyMs = state?.candidate?.recommendedText === optionText
+            ? Date.now() - state.candidate.startedAt
+            : null;
+
+        this.recordFeedbackFromCandidate(
+            sessionId,
+            optionsHash,
+            optionText,
+            edited ? "edit_send" : "send",
+            edited,
+            source,
+            scoreBefore,
+            latencyMs,
+        );
+    }
+
+    recordDismiss(
+        sessionId: string,
+        optionText: string | null,
+        optionsHash: string | null,
+    ): void {
+        if (!optionText || !optionsHash) return;
+        const state = this.states.get(sessionId);
+        const scoreBefore = state?.candidate?.recommendedText === optionText
+            ? state.candidate.qualityScore
+            : null;
+        const latencyMs = state?.candidate?.recommendedText === optionText
+            ? Date.now() - state.candidate.startedAt
+            : null;
+
+        this.recordFeedbackFromCandidate(
+            sessionId,
+            optionsHash,
+            optionText,
+            "dismiss",
+            false,
+            "manual",
+            scoreBefore,
+            latencyMs,
+        );
     }
 
     // ──────────────────────────────────────────────────────────────────────────
@@ -239,6 +308,8 @@ class AutoOptionSendService {
         now: number,
     ): AutoOptionSendContext {
         const session = storage.getState().sessions[sessionId];
+        const project = projectManager.getProjectForSession(sessionId);
+        const projectId = project?.id ?? `session:${sessionId}`;
         return {
             sessionId,
             currentSessionId: sessionId,
@@ -250,6 +321,8 @@ class AutoOptionSendService {
             now,
             durationMs: DURATION_MS,
             snapshot,
+            statsResolver: (optionText: string) =>
+                getAutoOptionFeedbackStats(projectId, optionText),
         };
     }
 
@@ -347,9 +420,31 @@ class AutoOptionSendService {
             // Notify other tabs to cancel their timers
             this.broadcastFired(sessionId, optionsHash);
 
+            this.recordFeedbackFromCandidate(
+                sessionId,
+                optionsHash,
+                textToSend,
+                "send",
+                false,
+                "auto",
+                state.candidate?.qualityScore ?? null,
+                state.candidate ? now - state.candidate.startedAt : null,
+            );
+
             this.sendMessageFn?.(sessionId, textToSend, undefined, {
                 source: "auto-option-send",
             }).catch(() => {});
+        } else if (state.candidate) {
+            this.recordFeedbackFromCandidate(
+                sessionId,
+                state.candidate.optionsHash,
+                state.candidate.recommendedText,
+                "timeout_ignore",
+                false,
+                "auto",
+                state.candidate.qualityScore,
+                now - state.candidate.startedAt,
+            );
         }
     }
 
@@ -478,6 +573,37 @@ class AutoOptionSendService {
                 });
             }
         }
+    }
+
+    private resolveProjectId(sessionId: string): string {
+        const project = projectManager.getProjectForSession(sessionId);
+        return project?.id ?? `session:${sessionId}`;
+    }
+
+    private recordFeedbackFromCandidate(
+        sessionId: string,
+        optionsHash: string,
+        optionText: string,
+        action: "send" | "edit_send" | "timeout_ignore" | "dismiss",
+        edited: boolean,
+        source: "auto" | "manual" | string,
+        scoreBefore: number | null,
+        latencyMs: number | null,
+    ): void {
+        const projectId = this.resolveProjectId(sessionId);
+        recordAutoOptionFeedback({
+            projectId,
+            sessionId,
+            optionText,
+            optionHash: optionsHash,
+            action,
+            source: source === "auto" ? "auto" : "manual",
+            scoreBefore,
+            latencyMs,
+            edited,
+            reason: null,
+            ts: Date.now(),
+        });
     }
 }
 
