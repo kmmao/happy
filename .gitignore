@@ -69,3 +69,5 @@ __pycache__/
 # Service output/artifacts
 services/*/output/
 .history/
+# Added by code-review-graph
+.code-review-graph/
