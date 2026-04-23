@@ -96,7 +96,7 @@ function clamp(value: number, min: number, max: number): number {
 }
 
 const MAX_OPTION_TEXT_LENGTH = 120;
-const PASS_SCORE_THRESHOLD = 70;
+const PASS_SCORE_THRESHOLD = 65;
 const TOP_OPTIONS_LIMIT = 3;
 
 export const PURE_VIEW_ONLY_OPTION_PATTERNS = [
@@ -118,7 +118,9 @@ const VIEW_ONLY_VERB_PREFIXES = [
 
 const ACTION_VERB_PREFIXES = [
   "继续", "修复", "处理", "执行", "运行", "提交", "重试", "部署", "实现", "更新", "排查", "定位", "优化", "重构", "补充", "验证", "回滚", "合并",
+  "推送", "发布", "创建", "删除", "移除", "添加", "配置", "清理", "迁移", "升级", "安装", "卸载", "启动", "停止", "重启", "生成", "构建", "打包", "测试", "调试",
   "continue", "fix", "run", "execute", "implement", "update", "retry", "deploy", "commit", "refactor", "optimize", "verify", "test", "ship",
+  "push", "publish", "create", "delete", "remove", "add", "configure", "clean", "migrate", "upgrade", "install", "start", "stop", "build", "debug",
 ] as const;
 
 const FOLLOW_UP_ACTION_CONNECTORS = /(?:并|后|再|然后|并且|逐个| and | then | to fix)/i;
@@ -220,7 +222,7 @@ function scoreOption(
 
     const remainder = normalized.slice(verbPrefix.length).trim();
     const isChinese = /[\u4e00-\u9fff]/.test(text);
-    const minRemainderLen = isChinese ? 4 : 6;
+    const minRemainderLen = isChinese ? 2 : 6;
     if (remainder.length < minRemainderLen) {
       score -= 15;
       reasons.push("vague-no-target");
