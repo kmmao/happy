@@ -97,7 +97,7 @@ function evictExpired(): void {
     }
 }
 
-function buildUserMessage(options: string[], contextSummary: string, sessionTitle: string | null): string {
+export function buildUserMessage(options: string[], contextSummary: string, sessionTitle: string | null): string {
     const lines: string[] = [];
     lines.push("Context:");
     lines.push(contextSummary);
@@ -112,7 +112,7 @@ function buildUserMessage(options: string[], contextSummary: string, sessionTitl
     return lines.join("\n");
 }
 
-function parseScores(text: string, expectedCount: number): number[] | null {
+export function parseScores(text: string, expectedCount: number): number[] | null {
     const match = text.match(/\[[\s\S]*?\]/);
     if (!match) return null;
 
