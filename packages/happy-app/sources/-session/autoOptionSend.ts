@@ -37,6 +37,7 @@ export interface RankedOption {
 export interface RankedOptionsResult {
   ranked: RankedOption[];
   recommendedIndex: number | null;
+  allScores: ReadonlyMap<number, number>;
 }
 
 export interface AutoOptionCandidate {
@@ -320,9 +321,15 @@ export function rankAndSelectOptions(
     ? limited.findIndex((item) => item.index === 0)
     : -1;
 
+  const allScores = new Map<number, number>();
+  for (const item of rankedAll) {
+    allScores.set(item.index, item.score);
+  }
+
   return {
     ranked: limited,
     recommendedIndex: recommendedIndex >= 0 ? recommendedIndex : null,
+    allScores,
   };
 }
 

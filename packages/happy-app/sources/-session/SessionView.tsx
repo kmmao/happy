@@ -790,14 +790,7 @@ function SessionViewInner({
     recommendedOptionIndex !== null
       ? latestOptions.items[recommendedOptionIndex] ?? null
       : null;
-  const optionScores = React.useMemo(() => {
-    if (!rankedLatestOptions) return null;
-    const map = new Map<number, number>();
-    for (const item of rankedLatestOptions.ranked) {
-      map.set(item.index, item.score);
-    }
-    return map;
-  }, [rankedLatestOptions]);
+  const optionScores = rankedLatestOptions?.allScores ?? null;
   const hasPendingAskUserQuestionVisible = React.useMemo(
     () => hasPendingAskUserQuestion(messages),
     [messages],
