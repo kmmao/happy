@@ -73,6 +73,7 @@ export interface AutoOptionSendContext {
   durationMs: number;
   snapshot: SessionFollowUpOptionsSnapshot | null;
   statsResolver?: AutoOptionStatsResolver;
+  contextKeywords?: ReadonlySet<string>;
 }
 
 export type AutoOptionSendEvent =
@@ -158,10 +159,27 @@ function matchedActionVerbPrefix(normalized: string): string | null {
   return null;
 }
 
+const CONTEXT_KEYWORD_PATTERN =
+  /(?:[a-zA-Z_]\w*\.[a-zA-Z]{1,5}|[a-z]+[A-Z]\w{2,}|\w{2,}_\w{2,}|[A-Z][a-z]+[A-Z]\w+)/g;
+
+export function extractContextKeywords(texts: string[]): Set<string> {
+  const keywords = new Set<string>();
+  for (const text of texts) {
+    const matches = text.match(CONTEXT_KEYWORD_PATTERN);
+    if (matches) {
+      for (const m of matches) {
+        keywords.add(m.toLowerCase());
+      }
+    }
+  }
+  return keywords;
+}
+
 function scoreOption(
   text: string,
   index: number,
   stats: AutoOptionFeedbackStats | undefined,
+  contextKeywords?: ReadonlySet<string>,
 ): AutoOptionQualityScore {
   const normalized = normalizeOptionText(text);
 
@@ -255,6 +273,18 @@ function scoreOption(
     reasons.push("mixed-lang-technical");
   }
 
+  if (contextKeywords && contextKeywords.size > 0) {
+    const optionTokens = text.match(CONTEXT_KEYWORD_PATTERN) ?? [];
+    const hits = optionTokens.filter((t) => contextKeywords.has(t.toLowerCase()));
+    if (hits.length >= 2) {
+      score += 12;
+      reasons.push("context-match-strong");
+    } else if (hits.length === 1) {
+      score += 6;
+      reasons.push("context-match");
+    }
+  }
+
   if (stats && stats.total > 0) {
     const successRate = (stats.send + stats.editSend) / stats.total;
     const negativeRate = (stats.timeoutIgnore + stats.dismiss) / stats.total;
@@ -276,6 +306,7 @@ function scoreOption(
 export function rankAndSelectOptions(
   items: string[],
   statsResolver?: AutoOptionStatsResolver,
+  contextKeywords?: ReadonlySet<string>,
 ): RankedOptionsResult {
   const seen = new Set<string>();
   const rankedAll: RankedOption[] = [];
@@ -287,7 +318,7 @@ export function rankAndSelectOptions(
     seen.add(normalized);
 
     const stats = statsResolver?.(item);
-    const quality = scoreOption(item, index, stats);
+    const quality = scoreOption(item, index, stats, contextKeywords);
     rankedAll.push({
       text: item.trim(),
       index,
@@ -337,9 +368,10 @@ export function rankAndSelectOptions(
 export function getRecommendedOptionIndex(
   items: string[],
   statsResolver?: AutoOptionStatsResolver,
+  contextKeywords?: ReadonlySet<string>,
 ): number | null {
   if (items.length < 2) return null;
-  const result = rankAndSelectOptions(items, statsResolver);
+  const result = rankAndSelectOptions(items, statsResolver, contextKeywords);
   if (result.recommendedIndex === null) return null;
   return result.ranked[result.recommendedIndex]?.index ?? null;
 }
@@ -397,7 +429,7 @@ export function buildAutoOptionCandidate(
   const snapshot = context.snapshot;
   if (!snapshot) return null;
 
-  const ranked = rankAndSelectOptions(snapshot.items, context.statsResolver);
+  const ranked = rankAndSelectOptions(snapshot.items, context.statsResolver, context.contextKeywords);
   if (ranked.recommendedIndex === null) return null;
 
   const selected = ranked.ranked[ranked.recommendedIndex];

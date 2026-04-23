@@ -106,6 +106,7 @@ import { useUnistyles } from "react-native-unistyles";
 import { Message } from "@/sync/typesMessage";
 import {
   buildOptionsHash,
+  extractContextKeywords,
   rankAndSelectOptions,
   type SessionFollowUpOptionsSnapshot,
 } from "./autoOptionSend";
@@ -778,12 +779,24 @@ function SessionViewInner({
     () => buildOptionsHash(latestOptions.items),
     [latestOptions.items],
   );
+  const sessionContextKeywords = React.useMemo(() => {
+    const recentTexts: string[] = [];
+    let count = 0;
+    for (const msg of messages) {
+      if (count >= 5) break;
+      if (msg.kind === "agent-text" || msg.kind === "user-text") {
+        recentTexts.push(msg.text);
+        count++;
+      }
+    }
+    return extractContextKeywords(recentTexts);
+  }, [messages]);
   const rankedLatestOptions = React.useMemo(
     () =>
       latestOptions.items.length < 2
         ? null
-        : rankAndSelectOptions(latestOptions.items, optionStatsResolver),
-    [latestOptions.items, optionStatsResolver, autoOptionFeedbackRevision],
+        : rankAndSelectOptions(latestOptions.items, optionStatsResolver, sessionContextKeywords),
+    [latestOptions.items, optionStatsResolver, autoOptionFeedbackRevision, sessionContextKeywords],
   );
   const recommendedOptionIndex = rankedLatestOptions?.recommendedIndex ?? null;
   const recommendedOptionText =

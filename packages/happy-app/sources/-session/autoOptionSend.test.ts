@@ -4,6 +4,7 @@ import {
   buildAutoSentKey,
   buildOptionsHash,
   createInitialAutoOptionSendState,
+  extractContextKeywords,
   getRecommendedOptionIndex,
   normalizeOptionText,
   rankAndSelectOptions,
@@ -434,5 +435,48 @@ describe("autoOptionSend", () => {
     ]);
     const first = result.ranked[0];
     expect(first?.reasons).toContain("detailed");
+  });
+
+  it("extractContextKeywords 从文本中提取技术关键词", () => {
+    const keywords = extractContextKeywords([
+      "修改了 autoOptionSend.ts 中的 scoreOption 函数",
+      "使用 buildAutoSentKey 构建唯一键",
+    ]);
+    expect(keywords.has("autooptionsend.ts")).toBe(true);
+    expect(keywords.has("scoreoption")).toBe(true);
+    expect(keywords.has("buildautosentkey")).toBe(true);
+  });
+
+  it("上下文关联选项获得 context-match 加分", () => {
+    const ctx = new Set(["scoreoption", "autooptionsend.ts"]);
+    const result = rankAndSelectOptions(
+      ["优化 scoreOption 的权重计算", "部署到生产环境"],
+      undefined,
+      ctx,
+    );
+    const matched = result.ranked.find((r) => r.text === "优化 scoreOption 的权重计算");
+    expect(matched?.reasons).toContain("context-match");
+  });
+
+  it("多个上下文关键词命中获得 context-match-strong 加分", () => {
+    const ctx = new Set(["scoreoption", "autooptionsend.ts"]);
+    const result = rankAndSelectOptions(
+      ["重构 autoOptionSend.ts 中的 scoreOption 逻辑", "跳过"],
+      undefined,
+      ctx,
+    );
+    const matched = result.ranked.find((r) => r.text.includes("scoreOption"));
+    expect(matched?.reasons).toContain("context-match-strong");
+  });
+
+  it("无上下文关键词时不影响评分", () => {
+    const result = rankAndSelectOptions(
+      ["继续修 token", "整理检查清单"],
+      undefined,
+      new Set(),
+    );
+    const first = result.ranked.find((r) => r.text === "继续修 token");
+    expect(first?.reasons).not.toContain("context-match");
+    expect(first?.reasons).not.toContain("context-match-strong");
   });
 });

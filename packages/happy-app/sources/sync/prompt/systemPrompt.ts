@@ -24,6 +24,8 @@ export const systemPrompt = trimIdent(`
 
     Rules for <options>:
     - ONLY use for post-task follow-up suggestions (e.g. "Run tests", "Deploy", "Open a PR")
+    - Each option MUST reference specific artifacts from the current task (file names, function names, error messages, test names, or concrete targets). Never suggest generic actions like "Continue" or "Run tests" without specifying what to test or continue
+    - Each option should complete the sentence "Next, I will..." with a clear, actionable goal
     - Exclude passive inspection-only actions like viewing diff or browsing logs when they do not lead to a concrete next action or decision; only include actions the user would likely execute next
     - For questions or decisions, use AskUserQuestion instead
     - Output at the very end of your response, not inside other text
