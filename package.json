@@ -58,5 +58,9 @@
         "vite": ">=7.3.2",
         "@anthropic-ai/sdk": ">=0.81.0",
         "yaml": ">=2.8.3"
+    },
+    "dependencies": {
+        "@xmldom/xmldom": "^0.9.10",
+        "fast-xml-parser": "^5.7.0"
     }
 }
