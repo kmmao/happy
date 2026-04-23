@@ -125,6 +125,8 @@ const ACTION_VERB_PREFIXES = [
 
 const FOLLOW_UP_ACTION_CONNECTORS = /(?:并|后|再|然后|并且|逐个| and | then | to fix)/i;
 
+const VERIFICATION_SUFFIX_PATTERN = /(?:是否已|是否需要|是否可以|是否能|是否应该|是否正确|是否完成|if .+(?:fixed|resolved|working|done|completed|correct))/i;
+
 const VAGUE_OPTION_BLACKLIST = new Set([
   "继续", "好的", "确认", "开始", "执行", "提交", "ok", "是的", "可以", "没问题", "好",
   "continue", "yes", "go ahead", "proceed", "do it", "sounds good", "go", "sure",
@@ -148,7 +150,9 @@ function isPureViewOnlyOption(text: string): boolean {
   if (PURE_VIEW_ONLY_OPTION_SET.has(normalized)) return true;
   for (const prefix of VIEW_ONLY_VERB_PREFIXES) {
     if (normalized.startsWith(prefix.toLowerCase())) {
-      return !FOLLOW_UP_ACTION_CONNECTORS.test(normalized);
+      if (FOLLOW_UP_ACTION_CONNECTORS.test(normalized)) return false;
+      if (VERIFICATION_SUFFIX_PATTERN.test(normalized)) return false;
+      return true;
     }
   }
   return false;
@@ -335,24 +339,10 @@ export function rankAndSelectOptions(
     return a.index - b.index;
   });
 
-  const firstItem = rankedAll.find((item) => item.index === 0) ?? null;
-  const firstItemPassed = firstItem?.passed === true;
-
   const limited = rankedAll.slice(0, TOP_OPTIONS_LIMIT);
-  if (
-    firstItem &&
-    !limited.some((item) => item.index === firstItem.index)
-  ) {
-    if (limited.length < TOP_OPTIONS_LIMIT) {
-      limited.push(firstItem);
-    } else {
-      limited[limited.length - 1] = firstItem;
-    }
-  }
 
-  const recommendedIndex = firstItemPassed
-    ? limited.findIndex((item) => item.index === 0)
-    : -1;
+  const bestPassing = rankedAll.find((item) => item.passed) ?? null;
+  const recommendedOriginalIndex = bestPassing?.index ?? -1;
 
   const allScores = new Map<number, number>();
   for (const item of rankedAll) {
@@ -361,7 +351,7 @@ export function rankAndSelectOptions(
 
   return {
     ranked: limited,
-    recommendedIndex: recommendedIndex >= 0 ? recommendedIndex : null,
+    recommendedIndex: recommendedOriginalIndex >= 0 ? recommendedOriginalIndex : null,
     allScores,
   };
 }
@@ -374,8 +364,7 @@ export function getRecommendedOptionIndex(
 ): number | null {
   if (items.length < 2) return null;
   const result = rankAndSelectOptions(items, statsResolver, contextKeywords);
-  if (result.recommendedIndex === null) return null;
-  return result.ranked[result.recommendedIndex]?.index ?? null;
+  return result.recommendedIndex;
 }
 
 export function buildAutoSentKey(candidate: AutoOptionCandidate): string {
@@ -434,7 +423,7 @@ export function buildAutoOptionCandidate(
   const ranked = rankAndSelectOptions(snapshot.items, context.statsResolver, context.contextKeywords);
   if (ranked.recommendedIndex === null) return null;
 
-  const selected = ranked.ranked[ranked.recommendedIndex];
+  const selected = ranked.ranked.find((item) => item.index === ranked.recommendedIndex) ?? null;
   if (!selected?.text) return null;
 
   return {

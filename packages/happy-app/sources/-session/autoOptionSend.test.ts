@@ -357,14 +357,14 @@ describe("autoOptionSend", () => {
     expect(next.status).toBe("idle");
   });
 
-  it("空洞选项被黑名单拦截（中文）", () => {
+  it("空洞选项被黑名单拦截，高质量选项仍可推荐（中文）", () => {
     expect(getRecommendedOptionIndex(["继续", "整理检查清单"])).toBeNull();
     expect(getRecommendedOptionIndex(["好的", "开始部署"])).toBeNull();
     expect(getRecommendedOptionIndex(["确认", "下一步"])).toBeNull();
-    expect(getRecommendedOptionIndex(["ok", "继续修复 token"])).toBeNull();
+    expect(getRecommendedOptionIndex(["ok", "继续修复 token"])).toBe(1);
   });
 
-  it("空洞选项被黑名单拦截（英文）", () => {
+  it("空洞选项被黑名单拦截，低质量选项不推荐（英文）", () => {
     expect(getRecommendedOptionIndex(["continue", "Fix the auth bug"])).toBeNull();
     expect(getRecommendedOptionIndex(["go ahead", "Deploy to staging"])).toBeNull();
     expect(getRecommendedOptionIndex(["run tests", "Fix failing specs"])).toBeNull();
