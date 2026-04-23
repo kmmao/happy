@@ -29,7 +29,7 @@
     },
     "packageManager": "yarn@1.22.22",
     "resolutions": {
-        "fast-xml-parser": "^5.5.6",
+        "fast-xml-parser": "^5.7.0",
         "basic-ftp": ">=5.3.0",
         "rollup": "^4.59.0",
         "prismjs": "^1.30.0",
@@ -51,16 +51,12 @@
         "ajv": ">=8.18.0",
         "effect": ">=3.20.0",
         "node-forge": ">=1.4.0",
-        "@xmldom/xmldom": ">=0.8.12",
+        "@xmldom/xmldom": ">=0.9.10",
         "defu": ">=6.1.5",
         "path-to-regexp": ">=8.4.0",
         "picomatch": ">=4.0.4",
         "vite": ">=7.3.2",
         "@anthropic-ai/sdk": ">=0.81.0",
         "yaml": ">=2.8.3"
-    },
-    "dependencies": {
-        "@xmldom/xmldom": "^0.9.10",
-        "fast-xml-parser": "^5.7.0"
     }
 }
