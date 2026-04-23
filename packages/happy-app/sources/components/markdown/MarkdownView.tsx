@@ -22,6 +22,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useUnistyles } from "react-native-unistyles";
 import { ShimmerOverlay } from "../ShimmerOverlay";
 import { log } from '@/log';
+import { rankAndSelectOptions } from "@/-session/autoOptionSend";
 
 // Option type for callback
 export type Option = {
@@ -429,6 +430,13 @@ function RenderOptionsBlock(props: {
   const appendToInput = useAppendToInput();
   const { theme } = useUnistyles();
 
+  const ranked = React.useMemo(
+    () => props.items.length >= 2
+      ? rankAndSelectOptions(props.items)
+      : null,
+    [props.items],
+  );
+
   return (
     <View
       style={[
@@ -438,7 +446,8 @@ function RenderOptionsBlock(props: {
       ]}
     >
       {props.items.map((item, index) => {
-        const isRecommended = index === 0 && props.items.length > 1;
+        const isRecommended = ranked?.recommendedIndex === index;
+        const score = ranked?.allScores.get(index) ?? null;
         if (props.onOptionPress) {
           const bookmarked = isBookmarked(item);
           return (
@@ -456,6 +465,13 @@ function RenderOptionsBlock(props: {
                   <Text selectable={props.selectable} style={[style.optionText, style.optionTextFlex]}>
                     {item}
                   </Text>
+                  {score != null && (
+                    <View style={[style.scoreBadge, score >= 70 ? { backgroundColor: theme.colors.radio.active + "20" } : { backgroundColor: theme.colors.box.warning.background }]}>
+                      <Text style={[style.scoreBadgeText, score >= 70 ? { color: theme.colors.radio.active } : { color: theme.colors.box.warning.text }]}>
+                        {score}
+                      </Text>
+                    </View>
+                  )}
                   {isRecommended && (
                     <View style={style.recommendedTag}>
                       <Ionicons
@@ -519,6 +535,13 @@ function RenderOptionsBlock(props: {
                 <Text selectable={props.selectable} style={[style.optionText, style.optionTextFlex]}>
                   {item}
                 </Text>
+                {score != null && (
+                  <View style={[style.scoreBadge, score >= 70 ? { backgroundColor: theme.colors.radio.active + "20" } : { backgroundColor: theme.colors.box.warning.background }]}>
+                    <Text style={[style.scoreBadgeText, score >= 70 ? { color: theme.colors.radio.active } : { color: theme.colors.box.warning.text }]}>
+                      {score}
+                    </Text>
+                  </View>
+                )}
                 {isRecommended && (
                   <View style={style.recommendedTag}>
                     <Ionicons
@@ -910,6 +933,16 @@ const style = StyleSheet.create((theme) => ({
     fontSize: 11,
     fontWeight: "600" as const,
     color: theme.colors.radio.active,
+  },
+  scoreBadge: {
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+    borderRadius: 4,
+    flexShrink: 0,
+  },
+  scoreBadgeText: {
+    fontSize: 10,
+    ...Typography.default("semiBold"),
   },
   bookmarkButton: {
     padding: 6,
