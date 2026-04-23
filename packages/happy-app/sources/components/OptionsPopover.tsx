@@ -23,6 +23,7 @@ interface OptionsPopoverProps {
   recommendedIndex?: number | null;
   recommendedRemainingMs?: number | null;
   onCopyOption?: (text: string) => void;
+  scores?: ReadonlyMap<number, number> | null;
 }
 
 function normalizeOption(option: string | OptionItem): OptionItem {
@@ -44,6 +45,7 @@ export const OptionsPopover = React.memo(
     recommendedIndex,
     recommendedRemainingMs,
     onCopyOption,
+    scores,
   }: OptionsPopoverProps) => {
     const { theme } = useUnistyles();
     const appendToInput = useAppendToInput();
@@ -86,9 +88,32 @@ export const OptionsPopover = React.memo(
                   onPress={() => onOptionPress(option.text)}
                 >
                   <View style={styles.optionContent}>
-                    <Text style={styles.optionText} numberOfLines={2}>
-                      {option.text}
-                    </Text>
+                    <View style={styles.optionTextRow}>
+                      <Text style={styles.optionText} numberOfLines={2}>
+                        {option.text}
+                      </Text>
+                      {scores?.has(index) && (
+                        <View
+                          style={[
+                            styles.scoreBadge,
+                            (scores.get(index) ?? 0) >= 70
+                              ? { backgroundColor: theme.colors.radio.active + "20" }
+                              : { backgroundColor: theme.colors.box.warning.background },
+                          ]}
+                        >
+                          <Text
+                            style={[
+                              styles.scoreBadgeText,
+                              (scores.get(index) ?? 0) >= 70
+                                ? { color: theme.colors.radio.active }
+                                : { color: theme.colors.box.warning.text },
+                            ]}
+                          >
+                            {scores.get(index)}
+                          </Text>
+                        </View>
+                      )}
+                    </View>
                     {isRecommended && (
                       <View style={styles.recommendedTag}>
                         <Ionicons
@@ -234,12 +259,28 @@ const styles = StyleSheet.create((theme) => ({
     alignItems: "center" as const,
     gap: 8,
   },
+  optionTextRow: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: 6,
+    flexShrink: 1,
+  },
   optionText: {
     ...Typography.default(),
     fontSize: 15,
     lineHeight: 22,
     color: theme.colors.text,
     flexShrink: 1,
+  },
+  scoreBadge: {
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+    borderRadius: 4,
+    flexShrink: 0,
+  },
+  scoreBadgeText: {
+    fontSize: 10,
+    ...Typography.default("semiBold"),
   },
   recommendedTag: {
     flexDirection: "row" as const,

@@ -355,4 +355,84 @@ describe("autoOptionSend", () => {
     expect(next.enabled).toBe(true);
     expect(next.status).toBe("idle");
   });
+
+  it("空洞选项被黑名单拦截（中文）", () => {
+    expect(getRecommendedOptionIndex(["继续", "整理检查清单"])).toBeNull();
+    expect(getRecommendedOptionIndex(["好的", "开始部署"])).toBeNull();
+    expect(getRecommendedOptionIndex(["确认", "下一步"])).toBeNull();
+    expect(getRecommendedOptionIndex(["ok", "继续修复 token"])).toBeNull();
+  });
+
+  it("空洞选项被黑名单拦截（英文）", () => {
+    expect(getRecommendedOptionIndex(["continue", "Fix the auth bug"])).toBeNull();
+    expect(getRecommendedOptionIndex(["go ahead", "Deploy to staging"])).toBeNull();
+    expect(getRecommendedOptionIndex(["run tests", "Fix failing specs"])).toBeNull();
+    expect(getRecommendedOptionIndex(["fix it", "Refactor auth module"])).toBeNull();
+    expect(getRecommendedOptionIndex(["ship it", "Run integration tests"])).toBeNull();
+  });
+
+  it("动词后缺乏目标的选项被惩罚", () => {
+    const result = rankAndSelectOptions(["继续修", "整理检查清单"]);
+    const first = result.ranked.find((r) => r.text === "继续修");
+    expect(first?.passed).toBe(false);
+    expect(first?.reasons).toContain("vague-no-target");
+  });
+
+  it("fix bug 英文过短目标被惩罚", () => {
+    const result = rankAndSelectOptions(["fix bug", "Refactor the module"]);
+    const first = result.ranked.find((r) => r.text === "fix bug");
+    expect(first?.passed).toBe(false);
+    expect(first?.reasons).toContain("vague-no-target");
+  });
+
+  it("有明确目标的动词选项不被惩罚", () => {
+    const result = rankAndSelectOptions(["继续修复 auth 模块", "整理检查清单"]);
+    const first = result.ranked.find((r) => r.text === "继续修复 auth 模块");
+    expect(first?.passed).toBe(true);
+    expect(first?.reasons).not.toContain("vague-no-target");
+  });
+
+  it("含文件名的选项获得技术具体性加分", () => {
+    const result = rankAndSelectOptions(["修复 autoOptionSend.ts 的评分逻辑", "跳过"]);
+    const first = result.ranked.find((r) => r.text === "修复 autoOptionSend.ts 的评分逻辑");
+    expect(first?.passed).toBe(true);
+    expect(first?.reasons).toContain("technical-specificity");
+  });
+
+  it("含函数调用的选项获得技术具体性加分", () => {
+    const result = rankAndSelectOptions(["优化 scoreOption() 的权重计算", "跳过"]);
+    const first = result.ranked.find((r) => r.text === "优化 scoreOption() 的权重计算");
+    expect(first?.passed).toBe(true);
+    expect(first?.reasons).toContain("technical-specificity");
+  });
+
+  it("含领域关键词且足够长的中文选项获得领域具体性加分", () => {
+    const result = rankAndSelectOptions(["修复认证模块的 token 刷新逻辑", "跳过"]);
+    const first = result.ranked.find((r) => r.text === "修复认证模块的 token 刷新逻辑");
+    expect(first?.passed).toBe(true);
+    expect(first?.reasons).toContain("domain-specificity");
+  });
+
+  it("中英混合技术词获得混合语言加分", () => {
+    const result = rankAndSelectOptions(["继续修 token", "整理检查清单"]);
+    const first = result.ranked.find((r) => r.text === "继续修 token");
+    expect(first?.passed).toBe(true);
+    expect(first?.reasons).toContain("mixed-lang-technical");
+  });
+
+  it("复合动作中尾部含动词的选项获得 compound-action 加分", () => {
+    const result = rankAndSelectOptions(["看日志后继续定位", "总结原因"]);
+    const first = result.ranked.find((r) => r.text === "看日志后继续定位");
+    expect(first?.passed).toBe(true);
+    expect(first?.reasons).toContain("compound-action");
+  });
+
+  it("长描述选项获得 detailed 加分", () => {
+    const result = rankAndSelectOptions([
+      "继续修复 auth 模块的 token 刷新逻辑并运行集成测试",
+      "跳过",
+    ]);
+    const first = result.ranked[0];
+    expect(first?.reasons).toContain("detailed");
+  });
 });

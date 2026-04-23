@@ -790,6 +790,14 @@ function SessionViewInner({
     recommendedOptionIndex !== null
       ? latestOptions.items[recommendedOptionIndex] ?? null
       : null;
+  const optionScores = React.useMemo(() => {
+    if (!rankedLatestOptions) return null;
+    const map = new Map<number, number>();
+    for (const item of rankedLatestOptions.ranked) {
+      map.set(item.index, item.score);
+    }
+    return map;
+  }, [rankedLatestOptions]);
   const hasPendingAskUserQuestionVisible = React.useMemo(
     () => hasPendingAskUserQuestion(messages),
     [messages],
@@ -1663,6 +1671,7 @@ function SessionViewInner({
           }
           recommendedIndex={recommendedOptionIndex}
           recommendedRemainingMs={autoOptionSendControl.remainingMs}
+          scores={optionScores}
         />
         <OptionsPopover
           visible={showBookmarksPopover && bookmarks.length > 0}

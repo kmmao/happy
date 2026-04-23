@@ -121,6 +121,20 @@ const ACTION_VERB_PREFIXES = [
 
 const FOLLOW_UP_ACTION_CONNECTORS = /(?:并|后|再|然后|并且|逐个| and | then | to fix)/i;
 
+const VAGUE_OPTION_BLACKLIST = new Set([
+  "继续", "好的", "确认", "开始", "执行", "提交", "ok", "是的", "可以", "没问题", "好",
+  "continue", "yes", "go ahead", "proceed", "do it", "sounds good", "go", "sure",
+  "run tests", "run it", "fix it", "ship it",
+].map(normalizeOptionText));
+
+const TECHNICAL_SPECIFICITY_PATTERN =
+  /(?:[a-zA-Z_]\w*\.[a-zA-Z]{1,4}|[a-z]+[A-Z]\w+|\w+_\w+|`[^`]+`|[a-zA-Z_]\w*\(\)|\/[\w/.]+|@[\w/]+)/;
+
+const CHINESE_SPECIFICITY_PATTERN =
+  /(?:模块|文件|函数|接口|组件|页面|路由|配置|测试用例|逻辑|方法|类|表|字段|参数|变量|常量)/;
+
+const MIXED_LANG_TECHNICAL = /[\u4e00-\u9fff]\s*[a-zA-Z]\w{2,}/;
+
 const PURE_VIEW_ONLY_OPTION_SET = new Set(
   PURE_VIEW_ONLY_OPTION_PATTERNS.map(normalizeOptionText),
 );
@@ -136,11 +150,11 @@ function isPureViewOnlyOption(text: string): boolean {
   return false;
 }
 
-function hasActionVerb(text: string): boolean {
-  const normalized = normalizeOptionText(text);
-  return ACTION_VERB_PREFIXES.some((prefix) =>
-    normalized.startsWith(prefix.toLowerCase()),
-  );
+function matchedActionVerbPrefix(normalized: string): string | null {
+  for (const prefix of ACTION_VERB_PREFIXES) {
+    if (normalized.startsWith(prefix.toLowerCase())) return prefix.toLowerCase();
+  }
+  return null;
 }
 
 function scoreOption(
@@ -159,43 +173,85 @@ function scoreOption(
   if (isPureViewOnlyOption(normalized)) {
     return { score: 0, passed: false, reasons: ["view-only"] };
   }
+  if (VAGUE_OPTION_BLACKLIST.has(normalized)) {
+    return { score: 0, passed: false, reasons: ["vague-blacklist"] };
+  }
 
   const reasons: string[] = [];
   let score = 0;
 
   if (index === 0) {
-    score += 30;
+    score += 25;
     reasons.push("source-priority-1");
   } else if (index === 1) {
-    score += 20;
+    score += 16;
     reasons.push("source-priority-2");
   } else if (index === 2) {
-    score += 12;
+    score += 10;
     reasons.push("source-priority-3");
   } else {
-    score += 6;
+    score += 4;
     reasons.push("source-priority-tail");
   }
 
-  if (hasActionVerb(normalized)) {
-    score += 28;
+  const verbPrefix = matchedActionVerbPrefix(normalized);
+  if (verbPrefix) {
+    score += 22;
     reasons.push("action-verb");
+
+    const remainder = normalized.slice(verbPrefix.length).trim();
+    const isChinese = /[\u4e00-\u9fff]/.test(text);
+    const minRemainderLen = isChinese ? 4 : 6;
+    if (remainder.length < minRemainderLen) {
+      score -= 15;
+      reasons.push("vague-no-target");
+    }
   } else {
-    score += 12;
-    reasons.push("weak-action");
+    const connectorMatch = FOLLOW_UP_ACTION_CONNECTORS.exec(normalized);
+    const tail = connectorMatch
+      ? normalized.slice(connectorMatch.index + connectorMatch[0].length).trim()
+      : "";
+    const tailHasAction = tail
+      ? ACTION_VERB_PREFIXES.some((p) => tail.includes(p.toLowerCase()))
+      : false;
+    if (tailHasAction) {
+      score += 22;
+      reasons.push("compound-action");
+    } else {
+      score += 8;
+      reasons.push("weak-action");
+    }
   }
 
   if (FOLLOW_UP_ACTION_CONNECTORS.test(normalized)) {
-    score += 18;
+    score += 16;
     reasons.push("follow-up-connector");
   }
 
-  if (normalized.length >= 10) {
-    score += 10;
-    reasons.push("specificity");
-  } else {
+  if (normalized.length >= 20) {
+    score += 12;
+    reasons.push("detailed");
+  } else if (normalized.length >= 10) {
+    score += 8;
+    reasons.push("medium-length");
+  } else if (normalized.length >= 6) {
     score += 4;
     reasons.push("short");
+  } else {
+    reasons.push("too-short");
+  }
+
+  if (TECHNICAL_SPECIFICITY_PATTERN.test(text)) {
+    score += 8;
+    reasons.push("technical-specificity");
+  }
+  if (CHINESE_SPECIFICITY_PATTERN.test(text) && normalized.length >= 8) {
+    score += 6;
+    reasons.push("domain-specificity");
+  }
+  if (MIXED_LANG_TECHNICAL.test(text)) {
+    score += 6;
+    reasons.push("mixed-lang-technical");
   }
 
   if (stats && stats.total > 0) {
@@ -204,7 +260,7 @@ function scoreOption(
     score += Math.round(successRate * 20 - negativeRate * 10);
     reasons.push("history");
   } else {
-    score += 20;
+    score += 14;
     reasons.push("no-history-default");
   }
 
