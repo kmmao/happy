@@ -9,12 +9,16 @@ import {
     buildOptionsHash,
     createInitialAutoOptionSendState,
     getRecommendedOptionIndex,
+    rankAndSelectOptions,
     reduceAutoOptionSendEvent,
 } from "@/-session/autoOptionSend";
 import { type Message } from "@/sync/typesMessage";
 import { getAutoOptionFeedbackStats, recordAutoOptionFeedback } from "./autoOptionFeedback";
 import { projectManager } from "./projectManager";
 import { log } from "@/log";
+import { scoreOptionsRemote } from "./apiOptionScore";
+import { buildOptionScoringContext } from "@/-session/buildOptionScoringContext";
+import { sync } from "./sync";
 
 const DURATION_MS = 10_000;
 
@@ -120,6 +124,12 @@ class AutoOptionSendService {
     private readonly tabId = Math.random().toString(36).slice(2, 10);
     /** BroadcastChannel for cross-tab coordination (web only). */
     private channel: BroadcastChannel | null = null;
+
+    private semanticScores = new Map<string, Map<number, number>>();
+    private semanticControllers = new Map<string, AbortController>();
+    private lastSemanticScoredAt = new Map<string, number>();
+    private static readonly SEMANTIC_COOLDOWN_MS = 30_000;
+    private static readonly SEMANTIC_SCORE_GAP_THRESHOLD = 15;
 
     /** Called once by sync.ts during init. */
     init(
@@ -363,8 +373,10 @@ class AutoOptionSendService {
 
         if (isArmed && !wasArmed) {
             this.startTimer(sessionId);
+            this.triggerSemanticScoring(sessionId);
         } else if (!isArmed && wasArmed) {
             this.clearTimer(sessionId);
+            this.cancelSemanticScoring(sessionId);
         }
     }
 
@@ -400,6 +412,83 @@ class AutoOptionSendService {
             clearInterval(timer);
             this.timers.delete(sessionId);
         }
+    }
+
+    private cancelSemanticScoring(sessionId: string): void {
+        const controller = this.semanticControllers.get(sessionId);
+        if (controller) {
+            controller.abort();
+            this.semanticControllers.delete(sessionId);
+        }
+    }
+
+    private triggerSemanticScoring(sessionId: string): void {
+        const state = this.states.get(sessionId);
+        if (!state?.candidate) return;
+
+        const optionsHash = state.candidate.optionsHash;
+
+        if (this.semanticScores.has(optionsHash)) return;
+
+        const now = Date.now();
+        const lastScored = this.lastSemanticScoredAt.get(sessionId) ?? 0;
+        if (now - lastScored < AutoOptionSendService.SEMANTIC_COOLDOWN_MS) return;
+
+        const messages =
+            storage.getState().sessionMessages[sessionId]?.messages ?? [];
+        const result = buildSnapshotFromMessages(messages);
+        if (!result?.snapshot) return;
+
+        const items = result.snapshot.items;
+        const heuristicResult = rankAndSelectOptions(items);
+        const scores = [...heuristicResult.allScores.values()];
+        scores.sort((a, b) => b - a);
+        if (scores.length >= 2 && scores[0] - scores[1] > AutoOptionSendService.SEMANTIC_SCORE_GAP_THRESHOLD) return;
+
+        const credentials = sync.getCredentials();
+        if (!credentials) return;
+
+        const contextSummary = buildOptionScoringContext(messages, null);
+        const controller = new AbortController();
+        this.cancelSemanticScoring(sessionId);
+        this.semanticControllers.set(sessionId, controller);
+        this.lastSemanticScoredAt.set(sessionId, now);
+
+        scoreOptionsRemote(credentials, items, contextSummary, null, controller.signal)
+            .then((response) => {
+                this.semanticControllers.delete(sessionId);
+
+                const current = this.states.get(sessionId);
+                if (!current || current.status !== "armed" || !current.candidate) return;
+                if (current.candidate.optionsHash !== optionsHash) return;
+
+                const semanticMap = new Map<number, number>();
+                response.scores.forEach((s, i) => semanticMap.set(i, s));
+                this.semanticScores.set(optionsHash, semanticMap);
+
+                const projectId = this.resolveProjectId(sessionId);
+                const statsResolver = (optionText: string) =>
+                    getAutoOptionFeedbackStats(projectId, optionText);
+                const reranked = rankAndSelectOptions(items, statsResolver, undefined, semanticMap);
+
+                if (reranked.recommendedIndex !== null) {
+                    const selected = reranked.ranked.find((item) => item.index === reranked.recommendedIndex);
+                    if (selected && selected.text !== current.candidate.recommendedText) {
+                        this.setState(sessionId, {
+                            ...current,
+                            candidate: {
+                                ...current.candidate,
+                                recommendedText: selected.text,
+                                qualityScore: selected.score,
+                                qualityReasons: selected.reasons,
+                            },
+                        });
+                    }
+                }
+            })
+            .catch(() => {
+                this.semanticControllers.delete(sessionId);
+            });
     }
 
     private fireTimerFinished(sessionId: string): void {

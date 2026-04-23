@@ -186,6 +186,7 @@ function scoreOption(
   index: number,
   stats: AutoOptionFeedbackStats | undefined,
   contextKeywords?: ReadonlySet<string>,
+  semanticScore?: number,
 ): AutoOptionQualityScore {
   const normalized = normalizeOptionText(text);
 
@@ -301,6 +302,11 @@ function scoreOption(
     reasons.push("no-history-default");
   }
 
+  if (semanticScore != null && semanticScore > 0) {
+    score += Math.round(semanticScore * 0.3);
+    reasons.push("semantic-boost");
+  }
+
   const clamped = clamp(score, 0, 100);
   return {
     score: clamped,
@@ -313,6 +319,7 @@ export function rankAndSelectOptions(
   items: string[],
   statsResolver?: AutoOptionStatsResolver,
   contextKeywords?: ReadonlySet<string>,
+  semanticScores?: ReadonlyMap<number, number>,
 ): RankedOptionsResult {
   const seen = new Set<string>();
   const rankedAll: RankedOption[] = [];
@@ -324,7 +331,7 @@ export function rankAndSelectOptions(
     seen.add(normalized);
 
     const stats = statsResolver?.(item);
-    const quality = scoreOption(item, index, stats, contextKeywords);
+    const quality = scoreOption(item, index, stats, contextKeywords, semanticScores?.get(index));
     rankedAll.push({
       text: item.trim(),
       index,
