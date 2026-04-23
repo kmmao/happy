@@ -1,12 +1,15 @@
 import { describe, expect, it } from "vitest";
 import {
   buildAutoOptionCandidate,
+  buildAutoSentKey,
   buildOptionsHash,
   createInitialAutoOptionSendState,
   getRecommendedOptionIndex,
+  normalizeOptionText,
   rankAndSelectOptions,
   reduceAutoOptionSendEvent,
   type AutoOptionSendContext,
+  type AutoOptionCandidate,
   type AutoOptionFeedbackStats,
 } from "./autoOptionSend";
 
@@ -289,5 +292,67 @@ describe("autoOptionSend", () => {
 
     expect(result.ranked.length).toBeLessThanOrEqual(3);
     expect(result.ranked.map((item) => item.text)).toContain("继续修 token");
+  });
+
+  it("normalizeOptionText 统一空白和大小写", () => {
+    expect(normalizeOptionText("  Hello  World ")).toBe("hello world");
+    expect(normalizeOptionText("继续\t修复")).toBe("继续 修复");
+    expect(normalizeOptionText("")).toBe("");
+  });
+
+  it("buildAutoSentKey 生成唯一键", () => {
+    const candidate: AutoOptionCandidate = {
+      sourceMessageId: "msg-1",
+      optionsHash: '["a","b"]',
+      recommendedText: "a",
+      startedAt: 1000,
+      durationMs: 10000,
+      qualityScore: 80,
+      qualityReasons: ["source-priority-1"],
+    };
+    expect(buildAutoSentKey(candidate)).toBe('msg-1:["a","b"]:a');
+  });
+
+  it("buildAutoSentKey 处理 null sourceMessageId", () => {
+    const candidate: AutoOptionCandidate = {
+      sourceMessageId: null,
+      optionsHash: '["x"]',
+      recommendedText: "x",
+      startedAt: 0,
+      durationMs: 5000,
+      qualityScore: 70,
+      qualityReasons: [],
+    };
+    expect(buildAutoSentKey(candidate)).toBe('none:["x"]:x');
+  });
+
+  it("用户正在输入时不会进入 armed", () => {
+    const next = reduceAutoOptionSendEvent(
+      createInitialAutoOptionSendState(),
+      { type: "toggle", enabled: true },
+      createContext({ inputText: "typing..." }),
+    );
+    expect(next.enabled).toBe(true);
+    expect(next.status).toBe("idle");
+  });
+
+  it("有待处理图片时不会进入 armed", () => {
+    const next = reduceAutoOptionSendEvent(
+      createInitialAutoOptionSendState(),
+      { type: "toggle", enabled: true },
+      createContext({ hasPendingImages: true }),
+    );
+    expect(next.enabled).toBe(true);
+    expect(next.status).toBe("idle");
+  });
+
+  it("STT 监听中不会进入 armed", () => {
+    const next = reduceAutoOptionSendEvent(
+      createInitialAutoOptionSendState(),
+      { type: "toggle", enabled: true },
+      createContext({ isSttListening: true }),
+    );
+    expect(next.enabled).toBe(true);
+    expect(next.status).toBe("idle");
   });
 });

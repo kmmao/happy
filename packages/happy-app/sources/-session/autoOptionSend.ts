@@ -85,7 +85,7 @@ export function buildOptionsHash(items: string[]): string {
   return JSON.stringify(items);
 }
 
-function normalizeOptionText(text: string): string {
+export function normalizeOptionText(text: string): string {
   return text.trim().toLowerCase().replace(/\s+/g, " ");
 }
 
@@ -281,7 +281,7 @@ export function getRecommendedOptionIndex(
   return result.ranked[result.recommendedIndex]?.index ?? null;
 }
 
-function buildAutoSentKey(candidate: AutoOptionCandidate): string {
+export function buildAutoSentKey(candidate: AutoOptionCandidate): string {
   return `${candidate.sourceMessageId ?? "none"}:${candidate.optionsHash}:${candidate.recommendedText}`;
 }
 
@@ -351,7 +351,7 @@ export function buildAutoOptionCandidate(
   };
 }
 
-function canArm(context: AutoOptionSendContext): boolean {
+function isContextReady(context: AutoOptionSendContext): boolean {
   if (!context.snapshot) return false;
   if (context.hasAskUserQuestionVisible) return false;
   if (!context.isCurrentSessionActive) return false;
@@ -359,10 +359,7 @@ function canArm(context: AutoOptionSendContext): boolean {
   if (context.inputText.trim().length > 0) return false;
   if (context.hasPendingImages) return false;
   if (context.isSttListening) return false;
-  return (
-    getRecommendedOptionIndex(context.snapshot.items, context.statsResolver) !==
-    null
-  );
+  return true;
 }
 
 function canFire(
@@ -370,25 +367,14 @@ function canFire(
   context: AutoOptionSendContext,
 ): boolean {
   if (!state.candidate) return false;
-  if (!context.snapshot) return false;
-  if (context.hasAskUserQuestionVisible) return false;
-  if (!context.isCurrentSessionActive) return false;
-  if (context.sessionId !== context.currentSessionId) return false;
-  if (context.inputText.trim().length > 0) return false;
-  if (context.hasPendingImages) return false;
-  if (context.isSttListening) return false;
+  if (!isContextReady(context)) return false;
 
-  const recIdx = getRecommendedOptionIndex(
-    context.snapshot.items,
-    context.statsResolver,
-  );
-  if (recIdx === null) return false;
+  const candidate = buildAutoOptionCandidate(context);
+  if (!candidate) return false;
 
-  const currentText = context.snapshot.items[recIdx]?.trim() ?? "";
-  if (!currentText) return false;
-  if (currentText !== state.candidate.recommendedText) return false;
-  if (context.snapshot.optionsHash !== state.candidate.optionsHash) return false;
-  if (context.snapshot.sourceMessageId !== state.candidate.sourceMessageId) return false;
+  if (candidate.recommendedText !== state.candidate.recommendedText) return false;
+  if (candidate.optionsHash !== state.candidate.optionsHash) return false;
+  if (context.snapshot!.sourceMessageId !== state.candidate.sourceMessageId) return false;
   if (state.lastAutoSentKey === buildAutoSentKey(state.candidate)) return false;
 
   return true;
@@ -404,7 +390,7 @@ export function reduceAutoOptionSendEvent(
       return clearToOff(state, "manual-toggle-off");
     }
 
-    if (!canArm(context)) {
+    if (!isContextReady(context)) {
       return clearToIdle(state, null);
     }
 
@@ -433,7 +419,7 @@ export function reduceAutoOptionSendEvent(
 
   if (event.type === "options-updated") {
     if (!state.enabled) return state;
-    if (!canArm(context)) {
+    if (!isContextReady(context)) {
       return clearToIdle(state, "options-invalid");
     }
 

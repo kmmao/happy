@@ -949,6 +949,15 @@ function SessionViewInner({
     sessionId,
   ]);
 
+  // Keep the auto-option-send service aware of UI context so that
+  // canFire guards work correctly even on timer-triggered paths.
+  React.useEffect(() => {
+    autoOptionSendService.updateUIContext(sessionId, {
+      inputText: message,
+      hasPendingImages: pendingImagePaths.length > 0,
+      isSttListening: false,
+    });
+  }, [sessionId, message, pendingImagePaths]);
 
   // Collapsible input state
   const collapsibleInput = useCollapsibleInput({

@@ -5,6 +5,7 @@ import {
     type AutoOptionSendEvent,
     type AutoOptionSendState,
     type SessionFollowUpOptionsSnapshot,
+    buildAutoSentKey,
     buildOptionsHash,
     createInitialAutoOptionSendState,
     getRecommendedOptionIndex,
@@ -13,6 +14,7 @@ import {
 import { type Message } from "@/sync/typesMessage";
 import { getAutoOptionFeedbackStats, recordAutoOptionFeedback } from "./autoOptionFeedback";
 import { projectManager } from "./projectManager";
+import { log } from "@/log";
 
 const DURATION_MS = 10_000;
 
@@ -88,10 +90,23 @@ function hasPendingAskUserQuestion(messages: readonly Message[]): boolean {
     return false;
 }
 
+interface UIContext {
+    inputText: string;
+    hasPendingImages: boolean;
+    isSttListening: boolean;
+}
+
+const DEFAULT_UI_CONTEXT: UIContext = {
+    inputText: "",
+    hasPendingImages: false,
+    isSttListening: false,
+};
+
 class AutoOptionSendService {
     private states = new Map<string, AutoOptionSendState>();
     private timers = new Map<string, ReturnType<typeof setInterval>>();
     private listeners = new Map<string, Set<() => void>>();
+    private uiContexts = new Map<string, UIContext>();
     private sendMessageFn:
         | ((
             sessionId: string,
@@ -155,6 +170,12 @@ class AutoOptionSendService {
         this.checkAndDispatch(sessionId);
     }
 
+    /** Called by SessionView to keep the service aware of current UI state. */
+    updateUIContext(sessionId: string, ctx: Partial<UIContext>): void {
+        const prev = this.uiContexts.get(sessionId) ?? DEFAULT_UI_CONTEXT;
+        this.uiContexts.set(sessionId, { ...prev, ...ctx });
+    }
+
     /** Toggle auto-send for a session. Called from UI. */
     toggle(sessionId: string, enabled: boolean): void {
         const current =
@@ -197,7 +218,7 @@ class AutoOptionSendService {
                 state.candidate.recommendedText,
                 "timeout_ignore",
                 false,
-                "options-missing",
+                "auto",
                 state.candidate.qualityScore,
                 Date.now() - state.candidate.startedAt,
             );
@@ -310,12 +331,13 @@ class AutoOptionSendService {
         const session = storage.getState().sessions[sessionId];
         const project = projectManager.getProjectForSession(sessionId);
         const projectId = project?.id ?? `session:${sessionId}`;
+        const ui = this.uiContexts.get(sessionId) ?? DEFAULT_UI_CONTEXT;
         return {
             sessionId,
             currentSessionId: sessionId,
-            inputText: "",
-            hasPendingImages: false,
-            isSttListening: false,
+            inputText: ui.inputText,
+            hasPendingImages: ui.hasPendingImages,
+            isSttListening: ui.isSttListening,
             hasAskUserQuestionVisible: hasPendingAskUserQuestion(messages),
             isCurrentSessionActive: session?.active ?? false,
             now,
@@ -420,20 +442,42 @@ class AutoOptionSendService {
             // Notify other tabs to cancel their timers
             this.broadcastFired(sessionId, optionsHash);
 
-            this.recordFeedbackFromCandidate(
-                sessionId,
-                optionsHash,
-                textToSend,
-                "send",
-                false,
-                "auto",
-                state.candidate?.qualityScore ?? null,
-                state.candidate ? now - state.candidate.startedAt : null,
-            );
+            const prevAutoSentKey = firedState.lastAutoSentKey;
 
             this.sendMessageFn?.(sessionId, textToSend, undefined, {
                 source: "auto-option-send",
-            }).catch(() => {});
+            }).then(() => {
+                this.recordFeedbackFromCandidate(
+                    sessionId,
+                    optionsHash,
+                    textToSend,
+                    "send",
+                    false,
+                    "auto",
+                    state.candidate?.qualityScore ?? null,
+                    state.candidate ? now - state.candidate.startedAt : null,
+                );
+            }).catch(() => {
+                log.warn("auto-option-send: sendMessage failed, resetting state for retry");
+                this.recordFeedbackFromCandidate(
+                    sessionId,
+                    optionsHash,
+                    textToSend,
+                    "timeout_ignore",
+                    false,
+                    "auto",
+                    state.candidate?.qualityScore ?? null,
+                    state.candidate ? now - state.candidate.startedAt : null,
+                );
+                const current = this.states.get(sessionId);
+                if (current) {
+                    this.setState(sessionId, {
+                        ...current,
+                        lastAutoSentKey: prevAutoSentKey,
+                        lastAutoSentText: current.lastAutoSentText,
+                    });
+                }
+            });
         } else if (state.candidate) {
             this.recordFeedbackFromCandidate(
                 sessionId,
@@ -474,7 +518,7 @@ class AutoOptionSendService {
             candidate: null,
             remainingMs: null,
             lastAutoSentKey: state.candidate
-                ? `${state.candidate.sourceMessageId ?? "none"}:${state.candidate.optionsHash}:${state.candidate.recommendedText}`
+                ? buildAutoSentKey(state.candidate)
                 : state.lastAutoSentKey,
             lastAutoSentText:
                 state.candidate?.recommendedText ?? state.lastAutoSentText,
@@ -501,9 +545,12 @@ class AutoOptionSendService {
      * Try to claim a send lock via localStorage. Returns true if this tab
      * should proceed with sending (no other tab sent the same options recently).
      *
-     * There is a theoretical sub-millisecond race window between getItem and
-     * setItem across tabs, but this is negligible in practice. The
-     * BroadcastChannel notification provides the secondary defense.
+     * localStorage read→write is NOT atomic across tabs. Two tabs reaching
+     * countdown zero within the same event-loop tick can both read "no lock"
+     * and both write their own lock, causing duplicate sends. The write-then-
+     * re-read check below shrinks this window (only a sub-millisecond overlap
+     * between setItem calls can bypass it). BroadcastChannel provides an
+     * additional async defense layer.
      */
     private acquireSendLock(
         sessionId: string,
@@ -522,7 +569,6 @@ class AutoOptionSendService {
                     ts: number;
                     tabId: string;
                 };
-                // Same options already sent by another tab within TTL
                 if (
                     lock.hash === optionsHash &&
                     lock.tabId !== this.tabId &&
@@ -535,11 +581,22 @@ class AutoOptionSendService {
             // Corrupt data, proceed and overwrite
         }
 
-        // Claim the lock
-        localStorage.setItem(
-            key,
-            JSON.stringify({ hash: optionsHash, ts: now, tabId: this.tabId }),
-        );
+        // Claim the lock, then re-read to detect concurrent writers
+        const lockValue = JSON.stringify({ hash: optionsHash, ts: now, tabId: this.tabId });
+        localStorage.setItem(key, lockValue);
+
+        try {
+            const reRead = localStorage.getItem(key);
+            if (reRead !== lockValue) {
+                const winner = JSON.parse(reRead!) as { tabId: string };
+                if (winner.tabId !== this.tabId) {
+                    return false;
+                }
+            }
+        } catch {
+            // Parse failure on re-read — assume we hold the lock
+        }
+
         return true;
     }
 
@@ -586,7 +643,7 @@ class AutoOptionSendService {
         optionText: string,
         action: "send" | "edit_send" | "timeout_ignore" | "dismiss",
         edited: boolean,
-        source: "auto" | "manual" | string,
+        source: "auto" | "manual",
         scoreBefore: number | null,
         latencyMs: number | null,
     ): void {
@@ -597,7 +654,7 @@ class AutoOptionSendService {
             optionText,
             optionHash: optionsHash,
             action,
-            source: source === "auto" ? "auto" : "manual",
+            source,
             scoreBefore,
             latencyMs,
             edited,

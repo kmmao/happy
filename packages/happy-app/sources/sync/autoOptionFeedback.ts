@@ -1,5 +1,5 @@
 import { MMKV } from "react-native-mmkv";
-import { AutoOptionFeedbackStats } from "@/-session/autoOptionSend";
+import { AutoOptionFeedbackStats, normalizeOptionText } from "@/-session/autoOptionSend";
 
 export type AutoOptionFeedbackAction =
   | "send"
@@ -33,10 +33,6 @@ const KEY_PREFIX = "auto-option-feedback:";
 const MAX_EVENTS = 200;
 const TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const feedbackListeners = new Map<string, Set<AutoOptionFeedbackListener>>();
-
-function normalizeOptionText(text: string): string {
-  return text.trim().toLowerCase().replace(/\s+/g, " ");
-}
 
 function getKey(projectId: string): string {
   return `${KEY_PREFIX}${projectId}`;
