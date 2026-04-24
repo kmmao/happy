@@ -168,7 +168,7 @@ export function SessionMetadataSection({
                 showChevron={false}
             />
             <Item
-                title="Sandbox"
+                title={t("sessionInfo.sandbox")}
                 subtitle={formatSandboxMetadata(
                     session.metadata.sandbox,
                     session.metadata.homeDir,
@@ -177,7 +177,7 @@ export function SessionMetadataSection({
                 showChevron={false}
             />
             <Item
-                title="Dangerously Skip Permissions"
+                title={t("sessionInfo.dangerouslySkipPermissions")}
                 subtitle={formatDangerouslySkipPermissionsMetadata(
                     session.metadata.dangerouslySkipPermissions,
                     session.metadata.flavor,

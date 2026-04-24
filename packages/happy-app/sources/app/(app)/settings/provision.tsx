@@ -639,7 +639,7 @@ function ProvisionSettingsScreen() {
                         {/* Web App link */}
                         {token.webappUrl && (
                             <Item
-                                title="Web App"
+                                title={t("provision.webApp")}
                                 subtitle={token.webappUrl.length > 60 ? token.webappUrl.slice(0, 60) + "…" : token.webappUrl}
                                 subtitleStyle={{ color: theme.colors.textLink, fontSize: 12 }}
                                 icon={<Ionicons name="globe-outline" size={20} color={theme.colors.accentBlue} />}
@@ -658,7 +658,7 @@ function ProvisionSettingsScreen() {
                         {/* Web Terminal — HTTPS */}
                         {ttydCleanUrl ? (
                             <Item
-                                title="Web Terminal"
+                                title={t("provision.webTerminal")}
                                 subtitle={ttydCleanUrl}
                                 subtitleStyle={{ color: theme.colors.textLink, fontSize: 12 }}
                                 icon={<Ionicons name="terminal-outline" size={20} color={theme.colors.accentPurple} />}

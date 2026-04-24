@@ -621,8 +621,8 @@ function SessionInfoContent({ session }: { session: Session }) {
             showChevron
           />
           <Item
-            title="Task Debug"
-            subtitle="View raw background task data"
+            title={t("sessionInfo.taskDebug")}
+            subtitle={t("sessionInfo.taskDebugSubtitle")}
             icon={<Ionicons name="bug-outline" size={29} color="#FF9500" />}
             onPress={() => router.push(`/session/${session.id}/debug-tasks` as any)}
             showChevron

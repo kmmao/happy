@@ -885,6 +885,10 @@ export const en = {
     happyHome: "Happy Home",
     copyMetadata: "Copy Metadata",
     copyMetadataSubtitle: "Copy raw session metadata JSON",
+    taskDebug: "Task Debug",
+    taskDebugSubtitle: "View raw background task data",
+    sandbox: "Sandbox",
+    dangerouslySkipPermissions: "Dangerously Skip Permissions",
     agentState: "Agent State",
     controlledByUser: "Controlled by User",
     pendingRequests: "Pending Requests",
@@ -1510,6 +1514,8 @@ export const en = {
     restartConfirm: "This will restart the Docker container. Running sessions will be interrupted.",
     restarting: "Restarting container...",
     restarted: "Container Restarted",
+    webApp: "Web App",
+    webTerminal: "Web Terminal",
   },
 
   connectButton: {
@@ -1584,7 +1590,9 @@ export const en = {
     scanQrDescription: "Open this app on your phone, tap the scan button on the home screen, and scan the QR code. Done! Your session is now connected with end-to-end encryption.",
     // Other Agents
     otherAgents: "Other Agents",
+    geminiTitle: "Gemini",
     geminiDescription: "Start a Gemini CLI session. Authenticate first, then start the session.",
+    codexTitle: "Codex",
     codexDescription: "Start a Codex session with remote control capabilities.",
     // Useful Commands
     usefulCommands: "Useful Commands",

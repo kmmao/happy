@@ -460,14 +460,14 @@ function InstallationGuideScreen() {
                     </Text>
                     <Step
                         number={1}
-                        title="Gemini"
+                        title={t("installGuide.geminiTitle")}
                         description={t("installGuide.geminiDescription")}
                         code="happy connect gemini && happy gemini"
                         theme={theme}
                     />
                     <Step
                         number={2}
-                        title="Codex"
+                        title={t("installGuide.codexTitle")}
                         description={t("installGuide.codexDescription")}
                         code="happy codex"
                         theme={theme}
