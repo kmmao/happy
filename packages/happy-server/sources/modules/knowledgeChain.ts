@@ -17,7 +17,6 @@ export interface ChainEntry {
     tags: string;
     confidence: string;
     supersedesId: string | null;
-    relatedIds: string; // Kept for backward compat (deprecated — prefer KnowledgeRelation table)
     createdAt: Date;
 }
 
@@ -49,7 +48,6 @@ interface SerializedChainEntry {
  * Pure function — no DB access, easy to test.
  *
  * Walks the supersession chain (up and down) and graph relations.
- * Falls back to relatedIds JSON for entries not yet migrated.
  * Limited to MAX_CHAIN_DEPTH to prevent infinite loops.
  */
 export function buildChain(
@@ -107,16 +105,6 @@ export function buildChain(
             }
         }
 
-        // Fallback: legacy relatedIds JSON (for entries not yet migrated)
-        if (!peers || peers.length === 0) {
-            const relatedIds = safeParseJsonArray(entry.relatedIds);
-            for (const relatedId of relatedIds) {
-                if (!collected.has(relatedId)) {
-                    relations.push({ from: id, to: relatedId, type: "related" });
-                    collect(relatedId, depth + 1);
-                }
-            }
-        }
     }
 
     collect(entryId, 0);
@@ -145,7 +133,7 @@ export function buildChain(
 /**
  * Fetch the evolution chain for a knowledge entry from the database.
  * Fetches all entries in the same project and builds the chain graph.
- * Uses KnowledgeRelation table with fallback to relatedIds JSON.
+ * Uses KnowledgeRelation table for graph relations.
  *
  * PRECONDITION: caller must verify project belongs to the requesting user.
  */
@@ -167,7 +155,6 @@ export async function fetchKnowledgeChain(
                 tags: true,
                 confidence: true,
                 supersedesId: true,
-                relatedIds: true,
                 createdAt: true,
             },
             orderBy: { createdAt: "desc" },

@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { buildChain, type ChainEntry } from "./knowledgeChain";
+import type { KnowledgeRelationRow } from "./knowledgeRelation";
 
 describe("knowledgeChain", () => {
     describe("buildChain", () => {
@@ -14,7 +15,6 @@ describe("knowledgeChain", () => {
                 tags: "[]",
                 confidence: "high",
                 supersedesId: null,
-                relatedIds: "[]",
                 createdAt: new Date("2026-03-01"),
             }];
 
@@ -36,7 +36,6 @@ describe("knowledgeChain", () => {
                     tags: "[]",
                     confidence: "medium",
                     supersedesId: null,
-                    relatedIds: "[]",
                     createdAt: new Date("2026-03-01"),
                 },
                 {
@@ -49,7 +48,6 @@ describe("knowledgeChain", () => {
                     tags: "[]",
                     confidence: "high",
                     supersedesId: "old",
-                    relatedIds: "[]",
                     createdAt: new Date("2026-03-02"),
                 },
             ];
@@ -63,7 +61,7 @@ describe("knowledgeChain", () => {
             expect(result.relations[0]).toEqual({ from: "new", to: "old", type: "supersedes" });
         });
 
-        it("should include related entries", () => {
+        it("should include related entries via graph relations", () => {
             const entries: ChainEntry[] = [
                 {
                     id: "main",
@@ -75,7 +73,6 @@ describe("knowledgeChain", () => {
                     tags: "[]",
                     confidence: "high",
                     supersedesId: null,
-                    relatedIds: JSON.stringify(["related-1"]),
                     createdAt: new Date("2026-03-01"),
                 },
                 {
@@ -88,12 +85,15 @@ describe("knowledgeChain", () => {
                     tags: "[]",
                     confidence: "medium",
                     supersedesId: null,
-                    relatedIds: "[]",
                     createdAt: new Date("2026-02-28"),
                 },
             ];
 
-            const result = buildChain("main", entries);
+            const graphRelations: KnowledgeRelationRow[] = [
+                { id: "r1", fromEntryId: "main", toEntryId: "related-1", relationType: "related", metadata: null, createdAt: new Date("2026-03-01") },
+            ];
+
+            const result = buildChain("main", entries, graphRelations);
             expect(result.chain).toHaveLength(2);
             expect(result.relations).toContainEqual({ from: "main", to: "related-1", type: "related" });
         });
@@ -112,7 +112,6 @@ describe("knowledgeChain", () => {
                     tags: "[]",
                     confidence: "medium",
                     supersedesId: i > 0 ? `entry-${i - 1}` : null,
-                    relatedIds: "[]",
                     createdAt: new Date(`2026-03-${String(i + 1).padStart(2, "0")}`),
                 });
             }
@@ -123,8 +122,8 @@ describe("knowledgeChain", () => {
         });
 
         it("should cap total entries even with wide fan-out", () => {
-            // Root entry with 20 related entries (fan-out)
-            const relatedIds = Array.from({ length: 20 }, (_, i) => `child-${i}`);
+            // Root entry with 20 related entries (fan-out) via graph relations
+            const childIds = Array.from({ length: 20 }, (_, i) => `child-${i}`);
             const entries: ChainEntry[] = [
                 {
                     id: "root",
@@ -136,10 +135,9 @@ describe("knowledgeChain", () => {
                     tags: "[]",
                     confidence: "high",
                     supersedesId: null,
-                    relatedIds: JSON.stringify(relatedIds),
                     createdAt: new Date("2026-03-01"),
                 },
-                ...relatedIds.map((id, i) => ({
+                ...childIds.map((id, i) => ({
                     id,
                     entryType: "discovery",
                     action: "create",
@@ -149,12 +147,20 @@ describe("knowledgeChain", () => {
                     tags: "[]",
                     confidence: "medium" as const,
                     supersedesId: null,
-                    relatedIds: "[]",
                     createdAt: new Date(`2026-03-${String(i + 2).padStart(2, "0")}`),
                 })),
             ];
 
-            const result = buildChain("root", entries);
+            const graphRelations: KnowledgeRelationRow[] = childIds.map((childId, i) => ({
+                id: `r-${i}`,
+                fromEntryId: "root",
+                toEntryId: childId,
+                relationType: "related" as const,
+                metadata: null,
+                createdAt: new Date("2026-03-01"),
+            }));
+
+            const result = buildChain("root", entries, graphRelations);
             // collected.size cap should limit total entries to MAX_CHAIN_DEPTH (10)
             expect(result.chain.length).toBeLessThanOrEqual(10);
         });
