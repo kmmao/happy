@@ -75,6 +75,13 @@ export async function claudeRemote(opts: {
   jsRuntime?: JsRuntime;
   /** Callback for handling MCP elicitation requests (forwarded to App) */
   onElicitation?: OnElicitation;
+  /**
+   * Happy session ID — forwarded to the SDK as `Options.title` (0.2.119+) so
+   * Claude Code's persisted JSONL metadata carries a stable link back to the
+   * originating Happy session. Only used on fresh SDK sessions; resume/continue
+   * will keep whatever title the prior session persisted.
+   */
+  happySessionId?: string;
 
   // Dynamic parameters
   nextMessage: () => Promise<{ message: string; mode: EnhancedMode } | null>;
@@ -312,6 +319,10 @@ export async function claudeRemote(opts: {
     outputFormat: initial.mode.outputFormat,
     plugins: initial.mode.plugins,
     additionalDirectories: initial.mode.additionalDirectories,
+    // Tag the SDK session with the originating Happy session ID so the
+    // persisted JSONL metadata is reverse-linkable. SDK ignores this when
+    // resuming/continuing (persisted title wins), so it's safe to set always.
+    title: opts.happySessionId || undefined,
   };
 
   // Track thinking state

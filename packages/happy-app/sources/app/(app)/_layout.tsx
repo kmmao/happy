@@ -116,6 +116,13 @@ export default function RootLayout() {
         }}
       />
       <Stack.Screen
+        name="session/[id]/file-viewer"
+        options={{
+          headerShown: false,
+          presentation: "modal",
+        }}
+      />
+      <Stack.Screen
         name="session/[id]/timeline"
         options={{
           headerShown: true,

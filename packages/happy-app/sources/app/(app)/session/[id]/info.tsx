@@ -38,6 +38,8 @@ import { isVersionSupported, MINIMUM_CLI_VERSION } from "@/utils/versionUtils";
 import { useSessionUpgrade } from "@/hooks/useSessionUpgrade";
 import { CodeView } from "@/components/CodeView";
 import { BinaryVersionRow } from "@/components/claudeControl/BinaryVersionRow";
+import { CostBadge } from "@/components/claudeControl/CostBadge";
+import { SessionColorPicker } from "@/components/claudeControl/SessionColorPicker";
 import { Session } from "@/sync/storageTypes";
 import { useHappyAction } from "@/hooks/useHappyAction";
 import { HappyError } from "@/utils/errors";
@@ -646,9 +648,23 @@ function SessionInfoContent({ session }: { session: Session }) {
 
         {/* Claude Control sidebar diagnostics (SDK 0.2.119+). Shows 'unknown' on
             non-Claude runtimes because the claude-control:* RPC is not registered
-            there; fetch errors are swallowed inside BinaryVersionRow. */}
+            there; fetch errors are swallowed inside each component. */}
         <ItemGroup>
           <BinaryVersionRow sessionId={session.id} />
+          <Item
+            title={t("claudeControl.cost.label")}
+            icon={<Ionicons name="cash-outline" size={29} color="#34C759" />}
+            rightElement={<CostBadge sessionId={session.id} compact={true} />}
+            showChevron={false}
+          />
+        </ItemGroup>
+        <ItemGroup title={t("claudeControl.color.title")}>
+          <SessionColorPicker
+            sessionId={session.id}
+            onChange={(color) => {
+              Modal.toast(`${t("claudeControl.color.title")}: ${color}`);
+            }}
+          />
         </ItemGroup>
 
         {/* Agent State */}

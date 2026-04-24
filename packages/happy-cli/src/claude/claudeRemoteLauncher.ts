@@ -1682,6 +1682,7 @@ export async function claudeRemoteLauncher(
           },
           hookSettingsPath: session.hookSettingsPath,
           jsRuntime: session.jsRuntime,
+          happySessionId: session.client.sessionId,
           canCallTool: permissionHandler.handleToolCall,
           onElicitation: handleElicitation,
           isAborted: (toolCallId: string) => {
