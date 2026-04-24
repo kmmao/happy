@@ -2053,6 +2053,103 @@ export async function startDaemon(): Promise<void> {
     apiMachine.setTunnelManager(tunnelManager);
 
     // Set RPC handlers
+    // Heartbeat silence threshold — 4.5× the 20 s heartbeat interval. Anything
+    // longer than this without a heartbeat is assumed to be wedged / zombified.
+    const STALE_HEARTBEAT_MS = 90_000;
+
+    const listStaleSessions = async () => {
+      const now = Date.now();
+      const stale: Array<{
+        pid: number;
+        happySessionId?: string;
+        spawnId?: string;
+        startedAt?: number;
+        lastHeartbeatAt?: number;
+        lastActivityAt?: number;
+        tmuxSessionId?: string;
+        reason: "dead" | "silent";
+        silentMs?: number;
+      }> = [];
+      for (const [pid, session] of pidToTrackedSession) {
+        let dead = false;
+        try {
+          process.kill(pid, 0);
+        } catch {
+          dead = true;
+        }
+        if (dead) {
+          stale.push({
+            pid,
+            happySessionId: session.happySessionId,
+            spawnId: session.spawnId,
+            startedAt: session.startedAt,
+            lastHeartbeatAt: session.lastHeartbeatAt,
+            lastActivityAt: session.lastActivityAt,
+            tmuxSessionId: session.tmuxSessionId,
+            reason: "dead",
+          });
+          continue;
+        }
+        if (
+          session.lastHeartbeatAt &&
+          now - session.lastHeartbeatAt > STALE_HEARTBEAT_MS
+        ) {
+          stale.push({
+            pid,
+            happySessionId: session.happySessionId,
+            spawnId: session.spawnId,
+            startedAt: session.startedAt,
+            lastHeartbeatAt: session.lastHeartbeatAt,
+            lastActivityAt: session.lastActivityAt,
+            tmuxSessionId: session.tmuxSessionId,
+            reason: "silent",
+            silentMs: now - session.lastHeartbeatAt,
+          });
+        }
+      }
+      return { stale, checkedAt: now, thresholdMs: STALE_HEARTBEAT_MS };
+    };
+
+    const cleanStaleSessions = async (params: { pids: number[] }) => {
+      let killed = 0;
+      const errors: Array<{ pid: number; error: string }> = [];
+      for (const pid of params.pids) {
+        const session = pidToTrackedSession.get(pid);
+        // Safety: only kill pids we know about. Prevents this RPC from being
+        // used to kill arbitrary processes on the machine.
+        if (!session) {
+          errors.push({ pid, error: "pid not tracked by daemon" });
+          continue;
+        }
+        // Mark for graceful exit so any in-flight heartbeat from this child
+        // sees keepAlive=false and can clean up before SIGTERM lands.
+        session.terminationRequestedAt = Date.now();
+        try {
+          process.kill(pid, "SIGTERM");
+          killed += 1;
+        } catch (error) {
+          // EPERM or ESRCH — process already dead or unkillable; still clean
+          // up our registry entry below.
+          errors.push({
+            pid,
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+        // Drop from in-memory + persisted registry regardless of kill outcome.
+        pidToTrackedSession.delete(pid);
+        if (session.happySessionId) {
+          await trackedSessionRegistry
+            .forgetSession(session.happySessionId)
+            .catch(() => {});
+        } else if (session.spawnId) {
+          await trackedSessionRegistry
+            .forgetSpawn(session.spawnId)
+            .catch(() => {});
+        }
+      }
+      return { killed, errors };
+    };
+
     apiMachine.setRPCHandlers({
       spawnSession,
       stopSession,
@@ -2277,6 +2374,8 @@ export async function startDaemon(): Promise<void> {
         scheduleAutomationStatePublish();
         return result;
       },
+      listStaleSessions,
+      cleanStaleSessions,
     });
 
     // Provide active session IDs to the client so it can re-sync with the server on reconnect.

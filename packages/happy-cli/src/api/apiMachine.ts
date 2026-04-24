@@ -207,7 +207,35 @@ type MachineRpcHandlers = {
   resumeAutoDreamProfile: (profileIdValue: string) => Promise<AutoDreamMutationResult>;
   runAutoDreamProfileNow: (profileIdValue: string) => Promise<AutoDreamMutationResult>;
   removeAutoDreamProfile: (profileIdValue: string) => Promise<AutoDreamMutationResult>;
+  listStaleSessions: () => Promise<StaleSessionsListResult>;
+  cleanStaleSessions: (params: { pids: number[] }) => Promise<StaleSessionsCleanResult>;
 };
+
+export interface StaleSessionInfo {
+  pid: number;
+  happySessionId?: string;
+  spawnId?: string;
+  startedAt?: number;
+  lastHeartbeatAt?: number;
+  lastActivityAt?: number;
+  tmuxSessionId?: string;
+  /** "dead" = process.kill(pid, 0) threw; "silent" = alive but no heartbeat for > threshold. */
+  reason: "dead" | "silent";
+  /** Time since last heartbeat, when `reason === "silent"`. */
+  silentMs?: number;
+}
+
+export interface StaleSessionsListResult {
+  stale: StaleSessionInfo[];
+  checkedAt: number;
+  /** Silence threshold used for detection, for UI display. */
+  thresholdMs: number;
+}
+
+export interface StaleSessionsCleanResult {
+  killed: number;
+  errors: Array<{ pid: number; error: string }>;
+}
 
 export type WebhookTriggerData = {
   type: "webhook-trigger";
@@ -417,6 +445,8 @@ export class ApiMachineClient {
     resumeAutoDreamProfile,
     runAutoDreamProfileNow,
     removeAutoDreamProfile,
+    listStaleSessions,
+    cleanStaleSessions,
   }: MachineRpcHandlers) {
     // Register spawn session handler
     this.rpcHandlerManager.registerHandler(
@@ -548,6 +578,28 @@ export class ApiMachineClient {
         errors: result.errors,
       };
     });
+
+    // List daemon-tracked sessions whose heartbeat has gone silent or whose
+    // pid is dead. Does not kill anything — the App should show the list,
+    // confirm, then call clean-stale-sessions with the chosen pids.
+    this.rpcHandlerManager.registerHandler(
+      "list-stale-sessions",
+      async () => listStaleSessions(),
+    );
+
+    // Kill specific pids that the App confirmed as stale. The handler
+    // validates each pid against its own tracked-session map before killing,
+    // so an attacker cannot use this to kill arbitrary pids on the machine.
+    this.rpcHandlerManager.registerHandler(
+      "clean-stale-sessions",
+      async (params: any) => {
+        const rawPids = Array.isArray(params?.pids) ? params.pids : [];
+        const pids = rawPids
+          .map((p: unknown) => (typeof p === "number" ? p : Number(p)))
+          .filter((p: number) => Number.isInteger(p) && p > 1);
+        return cleanStaleSessions({ pids });
+      },
+    );
 
     this.rpcHandlerManager.registerHandler("killswitch-set", async (params: any) => {
       const { enabled } = params || {};

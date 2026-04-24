@@ -1315,6 +1315,88 @@ export async function machineCleanRunawayProcesses(
   }
 }
 
+export interface StaleSessionInfo {
+  pid: number;
+  happySessionId?: string;
+  spawnId?: string;
+  startedAt?: number;
+  lastHeartbeatAt?: number;
+  lastActivityAt?: number;
+  tmuxSessionId?: string;
+  reason: "dead" | "silent";
+  silentMs?: number;
+}
+
+export interface MachineStaleSessionsResult {
+  success: boolean;
+  stale: StaleSessionInfo[];
+  checkedAt: number;
+  thresholdMs: number;
+  error?: string;
+}
+
+export interface MachineStaleSessionsCleanResult {
+  success: boolean;
+  killed: number;
+  errors: readonly { pid: number; error: string }[];
+  error?: string;
+}
+
+/** List daemon-tracked sessions whose heartbeat has gone silent or whose pid is dead. */
+export async function machineListStaleSessions(
+  machineId: string,
+): Promise<MachineStaleSessionsResult> {
+  try {
+    const result = await apiSocket.machineRPC<
+      {
+        stale: readonly StaleSessionInfo[];
+        checkedAt: number;
+        thresholdMs: number;
+      },
+      Record<string, never>
+    >(machineId, "list-stale-sessions", {});
+    return {
+      success: true,
+      stale: [...(result.stale ?? [])],
+      checkedAt: result.checkedAt ?? Date.now(),
+      thresholdMs: result.thresholdMs ?? 0,
+    };
+  } catch (error) {
+    return {
+      success: false,
+      stale: [],
+      checkedAt: Date.now(),
+      thresholdMs: 0,
+      error: getErrorMessage(error),
+    };
+  }
+}
+
+/** Kill the given pids via the daemon; daemon validates each pid is tracked first. */
+export async function machineCleanStaleSessions(
+  machineId: string,
+  pids: readonly number[],
+): Promise<MachineStaleSessionsCleanResult> {
+  try {
+    const result = await apiSocket.machineRPC<
+      { killed: number; errors: readonly { pid: number; error: string }[] },
+      { pids: readonly number[] }
+    >(machineId, "clean-stale-sessions", { pids });
+    return {
+      success: true,
+      killed: result.killed ?? 0,
+      errors: result.errors ?? [],
+    };
+  } catch (error) {
+    return {
+      success: false,
+      killed: 0,
+      errors: [],
+      error: getErrorMessage(error),
+    };
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Tailscale Serve / Funnel management
 // ---------------------------------------------------------------------------
