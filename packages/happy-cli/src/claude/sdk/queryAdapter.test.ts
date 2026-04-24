@@ -10,7 +10,6 @@ describe("queryAdapter", () => {
         allowedTools: ["Bash", "Read"],
         disallowedTools: ["Write"],
         executable: "node",
-        executableArgs: ["--max-old-space-size=8192"],
         maxTurns: 10,
         pathToClaudeCodeExecutable: "/usr/local/bin/claude.cjs",
         permissionMode: "bypassPermissions",
@@ -18,7 +17,6 @@ describe("queryAdapter", () => {
         resume: "session-123",
         model: "claude-opus-4-6",
         fallbackModel: "claude-sonnet-4-6",
-        strictMcpConfig: true,
       };
 
       const result = mapOptions(opts);
@@ -27,7 +25,6 @@ describe("queryAdapter", () => {
       expect(result.allowedTools).toEqual(["Bash", "Read"]);
       expect(result.disallowedTools).toEqual(["Write"]);
       expect(result.executable).toBe("node");
-      expect(result.executableArgs).toEqual(["--max-old-space-size=8192"]);
       expect(result.maxTurns).toBe(10);
       expect(result.pathToClaudeCodeExecutable).toBe(
         "/usr/local/bin/claude.cjs",
@@ -37,7 +34,6 @@ describe("queryAdapter", () => {
       expect(result.resume).toBe("session-123");
       expect(result.model).toBe("claude-opus-4-6");
       expect(result.fallbackModel).toBe("claude-sonnet-4-6");
-      expect(result.strictMcpConfig).toBe(true);
     });
 
     it("should map abort signal to abortController", () => {

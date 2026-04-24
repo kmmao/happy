@@ -65,7 +65,6 @@ export interface QueryOptions {
   cwd?: string;
   disallowedTools?: string[];
   executable?: string;
-  executableArgs?: string[];
   maxTurns?: number;
   mcpServers?: Record<string, unknown>;
   pathToClaudeCodeExecutable?: string;
@@ -82,7 +81,6 @@ export interface QueryOptions {
   resume?: string;
   model?: string;
   fallbackModel?: string;
-  strictMcpConfig?: boolean;
   canCallTool?: CanCallToolCallback;
   /**
    * Settings to pass to Claude — path to a JSON file or an inline settings object.

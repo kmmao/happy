@@ -41,7 +41,6 @@ export function mapOptions(opts: QueryOptions): OfficialOptions {
   if (opts.disallowedTools) result.disallowedTools = opts.disallowedTools;
   if (opts.executable)
     result.executable = opts.executable as "node" | "bun" | "deno";
-  if (opts.executableArgs) result.executableArgs = opts.executableArgs;
   if (opts.maxTurns) result.maxTurns = opts.maxTurns;
   if (opts.mcpServers)
     result.mcpServers = opts.mcpServers as Record<string, any>;
@@ -53,7 +52,6 @@ export function mapOptions(opts: QueryOptions): OfficialOptions {
   if (opts.resume) result.resume = opts.resume;
   if (opts.model) result.model = opts.model;
   if (opts.fallbackModel) result.fallbackModel = opts.fallbackModel;
-  if (opts.strictMcpConfig) result.strictMcpConfig = opts.strictMcpConfig;
 
   // ── abort (AbortSignal) → abortController (AbortController) ──
   if (opts.abort) {
