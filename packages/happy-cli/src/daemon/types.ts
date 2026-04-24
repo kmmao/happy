@@ -23,8 +23,20 @@ export interface TrackedSession {
     loopId?: string;
     dedupeKey?: string;
   };
+  /**
+   * Daemon-generated UUID injected into the spawned child's args as
+   * `--happy-spawn-id`. Populated for daemon-spawned sessions before the
+   * child reports back via /session-started. Enables tracking pre-registration
+   * (offline stub) children and serves as the heartbeat identity when the
+   * server-assigned `happySessionId` is not yet known.
+   */
+  spawnId?: string;
   happySessionId?: string;
   happySessionMetadataFromLocalWebhook?: Metadata;
+  /** Last wall-clock time the child posted to /session-heartbeat. */
+  lastHeartbeatAt?: number;
+  /** Most recent activity reported by the child via heartbeat payload. */
+  activity?: "idle" | "thinking" | "executing" | "blocked";
   pid: number;
   childProcess?: ChildProcess;
   error?: string;

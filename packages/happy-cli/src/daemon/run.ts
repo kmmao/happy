@@ -531,8 +531,11 @@ export async function startDaemon(): Promise<void> {
     const recoverTrackedSessionsFromIndex = async (): Promise<Set<string>> => {
       const recoveredSessionIds = new Set<string>();
       for (const persisted of trackedSessionRegistry.getAll()) {
+        const persistedSessionId = persisted.happySessionId;
         if (pidToTrackedSession.has(persisted.pid)) {
-          recoveredSessionIds.add(persisted.happySessionId);
+          if (persistedSessionId) {
+            recoveredSessionIds.add(persistedSessionId);
+          }
           continue;
         }
 
@@ -541,13 +544,25 @@ export async function startDaemon(): Promise<void> {
           // For task sessions, do not force a terminal status during daemon restart.
           // Scheduler recovery will requeue non-terminal jobs when possible, which
           // avoids spurious "failed" caused only by CLI process restarts/upgrades.
-          await trackedSessionRegistry.forgetSession(persisted.happySessionId).catch(() => {});
+          if (persistedSessionId) {
+            await trackedSessionRegistry.forgetSession(persistedSessionId).catch(() => {});
+          } else if (persisted.spawnId) {
+            await trackedSessionRegistry.forgetSpawn(persisted.spawnId).catch(() => {});
+          }
+          continue;
+        }
+
+        // Pending entries (spawnId only, no session id yet) cannot be re-keyed
+        // into pidToTrackedSession with meaningful state — the child still
+        // owns the source of truth and will re-register via /session-started.
+        // Leave the persisted pending entry alone.
+        if (!persistedSessionId) {
           continue;
         }
 
         const existingRecoveredSession = pidToTrackedSession.get(recoveredPid);
-        if (existingRecoveredSession?.happySessionId === persisted.happySessionId) {
-          recoveredSessionIds.add(persisted.happySessionId);
+        if (existingRecoveredSession?.happySessionId === persistedSessionId) {
+          recoveredSessionIds.add(persistedSessionId);
           continue;
         }
 
@@ -555,10 +570,13 @@ export async function startDaemon(): Promise<void> {
         const trackedSession: TrackedSession = {
           startedBy: persisted.startedBy,
           pid: recoveredPid,
-          happySessionId: persisted.happySessionId,
+          spawnId: persisted.spawnId,
+          happySessionId: persistedSessionId,
           startedAt: persisted.startedAt,
           lastActivityAt: persisted.lastActivityAt,
           lastOutputAt: persisted.lastOutputAt,
+          lastHeartbeatAt: persisted.lastHeartbeatAt,
+          activity: persisted.activity,
           automationContext: persisted.automationContext,
           tmuxSessionId: persisted.tmuxSessionId,
           directoryCreated: persisted.directoryCreated,
@@ -568,9 +586,9 @@ export async function startDaemon(): Promise<void> {
         };
         pidToTrackedSession.set(recoveredPid, trackedSession);
         await trackedSessionRegistry.rememberTrackedSession(trackedSession).catch((error) => {
-          logger.debug(`[DAEMON RUN] Failed to refresh persisted tracked session ${persisted.happySessionId}: ${error}`);
+          logger.debug(`[DAEMON RUN] Failed to refresh persisted tracked session ${persistedSessionId}: ${error}`);
         });
-        recoveredSessionIds.add(persisted.happySessionId);
+        recoveredSessionIds.add(persistedSessionId);
         void recordAutomationAuditEvent({
           kind: "session_reattached",
           sessionId: persisted.happySessionId,
