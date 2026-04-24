@@ -3,12 +3,14 @@ export type ProjectDetailTabKey =
     | "health"
     | "research"
     | "knowledge"
+    | "config"
 ;
 
 const ALWAYS_TABS: ProjectDetailTabKey[] = [
     "sessions",
     "health",
     "research",
+    "config",
 ];
 
 export function resolveProjectDetailTabs(input: {

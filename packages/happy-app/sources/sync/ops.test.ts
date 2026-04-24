@@ -7,11 +7,6 @@ const { machineRPCMock, sessionRPCMock, storageState } = vi.hoisted(() => ({
     sessions: {} as Record<string, { rpcReady: boolean } | undefined>,
     settings: {
       knowledgeBase: false,
-      knowledgeBaseMode: "off",
-      knowledgeBaseSensitivity: "balanced",
-      knowledgeBaseTrackFileEdits: false,
-      knowledgeBaseTrackToolCalls: false,
-      knowledgeBaseTrackTokens: false,
     },
   },
 }));

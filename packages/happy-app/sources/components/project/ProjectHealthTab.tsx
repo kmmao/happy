@@ -859,29 +859,6 @@ export const ProjectHealthTab = React.memo(
                             color={theme.colors.textSecondary}
                         />
                     </Pressable>
-                    <View style={styles.linkDivider} />
-                    <Pressable
-                        style={styles.settingsLink}
-                        onPress={() =>
-                            router.push(
-                                `/project/${project.id}/webhook-events` as any,
-                            )
-                        }
-                    >
-                        <Ionicons
-                            name="git-pull-request-outline"
-                            size={20}
-                            color={theme.colors.textSecondary}
-                        />
-                        <Text style={styles.settingsLinkText}>
-                            {t("webhook.eventHistory")}
-                        </Text>
-                        <Ionicons
-                            name="chevron-forward"
-                            size={18}
-                            color={theme.colors.textSecondary}
-                        />
-                    </Pressable>
                 </ItemGroup>
 
 

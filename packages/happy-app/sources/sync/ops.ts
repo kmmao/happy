@@ -204,17 +204,14 @@ export async function machineSpawnNewSession(
       };
     }
 
-    // Inject knowledge base settings as environment variables
+    // Global kill-switch only. Per-project mode/sensitivity/track options are
+    // synced from server `knowledgeConfig` at runtime via syncKnowledgeConfig().
     const settings = storage.getState().settings;
-    const knowledgeEnvVars: Record<string, string> = {};
-    knowledgeEnvVars.HAPPY_KNOWLEDGE_BASE = settings.knowledgeBase ? "true" : "false";
-    knowledgeEnvVars.HAPPY_KNOWLEDGE_MODE = settings.knowledgeBaseMode;
-    knowledgeEnvVars.HAPPY_KNOWLEDGE_SENSITIVITY = settings.knowledgeBaseSensitivity;
-    knowledgeEnvVars.HAPPY_KNOWLEDGE_TRACK_FILE_EDITS = String(settings.knowledgeBaseTrackFileEdits);
-    knowledgeEnvVars.HAPPY_KNOWLEDGE_TRACK_TOOL_CALLS = String(settings.knowledgeBaseTrackToolCalls);
-    knowledgeEnvVars.HAPPY_KNOWLEDGE_TRACK_TOKENS = String(settings.knowledgeBaseTrackTokens);
+    const knowledgeEnvVars: Record<string, string> = {
+        HAPPY_KNOWLEDGE_BASE: settings.knowledgeBase ? "true" : "false",
+    };
 
-    // Caller env vars (e.g. from profile) take precedence over knowledge settings
+    // Caller env vars (e.g. from profile) take precedence
     const mergedEnvironmentVariables = { ...knowledgeEnvVars, ...environmentVariables };
 
     const result = await apiSocket.machineRPC<

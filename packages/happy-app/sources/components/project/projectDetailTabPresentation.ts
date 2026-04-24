@@ -24,6 +24,10 @@ const PRESENTATIONS: Record<ProjectDetailTabKey, ProjectDetailTabPresentation> =
         icon: "library-outline",
         tone: "purple",
     },
+    config: {
+        icon: "settings-outline",
+        tone: "teal",
+    },
 };
 
 export function resolveProjectDetailTabPresentation(

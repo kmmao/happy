@@ -7,6 +7,7 @@ import { ProjectSessionsTab } from "./ProjectSessionsTab";
 import { ProjectHealthTab } from "./ProjectHealthTab";
 import { ProjectResearchTab, type ResearchSyncStatus } from "./ProjectResearchTab";
 import { ProjectKnowledgeTab } from "./ProjectKnowledgeTab";
+import { ProjectConfigTab } from "./ProjectConfigTab";
 import { layout } from "@/components/layout";
 import { t } from "@/text";
 import { useSetting } from "@/sync/storage";
@@ -24,6 +25,7 @@ const TAB_LABELS: Record<TabKey, () => string> = {
     health: () => t("projects.tabHealth"),
     research: () => t("projects.tabResearch"),
     knowledge: () => t("projects.tabKnowledge"),
+    config: () => t("projects.tabConfig"),
 };
 
 interface ProjectDetailViewProps {
@@ -192,6 +194,15 @@ export const ProjectDetailView = React.memo(
                             <ProjectKnowledgeTab projectId={project.id} isActive={activeTab === "knowledge"} />
                         </View>
                     )}
+                    <View
+                        style={
+                            activeTab === "config"
+                                ? styles.tabVisible
+                                : styles.tabHidden
+                        }
+                    >
+                        <ProjectConfigTab project={project} />
+                    </View>
                 </View>
             </View>
         );
@@ -243,7 +254,7 @@ const styles = StyleSheet.create((theme) => ({
         paddingHorizontal: 10,
     },
     segmentButtonActive: {
-        backgroundColor: theme.colors.header.tint,
+        backgroundColor: theme.dark ? theme.colors.accentPurple : theme.colors.header.tint,
     },
     segmentButtonPressed: {
         opacity: 0.88,

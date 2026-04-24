@@ -80,22 +80,7 @@ export const SettingsSchema = z.object({
     ),
   knowledgeBase: z
     .boolean()
-    .describe("Enable project knowledge base (experimental)"),
-  knowledgeBaseMode: z
-    .enum(["auto", "full", "minimal"])
-    .describe("Knowledge injection mode"),
-  knowledgeBaseSensitivity: z
-    .enum(["conservative", "balanced", "aggressive"])
-    .describe("Knowledge collection sensitivity preset"),
-  knowledgeBaseTrackFileEdits: z
-    .boolean()
-    .describe("Track file edits as valuable turn signal"),
-  knowledgeBaseTrackToolCalls: z
-    .boolean()
-    .describe("Track tool call count as valuable turn signal"),
-  knowledgeBaseTrackTokens: z
-    .boolean()
-    .describe("Track output token count as valuable turn signal"),
+    .describe("Enable project knowledge base (experimental). Controls Tab visibility and CLI kill-switch; per-project mode/sensitivity/track options live on Project.knowledgeConfig."),
   enablePreviewTab: z
     .boolean()
     .describe("Enable preview tab in session side panel (experimental)"),
@@ -414,11 +399,6 @@ export const settingsDefaults: Settings = {
   experiments: false,
   showAgentActivity: true,
   knowledgeBase: false,
-  knowledgeBaseMode: "auto" as const,
-  knowledgeBaseSensitivity: "balanced" as const,
-  knowledgeBaseTrackFileEdits: true,
-  knowledgeBaseTrackToolCalls: true,
-  knowledgeBaseTrackTokens: true,
   enablePreviewTab: false,
   useEnhancedSessionWizard: false,
   alwaysShowContextSize: true,

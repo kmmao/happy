@@ -33,11 +33,6 @@ function FeaturesSettingsScreen() {
   const [useEnhancedSessionWizard, setUseEnhancedSessionWizard] =
     useSettingMutable("useEnhancedSessionWizard");
   const [knowledgeBase, setKnowledgeBase] = useSettingMutable("knowledgeBase");
-  const [knowledgeBaseMode, setKnowledgeBaseMode] = useSettingMutable("knowledgeBaseMode");
-  const [knowledgeBaseSensitivity, setKnowledgeBaseSensitivity] = useSettingMutable("knowledgeBaseSensitivity");
-  const [knowledgeBaseTrackFileEdits, setKnowledgeBaseTrackFileEdits] = useSettingMutable("knowledgeBaseTrackFileEdits");
-  const [knowledgeBaseTrackToolCalls, setKnowledgeBaseTrackToolCalls] = useSettingMutable("knowledgeBaseTrackToolCalls");
-  const [knowledgeBaseTrackTokens, setKnowledgeBaseTrackTokens] = useSettingMutable("knowledgeBaseTrackTokens");
   const [webNotifications, setWebNotifications] =
     useSettingMutable("webNotifications");
   const [webNotificationsPersistent, setWebNotificationsPersistent] =
@@ -109,14 +104,10 @@ function FeaturesSettingsScreen() {
         />
       </ItemGroup>
 
-      {/* Knowledge Base */}
+      {/* Knowledge Base — global kill-switch + Tab visibility. Per-project details live in the project Config tab. */}
       <ItemGroup
         title={t("settingsFeatures.knowledgeBase")}
-        footer={
-          knowledgeBase && !knowledgeBaseTrackFileEdits && !knowledgeBaseTrackToolCalls && !knowledgeBaseTrackTokens
-            ? t("settingsFeatures.knowledgeBaseAllTracksOff")
-            : t("settingsFeatures.knowledgeBaseFooter")
-        }
+        footer={t("settingsFeatures.knowledgeBaseFooter")}
       >
         <Item
           title={t("settingsFeatures.knowledgeBase")}
@@ -131,118 +122,6 @@ function FeaturesSettingsScreen() {
           }
           showChevron={false}
         />
-        {knowledgeBase && (
-          <>
-            <Item
-              title={t("settingsFeatures.knowledgeBaseMode")}
-              subtitle={t("settingsFeatures.knowledgeBaseModeAuto")}
-              icon={<Ionicons name="flash-outline" size={29} color={theme.colors.accentOrange} />}
-              rightElement={
-                <Switch
-                  value={knowledgeBaseMode === "auto"}
-                  onValueChange={() => setKnowledgeBaseMode("auto")}
-                />
-              }
-              showChevron={false}
-            />
-            <Item
-              title={t("settingsFeatures.knowledgeBaseMode")}
-              subtitle={t("settingsFeatures.knowledgeBaseModeFull")}
-              icon={<Ionicons name="server-outline" size={29} color={theme.colors.accentOrange} />}
-              rightElement={
-                <Switch
-                  value={knowledgeBaseMode === "full"}
-                  onValueChange={() => setKnowledgeBaseMode("full")}
-                />
-              }
-              showChevron={false}
-            />
-            <Item
-              title={t("settingsFeatures.knowledgeBaseMode")}
-              subtitle={t("settingsFeatures.knowledgeBaseModeMinimal")}
-              icon={<Ionicons name="leaf-outline" size={29} color={theme.colors.accentOrange} />}
-              rightElement={
-                <Switch
-                  value={knowledgeBaseMode === "minimal"}
-                  onValueChange={() => setKnowledgeBaseMode("minimal")}
-                />
-              }
-              showChevron={false}
-            />
-            <Item
-              title={t("settingsFeatures.knowledgeBaseSensitivity")}
-              subtitle={t("settingsFeatures.knowledgeBaseSensitivityConservative")}
-              icon={<Ionicons name="shield-outline" size={29} color={theme.colors.accentTeal} />}
-              rightElement={
-                <Switch
-                  value={knowledgeBaseSensitivity === "conservative"}
-                  onValueChange={() => setKnowledgeBaseSensitivity("conservative")}
-                />
-              }
-              showChevron={false}
-            />
-            <Item
-              title={t("settingsFeatures.knowledgeBaseSensitivity")}
-              subtitle={t("settingsFeatures.knowledgeBaseSensitivityBalanced")}
-              icon={<Ionicons name="options-outline" size={29} color={theme.colors.accentTeal} />}
-              rightElement={
-                <Switch
-                  value={knowledgeBaseSensitivity === "balanced"}
-                  onValueChange={() => setKnowledgeBaseSensitivity("balanced")}
-                />
-              }
-              showChevron={false}
-            />
-            <Item
-              title={t("settingsFeatures.knowledgeBaseSensitivity")}
-              subtitle={t("settingsFeatures.knowledgeBaseSensitivityAggressive")}
-              icon={<Ionicons name="rocket-outline" size={29} color={theme.colors.accentTeal} />}
-              rightElement={
-                <Switch
-                  value={knowledgeBaseSensitivity === "aggressive"}
-                  onValueChange={() => setKnowledgeBaseSensitivity("aggressive")}
-                />
-              }
-              showChevron={false}
-            />
-            <Item
-              title={t("settingsFeatures.knowledgeBaseTrackFileEdits")}
-              subtitle={t("settingsFeatures.knowledgeBaseTrackFileEditsSubtitle")}
-              icon={<Ionicons name="document-text-outline" size={29} color={theme.colors.accentBlue} />}
-              rightElement={
-                <Switch
-                  value={knowledgeBaseTrackFileEdits}
-                  onValueChange={setKnowledgeBaseTrackFileEdits}
-                />
-              }
-              showChevron={false}
-            />
-            <Item
-              title={t("settingsFeatures.knowledgeBaseTrackToolCalls")}
-              subtitle={t("settingsFeatures.knowledgeBaseTrackToolCallsSubtitle")}
-              icon={<Ionicons name="hammer-outline" size={29} color={theme.colors.accentBlue} />}
-              rightElement={
-                <Switch
-                  value={knowledgeBaseTrackToolCalls}
-                  onValueChange={setKnowledgeBaseTrackToolCalls}
-                />
-              }
-              showChevron={false}
-            />
-            <Item
-              title={t("settingsFeatures.knowledgeBaseTrackTokens")}
-              subtitle={t("settingsFeatures.knowledgeBaseTrackTokensSubtitle")}
-              icon={<Ionicons name="chatbubbles-outline" size={29} color={theme.colors.accentBlue} />}
-              rightElement={
-                <Switch
-                  value={knowledgeBaseTrackTokens}
-                  onValueChange={setKnowledgeBaseTrackTokens}
-                />
-              }
-              showChevron={false}
-            />
-          </>
-        )}
       </ItemGroup>
 
       {/* Scoring Model Override */}

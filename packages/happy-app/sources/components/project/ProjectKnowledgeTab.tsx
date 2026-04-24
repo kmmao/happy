@@ -11,7 +11,7 @@ import { useHappyAction } from "@/hooks/useHappyAction";
 import { Modal } from "@/modal";
 import { KnowledgeEntryCard } from "./KnowledgeEntryCard";
 import { ProjectProfileCard } from "./ProjectProfileCard";
-import { ProjectKnowledgeConfigCard } from "./ProjectKnowledgeConfigCard";
+
 import { layout } from "@/components/layout";
 import { useProject } from "@/hooks/useProjects";
 import { SharedStateView } from "@/components/SharedStateView";
@@ -272,16 +272,13 @@ export const ProjectKnowledgeTab = React.memo<ProjectKnowledgeTabProps>(
         const ListHeader = React.useMemo(
             () => (
                 <View>
-                    {/* Project-level knowledge config */}
-                    {knowledgeConfig && (
-                        <ProjectKnowledgeConfigCard
-                            config={knowledgeConfig}
-                            isCustomized={configIsCustomized}
-                            saving={configSaving}
-                            onUpdate={updateConfig}
-                            onReset={resetConfig}
-                        />
-                    )}
+                    {/* Knowledge config moved to Config tab */}
+                    <View style={styles.configHintCard}>
+                        <Ionicons name="information-circle-outline" size={16} color={theme.colors.textSecondary} />
+                        <Text style={[styles.configHintText, { color: theme.colors.textSecondary }]}>
+                            {t("projectConfig.movedToConfigHint")}
+                        </Text>
+                    </View>
                     <ProjectProfileCard
                         profile={profile}
                         onRegenerate={doRegenerate}
@@ -615,5 +612,22 @@ const styles = StyleSheet.create((theme) => ({
     lifecycleButtonText: {
         ...Typography.default("semiBold"),
         fontSize: 12,
+    },
+    configHintCard: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 8,
+        paddingHorizontal: 16,
+        paddingVertical: 10,
+        marginHorizontal: 16,
+        marginTop: 8,
+        marginBottom: 4,
+        borderRadius: 8,
+        backgroundColor: theme.colors.groupped.background,
+    },
+    configHintText: {
+        ...Typography.default("regular"),
+        fontSize: 13,
+        flex: 1,
     },
 }));
