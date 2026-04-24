@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { findActiveWord, findActiveWordString, getActiveWordQuery } from './findActiveWord';
+import { findActiveWord, getActiveWordQuery } from './findActiveWord';
 
 describe('findActiveWord', () => {
     describe('basic prefix detection', () => {
@@ -321,22 +321,6 @@ describe('findActiveWord', () => {
                 endOffset: 15           // Where the word ends
             });
         });
-    });
-});
-
-describe('findActiveWordString', () => {
-    it('should return just the word string for backward compatibility', () => {
-        const content = 'Hello @john';
-        const selection = { start: 11, end: 11 };
-        const result = findActiveWordString(content, selection);
-        expect(result).toBe('@john');
-    });
-
-    it('should return undefined when no active word', () => {
-        const content = 'Hello world';
-        const selection = { start: 11, end: 11 };
-        const result = findActiveWordString(content, selection);
-        expect(result).toBeUndefined();
     });
 });
 

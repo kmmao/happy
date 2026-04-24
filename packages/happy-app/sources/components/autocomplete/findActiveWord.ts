@@ -182,19 +182,6 @@ export function findActiveWord(
 }
 
 /**
- * Backward-compatible wrapper that returns just the word string
- * @deprecated Use findActiveWord instead which returns more information
- */
-export function findActiveWordString(
-    content: string,
-    selection: Selection,
-    prefixes: string[] = ['@', ':', '/']
-): string | undefined {
-    const result = findActiveWord(content, selection, prefixes);
-    return result?.activeWord; // Return the active part for backward compatibility
-}
-
-/**
  * Extracts just the query part without the prefix
  * @param activeWord The active word including prefix
  * @returns The query string without prefix
