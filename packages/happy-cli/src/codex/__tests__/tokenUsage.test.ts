@@ -39,7 +39,7 @@ describe("codex token usage helpers", () => {
       output_tokens: 25,
       cache_read_input_tokens: 50,
     });
-    expect(buildCodexContextUsage(snapshot!, "gpt-5.4")).toEqual({
+    expect(buildCodexContextUsage(snapshot!, "gpt-5.5")).toEqual({
       totalTokens: 150,
       maxTokens: 900000,
       percentage: (150 / 900000) * 100,
@@ -74,7 +74,7 @@ describe("codex token usage helpers", () => {
     expect(snapshot?.total.cachedInputTokens).toBe(200);
     expect(snapshot?.last.reasoningOutputTokens).toBe(10);
     expect(getCodexTokenUsageSignature(snapshot!)).toContain("turn-app-server");
-    expect(buildCodexContextUsage(snapshot!, "gpt-5.4")).toEqual({
+    expect(buildCodexContextUsage(snapshot!, "gpt-5.5")).toEqual({
       totalTokens: 190,
       maxTokens: 900000,
       percentage: (190 / 900000) * 100,

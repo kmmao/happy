@@ -122,6 +122,6 @@ describe("runTaskJob", () => {
     );
 
     const call = (spawnSession.mock.calls as unknown as any[][])[0]?.[0] as any;
-    expect(call.environmentVariables.OPENAI_MODEL).toBe("gpt-5.4");
+    expect(call.environmentVariables.OPENAI_MODEL).toBe("gpt-5.5");
   });
 });
