@@ -4077,6 +4077,54 @@ export const pt: TranslationStructure = {
   suggestions: {
     refresh: "Atualizar",
   },
+  claudeControl: {
+    cost: {
+      label: "Session cost",
+      loading: "Calculating cost…",
+      error: "Cost unavailable",
+    },
+    version: {
+      remoteCli: "Remote Claude Code",
+      happyCli: "Happy CLI",
+      unknown: "Unknown",
+    },
+    color: {
+      title: "Session color",
+      default: "Default",
+      apply: "Apply",
+    },
+    fileViewer: {
+      title: "View File",
+      close: "Close",
+      loading: "Loading…",
+      truncated: "Truncated to 1 MiB",
+      deniedBlacklistedPath: "Path blocked by CLI safety policy",
+      deniedPermissionDenied: "Access denied by Claude Code",
+      deniedTooLarge: "File too large",
+      deniedNotFound: "File not found",
+      deniedError: "Could not read file",
+    },
+    mention: {
+      placeholder: "Type to search files…",
+      noResults: "No files match",
+      searching: "Searching…",
+    },
+    mcp: {
+      title: "Invoke MCP Tool",
+      stepSelect: "1. Select tool",
+      stepConfirm: "2. Confirm",
+      reviewHeading: "Review before invoking",
+      confirmCheckbox: "I understand this will run an MCP tool directly",
+      invoke: "Invoke",
+      result: "Result",
+      errorNotWhitelisted: "MCP server not whitelisted on the remote CLI",
+      errorServerUnavailable: "MCP server unavailable",
+      errorToolNotFound: "Tool not found on server",
+      errorInvalidArguments: "Invalid arguments",
+      errorPermissionDenied: "Permission denied",
+      errorUnknown: "Unknown error",
+    },
+  },
 } as const;
 
 export type TranslationsPt = typeof pt;

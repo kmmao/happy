@@ -3977,4 +3977,52 @@ export const zhHant: TranslationStructure = {
   suggestions: {
     refresh: "重新整理",
   },
+  claudeControl: {
+    cost: {
+      label: "工作階段費用",
+      loading: "正在計算費用…",
+      error: "費用無法取得",
+    },
+    version: {
+      remoteCli: "遠端 Claude Code",
+      happyCli: "Happy CLI",
+      unknown: "未知",
+    },
+    color: {
+      title: "工作階段顏色",
+      default: "預設",
+      apply: "套用",
+    },
+    fileViewer: {
+      title: "檢視檔案",
+      close: "關閉",
+      loading: "載入中…",
+      truncated: "已截斷至 1 MiB",
+      deniedBlacklistedPath: "路徑被 CLI 安全原則封鎖",
+      deniedPermissionDenied: "Claude Code 拒絕存取",
+      deniedTooLarge: "檔案過大",
+      deniedNotFound: "找不到檔案",
+      deniedError: "無法讀取檔案",
+    },
+    mention: {
+      placeholder: "輸入以搜尋檔案…",
+      noResults: "沒有相符的檔案",
+      searching: "搜尋中…",
+    },
+    mcp: {
+      title: "呼叫 MCP 工具",
+      stepSelect: "1. 選擇工具",
+      stepConfirm: "2. 確認",
+      reviewHeading: "呼叫前複核",
+      confirmCheckbox: "我已了解這將直接執行一個 MCP 工具",
+      invoke: "呼叫",
+      result: "結果",
+      errorNotWhitelisted: "MCP 伺服器未列入遠端 CLI 白名單",
+      errorServerUnavailable: "MCP 伺服器無法使用",
+      errorToolNotFound: "伺服器上找不到該工具",
+      errorInvalidArguments: "參數無效",
+      errorPermissionDenied: "權限被拒絕",
+      errorUnknown: "未知錯誤",
+    },
+  },
 } as const;
