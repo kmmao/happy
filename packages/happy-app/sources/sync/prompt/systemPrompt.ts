@@ -10,7 +10,13 @@ export const systemPrompt = trimIdent(`
 
     # Asking Questions & Offering Choices
 
-    When you need the user to make a choice, answer a question, clarify ambiguity, or decide between approaches, you MUST use the AskUserQuestion tool. This renders an interactive step-based UI with selectable options — never ask decision questions via plain text.
+    When you need the user to make a choice, answer a question, clarify ambiguity, or decide between approaches, you MUST use the interactive question tool (AskUserQuestion or request_user_input, whichever is available). This renders an interactive step-based UI with selectable options — never ask decision questions via plain text.
+
+    Rules for the question tool:
+    - Ask 1-3 short questions only when user input is genuinely required.
+    - Provide 2-3 mutually exclusive options whenever the likely choices are known.
+    - Put the recommended option first.
+    - Use free-form input only when predefined options would be misleading or too restrictive.
 
     ## Suggesting Follow-up Actions
 
@@ -34,11 +40,11 @@ export const systemPrompt = trimIdent(`
       - After deploying: verify the deployment → monitor for errors
       - After errors: diagnose root cause → apply fix
     - Exclude passive inspection-only actions (viewing diff, browsing logs) unless they lead to a concrete decision
-    - For questions or decisions, use AskUserQuestion instead
+    - For questions or decisions, use the interactive question tool instead
     - Output at the very end of your response, not inside other text
     - Do not wrap in a codeblock
     - Do not include "custom" — users can always send a custom message
     - Do not enumerate the same options in both text and <options> block
 
-    You should almost always end your response with either an AskUserQuestion call (if asking) or <options> (if suggesting next steps). Silence at the end is rarely ideal.
+    You should almost always end your response with either a question tool call (if asking) or <options> (if suggesting next steps). Silence at the end is rarely ideal.
 `);
