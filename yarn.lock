@@ -7,10 +7,10 @@
   resolved "https://registry.yarnpkg.com/@0no-co/graphql.web/-/graphql.web-1.2.0.tgz#296d00581bfaaabfda1e976849d927824aaea81b"
   integrity sha512-/1iHy9TTr63gE1YcR5idjx8UREz1s0kFhydf3bBLCXyqjhkIc6igAzTOx3zPifCwFR87tsh/4Pa9cNts6d2otw==
 
-"@agentclientprotocol/sdk@^0.14.1":
-  version "0.14.1"
-  resolved "https://registry.yarnpkg.com/@agentclientprotocol/sdk/-/sdk-0.14.1.tgz#21e618065facd60ec440876bdbb27183a767dc1b"
-  integrity sha512-b6r3PS3Nly+Wyw9U+0nOr47bV8tfS476EgyEMhoKvJCZLbgqoDFN7DJwkxL88RR0aiOqOYV1ZnESHqb+RmdH8w==
+"@agentclientprotocol/sdk@^0.20.0":
+  version "0.20.0"
+  resolved "https://registry.yarnpkg.com/@agentclientprotocol/sdk/-/sdk-0.20.0.tgz#5a832b0b12fe1ede6423f10b693828ea474b8f35"
+  integrity sha512-BxEHyE4MvwyOsdyVPub1vEtyrq8E0JSdjC+ckXWimY1VabFCTXdPyXv2y2Omz1j+iod7Z8oBJDXFCJptM0GBqQ==
 
 "@ai-sdk/gateway@3.0.98":
   version "3.0.98"
