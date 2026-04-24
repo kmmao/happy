@@ -22,6 +22,7 @@ import { awaitFileExist } from "@/modules/watcher/awaitFileExist";
 import { systemPrompt } from "./utils/systemPrompt";
 import { buildLocaleInstruction } from "./utils/localeInstruction";
 import { PermissionResult } from "./sdk/types";
+import { HAPPY_PLAN_MODE_INSTRUCTIONS } from "./sdk/prompts";
 import type { JsRuntime } from "./runClaude";
 /**
  * Map App-level virtual model mode keys to real Anthropic model IDs.
@@ -323,6 +324,10 @@ export async function claudeRemote(opts: {
     // persisted JSONL metadata is reverse-linkable. SDK ignores this when
     // resuming/continuing (persisted title wins), so it's safe to set always.
     title: opts.happySessionId || undefined,
+    // Happy-flavored plan-mode workflow body (SDK 0.2.119+). SDK only applies
+    // this when `permissionMode === 'plan'`; passing it unconditionally is a
+    // no-op outside plan mode.
+    planModeInstructions: HAPPY_PLAN_MODE_INSTRUCTIONS,
   };
 
   // Track thinking state
