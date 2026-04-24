@@ -1,6 +1,7 @@
 import { buildRpcReadyEphemeral, eventRouter } from "@/app/events/eventRouter";
 import { debug, log } from "@/utils/log";
 import { Socket } from "socket.io";
+import { checkRpcRateLimit } from "./rpcRateLimit";
 
 /** Long-running RPC methods that need more than 30 seconds to complete. */
 const LONG_RUNNING_METHODS = new Set([
@@ -245,6 +246,24 @@ export function rpcHandler(options: RpcHandlerOptions) {
             callback({
               ok: false,
               error: "Cannot call RPC on the same socket",
+            });
+          }
+          return;
+        }
+
+        // Per-user, per-method rate limit (no-op for methods without a rule).
+        // Currently guards claude-control:read_file (20/min) and
+        // claude-control:file_suggestions (60/min) per IMPLEMENTATION_GUIDE.
+        const rl = checkRpcRateLimit(userId, method);
+        if (!rl.allowed) {
+          log(
+            { module: "websocket-rpc", level: "warn" },
+            `RPC rate limited: ${method} userId=${userId} — ${rl.reason} (retry in ${rl.retryInSec}s)`,
+          );
+          if (callback) {
+            callback({
+              ok: false,
+              error: `rate_limited: retry in ${rl.retryInSec}s (${rl.reason})`,
             });
           }
           return;
