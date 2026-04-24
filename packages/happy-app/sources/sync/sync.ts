@@ -87,6 +87,10 @@ import {
   loadLastSeqs,
   saveLastSeq,
   deleteLastSeq,
+  loadBackfillBoundaries,
+  saveBackfillBoundary,
+  deleteBackfillBoundary,
+  type BackfillBoundary,
 } from "./persistence";
 import { initializeTracking, tracking } from "@/track";
 import { parseToken } from "@/utils/parseToken";
@@ -166,6 +170,7 @@ class Sync {
   private sendSync = new Map<string, InvalidateSync>();
   private sendAbortControllers = new Map<string, AbortController>();
   private sessionLastSeq = loadLastSeqs();
+  private backfillBoundaries = loadBackfillBoundaries();
   private pendingOutbox = new Map<string, OutboxMessage[]>();
   private sessionMessageQueue = new Map<string, NormalizedMessage[]>();
   private sessionQueueProcessing = new Set<string>();
@@ -465,9 +470,13 @@ class Sync {
         );
       } else if (this.sessionLastSeq.has(sessionId)) {
         // lastSeq exists but no cache (e.g. first launch after feature rollout)
-        // Reset to 0 to force full re-fetch, otherwise history would be missing
+        // Reset to 0 to force full re-fetch, otherwise history would be missing.
+        // Clear any stale backfill boundary too — the tail range it claims to
+        // cover is no longer guaranteed to be in storage.
         this.sessionLastSeq.delete(sessionId);
         deleteLastSeq(sessionId);
+        this.backfillBoundaries.delete(sessionId);
+        deleteBackfillBoundary(sessionId);
         log.log(`💬 Reset lastSeq for ${sessionId} — no cache available`);
       }
     }
@@ -491,9 +500,13 @@ class Sync {
    * Returns a promise that resolves when message fetch completes.
    */
   refreshSession = async (sessionId: string) => {
-    // Reset lastSeq so fetchMessages does a full re-fetch instead of incremental
+    // Reset lastSeq so fetchMessages does a full re-fetch instead of incremental.
+    // Clear backfill boundary too — it refers to a prior reverse-pagination
+    // batch that may no longer be accurate after the manual refresh.
     this.sessionLastSeq.delete(sessionId);
     deleteLastSeq(sessionId);
+    this.backfillBoundaries.delete(sessionId);
+    deleteBackfillBoundary(sessionId);
 
     const messagesPromise = this.getMessagesSync(sessionId)?.invalidateAndAwait();
     gitStatusSync.getSync(sessionId).invalidate();
@@ -575,6 +588,8 @@ class Sync {
     this.pendingOutbox.delete(sessionId);
     this.sessionLastSeq.delete(sessionId);
     deleteLastSeq(sessionId);
+    this.backfillBoundaries.delete(sessionId);
+    deleteBackfillBoundary(sessionId);
     deleteMessageCache(sessionId);
     // Do NOT delete sessionMessageLocks — we are still inside lock.inLock().
     this.sessionMessageQueue.delete(sessionId);
@@ -2074,12 +2089,14 @@ class Sync {
       // NEWEST messages first using reverse pagination (before_seq). This way
       // the user sees the latest content immediately instead of waiting for
       // all historical messages to load.
-      let needsBackfill = false;
-      let backfillMaxSeq = 0;
-      // Lower bound of the reverse-pagination newest batch. Forward backfill
-      // only needs to cover seq < backfillMinSeq, since [backfillMinSeq,
-      // backfillMaxSeq] was already fetched and applied above.
-      let backfillMinSeq = 0;
+      //
+      // The `boundary` tracks the seq range of the newest batch that has
+      // already been applied — forward backfill must stop at boundary.minSeq-1
+      // since [boundary.minSeq, boundary.maxSeq] is already in storage.
+      // Restored from persistence so an interrupted backfill resumes with the
+      // correct stop-bound rather than re-fetching the already-applied tail.
+      let boundary: BackfillBoundary | null =
+        this.backfillBoundaries.get(sessionId) ?? null;
       if (afterSeq === 0) {
         const newestResponse = await apiSocket.request(
           `/v3/sessions/${sessionId}/messages?before_seq=2147483647&limit=300`,
@@ -2128,14 +2145,19 @@ class Sync {
             // lower edge of that batch — persisting intermediate cursors is
             // still safe because each forward batch is applied immediately
             // (see below), so interrupted backfills resume from the last
-            // fully-applied seq instead of restarting from 0.
+            // fully-applied seq instead of restarting from 0. The boundary
+            // itself is persisted too, so the stop-bound survives crashes.
             if (newestData.hasMore) {
               log.log(
                 `💬 fetchMessages: newest batch loaded (seq ${minNewestSeq}-${maxNewestSeq}), backfilling older messages`,
               );
-              needsBackfill = true;
-              backfillMaxSeq = maxNewestSeq;
-              backfillMinSeq = minNewestSeq;
+              boundary = {
+                minSeq: minNewestSeq,
+                maxSeq: maxNewestSeq,
+                updatedAt: Date.now(),
+              };
+              this.backfillBoundaries.set(sessionId, boundary);
+              saveBackfillBoundary(sessionId, boundary);
               // afterSeq stays at 0, forward pagination will fill the gap
               // [1, minNewestSeq - 1]
             } else {
@@ -2207,10 +2229,12 @@ class Sync {
 
         hasMore = !!data.hasMore;
         // Backfill stops once the gap below the reverse-pagination newest
-        // batch is filled. Messages in [backfillMinSeq, backfillMaxSeq] are
+        // batch is filled. Messages in [boundary.minSeq, boundary.maxSeq] are
         // already applied, so we don't need to re-fetch them via forward
-        // pagination.
-        if (needsBackfill && backfillMinSeq > 0 && maxSeq >= backfillMinSeq - 1) {
+        // pagination. Boundary may come from either this call's reverse
+        // pagination OR from persistence (a prior interrupted attempt), so
+        // the stop-bound is correct across crashes and Web reload paths too.
+        if (boundary && maxSeq >= boundary.minSeq - 1) {
           hasMore = false;
         }
         if (hasMore && maxSeq === afterSeq) {
@@ -2226,14 +2250,16 @@ class Sync {
       }
 
       // After the forward backfill fills the gap below the newest batch,
-      // jump the cursor past the already-applied newest batch so future
-      // incremental fetches start from the true tail.
-      if (needsBackfill && backfillMaxSeq > 0) {
+      // jump the cursor past the already-applied newest batch and clear the
+      // boundary so future incremental fetches start from the true tail.
+      if (boundary) {
         const currentSeq = this.sessionLastSeq.get(sessionId) ?? 0;
-        if (backfillMaxSeq > currentSeq) {
-          this.sessionLastSeq.set(sessionId, backfillMaxSeq);
-          saveLastSeq(sessionId, backfillMaxSeq);
+        if (boundary.maxSeq > currentSeq) {
+          this.sessionLastSeq.set(sessionId, boundary.maxSeq);
+          saveLastSeq(sessionId, boundary.maxSeq);
         }
+        this.backfillBoundaries.delete(sessionId);
+        deleteBackfillBoundary(sessionId);
       }
 
       // Surface side-channel session signals after all messages are merged in seq order.
