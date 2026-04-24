@@ -2,6 +2,7 @@ import fs from "fs/promises";
 import os from "os";
 import { execFile as execFileCb } from "node:child_process";
 import { promisify } from "node:util";
+import { randomUUID } from "node:crypto";
 
 import { ApiClient } from "@/api/api";
 import { TrackedSession } from "./types";
@@ -454,11 +455,16 @@ export async function startDaemon(): Promise<void> {
     const getCurrentChildren = () => Array.from(pidToTrackedSession.values());
 
     const rememberTrackedSession = (session: TrackedSession) => {
-      if (!session.happySessionId) {
+      // Schema v2 allows persisting spawn-only pending entries (daemon has
+      // spawned a child and knows its spawnId, but the child has not yet
+      // posted /session-started with its happySessionId). Require at least
+      // one stable identity.
+      if (!session.happySessionId && !session.spawnId) {
         return;
       }
       void trackedSessionRegistry.rememberTrackedSession(session).catch((error) => {
-        logger.debug(`[DAEMON RUN] Failed to persist tracked session ${session.happySessionId}: ${error}`);
+        const identity = session.happySessionId ?? `spawn:${session.spawnId}`;
+        logger.debug(`[DAEMON RUN] Failed to persist tracked session ${identity}: ${error}`);
       });
     };
 
@@ -973,9 +979,15 @@ export async function startDaemon(): Promise<void> {
           }
         }
 
-        const finalSessionEnv = {
+        // Daemon-generated spawn id — pre-registry key that's stable before the
+        // child posts /session-started with its server-assigned happySessionId.
+        // Injected as HAPPY_SPAWN_ID env var so any of the 4 runners can read
+        // it uniformly without touching CLI arg parsing.
+        const spawnId: string = randomUUID();
+        const finalSessionEnv: Record<string, string> = {
           ...filteredDaemonEnv,
           ...sessionScopedEnv,
+          HAPPY_SPAWN_ID: spawnId,
         };
 
         // Fail-fast validation: Check that any auth variables present are fully expanded
@@ -1102,6 +1114,7 @@ export async function startDaemon(): Promise<void> {
             // Create a tracked session for tmux windows - now we have the real PID!
             const trackedSession: TrackedSession = {
               startedBy: "daemon",
+              spawnId,
               pid: tmuxResult.pid, // Real PID from tmux -P flag
               tmuxSessionId: tmuxResult.sessionId,
               startedAt: Date.now(),
@@ -1116,6 +1129,11 @@ export async function startDaemon(): Promise<void> {
 
             // Add to tracking map so webhook can find it later
             pidToTrackedSession.set(tmuxResult.pid, trackedSession);
+            // Pre-register pending entry keyed by spawnId so crashes before
+            // /session-started don't leave the daemon blind to this child.
+            await trackedSessionRegistry.rememberTrackedSession(trackedSession).catch((error) => {
+              logger.debug(`[DAEMON RUN] Failed to pre-register spawn ${spawnId}: ${error}`);
+            });
 
             // Wait for webhook to populate session with happySessionId (exact same as regular flow)
             logger.debug(
@@ -1266,6 +1284,7 @@ export async function startDaemon(): Promise<void> {
 
           const trackedSession: TrackedSession = {
             startedBy: "daemon",
+            spawnId,
             pid: happyProcess.pid,
             childProcess: happyProcess,
             startedAt: Date.now(),
@@ -1279,6 +1298,11 @@ export async function startDaemon(): Promise<void> {
           };
 
           pidToTrackedSession.set(happyProcess.pid, trackedSession);
+          // Pre-register pending entry keyed by spawnId so crashes before
+          // /session-started don't leave the daemon blind to this child.
+          await trackedSessionRegistry.rememberTrackedSession(trackedSession).catch((error) => {
+            logger.debug(`[DAEMON RUN] Failed to pre-register spawn ${spawnId}: ${error}`);
+          });
 
           happyProcess.on("exit", (code, signal) => {
             logger.debug(
