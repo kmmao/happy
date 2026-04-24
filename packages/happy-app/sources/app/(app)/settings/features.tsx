@@ -39,6 +39,10 @@ function FeaturesSettingsScreen() {
     useSettingMutable("webNotificationsPersistent");
   const [scoringModelOverride, setScoringModelOverride] =
     useLocalSettingMutable("scoringModelOverride");
+  const [openClawEnabled, setOpenClawEnabled] =
+    useLocalSettingMutable("openClawEnabled");
+  const [sub2ApiEnabled, setSub2ApiEnabled] =
+    useLocalSettingMutable("sub2ApiEnabled");
 
   // Track browser notification permission state to avoid calling browser API in render
   const [notifPermission, setNotifPermission] = React.useState<
@@ -268,6 +272,43 @@ function FeaturesSettingsScreen() {
           )}
         </ItemGroup>
       )}
+
+      {/* Integrations */}
+      <ItemGroup
+        title={t("settingsFeatures.integrations")}
+        footer={t("settingsFeatures.integrationsFooter")}
+      >
+        <Item
+          title="OpenClaw"
+          subtitle={
+            openClawEnabled
+              ? t("settingsFeatures.openClawEnabled")
+              : t("settingsFeatures.openClawDisabled")
+          }
+          icon={
+            <Ionicons name="extension-puzzle-outline" size={29} color={theme.colors.accentPurple} />
+          }
+          rightElement={
+            <Switch value={openClawEnabled} onValueChange={setOpenClawEnabled} />
+          }
+          showChevron={false}
+        />
+        <Item
+          title="Sub2API"
+          subtitle={
+            sub2ApiEnabled
+              ? t("settingsFeatures.sub2ApiEnabled")
+              : t("settingsFeatures.sub2ApiDisabled")
+          }
+          icon={
+            <Ionicons name="speedometer-outline" size={29} color={theme.colors.accentTeal} />
+          }
+          rightElement={
+            <Switch value={sub2ApiEnabled} onValueChange={setSub2ApiEnabled} />
+          }
+          showChevron={false}
+        />
+      </ItemGroup>
     </ItemList>
   );
 }

@@ -15,6 +15,7 @@ import {
   useEntitlement,
   useLocalSettingMutable,
   useSetting,
+  useLocalSettings,
 } from "@/sync/storage";
 import { sync } from "@/sync/sync";
 import { isUsingCustomServer } from "@/sync/serverConfig";
@@ -42,6 +43,9 @@ export const SettingsView = React.memo(function SettingsView() {
     useLocalSettingMutable("devModeEnabled");
   const isPro = __DEV__ || useEntitlement("pro");
   const experiments = useSetting("experiments");
+  const localSettings = useLocalSettings();
+  const openClawEnabled = localSettings.openClawEnabled;
+  const sub2ApiEnabled = localSettings.sub2ApiEnabled;
   const isCustomServer = isUsingCustomServer();
   const allMachines = useAllMachines();
   const profile = useProfile();
@@ -320,31 +324,35 @@ export const SettingsView = React.memo(function SettingsView() {
         )}
       </ItemGroup>
 
-      {/* OpenClaw */}
-      <ItemGroup title={t("openclaw.title")}>
-        <Item
-          title={t("openclaw.title")}
-          subtitle={t("openclaw.connectDescription")}
-          icon={
-            <Image
-              source={require("@/assets/images/openclaw-icon-color.png")}
-              contentFit="contain"
-              style={{ width: 29, height: 29 }}
-            />
-          }
-          onPress={() => router.push("/(app)/openclaw")}
-        />
-      </ItemGroup>
+      {/* OpenClaw — only shown when enabled in Features settings */}
+      {openClawEnabled && (
+        <ItemGroup title={t("openclaw.title")}>
+          <Item
+            title={t("openclaw.title")}
+            subtitle={t("openclaw.connectDescription")}
+            icon={
+              <Image
+                source={require("@/assets/images/openclaw-icon-color.png")}
+                contentFit="contain"
+                style={{ width: 29, height: 29 }}
+              />
+            }
+            onPress={() => router.push("/(app)/openclaw")}
+          />
+        </ItemGroup>
+      )}
 
-      {/* Sub2API Usage Monitor */}
-      <ItemGroup title={t("sub2api.title")}>
-        <Item
-          title={t("sub2api.title")}
-          subtitle={t("sub2api.subtitle")}
-          icon={<Ionicons name="speedometer-outline" size={29} color={theme.colors.accentTeal} />}
-          onPress={() => router.push("/(app)/sub2api")}
-        />
-      </ItemGroup>
+      {/* Sub2API Usage Monitor — only shown when enabled in Features settings */}
+      {sub2ApiEnabled && (
+        <ItemGroup title={t("sub2api.title")}>
+          <Item
+            title={t("sub2api.title")}
+            subtitle={t("sub2api.subtitle")}
+            icon={<Ionicons name="speedometer-outline" size={29} color={theme.colors.accentTeal} />}
+            onPress={() => router.push("/(app)/sub2api")}
+          />
+        </ItemGroup>
+      )}
 
       {/* Developer */}
       {(__DEV__ || devModeEnabled) && (

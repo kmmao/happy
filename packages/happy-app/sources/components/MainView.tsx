@@ -10,6 +10,7 @@ import {
   useFriendRequests,
   useSocketStatus,
   useRealtimeStatus,
+  useLocalSettings,
 } from "@/sync/storage";
 import { useInboxUnreadCount } from "@/hooks/useInboxData";
 import { useVisibleSessionListViewData } from "@/hooks/useVisibleSessionListViewData";
@@ -299,7 +300,8 @@ export const MainView = React.memo(({ variant }: MainViewProps) => {
 
   // Tab state management
   const [activeTab, setActiveTab] = React.useState<TabType>("sessions");
-  const showOpenClaw = hasOpenClawConfig();
+  const { openClawEnabled } = useLocalSettings();
+  const showOpenClaw = openClawEnabled && hasOpenClawConfig();
 
   // If openclaw tab is hidden but was active, switch to sessions
   React.useEffect(() => {

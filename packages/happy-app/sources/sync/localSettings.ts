@@ -56,6 +56,9 @@ export const LocalSettingsSchema = z.object({
   scoringModelOverride: z
     .record(z.string(), z.string())
     .describe("Scoring model override per provider (e.g. anthropic → claude-haiku-4-5-20251001)"),
+  // Third-party integration visibility toggles (default off)
+  openClawEnabled: z.boolean().describe("Show OpenClaw integration in settings and tab bar"),
+  sub2ApiEnabled: z.boolean().describe("Show Sub2API usage monitor in settings"),
 });
 
 //
@@ -85,6 +88,8 @@ export const localSettingsDefaults: LocalSettings = {
   fileFavorites: {},
   autoOptionSendSessions: {},
   scoringModelOverride: {},
+  openClawEnabled: false,
+  sub2ApiEnabled: false,
 };
 Object.freeze(localSettingsDefaults);
 
