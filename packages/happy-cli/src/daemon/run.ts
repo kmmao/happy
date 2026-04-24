@@ -617,6 +617,7 @@ export async function startDaemon(): Promise<void> {
     const onHappySessionWebhook = (
       sessionId: string,
       sessionMetadata: Metadata,
+      reportedSpawnId?: string,
     ) => {
       logger.debugLargeJson(`[DAEMON RUN] Session reported`, sessionMetadata);
 
@@ -629,16 +630,62 @@ export async function startDaemon(): Promise<void> {
       }
 
       logger.debug(
-        `[DAEMON RUN] Session webhook: ${sessionId}, PID: ${pid}, started by: ${sessionMetadata.startedBy || "unknown"}`,
+        `[DAEMON RUN] Session webhook: ${sessionId}, PID: ${pid}, started by: ${sessionMetadata.startedBy || "unknown"}${reportedSpawnId ? `, spawnId: ${reportedSpawnId}` : ""}`,
       );
       logger.debug(
         `[DAEMON RUN] Current tracked sessions before webhook: ${Array.from(pidToTrackedSession.keys()).join(", ")}`,
       );
 
-      // Check if we already have this PID (daemon-spawned)
-      const existingSession = pidToTrackedSession.get(pid);
+      // Primary match: in-memory pid map (normal daemon-spawn → webhook path).
+      let existingSession = pidToTrackedSession.get(pid);
+
+      // Fallback match: daemon crashed between spawn and /session-started, so
+      // the in-memory map is empty but the pending entry persisted in
+      // tracked-sessions.json keyed by spawnId. Reconstruct the TrackedSession
+      // so automationContext / startedAt / directoryCreated survive the
+      // crash-and-restart, and this child isn't mislabeled as externally-started.
+      if (!existingSession && reportedSpawnId) {
+        const persisted = trackedSessionRegistry.getBySpawnId(reportedSpawnId);
+        if (persisted) {
+          existingSession = {
+            startedBy: persisted.startedBy,
+            pid,
+            spawnId: persisted.spawnId,
+            startedAt: persisted.startedAt,
+            lastActivityAt: persisted.lastActivityAt,
+            lastOutputAt: persisted.lastOutputAt,
+            automationContext: persisted.automationContext,
+            tmuxSessionId: persisted.tmuxSessionId,
+            directoryCreated: persisted.directoryCreated,
+            message: persisted.message,
+            recoveredFromIndex: true,
+            recoveredAt: Date.now(),
+          };
+          pidToTrackedSession.set(pid, existingSession);
+          logger.debug(
+            `[DAEMON RUN] Recovered pending spawn ${reportedSpawnId} from registry on webhook (pid ${pid})`,
+          );
+        }
+      }
 
       if (existingSession && existingSession.startedBy === "daemon") {
+        // Defensive: child should echo back the exact spawnId we injected via
+        // HAPPY_SPAWN_ID env var. Mismatch suggests env propagation broke
+        // (shell wrapper clobbered env, process re-exec'd with fresh env, etc.).
+        // Keep daemon's authoritative spawnId and warn — do not trust the child.
+        if (
+          reportedSpawnId &&
+          existingSession.spawnId &&
+          reportedSpawnId !== existingSession.spawnId
+        ) {
+          logger.debug(
+            `[DAEMON RUN] Spawn id mismatch for PID ${pid}: daemon=${existingSession.spawnId}, child reported=${reportedSpawnId}. Keeping daemon's spawnId.`,
+          );
+        } else if (reportedSpawnId && !existingSession.spawnId) {
+          // Old daemon restart + new child — backfill spawnId from webhook.
+          existingSession.spawnId = reportedSpawnId;
+        }
+
         // Update daemon-spawned session with reported data
         existingSession.happySessionId = sessionId;
         existingSession.happySessionMetadataFromLocalWebhook = sessionMetadata;
@@ -658,9 +705,12 @@ export async function startDaemon(): Promise<void> {
         }
         rememberTrackedSession(existingSession);
       } else if (!existingSession) {
-        // New session started externally
+        // New session started externally. Rare to get a spawnId here — would
+        // only happen if HAPPY_SPAWN_ID was set outside the daemon's own spawn
+        // path (e.g. user-set manually). Record it anyway for consistency.
         const trackedSession: TrackedSession = {
           startedBy: "happy directly - likely by user from terminal",
+          spawnId: reportedSpawnId,
           happySessionId: sessionId,
           happySessionMetadataFromLocalWebhook: sessionMetadata,
           pid,
