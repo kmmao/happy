@@ -207,10 +207,55 @@ export function accountProfileRoutes(app: Fastify) {
         preHandler: app.authenticate,
         schema: {
             params: z.object({ profileId: z.string() }),
-            response: { 200: z.object({ success: z.literal(true) }) },
+            response: {
+                200: z.object({ success: z.literal(true) }),
+                409: z.object({
+                    error: z.literal("profile_in_use"),
+                    message: z.string(),
+                    referenceCounts: z.object({
+                        activeTasks: z.number().int().nonnegative(),
+                        enabledSchedules: z.number().int().nonnegative(),
+                        enabledWebhooks: z.number().int().nonnegative(),
+                    }),
+                }),
+            },
         },
     }, async (request, reply) => {
         const { profileId } = request.params;
+
+        // Archive-guard: refuse to archive a profile that's still bound to
+        // live triggers (Cron schedules / webhooks) or in-flight tasks. The
+        // operator must rebind or disable those first, otherwise the next
+        // dispatch would fail "profile not found" and surface via the Inbox
+        // `profile.resolve_failed` channel — cleaner to block up front.
+        const [taskRefs, scheduleRefs, webhookRefs] = await Promise.all([
+            db.task.count({
+                where: {
+                    accountId: request.userId,
+                    profileId,
+                    status: { in: ["queued", "dispatching", "running"] },
+                },
+            }),
+            db.triggerSchedule.count({
+                where: { accountId: request.userId, profileId, enabled: true },
+            }),
+            db.webhookTrigger.count({
+                where: { accountId: request.userId, profileId, enabled: true },
+            }),
+        ]);
+        const totalRefs = taskRefs + scheduleRefs + webhookRefs;
+        if (totalRefs > 0) {
+            return reply.code(409).send({
+                error: "profile_in_use",
+                message: `Profile is still referenced by ${totalRefs} active record(s). Rebind or disable them before archiving.`,
+                referenceCounts: {
+                    activeTasks: taskRefs,
+                    enabledSchedules: scheduleRefs,
+                    enabledWebhooks: webhookRefs,
+                },
+            });
+        }
+
         await db.$executeRaw(Prisma.sql`
             UPDATE "AiBackendProfile"
             SET "archivedAt" = NOW(), "updatedAt" = NOW()

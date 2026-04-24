@@ -15,6 +15,11 @@ import {
     normalizeTaskStatusReport,
     shouldApplyTaskStatus,
 } from "@/modules/taskStatusLogic";
+import {
+    isUnifiedRuntimeProfileResolverEnabled,
+    notifyRuntimeProfileFailure,
+    resolveRuntimeProfile,
+} from "@/modules/runtimeProfileResolver";
 
 const TaskPrioritySchema = z.enum(["urgent", "user", "background"]);
 const TaskStatusSchema = z.enum(["queued", "dispatching", "running", "completed", "failed", "cancelled"]);
@@ -152,6 +157,7 @@ export function taskRoutes(app: Fastify) {
 
             let directory = "~";
             let resolvedProjectId: string | null = null;
+            let projectSupervisorConfig: string | null = null;
             if (projectId) {
                 const project = await db.project.findFirst({
                     where: { id: projectId, accountId: userId },
@@ -160,6 +166,7 @@ export function taskRoutes(app: Fastify) {
                     return reply.code(404).send({ error: "Project not found" });
                 }
                 resolvedProjectId = project.id;
+                projectSupervisorConfig = project.supervisorConfig ?? null;
                 if (bodyDirectory?.trim()) {
                     const candidate = bodyDirectory.trim();
                     if (!isDirectoryUnderProject(project.path, candidate)) {
@@ -171,6 +178,39 @@ export function taskRoutes(app: Fastify) {
                 }
             } else if (bodyDirectory?.trim()) {
                 return reply.code(400).send({ error: "directory override requires projectId" });
+            }
+
+            // Resolve the runtime profile so the session spawns with the
+            // correct provider/permission binding rather than CLI defaults.
+            // Manual creates currently have no explicit profileId (CreateTaskBody
+            // hasn't exposed it yet — pending C5 App UI), so we fall back to
+            // project default. Failures are surfaced to the operator via Inbox
+            // AND a 400 response (per the no-silent-fallback decision).
+            let taskProfileId: string | undefined;
+            let taskRuntimeProfile:
+                | Awaited<ReturnType<typeof resolveRuntimeProfile>>
+                | null = null;
+            if (isUnifiedRuntimeProfileResolverEnabled()) {
+                taskRuntimeProfile = await resolveRuntimeProfile({
+                    accountId: userId,
+                    explicitProfileId: null,
+                    projectSupervisorConfig,
+                    purpose: "task-manual",
+                });
+                if (!taskRuntimeProfile.ok) {
+                    notifyRuntimeProfileFailure({
+                        accountId: userId,
+                        purpose: "task-manual",
+                        failure: taskRuntimeProfile,
+                        referenceUrl: `/machine/${machineId}/tasks`,
+                    });
+                    return reply.code(400).send({
+                        error: "profile_unavailable",
+                        reason: taskRuntimeProfile.reason,
+                        message: taskRuntimeProfile.message,
+                    });
+                }
+                taskProfileId = taskRuntimeProfile.profileId;
             }
 
             let skillContents: Array<{ name: string; content: string }> | undefined;
@@ -199,6 +239,7 @@ export function taskRoutes(app: Fastify) {
                     maxAttempts,
                     triggerType: "manual",
                     status: "dispatching",
+                    profileId: taskProfileId,
                     ...(skillIds.length > 0
                         ? {
                               skillBindings: {
@@ -227,6 +268,11 @@ export function taskRoutes(app: Fastify) {
                     projectId: resolvedProjectId ?? undefined,
                     resultToken,
                     skillContents,
+                    profileId: taskProfileId,
+                    runtimeProfile:
+                        taskRuntimeProfile?.ok
+                            ? taskRuntimeProfile.runtimeProfile
+                            : undefined,
                 }),
                 recipientFilter: {
                     type: "machine-scoped-only",
@@ -374,6 +420,7 @@ export function taskRoutes(app: Fastify) {
             }
 
             let directory = task.directory ?? "~";
+            let projectSupervisorConfig: string | null = null;
             if (task.projectId) {
                 const project = await db.project.findFirst({
                     where: { id: task.projectId, accountId: request.userId },
@@ -384,6 +431,40 @@ export function taskRoutes(app: Fastify) {
                 if (!task.directory) {
                     directory = project.path;
                 }
+                projectSupervisorConfig = project.supervisorConfig ?? null;
+            }
+
+            // Re-resolve profile on retry: the original binding (task.profileId)
+            // wins, with project default as a fallback path. If the referenced
+            // profile has since been archived / broken, fail loudly with 400
+            // + Inbox rather than silently spawning with stale env.
+            let retryProfileId: string | undefined;
+            let retryRuntimeProfile:
+                | Awaited<ReturnType<typeof resolveRuntimeProfile>>
+                | null = null;
+            if (isUnifiedRuntimeProfileResolverEnabled()) {
+                retryRuntimeProfile = await resolveRuntimeProfile({
+                    accountId: request.userId,
+                    explicitProfileId: task.profileId,
+                    projectSupervisorConfig,
+                    purpose: "task-retry",
+                });
+                if (!retryRuntimeProfile.ok) {
+                    notifyRuntimeProfileFailure({
+                        accountId: request.userId,
+                        purpose: "task-retry",
+                        failure: retryRuntimeProfile,
+                        referenceUrl: `/machine/${task.machineId}/tasks`,
+                        refType: "task",
+                        refId: task.id,
+                    });
+                    return reply.code(400).send({
+                        error: "profile_unavailable",
+                        reason: retryRuntimeProfile.reason,
+                        message: retryRuntimeProfile.message,
+                    });
+                }
+                retryProfileId = retryRuntimeProfile.profileId;
             }
 
             let skillContents: Array<{ name: string; content: string }> | undefined;
@@ -405,6 +486,10 @@ export function taskRoutes(app: Fastify) {
                     sessionId: null,
                     dispatchedAt: null,
                     completedAt: null,
+                    // Refresh profileId so future retries surface the latest
+                    // binding resolution (e.g. if the user moved project
+                    // default to a new profile).
+                    ...(retryProfileId ? { profileId: retryProfileId } : {}),
                 },
             });
 
@@ -423,6 +508,11 @@ export function taskRoutes(app: Fastify) {
                     projectId: task.projectId ?? undefined,
                     resultToken,
                     skillContents,
+                    profileId: retryProfileId,
+                    runtimeProfile:
+                        retryRuntimeProfile?.ok
+                            ? retryRuntimeProfile.runtimeProfile
+                            : undefined,
                 }),
                 recipientFilter: {
                     type: "machine-scoped-only",

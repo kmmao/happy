@@ -7,6 +7,11 @@ import {
 } from "@/app/events/eventRouter";
 import { CronExpressionParser } from "cron-parser";
 import { inboxCreate } from "./inboxCreate";
+import {
+    isUnifiedRuntimeProfileResolverEnabled,
+    notifyRuntimeProfileFailure,
+    resolveRuntimeProfile,
+} from "./runtimeProfileResolver";
 
 const TERMINAL_TASK_STATUSES = new Set(["completed", "failed", "cancelled"]);
 
@@ -74,7 +79,7 @@ export async function checkAndTriggerSchedules(
         projectIds.length > 0
             ? db.project.findMany({
                   where: { id: { in: projectIds }, accountId: userId },
-                  select: { id: true, path: true },
+                  select: { id: true, path: true, supervisorConfig: true },
               })
             : Promise.resolve([]),
         allSkillIds.length > 0
@@ -119,12 +124,44 @@ export async function checkAndTriggerSchedules(
 
             let directory = "~";
             let resolvedProjectId: string | null = null;
+            let projectSupervisorConfig: string | null = null;
             if (schedule.projectId) {
                 const project = projectMap.get(schedule.projectId);
                 if (project) {
                     directory = project.path;
                     resolvedProjectId = project.id;
+                    projectSupervisorConfig = project.supervisorConfig ?? null;
                 }
+            }
+
+            // Resolve the runtime profile before claiming the schedule so a
+            // missing / archived / corrupt binding surfaces as an operator
+            // notification instead of a silently-spawned session using stale
+            // env defaults. Disabled path (`RUNTIME_PROFILE_UNIFIED_RESOLVER=false`)
+            // keeps the legacy "no runtimeProfile in payload" behavior.
+            let resolvedProfileId: string | undefined;
+            let resolvedRuntimeProfile:
+                | Awaited<ReturnType<typeof resolveRuntimeProfile>>
+                | null = null;
+            if (isUnifiedRuntimeProfileResolverEnabled()) {
+                resolvedRuntimeProfile = await resolveRuntimeProfile({
+                    accountId: userId,
+                    explicitProfileId: schedule.profileId,
+                    projectSupervisorConfig,
+                    purpose: "cron",
+                });
+                if (!resolvedRuntimeProfile.ok) {
+                    notifyRuntimeProfileFailure({
+                        accountId: userId,
+                        purpose: "cron",
+                        failure: resolvedRuntimeProfile,
+                        referenceUrl: `/machine/${machineId}/tasks`,
+                        refType: "triggerSchedule",
+                        refId: schedule.id,
+                    });
+                    continue;
+                }
+                resolvedProfileId = resolvedRuntimeProfile.profileId;
             }
 
             let skillContents: Array<{ name: string; content: string }> | undefined;
@@ -171,6 +208,7 @@ export async function checkAndTriggerSchedules(
                         triggerType: "cron",
                         triggerRef: schedule.id,
                         status: "dispatching",
+                        profileId: resolvedProfileId,
                         ...(skillIds.length > 0
                             ? {
                                   skillBindings: {
@@ -208,6 +246,11 @@ export async function checkAndTriggerSchedules(
                     priority: schedule.priority,
                     projectId: resolvedProjectId ?? undefined,
                     skillContents,
+                    profileId: resolvedProfileId,
+                    runtimeProfile:
+                        resolvedRuntimeProfile?.ok
+                            ? resolvedRuntimeProfile.runtimeProfile
+                            : undefined,
                 }),
                 recipientFilter: {
                     type: "machine-scoped-only",

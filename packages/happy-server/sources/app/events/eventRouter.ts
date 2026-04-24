@@ -1179,6 +1179,11 @@ export function buildTaskTriggerEphemeral(opts: {
   skillContents?: Array<{ name: string; content: string }>;
   agentType?: string | null;
   modelOverride?: string | null;
+  // Profile binding (wire 0.14.0 / unified resolver 2026-04-24). Optional so
+  // callers that still run under feature flag `RUNTIME_PROFILE_UNIFIED_RESOLVER=false`
+  // keep the pre-0.14.0 payload shape.
+  profileId?: string;
+  runtimeProfile?: ResolvedRuntimeProfile;
 }): EphemeralPayload {
   return {
     type: "task-trigger",
