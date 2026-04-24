@@ -9,6 +9,11 @@ import { log } from "@/utils/log";
 import crypto from "crypto";
 import { inTx } from "@/storage/inTx";
 import { inboxCreate } from "@/modules/inboxCreate";
+import {
+    isUnifiedRuntimeProfileResolverEnabled,
+    notifyRuntimeProfileFailure,
+    resolveRuntimeProfile,
+} from "@/modules/runtimeProfileResolver";
 import { WEBHOOK_INBOUND_RATE_LIMIT } from "../utils/enableRateLimit";
 
 const MAX_WEBHOOK_PAYLOAD_SIZE = 65536; // 64KB
@@ -120,18 +125,57 @@ export function webhookTriggerRoutes(app: Fastify) {
                 return reply.code(413).send({ error: "Resulting prompt too large" });
             }
 
-            // Resolve project directory
+            // Resolve project directory (+ supervisorConfig needed for
+            // runtime profile resolution below)
             let directory = "~";
             let resolvedProjectId: string | null = null;
+            let projectSupervisorConfig: string | null = null;
             if (trigger.projectId) {
                 const project = await db.project.findFirst({
                     where: { id: trigger.projectId, accountId: trigger.accountId },
-                    select: { id: true, path: true },
+                    select: { id: true, path: true, supervisorConfig: true },
                 });
                 if (project) {
                     directory = project.path;
                     resolvedProjectId = project.id;
+                    projectSupervisorConfig = project.supervisorConfig ?? null;
                 }
+            }
+
+            // Resolve the runtime profile before creating the Task. When
+            // the unified resolver is disabled (feature flag off) we keep
+            // the pre-0.14.0 behavior of dispatching without a profile,
+            // matching Cron/Task routes. When enabled, a missing / stale
+            // binding results in a 503 + Inbox notification so the
+            // external caller knows to fix the binding and retry; we do
+            // NOT silently dispatch a Task that would run with stale env.
+            let resolvedProfileId: string | undefined;
+            let resolvedRuntimeProfile:
+                | Awaited<ReturnType<typeof resolveRuntimeProfile>>
+                | null = null;
+            if (isUnifiedRuntimeProfileResolverEnabled()) {
+                resolvedRuntimeProfile = await resolveRuntimeProfile({
+                    accountId: trigger.accountId,
+                    explicitProfileId: trigger.profileId,
+                    projectSupervisorConfig,
+                    purpose: "webhook",
+                });
+                if (!resolvedRuntimeProfile.ok) {
+                    notifyRuntimeProfileFailure({
+                        accountId: trigger.accountId,
+                        purpose: "webhook",
+                        failure: resolvedRuntimeProfile,
+                        referenceUrl: `/machine/${trigger.machineId}/tasks`,
+                        refType: "webhookTrigger",
+                        refId: trigger.id,
+                    });
+                    return reply.code(503).send({
+                        error: "profile_unavailable",
+                        reason: resolvedRuntimeProfile.reason,
+                        message: resolvedRuntimeProfile.message,
+                    });
+                }
+                resolvedProfileId = resolvedRuntimeProfile.profileId;
             }
 
             // Load skills if bound
@@ -167,6 +211,7 @@ export function webhookTriggerRoutes(app: Fastify) {
                         triggerType: "webhook",
                         triggerRef: trigger.id,
                         status: "dispatching",
+                        profileId: resolvedProfileId,
                         ...(skillIds.length > 0
                             ? {
                                   skillBindings: {
@@ -201,6 +246,11 @@ export function webhookTriggerRoutes(app: Fastify) {
                     priority: trigger.priority,
                     projectId: resolvedProjectId ?? undefined,
                     skillContents,
+                    profileId: resolvedProfileId,
+                    runtimeProfile:
+                        resolvedRuntimeProfile?.ok
+                            ? resolvedRuntimeProfile.runtimeProfile
+                            : undefined,
                 }),
                 recipientFilter: {
                     type: "machine-scoped-only",
