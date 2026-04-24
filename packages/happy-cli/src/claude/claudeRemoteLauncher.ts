@@ -49,6 +49,11 @@ import {
   buildProgressStateFromLists,
   capProgressLists,
 } from "@/utils/progressState";
+import {
+  registerClaudeControlHandlers,
+  SessionCostTracker,
+} from "./rpc/claudeControlHandlers";
+import packageJson from "../../package.json";
 
 interface PermissionsField {
   date: number;
@@ -280,6 +285,16 @@ export async function claudeRemoteLauncher(
   session.client.rpcHandlerManager.registerHandler("switch", doSwitch); // When switch clicked
   session.client.rpcHandlerManager.registerHandler("interrupt", doInterrupt); // Graceful interrupt
   session.client.rpcHandlerManager.registerHandler("stopTask", doStopTask); // Stop background task
+
+  // Claude Control sidebar RPCs (SDK 0.2.119+ — see claudeControlRpc.ts wire schemas)
+  const sessionCostTracker = new SessionCostTracker();
+  registerClaudeControlHandlers({
+    rpcHandlerManager: session.client.rpcHandlerManager,
+    getCurrentQuery: () => currentQuery,
+    cwd: session.path,
+    costTracker: sessionCostTracker,
+    happyCliVersion: (packageJson as { version?: string }).version,
+  });
   // Removed catch-all stdin handler - now handled by RemoteModeDisplay keyboard handlers
 
   // Task log streaming: subscribe/unsubscribe to real-time output file monitoring

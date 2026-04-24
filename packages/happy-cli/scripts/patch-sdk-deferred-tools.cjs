@@ -2,22 +2,27 @@
  * Patch Claude Code SDK to prevent AskUserQuestion from being deferred.
  *
  * Background:
- *   SDK >= 0.2.81 introduced a "deferred tools" mechanism controlled by
- *   server-side GrowthBook feature flags (tengu_defer_all_bn4).  When the
- *   flag is active, AskUserQuestion becomes a deferred tool — the model must
- *   first call ToolSearch to fetch its schema before it can use it.  In
- *   practice the model skips this extra step and falls back to plain-text
+ *   SDK 0.2.81..0.2.118 shipped the Claude Code runtime as minified JS
+ *   (cli.js) inside the main package. That runtime gates AskUserQuestion
+ *   behind a "deferred tools" mechanism (GrowthBook flag tengu_defer_all_bn4):
+ *   the model must call ToolSearch to fetch the schema before invoking
+ *   AskUserQuestion — the model skips that step and falls back to plain-text
  *   options, so the interactive step-based Q&A UI never appears.
  *
- *   This script patches the minified isDeferredTool() function (exported as
- *   `RD`) to short-circuit for AskUserQuestion, keeping it always available.
+ *   This script patches the minified isDeferredTool() function to
+ *   short-circuit for AskUserQuestion, keeping it always pre-loaded.
  *
- * How it works:
- *   Locates the isDeferredTool function by matching known signatures and
- *   injects an early return for AskUserQuestion before any other checks.
- *   Supports multiple SDK versions (function name changes across minified builds).
+ * SDK 0.2.119+:
+ *   cli.js no longer ships in the main package — the runtime is split into
+ *   platform-specific native binaries (@anthropic-ai/claude-agent-sdk-
+ *   {platform}-{arch}). Binary patching is not viable, so on 0.2.119+ we
+ *   fall back to disabling deferred-tool behavior entirely via env vars in
+ *   the query adapter — see packages/happy-cli/src/claude/sdk/queryAdapter.ts
+ *   (ENABLE_TOOL_SEARCH="auto:100" forces "standard" mode so every tool,
+ *   including AskUserQuestion, is pre-loaded).
  *
- * This runs as a postinstall hook — safe to re-run, idempotent.
+ *   This script continues to be the preferred fix on any SDK version that
+ *   still ships cli.js; it's an idempotent no-op when cli.js is absent.
  */
 
 const fs = require('fs');

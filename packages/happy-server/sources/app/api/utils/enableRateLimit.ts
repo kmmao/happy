@@ -2,7 +2,9 @@ import rateLimit from "@fastify/rate-limit";
 import { log } from "@/utils/log";
 import type { Fastify } from "../types";
 
-const RATE_LIMIT_ENABLED = (process.env.RATE_LIMIT_ENABLED ?? "false") === "true";
+// Default enabled — explicit opt-out requires RATE_LIMIT_ENABLED="false".
+// Previously defaulted to disabled which made every downstream rate-limit ineffective in production.
+const RATE_LIMIT_ENABLED = (process.env.RATE_LIMIT_ENABLED ?? "true") === "true";
 const GLOBAL_MAX = parseInt(process.env.RATE_LIMIT_MAX ?? "600", 10);
 const GLOBAL_WINDOW_MS = parseInt(process.env.RATE_LIMIT_WINDOW ?? "60000", 10);
 

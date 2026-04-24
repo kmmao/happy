@@ -14,3 +14,4 @@ export * from './sessionState';
 export * from './happyMcp';
 export * from './codexBackendSelection';
 export * from './codexMetadata';
+export * from './claudeControlRpc';

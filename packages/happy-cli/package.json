@@ -91,8 +91,8 @@
   },
   "dependencies": {
     "@agentclientprotocol/sdk": "^0.14.1",
-    "@anthropic-ai/claude-agent-sdk": "^0.2.112",
-    "@anthropic-ai/sandbox-runtime": "^0.0.43",
+    "@anthropic-ai/claude-agent-sdk": "^0.2.119",
+    "@anthropic-ai/sandbox-runtime": "^0.0.49",
     "@kmmao/happy-wire": "^0.13.0",
     "@modelcontextprotocol/sdk": "^1.26.0",
     "@paralleldrive/cuid2": "^2.2.2",
