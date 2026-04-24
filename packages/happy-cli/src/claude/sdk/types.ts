@@ -168,6 +168,16 @@ export interface QueryOptions {
    * Maps to the official SDK's `Options.planModeInstructions` introduced in 0.2.119.
    */
   planModeInstructions?: string;
+  /**
+   * Adapter that mirrors session transcript entries to an external store.
+   * When set, the SDK still writes to CLAUDE_CONFIG_DIR AND emits entries
+   * to this adapter via dual-write. Currently used as an observability hook
+   * behind the `HAPPY_USE_SESSION_STORE` env flag — see
+   * `sessionStoreAdapter.ts`.
+   *
+   * Maps to the official SDK's `Options.sessionStore` (@alpha, 0.2.119+).
+   */
+  sessionStore?: import("@anthropic-ai/claude-agent-sdk").SessionStore;
 }
 
 /** Query prompt — string or async stream of user messages */

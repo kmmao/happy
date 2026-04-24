@@ -23,6 +23,7 @@ import { systemPrompt } from "./utils/systemPrompt";
 import { buildLocaleInstruction } from "./utils/localeInstruction";
 import { PermissionResult } from "./sdk/types";
 import { HAPPY_PLAN_MODE_INSTRUCTIONS } from "./sdk/prompts";
+import { createSessionStoreAdapter } from "./sdk/sessionStoreAdapter";
 import type { JsRuntime } from "./runClaude";
 /**
  * Map App-level virtual model mode keys to real Anthropic model IDs.
@@ -328,6 +329,11 @@ export async function claudeRemote(opts: {
     // this when `permissionMode === 'plan'`; passing it unconditionally is a
     // no-op outside plan mode.
     planModeInstructions: HAPPY_PLAN_MODE_INSTRUCTIONS,
+    // SessionStore @alpha adapter — undefined unless HAPPY_USE_SESSION_STORE=1.
+    // When enabled the SDK dual-writes transcript entries to our observer
+    // adapter (in-memory) in addition to the usual on-disk JSONL, so we can
+    // study real call cadence before building a production backend.
+    sessionStore: createSessionStoreAdapter(),
   };
 
   // Track thinking state

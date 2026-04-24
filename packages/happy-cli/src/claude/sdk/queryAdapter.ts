@@ -129,6 +129,9 @@ export function mapOptions(opts: QueryOptions): OfficialOptions {
     (result as OfficialOptions & { planModeInstructions?: string }).planModeInstructions = opts.planModeInstructions;
   }
 
+  // ── SessionStore @alpha adapter (SDK 0.2.119+) ──
+  if (opts.sessionStore) result.sessionStore = opts.sessionStore;
+
   // ── System prompt mapping ──
   if (opts.customSystemPrompt) {
     result.systemPrompt = opts.customSystemPrompt;
