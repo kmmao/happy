@@ -15,7 +15,7 @@
  *   - Plaintext-content tier (simple pass-through, no content-level secrets):
  *       get_session_cost, get_binary_version, set_color
  *   - E2E content tier (payload contains user source / paths):
- *       read_file, file_suggestions
+ *       read_file
  *   - Permission-gated (destructive side effects):
  *       mcp_call
  */
@@ -88,24 +88,6 @@ export const ReadFileResponseSchema = z.object({
 export type ReadFileRequest = z.infer<typeof ReadFileRequestSchema>;
 export type ReadFileResponse = z.infer<typeof ReadFileResponseSchema>;
 
-// ── file_suggestions ────────────────────────────────────────────────────────
-export const FileSuggestionsRequestSchema = z.object({
-    /** Partial query string for fuzzy-matching file paths (e.g. "conf/dev"). */
-    query: z.string().max(1024),
-    /** Max suggestions to return; CLI caps at 50. */
-    limit: z.number().int().positive().max(50).optional(),
-}).strict();
-export const FileSuggestionsResponseSchema = z.object({
-    suggestions: z.array(z.object({
-        /** Project-relative path. */
-        path: z.string(),
-        /** Detected file type for icon display. */
-        type: z.enum(['file', 'directory']),
-    })),
-}).strict();
-export type FileSuggestionsRequest = z.infer<typeof FileSuggestionsRequestSchema>;
-export type FileSuggestionsResponse = z.infer<typeof FileSuggestionsResponseSchema>;
-
 // ── mcp_call ────────────────────────────────────────────────────────────────
 export const McpCallRequestSchema = z.object({
     /** Fully-qualified MCP tool name, e.g. `mcp__fs__read`. Must pass CLI whitelist. */
@@ -154,7 +136,6 @@ export const CLAUDE_CONTROL_METHODS = [
     'get_binary_version',
     'set_color',
     'read_file',
-    'file_suggestions',
     'mcp_call',
 ] as const;
 

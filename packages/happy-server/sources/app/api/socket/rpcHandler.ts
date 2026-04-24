@@ -252,8 +252,7 @@ export function rpcHandler(options: RpcHandlerOptions) {
         }
 
         // Per-user, per-method rate limit (no-op for methods without a rule).
-        // Currently guards claude-control:read_file (20/min) and
-        // claude-control:file_suggestions (60/min) per IMPLEMENTATION_GUIDE.
+        // Currently guards claude-control:read_file (20/min).
         const rl = checkRpcRateLimit(userId, method);
         if (!rl.allowed) {
           log(

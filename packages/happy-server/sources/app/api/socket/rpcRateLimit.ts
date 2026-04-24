@@ -1,12 +1,11 @@
 /**
  * Per-user, per-method rate limit for Socket.IO RPC forwarding.
  *
- * Currently scoped to the two claude-control file-access RPCs introduced in
- * SDK 0.2.119 (IMPLEMENTATION_GUIDE follow-up). Other methods pass through
- * unlimited. Fixed-window counter in-memory — simpler than sliding window,
- * sufficient for basic abuse prevention. Not persistent: if the server
- * restarts, counters reset (acceptable trade-off vs. Redis complexity for
- * this surface).
+ * Currently scoped to `claude-control:read_file` (SDK 0.2.119 sidebar
+ * file-read RPC). Other methods pass through unlimited. Fixed-window
+ * counter in-memory — simpler than sliding window, sufficient for basic
+ * abuse prevention. Not persistent: if the server restarts, counters reset
+ * (acceptable trade-off vs. Redis complexity for this surface).
  *
  * Multi-instance note: counters are per-process. If the server runs behind
  * multiple nodes, the effective limit becomes `nodes × max`. Acceptable for
@@ -26,7 +25,6 @@ interface RpcRateLimitRule {
  */
 const RULES: Record<string, RpcRateLimitRule> = {
     "claude-control:read_file": { max: 20, windowMs: 60_000 },
-    "claude-control:file_suggestions": { max: 60, windowMs: 60_000 },
 };
 
 interface Counter {

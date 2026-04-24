@@ -13,7 +13,7 @@
  *
  * Tier model (see docs/encryption.md — pending update with claude-control):
  *   - Plaintext content: get_session_cost, get_binary_version, set_color
- *   - E2E content:       read_file, file_suggestions
+ *   - E2E content:       read_file
  *   - Permission-gated:  mcp_call
  *
  * Usage example:
@@ -32,8 +32,6 @@ import type {
     SetColorResponse,
     ReadFileRequest,
     ReadFileResponse,
-    FileSuggestionsRequest,
-    FileSuggestionsResponse,
     McpCallRequest,
     McpCallResponse,
     ClaudeControlMethod,
@@ -114,28 +112,6 @@ export async function remoteReadFile(
         sessionId,
         methodName('read_file'),
         maxBytes != null ? { path, maxBytes } : { path },
-    );
-}
-
-// ─── file_suggestions ───────────────────────────────────────────────────────
-
-/**
- * Query the remote CLI for fuzzy-matched file paths under cwd. Intended for
- * at-mention autocomplete in the message composer. Returns at most `limit`
- * suggestions (CLI hard-caps 50; default 20).
- *
- * Paths are E2E-encrypted in transit; App should render relative paths only
- * (the CLI only returns project-relative paths).
- */
-export async function fetchFileSuggestions(
-    sessionId: string,
-    query: string,
-    limit?: number,
-): Promise<FileSuggestionsResponse> {
-    return apiSocket.sessionRPC<FileSuggestionsResponse, FileSuggestionsRequest>(
-        sessionId,
-        methodName('file_suggestions'),
-        limit != null ? { query, limit } : { query },
     );
 }
 

@@ -18,7 +18,6 @@
  *
  * Stage 3B (E2E content tier):
  *   - read_file: SDK's Query.readFile() with CLI-side path blacklist
- *   - file_suggestions: fs walk-based fuzzy match under cwd, blacklist-aware
  *
  * Stage 3C (permission-gated):
  *   - mcp_call: CLI-side MCP server whitelist gating. The App MUST display a
@@ -27,8 +26,7 @@
  *     is provided.
  */
 
-import { readdir } from "node:fs/promises";
-import { join, relative, isAbsolute, resolve as resolvePath } from "node:path";
+import { join, isAbsolute, resolve as resolvePath } from "node:path";
 import { homedir } from "node:os";
 import type {
   Query as OfficialQuery,
@@ -46,8 +44,6 @@ import {
   type SetColorResponse,
   type ReadFileRequest,
   type ReadFileResponse,
-  type FileSuggestionsRequest,
-  type FileSuggestionsResponse,
   type McpCallRequest,
   type McpCallResponse,
 } from "@kmmao/happy-wire";
@@ -55,8 +51,8 @@ import {
 // ─── Constants ──────────────────────────────────────────────────────────────
 
 /**
- * CLI-side path blacklist. Any read_file / file_suggestions request that
- * resolves under these prefixes returns deniedReason: 'blacklisted_path'.
+ * CLI-side path blacklist. Any read_file request that resolves under these
+ * prefixes returns deniedReason: 'blacklisted_path'.
  * This is a defense-in-depth guard on top of the SDK's Read-tool permission
  * rules; operators may widen/narrow this via the env var
  * `HAPPY_SIDEBAR_PATH_BLACKLIST` (colon-separated absolute paths).
@@ -220,63 +216,13 @@ export class SessionCostTracker {
   }
 }
 
-// ─── File-suggestions helper ────────────────────────────────────────────────
-
-async function collectFileSuggestions(
-  cwd: string,
-  query: string,
-  limit: number,
-): Promise<FileSuggestionsResponse["suggestions"]> {
-  const needle = query.toLowerCase();
-  const MAX_ENTRIES_SCANNED = 500;
-  const suggestions: FileSuggestionsResponse["suggestions"] = [];
-  let scanned = 0;
-
-  async function walk(dir: string): Promise<void> {
-    if (scanned >= MAX_ENTRIES_SCANNED || suggestions.length >= limit) return;
-    let entries;
-    try {
-      entries = await readdir(dir, { withFileTypes: true });
-    } catch {
-      return;
-    }
-    for (const e of entries) {
-      if (scanned >= MAX_ENTRIES_SCANNED || suggestions.length >= limit) return;
-      scanned++;
-      if (e.name.startsWith(".")) continue;
-      if (
-        e.name === "node_modules" ||
-        e.name === ".git" ||
-        e.name === "dist" ||
-        e.name === "build"
-      ) {
-        continue;
-      }
-      const absPath = join(dir, e.name);
-      if (isBlacklistedPath(absPath)) continue;
-      const rel = relative(cwd, absPath);
-      if (rel.toLowerCase().includes(needle)) {
-        suggestions.push({
-          path: rel,
-          type: e.isDirectory() ? "directory" : "file",
-        });
-        if (suggestions.length >= limit) return;
-      }
-      if (e.isDirectory()) await walk(absPath);
-    }
-  }
-
-  await walk(cwd);
-  return suggestions;
-}
-
 // ─── Registration ───────────────────────────────────────────────────────────
 
 export interface RegisterClaudeControlHandlersOptions {
   rpcHandlerManager: RpcHandlerManager;
   /** Returns the currently-active Claude Query, or null when idle. */
   getCurrentQuery: () => OfficialQuery | null;
-  /** Session working directory used for file_suggestions and path resolution. */
+  /** Session working directory used for resolving read_file relative paths. */
   cwd: string;
   /** Session-scoped cost tracker; null when the launcher does not wire one. */
   costTracker?: SessionCostTracker | null;
@@ -370,24 +316,6 @@ export function registerClaudeControlHandlers(
       } catch (e) {
         logger.debug("[claudeControl] read_file failed", e);
         return { result: null, deniedReason: "error" };
-      }
-    },
-  );
-
-  // file_suggestions
-  rpcHandlerManager.registerHandler<FileSuggestionsRequest, FileSuggestionsResponse>(
-    `${scope}:file_suggestions`,
-    async (req) => {
-      const limit = req.limit ?? 20;
-      if (!req.query.trim()) {
-        return { suggestions: [] };
-      }
-      try {
-        const suggestions = await collectFileSuggestions(cwd, req.query, limit);
-        return { suggestions };
-      } catch (e) {
-        logger.debug("[claudeControl] file_suggestions failed", e);
-        return { suggestions: [] };
       }
     },
   );
