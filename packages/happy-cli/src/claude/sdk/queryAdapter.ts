@@ -133,14 +133,6 @@ export function mapOptions(opts: QueryOptions): OfficialOptions {
   // ── Hook lifecycle events in output stream ──
   if (opts.includeHookEvents) result.includeHookEvents = opts.includeHookEvents;
 
-  // ── Custom session title (SDK 0.2.119+) ──
-  if (opts.title) (result as OfficialOptions & { title?: string }).title = opts.title;
-
-  // ── Custom plan-mode workflow body (SDK 0.2.119+) ──
-  if (opts.planModeInstructions) {
-    (result as OfficialOptions & { planModeInstructions?: string }).planModeInstructions = opts.planModeInstructions;
-  }
-
   // ── System prompt mapping ──
   if (opts.customSystemPrompt) {
     result.systemPrompt = opts.customSystemPrompt;
@@ -155,16 +147,7 @@ export function mapOptions(opts: QueryOptions): OfficialOptions {
   // ── Environment tweaks ──
   const env = { ...process.env };
   delete env.CLAUDECODE; // avoid nested session detection
-
-  // Force "standard" mode for the SDK's tool-search / deferred-tools machinery
-  // so AskUserQuestion (and every other built-in tool) is always pre-loaded.
-  // SDK 0.2.81..0.2.118 let us patch cli.js to exempt AskUserQuestion while
-  // keeping on-demand tool discovery on (ENABLE_TOOL_SEARCH="1"); SDK
-  // 0.2.119+ ships the runtime as a native binary we cannot patch, so we
-  // disable deferred behavior via the documented env knob. Trade-off: the
-  // ~85% tool-definition token saving is lost, but the step-based Q&A UI
-  // stays reliable — see packages/happy-cli/scripts/patch-sdk-deferred-tools.cjs.
-  env.ENABLE_TOOL_SEARCH = "auto:100";
+  env.ENABLE_TOOL_SEARCH = "1"; // enable on-demand tool discovery (saves ~85% tool-definition tokens)
   result.env = env;
 
   return result;
