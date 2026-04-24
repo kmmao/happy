@@ -60,6 +60,11 @@ export const CreateTaskBodySchema = z.object({
   priority: TaskPrioritySchema.default("user"),
   maxAttempts: z.number().int().min(1).max(10).default(3),
   skillIds: z.array(z.string()).max(10).default([]),
+  // Profile binding (wire 0.15.0). Business key — built-in id like
+  // "anthropic" or AiBackendProfile.profileKey for the account. Optional:
+  // when omitted the server falls back to Project.supervisorConfig.defaultProfileId
+  // via the unified runtimeProfileResolver (feature-flagged).
+  profileId: z.string().optional(),
 });
 export type CreateTaskBody = z.infer<typeof CreateTaskBodySchema>;
 
