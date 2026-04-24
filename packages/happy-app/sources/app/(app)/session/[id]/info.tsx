@@ -37,6 +37,7 @@ import { t } from "@/text";
 import { isVersionSupported, MINIMUM_CLI_VERSION } from "@/utils/versionUtils";
 import { useSessionUpgrade } from "@/hooks/useSessionUpgrade";
 import { CodeView } from "@/components/CodeView";
+import { BinaryVersionRow } from "@/components/claudeControl/BinaryVersionRow";
 import { Session } from "@/sync/storageTypes";
 import { useHappyAction } from "@/hooks/useHappyAction";
 import { HappyError } from "@/utils/errors";
@@ -642,6 +643,13 @@ function SessionInfoContent({ session }: { session: Session }) {
           isCliOutdated={!!isCliOutdated}
         />
         <CodexInfoSection session={session} />
+
+        {/* Claude Control sidebar diagnostics (SDK 0.2.119+). Shows 'unknown' on
+            non-Claude runtimes because the claude-control:* RPC is not registered
+            there; fetch errors are swallowed inside BinaryVersionRow. */}
+        <ItemGroup>
+          <BinaryVersionRow sessionId={session.id} />
+        </ItemGroup>
 
         {/* Agent State */}
         {session.agentState && (
