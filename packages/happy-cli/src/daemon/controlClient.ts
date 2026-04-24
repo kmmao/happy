@@ -72,8 +72,9 @@ async function daemonPost(path: string, body?: any): Promise<{ error?: string } 
 export async function notifyDaemonSessionStarted(
   sessionId: string,
   metadata: Metadata,
+  spawnId?: string,
 ): Promise<{ error?: string } | any> {
-  return daemonPost("/session-started", { sessionId, metadata });
+  return daemonPost("/session-started", { sessionId, metadata, spawnId });
 }
 
 export async function listDaemonSessions(): Promise<any[]> {

@@ -82,6 +82,13 @@ export function toPersistedTrackedSession(session: TrackedSession): PersistedTra
 export class TrackedSessionRegistry {
   private entries = new Map<string, PersistedTrackedSession>();
   private loaded = false;
+  /**
+   * Serializes concurrent flushes so rapid upsert bursts cannot race each
+   * other's `atomicFileWrite → rename` and lose entries. Each flush chains
+   * on the previous one and re-snapshots `entries` inside the lock so the
+   * last writer always persists the latest in-memory state.
+   */
+  private writeLock: Promise<unknown> = Promise.resolve();
 
   constructor(private readonly filePath: string) {}
 
@@ -190,10 +197,20 @@ export class TrackedSessionRegistry {
   }
 
   private async flush(): Promise<void> {
-    const payload: TrackedSessionStoreFile = {
-      ...EMPTY_STORE,
-      sessions: this.getAll(),
-    };
-    await atomicFileWrite(this.filePath, JSON.stringify(payload, null, 2));
+    const previous = this.writeLock;
+    const next = (async () => {
+      try {
+        await previous;
+      } catch {
+        // Previous flush failed — don't cascade; attempt a fresh write below.
+      }
+      const payload: TrackedSessionStoreFile = {
+        ...EMPTY_STORE,
+        sessions: this.getAll(),
+      };
+      await atomicFileWrite(this.filePath, JSON.stringify(payload, null, 2));
+    })();
+    this.writeLock = next;
+    return next;
   }
 }

@@ -476,7 +476,11 @@ export function startDaemonControlServer({
   stopSession: (sessionId: string) => boolean;
   spawnSession: (options: SpawnSessionOptions) => Promise<SpawnSessionResult>;
   requestShutdown: () => void;
-  onHappySessionWebhook: (sessionId: string, metadata: Metadata) => void;
+  onHappySessionWebhook: (
+    sessionId: string,
+    metadata: Metadata,
+    spawnId?: string,
+  ) => void;
   getAutomationStatus: () => {
     jobs: AutomationJob[];
     counts: Record<string, number>;
@@ -587,6 +591,10 @@ export function startDaemonControlServer({
           body: z.object({
             sessionId: z.string(),
             metadata: z.any(),
+            // New-daemon + new-child pair echoes back the spawnId that was
+            // injected via HAPPY_SPAWN_ID. Old children omit it and daemon
+            // falls back to pid-keyed matching in the webhook handler.
+            spawnId: z.string().optional(),
           }),
           response: {
             200: z.object({
@@ -596,9 +604,11 @@ export function startDaemonControlServer({
         },
       },
       async (request) => {
-        const { sessionId, metadata } = request.body;
-        logger.debug(`[CONTROL SERVER] Session started: ${sessionId}`);
-        onHappySessionWebhook(sessionId, metadata);
+        const { sessionId, metadata, spawnId } = request.body;
+        logger.debug(
+          `[CONTROL SERVER] Session started: ${sessionId}${spawnId ? ` (spawnId=${spawnId})` : ""}`,
+        );
+        onHappySessionWebhook(sessionId, metadata, spawnId);
         return { status: "ok" as const };
       },
     );
