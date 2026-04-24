@@ -503,6 +503,78 @@ export function deleteLastSeq(sessionId: string): void {
   mmkv.delete(`${LAST_SEQ_PREFIX}${sessionId}`);
 }
 
+// Backfill boundary — the seq range of the reverse-pagination "newest batch"
+// that has already been applied to storage. Persisted so that an interrupted
+// forward backfill can resume with the correct stop bound instead of re-fetching
+// the already-applied tail range.
+//
+// Lifecycle:
+//   1. Written at the end of reverse pagination when hasMore=true.
+//   2. Consumed as the stop-bound of the forward backfill loop.
+//   3. Deleted once the forward loop reaches boundary.minSeq - 1 (and cursor
+//      is advanced to boundary.maxSeq).
+//   4. Also deleted on manual refresh, 404 cleanup, and cache-less reset paths,
+//      since the tail range in storage is no longer guaranteed to be present.
+//
+// Boundary entries are normally consumed within the same fetchMessages call
+// they are created in. Persistence only matters across crashes/interrupts.
+// A TTL guards against corrupt/ancient entries lingering after long gaps.
+const BACKFILL_BOUNDARY_PREFIX = "msg-backfill-boundary-";
+const BACKFILL_BOUNDARY_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
+
+const BackfillBoundarySchema = z.object({
+  minSeq: z.number().int().positive(),
+  maxSeq: z.number().int().positive(),
+  updatedAt: z.number().int().nonnegative(),
+});
+
+export type BackfillBoundary = z.infer<typeof BackfillBoundarySchema>;
+
+export function loadBackfillBoundaries(): Map<string, BackfillBoundary> {
+  const keys = mmkv
+    .getAllKeys()
+    .filter((k) => k.startsWith(BACKFILL_BOUNDARY_PREFIX));
+  const result = new Map<string, BackfillBoundary>();
+  const now = Date.now();
+  for (const key of keys) {
+    const raw = mmkv.getString(key);
+    if (!raw) continue;
+    try {
+      const parsed = BackfillBoundarySchema.safeParse(JSON.parse(raw));
+      if (!parsed.success) {
+        mmkv.delete(key);
+        continue;
+      }
+      if (
+        parsed.data.minSeq > parsed.data.maxSeq ||
+        now - parsed.data.updatedAt > BACKFILL_BOUNDARY_TTL_MS
+      ) {
+        mmkv.delete(key);
+        continue;
+      }
+      const sessionId = key.slice(BACKFILL_BOUNDARY_PREFIX.length);
+      result.set(sessionId, parsed.data);
+    } catch {
+      mmkv.delete(key);
+    }
+  }
+  return result;
+}
+
+export function saveBackfillBoundary(
+  sessionId: string,
+  boundary: BackfillBoundary,
+): void {
+  mmkv.set(
+    `${BACKFILL_BOUNDARY_PREFIX}${sessionId}`,
+    JSON.stringify(boundary),
+  );
+}
+
+export function deleteBackfillBoundary(sessionId: string): void {
+  mmkv.delete(`${BACKFILL_BOUNDARY_PREFIX}${sessionId}`);
+}
+
 // Hidden processes per machine — user-configurable process name filter
 const HIDDEN_PROCESSES_PREFIX = "hidden-processes-";
 const HiddenProcessesSchema = z.array(z.string());
