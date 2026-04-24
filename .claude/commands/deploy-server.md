@@ -8,6 +8,36 @@ docker compose version
 docker compose -f /Users/sangreal/Documents/dev-workspace/happy/docker-compose.yml ps
 ```
 
+### 1.5 同步 server 的内部依赖版本号（关键前置）
+
+Docker 构建过程中 `yarn install` 会按 `packages/happy-server/package.json` 的版本约束从 npm 拉取依赖。
+如果 server 的 `@kmmao/*` 版本号落后于 npm 最新发布，新代码可能依赖尚未被 server 显式 pin 的 wire schema，
+运行时会出现类型不匹配 / zod 校验失败。
+
+**扫描 server 的所有内部包依赖**：
+```bash
+grep -E '"@kmmao/' packages/happy-server/package.json
+```
+
+**对每个 `@kmmao/*` 依赖，比较 server pin 版本 vs npm latest**：
+```bash
+for pkg in $(grep -oE '"@kmmao/[a-z-]+"' packages/happy-server/package.json | sort -u | tr -d '"'); do
+  server_pin=$(grep "\"$pkg\"" packages/happy-server/package.json | head -1 | sed 's/.*: "//; s/",*//')
+  npm_latest=$(npm view "$pkg" version 2>/dev/null || echo "未发布")
+  echo "$pkg → server pins $server_pin | npm latest $npm_latest"
+done
+```
+
+如果发现任何 `@kmmao/*` 落后（例如 `^0.13.0` vs npm `0.16.0`）：
+
+1. 更新 `packages/happy-server/package.json` 的版本约束到最新（保留 `^` 前缀）
+2. 运行 `yarn install` 刷新 `yarn.lock`
+3. 运行 `yarn workspace happy-server build` 验证 typecheck 通过
+4. 提交：`chore(server): bump @kmmao/happy-wire to ^X.Y.Z`
+5. 再进入步骤 2 重建镜像
+
+> **历史教训**：server / app 的 wire 依赖曾长期 pin 在 `^0.13.0`，而 cli / agent 已到 `^0.16.0`。如果部署时不同步，新 schema 类型会在 server 启动时异常。
+
 ## 部署流程
 
 ### 2. 重建 Server 镜像

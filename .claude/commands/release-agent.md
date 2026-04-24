@@ -36,8 +36,22 @@ git log --oneline $LAST_VER_COMMIT..HEAD -- packages/happy-wire/src/
 2. **构建**：`yarn workspace @kmmao/happy-wire build`
 3. **测试**：`yarn workspace @kmmao/happy-wire test`
 4. **发布到 npm**：`cd packages/happy-wire && npm publish --access public`
-5. **更新 agent 的依赖版本号**：修改 `packages/happy-agent/package.json` 中 `dependencies["@kmmao/happy-wire"]`
-6. **提交**：commit message `chore(wire): release @kmmao/happy-wire@X.Y.Z`，push 到 main
+5. **全量同步所有下游消费者的版本号**（**不要只改 agent**）：
+
+   先 grep 扫描全部依赖方：
+   ```bash
+   grep -rn "\"@kmmao/happy-wire\"" packages/*/package.json | grep -v "\"name\":"
+   ```
+
+   **当前 4 个下游都必须同步**（只改版本范围，保留 `^` 前缀）：
+   - `packages/happy-cli/package.json` → `devDependencies["@kmmao/happy-wire"]`
+   - `packages/happy-agent/package.json` → `dependencies["@kmmao/happy-wire"]`
+   - `packages/happy-server/package.json` → `dependencies["@kmmao/happy-wire"]`
+   - `packages/happy-app/package.json` → `dependencies["@kmmao/happy-wire"]`
+
+   > **历史教训**：server / app 曾被遗漏、长期 pin 在旧 wire 版本，导致构建时拉到与运行时类型不一致的包。必须用 grep 扫全部包。
+
+6. **提交**：commit message `chore(wire): release @kmmao/happy-wire@X.Y.Z`，把 wire + **所有** grep 扫出的下游 package.json 一起提交，push 到 main
 
 ---
 
@@ -45,6 +59,12 @@ git log --oneline $LAST_VER_COMMIT..HEAD -- packages/happy-wire/src/
 - 读取 `packages/happy-agent/package.json` 当前版本
 - 按 semver 递增（patch/minor/major 根据变更程度）
 - 修改 `version` 字段
+- **同步内置版本断言**：`packages/happy-agent/src/index.test.ts` 有硬编码的 `expect(stdout.trim()).toBe("X.Y.Z")`，必须同步到新版本号，否则测试失败
+- **扫描反向依赖**（确认 agent 是否被其他 monorepo 包依赖）：
+  ```bash
+  grep -rn "\"@kmmao/happy-agent\"" packages/*/package.json | grep -v "\"name\":"
+  ```
+  当前无下游消费者；如果未来有新包 depend agent，必须同步版本约束后再发布。
 
 ### 2. 构建
 ```bash

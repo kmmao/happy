@@ -46,13 +46,24 @@ yarn workspace @kmmao/happy-wire test
 ```bash
 cd packages/happy-wire && npm publish --access public
 ```
-5. **更新依赖方版本号**（如果 wire 版本变了）：
+5. **全量同步所有下游消费者的版本号**（如果 wire 版本变了）：
+
+   先 grep 扫描所有依赖方，避免遗漏（**不要靠记忆列清单**）：
+   ```bash
+   grep -rn "\"@kmmao/happy-wire\"" packages/*/package.json | grep -v "\"name\":"
+   ```
+
+   **当前 4 个下游都必须同步**（只改版本范围，保留 `^` 前缀）：
    - `packages/happy-cli/package.json` → `devDependencies["@kmmao/happy-wire"]`
    - `packages/happy-agent/package.json` → `dependencies["@kmmao/happy-wire"]`
-   - 注意：只需更新版本范围（如 `"^0.2.0"`），不要改变 `^` 前缀
+   - `packages/happy-server/package.json` → `dependencies["@kmmao/happy-wire"]`
+   - `packages/happy-app/package.json` → `dependencies["@kmmao/happy-wire"]`
+
+   > **历史教训**：server 和 app 曾被遗漏，长期 pin 在 `^0.13.0`，而 cli/agent 已到 `^0.16.0`，导致 server 构建时可能拉到旧版 wire 与运行时类型不一致。每次 wire 升版后必须用 grep 扫全部包。
+
 6. **提交**：
    - commit message 格式：`chore(wire): release @kmmao/happy-wire@X.Y.Z`
-   - 将 wire 的 package.json 和所有依赖方 package.json 变更一起提交
+   - 将 wire 的 package.json 和**所有** grep 扫出的下游 package.json 变更一起提交
    - push 到 origin/main
 
 ---
@@ -61,6 +72,11 @@ cd packages/happy-wire && npm publish --access public
 - 读取 `packages/happy-cli/package.json` 当前版本
 - 按 semver 递增版本号（patch/minor/major 根据变更程度决定）
 - 修改 `package.json` 中的 `version` 字段
+- **扫描反向依赖**（确认 CLI 是否被其他 monorepo 包依赖）：
+  ```bash
+  grep -rn "\"@kmmao/happy-coder\"" packages/*/package.json | grep -v "\"name\":"
+  ```
+  当前无下游消费者；如果未来有（如新 package 开始 depend CLI），必须同步版本约束后再发布。
 
 ### 2. 构建
 ```bash
