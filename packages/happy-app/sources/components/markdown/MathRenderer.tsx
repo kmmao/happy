@@ -48,8 +48,12 @@ export const MathRenderer = React.memo((props: {
                         output: 'html',
                     });
 
+                    const dompurifyModule: any = await import("dompurify");
+                    const DOMPurify = dompurifyModule.default || dompurifyModule;
+                    const sanitized = DOMPurify.sanitize(rendered, { FORCE_BODY: true });
+
                     if (isMounted) {
-                        setHtml(rendered);
+                        setHtml(sanitized);
                     }
                 } catch (error) {
                     if (isMounted) {

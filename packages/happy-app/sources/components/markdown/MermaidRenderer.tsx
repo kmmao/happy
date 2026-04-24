@@ -93,8 +93,14 @@ export const MermaidRenderer = React.memo((props: { content: string }) => {
               props.content,
             );
 
+            const dompurifyModule: any = await import("dompurify");
+            const DOMPurify = dompurifyModule.default || dompurifyModule;
+            const sanitizedSvg = DOMPurify.sanitize(svg, {
+              USE_PROFILES: { svg: true, svgFilters: true },
+            });
+
             if (isMounted) {
-              setSvgContent(svg);
+              setSvgContent(sanitizedSvg);
             }
           }
         } catch (error) {
