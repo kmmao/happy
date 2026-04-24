@@ -21,11 +21,11 @@ describe("buildSupervisorRequestProfile", () => {
                 trust: "trusted",
                 environmentVariables: {
                     OPENAI_BASE_URL: "https://api.openai.com/v1",
-                    OPENAI_MODEL: "gpt-5.4",
+                    OPENAI_MODEL: "gpt-5.5",
                     OPENAI_API_TIMEOUT_MS: "600000",
-                    OPENAI_SMALL_FAST_MODEL: "gpt-5.4",
+                    OPENAI_SMALL_FAST_MODEL: "gpt-5.4-mini",
                     API_TIMEOUT_MS: "600000",
-                    CODEX_SMALL_FAST_MODEL: "gpt-5.4",
+                    CODEX_SMALL_FAST_MODEL: "gpt-5.4-mini",
                 },
             }),
         );
@@ -77,11 +77,11 @@ describe("buildDefaultSupervisorRequestProfile", () => {
                 trust: "trusted",
                 environmentVariables: {
                     OPENAI_BASE_URL: "https://api.openai.com/v1",
-                    OPENAI_MODEL: "gpt-5.4",
+                    OPENAI_MODEL: "gpt-5.5",
                     OPENAI_API_TIMEOUT_MS: "600000",
-                    OPENAI_SMALL_FAST_MODEL: "gpt-5.4",
+                    OPENAI_SMALL_FAST_MODEL: "gpt-5.4-mini",
                     API_TIMEOUT_MS: "600000",
-                    CODEX_SMALL_FAST_MODEL: "gpt-5.4",
+                    CODEX_SMALL_FAST_MODEL: "gpt-5.4-mini",
                 },
             }),
         });
