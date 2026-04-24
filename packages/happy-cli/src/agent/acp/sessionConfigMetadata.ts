@@ -91,7 +91,7 @@ function applyConfigCategory(
   option: SessionConfigOption | null,
   kind: SupportedCategory,
 ): void {
-  if (!option) {
+  if (!option || option.type !== 'select') {
     if (kind === 'model') {
       delete metadata.models;
       delete metadata.currentModelCode;

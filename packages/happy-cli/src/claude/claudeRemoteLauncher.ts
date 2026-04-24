@@ -2002,8 +2002,8 @@ export async function claudeRemoteLauncher(
             try {
               if (turnCollector && knowledgeEntries.size > 0) {
                 const assistantText = turnCollector.getAssistantTextSnapshot().toLowerCase();
+                const hitIds: string[] = [];
                 if (assistantText.length > 0) {
-                  const hitIds: string[] = [];
                   for (const entry of knowledgeEntries.values()) {
                     let matched = false;
                     const lowerTitle = entry.title.toLowerCase();
@@ -2034,11 +2034,11 @@ export async function claudeRemoteLauncher(
                     }
                     if (matched) hitIds.push(entry.id);
                   }
-                  session.client.emitKnowledgeTurnEnd(hitIds);
-                  logger.debug(
-                    `[knowledge] Turn-end hits: ${hitIds.length}/${knowledgeEntries.size} (injected entries)`,
-                  );
                 }
+                session.client.emitKnowledgeTurnEnd(hitIds);
+                logger.debug(
+                  `[knowledge] Turn-end hits: ${hitIds.length}/${knowledgeEntries.size} (injected entries)`,
+                );
               }
             } catch (err) {
               logger.debug(`[knowledge] Error detecting turn hits: ${err}`);

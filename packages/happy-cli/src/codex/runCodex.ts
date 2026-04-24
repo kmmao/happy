@@ -555,6 +555,8 @@ export async function runCodex(opts: {
   let currentPlanTurnId: string | null = null;
   let currentTurnPromptSource: string | null = null;
   let currentTurnAutomation = createCodexTurnAutomationState();
+  let codexKnowledgeEntries = new Map<string, { id: string; title: string; tags: string[] }>();
+  let codexCurrentTurnText = "";
   let codexStartedSubagents = new Set<string>();
   let codexActiveSubagents = new Set<string>();
   let codexProviderSubagentToSessionSubagent = new Map<string, string>();
@@ -1058,6 +1060,9 @@ export async function runCodex(opts: {
     // Add messages to the ink UI buffer based on message type
     if (msg.type === "agent_message") {
       messageBuffer.addMessage(msg.message, "assistant");
+      if (typeof msg.message === "string") {
+        codexCurrentTurnText += " " + msg.message;
+      }
       if (
         typeof msg.message === "string" &&
         hasLegacyCodexPlanPreview(msg.message)
@@ -1098,6 +1103,7 @@ export async function runCodex(opts: {
     if (msg.type === "task_started") {
       currentPlanTurnId = null;
       currentTurnAutomation = createCodexTurnAutomationState();
+      codexCurrentTurnText = "";
       if (!thinking) {
         logger.debug("thinking started");
         thinking = true;
@@ -1113,6 +1119,49 @@ export async function runCodex(opts: {
       }
       // Reset diff processor on task end or abort
       diffProcessor.reset();
+      // Knowledge turn-end hit detection (mirrors claudeRemoteLauncher logic)
+      if (codexKnowledgeEntries.size > 0) {
+        try {
+          const assistantText = codexCurrentTurnText.toLowerCase();
+          const hitIds: string[] = [];
+          if (assistantText.length > 0) {
+            for (const entry of codexKnowledgeEntries.values()) {
+              let matched = false;
+              const lowerTitle = entry.title.toLowerCase();
+              if (lowerTitle.length >= 6 && assistantText.includes(lowerTitle)) {
+                matched = true;
+              }
+              if (!matched) {
+                const titleWords = lowerTitle
+                  .split(/[^\p{L}\p{N}]+/u)
+                  .filter((w) => w.length >= 4);
+                for (const word of titleWords) {
+                  if (assistantText.includes(word)) {
+                    matched = true;
+                    break;
+                  }
+                }
+              }
+              if (!matched) {
+                for (const tag of entry.tags) {
+                  const lowerTag = tag.toLowerCase();
+                  if (lowerTag.length >= 2 && assistantText.includes(lowerTag)) {
+                    matched = true;
+                    break;
+                  }
+                }
+              }
+              if (matched) hitIds.push(entry.id);
+            }
+          }
+          session.emitKnowledgeTurnEnd(hitIds);
+          logger.debug(
+            `[codex][knowledge] Turn-end hits: ${hitIds.length}/${codexKnowledgeEntries.size} (injected entries)`,
+          );
+        } catch (err) {
+          logger.debug(`[codex][knowledge] Error detecting turn hits: ${err}`);
+        }
+      }
     }
     if (msg.type === "agent_reasoning_section_break") {
       // Reset reasoning processor for new section
@@ -1649,6 +1698,19 @@ export async function runCodex(opts: {
     } | null = null;
     // If we restart (e.g., mode change), use this to carry a resume file
     let nextExperimentalResume: string | null = null;
+
+    // Pre-fetch knowledge entries for per-turn hit detection
+    try {
+      const knowledgeResult = await session.fetchKnowledge("full");
+      if (knowledgeResult && knowledgeResult.entries.length > 0) {
+        for (const e of knowledgeResult.entries) {
+          codexKnowledgeEntries.set(e.id, { id: e.id, title: e.title, tags: e.tags });
+        }
+        logger.debug(`[codex][knowledge] Pre-fetched ${codexKnowledgeEntries.size} entries`);
+      }
+    } catch (err) {
+      logger.debug(`[codex][knowledge] Pre-fetch error: ${err}`);
+    }
 
     while (!shouldExit) {
       logActiveHandles("loop-top");
