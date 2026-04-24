@@ -131,7 +131,7 @@
     "@types/tmp": "^0.2.6",
     "cross-env": "^10.1.0",
     "dotenv": "^17.3.1",
-    "eslint": "^9",
+    "eslint": "^10",
     "eslint-config-prettier": "^10",
     "pkgroll": "^2.14.2",
     "release-it": "^19.0.6",
