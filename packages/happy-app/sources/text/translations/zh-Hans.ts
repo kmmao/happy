@@ -343,6 +343,12 @@ export const zhHans: TranslationStructure = {
     webNotificationsPersistent: "固定通知",
     webNotificationsPersistentEnabled: "通知保持显示直到手动关闭",
     webNotificationsPersistentDisabled: "通知 5 秒后自动关闭",
+    integrations: "集成",
+    integrationsFooter: "在设置中显示或隐藏第三方集成。",
+    openClawEnabled: "OpenClaw 在设置中可见",
+    openClawDisabled: "OpenClaw 已隐藏",
+    sub2ApiEnabled: "Sub2API 监控在设置中可见",
+    sub2ApiDisabled: "Sub2API 监控已隐藏",
   },
 
   errors: {
@@ -3140,6 +3146,7 @@ export const zhHans: TranslationStructure = {
     emptySubtitle: "连接 CLI 或点击下方按钮添加项目",
     allProjects: "所有项目",
     tabSessions: "会话",
+    tabGit: "Git",
     tabHealth: "健康",
     tabResearch: "调研",
     tabRoles: "角色",

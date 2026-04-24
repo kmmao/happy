@@ -499,6 +499,12 @@ export const it: TranslationStructure = {
     webNotificationsPersistentEnabled:
       "Le notifiche restano visibili fino alla chiusura",
     webNotificationsPersistentDisabled: "Le notifiche si chiudono dopo 5 sec",
+    integrations: "Integrazioni",
+    integrationsFooter: "Mostra o nascondi le integrazioni di terze parti nelle impostazioni.",
+    openClawEnabled: "OpenClaw visibile nelle impostazioni",
+    openClawDisabled: "OpenClaw nascosto",
+    sub2ApiEnabled: "Monitor Sub2API visibile nelle impostazioni",
+    sub2ApiDisabled: "Monitor Sub2API nascosto",
   },
 
   errors: {
@@ -3227,6 +3233,7 @@ export const it: TranslationStructure = {
     emptySubtitle: "Collega un CLI o tocca il pulsante qui sotto per aggiungere un progetto",
     allProjects: "Tutti i progetti",
     tabSessions: "Sessioni",
+    tabGit: "Git",
     tabHealth: "Salute",
     tabResearch: "Ricerca",
     tabRoles: "Roles",

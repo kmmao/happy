@@ -488,6 +488,12 @@ export const ja: TranslationStructure = {
     webNotificationsPersistent: "通知を固定",
     webNotificationsPersistentEnabled: "手動で閉じるまで通知を表示",
     webNotificationsPersistentDisabled: "5秒後に自動で閉じる",
+    integrations: "インテグレーション",
+    integrationsFooter: "設定でサードパーティ連携の表示・非表示を切り替えます。",
+    openClawEnabled: "OpenClawが設定に表示されています",
+    openClawDisabled: "OpenClawが非表示",
+    sub2ApiEnabled: "Sub2APIモニターが設定に表示されています",
+    sub2ApiDisabled: "Sub2APIモニターが非表示",
   },
 
   errors: {
@@ -3205,6 +3211,7 @@ export const ja: TranslationStructure = {
     emptySubtitle: "CLIを接続するか、下のボタンをタップしてプロジェクトを追加してください",
     allProjects: "すべてのプロジェクト",
     tabSessions: "セッション",
+    tabGit: "Git",
     tabHealth: "ヘルス",
     tabResearch: "調査",
     tabRoles: "ロール",

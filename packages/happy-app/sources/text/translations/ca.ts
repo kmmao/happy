@@ -364,6 +364,12 @@ export const ca: TranslationStructure = {
     webNotificationsPersistentEnabled:
       "Les notificacions es mantenen fins tancar-les",
     webNotificationsPersistentDisabled: "Les notificacions es tanquen en 5 seg",
+    integrations: "Integracions",
+    integrationsFooter: "Mostra o amaga integracions de tercers als ajustos.",
+    openClawEnabled: "OpenClaw visible als ajustos",
+    openClawDisabled: "OpenClaw amagat",
+    sub2ApiEnabled: "Monitor Sub2API visible als ajustos",
+    sub2ApiDisabled: "Monitor Sub2API amagat",
   },
 
   errors: {
@@ -3231,6 +3237,7 @@ export const ca: TranslationStructure = {
     emptySubtitle: "Connecta un CLI o prem el botó de sota per afegir un projecte",
     allProjects: "Tots els projectes",
     tabSessions: "Sessions",
+    tabGit: "Git",
     tabHealth: "Salut",
     tabResearch: "Recerca",
     tabRoles: "Roles",

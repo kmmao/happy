@@ -12,6 +12,10 @@ const PRESENTATIONS: Record<ProjectDetailTabKey, ProjectDetailTabPresentation> =
         icon: "chatbubble-ellipses-outline",
         tone: "neutral",
     },
+    git: {
+        icon: "git-branch-outline",
+        tone: "orange",
+    },
     health: {
         icon: "pulse-outline",
         tone: "green",

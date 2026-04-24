@@ -343,6 +343,12 @@ export const zhHant: TranslationStructure = {
     webNotificationsPersistent: "釘選通知",
     webNotificationsPersistentEnabled: "通知保持顯示直到手動關閉",
     webNotificationsPersistentDisabled: "通知 5 秒後自動關閉",
+    integrations: "整合",
+    integrationsFooter: "在設定中顯示或隱藏第三方整合。",
+    openClawEnabled: "OpenClaw 在設定中可見",
+    openClawDisabled: "OpenClaw 已隱藏",
+    sub2ApiEnabled: "Sub2API 監控在設定中可見",
+    sub2ApiDisabled: "Sub2API 監控已隱藏",
   },
 
   errors: {
@@ -3141,6 +3147,7 @@ export const zhHant: TranslationStructure = {
     emptySubtitle: "連接 CLI 或點擊下方按鈕新增專案",
     allProjects: "所有專案",
     tabSessions: "工作階段",
+    tabGit: "Git",
     tabHealth: "健康",
     tabResearch: "調研",
     tabRoles: "角色",

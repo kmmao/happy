@@ -329,6 +329,12 @@ export const ru: TranslationStructure = {
     webNotificationsPersistent: "Закрепить уведомления",
     webNotificationsPersistentEnabled: "Уведомления остаются до закрытия",
     webNotificationsPersistentDisabled: "Уведомления закрываются через 5 сек",
+    integrations: "Интеграции",
+    integrationsFooter: "Показать или скрыть сторонние интеграции в настройках.",
+    openClawEnabled: "OpenClaw отображается в настройках",
+    openClawDisabled: "OpenClaw скрыт",
+    sub2ApiEnabled: "Монитор Sub2API отображается в настройках",
+    sub2ApiDisabled: "Монитор Sub2API скрыт",
   },
 
   errors: {
@@ -3249,6 +3255,7 @@ export const ru: TranslationStructure = {
     emptySubtitle: "Подключите CLI или нажмите кнопку ниже, чтобы добавить проект",
     allProjects: "Все проекты",
     tabSessions: "Сессии",
+    tabGit: "Git",
     tabHealth: "Здоровье",
     tabResearch: "Анализ",
     tabRoles: "Roles",
