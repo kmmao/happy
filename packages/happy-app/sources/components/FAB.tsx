@@ -28,7 +28,7 @@ const stylesheet = StyleSheet.create((theme, runtime) => ({
     },
 }));
 
-export const FAB = React.memo(({ onPress }: { onPress: () => void }) => {
+export const FAB = React.memo(({ onPress, accessibilityLabel }: { onPress: () => void; accessibilityLabel?: string }) => {
     const { theme } = useUnistyles();
     const styles = stylesheet;
     const safeArea = useSafeAreaInsets();
@@ -45,6 +45,8 @@ export const FAB = React.memo(({ onPress }: { onPress: () => void }) => {
                     pressed ? styles.buttonPressed : styles.buttonDefault
                 ]}
                 onPress={onPress}
+                accessibilityRole="button"
+                accessibilityLabel={accessibilityLabel}
             >
                 <Ionicons name="add" size={24} color={theme.colors.fab.icon} />
             </Pressable>

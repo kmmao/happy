@@ -460,6 +460,8 @@ function PluginsSettingsScreen() {
                                                 plugin.name,
                                             )
                                         }
+                                        accessibilityRole="button"
+                                        accessibilityLabel={t("settingsPlugins.install")}
                                     >
                                         <Text style={styles.installButtonText}>
                                             {t("settingsPlugins.install")}
@@ -584,6 +586,8 @@ function PluginsSettingsScreen() {
                                                     styles.installButton,
                                                     pressed && { opacity: 0.7 },
                                                 ]}
+                                                accessibilityRole="button"
+                                                accessibilityLabel={t("settingsPlugins.addMarketplace")}
                                                 onPress={async () => {
                                                     const machineId =
                                                         machineIdRef.current ??

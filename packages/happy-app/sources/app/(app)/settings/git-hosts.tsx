@@ -332,6 +332,8 @@ export default React.memo(function GitHostsScreen() {
                 alignItems: "center",
               }}
               onPress={() => handleEdit(index)}
+              accessibilityRole="button"
+              accessibilityLabel={entry.host}
             >
               <Ionicons
                 name={
@@ -367,7 +369,7 @@ export default React.memo(function GitHostsScreen() {
                     : ""}
                 </Text>
               </View>
-              <Pressable onPress={() => handleDelete(index)} hitSlop={8}>
+              <Pressable onPress={() => handleDelete(index)} hitSlop={8} accessibilityRole="button" accessibilityLabel={t("common.delete")}>
                 <Ionicons
                   name="trash-outline"
                   size={20}
@@ -471,6 +473,8 @@ export default React.memo(function GitHostsScreen() {
                     borderRadius: 8,
                   }}
                   onPress={handleCancel}
+                  accessibilityRole="button"
+                  accessibilityLabel={t("common.cancel")}
                 >
                   <Text
                     style={{
@@ -492,6 +496,8 @@ export default React.memo(function GitHostsScreen() {
                   }}
                   onPress={handleSave}
                   disabled={!formHost.trim()}
+                  accessibilityRole="button"
+                  accessibilityLabel={t("common.save")}
                 >
                   <Text
                     style={{
@@ -521,6 +527,8 @@ export default React.memo(function GitHostsScreen() {
                 justifyContent: "center",
               }}
               onPress={handleAdd}
+              accessibilityRole="button"
+              accessibilityLabel={t("gitHosts.addHost")}
             >
               <Ionicons
                 name="add-circle-outline"

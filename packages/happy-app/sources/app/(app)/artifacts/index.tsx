@@ -263,7 +263,7 @@ function ArtifactsScreen() {
             />
             
             {/* Floating Action Button */}
-            <FAB onPress={() => router.push('/artifacts/new')} />
+            <FAB onPress={() => router.push('/artifacts/new')} accessibilityLabel={t('common.create')} />
         </View>
     );
 }
