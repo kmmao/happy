@@ -100,7 +100,7 @@ describe("runTaskJob", () => {
     expect(promptPath.startsWith("~")).toBe(false);
   });
 
-  it("forces Codex automation tasks onto GPT-5.4", async () => {
+  it("forces Codex automation tasks onto GPT-5.5", async () => {
     const spawnSession = vi.fn(async () => ({
       type: "success" as const,
       sessionId: "session-codex",
