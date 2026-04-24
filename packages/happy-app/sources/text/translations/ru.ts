@@ -326,6 +326,10 @@ export const ru: TranslationStructure = {
     knowledgeBaseTrackTokensSubtitle: "Собирать знания из длинных ответов ИИ",
     knowledgeBaseFooter: "Изменения вступят в силу в новых сессиях. Текущие сессии не затрагиваются.",
     knowledgeBaseAllTracksOff: "Все триггеры сбора отключены. Знания не будут собираться, пока не будет включён хотя бы один.",
+    scoringModel: "Scoring Model",
+    scoringModelDescription: "Override the LLM model used for option relevance scoring per provider. Leave empty for defaults (Anthropic → Haiku, OpenAI → GPT-4o-mini).",
+    scoringModelProvider: "{{provider}} Model",
+    scoringModelPlaceholder: "Default",
     showProjectTab: "Вкладка проекта",
     showProjectTabSubtitle:
       "Показывать вкладку проекта (канбан) в панели вкладок",

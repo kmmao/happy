@@ -495,6 +495,10 @@ export const it: TranslationStructure = {
     knowledgeBaseTrackTokensSubtitle: "Raccogli conoscenza dalle risposte AI lunghe",
     knowledgeBaseFooter: "Le modifiche avranno effetto nelle nuove sessioni. Le sessioni in corso non sono interessate.",
     knowledgeBaseAllTracksOff: "Tutti i trigger di raccolta sono disattivati. Nessuna conoscenza verrà raccolta finché almeno uno non sarà attivato.",
+    scoringModel: "Scoring Model",
+    scoringModelDescription: "Override the LLM model used for option relevance scoring per provider. Leave empty for defaults (Anthropic → Haiku, OpenAI → GPT-4o-mini).",
+    scoringModelProvider: "{{provider}} Model",
+    scoringModelPlaceholder: "Default",
     showProjectTab: "Scheda progetto",
     showProjectTabSubtitle:
       "Mostra la scheda progetto (kanban) nella barra delle schede",

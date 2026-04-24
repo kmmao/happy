@@ -456,8 +456,12 @@ class AutoOptionSendService {
 
         const session = storage.getState().sessions[sessionId];
         const profileId = session?.profileId ?? null;
+        const scoringOverrides = storage.getState().localSettings.scoringModelOverride ?? {};
+        const modelOverride = Object.keys(scoringOverrides).length > 0
+            ? JSON.stringify(scoringOverrides)
+            : null;
 
-        scoreOptionsRemote(credentials, items, contextSummary, null, profileId, controller.signal)
+        scoreOptionsRemote(credentials, items, contextSummary, null, profileId, modelOverride, controller.signal)
             .then((response) => {
                 this.semanticControllers.delete(sessionId);
 

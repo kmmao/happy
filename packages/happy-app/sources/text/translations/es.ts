@@ -360,6 +360,10 @@ export const es: TranslationStructure = {
     knowledgeBaseTrackTokensSubtitle: "Recopilar conocimiento de respuestas largas de IA",
     knowledgeBaseFooter: "Los cambios se aplican en nuevas sesiones. Las sesiones en curso no se ven afectadas.",
     knowledgeBaseAllTracksOff: "Todos los activadores de recolección están desactivados. No se recopilará conocimiento hasta que se active al menos uno.",
+    scoringModel: "Scoring Model",
+    scoringModelDescription: "Override the LLM model used for option relevance scoring per provider. Leave empty for defaults (Anthropic → Haiku, OpenAI → GPT-4o-mini).",
+    scoringModelProvider: "{{provider}} Model",
+    scoringModelPlaceholder: "Default",
     showProjectTab: "Pestaña de proyecto",
     showProjectTabSubtitle:
       "Mostrar la pestaña de proyecto (kanban) en la barra de pestañas",

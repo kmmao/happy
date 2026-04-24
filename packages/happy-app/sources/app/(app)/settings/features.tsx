@@ -1,5 +1,5 @@
 import * as React from "react";
-import { Platform } from "react-native";
+import { Platform, TextInput, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Item } from "@/components/Item";
 import { ItemGroup } from "@/components/ItemGroup";
@@ -7,6 +7,7 @@ import { ItemList } from "@/components/ItemList";
 import { useSettingMutable, useLocalSettingMutable } from "@/sync/storage";
 import { Switch } from "@/components/Switch";
 import { t } from "@/text";
+import { StyleSheet } from "react-native-unistyles";
 import {
   requestNotificationPermission,
   getNotificationPermission,
@@ -41,6 +42,8 @@ function FeaturesSettingsScreen() {
     useSettingMutable("webNotifications");
   const [webNotificationsPersistent, setWebNotificationsPersistent] =
     useSettingMutable("webNotificationsPersistent");
+  const [scoringModelOverride, setScoringModelOverride] =
+    useLocalSettingMutable("scoringModelOverride");
 
   // Track browser notification permission state to avoid calling browser API in render
   const [notifPermission, setNotifPermission] = React.useState<
@@ -242,6 +245,48 @@ function FeaturesSettingsScreen() {
         )}
       </ItemGroup>
 
+      {/* Scoring Model Override */}
+      <ItemGroup
+        title={t("settingsFeatures.scoringModel")}
+        footer={t("settingsFeatures.scoringModelDescription")}
+      >
+        {(["anthropic", "openai", "ollama"] as const).map((provider) => (
+          <Item
+            key={provider}
+            title={`${provider.charAt(0).toUpperCase() + provider.slice(1)} Model`}
+            icon={
+              <Ionicons
+                name={provider === "anthropic" ? "sparkles-outline" : provider === "openai" ? "logo-github" : "server-outline"}
+                size={29}
+                color={theme.colors.accentTeal}
+              />
+            }
+            rightElement={
+              <View style={scoringStyles.inputContainer}>
+                <TextInput
+                  style={[scoringStyles.input, { color: theme.colors.text, borderColor: theme.colors.divider }]}
+                  value={scoringModelOverride[provider] ?? ""}
+                  onChangeText={(text) => {
+                    const next = { ...scoringModelOverride };
+                    if (text.trim()) {
+                      next[provider] = text.trim();
+                    } else {
+                      delete next[provider];
+                    }
+                    setScoringModelOverride(next);
+                  }}
+                  placeholder={t("settingsFeatures.scoringModelPlaceholder")}
+                  placeholderTextColor={theme.colors.textSecondary}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                />
+              </View>
+            }
+            showChevron={false}
+          />
+        ))}
+      </ItemGroup>
+
       {/* Web-only Features */}
       {Platform.OS === "web" && (
         <ItemGroup
@@ -347,5 +392,19 @@ function FeaturesSettingsScreen() {
     </ItemList>
   );
 }
+
+const scoringStyles = StyleSheet.create((theme) => ({
+  inputContainer: {
+    width: 160,
+  },
+  input: {
+    fontSize: 14,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderWidth: 1,
+    borderRadius: 8,
+    textAlign: "right" as const,
+  },
+}));
 
 export default React.memo(FeaturesSettingsScreen);

@@ -52,6 +52,10 @@ export const LocalSettingsSchema = z.object({
   autoOptionSendSessions: z
     .record(z.string(), z.boolean())
     .describe("Sessions with auto-option-send enabled, keyed by session ID"),
+  // Scoring model override per provider for option recommendation
+  scoringModelOverride: z
+    .record(z.string(), z.string())
+    .describe("Scoring model override per provider (e.g. anthropic → claude-haiku-4-5-20251001)"),
 });
 
 //
@@ -80,6 +84,7 @@ export const localSettingsDefaults: LocalSettings = {
   sidePanelWidth: 400,
   fileFavorites: {},
   autoOptionSendSessions: {},
+  scoringModelOverride: {},
 };
 Object.freeze(localSettingsDefaults);
 

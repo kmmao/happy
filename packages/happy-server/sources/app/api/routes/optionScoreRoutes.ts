@@ -15,6 +15,7 @@ export function optionScoreRoutes(app: Fastify) {
                 contextSummary: z.string().max(2000),
                 sessionTitle: z.string().max(200).nullable(),
                 profileId: z.string().max(200).nullable(),
+                modelOverride: z.string().max(500).nullable(),
             }),
             response: {
                 200: z.object({
@@ -27,13 +28,23 @@ export function optionScoreRoutes(app: Fastify) {
             },
         },
     }, async (request, reply) => {
-        const { options, contextSummary, sessionTitle, profileId } = request.body;
+        const { options, contextSummary, sessionTitle, profileId, modelOverride } = request.body;
         const accountId = request.userId;
 
         try {
             const credentials = await resolveCredentials(accountId, profileId);
             if (!credentials) {
                 return reply.code(500).send({ error: "No LLM provider available for this profile" });
+            }
+
+            if (modelOverride) {
+                try {
+                    const overrides = JSON.parse(modelOverride) as Record<string, string>;
+                    const override = overrides[credentials.provider];
+                    if (override) {
+                        credentials.model = override;
+                    }
+                } catch { /* ignore malformed override */ }
             }
 
             const result = await scoreOptionsWithLLM(credentials, options, contextSummary, sessionTitle);
