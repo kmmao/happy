@@ -18,6 +18,21 @@ const ALL_EFFORT_LEVELS = [
 
 type EffortLevel = (typeof ALL_EFFORT_LEVELS)[number];
 
+// Opus 4.7 supports xhigh natively (SDK 0.2.112+). When the SDK omits xhigh
+// from supportedEffortLevels for Opus 4.7, surface it anyway so users aren't
+// forced back to max.
+const OPUS_47_MODEL_CODES = new Set([
+    "opus-4-7",
+    "opus-4-7-1m",
+    "claude-opus-4-7",
+    "claude-opus-4-7[1m]",
+]);
+
+function isOpus47ModelCode(code: string | null | undefined): boolean {
+    if (!code) return false;
+    return OPUS_47_MODEL_CODES.has(code) || code.startsWith("claude-opus-4-7");
+}
+
 function resolveCurrentModelInfo(params: {
     metadata?: Metadata | null;
     modelModeKey?: string | null;
@@ -67,13 +82,35 @@ export function getVisibleEffortLevels(params: {
     const supported =
         resolveCurrentModelInfo(params)?.supportedEffortLevels ?? null;
 
-    if (!supported || supported.length === 0) {
-        return params.isCodex
-            ? [...CODEX_EFFORT_LEVELS]
-            : [...CLAUDE_EFFORT_LEVELS];
+    const baseLevels: EffortLevel[] =
+        !supported || supported.length === 0
+            ? params.isCodex
+                ? [...CODEX_EFFORT_LEVELS]
+                : [...CLAUDE_EFFORT_LEVELS]
+            : ALL_EFFORT_LEVELS.filter((level) => supported.includes(level));
+
+    if (params.isCodex || baseLevels.includes("xhigh")) {
+        return baseLevels;
     }
 
-    return ALL_EFFORT_LEVELS.filter((level) => supported.includes(level));
+    const selectedModelCode =
+        params.modelModeKey && params.modelModeKey !== "default"
+            ? params.modelModeKey
+            : params.currentModelCode ?? params.metadata?.currentModelCode ?? null;
+
+    if (!isOpus47ModelCode(selectedModelCode)) {
+        return baseLevels;
+    }
+
+    const maxIndex = baseLevels.indexOf("max");
+    if (maxIndex === -1) {
+        return ["xhigh", ...baseLevels];
+    }
+    return [
+        ...baseLevels.slice(0, maxIndex + 1),
+        "xhigh",
+        ...baseLevels.slice(maxIndex + 1),
+    ];
 }
 
 export function getReasoningSummaryLabels(params: {

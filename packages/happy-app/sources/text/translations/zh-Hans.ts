@@ -1052,7 +1052,7 @@ export const zhHans: TranslationStructure = {
       high: "高",
       highDesc: "智能与成本间的平衡，适合并发任务较多的场景",
       xhigh: "超高",
-      xhighDesc: "适合绝大部分智能敏感任务，高效且智能（推荐）",
+      xhighDesc: "适合绝大部分智能敏感任务，高效且智能（仅 Opus 4.7 · Codex GPT-5 系列）",
       max: "最大",
       maxDesc: "真正难的任务或极致智能需求，可能过度思考",
     },

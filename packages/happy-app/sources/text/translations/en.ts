@@ -1091,7 +1091,7 @@ export const en: TranslationStructure = {
       high: "High",
       highDesc: "Balance of quality and cost, good for high concurrency",
       xhigh: "XHigh",
-      xhighDesc: "Recommended for most intelligence-sensitive tasks (Opus 4.7)",
+      xhighDesc: "Recommended for intelligence-sensitive tasks (Opus 4.7 · Codex GPT-5 only)",
       max: "Max",
       maxDesc: "Only for truly hard problems — diminishing returns, may over-think",
     },

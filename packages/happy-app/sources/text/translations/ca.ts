@@ -1092,7 +1092,7 @@ export const ca: TranslationStructure = {
       high: "Alt",
       highDesc: "Equilibri entre qualitat i cost, ideal per a alta concurrència",
       xhigh: "XHigh",
-      xhighDesc: "Recomanat per a tasques sensibles a la intel·ligència (Opus 4.7)",
+      xhighDesc: "Recomanat per a tasques sensibles a la intel·ligència (només Opus 4.7 · Codex GPT-5)",
       max: "Màxim",
       maxDesc: "Només per a problemes molt difícils — rendiment decreixent, pot sobre-pensar",
     },

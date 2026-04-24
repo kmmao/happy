@@ -48,6 +48,46 @@ describe("reasoningEffort", () => {
         ).toEqual(["max", "high", "medium", "low"]);
     });
 
+    it("forces xhigh into visible list for Opus 4.7 when SDK omits it", () => {
+        expect(
+            getVisibleEffortLevels({
+                isCodex: false,
+                modelModeKey: "opus-4-7",
+                currentModelCode: null,
+                metadata: null,
+            }),
+        ).toEqual(["max", "xhigh", "high", "medium", "low"]);
+
+        expect(
+            getVisibleEffortLevels({
+                isCodex: false,
+                modelModeKey: "default",
+                currentModelCode: "claude-opus-4-7[1m]",
+                metadata: {
+                    currentModelCode: "claude-opus-4-7[1m]",
+                    models: [
+                        {
+                            code: "claude-opus-4-7[1m]",
+                            value: "Opus 4.7",
+                            supportedEffortLevels: ["max", "high", "medium", "low"],
+                        },
+                    ],
+                } as any,
+            }),
+        ).toEqual(["max", "xhigh", "high", "medium", "low"]);
+    });
+
+    it("does not force xhigh for non-Opus-4.7 Claude models", () => {
+        expect(
+            getVisibleEffortLevels({
+                isCodex: false,
+                modelModeKey: "sonnet",
+                currentModelCode: null,
+                metadata: null,
+            }),
+        ).toEqual(["max", "high", "medium", "low"]);
+    });
+
     it("shows the effort selector for Codex when the active model supports it", () => {
         expect(
             shouldShowEffortSelector({

@@ -1214,7 +1214,7 @@ export const ja: TranslationStructure = {
       high: "高",
       highDesc: "品質とコストのバランス、高並列に最適",
       xhigh: "超高",
-      xhighDesc: "知性重視のタスクに推奨 (Opus 4.7)",
+      xhighDesc: "知性重視のタスクに推奨 (Opus 4.7 · Codex GPT-5 のみ)",
       max: "最大",
       maxDesc: "本当に難しい問題のみ — 限界効用低下、考えすぎる恐れあり",
     },

@@ -1052,7 +1052,7 @@ export const zhHant: TranslationStructure = {
       high: "高",
       highDesc: "智能與成本間的平衡，適合並發任務較多的場景",
       xhigh: "超高",
-      xhighDesc: "適合絕大部分智能敏感任務，高效且智能（推薦）",
+      xhighDesc: "適合絕大部分智能敏感任務，高效且智能（僅 Opus 4.7 · Codex GPT-5 系列）",
       max: "最大",
       maxDesc: "真正難的任務或極致智能需求，可能過度思考",
     },

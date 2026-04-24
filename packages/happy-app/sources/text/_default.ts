@@ -1078,7 +1078,7 @@ export const en = {
       high: "High",
       highDesc: "Deeper reasoning",
       xhigh: "XHigh",
-      xhighDesc: "Maximum reasoning depth",
+      xhighDesc: "Recommended for intelligence-sensitive tasks (Opus 4.7 · Codex GPT-5 only)",
       max: "Max",
       maxDesc: "Extended thinking, best quality",
     },
