@@ -11,6 +11,7 @@ export async function scoreOptionsRemote(
     options: string[],
     contextSummary: string,
     sessionTitle: string | null,
+    profileId: string | null,
     signal?: AbortSignal,
 ): Promise<OptionScoreResponse> {
     const url = getServerUrl();
@@ -21,7 +22,7 @@ export async function scoreOptionsRemote(
             "Authorization": `Bearer ${credentials.token}`,
             "Content-Type": "application/json",
         },
-        body: JSON.stringify({ options, contextSummary, sessionTitle }),
+        body: JSON.stringify({ options, contextSummary, sessionTitle, profileId }),
         signal: signal ?? AbortSignal.timeout(7000),
     });
 

@@ -1,33 +1,60 @@
 import { log } from "@/utils/log";
 import { createHash } from "crypto";
 
-type LLMProvider = "ollama" | "anthropic" | "none";
-
-function detectProvider(): LLMProvider {
-    const explicit = process.env.PROFILE_PROVIDER;
-    if (explicit === "ollama" || explicit === "anthropic") return explicit;
-    if (process.env.ANTHROPIC_API_KEY) return "anthropic";
-    if (process.env.OLLAMA_URL) return "ollama";
-    return "none";
-}
-
 const SYSTEM_PROMPT =
     "You are an option relevance scorer. Given conversation context and candidate follow-up options, " +
     "rate each option's relevance as a next step from 0-100. Consider: task continuity, logical sequencing, " +
     "specificity to current work. Output ONLY a JSON array of integers, one score per option, in the same order as the input.";
 
-async function callAnthropic(userMessage: string): Promise<string | null> {
-    const apiKey = process.env.ANTHROPIC_API_KEY;
-    if (!apiKey) return null;
+export type ScoringProvider = "anthropic" | "openai" | "ollama";
 
-    const baseUrl = (process.env.ANTHROPIC_BASE_URL || "https://api.anthropic.com").replace(/\/+$/, "");
-    const model = process.env.ANTHROPIC_OPTION_SCORE_MODEL || "claude-haiku-4-5-20251001";
+export interface ScoringCredentials {
+    provider: ScoringProvider;
+    apiKey: string;
+    baseUrl?: string;
+    model?: string;
+}
+
+const DEFAULT_SCORING_MODELS: Record<ScoringProvider, string> = {
+    anthropic: "claude-haiku-4-5-20251001",
+    openai: "gpt-4o-mini",
+    ollama: "llama3",
+};
+
+export function detectProviderFromEnv(env: Record<string, string>): ScoringCredentials | null {
+    if (env.ANTHROPIC_AUTH_TOKEN || env.ANTHROPIC_API_KEY) {
+        return {
+            provider: "anthropic",
+            apiKey: env.ANTHROPIC_AUTH_TOKEN ?? env.ANTHROPIC_API_KEY,
+            baseUrl: env.ANTHROPIC_BASE_URL,
+        };
+    }
+    if (env.OPENAI_API_KEY) {
+        return {
+            provider: "openai",
+            apiKey: env.OPENAI_API_KEY,
+            baseUrl: env.OPENAI_BASE_URL,
+        };
+    }
+    if (env.OLLAMA_URL) {
+        return {
+            provider: "ollama",
+            apiKey: "",
+            baseUrl: env.OLLAMA_URL,
+        };
+    }
+    return null;
+}
+
+async function callAnthropic(creds: ScoringCredentials, userMessage: string): Promise<string | null> {
+    const baseUrl = (creds.baseUrl || "https://api.anthropic.com").replace(/\/+$/, "");
+    const model = creds.model || DEFAULT_SCORING_MODELS.anthropic;
 
     const response = await fetch(`${baseUrl}/v1/messages`, {
         method: "POST",
         headers: {
             "Content-Type": "application/json",
-            "x-api-key": apiKey,
+            "x-api-key": creds.apiKey,
             "anthropic-version": "2023-06-01",
         },
         body: JSON.stringify({
@@ -48,9 +75,40 @@ async function callAnthropic(userMessage: string): Promise<string | null> {
     return data.content[0]?.text ?? null;
 }
 
-async function callOllama(userMessage: string): Promise<string | null> {
-    const url = process.env.OLLAMA_URL || "http://localhost:11434";
-    const model = process.env.OLLAMA_CHAT_MODEL || "gpt-oss:20b";
+async function callOpenAI(creds: ScoringCredentials, userMessage: string): Promise<string | null> {
+    const baseUrl = (creds.baseUrl || "https://api.openai.com").replace(/\/+$/, "");
+    const model = creds.model || DEFAULT_SCORING_MODELS.openai;
+
+    const response = await fetch(`${baseUrl}/v1/chat/completions`, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${creds.apiKey}`,
+        },
+        body: JSON.stringify({
+            model,
+            max_tokens: 64,
+            messages: [
+                { role: "system", content: SYSTEM_PROMPT },
+                { role: "user", content: userMessage },
+            ],
+            temperature: 0.1,
+        }),
+        signal: AbortSignal.timeout(6000),
+    });
+
+    if (!response.ok) {
+        const errBody = await response.text();
+        throw new Error(`OpenAI API error ${response.status}: ${errBody.slice(0, 300)}`);
+    }
+
+    const data = (await response.json()) as { choices: { message: { content: string } }[] };
+    return data.choices[0]?.message?.content ?? null;
+}
+
+async function callOllama(creds: ScoringCredentials, userMessage: string): Promise<string | null> {
+    const url = creds.baseUrl || "http://localhost:11434";
+    const model = creds.model || DEFAULT_SCORING_MODELS.ollama;
 
     const response = await fetch(`${url}/api/chat`, {
         method: "POST",
@@ -75,6 +133,12 @@ async function callOllama(userMessage: string): Promise<string | null> {
     const data = (await response.json()) as { message: { content: string } };
     return data.message?.content ?? null;
 }
+
+const CALL_FNS: Record<ScoringProvider, (creds: ScoringCredentials, msg: string) => Promise<string | null>> = {
+    anthropic: callAnthropic,
+    openai: callOpenAI,
+    ollama: callOllama,
+};
 
 interface CacheEntry {
     scores: number[];
@@ -138,15 +202,11 @@ export interface OptionScoreResult {
 }
 
 export async function scoreOptionsWithLLM(
+    credentials: ScoringCredentials,
     options: string[],
     contextSummary: string,
     sessionTitle: string | null,
 ): Promise<OptionScoreResult> {
-    const provider = detectProvider();
-    if (provider === "none") {
-        throw new Error("No LLM provider configured");
-    }
-
     evictExpired();
 
     const key = cacheKey(options, contextSummary);
@@ -157,8 +217,8 @@ export async function scoreOptionsWithLLM(
 
     const userMessage = buildUserMessage(options, contextSummary, sessionTitle);
 
-    const callFn = provider === "anthropic" ? callAnthropic : callOllama;
-    const raw = await callFn(userMessage);
+    const callFn = CALL_FNS[credentials.provider];
+    const raw = await callFn(credentials, userMessage);
     if (!raw) {
         throw new Error("LLM returned empty response");
     }

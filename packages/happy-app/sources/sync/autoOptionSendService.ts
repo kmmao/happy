@@ -454,7 +454,10 @@ class AutoOptionSendService {
         this.semanticControllers.set(sessionId, controller);
         this.lastSemanticScoredAt.set(sessionId, now);
 
-        scoreOptionsRemote(credentials, items, contextSummary, null, controller.signal)
+        const session = storage.getState().sessions[sessionId];
+        const profileId = session?.profileId ?? null;
+
+        scoreOptionsRemote(credentials, items, contextSummary, null, profileId, controller.signal)
             .then((response) => {
                 this.semanticControllers.delete(sessionId);
 
