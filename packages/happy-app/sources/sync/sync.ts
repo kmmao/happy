@@ -249,6 +249,11 @@ class Sync {
   private pendingSettings: Partial<Settings> = loadPendingSettings();
   private appState: AppStateStatus = AppState.currentState;
   private appStateSubscription: ReturnType<typeof AppState.addEventListener> | null = null;
+  // Last session opened via onSessionVisible. On AppState→active we re-invalidate
+  // its messagesSync so the foreground session catches up if any `update` push
+  // was missed while backgrounded but the socket stayed connected (web tab
+  // throttling, iOS keep-alive). Socket reconnect already covers the disconnect case.
+  private lastVisibleSessionId: string | null = null;
   private backgroundSendTimeout: ReturnType<typeof setTimeout> | null = null;
   private backgroundSendNotificationId: string | null = null;
   private backgroundSendStartedAt: number | null = null;
@@ -315,6 +320,14 @@ class Sync {
         this.friendRequestsSync.invalidate();
         this.feedSync.invalidate();
         this.projectsSync.invalidate();
+        // Foreground session may have missed `update` pushes while backgrounded
+        // (web tab throttled, iOS keep-alive). Re-invalidate its messagesSync
+        // so lastSeq-based incremental fetch fills any gap.
+        const foregroundSessionId = this.lastVisibleSessionId;
+        if (foregroundSessionId) {
+          this.getMessagesSync(foregroundSessionId)?.invalidate();
+          gitStatusSync.getSync(foregroundSessionId).invalidate();
+        }
       } else {
         log.log(`📱 App state changed to: ${nextAppState}`);
         this.maybeStartBackgroundSendWatchdog();
@@ -429,6 +442,7 @@ class Sync {
   }
 
   onSessionVisible = (sessionId: string) => {
+    this.lastVisibleSessionId = sessionId;
     // Restore from local cache if no messages in memory yet
     const existingMessages = storage.getState().sessionMessages[sessionId];
     if (!existingMessages || existingMessages.messages.length === 0) {
@@ -565,6 +579,9 @@ class Sync {
     // Do NOT delete sessionMessageLocks — we are still inside lock.inLock().
     this.sessionMessageQueue.delete(sessionId);
     this.sessionQueueProcessing.delete(sessionId);
+    if (this.lastVisibleSessionId === sessionId) {
+      this.lastVisibleSessionId = null;
+    }
   }
 
   private scheduleQueuedMessagesProcessing(sessionId: string) {
