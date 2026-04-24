@@ -3746,6 +3746,10 @@ export const ja: TranslationStructure = {
     defaultProfileNone: "プロファイルが設定されていません。設定 → プロファイルで追加してください。",
     defaultProfileMissing: ({ profileName }: { profileName: string }) => `選択したプロファイル「${profileName}」はこの端末では利用できなくなっています。Supervisor設定で再選択してください。`,
     defaultProfileDefault: "デフォルト（CLI設定）",
+    healthProfileSection: "ヘルスモニター Profile 上書き",
+    healthProfileDesc: "任意設定。スケジュール実行および手動のヘルススキャンで使用する Profile を上書きします。デフォルトのままなら既定の実行 Profile を継承します。",
+    researchProfileSection: "リサーチ Profile 上書き",
+    researchProfileDesc: "任意設定。競合リサーチ実行で使用する Profile を上書きします。デフォルトのままなら既定の実行 Profile を継承します。",
 
     notificationsSection: "通知",
     notifAnalysisComplete: "分析完了",

@@ -3778,6 +3778,10 @@ export const ca: TranslationStructure = {
     defaultProfileNone: "No hi ha perfils configurats. Afegiu perfils a Configuració → Perfils.",
     defaultProfileMissing: ({ profileName }: { profileName: string }) => `El perfil seleccionat \"${profileName}\" ja no està disponible en aquest dispositiu. Torneu-lo a seleccionar a la configuració de Supervisor.`,
     defaultProfileDefault: "Predeterminat (configuració CLI)",
+    healthProfileSection: "Sobreescriu el perfil del Monitor de Salut",
+    healthProfileDesc: "Opcional. Sobreescriu el Profile utilitzat en anàlisi de salut programades i manuals. Deixa-ho en predeterminat per heretar el Profile d'execució predeterminat.",
+    researchProfileSection: "Sobreescriu el perfil de Recerca",
+    researchProfileDesc: "Opcional. Sobreescriu el Profile utilitzat en execucions de recerca de competidors. Deixa-ho en predeterminat per heretar el Profile d'execució predeterminat.",
 
     notificationsSection: "Notificacions",
     notifAnalysisComplete: "Anàlisi completada",

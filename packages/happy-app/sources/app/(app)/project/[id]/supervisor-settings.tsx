@@ -22,6 +22,7 @@ import {
     getSupervisorAvailableProfiles,
     getSupervisorDefaultProfileId,
 } from "@/components/project/supervisorProfileSelection";
+import { ProfilePicker } from "@/components/ProfilePicker";
 
 type SupervisorMode = "suggest" | "semi-auto" | "auto";
 
@@ -77,6 +78,11 @@ const defaultConfig = {
         onError: true,
     },
     defaultProfileId: null as string | null,
+    // Purpose-specific overrides. When null the supervisor resolver falls
+    // back to `defaultProfileId`; when set, the server's unified
+    // runtimeProfileResolver uses this value for the matching purpose.
+    healthCheckProfileId: null as string | null,
+    researchProfileId: null as string | null,
 };
 
 type SupervisorConfig = typeof defaultConfig;
@@ -115,6 +121,14 @@ function SupervisorSettingsScreen() {
     const missingDefaultProfileName = React.useMemo(() => {
         return getMissingSupervisorProfileName(config.defaultProfileId, allProfiles);
     }, [allProfiles, config.defaultProfileId]);
+
+    const missingHealthCheckProfileName = React.useMemo(() => {
+        return getMissingSupervisorProfileName(config.healthCheckProfileId, allProfiles);
+    }, [allProfiles, config.healthCheckProfileId]);
+
+    const missingResearchProfileName = React.useMemo(() => {
+        return getMissingSupervisorProfileName(config.researchProfileId, allProfiles);
+    }, [allProfiles, config.researchProfileId]);
 
     React.useLayoutEffect(() => {
         navigation.setOptions({
@@ -761,6 +775,58 @@ function SupervisorSettingsScreen() {
                     <Text style={styles.customRulesCharCount}>
                         {config.customRules.length}/2000
                     </Text>
+                </View>
+            </ItemGroup>
+
+            {/* Health-check Profile Override — takes priority over the default for scheduled/manual health runs */}
+            <ItemGroup title={t("supervisor.healthProfileSection")}>
+                <View style={styles.customRulesCard}>
+                    <ProfilePicker
+                        value={config.healthCheckProfileId}
+                        onChange={(profileId) =>
+                            updateConfig((prev) => ({ ...prev, healthCheckProfileId: profileId }))
+                        }
+                        profiles={allProfiles}
+                        defaultOptionLabel={t("supervisor.defaultProfileDefault")}
+                        description={t("supervisor.healthProfileDesc")}
+                        missingProfileName={missingHealthCheckProfileName}
+                        missingMessage={
+                            missingHealthCheckProfileName
+                                ? t("supervisor.defaultProfileMissing", {
+                                    profileName: missingHealthCheckProfileName,
+                                })
+                                : undefined
+                        }
+                        refreshLabel={t("suggestions.refresh")}
+                        onRefresh={handleRefreshProfiles}
+                        refreshing={profileRefreshing}
+                    />
+                </View>
+            </ItemGroup>
+
+            {/* Research Profile Override — for research/competitive analysis runs */}
+            <ItemGroup title={t("supervisor.researchProfileSection")}>
+                <View style={styles.customRulesCard}>
+                    <ProfilePicker
+                        value={config.researchProfileId}
+                        onChange={(profileId) =>
+                            updateConfig((prev) => ({ ...prev, researchProfileId: profileId }))
+                        }
+                        profiles={allProfiles}
+                        defaultOptionLabel={t("supervisor.defaultProfileDefault")}
+                        description={t("supervisor.researchProfileDesc")}
+                        missingProfileName={missingResearchProfileName}
+                        missingMessage={
+                            missingResearchProfileName
+                                ? t("supervisor.defaultProfileMissing", {
+                                    profileName: missingResearchProfileName,
+                                })
+                                : undefined
+                        }
+                        refreshLabel={t("suggestions.refresh")}
+                        onRefresh={handleRefreshProfiles}
+                        refreshing={profileRefreshing}
+                    />
                 </View>
             </ItemGroup>
 

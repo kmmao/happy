@@ -3767,6 +3767,10 @@ export const en: TranslationStructure = {
     defaultProfileNone: "No profiles configured. Add profiles in Settings → Profiles.",
     defaultProfileMissing: ({ profileName }: { profileName: string }) => `Selected profile \"${profileName}\" is no longer available on this device. Please reselect a profile in Supervisor Settings.`,
     defaultProfileDefault: "Default (CLI settings)",
+    healthProfileSection: "Health Monitor Profile Override",
+    healthProfileDesc: "Optional override applied to scheduled and manual health scans. Leave on Default to inherit the Default Run Profile.",
+    researchProfileSection: "Research Profile Override",
+    researchProfileDesc: "Optional override applied to competitor research runs. Leave on Default to inherit the Default Run Profile.",
 
     notificationsSection: "Notifications",
     notifAnalysisComplete: "Analysis Complete",

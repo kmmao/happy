@@ -3794,6 +3794,10 @@ export const pl: TranslationStructure = {
     defaultProfileNone: "Brak skonfigurowanych profili. Dodaj profile w Ustawienia → Profile.",
     defaultProfileMissing: ({ profileName }: { profileName: string }) => `Wybrany profil „${profileName}” nie jest już dostępny na tym urządzeniu. Wybierz go ponownie w ustawieniach Supervisor.`,
     defaultProfileDefault: "Domyślny (ustawienia CLI)",
+    healthProfileSection: "Zastąp profil monitora kondycji",
+    healthProfileDesc: "Opcjonalne. Zastępuje Profile używany w zaplanowanych i ręcznych skanach kondycji. Pozostaw domyślny, aby dziedziczyć domyślny profil uruchomienia.",
+    researchProfileSection: "Zastąp profil badań",
+    researchProfileDesc: "Opcjonalne. Zastępuje Profile używany w badaniach konkurencji. Pozostaw domyślny, aby dziedziczyć domyślny profil uruchomienia.",
 
     notificationsSection: "Powiadomienia",
     notifAnalysisComplete: "Analiza zakończona",

@@ -3816,6 +3816,12 @@ export const en = {
     defaultProfileMissing: ({ profileName }: { profileName: string }) => `Selected profile \"${profileName}\" is no longer available on this device. Please reselect a profile in Supervisor Settings.`,
     defaultProfileDefault: "Default (CLI settings)",
 
+    // Settings: Per-purpose profile overrides (wire 0.15.0 / unified resolver)
+    healthProfileSection: "Health Monitor Profile Override",
+    healthProfileDesc: "Optional override applied to scheduled and manual health scans. Leave on Default to inherit the Default Run Profile.",
+    researchProfileSection: "Research Profile Override",
+    researchProfileDesc: "Optional override applied to competitor research runs. Leave on Default to inherit the Default Run Profile.",
+
     // Settings: Notifications
     notificationsSection: "Notifications",
     notifAnalysisComplete: "Analysis Complete",

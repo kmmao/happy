@@ -3673,6 +3673,10 @@ export const zhHant: TranslationStructure = {
     defaultProfileNone: "尚無配置檔。請前往設定 → 配置檔 新增。",
     defaultProfileMissing: ({ profileName }: { profileName: string }) => `所選配置檔「${profileName}」已在目前裝置上失效，請前往 Supervisor 設定重新選擇。`,
     defaultProfileDefault: "預設（CLI 設定）",
+    healthProfileSection: "健康監測 Profile 覆蓋",
+    healthProfileDesc: "可選項。覆蓋定時及手動健康掃描使用的 Profile。保持預設則繼承預設運行 Profile。",
+    researchProfileSection: "調研 Profile 覆蓋",
+    researchProfileDesc: "可選項。覆蓋競品調研運行使用的 Profile。保持預設則繼承預設運行 Profile。",
 
     notificationsSection: "通知",
     notifAnalysisComplete: "分析完成",

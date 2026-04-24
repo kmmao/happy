@@ -3792,6 +3792,10 @@ export const ru: TranslationStructure = {
     defaultProfileNone: "Профили не настроены. Добавьте профили в Настройки → Профили.",
     defaultProfileMissing: ({ profileName }: { profileName: string }) => `Выбранный профиль «${profileName}» больше недоступен на этом устройстве. Пожалуйста, выберите его заново в настройках Supervisor.`,
     defaultProfileDefault: "По умолчанию (настройки CLI)",
+    healthProfileSection: "Переопределение профиля мониторинга",
+    healthProfileDesc: "Необязательно. Переопределяет Profile для запланированных и ручных сканирований здоровья. Оставьте по умолчанию, чтобы использовать основной профиль запуска.",
+    researchProfileSection: "Переопределение профиля исследования",
+    researchProfileDesc: "Необязательно. Переопределяет Profile для запусков исследования конкурентов. Оставьте по умолчанию, чтобы использовать основной профиль запуска.",
 
     notificationsSection: "Уведомления",
     notifAnalysisComplete: "Анализ завершён",

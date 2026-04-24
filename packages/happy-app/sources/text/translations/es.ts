@@ -3773,6 +3773,10 @@ export const es: TranslationStructure = {
     defaultProfileNone: "No hay perfiles configurados. Añade perfiles en Ajustes → Perfiles.",
     defaultProfileMissing: ({ profileName }: { profileName: string }) => `El perfil seleccionado \"${profileName}\" ya no está disponible en este dispositivo. Vuelve a seleccionarlo en la configuración de Supervisor.`,
     defaultProfileDefault: "Predeterminado (configuración CLI)",
+    healthProfileSection: "Sobrescribir perfil del Monitor de Salud",
+    healthProfileDesc: "Opcional. Sobrescribe el Profile usado en análisis de salud programados y manuales. Deja en predeterminado para heredar el Profile de ejecución predeterminado.",
+    researchProfileSection: "Sobrescribir perfil de Investigación",
+    researchProfileDesc: "Opcional. Sobrescribe el Profile usado en ejecuciones de investigación de competidores. Deja en predeterminado para heredar el Profile de ejecución predeterminado.",
 
     notificationsSection: "Notificaciones",
     notifAnalysisComplete: "Análisis completado",
