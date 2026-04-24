@@ -24,7 +24,7 @@ export async function scoreOptionsRemote(
             "Content-Type": "application/json",
         },
         body: JSON.stringify({ options, contextSummary, sessionTitle, profileId, modelOverride }),
-        signal: signal ?? AbortSignal.timeout(7000),
+        signal: signal ?? AbortSignal.timeout(18000),
     });
 
     if (!response.ok) {

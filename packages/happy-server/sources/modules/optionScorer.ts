@@ -17,7 +17,7 @@ export interface ScoringCredentials {
 
 const DEFAULT_SCORING_MODELS: Record<ScoringProvider, string> = {
     anthropic: "claude-haiku-4-5-20251001",
-    openai: "gpt-5.4",
+    openai: "gpt-5.4-mini",
     ollama: "llama3",
 };
 
@@ -63,7 +63,7 @@ async function callAnthropic(creds: ScoringCredentials, userMessage: string): Pr
             system: SYSTEM_PROMPT,
             messages: [{ role: "user", content: userMessage }],
         }),
-        signal: AbortSignal.timeout(6000),
+        signal: AbortSignal.timeout(15000),
     });
 
     if (!response.ok) {
@@ -94,7 +94,7 @@ async function callOpenAI(creds: ScoringCredentials, userMessage: string): Promi
             ],
             temperature: 0.1,
         }),
-        signal: AbortSignal.timeout(6000),
+        signal: AbortSignal.timeout(15000),
     });
 
     if (!response.ok) {
@@ -122,7 +122,7 @@ async function callOllama(creds: ScoringCredentials, userMessage: string): Promi
             stream: false,
             options: { temperature: 0.1 },
         }),
-        signal: AbortSignal.timeout(6000),
+        signal: AbortSignal.timeout(15000),
     });
 
     if (!response.ok) {

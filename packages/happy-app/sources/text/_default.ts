@@ -353,7 +353,7 @@ export const en = {
     knowledgeBaseFooter: "Changes take effect in new sessions. Running sessions are not affected.",
     knowledgeBaseAllTracksOff: "All collection triggers are disabled. No knowledge will be collected until at least one is enabled.",
     scoringModel: "Scoring Model",
-    scoringModelDescription: "Override the LLM model used for option relevance scoring per provider. Leave empty for defaults (Anthropic → Haiku, OpenAI → GPT-5.4).",
+    scoringModelDescription: "Override the LLM model used for option relevance scoring per provider. Leave empty for defaults (Anthropic → Haiku, OpenAI → GPT-5.4-mini).",
     scoringModelProvider: "{{provider}} Model",
     scoringModelPlaceholder: "Default",
     showProjectTab: "Project Tab",

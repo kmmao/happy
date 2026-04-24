@@ -20,7 +20,7 @@ import { scoreOptionsRemote } from "./apiOptionScore";
 import { buildOptionScoringContext } from "@/-session/buildOptionScoringContext";
 import { sync } from "./sync";
 
-const DURATION_MS = 10_000;
+const DURATION_MS = 15_000;
 
 /** localStorage key prefix for cross-tab send lock. */
 const LOCK_PREFIX = "happy-aos-lock:";

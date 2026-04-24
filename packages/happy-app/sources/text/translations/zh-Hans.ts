@@ -344,7 +344,7 @@ export const zhHans: TranslationStructure = {
     knowledgeBaseFooter: "设置将在新会话中生效，不影响正在运行的会话。",
     knowledgeBaseAllTracksOff: "所有收集触发器已禁用，将不会收集任何知识。请至少启用一项。",
     scoringModel: "评分模型",
-    scoringModelDescription: "自定义各 Provider 用于选项推荐评分的 LLM 模型。留空则使用默认值（Anthropic → Haiku, OpenAI → GPT-5.4）。",
+    scoringModelDescription: "自定义各 Provider 用于选项推荐评分的 LLM 模型。留空则使用默认值（Anthropic → Haiku, OpenAI → GPT-5.4-mini）。",
     scoringModelProvider: "{{provider}} 模型",
     scoringModelPlaceholder: "默认",
     showProjectTab: "项目标签页",
