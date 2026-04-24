@@ -839,6 +839,13 @@ model Task {
     triggerType     String    @default("manual")    // manual | cron | webhook
     triggerRef      String?                         // cron:<scheduleId> | webhook:<triggerId>
 
+    // Profile binding (wire 0.14.0 / schema 2026-04-24)
+    // Value is a profile business key: built-in id (e.g. "anthropic") or
+    // AiBackendProfile.profileKey under the same accountId. Nullable for
+    // backward compatibility; C4 server resolver enforces presence at
+    // runtime. NOT NULL constraint is a follow-up migration.
+    profileId       String?
+
     // Execution tracking
     sessionId       String?                         // CLI session spawned for this task
     errorMessage    String?
@@ -856,6 +863,7 @@ model Task {
     @@index([machineId, status])
     @@index([projectId])
     @@index([accountId, createdAt(sort: Desc)])
+    @@index([accountId, profileId])
 }
 
 //
@@ -930,6 +938,9 @@ model TriggerSchedule {
     // Skill bindings (JSON array of skill IDs)
     skillIds        String    @default("[]")
 
+    // Profile binding — see Task.profileId docs. Nullable pending backfill.
+    profileId       String?
+
     // Tracking
     nextRunAt       DateTime?
     lastRunAt       DateTime?
@@ -941,6 +952,7 @@ model TriggerSchedule {
 
     @@index([accountId, machineId, enabled])
     @@index([nextRunAt])
+    @@index([accountId, profileId])
 }
 
 //
@@ -965,6 +977,9 @@ model WebhookTrigger {
     // Skill bindings (JSON array of skill IDs)
     skillIds        String    @default("[]")
 
+    // Profile binding — see Task.profileId docs. Nullable pending backfill.
+    profileId       String?
+
     // Stats
     lastTriggeredAt DateTime?
     triggerCount    Int       @default(0)
@@ -973,6 +988,7 @@ model WebhookTrigger {
     updatedAt       DateTime  @updatedAt
 
     @@index([accountId, machineId])
+    @@index([accountId, profileId])
 }
 
 //
