@@ -22,7 +22,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useUnistyles } from "react-native-unistyles";
 import { ShimmerOverlay } from "../ShimmerOverlay";
 import { log } from '@/log';
-import { rankAndSelectOptions } from "@/-session/autoOptionSend";
+import { type AutoOptionStatsResolver, rankAndSelectOptions } from "@/-session/autoOptionSend";
 
 // Option type for callback
 export type Option = {
@@ -30,7 +30,7 @@ export type Option = {
 };
 
 export const MarkdownView = React.memo(
-  (props: { markdown: string; onOptionPress?: (option: Option) => void }) => {
+  (props: { markdown: string; onOptionPress?: (option: Option) => void; optionStatsResolver?: AutoOptionStatsResolver }) => {
     const blocks = React.useMemo(
       () => parseMarkdown(props.markdown),
       [props.markdown],
@@ -128,6 +128,7 @@ export const MarkdownView = React.memo(
                   last={index === blocks.length - 1}
                   selectable={selectable}
                   onOptionPress={props.onOptionPress}
+                  statsResolver={props.optionStatsResolver}
                 />
               );
             } else if (block.type === "plan-card") {
@@ -425,6 +426,7 @@ function RenderOptionsBlock(props: {
   last: boolean;
   selectable: boolean;
   onOptionPress?: (option: Option) => void;
+  statsResolver?: AutoOptionStatsResolver;
 }) {
   const { toggleBookmark, isBookmarked } = useBookmarks();
   const appendToInput = useAppendToInput();
@@ -432,9 +434,9 @@ function RenderOptionsBlock(props: {
 
   const ranked = React.useMemo(
     () => props.items.length >= 2
-      ? rankAndSelectOptions(props.items)
+      ? rankAndSelectOptions(props.items, props.statsResolver)
       : null,
-    [props.items],
+    [props.items, props.statsResolver],
   );
 
   return (

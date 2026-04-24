@@ -17,7 +17,8 @@ import { ToolView } from "./tools/ToolView";
 import { AgentEvent } from "@/sync/typesRaw";
 import { sync } from "@/sync/sync";
 import { Option } from "./markdown/MarkdownView";
-import { useSetting, storage } from "@/sync/storage";
+import { useSetting, storage, useProjectForSession } from "@/sync/storage";
+import { getAutoOptionFeedbackStats } from "@/sync/autoOptionFeedback";
 import { sessionCancelQueuedMessage, sessionRewindFiles } from "@/sync/ops";
 import { Modal } from "@/modal";
 import { AgentDot } from "./AgentDot";
@@ -347,6 +348,12 @@ function AgentTextBlock(props: {
     },
     [props.sessionId],
   );
+  const project = useProjectForSession(props.sessionId);
+  const optionStatsProjectId = project?.id ?? `session:${props.sessionId}`;
+  const optionStatsResolver = React.useCallback(
+    (optionText: string) => getAutoOptionFeedbackStats(optionStatsProjectId, optionText),
+    [optionStatsProjectId],
+  );
 
   // Hide thinking messages unless experiments is enabled
   if (props.message.isThinking && !experiments) {
@@ -393,6 +400,7 @@ function AgentTextBlock(props: {
               <MarkdownView
                 markdown={props.message.text}
                 onOptionPress={handleOptionPress}
+                optionStatsResolver={optionStatsResolver}
               />
             </View>
           )}
@@ -689,6 +697,7 @@ function AgentTextBlock(props: {
           <MarkdownView
             markdown={props.message.text}
             onOptionPress={handleOptionPress}
+            optionStatsResolver={optionStatsResolver}
           />
         )}
       </View>
