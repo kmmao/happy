@@ -4016,11 +4016,6 @@ export const zhHans: TranslationStructure = {
       deniedNotFound: "文件未找到",
       deniedError: "无法读取文件",
     },
-    mention: {
-      placeholder: "输入以搜索文件…",
-      noResults: "没有匹配的文件",
-      searching: "搜索中…",
-    },
     mcp: {
       title: "调用 MCP 工具",
       stepSelect: "1. 选择工具",

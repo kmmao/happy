@@ -4142,11 +4142,6 @@ export const pl: TranslationStructure = {
       deniedNotFound: "File not found",
       deniedError: "Could not read file",
     },
-    mention: {
-      placeholder: "Type to search files…",
-      noResults: "No files match",
-      searching: "Searching…",
-    },
     mcp: {
       title: "Invoke MCP Tool",
       stepSelect: "1. Select tool",

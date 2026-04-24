@@ -4022,11 +4022,6 @@ export const zhHant: TranslationStructure = {
       deniedNotFound: "找不到檔案",
       deniedError: "無法讀取檔案",
     },
-    mention: {
-      placeholder: "輸入以搜尋檔案…",
-      noResults: "沒有相符的檔案",
-      searching: "搜尋中…",
-    },
     mcp: {
       title: "呼叫 MCP 工具",
       stepSelect: "1. 選擇工具",

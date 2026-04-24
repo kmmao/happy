@@ -85,21 +85,22 @@ consistent with existing Happy App conventions (`Item`, `Avatar`,
 - Integration point: new route `app/(app)/session/[id]/file-viewer.tsx`
   (pass `path` via query param)
 
-### 5. `MentionPicker` — E2E tier
+### 5. `MentionPicker` — DROPPED (YAGNI, 2026-04-25)
 
-- Location: `sources/components/claudeControl/MentionPicker.tsx`
-- Props: `{ sessionId: string; query: string; onSelect: (path: string) => void }`
-- Behavior:
-  - Debounced `fetchFileSuggestions(sessionId, query, 20)` (300 ms)
-  - Render floating panel anchored above the composer input
-  - Each row: icon (file/directory) + relative path
-  - Keyboard nav: ↑↓ select, Enter confirms
-- i18n keys (`claudeControl.mention.*`):
-  - `placeholder`: "Type to search files…"
-  - `noResults`: "No files match"
-  - `searching`: "Searching…"
-- Integration point: message composer at-mention handler in
-  `components/composer/` (hook up when `@` is detected)
+The originally-planned MentionPicker component + `claudeControl.mention.*`
+i18n keys have been removed. Reason: the App already ships an equivalent
+`@` autocomplete pipeline wired via `AgentInputAutocomplete` +
+`autocompletePrefixes={["@", "/"]}` (see `SessionView.tsx`) and
+`suggestionFile.ts` (sessionRipgrep + Fuse.js fuzzy cache). That pipeline
+was discovered after MentionPicker was written; they overlap UI-wise and
+the existing Fuse-based matcher beats the claude-control RPC's substring
+match for typing ergonomics.
+
+`fetchFileSuggestions` (App-side RPC wrapper), the CLI handler, and the
+server rate limit are intentionally kept — they are cheap idle
+infrastructure and may be reused for a future non-composer surface (e.g.
+a file picker in FileViewer). If a later audit confirms no surface plans
+to use them, drop the chain wholesale as a separate commit.
 
 ### 6. `McpInvoker` — permission-gated tier
 
