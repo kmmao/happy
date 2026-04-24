@@ -112,6 +112,16 @@ vi.mock("@/utils/setupOfflineReconnection", () => ({
 
 vi.mock("@/daemon/controlClient", () => ({
   notifyDaemonSessionStarted: mocks.mockNotifyDaemonSessionStarted,
+  notifyDaemonSessionHeartbeat: vi.fn(async () => ({ error: "not running" })),
+}));
+
+// Heartbeat runs a background interval we don't care about in unit tests —
+// stub the module entirely so ACP tests don't leak a timer.
+vi.mock("@/daemon/sessionHeartbeat", () => ({
+  startSessionHeartbeat: vi.fn(() => ({
+    stop: vi.fn(),
+    setActivity: vi.fn(),
+  })),
 }));
 
 vi.mock("@/claude/registerKillSessionHandler", () => ({

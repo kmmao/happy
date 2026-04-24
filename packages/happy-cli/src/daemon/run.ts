@@ -725,6 +725,35 @@ export async function startDaemon(): Promise<void> {
       }
     };
 
+    // Periodic liveness + activity signal from child — stronger than
+    // kill(pid, 0) because a wedged event loop cannot post.
+    const onSessionHeartbeat = (params: {
+      pid: number;
+      happySessionId?: string;
+      spawnId?: string;
+      activity?: "idle" | "thinking" | "executing" | "blocked";
+    }): { known: boolean; keepAlive: boolean } => {
+      const existing = pidToTrackedSession.get(params.pid);
+      if (!existing) {
+        logger.debug(
+          `[DAEMON RUN] Heartbeat from unknown PID ${params.pid}${params.spawnId ? ` (spawnId=${params.spawnId})` : ""}`,
+        );
+        return { known: false, keepAlive: true };
+      }
+      const now = Date.now();
+      existing.lastHeartbeatAt = now;
+      existing.lastActivityAt = now;
+      if (params.activity) {
+        existing.activity = params.activity;
+      }
+      // Daemon asked for termination via diagnostics kill; signal the child to
+      // exit gracefully. kill(pid, SIGTERM) still runs independently, this is
+      // just a cooperative nudge.
+      const keepAlive = !existing.terminationRequestedAt;
+      void rememberTrackedSession(existing);
+      return { known: true, keepAlive };
+    };
+
     // Spawn a new session (sessionId reserved for future --resume functionality)
     const spawnSession = async (
       options: SpawnSessionOptions,
@@ -1679,6 +1708,7 @@ export async function startDaemon(): Promise<void> {
         spawnSession,
         requestShutdown: () => requestShutdown("happy-cli"),
         onHappySessionWebhook,
+        onSessionHeartbeat,
         getAutomationStatus: () => getAutomationStatusSnapshot(),
         cancelAutomationJob: async (jobId) => {
           if (!automationScheduler) {

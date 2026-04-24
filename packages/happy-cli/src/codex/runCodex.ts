@@ -56,6 +56,7 @@ import { trimIdent } from "@/utils/trimIdent";
 import type { CodexSessionConfig, CodexToolResponse } from "./types";
 import { CHANGE_TITLE_INSTRUCTION } from "@/gemini/constants";
 import { notifyDaemonSessionStarted } from "@/daemon/controlClient";
+import { startSessionHeartbeat } from "@/daemon/sessionHeartbeat";
 import { registerKillSessionHandler } from "@/claude/registerKillSessionHandler";
 import { delay } from "@/utils/time";
 import { stopCaffeinate } from "@/utils/caffeinate";
@@ -440,6 +441,11 @@ export async function runCodex(opts: {
   // Always report to daemon if it exists (skip if offline). HAPPY_SPAWN_ID is
   // injected by the daemon at spawn time; absent when started directly by the user.
   const spawnId = process.env.HAPPY_SPAWN_ID;
+  // Start periodic heartbeat for daemon fleet tracking. For codex in offline
+  // stub mode (`response === undefined`), no happySessionId is available yet,
+  // but we still heartbeat — the spawnId alone is enough for the daemon to
+  // match pending entries pre-registered at spawn.
+  startSessionHeartbeat({ happySessionId: response?.id, spawnId });
   if (response) {
     try {
       logger.debug(

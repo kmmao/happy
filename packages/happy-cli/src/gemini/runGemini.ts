@@ -32,6 +32,7 @@ import { projectPath } from "@/projectPath";
 import { startHappyServer } from "@/claude/utils/startHappyServer";
 import { MessageBuffer } from "@/ui/ink/messageBuffer";
 import { notifyDaemonSessionStarted } from "@/daemon/controlClient";
+import { startSessionHeartbeat } from "@/daemon/sessionHeartbeat";
 import { registerKillSessionHandler } from "@/claude/registerKillSessionHandler";
 import { stopCaffeinate } from "@/utils/caffeinate";
 import { connectionState } from "@/utils/serverConnectionErrors";
@@ -215,6 +216,10 @@ export async function runGemini(opts: {
   // Report to daemon (only if we have a real session). HAPPY_SPAWN_ID is
   // injected by the daemon at spawn time; absent when started directly by the user.
   const spawnId = process.env.HAPPY_SPAWN_ID;
+  // Start periodic heartbeat for daemon fleet tracking. For offline stubs
+  // (`response === undefined`) we still heartbeat so the daemon can track
+  // this pid via the pending spawn entry.
+  startSessionHeartbeat({ happySessionId: response?.id, spawnId });
   if (response) {
     try {
       logger.debug(

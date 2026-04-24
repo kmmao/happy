@@ -435,6 +435,7 @@ export function startDaemonControlServer({
   spawnSession,
   requestShutdown,
   onHappySessionWebhook,
+  onSessionHeartbeat,
   getAutomationStatus,
   cancelAutomationJob,
   retryAutomationJob,
@@ -481,6 +482,19 @@ export function startDaemonControlServer({
     metadata: Metadata,
     spawnId?: string,
   ) => void;
+  /**
+   * Invoked when a tracked child posts to /session-heartbeat. Handler updates
+   * in-memory `lastHeartbeatAt` / `activity` and persists to the registry.
+   * Returns `{ known: true }` when daemon recognizes the pid/spawn pair and
+   * wants the child to keep running; `{ known: false }` signals the child to
+   * optionally re-handshake via /session-started.
+   */
+  onSessionHeartbeat: (params: {
+    pid: number;
+    happySessionId?: string;
+    spawnId?: string;
+    activity?: "idle" | "thinking" | "executing" | "blocked";
+  }) => { known: boolean; keepAlive: boolean };
   getAutomationStatus: () => {
     jobs: AutomationJob[];
     counts: Record<string, number>;
@@ -610,6 +624,46 @@ export function startDaemonControlServer({
         );
         onHappySessionWebhook(sessionId, metadata, spawnId);
         return { status: "ok" as const };
+      },
+    );
+
+    // Periodic heartbeat from daemon-tracked children. Replaces kill(pid, 0)
+    // polling with explicit liveness signal — a wedged child whose process is
+    // alive but whose event loop is blocked will still fail to send heartbeats.
+    typed.post(
+      "/session-heartbeat",
+      {
+        schema: {
+          body: z.object({
+            pid: z.number().int().positive(),
+            happySessionId: z.string().optional(),
+            spawnId: z.string().optional(),
+            activity: z
+              .enum(["idle", "thinking", "executing", "blocked"])
+              .optional(),
+          }),
+          response: {
+            200: z.object({
+              status: z.literal("ok"),
+              // `known: false` — daemon has no matching trackedSession; child
+              // may re-handshake by re-posting /session-started.
+              known: z.boolean(),
+              // `keepAlive: false` — daemon wants the child to exit gracefully
+              // (e.g. diagnostics "kill" was requested via terminationRequestedAt).
+              keepAlive: z.boolean(),
+            }),
+          },
+        },
+      },
+      async (request) => {
+        const { pid, happySessionId, spawnId, activity } = request.body;
+        const result = onSessionHeartbeat({
+          pid,
+          happySessionId,
+          spawnId,
+          activity,
+        });
+        return { status: "ok" as const, ...result };
       },
     );
 

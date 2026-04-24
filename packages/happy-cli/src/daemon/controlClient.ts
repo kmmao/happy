@@ -77,6 +77,28 @@ export async function notifyDaemonSessionStarted(
   return daemonPost("/session-started", { sessionId, metadata, spawnId });
 }
 
+export interface DaemonHeartbeatResponse {
+  status: "ok";
+  /** `false` = daemon has no matching trackedSession; child may re-handshake. */
+  known: boolean;
+  /** `false` = daemon requested this child to exit gracefully. */
+  keepAlive: boolean;
+}
+
+export async function notifyDaemonSessionHeartbeat(
+  pid: number,
+  happySessionId?: string,
+  spawnId?: string,
+  activity?: "idle" | "thinking" | "executing" | "blocked",
+): Promise<DaemonHeartbeatResponse | { error: string }> {
+  return daemonPost("/session-heartbeat", {
+    pid,
+    happySessionId,
+    spawnId,
+    activity,
+  });
+}
+
 export async function listDaemonSessions(): Promise<any[]> {
   const result = await daemonPost("/list");
   return result.children || [];

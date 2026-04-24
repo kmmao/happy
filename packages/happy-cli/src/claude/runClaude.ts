@@ -19,6 +19,7 @@ import { executeShellCommand } from "@/utils/shellCommand";
 import { getEnvironmentInfo } from "@/ui/doctor";
 import { configuration } from "@/configuration";
 import { notifyDaemonSessionStarted } from "@/daemon/controlClient";
+import { startSessionHeartbeat } from "@/daemon/sessionHeartbeat";
 import { initialMachineMetadata } from "@/daemon/run";
 import { startHappyServer } from "@/claude/utils/startHappyServer";
 import { startHookServer } from "@/claude/utils/startHookServer";
@@ -316,6 +317,9 @@ export async function runClaude(
   // Always report to daemon if it exists. HAPPY_SPAWN_ID is injected by the
   // daemon at spawn time; absent when this CLI was started directly by the user.
   const spawnId = process.env.HAPPY_SPAWN_ID;
+  // Start periodic heartbeat. Timer is unref'd so it won't keep the event
+  // loop alive on shutdown; no explicit stop() call needed in the happy path.
+  startSessionHeartbeat({ happySessionId: response.id, spawnId });
   try {
     logger.debug(
       `[START] Reporting session ${response.id} to daemon${spawnId ? ` (spawnId=${spawnId})` : ""}`,

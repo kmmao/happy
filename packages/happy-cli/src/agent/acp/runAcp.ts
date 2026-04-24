@@ -22,6 +22,7 @@ import {
 } from "@/utils/worktreeCleanup";
 import { setupOfflineReconnection } from "@/utils/setupOfflineReconnection";
 import { notifyDaemonSessionStarted } from "@/daemon/controlClient";
+import { startSessionHeartbeat } from "@/daemon/sessionHeartbeat";
 import { registerKillSessionHandler } from "@/claude/registerKillSessionHandler";
 import { startHappyServer } from "@/claude/utils/startHappyServer";
 import { projectPath } from "@/projectPath";
@@ -582,6 +583,9 @@ export async function runAcp(opts: {
   // HAPPY_SPAWN_ID is injected by the daemon at spawn time; absent when
   // started directly by the user.
   const spawnId = process.env.HAPPY_SPAWN_ID;
+  // Periodic heartbeat for daemon fleet tracking. Works for offline stubs too
+  // via the spawn id alone.
+  startSessionHeartbeat({ happySessionId: response?.id, spawnId });
   if (response) {
     try {
       await notifyDaemonSessionStarted(response.id, metadata, spawnId);
