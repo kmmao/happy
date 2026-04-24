@@ -7,6 +7,7 @@ import { ItemGroup } from "@/components/ItemGroup";
 import { ItemList } from "@/components/ItemList";
 import { Ionicons } from "@expo/vector-icons";
 import { Typography } from "@/constants/Typography";
+import { resolveActiveTint } from "@/constants/activeTint";
 import { Project } from "@/sync/projectManager";
 import { storage, useMachine } from "@/sync/storage";
 import { useShallow } from "zustand/react/shallow";
@@ -490,7 +491,7 @@ const styles = StyleSheet.create((theme) => ({
         flexDirection: "row",
         alignItems: "center",
         gap: 6,
-        backgroundColor: theme.dark ? theme.colors.accentPurple : theme.colors.header.tint,
+        backgroundColor: resolveActiveTint(theme),
         paddingHorizontal: 16,
         paddingVertical: 10,
         borderRadius: 8,
