@@ -77,7 +77,7 @@ describe("getBuiltInAIBackendProfile", () => {
 
     expect(profile).toMatchObject({
       id: "openai",
-      name: "OpenAI (GPT-5.4)",
+      name: "OpenAI (GPT-5.5)",
       isBuiltIn: true,
       compatibility: {
         claude: false,
@@ -86,8 +86,8 @@ describe("getBuiltInAIBackendProfile", () => {
       },
       environmentVariables: expect.arrayContaining([
         { name: "OPENAI_BASE_URL", value: "https://api.openai.com/v1" },
-        { name: "OPENAI_MODEL", value: "gpt-5.4" },
-        { name: "CODEX_SMALL_FAST_MODEL", value: "gpt-5.4" },
+        { name: "OPENAI_MODEL", value: "gpt-5.5" },
+        { name: "CODEX_SMALL_FAST_MODEL", value: "gpt-5.4-mini" },
       ]),
     });
   });
