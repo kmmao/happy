@@ -728,6 +728,10 @@ class AutoOptionSendService {
         }
     }
 
+    getSemanticScores(optionsHash: string): ReadonlyMap<number, number> | null {
+        return this.semanticScores.get(optionsHash) ?? null;
+    }
+
     private resolveProjectId(sessionId: string): string {
         const project = projectManager.getProjectForSession(sessionId);
         return project?.id ?? `session:${sessionId}`;

@@ -24,6 +24,7 @@ interface OptionsPopoverProps {
   recommendedRemainingMs?: number | null;
   onCopyOption?: (text: string) => void;
   scores?: ReadonlyMap<number, number> | null;
+  llmScoredIndices?: ReadonlySet<number> | null;
 }
 
 function normalizeOption(option: string | OptionItem): OptionItem {
@@ -46,6 +47,7 @@ export const OptionsPopover = React.memo(
     recommendedRemainingMs,
     onCopyOption,
     scores,
+    llmScoredIndices,
   }: OptionsPopoverProps) => {
     const { theme } = useUnistyles();
     const appendToInput = useAppendToInput();
@@ -109,7 +111,7 @@ export const OptionsPopover = React.memo(
                                 : { color: theme.colors.box.warning.text },
                             ]}
                           >
-                            {scores.get(index)}
+                            {scores.get(index)}{llmScoredIndices?.has(index) ? "+" : ""}
                           </Text>
                         </View>
                       )}
