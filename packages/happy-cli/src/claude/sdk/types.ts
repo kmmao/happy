@@ -107,12 +107,6 @@ export interface QueryOptions {
   taskBudget?: { total: number };
   /** Enable prompt suggestions — agent emits a prompt_suggestion after each turn */
   promptSuggestions?: boolean;
-  /**
-   * Per-tool configuration for built-in tools.
-   * Currently supports AskUserQuestion preview format ('markdown' | 'html').
-   * Use 'html' for web-based SDK consumers (happy-cli default).
-   */
-  toolConfig?: import("@anthropic-ai/claude-agent-sdk").ToolConfig;
   /** Callback for handling MCP elicitation requests (user input from MCP servers) */
   onElicitation?: import("@anthropic-ai/claude-agent-sdk").OnElicitation;
   /**
@@ -137,11 +131,6 @@ export interface QueryOptions {
    */
   enableFileCheckpointing?: boolean;
   /**
-   * When false, disables session persistence to disk. Useful for ephemeral workflows.
-   * @default true
-   */
-  persistSession?: boolean;
-  /**
    * Agent name for the main thread. The agent must be defined in the `agents` option or in settings.
    */
   agent?: string;
@@ -161,16 +150,6 @@ export interface QueryOptions {
    * Additional directories Claude can access beyond the current working directory.
    */
   additionalDirectories?: string[];
-  /**
-   * Include partial/streaming message events in the output.
-   */
-  includePartialMessages?: boolean;
-  /**
-   * Include hook lifecycle events (hook_started, hook_progress, hook_response)
-   * in the output stream. SessionStart and Setup hooks are always emitted.
-   * @default false
-   */
-  includeHookEvents?: boolean;
   /**
    * Custom title for a new session. When provided, the session uses this title
    * instead of auto-generating one from the first user message. When resuming

@@ -90,9 +90,6 @@ export function mapOptions(opts: QueryOptions): OfficialOptions {
   if (opts.taskBudget) result.taskBudget = opts.taskBudget;
   if (opts.promptSuggestions) result.promptSuggestions = opts.promptSuggestions;
 
-  // ── toolConfig (AskUserQuestion previewFormat etc.) ──
-  if (opts.toolConfig) result.toolConfig = opts.toolConfig;
-
   // ── onElicitation (MCP server user input requests) ──
   if (opts.onElicitation) result.onElicitation = opts.onElicitation;
 
@@ -111,9 +108,6 @@ export function mapOptions(opts: QueryOptions): OfficialOptions {
   // ── File checkpointing for rewind support ──
   if (opts.enableFileCheckpointing) result.enableFileCheckpointing = opts.enableFileCheckpointing;
 
-  // ── Session persistence control ──
-  if (opts.persistSession != null) result.persistSession = opts.persistSession;
-
   // ── Agent configuration ──
   if (opts.agent) result.agent = opts.agent;
   if (opts.agents) result.agents = opts.agents;
@@ -126,12 +120,6 @@ export function mapOptions(opts: QueryOptions): OfficialOptions {
 
   // ── Additional directories ──
   if (opts.additionalDirectories) result.additionalDirectories = opts.additionalDirectories;
-
-  // ── Partial/streaming messages ──
-  if (opts.includePartialMessages) result.includePartialMessages = opts.includePartialMessages;
-
-  // ── Hook lifecycle events in output stream ──
-  if (opts.includeHookEvents) result.includeHookEvents = opts.includeHookEvents;
 
   // ── Custom session title (SDK 0.2.119+) ──
   if (opts.title) (result as OfficialOptions & { title?: string }).title = opts.title;
