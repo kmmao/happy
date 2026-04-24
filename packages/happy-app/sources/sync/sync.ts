@@ -2048,9 +2048,6 @@ class Sync {
       let totalNormalized = 0;
       let isFirstBatch = true;
 
-      // After the first batch is applied immediately (to exit loading state),
-      // remaining batches are collected here and applied all at once at the end.
-      const remainingNormalized: NormalizedMessage[] = [];
       const historySignalEntries: Array<{
         seq: number;
         content: RawRecord | null | undefined;
@@ -2062,6 +2059,10 @@ class Sync {
       // all historical messages to load.
       let needsBackfill = false;
       let backfillMaxSeq = 0;
+      // Lower bound of the reverse-pagination newest batch. Forward backfill
+      // only needs to cover seq < backfillMinSeq, since [backfillMinSeq,
+      // backfillMaxSeq] was already fetched and applied above.
+      let backfillMinSeq = 0;
       if (afterSeq === 0) {
         const newestResponse = await apiSocket.request(
           `/v3/sessions/${sessionId}/messages?before_seq=2147483647&limit=300`,
@@ -2104,16 +2105,22 @@ class Sync {
               if (msg.seq > maxNewestSeq) maxNewestSeq = msg.seq;
             }
 
-            // If there are older messages, backfill with forward pagination.
-            // Do NOT save maxNewestSeq as lastSeq yet — if backfill is interrupted,
-            // the next attempt must still start from seq 0 to avoid missing messages.
+            // If there are older messages, backfill with forward pagination
+            // bounded above by minNewestSeq. The newest batch was applied to
+            // storage, but the cursor stays at 0 until backfill reaches the
+            // lower edge of that batch — persisting intermediate cursors is
+            // still safe because each forward batch is applied immediately
+            // (see below), so interrupted backfills resume from the last
+            // fully-applied seq instead of restarting from 0.
             if (newestData.hasMore) {
               log.log(
                 `💬 fetchMessages: newest batch loaded (seq ${minNewestSeq}-${maxNewestSeq}), backfilling older messages`,
               );
               needsBackfill = true;
               backfillMaxSeq = maxNewestSeq;
-              // afterSeq stays at 0, forward pagination will fill in everything
+              backfillMinSeq = minNewestSeq;
+              // afterSeq stays at 0, forward pagination will fill the gap
+              // [1, minNewestSeq - 1]
             } else {
               // All messages fit in one batch, no more to fetch
               this.sessionLastSeq.set(sessionId, maxNewestSeq);
@@ -2160,28 +2167,33 @@ class Sync {
 
         totalNormalized += batchNormalized.length;
 
-        // Apply first batch immediately so the UI exits the loading spinner.
-        // Subsequent batches are collected and applied all at once at the end
-        // to avoid the jarring "old messages appear first" progressive loading.
+        // Apply every batch immediately. This makes messages durable in
+        // storage so the persisted cursor (below) cannot race ahead of
+        // applied messages, and gives the user progressive loading feedback
+        // on long sessions instead of a long silent gap.
+        if (batchNormalized.length > 0) {
+          this.applyMessages(sessionId, batchNormalized);
+        }
         if (isFirstBatch) {
-          if (batchNormalized.length > 0) {
-            this.applyMessages(sessionId, batchNormalized);
-          }
           storage.getState().applyMessagesLoaded(sessionId);
           isFirstBatch = false;
-        } else {
-          remainingNormalized.push(...batchNormalized);
         }
 
-        // During backfill (needsBackfill=true), only update the in-memory cursor.
-        // Persisting intermediate seq values would cause interrupted backfills to
-        // skip earlier messages on next attempt. The final lastSeq is saved after
-        // the loop completes successfully.
+        // Persist the cursor after each batch is applied. Intermediate
+        // persistence is safe because applyMessages above has already made
+        // the batch durable; an interrupted backfill will resume from the
+        // last fully-applied seq rather than redo everything from 0.
         this.sessionLastSeq.set(sessionId, maxSeq);
-        if (!needsBackfill) {
-          saveLastSeq(sessionId, maxSeq);
-        }
+        saveLastSeq(sessionId, maxSeq);
+
         hasMore = !!data.hasMore;
+        // Backfill stops once the gap below the reverse-pagination newest
+        // batch is filled. Messages in [backfillMinSeq, backfillMaxSeq] are
+        // already applied, so we don't need to re-fetch them via forward
+        // pagination.
+        if (needsBackfill && backfillMinSeq > 0 && maxSeq >= backfillMinSeq - 1) {
+          hasMore = false;
+        }
         if (hasMore && maxSeq === afterSeq) {
           // API returned hasMore=true but no new messages (empty page).
           // Skip past current seq to avoid infinite loop.
@@ -2194,20 +2206,15 @@ class Sync {
         }
       }
 
-      // Apply remaining batches at once so the UI renders them together.
-      // We call applyMessages directly (not enqueueMessages) because we
-      // already hold the sessionMessageLock — the queue processor needs
-      // the same lock and would deadlock.
-      if (remainingNormalized.length > 0) {
-        this.applyMessages(sessionId, remainingNormalized);
-      }
-
-      // If we did a reverse-pagination + backfill, now that backfill is
-      // complete we can safely persist the highest seq from the newest batch.
-      // This ensures interrupted backfills restart from seq 0 next time.
+      // After the forward backfill fills the gap below the newest batch,
+      // jump the cursor past the already-applied newest batch so future
+      // incremental fetches start from the true tail.
       if (needsBackfill && backfillMaxSeq > 0) {
-        this.sessionLastSeq.set(sessionId, backfillMaxSeq);
-        saveLastSeq(sessionId, backfillMaxSeq);
+        const currentSeq = this.sessionLastSeq.get(sessionId) ?? 0;
+        if (backfillMaxSeq > currentSeq) {
+          this.sessionLastSeq.set(sessionId, backfillMaxSeq);
+          saveLastSeq(sessionId, backfillMaxSeq);
+        }
       }
 
       // Surface side-channel session signals after all messages are merged in seq order.
