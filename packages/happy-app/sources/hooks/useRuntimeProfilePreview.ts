@@ -68,3 +68,35 @@ export function useRuntimeProfileEffectiveLabel(
         return t("triggers.profileEffective", { name, source });
     }, [result]);
 }
+
+export interface RuntimeProfileEffective {
+    label: string;
+    isProjectDefault: boolean;
+}
+
+/**
+ * Same as useRuntimeProfileEffectiveLabel but also exposes whether the
+ * resolution came from the project's default (vs an explicit binding on
+ * the triggering record). Consumers use this to decide whether the
+ * effective label should be tap-to-navigate — tapping only makes sense
+ * when the user would want to change the project default.
+ */
+export function useRuntimeProfileEffective(
+    projectId: string | null | undefined,
+    purpose: RuntimeProfilePreviewPurpose,
+    refreshKey: number = 0,
+): RuntimeProfileEffective | null {
+    const result = useRuntimeProfilePreview(projectId, purpose, refreshKey);
+    return React.useMemo(() => {
+        if (!result || !result.ok) return null;
+        const name = result.profileName ?? result.profileId;
+        const isProjectDefault = result.profileSource === "project-default";
+        const source = isProjectDefault
+            ? t("triggers.profileSourceProjectDefault")
+            : t("triggers.profileSourceExplicit");
+        return {
+            label: t("triggers.profileEffective", { name, source }),
+            isProjectDefault,
+        };
+    }, [result]);
+}

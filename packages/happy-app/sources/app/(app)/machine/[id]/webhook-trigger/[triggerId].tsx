@@ -23,7 +23,8 @@ import { ProfilePicker } from "@/components/ProfilePicker";
 import { useSettings } from "@/sync/storage";
 import { DEFAULT_PROFILES } from "@/sync/profileUtils";
 import { getSupervisorAvailableProfiles } from "@/components/project/supervisorProfileSelection";
-import { useRuntimeProfileEffectiveLabel } from "@/hooks/useRuntimeProfilePreview";
+import { useRuntimeProfileEffective } from "@/hooks/useRuntimeProfilePreview";
+import { useProjects } from "@/hooks/useProjects";
 
 const PRIORITIES = ["background", "user", "urgent"] as const;
 
@@ -58,10 +59,19 @@ function EditWebhookTriggerPage() {
         return getSupervisorAvailableProfiles(builtInProfiles, userDefinedProfiles);
     }, [settings.profiles]);
 
-    const effectiveLabel = useRuntimeProfileEffectiveLabel(
+    const projects = useProjects();
+    const effective = useRuntimeProfileEffective(
         trigger?.projectId ?? null,
         "webhook",
     );
+    const onEffectivePress = React.useMemo(() => {
+        if (!effective?.isProjectDefault || !trigger?.projectId) return undefined;
+        const localProject = projects.find(
+            (p) => p.serverId === trigger.projectId || p.id === trigger.projectId,
+        );
+        if (!localProject) return undefined;
+        return () => router.push(`/project/${localProject.id}/supervisor-settings` as any);
+    }, [effective, trigger?.projectId, projects, router]);
 
     // Load trigger from list (no single-fetch endpoint yet — list+filter is
     // acceptable since webhook counts are tiny per machine)
@@ -253,7 +263,8 @@ function EditWebhookTriggerPage() {
                         profiles={allProfiles}
                         defaultOptionLabel={t("supervisor.defaultProfileDefault")}
                         description={t("triggers.profileDesc")}
-                        effectiveLabel={effectiveLabel}
+                        effectiveLabel={effective?.label}
+                        onEffectivePress={onEffectivePress}
                     />
                 </View>
             </ItemGroup>

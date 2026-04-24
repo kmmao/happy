@@ -43,6 +43,13 @@ export interface ProfilePickerProps {
     effectiveLabel?: string;
     /** Color hint for the effective label row. `warning` tints it orange. */
     effectiveTone?: "ok" | "warning";
+    /**
+     * Optional tap handler for the effective label row. When provided, the
+     * row renders as a Pressable with a trailing chevron to indicate the
+     * user can drill into the source (e.g. project supervisor settings) to
+     * change the underlying default.
+     */
+    onEffectivePress?: () => void;
 }
 
 export const ProfilePicker = React.memo<ProfilePickerProps>((props) => {
@@ -61,6 +68,7 @@ export const ProfilePicker = React.memo<ProfilePickerProps>((props) => {
         initialOpen = false,
         effectiveLabel,
         effectiveTone = "ok",
+        onEffectivePress,
     } = props;
 
     const { theme } = useUnistyles();
@@ -134,7 +142,40 @@ export const ProfilePicker = React.memo<ProfilePickerProps>((props) => {
                 </View>
             )}
 
-            {effectiveLabel && (
+            {effectiveLabel && (onEffectivePress ? (
+                <Pressable
+                    style={[
+                        styles.effectiveRow,
+                        {
+                            backgroundColor:
+                                effectiveTone === "warning"
+                                    ? `${theme.colors.warning ?? "#FF9500"}1A`
+                                    : `${theme.colors.textLink}12`,
+                        },
+                    ]}
+                    onPress={onEffectivePress}
+                >
+                    <Ionicons
+                        name={effectiveTone === "warning" ? "alert-circle-outline" : "information-circle-outline"}
+                        size={14}
+                        color={effectiveTone === "warning" ? "#FF9500" : theme.colors.textLink}
+                    />
+                    <Text
+                        style={[
+                            styles.effectiveText,
+                            { color: theme.colors.text },
+                        ]}
+                        numberOfLines={2}
+                    >
+                        {effectiveLabel}
+                    </Text>
+                    <Ionicons
+                        name="chevron-forward"
+                        size={14}
+                        color={theme.colors.textSecondary}
+                    />
+                </Pressable>
+            ) : (
                 <View
                     style={[
                         styles.effectiveRow,
@@ -161,7 +202,7 @@ export const ProfilePicker = React.memo<ProfilePickerProps>((props) => {
                         {effectiveLabel}
                     </Text>
                 </View>
-            )}
+            ))}
 
             {open && (
                 <View style={[styles.optionList, { borderTopColor: theme.colors.divider }]}>
