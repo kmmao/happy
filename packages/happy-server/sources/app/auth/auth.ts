@@ -5,6 +5,7 @@ import { log } from "@/utils/log";
 
 interface TokenCacheEntry {
     userId: string;
+    uuid?: string;
     extras?: any;
     cachedAt: number;
 }
@@ -14,7 +15,7 @@ interface TaskResultTokenPayload {
     taskId: string;
     scope: "task-result";
     expiresAt: number;
-    jti: string;
+    jti?: string;
 }
 
 interface SupervisorCallbackTokenPayload {
@@ -26,7 +27,7 @@ interface SupervisorCallbackTokenPayload {
     runId?: string;
     actionId?: string;
     expiresAt: number;
-    jti: string;
+    jti?: string;
 }
 
 interface AuthTokens {
@@ -106,11 +107,12 @@ class AuthModule {
         return token;
     }
 
-    async verifyToken(token: string): Promise<{ userId: string; extras?: any } | null> {
+    async verifyToken(token: string): Promise<{ userId: string; uuid?: string; extras?: any } | null> {
         const cached = this.tokenCache.get(token);
         if (cached) {
             return {
                 userId: cached.userId,
+                uuid: cached.uuid,
                 extras: cached.extras,
             };
         }
@@ -126,15 +128,17 @@ class AuthModule {
             }
 
             const userId = verified.user as string;
+            const uuid = verified.uuid ?? undefined;
             const extras = verified.extras;
 
             this.tokenCache.set(token, {
                 userId,
+                uuid,
                 extras,
                 cachedAt: Date.now(),
             });
 
-            return { userId, extras };
+            return { userId, uuid, extras };
         } catch (error) {
             log({ module: "auth", level: "error" }, `Token verification failed: ${error}`);
             return null;
@@ -183,13 +187,11 @@ class AuthModule {
         expiresInMs?: number;
     }): Promise<string> {
         const expiresAt = Date.now() + (input.expiresInMs ?? 6 * 60 * 60 * 1000);
-        const jti = crypto.randomUUID();
         return await this.createToken(input.userId, {
             purpose: "task-result",
             taskId: input.taskId,
             scope: "task-result",
             expiresAt,
-            jti,
         });
     }
 
@@ -199,11 +201,11 @@ class AuthModule {
             return null;
         }
 
-        const extras = verified.extras as { purpose?: string; taskId?: string; scope?: string; expiresAt?: number; jti?: string } | undefined;
+        const extras = verified.extras as { purpose?: string; taskId?: string; scope?: string; expiresAt?: number } | undefined;
         if (extras?.purpose !== "task-result") {
             return null;
         }
-        if (!extras.taskId || extras.scope !== "task-result" || typeof extras.expiresAt !== "number" || !extras.jti) {
+        if (!extras.taskId || extras.scope !== "task-result" || typeof extras.expiresAt !== "number") {
             return null;
         }
         if (extras.expiresAt < Date.now()) {
@@ -215,7 +217,7 @@ class AuthModule {
             taskId: extras.taskId,
             scope: "task-result",
             expiresAt: extras.expiresAt,
-            jti: extras.jti as string,
+            jti: verified.uuid ?? crypto.randomUUID(),
         };
     }
 
@@ -229,7 +231,6 @@ class AuthModule {
         expiresInMs?: number;
     }): Promise<string> {
         const expiresAt = Date.now() + (input.expiresInMs ?? 6 * 60 * 60 * 1000);
-        const jti = crypto.randomUUID();
         return await this.createToken(input.userId, {
             purpose: input.purpose,
             projectId: input.projectId,
@@ -238,7 +239,6 @@ class AuthModule {
             actionId: input.actionId,
             scope: "supervisor-callback",
             expiresAt,
-            jti,
         });
     }
 
@@ -256,12 +256,11 @@ class AuthModule {
             actionId?: string;
             scope?: string;
             expiresAt?: number;
-            jti?: string;
         } | undefined;
         if (extras?.scope !== "supervisor-callback") {
             return null;
         }
-        if ((extras.purpose !== "run-status" && extras.purpose !== "fix-status") || !extras.projectId || !extras.machineId || typeof extras.expiresAt !== "number" || !extras.jti) {
+        if ((extras.purpose !== "run-status" && extras.purpose !== "fix-status") || !extras.projectId || !extras.machineId || typeof extras.expiresAt !== "number") {
             return null;
         }
         if (extras.expiresAt < Date.now()) {
@@ -283,7 +282,7 @@ class AuthModule {
             runId: extras.runId,
             actionId: extras.actionId,
             expiresAt: extras.expiresAt,
-            jti: extras.jti,
+            jti: verified.uuid,
         };
     }
 

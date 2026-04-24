@@ -72,6 +72,77 @@ describe("AuthModule", () => {
         });
     });
 
+    describe("supervisor callback tokens", () => {
+        it("should create and verify a run-status callback token", async () => {
+            const token = await auth.createSupervisorCallbackToken({
+                userId: "user-1",
+                projectId: "proj-1",
+                machineId: "machine-1",
+                purpose: "run-status",
+                runId: "run-1",
+                expiresInMs: 60_000,
+            });
+
+            const result = await auth.verifySupervisorCallbackToken(token);
+            expect(result).not.toBeNull();
+            expect(result!.userId).toBe("user-1");
+            expect(result!.projectId).toBe("proj-1");
+            expect(result!.machineId).toBe("machine-1");
+            expect(result!.purpose).toBe("run-status");
+            expect(result!.runId).toBe("run-1");
+            expect(result!.scope).toBe("supervisor-callback");
+            expect(result!.expiresAt).toBeTypeOf("number");
+        });
+
+        it("should create and verify a fix-status callback token", async () => {
+            const token = await auth.createSupervisorCallbackToken({
+                userId: "user-2",
+                projectId: "proj-2",
+                machineId: "machine-2",
+                purpose: "fix-status",
+                actionId: "action-1",
+                expiresInMs: 60_000,
+            });
+
+            const result = await auth.verifySupervisorCallbackToken(token);
+            expect(result).not.toBeNull();
+            expect(result!.purpose).toBe("fix-status");
+            expect(result!.actionId).toBe("action-1");
+        });
+
+        it("should reject expired callback tokens", async () => {
+            const token = await auth.createSupervisorCallbackToken({
+                userId: "user-3",
+                projectId: "proj-3",
+                machineId: "machine-3",
+                purpose: "run-status",
+                runId: "run-3",
+                expiresInMs: -1000,
+            });
+
+            const result = await auth.verifySupervisorCallbackToken(token);
+            expect(result).toBeNull();
+        });
+
+        it("should still verify after cache eviction (crypto path)", async () => {
+            const token = await auth.createSupervisorCallbackToken({
+                userId: "user-4",
+                projectId: "proj-4",
+                machineId: "machine-4",
+                purpose: "run-status",
+                runId: "run-4",
+                expiresInMs: 60_000,
+            });
+
+            auth.invalidateToken(token);
+
+            const result = await auth.verifySupervisorCallbackToken(token);
+            expect(result).not.toBeNull();
+            expect(result!.userId).toBe("user-4");
+            expect(result!.projectId).toBe("proj-4");
+        });
+    });
+
     describe("invalidateToken", () => {
         it("should remove token from cache", async () => {
             const token = await auth.createToken("user-inv");
