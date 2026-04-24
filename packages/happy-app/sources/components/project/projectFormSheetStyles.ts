@@ -1,5 +1,6 @@
 import { StyleSheet } from "react-native-unistyles";
 import { Typography } from "@/constants/Typography";
+import { resolveActiveTint } from "@/constants/activeTint";
 
 export const projectFormSheetStyles = StyleSheet.create((theme) => ({
     modalOverlay: {
@@ -137,7 +138,7 @@ export const projectFormSheetStyles = StyleSheet.create((theme) => ({
         paddingHorizontal: 16,
         paddingVertical: 10,
         borderRadius: 10,
-        backgroundColor: theme.dark ? theme.colors.accentPurple : theme.colors.header.tint,
+        backgroundColor: resolveActiveTint(theme),
     },
     confirmButtonText: {
         ...Typography.default("semiBold"),
