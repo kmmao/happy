@@ -1,5 +1,18 @@
 # 更新日志
 
+## 2.14.1 - 2026-04-24
+
+恢复 Opus 4.7 会话中的 XHigh 推理强度选项，同时修复 PC Web 长会话刷新后历史消息加载不完整的问题。
+
+### 修复
+- 修复 Claude SDK 未上报 `supportedEffortLevels` 时 XHigh 选项消失的问题 —— 现已为 Opus 4.7（含 1M 变体）强制保留
+- 修复 PC Web 长会话始终无法完成初次加载：回填游标现在每批持久化，断点续传而不是从头重跑；向前分页在命中已加载最新批次边界时停止，而不是重复走到尾部
+- 修复只读副本滞后导致的"Session not found"临时 404 重试 —— 服务端 404 缓存窗口从 30 秒降到 3 秒
+
+### 改进
+- 统一 9 种语言的 XHigh 描述，明确标注支持范围（仅 Opus 4.7 · Codex GPT-5 系列），Sonnet / Opus 4.6 / Haiku 的用户现在能理解为什么看不到该选项
+- 长会话初次加载提速约 5 倍 —— 消息分页 size 从 100 提高到服务端上限 500
+
 ## 2.14.0 - 2026-04-21
 
 重新设计的 Session 进度面板（Glass UI）、统一侧栏与独立 Code Changes 视图、按轮次的 Knowledge 生命周期与 hot/evicted 徽章、无需重启的归档恢复、全新重构的 AI Profile 设置 UI，以及对核心页面 loading / error / empty 三态的最终视觉统一。

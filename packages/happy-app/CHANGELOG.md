@@ -1,5 +1,18 @@
 # Changelog
 
+## 2.14.1 - 2026-04-24
+
+Restored the XHigh reasoning option for Opus 4.7 sessions, and fixed long-session message loading so refreshes on PC Web reliably fill in all history.
+
+### Fixed
+- Fixed the XHigh effort option going missing when the Claude SDK did not report `supportedEffortLevels` — it is now force-surfaced for Opus 4.7 (including the 1M variant)
+- Fixed long sessions never finishing their initial load on PC Web: the backfill cursor is now persisted after each batch so interrupted fetches resume instead of restarting from scratch, and forward pagination stops at the edge of the already-loaded newest batch instead of re-walking the tail
+- Fixed transient "session not found" retries caused by read-replica lag — the server's 404 cache window dropped from 30 seconds to 3 seconds
+
+### Improved
+- Clarified the XHigh description across all nine languages to call out the supported models (Opus 4.7 · Codex GPT-5 only), so users on Sonnet / Opus 4.6 / Haiku understand why the option is not offered
+- Sped up first-load of long sessions about 5x by raising the message page size from 100 to 500 (the server cap)
+
 ## 2.14.0 - 2026-04-21
 
 Redesigned session progress panel with glass UI, a unified side-panel with dedicated code-changes view, per-turn knowledge lifespan with hot/evicted badges, unarchive without restart, a rebuilt AI profile settings UI, and final visual polish for loading / error / empty states across core app surfaces.

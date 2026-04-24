@@ -2,6 +2,19 @@
   "entries": {
     "en": [
       {
+        "version": "2.14.1",
+        "date": "2026-04-24",
+        "summary": "Restored the XHigh reasoning option for Opus 4.7 sessions, and fixed long-session message loading so refreshes on PC Web reliably fill in all history.",
+        "changes": [
+          "Fixed the XHigh effort option going missing when the Claude SDK did not report `supportedEffortLevels` — it is now force-surfaced for Opus 4.7 (including the 1M variant)",
+          "Fixed long sessions never finishing their initial load on PC Web: the backfill cursor is now persisted after each batch so interrupted fetches resume instead of restarting from scratch, and forward pagination stops at the edge of the already-loaded newest batch instead of re-walking the tail",
+          "Fixed transient \"session not found\" retries caused by read-replica lag — the server's 404 cache window dropped from 30 seconds to 3 seconds",
+          "Clarified the XHigh description across all nine languages to call out the supported models (Opus 4.7 · Codex GPT-5 only), so users on Sonnet / Opus 4.6 / Haiku understand why the option is not offered",
+          "Sped up first-load of long sessions about 5x by raising the message page size from 100 to 500 (the server cap)"
+        ],
+        "rawMarkdown": "## 2.14.1 - 2026-04-24\n\n\nRestored the XHigh reasoning option for Opus 4.7 sessions, and fixed long-session message loading so refreshes on PC Web reliably fill in all history.\n\n### Fixed\n- Fixed the XHigh effort option going missing when the Claude SDK did not report `supportedEffortLevels` — it is now force-surfaced for Opus 4.7 (including the 1M variant)\n- Fixed long sessions never finishing their initial load on PC Web: the backfill cursor is now persisted after each batch so interrupted fetches resume instead of restarting from scratch, and forward pagination stops at the edge of the already-loaded newest batch instead of re-walking the tail\n- Fixed transient \"session not found\" retries caused by read-replica lag — the server's 404 cache window dropped from 30 seconds to 3 seconds\n\n### Improved\n- Clarified the XHigh description across all nine languages to call out the supported models (Opus 4.7 · Codex GPT-5 only), so users on Sonnet / Opus 4.6 / Haiku understand why the option is not offered\n- Sped up first-load of long sessions about 5x by raising the message page size from 100 to 500 (the server cap)"
+      },
+      {
         "version": "2.14.0",
         "date": "2026-04-21",
         "summary": "Redesigned session progress panel with glass UI, a unified side-panel with dedicated code-changes view, per-turn knowledge lifespan with hot/evicted badges, unarchive without restart, a rebuilt AI profile settings UI, and final visual polish for loading / error / empty states across core app surfaces.",
@@ -554,6 +567,19 @@
     ],
     "zh-Hans": [
       {
+        "version": "2.14.1",
+        "date": "2026-04-24",
+        "summary": "恢复 Opus 4.7 会话中的 XHigh 推理强度选项，同时修复 PC Web 长会话刷新后历史消息加载不完整的问题。",
+        "changes": [
+          "修复 Claude SDK 未上报 `supportedEffortLevels` 时 XHigh 选项消失的问题 —— 现已为 Opus 4.7（含 1M 变体）强制保留",
+          "修复 PC Web 长会话始终无法完成初次加载：回填游标现在每批持久化，断点续传而不是从头重跑；向前分页在命中已加载最新批次边界时停止，而不是重复走到尾部",
+          "修复只读副本滞后导致的\"Session not found\"临时 404 重试 —— 服务端 404 缓存窗口从 30 秒降到 3 秒",
+          "统一 9 种语言的 XHigh 描述，明确标注支持范围（仅 Opus 4.7 · Codex GPT-5 系列），Sonnet / Opus 4.6 / Haiku 的用户现在能理解为什么看不到该选项",
+          "长会话初次加载提速约 5 倍 —— 消息分页 size 从 100 提高到服务端上限 500"
+        ],
+        "rawMarkdown": "## 2.14.1 - 2026-04-24\n\n\n恢复 Opus 4.7 会话中的 XHigh 推理强度选项，同时修复 PC Web 长会话刷新后历史消息加载不完整的问题。\n\n### 修复\n- 修复 Claude SDK 未上报 `supportedEffortLevels` 时 XHigh 选项消失的问题 —— 现已为 Opus 4.7（含 1M 变体）强制保留\n- 修复 PC Web 长会话始终无法完成初次加载：回填游标现在每批持久化，断点续传而不是从头重跑；向前分页在命中已加载最新批次边界时停止，而不是重复走到尾部\n- 修复只读副本滞后导致的\"Session not found\"临时 404 重试 —— 服务端 404 缓存窗口从 30 秒降到 3 秒\n\n### 改进\n- 统一 9 种语言的 XHigh 描述，明确标注支持范围（仅 Opus 4.7 · Codex GPT-5 系列），Sonnet / Opus 4.6 / Haiku 的用户现在能理解为什么看不到该选项\n- 长会话初次加载提速约 5 倍 —— 消息分页 size 从 100 提高到服务端上限 500"
+      },
+      {
         "version": "2.14.0",
         "date": "2026-04-21",
         "summary": "重新设计的 Session 进度面板（Glass UI）、统一侧栏与独立 Code Changes 视图、按轮次的 Knowledge 生命周期与 hot/evicted 徽章、无需重启的归档恢复、全新重构的 AI Profile 设置 UI，以及对核心页面 loading / error / empty 三态的最终视觉统一。",
@@ -1085,7 +1111,7 @@
       }
     ]
   },
-  "latestVersion": "2.14.0",
+  "latestVersion": "2.14.1",
   "availableLocales": [
     "en",
     "zh-Hans"
