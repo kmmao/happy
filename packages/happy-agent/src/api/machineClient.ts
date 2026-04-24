@@ -85,6 +85,10 @@ export type EphemeralEvent =
       projectId?: string;
       resultToken?: string;
       skillContents?: Array<{ name: string; content: string }>;
+      agentType?: string | null;
+      modelOverride?: string | null;
+      profileId?: string;
+      runtimeProfile?: import("@kmmao/happy-wire").ResolvedRuntimeProfile;
     };
 
 export type MachineClientOptions = {

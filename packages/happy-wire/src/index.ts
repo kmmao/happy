@@ -10,6 +10,7 @@ export * from './inbox';
 export * from './sessionEvents';
 export * from './terminal';
 export * from './profile';
+export * from './runtimeProfileEnvKeys';
 export * from './sessionState';
 export * from './happyMcp';
 export * from './codexBackendSelection';

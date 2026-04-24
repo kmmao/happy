@@ -108,6 +108,8 @@ export async function runTaskJob(
     directory: resolvedDirectory,
     approvedNewDirectoryCreation: false,
     agent: agentType,
+    profileId: data.profileId,
+    runtimeProfile: data.runtimeProfile,
     automationContext: {
       kind: "task",
       trigger: "task",
@@ -115,6 +117,10 @@ export async function runTaskJob(
       dedupeKey: `task:${data.taskId}`,
     },
     environmentVariables: {
+      // Profile-resolved env (provider base URL / auth / model mappings,
+      // plus any HAPPY_* profile-derived vars) is applied first so that
+      // task-specific overrides below still win.
+      ...(data.runtimeProfile?.environmentVariables ?? {}),
       HAPPY_INITIAL_PROMPT_FILE: promptFilePath,
       HAPPY_TASK_ID: data.taskId,
       HAPPY_TASK_PRIORITY: data.priority,

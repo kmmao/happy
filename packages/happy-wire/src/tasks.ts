@@ -1,4 +1,5 @@
 import * as z from "zod";
+import { ResolvedRuntimeProfileSchema } from "./profile";
 
 // ===== Task Priority =====
 export const TaskPrioritySchema = z.enum([
@@ -77,6 +78,14 @@ export const TaskTriggerDataSchema = z.object({
   })).optional(),
   agentType: z.string().nullable().optional(),    // "claude" | "codex" | "gemini" — null = inherit CLI default
   modelOverride: z.string().nullable().optional(), // e.g. "claude-sonnet-4-20250514" — null = agent default
+  // Profile binding for this task. `profileId` references the AIBackendProfile
+  // selected when the task was created (Task.profileId column). `runtimeProfile`
+  // is the resolved snapshot (env vars, startup script, permission mode, etc.)
+  // that the CLI should honor when spawning the session. Both optional for
+  // backward compatibility; starting from wire 0.14.0 + server unified resolver
+  // these are always populated for scheduled/webhook/manual tasks.
+  profileId: z.string().optional(),
+  runtimeProfile: ResolvedRuntimeProfileSchema.optional(),
 });
 export type TaskTriggerData = z.infer<typeof TaskTriggerDataSchema>;
 

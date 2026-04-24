@@ -2630,7 +2630,12 @@ export async function startDaemon(): Promise<void> {
           directory: data.directory,
           priority: data.priority as "urgent" | "user" | "background",
           projectId: data.projectId,
+          resultToken: data.resultToken,
           skillContents: data.skillContents,
+          agentType: data.agentType,
+          modelOverride: data.modelOverride,
+          profileId: data.profileId,
+          runtimeProfile: data.runtimeProfile,
         })
         .then((result) => {
           if (!result.deduped) {

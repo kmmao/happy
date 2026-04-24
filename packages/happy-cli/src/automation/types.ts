@@ -1,3 +1,4 @@
+import type { ResolvedRuntimeProfile } from "@kmmao/happy-wire";
 import type {
   SupervisorTriggerData,
   WebhookTriggerData,
@@ -84,6 +85,12 @@ export interface TaskTriggerData {
   skillContents?: Array<{ name: string; content: string }>;
   agentType?: string | null;    // "claude" | "codex" | "gemini" — null = inherit CLI default
   modelOverride?: string | null; // e.g. "claude-sonnet-4-20250514" — null = agent default
+  // Profile binding resolved server-side. `profileId` references the
+  // AiBackendProfile (or built-in id); `runtimeProfile` carries the resolved
+  // env vars + metadata that should govern the spawned session. See
+  // packages/happy-wire/src/tasks.ts (wire 0.14.0+).
+  profileId?: string;
+  runtimeProfile?: ResolvedRuntimeProfile;
 }
 
 export type AutomationJobKind = "supervisor" | "webhook" | "agent_loop" | "task";

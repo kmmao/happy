@@ -7,6 +7,7 @@
 import { writeFile, mkdir } from "fs/promises";
 import { join } from "path";
 import { tmpdir } from "os";
+import type { ResolvedRuntimeProfile } from "@kmmao/happy-wire";
 import { logger } from "../logger";
 import { spawnSession } from "./spawnSession";
 import type { MachineClient } from "../api/machineClient";
@@ -54,6 +55,12 @@ export interface TaskTriggerData {
   skillContents?: Array<{ name: string; content: string }>;
   agentType?: string | null;    // "claude" | "codex" | "gemini" — null = inherit default
   modelOverride?: string | null; // e.g. "claude-sonnet-4-20250514" — null = agent default
+  // Profile binding resolved server-side. `profileId` references the
+  // AiBackendProfile (or built-in id); `runtimeProfile` carries the resolved
+  // env vars + metadata to govern the spawned session. See
+  // packages/happy-wire/src/tasks.ts (wire 0.14.0+).
+  profileId?: string;
+  runtimeProfile?: ResolvedRuntimeProfile;
 }
 
 const PROMPT_DIR = join(tmpdir(), "happy", "agent-prompts");
@@ -247,6 +254,8 @@ export function handleTaskTrigger(
         approvedNewDirectoryCreation: true,
         automationContext: { kind: "task", trigger: "task-dispatch", projectId: data.projectId },
         environmentVariables: {
+          // Profile-resolved env applied first so task-specific overrides win.
+          ...(data.runtimeProfile?.environmentVariables ?? {}),
           HAPPY_INITIAL_PROMPT_FILE: promptFile,
           HAPPY_TASK_ID: data.taskId,
           HAPPY_TASK_PRIORITY: data.priority,

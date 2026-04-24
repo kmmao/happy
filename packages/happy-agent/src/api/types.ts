@@ -163,6 +163,10 @@ export interface ServerToClientEvents {
           projectId?: string;
           resultToken?: string;
           skillContents?: Array<{ name: string; content: string }>;
+          agentType?: string | null;
+          modelOverride?: string | null;
+          profileId?: string;
+          runtimeProfile?: import("@kmmao/happy-wire").ResolvedRuntimeProfile;
         },
   ) => void;
   auth: (data: { success: boolean; user: string }) => void;
