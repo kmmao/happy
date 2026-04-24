@@ -13,7 +13,14 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { Text } from "@/components/StyledText";
 import { Ionicons } from "@expo/vector-icons";
-import { machineBash, machineCleanRunawayProcesses, machineKillProcess } from "@/sync/ops";
+import {
+    machineBash,
+    machineCleanRunawayProcesses,
+    machineCleanStaleSessions,
+    machineKillProcess,
+    machineListStaleSessions,
+    type StaleSessionInfo,
+} from "@/sync/ops";
 import { Modal } from "@/modal";
 import { layout } from "@/components/layout";
 import { t } from "@/text";
@@ -303,6 +310,7 @@ export default React.memo(function DiagnosticsPage() {
     const router = useRouter();
     const { processes, isLoading, error, scan } = useHappyProcesses(machineId);
     const [isCleaning, setIsCleaning] = React.useState(false);
+    const [isSmartCleaning, setIsSmartCleaning] = React.useState(false);
 
     const handleOpenSession = React.useCallback((sessionId: string) => {
         router.push(`/session/${sessionId}` as any);
@@ -320,6 +328,69 @@ export default React.memo(function DiagnosticsPage() {
             await scan();
         } else {
             Modal.alert(t("common.error"), result.error || result.stderr || "Failed");
+        }
+    }, [machineId, scan]);
+
+    const handleSmartClean = React.useCallback(async () => {
+        setIsSmartCleaning(true);
+        try {
+            const list = await machineListStaleSessions(machineId!);
+            if (!list.success) {
+                Modal.alert(
+                    t("common.error"),
+                    list.error || t("diagnostics.smartCleanFailed"),
+                );
+                return;
+            }
+            if (list.stale.length === 0) {
+                Modal.alert(
+                    t("common.success"),
+                    t("diagnostics.smartCleanEmpty"),
+                );
+                return;
+            }
+            // Preview up to 5 entries so the confirmation makes the impact visible.
+            const previewLines = list.stale
+                .slice(0, 5)
+                .map((s: StaleSessionInfo) => {
+                    const parts: string[] = [`PID ${s.pid}`, s.reason];
+                    if (s.silentMs !== undefined) {
+                        parts.push(`silent ${Math.round(s.silentMs / 1000)}s`);
+                    }
+                    if (s.happySessionId) {
+                        parts.push(s.happySessionId.slice(0, 8));
+                    } else if (s.spawnId) {
+                        parts.push(`sp:${s.spawnId.slice(0, 8)}`);
+                    }
+                    return parts.join(" · ");
+                });
+            const suffix =
+                list.stale.length > 5
+                    ? `\n… +${list.stale.length - 5} more`
+                    : "";
+            const confirmed = await Modal.confirm(
+                t("diagnostics.smartCleanConfirmTitle"),
+                `${t("diagnostics.smartCleanConfirmMessage", { count: list.stale.length })}\n\n${previewLines.join("\n")}${suffix}`,
+            );
+            if (!confirmed) return;
+            const pids = list.stale.map((s: StaleSessionInfo) => s.pid);
+            const cleaned = await machineCleanStaleSessions(machineId!, pids);
+            if (!cleaned.success) {
+                Modal.alert(
+                    t("common.error"),
+                    cleaned.error || t("diagnostics.smartCleanFailed"),
+                );
+                return;
+            }
+            Modal.alert(
+                t("common.success"),
+                t("diagnostics.smartCleanSuccess", { killed: cleaned.killed }),
+            );
+            await scan();
+        } catch {
+            Modal.alert(t("common.error"), t("diagnostics.smartCleanFailed"));
+        } finally {
+            setIsSmartCleaning(false);
         }
     }, [machineId, scan]);
 
@@ -394,6 +465,28 @@ export default React.memo(function DiagnosticsPage() {
                             ) : (
                                 <Ionicons name="refresh-outline" size={16} color={theme.colors.text} />
                             )}
+                        </Pressable>
+                        {/* Smart clean — lists stale entries from daemon's tracked registry
+                            and kills only the confirmed ones; safer than Clean Runaway. */}
+                        <Pressable
+                            onPress={handleSmartClean}
+                            disabled={isSmartCleaning}
+                            style={({ pressed }) => [
+                                pageStyles.headerBtn,
+                                {
+                                    backgroundColor: theme.colors.text + "18",
+                                    opacity: pressed || isSmartCleaning ? 0.6 : 1,
+                                },
+                            ]}
+                        >
+                            {isSmartCleaning ? (
+                                <ActivityIndicator size="small" color={theme.colors.text} />
+                            ) : (
+                                <Ionicons name="flash-outline" size={16} color={theme.colors.text} />
+                            )}
+                            <Text style={[pageStyles.cleanBtnText, { color: theme.colors.text }]}>
+                                {t("diagnostics.smartClean")}
+                            </Text>
                         </Pressable>
                         {/* Clean runaway */}
                         {runawayCount > 0 && (

@@ -3645,6 +3645,14 @@ export const ru: TranslationStructure = {
     cleanSuccess: ({ killed }: { killed: number }) =>
       `Очищено ${killed} процесс${killed === 1 ? "" : killed < 5 ? "а" : "ов"}`,
     cleanFailed: "Не удалось очистить процессы",
+    smartClean: "Smart Clean",
+    smartCleanEmpty: "No stale sessions detected",
+    smartCleanConfirmTitle: "Clean Stale Sessions",
+    smartCleanConfirmMessage: ({ count }: { count: number }) =>
+      `Kill ${count} stale session${count !== 1 ? "s" : ""}?`,
+    smartCleanSuccess: ({ killed }: { killed: number }) =>
+      `Cleaned up ${killed} stale session${killed !== 1 ? "s" : ""}`,
+    smartCleanFailed: "Failed to clean stale sessions",
     killConfirmTitle: "Завершить процесс",
     killConfirmMessage: ({ pid }: { pid: number }) => `Завершить процесс PID ${pid}?`,
     typeDaemon: "Daemon",

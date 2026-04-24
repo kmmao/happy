@@ -3627,6 +3627,14 @@ export const en = {
     cleanSuccess: ({ killed }: { killed: number }) =>
       `Cleaned up ${killed} process${killed !== 1 ? "es" : ""}`,
     cleanFailed: "Failed to clean processes",
+    smartClean: "Smart Clean",
+    smartCleanEmpty: "No stale sessions detected",
+    smartCleanConfirmTitle: "Clean Stale Sessions",
+    smartCleanConfirmMessage: ({ count }: { count: number }) =>
+      `Kill ${count} stale session${count !== 1 ? "s" : ""}?`,
+    smartCleanSuccess: ({ killed }: { killed: number }) =>
+      `Cleaned up ${killed} stale session${killed !== 1 ? "s" : ""}`,
+    smartCleanFailed: "Failed to clean stale sessions",
     killConfirmTitle: "Kill Process",
     killConfirmMessage: ({ pid }: { pid: number }) => `Kill process PID ${pid}?`,
     typeDaemon: "Daemon",

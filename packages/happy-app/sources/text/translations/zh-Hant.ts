@@ -3527,6 +3527,13 @@ export const zhHant: TranslationStructure = {
     cleanConfirmMessage: "終止所有孤立的 daemon 和會話程序？",
     cleanSuccess: ({ killed }: { killed: number }) => `已清理 ${killed} 個程序`,
     cleanFailed: "清理程序失敗",
+    smartClean: "智慧清理",
+    smartCleanEmpty: "未偵測到殭屍會話",
+    smartCleanConfirmTitle: "清理殭屍會話",
+    smartCleanConfirmMessage: ({ count }: { count: number }) =>
+      `終止 ${count} 個殭屍會話？`,
+    smartCleanSuccess: ({ killed }: { killed: number }) => `已清理 ${killed} 個殭屍會話`,
+    smartCleanFailed: "清理殭屍會話失敗",
     killConfirmTitle: "終止程序",
     killConfirmMessage: ({ pid }: { pid: number }) => `終止 PID ${pid} 程序？`,
     typeDaemon: "Daemon",

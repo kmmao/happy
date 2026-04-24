@@ -3631,6 +3631,14 @@ export const ca: TranslationStructure = {
     cleanSuccess: ({ killed }: { killed: number }) =>
       `S'han netejat ${killed} procés${killed !== 1 ? "sos" : ""}`,
     cleanFailed: "Error en netejar processos",
+    smartClean: "Smart Clean",
+    smartCleanEmpty: "No stale sessions detected",
+    smartCleanConfirmTitle: "Clean Stale Sessions",
+    smartCleanConfirmMessage: ({ count }: { count: number }) =>
+      `Kill ${count} stale session${count !== 1 ? "s" : ""}?`,
+    smartCleanSuccess: ({ killed }: { killed: number }) =>
+      `Cleaned up ${killed} stale session${killed !== 1 ? "s" : ""}`,
+    smartCleanFailed: "Failed to clean stale sessions",
     killConfirmTitle: "Finalitzar procés",
     killConfirmMessage: ({ pid }: { pid: number }) => `Finalitzar el procés PID ${pid}?`,
     typeDaemon: "Daemon",

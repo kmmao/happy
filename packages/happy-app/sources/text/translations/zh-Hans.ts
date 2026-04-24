@@ -3525,6 +3525,13 @@ export const zhHans: TranslationStructure = {
     cleanConfirmMessage: "终止所有孤立的 daemon 和会话进程？",
     cleanSuccess: ({ killed }: { killed: number }) => `已清理 ${killed} 个进程`,
     cleanFailed: "清理进程失败",
+    smartClean: "智能清理",
+    smartCleanEmpty: "未检测到僵尸会话",
+    smartCleanConfirmTitle: "清理僵尸会话",
+    smartCleanConfirmMessage: ({ count }: { count: number }) =>
+      `终止 ${count} 个僵尸会话？`,
+    smartCleanSuccess: ({ killed }: { killed: number }) => `已清理 ${killed} 个僵尸会话`,
+    smartCleanFailed: "清理僵尸会话失败",
     killConfirmTitle: "终止进程",
     killConfirmMessage: ({ pid }: { pid: number }) => `终止 PID ${pid} 进程？`,
     typeDaemon: "Daemon",

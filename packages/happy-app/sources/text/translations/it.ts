@@ -3625,6 +3625,14 @@ export const it: TranslationStructure = {
     cleanSuccess: ({ killed }: { killed: number }) =>
       `Puliti ${killed} processo${killed !== 1 ? "i" : ""}`,
     cleanFailed: "Pulizia processi non riuscita",
+    smartClean: "Smart Clean",
+    smartCleanEmpty: "No stale sessions detected",
+    smartCleanConfirmTitle: "Clean Stale Sessions",
+    smartCleanConfirmMessage: ({ count }: { count: number }) =>
+      `Kill ${count} stale session${count !== 1 ? "s" : ""}?`,
+    smartCleanSuccess: ({ killed }: { killed: number }) =>
+      `Cleaned up ${killed} stale session${killed !== 1 ? "s" : ""}`,
+    smartCleanFailed: "Failed to clean stale sessions",
     killConfirmTitle: "Termina processo",
     killConfirmMessage: ({ pid }: { pid: number }) => `Terminare il processo PID ${pid}?`,
     typeDaemon: "Daemon",

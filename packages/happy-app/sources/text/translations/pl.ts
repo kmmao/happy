@@ -3647,6 +3647,14 @@ export const pl: TranslationStructure = {
     cleanSuccess: ({ killed }: { killed: number }) =>
       `Wyczyszczono ${killed} proces${killed === 1 ? "" : killed < 5 ? "y" : "ów"}`,
     cleanFailed: "Nie udało się wyczyścić procesów",
+    smartClean: "Smart Clean",
+    smartCleanEmpty: "No stale sessions detected",
+    smartCleanConfirmTitle: "Clean Stale Sessions",
+    smartCleanConfirmMessage: ({ count }: { count: number }) =>
+      `Kill ${count} stale session${count !== 1 ? "s" : ""}?`,
+    smartCleanSuccess: ({ killed }: { killed: number }) =>
+      `Cleaned up ${killed} stale session${killed !== 1 ? "s" : ""}`,
+    smartCleanFailed: "Failed to clean stale sessions",
     killConfirmTitle: "Zakończ proces",
     killConfirmMessage: ({ pid }: { pid: number }) => `Zakończyć proces PID ${pid}?`,
     typeDaemon: "Daemon",

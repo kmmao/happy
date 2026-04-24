@@ -3599,6 +3599,14 @@ export const ja: TranslationStructure = {
     cleanConfirmMessage: "孤立したdaemonとセッションプロセスを終了しますか？",
     cleanSuccess: ({ killed }: { killed: number }) => `${killed}件のプロセスをクリーンしました`,
     cleanFailed: "プロセスのクリーンに失敗しました",
+    smartClean: "Smart Clean",
+    smartCleanEmpty: "No stale sessions detected",
+    smartCleanConfirmTitle: "Clean Stale Sessions",
+    smartCleanConfirmMessage: ({ count }: { count: number }) =>
+      `Kill ${count} stale session${count !== 1 ? "s" : ""}?`,
+    smartCleanSuccess: ({ killed }: { killed: number }) =>
+      `Cleaned up ${killed} stale session${killed !== 1 ? "s" : ""}`,
+    smartCleanFailed: "Failed to clean stale sessions",
     killConfirmTitle: "プロセスを終了",
     killConfirmMessage: ({ pid }: { pid: number }) => `PID ${pid}のプロセスを終了しますか？`,
     typeDaemon: "Daemon",
