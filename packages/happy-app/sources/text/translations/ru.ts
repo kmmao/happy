@@ -2351,6 +2351,8 @@ export const ru: TranslationStructure = {
     prompt: "Промпт",
     promptPlaceholder: "Опишите задачу...",
     webhookPromptHint: "Используйте {{payload}} для вставки тела запроса",
+    profileSection: "AI Backend Profile",
+    profileDesc: "Необязательно. Закрепить триггер за конкретным Profile. По умолчанию используется Profile проекта.",
     nextRunAt: "Следующий запуск",
     lastRunAt: "Последний запуск",
     runCount: ({ count }: { count: number }) => `${count} запусков`,

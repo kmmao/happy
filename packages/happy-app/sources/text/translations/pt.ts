@@ -2353,6 +2353,8 @@ export const pt: TranslationStructure = {
     prompt: "Prompt",
     promptPlaceholder: "Descreva a tarefa...",
     webhookPromptHint: "Use {{payload}} para incluir o corpo do webhook",
+    profileSection: "AI Backend Profile",
+    profileDesc: "Opcional. Fixe este gatilho em um Profile específico. Mantenha no padrão para herdar o do projeto.",
     nextRunAt: "Próxima execução",
     lastRunAt: "Última execução",
     runCount: ({ count }: { count: number }) => `${count} execuções`,

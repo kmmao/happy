@@ -2472,6 +2472,8 @@ export const ja: TranslationStructure = {
     prompt: "プロンプト",
     promptPlaceholder: "タスクを説明...",
     webhookPromptHint: "{{payload}} で Webhook の本文を挿入",
+    profileSection: "AI Backend Profile",
+    profileDesc: "任意設定。このトリガーを特定の Profile に固定します。デフォルトのままならプロジェクトの既定を継承します。",
     nextRunAt: "次回実行",
     lastRunAt: "前回実行",
     runCount: ({ count }: { count: number }) => `${count} 回実行`,

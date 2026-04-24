@@ -14,6 +14,10 @@ const CreateTriggerScheduleBodySchema = z.object({
     cronExpression: z.string().min(1),
     priority: TaskPrioritySchema.default("background"),
     skillIds: z.array(z.string()).max(10).default([]),
+    // Profile binding (wire 0.14.0). Business key — built-in id or
+    // AiBackendProfile.profileKey. Resolved server-side by
+    // triggerScheduleRunner (C4) when the cron fires.
+    profileId: z.string().optional(),
 });
 
 const UpdateTriggerScheduleBodySchema = z.object({
@@ -22,6 +26,7 @@ const UpdateTriggerScheduleBodySchema = z.object({
     cronExpression: z.string().min(1).optional(),
     priority: TaskPrioritySchema.optional(),
     skillIds: z.array(z.string()).max(10).optional(),
+    profileId: z.string().nullable().optional(),
 });
 
 const QueryTriggerSchedulesSchema = z.object({
@@ -59,7 +64,7 @@ export function triggerScheduleRoutes(app: Fastify) {
         },
         async (request, reply) => {
             const userId = request.userId;
-            const { machineId, projectId, name, prompt, cronExpression, priority, skillIds } = request.body;
+            const { machineId, projectId, name, prompt, cronExpression, priority, skillIds, profileId } = request.body;
 
             // Validate cron expression
             const nextRunAt = computeNextRunAt(cronExpression);
@@ -98,6 +103,7 @@ export function triggerScheduleRoutes(app: Fastify) {
                     priority,
                     skillIds: JSON.stringify(skillIds),
                     nextRunAt,
+                    profileId: profileId ?? null,
                 },
             });
 
@@ -174,13 +180,14 @@ export function triggerScheduleRoutes(app: Fastify) {
                 return reply.code(404).send({ error: "Trigger schedule not found" });
             }
 
-            const { name, prompt, cronExpression, priority, skillIds } = request.body;
+            const { name, prompt, cronExpression, priority, skillIds, profileId } = request.body;
             const data: Record<string, unknown> = {};
 
             if (name !== undefined) data.name = name;
             if (prompt !== undefined) data.prompt = prompt;
             if (priority !== undefined) data.priority = priority;
             if (skillIds !== undefined) data.skillIds = JSON.stringify(skillIds);
+            if (profileId !== undefined) data.profileId = profileId;
 
             if (cronExpression !== undefined) {
                 const nextRunAt = computeNextRunAt(cronExpression);
@@ -281,6 +288,7 @@ function serializeTriggerSchedule(schedule: Record<string, unknown>): Record<str
         lastRunAt: Date | null;
         lastTaskId: string | null;
         runCount: number;
+        profileId: string | null;
         createdAt: Date;
         updatedAt: Date;
     };
@@ -299,6 +307,7 @@ function serializeTriggerSchedule(schedule: Record<string, unknown>): Record<str
         lastRunAt: s.lastRunAt?.getTime() ?? null,
         lastTaskId: s.lastTaskId,
         runCount: s.runCount,
+        profileId: s.profileId,
         createdAt: s.createdAt.getTime(),
         updatedAt: s.updatedAt.getTime(),
     };

@@ -16,6 +16,7 @@ export interface ServerTriggerSchedule {
     lastRunAt: number | null;
     lastTaskId: string | null;
     runCount: number;
+    profileId: string | null;
     createdAt: number;
     updatedAt: number;
 }
@@ -78,6 +79,7 @@ export async function createTriggerSchedule(
         priority?: string;
         projectId?: string;
         skillIds?: string[];
+        profileId?: string;
     },
 ): Promise<ServerTriggerSchedule> {
     const API_ENDPOINT = getServerUrl();
@@ -106,6 +108,7 @@ export async function updateTriggerSchedule(
         cronExpression?: string;
         priority?: string;
         skillIds?: string[];
+        profileId?: string | null;
     },
 ): Promise<ServerTriggerSchedule> {
     const API_ENDPOINT = getServerUrl();

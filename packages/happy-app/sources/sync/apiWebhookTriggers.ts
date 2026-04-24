@@ -14,6 +14,7 @@ export interface ServerWebhookTrigger {
     skillIds: string[];
     lastTriggeredAt: number | null;
     triggerCount: number;
+    profileId: string | null;
     createdAt: number;
     updatedAt: number;
 }
@@ -81,6 +82,7 @@ export async function createWebhookTrigger(
         priority?: string;
         projectId?: string;
         skillIds?: string[];
+        profileId?: string;
     },
 ): Promise<{ webhookTrigger: ServerWebhookTrigger; secret: string }> {
     const API_ENDPOINT = getServerUrl();
@@ -108,6 +110,7 @@ export async function updateWebhookTrigger(
         priority?: string;
         enabled?: boolean;
         skillIds?: string[];
+        profileId?: string | null;
     },
 ): Promise<ServerWebhookTrigger> {
     const API_ENDPOINT = getServerUrl();

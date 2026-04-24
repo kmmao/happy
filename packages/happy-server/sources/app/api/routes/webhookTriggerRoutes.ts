@@ -23,6 +23,10 @@ const CreateWebhookTriggerBodySchema = z.object({
     prompt: z.string().min(1),
     priority: TaskPrioritySchema.default("background"),
     skillIds: z.array(z.string()).max(10).default([]),
+    // Profile binding (wire 0.14.0). Business key — built-in id or
+    // AiBackendProfile.profileKey. When null/omitted the inbound handler
+    // falls back to project default via runtimeProfileResolver (C4).
+    profileId: z.string().optional(),
 });
 
 const UpdateWebhookTriggerBodySchema = z.object({
@@ -31,6 +35,7 @@ const UpdateWebhookTriggerBodySchema = z.object({
     priority: TaskPrioritySchema.optional(),
     enabled: z.boolean().optional(),
     skillIds: z.array(z.string()).max(10).optional(),
+    profileId: z.string().nullable().optional(),
 });
 
 const QueryWebhookTriggersSchema = z.object({
@@ -242,7 +247,7 @@ export function webhookTriggerRoutes(app: Fastify) {
         },
         async (request, reply) => {
             const userId = request.userId;
-            const { machineId, projectId, name, slug, prompt, priority, skillIds } = request.body;
+            const { machineId, projectId, name, slug, prompt, priority, skillIds, profileId } = request.body;
 
             // Verify machine
             const machine = await db.machine.findFirst({
@@ -286,6 +291,7 @@ export function webhookTriggerRoutes(app: Fastify) {
                     prompt,
                     priority,
                     skillIds: JSON.stringify(skillIds),
+                    profileId: profileId ?? null,
                 },
             });
 
@@ -365,7 +371,7 @@ export function webhookTriggerRoutes(app: Fastify) {
                 return reply.code(404).send({ error: "Webhook trigger not found" });
             }
 
-            const { name, prompt, priority, enabled, skillIds } = request.body;
+            const { name, prompt, priority, enabled, skillIds, profileId } = request.body;
             const data: Record<string, unknown> = {};
 
             if (name !== undefined) data.name = name;
@@ -373,6 +379,7 @@ export function webhookTriggerRoutes(app: Fastify) {
             if (priority !== undefined) data.priority = priority;
             if (enabled !== undefined) data.enabled = enabled;
             if (skillIds !== undefined) data.skillIds = JSON.stringify(skillIds);
+            if (profileId !== undefined) data.profileId = profileId;
 
             const updated = await db.webhookTrigger.update({
                 where: { id: trigger.id },
@@ -447,6 +454,7 @@ function serializeWebhookTrigger(trigger: Record<string, unknown>): Record<strin
         skillIds: string;
         lastTriggeredAt: Date | null;
         triggerCount: number;
+        profileId: string | null;
         createdAt: Date;
         updatedAt: Date;
     };
@@ -463,6 +471,7 @@ function serializeWebhookTrigger(trigger: Record<string, unknown>): Record<strin
         skillIds: safeParseJsonArray(t.skillIds),
         lastTriggeredAt: t.lastTriggeredAt?.getTime() ?? null,
         triggerCount: t.triggerCount,
+        profileId: t.profileId,
         createdAt: t.createdAt.getTime(),
         updatedAt: t.updatedAt.getTime(),
     };

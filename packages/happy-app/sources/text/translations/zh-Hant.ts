@@ -2295,6 +2295,8 @@ export const zhHant: TranslationStructure = {
     prompt: "提示詞",
     promptPlaceholder: "描述任務...",
     webhookPromptHint: "使用 {{payload}} 插入 Webhook 請求內容",
+    profileSection: "AI Backend Profile",
+    profileDesc: "可選。將此觸發器綁定到指定 Profile。保持預設則繼承專案預設。",
     nextRunAt: "下次執行",
     lastRunAt: "上次執行",
     runCount: ({ count }: { count: number }) => `${count} 次執行`,

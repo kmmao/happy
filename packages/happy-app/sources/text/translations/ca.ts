@@ -2356,6 +2356,8 @@ export const ca: TranslationStructure = {
     prompt: "Prompt",
     promptPlaceholder: "Descriu la tasca...",
     webhookPromptHint: "Usa {{payload}} per incloure el cos del webhook",
+    profileSection: "AI Backend Profile",
+    profileDesc: "Opcional. Fixa aquest disparador a un Profile específic. Deixa-ho en predeterminat per heretar el del projecte.",
     nextRunAt: "Propera execució",
     lastRunAt: "Última execució",
     runCount: ({ count }: { count: number }) => `${count} execucions`,

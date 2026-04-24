@@ -2491,6 +2491,8 @@ export const it: TranslationStructure = {
     prompt: "Prompt",
     promptPlaceholder: "Descrivi l'attività...",
     webhookPromptHint: "Usa {{payload}} per includere il corpo del webhook",
+    profileSection: "AI Backend Profile",
+    profileDesc: "Opzionale. Vincola questo trigger a un Profile specifico. Lascia su predefinito per ereditare quello del progetto.",
     nextRunAt: "Prossima esecuzione",
     lastRunAt: "Ultima esecuzione",
     runCount: ({ count }: { count: number }) => `${count} esecuzioni`,

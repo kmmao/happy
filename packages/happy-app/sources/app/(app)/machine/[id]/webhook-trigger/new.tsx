@@ -16,6 +16,10 @@ import { Modal } from "@/modal";
 import { t } from "@/text";
 import { Ionicons } from "@expo/vector-icons";
 import { SkillPickerModal } from "../SkillPickerModal";
+import { ProfilePicker } from "@/components/ProfilePicker";
+import { useSettings } from "@/sync/storage";
+import { DEFAULT_PROFILES } from "@/sync/profileUtils";
+import { getSupervisorAvailableProfiles } from "@/components/project/supervisorProfileSelection";
 
 const PRIORITIES = ["background", "user", "urgent"] as const;
 
@@ -40,6 +44,21 @@ function NewWebhookTriggerPage() {
     const [selectedSkillIds, setSelectedSkillIds] = React.useState<string[]>([]);
     const [selectedSkillNames, setSelectedSkillNames] = React.useState<string[]>([]);
     const [skillPickerVisible, setSkillPickerVisible] = React.useState(false);
+    const [selectedProfileId, setSelectedProfileId] = React.useState<string | null>(null);
+
+    const settings = useSettings();
+    const allProfiles = React.useMemo(() => {
+        const builtInProfiles = DEFAULT_PROFILES.map((profile) => ({
+            id: profile.id,
+            name: profile.name,
+            isBuiltIn: true as const,
+        }));
+        const userDefinedProfiles = (settings.profiles ?? []).map((profile) => ({
+            id: profile.id,
+            name: profile.name,
+        }));
+        return getSupervisorAvailableProfiles(builtInProfiles, userDefinedProfiles);
+    }, [settings.profiles]);
 
     const machineProjects = React.useMemo(
         () => projects.filter((p) => p.key.machineId === machineId),
@@ -62,6 +81,7 @@ function NewWebhookTriggerPage() {
                 priority,
                 projectId: selectedProjectId ?? undefined,
                 skillIds: selectedSkillIds.length > 0 ? selectedSkillIds : undefined,
+                profileId: selectedProfileId ?? undefined,
             });
 
             // Show secret + webhook URL (one-time)
@@ -84,7 +104,7 @@ function NewWebhookTriggerPage() {
                     },
                 ],
             );
-        }, [machineId, name, slug, prompt, priority, selectedProjectId, selectedSkillIds, canSubmit, router]),
+        }, [machineId, name, slug, prompt, priority, selectedProjectId, selectedSkillIds, selectedProfileId, canSubmit, router]),
     );
 
     return (
@@ -196,6 +216,19 @@ function NewWebhookTriggerPage() {
                     ))}
                 </ItemGroup>
             )}
+
+            {/* Profile Binding (optional) */}
+            <ItemGroup title={t("triggers.profileSection")}>
+                <View style={{ paddingHorizontal: 16, paddingVertical: 12 }}>
+                    <ProfilePicker
+                        value={selectedProfileId}
+                        onChange={setSelectedProfileId}
+                        profiles={allProfiles}
+                        defaultOptionLabel={t("supervisor.defaultProfileDefault")}
+                        description={t("triggers.profileDesc")}
+                    />
+                </View>
+            </ItemGroup>
 
             {/* Skills (optional) */}
             <ItemGroup title={t("triggers.skills")}>

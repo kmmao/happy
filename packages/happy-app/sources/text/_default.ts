@@ -2351,6 +2351,8 @@ export const en = {
     prompt: "Prompt",
     promptPlaceholder: "Describe the task...",
     webhookPromptHint: "Use {{payload}} to include webhook body",
+    profileSection: "AI Backend Profile",
+    profileDesc: "Optional. Pin this trigger to a specific profile. Leave on Default to inherit the project default.",
     nextRunAt: "Next Run",
     lastRunAt: "Last Run",
     runCount: ({ count }: { count: number }) => `${count} runs`,
