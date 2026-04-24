@@ -35,6 +35,14 @@ export interface ProfilePickerProps {
     refreshLabel?: string;
     builtInLabel?: string;
     initialOpen?: boolean;
+    /**
+     * Optional "currently effective" label rendered as a small footer row.
+     * Typically driven by the runtime-profile preview API so the user can
+     * see what the binding actually resolves to after Save.
+     */
+    effectiveLabel?: string;
+    /** Color hint for the effective label row. `warning` tints it orange. */
+    effectiveTone?: "ok" | "warning";
 }
 
 export const ProfilePicker = React.memo<ProfilePickerProps>((props) => {
@@ -51,6 +59,8 @@ export const ProfilePicker = React.memo<ProfilePickerProps>((props) => {
         refreshLabel,
         builtInLabel = "Built-in",
         initialOpen = false,
+        effectiveLabel,
+        effectiveTone = "ok",
     } = props;
 
     const { theme } = useUnistyles();
@@ -120,6 +130,35 @@ export const ProfilePicker = React.memo<ProfilePickerProps>((props) => {
                     <Ionicons name="alert-circle-outline" size={16} color="#FF9500" />
                     <Text style={[styles.warningText, { color: theme.colors.text }]}>
                         {missingMessage}
+                    </Text>
+                </View>
+            )}
+
+            {effectiveLabel && (
+                <View
+                    style={[
+                        styles.effectiveRow,
+                        {
+                            backgroundColor:
+                                effectiveTone === "warning"
+                                    ? `${theme.colors.warning ?? "#FF9500"}1A`
+                                    : `${theme.colors.textLink}12`,
+                        },
+                    ]}
+                >
+                    <Ionicons
+                        name={effectiveTone === "warning" ? "alert-circle-outline" : "information-circle-outline"}
+                        size={14}
+                        color={effectiveTone === "warning" ? "#FF9500" : theme.colors.textLink}
+                    />
+                    <Text
+                        style={[
+                            styles.effectiveText,
+                            { color: theme.colors.text },
+                        ]}
+                        numberOfLines={2}
+                    >
+                        {effectiveLabel}
                     </Text>
                 </View>
             )}
@@ -250,6 +289,19 @@ const styles = StyleSheet.create(() => ({
     builtInTag: {
         ...Typography.default(),
         fontSize: 11,
+    },
+    effectiveRow: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 6,
+        paddingVertical: 6,
+        paddingHorizontal: 10,
+        borderRadius: 6,
+    },
+    effectiveText: {
+        ...Typography.default(),
+        fontSize: 12,
+        flex: 1,
     },
 }));
 

@@ -23,6 +23,7 @@ import {
     getSupervisorDefaultProfileId,
 } from "@/components/project/supervisorProfileSelection";
 import { ProfilePicker } from "@/components/ProfilePicker";
+import { useRuntimeProfilePreview } from "@/hooks/useRuntimeProfilePreview";
 
 type SupervisorMode = "suggest" | "semi-auto" | "auto";
 
@@ -129,6 +130,44 @@ function SupervisorSettingsScreen() {
     const missingResearchProfileName = React.useMemo(() => {
         return getMissingSupervisorProfileName(config.researchProfileId, allProfiles);
     }, [allProfiles, config.researchProfileId]);
+
+    // Re-query preview API after each save so the "Effective" label matches
+    // the newly-persisted config. initialConfig only changes on successful
+    // save, so it works as a stable refresh signal.
+    const previewRefreshKey = React.useMemo(
+        () => JSON.stringify({
+            d: initialConfig.defaultProfileId,
+            h: initialConfig.healthCheckProfileId,
+            r: initialConfig.researchProfileId,
+        }),
+        [initialConfig.defaultProfileId, initialConfig.healthCheckProfileId, initialConfig.researchProfileId],
+    );
+    const previewRefreshCounter = React.useMemo(
+        () => previewRefreshKey.length, // cheap hash; value identity is what matters
+        [previewRefreshKey],
+    );
+    const healthPreview = useRuntimeProfilePreview(
+        project?.serverId ?? null,
+        "health",
+        previewRefreshCounter,
+    );
+    const researchPreview = useRuntimeProfilePreview(
+        project?.serverId ?? null,
+        "research",
+        previewRefreshCounter,
+    );
+
+    const formatPreview = React.useCallback(
+        (result: typeof healthPreview): string | undefined => {
+            if (!result || !result.ok) return undefined;
+            const name = result.profileName ?? result.profileId;
+            const source = result.profileSource === "explicit"
+                ? t("triggers.profileSourceExplicit")
+                : t("triggers.profileSourceProjectDefault");
+            return t("triggers.profileEffective", { name, source });
+        },
+        [],
+    );
 
     React.useLayoutEffect(() => {
         navigation.setOptions({
@@ -800,6 +839,7 @@ function SupervisorSettingsScreen() {
                         refreshLabel={t("suggestions.refresh")}
                         onRefresh={handleRefreshProfiles}
                         refreshing={profileRefreshing}
+                        effectiveLabel={formatPreview(healthPreview)}
                     />
                 </View>
             </ItemGroup>
@@ -826,6 +866,7 @@ function SupervisorSettingsScreen() {
                         refreshLabel={t("suggestions.refresh")}
                         onRefresh={handleRefreshProfiles}
                         refreshing={profileRefreshing}
+                        effectiveLabel={formatPreview(researchPreview)}
                     />
                 </View>
             </ItemGroup>
