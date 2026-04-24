@@ -1860,7 +1860,19 @@ export async function sessionAllow(
     decision,
     ...(answers && { answers }),
   };
-  await apiSocket.sessionRPC(sessionId, "permission", request);
+  try {
+    await apiSocket.sessionRPC(sessionId, "permission", request);
+  } catch (error) {
+    // Diagnostic tap: AskUserQuestion's submit button occasionally flashes
+    // and silently drops the answer because AskUserQuestionView's own catch
+    // swallows this error. Surface the real RPC error in DevTools while we
+    // decide whether to add user-facing retry/toast.
+    console.error(
+      `[sessionAllow] RPC failed (sessionId=${sessionId}, permissionId=${id}):`,
+      error,
+    );
+    throw error;
+  }
 }
 
 /**
