@@ -27,6 +27,7 @@ import { userRoutes } from "./routes/userRoutes";
 import { feedRoutes } from "./routes/feedRoutes";
 import { kvRoutes } from "./routes/kvRoutes";
 import { projectRoutes } from "./routes/projectRoutes";
+import { runtimeProfilePreviewRoutes } from "./routes/runtimeProfilePreviewRoutes";
 import { supervisorRoutes } from "./routes/supervisorRoutes";
 import { supervisorRunRoutes } from "./routes/supervisorRunRoutes";
 import { supervisorReportRoutes } from "./routes/supervisorReportRoutes";
@@ -149,6 +150,7 @@ export async function startApi() {
   feedRoutes(typed);
   kvRoutes(typed);
   projectRoutes(typed);
+  runtimeProfilePreviewRoutes(typed);
   supervisorRoutes(typed);
   supervisorRunRoutes(typed);
   supervisorReportRoutes(typed);
