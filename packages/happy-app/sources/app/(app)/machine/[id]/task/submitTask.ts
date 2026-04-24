@@ -21,6 +21,7 @@ type CreateTaskFn = (credentials: AuthCredentials, body: {
     maxAttempts?: number;
     skillIds?: string[];
     projectId?: string;
+    profileId?: string;
     directory?: string;
 }) => Promise<unknown>;
 
@@ -45,6 +46,7 @@ interface SubmitTaskInput {
     priority: string;
     maxAttempts: string;
     selectedProjectId: string | null;
+    selectedProfileId?: string | null;
     machineProjects: Project[];
 }
 
@@ -99,6 +101,7 @@ export async function submitTask(
         priority: input.priority,
         maxAttempts: Math.max(1, parseInt(input.maxAttempts, 10) || 3),
         projectId: input.selectedProjectId ?? undefined,
+        profileId: input.selectedProfileId ?? undefined,
         directory: taskDirectory,
     });
 }

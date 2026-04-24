@@ -77,13 +77,12 @@ export type ResolveRuntimeProfileResult =
   | ResolveRuntimeProfileFailure;
 
 /**
- * Whether the unified resolver is enabled. Opt-in via
- * `RUNTIME_PROFILE_UNIFIED_RESOLVER=true`. Default is OFF during the rollout
- * (CLI 0.72.0 + App UI must ship before server-side enforcement flips on),
- * keeping the pre-0.14.0 payload shape and allowing existing tests to pass.
+ * Whether the unified resolver is enabled. Opt-out via
+ * `RUNTIME_PROFILE_UNIFIED_RESOLVER=false`. Default is ON since CLI 0.72.0+
+ * and App ProfilePicker are both shipped.
  */
 export function isUnifiedRuntimeProfileResolverEnabled(): boolean {
-  return process.env.RUNTIME_PROFILE_UNIFIED_RESOLVER === "true";
+  return process.env.RUNTIME_PROFILE_UNIFIED_RESOLVER !== "false";
 }
 
 export async function resolveRuntimeProfile(

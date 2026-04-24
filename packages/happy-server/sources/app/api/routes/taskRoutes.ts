@@ -146,7 +146,7 @@ export function taskRoutes(app: Fastify) {
         },
         async (request, reply) => {
             const userId = request.userId;
-            const { machineId, prompt, priority, maxAttempts, skillIds, projectId, directory: bodyDirectory } = request.body;
+            const { machineId, prompt, priority, maxAttempts, skillIds, projectId, profileId: bodyProfileId, directory: bodyDirectory } = request.body;
 
             const machine = await db.machine.findFirst({
                 where: { id: machineId, accountId: userId },
@@ -180,12 +180,6 @@ export function taskRoutes(app: Fastify) {
                 return reply.code(400).send({ error: "directory override requires projectId" });
             }
 
-            // Resolve the runtime profile so the session spawns with the
-            // correct provider/permission binding rather than CLI defaults.
-            // Manual creates currently have no explicit profileId (CreateTaskBody
-            // hasn't exposed it yet — pending C5 App UI), so we fall back to
-            // project default. Failures are surfaced to the operator via Inbox
-            // AND a 400 response (per the no-silent-fallback decision).
             let taskProfileId: string | undefined;
             let taskRuntimeProfile:
                 | Awaited<ReturnType<typeof resolveRuntimeProfile>>
@@ -193,7 +187,7 @@ export function taskRoutes(app: Fastify) {
             if (isUnifiedRuntimeProfileResolverEnabled()) {
                 taskRuntimeProfile = await resolveRuntimeProfile({
                     accountId: userId,
-                    explicitProfileId: null,
+                    explicitProfileId: bodyProfileId ?? null,
                     projectSupervisorConfig,
                     purpose: "task-manual",
                 });

@@ -14,6 +14,11 @@ import { ItemGroup } from "@/components/ItemGroup";
 import { Item } from "@/components/Item";
 import { t } from "@/text";
 import { Ionicons } from "@expo/vector-icons";
+import { ProfilePicker } from "@/components/ProfilePicker";
+import { useSettings } from "@/sync/storage";
+import { DEFAULT_PROFILES } from "@/sync/profileUtils";
+import { getSupervisorAvailableProfiles } from "@/components/project/supervisorProfileSelection";
+import { useRuntimeProfileEffective } from "@/hooks/useRuntimeProfilePreview";
 
 const PRIORITIES = ["user", "urgent", "background"] as const;
 
@@ -34,11 +39,25 @@ function NewTaskPage() {
     const [priority, setPriority] = React.useState<string>("user");
     const [selectedProjectId, setSelectedProjectId] = React.useState<string | null>(null);
     const [maxAttempts, setMaxAttempts] = React.useState("3");
+    const [selectedProfileId, setSelectedProfileId] = React.useState<string | null>(null);
+
+    const settings = useSettings();
+    const allProfiles = React.useMemo(() => {
+        const builtInProfiles = DEFAULT_PROFILES.map((profile) => ({
+            id: profile.id,
+            name: profile.name,
+            isBuiltIn: true as const,
+        }));
+        const userDefinedProfiles = (settings.profiles ?? []).map((p) => ({ id: p.id, name: p.name }));
+        return getSupervisorAvailableProfiles(builtInProfiles, userDefinedProfiles);
+    }, [settings.profiles]);
 
     const machineProjects = React.useMemo(
         () => projects.filter((p) => p.key.machineId === machineId),
         [projects, machineId],
     );
+
+    const effective = useRuntimeProfileEffective(selectedProjectId, "task-manual");
 
     const canSubmit = prompt.trim().length > 0 && typeof machineId === "string";
 
@@ -56,6 +75,7 @@ function NewTaskPage() {
                     priority,
                     maxAttempts,
                     selectedProjectId,
+                    selectedProfileId,
                     machineProjects,
                 });
                 router.back();
@@ -76,7 +96,7 @@ function NewTaskPage() {
                 }
                 throw error;
             }
-        }, [machineId, prompt, priority, maxAttempts, selectedProjectId, router, machineProjects]),
+        }, [machineId, prompt, priority, maxAttempts, selectedProjectId, selectedProfileId, router, machineProjects]),
     );
 
     return (
@@ -156,6 +176,20 @@ function NewTaskPage() {
                     ))}
                 </ItemGroup>
             )}
+
+            {/* Profile */}
+            <ItemGroup title={t("triggers.profileSection")}>
+                <View style={{ paddingHorizontal: 16, paddingVertical: 12 }}>
+                    <ProfilePicker
+                        value={selectedProfileId}
+                        onChange={setSelectedProfileId}
+                        profiles={allProfiles}
+                        defaultOptionLabel={t("supervisor.defaultProfileDefault")}
+                        description={t("triggers.profileDesc")}
+                        effectiveLabel={effective?.label}
+                    />
+                </View>
+            </ItemGroup>
 
             {/* Max Attempts */}
             <ItemGroup title={t("tasks.maxAttempts")}>
