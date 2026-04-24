@@ -77,7 +77,37 @@ describe("resolveCodexRuntimeConfigFromEnv", () => {
     });
   });
 
-  it("falls back to GPT-5.4 for unsupported Codex model overrides", () => {
+  it("accepts gpt-5.5 model overrides", () => {
+    expect(
+      resolveCodexRuntimeConfigFromEnv({
+        HAPPY_CODEX_CONFIG_MODE: "managed-overrides",
+        HAPPY_CODEX_MODEL: "gpt-5.5",
+      }),
+    ).toEqual({
+      configMode: "managed-overrides",
+      profileName: undefined,
+      overrides: {
+        model: "gpt-5.5",
+      },
+    });
+  });
+
+  it("accepts gpt-5.4 model overrides", () => {
+    expect(
+      resolveCodexRuntimeConfigFromEnv({
+        HAPPY_CODEX_CONFIG_MODE: "managed-overrides",
+        HAPPY_CODEX_MODEL: "gpt-5.4",
+      }),
+    ).toEqual({
+      configMode: "managed-overrides",
+      profileName: undefined,
+      overrides: {
+        model: "gpt-5.4",
+      },
+    });
+  });
+
+  it("falls back to GPT-5.5 for unsupported Codex model overrides", () => {
     expect(
       resolveCodexRuntimeConfigFromEnv({
         HAPPY_CODEX_CONFIG_MODE: "managed-overrides",
@@ -87,7 +117,7 @@ describe("resolveCodexRuntimeConfigFromEnv", () => {
       configMode: "managed-overrides",
       profileName: undefined,
       overrides: {
-        model: "gpt-5.4",
+        model: "gpt-5.5",
       },
     });
   });

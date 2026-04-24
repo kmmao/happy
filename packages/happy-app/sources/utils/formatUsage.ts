@@ -1,5 +1,5 @@
 const DEFAULT_CONTEXT_WINDOW = 200_000;
-const GPT_54_CONTEXT_WINDOW = 900_000;
+const GPT_5X_CONTEXT_WINDOW = 900_000;
 
 // Context window sizes by model pattern (tokens)
 const CONTEXT_WINDOW_MAP: Array<[RegExp, number]> = [
@@ -19,7 +19,7 @@ export const getContextWindowSize = (
   modelCode?: string | null,
   sdkContextWindow?: number,
 ): number => {
-  if (modelCode === "gpt-5.4") return GPT_54_CONTEXT_WINDOW;
+  if (modelCode === "gpt-5.5" || modelCode === "gpt-5.4") return GPT_5X_CONTEXT_WINDOW;
   if (sdkContextWindow && sdkContextWindow > 0) return sdkContextWindow;
   if (!modelCode) return DEFAULT_CONTEXT_WINDOW;
   for (const [pattern, size] of CONTEXT_WINDOW_MAP) {

@@ -1037,6 +1037,7 @@ export const en: TranslationStructure = {
     },
     codexModel: {
       title: "CODEX MODEL",
+      gpt55: "GPT-5.5",
       gpt54: "GPT-5.4",
       gpt54Pro: "GPT-5.4 Pro",
       gpt54Mini: "GPT-5.4 Mini",

@@ -3,9 +3,10 @@ export type CodexConfigMode =
   | "managed-profile"
   | "managed-overrides";
 
-export const LOCKED_CODEX_MODEL = "gpt-5.4";
+export const LOCKED_CODEX_MODEL = "gpt-5.5";
 export const SUPPORTED_CODEX_MODELS = [
   LOCKED_CODEX_MODEL,
+  "gpt-5.4",
   "gpt-5.3-codex",
 ] as const;
 

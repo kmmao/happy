@@ -43,11 +43,17 @@ describe("modelModeOptions", () => {
     const models = getCodexModelModes(translate);
     expect(models.map((model) => model.key)).toEqual([
       LOCKED_CODEX_MODEL,
+      "gpt-5.4",
       "gpt-5.3-codex",
     ]);
     expect(models).toEqual([
       {
         key: LOCKED_CODEX_MODEL,
+        name: "tr:agentInput.codexModel.gpt55",
+        description: null,
+      },
+      {
+        key: "gpt-5.4",
         name: "tr:agentInput.codexModel.gpt54",
         description: null,
       },
@@ -105,6 +111,11 @@ describe("modelModeOptions", () => {
 
     expect(models).toEqual([
       {
+        key: "gpt-5.5",
+        name: "tr:agentInput.codexModel.gpt55",
+        description: null,
+      },
+      {
         key: "gpt-5.4",
         name: "tr:agentInput.codexModel.gpt54",
         description: null,
@@ -128,6 +139,11 @@ describe("modelModeOptions", () => {
     );
 
     expect(models).toEqual([
+      {
+        key: "gpt-5.5",
+        name: "tr:agentInput.codexModel.gpt55",
+        description: null,
+      },
       {
         key: "gpt-5.4",
         name: "tr:agentInput.codexModel.gpt54",
@@ -239,7 +255,7 @@ describe("modelModeOptions", () => {
     expect(resolveCurrentOption(options, ["missing"])).toBeNull();
   });
 
-  it("uses GPT-5.4 as the codex fallback model key", () => {
-    expect(getDefaultModelKey("codex")).toBe("gpt-5.4");
+  it("uses GPT-5.5 as the codex fallback model key", () => {
+    expect(getDefaultModelKey("codex")).toBe("gpt-5.5");
   });
 });
