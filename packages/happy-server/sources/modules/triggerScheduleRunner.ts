@@ -46,20 +46,63 @@ export async function checkAndTriggerSchedules(
 
     if (dueSchedules.length === 0) return;
 
+    const lastTaskIds = dueSchedules
+        .map((s) => s.lastTaskId)
+        .filter((id): id is string => id != null);
+
+    const projectIds = [
+        ...new Set(
+            dueSchedules
+                .map((s) => s.projectId)
+                .filter((id): id is string => id != null),
+        ),
+    ];
+
+    const allSkillIds = [
+        ...new Set(
+            dueSchedules.flatMap((s) => safeParseJsonArray(s.skillIds)),
+        ),
+    ];
+
+    const [lastTasks, projects, skills] = await Promise.all([
+        lastTaskIds.length > 0
+            ? db.task.findMany({
+                  where: { id: { in: lastTaskIds } },
+                  select: { id: true, status: true },
+              })
+            : Promise.resolve([]),
+        projectIds.length > 0
+            ? db.project.findMany({
+                  where: { id: { in: projectIds }, accountId: userId },
+                  select: { id: true, path: true },
+              })
+            : Promise.resolve([]),
+        allSkillIds.length > 0
+            ? db.skill.findMany({
+                  where: {
+                      id: { in: allSkillIds },
+                      accountId: userId,
+                      archived: false,
+                  },
+                  select: { id: true, name: true, content: true },
+              })
+            : Promise.resolve([]),
+    ]);
+
+    const taskStatusMap = new Map(lastTasks.map((t) => [t.id, t.status]));
+    const projectMap = new Map(projects.map((p) => [p.id, p]));
+    const skillMap = new Map(skills.map((s) => [s.id, s]));
+
     for (const schedule of dueSchedules) {
         try {
             if (!schedule.nextRunAt) continue;
 
-            // Skip if the last task from this schedule is still in progress
             if (schedule.lastTaskId) {
-                const lastTask = await db.task.findUnique({
-                    where: { id: schedule.lastTaskId },
-                    select: { status: true },
-                });
-                if (lastTask && !TERMINAL_TASK_STATUSES.has(lastTask.status)) {
+                const lastTaskStatus = taskStatusMap.get(schedule.lastTaskId);
+                if (lastTaskStatus && !TERMINAL_TASK_STATUSES.has(lastTaskStatus)) {
                     log(
                         { module: "trigger" },
-                        `Skipping schedule ${schedule.id}: last task ${schedule.lastTaskId} still ${lastTask.status}`,
+                        `Skipping schedule ${schedule.id}: last task ${schedule.lastTaskId} still ${lastTaskStatus}`,
                     );
                     continue;
                 }
@@ -74,34 +117,24 @@ export async function checkAndTriggerSchedules(
                 continue;
             }
 
-            // Resolve project directory (read-only, outside transaction)
             let directory = "~";
             let resolvedProjectId: string | null = null;
             if (schedule.projectId) {
-                const project = await db.project.findFirst({
-                    where: { id: schedule.projectId, accountId: userId },
-                    select: { id: true, path: true },
-                });
+                const project = projectMap.get(schedule.projectId);
                 if (project) {
                     directory = project.path;
                     resolvedProjectId = project.id;
                 }
             }
 
-            // Load skills (read-only, outside transaction)
             let skillContents: Array<{ name: string; content: string }> | undefined;
             const skillIds: string[] = safeParseJsonArray(schedule.skillIds);
             if (skillIds.length > 0) {
-                const skills = await db.skill.findMany({
-                    where: {
-                        id: { in: skillIds },
-                        accountId: userId,
-                        archived: false,
-                    },
-                    orderBy: { name: "asc" },
-                });
-                if (skills.length > 0) {
-                    skillContents = skills.map((s) => ({
+                const resolved = skillIds
+                    .map((sid) => skillMap.get(sid))
+                    .filter((s): s is NonNullable<typeof s> => s != null);
+                if (resolved.length > 0) {
+                    skillContents = resolved.map((s) => ({
                         name: s.name,
                         content: s.content,
                     }));
