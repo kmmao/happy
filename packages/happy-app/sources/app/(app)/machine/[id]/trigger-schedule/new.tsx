@@ -18,6 +18,7 @@ import { ProfilePicker } from "@/components/ProfilePicker";
 import { useSettings } from "@/sync/storage";
 import { DEFAULT_PROFILES } from "@/sync/profileUtils";
 import { getSupervisorAvailableProfiles } from "@/components/project/supervisorProfileSelection";
+import { useRuntimeProfileEffectiveLabel } from "@/hooks/useRuntimeProfilePreview";
 
 const PRIORITIES = ["background", "user", "urgent"] as const;
 
@@ -59,6 +60,8 @@ function NewTriggerSchedulePage() {
         () => projects.filter((p) => p.key.machineId === machineId),
         [projects, machineId],
     );
+
+    const effectiveLabel = useRuntimeProfileEffectiveLabel(selectedProjectId, "cron");
 
     const canSubmit = cronExpression.trim().length > 0 && prompt.trim().length > 0;
 
@@ -198,6 +201,7 @@ function NewTriggerSchedulePage() {
                         profiles={allProfiles}
                         defaultOptionLabel={t("supervisor.defaultProfileDefault")}
                         description={t("triggers.profileDesc")}
+                        effectiveLabel={effectiveLabel}
                     />
                 </View>
             </ItemGroup>

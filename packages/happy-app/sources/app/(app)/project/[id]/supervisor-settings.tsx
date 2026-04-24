@@ -23,7 +23,7 @@ import {
     getSupervisorDefaultProfileId,
 } from "@/components/project/supervisorProfileSelection";
 import { ProfilePicker } from "@/components/ProfilePicker";
-import { useRuntimeProfilePreview } from "@/hooks/useRuntimeProfilePreview";
+import { useRuntimeProfileEffectiveLabel } from "@/hooks/useRuntimeProfilePreview";
 
 type SupervisorMode = "suggest" | "semi-auto" | "auto";
 
@@ -146,27 +146,15 @@ function SupervisorSettingsScreen() {
         () => previewRefreshKey.length, // cheap hash; value identity is what matters
         [previewRefreshKey],
     );
-    const healthPreview = useRuntimeProfilePreview(
+    const healthEffectiveLabel = useRuntimeProfileEffectiveLabel(
         project?.serverId ?? null,
         "health",
         previewRefreshCounter,
     );
-    const researchPreview = useRuntimeProfilePreview(
+    const researchEffectiveLabel = useRuntimeProfileEffectiveLabel(
         project?.serverId ?? null,
         "research",
         previewRefreshCounter,
-    );
-
-    const formatPreview = React.useCallback(
-        (result: typeof healthPreview): string | undefined => {
-            if (!result || !result.ok) return undefined;
-            const name = result.profileName ?? result.profileId;
-            const source = result.profileSource === "explicit"
-                ? t("triggers.profileSourceExplicit")
-                : t("triggers.profileSourceProjectDefault");
-            return t("triggers.profileEffective", { name, source });
-        },
-        [],
     );
 
     React.useLayoutEffect(() => {
@@ -839,7 +827,7 @@ function SupervisorSettingsScreen() {
                         refreshLabel={t("suggestions.refresh")}
                         onRefresh={handleRefreshProfiles}
                         refreshing={profileRefreshing}
-                        effectiveLabel={formatPreview(healthPreview)}
+                        effectiveLabel={healthEffectiveLabel}
                     />
                 </View>
             </ItemGroup>
@@ -866,7 +854,7 @@ function SupervisorSettingsScreen() {
                         refreshLabel={t("suggestions.refresh")}
                         onRefresh={handleRefreshProfiles}
                         refreshing={profileRefreshing}
-                        effectiveLabel={formatPreview(researchPreview)}
+                        effectiveLabel={researchEffectiveLabel}
                     />
                 </View>
             </ItemGroup>

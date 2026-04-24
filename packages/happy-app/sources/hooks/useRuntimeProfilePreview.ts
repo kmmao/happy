@@ -1,5 +1,6 @@
 import * as React from "react";
 import { TokenStorage } from "@/auth/tokenStorage";
+import { t } from "@/text";
 import {
     fetchRuntimeProfilePreview,
     type RuntimeProfilePreviewPurpose,
@@ -44,4 +45,26 @@ export function useRuntimeProfilePreview(
     }, [projectId, purpose, refreshKey]);
 
     return result;
+}
+
+/**
+ * Wrapper around useRuntimeProfilePreview that returns a ready-to-render
+ * "Effective: <name> (<source>)" label — localized through the t() text
+ * pipeline. Returns undefined while loading, on preview failure, or when
+ * projectId is missing.
+ */
+export function useRuntimeProfileEffectiveLabel(
+    projectId: string | null | undefined,
+    purpose: RuntimeProfilePreviewPurpose,
+    refreshKey: number = 0,
+): string | undefined {
+    const result = useRuntimeProfilePreview(projectId, purpose, refreshKey);
+    return React.useMemo(() => {
+        if (!result || !result.ok) return undefined;
+        const name = result.profileName ?? result.profileId;
+        const source = result.profileSource === "explicit"
+            ? t("triggers.profileSourceExplicit")
+            : t("triggers.profileSourceProjectDefault");
+        return t("triggers.profileEffective", { name, source });
+    }, [result]);
 }

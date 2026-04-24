@@ -22,6 +22,7 @@ import { ProfilePicker } from "@/components/ProfilePicker";
 import { useSettings } from "@/sync/storage";
 import { DEFAULT_PROFILES } from "@/sync/profileUtils";
 import { getSupervisorAvailableProfiles } from "@/components/project/supervisorProfileSelection";
+import { useRuntimeProfileEffectiveLabel } from "@/hooks/useRuntimeProfilePreview";
 
 const PRIORITIES = ["background", "user", "urgent"] as const;
 
@@ -56,6 +57,11 @@ function EditTriggerSchedulePage() {
         const userDefinedProfiles = (settings.profiles ?? []).map((p) => ({ id: p.id, name: p.name }));
         return getSupervisorAvailableProfiles(builtInProfiles, userDefinedProfiles);
     }, [settings.profiles]);
+
+    const effectiveLabel = useRuntimeProfileEffectiveLabel(
+        schedule?.projectId ?? null,
+        "cron",
+    );
 
     React.useEffect(() => {
         let cancelled = false;
@@ -239,6 +245,7 @@ function EditTriggerSchedulePage() {
                         profiles={allProfiles}
                         defaultOptionLabel={t("supervisor.defaultProfileDefault")}
                         description={t("triggers.profileDesc")}
+                        effectiveLabel={effectiveLabel}
                     />
                 </View>
             </ItemGroup>

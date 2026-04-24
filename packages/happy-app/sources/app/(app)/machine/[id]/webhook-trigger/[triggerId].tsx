@@ -23,6 +23,7 @@ import { ProfilePicker } from "@/components/ProfilePicker";
 import { useSettings } from "@/sync/storage";
 import { DEFAULT_PROFILES } from "@/sync/profileUtils";
 import { getSupervisorAvailableProfiles } from "@/components/project/supervisorProfileSelection";
+import { useRuntimeProfileEffectiveLabel } from "@/hooks/useRuntimeProfilePreview";
 
 const PRIORITIES = ["background", "user", "urgent"] as const;
 
@@ -56,6 +57,11 @@ function EditWebhookTriggerPage() {
         const userDefinedProfiles = (settings.profiles ?? []).map((p) => ({ id: p.id, name: p.name }));
         return getSupervisorAvailableProfiles(builtInProfiles, userDefinedProfiles);
     }, [settings.profiles]);
+
+    const effectiveLabel = useRuntimeProfileEffectiveLabel(
+        trigger?.projectId ?? null,
+        "webhook",
+    );
 
     // Load trigger from list (no single-fetch endpoint yet — list+filter is
     // acceptable since webhook counts are tiny per machine)
@@ -247,6 +253,7 @@ function EditWebhookTriggerPage() {
                         profiles={allProfiles}
                         defaultOptionLabel={t("supervisor.defaultProfileDefault")}
                         description={t("triggers.profileDesc")}
+                        effectiveLabel={effectiveLabel}
                     />
                 </View>
             </ItemGroup>
