@@ -244,6 +244,76 @@ sequenceDiagram
 - `UserKVStore.value` is encrypted bytes encoded as base64 on the wire.
 - `kvMutate` expects base64 strings; `kvGet/list/bulk` return base64 strings.
 
+## Claude Control RPC data tiers
+
+The `claude-control:*` RPCs added in happy-cli 0.72 (SDK 0.2.119) follow a
+deliberate data-tier classification so each API can be evaluated independently
+against Happy's zero-knowledge server promise. All tiers share the same
+transport (per-session `RpcHandlerManager` with AES-256-GCM via
+`Session.dataEncryptionKey`) — they differ only in how sensitive the plaintext
+is **before** encryption, and in the extra mitigations the CLI applies.
+
+Wire schemas: `packages/happy-wire/src/claudeControlRpc.ts`
+CLI handlers: `packages/happy-cli/src/claude/rpc/claudeControlHandlers.ts`
+App client:   `packages/happy-app/sources/sync/apiClaudeControl.ts`
+
+### Tier 1 — plaintext content
+
+Payloads never carry user source, paths, or credentials. If the E2E layer
+were removed, the worst case is leaking cost numbers, version strings, or a
+single color string.
+
+| RPC | Request → Response (plaintext shape) |
+|-----|---------------------------------------|
+| `get_session_cost` | `{}` → `{ formatted, totalUsd, byModel }` |
+| `get_binary_version` | `{}` → `{ version, binaryPath?, happyCliVersion? }` |
+| `set_color` | `{ color }` → `{ success: true, color }` |
+
+Extra mitigations: none required.
+
+### Tier 2 — E2E content
+
+Payloads carry user source or directory structure. Server must remain blind
+even when operators are debugging.
+
+| RPC | Extra mitigations |
+|-----|-------------------|
+| `read_file` | CLI path blacklist (`~/.ssh`, `~/.aws`, `~/.gnupg`, `~/.happy`, `~/.password-store`, `/etc/shadow`, `/etc/sudoers`) configurable via `HAPPY_SIDEBAR_PATH_BLACKLIST`; 1 MiB default max; SDK Read-tool permission gating via `Query.readFile()`; explicit `deniedReason` enum so UI can surface why a read failed without leaking path |
+| `file_suggestions` | Same path blacklist; 500-entry scan cap; always filters out `node_modules`, `.git`, `dist`, `build`; returns project-relative paths only |
+
+### Tier 3 — permission-gated
+
+Payloads trigger destructive or side-effecting MCP tool invocations. Three
+independent gates must all pass.
+
+| Gate | Enforced where |
+|------|----------------|
+| Default-deny MCP server whitelist | CLI — operator opts in via `HAPPY_SIDEBAR_MCP_WHITELIST` (comma-separated server names). Missing server → `errorCode: "not_whitelisted"` |
+| Tool-name format validation | CLI — must match `mcp__<server>__<tool>`; bad shape → `errorCode: "invalid_arguments"` |
+| `clientConfirmToken` echo from 2-step App confirm | CLI — missing token → `errorCode: "permission_denied"`; first 8 bytes written to the audit log |
+
+App responsibilities for Tier 3:
+1. Display a 2-step confirmation dialog (tool name + argument summary) before
+   calling `invokeMcpCall()`.
+2. Generate a per-call nonce via `generateMcpConfirmToken()` that the user has
+   acknowledged.
+3. Persist audit-visible records of confirmed MCP tool invocations on the App
+   side in addition to the CLI audit log.
+
+### What is still server-observable (out of E2E scope)
+
+The RPC `method` names themselves (e.g., `claude-control:mcp_call`) are
+visible to the server because the Socket.IO `rpc-call` event carries them in
+plaintext for routing. Server can therefore see that an RPC of a given kind
+happened and at what time, but not its parameters or responses. This matches
+the existing treatment of other per-session RPCs (`abort`, `interrupt`,
+`rewindFiles`, etc.) — the method vocabulary is the protocol's public surface.
+
+Rate limits per method (when enabled) also operate on the plaintext method
+name and must be configured explicitly — recommended limits noted in the CLI
+security-review report: `read_file` 20/min/user, `file_suggestions`
+60/min/user, `mcp_call` 10/min/user.
+
 ## On-wire formats (encrypted fields)
 
 ```mermaid

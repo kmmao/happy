@@ -30,7 +30,10 @@
 import { readdir } from "node:fs/promises";
 import { join, relative, isAbsolute, resolve as resolvePath } from "node:path";
 import { homedir } from "node:os";
-import type { Query as OfficialQuery } from "@anthropic-ai/claude-agent-sdk";
+import type {
+  Query as OfficialQuery,
+  SDKResultMessage,
+} from "@anthropic-ai/claude-agent-sdk";
 import type { RpcHandlerManager } from "@/api/rpc/RpcHandlerManager";
 import { logger } from "@/ui/logger";
 import {
@@ -158,6 +161,51 @@ export class SessionCostTracker {
       this.byModel.set(model, existing);
     } catch (e) {
       logger.debug("[claudeControl] SessionCostTracker.record failed", e);
+    }
+  }
+
+  /**
+   * Fold an `SDKResultMessage` (either success or error subtype) into the
+   * running tally. Prefers the per-model `modelUsage` breakdown when
+   * present, falling back to the aggregate `usage` + `total_cost_usd` pair
+   * when the SDK did not report per-model data.
+   *
+   * Both branches accumulate additively; never subtract. Call once per
+   * result message the launcher sees.
+   */
+  recordResult(msg: SDKResultMessage): void {
+    try {
+      const modelUsage = msg.modelUsage;
+      const perModelKeys = modelUsage ? Object.keys(modelUsage) : [];
+      if (perModelKeys.length > 0 && modelUsage) {
+        for (const modelName of perModelKeys) {
+          const mu = modelUsage[modelName];
+          if (!mu) continue;
+          this.record({
+            model: modelName,
+            usage: {
+              input_tokens: mu.inputTokens,
+              output_tokens: mu.outputTokens,
+              cache_creation_input_tokens: mu.cacheCreationInputTokens,
+              cache_read_input_tokens: mu.cacheReadInputTokens,
+            },
+            total_cost_usd: mu.costUSD,
+          });
+        }
+        return;
+      }
+      // Aggregate fallback — no per-model breakdown available.
+      this.record({
+        usage: {
+          input_tokens: msg.usage?.input_tokens ?? 0,
+          output_tokens: msg.usage?.output_tokens ?? 0,
+          cache_creation_input_tokens: msg.usage?.cache_creation_input_tokens ?? 0,
+          cache_read_input_tokens: msg.usage?.cache_read_input_tokens ?? 0,
+        },
+        total_cost_usd: msg.total_cost_usd,
+      });
+    } catch (e) {
+      logger.debug("[claudeControl] SessionCostTracker.recordResult failed", e);
     }
   }
 

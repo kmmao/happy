@@ -554,6 +554,13 @@ export async function claudeRemoteLauncher(
       logger.debug(`[perf] E2E socket_received → first_assistant: ${e2e}ms`);
     }
 
+    // Fold result messages into the session-cost tracker so the claude-control
+    // `get_session_cost` RPC returns real values instead of zero. See
+    // claudeControlHandlers.ts for the aggregation semantics.
+    if (message.type === "result") {
+      sessionCostTracker.recordResult(message);
+    }
+
     // Write to message log
     formatClaudeMessageForInk(message, messageBuffer);
 
