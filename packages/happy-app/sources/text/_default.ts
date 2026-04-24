@@ -2345,6 +2345,7 @@ export const en = {
     createSchedule: "New Schedule",
     createWebhook: "New Webhook",
     editWebhook: "Edit Webhook",
+    editSchedule: "Edit Schedule",
     name: "Name",
     namePlaceholder: "e.g. Nightly code review",
     cronExpression: "Cron Expression",

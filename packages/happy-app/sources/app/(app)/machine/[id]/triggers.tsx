@@ -123,6 +123,10 @@ function TriggersPage() {
     const handleSchedulePress = React.useCallback((schedule: ServerTriggerSchedule) => {
         const buttons: Array<{ text: string; style?: "cancel" | "destructive"; onPress?: () => void }> = [
             {
+                text: t("triggers.editSchedule"),
+                onPress: () => router.push(`/machine/${machineId}/trigger-schedule/${schedule.id}` as any),
+            },
+            {
                 text: schedule.enabled ? t("triggers.disabled") : t("triggers.enabled"),
                 onPress: () => doToggleSchedule(schedule.id),
             },

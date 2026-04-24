@@ -2485,6 +2485,7 @@ export const it: TranslationStructure = {
     createSchedule: "Nuova programmazione",
     createWebhook: "Nuovo Webhook",
     editWebhook: "Modifica Webhook",
+    editSchedule: "Modifica programmazione",
     name: "Nome",
     namePlaceholder: "es. Revisione codice notturna",
     cronExpression: "Espressione Cron",

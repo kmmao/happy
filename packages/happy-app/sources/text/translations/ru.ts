@@ -2345,6 +2345,7 @@ export const ru: TranslationStructure = {
     createSchedule: "Новое расписание",
     createWebhook: "Новый Webhook",
     editWebhook: "Редактировать Webhook",
+    editSchedule: "Редактировать расписание",
     name: "Название",
     namePlaceholder: "напр. Ночной ревью кода",
     cronExpression: "Cron-выражение",

@@ -526,6 +526,14 @@ export default function RootLayout() {
         }}
       />
       <Stack.Screen
+        name="machine/[id]/trigger-schedule/[triggerId]"
+        options={{
+          headerShown: true,
+          headerTitle: t("triggers.editSchedule"),
+          headerBackTitle: t("common.back"),
+        }}
+      />
+      <Stack.Screen
         name="machine/[id]/webhook-trigger/new"
         options={{
           headerShown: true,

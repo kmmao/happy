@@ -2288,6 +2288,7 @@ export const zhHans: TranslationStructure = {
     createSchedule: "新建计划",
     createWebhook: "新建 Webhook",
     editWebhook: "编辑 Webhook",
+    editSchedule: "编辑计划",
     name: "名称",
     namePlaceholder: "例如：每日代码审查",
     cronExpression: "Cron 表达式",
