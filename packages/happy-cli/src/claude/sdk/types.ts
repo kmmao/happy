@@ -34,6 +34,8 @@ export type {
   SdkPluginConfig,
   GetSubagentMessagesOptions,
   ListSubagentsOptions,
+  // SDK 0.2.119+ additions
+  SDKMirrorErrorMessage,
 } from "@anthropic-ai/claude-agent-sdk";
 
 export {
@@ -169,6 +171,24 @@ export interface QueryOptions {
    * @default false
    */
   includeHookEvents?: boolean;
+  /**
+   * Custom title for a new session. When provided, the session uses this title
+   * instead of auto-generating one from the first user message. When resuming
+   * via `resume` or `continue`, the resumed session's persisted title takes
+   * precedence — this option only affects newly-created sessions.
+   *
+   * Maps to the official SDK's `Options.title` introduced in 0.2.119.
+   */
+  title?: string;
+  /**
+   * Custom workflow body for the plan-mode system reminder. Replaces the
+   * default code-implementation workflow when `permissionMode === 'plan'`.
+   * The CLI still wraps this with the read-only enforcement preamble and the
+   * ExitPlanMode protocol footer.
+   *
+   * Maps to the official SDK's `Options.planModeInstructions` introduced in 0.2.119.
+   */
+  planModeInstructions?: string;
 }
 
 /** Query prompt — string or async stream of user messages */
