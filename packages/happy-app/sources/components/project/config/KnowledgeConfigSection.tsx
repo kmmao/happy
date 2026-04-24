@@ -3,6 +3,7 @@ import { View, Text, Pressable } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { Ionicons } from "@expo/vector-icons";
 import { Typography } from "@/constants/Typography";
+import { resolveActiveTint } from "@/constants/activeTint";
 import { Switch } from "@/components/Switch";
 import { Modal } from "@/modal";
 import { t } from "@/text";
@@ -265,7 +266,7 @@ function Segmented<K extends string>({
                             styles.segmentedItem,
                             {
                                 backgroundColor: active
-                                    ? (theme.dark ? theme.colors.accentPurple : theme.colors.header.tint)
+                                    ? resolveActiveTint(theme)
                                     : theme.colors.surfaceHighest,
                             },
                         ]}
