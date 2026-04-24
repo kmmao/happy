@@ -470,6 +470,7 @@ export async function runCodex(opts: {
   let currentReasoningEffort:
     | NonNullable<import("@/api/types").MessageMeta["effort"]>
     | undefined = undefined;
+  let currentAppendSystemPrompt: string | undefined = undefined;
   session.onUserMessage((message) => {
     const perfSocketReceivedAt = session.lastPerfSocketReceivedAt;
     const perfQueuedAt = Date.now();
@@ -492,6 +493,9 @@ export async function runCodex(opts: {
     currentPermissionMode = resolvedMode.next.permissionMode;
     currentModel = resolvedMode.next.model;
     currentReasoningEffort = resolvedMode.next.reasoningEffort;
+    if (message.meta?.hasOwnProperty("appendSystemPrompt")) {
+      currentAppendSystemPrompt = (message.meta.appendSystemPrompt as string) || undefined;
+    }
 
     if (message.meta?.permissionMode) {
       if (permissionHandler) {
@@ -1517,7 +1521,9 @@ export async function runCodex(opts: {
         try {
           await appServerClient.resumeThread({
             threadId: resumeThreadId,
-            baseInstructions: codexBaseInstructions,
+            baseInstructions: currentAppendSystemPrompt
+              ? codexBaseInstructions + "\n\n" + currentAppendSystemPrompt
+              : codexBaseInstructions,
             profile: runtimeConfig.profileName,
             model: runtimeConfig.overrides.model,
             approvalPolicy:
@@ -1736,7 +1742,9 @@ export async function runCodex(opts: {
             prompt: first
               ? message.message + "\n\n" + CHANGE_TITLE_INSTRUCTION
               : message.message,
-            "base-instructions": codexBaseInstructions,
+            "base-instructions": currentAppendSystemPrompt
+              ? codexBaseInstructions + "\n\n" + currentAppendSystemPrompt
+              : codexBaseInstructions,
             config: {
               mcp_servers: mcpServers,
               ...(resolvedReasoningEffort

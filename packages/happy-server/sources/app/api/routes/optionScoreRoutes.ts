@@ -82,6 +82,8 @@ function fallbackFromServerEnv() {
     return detectProviderFromEnv({
         ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY ?? "",
         ANTHROPIC_BASE_URL: process.env.ANTHROPIC_BASE_URL ?? "",
+        OPENAI_API_KEY: process.env.OPENAI_API_KEY ?? "",
+        OPENAI_BASE_URL: process.env.OPENAI_BASE_URL ?? "",
         OLLAMA_URL: process.env.OLLAMA_URL ?? "",
     });
 }

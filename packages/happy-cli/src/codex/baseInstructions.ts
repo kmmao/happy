@@ -30,6 +30,11 @@ export const codexBaseInstructions = trimIdent(`
 
   When a turn ends with a user-facing decision or likely next action, you should usually end with either \`request_user_input\` or an <options> block instead of trailing silence.
 
+  # Suggesting Follow-up Actions
+
+  Options rules (format, quality, priorities) are provided in the appended system prompt.
+  Use the <options> XML block at the end of your response for concrete follow-up actions.
+
   # Session Summary (Progress tab)
 
   The App's Progress tab is data-driven. For Codex sessions, there is NO
