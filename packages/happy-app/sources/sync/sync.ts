@@ -2132,8 +2132,10 @@ class Sync {
       }
 
       while (hasMore) {
+        // Server caps limit at 500 (v3SessionRoutes getMessagesQuerySchema).
+        // Larger pages cut round-trips on long sessions by ~5x.
         const response = await apiSocket.request(
-          `/v3/sessions/${sessionId}/messages?after_seq=${afterSeq}&limit=100`,
+          `/v3/sessions/${sessionId}/messages?after_seq=${afterSeq}&limit=500`,
         );
         if (!response.ok) {
           if (response.status === 404) {
