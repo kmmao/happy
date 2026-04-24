@@ -10,6 +10,7 @@ import {
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { Ionicons } from "@expo/vector-icons";
 import { Typography } from "@/constants/Typography";
+import { resolveActiveTint } from "@/constants/activeTint";
 import { t } from "@/text";
 import { Project } from "@/sync/projectManager";
 import { TokenStorage } from "@/auth/tokenStorage";
@@ -1099,7 +1100,7 @@ const styles = StyleSheet.create((theme) => ({
         flexDirection: "row",
         alignItems: "center",
         gap: 6,
-        backgroundColor: theme.dark ? theme.colors.accentPurple : theme.colors.header.tint,
+        backgroundColor: resolveActiveTint(theme),
         paddingHorizontal: 20,
         paddingVertical: 10,
         borderRadius: 8,
@@ -1245,7 +1246,7 @@ const styles = StyleSheet.create((theme) => ({
         justifyContent: "center",
     },
     quickActionIconActive: {
-        backgroundColor: theme.dark ? theme.colors.accentPurple : theme.colors.header.tint,
+        backgroundColor: resolveActiveTint(theme),
     },
     quickActionIconInactive: {
         backgroundColor: theme.colors.surface,
