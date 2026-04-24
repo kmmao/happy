@@ -2349,6 +2349,7 @@ export const ca: TranslationStructure = {
     noWebhookTriggers: "Sense disparadors webhook",
     createSchedule: "Nova programació",
     createWebhook: "Nou Webhook",
+    editWebhook: "Edita el Webhook",
     name: "Nom",
     namePlaceholder: "p. ex. Revisió de codi nocturna",
     cronExpression: "Expressió Cron",

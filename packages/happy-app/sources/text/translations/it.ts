@@ -2484,6 +2484,7 @@ export const it: TranslationStructure = {
     noWebhookTriggers: "Nessun trigger webhook",
     createSchedule: "Nuova programmazione",
     createWebhook: "Nuovo Webhook",
+    editWebhook: "Modifica Webhook",
     name: "Nome",
     namePlaceholder: "es. Revisione codice notturna",
     cronExpression: "Espressione Cron",

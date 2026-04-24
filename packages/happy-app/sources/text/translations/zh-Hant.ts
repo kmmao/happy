@@ -2288,6 +2288,7 @@ export const zhHant: TranslationStructure = {
     noWebhookTriggers: "暫無 Webhook 觸發器",
     createSchedule: "新建計劃",
     createWebhook: "新建 Webhook",
+    editWebhook: "編輯 Webhook",
     name: "名稱",
     namePlaceholder: "例如：每日程式碼審查",
     cronExpression: "Cron 表達式",

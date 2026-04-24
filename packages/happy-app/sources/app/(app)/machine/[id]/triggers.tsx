@@ -149,6 +149,10 @@ function TriggersPage() {
         const webhookUrl = `${getServerUrl()}/v1/triggers/${webhook.slug}`;
         const buttons: Array<{ text: string; style?: "cancel" | "destructive"; onPress?: () => void }> = [
             {
+                text: t("triggers.editWebhook"),
+                onPress: () => router.push(`/machine/${machineId}/webhook-trigger/${webhook.id}` as any),
+            },
+            {
                 text: t("triggers.copyUrl"),
                 onPress: () => {
                     void import("expo-clipboard").then(({ setStringAsync }) => setStringAsync(webhookUrl));

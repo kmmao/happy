@@ -2465,6 +2465,7 @@ export const ja: TranslationStructure = {
     noWebhookTriggers: "Webhook トリガーはまだありません",
     createSchedule: "新規スケジュール",
     createWebhook: "新規 Webhook",
+    editWebhook: "Webhook を編集",
     name: "名前",
     namePlaceholder: "例: 毎晩のコードレビュー",
     cronExpression: "Cron 式",
