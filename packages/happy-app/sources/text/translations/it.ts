@@ -4138,6 +4138,7 @@ export const it: TranslationStructure = {
       errorToolNotFound: "Tool not found on server",
       errorInvalidArguments: "Invalid arguments",
       errorPermissionDenied: "Permission denied",
+      errorSdkNotImplemented: "Waiting on Claude Agent SDK — mcp_call runtime not yet exposed upstream",
       errorUnknown: "Unknown error",
     },
   },

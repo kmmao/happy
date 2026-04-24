@@ -426,19 +426,26 @@ export function registerClaudeControlHandlers(
       logger.debug(
         `[claudeControl] [AUDIT] mcp_call server=${parsed.server} tool=${parsed.toolName} confirmToken=${req.clientConfirmToken.slice(0, 8)}...`,
       );
-      // Actual MCP invocation requires wiring into happy-cli's MCP client
-      // infrastructure (see packages/happy-cli/src/codex/codexMcpClient.ts
-      // for the codex pattern; Claude has its own MCP lifecycle via the SDK).
-      // That integration is out of scope for the initial rollout — the
-      // handler returns `server_unavailable` as a safe placeholder. Follow-up
-      // work: resolve the MCP client for `parsed.server` via the SDK's
-      // mcpServerStatus + setMcpServers API, then invoke the tool and map
-      // the response.
+      // Upstream SDK gap: `@anthropic-ai/claude-agent-sdk@0.2.119` ships the
+      // `SDKControlMcpCallRequest` protocol type in sdk.d.ts but exposes no
+      // corresponding runtime method on the `Query` interface — the existing
+      // `mcpServerStatus()` / `setMcpServers()` / `reconnectMcpServer()` /
+      // `toggleMcpServer()` members only configure and report on servers,
+      // none invokes a tool. Until the SDK lands a public `callMcpTool()`
+      // (or equivalent), we return `sdk_not_implemented` so the App can
+      // surface an honest "waiting on SDK" state instead of masking the gap
+      // as a transient server error.
+      //
+      // Rolling our own MCP client (spawning a parallel
+      // `@modelcontextprotocol/sdk` connection per whitelisted server) is
+      // possible but duplicates the SDK's managed lifecycle and cannot cover
+      // `type: 'sdk'` servers — not worth the maintenance cost for a gap
+      // that should be closed upstream.
       return {
         success: false,
-        errorCode: "server_unavailable",
+        errorCode: "sdk_not_implemented",
         errorMessage:
-          "mcp_call integration is stubbed pending MCP client wiring; tool whitelisted and confirm token accepted.",
+          "Claude Agent SDK 0.2.119 does not expose a public runtime method for mcp_call (protocol type is declared but unimplemented). Waiting on upstream; whitelist and confirm token were accepted.",
       };
     },
   );

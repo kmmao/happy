@@ -4040,6 +4040,7 @@ export const zhHant: TranslationStructure = {
       errorToolNotFound: "伺服器上找不到該工具",
       errorInvalidArguments: "參數無效",
       errorPermissionDenied: "權限被拒絕",
+      errorSdkNotImplemented: "等待 Claude Agent SDK —— mcp_call 運行時尚未在上游公開",
       errorUnknown: "未知錯誤",
     },
   },

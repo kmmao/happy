@@ -29,6 +29,8 @@ function errorText(
             return t("claudeControl.mcp.errorInvalidArguments");
         case "permission_denied":
             return t("claudeControl.mcp.errorPermissionDenied");
+        case "sdk_not_implemented":
+            return t("claudeControl.mcp.errorSdkNotImplemented");
         case "unknown":
             return t("claudeControl.mcp.errorUnknown");
     }

@@ -130,6 +130,14 @@ export const McpCallResponseSchema = z.object({
         'tool_not_found',
         'invalid_arguments',
         'permission_denied',
+        /**
+         * SDK 0.2.119 defines the `mcp_call` control protocol type but does
+         * not expose a public runtime method on the `Query` interface. Until
+         * upstream lands a `callMcpTool()` / equivalent, the CLI handler
+         * returns this code so the App can surface an honest "waiting on
+         * SDK" state instead of masking the gap as a server error.
+         */
+        'sdk_not_implemented',
         'unknown',
     ]).optional(),
     errorMessage: z.string().optional(),
