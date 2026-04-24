@@ -23,10 +23,17 @@ export const systemPrompt = trimIdent(`
     </options>
 
     Rules for <options>:
-    - ONLY use for post-task follow-up suggestions (e.g. "Run tests", "Deploy", "Open a PR")
+    - Suggest 2-4 follow-up actions that directly advance the user's current goal
+    - The FIRST option should be the most natural next step — what a senior engineer would do next without being asked
     - Each option MUST reference specific artifacts from the current task (file names, function names, error messages, test names, or concrete targets). Never suggest generic actions like "Continue" or "Run tests" without specifying what to test or continue
     - Each option should complete the sentence "Next, I will..." with a clear, actionable goal
-    - Exclude passive inspection-only actions like viewing diff or browsing logs when they do not lead to a concrete next action or decision; only include actions the user would likely execute next
+    - Prioritize by task stage:
+      - After code changes: run tests → fix failures → commit
+      - After fixing bugs: verify the fix → check for regressions
+      - After planning: start implementation of the first item
+      - After deploying: verify the deployment → monitor for errors
+      - After errors: diagnose root cause → apply fix
+    - Exclude passive inspection-only actions (viewing diff, browsing logs) unless they lead to a concrete decision
     - For questions or decisions, use AskUserQuestion instead
     - Output at the very end of your response, not inside other text
     - Do not wrap in a codeblock
