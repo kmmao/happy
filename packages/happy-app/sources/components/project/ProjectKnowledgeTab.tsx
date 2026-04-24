@@ -3,6 +3,7 @@ import { View, Text, FlatList, Pressable, RefreshControl, ActivityIndicator } fr
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { Ionicons } from "@expo/vector-icons";
 import { Typography } from "@/constants/Typography";
+import { resolveActiveTint } from "@/constants/activeTint";
 import { t } from "@/text";
 import { useRouter } from "expo-router";
 import { useProjectKnowledge, type LifecycleStats } from "@/hooks/useProjectKnowledge";
@@ -372,7 +373,7 @@ export const ProjectKnowledgeTab = React.memo<ProjectKnowledgeTabProps>(
                                         styles.filterChip,
                                         {
                                             backgroundColor: isFilterActive
-                                                ? (theme.dark ? theme.colors.accentPurple : theme.colors.header.tint)
+                                                ? (resolveActiveTint(theme))
                                                 : theme.colors.surfaceHighest,
                                         },
                                     ]}

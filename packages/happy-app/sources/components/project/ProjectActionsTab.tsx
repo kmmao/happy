@@ -10,6 +10,7 @@ import {
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { Ionicons } from "@expo/vector-icons";
 import { Typography } from "@/constants/Typography";
+import { resolveActiveTint } from "@/constants/activeTint";
 import { t } from "@/text";
 import { TokenStorage } from "@/auth/tokenStorage";
 import { emitProjectEvent, onProjectEvent } from "@/utils/projectEvents";
@@ -644,7 +645,7 @@ const styles = StyleSheet.create((theme) => ({
         backgroundColor: theme.colors.groupped.background,
     },
     tabActive: {
-        backgroundColor: theme.dark ? theme.colors.accentPurple : theme.colors.header.tint,
+        backgroundColor: resolveActiveTint(theme),
     },
     tabLabel: {
         ...Typography.default(),
@@ -707,7 +708,7 @@ const styles = StyleSheet.create((theme) => ({
         backgroundColor: theme.colors.surface,
     },
     chipActive: {
-        backgroundColor: theme.dark ? theme.colors.accentPurple : theme.colors.header.tint,
+        backgroundColor: resolveActiveTint(theme),
     },
     chipText: {
         ...Typography.default(),
