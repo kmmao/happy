@@ -9,7 +9,9 @@ import { type Fastify } from "../types";
 // Caches (userId:sessionId) → timestamp of last 404 response.
 // If a client repeatedly hits a non-existent session within the window, skip the DB query.
 const notFoundCache = new Map<string, number>();
-const NOT_FOUND_WINDOW_MS = 30_000; // 30 seconds
+// Short window so brief read-replica lag (session just created on primary,
+// not yet visible on replica) doesn't keep clients locked out for long.
+const NOT_FOUND_WINDOW_MS = 3_000; // 3 seconds
 const NOT_FOUND_CACHE_MAX_SIZE = 10_000;
 
 // Cleanup stale entries every 60 seconds. Use unref() so the timer
