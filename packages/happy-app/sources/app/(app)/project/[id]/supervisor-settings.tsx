@@ -3,6 +3,7 @@ import { View, Text, ScrollView, Switch, Pressable, TextInput, ActivityIndicator
 import { useLocalSearchParams, useNavigation } from "expo-router";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { Typography } from "@/constants/Typography";
+import { resolveActiveTint } from "@/constants/activeTint";
 import { useProject } from "@/hooks/useProjects";
 import { ItemGroup } from "@/components/ItemGroup";
 import { t } from "@/text";
@@ -1284,7 +1285,7 @@ const styles = StyleSheet.create((theme) => ({
         backgroundColor: theme.colors.surface,
     },
     concurrencyOptionSelected: {
-        backgroundColor: theme.dark ? theme.colors.accentPurple : theme.colors.header.tint,
+        backgroundColor: resolveActiveTint(theme),
     },
     concurrencyOptionText: {
         ...Typography.default("semiBold"),
@@ -1300,7 +1301,7 @@ const styles = StyleSheet.create((theme) => ({
         paddingBottom: 16,
     },
     saveButton: {
-        backgroundColor: theme.dark ? theme.colors.accentPurple : theme.colors.header.tint,
+        backgroundColor: resolveActiveTint(theme),
         borderRadius: 12,
         paddingVertical: 14,
         alignItems: "center",

@@ -8,6 +8,7 @@ import { View, Text, Pressable, ActivityIndicator } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { Ionicons } from "@expo/vector-icons";
 import { Typography } from "@/constants/Typography";
+import { resolveActiveTint } from "@/constants/activeTint";
 import { t } from "@/text";
 import { useHappyAction } from "@/hooks/useHappyAction";
 import { TokenStorage } from "@/auth/tokenStorage";
@@ -378,7 +379,7 @@ export const SupervisorLoopConfigPanel = React.memo(
                         </Text>
                     </Pressable>
                     <Pressable
-                        style={[styles.button, styles.startButton, { backgroundColor: theme.dark ? theme.colors.accentPurple : theme.colors.header.tint }]}
+                        style={[styles.button, styles.startButton, { backgroundColor: resolveActiveTint(theme) }]}
                         onPress={doStart}
                         disabled={startLoading}
                     >
@@ -478,8 +479,8 @@ const styles = StyleSheet.create((theme) => ({
         borderColor: theme.colors.divider,
     },
     profileChipSelected: {
-        backgroundColor: theme.colors.header.tint,
-        borderColor: theme.colors.header.tint,
+        backgroundColor: resolveActiveTint(theme),
+        borderColor: resolveActiveTint(theme),
     },
     profileChipText: {
         ...Typography.default("semiBold"),

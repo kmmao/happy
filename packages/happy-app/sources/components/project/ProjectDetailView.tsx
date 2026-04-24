@@ -14,6 +14,7 @@ import { useSetting } from "@/sync/storage";
 import { Ionicons } from "@expo/vector-icons";
 import { useIsTablet } from "@/utils/responsive";
 import { resolveUiTabToneColors } from "@/components/tabTone";
+import { resolveActiveTint } from "@/constants/activeTint";
 
 import { resolveProjectDetailInitialTab, resolveProjectDetailTabs, type ProjectDetailTabKey } from "./projectDetailTabs";
 import { resolveProjectDetailTabPresentation } from "./projectDetailTabPresentation";
@@ -254,7 +255,7 @@ const styles = StyleSheet.create((theme) => ({
         paddingHorizontal: 10,
     },
     segmentButtonActive: {
-        backgroundColor: theme.dark ? theme.colors.accentPurple : theme.colors.header.tint,
+        backgroundColor: resolveActiveTint(theme),
     },
     segmentButtonPressed: {
         opacity: 0.88,

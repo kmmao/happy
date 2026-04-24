@@ -3,6 +3,7 @@ import { ActivityIndicator, Pressable, Text, TextInput, View } from "react-nativ
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { Typography } from "@/constants/Typography";
+import { resolveActiveTint } from "@/constants/activeTint";
 import { useHappyAction } from "@/hooks/useHappyAction";
 import { TokenStorage } from "@/auth/tokenStorage";
 import { createSkill } from "@/sync/apiSkills";
@@ -103,7 +104,7 @@ function NewSkillPage() {
                         styles.createButton,
                         {
                             backgroundColor: canSubmit && !loading
-                                ? theme.colors.header.tint
+                                ? resolveActiveTint(theme)
                                 : theme.colors.textSecondary,
                         },
                     ]}

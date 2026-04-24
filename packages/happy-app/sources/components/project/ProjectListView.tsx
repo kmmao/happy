@@ -6,6 +6,7 @@ import { ItemList } from "@/components/ItemList";
 import { ItemGroup } from "@/components/ItemGroup";
 import { Ionicons } from "@expo/vector-icons";
 import { Typography } from "@/constants/Typography";
+import { resolveActiveTint } from "@/constants/activeTint";
 import { useProjects } from "@/hooks/useProjects";
 import { ProjectCard } from "./ProjectCard";
 import { Modal } from "@/modal";
@@ -140,7 +141,7 @@ const styles = StyleSheet.create((theme) => ({
         alignItems: "center",
         gap: 6,
         marginTop: 24,
-        backgroundColor: theme.dark ? theme.colors.accentPurple : theme.colors.header.tint,
+        backgroundColor: resolveActiveTint(theme),
         paddingHorizontal: 20,
         paddingVertical: 12,
         borderRadius: 10,

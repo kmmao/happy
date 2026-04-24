@@ -3,6 +3,7 @@ import { ActivityIndicator, Pressable, TextInput, View, Text } from "react-nativ
 import { useLocalSearchParams, useNavigation, useRouter } from "expo-router";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { Typography } from "@/constants/Typography";
+import { resolveActiveTint } from "@/constants/activeTint";
 import { TokenStorage } from "@/auth/tokenStorage";
 import { fetchTask, updateTask } from "@/sync/apiTasks";
 import { Modal } from "@/modal";
@@ -132,7 +133,7 @@ function EditTaskPage() {
                         styles.saveButton,
                         {
                             backgroundColor: canSave
-                                ? theme.colors.header.tint
+                                ? resolveActiveTint(theme)
                                 : theme.colors.textSecondary,
                         },
                     ]}

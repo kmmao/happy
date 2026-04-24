@@ -3,6 +3,7 @@ import { View, Text, TextInput, Pressable } from "react-native";
 import { useRouter } from "expo-router";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { Typography } from "@/constants/Typography";
+import { resolveActiveTint } from "@/constants/activeTint";
 import { useAllMachines } from "@/sync/storage";
 import { Ionicons } from "@expo/vector-icons";
 import { isMachineOnline } from "@/utils/machineUtils";
@@ -120,7 +121,7 @@ function AddProjectScreen() {
                         styles.createButton,
                         {
                             backgroundColor: canSubmit && !loading
-                                ? theme.colors.header.tint
+                                ? resolveActiveTint(theme)
                                 : theme.colors.textSecondary,
                         },
                     ]}

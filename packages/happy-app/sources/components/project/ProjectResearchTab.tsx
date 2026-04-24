@@ -13,6 +13,7 @@ import {
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { Ionicons } from "@expo/vector-icons";
 import { Typography } from "@/constants/Typography";
+import { resolveActiveTint } from "@/constants/activeTint";
 import { t } from "@/text";
 import { Project } from "@/sync/projectManager";
 import { TokenStorage } from "@/auth/tokenStorage";
@@ -848,7 +849,7 @@ const styles = StyleSheet.create((theme) => ({
         gap: 6,
     },
     startButton: {
-        backgroundColor: theme.dark ? theme.colors.accentPurple : theme.colors.header.tint,
+        backgroundColor: resolveActiveTint(theme),
     },
     cancelButton: {
         backgroundColor: theme.colors.deleteAction,

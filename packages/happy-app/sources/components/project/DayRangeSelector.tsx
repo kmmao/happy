@@ -2,6 +2,7 @@ import * as React from "react";
 import { View, Text, Pressable, ActivityIndicator } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { Typography } from "@/constants/Typography";
+import { resolveActiveTint } from "@/constants/activeTint";
 
 const DAY_OPTIONS = [3, 7, 14, 30] as const;
 
@@ -23,7 +24,7 @@ export const DayRangeSelector = React.memo(
                         style={[
                             styles.button,
                             selectedDays === days && {
-                                backgroundColor: theme.dark ? theme.colors.accentPurple : theme.colors.header.tint,
+                                backgroundColor: resolveActiveTint(theme),
                             },
                         ]}
                         onPress={() => onDaysChange(days)}
