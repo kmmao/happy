@@ -579,9 +579,12 @@ export async function runAcp(opts: {
     });
   session = initialSession;
 
+  // HAPPY_SPAWN_ID is injected by the daemon at spawn time; absent when
+  // started directly by the user.
+  const spawnId = process.env.HAPPY_SPAWN_ID;
   if (response) {
     try {
-      await notifyDaemonSessionStarted(response.id, metadata);
+      await notifyDaemonSessionStarted(response.id, metadata, spawnId);
     } catch (error) {
       logger.debug("[acp] Failed to report session to daemon:", error);
     }

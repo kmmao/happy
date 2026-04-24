@@ -313,10 +313,14 @@ export async function runClaude(
 
   logger.debug(`Session created: ${response.id}`);
 
-  // Always report to daemon if it exists
+  // Always report to daemon if it exists. HAPPY_SPAWN_ID is injected by the
+  // daemon at spawn time; absent when this CLI was started directly by the user.
+  const spawnId = process.env.HAPPY_SPAWN_ID;
   try {
-    logger.debug(`[START] Reporting session ${response.id} to daemon`);
-    const result = await notifyDaemonSessionStarted(response.id, metadata);
+    logger.debug(
+      `[START] Reporting session ${response.id} to daemon${spawnId ? ` (spawnId=${spawnId})` : ""}`,
+    );
+    const result = await notifyDaemonSessionStarted(response.id, metadata, spawnId);
     if (result.error) {
       logger.debug(
         `[START] Failed to report to daemon (may not be running):`,

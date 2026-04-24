@@ -437,11 +437,15 @@ export async function runCodex(opts: {
     });
   session = initialSession;
 
-  // Always report to daemon if it exists (skip if offline)
+  // Always report to daemon if it exists (skip if offline). HAPPY_SPAWN_ID is
+  // injected by the daemon at spawn time; absent when started directly by the user.
+  const spawnId = process.env.HAPPY_SPAWN_ID;
   if (response) {
     try {
-      logger.debug(`[START] Reporting session ${response.id} to daemon`);
-      const result = await notifyDaemonSessionStarted(response.id, metadata);
+      logger.debug(
+        `[START] Reporting session ${response.id} to daemon${spawnId ? ` (spawnId=${spawnId})` : ""}`,
+      );
+      const result = await notifyDaemonSessionStarted(response.id, metadata, spawnId);
       if (result.error) {
         logger.debug(
           `[START] Failed to report to daemon (may not be running):`,
