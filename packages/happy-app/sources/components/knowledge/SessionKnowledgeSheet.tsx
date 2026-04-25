@@ -82,16 +82,13 @@ function isAccessEntry(
 }
 
 const HotBadge = React.memo<HotBadgeProps>(({ entry }) => {
-    if (!isAccessEntry(entry)) return null;
-    const hotStatus = entry.hotStatus;
-    const turnsRemaining = entry.turnsRemaining;
-    const maxTurns = entry.maxTurns;
-    const hitCount = entry.hitCount ?? 0;
+    const accessEntry = isAccessEntry(entry) ? entry : null;
+    const hotStatus = accessEntry?.hotStatus;
+    const turnsRemaining = accessEntry?.turnsRemaining;
+    const maxTurns = accessEntry?.maxTurns;
+    const hitCount = accessEntry?.hitCount ?? 0;
 
-    // Backward compat: if server didn't include TTL fields, skip the badge entirely.
-    if (hotStatus === undefined && turnsRemaining === undefined) return null;
-
-    // Delta animation: show +N / −N when turnsRemaining changes
+    // All hooks must be unconditional — no early returns before this block.
     const prevTurnsRef = React.useRef<number | undefined>(undefined);
     const [deltaText, setDeltaText] = React.useState<string | null>(null);
     const deltaOpacity = React.useRef(new Animated.Value(0)).current;
@@ -111,7 +108,6 @@ const HotBadge = React.memo<HotBadgeProps>(({ entry }) => {
         prevTurnsRef.current = turnsRemaining;
     }, [turnsRemaining]);
 
-    // Evicted pulse: scale 1 → 1.18 → 1 when transitioning hot → evicted
     const prevHotStatusRef = React.useRef<string | undefined>(undefined);
     const evictedScale = React.useRef(new Animated.Value(1)).current;
 
@@ -126,6 +122,11 @@ const HotBadge = React.memo<HotBadgeProps>(({ entry }) => {
         }
         prevHotStatusRef.current = hotStatus;
     }, [hotStatus]);
+
+    if (!accessEntry) return null;
+
+    // Backward compat: if server didn't include TTL fields, skip the badge entirely.
+    if (hotStatus === undefined && turnsRemaining === undefined) return null;
 
     // Long-press opens an inline explanation so users understand why an entry
     // is "hot" vs "evicted" and how the turn-based countdown works.
