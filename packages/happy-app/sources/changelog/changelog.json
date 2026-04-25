@@ -2,6 +2,30 @@
   "entries": {
     "en": [
       {
+        "version": "2.15.0",
+        "date": "2026-04-25",
+        "summary": "This release brings full profile-per-trigger binding, a restored Git tab, LLM-weighted option scoring, and several session management improvements.",
+        "changes": [
+          "Added ProfilePicker to Cron and Webhook edit pages — each trigger can now run under a specific runtime profile",
+          "Added runtime-profile preview in Supervisor settings so you can verify which profile a trigger will use before it fires",
+          "Improved profile label on triggers to be tap-to-edit when the source is a saved profile",
+          "Added health and research profile overrides in Supervisor settings",
+          "Restored Git tab to the project detail view",
+          "Added Config tab to project detail, consolidating project-level knowledge and settings in one place",
+          "Added Smart Clean button to machine diagnostics for one-tap stale-data cleanup",
+          "Added one-tap CLI version upgrade button in the session header and info page — no confirmation dialog",
+          "Added stale session detection with selective cleanup RPCs to recover from stuck sessions",
+          "Fixed session messages not refreshing when returning to the app from the background",
+          "Improved option score badges to reflect LLM-weighted scores when semantic re-ranking was applied, with a \"+\" indicator to show LLM influence",
+          "Updated Claude Agent SDK to 0.2.119",
+          "Added claude-control sidebar components (file viewer, tool calls, session info) for richer in-session visibility",
+          "Fixed message backfill not resuming correctly after session interrupts",
+          "Fixed security vulnerability in the `uuid` dependency (buffer overflow, GHSA-w5hq-g745-h8pq)",
+          "Fixed Math and Mermaid rendering when content contains HTML-like syntax"
+        ],
+        "rawMarkdown": "## 2.15.0 - 2026-04-25\n\n\nThis release brings full profile-per-trigger binding, a restored Git tab, LLM-weighted option scoring, and several session management improvements.\n\n### Profile & Trigger Management\n- Added ProfilePicker to Cron and Webhook edit pages — each trigger can now run under a specific runtime profile\n- Added runtime-profile preview in Supervisor settings so you can verify which profile a trigger will use before it fires\n- Improved profile label on triggers to be tap-to-edit when the source is a saved profile\n- Added health and research profile overrides in Supervisor settings\n\n### Project\n- Restored Git tab to the project detail view\n- Added Config tab to project detail, consolidating project-level knowledge and settings in one place\n- Added Smart Clean button to machine diagnostics for one-tap stale-data cleanup\n\n### Session\n- Added one-tap CLI version upgrade button in the session header and info page — no confirmation dialog\n- Added stale session detection with selective cleanup RPCs to recover from stuck sessions\n- Fixed session messages not refreshing when returning to the app from the background\n\n### Auto-Send & Options\n- Improved option score badges to reflect LLM-weighted scores when semantic re-ranking was applied, with a \"+\" indicator to show LLM influence\n\n### SDK & Integrations\n- Updated Claude Agent SDK to 0.2.119\n- Added claude-control sidebar components (file viewer, tool calls, session info) for richer in-session visibility\n\n### Bug Fixes\n- Fixed message backfill not resuming correctly after session interrupts\n- Fixed security vulnerability in the `uuid` dependency (buffer overflow, GHSA-w5hq-g745-h8pq)\n- Fixed Math and Mermaid rendering when content contains HTML-like syntax"
+      },
+      {
         "version": "2.14.1",
         "date": "2026-04-24",
         "summary": "Restored the XHigh reasoning option for Opus 4.7 sessions, and fixed long-session message loading so refreshes on PC Web reliably fill in all history.",
@@ -567,6 +591,30 @@
     ],
     "zh-Hans": [
       {
+        "version": "2.15.0",
+        "date": "2026-04-25",
+        "summary": "本次更新带来完整的触发器级 Profile 绑定、Git 标签页恢复、LLM 加权选项评分，以及多项会话管理改进。",
+        "changes": [
+          "新增 Cron 和 Webhook 编辑页的 ProfilePicker — 每个触发器现在可以指定独立的运行时 Profile",
+          "新增 Supervisor 设置中的运行时 Profile 预览，可在触发前确认将使用哪个 Profile",
+          "改进触发器的 Profile 标签，当来源为已保存 Profile 时支持点击直接编辑",
+          "新增 Supervisor 设置中的健康检查和调研 Profile 独立覆盖选项",
+          "恢复项目详情页的 Git 标签页",
+          "新增项目详情页 Config 标签页，将项目级知识库配置和设置整合到一处",
+          "新增机器诊断页的 Smart Clean 按钮，一键清理过时数据",
+          "新增会话 Header 和信息页的 CLI 版本一键升级按钮，无需二次确认",
+          "新增失效会话检测与选择性清理 RPC，帮助从卡死会话中恢复",
+          "修复从后台返回 App 时会话消息未能自动刷新的问题",
+          "改进选项评分 Badge，当启用了语义重排序时显示 LLM 加权后的分数，并以\"+\"标识符标注 LLM 的影响",
+          "更新 Claude Agent SDK 至 0.2.119",
+          "新增 claude-control 侧边栏组件（文件查看器、工具调用、会话信息），提供更丰富的会话内可见性",
+          "修复会话中断后消息回填无法正确恢复的问题",
+          "修复 `uuid` 依赖的安全漏洞（缓冲区越界，GHSA-w5hq-g745-h8pq）",
+          "修复包含 HTML 类语法的内容在 Math 和 Mermaid 渲染时出错的问题"
+        ],
+        "rawMarkdown": "## 2.15.0 - 2026-04-25\n\n\n本次更新带来完整的触发器级 Profile 绑定、Git 标签页恢复、LLM 加权选项评分，以及多项会话管理改进。\n\n### Profile 与触发器管理\n- 新增 Cron 和 Webhook 编辑页的 ProfilePicker — 每个触发器现在可以指定独立的运行时 Profile\n- 新增 Supervisor 设置中的运行时 Profile 预览，可在触发前确认将使用哪个 Profile\n- 改进触发器的 Profile 标签，当来源为已保存 Profile 时支持点击直接编辑\n- 新增 Supervisor 设置中的健康检查和调研 Profile 独立覆盖选项\n\n### 项目\n- 恢复项目详情页的 Git 标签页\n- 新增项目详情页 Config 标签页，将项目级知识库配置和设置整合到一处\n- 新增机器诊断页的 Smart Clean 按钮，一键清理过时数据\n\n### 会话\n- 新增会话 Header 和信息页的 CLI 版本一键升级按钮，无需二次确认\n- 新增失效会话检测与选择性清理 RPC，帮助从卡死会话中恢复\n- 修复从后台返回 App 时会话消息未能自动刷新的问题\n\n### 自动发送与选项\n- 改进选项评分 Badge，当启用了语义重排序时显示 LLM 加权后的分数，并以\"+\"标识符标注 LLM 的影响\n\n### SDK 与集成\n- 更新 Claude Agent SDK 至 0.2.119\n- 新增 claude-control 侧边栏组件（文件查看器、工具调用、会话信息），提供更丰富的会话内可见性\n\n### Bug 修复\n- 修复会话中断后消息回填无法正确恢复的问题\n- 修复 `uuid` 依赖的安全漏洞（缓冲区越界，GHSA-w5hq-g745-h8pq）\n- 修复包含 HTML 类语法的内容在 Math 和 Mermaid 渲染时出错的问题"
+      },
+      {
         "version": "2.14.1",
         "date": "2026-04-24",
         "summary": "恢复 Opus 4.7 会话中的 XHigh 推理强度选项，同时修复 PC Web 长会话刷新后历史消息加载不完整的问题。",
@@ -1111,7 +1159,7 @@
       }
     ]
   },
-  "latestVersion": "2.14.1",
+  "latestVersion": "2.15.0",
   "availableLocales": [
     "en",
     "zh-Hans"

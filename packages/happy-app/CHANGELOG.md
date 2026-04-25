@@ -1,5 +1,37 @@
 # Changelog
 
+## 2.15.0 - 2026-04-25
+
+This release brings full profile-per-trigger binding, a restored Git tab, LLM-weighted option scoring, and several session management improvements.
+
+### Profile & Trigger Management
+- Added ProfilePicker to Cron and Webhook edit pages — each trigger can now run under a specific runtime profile
+- Added runtime-profile preview in Supervisor settings so you can verify which profile a trigger will use before it fires
+- Improved profile label on triggers to be tap-to-edit when the source is a saved profile
+- Added health and research profile overrides in Supervisor settings
+
+### Project
+- Restored Git tab to the project detail view
+- Added Config tab to project detail, consolidating project-level knowledge and settings in one place
+- Added Smart Clean button to machine diagnostics for one-tap stale-data cleanup
+
+### Session
+- Added one-tap CLI version upgrade button in the session header and info page — no confirmation dialog
+- Added stale session detection with selective cleanup RPCs to recover from stuck sessions
+- Fixed session messages not refreshing when returning to the app from the background
+
+### Auto-Send & Options
+- Improved option score badges to reflect LLM-weighted scores when semantic re-ranking was applied, with a "+" indicator to show LLM influence
+
+### SDK & Integrations
+- Updated Claude Agent SDK to 0.2.119
+- Added claude-control sidebar components (file viewer, tool calls, session info) for richer in-session visibility
+
+### Bug Fixes
+- Fixed message backfill not resuming correctly after session interrupts
+- Fixed security vulnerability in the `uuid` dependency (buffer overflow, GHSA-w5hq-g745-h8pq)
+- Fixed Math and Mermaid rendering when content contains HTML-like syntax
+
 ## 2.14.1 - 2026-04-24
 
 Restored the XHigh reasoning option for Opus 4.7 sessions, and fixed long-session message loading so refreshes on PC Web reliably fill in all history.
