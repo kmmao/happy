@@ -6,9 +6,8 @@
  * onClose 由 CustomModal 自动注入。
  */
 import * as React from "react";
-import { Platform, Pressable, ScrollView, Text, View } from "react-native";
+import { Platform, Pressable, ScrollView, Text, View, useWindowDimensions } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { BlurView } from "expo-blur";
 import { useUnistyles } from "react-native-unistyles";
 import { BaseModal } from "@/modal/components/BaseModal";
 
@@ -115,7 +114,9 @@ export function DetailSheet({
     onClose,
 }: DetailSheetProps) {
     const { theme } = useUnistyles();
-    const isDark = (theme.colors.surface as string).toLowerCase().startsWith("#1");
+    const { height: screenHeight } = useWindowDimensions();
+    // 最多占屏幕 65%，上方至少留 35% 供点击关闭
+    const maxHeight = screenHeight * 0.65;
 
     const actionButtons = buttons.filter((b) => b.style !== "cancel");
     const cancelButton = buttons.find((b) => b.style === "cancel");
@@ -124,24 +125,18 @@ export function DetailSheet({
         <BaseModal visible onClose={onClose} closeOnBackdrop>
             <View style={{
                 maxWidth: 480, width: "100%",
-                maxHeight: "88%" as any,
+                maxHeight,
                 borderRadius: 22, overflow: "hidden",
+                shadowColor: "#000",
+                shadowOffset: { width: 0, height: 8 },
+                shadowOpacity: 0.15,
+                shadowRadius: 20,
+                elevation: 12,
             }}>
-                <BlurView
-                    intensity={Platform.OS === "web" ? 0 : 72}
-                    tint={isDark ? "dark" : "light"}
-                    style={{ flex: 1 }}
-                >
                     <View style={{
-                        backgroundColor: isDark ? "rgba(26,26,30,0.7)" : "rgba(252,252,255,0.7)",
+                        backgroundColor: theme.colors.surface,
                         borderRadius: 22,
-                        borderWidth: 1,
-                        borderColor: isDark ? "rgba(255,255,255,0.1)" : "rgba(255,255,255,0.85)",
                         overflow: "hidden",
-                        ...(Platform.OS === "web" ? {
-                            backdropFilter: "blur(28px) saturate(180%)",
-                            WebkitBackdropFilter: "blur(28px) saturate(180%)",
-                        } as any : {}),
                     }}>
 
                         {/* 拖动把手 */}
@@ -267,9 +262,7 @@ export function DetailSheet({
                                         paddingVertical: 14, alignItems: "center",
                                         borderBottomWidth: i < actionButtons.length - 1 ? 1 : 0,
                                         borderBottomColor: theme.colors.divider + "40",
-                                        backgroundColor: pressed
-                                            ? (isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.04)")
-                                            : "transparent",
+                                        backgroundColor: pressed ? theme.colors.surfaceHigh : "transparent",
                                     })}
                                     onPress={() => { btn.onPress?.(); onClose(); }}
                                 >
@@ -288,10 +281,8 @@ export function DetailSheet({
                                     style={({ pressed }) => ({
                                         paddingVertical: 14, alignItems: "center",
                                         borderTopWidth: 5,
-                                        borderTopColor: isDark ? "rgba(0,0,0,0.35)" : "rgba(0,0,0,0.07)",
-                                        backgroundColor: pressed
-                                            ? (isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.04)")
-                                            : "transparent",
+                                        borderTopColor: theme.colors.groupped.background,
+                                        backgroundColor: pressed ? theme.colors.surfaceHigh : "transparent",
                                     })}
                                     onPress={onClose}
                                 >
@@ -303,7 +294,6 @@ export function DetailSheet({
                         </View>
 
                     </View>
-                </BlurView>
             </View>
         </BaseModal>
     );
