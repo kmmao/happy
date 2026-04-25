@@ -75,12 +75,30 @@ const fixWorktrees = new Map<
   }
 >();
 
+// Track in-flight research/analysis sessions for fallback failure reporting on exit.
+// If the session exits without sending the HTTP callback, the daemon uses this to
+// emit a "failed" status and prevent the run from being stuck as "running" forever.
+const researchRuns = new Map<string, { readonly runId: string; readonly projectId: string }>();
+
 /**
  * Look up fix worktree info for a given session.
  * Used by the daemon to detect orphaned fix sessions on exit.
  */
 export function getFixWorktreeInfo(sessionId: string) {
   return fixWorktrees.get(sessionId) ?? null;
+}
+
+/**
+ * Look up research/analysis run info for a given session.
+ * Used by the daemon to emit a fallback "failed" status if the session exits
+ * without the Claude-side curl callback completing successfully.
+ */
+export function getResearchRunInfo(sessionId: string) {
+  return researchRuns.get(sessionId) ?? null;
+}
+
+export function forgetResearchRun(sessionId: string): void {
+  researchRuns.delete(sessionId);
 }
 
 /**
@@ -524,6 +542,7 @@ async function handleAnalysisTrigger(
     status: "running",
     sessionId: spawnResult.sessionId,
   });
+  researchRuns.set(spawnResult.sessionId, { runId, projectId });
   await deps.rememberGuardianSession?.(data, spawnResult.sessionId);
   return spawnResult.sessionId;
 }
@@ -613,6 +632,7 @@ async function handleResearchTrigger(
     status: "running",
     sessionId: spawnResult.sessionId,
   });
+  researchRuns.set(spawnResult.sessionId, { runId, projectId });
   await deps.rememberGuardianSession?.(data, spawnResult.sessionId);
   return spawnResult.sessionId;
 }

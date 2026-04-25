@@ -216,61 +216,75 @@ curl -s -X POST "${reportUrl}" \\
 
 ## MANDATORY: Report Results (CRITICAL — do this AFTER your analysis)
 
-### Step 1: Report results to the server
-Write your report AND actions to a temp file, then POST it to the server using curl.
-Use the Bash tool to run this exact sequence:
+Use Python to build and submit the JSON payload. Python's \`json.dumps\` handles all
+escaping automatically — no manual JSON escaping needed.
 
-\`\`\`
-# Write the report JSON to a temp file
-# IMPORTANT: Include both reportContent (full Markdown) AND actions (structured items from Step 4)
-cat > /tmp/research-result-${options.runId}.json << 'RESEARCH_EOF'
-{
-  "status": "completed",
-  "reportTitle": "<Your Report Title>",
-  "reportContent": "<Full Markdown Report Content>",
-  "actions": [
+Use the Bash tool to run this exact script (replace the placeholder values):
+
+\`\`\`bash
+python3 - << 'PYEOF'
+import json, subprocess, sys, os
+
+report_title = """<Your Report Title>"""
+
+report_content = """<Full Markdown Report Content>"""
+
+actions = [
     {
-      "severity": "high",
-      "category": "research",
-      "title": "<Short actionable title>",
-      "description": "<What to build and why>",
-      "suggestedFix": "<Concrete implementation approach>",
-      "confidence": 80
-    }
-  ]
-}
-RESEARCH_EOF
+        "severity": "high",
+        "category": "research",
+        "title": "<Short actionable title>",
+        "description": "<What to build and why>",
+        "suggestedFix": "<Concrete implementation approach>",
+        "confidence": 80,
+    },
+]
 
-# POST results to server
-curl -s -X POST "${reportUrl}" \\
-  -H "Authorization: Bearer $HAPPY_SUPERVISOR_CALLBACK_TOKEN" \\
-  -H "X-Happy-Machine-Id: $HAPPY_SUPERVISOR_MACHINE_ID" \\
-  -H "Content-Type: application/json" \\
-  -d @/tmp/research-result-${options.runId}.json
+tmp = "/tmp/research-result-${options.runId}.json"
+with open(tmp, "w") as f:
+    json.dump({
+        "status": "completed",
+        "reportTitle": report_title.strip(),
+        "reportContent": report_content.strip(),
+        "actions": actions,
+    }, f)
 
-# Cleanup
-rm -f /tmp/research-result-${options.runId}.json
+token = os.environ.get("HAPPY_SUPERVISOR_CALLBACK_TOKEN", "")
+machine_id = os.environ.get("HAPPY_SUPERVISOR_MACHINE_ID", "")
+result = subprocess.run(
+    ["curl", "-s", "-o", "/dev/null", "-w", "%{http_code}", "-X", "POST",
+     "${reportUrl}",
+     "-H", f"Authorization: Bearer {token}",
+     "-H", f"X-Happy-Machine-Id: {machine_id}",
+     "-H", "Content-Type: application/json",
+     "-d", f"@{tmp}"],
+    capture_output=True, text=True,
+)
+os.unlink(tmp)
+http_code = result.stdout.strip()
+if http_code.startswith("2"):
+    print(f"[SUPERVISOR] Report submitted (HTTP {http_code})")
+else:
+    print(f"[SUPERVISOR] Submission failed (HTTP {http_code})", file=sys.stderr)
+    # Report failure so the run is not left stuck as running
+    subprocess.run(
+        ["curl", "-s", "-X", "POST", "${reportUrl}",
+         "-H", f"Authorization: Bearer {token}",
+         "-H", f"X-Happy-Machine-Id: {machine_id}",
+         "-H", "Content-Type: application/json",
+         "-d", json.dumps({"status": "failed", "errorMessage": f"Report submission failed (HTTP {http_code})"})],
+        capture_output=True,
+    )
+    sys.exit(1)
+PYEOF
 \`\`\`
 
-**Important**: The JSON body must contain:
-- \`"status": "completed"\`
-- \`"reportTitle"\` — short title for the report
-- \`"reportContent"\` — full Markdown report
-- \`"actions"\` — array of actionable items extracted in Step 4 (max 10)
-
-Use the HAPPY_SUPERVISOR_CALLBACK_TOKEN environment variable (already set) for authentication.
-Escape all special characters properly in the JSON. For newlines in reportContent, use \\n.
+**Important**:
+- Replace \`report_title\`, \`report_content\`, and \`actions\` with your actual content
+- \`actions\` max 10 items; each needs \`severity\`, \`category\`, \`title\`, \`description\`
+- On failure the script automatically sends \`status: "failed"\` so the run is never left stuck
 
 After reporting, stop and wait. Do not send "/exit" — the user may want to inspect or continue this session.
-
-If the curl command fails, report failure instead:
-\`\`\`
-curl -s -X POST "${reportUrl}" \\
-  -H "Authorization: Bearer $HAPPY_SUPERVISOR_CALLBACK_TOKEN" \\
-  -H "X-Happy-Machine-Id: $HAPPY_SUPERVISOR_MACHINE_ID" \\
-  -H "Content-Type: application/json" \\
-  -d '{"status":"failed","errorMessage":"Failed to report research results"}'
-\`\`\`
 
 Begin your analysis now.`;
 }

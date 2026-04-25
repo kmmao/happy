@@ -192,41 +192,66 @@ Do this for EVERY dimension, one by one, before moving to the next dimension.
 
 ## MANDATORY: Report Results (CRITICAL — do this AFTER your analysis)
 
-After completing your analysis, you MUST execute the following two steps in order:
+Use Python to build and submit the JSON payload. Python's \`json.dumps\` handles all
+escaping automatically — no manual JSON escaping needed.
 
-### Step 1: Report results to the server
-Write your actions JSON to a temp file, then POST it to the server using curl.
-Use the Bash tool to run this exact sequence:
+Use the Bash tool to run this exact script (replace the actions array with your actual findings):
 
+\`\`\`bash
+python3 - << 'PYEOF'
+import json, subprocess, sys, os
+
+actions = [
+    {
+        "severity": "high",
+        "category": "<dimension_key>",
+        "title": "<Short finding title>",
+        "description": "<What the issue is and why it matters>",
+        "suggestedFix": "<Concrete fix referencing real file paths>",
+        "confidence": 80,
+    },
+]
+
+tmp = "/tmp/supervisor-result-${options.runId}.json"
+with open(tmp, "w") as f:
+    json.dump({"status": "completed", "actions": actions}, f)
+
+token = os.environ.get("HAPPY_SUPERVISOR_CALLBACK_TOKEN", "")
+machine_id = os.environ.get("HAPPY_SUPERVISOR_MACHINE_ID", "")
+result = subprocess.run(
+    ["curl", "-s", "-o", "/dev/null", "-w", "%{http_code}", "-X", "POST",
+     "${reportUrl}",
+     "-H", f"Authorization: Bearer {token}",
+     "-H", f"X-Happy-Machine-Id: {machine_id}",
+     "-H", "Content-Type: application/json",
+     "-d", f"@{tmp}"],
+    capture_output=True, text=True,
+)
+os.unlink(tmp)
+http_code = result.stdout.strip()
+if http_code.startswith("2"):
+    print(f"[SUPERVISOR] Results submitted (HTTP {http_code})")
+else:
+    print(f"[SUPERVISOR] Submission failed (HTTP {http_code})", file=sys.stderr)
+    # Report failure so the run is not left stuck as running
+    subprocess.run(
+        ["curl", "-s", "-X", "POST", "${reportUrl}",
+         "-H", f"Authorization: Bearer {token}",
+         "-H", f"X-Happy-Machine-Id: {machine_id}",
+         "-H", "Content-Type: application/json",
+         "-d", json.dumps({"status": "failed", "errorMessage": f"Results submission failed (HTTP {http_code})"})],
+        capture_output=True,
+    )
+    sys.exit(1)
+PYEOF
 \`\`\`
-# Write the actions JSON to a temp file (replace the actions array with your actual findings)
-cat > /tmp/supervisor-result-${options.runId}.json << 'SUPERVISOR_EOF'
-{"status":"completed","actions":[... your actual actions array here ...]}
-SUPERVISOR_EOF
 
-# POST results to server
-curl -s -X POST "${reportUrl}" \\
-  -H "Authorization: Bearer $HAPPY_SUPERVISOR_CALLBACK_TOKEN" \\
-  -H "X-Happy-Machine-Id: $HAPPY_SUPERVISOR_MACHINE_ID" \\
-  -H "Content-Type: application/json" \\
-  -d @/tmp/supervisor-result-${options.runId}.json
-
-# Cleanup
-rm -f /tmp/supervisor-result-${options.runId}.json
-\`\`\`
-
-**Important**: The JSON body must contain \`"status": "completed"\` and the \`"actions"\` array with your findings. Use the HAPPY_SUPERVISOR_CALLBACK_TOKEN environment variable (already set) for authentication.
+**Important**:
+- Replace the \`actions\` list with your actual findings (max 10 items)
+- Each action needs: \`severity\`, \`category\`, \`title\`, \`description\`; \`suggestedFix\` and \`confidence\` are optional
+- On failure the script automatically sends \`status: "failed"\` so the run is never left stuck
 
 After reporting, stop and wait. Do not send "/exit" — the user may want to inspect or continue this session.
-
-If the curl command fails, report failure instead:
-\`\`\`
-curl -s -X POST "${reportUrl}" \\
-  -H "Authorization: Bearer $HAPPY_SUPERVISOR_CALLBACK_TOKEN" \\
-  -H "X-Happy-Machine-Id: $HAPPY_SUPERVISOR_MACHINE_ID" \\
-  -H "Content-Type: application/json" \\
-  -d '{"status":"failed","errorMessage":"Failed to report results"}'
-\`\`\`
 
 Begin your analysis now.`;
 }
