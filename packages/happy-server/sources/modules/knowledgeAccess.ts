@@ -5,8 +5,8 @@
  * Also syncs lastAccessedAt + accessCount on ProjectKnowledge for lifecycle decay.
  *
  * Session-scoped TTL-by-turn (migrate-out countdown):
- *   - On injection: seed turnsRemaining = 1 for all confidence levels.
- *                   maxTurns caps the +1 growth on hits (2× initial).
+ *   - On injection: seed turnsRemaining = 1 (use-it-or-lose-it).
+ *                   maxTurns varies by confidence (high=14, medium=10, low=6).
  *   - On turn end: hits increment turnsRemaining (up to maxTurns) and hitCount;
  *                  misses decrement turnsRemaining; at ≤ 0 hotStatus becomes "evicted".
  *   - Evicted entries are excluded from future in-session injections.
@@ -15,18 +15,20 @@
 import { db } from "@/storage/db";
 
 // ─── Initial turn budgets per confidence ───
+// All entries start at 1 (use-it-or-lose-it on first turn).
+// maxTurns still varies by confidence so frequently-referenced
+// high-confidence entries can grow and stay much longer.
 
-const INITIAL_TURNS: Record<string, number> = {
-    high: 1,
-    medium: 1,
-    low: 1,
+const INITIAL_TURNS = 1;
+
+const MAX_TURNS: Record<string, number> = {
+    high: 14,
+    medium: 10,
+    low: 6,
 };
 
-const MAX_TURN_MULTIPLIER = 2; // cap = initial × 2
-
 export function getInitialTurnBudget(confidence: string): { initialTurns: number; maxTurns: number } {
-    const initialTurns = INITIAL_TURNS[confidence] ?? INITIAL_TURNS.medium;
-    return { initialTurns, maxTurns: initialTurns * MAX_TURN_MULTIPLIER };
+    return { initialTurns: INITIAL_TURNS, maxTurns: MAX_TURNS[confidence] ?? MAX_TURNS.medium };
 }
 
 interface AccessEntry {
