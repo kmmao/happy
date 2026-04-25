@@ -5,7 +5,6 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { useUnistyles } from "react-native-unistyles";
 import { Item } from "@/components/Item";
 import { ItemGroup } from "@/components/ItemGroup";
-import { ItemList } from "@/components/ItemList";
 import { Modal } from "@/modal";
 import {
     machineSetKillswitch,
@@ -360,6 +359,41 @@ export default React.memo(function MachineAutomationPage() {
                 </Pressable>
             ) : null}
 
+            {/* ── Pipeline: interactive section selector ── */}
+            <View style={styles.pipelineContainer}>
+                <Text style={styles.pipelineTitle}>{t("machine.automationPipelineTitle")}</Text>
+                <View style={styles.pipelineRow}>
+                    <PipelineNode
+                        label={t("machine.automationLoopsTotal")}
+                        count={data.loopRollup.total}
+                        accent="#0A84FF"
+                        isActive={activeSection === "loops"}
+                        onPress={() => toggleSection("loops")}
+                    />
+                    <PipelineNode
+                        label={t("machine.automationJobs")}
+                        count={data.jobs.length}
+                        accent={(data.counts.running ?? 0) + (data.counts.dispatching ?? 0) > 0 ? "#0A84FF" : undefined}
+                        isActive={activeSection === "jobs"}
+                        onPress={() => toggleSection("jobs")}
+                    />
+                    <PipelineNode
+                        label={t("machine.automationGuardians")}
+                        count={data.guardians.length}
+                        accent={data.guardians.length > 0 ? "#34C759" : undefined}
+                        isActive={activeSection === "guardians"}
+                        onPress={() => toggleSection("guardians")}
+                    />
+                    <PipelineNode
+                        label={t("machine.automationAudit")}
+                        count={data.recentAuditEvents.length}
+                        isLast
+                        isActive={activeSection === "audit"}
+                        onPress={() => toggleSection("audit")}
+                    />
+                </View>
+            </View>
+
             {/* Alert cards — always visible */}
             {data.alertCards.length > 0 ? (
                 <View style={{ paddingHorizontal: 16, paddingTop: 8, gap: 8 }}>
@@ -434,46 +468,11 @@ export default React.memo(function MachineAutomationPage() {
                 />
             </ItemGroup>
 
-            {/* ── Pipeline: interactive section selector ── */}
-            <View style={styles.pipelineContainer}>
-                <Text style={styles.pipelineTitle}>{t("machine.automationPipelineTitle")}</Text>
-                <View style={styles.pipelineRow}>
-                    <PipelineNode
-                        label={t("machine.automationLoopsTotal")}
-                        count={data.loopRollup.total}
-                        accent="#0A84FF"
-                        isActive={activeSection === "loops"}
-                        onPress={() => toggleSection("loops")}
-                    />
-                    <PipelineNode
-                        label={t("machine.automationJobs")}
-                        count={data.jobs.length}
-                        accent={(data.counts.running ?? 0) + (data.counts.dispatching ?? 0) > 0 ? "#0A84FF" : undefined}
-                        isActive={activeSection === "jobs"}
-                        onPress={() => toggleSection("jobs")}
-                    />
-                    <PipelineNode
-                        label={t("machine.automationGuardians")}
-                        count={data.guardians.length}
-                        accent={data.guardians.length > 0 ? "#34C759" : undefined}
-                        isActive={activeSection === "guardians"}
-                        onPress={() => toggleSection("guardians")}
-                    />
-                    <PipelineNode
-                        label={t("machine.automationAudit")}
-                        count={data.recentAuditEvents.length}
-                        isLast
-                        isActive={activeSection === "audit"}
-                        onPress={() => toggleSection("audit")}
-                    />
-                </View>
-            </View>
-
             {/* ── Section content (conditional on activeSection) ── */}
-            <ItemList>
+            <View>
                 {/* Loops */}
                 {activeSection === "loops" ? (
-                    <ItemGroup title={t("machine.automationLoopRollup")}>
+                    <ItemGroup title={<Text style={{ fontSize: 16, fontWeight: "700", color: theme.colors.text }}>{t("machine.automationLoopRollup")}</Text>}>
                         <View style={styles.summaryGrid}>
                             {renderSummaryCard({ title: t("machine.automationLoopsTotal"), value: String(data.loopRollup.total), hint: t("machine.automationLoopsTotalHint") })}
                             {renderSummaryCard({ title: t("machine.automationLoopsActive"), value: String(data.loopRollup.active), hint: t("machine.automationLoopsActiveHint"), accent: "#0A84FF" })}
@@ -493,7 +492,7 @@ export default React.memo(function MachineAutomationPage() {
 
                 {/* Jobs + Timeline */}
                 {activeSection === "jobs" ? (
-                    <ItemGroup title={t("machine.automationJobs")}>
+                    <ItemGroup title={<Text style={{ fontSize: 16, fontWeight: "700", color: theme.colors.text }}>{t("machine.automationJobs")}</Text>}>
                         {/* Jobs toggle → job cards immediately below */}
                         <Item
                             title={`${t("machine.automationJobs")} (${data.filteredJobs.length})`}
@@ -575,7 +574,7 @@ export default React.memo(function MachineAutomationPage() {
 
                 {/* Guardians */}
                 {activeSection === "guardians" ? (
-                    <ItemGroup title={t("machine.automationGuardians")}>
+                    <ItemGroup title={<Text style={{ fontSize: 16, fontWeight: "700", color: theme.colors.text }}>{t("machine.automationGuardians")}</Text>}>
                         {/* Guardians toggle → guardian cards immediately below */}
                         <Item
                             title={`${t("machine.automationGuardians")} (${data.filteredGuardians.length})`}
@@ -653,7 +652,7 @@ export default React.memo(function MachineAutomationPage() {
 
                 {/* Audit Stats + Events */}
                 {activeSection === "audit" ? (
-                    <ItemGroup title={t("machine.automationAuditStats")}>
+                    <ItemGroup title={<Text style={{ fontSize: 16, fontWeight: "700", color: theme.colors.text }}>{t("machine.automationAuditStats")}</Text>}>
                         <View style={styles.summaryGrid}>
                             {renderSummaryCard({ title: t("machine.automationTotalAuditEvents"), value: String(data.auditStats?.totalEvents ?? 0), hint: t("machine.automationTotalAuditEventsHint") })}
                             {renderSummaryCard({ title: t("machine.automationGuardianReuseCount"), value: String(data.auditStats?.guardianReuseCount ?? 0), hint: t("machine.automationGuardianReuseCountHint"), accent: "#0A84FF" })}
@@ -731,7 +730,7 @@ export default React.memo(function MachineAutomationPage() {
                         ) : null}
                     </ItemGroup>
                 ) : null}
-            </ItemList>
+            </View>
         </ScrollView>
     );
 });
