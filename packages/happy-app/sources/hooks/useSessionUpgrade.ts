@@ -74,5 +74,6 @@ export function useSessionUpgrade(
         machineCliVersion,
         upgrading,
         handleUpgrade,
+        handleUpgradeDirect: performUpgrade,
     };
 }

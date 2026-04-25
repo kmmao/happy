@@ -131,7 +131,7 @@ function SessionInfoContent({ session }: { session: Session }) {
     !!machine &&
     isMachineOnline(machine);
 
-  const { needsUpgrade, machineCliVersion, handleUpgrade: handleUpgradeSession } = useSessionUpgrade(session, machine);
+  const { needsUpgrade, machineCliVersion, handleUpgradeDirect: handleUpgradeSession } = useSessionUpgrade(session, machine);
 
   // Check if CLI version is outdated
   const isCliOutdated =

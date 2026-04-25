@@ -34,6 +34,7 @@ interface ChatHeaderViewProps {
   devTotalCount?: number;
   onDevPress?: () => void;
   onDevLongPress?: () => void;
+  onUpgradePress?: () => void;
 }
 
 export const ChatHeaderView: React.FC<ChatHeaderViewProps> = ({
@@ -55,6 +56,7 @@ export const ChatHeaderView: React.FC<ChatHeaderViewProps> = ({
   devTotalCount,
   onDevPress,
   onDevLongPress,
+  onUpgradePress,
 }) => {
   const { theme } = useUnistyles();
   const router = useRouter();
@@ -219,6 +221,20 @@ export const ChatHeaderView: React.FC<ChatHeaderViewProps> = ({
                   color={theme.colors.header.tint}
                 />
               </Animated.View>
+            </Pressable>
+          )}
+
+          {onUpgradePress && (
+            <Pressable
+              onPress={onUpgradePress}
+              hitSlop={15}
+              style={styles.actionButton}
+            >
+              <Ionicons
+                name="arrow-up-circle"
+                size={22}
+                color="#F59E0B"
+              />
             </Pressable>
           )}
 

@@ -60,7 +60,9 @@ import {
   useSessionKnowledgeCount,
   useProjectForSession,
   useSetting,
+  useMachine,
 } from "@/sync/storage";
+import { useSessionUpgrade } from "@/hooks/useSessionUpgrade";
 import { Session } from "@/sync/storageTypes";
 import { randomUUID } from "expo-crypto";
 import { sync } from "@/sync/sync";
@@ -146,6 +148,11 @@ export const SessionView = React.memo((props: { id: string }) => {
   const sessionId = props.id;
   const router = useRouter();
   const session = useSession(sessionId);
+  const machine = useMachine(session?.metadata?.machineId ?? "");
+  const { needsUpgrade, upgrading, handleUpgradeDirect } = useSessionUpgrade(
+    session ?? ({ active: false } as Session),
+    machine,
+  );
   const isDataReady = useIsDataReady();
   const { theme } = useUnistyles();
   const safeArea = useSafeAreaInsets();
@@ -346,6 +353,7 @@ export const SessionView = React.memo((props: { id: string }) => {
                 devButtonState={headerProps.isConnected && hasDevConfig ? "idle" : "hidden"}
                 onDevPress={headerProps.isConnected && hasDevConfig ? () => router.push(`/session/${sessionId}/dev` as any) : undefined}
                 onDevLongPress={headerProps.isConnected && hasDevConfig ? () => router.push(`/session/${sessionId}/dev` as any) : undefined}
+                onUpgradePress={needsUpgrade && !upgrading ? handleUpgradeDirect : undefined}
               />
               {/* Voice status bar below header - not on tablet (shown in sidebar) */}
               {!isTablet && realtimeStatus !== "disconnected" && (
