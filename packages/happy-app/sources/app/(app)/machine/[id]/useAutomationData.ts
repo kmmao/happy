@@ -18,6 +18,7 @@ import {
 import { useMachine } from "@/sync/storage";
 import { Modal } from "@/modal";
 import { t } from "@/text";
+import { projectManager, getProjectDisplayName } from "@/sync/projectManager";
 import {
     buildAutomationAlerts,
     buildAutomationOverviewCards,
@@ -191,11 +192,19 @@ export function useAutomationData(params: {
     }, [loopNameMap]);
 
     const resolveGuardianKeyLabel = React.useCallback((key: string): string => {
+        // agent-loop:<loopId> → loop name
         const loopPrefix = "agent-loop:";
         if (key.startsWith(loopPrefix)) {
             const loopId = key.slice(loopPrefix.length);
             const name = loopNameMap.get(loopId);
             return name ?? key;
+        }
+        // project:<serverProjectId> → project display name
+        const projectPrefix = "project:";
+        if (key.startsWith(projectPrefix)) {
+            const serverId = key.slice(projectPrefix.length);
+            const project = projectManager.getProjectByServerId(serverId);
+            if (project) return getProjectDisplayName(project);
         }
         return key;
     }, [loopNameMap]);
