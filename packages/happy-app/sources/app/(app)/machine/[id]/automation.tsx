@@ -139,27 +139,6 @@ function SubToggle({
     );
 }
 
-// ── 横排统计行 ────────────────────────────────────────────────────────────
-function StatRow({ items }: {
-    items: Array<{ label: string; value: string | number; color?: string; dimmed?: boolean }>;
-}) {
-    const { theme } = useUnistyles();
-    return (
-        <View style={{ flexDirection: "row", paddingHorizontal: 16, paddingBottom: 12, gap: 20, flexWrap: "wrap" }}>
-            {items.map((item) => (
-                <View key={item.label} style={{ alignItems: "flex-start", gap: 2 }}>
-                    <Text style={{
-                        fontSize: 22, fontWeight: "800",
-                        color: item.dimmed ? theme.colors.textSecondary : (item.color ?? theme.colors.text),
-                    }}>
-                        {item.value}
-                    </Text>
-                    <Text style={{ fontSize: 11, color: theme.colors.textSecondary }}>{item.label}</Text>
-                </View>
-            ))}
-        </View>
-    );
-}
 
 // ── 区块容器 ─────────────────────────────────────────────────────────────
 function SectionContainer({ title, rightAction, children }: {
@@ -534,13 +513,43 @@ export default React.memo(function MachineAutomationPage() {
                 {/* ── Jobs + Timeline ── */}
                 {activeSection === "jobs" ? (
                     <SectionContainer title={t("machine.automationJobs")}>
-                        {/* 核心指标 */}
-                        <StatRow items={[
-                            { label: t("machine.automationRunning"), value: activeCount, color: activeCount > 0 ? "#0A84FF" : undefined, dimmed: activeCount === 0 },
-                            { label: t("machine.automationQueued"), value: queuedCount, color: queuedCount > 0 ? "#FF9500" : undefined, dimmed: queuedCount === 0 },
-                            { label: t("machine.automationFailed"), value: failedCount, color: failedCount > 0 ? "#FF3B30" : undefined, dimmed: failedCount === 0 },
-                            { label: t("machine.automationCompleted"), value: data.counts.completed ?? 0, dimmed: true },
-                        ]} />
+                        {data.jobs.length === 0 ? (
+                            /* 无任务时 */
+                            <View style={{ paddingHorizontal: 16, paddingBottom: 16, alignItems: "center", gap: 6 }}>
+                                <Ionicons name="list-outline" size={32} color={theme.colors.textSecondary} style={{ opacity: 0.35 }} />
+                                <Text style={{ fontSize: 13, color: theme.colors.textSecondary }}>{t("machine.automationDetailsEmpty")}</Text>
+                            </View>
+                        ) : (
+                            <View style={{ paddingHorizontal: 16, paddingBottom: 14, gap: 10 }}>
+                                {/* Total 大数字 */}
+                                <View style={{ flexDirection: "row", alignItems: "baseline", gap: 6 }}>
+                                    <Text style={{ fontSize: 36, fontWeight: "800", color: theme.colors.text }}>{data.jobs.length}</Text>
+                                    <Text style={{ fontSize: 14, color: theme.colors.textSecondary }}>{t("machine.automationJobs")}</Text>
+                                </View>
+                                {/* 状态 chips（只显示非 0） */}
+                                <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
+                                    {[
+                                        { key: "active",    value: activeCount,                  label: t("machine.automationRunning"),   color: "#0A84FF", icon: "play-circle-outline" as const },
+                                        { key: "queued",    value: queuedCount,                  label: t("machine.automationQueued"),    color: "#FF9500", icon: "time-outline" as const },
+                                        { key: "failed",    value: failedCount,                  label: t("machine.automationFailed"),    color: "#FF3B30", icon: "alert-circle-outline" as const },
+                                    ].filter((s) => s.value > 0).map((s) => (
+                                        <View key={s.key} style={{ flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: s.color + "14", borderRadius: 8, borderWidth: 1, borderColor: s.color + "40", paddingHorizontal: 10, paddingVertical: 5 }}>
+                                            <Ionicons name={s.icon} size={13} color={s.color} />
+                                            <Text style={{ fontSize: 13, fontWeight: "700", color: s.color }}>{s.value}</Text>
+                                            <Text style={{ fontSize: 12, color: s.color }}>{s.label}</Text>
+                                        </View>
+                                    ))}
+                                    {/* 全部完成时显示绿色 chip */}
+                                    {activeCount === 0 && queuedCount === 0 && failedCount === 0 && (
+                                        <View style={{ flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: "#34C75914", borderRadius: 8, borderWidth: 1, borderColor: "#34C75940", paddingHorizontal: 10, paddingVertical: 5 }}>
+                                            <Ionicons name="checkmark-circle-outline" size={13} color="#34C759" />
+                                            <Text style={{ fontSize: 13, fontWeight: "700", color: "#34C759" }}>{data.counts.completed ?? 0}</Text>
+                                            <Text style={{ fontSize: 12, color: "#34C759" }}>{t("machine.automationCompleted")}</Text>
+                                        </View>
+                                    )}
+                                </View>
+                            </View>
+                        )}
 
                         {/* 失败任务自动展示 */}
                         {data.filteredJobs.filter((j) => j.status === "failed").map((job) => (
