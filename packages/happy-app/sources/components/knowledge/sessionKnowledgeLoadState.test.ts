@@ -2,27 +2,25 @@ import { describe, expect, it } from "vitest";
 import { getSessionKnowledgeLoadState } from "./sessionKnowledgeLoadState";
 
 describe("getSessionKnowledgeLoadState", () => {
-    it("loads only changes tab when sheet first becomes visible", () => {
+    it("loads both changes and references when sheet first becomes visible on changes tab", () => {
         expect(
             getSessionKnowledgeLoadState({
                 visible: true,
                 activeTab: "changes",
                 hasLoadedChanges: false,
-                hasLoadedReferences: false,
             }),
         ).toEqual({
             shouldLoadChanges: true,
-            shouldLoadReferences: false,
+            shouldLoadReferences: true,
         });
     });
 
-    it("loads references when user switches to references tab", () => {
+    it("loads both when user is on references tab", () => {
         expect(
             getSessionKnowledgeLoadState({
                 visible: true,
                 activeTab: "references",
                 hasLoadedChanges: true,
-                hasLoadedReferences: false,
             }),
         ).toEqual({
             shouldLoadChanges: true,
@@ -36,7 +34,6 @@ describe("getSessionKnowledgeLoadState", () => {
                 visible: false,
                 activeTab: "changes",
                 hasLoadedChanges: true,
-                hasLoadedReferences: true,
             }),
         ).toEqual({
             shouldLoadChanges: false,

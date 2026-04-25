@@ -8,7 +8,6 @@ interface SessionKnowledgeLoadStateInput {
     visible: boolean;
     activeTab: SessionKnowledgeTab;
     hasLoadedChanges: boolean;
-    hasLoadedReferences: boolean;
 }
 
 interface SessionKnowledgeLoadState {
@@ -18,11 +17,12 @@ interface SessionKnowledgeLoadState {
 
 // Archive tab reuses the references dataset (filters client-side), so its
 // loading signal is tied to shouldLoadReferences.
+// Accesses are always loaded when visible so tab badge counts are accurate
+// even before the user clicks a references-related tab.
 export function getSessionKnowledgeLoadState({
     visible,
     activeTab,
     hasLoadedChanges,
-    hasLoadedReferences,
 }: SessionKnowledgeLoadStateInput): SessionKnowledgeLoadState {
     if (!visible) {
         return {
@@ -31,12 +31,8 @@ export function getSessionKnowledgeLoadState({
         };
     }
 
-    const needsReferencesData =
-        activeTab === "references"
-        || activeTab === "evicted"
-        || activeTab === "archive";
     return {
         shouldLoadChanges: hasLoadedChanges || activeTab === "changes",
-        shouldLoadReferences: hasLoadedReferences || needsReferencesData,
+        shouldLoadReferences: true,
     };
 }

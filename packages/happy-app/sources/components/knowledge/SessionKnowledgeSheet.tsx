@@ -31,10 +31,13 @@ const STATUS_COLORS: Record<string, string> = {
 // Session TTL badge colors:
 //   - hot + never hit   → blue (fresh, waiting to be referenced)
 //   - hot + has hits    → orange (proven useful, banking turns)
+//   - urgent (≤3 turns) → red (about to be evicted)
 //   - evicted           → grey (countdown hit zero, not injected anymore)
 const HOT_BADGE_COLOR_FRESH = "#3B82F6";
 const HOT_BADGE_COLOR_USED = "#F97316";
+const HOT_BADGE_COLOR_URGENT = "#EF4444";
 const EVICTED_BADGE_COLOR = "#9CA3AF";
+const URGENT_THRESHOLD = 3;
 
 interface SessionKnowledgeSheetProps {
     visible: boolean;
@@ -87,6 +90,42 @@ const HotBadge = React.memo<HotBadgeProps>(({ entry }) => {
     // Backward compat: if server didn't include TTL fields, skip the badge entirely.
     if (hotStatus === undefined && turnsRemaining === undefined) return null;
 
+    // Delta animation: show +N / −N when turnsRemaining changes
+    const prevTurnsRef = React.useRef<number | undefined>(undefined);
+    const [deltaText, setDeltaText] = React.useState<string | null>(null);
+    const deltaOpacity = React.useRef(new Animated.Value(0)).current;
+
+    React.useEffect(() => {
+        if (prevTurnsRef.current !== undefined && turnsRemaining !== undefined) {
+            const diff = turnsRemaining - prevTurnsRef.current;
+            if (diff !== 0) {
+                setDeltaText(diff > 0 ? `+${diff}` : `${diff}`);
+                deltaOpacity.setValue(1);
+                Animated.sequence([
+                    Animated.delay(800),
+                    Animated.timing(deltaOpacity, { toValue: 0, duration: 700, useNativeDriver: true }),
+                ]).start(() => setDeltaText(null));
+            }
+        }
+        prevTurnsRef.current = turnsRemaining;
+    }, [turnsRemaining]);
+
+    // Evicted pulse: scale 1 → 1.18 → 1 when transitioning hot → evicted
+    const prevHotStatusRef = React.useRef<string | undefined>(undefined);
+    const evictedScale = React.useRef(new Animated.Value(1)).current;
+
+    React.useEffect(() => {
+        if (prevHotStatusRef.current !== undefined &&
+            prevHotStatusRef.current !== "evicted" &&
+            hotStatus === "evicted") {
+            Animated.sequence([
+                Animated.timing(evictedScale, { toValue: 1.18, duration: 160, useNativeDriver: true }),
+                Animated.timing(evictedScale, { toValue: 1, duration: 200, useNativeDriver: true }),
+            ]).start();
+        }
+        prevHotStatusRef.current = hotStatus;
+    }, [hotStatus]);
+
     // Long-press opens an inline explanation so users understand why an entry
     // is "hot" vs "evicted" and how the turn-based countdown works.
     const showTooltip = () => {
@@ -103,27 +142,34 @@ const HotBadge = React.memo<HotBadgeProps>(({ entry }) => {
 
     if (hotStatus === "evicted") {
         return (
-            <Pressable
-                onLongPress={showTooltip}
-                delayLongPress={300}
-                style={[styles.hotBadge, { backgroundColor: EVICTED_BADGE_COLOR + "20" }]}
-                accessibilityRole="button"
-                accessibilityLabel={t("session.knowledgeBadgeTooltipTitle")}
-            >
-                <Ionicons
-                    name="close-circle-outline"
-                    size={11}
-                    color={EVICTED_BADGE_COLOR}
-                    style={styles.hotBadgeIcon}
-                />
-                <Text style={[styles.hotBadgeText, { color: EVICTED_BADGE_COLOR }]}>
-                    {t("session.knowledgeBadgeEvicted")}
-                </Text>
-            </Pressable>
+            <Animated.View style={{ transform: [{ scale: evictedScale }] }}>
+                <Pressable
+                    onLongPress={showTooltip}
+                    delayLongPress={300}
+                    style={[styles.hotBadge, { backgroundColor: EVICTED_BADGE_COLOR + "20" }]}
+                    accessibilityRole="button"
+                    accessibilityLabel={t("session.knowledgeBadgeTooltipTitle")}
+                >
+                    <Ionicons
+                        name="close-circle-outline"
+                        size={11}
+                        color={EVICTED_BADGE_COLOR}
+                        style={styles.hotBadgeIcon}
+                    />
+                    <Text style={[styles.hotBadgeText, { color: EVICTED_BADGE_COLOR }]}>
+                        {t("session.knowledgeBadgeEvicted")}
+                    </Text>
+                </Pressable>
+            </Animated.View>
         );
     }
 
-    const color = hitCount > 0 ? HOT_BADGE_COLOR_USED : HOT_BADGE_COLOR_FRESH;
+    const isUrgent = turnsRemaining !== undefined && turnsRemaining <= URGENT_THRESHOLD;
+    const color = isUrgent
+        ? HOT_BADGE_COLOR_URGENT
+        : hitCount > 0 ? HOT_BADGE_COLOR_USED : HOT_BADGE_COLOR_FRESH;
+    const deltaColor = deltaText?.startsWith("+") ? HOT_BADGE_COLOR_FRESH : HOT_BADGE_COLOR_URGENT;
+
     // Use localised "7/14 轮 · 2 次" style labels so users can read the budget
     // at a glance without having to long-press for the tooltip.
     const label =
@@ -136,23 +182,30 @@ const HotBadge = React.memo<HotBadgeProps>(({ entry }) => {
             : t("session.knowledgeBadgeHotHitsOnly", { hits: hitCount });
 
     return (
-        <Pressable
-            onLongPress={showTooltip}
-            delayLongPress={300}
-            style={[styles.hotBadge, { backgroundColor: color + "20" }]}
-            accessibilityRole="button"
-            accessibilityLabel={t("session.knowledgeBadgeTooltipTitle")}
-        >
-            <Ionicons
-                name="timer-outline"
-                size={11}
-                color={color}
-                style={styles.hotBadgeIcon}
-            />
-            <Text style={[styles.hotBadgeText, { color }]}>
-                {label}
-            </Text>
-        </Pressable>
+        <View style={styles.hotBadgeWrapper}>
+            <Pressable
+                onLongPress={showTooltip}
+                delayLongPress={300}
+                style={[styles.hotBadge, { backgroundColor: color + "20" }]}
+                accessibilityRole="button"
+                accessibilityLabel={t("session.knowledgeBadgeTooltipTitle")}
+            >
+                <Ionicons
+                    name={isUrgent ? "warning-outline" : "timer-outline"}
+                    size={11}
+                    color={color}
+                    style={styles.hotBadgeIcon}
+                />
+                <Text style={[styles.hotBadgeText, { color }]}>
+                    {label}
+                </Text>
+            </Pressable>
+            {deltaText && (
+                <Animated.Text style={[styles.hotBadgeDelta, { color: deltaColor, opacity: deltaOpacity }]}>
+                    {deltaText}
+                </Animated.Text>
+            )}
+        </View>
     );
 });
 
@@ -270,7 +323,6 @@ export const SessionKnowledgeSheet = React.memo<SessionKnowledgeSheetProps>(
         const [shouldRender, setShouldRender] = React.useState(false);
         const [activeTab, setActiveTab] = React.useState<SessionKnowledgeTab>(initialTab);
         const [hasLoadedChanges, setHasLoadedChanges] = React.useState(false);
-        const [hasLoadedReferences, setHasLoadedReferences] = React.useState(false);
 
         // Inline mode: always-visible, skip overlay chrome + animation state.
         const effectiveVisible = inline ? true : visible;
@@ -285,16 +337,13 @@ export const SessionKnowledgeSheet = React.memo<SessionKnowledgeSheetProps>(
             if (!effectiveVisible) return;
             if (activeTab === "changes") {
                 setHasLoadedChanges(true);
-                return;
             }
-            setHasLoadedReferences(true);
         }, [activeTab, effectiveVisible]);
 
         const loadState = getSessionKnowledgeLoadState({
             visible: effectiveVisible,
             activeTab,
             hasLoadedChanges,
-            hasLoadedReferences,
         });
 
         const {
@@ -694,6 +743,11 @@ const styles = StyleSheet.create({
         fontSize: 10,
         textTransform: "uppercase",
     },
+    hotBadgeWrapper: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 4,
+    },
     hotBadge: {
         flexDirection: "row",
         alignItems: "center",
@@ -706,6 +760,10 @@ const styles = StyleSheet.create({
         marginRight: 0,
     },
     hotBadgeText: {
+        ...Typography.default("semiBold"),
+        fontSize: 10,
+    },
+    hotBadgeDelta: {
         ...Typography.default("semiBold"),
         fontSize: 10,
     },
