@@ -1,6 +1,6 @@
 import { machineAliveEventsCounter, websocketEventsCounter } from "@/app/monitoring/metrics2";
 import { activityCache } from "@/app/presence/sessionCache";
-import { buildMachineActivityEphemeral, buildUpdateMachineUpdate, eventRouter } from "@/app/events/eventRouter";
+import { buildKnowledgeCountEphemeral, buildMachineActivityEphemeral, buildUpdateMachineUpdate, eventRouter } from "@/app/events/eventRouter";
 import { log } from "@/utils/log";
 import { db } from "@/storage/db";
 import { Socket } from "socket.io";
@@ -334,6 +334,8 @@ export function machineUpdateHandler(userId: string, socket: Socket) {
             const turns = data?.turns;
             if (!Array.isArray(turns) || turns.length === 0) return;
 
+            const updatedSessionIds = new Set<string>();
+
             for (const turn of turns.slice(0, 10)) {
                 const sessionId = turn.sessionId;
                 if (!sessionId) continue;
@@ -384,6 +386,19 @@ export function machineUpdateHandler(userId: string, socket: Socket) {
                 });
 
                 void storeKnowledgeEmbedding(created.id, turn.title ?? "", turn.content ?? "");
+                updatedSessionIds.add(sessionId);
+            }
+
+            // Notify App once per affected session so the "changes" tab updates in real time.
+            for (const sessionId of updatedSessionIds) {
+                const knowledgeCount = await db.projectKnowledge.count({
+                    where: { sessionId, status: "active" },
+                });
+                eventRouter.emitEphemeral({
+                    userId,
+                    payload: buildKnowledgeCountEphemeral(sessionId, knowledgeCount),
+                    recipientFilter: { type: "user-scoped-only" },
+                });
             }
 
             log({ module: 'knowledge' }, `Processed ${turns.length} transcript knowledge entries`);
