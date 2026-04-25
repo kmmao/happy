@@ -1026,7 +1026,7 @@ export class ApiSessionClient extends EventEmitter {
    * counters on KnowledgeAccess rows and evict cold entries.
    */
   emitKnowledgeTurnEnd(hitIds: string[]) {
-    this.socket.volatile.emit("knowledge-turn-end", {
+    this.socket.emit("knowledge-turn-end", {
       sid: this.sessionId,
       hitIds,
     });
