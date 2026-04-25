@@ -39,7 +39,6 @@ import { kvSetWithRetry } from "@/sync/kvConflictRetry";
 import { encodeBase64, decodeBase64 } from "@/encryption/base64";
 import { useSettings } from "@/sync/storage";
 import { useElapsedSeconds, type DimensionProgress } from "./supervisorUtils";
-import { resolveDimensionLabel } from "./supervisorDimensionLabels";
 import { SupervisorProgressView } from "./SupervisorProgressView";
 import { buildDefaultSupervisorRequestProfile } from "./supervisorRequestProfile";
 
@@ -442,169 +441,161 @@ export const ProjectResearchTab = React.memo(
                                 syncStatus={syncStatus}
                             />
                         }>
-                            {/* Dimension toggles first */}
-                            <View style={styles.dimensionHeader}>
-                                <Text style={[styles.inputLabel, { color: theme.colors.text }]}>
-                                    {t("competitorResearch.dimensionsSection")}
-                                </Text>
-                            </View>
-                            {RESEARCH_DIMENSIONS.map((dim) => (
-                                <DimensionToggle
-                                    key={dim}
-                                    label={DIMENSION_LABELS[dim].label()}
-                                    subtitle={DIMENSION_LABELS[dim].note()}
-                                    value={dimensions[dim]}
-                                    onToggle={() => toggleDimension(dim)}
-                                    disabled={isRunning}
-                                />
-                            ))}
-
-                            {/* Known Competitors */}
-                            <View style={styles.inputSection}>
-                                <Text style={[styles.inputLabel, { color: theme.colors.text }]}>
-                                    {t("competitorResearch.knownCompetitors")}
-                                </Text>
-                                <TextInput
-                                    style={[
-                                        styles.textInput,
-                                        {
-                                            color: theme.colors.text,
-                                            backgroundColor: theme.colors.groupped.background,
-                                            borderColor: theme.colors.divider,
-                                        },
-                                    ]}
-                                    placeholder={t("competitorResearch.knownCompetitorsPlaceholder")}
-                                    placeholderTextColor={theme.colors.textSecondary}
-                                    value={knownCompetitors}
-                                    onChangeText={handleTextChange("knownCompetitors")}
-                                    multiline
-                                    numberOfLines={2}
-                                    editable={!isRunning}
-                                />
-                            </View>
-
-                            {/* Custom Rules */}
-                            <View style={styles.inputSection}>
-                                <Text style={[styles.inputLabel, { color: theme.colors.text }]}>
-                                    {t("competitorResearch.customRules")}
-                                </Text>
-                                <TextInput
-                                    style={[
-                                        styles.textInput,
-                                        {
-                                            color: theme.colors.text,
-                                            backgroundColor: theme.colors.groupped.background,
-                                            borderColor: theme.colors.divider,
-                                        },
-                                    ]}
-                                    placeholder={t("competitorResearch.customRulesPlaceholder")}
-                                    placeholderTextColor={theme.colors.textSecondary}
-                                    value={customRules}
-                                    onChangeText={handleTextChange("customRules")}
-                                    multiline
-                                    numberOfLines={2}
-                                    editable={!isRunning}
-                                />
-                            </View>
-
-                            {/* Feature Direction — triggers open-source discovery mode when filled */}
-                            <View style={styles.inputSection}>
-                                <Text style={[styles.inputLabel, { color: theme.colors.text }]}>
-                                    {t("competitorResearch.featureDirection")}
-                                </Text>
-                                <TextInput
-                                    style={[
-                                        styles.textInput,
-                                        {
-                                            color: theme.colors.text,
-                                            backgroundColor: theme.colors.groupped.background,
-                                            borderColor: featureDirection.trim()
-                                                ? theme.colors.header.tint
-                                                : theme.colors.divider,
-                                        },
-                                    ]}
-                                    placeholder={t("competitorResearch.featureDirectionPlaceholder")}
-                                    placeholderTextColor={theme.colors.textSecondary}
-                                    value={featureDirection}
-                                    onChangeText={handleTextChange("featureDirection")}
-                                    multiline
-                                    numberOfLines={2}
-                                    editable={!isRunning}
-                                />
-                            </View>
-
-                            {/* Additional Notes */}
-                            <View style={styles.inputSection}>
-                                <Text style={[styles.inputLabel, { color: theme.colors.text }]}>
-                                    {t("competitorResearch.additionalNotes")}
-                                </Text>
-                                <TextInput
-                                    style={[
-                                        styles.textInput,
-                                        {
-                                            color: theme.colors.text,
-                                            backgroundColor: theme.colors.groupped.background,
-                                            borderColor: theme.colors.divider,
-                                        },
-                                    ]}
-                                    placeholder={t("competitorResearch.additionalNotesPlaceholder")}
-                                    placeholderTextColor={theme.colors.textSecondary}
-                                    value={additionalNotes}
-                                    onChangeText={handleTextChange("additionalNotes")}
-                                    multiline
-                                    numberOfLines={2}
-                                    editable={!isRunning}
-                                />
-                            </View>
-
-                            {/* Action button */}
-                            <View style={styles.buttonRow}>
-                                {isRunning ? (
-                                    <Pressable
-                                        style={[styles.button, styles.cancelButton]}
-                                        onPress={doCancel}
-                                        disabled={cancelLoading}
-                                    >
-                                        {cancelLoading ? (
-                                            <ActivityIndicator size="small" color="#fff" />
-                                        ) : (
-                                            <>
-                                                <Ionicons name="close-circle" size={18} color="#fff" />
-                                                <Text style={styles.buttonText}>
-                                                    {t("common.cancel")}
-                                                </Text>
-                                            </>
-                                        )}
-                                    </Pressable>
-                                ) : (
-                                    <Pressable
-                                        style={[styles.button, styles.startButton]}
-                                        onPress={doTrigger}
-                                        disabled={triggerLoading}
-                                    >
-                                        {triggerLoading ? (
-                                            <ActivityIndicator size="small" color="#fff" />
-                                        ) : (
-                                            <>
-                                                <Ionicons name="search" size={18} color="#fff" />
-                                                <Text style={styles.buttonText}>
-                                                    {t("competitorResearch.startAnalysis")}
-                                                </Text>
-                                            </>
-                                        )}
-                                    </Pressable>
-                                )}
-                            </View>
-
-                            {isRunning && activeRun && (
-                                <View style={styles.progressSection}>
+                            {isRunning && activeRun ? (
+                                /* Running: swap entire form for progress + cancel */
+                                <View style={styles.runningContainer}>
                                     <SupervisorProgressView
                                         status={activeRun.status}
                                         elapsedSeconds={elapsedSeconds}
                                         dimensionProgress={dimensionProgress}
                                         analyzingLabel={t("competitorResearch.analyzing")}
                                     />
+                                    <View style={styles.buttonRow}>
+                                        <Pressable
+                                            style={[styles.button, styles.cancelButton]}
+                                            onPress={doCancel}
+                                            disabled={cancelLoading}
+                                        >
+                                            {cancelLoading ? (
+                                                <ActivityIndicator size="small" color="#fff" />
+                                            ) : (
+                                                <>
+                                                    <Ionicons name="close-circle" size={18} color="#fff" />
+                                                    <Text style={styles.buttonText}>
+                                                        {t("common.cancel")}
+                                                    </Text>
+                                                </>
+                                            )}
+                                        </Pressable>
+                                    </View>
                                 </View>
+                            ) : (
+                                /* Idle: full form, no disabled state needed */
+                                <>
+                                    <View style={styles.dimensionHeader}>
+                                        <Text style={[styles.inputLabel, { color: theme.colors.text }]}>
+                                            {t("competitorResearch.dimensionsSection")}
+                                        </Text>
+                                    </View>
+                                    {RESEARCH_DIMENSIONS.map((dim) => (
+                                        <DimensionToggle
+                                            key={dim}
+                                            label={DIMENSION_LABELS[dim].label()}
+                                            subtitle={DIMENSION_LABELS[dim].note()}
+                                            value={dimensions[dim]}
+                                            onToggle={() => toggleDimension(dim)}
+                                        />
+                                    ))}
+
+                                    <View style={styles.inputSection}>
+                                        <Text style={[styles.inputLabel, { color: theme.colors.text }]}>
+                                            {t("competitorResearch.knownCompetitors")}
+                                        </Text>
+                                        <TextInput
+                                            style={[
+                                                styles.textInput,
+                                                {
+                                                    color: theme.colors.text,
+                                                    backgroundColor: theme.colors.groupped.background,
+                                                    borderColor: theme.colors.divider,
+                                                },
+                                            ]}
+                                            placeholder={t("competitorResearch.knownCompetitorsPlaceholder")}
+                                            placeholderTextColor={theme.colors.textSecondary}
+                                            value={knownCompetitors}
+                                            onChangeText={handleTextChange("knownCompetitors")}
+                                            multiline
+                                            numberOfLines={2}
+                                        />
+                                    </View>
+
+                                    <View style={styles.inputSection}>
+                                        <Text style={[styles.inputLabel, { color: theme.colors.text }]}>
+                                            {t("competitorResearch.customRules")}
+                                        </Text>
+                                        <TextInput
+                                            style={[
+                                                styles.textInput,
+                                                {
+                                                    color: theme.colors.text,
+                                                    backgroundColor: theme.colors.groupped.background,
+                                                    borderColor: theme.colors.divider,
+                                                },
+                                            ]}
+                                            placeholder={t("competitorResearch.customRulesPlaceholder")}
+                                            placeholderTextColor={theme.colors.textSecondary}
+                                            value={customRules}
+                                            onChangeText={handleTextChange("customRules")}
+                                            multiline
+                                            numberOfLines={2}
+                                        />
+                                    </View>
+
+                                    <View style={styles.inputSection}>
+                                        <Text style={[styles.inputLabel, { color: theme.colors.text }]}>
+                                            {t("competitorResearch.featureDirection")}
+                                        </Text>
+                                        <TextInput
+                                            style={[
+                                                styles.textInput,
+                                                {
+                                                    color: theme.colors.text,
+                                                    backgroundColor: theme.colors.groupped.background,
+                                                    borderColor: featureDirection.trim()
+                                                        ? theme.colors.header.tint
+                                                        : theme.colors.divider,
+                                                },
+                                            ]}
+                                            placeholder={t("competitorResearch.featureDirectionPlaceholder")}
+                                            placeholderTextColor={theme.colors.textSecondary}
+                                            value={featureDirection}
+                                            onChangeText={handleTextChange("featureDirection")}
+                                            multiline
+                                            numberOfLines={2}
+                                        />
+                                    </View>
+
+                                    <View style={styles.inputSection}>
+                                        <Text style={[styles.inputLabel, { color: theme.colors.text }]}>
+                                            {t("competitorResearch.additionalNotes")}
+                                        </Text>
+                                        <TextInput
+                                            style={[
+                                                styles.textInput,
+                                                {
+                                                    color: theme.colors.text,
+                                                    backgroundColor: theme.colors.groupped.background,
+                                                    borderColor: theme.colors.divider,
+                                                },
+                                            ]}
+                                            placeholder={t("competitorResearch.additionalNotesPlaceholder")}
+                                            placeholderTextColor={theme.colors.textSecondary}
+                                            value={additionalNotes}
+                                            onChangeText={handleTextChange("additionalNotes")}
+                                            multiline
+                                            numberOfLines={2}
+                                        />
+                                    </View>
+
+                                    <View style={styles.buttonRow}>
+                                        <Pressable
+                                            style={[styles.button, styles.startButton]}
+                                            onPress={doTrigger}
+                                            disabled={triggerLoading}
+                                        >
+                                            {triggerLoading ? (
+                                                <ActivityIndicator size="small" color="#fff" />
+                                            ) : (
+                                                <>
+                                                    <Ionicons name="search" size={18} color="#fff" />
+                                                    <Text style={styles.buttonText}>
+                                                        {t("competitorResearch.startAnalysis")}
+                                                    </Text>
+                                                </>
+                                            )}
+                                        </Pressable>
+                                    </View>
+                                </>
                             )}
                         </ItemGroup>
 
@@ -761,11 +752,10 @@ interface DimensionToggleProps {
     subtitle: string;
     value: boolean;
     onToggle: () => void;
-    disabled?: boolean;
 }
 
 const DimensionToggle = React.memo(
-    ({ label, subtitle, value, onToggle, disabled }: DimensionToggleProps) => {
+    ({ label, subtitle, value, onToggle }: DimensionToggleProps) => {
         const { theme } = useUnistyles();
 
         return (
@@ -781,7 +771,6 @@ const DimensionToggle = React.memo(
                 <Switch
                     value={value}
                     onValueChange={onToggle}
-                    disabled={disabled}
                     trackColor={{
                         false: theme.colors.surface,
                         true: theme.colors.header.tint,
@@ -859,11 +848,10 @@ const styles = StyleSheet.create((theme) => ({
         fontSize: 15,
         color: "#fff",
     },
-    progressSection: {
-        alignItems: "center",
+    runningContainer: {
+        paddingTop: 16,
+        paddingBottom: 4,
         gap: 8,
-        paddingHorizontal: 16,
-        paddingBottom: 12,
     },
     reportCard: {
         flexDirection: "row",

@@ -16,6 +16,10 @@ const PRESENTATIONS: Record<ProjectDetailTabKey, ProjectDetailTabPresentation> =
         icon: "git-branch-outline",
         tone: "orange",
     },
+    supervisor: {
+        icon: "scan-outline",
+        tone: "blue",
+    },
     health: {
         icon: "pulse-outline",
         tone: "green",

@@ -5,6 +5,7 @@ import { Typography } from "@/constants/Typography";
 import { Project } from "@/sync/projectManager";
 import { ProjectSessionsTab } from "./ProjectSessionsTab";
 import { ProjectGitTab } from "./ProjectGitTab";
+import { ProjectSupervisorTab } from "./ProjectSupervisorTab";
 import { ProjectHealthTab } from "./ProjectHealthTab";
 import { ProjectResearchTab, type ResearchSyncStatus } from "./ProjectResearchTab";
 import { ProjectKnowledgeTab } from "./ProjectKnowledgeTab";
@@ -26,6 +27,7 @@ type TabKey = ProjectDetailTabKey;
 const TAB_LABELS: Record<TabKey, () => string> = {
     sessions: () => t("projects.tabSessions"),
     git: () => t("projects.tabGit"),
+    supervisor: () => t("projects.tabSupervisor"),
     health: () => t("projects.tabHealth"),
     research: () => t("projects.tabResearch"),
     knowledge: () => t("projects.tabKnowledge"),
@@ -184,6 +186,15 @@ export const ProjectDetailView = React.memo(
                         }
                     >
                         <ProjectGitTab project={project} />
+                    </View>
+                    <View
+                        style={
+                            activeTab === "supervisor"
+                                ? styles.tabVisible
+                                : styles.tabHidden
+                        }
+                    >
+                        <ProjectSupervisorTab project={project} />
                     </View>
                     <View
                         style={

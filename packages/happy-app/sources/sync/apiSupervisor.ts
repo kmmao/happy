@@ -1070,6 +1070,111 @@ export interface RunComparison {
     persistentActions: RunComparisonAction[];
 }
 
+// --- Custom Dimensions ---
+
+export interface SupervisorDimension {
+    id: string;
+    key: string;
+    title: string;
+    prompt: string;
+    enabled: boolean;
+    sortOrder: number;
+    createdAt: number;
+    updatedAt: number;
+}
+
+export async function fetchCustomDimensions(
+    credentials: AuthCredentials,
+    projectId: string,
+): Promise<SupervisorDimension[]> {
+    const API_ENDPOINT = getServerUrl();
+    const response = await fetch(
+        `${API_ENDPOINT}/v1/projects/${projectId}/supervisor/dimensions`,
+        { headers: authHeaders(credentials) },
+    );
+    if (!response.ok) throw new Error(`Failed to fetch dimensions: ${response.status}`);
+    const data = (await response.json()) as { dimensions: SupervisorDimension[] };
+    return data.dimensions;
+}
+
+export async function createCustomDimension(
+    credentials: AuthCredentials,
+    projectId: string,
+    payload: { title: string; prompt: string },
+): Promise<SupervisorDimension> {
+    const API_ENDPOINT = getServerUrl();
+    const response = await fetch(
+        `${API_ENDPOINT}/v1/projects/${projectId}/supervisor/dimensions`,
+        {
+            method: "POST",
+            headers: { ...authHeaders(credentials), "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+        },
+    );
+    if (!response.ok) {
+        const err = (await response.json().catch(() => ({}))) as { error?: string };
+        throw new Error(err.error ?? `Failed to create dimension: ${response.status}`);
+    }
+    const data = (await response.json()) as { dimension: SupervisorDimension };
+    return data.dimension;
+}
+
+export async function updateCustomDimension(
+    credentials: AuthCredentials,
+    projectId: string,
+    dimId: string,
+    patch: { title?: string; prompt?: string; enabled?: boolean; sortOrder?: number },
+): Promise<SupervisorDimension> {
+    const API_ENDPOINT = getServerUrl();
+    const response = await fetch(
+        `${API_ENDPOINT}/v1/projects/${projectId}/supervisor/dimensions/${dimId}`,
+        {
+            method: "PATCH",
+            headers: { ...authHeaders(credentials), "Content-Type": "application/json" },
+            body: JSON.stringify(patch),
+        },
+    );
+    if (!response.ok) throw new Error(`Failed to update dimension: ${response.status}`);
+    const data = (await response.json()) as { dimension: SupervisorDimension };
+    return data.dimension;
+}
+
+export async function deleteCustomDimension(
+    credentials: AuthCredentials,
+    projectId: string,
+    dimId: string,
+): Promise<void> {
+    const API_ENDPOINT = getServerUrl();
+    const response = await fetch(
+        `${API_ENDPOINT}/v1/projects/${projectId}/supervisor/dimensions/${dimId}`,
+        { method: "DELETE", headers: authHeaders(credentials) },
+    );
+    if (!response.ok) throw new Error(`Failed to delete dimension: ${response.status}`);
+}
+
+export async function generateDimensionPrompt(
+    credentials: AuthCredentials,
+    projectId: string,
+    title: string,
+    profileId?: string,
+): Promise<string> {
+    const API_ENDPOINT = getServerUrl();
+    const response = await fetch(
+        `${API_ENDPOINT}/v1/projects/${projectId}/supervisor/dimensions/generate-prompt`,
+        {
+            method: "POST",
+            headers: { ...authHeaders(credentials), "Content-Type": "application/json" },
+            body: JSON.stringify({ title, profileId: profileId ?? null }),
+        },
+    );
+    if (!response.ok) {
+        const err = (await response.json().catch(() => ({}))) as { error?: string };
+        throw new Error(err.error ?? `Failed to generate prompt: ${response.status}`);
+    }
+    const data = (await response.json()) as { prompt: string };
+    return data.prompt;
+}
+
 /**
  * Fetch run comparison (diff with previous run)
  */

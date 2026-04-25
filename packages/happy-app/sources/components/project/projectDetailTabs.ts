@@ -1,6 +1,7 @@
 export type ProjectDetailTabKey =
     | "sessions"
     | "git"
+    | "supervisor"
     | "health"
     | "research"
     | "knowledge"
@@ -10,6 +11,7 @@ export type ProjectDetailTabKey =
 const ALWAYS_TABS: ProjectDetailTabKey[] = [
     "sessions",
     "git",
+    "supervisor",
     "health",
     "research",
     "config",

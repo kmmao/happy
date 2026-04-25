@@ -36,6 +36,7 @@ interface EmitResolvedSupervisorRunTriggerInput {
     dimensions?: string[];
     changedFiles?: string[];
     customRules?: string;
+    customDimensions?: ReadonlyArray<{ key: string; title: string; prompt: string }>;
     researchParams?: string;
     existingActions?: readonly ExistingActionSummary[];
     maxConcurrentAnalysis?: number;
@@ -77,6 +78,7 @@ export async function emitResolvedSupervisorRunTrigger(
             dimensions: input.dimensions,
             changedFiles: input.changedFiles,
             customRules: input.customRules,
+            customDimensions: input.customDimensions,
             researchParams: input.researchParams,
             existingActions: input.existingActions,
             maxConcurrentAnalysis: input.maxConcurrentAnalysis,

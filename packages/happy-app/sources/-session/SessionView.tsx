@@ -44,6 +44,12 @@ import {
 } from "@/realtime/RealtimeSession";
 import { gitStatusSync } from "@/sync/gitStatusSync";
 import { sessionInterrupt, sessionStopTask, sessionBash } from "@/sync/ops";
+import { reactivateArchivedSession } from "@/sync/sessionResumeFlow";
+import { runWithSessionReactivationGuard } from "@/sync/sessionResumeGuard";
+import { resolveSessionReactivationContext } from "@/hooks/sessionResumeSupport";
+import { buildSessionRespawnProfile } from "@/hooks/sessionUpgradeProfile";
+import { useHappyAction } from "@/hooks/useHappyAction";
+import { HappyError } from "@/utils/errors";
 import {
   storage,
   useIsDataReady,
@@ -153,6 +159,68 @@ export const SessionView = React.memo((props: { id: string }) => {
     session ?? ({ active: false } as Session),
     machine,
   );
+
+  // Resume logic for archived sessions
+  const reactivationContext = session && machine
+    ? resolveSessionReactivationContext(session, machine)
+    : null;
+  const canReactivate = session?.presence !== "online" && reactivationContext !== null;
+
+  const [, performReactivation] = useHappyAction(async () => {
+    if (!session || !reactivationContext) {
+      throw new HappyError(t("machine.failedToStartSession"), false);
+    }
+    await runWithSessionReactivationGuard(session.id, async () => {
+      const worktree = session.metadata?.worktree;
+      const spawnProfile = buildSessionRespawnProfile(
+        session,
+        storage.getState().settings.profiles ?? [],
+      );
+      const createResumeRequest = (
+        directory?: string,
+        approvedNewDirectoryCreation: boolean = false,
+      ) => {
+        if (reactivationContext.mode !== "resume") {
+          throw new HappyError(t("machine.failedToStartSession"), false);
+        }
+        return {
+          ...reactivationContext.resumeContext!.baseSpawnOptions,
+          directory: directory ?? reactivationContext.resumeContext!.baseSpawnOptions.directory,
+          approvedNewDirectoryCreation,
+          ...spawnProfile,
+        };
+      };
+      await reactivateArchivedSession({
+        sessionId: session.id,
+        mode: reactivationContext.mode,
+        onSuccess: () => {},
+        requestDirectoryApproval: (directory) =>
+          Modal.confirm(
+            t("machine.createDirectoryTitle"),
+            t("machine.createDirectoryMessage", { directory }),
+            { cancelText: t("common.cancel"), confirmText: t("common.create") },
+          ),
+        createError: (message) => new HappyError(message, false),
+        getStartSessionFallbackMessage: () =>
+          reactivationContext.mode === "unarchive"
+            ? t("sessionInfo.failedToUnarchiveSession")
+            : t("machine.failedToStartSession"),
+        createResumeRequest,
+        mapRetryDirectory: (directory) => {
+          if (
+            reactivationContext.mode === "resume"
+            && worktree?.isWorktree
+            && worktree.parentRepoPath
+            && directory === reactivationContext.resumeContext!.baseSpawnOptions.directory
+          ) {
+            return worktree.parentRepoPath;
+          }
+          return directory;
+        },
+      });
+    });
+  });
+
   const isDataReady = useIsDataReady();
   const { theme } = useUnistyles();
   const safeArea = useSafeAreaInsets();
@@ -349,6 +417,7 @@ export const SessionView = React.memo((props: { id: string }) => {
                 onPanelPress={shouldShowMobilePanelButton ? () => setShowMobilePanelSheet(true) : undefined}
                 onBackPress={() => router.back()}
                 onRefreshPress={() => sync.refreshSession(sessionId)}
+                onResumePress={canReactivate ? performReactivation : undefined}
                 onForkPress={session?.forkedFromSessionId ? () => router.push(`/session/${session.forkedFromSessionId!}` as any) : undefined}
                 devButtonState={headerProps.isConnected && hasDevConfig ? "idle" : "hidden"}
                 onDevPress={headerProps.isConnected && hasDevConfig ? () => router.push(`/session/${sessionId}/dev` as any) : undefined}

@@ -464,20 +464,43 @@ model Project {
     updatedAt       DateTime  @updatedAt
 
     // Relations
-    sessions           Session[]
-    supervisorRuns     SupervisorRun[]
-    supervisorLoops    SupervisorLoop[]
-    knowledgeEntries   ProjectKnowledge[]
-    profile            ProjectProfile?
-    tasks              Task[]
-    skills             Skill[]
-    triggerSchedules   TriggerSchedule[]
-    webhookTriggers    WebhookTrigger[]
+    sessions              Session[]
+    supervisorRuns        SupervisorRun[]
+    supervisorLoops       SupervisorLoop[]
+    supervisorDimensions  SupervisorDimension[]
+    knowledgeEntries      ProjectKnowledge[]
+    profile               ProjectProfile?
+    tasks                 Task[]
+    skills                Skill[]
+    triggerSchedules      TriggerSchedule[]
+    webhookTriggers       WebhookTrigger[]
 
     @@unique([accountId, machineId, path])
     @@index([accountId])
     @@index([accountId, archived])
     @@index([supervisorNextRunAt])
+}
+
+//
+// Supervisor Custom Dimensions (user-defined health analysis dimensions per project)
+//
+
+model SupervisorDimension {
+    id          String   @id @default(cuid())
+    projectId   String
+    accountId   String
+    key         String   // camelCase auto-generated from title, unique within project
+    title       String
+    prompt      String
+    enabled     Boolean  @default(true)
+    sortOrder   Int      @default(0)
+    createdAt   DateTime @default(now())
+    updatedAt   DateTime @updatedAt
+
+    project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+    @@unique([projectId, key])
+    @@index([projectId, enabled])
 }
 
 //

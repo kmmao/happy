@@ -21,6 +21,10 @@ const healthDimensionMap: Record<string, TranslationKey> = {
     documentation: "supervisor.dimDocumentation",
     performance: "supervisor.dimPerformance",
     uiUx: "supervisor.dimUiUx",
+    typeSafety: "supervisor.dimTypeSafety",
+    observability: "supervisor.dimObservability",
+    apiDesign: "supervisor.dimApiDesign",
+    buildCI: "supervisor.dimBuildCI",
 };
 
 // Research dimension keys → i18n keys
@@ -48,9 +52,19 @@ const preflightDimensionMap: Record<string, TranslationKey> = {
     preflight_deploy_server: "supervisor.dimPreflightDeployServer",
 };
 
+// Custom dimension key → title map (populated at runtime from project data)
+let customDimensionMap: Record<string, string> = {};
+
+/** Register custom dimension labels so action cards can resolve their titles. */
+export function setCustomDimensionLabels(
+    dims: ReadonlyArray<{ key: string; title: string }>,
+): void {
+    customDimensionMap = Object.fromEntries(dims.map((d) => [d.key, d.title]));
+}
+
 /**
  * Resolve a dimension key to a localized label.
- * Works across all three dimension categories.
+ * Works across all four dimension categories (built-in, research, preflight, custom).
  * Returns the raw key if no mapping is found.
  */
 export function resolveDimensionLabel(key: string): string {
@@ -58,7 +72,8 @@ export function resolveDimensionLabel(key: string): string {
         healthDimensionMap[key] ??
         researchDimensionMap[key] ??
         preflightDimensionMap[key];
-    return translationKey ? t(translationKey) : key;
+    if (translationKey) return t(translationKey);
+    return customDimensionMap[key] ?? key;
 }
 
 // Run status → i18n key mapping

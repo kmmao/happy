@@ -8,7 +8,9 @@ import { useProject } from "@/hooks/useProjects";
 import { ItemGroup } from "@/components/ItemGroup";
 import { t } from "@/text";
 import { TokenStorage } from "@/auth/tokenStorage";
-import { updateSupervisorConfig, fetchActionStats, reprocessPendingActions } from "@/sync/apiSupervisor";
+import { updateSupervisorConfig, fetchActionStats, reprocessPendingActions, fetchCustomDimensions, createCustomDimension, updateCustomDimension, deleteCustomDimension, generateDimensionPrompt, type SupervisorDimension } from "@/sync/apiSupervisor";
+import { setCustomDimensionLabels } from "@/components/project/supervisorDimensionLabels";
+import { getDimensionPrompt } from "@/components/project/supervisorDimensionPrompts";
 import { projectManager } from "@/sync/projectManager";
 import { Ionicons } from "@expo/vector-icons";
 import { Modal } from "@/modal";
@@ -53,6 +55,10 @@ const defaultConfig = {
         documentation: false,
         performance: false,
         uiUx: false,
+        typeSafety: false,
+        observability: false,
+        apiDesign: false,
+        buildCI: false,
     },
     autoApprove: {
         semiAutoSeverities: ["low", "medium"] as Severity[],
@@ -84,6 +90,7 @@ const defaultConfig = {
     // runtimeProfileResolver uses this value for the matching purpose.
     healthCheckProfileId: null as string | null,
     researchProfileId: null as string | null,
+    dimensionAiProfileId: null as string | null,
 };
 
 type SupervisorConfig = typeof defaultConfig;
@@ -119,6 +126,41 @@ function SupervisorSettingsScreen() {
     const [saving, setSaving] = React.useState(false);
     const [profileRefreshing, setProfileRefreshing] = React.useState(false);
 
+    // Custom dimensions state
+    // customDimensions = server-committed state (source of truth for diff)
+    // localCustomDimensions = user's pending edits (synced to server on main Save)
+    const [customDimensions, setCustomDimensions] = React.useState<SupervisorDimension[]>([]);
+    const [localCustomDimensions, setLocalCustomDimensions] = React.useState<SupervisorDimension[]>([]);
+    const [dimModalVisible, setDimModalVisible] = React.useState(false);
+    const [dimEditTarget, setDimEditTarget] = React.useState<SupervisorDimension | null>(null);
+    const [dimTitle, setDimTitle] = React.useState("");
+    const [dimPrompt, setDimPrompt] = React.useState("");
+    const [dimGenerating, setDimGenerating] = React.useState(false);
+
+    // Dimension detail (ℹ) modal state
+    const [dimInfoKey, setDimInfoKey] = React.useState<string | null>(null);
+    const dimInfoPrompt = dimInfoKey
+        ? (getDimensionPrompt(dimInfoKey) ?? localCustomDimensions.find((d) => d.key === dimInfoKey)?.prompt ?? null)
+        : null;
+
+    // Fetch custom dimensions on mount
+    React.useEffect(() => {
+        if (!project?.serverId) return;
+        (async () => {
+            try {
+                const credentials = await TokenStorage.getCredentials();
+                if (!credentials) return;
+                const dims = await fetchCustomDimensions(credentials, project.serverId!);
+                if (!mountedRef.current) return;
+                setCustomDimensions(dims);
+                setLocalCustomDimensions(dims);
+                setCustomDimensionLabels(dims);
+            } catch {
+                // best-effort
+            }
+        })();
+    }, [project?.serverId]);
+
     const missingDefaultProfileName = React.useMemo(() => {
         return getMissingSupervisorProfileName(config.defaultProfileId, allProfiles);
     }, [allProfiles, config.defaultProfileId]);
@@ -130,6 +172,10 @@ function SupervisorSettingsScreen() {
     const missingResearchProfileName = React.useMemo(() => {
         return getMissingSupervisorProfileName(config.researchProfileId, allProfiles);
     }, [allProfiles, config.researchProfileId]);
+
+    const missingDimensionAiProfileName = React.useMemo(() => {
+        return getMissingSupervisorProfileName(config.dimensionAiProfileId, allProfiles);
+    }, [allProfiles, config.dimensionAiProfileId]);
 
     // Re-query preview API after each save so the "Effective" label matches
     // the newly-persisted config. initialConfig only changes on successful
@@ -201,8 +247,10 @@ function SupervisorSettingsScreen() {
     }, [project?.supervisorConfig]);
 
     const isDirty = React.useMemo(
-        () => JSON.stringify(config) !== JSON.stringify(initialConfig),
-        [config, initialConfig],
+        () =>
+            JSON.stringify(config) !== JSON.stringify(initialConfig) ||
+            JSON.stringify(localCustomDimensions) !== JSON.stringify(customDimensions),
+        [config, initialConfig, localCustomDimensions, customDimensions],
     );
 
     const mountedRef = React.useRef(true);
@@ -272,6 +320,45 @@ function SupervisorSettingsScreen() {
                 localProject.supervisorPushTriggerEnabled = config.pushTrigger.enabled;
                 localProject.supervisorCustomRules = config.customRules.trim() || null;
             }
+            // Sync custom dimension changes (create / update / delete)
+            const serverIds = new Set(customDimensions.map((d) => d.id));
+            const localPersisted = localCustomDimensions.filter((d) => !d.id.startsWith("local_"));
+            const localPersistedIds = new Set(localPersisted.map((d) => d.id));
+
+            const toCreate = localCustomDimensions.filter((d) => d.id.startsWith("local_"));
+            const toDelete = customDimensions.filter((d) => !localPersistedIds.has(d.id));
+            const toUpdate = localPersisted.filter((d) => {
+                if (!serverIds.has(d.id)) return false;
+                const srv = customDimensions.find((s) => s.id === d.id);
+                return srv && (d.title !== srv.title || d.prompt !== srv.prompt || d.enabled !== srv.enabled);
+            });
+
+            await Promise.all([
+                ...toCreate.map((d) =>
+                    createCustomDimension(credentials, project.serverId!, { title: d.title, prompt: d.prompt }),
+                ),
+                ...toDelete.map((d) =>
+                    deleteCustomDimension(credentials, project.serverId!, d.id),
+                ),
+                ...toUpdate.map((d) =>
+                    updateCustomDimension(credentials, project.serverId!, d.id, {
+                        title: d.title, prompt: d.prompt, enabled: d.enabled,
+                    }),
+                ),
+            ]);
+
+            // Re-fetch to get canonical server state (replaces temp IDs with real IDs)
+            if (toCreate.length > 0 || toDelete.length > 0 || toUpdate.length > 0) {
+                const freshDims = await fetchCustomDimensions(credentials, project.serverId!);
+                if (mountedRef.current) {
+                    setCustomDimensions(freshDims);
+                    setLocalCustomDimensions(freshDims);
+                    setCustomDimensionLabels(freshDims);
+                }
+            } else {
+                setCustomDimensions(localCustomDimensions);
+            }
+
             if (!mountedRef.current) return;
             setInitialConfig(config);
             Modal.toast(t("supervisor.settingsSaved"));
@@ -547,57 +634,303 @@ function SupervisorSettingsScreen() {
                     value={config.analysis.security}
                     onToggle={() => toggleDimension("security")}
                     subtitle={t("supervisor.dimSecurityNote")}
+                    onInfo={() => setDimInfoKey("security")}
                 />
                 <ToggleRow
                     label={t("supervisor.dimDependencies")}
                     value={config.analysis.dependencies}
                     onToggle={() => toggleDimension("dependencies")}
                     subtitle={t("supervisor.dimDependenciesNote")}
+                    onInfo={() => setDimInfoKey("dependencies")}
                 />
                 <ToggleRow
                     label={t("supervisor.dimArchitecture")}
                     value={config.analysis.architecture}
                     onToggle={() => toggleDimension("architecture")}
                     subtitle={t("supervisor.dimArchitectureNote")}
+                    onInfo={() => setDimInfoKey("architecture")}
                 />
                 <ToggleRow
                     label={t("supervisor.dimTechDebt")}
                     value={config.analysis.techDebt}
                     onToggle={() => toggleDimension("techDebt")}
                     subtitle={t("supervisor.dimTechDebtNote")}
+                    onInfo={() => setDimInfoKey("techDebt")}
                 />
                 <ToggleRow
                     label={t("supervisor.dimCodeQuality")}
                     value={config.analysis.codeQuality}
                     onToggle={() => toggleDimension("codeQuality")}
                     subtitle={t("supervisor.dimCodeQualityNote")}
+                    onInfo={() => setDimInfoKey("codeQuality")}
                 />
                 <ToggleRow
                     label={t("supervisor.dimTestCoverage")}
                     value={config.analysis.testCoverage}
                     onToggle={() => toggleDimension("testCoverage")}
                     subtitle={t("supervisor.dimTestCoverageNote")}
+                    onInfo={() => setDimInfoKey("testCoverage")}
                 />
                 <ToggleRow
                     label={t("supervisor.dimDocumentation")}
                     value={config.analysis.documentation}
                     onToggle={() => toggleDimension("documentation")}
                     subtitle={t("supervisor.dimDocumentationNote")}
+                    onInfo={() => setDimInfoKey("documentation")}
                 />
                 <ToggleRow
                     label={t("supervisor.dimPerformance")}
                     value={config.analysis.performance}
                     onToggle={() => toggleDimension("performance")}
                     subtitle={t("supervisor.dimPerformanceNote")}
+                    onInfo={() => setDimInfoKey("performance")}
                 />
                 <ToggleRow
                     label={t("supervisor.dimUiUx")}
                     value={config.analysis.uiUx}
                     onToggle={() => toggleDimension("uiUx")}
                     subtitle={t("supervisor.dimUiUxNote")}
+                    onInfo={() => setDimInfoKey("uiUx")}
+                />
+                <ToggleRow
+                    label={t("supervisor.dimTypeSafety")}
+                    value={config.analysis.typeSafety}
+                    onToggle={() => toggleDimension("typeSafety")}
+                    subtitle={t("supervisor.dimTypeSafetyNote")}
+                    onInfo={() => setDimInfoKey("typeSafety")}
+                />
+                <ToggleRow
+                    label={t("supervisor.dimObservability")}
+                    value={config.analysis.observability}
+                    onToggle={() => toggleDimension("observability")}
+                    subtitle={t("supervisor.dimObservabilityNote")}
+                    onInfo={() => setDimInfoKey("observability")}
+                />
+                <ToggleRow
+                    label={t("supervisor.dimApiDesign")}
+                    value={config.analysis.apiDesign}
+                    onToggle={() => toggleDimension("apiDesign")}
+                    subtitle={t("supervisor.dimApiDesignNote")}
+                    onInfo={() => setDimInfoKey("apiDesign")}
+                />
+                <ToggleRow
+                    label={t("supervisor.dimBuildCI")}
+                    value={config.analysis.buildCI}
+                    onToggle={() => toggleDimension("buildCI")}
+                    subtitle={t("supervisor.dimBuildCINote")}
+                    onInfo={() => setDimInfoKey("buildCI")}
                     isLast
                 />
             </ItemGroup>
+
+            {/* Dimension detail (ℹ) modal */}
+            {dimInfoKey && dimInfoPrompt && (
+                <View style={styles.dimModalOverlay}>
+                    <View style={styles.dimModalCard}>
+                        <Text style={styles.dimModalTitle}>
+                            {localCustomDimensions.find((d) => d.key === dimInfoKey)?.title
+                                ?? t(`supervisor.dim${dimInfoKey.charAt(0).toUpperCase()}${dimInfoKey.slice(1)}` as Parameters<typeof t>[0])}
+                        </Text>
+                        <ScrollView style={{ maxHeight: 320 }} showsVerticalScrollIndicator={false}>
+                            <Text style={[styles.dimModalLabel, { lineHeight: 22, fontSize: 14 }]}>
+                                {dimInfoPrompt}
+                            </Text>
+                        </ScrollView>
+                        <View style={[styles.dimModalFooter, { justifyContent: "center" }]}>
+                            <Pressable
+                                style={styles.dimModalSaveBtn}
+                                onPress={() => setDimInfoKey(null)}
+                            >
+                                <Text style={styles.dimModalSaveText}>{t("common.ok")}</Text>
+                            </Pressable>
+                        </View>
+                    </View>
+                </View>
+            )}
+
+            {/* Custom Dimensions */}
+            <ItemGroup title={t("supervisor.customDimensionsSection")}>
+                {localCustomDimensions.map((dim, idx) => (
+                    <View
+                        key={dim.id}
+                        style={[
+                            styles.toggleRow,
+                            idx < localCustomDimensions.length - 1 && styles.toggleRowBorder,
+                        ]}
+                    >
+                        <View style={styles.toggleRowContent}>
+                            <Text style={styles.toggleRowLabel}>{dim.title}</Text>
+                            <Text
+                                style={styles.toggleRowSubtitle}
+                                numberOfLines={2}
+                            >
+                                {dim.prompt}
+                            </Text>
+                        </View>
+                        <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                            <Switch
+                                value={dim.enabled}
+                                onValueChange={(val) => {
+                                    setLocalCustomDimensions((prev) =>
+                                        prev.map((d) => d.id === dim.id ? { ...d, enabled: val } : d),
+                                    );
+                                }}
+                                trackColor={{
+                                    false: theme.colors.surface,
+                                    true: theme.colors.header.tint,
+                                }}
+                            />
+                            <Pressable
+                                onPress={() => {
+                                    setDimEditTarget(dim);
+                                    setDimTitle(dim.title);
+                                    setDimPrompt(dim.prompt);
+                                    setDimModalVisible(true);
+                                }}
+                                hitSlop={8}
+                            >
+                                <Ionicons name="pencil-outline" size={18} color={theme.colors.textSecondary} />
+                            </Pressable>
+                        </View>
+                    </View>
+                ))}
+                <Pressable
+                    style={[styles.toggleRow, localCustomDimensions.length > 0 && { borderTopWidth: 0.5, borderTopColor: theme.colors.divider }]}
+                    onPress={() => {
+                        setDimEditTarget(null);
+                        setDimTitle("");
+                        setDimPrompt("");
+                        setDimModalVisible(true);
+                    }}
+                >
+                    <Ionicons name="add-circle-outline" size={18} color={theme.colors.header.tint} style={{ marginRight: 8 }} />
+                    <Text style={[styles.toggleRowLabel, { color: theme.colors.header.tint }]}>
+                        {t("supervisor.customDimensionsAdd")}
+                    </Text>
+                </Pressable>
+            </ItemGroup>
+
+            {/* Custom Dimension Add/Edit Modal */}
+            {dimModalVisible && (
+                <View style={styles.dimModalOverlay}>
+                    <View style={styles.dimModalCard}>
+                        <Text style={styles.dimModalTitle}>
+                            {dimEditTarget
+                                ? t("supervisor.customDimensionEditTitle")
+                                : t("supervisor.customDimensionAddTitle")}
+                        </Text>
+
+                        <Text style={styles.dimModalLabel}>{t("supervisor.customDimensionNameLabel")}</Text>
+                        <TextInput
+                            style={styles.dimModalInput}
+                            value={dimTitle}
+                            onChangeText={setDimTitle}
+                            placeholder={t("supervisor.customDimensionNamePlaceholder")}
+                            placeholderTextColor={theme.colors.textSecondary}
+                            maxLength={50}
+                            editable={!dimEditTarget}
+                        />
+
+                        <Text style={styles.dimModalLabel}>{t("supervisor.customDimensionPromptLabel")}</Text>
+                        <TextInput
+                            style={styles.dimModalTextarea}
+                            value={dimPrompt}
+                            onChangeText={setDimPrompt}
+                            placeholder={t("supervisor.customDimensionPromptPlaceholder")}
+                            placeholderTextColor={theme.colors.textSecondary}
+                            multiline
+                            maxLength={5000}
+                        />
+
+                        <View style={styles.dimModalActions}>
+                            {dimEditTarget && (
+                                <Pressable
+                                    style={styles.dimModalDeleteBtn}
+                                    onPress={async () => {
+                                        const confirmed = await Modal.confirm(
+                                            dimEditTarget.title,
+                                            t("supervisor.customDimensionDeleteConfirm"),
+                                            { confirmText: t("common.delete"), cancelText: t("common.cancel") },
+                                        );
+                                        if (!confirmed) return;
+                                        setLocalCustomDimensions((prev) => prev.filter((d) => d.id !== dimEditTarget.id));
+                                        setDimModalVisible(false);
+                                    }}
+                                >
+                                    <Text style={styles.dimModalDeleteText}>{t("common.delete")}</Text>
+                                </Pressable>
+                            )}
+                            <Pressable
+                                style={styles.dimModalAiBtn}
+                                disabled={dimGenerating || !dimTitle.trim()}
+                                onPress={async () => {
+                                    if (!dimTitle.trim() || !project?.serverId) return;
+                                    setDimGenerating(true);
+                                    try {
+                                        const credentials = await TokenStorage.getCredentials();
+                                        if (!credentials) return;
+                                        const generated = await generateDimensionPrompt(credentials, project.serverId, dimTitle.trim(), config.dimensionAiProfileId ?? undefined);
+                                        if (mountedRef.current) setDimPrompt(generated);
+                                    } catch {
+                                        Modal.toast(t("errors.unknownError"));
+                                    } finally {
+                                        if (mountedRef.current) setDimGenerating(false);
+                                    }
+                                }}
+                            >
+                                {dimGenerating
+                                    ? <ActivityIndicator size="small" color={theme.colors.header.tint} />
+                                    : <Text style={styles.dimModalAiText}>
+                                        {t("supervisor.customDimensionAiGenerate")}
+                                    </Text>
+                                }
+                            </Pressable>
+                        </View>
+
+                        <View style={styles.dimModalFooter}>
+                            <Pressable
+                                style={styles.dimModalCancelBtn}
+                                onPress={() => setDimModalVisible(false)}
+                            >
+                                <Text style={styles.dimModalCancelText}>{t("common.cancel")}</Text>
+                            </Pressable>
+                            <Pressable
+                                style={[
+                                    styles.dimModalSaveBtn,
+                                    (!dimTitle.trim() || !dimPrompt.trim()) && { opacity: 0.5 },
+                                ]}
+                                disabled={!dimTitle.trim() || !dimPrompt.trim()}
+                                onPress={() => {
+                                    if (dimEditTarget) {
+                                        setLocalCustomDimensions((prev) =>
+                                            prev.map((d) =>
+                                                d.id === dimEditTarget.id
+                                                    ? { ...d, title: dimTitle.trim(), prompt: dimPrompt.trim() }
+                                                    : d,
+                                            ),
+                                        );
+                                    } else {
+                                        const tempDim: SupervisorDimension = {
+                                            id: `local_${Date.now()}`,
+                                            key: dimTitle.trim().toLowerCase().replace(/[^a-z0-9]/g, "_"),
+                                            title: dimTitle.trim(),
+                                            prompt: dimPrompt.trim(),
+                                            enabled: true,
+                                            sortOrder: localCustomDimensions.length,
+                                            createdAt: Date.now(),
+                                            updatedAt: Date.now(),
+                                        };
+                                        setLocalCustomDimensions((prev) => [...prev, tempDim]);
+                                    }
+                                    setDimModalVisible(false);
+                                }}
+                            >
+                                <Text style={styles.dimModalSaveText}>{t("common.save")}</Text>
+                            </Pressable>
+                        </View>
+                    </View>
+                </View>
+            )}
 
             {/* Push Trigger (Incremental Scan) */}
             <ItemGroup title={t("supervisor.pushTriggerSection")}>
@@ -855,6 +1188,32 @@ function SupervisorSettingsScreen() {
                         onRefresh={handleRefreshProfiles}
                         refreshing={profileRefreshing}
                         effectiveLabel={researchEffectiveLabel}
+                    />
+                </View>
+            </ItemGroup>
+
+            {/* Dimension AI Profile — model used for "AI Generate" in custom dimension editor */}
+            <ItemGroup title={t("supervisor.dimAiProfileSection")}>
+                <View style={styles.customRulesCard}>
+                    <ProfilePicker
+                        value={config.dimensionAiProfileId}
+                        onChange={(profileId) =>
+                            updateConfig((prev) => ({ ...prev, dimensionAiProfileId: profileId }))
+                        }
+                        profiles={allProfiles}
+                        defaultOptionLabel={t("supervisor.defaultProfileDefault")}
+                        description={t("supervisor.dimAiProfileDesc")}
+                        missingProfileName={missingDimensionAiProfileName}
+                        missingMessage={
+                            missingDimensionAiProfileName
+                                ? t("supervisor.defaultProfileMissing", {
+                                    profileName: missingDimensionAiProfileName,
+                                })
+                                : undefined
+                        }
+                        refreshLabel={t("suggestions.refresh")}
+                        onRefresh={handleRefreshProfiles}
+                        refreshing={profileRefreshing}
                     />
                 </View>
             </ItemGroup>
@@ -1197,10 +1556,11 @@ interface ToggleRowProps {
     onToggle: () => void;
     subtitle?: string;
     isLast?: boolean;
+    onInfo?: () => void;
 }
 
 const ToggleRow = React.memo(
-    ({ label, value, onToggle, subtitle, isLast }: ToggleRowProps) => {
+    ({ label, value, onToggle, subtitle, isLast, onInfo }: ToggleRowProps) => {
         const { theme } = useUnistyles();
 
         return (
@@ -1211,7 +1571,18 @@ const ToggleRow = React.memo(
                 ]}
             >
                 <View style={styles.toggleRowContent}>
-                    <Text style={styles.toggleRowLabel}>{label}</Text>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                        <Text style={styles.toggleRowLabel}>{label}</Text>
+                        {onInfo && (
+                            <Pressable onPress={onInfo} hitSlop={8}>
+                                <Ionicons
+                                    name="information-circle-outline"
+                                    size={16}
+                                    color={theme.colors.textSecondary}
+                                />
+                            </Pressable>
+                        )}
+                    </View>
                     {subtitle && (
                         <Text style={styles.toggleRowSubtitle}>
                             {subtitle}
@@ -1455,6 +1826,120 @@ const styles = StyleSheet.create((theme) => ({
     severityTagText: {
         ...Typography.default(),
         fontSize: 11,
+    },
+    dimModalOverlay: {
+        position: "absolute" as const,
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: "rgba(0,0,0,0.5)",
+        justifyContent: "center" as const,
+        alignItems: "center" as const,
+        zIndex: 100,
+        padding: 16,
+    },
+    dimModalCard: {
+        backgroundColor: theme.colors.groupped.background,
+        borderRadius: 16,
+        padding: 20,
+        width: "100%" as const,
+        maxWidth: 480,
+        gap: 12,
+    },
+    dimModalTitle: {
+        ...Typography.default(),
+        fontSize: 17,
+        fontWeight: "600" as const,
+        color: theme.colors.text,
+        marginBottom: 4,
+    },
+    dimModalLabel: {
+        ...Typography.default(),
+        fontSize: 13,
+        color: theme.colors.textSecondary,
+        marginBottom: 2,
+    },
+    dimModalInput: {
+        ...Typography.default(),
+        fontSize: 15,
+        color: theme.colors.text,
+        backgroundColor: theme.colors.surface,
+        borderRadius: 10,
+        paddingHorizontal: 12,
+        paddingVertical: 10,
+    },
+    dimModalTextarea: {
+        ...Typography.default(),
+        fontSize: 14,
+        color: theme.colors.text,
+        backgroundColor: theme.colors.surface,
+        borderRadius: 10,
+        paddingHorizontal: 12,
+        paddingVertical: 10,
+        minHeight: 120,
+        textAlignVertical: "top" as const,
+    },
+    dimModalActions: {
+        flexDirection: "row" as const,
+        justifyContent: "flex-end" as const,
+        gap: 8,
+        marginTop: 4,
+    },
+    dimModalDeleteBtn: {
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        borderRadius: 8,
+        backgroundColor: theme.colors.surface,
+    },
+    dimModalDeleteText: {
+        ...Typography.default(),
+        fontSize: 14,
+        color: "#FF3B30",
+    },
+    dimModalAiBtn: {
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        borderRadius: 8,
+        backgroundColor: theme.colors.surface,
+        minWidth: 90,
+        alignItems: "center" as const,
+    },
+    dimModalAiText: {
+        ...Typography.default(),
+        fontSize: 14,
+        color: theme.colors.header.tint,
+    },
+    dimModalFooter: {
+        flexDirection: "row" as const,
+        justifyContent: "flex-end" as const,
+        gap: 8,
+        marginTop: 4,
+    },
+    dimModalCancelBtn: {
+        paddingHorizontal: 16,
+        paddingVertical: 10,
+        borderRadius: 10,
+        backgroundColor: theme.colors.surface,
+    },
+    dimModalCancelText: {
+        ...Typography.default(),
+        fontSize: 15,
+        color: theme.colors.text,
+    },
+    dimModalSaveBtn: {
+        paddingHorizontal: 20,
+        paddingVertical: 10,
+        borderRadius: 10,
+        backgroundColor: theme.colors.header.tint,
+        minWidth: 80,
+        alignItems: "center" as const,
+    },
+    dimModalSaveText: {
+        ...Typography.default(),
+        fontSize: 15,
+        fontWeight: "600" as const,
+        color: "#fff",
     },
 }));
 

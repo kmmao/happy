@@ -28,6 +28,7 @@ interface ChatHeaderViewProps {
   provider?: string | null;
   knowledgeCount?: number;
   onKnowledgePress?: () => void;
+  onResumePress?: () => void;
   onForkPress?: () => void;
   devButtonState?: DevButtonState;
   devRunningCount?: number;
@@ -50,6 +51,7 @@ export const ChatHeaderView: React.FC<ChatHeaderViewProps> = ({
   provider,
   knowledgeCount,
   onKnowledgePress,
+  onResumePress,
   onForkPress,
   devButtonState,
   devRunningCount,
@@ -192,6 +194,20 @@ export const ChatHeaderView: React.FC<ChatHeaderViewProps> = ({
               onLongPress={onDevLongPress}
               tintColor={theme.colors.header.tint}
             />
+          )}
+
+          {onResumePress && (
+            <Pressable
+              onPress={onResumePress}
+              hitSlop={15}
+              style={styles.actionButton}
+            >
+              <Ionicons
+                name="play-circle-outline"
+                size={24}
+                color="#34C759"
+              />
+            </Pressable>
           )}
 
           {onForkPress && (
