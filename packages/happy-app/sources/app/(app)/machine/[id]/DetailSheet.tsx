@@ -132,8 +132,10 @@ export function DetailSheet({
                 shadowOpacity: 0.15,
                 shadowRadius: 20,
                 elevation: 12,
+                flex: 1,
             }}>
                     <View style={{
+                        flex: 1,
                         backgroundColor: theme.colors.surface,
                         borderRadius: 22,
                         overflow: "hidden",
@@ -189,8 +191,9 @@ export function DetailSheet({
 
                         {/* 可滚动内容 */}
                         <ScrollView
+                            style={{ flex: 1 }}
                             contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 12 }}
-                            showsVerticalScrollIndicator={false}
+                            showsVerticalScrollIndicator
                         >
                             {/* 字段区块 */}
                             {sections.map((section, si) => (
