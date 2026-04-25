@@ -29,6 +29,8 @@ import {
     fetchSupervisorTrend,
     deleteSupervisorRun,
     deleteSupervisorLoop,
+    clearAllRuns,
+    clearAllLoops,
     type SupervisorLoop,
     fetchLoopHistory,
 } from "@/sync/apiSupervisor";
@@ -38,6 +40,7 @@ import { sync } from "@/sync/sync";
 import { SupervisorTrendChart } from "./SupervisorTrendChart";
 import { SupervisorRunHistoryItem } from "./SupervisorRunHistoryItem";
 import { Modal } from "@/modal";
+import { useHappyAction } from "@/hooks/useHappyAction";
 import { DayRangeSelector } from "./DayRangeSelector";
 import { SupervisorLoopHistoryItem } from "./SupervisorLoopHistoryItem";
 import { SharedStateView } from "@/components/SharedStateView";
@@ -52,7 +55,8 @@ export const ProjectHealthTab = React.memo(
         const { theme } = useUnistyles();
         const router = useRouter();
         const [runs, setRuns] = React.useState<SupervisorRun[]>([]);
-        const [total, setTotal] = React.useState(0);
+        const [runsTotal, setRunsTotal] = React.useState(0);
+        const [loadingMore, setLoadingMore] = React.useState(false);
         const [costSummary, setCostSummary] =
             React.useState<SupervisorCostSummary | null>(null);
         const [trendData, setTrendData] =
@@ -64,6 +68,8 @@ export const ProjectHealthTab = React.memo(
         const [refreshing, setRefreshing] = React.useState(false);
         const [loopHistory, setLoopHistory] = React.useState<SupervisorLoop[]>([]);
         const [loopHistoryTotal, setLoopHistoryTotal] = React.useState(0);
+        const PAGE_SIZE = 20;
+        const [visibleRunCount, setVisibleRunCount] = React.useState(3);
         const [analyticsDays, setAnalyticsDays] = React.useState(3);
         const analyticsDaysRef = React.useRef(3);
         const [analyticsLoading, setAnalyticsLoading] = React.useState(false);
@@ -77,7 +83,7 @@ export const ProjectHealthTab = React.memo(
                 if (!credentials) return;
                 const [runsResult, costResult, trendResult, relatedResult, loopHistoryResult] =
                     await Promise.all([
-                        fetchSupervisorRuns(credentials, serverId, { limit: 20 }),
+                        fetchSupervisorRuns(credentials, serverId, { limit: PAGE_SIZE, offset: 0 }),
                         fetchSupervisorCost(credentials, serverId, analyticsDaysRef.current).catch(
                             () => null,
                         ),
@@ -90,7 +96,8 @@ export const ProjectHealthTab = React.memo(
                         ),
                     ]);
                 setRuns(runsResult.runs);
-                setTotal(runsResult.total);
+                setRunsTotal(runsResult.total);
+                setVisibleRunCount(3);
                 setCostSummary(costResult);
                 setTrendData(trendResult);
                 setRelatedProjects(relatedResult);
@@ -102,6 +109,37 @@ export const ProjectHealthTab = React.memo(
                 setLoaded(true);
             }
         }, [serverId]);
+
+        const loadMoreRuns = React.useCallback(async () => {
+            if (!serverId || loadingMore) return;
+            const nextVisible = visibleRunCount + 10;
+            // If we already have enough locally loaded, just expand the visible count
+            if (nextVisible <= runs.length) {
+                setVisibleRunCount(nextVisible);
+                return;
+            }
+            // Need to fetch from server
+            setLoadingMore(true);
+            try {
+                const credentials = await TokenStorage.getCredentials();
+                if (!credentials) return;
+                const result = await fetchSupervisorRuns(credentials, serverId, {
+                    limit: PAGE_SIZE,
+                    offset: runs.length,
+                });
+                setRuns((prev) => {
+                    const existingIds = new Set(prev.map((r) => r.id));
+                    const newRuns = result.runs.filter((r) => !existingIds.has(r.id));
+                    return [...prev, ...newRuns];
+                });
+                setRunsTotal(result.total);
+                setVisibleRunCount(nextVisible);
+            } catch {
+                // Silently fail
+            } finally {
+                setLoadingMore(false);
+            }
+        }, [serverId, loadingMore, visibleRunCount, runs.length]);
 
         React.useEffect(() => {
             loadData();
@@ -174,7 +212,6 @@ export const ProjectHealthTab = React.memo(
                 if (!credentials) return;
                 await deleteSupervisorRun(credentials, serverId, runId);
                 setRuns((prev) => prev.filter((r) => r.id !== runId));
-                setTotal((prev) => Math.max(0, prev - 1));
             },
             [serverId],
         );
@@ -197,7 +234,43 @@ export const ProjectHealthTab = React.memo(
             [serverId],
         );
 
-        // Compute health score delta from trend data
+        const [clearRunsLoading, doClearAllRuns] = useHappyAction(
+            React.useCallback(async () => {
+                if (!serverId) return;
+                const confirmed = await Modal.confirm(
+                    t("supervisor.clearAll"),
+                    t("supervisor.clearAllConfirm"),
+                    { confirmText: t("common.delete"), destructive: true },
+                );
+                if (!confirmed) return;
+                const credentials = await TokenStorage.getCredentials();
+                if (!credentials) return;
+                const result = await clearAllRuns(credentials, serverId);
+                Modal.toast(t("supervisor.clearAllSuccess", { count: result.deletedCount }));
+                setRuns([]);
+                setRunsTotal(0);
+                setVisibleRunCount(3);
+            }, [serverId]),
+        );
+
+        const [clearLoopsLoading, doClearAllLoops] = useHappyAction(
+            React.useCallback(async () => {
+                if (!serverId) return;
+                const confirmed = await Modal.confirm(
+                    t("supervisor.clearAll"),
+                    t("supervisor.clearAllConfirm"),
+                    { confirmText: t("common.delete"), destructive: true },
+                );
+                if (!confirmed) return;
+                const credentials = await TokenStorage.getCredentials();
+                if (!credentials) return;
+                const result = await clearAllLoops(credentials, serverId);
+                Modal.toast(t("supervisor.clearAllSuccess", { count: result.deletedCount }));
+                setLoopHistory([]);
+                setLoopHistoryTotal(0);
+            }, [serverId]),
+        );
+
         if (!serverId) {
             return (
                 <SharedStateView
@@ -249,7 +322,19 @@ export const ProjectHealthTab = React.memo(
 
                 {/* Loop History */}
                 {loaded && loopHistory.length > 0 && (
-                    <ItemGroup title={t("supervisor.loopHistory")}>
+                    <ItemGroup
+                        title={
+                            <View style={styles.sectionHeader}>
+                                <Text style={styles.sectionTitle}>{t("supervisor.loopHistory")}</Text>
+                                <Pressable onPress={doClearAllLoops} disabled={clearLoopsLoading} hitSlop={8}>
+                                    {clearLoopsLoading
+                                        ? <ActivityIndicator size="small" color="#FF3B30" />
+                                        : <Text style={styles.clearAllText}>{t("supervisor.clearAll")}</Text>
+                                    }
+                                </Pressable>
+                            </View>
+                        }
+                    >
                         {loopHistory.slice(0, 3).map((loop, index) => (
                             <SupervisorLoopHistoryItem
                                 key={loop.id}
@@ -277,7 +362,21 @@ export const ProjectHealthTab = React.memo(
                 )}
 
                 {/* Run History */}
-                <ItemGroup title={t("supervisor.runHistory")}>
+                <ItemGroup
+                    title={
+                        <View style={styles.sectionHeader}>
+                            <Text style={styles.sectionTitle}>{t("supervisor.runHistory")}</Text>
+                            {loaded && healthRuns.length > 0 && (
+                                <Pressable onPress={doClearAllRuns} disabled={clearRunsLoading} hitSlop={8}>
+                                    {clearRunsLoading
+                                        ? <ActivityIndicator size="small" color="#FF3B30" />
+                                        : <Text style={styles.clearAllText}>{t("supervisor.clearAll")}</Text>
+                                    }
+                                </Pressable>
+                            )}
+                        </View>
+                    }
+                >
                     {!loaded ? (
                         <View style={styles.loadingContainer}>
                             <ActivityIndicator size="small" />
@@ -290,11 +389,11 @@ export const ProjectHealthTab = React.memo(
                         </View>
                     ) : (
                         <>
-                            {healthRuns.slice(0, 3).map((run, index) => (
+                            {healthRuns.slice(0, visibleRunCount).map((run, index) => (
                                 <SupervisorRunHistoryItem
                                     key={run.id}
                                     run={run}
-                                    isLast={index === Math.min(healthRuns.length, 3) - 1}
+                                    isLast={index === Math.min(healthRuns.length, visibleRunCount) - 1}
                                     onPress={
                                         run.status !== "pending" && run.status !== "running" && serverId
                                             ? () =>
@@ -314,25 +413,31 @@ export const ProjectHealthTab = React.memo(
                                     }
                                 />
                             ))}
-                            {(healthRuns.length > 3 || total > healthRuns.length) && (
+                            {(healthRuns.length > visibleRunCount || runsTotal > runs.length) && (
                                 <Pressable
                                     style={styles.showMoreRow}
-                                    onPress={() =>
-                                        router.push(
-                                            `/project/${project.id}/supervisor-actions` as any,
-                                        )
-                                    }
+                                    onPress={loadMoreRuns}
+                                    disabled={loadingMore}
                                 >
-                                    <Text style={styles.showMoreText}>
-                                        {t("supervisor.showMoreRuns", {
-                                            count: Math.max(total, healthRuns.length) - 3,
-                                        })}
-                                    </Text>
-                                    <Ionicons
-                                        name="chevron-forward"
-                                        size={16}
-                                        color={theme.colors.header.tint}
-                                    />
+                                    {loadingMore ? (
+                                        <ActivityIndicator size="small" color={theme.colors.header.tint} />
+                                    ) : (
+                                        <>
+                                            <Text style={styles.showMoreText}>
+                                                {t("supervisor.showMoreRuns", {
+                                                    count: Math.max(
+                                                        healthRuns.length - visibleRunCount,
+                                                        runsTotal - visibleRunCount,
+                                                    ),
+                                                })}
+                                            </Text>
+                                            <Ionicons
+                                                name="chevron-forward"
+                                                size={16}
+                                                color={theme.colors.header.tint}
+                                            />
+                                        </>
+                                    )}
                                 </Pressable>
                             )}
                         </>
@@ -389,5 +494,23 @@ const styles = StyleSheet.create((theme) => ({
         ...Typography.default(),
         fontSize: 12,
         color: theme.colors.textSecondary,
+    },
+    sectionHeader: {
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "space-between",
+        flex: 1,
+    },
+    sectionTitle: {
+        ...Typography.default("semiBold"),
+        fontSize: 12,
+        color: theme.colors.textSecondary,
+        textTransform: "uppercase",
+        letterSpacing: 0.5,
+    },
+    clearAllText: {
+        ...Typography.default("semiBold"),
+        fontSize: 12,
+        color: "#FF3B30",
     },
 }));

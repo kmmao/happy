@@ -222,6 +222,31 @@ export function supervisorLoopRoutes(app: Fastify) {
         },
     );
 
+    // DELETE /v1/projects/:id/supervisor/loops — Bulk delete all completed/failed/stopped loops
+    app.delete(
+        "/v1/projects/:id/supervisor/loops",
+        {
+            preHandler: app.authenticate,
+            schema: {
+                params: z.object({ id: z.string() }),
+            },
+        },
+        async (request, reply) => {
+            const userId = request.userId;
+            const { id } = request.params;
+
+            const result = await db.supervisorLoop.deleteMany({
+                where: {
+                    projectId: id,
+                    accountId: userId,
+                    status: { notIn: ["running", "paused"] },
+                },
+            });
+
+            return reply.send({ deletedCount: result.count });
+        },
+    );
+
     // DELETE /v1/projects/:id/supervisor/loops/:loopId — Delete a completed/failed/stopped loop
     app.delete(
         "/v1/projects/:id/supervisor/loops/:loopId",

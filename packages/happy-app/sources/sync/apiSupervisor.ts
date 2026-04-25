@@ -878,6 +878,52 @@ export async function clearAllActions(
 }
 
 /**
+ * Bulk delete all completed/failed/cancelled runs for a project
+ */
+export async function clearAllRuns(
+    credentials: AuthCredentials,
+    projectId: string,
+): Promise<{ deletedCount: number }> {
+    const API_ENDPOINT = getServerUrl();
+    return await backoff(async () => {
+        const response = await fetch(
+            `${API_ENDPOINT}/v1/projects/${projectId}/supervisor/runs`,
+            {
+                method: "DELETE",
+                headers: authHeaders(credentials),
+            },
+        );
+        if (!response.ok) {
+            throw new NonRetryableError(`Failed to clear runs: ${response.status}`);
+        }
+        return (await response.json()) as { deletedCount: number };
+    });
+}
+
+/**
+ * Bulk delete all completed/failed/stopped loops for a project
+ */
+export async function clearAllLoops(
+    credentials: AuthCredentials,
+    projectId: string,
+): Promise<{ deletedCount: number }> {
+    const API_ENDPOINT = getServerUrl();
+    return await backoff(async () => {
+        const response = await fetch(
+            `${API_ENDPOINT}/v1/projects/${projectId}/supervisor/loops`,
+            {
+                method: "DELETE",
+                headers: authHeaders(credentials),
+            },
+        );
+        if (!response.ok) {
+            throw new NonRetryableError(`Failed to clear loops: ${response.status}`);
+        }
+        return (await response.json()) as { deletedCount: number };
+    });
+}
+
+/**
  * Delete a single action
  */
 export async function deleteAction(

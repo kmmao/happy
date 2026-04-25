@@ -351,6 +351,31 @@ export function supervisorRunRoutes(app: Fastify) {
         },
     );
 
+    // DELETE /v1/projects/:id/supervisor/runs — Bulk delete all completed/failed/cancelled runs
+    app.delete(
+        "/v1/projects/:id/supervisor/runs",
+        {
+            preHandler: app.authenticate,
+            schema: {
+                params: z.object({ id: z.string() }),
+            },
+        },
+        async (request, reply) => {
+            const userId = request.userId;
+            const { id } = request.params;
+
+            const result = await db.supervisorRun.deleteMany({
+                where: {
+                    projectId: id,
+                    accountId: userId,
+                    status: { notIn: ["pending", "running"] },
+                },
+            });
+
+            return reply.send({ deletedCount: result.count });
+        },
+    );
+
     // DELETE /v1/projects/:id/supervisor/runs/:runId — Delete a completed/failed/cancelled run
     app.delete(
         "/v1/projects/:id/supervisor/runs/:runId",

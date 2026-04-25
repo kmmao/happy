@@ -30,7 +30,11 @@ export const SupervisorCostSection = React.memo(
                             {t("supervisor.costTotalTokens")}
                         </Text>
                         <Text style={styles.costValue}>
-                            {costSummary.totalTokens.toLocaleString()}
+                            {costSummary.totalTokens >= 1_000_000
+                                ? `${(costSummary.totalTokens / 1_000_000).toFixed(1)}M`
+                                : costSummary.totalTokens >= 1_000
+                                    ? `${(costSummary.totalTokens / 1_000).toFixed(1)}K`
+                                    : String(costSummary.totalTokens)}
                         </Text>
                     </View>
                     <View style={styles.costRow}>
@@ -38,7 +42,9 @@ export const SupervisorCostSection = React.memo(
                             {t("supervisor.costTotalUsd")}
                         </Text>
                         <Text style={styles.costValue}>
-                            ${costSummary.totalCostUsd.toFixed(4)}
+                            ${costSummary.totalCostUsd < 0.01
+                                ? costSummary.totalCostUsd.toFixed(4)
+                                : costSummary.totalCostUsd.toFixed(2)}
                         </Text>
                     </View>
                 </View>
