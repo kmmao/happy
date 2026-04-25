@@ -210,8 +210,8 @@ export function accountRoutes(app: Fastify) {
             const startDate = startTime ? new Date(startTime * 1000) : null;
             const endDate = endTime ? new Date(endTime * 1000) : null;
             const truncExpr = actualGroupBy === 'hour'
-                ? Prisma.raw(`date_trunc('hour', "createdAt" AT TIME ZONE '${validTz}')`)
-                : Prisma.raw(`date_trunc('day', "createdAt" AT TIME ZONE '${validTz}')`);
+                ? Prisma.raw(`date_trunc('hour', ur."createdAt" AT TIME ZONE '${validTz}')`)
+                : Prisma.raw(`date_trunc('day', ur."createdAt" AT TIME ZONE '${validTz}')`);
 
             interface BucketRow {
                 bucket_epoch: number;

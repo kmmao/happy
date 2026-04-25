@@ -42,10 +42,7 @@ export async function queryUsage(
     });
 
     if (!response.ok) {
-      if (response.status >= 400 && response.status < 500) {
-        throw new NonRetryableError(`Failed to query usage: ${response.status}`);
-      }
-      throw new Error(`Failed to query usage: ${response.status}`);
+      throw new NonRetryableError(`Failed to query usage: ${response.status}`);
     }
 
     const data = (await response.json()) as UsageResponse;
