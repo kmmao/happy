@@ -78,7 +78,7 @@ export function BaseModal({
                             {
                                 opacity: fadeAnim.interpolate({
                                     inputRange: [0, 1],
-                                    outputRange: [0, 0.5]
+                                    outputRange: [0, 0.4]
                                 })
                             }
                         ]}

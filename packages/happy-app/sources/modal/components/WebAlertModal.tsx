@@ -54,26 +54,30 @@ export function WebAlertModal({
 
   const isVertical = buttons.length > 2;
 
+  // 暗色主题检测（通过 surface 背景色判断）
+  const isDark = (theme.colors.surface as string).toLowerCase().startsWith("#1");
+  const glassBackground = isDark ? "rgba(30,30,34,0.75)" : "rgba(255,255,255,0.75)";
+  const glassBorder = isDark ? "rgba(255,255,255,0.12)" : "rgba(255,255,255,0.7)";
+
   const styles = StyleSheet.create({
     container: {
-      backgroundColor: theme.colors.surface,
-      borderRadius: 14,
+      backgroundColor: glassBackground,
+      borderRadius: 18,
       width: modalWidth,
       maxHeight: windowHeight * 0.8,
       overflow: "hidden",
-      shadowColor: theme.colors.shadow.color,
-      shadowOffset: {
-        width: 0,
-        height: 2,
-      },
-      shadowOpacity: 0.25,
-      shadowRadius: 4,
-      elevation: 5,
-    },
+      borderWidth: 1,
+      borderColor: glassBorder,
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 8 },
+      shadowOpacity: isDark ? 0.5 : 0.2,
+      shadowRadius: 24,
+      elevation: 12,
+    } as any,
     content: {
-      paddingHorizontal: 16,
-      paddingTop: 20,
-      paddingBottom: 16,
+      paddingHorizontal: 20,
+      paddingTop: 22,
+      paddingBottom: 18,
       alignItems: "center",
     },
     title: {
@@ -91,22 +95,22 @@ export function WebAlertModal({
     },
     buttonContainer: {
       borderTopWidth: 1,
-      borderTopColor: theme.colors.divider,
+      borderTopColor: isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.1)",
       flexDirection: isVertical ? "column" : "row",
     },
     button: {
       flex: isVertical ? undefined : 1,
-      paddingVertical: 11,
+      paddingVertical: 13,
       alignItems: "center",
       justifyContent: "center",
     },
     buttonPressed: {
-      backgroundColor: theme.colors.divider,
+      backgroundColor: isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)",
     },
     buttonSeparator: {
       width: isVertical ? undefined : 1,
       height: isVertical ? 1 : undefined,
-      backgroundColor: theme.colors.divider,
+      backgroundColor: isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.1)",
     },
     buttonText: {
       fontSize: 17,

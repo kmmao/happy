@@ -12,7 +12,7 @@ import {
     type MachineAutomationJob,
 } from "@/sync/ops";
 import { useMachine } from "@/sync/storage";
-import { projectManager } from "@/sync/projectManager";
+import { projectManager, getProjectDisplayName } from "@/sync/projectManager";
 import { t } from "@/text";
 import {
     type AuditFilter,
@@ -224,6 +224,20 @@ export default React.memo(function MachineAutomationPage() {
         return projectManager.getProjectByServerId(serverProjectId)?.id ?? null;
     }, []);
 
+    // 将消息文本中的项目 UUID / Loop UUID 替换为可读名称
+    const resolveMessageUUIDs = React.useCallback((message: string, job?: { projectId?: string | null; loopId?: string | null }) => {
+        let result = message;
+        if (job?.projectId) {
+            const project = projectManager.getProjectByServerId(job.projectId);
+            if (project) result = result.replaceAll(job.projectId, getProjectDisplayName(project));
+        }
+        if (job?.loopId) {
+            const loopName = data.resolveLoopName(job.loopId);
+            if (loopName) result = result.replaceAll(job.loopId, loopName);
+        }
+        return result;
+    }, [data]);
+
     // ── Event handlers ────────────────────────────────────────────────────
 
     const handleJobPress = React.useCallback((job: MachineAutomationJob) => {
@@ -260,8 +274,8 @@ export default React.memo(function MachineAutomationPage() {
         if (job.status === "failed" || job.status === "cancelled" || job.status === "completed") {
             buttons.push({ text: t("machine.automationRetry"), onPress: () => void data.mutateAndReload(job.id, "retry") });
         }
-        Modal.alert(getJobTitle(job), getJobDetailMessage(job, relatedEvents), buttons);
-    }, [data.mutateAndReload, data.recentAuditEvents, data.stopJobSession, getLocalProjectId, machineId, router]);
+        Modal.alert(getJobTitle(job), resolveMessageUUIDs(getJobDetailMessage(job, relatedEvents), job), buttons);
+    }, [data.mutateAndReload, data.recentAuditEvents, data.stopJobSession, getLocalProjectId, machineId, resolveMessageUUIDs, router]);
 
     const handleGuardianPress = React.useCallback((guardian: MachineAutomationGuardian) => {
         const usage = data.guardianUsage.find((e) => e.key === guardian.key);
@@ -290,8 +304,12 @@ export default React.memo(function MachineAutomationPage() {
                 { text: t("machine.automationResetGuardian"), style: "destructive", onPress: () => void data.clearGuardians({ key: guardian.key, sessionId: guardian.sessionId }) },
             ]),
         });
-        Modal.alert(guardian.key, `${getGuardianDetailMessage(guardian, usage, relatedEvents)}\n${t("machine.automationStatusLabel")}: ${getGuardianStateLabel(guardian.attached, guardian.recovered)}`, buttons);
-    }, [data.clearGuardians, data.guardianUsage, data.recentAuditEvents, getLocalProjectId, machineId, router]);
+        Modal.alert(
+            data.resolveGuardianKeyLabel(guardian.key),
+            resolveMessageUUIDs(`${getGuardianDetailMessage(guardian, usage, relatedEvents)}\n${t("machine.automationStatusLabel")}: ${getGuardianStateLabel(guardian.attached, guardian.recovered)}`, { projectId: guardian.projectId, loopId: guardian.loopId }),
+            buttons,
+        );
+    }, [data.clearGuardians, data.guardianUsage, data.recentAuditEvents, data.resolveGuardianKeyLabel, getLocalProjectId, machineId, resolveMessageUUIDs, router]);
 
     const handleAuditEventPress = React.useCallback((event: MachineAutomationAuditEvent) => {
         const relatedJob = data.jobs.find((j) => j.id === event.jobId || j.dedupeKey === event.dedupeKey || (event.sessionId ? j.sessionId === event.sessionId : false));
@@ -308,8 +326,8 @@ export default React.memo(function MachineAutomationPage() {
         }
         if (event.projectId) buttons.push({ text: t("machine.automationOpenProject"), onPress: () => { const pid = getLocalProjectId(event.projectId); if (pid) router.push(`/project/${pid}` as any); } });
         if (relatedJob) buttons.push({ text: t("machine.automationOpenJob"), onPress: () => handleJobPress(relatedJob) });
-        Modal.alert(getAuditEventTitle(event), getAuditEventDetailMessage(event), buttons);
-    }, [data.jobs, getLocalProjectId, handleJobPress, machineId, router]);
+        Modal.alert(getAuditEventTitle(event), resolveMessageUUIDs(getAuditEventDetailMessage(event), { projectId: event.projectId, loopId: event.loopId }), buttons);
+    }, [data.jobs, getLocalProjectId, handleJobPress, machineId, resolveMessageUUIDs, router]);
 
     // ── 计算健康状态 ──────────────────────────────────────────────────────
 
