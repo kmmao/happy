@@ -3,8 +3,6 @@ import { Ionicons } from "@expo/vector-icons";
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, Text, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useUnistyles } from "react-native-unistyles";
-import { Item } from "@/components/Item";
-import { ItemGroup } from "@/components/ItemGroup";
 import { Modal } from "@/modal";
 import {
     machineSetKillswitch,
@@ -104,31 +102,94 @@ function MetricChip({ icon, value, label, color }: {
     );
 }
 
-// ── 区块标题 ──────────────────────────────────────────────────────────────
-function SectionTitle({ children }: { children: string }) {
+// ── 区块内子折叠标题 ─────────────────────────────────────────────────────
+function SubToggle({
+    label, count, expanded, onPress, accent,
+}: {
+    label: string; count: number; expanded: boolean; onPress: () => void; accent?: string;
+}) {
     const { theme } = useUnistyles();
     return (
-        <Text style={{ fontSize: 16, fontWeight: "700", color: theme.colors.text }}>
-            {children}
-        </Text>
+        <Pressable
+            style={({ pressed }) => ({
+                flexDirection: "row",
+                alignItems: "center",
+                justifyContent: "space-between",
+                paddingHorizontal: 16,
+                paddingVertical: 11,
+                borderTopWidth: 1,
+                borderTopColor: theme.colors.divider,
+                opacity: pressed ? 0.7 : 1,
+            })}
+            onPress={onPress}
+        >
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                <Text style={{ fontSize: 14, fontWeight: "600", color: theme.colors.text }}>{label}</Text>
+                <View style={{
+                    backgroundColor: accent ? accent + "18" : theme.colors.surfaceHigh,
+                    borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2,
+                }}>
+                    <Text style={{ fontSize: 11, fontWeight: "700", color: accent ?? theme.colors.textSecondary }}>
+                        {count}
+                    </Text>
+                </View>
+            </View>
+            <Ionicons name={expanded ? "chevron-up" : "chevron-down"} size={16} color={theme.colors.textSecondary} />
+        </Pressable>
     );
 }
 
-function renderSummaryCard(options: {
-    title: string;
-    value: string;
-    hint: string;
-    accent?: string;
+// ── 横排统计行 ────────────────────────────────────────────────────────────
+function StatRow({ items }: {
+    items: Array<{ label: string; value: string | number; color?: string; dimmed?: boolean }>;
 }) {
-    const { title, value, hint, accent } = options;
+    const { theme } = useUnistyles();
     return (
-        <View style={[styles.summaryCard, accent ? { borderColor: accent } : null]}>
-            <Text style={styles.summaryCardTitle}>{title}</Text>
-            <Text style={[styles.summaryCardValue, accent ? { color: accent } : null]}>{value}</Text>
-            <Text style={styles.summaryCardHint} numberOfLines={1}>{hint}</Text>
+        <View style={{ flexDirection: "row", paddingHorizontal: 16, paddingBottom: 12, gap: 20, flexWrap: "wrap" }}>
+            {items.map((item) => (
+                <View key={item.label} style={{ alignItems: "flex-start", gap: 2 }}>
+                    <Text style={{
+                        fontSize: 22, fontWeight: "800",
+                        color: item.dimmed ? theme.colors.textSecondary : (item.color ?? theme.colors.text),
+                    }}>
+                        {item.value}
+                    </Text>
+                    <Text style={{ fontSize: 11, color: theme.colors.textSecondary }}>{item.label}</Text>
+                </View>
+            ))}
         </View>
     );
 }
+
+// ── 区块容器 ─────────────────────────────────────────────────────────────
+function SectionContainer({ title, rightAction, children }: {
+    title: string;
+    rightAction?: React.ReactNode;
+    children: React.ReactNode;
+}) {
+    const { theme } = useUnistyles();
+    return (
+        <View style={{
+            marginHorizontal: 16, marginTop: 12,
+            borderRadius: 16, borderWidth: 1,
+            borderColor: theme.colors.divider,
+            backgroundColor: theme.colors.surface,
+            overflow: "hidden",
+        }}>
+            {/* 标题行 */}
+            <View style={{
+                flexDirection: "row", alignItems: "center",
+                justifyContent: "space-between",
+                paddingHorizontal: 16, paddingTop: 14, paddingBottom: 10,
+            }}>
+                <Text style={{ fontSize: 15, fontWeight: "700", color: theme.colors.text }}>{title}</Text>
+                {rightAction}
+            </View>
+            {children}
+        </View>
+    );
+}
+
 
 export default React.memo(function MachineAutomationPage() {
     const {
@@ -409,63 +470,76 @@ export default React.memo(function MachineAutomationPage() {
             </View>
 
             {/* ⑥ 按需展开的区块内容 */}
-            <View>
+            <View style={{ paddingBottom: 24 }}>
+
                 {/* ── Loops ── */}
                 {activeSection === "loops" ? (
-                    <ItemGroup title={<SectionTitle>{t("machine.automationLoopRollup")}</SectionTitle>}>
-                        <View style={styles.summaryGrid}>
-                            {renderSummaryCard({ title: t("machine.automationLoopsTotal"), value: String(data.loopRollup.total), hint: t("machine.automationLoopsTotalHint") })}
-                            {renderSummaryCard({ title: t("machine.automationLoopsActive"), value: String(data.loopRollup.active), hint: t("machine.automationLoopsActiveHint"), accent: "#0A84FF" })}
-                            {renderSummaryCard({ title: t("machine.automationLoopsBlocked"), value: String(data.loopRollup.blocked), hint: t("machine.automationLoopsBlockedHint"), accent: data.loopRollup.blocked > 0 ? "#FF3B30" : undefined })}
-                            {renderSummaryCard({ title: t("machine.automationLoopsPaused"), value: String(data.loopRollup.paused), hint: t("machine.automationLoopsPausedHint"), accent: theme.colors.textSecondary })}
-                            {renderSummaryCard({ title: t("machine.automationLoopsPendingEvents"), value: String(data.loopRollup.pendingEvents), hint: t("machine.automationLoopsPendingEventsHint") })}
-                            {renderSummaryCard({ title: t("machine.automationLoopsPolicyStopped"), value: String(data.loopRollup.policyStopped), hint: t("machine.automationLoopsPolicyStoppedHint"), accent: data.loopRollup.policyStopped > 0 ? "#FF9500" : undefined })}
-                        </View>
-                        <Item title={t("machine.automationOpenLoops")} subtitle={t("machine.automationOpenLoopsHint")} titleStyle={{ color: theme.colors.textLink }} onPress={() => router.push(`/machine/${machineId}/loops` as any)} />
-                    </ItemGroup>
+                    <SectionContainer
+                        title={t("machine.automationLoopRollup")}
+                        rightAction={
+                            <Pressable onPress={() => router.push(`/machine/${machineId}/loops` as any)}
+                                style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                                <Text style={{ fontSize: 13, fontWeight: "600", color: theme.colors.textLink }}>{t("machine.automationOpenLoops")}</Text>
+                                <Ionicons name="arrow-forward" size={14} color={theme.colors.textLink} />
+                            </Pressable>
+                        }
+                    >
+                        <StatRow items={[
+                            { label: t("machine.automationLoopsTotal"), value: data.loopRollup.total },
+                            { label: t("machine.automationLoopsActive"), value: data.loopRollup.active, color: data.loopRollup.active > 0 ? "#0A84FF" : undefined, dimmed: data.loopRollup.active === 0 },
+                            { label: t("machine.automationLoopsBlocked"), value: data.loopRollup.blocked, color: data.loopRollup.blocked > 0 ? "#FF3B30" : undefined, dimmed: data.loopRollup.blocked === 0 },
+                            { label: t("machine.automationLoopsPaused"), value: data.loopRollup.paused, dimmed: data.loopRollup.paused === 0 },
+                            { label: t("machine.automationLoopsPendingEvents"), value: data.loopRollup.pendingEvents, color: data.loopRollup.pendingEvents > 0 ? "#FF9500" : undefined, dimmed: data.loopRollup.pendingEvents === 0 },
+                            { label: t("machine.automationLoopsPolicyStopped"), value: data.loopRollup.policyStopped, color: data.loopRollup.policyStopped > 0 ? "#FF9500" : undefined, dimmed: data.loopRollup.policyStopped === 0 },
+                        ]} />
+                    </SectionContainer>
                 ) : null}
 
                 {/* ── Jobs + Timeline ── */}
                 {activeSection === "jobs" ? (
-                    <ItemGroup title={<SectionTitle>{t("machine.automationJobs")}</SectionTitle>}>
-                        {/* 失败任务优先显示（不需要点击展开） */}
-                        {data.filteredJobs.filter((j) => j.status === "failed").length > 0 ? (
-                            <View style={{ paddingHorizontal: 12, paddingTop: 8, paddingBottom: 4, gap: 6 }}>
-                                <View style={{ flexDirection: "row", alignItems: "center", gap: 6, paddingBottom: 2 }}>
-                                    <Ionicons name="alert-circle" size={14} color="#FF3B30" />
-                                    <Text style={{ fontSize: 12, fontWeight: "700", color: "#FF3B30" }}>
-                                        {t("machine.automationFailed").toUpperCase()}
-                                    </Text>
-                                </View>
-                                {data.filteredJobs.filter((j) => j.status === "failed").map((job) => (
-                                    <Pressable key={job.id} style={[styles.dataCard, { borderLeftWidth: 4, borderLeftColor: "#FF3B30", marginHorizontal: 0, marginVertical: 0 }]} onPress={() => handleJobPress(job)}>
-                                        <View style={styles.dataCardHeader}>
-                                            <View style={styles.dataCardTitleWrap}>
-                                                <Text style={styles.dataCardTitle} numberOfLines={1}>{getJobTitle(job)}</Text>
-                                                {job.errorMessage ? <Text style={[styles.dataCardSubtitle, { color: "#FF3B30" }]} numberOfLines={2}>{job.errorMessage}</Text> : null}
-                                            </View>
-                                            <View style={{ alignItems: "flex-end", gap: 4 }}>
-                                                <Text style={{ fontSize: 11, color: theme.colors.textSecondary }}>{formatTimestamp(job.updatedAt)}</Text>
-                                                {data.activeJobId === job.id && <ActivityIndicator size="small" color={theme.colors.textSecondary} />}
-                                            </View>
-                                        </View>
-                                        <View style={styles.pillRow}>
-                                            <View style={[styles.pill, { borderColor: "#FF3B30" + "40" }]}><Text style={styles.pillText}>{getJobKindLabel(job.kind)}</Text></View>
-                                        </View>
-                                    </Pressable>
-                                ))}
-                            </View>
-                        ) : null}
+                    <SectionContainer title={t("machine.automationJobs")}>
+                        {/* 核心指标 */}
+                        <StatRow items={[
+                            { label: t("machine.automationRunning"), value: activeCount, color: activeCount > 0 ? "#0A84FF" : undefined, dimmed: activeCount === 0 },
+                            { label: t("machine.automationQueued"), value: queuedCount, color: queuedCount > 0 ? "#FF9500" : undefined, dimmed: queuedCount === 0 },
+                            { label: t("machine.automationFailed"), value: failedCount, color: failedCount > 0 ? "#FF3B30" : undefined, dimmed: failedCount === 0 },
+                            { label: t("machine.automationCompleted"), value: data.counts.completed ?? 0, dimmed: true },
+                        ]} />
 
-                        {/* 所有任务（展开） */}
-                        <Item
-                            title={`${t("machine.automationJobs")} (${data.filteredJobs.length})`}
-                            subtitle={data.filteredJobs.length === 0
-                                ? t("machine.automationDetailsEmpty")
-                                : `${t("machine.automationRunning")}: ${activeCount} · ${t("machine.automationQueued")}: ${queuedCount} · ${t("machine.automationFailed")}: ${failedCount}`}
-                            detail={data.showAllJobs ? t("machine.automationSectionShowLess") : undefined}
+                        {/* 失败任务自动展示 */}
+                        {data.filteredJobs.filter((j) => j.status === "failed").map((job) => (
+                            <Pressable
+                                key={job.id}
+                                style={[styles.dataCard, { borderLeftWidth: 4, borderLeftColor: "#FF3B30" }]}
+                                onPress={() => handleJobPress(job)}
+                            >
+                                <View style={styles.dataCardHeader}>
+                                    <View style={styles.dataCardTitleWrap}>
+                                        <Text style={styles.dataCardTitle} numberOfLines={1}>{getJobTitle(job)}</Text>
+                                        {job.errorMessage
+                                            ? <Text style={[styles.dataCardSubtitle, { color: "#FF3B30" }]} numberOfLines={2}>{job.errorMessage}</Text>
+                                            : null}
+                                    </View>
+                                    <View style={{ alignItems: "flex-end", gap: 4 }}>
+                                        <View style={[styles.statusBadge, { borderColor: "#FF3B30", backgroundColor: "#FF3B3018" }]}>
+                                            <Text style={[styles.statusBadgeText, { color: "#FF3B30" }]}>{getStatusLabel(job.status)}</Text>
+                                        </View>
+                                        {data.activeJobId === job.id && <ActivityIndicator size="small" color={theme.colors.textSecondary} />}
+                                    </View>
+                                </View>
+                                <View style={styles.pillRow}>
+                                    <View style={[styles.pill, { borderColor: "#FF3B3040" }]}><Text style={styles.pillText}>{getJobKindLabel(job.kind)}</Text></View>
+                                    <View style={[styles.pill, { borderColor: theme.colors.divider }]}><Text style={styles.pillText}>{formatTimestamp(job.updatedAt)}</Text></View>
+                                </View>
+                            </Pressable>
+                        ))}
+
+                        {/* 其余任务（折叠） */}
+                        <SubToggle
+                            label={t("machine.automationJobs")}
+                            count={data.filteredJobs.filter((j) => j.status !== "failed").length}
+                            expanded={data.showAllJobs}
                             onPress={() => data.setShowAllJobs((c) => !c)}
-                            showChevron={!data.showAllJobs && data.filteredJobs.length > 0}
                         />
                         {data.showAllJobs ? data.filteredJobs.filter((j) => j.status !== "failed").map((job) => {
                             const statusColor = getStatusColor(job.status) ?? theme.colors.divider;
@@ -492,13 +566,12 @@ export default React.memo(function MachineAutomationPage() {
                             );
                         }) : null}
 
-                        {/* Timeline */}
-                        <Item
-                            title={`${t("machine.automationTimeline")} (${data.fullTimelineEntries.length})`}
-                            subtitle={data.fullTimelineEntries.length === 0 ? t("machine.automationTimelineEmpty") : t("machine.automationTimelineHint")}
-                            detail={data.showAllTimeline ? t("machine.automationSectionShowLess") : undefined}
+                        {/* 时间线（折叠） */}
+                        <SubToggle
+                            label={t("machine.automationTimeline")}
+                            count={data.fullTimelineEntries.length}
+                            expanded={data.showAllTimeline}
                             onPress={() => data.setShowAllTimeline((c) => !c)}
-                            showChevron={!data.showAllTimeline && data.fullTimelineEntries.length > 0}
                         />
                         {data.showAllTimeline ? data.visibleTimelineEntries.map((entry) => {
                             const job = data.jobs.find((c) => c.id === entry.jobId);
@@ -522,53 +595,37 @@ export default React.memo(function MachineAutomationPage() {
                             );
                         }) : null}
 
-                        {/* 清除终态任务 */}
-                        <Item
-                            title={t("machine.automationClearTerminal")}
-                            subtitle={t("machine.automationClearTerminalHint")}
-                            titleStyle={{ color: theme.colors.textLink }}
+                        {/* 清除终态任务（危险操作底部文字链接） */}
+                        <Pressable
+                            style={{ borderTopWidth: 1, borderTopColor: theme.colors.divider, paddingHorizontal: 16, paddingVertical: 12, flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}
                             onPress={() => Modal.alert(t("machine.automationClearTerminal"), t("machine.automationClearTerminalMessage"), [
                                 { text: t("common.cancel"), style: "cancel" },
                                 { text: t("machine.automationClearTerminal"), style: "destructive", onPress: () => void data.clearTerminal() },
                             ])}
-                            rightElement={data.clearing ? <ActivityIndicator size="small" color={theme.colors.textSecondary} /> : undefined}
-                        />
-                    </ItemGroup>
+                        >
+                            <Text style={{ fontSize: 14, color: theme.colors.textLink }}>{t("machine.automationClearTerminal")}</Text>
+                            {data.clearing ? <ActivityIndicator size="small" color={theme.colors.textSecondary} /> : <Ionicons name="trash-outline" size={16} color={theme.colors.textLink} />}
+                        </Pressable>
+                    </SectionContainer>
                 ) : null}
 
                 {/* ── Guardians（状态连续性） ── */}
                 {activeSection === "guardians" ? (
-                    <ItemGroup title={<SectionTitle>{t("machine.automationGuardians")}</SectionTitle>}>
-                        {/* Guardian 效率指标 */}
-                        <View style={{ paddingHorizontal: 12, paddingTop: 8, paddingBottom: 4, flexDirection: "row", gap: 8, flexWrap: "wrap" }}>
-                            <View style={[styles.summaryCard, { borderColor: data.guardians.filter((g) => g.attached).length > 0 ? "#34C759" : theme.colors.divider }]}>
-                                <Text style={styles.summaryCardTitle}>{t("machine.automationGuardianAttached")}</Text>
-                                <Text style={[styles.summaryCardValue, { color: "#34C759" }]}>{data.guardians.filter((g) => g.attached).length}</Text>
-                                <Text style={styles.summaryCardHint}>{t("machine.automationGuardiansHint")}</Text>
-                            </View>
-                            <View style={[styles.summaryCard, { borderColor: theme.colors.divider }]}>
-                                <Text style={styles.summaryCardTitle}>{t("machine.automationGuardianPersisted")}</Text>
-                                <Text style={styles.summaryCardValue}>{data.guardians.filter((g) => !g.attached).length}</Text>
-                                <Text style={styles.summaryCardHint}>{t("machine.automationGuardianUsageHint")}</Text>
-                            </View>
-                            {data.auditStats ? (
-                                <View style={styles.summaryCard}>
-                                    <Text style={styles.summaryCardTitle}>{t("machine.automationGuardianReuseRate")}</Text>
-                                    <Text style={[styles.summaryCardValue, { color: (data.auditStats.guardianReuseRate ?? 0) > 0.5 ? "#34C759" : "#FF9500" }]}>
-                                        {formatRate(data.auditStats.guardianReuseRate)}
-                                    </Text>
-                                    <Text style={styles.summaryCardHint}>{t("machine.automationGuardianReuseRateHint")}</Text>
-                                </View>
-                            ) : null}
-                        </View>
+                    <SectionContainer title={t("machine.automationGuardians")}>
+                        {/* 三项核心健康指标 */}
+                        <StatRow items={[
+                            { label: t("machine.automationGuardianAttached"), value: data.guardians.filter((g) => g.attached).length, color: "#34C759", dimmed: data.guardians.filter((g) => g.attached).length === 0 },
+                            { label: t("machine.automationGuardianPersisted"), value: data.guardians.filter((g) => !g.attached).length, dimmed: data.guardians.filter((g) => !g.attached).length === 0 },
+                            ...(data.auditStats ? [{ label: t("machine.automationGuardianReuseRate"), value: formatRate(data.auditStats.guardianReuseRate), color: (data.auditStats.guardianReuseRate ?? 0) > 0.5 ? "#34C759" : "#FF9500" }] : []),
+                        ]} />
 
-                        {/* Guardian 列表 */}
-                        <Item
-                            title={`${t("machine.automationGuardians")} (${data.filteredGuardians.length})`}
-                            subtitle={data.filteredGuardians.length === 0 ? t("machine.automationGuardiansEmpty") : `${t("machine.automationGuardianAttached")}: ${data.filteredGuardians.filter((g) => g.attached).length} · ${t("machine.automationGuardianPersisted")}: ${data.filteredGuardians.filter((g) => !g.attached).length}`}
-                            detail={data.showAllGuardians ? t("machine.automationSectionShowLess") : undefined}
+                        {/* Guardian 列表（折叠） */}
+                        <SubToggle
+                            label={t("machine.automationGuardians")}
+                            count={data.filteredGuardians.length}
+                            expanded={data.showAllGuardians}
                             onPress={() => data.setShowAllGuardians((c) => !c)}
-                            showChevron={!data.showAllGuardians && data.filteredGuardians.length > 0}
+                            accent={data.filteredGuardians.length > 0 ? "#34C759" : undefined}
                         />
                         {data.showAllGuardians ? (
                             <>
@@ -593,12 +650,12 @@ export default React.memo(function MachineAutomationPage() {
                                         </Pressable>
                                     );
                                 })}
-                                <Item
-                                    title={`${t("machine.automationGuardianUsage")} (${data.filteredGuardianUsage.length})`}
-                                    subtitle={t("machine.automationGuardianUsageHint")}
-                                    detail={data.showAllGuardianUsage ? t("machine.automationSectionShowLess") : undefined}
+                                {/* 使用统计（折叠） */}
+                                <SubToggle
+                                    label={t("machine.automationGuardianUsage")}
+                                    count={data.filteredGuardianUsage.length}
+                                    expanded={data.showAllGuardianUsage}
                                     onPress={() => data.setShowAllGuardianUsage((c) => !c)}
-                                    showChevron={!data.showAllGuardianUsage && data.filteredGuardianUsage.length > 0}
                                 />
                                 {data.showAllGuardianUsage ? data.visibleGuardianUsage.map((entry: MachineAutomationGuardianUsage) => {
                                     const matchingGuardian = data.guardians.find((g) => g.key === entry.key);
@@ -621,39 +678,34 @@ export default React.memo(function MachineAutomationPage() {
                                 }) : null}
                             </>
                         ) : null}
-                    </ItemGroup>
+                    </SectionContainer>
                 ) : null}
 
                 {/* ── Audit（技术日志） ── */}
                 {activeSection === "audit" ? (
-                    <ItemGroup title={<SectionTitle>{t("machine.automationAuditStats")}</SectionTitle>}>
-                        <View style={styles.summaryGrid}>
-                            {renderSummaryCard({ title: t("machine.automationTotalAuditEvents"), value: String(data.auditStats?.totalEvents ?? 0), hint: t("machine.automationTotalAuditEventsHint") })}
-                            {renderSummaryCard({ title: t("machine.automationGuardianReuseCount"), value: String(data.auditStats?.guardianReuseCount ?? 0), hint: t("machine.automationGuardianReuseCountHint"), accent: "#0A84FF" })}
-                            {renderSummaryCard({ title: t("machine.automationGuardianReuseRate"), value: formatRate(data.auditStats?.guardianReuseRate), hint: t("machine.automationGuardianReuseRateHint") })}
-                            {renderSummaryCard({ title: t("machine.automationSessionReattachedCount"), value: String(data.auditStats?.sessionReattachedCount ?? 0), hint: t("machine.automationSessionReattachedCountHint"), accent: "#34C759" })}
-                            {renderSummaryCard({ title: t("machine.automationWatchdogStops"), value: String(data.auditStats?.watchdogStopCount ?? 0), hint: t("machine.automationWatchdogStopsHint"), accent: (data.auditStats?.watchdogStopCount ?? 0) > 0 ? "#FF3B30" : undefined })}
-                            {renderSummaryCard({ title: t("machine.automationGuardianResetCount"), value: String(data.auditStats?.guardianResetCount ?? 0), hint: t("machine.automationGuardianResetCountHint"), accent: "#FF9500" })}
-                        </View>
-                        <Item title={t("machine.automationLastAuditEvent")} subtitle={t("machine.automationLastAuditEventHint")} detail={data.auditStats?.lastEventAt ? formatTimestamp(data.auditStats.lastEventAt) : "-"} showChevron={false} />
-                        <Item
-                            title={`${t("machine.automationAudit")} (${data.filteredAuditEvents.length})`}
-                            subtitle={data.filteredAuditEvents.length === 0 ? t("machine.automationAuditEmpty") : t("machine.automationAuditHint")}
-                            detail={data.showAllAuditEvents ? t("machine.automationSectionShowLess") : undefined}
+                    <SectionContainer
+                        title={t("machine.automationAuditStats")}
+                        rightAction={data.auditStats?.lastEventAt
+                            ? <Text style={{ fontSize: 12, color: theme.colors.textSecondary }}>{formatTimestamp(data.auditStats.lastEventAt)}</Text>
+                            : undefined}
+                    >
+                        {/* 4 个关键指标 */}
+                        <StatRow items={[
+                            { label: t("machine.automationTotalAuditEvents"), value: data.auditStats?.totalEvents ?? 0 },
+                            { label: t("machine.automationGuardianReuseRate"), value: formatRate(data.auditStats?.guardianReuseRate), color: (data.auditStats?.guardianReuseRate ?? 0) > 0.5 ? "#34C759" : "#FF9500" },
+                            { label: t("machine.automationWatchdogStops"), value: data.auditStats?.watchdogStopCount ?? 0, color: (data.auditStats?.watchdogStopCount ?? 0) > 0 ? "#FF3B30" : undefined, dimmed: (data.auditStats?.watchdogStopCount ?? 0) === 0 },
+                            { label: t("machine.automationSessionReattachedCount"), value: data.auditStats?.sessionReattachedCount ?? 0, color: (data.auditStats?.sessionReattachedCount ?? 0) > 0 ? "#34C759" : undefined, dimmed: (data.auditStats?.sessionReattachedCount ?? 0) === 0 },
+                        ]} />
+
+                        {/* 审计事件列表（折叠） */}
+                        <SubToggle
+                            label={t("machine.automationAudit")}
+                            count={data.filteredAuditEvents.length}
+                            expanded={data.showAllAuditEvents}
                             onPress={() => data.setShowAllAuditEvents((c) => !c)}
-                            showChevron={!data.showAllAuditEvents && data.filteredAuditEvents.length > 0}
                         />
                         {data.showAllAuditEvents ? (
                             <>
-                                <Item
-                                    title={t("machine.automationClearAudit")} subtitle={t("machine.automationClearAuditHint")}
-                                    titleStyle={{ color: theme.colors.textLink }}
-                                    onPress={() => Modal.alert(t("machine.automationClearAudit"), t("machine.automationClearAuditMessage"), [
-                                        { text: t("common.cancel"), style: "cancel" },
-                                        { text: t("machine.automationClearAudit"), style: "destructive", onPress: () => void data.clearAudit() },
-                                    ])}
-                                    rightElement={data.clearingAudit ? <ActivityIndicator size="small" color={theme.colors.textSecondary} /> : undefined}
-                                />
                                 {data.visibleAuditEvents.map((event: MachineAutomationAuditEvent) => {
                                     const aAccent = getAuditKindAccent(event) ?? theme.colors.divider;
                                     return (
@@ -674,10 +726,22 @@ export default React.memo(function MachineAutomationPage() {
                                         </Pressable>
                                     );
                                 })}
+                                {/* 清除审计日志（危险操作底部） */}
+                                <Pressable
+                                    style={{ borderTopWidth: 1, borderTopColor: theme.colors.divider, paddingHorizontal: 16, paddingVertical: 12, flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}
+                                    onPress={() => Modal.alert(t("machine.automationClearAudit"), t("machine.automationClearAuditMessage"), [
+                                        { text: t("common.cancel"), style: "cancel" },
+                                        { text: t("machine.automationClearAudit"), style: "destructive", onPress: () => void data.clearAudit() },
+                                    ])}
+                                >
+                                    <Text style={{ fontSize: 14, color: theme.colors.textLink }}>{t("machine.automationClearAudit")}</Text>
+                                    {data.clearingAudit ? <ActivityIndicator size="small" color={theme.colors.textSecondary} /> : <Ionicons name="trash-outline" size={16} color={theme.colors.textLink} />}
+                                </Pressable>
                             </>
                         ) : null}
-                    </ItemGroup>
+                    </SectionContainer>
                 ) : null}
+
             </View>
         </ScrollView>
     );
