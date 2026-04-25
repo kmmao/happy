@@ -648,12 +648,42 @@ export default React.memo(function MachineAutomationPage() {
                 {/* ── Guardians（状态连续性） ── */}
                 {activeSection === "guardians" ? (
                     <SectionContainer title={t("machine.automationGuardians")}>
-                        {/* 三项核心健康指标 */}
-                        <StatRow items={[
-                            { label: t("machine.automationGuardianAttached"), value: data.guardians.filter((g) => g.attached).length, color: "#34C759", dimmed: data.guardians.filter((g) => g.attached).length === 0 },
-                            { label: t("machine.automationGuardianPersisted"), value: data.guardians.filter((g) => !g.attached).length, dimmed: data.guardians.filter((g) => !g.attached).length === 0 },
-                            ...(data.auditStats ? [{ label: t("machine.automationGuardianReuseRate"), value: formatRate(data.auditStats.guardianReuseRate), color: (data.auditStats.guardianReuseRate ?? 0) > 0.5 ? "#34C759" : "#FF9500" }] : []),
-                        ]} />
+                        {data.guardians.length === 0 ? (
+                            /* 无 Guardian 时 */
+                            <View style={{ paddingHorizontal: 16, paddingBottom: 16, alignItems: "center", gap: 6 }}>
+                                <Ionicons name="shield-outline" size={32} color={theme.colors.textSecondary} style={{ opacity: 0.35 }} />
+                                <Text style={{ fontSize: 13, color: theme.colors.textSecondary }}>{t("machine.automationGuardiansEmpty")}</Text>
+                            </View>
+                        ) : (
+                            <View style={{ paddingHorizontal: 16, paddingBottom: 14, gap: 10 }}>
+                                {/* Total 大数字 + reuse rate */}
+                                <View style={{ flexDirection: "row", alignItems: "baseline", gap: 6 }}>
+                                    <Text style={{ fontSize: 36, fontWeight: "800", color: theme.colors.text }}>{data.guardians.length}</Text>
+                                    <Text style={{ fontSize: 14, color: theme.colors.textSecondary }}>{t("machine.automationGuardians")}</Text>
+                                    {data.auditStats && (
+                                        <View style={{ marginLeft: "auto", backgroundColor: (data.auditStats.guardianReuseRate ?? 0) > 0.5 ? "#34C75918" : "#FF950018", borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4, borderWidth: 1, borderColor: (data.auditStats.guardianReuseRate ?? 0) > 0.5 ? "#34C75940" : "#FF950040" }}>
+                                            <Text style={{ fontSize: 13, fontWeight: "700", color: (data.auditStats.guardianReuseRate ?? 0) > 0.5 ? "#34C759" : "#FF9500" }}>
+                                                {`${t("machine.automationGuardianReuseRate")} ${formatRate(data.auditStats.guardianReuseRate)}`}
+                                            </Text>
+                                        </View>
+                                    )}
+                                </View>
+                                {/* 状态 chips（只显示非 0） */}
+                                <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
+                                    {[
+                                        { key: "attached",  value: data.guardians.filter((g) => g.attached && !g.recovered).length,  label: t("machine.automationGuardianAttached"),  color: "#34C759", icon: "link-outline" as const },
+                                        { key: "persisted", value: data.guardians.filter((g) => !g.attached).length,                 label: t("machine.automationGuardianPersisted"), color: "#8E8E93", icon: "save-outline" as const },
+                                        { key: "recovered", value: data.guardians.filter((g) => g.recovered).length,                  label: t("machine.automationGuardianRecovered"),  color: "#FF9500", icon: "refresh-circle-outline" as const },
+                                    ].filter((s) => s.value > 0).map((s) => (
+                                        <View key={s.key} style={{ flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: s.color + "14", borderRadius: 8, borderWidth: 1, borderColor: s.color + "40", paddingHorizontal: 10, paddingVertical: 5 }}>
+                                            <Ionicons name={s.icon} size={13} color={s.color} />
+                                            <Text style={{ fontSize: 13, fontWeight: "700", color: s.color }}>{s.value}</Text>
+                                            <Text style={{ fontSize: 12, color: s.color }}>{s.label}</Text>
+                                        </View>
+                                    ))}
+                                </View>
+                            </View>
+                        )}
 
                         {/* Guardian 列表（折叠） */}
                         <SubToggle
@@ -725,13 +755,50 @@ export default React.memo(function MachineAutomationPage() {
                             ? <Text style={{ fontSize: 12, color: theme.colors.textSecondary }}>{formatTimestamp(data.auditStats.lastEventAt)}</Text>
                             : undefined}
                     >
-                        {/* 4 个关键指标 */}
-                        <StatRow items={[
-                            { label: t("machine.automationTotalAuditEvents"), value: data.auditStats?.totalEvents ?? 0 },
-                            { label: t("machine.automationGuardianReuseRate"), value: formatRate(data.auditStats?.guardianReuseRate), color: (data.auditStats?.guardianReuseRate ?? 0) > 0.5 ? "#34C759" : "#FF9500" },
-                            { label: t("machine.automationWatchdogStops"), value: data.auditStats?.watchdogStopCount ?? 0, color: (data.auditStats?.watchdogStopCount ?? 0) > 0 ? "#FF3B30" : undefined, dimmed: (data.auditStats?.watchdogStopCount ?? 0) === 0 },
-                            { label: t("machine.automationSessionReattachedCount"), value: data.auditStats?.sessionReattachedCount ?? 0, color: (data.auditStats?.sessionReattachedCount ?? 0) > 0 ? "#34C759" : undefined, dimmed: (data.auditStats?.sessionReattachedCount ?? 0) === 0 },
-                        ]} />
+                        {(data.auditStats?.totalEvents ?? 0) === 0 ? (
+                            /* 无审计事件时 */
+                            <View style={{ paddingHorizontal: 16, paddingBottom: 16, alignItems: "center", gap: 6 }}>
+                                <Ionicons name="document-text-outline" size={32} color={theme.colors.textSecondary} style={{ opacity: 0.35 }} />
+                                <Text style={{ fontSize: 13, color: theme.colors.textSecondary }}>{t("machine.automationAuditEmpty")}</Text>
+                            </View>
+                        ) : (
+                            <View style={{ paddingHorizontal: 16, paddingBottom: 14, gap: 10 }}>
+                                {/* Total 大数字 + reuse rate */}
+                                <View style={{ flexDirection: "row", alignItems: "baseline", gap: 6 }}>
+                                    <Text style={{ fontSize: 36, fontWeight: "800", color: theme.colors.text }}>{data.auditStats?.totalEvents ?? 0}</Text>
+                                    <Text style={{ fontSize: 14, color: theme.colors.textSecondary }}>{t("machine.automationTotalAuditEvents")}</Text>
+                                    {data.auditStats && (data.auditStats.guardianReuseRate ?? 0) > 0 && (
+                                        <View style={{ marginLeft: "auto", backgroundColor: (data.auditStats.guardianReuseRate ?? 0) > 0.5 ? "#34C75918" : "#FF950018", borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4, borderWidth: 1, borderColor: (data.auditStats.guardianReuseRate ?? 0) > 0.5 ? "#34C75940" : "#FF950040" }}>
+                                            <Text style={{ fontSize: 13, fontWeight: "700", color: (data.auditStats.guardianReuseRate ?? 0) > 0.5 ? "#34C759" : "#FF9500" }}>
+                                                {`${t("machine.automationGuardianReuseRate")} ${formatRate(data.auditStats.guardianReuseRate)}`}
+                                            </Text>
+                                        </View>
+                                    )}
+                                </View>
+                                {/* 异常指标 chips（只显示非 0） */}
+                                <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
+                                    {[
+                                        { key: "reuse",    value: data.auditStats?.guardianReuseCount ?? 0,      label: t("machine.automationGuardianReuseCount"),      color: "#0A84FF", icon: "repeat-outline" as const },
+                                        { key: "reattach", value: data.auditStats?.sessionReattachedCount ?? 0,  label: t("machine.automationSessionReattachedCount"),   color: "#34C759", icon: "refresh-outline" as const },
+                                        { key: "watchdog", value: data.auditStats?.watchdogStopCount ?? 0,       label: t("machine.automationWatchdogStops"),            color: "#FF3B30", icon: "warning-outline" as const },
+                                        { key: "reset",    value: data.auditStats?.guardianResetCount ?? 0,      label: t("machine.automationGuardianResetCount"),       color: "#FF9500", icon: "trash-outline" as const },
+                                    ].filter((s) => s.value > 0).map((s) => (
+                                        <View key={s.key} style={{ flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: s.color + "14", borderRadius: 8, borderWidth: 1, borderColor: s.color + "40", paddingHorizontal: 10, paddingVertical: 5 }}>
+                                            <Ionicons name={s.icon} size={13} color={s.color} />
+                                            <Text style={{ fontSize: 13, fontWeight: "700", color: s.color }}>{s.value}</Text>
+                                            <Text style={{ fontSize: 12, color: s.color }}>{s.label}</Text>
+                                        </View>
+                                    ))}
+                                    {/* 全为 0 时显示健康状态 */}
+                                    {(data.auditStats?.watchdogStopCount ?? 0) === 0 && (data.auditStats?.guardianResetCount ?? 0) === 0 && (
+                                        <View style={{ flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: "#34C75914", borderRadius: 8, borderWidth: 1, borderColor: "#34C75940", paddingHorizontal: 10, paddingVertical: 5 }}>
+                                            <Ionicons name="checkmark-circle-outline" size={13} color="#34C759" />
+                                            <Text style={{ fontSize: 12, color: "#34C759" }}>{t("common.ok") ?? "无异常"}</Text>
+                                        </View>
+                                    )}
+                                </View>
+                            </View>
+                        )}
 
                         {/* 审计事件列表（折叠） */}
                         <SubToggle
