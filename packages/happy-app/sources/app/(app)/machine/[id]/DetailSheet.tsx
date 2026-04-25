@@ -254,47 +254,55 @@ export function DetailSheet({
                                     ))}
                                 </>
                             ) : null}
-                        </ScrollView>
+                            {/* 操作按钮区（随内容滚动） */}
+                            {actionButtons.length > 0 ? (
+                                <View style={{ marginTop: 20, gap: 10 }}>
+                                    {actionButtons.map((btn, i) => (
+                                        <Pressable
+                                            key={i}
+                                            style={({ pressed }) => ({
+                                                borderRadius: 12,
+                                                paddingVertical: 14,
+                                                alignItems: "center",
+                                                backgroundColor: btn.style === "destructive"
+                                                    ? (pressed ? "#FF3B3025" : "#FF3B3015")
+                                                    : (pressed ? theme.colors.textLink + "22" : theme.colors.textLink + "12"),
+                                                borderWidth: 1,
+                                                borderColor: btn.style === "destructive"
+                                                    ? "#FF3B3040"
+                                                    : theme.colors.textLink + "30",
+                                            })}
+                                            onPress={() => { btn.onPress?.(); onClose(); }}
+                                        >
+                                            <Text style={{
+                                                fontSize: 15, fontWeight: "600",
+                                                color: btn.style === "destructive" ? "#FF3B30" : theme.colors.textLink,
+                                            }}>
+                                                {btn.text}
+                                            </Text>
+                                        </Pressable>
+                                    ))}
+                                </View>
+                            ) : null}
 
-                        {/* 操作按钮区 */}
-                        <View style={{ borderTopWidth: 1, borderTopColor: theme.colors.divider + "50" }}>
-                            {actionButtons.map((btn, i) => (
-                                <Pressable
-                                    key={i}
-                                    style={({ pressed }) => ({
-                                        paddingVertical: 14, alignItems: "center",
-                                        borderBottomWidth: i < actionButtons.length - 1 ? 1 : 0,
-                                        borderBottomColor: theme.colors.divider + "40",
-                                        backgroundColor: pressed ? theme.colors.surfaceHigh : "transparent",
-                                    })}
-                                    onPress={() => { btn.onPress?.(); onClose(); }}
-                                >
-                                    <Text style={{
-                                        fontSize: 16, fontWeight: "500",
-                                        color: btn.style === "destructive" ? "#FF3B30" : theme.colors.textLink,
-                                    }}>
-                                        {btn.text}
-                                    </Text>
-                                </Pressable>
-                            ))}
-
-                            {/* 取消按钮视觉分离 */}
+                            {/* 取消按钮：浅色文字，与操作按钮保持距离 */}
                             {cancelButton ? (
                                 <Pressable
                                     style={({ pressed }) => ({
-                                        paddingVertical: 14, alignItems: "center",
-                                        borderTopWidth: 5,
-                                        borderTopColor: theme.colors.groupped.background,
+                                        marginTop: 8,
+                                        paddingVertical: 13,
+                                        alignItems: "center",
+                                        borderRadius: 12,
                                         backgroundColor: pressed ? theme.colors.surfaceHigh : "transparent",
                                     })}
                                     onPress={onClose}
                                 >
-                                    <Text style={{ fontSize: 16, fontWeight: "600", color: theme.colors.text }}>
+                                    <Text style={{ fontSize: 15, fontWeight: "500", color: theme.colors.textSecondary }}>
                                         {cancelButton.text}
                                     </Text>
                                 </Pressable>
                             ) : null}
-                        </View>
+                        </ScrollView>
 
                     </View>
             </View>
