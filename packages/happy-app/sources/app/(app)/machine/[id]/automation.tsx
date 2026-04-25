@@ -484,14 +484,50 @@ export default React.memo(function MachineAutomationPage() {
                             </Pressable>
                         }
                     >
-                        <StatRow items={[
-                            { label: t("machine.automationLoopsTotal"), value: data.loopRollup.total },
-                            { label: t("machine.automationLoopsActive"), value: data.loopRollup.active, color: data.loopRollup.active > 0 ? "#0A84FF" : undefined, dimmed: data.loopRollup.active === 0 },
-                            { label: t("machine.automationLoopsBlocked"), value: data.loopRollup.blocked, color: data.loopRollup.blocked > 0 ? "#FF3B30" : undefined, dimmed: data.loopRollup.blocked === 0 },
-                            { label: t("machine.automationLoopsPaused"), value: data.loopRollup.paused, dimmed: data.loopRollup.paused === 0 },
-                            { label: t("machine.automationLoopsPendingEvents"), value: data.loopRollup.pendingEvents, color: data.loopRollup.pendingEvents > 0 ? "#FF9500" : undefined, dimmed: data.loopRollup.pendingEvents === 0 },
-                            { label: t("machine.automationLoopsPolicyStopped"), value: data.loopRollup.policyStopped, color: data.loopRollup.policyStopped > 0 ? "#FF9500" : undefined, dimmed: data.loopRollup.policyStopped === 0 },
-                        ]} />
+                        {data.loopRollup.total === 0 ? (
+                            /* 全 0 时：简洁空状态 */
+                            <View style={{ paddingHorizontal: 16, paddingBottom: 16, alignItems: "center", gap: 6 }}>
+                                <Ionicons name="repeat-outline" size={32} color={theme.colors.textSecondary} style={{ opacity: 0.35 }} />
+                                <Text style={{ fontSize: 13, color: theme.colors.textSecondary }}>{t("machine.agentLoopsEmpty")}</Text>
+                            </View>
+                        ) : (
+                            /* 有数据时：total 大字 + 非 0 状态 chip */
+                            <View style={{ paddingHorizontal: 16, paddingBottom: 14, gap: 10 }}>
+                                {/* Total 大数字 */}
+                                <View style={{ flexDirection: "row", alignItems: "baseline", gap: 6 }}>
+                                    <Text style={{ fontSize: 36, fontWeight: "800", color: theme.colors.text }}>{data.loopRollup.total}</Text>
+                                    <Text style={{ fontSize: 14, color: theme.colors.textSecondary }}>{t("machine.automationLoopsTotal")}</Text>
+                                </View>
+                                {/* 状态 chips（只显示有值的） */}
+                                <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
+                                    {[
+                                        { key: "active",  value: data.loopRollup.active,        label: t("machine.automationLoopsActive"),        color: "#0A84FF", icon: "play-circle-outline" as const },
+                                        { key: "blocked", value: data.loopRollup.blocked,        label: t("machine.automationLoopsBlocked"),       color: "#FF3B30", icon: "ban-outline" as const },
+                                        { key: "paused",  value: data.loopRollup.paused,         label: t("machine.automationLoopsPaused"),        color: "#8E8E93", icon: "pause-circle-outline" as const },
+                                        { key: "events",  value: data.loopRollup.pendingEvents,  label: t("machine.automationLoopsPendingEvents"), color: "#FF9500", icon: "flash-outline" as const },
+                                        { key: "policy",  value: data.loopRollup.policyStopped,  label: t("machine.automationLoopsPolicyStopped"), color: "#FF9500", icon: "shield-outline" as const },
+                                    ].filter((s) => s.value > 0).map((s) => (
+                                        <View key={s.key} style={{
+                                            flexDirection: "row", alignItems: "center", gap: 5,
+                                            backgroundColor: s.color + "14",
+                                            borderRadius: 8, borderWidth: 1, borderColor: s.color + "40",
+                                            paddingHorizontal: 10, paddingVertical: 5,
+                                        }}>
+                                            <Ionicons name={s.icon} size={13} color={s.color} />
+                                            <Text style={{ fontSize: 13, fontWeight: "700", color: s.color }}>{s.value}</Text>
+                                            <Text style={{ fontSize: 12, color: s.color }}>{s.label}</Text>
+                                        </View>
+                                    ))}
+                                    {/* 若所有子状态均为 0 只显示 active 占位 */}
+                                    {data.loopRollup.active === 0 && data.loopRollup.blocked === 0 && data.loopRollup.paused === 0 && (
+                                        <View style={{ flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: theme.colors.surfaceHigh, borderRadius: 8, borderWidth: 1, borderColor: theme.colors.divider, paddingHorizontal: 10, paddingVertical: 5 }}>
+                                            <Ionicons name="checkmark-circle-outline" size={13} color={theme.colors.textSecondary} />
+                                            <Text style={{ fontSize: 12, color: theme.colors.textSecondary }}>{t("machine.automationCompleted")}</Text>
+                                        </View>
+                                    )}
+                                </View>
+                            </View>
+                        )}
                     </SectionContainer>
                 ) : null}
 
