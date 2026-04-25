@@ -788,7 +788,7 @@ export function useAutomationSummaryCounts(machineId: string): SummaryCounts {
         if (!credentials) return;
 
         // Tasks: fetch all, count active statuses client-side
-        fetchTasks(credentials, { machineId, limit: 200 })
+        fetchTasks(credentials, { machineId, limit: 100 })
             .then(({ tasks }) => {
                 const count = tasks.filter((task) =>
                     ["queued", "dispatching", "running"].includes(task.status),
