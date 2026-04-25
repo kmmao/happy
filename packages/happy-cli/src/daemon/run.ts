@@ -2927,6 +2927,19 @@ export async function startDaemon(): Promise<void> {
       }
     });
 
+    // Finalise local AutomationJob when the server receives the HTTP callback.
+    // The HTTP path (Claude → Server curl) bypasses the daemon, so without this
+    // the AutomationScheduler stays stuck at "running" for Guardian sessions.
+    apiMachine.setSupervisorRunCompleteHandler(({ runId, status }) => {
+      logger.debug(
+        `[DAEMON RUN] supervisor-run-complete: run=${runId} status=${status}`,
+      );
+      void automationScheduler?.markJobTerminalByDedupeKey(
+        "supervisor:" + runId,
+        status,
+      );
+    });
+
     // Set up fix-kill handler: terminate fix sessions after completion/failure
     apiMachine.setFixKillHandler((data) => {
       logger.debug(

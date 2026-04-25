@@ -366,6 +366,9 @@ export class ApiMachineClient {
   private fixKillHandler:
     | ((data: { fixSessionId: string; projectId: string; fixStatus: string }) => void)
     | null = null;
+  private supervisorRunCompleteHandler:
+    | ((data: { runId: string; projectId: string; status: "completed" | "failed" }) => void)
+    | null = null;
   private pendingWebhookStatuses: Array<{
     webhookEventId: string;
     status: "dispatched" | "completed" | "failed";
@@ -884,6 +887,12 @@ export class ApiMachineClient {
     this.supervisorHandler = handler;
   }
 
+  setSupervisorRunCompleteHandler(
+    handler: (data: { runId: string; projectId: string; status: "completed" | "failed" }) => void,
+  ) {
+    this.supervisorRunCompleteHandler = handler;
+  }
+
   /**
    * Set handler for incoming task trigger events.
    * Called when Server dispatches a task-trigger ephemeral event to this machine.
@@ -1349,6 +1358,13 @@ export class ApiMachineClient {
           `[API MACHINE] Received fix-kill-session for session ${data.fixSessionId}`,
         );
         this.fixKillHandler(data as unknown as { fixSessionId: string; projectId: string; fixStatus: string });
+      }
+
+      if (data.type === "supervisor-run-complete" && this.supervisorRunCompleteHandler) {
+        logger.debug(
+          `[API MACHINE] Received supervisor-run-complete for run ${data.runId} status=${data.status}`,
+        );
+        this.supervisorRunCompleteHandler(data as unknown as { runId: string; projectId: string; status: "completed" | "failed" });
       }
 
       // Terminal input forwarding (from App via Server)

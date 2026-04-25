@@ -433,6 +433,12 @@ export type EphemeralEvent =
       taskId: string;
       sessionId?: string;
     }
+  | {
+      type: "supervisor-run-complete";
+      runId: string;
+      projectId: string;
+      status: "completed" | "failed";
+    }
 ;
 
 // === EVENT PAYLOAD TYPES ===
@@ -1076,6 +1082,7 @@ export interface SupervisorTriggerOptions {
   dimensions?: string[];
   changedFiles?: string[];
   customRules?: string;
+  customDimensions?: ReadonlyArray<{ key: string; title: string; prompt: string }>;
   fixAction?: { title: string; description: string; suggestedFix: string | null; category: string; severity: string; issueNumber?: number };
   researchParams?: string;
   fixStrategy?: string;

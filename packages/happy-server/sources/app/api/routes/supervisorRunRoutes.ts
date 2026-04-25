@@ -130,6 +130,16 @@ export function supervisorRunRoutes(app: Fastify) {
             const triggerType = request.body?.trigger ?? "manual";
             const researchParams = request.body?.researchParams;
 
+            // Query enabled custom dimensions for this project
+            const customDimensions =
+                triggerType !== "research"
+                    ? await db.supervisorDimension.findMany({
+                          where: { projectId: id, accountId: userId, enabled: true },
+                          orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+                          select: { key: true, title: true, prompt: true },
+                      })
+                    : undefined;
+
             // Query all existing actions (including dismissed) for dedup in analysis prompt
             const existingActions = triggerType !== "research"
                 ? await db.supervisorAction.findMany({
@@ -168,6 +178,10 @@ export function supervisorRunRoutes(app: Fastify) {
                     triggerType === "research"
                         ? undefined
                         : (project.supervisorCustomRules ?? undefined),
+                customDimensions:
+                    customDimensions && customDimensions.length > 0
+                        ? customDimensions
+                        : undefined,
                 researchParams: researchParams
                     ? JSON.stringify(researchParams)
                     : undefined,
@@ -652,6 +666,17 @@ export function supervisorRunRoutes(app: Fastify) {
                 ),
                 recipientFilter: { type: "user-scoped-only" },
             });
+
+            // Notify the daemon so it can finalise its local AutomationJob.
+            // The HTTP callback (Claude → Server) bypasses the daemon entirely,
+            // so without this the AutomationScheduler stays stuck at "running".
+            if ((status === "completed" || status === "failed") && machineId) {
+                eventRouter.emitEphemeral({
+                    userId,
+                    payload: { type: "supervisor-run-complete", runId, projectId: id, status },
+                    recipientFilter: { type: "machine-scoped-only", machineId },
+                });
+            }
 
             if (status === "completed" || status === "failed") {
                 // Auto/semi-auto mode: automatically approve actions based on configured severities
