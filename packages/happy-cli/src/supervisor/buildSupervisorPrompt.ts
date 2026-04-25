@@ -22,6 +22,8 @@ export interface SupervisorPromptOptions {
   readonly mode?: string;
   /** Enabled analysis dimension keys. Falls back to defaults if empty/omitted. */
   readonly dimensions?: readonly string[];
+  /** User-defined custom dimensions with their own prompts. */
+  readonly customDimensions?: ReadonlyArray<{ key: string; title: string; prompt: string }>;
   /** Changed files (for incremental/push-triggered scans). */
   readonly changedFiles?: readonly string[];
   /** User-defined custom analysis rules (appended to prompt). */
@@ -93,17 +95,26 @@ ${options.customRules.trim()}
   const existingActionsSection = buildExistingActionsSection(options.existingActions);
 
   const categories = getEnabledCategories(dims);
-  const categoryUnion = categories.map((c) => `"${c}"`).join(" | ");
+  const customDims = options.customDimensions ?? [];
+  const allCategories = [
+    ...categories,
+    ...customDims.map((d) => d.key),
+  ];
+  const categoryUnion = allCategories.map((c) => `"${c}"`).join(" | ");
 
   const reportUrl = `${options.serverUrl}/v1/projects/${options.projectId}/supervisor/runs/${options.runId}/status`;
 
-  // Build dimension key list for progress reporting
+  // Build dimension key list for progress reporting (built-in + custom)
   const dimKeys = (dims as readonly string[]).filter(
     (k) => dimensionTemplates[k] !== undefined,
   );
-  const totalDimensions = dimKeys.length;
-  const dimKeyList = dimKeys
-    .map((k, i) => `${i + 1}. "${k}" → ${dimensionTemplates[k]!.title}`)
+  const allDimEntries = [
+    ...dimKeys.map((k) => ({ key: k, title: dimensionTemplates[k]!.title })),
+    ...customDims.map((d) => ({ key: d.key, title: d.title })),
+  ];
+  const totalDimensions = allDimEntries.length;
+  const dimKeyList = allDimEntries
+    .map((d, i) => `${i + 1}. "${d.key}" → ${d.title}`)
     .join("\n");
 
   return `You are a **Project Health Supervisor** running an automated analysis.
@@ -122,7 +133,7 @@ ${autoModeSection}${incrementalSection}${customRulesSection}${existingActionsSec
 ## Analysis Dimensions
 Analyze the project across these dimensions **in order**:
 
-${buildDimensionsSection(dims)}
+${buildDimensionsSection(dims)}${customDims.length > 0 ? "\n\n" + customDims.map((d, i) => `### ${dimKeys.length + i + 1}. ${d.title}\n${d.prompt}`).join("\n\n") : ""}
 
 ## Output Format
 After your analysis, you MUST produce a JSON object with an \`actions\` array containing your findings:

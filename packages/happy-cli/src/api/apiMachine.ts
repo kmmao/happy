@@ -282,6 +282,7 @@ export type SupervisorTriggerData = {
   dimensions?: string[];
   changedFiles?: string[];
   customRules?: string;
+  customDimensions?: ReadonlyArray<{ key: string; title: string; prompt: string }>;
   fixAction?: {
     title: string;
     description: string;

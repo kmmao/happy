@@ -23,9 +23,13 @@ export const dimensionTemplates: Record<string, DimensionTemplate> = {
     title: "Security",
     category: "security",
     prompt: `- Run \`yarn audit\` or \`npm audit\` to check for known vulnerabilities
-- Search for hardcoded secrets (API keys, passwords, tokens)
-- Check for common security anti-patterns (eval, innerHTML, SQL concatenation)
-- Look for missing input validation on user-facing endpoints`,
+- Search for hardcoded secrets (API keys, passwords, tokens) using grep patterns
+- Check for common security anti-patterns (eval, innerHTML, SQL concatenation, path traversal)
+- Look for missing input validation on user-facing endpoints
+- Check CORS configuration — overly permissive origins or missing headers
+- Verify auth tokens/session credentials are not stored in localStorage or logs
+- Look for missing rate limiting on sensitive endpoints (auth, password reset, upload)
+- Check that error responses don't leak stack traces or internal paths`,
   },
 
   dependencies: {
@@ -72,10 +76,12 @@ export const dimensionTemplates: Record<string, DimensionTemplate> = {
     key: "testCoverage",
     title: "Test Coverage",
     category: "test-coverage",
-    prompt: `- Check if test files exist for core modules
-- Identify critical paths without test coverage
-- Look for test files that only test trivial cases
-- Verify test commands are configured and runnable`,
+    prompt: `- Run \`yarn test --coverage\` or \`npx vitest run --coverage\` and check overall coverage %
+- Identify core modules (business logic, API handlers, auth) that have no test files at all
+- Look for tests that only assert trivial things (snapshot tests, empty assertions)
+- Check that critical paths (auth flows, payment logic, data mutations) have integration tests
+- Verify test commands are configured in package.json and runnable
+- Look for skipped or disabled tests (\`xit\`, \`xdescribe\`, \`test.skip\`) that hide real failures`,
   },
 
   documentation: {
@@ -96,7 +102,11 @@ export const dimensionTemplates: Record<string, DimensionTemplate> = {
 - Identify missing indexes on frequently queried fields
 - Check for synchronous blocking operations in async contexts
 - Look for unbounded list operations (no pagination, no limit)
-- Identify potential memory leaks (event listeners not cleaned up, growing caches)`,
+- Identify potential memory leaks (event listeners not cleaned up, growing caches)
+- Check frontend bundle size — look for heavy dependencies imported without tree-shaking
+- Identify unnecessary re-renders (missing React.memo, unstable object/array literals in props)
+- Look for images or assets loaded without lazy loading or size optimization
+- Check for expensive operations inside render functions or tight loops`,
   },
 
   uiUx: {
@@ -110,6 +120,60 @@ export const dimensionTemplates: Record<string, DimensionTemplate> = {
 - Look for missing touch feedback (pressable without visual response)
 - Identify overly long text without truncation or wrapping
 - Check for missing i18n in user-visible strings`,
+  },
+
+  typeSafety: {
+    key: "typeSafety",
+    title: "Type Safety",
+    category: "type-safety",
+    prompt: `- Search for \`any\` type usage in non-test TypeScript files — especially in function signatures and API boundaries
+- Look for unsafe type assertions (\`as SomeType\`) that bypass null/undefined checks
+- Identify missing return types on exported functions
+- Check for \`@ts-ignore\` and \`@ts-expect-error\` comments — assess if they hide real issues
+- Look for implicit \`any\` from untyped third-party libraries without \`@types\` packages
+- Verify that Zod or equivalent runtime validation is used at all external data boundaries (API responses, user input)
+- Check for optional chaining (\`?.\`) gaps where runtime crashes can occur`,
+  },
+
+  observability: {
+    key: "observability",
+    title: "Observability",
+    category: "observability",
+    prompt: `- Check if errors are logged with enough context (request ID, user ID, operation name) — not just the error message
+- Look for silent error swallowing: \`catch {}\`, \`catch (e) { /* ignore */ }\`
+- Identify missing structured logging — plain \`console.log\` strings instead of key-value pairs
+- Check that async background jobs and scheduled tasks log their start, end, and failure states
+- Look for performance-critical paths (DB queries, external API calls) that have no timing instrumentation
+- Verify that health check endpoints exist and return meaningful status
+- Check if critical business events (user signup, payment, auth failure) are logged for auditing`,
+  },
+
+  apiDesign: {
+    key: "apiDesign",
+    title: "API Design",
+    category: "api-design",
+    prompt: `- Check REST endpoint naming — consistent plural nouns, no verbs in paths
+- Verify HTTP method usage is correct (GET for reads, POST for creates, PATCH for partial updates, DELETE for removal)
+- Look for inconsistent error response formats across endpoints — should use a single envelope shape
+- Check that all endpoints return appropriate HTTP status codes (not just 200 for errors)
+- Identify missing pagination on list endpoints that could return unbounded results
+- Look for breaking changes in existing endpoints (removed fields, changed types) without versioning
+- Check that request body validation is present on all mutation endpoints
+- Verify that API authentication is applied consistently — no accidentally public endpoints`,
+  },
+
+  buildCI: {
+    key: "buildCI",
+    title: "Build & CI",
+    category: "build-ci",
+    prompt: `- Check if CI configuration file exists (.github/workflows, .gitlab-ci.yml, etc.) and runs on PRs
+- Verify the build command completes without warnings being treated as errors
+- Look for \`tsc --noEmit\` or equivalent type checking in the CI pipeline
+- Check that tests are executed in CI — not just linting
+- Identify overly long build times (check for missing caches for node_modules, build artifacts)
+- Look for hardcoded environment-specific values in build configs that break other environments
+- Check if the CI pipeline has a deploy step and whether it requires manual approval for production
+- Verify that build scripts in package.json are consistent with what CI actually runs`,
   },
 };
 
