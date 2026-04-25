@@ -33,7 +33,6 @@ import {
     getJobDetailMessage,
     getJobKindLabel,
     getJobTitle,
-    getPriorityLabel,
     getStatusColor,
     getStatusLabel,
 } from "./automationLabels";
@@ -458,44 +457,35 @@ export default React.memo(function MachineAutomationPage() {
 
             <ItemList>
                 {data.alertCards.length > 0 ? (
-                    <ItemGroup title={renderSectionTitle(t("machine.automationAlerts"), t("machine.automationSectionAlerts"))}>
+                    <View style={{ paddingHorizontal: 16, paddingTop: 8, gap: 8 }}>
                         {data.alertCards.map((alert) => {
-                            if (alert.kind === "anomalies") {
-                                return (
-                                    <Item
-                                        key={alert.kind}
-                                        title={t("machine.automationAnomaliesDetected")}
-                                        subtitle={`${t("machine.automationFailed")}: ${data.counts.failed ?? 0} • ${t("machine.automationWatchdogStops")}: ${data.auditStats?.watchdogStopCount ?? 0}`}
-                                        detail={String(alert.count)}
-                                        detailStyle={{ color: "#FF3B30" }}
-                                        showChevron={false}
-                                    />
-                                );
-                            }
-                            if (alert.kind === "recovered") {
-                                return (
-                                    <Item
-                                        key={alert.kind}
-                                        title={t("machine.automationRecoveredSessions")}
-                                        subtitle={`${t("machine.automationRecoveredGuardians")}: ${data.guardians.filter((guardian) => guardian.recovered).length} • ${t("machine.automationRecoveredJobs")}: ${data.jobs.filter((job) => job.recovered).length}`}
-                                        detail={String(alert.count)}
-                                        detailStyle={{ color: "#34C759" }}
-                                        showChevron={false}
-                                    />
-                                );
-                            }
+                            const accent = alert.kind === "anomalies" ? "#FF3B30" : alert.kind === "recovered" ? "#34C759" : "#FF9500";
+                            const title = alert.kind === "anomalies"
+                                ? t("machine.automationAnomaliesDetected")
+                                : alert.kind === "recovered"
+                                    ? t("machine.automationRecoveredSessions")
+                                    : t("machine.automationGuardianRecoveryNeeded");
+                            const subtitle = alert.kind === "anomalies"
+                                ? `${t("machine.automationFailed")}: ${data.counts.failed ?? 0} · ${t("machine.automationWatchdogStops")}: ${data.auditStats?.watchdogStopCount ?? 0}`
+                                : alert.kind === "recovered"
+                                    ? `${t("machine.automationRecoveredGuardians")}: ${data.guardians.filter((g) => g.recovered).length} · ${t("machine.automationRecoveredJobs")}: ${data.jobs.filter((j) => j.recovered).length}`
+                                    : t("machine.automationGuardianRecoveryNeededMessage");
                             return (
-                                <Item
+                                <View
                                     key={alert.kind}
-                                    title={t("machine.automationGuardianRecoveryNeeded")}
-                                    subtitle={t("machine.automationGuardianRecoveryNeededMessage")}
-                                    detail={String(alert.count)}
-                                    detailStyle={{ color: "#FF9500" }}
-                                    showChevron={false}
-                                />
+                                    style={[styles.dataCard, { borderLeftWidth: 4, borderLeftColor: accent, marginHorizontal: 0, marginVertical: 0 }]}
+                                >
+                                    <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+                                        <Text style={[styles.dataCardTitle, { color: accent, flex: 1 }]} numberOfLines={1}>{title}</Text>
+                                        <View style={{ backgroundColor: accent + "22", borderRadius: 8, paddingHorizontal: 10, paddingVertical: 3, marginLeft: 8 }}>
+                                            <Text style={{ fontSize: 15, fontWeight: "800", color: accent }}>{alert.count}</Text>
+                                        </View>
+                                    </View>
+                                    <Text style={styles.dataCardSubtitle}>{subtitle}</Text>
+                                </View>
                             );
                         })}
-                    </ItemGroup>
+                    </View>
                 ) : null}
                 <ItemGroup title={renderSectionTitle(t("machine.automation"), t("machine.automationSectionOverview"))}>
                     <View style={styles.summaryGrid}>
@@ -583,31 +573,42 @@ export default React.memo(function MachineAutomationPage() {
                             </Pressable>
                         );
                     }) : null}
-                    {data.showAllJobs ? data.filteredJobs.map((job) => (
-                        <Pressable key={job.id} style={styles.dataCard} onPress={() => handleJobPress(job)}>
-                            <View style={styles.dataCardHeader}>
-                                <View style={styles.dataCardTitleWrap}>
-                                    <Text style={styles.dataCardTitle}>{getJobTitle(job)}</Text>
-                                    <Text style={styles.dataCardSubtitle}>{formatJobSubtitle(job, data.resolveGuardianKeyLabel)}</Text>
-                                </View>
-                                <View style={styles.statusWrap}>
-                                    <View style={[styles.statusBadge, { borderColor: getStatusColor(job.status) ?? theme.colors.divider, backgroundColor: theme.colors.surface }] }>
-                                        <Text style={[styles.statusBadgeText, { color: getStatusColor(job.status) ?? theme.colors.text }]}>{getStatusLabel(job.status)}</Text>
+                    {data.showAllJobs ? data.filteredJobs.map((job) => {
+                        const statusColor = getStatusColor(job.status) ?? theme.colors.divider;
+                        return (
+                            <Pressable
+                                key={job.id}
+                                style={[styles.dataCard, { borderLeftWidth: 4, borderLeftColor: statusColor }]}
+                                onPress={() => handleJobPress(job)}
+                            >
+                                <View style={styles.dataCardHeader}>
+                                    <View style={styles.dataCardTitleWrap}>
+                                        <Text style={styles.dataCardTitle} numberOfLines={2}>{getJobTitle(job)}</Text>
+                                        <Text style={styles.dataCardSubtitle}>{formatJobSubtitle(job, data.resolveGuardianKeyLabel)}</Text>
                                     </View>
-                                    {data.activeJobId === job.id ? (
-                                        <ActivityIndicator size="small" color={theme.colors.textSecondary} />
+                                    <View style={{ alignItems: "flex-end", gap: 6 }}>
+                                        <View style={[styles.statusBadge, { borderColor: statusColor, backgroundColor: statusColor + "18" }]}>
+                                            <Text style={[styles.statusBadgeText, { color: statusColor }]}>{getStatusLabel(job.status)}</Text>
+                                        </View>
+                                        {data.activeJobId === job.id && <ActivityIndicator size="small" color={theme.colors.textSecondary} />}
+                                    </View>
+                                </View>
+                                <View style={styles.pillRow}>
+                                    <View style={[styles.pill, { borderColor: theme.colors.divider }]}>
+                                        <Text style={styles.pillText}>{getJobKindLabel(job.kind)}</Text>
+                                    </View>
+                                    <View style={[styles.pill, { borderColor: theme.colors.divider }]}>
+                                        <Text style={styles.pillText}>{formatTimestamp(job.createdAt)}</Text>
+                                    </View>
+                                    {job.loopId ? (
+                                        <View style={[styles.pill, { borderColor: theme.colors.divider }]}>
+                                            <Text style={styles.pillText}>{data.resolveLoopName(job.loopId) ?? job.loopId.slice(0, 8)}</Text>
+                                        </View>
                                     ) : null}
                                 </View>
-                            </View>
-                            <View style={styles.pillRow}>
-                                <View style={[styles.pill, { borderColor: theme.colors.divider }]}><Text style={styles.pillText}>{getJobKindLabel(job.kind)}</Text></View>
-                                <View style={[styles.pill, { borderColor: theme.colors.divider }]}><Text style={styles.pillText}>{`${t("machine.automationPriority")}: ${getPriorityLabel(job.priority)}`}</Text></View>
-                                <View style={[styles.pill, { borderColor: theme.colors.divider }]}><Text style={styles.pillText}>{`${t("machine.automationCreatedAt")}: ${formatTimestamp(job.createdAt)}`}</Text></View>
-                                {job.projectId ? <View style={[styles.pill, { borderColor: theme.colors.divider }]}><Text style={styles.pillText}>{`${t("machine.automationAuditProject")}: ${job.projectId}`}</Text></View> : null}
-                                {job.loopId ? <View style={[styles.pill, { borderColor: theme.colors.divider }]}><Text style={styles.pillText}>{`${t("machine.automationAuditLoop")}: ${data.resolveLoopName(job.loopId) ?? job.loopId.slice(0, 8)}`}</Text></View> : null}
-                            </View>
-                        </Pressable>
-                    )) : null}
+                            </Pressable>
+                        );
+                    }) : null}
                 </ItemGroup>
 
                 <ItemGroup title={renderSectionTitle(t("machine.automationLoopRollup"), t("machine.automationSectionLoopRollup"))}>
@@ -633,21 +634,31 @@ export default React.memo(function MachineAutomationPage() {
                     />
                     {data.showAllGuardians ? (
                         <>
-                            {data.visibleGuardians.map((guardian: MachineAutomationGuardian) => (
-                                <Pressable key={guardian.key} style={styles.dataCard} onPress={() => handleGuardianPress(guardian)}>
-                                    <View style={styles.dataCardHeader}>
-                                        <View style={styles.dataCardTitleWrap}>
-                                            <Text style={styles.dataCardTitle}>{data.resolveGuardianKeyLabel(guardian.key)}</Text>
-                                            <Text style={styles.dataCardSubtitle}>{getGuardianStateLabel(guardian.attached, guardian.recovered)}</Text>
+                            {data.visibleGuardians.map((guardian: MachineAutomationGuardian) => {
+                                const gColor = guardian.recovered ? "#FF9500" : guardian.attached ? "#34C759" : theme.colors.textSecondary;
+                                return (
+                                    <Pressable
+                                        key={guardian.key}
+                                        style={[styles.dataCard, { borderLeftWidth: 4, borderLeftColor: gColor }]}
+                                        onPress={() => handleGuardianPress(guardian)}
+                                    >
+                                        <View style={styles.dataCardHeader}>
+                                            <View style={styles.dataCardTitleWrap}>
+                                                <Text style={styles.dataCardTitle} numberOfLines={1}>{data.resolveGuardianKeyLabel(guardian.key)}</Text>
+                                                <Text style={[styles.dataCardSubtitle, { color: gColor }]}>{getGuardianStateLabel(guardian.attached, guardian.recovered)}</Text>
+                                            </View>
+                                            <Text style={styles.dataCardTimestamp}>{formatTimestamp(guardian.updatedAt)}</Text>
                                         </View>
-                                        <Text style={styles.dataCardTimestamp}>{formatTimestamp(guardian.updatedAt)}</Text>
-                                    </View>
-                                    <View style={styles.pillRow}>
-                                        <View style={[styles.pill, { borderColor: theme.colors.divider }]}><Text style={styles.pillText} numberOfLines={1}>{`${t("machine.automationGuardianSession")}: ${guardian.sessionId.slice(0, 12)}…`}</Text></View>
-                                        {guardian.loopId ? <View style={[styles.pill, { borderColor: theme.colors.divider }]}><Text style={styles.pillText}>{`${t("machine.automationAuditLoop")}: ${data.resolveLoopName(guardian.loopId) ?? guardian.loopId.slice(0, 8)}`}</Text></View> : null}
-                                    </View>
-                                </Pressable>
-                            ))}
+                                        {guardian.loopId ? (
+                                            <View style={styles.pillRow}>
+                                                <View style={[styles.pill, { borderColor: theme.colors.divider }]}>
+                                                    <Text style={styles.pillText}>{data.resolveLoopName(guardian.loopId) ?? guardian.loopId.slice(0, 8)}</Text>
+                                                </View>
+                                            </View>
+                                        ) : null}
+                                    </Pressable>
+                                );
+                            })}
                             <Item
                                 title={`${t("machine.automationGuardianUsage")} (${data.filteredGuardianUsage.length})`}
                                 subtitle={t("machine.automationGuardianUsageHint")}
@@ -723,22 +734,38 @@ export default React.memo(function MachineAutomationPage() {
                                 }}
                                 rightElement={data.clearingAudit ? <ActivityIndicator size="small" color={theme.colors.textSecondary} /> : undefined}
                             />
-                            {data.visibleAuditEvents.map((event: MachineAutomationAuditEvent) => (
-                                <Pressable key={event.id} style={styles.dataCard} onPress={() => handleAuditEventPress(event)}>
-                                    <View style={styles.dataCardHeader}>
-                                        <View style={styles.dataCardTitleWrap}>
-                                            <Text style={styles.dataCardTitle}>{getAuditEventTitle(event)}</Text>
-                                            <Text style={styles.dataCardSubtitle}>{event.message || getAuditEventSubtitle(event) || t("machine.automationAudit")}</Text>
+                            {data.visibleAuditEvents.map((event: MachineAutomationAuditEvent) => {
+                                const aAccent = getAuditKindAccent(event) ?? theme.colors.divider;
+                                return (
+                                    <Pressable
+                                        key={event.id}
+                                        style={[styles.dataCard, { borderLeftWidth: 4, borderLeftColor: aAccent }]}
+                                        onPress={() => handleAuditEventPress(event)}
+                                    >
+                                        <View style={styles.dataCardHeader}>
+                                            <View style={styles.dataCardTitleWrap}>
+                                                <Text style={styles.dataCardTitle} numberOfLines={1}>{getAuditEventTitle(event)}</Text>
+                                                <Text style={styles.dataCardSubtitle} numberOfLines={2}>{event.message || getAuditEventSubtitle(event) || t("machine.automationAudit")}</Text>
+                                            </View>
+                                            <Text style={[styles.dataCardTimestamp, { color: aAccent }]}>{formatTimestamp(event.occurredAt)}</Text>
                                         </View>
-                                        <Text style={[styles.dataCardTimestamp, getAuditKindAccent(event) ? { color: getAuditKindAccent(event) } : null]}>{formatTimestamp(event.occurredAt)}</Text>
-                                    </View>
-                                    <View style={styles.pillRow}>
-                                        {event.status ? <View style={[styles.pill, { borderColor: getAuditKindAccent(event) ?? theme.colors.divider }]}><Text style={styles.pillText}>{`${t("machine.automationStatusLabel")}: ${event.status}`}</Text></View> : null}
-                                        {event.guardianKey ? <View style={[styles.pill, { borderColor: theme.colors.divider }]}><Text style={styles.pillText}>{`${t("machine.automationAuditGuardian")}: ${data.resolveGuardianKeyLabel(event.guardianKey)}`}</Text></View> : null}
-                                        {event.loopId ? <View style={[styles.pill, { borderColor: theme.colors.divider }]}><Text style={styles.pillText}>{`${t("machine.automationAuditLoop")}: ${data.resolveLoopName(event.loopId) ?? event.loopId.slice(0, 8)}`}</Text></View> : null}
-                                    </View>
-                                </Pressable>
-                            ))}
+                                        {(event.guardianKey || event.loopId) ? (
+                                            <View style={styles.pillRow}>
+                                                {event.guardianKey ? (
+                                                    <View style={[styles.pill, { borderColor: aAccent + "80" }]}>
+                                                        <Text style={styles.pillText}>{data.resolveGuardianKeyLabel(event.guardianKey)}</Text>
+                                                    </View>
+                                                ) : null}
+                                                {event.loopId ? (
+                                                    <View style={[styles.pill, { borderColor: theme.colors.divider }]}>
+                                                        <Text style={styles.pillText}>{data.resolveLoopName(event.loopId) ?? event.loopId.slice(0, 8)}</Text>
+                                                    </View>
+                                                ) : null}
+                                            </View>
+                                        ) : null}
+                                    </Pressable>
+                                );
+                            })}
                         </>
                     ) : null}
                 </ItemGroup>

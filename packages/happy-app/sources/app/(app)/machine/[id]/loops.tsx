@@ -3,7 +3,6 @@ import { ActivityIndicator, Platform, Pressable, RefreshControl, ScrollView, Tex
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
-import { Item } from "@/components/Item";
 import { ItemGroup } from "@/components/ItemGroup";
 import { layout } from "@/components/layout";
 import { Modal } from "@/modal";
@@ -41,6 +40,76 @@ import {
     getLoopStatusColor,
     getLoopStatusLabel,
 } from "./loopsLabels";
+
+function LoopRow({
+    loop,
+    onPress,
+    mutating,
+}: {
+    loop: MachineAgentLoop;
+    onPress: () => void;
+    mutating: boolean;
+}) {
+    const { theme } = useUnistyles();
+    const hasError = !!loop.lastError;
+    const isActive = loop.runtimeState === "active";
+    const statusColor = hasError ? "#FF3B30" : getLoopStatusColor(loop, theme);
+
+    return (
+        <Pressable
+            style={({ pressed }) => ({
+                flexDirection: "row",
+                backgroundColor: pressed ? theme.colors.surfaceHigh : "transparent",
+                overflow: "hidden",
+            })}
+            onPress={onPress}
+        >
+            {/* Left status stripe */}
+            <View style={{ width: 3, backgroundColor: statusColor }} />
+
+            <View style={{ flex: 1, paddingVertical: 10, paddingLeft: 12, gap: 3 }}>
+                {/* Row 1: name + status label */}
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 8, paddingRight: 8 }}>
+                    <Text
+                        style={{ flex: 1, fontSize: 14, fontWeight: "600", color: theme.colors.text }}
+                        numberOfLines={1}
+                    >
+                        {loop.name || loop.id}
+                    </Text>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                        {isActive && !hasError && (
+                            <View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: statusColor }} />
+                        )}
+                        <Text style={{ fontSize: 11, fontWeight: "700", color: statusColor }}>
+                            {isActive && !hasError
+                                ? getLoopPhaseLabel(loop).toUpperCase()
+                                : getLoopStatusLabel(loop).toUpperCase()}
+                        </Text>
+                    </View>
+                </View>
+
+                {/* Row 2: error or subtitle */}
+                {hasError ? (
+                    <Text style={{ fontSize: 12, color: "#FF3B30" }} numberOfLines={2}>
+                        {loop.lastError}
+                    </Text>
+                ) : (
+                    <Text style={{ fontSize: 12, color: theme.colors.textSecondary }} numberOfLines={1}>
+                        {getLoopListSubtitleCompact(loop)}
+                    </Text>
+                )}
+            </View>
+
+            <View style={{ justifyContent: "center", paddingHorizontal: 12 }}>
+                {mutating ? (
+                    <ActivityIndicator size="small" color={theme.colors.textSecondary} />
+                ) : (
+                    <Ionicons name="chevron-forward" size={15} color={theme.colors.textSecondary} />
+                )}
+            </View>
+        </Pressable>
+    );
+}
 
 export default React.memo(function MachineLoopsPage() {
     const { id: machineIdParam, loopId: focusLoopId } = useLocalSearchParams<{ id: string; loopId?: string }>();
@@ -448,41 +517,38 @@ export default React.memo(function MachineLoopsPage() {
                     ) : (
                         loopSectionsByDirectory.map(([directoryKey, sectionLoops]) => (
                             <View key={directoryKey || "__nodir__"}>
+                                {/* Directory group header */}
                                 <View
                                     style={[
                                         styles.repoGroupHeader,
-                                        { backgroundColor: theme.colors.surfaceHigh, borderBottomColor: theme.colors.divider },
+                                        { borderTopColor: theme.colors.divider, borderBottomColor: theme.colors.divider },
                                     ]}
                                 >
-                                    <Ionicons name="folder-outline" size={13} color={theme.colors.textSecondary} />
+                                    <Ionicons name="folder-outline" size={12} color={theme.colors.textSecondary} />
                                     <Text
                                         style={[styles.repoGroupHeaderText, { color: theme.colors.textSecondary }]}
                                         numberOfLines={1}
                                     >
-                                        {directoryKey ? directoryKey : t("machine.agentLoopUnknownRepo")}
+                                        {directoryKey || t("machine.agentLoopUnknownRepo")}
                                     </Text>
+                                    <View style={[styles.repoGroupBadge, { backgroundColor: theme.colors.surfaceHigh, borderColor: theme.colors.divider }]}>
+                                        <Text style={[styles.repoGroupBadgeText, { color: theme.colors.textSecondary }]}>
+                                            {sectionLoops.length}
+                                        </Text>
+                                    </View>
                                 </View>
-                                {sectionLoops.map((loop) => (
-                                    <Item
-                                        key={loop.id}
-                                        title={loop.name || loop.id}
-                                        subtitle={getLoopListSubtitleCompact(loop)}
-                                        subtitleLines={1}
-                                        detail={loop.lastError ? "\u26A0" : loop.runtimeState === "active" ? getLoopPhaseLabel(loop) : getLoopStatusLabel(loop)}
-                                        detailStyle={{
-                                            color: loop.lastError ? "#FF3B30" : getLoopStatusColor(loop, theme),
-                                            fontWeight: loop.lastError || loop.runtimeState === "active" ? "700" : undefined,
-                                        }}
-                                        icon={<Ionicons
-                                            name={loop.lastError ? "alert-circle" : loop.runtimeState === "active" ? "play-circle" : "repeat-outline"}
-                                            size={20}
-                                            color={loop.lastError ? "#FF3B30" : getLoopStatusColor(loop, theme)}
-                                        />}
-                                        onPress={() => openLoopActions(loop)}
-                                        showChevron
-                                        style={styles.loopListItemCompact}
-                                        rightElement={mutatingLoopId === loop.id ? <ActivityIndicator size="small" color={theme.colors.textSecondary} /> : undefined}
-                                    />
+                                {/* Loop rows */}
+                                {sectionLoops.map((loop, idx) => (
+                                    <React.Fragment key={loop.id}>
+                                        <LoopRow
+                                            loop={loop}
+                                            onPress={() => openLoopActions(loop)}
+                                            mutating={mutatingLoopId === loop.id}
+                                        />
+                                        {idx < sectionLoops.length - 1 && (
+                                            <View style={{ height: 1, backgroundColor: theme.colors.divider, marginLeft: 15 }} />
+                                        )}
+                                    </React.Fragment>
                                 ))}
                             </View>
                         ))
@@ -610,19 +676,26 @@ const styles = StyleSheet.create((theme) => ({
         flexDirection: "row",
         alignItems: "center",
         gap: 6,
-        paddingHorizontal: 14,
+        paddingHorizontal: 12,
         paddingVertical: 5,
+        borderTopWidth: 1,
         borderBottomWidth: 1,
     },
     repoGroupHeaderText: {
         flex: 1,
         fontSize: 11,
         fontWeight: "600",
-        letterSpacing: 0.2,
+        letterSpacing: 0.3,
     },
-    loopListItemCompact: {
-        minHeight: 48,
-        paddingVertical: 6,
+    repoGroupBadge: {
+        borderRadius: 8,
+        borderWidth: 1,
+        paddingHorizontal: 6,
+        paddingVertical: 1,
+    },
+    repoGroupBadgeText: {
+        fontSize: 10,
+        fontWeight: "700",
     },
     searchRow: {
         flexDirection: "row",

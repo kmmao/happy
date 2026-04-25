@@ -3,8 +3,6 @@ import { ActivityIndicator, Pressable, RefreshControl, ScrollView, Text, View } 
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
-import { Item } from "@/components/Item";
-import { ItemGroup } from "@/components/ItemGroup";
 import { layout } from "@/components/layout";
 import { t } from "@/text";
 import { useTasksData } from "./useTasksData";
@@ -16,10 +14,104 @@ import {
     TASK_FILTERS,
 } from "./task/taskDetailViewModel";
 
-function StatusBadge({ status }: { status: string }) {
+function formatCompactTime(ts: number): string {
+    const diff = Date.now() - ts;
+    const mins = Math.floor(diff / 60000);
+    if (mins < 2) return "just now";
+    if (mins < 60) return `${mins}m ago`;
+    const hrs = Math.floor(mins / 60);
+    if (hrs < 24) return `${hrs}h ago`;
+    const days = Math.floor(hrs / 24);
+    return days === 1 ? "1d ago" : `${days}d ago`;
+}
+
+function TaskCard({ task, onPress }: { task: ServerTask; onPress: () => void }) {
+    const { theme } = useUnistyles();
+    const statusColor = getTaskStatusBadgeColor(task.status);
+    const isActive = ["queued", "dispatching", "running"].includes(task.status);
+
     return (
-        <View style={[styles.badge, { backgroundColor: getTaskStatusBadgeColor(status) }]}>
-            <Text style={styles.badgeText}>{getTaskStatusLabel(status, t as (key: string) => string)}</Text>
+        <Pressable
+            style={({ pressed }) => ({
+                flexDirection: "row",
+                backgroundColor: theme.colors.surface,
+                borderRadius: 12,
+                borderWidth: 1,
+                borderColor: isActive ? statusColor + "44" : theme.colors.divider,
+                overflow: "hidden",
+                opacity: pressed ? 0.75 : 1,
+            })}
+            onPress={onPress}
+        >
+            {/* Left status stripe */}
+            <View style={{ width: 4, backgroundColor: statusColor }} />
+
+            <View style={{ flex: 1, paddingVertical: 11, paddingLeft: 12, gap: 5 }}>
+                {/* Row 1: status label + time */}
+                <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingRight: 12 }}>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
+                        {isActive && (
+                            <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: statusColor }} />
+                        )}
+                        <Text style={{ fontSize: 11, fontWeight: "700", color: statusColor, letterSpacing: 0.3 }}>
+                            {getTaskStatusLabel(task.status, t as (key: string) => string).toUpperCase()}
+                        </Text>
+                    </View>
+                    <Text style={{ fontSize: 11, color: theme.colors.textSecondary }}>
+                        {formatCompactTime(task.updatedAt)}
+                    </Text>
+                </View>
+
+                {/* Row 2: title */}
+                <Text
+                    style={{ fontSize: 14, fontWeight: "500", color: theme.colors.text, lineHeight: 20 }}
+                    numberOfLines={2}
+                >
+                    {task.title || task.promptPreview || "—"}
+                </Text>
+
+                {/* Row 3: skill chips */}
+                {task.skillNames.length > 0 && (
+                    <View style={{ flexDirection: "row", gap: 4, flexWrap: "wrap" }}>
+                        {task.skillNames.slice(0, 4).map((s) => (
+                            <View
+                                key={s}
+                                style={{
+                                    backgroundColor: theme.colors.surfaceHigh,
+                                    borderRadius: 4,
+                                    paddingHorizontal: 6,
+                                    paddingVertical: 2,
+                                }}
+                            >
+                                <Text style={{ fontSize: 11, color: theme.colors.textSecondary }}>{s}</Text>
+                            </View>
+                        ))}
+                    </View>
+                )}
+
+                {/* Row 4: error message */}
+                {task.errorMessage && (
+                    <Text style={{ fontSize: 12, color: "#FF3B30" }} numberOfLines={1}>
+                        {task.errorMessage}
+                    </Text>
+                )}
+            </View>
+
+            <View style={{ justifyContent: "center", paddingHorizontal: 12 }}>
+                <Ionicons name="chevron-forward" size={15} color={theme.colors.textSecondary} />
+            </View>
+        </Pressable>
+    );
+}
+
+function EmptyTaskState() {
+    const { theme } = useUnistyles();
+    return (
+        <View style={{ alignItems: "center", paddingVertical: 56, paddingHorizontal: 32, gap: 10 }}>
+            <Ionicons name="list-outline" size={44} color={theme.colors.textSecondary} style={{ opacity: 0.4 }} />
+            <Text style={{ fontSize: 16, fontWeight: "600", color: theme.colors.text }}>
+                {t("tasks.noTasks")}
+            </Text>
         </View>
     );
 }
@@ -44,8 +136,13 @@ function TaskListPage() {
 
     return (
         <ScrollView
-            style={{ flex: 1, backgroundColor: theme.colors.surface }}
-            contentContainerStyle={{ maxWidth: layout.maxWidth, width: "100%", alignSelf: "center" as const, paddingBottom: 80 }}
+            style={{ flex: 1, backgroundColor: theme.colors.groupped.background }}
+            contentContainerStyle={{
+                maxWidth: layout.maxWidth,
+                width: "100%",
+                alignSelf: "center" as const,
+                paddingBottom: 100,
+            }}
             refreshControl={
                 <RefreshControl
                     refreshing={data.refreshing}
@@ -68,11 +165,8 @@ function TaskListPage() {
                             style={[
                                 styles.filterChip,
                                 {
-                                    backgroundColor: isActive
-                                        ? theme.colors.textLink
-                                        : theme.colors.surfaceHigh,
-                                    borderColor: theme.colors.divider,
-                                    borderWidth: isActive ? 0 : 1,
+                                    backgroundColor: isActive ? theme.colors.textLink : theme.colors.surface,
+                                    borderColor: isActive ? theme.colors.textLink : theme.colors.divider,
                                 },
                             ]}
                             onPress={() => data.setFilter(filterValue)}
@@ -80,7 +174,7 @@ function TaskListPage() {
                             <Text
                                 style={[
                                     styles.filterChipText,
-                                    { color: isActive ? "#FFF" : theme.colors.text },
+                                    { color: isActive ? "#FFF" : theme.colors.textSecondary },
                                 ]}
                             >
                                 {getTaskFilterLabel(f, t as (key: string) => string)}
@@ -90,23 +184,19 @@ function TaskListPage() {
                 })}
             </ScrollView>
 
+            {/* Task cards */}
             {data.tasks.length === 0 ? (
-                <ItemGroup>
-                    <Item title={t("tasks.noTasks")} />
-                </ItemGroup>
+                <EmptyTaskState />
             ) : (
-                <ItemGroup>
+                <View style={styles.cardList}>
                     {data.tasks.map((task) => (
-                        <Item
+                        <TaskCard
                             key={task.id}
-                            title={task.promptPreview || "\u2014"}
-                            subtitle={task.skillNames.length > 0 ? task.skillNames.join(", ") : undefined}
+                            task={task}
                             onPress={() => handleTaskPress(task)}
-                            rightElement={<StatusBadge status={task.status} />}
-                            showChevron
                         />
                     ))}
-                </ItemGroup>
+                </View>
             )}
 
             {/* FAB */}
@@ -133,20 +223,16 @@ const styles = StyleSheet.create({
         paddingHorizontal: 14,
         paddingVertical: 6,
         borderRadius: 16,
+        borderWidth: 1,
     },
     filterChipText: {
         fontSize: 13,
         fontWeight: "600",
     },
-    badge: {
-        paddingHorizontal: 8,
-        paddingVertical: 2,
-        borderRadius: 10,
-    },
-    badgeText: {
-        color: "#FFF",
-        fontSize: 11,
-        fontWeight: "600",
+    cardList: {
+        paddingHorizontal: 16,
+        gap: 8,
+        paddingTop: 4,
     },
     fab: {
         position: "absolute",

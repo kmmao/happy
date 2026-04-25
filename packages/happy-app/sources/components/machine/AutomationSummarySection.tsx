@@ -1,10 +1,9 @@
 import React, { useMemo, useRef, useState } from "react";
-import { ActivityIndicator } from "react-native";
+import { ActivityIndicator, View, Text, Pressable, Platform } from "react-native";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { Item } from "@/components/Item";
 import { ItemGroup } from "@/components/ItemGroup";
-import { MachineNavigationSummaryItem } from "@/components/machine/MachineNavigationSummaryItem";
 import type { Machine } from "@/sync/storageTypes";
 import {
     machineCancelAutomationJob,
@@ -18,6 +17,11 @@ import { useUnistyles } from "react-native-unistyles";
 import { Modal } from "@/modal";
 import { projectManager } from "@/sync/projectManager";
 import { useHappyAction } from "@/hooks/useHappyAction";
+import { fetchTasks } from "@/sync/apiTasks";
+import { fetchTriggerSchedules } from "@/sync/apiTriggerSchedules";
+import { fetchWebhookTriggers } from "@/sync/apiWebhookTriggers";
+import { TokenStorage } from "@/auth/tokenStorage";
+import { sync } from "@/sync/sync";
 
 type Props = {
     machine: Machine;
@@ -616,5 +620,291 @@ export const AutomationSummarySection = React.memo(function AutomationSummarySec
                 }
             />
         </ItemGroup>
+    );
+});
+
+export const AutomationGroupTitle = React.memo(function AutomationGroupTitle({
+    machine,
+    label,
+    activeTaskCount,
+}: {
+    machine: Machine;
+    label: string;
+    activeTaskCount?: number | null;
+}) {
+    const { theme } = useUnistyles();
+    const automation = machine.daemonState?.automation as any;
+
+    const activeCount = useMemo(() => {
+        if (!automation) return activeTaskCount ?? 0;
+        const counts = automation.counts ?? {};
+        const running = (counts.running ?? 0) + (counts.dispatching ?? 0);
+        const guardians = Array.isArray(automation.guardians) ? automation.guardians.length : 0;
+        return running + guardians + (activeTaskCount ?? 0);
+    }, [automation, activeTaskCount]);
+
+    return (
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+            <Text
+                style={{
+                    color: theme.colors.groupped.sectionTitle,
+                    fontSize: Platform.select({ ios: 13, default: 14 }),
+                    letterSpacing: Platform.select({ ios: -0.08, default: 0.1 }),
+                    textTransform: "uppercase",
+                    fontWeight: Platform.select({ ios: "normal", default: "500" }),
+                }}
+            >
+                {label}
+            </Text>
+            {activeCount > 0 && (
+                <View
+                    style={{
+                        backgroundColor: theme.colors.primary + "22",
+                        borderRadius: 8,
+                        paddingHorizontal: 6,
+                        paddingVertical: 1,
+                        minWidth: 18,
+                        alignItems: "center",
+                    }}
+                >
+                    <Text
+                        style={{
+                            color: theme.colors.primary,
+                            fontSize: 10,
+                            fontWeight: "700",
+                            letterSpacing: 0,
+                        }}
+                    >
+                        {activeCount}
+                    </Text>
+                </View>
+            )}
+        </View>
+    );
+});
+
+type GridMetric = {
+    label: string;
+    value: number;
+    activeColor: string;
+};
+
+type GridCardConfig = {
+    id: string;
+    iconName: React.ComponentProps<typeof Ionicons>["name"];
+    iconColor: string;
+    title: string;
+    route: string;
+    metrics?: GridMetric[];
+    emptyLabel?: string;
+};
+
+function GridCard({
+    card,
+    onPress,
+}: {
+    card: GridCardConfig;
+    onPress: () => void;
+}) {
+    const { theme } = useUnistyles();
+    const hasActiveMetric = card.metrics?.some((m) => m.value > 0) ?? false;
+
+    return (
+        <Pressable
+            style={({ pressed }) => ({
+                flex: 1,
+                borderRadius: 12,
+                borderWidth: 1,
+                padding: 12,
+                gap: 6,
+                backgroundColor: theme.colors.surfaceHigh,
+                borderColor: hasActiveMetric ? theme.colors.primary + "33" : theme.colors.divider,
+                opacity: pressed ? 0.75 : 1,
+            })}
+            onPress={onPress}
+        >
+            <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+                <View
+                    style={{
+                        width: 30,
+                        height: 30,
+                        borderRadius: 8,
+                        alignItems: "center",
+                        justifyContent: "center",
+                        backgroundColor: card.iconColor + "18",
+                    }}
+                >
+                    <Ionicons name={card.iconName} size={16} color={card.iconColor} />
+                </View>
+                <Ionicons name="chevron-forward" size={12} color={theme.colors.textSecondary} />
+            </View>
+            <Text style={{ fontSize: 13, fontWeight: "600", letterSpacing: -0.1, color: theme.colors.text }} numberOfLines={1}>
+                {card.title}
+            </Text>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                {card.metrics && card.metrics.length > 0 ? (
+                    card.metrics.map((m) => (
+                        <View key={m.label} style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                            <View
+                                style={{
+                                    width: 6,
+                                    height: 6,
+                                    borderRadius: 3,
+                                    backgroundColor: m.value > 0 ? m.activeColor : theme.colors.textSecondary + "60",
+                                }}
+                            />
+                            <Text
+                                style={{
+                                    fontSize: 12,
+                                    fontWeight: "500",
+                                    color: m.value > 0 ? m.activeColor : theme.colors.textSecondary,
+                                }}
+                            >
+                                {m.value}
+                            </Text>
+                        </View>
+                    ))
+                ) : (
+                    <Text style={{ fontSize: 12, color: theme.colors.textSecondary }}>
+                        {card.emptyLabel ?? "–"}
+                    </Text>
+                )}
+            </View>
+        </Pressable>
+    );
+}
+
+type SummaryCounts = {
+    activeTaskCount: number | null;
+    triggerCount: number | null;
+};
+
+export function useAutomationSummaryCounts(machineId: string): SummaryCounts {
+    const [activeTaskCount, setActiveTaskCount] = React.useState<number | null>(null);
+    const [triggerCount, setTriggerCount] = React.useState<number | null>(null);
+
+    const load = React.useCallback(async () => {
+        const credentials = await TokenStorage.getCredentials().catch(() => null);
+        if (!credentials) return;
+
+        // Tasks: fetch all, count active statuses client-side
+        fetchTasks(credentials, { machineId, limit: 200 })
+            .then(({ tasks }) => {
+                const count = tasks.filter((task) =>
+                    ["queued", "dispatching", "running"].includes(task.status),
+                ).length;
+                setActiveTaskCount(count);
+            })
+            .catch(() => {});
+
+        // Triggers: enabled cron schedules + enabled webhooks
+        Promise.all([
+            fetchTriggerSchedules(credentials, { machineId, enabled: true }),
+            fetchWebhookTriggers(credentials, { machineId, enabled: true }),
+        ])
+            .then(([cron, webhooks]) => {
+                setTriggerCount(cron.total + webhooks.total);
+            })
+            .catch(() => {});
+    }, [machineId]);
+
+    React.useEffect(() => {
+        void load();
+    }, [load]);
+
+    React.useEffect(() => {
+        return sync.onTaskStatusChanged((event) => {
+            if (event.machineId && event.machineId !== machineId) return;
+            void load();
+        });
+    }, [machineId, load]);
+
+    return { activeTaskCount, triggerCount };
+}
+
+type GridSectionProps = Props & { summaryCounts: SummaryCounts };
+
+export const AutomationGridSection = React.memo(function AutomationGridSection({
+    machine,
+    machineId,
+    summaryCounts,
+}: GridSectionProps) {
+    const router = useRouter();
+    const automation = machine.daemonState?.automation as any;
+    const { activeTaskCount, triggerCount } = summaryCounts;
+
+    const automationCounts = useMemo(() => {
+        const counts = automation?.counts ?? {};
+        return {
+            queued: counts.queued ?? 0,
+            running: (counts.running ?? 0) + (counts.dispatching ?? 0),
+            guardians: Array.isArray(automation?.guardians) ? automation.guardians.length : 0,
+        };
+    }, [automation]);
+
+    const loopCounts = useMemo(() => {
+        const r = automation?.loopRollup ?? {};
+        return { total: r.total ?? 0, active: r.active ?? 0 };
+    }, [automation]);
+
+    const cards: GridCardConfig[] = [
+        {
+            id: "automation",
+            iconName: "sparkles-outline",
+            iconColor: "#0A84FF",
+            title: t("machine.automation"),
+            route: `/machine/${machineId}/automation`,
+            metrics: [
+                { label: t("machine.automationQueued"), value: automationCounts.queued, activeColor: "#FF9500" },
+                { label: t("machine.automationRunning"), value: automationCounts.running, activeColor: "#0A84FF" },
+                ...(automationCounts.guardians > 0
+                    ? [{ label: t("machine.automationGuardians"), value: automationCounts.guardians, activeColor: "#34C759" }]
+                    : []),
+            ],
+        },
+        {
+            id: "loops",
+            iconName: "repeat-outline",
+            iconColor: "#BF5AF2",
+            title: t("machine.agentLoopsViewAll"),
+            route: `/machine/${machineId}/loops`,
+            metrics: [
+                { label: t("machine.automationLoopsTotal"), value: loopCounts.total, activeColor: "#BF5AF2" },
+                { label: t("machine.automationLoopsActive"), value: loopCounts.active, activeColor: "#34C759" },
+            ],
+        },
+        {
+            id: "tasks",
+            iconName: "list-outline",
+            iconColor: "#FF9500",
+            title: t("tasks.title"),
+            route: `/machine/${machineId}/tasks`,
+            metrics: [
+                { label: "active", value: activeTaskCount ?? 0, activeColor: "#FF9500" },
+            ],
+        },
+        {
+            id: "triggers",
+            iconName: "timer-outline",
+            iconColor: "#34C759",
+            title: t("triggers.title"),
+            route: `/machine/${machineId}/triggers`,
+            metrics: [
+                { label: "enabled", value: triggerCount ?? 0, activeColor: "#34C759" },
+            ],
+        },
+    ];
+
+    return (
+        <View style={{ paddingHorizontal: 12, paddingTop: 4, paddingBottom: 8, gap: 8 }}>
+            <View style={{ flexDirection: "row", gap: 8 }}>
+                <GridCard card={cards[0]} onPress={() => router.push(cards[0].route as any)} />
+                <GridCard card={cards[1]} onPress={() => router.push(cards[1].route as any)} />
+            </View>
+            <View style={{ flexDirection: "row", gap: 8 }}>
+                <GridCard card={cards[2]} onPress={() => router.push(cards[2].route as any)} />
+                <GridCard card={cards[3]} onPress={() => router.push(cards[3].route as any)} />
+            </View>
+        </View>
     );
 });

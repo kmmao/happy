@@ -43,7 +43,7 @@ import {
 } from "@/components/MultiTextInput";
 import { NetworkServicesSummaryItem } from "@/components/machine/NetworkServicesSection";
 import { MachineNavigationSummaryItem } from "@/components/machine/MachineNavigationSummaryItem";
-import { AgentLoopsSummaryItem, AutomationSummaryItem } from "@/components/machine/AutomationSummarySection";
+import { AutomationGridSection, AutomationGroupTitle, useAutomationSummaryCounts } from "@/components/machine/AutomationSummarySection";
 import { SessionProviderTag } from "@/components/session/SessionProviderTag";
 
 const styles = StyleSheet.create((theme) => ({
@@ -128,6 +128,7 @@ function MachineDetailScreen() {
   const router = useRouter();
   const sessions = useSessions();
   const machine = useMachine(machineId!);
+  const automationSummaryCounts = useAutomationSummaryCounts(machineId ?? "");
   const navigateToSession = useNavigateToSession();
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isStoppingDaemon, setIsStoppingDaemon] = useState(false);
@@ -576,22 +577,8 @@ function MachineDetailScreen() {
           </View>
         </ItemGroup>
 
-        <ItemGroup title={t("machine.automation")}>
-          <AutomationSummaryItem machine={machine} machineId={machineId} />
-          <AgentLoopsSummaryItem machine={machine} machineId={machineId} />
-          <Item
-            title={t("tasks.title")}
-            subtitle={t("tasks.noTasks")}
-            icon={<Ionicons name="list-outline" size={20} color={theme.colors.textLink} />}
-            onPress={() => router.push(`/machine/${machineId}/tasks` as any)}
-            showChevron
-          />
-          <Item
-            title={t("triggers.title")}
-            icon={<Ionicons name="timer-outline" size={20} color={theme.colors.textLink} />}
-            onPress={() => router.push(`/machine/${machineId}/triggers` as any)}
-            showChevron
-          />
+        <ItemGroup title={<AutomationGroupTitle machine={machine} label={t("machine.automation")} activeTaskCount={automationSummaryCounts.activeTaskCount} />}>
+          <AutomationGridSection machine={machine} machineId={machineId} summaryCounts={automationSummaryCounts} />
         </ItemGroup>
 
         {/* Network Services */}
