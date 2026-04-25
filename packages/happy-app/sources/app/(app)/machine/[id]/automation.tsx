@@ -18,21 +18,20 @@ import {
     type AuditFilter,
     type GuardianFilter,
     type JobFilter,
+    buildTimelineEntries,
     formatJobSubtitle,
     formatRate,
     formatTimestamp,
-    getAuditEventDetailMessage,
     getAuditEventSubtitle,
     getAuditEventTitle,
     getAuditKindAccent,
-    getGuardianDetailMessage,
     getGuardianStateLabel,
-    getJobDetailMessage,
     getJobKindLabel,
     getJobTitle,
     getStatusColor,
     getStatusLabel,
 } from "./automationLabels";
+import { DetailSheet } from "./DetailSheet";
 import { styles } from "./automationStyles";
 import { useAutomationData } from "./useAutomationData";
 
@@ -274,8 +273,49 @@ export default React.memo(function MachineAutomationPage() {
         if (job.status === "failed" || job.status === "cancelled" || job.status === "completed") {
             buttons.push({ text: t("machine.automationRetry"), onPress: () => void data.mutateAndReload(job.id, "retry") });
         }
-        Modal.alert(getJobTitle(job), resolveMessageUUIDs(getJobDetailMessage(job, relatedEvents), job), buttons);
-    }, [data.mutateAndReload, data.recentAuditEvents, data.stopJobSession, getLocalProjectId, machineId, resolveMessageUUIDs, router]);
+        const project = job.projectId ? projectManager.getProjectByServerId(job.projectId) : null;
+        const resolvedProject = project ? getProjectDisplayName(project) : undefined;
+        const resolvedLoop = job.loopId ? data.resolveLoopName(job.loopId) : undefined;
+        const lifecycle = buildTimelineEntries([job])
+            .slice()
+            .sort((a, b) => a.timestamp - b.timestamp)
+            .map((e) => ({
+                label: e.subtitle,
+                time: formatTimestamp(e.timestamp),
+                color: e.kind === "terminal" ? undefined : e.kind === "running" ? "#0A84FF" : "#FF9500",
+            }));
+
+        Modal.show({
+            component: DetailSheet,
+            props: {
+                title: getJobTitle(job),
+                kind: getJobKindLabel(job.kind),
+                statusLabel: getStatusLabel(job.status),
+                statusColor: getStatusColor(job.status) ?? undefined,
+                errorMessage: job.errorMessage ?? undefined,
+                sections: [{
+                    rows: [
+                        { label: t("machine.automationPriority"), value: job.priority },
+                        { label: t("machine.automationCreatedAt"), value: formatTimestamp(job.createdAt) },
+                        ...(job.dispatchedAt ? [{ label: t("machine.automationDispatchedAt"), value: formatTimestamp(job.dispatchedAt) }] : []),
+                        ...(job.completedAt ? [{ label: t("machine.automationCompletedAt"), value: formatTimestamp(job.completedAt) }] : []),
+                        ...(job.sessionId ? [{ label: t("machine.automationSession"), value: job.sessionId.slice(0, 18) + "…", mono: true }] : []),
+                        ...(resolvedProject ? [{ label: t("machine.automationAuditProject"), value: resolvedProject }] : []),
+                        ...(resolvedLoop ? [{ label: t("machine.automationAuditLoop"), value: resolvedLoop }] : []),
+                        ...(job.recovered ? [{ label: t("machine.automationRecoveredShort"), value: "✓", accent: "#34C759" }] : []),
+                    ],
+                }],
+                timeline: lifecycle,
+                events: relatedEvents.slice(0, 6).map((e) => ({
+                    id: e.id,
+                    title: getAuditEventTitle(e),
+                    time: formatTimestamp(e.occurredAt),
+                    message: e.message,
+                })),
+                buttons,
+            } satisfies Omit<import("./DetailSheet").DetailSheetProps, "onClose">,
+        });
+    }, [data.mutateAndReload, data.recentAuditEvents, data.resolveLoopName, data.stopJobSession, getLocalProjectId, machineId, resolveMessageUUIDs, router]);
 
     const handleGuardianPress = React.useCallback((guardian: MachineAutomationGuardian) => {
         const usage = data.guardianUsage.find((e) => e.key === guardian.key);
@@ -304,12 +344,40 @@ export default React.memo(function MachineAutomationPage() {
                 { text: t("machine.automationResetGuardian"), style: "destructive", onPress: () => void data.clearGuardians({ key: guardian.key, sessionId: guardian.sessionId }) },
             ]),
         });
-        Modal.alert(
-            data.resolveGuardianKeyLabel(guardian.key),
-            resolveMessageUUIDs(`${getGuardianDetailMessage(guardian, usage, relatedEvents)}\n${t("machine.automationStatusLabel")}: ${getGuardianStateLabel(guardian.attached, guardian.recovered)}`, { projectId: guardian.projectId, loopId: guardian.loopId }),
-            buttons,
-        );
-    }, [data.clearGuardians, data.guardianUsage, data.recentAuditEvents, data.resolveGuardianKeyLabel, getLocalProjectId, machineId, resolveMessageUUIDs, router]);
+        const gProject = guardian.projectId ? projectManager.getProjectByServerId(guardian.projectId) : null;
+        const gColor = guardian.recovered ? "#FF9500" : guardian.attached ? "#34C759" : undefined;
+
+        Modal.show({
+            component: DetailSheet,
+            props: {
+                title: data.resolveGuardianKeyLabel(guardian.key),
+                kind: t("machine.automationGuardians"),
+                statusLabel: getGuardianStateLabel(guardian.attached, guardian.recovered),
+                statusColor: gColor,
+                sections: [{
+                    rows: [
+                        { label: t("machine.automationUpdatedAt"), value: formatTimestamp(guardian.updatedAt) },
+                        { label: t("machine.automationGuardianSession"), value: guardian.sessionId.slice(0, 18) + "…", mono: true },
+                        ...(gProject ? [{ label: t("machine.automationAuditProject"), value: getProjectDisplayName(gProject) }] : []),
+                        ...(guardian.loopId ? [{ label: t("machine.automationAuditLoop"), value: data.resolveLoopName(guardian.loopId) ?? guardian.loopId.slice(0, 12) }] : []),
+                        ...(usage ? [
+                            { label: t("machine.automationGuardianReuseCount"), value: String(usage.reuseCount) },
+                            { label: t("machine.automationGuardianRememberCount"), value: String(usage.rememberCount) },
+                            { label: t("machine.automationGuardianResetCount"), value: String(usage.resetCount) },
+                        ] : []),
+                        ...(guardian.recovered ? [{ label: t("machine.automationRecoveredShort"), value: "✓", accent: "#34C759" }] : []),
+                    ],
+                }],
+                events: relatedEvents.slice(0, 6).map((e) => ({
+                    id: e.id,
+                    title: getAuditEventTitle(e),
+                    time: formatTimestamp(e.occurredAt),
+                    message: e.message,
+                })),
+                buttons,
+            } satisfies Omit<import("./DetailSheet").DetailSheetProps, "onClose">,
+        });
+    }, [data.clearGuardians, data.guardianUsage, data.recentAuditEvents, data.resolveGuardianKeyLabel, data.resolveLoopName, getLocalProjectId, machineId, resolveMessageUUIDs, router]);
 
     const handleAuditEventPress = React.useCallback((event: MachineAutomationAuditEvent) => {
         const relatedJob = data.jobs.find((j) => j.id === event.jobId || j.dedupeKey === event.dedupeKey || (event.sessionId ? j.sessionId === event.sessionId : false));
@@ -326,8 +394,30 @@ export default React.memo(function MachineAutomationPage() {
         }
         if (event.projectId) buttons.push({ text: t("machine.automationOpenProject"), onPress: () => { const pid = getLocalProjectId(event.projectId); if (pid) router.push(`/project/${pid}` as any); } });
         if (relatedJob) buttons.push({ text: t("machine.automationOpenJob"), onPress: () => handleJobPress(relatedJob) });
-        Modal.alert(getAuditEventTitle(event), resolveMessageUUIDs(getAuditEventDetailMessage(event), { projectId: event.projectId, loopId: event.loopId }), buttons);
-    }, [data.jobs, getLocalProjectId, handleJobPress, machineId, resolveMessageUUIDs, router]);
+        const aProject = event.projectId ? projectManager.getProjectByServerId(event.projectId) : null;
+        const aAccent = getAuditKindAccent(event) ?? undefined;
+
+        Modal.show({
+            component: DetailSheet,
+            props: {
+                title: getAuditEventTitle(event),
+                kind: event.trigger ?? t("machine.automationAudit"),
+                statusLabel: event.status ?? undefined,
+                statusColor: aAccent,
+                sections: [{
+                    rows: [
+                        { label: t("machine.automationUpdatedAt"), value: formatTimestamp(event.occurredAt) },
+                        ...(event.message ? [{ label: "Message", value: event.message }] : []),
+                        ...(event.sessionId ? [{ label: t("machine.automationSession"), value: event.sessionId.slice(0, 18) + "…", mono: true }] : []),
+                        ...(aProject ? [{ label: t("machine.automationAuditProject"), value: getProjectDisplayName(aProject) }] : []),
+                        ...(event.loopId ? [{ label: t("machine.automationAuditLoop"), value: data.resolveLoopName(event.loopId) ?? event.loopId.slice(0, 12) }] : []),
+                        ...(event.guardianKey ? [{ label: t("machine.automationAuditGuardian"), value: data.resolveGuardianKeyLabel(event.guardianKey) }] : []),
+                    ],
+                }],
+                buttons,
+            } satisfies Omit<import("./DetailSheet").DetailSheetProps, "onClose">,
+        });
+    }, [data.jobs, data.resolveGuardianKeyLabel, data.resolveLoopName, getLocalProjectId, handleJobPress, machineId, resolveMessageUUIDs, router]);
 
     // ── 计算健康状态 ──────────────────────────────────────────────────────
 
