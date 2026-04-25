@@ -10,7 +10,7 @@ import { TokenStorage } from "@/auth/tokenStorage";
 import { getServerUrl } from "@/sync/serverConfig";
 import {
     useSessionKnowledgeAccessRevision,
-    useSessionKnowledgeCount,
+    useSessionKnowledgeChangesRevision,
 } from "@/sync/storage";
 import { backoff } from "@/utils/time";
 import {
@@ -148,12 +148,14 @@ export function useSessionKnowledge(
     }, [refresh]);
 
     // Refetch when server signals new knowledge entries or access changes.
-    const knowledgeCount = useSessionKnowledgeCount(sessionId ?? "");
+    // changesRevision increments on every knowledge-count event (even if absolute
+    // count stays the same), making the trigger reliable regardless of value.
+    const changesRevision = useSessionKnowledgeChangesRevision(sessionId ?? "");
     const accessRevision = useSessionKnowledgeAccessRevision(sessionId ?? "");
     React.useEffect(() => {
-        if (knowledgeCount === 0 && accessRevision === 0) return;
+        if (changesRevision === 0 && accessRevision === 0) return;
         void refresh();
-    }, [knowledgeCount, accessRevision, refresh]);
+    }, [changesRevision, accessRevision, refresh]);
 
     const state = React.useMemo(
         () =>

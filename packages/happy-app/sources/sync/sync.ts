@@ -2629,11 +2629,16 @@ class Sync {
     }
 
     // Handle knowledge-count: update session knowledge badge in header
+    // and bump changesRevision so useSessionKnowledge always re-fetches.
     if (updateData.type === "knowledge-count") {
       storage.setState((prev) => ({
         sessionKnowledgeCount: {
           ...prev.sessionKnowledgeCount,
           [updateData.id]: updateData.count,
+        },
+        sessionKnowledgeChangesRevision: {
+          ...prev.sessionKnowledgeChangesRevision,
+          [updateData.id]: (prev.sessionKnowledgeChangesRevision[updateData.id] ?? 0) + 1,
         },
       }));
     }
