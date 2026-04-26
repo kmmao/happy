@@ -34,6 +34,18 @@ export function startTimeout() {
                         payload: buildSessionActivityEphemeral(session.id, false, updated[0].lastActiveAt.getTime(), false),
                         recipientFilter: { type: 'user-scoped-only' }
                     });
+                    // Notify the CLI daemon to terminate the process for this session
+                    const accessKey = await db.accessKey.findFirst({
+                        where: { sessionId: session.id, accountId: session.accountId },
+                        select: { machineId: true }
+                    });
+                    if (accessKey) {
+                        eventRouter.emitEphemeral({
+                            userId: session.accountId,
+                            payload: { type: 'session-terminate', sessionId: session.id, reason: 'timeout' },
+                            recipientFilter: { type: 'machine-scoped-only', machineId: accessKey.machineId }
+                        });
+                    }
                 }
             } while (sessionBatch.length === TIMEOUT_BATCH_SIZE);
 

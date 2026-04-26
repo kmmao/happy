@@ -439,6 +439,11 @@ export type EphemeralEvent =
       projectId: string;
       status: "completed" | "failed";
     }
+  | {
+      type: "session-terminate";
+      sessionId: string;
+      reason: "timeout" | "deleted";
+    }
 ;
 
 // === EVENT PAYLOAD TYPES ===

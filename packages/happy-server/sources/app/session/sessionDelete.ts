@@ -65,13 +65,20 @@ export async function sessionDelete(ctx: Context, sessionId: string): Promise<bo
             detachedCount: detachedReports.count
         }, `Detached ${detachedReports.count} usage reports (sessionId set to null)`);
 
-        // 3. Delete access keys
+        // 3. Query machine IDs before deleting access keys (used to notify CLI daemons)
+        const accessKeys = await tx.accessKey.findMany({
+            where: { sessionId },
+            select: { machineId: true }
+        });
+        const machineIds = [...new Set(accessKeys.map(ak => ak.machineId))];
+
+        // 4. Delete access keys
         const deletedAccessKeys = await tx.accessKey.deleteMany({
             where: { sessionId }
         });
-        log({ 
-            module: 'session-delete', 
-            userId: ctx.uid, 
+        log({
+            module: 'session-delete',
+            userId: ctx.uid,
             sessionId,
             deletedCount: deletedAccessKeys.count
         }, `Deleted ${deletedAccessKeys.count} access keys`);
@@ -90,7 +97,7 @@ export async function sessionDelete(ctx: Context, sessionId: string): Promise<bo
         afterTx(tx, async () => {
             const updSeq = await allocateUserSeq(ctx.uid);
             const updatePayload = buildDeleteSessionUpdate(sessionId, updSeq, randomKeyNaked(12));
-            
+
             log({
                 module: 'session-delete',
                 userId: ctx.uid,
@@ -104,6 +111,15 @@ export async function sessionDelete(ctx: Context, sessionId: string): Promise<bo
                 payload: updatePayload,
                 recipientFilter: { type: 'user-scoped-only' }
             });
+
+            // Notify CLI daemons to terminate the process for this session
+            for (const machineId of machineIds) {
+                eventRouter.emitEphemeral({
+                    userId: ctx.uid,
+                    payload: { type: 'session-terminate', sessionId, reason: 'deleted' },
+                    recipientFilter: { type: 'machine-scoped-only', machineId }
+                });
+            }
         });
 
         return true;

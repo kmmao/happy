@@ -308,6 +308,34 @@ export async function startDaemon(): Promise<void> {
       return undefined;
     };
 
+    // Send signal to the process and its entire process group.
+    // Using a negative PID kills all processes in the group (the spawned subtree).
+    // Falls back to the direct PID if the process group signal fails.
+    const killProcessTree = (pid: number, signal: NodeJS.Signals = "SIGTERM") => {
+      try {
+        process.kill(-pid, signal);
+      } catch {
+        try {
+          process.kill(pid, signal);
+        } catch (e) {
+          logger.debug(`[DAEMON RUN] Failed to kill PID ${pid} with ${signal}:`, e);
+        }
+      }
+    };
+
+    // Schedule a SIGKILL escalation if the process doesn't exit within the grace period.
+    const scheduleKillEscalation = (pid: number, gracePeriodMs = 5000) => {
+      setTimeout(() => {
+        try {
+          process.kill(pid, 0); // check if still alive
+          logger.debug(`[DAEMON RUN] PID ${pid} still alive after grace period, sending SIGKILL`);
+          killProcessTree(pid, "SIGKILL");
+        } catch {
+          // process already exited, nothing to do
+        }
+      }, gracePeriodMs);
+    };
+
     const requestTrackedSessionTermination = (
       pid: number,
       session: TrackedSession,
@@ -346,14 +374,8 @@ export async function startDaemon(): Promise<void> {
             logger.debug(
               `[DAEMON RUN] Failed to kill tmux session ${tmuxSession}: ${err.message}`,
             );
-            try {
-              process.kill(pid, "SIGTERM");
-            } catch (killError) {
-              logger.debug(
-                `[DAEMON RUN] Failed to kill fallback PID ${pid}:`,
-                killError,
-              );
-            }
+            killProcessTree(pid, "SIGTERM");
+            scheduleKillEscalation(pid);
           }
         });
         return true;
@@ -361,7 +383,8 @@ export async function startDaemon(): Promise<void> {
 
       if (session.startedBy === "daemon" && session.childProcess) {
         try {
-          session.childProcess.kill("SIGTERM");
+          killProcessTree(pid, "SIGTERM");
+          scheduleKillEscalation(pid);
           return true;
         } catch (error) {
           logger.debug(
@@ -373,7 +396,8 @@ export async function startDaemon(): Promise<void> {
       }
 
       try {
-        process.kill(pid, "SIGTERM");
+        killProcessTree(pid, "SIGTERM");
+        scheduleKillEscalation(pid);
         return true;
       } catch (error) {
         logger.debug(`[DAEMON RUN] Failed to kill external session PID ${pid}:`, error);
@@ -2942,6 +2966,14 @@ export async function startDaemon(): Promise<void> {
         "supervisor:" + runId,
         status,
       );
+    });
+
+    // Set up session-terminate handler: stop processes for archived or deleted sessions
+    apiMachine.setSessionTerminateHandler((data) => {
+      logger.debug(
+        `[DAEMON RUN] Server requested session termination: ${data.sessionId} (reason: ${data.reason})`,
+      );
+      stopSession(data.sessionId);
     });
 
     // Set up fix-kill handler: terminate fix sessions after completion/failure

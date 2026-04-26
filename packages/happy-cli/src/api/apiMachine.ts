@@ -367,6 +367,9 @@ export class ApiMachineClient {
   private fixKillHandler:
     | ((data: { fixSessionId: string; projectId: string; fixStatus: string }) => void)
     | null = null;
+  private sessionTerminateHandler:
+    | ((data: { sessionId: string; reason: string }) => void)
+    | null = null;
   private supervisorRunCompleteHandler:
     | ((data: { runId: string; projectId: string; status: "completed" | "failed" }) => void)
     | null = null;
@@ -931,6 +934,13 @@ export class ApiMachineClient {
     this.fixKillHandler = handler;
   }
 
+  /**
+   * Set handler for session-terminate events.
+   * Called when Server signals that a session was archived or deleted and its process should stop.
+   */
+  setSessionTerminateHandler(handler: (data: { sessionId: string; reason: string }) => void) {
+    this.sessionTerminateHandler = handler;
+  }
 
   /**
    * Report webhook processing status back to server.
@@ -1372,6 +1382,13 @@ export class ApiMachineClient {
           `[API MACHINE] Received fix-kill-session for session ${data.fixSessionId}`,
         );
         this.fixKillHandler(data as unknown as { fixSessionId: string; projectId: string; fixStatus: string });
+      }
+
+      if (data.type === "session-terminate" && this.sessionTerminateHandler) {
+        logger.debug(
+          `[API MACHINE] Received session-terminate for session ${data.sessionId} (reason: ${data.reason})`,
+        );
+        this.sessionTerminateHandler(data as unknown as { sessionId: string; reason: string });
       }
 
       if (data.type === "supervisor-run-complete" && this.supervisorRunCompleteHandler) {
