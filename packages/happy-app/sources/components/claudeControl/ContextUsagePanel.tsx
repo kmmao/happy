@@ -213,50 +213,6 @@ export const ContextUsagePanel = React.memo(function ContextUsagePanel({
                 </View>
             )}
 
-            {/* ── Memory files ── */}
-            {data.memoryFiles.length > 0 && (
-                <SectionBlock
-                    label={t("claudeControl.contextUsage.memoryFiles")}
-                    borderColor={theme.colors.divider}
-                    cardBg={theme.colors.surfaceHighest ?? theme.colors.surface}
-                >
-                    {data.memoryFiles.map((f, i) => (
-                        <FileRow
-                            key={f.path}
-                            name={f.path.split("/").pop() ?? f.path}
-                            value={formatTokens(f.tokens)}
-                            isLast={i === data.memoryFiles.length - 1}
-                            borderColor={theme.colors.divider}
-                        />
-                    ))}
-                </SectionBlock>
-            )}
-
-            {/* ── MCP tools ── */}
-            {data.mcpTools.length > 0 && (
-                <SectionBlock
-                    label={t("claudeControl.contextUsage.mcpTools")}
-                    borderColor={theme.colors.divider}
-                    cardBg={theme.colors.surfaceHighest ?? theme.colors.surface}
-                >
-                    {data.mcpTools.map((tool, i) => (
-                        <FileRow
-                            key={`${tool.serverName}/${tool.name}`}
-                            name={`${tool.serverName}/${tool.name}`}
-                            value={formatTokens(tool.tokens)}
-                            isLast={i === data.mcpTools.length - 1}
-                            borderColor={theme.colors.divider}
-                        />
-                    ))}
-                </SectionBlock>
-            )}
-
-            {/* Empty states */}
-            {data.memoryFiles.length === 0 && (
-                <Text style={[styles.emptyHint, { color: theme.colors.textSecondary }]}>
-                    {t("claudeControl.contextUsage.noMemoryFiles")}
-                </Text>
-            )}
         </View>
     );
 });
@@ -475,49 +431,6 @@ const donutStyles = {
     tokens: { fontSize: 11, lineHeight: 14, marginTop: 2 },
 };
 
-// ─── SectionBlock ─────────────────────────────────────────────────────────────
-
-interface SectionBlockProps {
-    label: string;
-    borderColor: string;
-    cardBg: string;
-    children: React.ReactNode;
-}
-
-function SectionBlock({ label, borderColor, cardBg, children }: SectionBlockProps) {
-    return (
-        <View style={styles.sectionBlock}>
-            <Text style={styles.sectionLabel}>{label}</Text>
-            <View style={[styles.card, { backgroundColor: cardBg, borderColor }]}>
-                {children}
-            </View>
-        </View>
-    );
-}
-
-// ─── FileRow ──────────────────────────────────────────────────────────────────
-
-interface FileRowProps {
-    name: string;
-    value: string;
-    isLast: boolean;
-    borderColor: string;
-}
-
-function FileRow({ name, value, isLast, borderColor }: FileRowProps) {
-    return (
-        <View
-            style={[
-                styles.fileRow,
-                !isLast && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: borderColor },
-            ]}
-        >
-            <Text style={styles.fileName}>{name}</Text>
-            <Text style={styles.fileValue}>{value}</Text>
-        </View>
-    );
-}
-
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create((theme) => ({
@@ -585,41 +498,6 @@ const styles = StyleSheet.create((theme) => ({
         fontVariant: ["tabular-nums"],
         minWidth: 40,
         textAlign: "right",
-    },
-    // Section blocks (Memory Files, MCP Tools)
-    sectionBlock: {
-        gap: 6,
-    },
-    sectionLabel: {
-        fontSize: 11,
-        fontWeight: "600",
-        color: theme.colors.textSecondary,
-        textTransform: "uppercase",
-        letterSpacing: 0.5,
-    },
-    fileRow: {
-        flexDirection: "row",
-        alignItems: "flex-start",
-        justifyContent: "space-between",
-        gap: 10,
-        paddingHorizontal: 12,
-        paddingVertical: 8,
-    },
-    fileName: {
-        flex: 1,
-        fontSize: 12,
-        color: theme.colors.text,
-        fontFamily: "Menlo",
-        lineHeight: 16,
-    },
-    fileValue: {
-        fontSize: 12,
-        color: theme.colors.textSecondary,
-        fontVariant: ["tabular-nums"],
-        flexShrink: 0,
-    },
-    emptyHint: {
-        fontSize: 12,
     },
     muted: {
         fontSize: 12,
