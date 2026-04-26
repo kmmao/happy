@@ -41,7 +41,6 @@ import { BinaryVersionRow } from "@/components/claudeControl/BinaryVersionRow";
 import { CostBadge } from "@/components/claudeControl/CostBadge";
 import { SessionColorPicker } from "@/components/claudeControl/SessionColorPicker";
 import { ContextUsagePanel } from "@/components/claudeControl/ContextUsagePanel";
-import { McpServersPanel } from "@/components/claudeControl/McpServersPanel";
 import { Session } from "@/sync/storageTypes";
 import { useHappyAction } from "@/hooks/useHappyAction";
 import { HappyError } from "@/utils/errors";
@@ -674,9 +673,6 @@ function SessionInfoContent({ session }: { session: Session }) {
           </View>
         </ItemGroup>
         <ItemGroup title={t("claudeControl.mcpServers.title")}>
-          <View style={{ paddingHorizontal: 16, paddingVertical: 12 }}>
-            <McpServersPanel sessionId={session.id} />
-          </View>
           <Item
             title={t("claudeControl.mcpServers.invokerEntry")}
             subtitle={t("claudeControl.mcpServers.invokerSubtitle")}
