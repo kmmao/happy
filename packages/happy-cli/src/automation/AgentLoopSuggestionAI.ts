@@ -43,7 +43,7 @@ async function listDirectorySafe(directory: string, limit: number): Promise<stri
   }
 }
 
-async function gatherProjectContext(directory: string): Promise<string> {
+export async function gatherProjectContext(directory: string): Promise<string> {
   const parts: string[] = [];
 
   parts.push(`Project directory: ${directory}`);
