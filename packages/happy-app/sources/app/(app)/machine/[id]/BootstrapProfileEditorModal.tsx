@@ -152,25 +152,27 @@ export const BootstrapProfileEditorModal = React.memo(function BootstrapProfileE
                     borderRadius: modalMetrics.borderRadius,
                 },
             ]}>
-                <View style={[
-                    styles.modalHeader,
-                    formLayout.modalHeaderStacked ? styles.modalHeaderStacked : null,
-                    { borderBottomColor: theme.colors.divider, paddingHorizontal: modalMetrics.horizontalPadding },
-                ]}>
-                    <View style={styles.modalHeaderTextWrap}>
-                        <Text style={[styles.modalTitle, { color: theme.colors.text }]}>{editingProfile ? t("machine.agentLoopEdit") : t("machine.agentLoopCreate")}</Text>
-                        <Text style={[styles.modalSubtitle, { color: theme.colors.textSecondary }]}>{t("machine.agentLoopBootstrapHint")}</Text>
+                {/* Header */}
+                <View style={[styles.modalHeader, { borderBottomColor: theme.colors.divider, paddingHorizontal: modalMetrics.horizontalPadding }]}>
+                    <View style={styles.modalHeaderTopRow}>
+                        <Text style={[styles.modalTitle, { color: theme.colors.text }]} numberOfLines={1}>
+                            {editingProfile ? t("machine.bootstrapProfileEdit") : t("machine.automationCreateBootstrapProfile")}
+                        </Text>
+                        <Pressable style={[styles.modalDismissButton, { borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]} onPress={handleClose}>
+                            <Ionicons name="close" size={18} color={theme.colors.textSecondary} />
+                        </Pressable>
                     </View>
-                    <Pressable style={[styles.modalDismissButton, { borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]} onPress={handleClose}>
-                        <Ionicons name="close" size={18} color={theme.colors.textSecondary} />
-                    </Pressable>
+                    <Text style={[styles.modalSubtitle, { color: theme.colors.textSecondary }]} numberOfLines={2}>
+                        {editingProfile
+                            ? (profileName.trim() || rootDirectory.trim() || t("machine.agentLoopBootstrapHint"))
+                            : t("machine.agentLoopBootstrapHint")}
+                    </Text>
                 </View>
+
                 <ScrollView style={styles.modalScroll} contentContainerStyle={[styles.modalScrollContent, { paddingHorizontal: modalMetrics.horizontalPadding }]}>
                     <View style={styles.formSection}>
-                        <View style={[styles.modalInfoBanner, { borderColor: theme.colors.divider, backgroundColor: theme.colors.surfaceHigh }]}>
-                            <Text style={[styles.modalInfoTitle, { color: theme.colors.text }]}>{t("machine.agentLoopBootstrap")}</Text>
-                            <Text style={[styles.modalInfoText, { color: theme.colors.textSecondary }]}>{t("machine.agentLoopBootstrapHint")}</Text>
-                        </View>
+                        {/* 名称（可选） */}
+                        <Text style={[styles.label, { color: theme.colors.textSecondary }]}>{t("machine.agentLoopName")}</Text>
                         <TextInput
                             style={[styles.input, { color: theme.colors.text, borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}
                             placeholder={t("machine.agentLoopNameOptional")}
@@ -178,7 +180,9 @@ export const BootstrapProfileEditorModal = React.memo(function BootstrapProfileE
                             value={profileName}
                             onChangeText={setProfileName}
                         />
-                        <Text style={[styles.hintText, { color: theme.colors.textSecondary }]}>{t("machine.hintLoopName")}</Text>
+
+                        {/* 根目录 */}
+                        <Text style={[styles.label, { color: theme.colors.textSecondary }]}>{t("machine.agentLoopPath")}</Text>
                         <TextInput
                             style={[styles.input, { color: theme.colors.text, borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}
                             placeholder={t("machine.agentLoopPathPlaceholder")}
@@ -189,6 +193,9 @@ export const BootstrapProfileEditorModal = React.memo(function BootstrapProfileE
                             autoCorrect={false}
                         />
                         <Text style={[styles.hintText, { color: theme.colors.textSecondary }]}>{t("machine.hintBootstrapRootDir")}</Text>
+
+                        {/* 扫描频率 */}
+                        <Text style={[styles.label, { color: theme.colors.textSecondary }]}>{t("machine.agentLoopInterval")}</Text>
                         <TextInput
                             style={[styles.input, { color: theme.colors.text, borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}
                             placeholder={t("machine.agentLoopIntervalPlaceholder")}
@@ -199,63 +206,78 @@ export const BootstrapProfileEditorModal = React.memo(function BootstrapProfileE
                             autoCorrect={false}
                         />
                         <Text style={[styles.hintText, { color: theme.colors.textSecondary }]}>{t("machine.hintBootstrapInterval")}</Text>
-                        <TextInput
-                            style={[styles.input, { color: theme.colors.text, borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}
-                            placeholder={t("machine.agentLoopBootstrapMaxDepth")}
-                            placeholderTextColor={theme.colors.textSecondary}
-                            value={maxDepth}
-                            onChangeText={setMaxDepth}
-                            keyboardType="number-pad"
-                        />
-                        <Text style={[styles.hintText, { color: theme.colors.textSecondary }]}>{t("machine.hintBootstrapMaxDepth")}</Text>
-                        <TextInput
-                            style={[styles.input, { color: theme.colors.text, borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}
-                            placeholder={t("machine.agentLoopBootstrapLimit")}
-                            placeholderTextColor={theme.colors.textSecondary}
-                            value={limit}
-                            onChangeText={setLimit}
-                            keyboardType="number-pad"
-                        />
-                        <Text style={[styles.hintText, { color: theme.colors.textSecondary }]}>{t("machine.hintBootstrapLimit")}</Text>
-                        <TextInput
-                            style={[styles.input, { color: theme.colors.text, borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}
-                            placeholder={t("machine.automationAuditProject")}
-                            placeholderTextColor={theme.colors.textSecondary}
-                            value={projectId}
-                            onChangeText={setProjectId}
-                            autoCapitalize="none"
-                            autoCorrect={false}
-                        />
-                        <Text style={[styles.hintText, { color: theme.colors.textSecondary }]}>{t("machine.hintLoopProjectId")}</Text>
-                        <TextInput
-                            style={[styles.input, { color: theme.colors.text, borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}
-                            placeholder={t("machine.agentLoopProfile")}
-                            placeholderTextColor={theme.colors.textSecondary}
-                            value={profileId}
-                            onChangeText={setProfileId}
-                            autoCapitalize="none"
-                            autoCorrect={false}
-                        />
-                        <Text style={[styles.hintText, { color: theme.colors.textSecondary }]}>{t("machine.hintLoopProfileId")}</Text>
-                        <Text style={[styles.label, { color: theme.colors.textSecondary }]}>{t("machine.agentLoopBootstrapAutoRunCreated")}</Text>
-                        <Pressable
-                            style={[styles.inlineSecondaryButton, { borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}
-                            onPress={() => setAutoRunCreated((current) => !current)}
-                        >
-                            <Text style={{ color: theme.colors.text }}>{autoRunCreated ? t("common.yes") : t("common.no")}</Text>
-                        </Pressable>
-                        <Text style={[styles.hintText, { color: theme.colors.textSecondary }]}>{t("machine.hintBootstrapAutoRun")}</Text>
-                        <View style={styles.buttonRow}>
+
+                        {/* 高级选项 */}
+                        <View style={[styles.advancedSection, { borderColor: theme.colors.divider, backgroundColor: theme.colors.surfaceHigh }]}>
+                            <Text style={[styles.label, { color: theme.colors.textSecondary }]}>{t("machine.agentLoopBootstrapMaxDepth")}</Text>
+                            <TextInput
+                                style={[styles.input, { color: theme.colors.text, borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}
+                                placeholder="4"
+                                placeholderTextColor={theme.colors.textSecondary}
+                                value={maxDepth}
+                                onChangeText={setMaxDepth}
+                                keyboardType="number-pad"
+                            />
+                            <Text style={[styles.hintText, { color: theme.colors.textSecondary }]}>{t("machine.hintBootstrapMaxDepth")}</Text>
+
+                            <Text style={[styles.label, { color: theme.colors.textSecondary }]}>{t("machine.agentLoopBootstrapLimit")}</Text>
+                            <TextInput
+                                style={[styles.input, { color: theme.colors.text, borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}
+                                placeholder="25"
+                                placeholderTextColor={theme.colors.textSecondary}
+                                value={limit}
+                                onChangeText={setLimit}
+                                keyboardType="number-pad"
+                            />
+                            <Text style={[styles.hintText, { color: theme.colors.textSecondary }]}>{t("machine.hintBootstrapLimit")}</Text>
+
+                            <Text style={[styles.label, { color: theme.colors.textSecondary }]}>{t("machine.automationAuditProject")}</Text>
+                            <TextInput
+                                style={[styles.input, { color: theme.colors.text, borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}
+                                placeholder={t("machine.agentLoopProjectPlaceholder")}
+                                placeholderTextColor={theme.colors.textSecondary}
+                                value={projectId}
+                                onChangeText={setProjectId}
+                                autoCapitalize="none"
+                                autoCorrect={false}
+                            />
+
+                            <Text style={[styles.label, { color: theme.colors.textSecondary }]}>{t("machine.agentLoopProfile")}</Text>
+                            <TextInput
+                                style={[styles.input, { color: theme.colors.text, borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}
+                                placeholder={t("machine.agentLoopProfilePlaceholder")}
+                                placeholderTextColor={theme.colors.textSecondary}
+                                value={profileId}
+                                onChangeText={setProfileId}
+                                autoCapitalize="none"
+                                autoCorrect={false}
+                            />
+
+                            <Text style={[styles.label, { color: theme.colors.textSecondary }]}>{t("machine.agentLoopBootstrapAutoRunCreated")}</Text>
                             <Pressable
-                                style={[styles.createButton, { backgroundColor: theme.colors.primary, opacity: saving ? 0.7 : 1 }]}
+                                style={[styles.inlineSecondaryButton, { borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}
+                                onPress={() => setAutoRunCreated((current) => !current)}
+                            >
+                                <Text style={{ color: theme.colors.text }}>{autoRunCreated ? t("common.yes") : t("common.no")}</Text>
+                            </Pressable>
+                            <Text style={[styles.hintText, { color: theme.colors.textSecondary }]}>{t("machine.hintBootstrapAutoRun")}</Text>
+                        </View>
+
+                        <View style={[styles.buttonRow, formLayout.fullWidthButtons ? { flexDirection: "column" } : null]}>
+                            <Pressable
+                                style={[styles.createButton, { backgroundColor: theme.colors.button.primary.background, opacity: saving ? 0.6 : 1 }]}
                                 onPress={() => void handleSave()}
                                 disabled={saving}
                             >
-                                {saving ? <ActivityIndicator size="small" color={theme.colors.button.primary.tint} /> : <Text style={[styles.createButtonText, { color: theme.colors.button.primary.tint }]}>{editingProfile ? t("machine.agentLoopEdit") : t("machine.agentLoopCreate")}</Text>}
+                                {saving
+                                    ? <ActivityIndicator size="small" color={theme.colors.button.primary.tint} />
+                                    : <Text style={[styles.createButtonText, { color: theme.colors.button.primary.tint }]}>{t("common.save")}</Text>
+                                }
                             </Pressable>
                             <Pressable
                                 style={[styles.secondaryButton, { borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}
                                 onPress={handleClose}
+                                disabled={saving}
                             >
                                 <Text style={{ color: theme.colors.textSecondary }}>{t("common.cancel")}</Text>
                             </Pressable>
@@ -278,22 +300,17 @@ const styles = StyleSheet.create((theme) => ({
         elevation: 10,
     },
     modalHeader: {
-        flexDirection: "row",
-        alignItems: "center",
-        justifyContent: "space-between",
-        paddingVertical: 16,
+        paddingVertical: 14,
         borderBottomWidth: 1,
-        gap: 16,
-    },
-    modalHeaderStacked: {
-        alignItems: "flex-start",
-        flexDirection: "column",
-    },
-    modalHeaderTextWrap: {
-        flex: 1,
         gap: 4,
     },
+    modalHeaderTopRow: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 12,
+    },
     modalTitle: {
+        flex: 1,
         fontSize: 18,
         fontWeight: "700",
     },
@@ -308,7 +325,7 @@ const styles = StyleSheet.create((theme) => ({
         borderWidth: 1,
         alignItems: "center",
         justifyContent: "center",
-        alignSelf: Platform.OS === "web" ? "auto" : "flex-end",
+        flexShrink: 0,
     },
     modalScroll: {
         width: "100%",
@@ -317,24 +334,18 @@ const styles = StyleSheet.create((theme) => ({
     modalScrollContent: {
         paddingBottom: 24,
     },
-    modalInfoBanner: {
-        borderWidth: 1,
-        borderRadius: 14,
-        padding: 14,
-        gap: 4,
-        marginBottom: 4,
-    },
-    modalInfoTitle: {
-        fontSize: 14,
-        fontWeight: "700",
-    },
-    modalInfoText: {
-        fontSize: 13,
-        lineHeight: 18,
-    },
     formSection: {
         padding: 16,
         gap: 8,
+    },
+    advancedSection: {
+        gap: 8,
+        paddingTop: 4,
+        marginTop: 4,
+        borderWidth: 1,
+        borderRadius: 14,
+        paddingHorizontal: 12,
+        paddingBottom: 12,
     },
     hintText: {
         fontSize: 12,

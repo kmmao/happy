@@ -132,7 +132,7 @@ export const SharedGroupHeaderAction = React.memo(
 const styles = StyleSheet.create((theme) => ({
     container: {
         flexDirection: "row",
-        alignItems: "flex-start",
+        alignItems: "flex-end",
         justifyContent: "space-between",
         gap: 12,
         minWidth: 0,

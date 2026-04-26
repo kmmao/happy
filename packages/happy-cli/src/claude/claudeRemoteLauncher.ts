@@ -44,6 +44,12 @@ import { parseSpecialCommand } from "@/parsers/specialCommands";
 import { executeShellCommand } from "@/utils/shellCommand";
 import { TurnCollector } from "@/knowledge";
 import type { TurnCollectorConfig } from "@/knowledge";
+import { applyHappyProgressUpdate } from "@/utils/happyProgressMetadata";
+import { applySessionSummaryUpdate } from "@/utils/sessionSummaryMetadata";
+import {
+  buildAutoSummarySyntheticPrompt,
+  HAPPY_AUTO_SUMMARY_SOURCE,
+} from "@/utils/progressAutomation";
 import { ExecutionGuard } from "@/automation/ExecutionGuard";
 import {
   buildProgressStateFromLists,
@@ -1671,13 +1677,119 @@ export async function claudeRemoteLauncher(
         ],
       }) : null;
 
+      // SDK 0.2.119+ native binary: type:"http" MCP servers are not reliably
+      // forwarded to the spawned Claude Code process. Use in-process SDK MCP
+      // servers (same approach as knowledgeMcpServer) so tools are always
+      // visible to Claude regardless of external HTTP connectivity.
+      const happyMcpServer = createSdkMcpServer({
+        name: "happy",
+        tools: [
+          {
+            name: "change_title",
+            description: 'Set or update the chat session title. Titles should be short (under 50 chars) and action-oriented, e.g. "Fix auth token refresh".',
+            inputSchema: { title: z.string().describe("New chat session title") },
+            handler: async (args: { [x: string]: unknown }) => {
+              const title = typeof args["title"] === "string" ? args["title"] : "";
+              try {
+                session.client.sendClaudeSessionMessage({
+                  type: "summary",
+                  summary: title,
+                  leafUuid: randomUUID(),
+                });
+                logger.debug(`[happyMCP] change_title: "${title}"`);
+                return { content: [{ type: "text" as const, text: `Successfully changed chat title to: "${title}"` }] };
+              } catch (err) {
+                return { content: [{ type: "text" as const, text: `Failed to change title: ${err}` }] };
+              }
+            },
+          },
+          {
+            name: "update_progress",
+            description: "Optional override for the App's Progress tab. In most cases your TodoWrite calls are auto-mirrored, so you do NOT need to call this. Use it only when you want to set extra fields the CLI hook does not capture (currentStage, blockers) or to force a new list boundary with `listId: \"new\"`.",
+            inputSchema: {
+              todos: z.array(z.object({
+                content: z.string(),
+                status: z.enum(["pending", "in_progress", "completed"]),
+                activeForm: z.string().optional(),
+                stage: z.string().optional(),
+              })).describe("The full checklist — always send every item, not a delta"),
+              currentStage: z.string().optional().describe("Optional overall stage name for the checklist"),
+              blockers: z.array(z.string()).optional().describe("Optional list of things blocking progress"),
+              listId: z.string().optional().describe("Target list id. Use 'new' to force a fresh list"),
+              label: z.string().optional().describe("Short human-readable name for this task list"),
+            },
+            handler: async (args: { [x: string]: unknown }) => {
+              try {
+                const sanitizedTodos = (Array.isArray(args["todos"]) ? args["todos"] : []).map((t: { content?: unknown; status?: unknown; activeForm?: unknown; stage?: unknown }) => ({
+                  content: typeof t.content === "string" ? t.content : "",
+                  status: (t.status as "pending" | "in_progress" | "completed") ?? "pending",
+                  activeForm: typeof t.activeForm === "string" ? t.activeForm : undefined,
+                  stage: typeof t.stage === "string" ? t.stage : undefined,
+                }));
+                let shouldTriggerAutoSummary = false;
+                session.client.updateMetadata((metadata) => {
+                  const result = applyHappyProgressUpdate(metadata, {
+                    todos: sanitizedTodos,
+                    currentStage: typeof args["currentStage"] === "string" ? args["currentStage"] : undefined,
+                    blockers: Array.isArray(args["blockers"]) ? (args["blockers"] as string[]) : undefined,
+                    listId: typeof args["listId"] === "string" ? args["listId"] : undefined,
+                    label: typeof args["label"] === "string" ? args["label"] : undefined,
+                    createId: randomUUID,
+                  });
+                  shouldTriggerAutoSummary = result.shouldTriggerAutoSummary;
+                  return result.metadata;
+                });
+                if (shouldTriggerAutoSummary) {
+                  session.client.sendSyntheticUserMessage(buildAutoSummarySyntheticPrompt(), {
+                    displayText: "",
+                    sentFrom: HAPPY_AUTO_SUMMARY_SOURCE,
+                  });
+                }
+                return { content: [{ type: "text" as const, text: `Progress updated (${sanitizedTodos.length} items).` }] };
+              } catch (err) {
+                return { content: [{ type: "text" as const, text: `Failed to update progress: ${err}` }] };
+              }
+            },
+          },
+          {
+            name: "update_session_summary",
+            description: "Write a narrative session summary the App shows above the progress checklist. Call at milestones, not per task.",
+            inputSchema: {
+              goal: z.string().describe("What the user ultimately wants to accomplish"),
+              currentFocus: z.string().optional().describe("Brief description of the active task or phase"),
+              keyDecisions: z.array(z.string()).optional().describe("Important choices already made this session"),
+              openQuestions: z.array(z.string()).optional().describe("Unresolved questions or pending decisions"),
+              impactScope: z.array(z.string()).optional().describe("Modules/files/areas affected by this session's work"),
+              requestId: z.string().optional().describe("Optional request identifier"),
+            },
+            handler: async (args: { [x: string]: unknown }) => {
+              try {
+                session.client.updateMetadata((metadata) =>
+                  applySessionSummaryUpdate(metadata, {
+                    goal: typeof args["goal"] === "string" ? args["goal"] : "",
+                    currentFocus: typeof args["currentFocus"] === "string" ? args["currentFocus"] : undefined,
+                    keyDecisions: Array.isArray(args["keyDecisions"]) ? (args["keyDecisions"] as string[]) : undefined,
+                    openQuestions: Array.isArray(args["openQuestions"]) ? (args["openQuestions"] as string[]) : undefined,
+                    impactScope: Array.isArray(args["impactScope"]) ? (args["impactScope"] as string[]) : undefined,
+                    requestId: typeof args["requestId"] === "string" ? args["requestId"] : undefined,
+                  })
+                );
+                return { content: [{ type: "text" as const, text: "Session summary updated." }] };
+              } catch (err) {
+                return { content: [{ type: "text" as const, text: `Failed to update session summary: ${err}` }] };
+              }
+            },
+          },
+        ],
+      });
+
       try {
         const remoteResult = await claudeRemote({
           sessionId: session.sessionId,
           path: session.path,
           allowedTools: session.allowedTools ?? [],
           mcpServers: {
-            ...session.mcpServers,
+            happy: happyMcpServer,
             ...(knowledgeMcpServer ? { "happy-knowledge": knowledgeMcpServer } : {}),
           },
           hookSettingsPath: session.hookSettingsPath,

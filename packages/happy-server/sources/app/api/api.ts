@@ -51,6 +51,7 @@ import { inboxRoutes } from "./routes/inboxRoutes";
 import { sessionEventRoutes } from "./routes/sessionEventRoutes";
 import { optionScoreRoutes } from "./routes/optionScoreRoutes";
 import { supervisorDimensionRoutes } from "./routes/supervisorDimensionRoutes";
+import { agentLoopSuggestRoutes } from "./routes/agentLoopSuggestRoutes";
 import { isLocalStorage, getLocalFilesDir } from "@/storage/files";
 import { startKnowledgeLifecycleScheduler, stopKnowledgeLifecycleScheduler } from "@/modules/knowledgeLifecycleScheduler";
 import { startTaskStaleReaper, stopTaskStaleReaper } from "@/modules/taskStaleReaper";
@@ -175,6 +176,7 @@ export async function startApi() {
   sessionEventRoutes(typed);
   optionScoreRoutes(typed);
   supervisorDimensionRoutes(typed);
+  agentLoopSuggestRoutes(typed);
 
   // Start HTTP
   const port = process.env.PORT ? parseInt(process.env.PORT, 10) : 3005;

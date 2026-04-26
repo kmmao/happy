@@ -56,18 +56,16 @@ export function WebAlertModal({
 
   // 暗色主题检测（通过 surface 背景色判断）
   const isDark = (theme.colors.surface as string).toLowerCase().startsWith("#1");
-  const glassBackground = isDark ? "rgba(30,30,34,0.75)" : "rgba(255,255,255,0.75)";
-  const glassBorder = isDark ? "rgba(255,255,255,0.12)" : "rgba(255,255,255,0.7)";
 
   const styles = StyleSheet.create({
     container: {
-      backgroundColor: glassBackground,
+      backgroundColor: theme.colors.surface,
       borderRadius: 18,
       width: modalWidth,
       maxHeight: windowHeight * 0.8,
       overflow: "hidden",
       borderWidth: 1,
-      borderColor: glassBorder,
+      borderColor: theme.colors.divider,
       shadowColor: "#000",
       shadowOffset: { width: 0, height: 8 },
       shadowOpacity: isDark ? 0.5 : 0.2,

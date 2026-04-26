@@ -155,6 +155,13 @@ const stylesheet = StyleSheet.create((theme) => ({
   buttonDisabled: {
     backgroundColor: theme.colors.fab.background,
   },
+  buttonActive: {
+    backgroundColor: theme.colors.radio.active,
+  },
+  buttonActivePressed: {
+    backgroundColor: theme.colors.radio.active,
+    opacity: 0.8,
+  },
   badge: {
     position: "absolute" as const,
     top: 0,
@@ -324,7 +331,7 @@ export const InputFAB = React.memo(function InputFAB({
                     : t("session.autoOptionSendLabel")
               }
               onPress={() => autoOptionSend.onToggle(!autoOptionSend.enabled)}
-              badgeColor={autoOptionSend.enabled ? badgeColor : undefined}
+              active={autoOptionSend.enabled}
               styles={styles}
               iconColor={iconColor}
               disabledIconColor={disabledIconColor}
@@ -621,6 +628,8 @@ interface FABButtonProps {
   iconColor: string;
   disabledIconColor: string;
   disabled?: boolean;
+  /** Renders the button with a solid accent background to indicate an active/on state. */
+  active?: boolean;
   label?: string;
   badgeColor?: string;
 }
@@ -632,16 +641,29 @@ function FABButton({
   iconColor,
   disabledIconColor,
   disabled = false,
+  active = false,
   label,
   badgeColor,
 }: FABButtonProps) {
+  const activeIconColor = "#FFFFFF";
+  const effectiveIconColor = disabled
+    ? disabledIconColor
+    : active
+      ? activeIconColor
+      : iconColor;
   return (
     <Pressable
       onPress={onPress}
       disabled={disabled}
       style={({ pressed }) => [
         styles.button,
-        pressed && !disabled ? styles.buttonPressed : styles.buttonDefault,
+        active
+          ? pressed
+            ? styles.buttonActivePressed
+            : styles.buttonActive
+          : pressed && !disabled
+            ? styles.buttonPressed
+            : styles.buttonDefault,
         disabled && styles.buttonDisabled,
       ]}
       hitSlop={8}
@@ -649,13 +671,13 @@ function FABButton({
       <Ionicons
         name={icon}
         size={18}
-        color={disabled ? disabledIconColor : iconColor}
+        color={effectiveIconColor}
       />
       {label ? (
         <Text
           style={[
             styles.buttonLabel,
-            { color: disabled ? disabledIconColor : iconColor },
+            { color: effectiveIconColor },
           ]}
         >
           {label}

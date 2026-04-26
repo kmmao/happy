@@ -1,18 +1,27 @@
 import * as React from "react";
-import { ActivityIndicator, Pressable, RefreshControl, ScrollView, Text, View } from "react-native";
+import {
+    ActivityIndicator,
+    Pressable,
+    RefreshControl,
+    ScrollView,
+    Text,
+    View,
+} from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
-import { layout } from "@/components/layout";
 import { t } from "@/text";
 import { useTasksData } from "./useTasksData";
 import type { ServerTask } from "@/sync/apiTasks";
-import {
-    getTaskFilterLabel,
-    getTaskStatusBadgeColor,
-    getTaskStatusLabel,
-    TASK_FILTERS,
-} from "./task/taskDetailViewModel";
+import { getTaskStatusBadgeColor } from "./task/taskDetailViewModel";
+
+// ─── constants ────────────────────────────────────────────────────────────────
+
+const COLUMN_WIDTH = 260;
+const COLUMN_GAP = 10;
+const BOARD_H_PADDING = 16;
+
+// ─── helpers ──────────────────────────────────────────────────────────────────
 
 function formatCompactTime(ts: number): string {
     const diff = Date.now() - ts;
@@ -25,7 +34,20 @@ function formatCompactTime(ts: number): string {
     return days === 1 ? "1d ago" : `${days}d ago`;
 }
 
-function TaskCard({ task, onPress }: { task: ServerTask; onPress: () => void }) {
+// ─── types ────────────────────────────────────────────────────────────────────
+
+type KanbanColumnDef = {
+    key: string;
+    label: string;
+    statuses: string[];
+    color: string;
+};
+
+type KanbanColumnWithTasks = KanbanColumnDef & { tasks: ServerTask[] };
+
+// ─── KanbanCard ───────────────────────────────────────────────────────────────
+
+function KanbanCard({ task, onPress }: { task: ServerTask; onPress: () => void }) {
     const { theme } = useUnistyles();
     const statusColor = getTaskStatusBadgeColor(task.status);
     const isActive = ["queued", "dispatching", "running"].includes(task.status);
@@ -33,88 +55,187 @@ function TaskCard({ task, onPress }: { task: ServerTask; onPress: () => void }) 
     return (
         <Pressable
             style={({ pressed }) => ({
-                flexDirection: "row",
                 backgroundColor: theme.colors.surface,
-                borderRadius: 12,
+                borderRadius: 10,
                 borderWidth: 1,
                 borderColor: isActive ? statusColor + "44" : theme.colors.divider,
                 overflow: "hidden",
-                opacity: pressed ? 0.75 : 1,
+                opacity: pressed ? 0.72 : 1,
             })}
             onPress={onPress}
         >
-            {/* Left status stripe */}
-            <View style={{ width: 4, backgroundColor: statusColor }} />
+            {/* top status bar */}
+            <View style={{ height: 3, backgroundColor: statusColor }} />
 
-            <View style={{ flex: 1, paddingVertical: 11, paddingLeft: 12, gap: 5 }}>
-                {/* Row 1: status label + time */}
-                <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingRight: 12 }}>
-                    <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
-                        {isActive && (
-                            <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: statusColor }} />
-                        )}
-                        <Text style={{ fontSize: 11, fontWeight: "700", color: statusColor, letterSpacing: 0.3 }}>
-                            {getTaskStatusLabel(task.status, t as (key: string) => string).toUpperCase()}
-                        </Text>
-                    </View>
-                    <Text style={{ fontSize: 11, color: theme.colors.textSecondary }}>
+            <View style={{ padding: 10, gap: 6 }}>
+                {/* time row */}
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
+                    {isActive && (
+                        <View
+                            style={{
+                                width: 6,
+                                height: 6,
+                                borderRadius: 3,
+                                backgroundColor: statusColor,
+                            }}
+                        />
+                    )}
+                    <Text
+                        style={{
+                            fontSize: 11,
+                            color: theme.colors.textSecondary,
+                            marginLeft: isActive ? 0 : 11,
+                        }}
+                    >
                         {formatCompactTime(task.updatedAt)}
                     </Text>
                 </View>
 
-                {/* Row 2: title */}
+                {/* title */}
                 <Text
-                    style={{ fontSize: 14, fontWeight: "500", color: theme.colors.text, lineHeight: 20 }}
-                    numberOfLines={2}
+                    style={{
+                        fontSize: 13,
+                        fontWeight: "500",
+                        color: theme.colors.text,
+                        lineHeight: 18,
+                    }}
+                    numberOfLines={3}
                 >
                     {task.title || task.promptPreview || "—"}
                 </Text>
 
-                {/* Row 3: skill chips */}
+                {/* skill chips */}
                 {task.skillNames.length > 0 && (
                     <View style={{ flexDirection: "row", gap: 4, flexWrap: "wrap" }}>
-                        {task.skillNames.slice(0, 4).map((s) => (
+                        {task.skillNames.slice(0, 3).map((s) => (
                             <View
                                 key={s}
                                 style={{
                                     backgroundColor: theme.colors.surfaceHigh,
                                     borderRadius: 4,
-                                    paddingHorizontal: 6,
+                                    paddingHorizontal: 5,
                                     paddingVertical: 2,
                                 }}
                             >
-                                <Text style={{ fontSize: 11, color: theme.colors.textSecondary }}>{s}</Text>
+                                <Text style={{ fontSize: 10, color: theme.colors.textSecondary }}>
+                                    {s}
+                                </Text>
                             </View>
                         ))}
                     </View>
                 )}
 
-                {/* Row 4: error message */}
-                {task.errorMessage && (
-                    <Text style={{ fontSize: 12, color: "#FF3B30" }} numberOfLines={1}>
+                {/* error */}
+                {task.errorMessage != null && (
+                    <Text style={{ fontSize: 11, color: "#FF3B30" }} numberOfLines={1}>
                         {task.errorMessage}
                     </Text>
                 )}
-            </View>
-
-            <View style={{ justifyContent: "center", paddingHorizontal: 12 }}>
-                <Ionicons name="chevron-forward" size={15} color={theme.colors.textSecondary} />
             </View>
         </Pressable>
     );
 }
 
-function EmptyTaskState() {
+// ─── KanbanColumn ─────────────────────────────────────────────────────────────
+
+function KanbanColumn({
+    column,
+    onTaskPress,
+}: {
+    column: KanbanColumnWithTasks;
+    onTaskPress: (task: ServerTask) => void;
+}) {
     const { theme } = useUnistyles();
+
     return (
-        <View style={{ alignItems: "center", paddingVertical: 56, paddingHorizontal: 32, gap: 10 }}>
-            <Ionicons name="list-outline" size={44} color={theme.colors.textSecondary} style={{ opacity: 0.4 }} />
-            <Text style={{ fontSize: 16, fontWeight: "600", color: theme.colors.text }}>
-                {t("tasks.noTasks")}
-            </Text>
+        <View
+            style={{
+                width: COLUMN_WIDTH,
+                marginRight: COLUMN_GAP,
+                backgroundColor: theme.colors.surface,
+                borderRadius: 14,
+                borderWidth: 1,
+                borderColor: theme.colors.divider,
+                padding: 12,
+                minHeight: 200,
+            }}
+        >
+            {/* column header */}
+            <View
+                style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    gap: 7,
+                    marginBottom: 10,
+                }}
+            >
+                <View
+                    style={{
+                        width: 8,
+                        height: 8,
+                        borderRadius: 4,
+                        backgroundColor: column.color,
+                    }}
+                />
+                <Text
+                    style={{
+                        fontSize: 13,
+                        fontWeight: "700",
+                        color: theme.colors.text,
+                        flex: 1,
+                    }}
+                >
+                    {column.label}
+                </Text>
+                <View
+                    style={{
+                        backgroundColor: column.color + "26",
+                        borderRadius: 10,
+                        paddingHorizontal: 8,
+                        paddingVertical: 2,
+                    }}
+                >
+                    <Text
+                        style={{
+                            fontSize: 12,
+                            fontWeight: "700",
+                            color: column.color,
+                        }}
+                    >
+                        {column.tasks.length}
+                    </Text>
+                </View>
+            </View>
+
+            {/* cards */}
+            {column.tasks.length === 0 ? (
+                <View style={{ flex: 1, alignItems: "center", paddingTop: 32 }}>
+                    <Text
+                        style={{
+                            fontSize: 22,
+                            color: theme.colors.textSecondary,
+                            opacity: 0.25,
+                        }}
+                    >
+                        —
+                    </Text>
+                </View>
+            ) : (
+                <View style={{ gap: 8 }}>
+                    {column.tasks.map((task) => (
+                        <KanbanCard
+                            key={task.id}
+                            task={task}
+                            onPress={() => onTaskPress(task)}
+                        />
+                    ))}
+                </View>
+            )}
         </View>
     );
 }
+
+// ─── TaskListPage ─────────────────────────────────────────────────────────────
 
 function TaskListPage() {
     const { id: machineId } = useLocalSearchParams<{ id: string }>();
@@ -122,9 +243,57 @@ function TaskListPage() {
     const { theme } = useUnistyles();
     const data = useTasksData(machineId!);
 
-    const handleTaskPress = React.useCallback((task: ServerTask) => {
-        router.push(`/machine/${machineId}/task/${task.id}` as any);
-    }, [machineId, router]);
+    const KANBAN_COLUMNS = React.useMemo<KanbanColumnDef[]>(
+        () => [
+            {
+                key: "queue",
+                label: t("tasks.statusQueued"),
+                statuses: ["queued", "dispatching"],
+                color: "#AEAEB2",
+            },
+            {
+                key: "running",
+                label: t("tasks.statusRunning"),
+                statuses: ["running"],
+                color: "#007AFF",
+            },
+            {
+                key: "completed",
+                label: t("tasks.statusCompleted"),
+                statuses: ["completed"],
+                color: "#34C759",
+            },
+            {
+                key: "failed",
+                label: t("tasks.statusFailed"),
+                statuses: ["failed"],
+                color: "#FF3B30",
+            },
+            {
+                key: "cancelled",
+                label: t("tasks.statusCancelled"),
+                statuses: ["cancelled"],
+                color: "#8E8E93",
+            },
+        ],
+        [],
+    );
+
+    const columnTasks = React.useMemo<KanbanColumnWithTasks[]>(
+        () =>
+            KANBAN_COLUMNS.map((col) => ({
+                ...col,
+                tasks: data.tasks.filter((task) => col.statuses.includes(task.status)),
+            })),
+        [KANBAN_COLUMNS, data.tasks],
+    );
+
+    const handleTaskPress = React.useCallback(
+        (task: ServerTask) => {
+            router.push(`/machine/${machineId}/task/${task.id}` as any);
+        },
+        [machineId, router],
+    );
 
     if (data.loading) {
         return (
@@ -135,109 +304,59 @@ function TaskListPage() {
     }
 
     return (
-        <ScrollView
-            style={{ flex: 1, backgroundColor: theme.colors.groupped.background }}
-            contentContainerStyle={{
-                maxWidth: layout.maxWidth,
-                width: "100%",
-                alignSelf: "center" as const,
-                paddingBottom: 100,
-            }}
-            refreshControl={
-                <RefreshControl
-                    refreshing={data.refreshing}
-                    onRefresh={() => void data.load("refresh")}
-                />
-            }
-        >
-            {/* Filter chips */}
+        <View style={{ flex: 1 }}>
             <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.filterRow}
+                style={{ flex: 1, backgroundColor: theme.colors.groupped.background }}
+                refreshControl={
+                    <RefreshControl
+                        refreshing={data.refreshing}
+                        onRefresh={() => void data.load("refresh")}
+                    />
+                }
+                // allow bounce so pull-to-refresh works even when board fits on screen
+                alwaysBounceVertical
             >
-                {TASK_FILTERS.map((f) => {
-                    const filterValue = f === "all" ? undefined : f;
-                    const isActive = data.filter === filterValue;
-                    return (
-                        <Pressable
-                            key={f}
-                            style={[
-                                styles.filterChip,
-                                {
-                                    backgroundColor: isActive ? theme.colors.textLink : theme.colors.surface,
-                                    borderColor: isActive ? theme.colors.textLink : theme.colors.divider,
-                                },
-                            ]}
-                            onPress={() => data.setFilter(filterValue)}
-                        >
-                            <Text
-                                style={[
-                                    styles.filterChipText,
-                                    { color: isActive ? "#FFF" : theme.colors.textSecondary },
-                                ]}
-                            >
-                                {getTaskFilterLabel(f, t as (key: string) => string)}
-                            </Text>
-                        </Pressable>
-                    );
-                })}
-            </ScrollView>
-
-            {/* Task cards */}
-            {data.tasks.length === 0 ? (
-                <EmptyTaskState />
-            ) : (
-                <View style={styles.cardList}>
-                    {data.tasks.map((task) => (
-                        <TaskCard
-                            key={task.id}
-                            task={task}
-                            onPress={() => handleTaskPress(task)}
+                <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={styles.boardContent}
+                >
+                    {columnTasks.map((col) => (
+                        <KanbanColumn
+                            key={col.key}
+                            column={col}
+                            onTaskPress={handleTaskPress}
                         />
                     ))}
-                </View>
-            )}
+                </ScrollView>
+            </ScrollView>
 
-            {/* FAB */}
+            {/* FAB — outside ScrollView so it stays fixed */}
             <Pressable
                 style={[styles.fab, { backgroundColor: theme.colors.textLink }]}
                 onPress={() => router.push(`/machine/${machineId}/task/new`)}
             >
                 <Ionicons name="add" size={28} color="#FFF" />
             </Pressable>
-        </ScrollView>
+        </View>
     );
 }
 
 export default React.memo(TaskListPage);
 
+// ─── styles ───────────────────────────────────────────────────────────────────
+
 const styles = StyleSheet.create({
-    filterRow: {
-        flexDirection: "row",
-        gap: 8,
-        paddingHorizontal: 16,
-        paddingVertical: 12,
-    },
-    filterChip: {
-        paddingHorizontal: 14,
-        paddingVertical: 6,
-        borderRadius: 16,
-        borderWidth: 1,
-    },
-    filterChipText: {
-        fontSize: 13,
-        fontWeight: "600",
-    },
-    cardList: {
-        paddingHorizontal: 16,
-        gap: 8,
-        paddingTop: 4,
+    boardContent: {
+        paddingLeft: BOARD_H_PADDING,
+        paddingRight: BOARD_H_PADDING - COLUMN_GAP,
+        paddingTop: 14,
+        paddingBottom: 120,
     },
     fab: {
         position: "absolute",
         right: 20,
-        bottom: 24,
+        bottom: 28,
         width: 56,
         height: 56,
         borderRadius: 28,

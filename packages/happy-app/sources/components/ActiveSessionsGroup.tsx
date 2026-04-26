@@ -81,9 +81,6 @@ const stylesheet = StyleSheet.create((theme, runtime) => ({
     paddingTop: 12,
     paddingBottom: Platform.select({ ios: 6, default: 8 }),
     paddingHorizontal: Platform.select({ ios: 32, default: 24 }),
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
   },
   sectionHeaderLeft: {
     flexDirection: "row",
@@ -549,21 +546,14 @@ export function ActiveSessionsGroup({
                 subtitle={
                   projectAliasMap.has(projectPath)
                     ? projectGroup.displayPath
-                    : undefined
+                    : machineName
                 }
                 variant="context"
-                trailing={(() => {
-                  const firstSession = Array.from(
-                    projectGroup.machines.values(),
-                  )[0]?.sessions[0];
-                  return firstSession ? (
-                    <ProjectGitStatus sessionId={firstSession.id} />
-                  ) : (
-                    <Text style={styles.sectionHeaderMachine} numberOfLines={1}>
-                      {machineName}
-                    </Text>
-                  );
-                })()}
+                trailing={
+                  firstMachine?.sessions[0] ? (
+                    <ProjectGitStatus sessionId={firstMachine.sessions[0].id} />
+                  ) : undefined
+                }
               />
             </View>
 

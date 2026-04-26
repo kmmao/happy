@@ -11,7 +11,8 @@ import {
     type MachineAutomationGuardianUsage,
     type MachineAutomationJob,
 } from "@/sync/ops";
-import { useMachine } from "@/sync/storage";
+import { useMachine, storage } from "@/sync/storage";
+import { getSessionName } from "@/utils/sessionUtils";
 import { projectManager, getProjectDisplayName } from "@/sync/projectManager";
 import { t } from "@/text";
 import {
@@ -188,6 +189,13 @@ export default React.memo(function MachineAutomationPage() {
     const machine = useMachine(typeof machineId === "string" ? machineId : "");
     const isKilled = Boolean(machine?.daemonState?.killed);
 
+    const resolveSessionTitle = React.useCallback((sessionId: string | null | undefined): string | undefined => {
+        if (!sessionId) return undefined;
+        const session = storage.getState().sessions[sessionId];
+        if (!session) return undefined;
+        return getSessionName(session);
+    }, []);
+
     const [activeSection, setActiveSection] = React.useState<ActiveSection>(null);
 
     const toggleSection = React.useCallback((section: Exclude<ActiveSection, null>) => {
@@ -299,7 +307,10 @@ export default React.memo(function MachineAutomationPage() {
                         { label: t("machine.automationCreatedAt"), value: formatTimestamp(job.createdAt) },
                         ...(job.dispatchedAt ? [{ label: t("machine.automationDispatchedAt"), value: formatTimestamp(job.dispatchedAt) }] : []),
                         ...(job.completedAt ? [{ label: t("machine.automationCompletedAt"), value: formatTimestamp(job.completedAt) }] : []),
-                        ...(job.sessionId ? [{ label: t("machine.automationSession"), value: job.sessionId.slice(0, 18) + "…", mono: true }] : []),
+                        ...(job.sessionId ? [
+                            ...(resolveSessionTitle(job.sessionId) ? [{ label: t("machine.automationSession"), value: resolveSessionTitle(job.sessionId)! }] : []),
+                            { label: "Session ID", value: job.sessionId, mono: true },
+                        ] : []),
                         ...(resolvedProject ? [{ label: t("machine.automationAuditProject"), value: resolvedProject }] : []),
                         ...(resolvedLoop ? [{ label: t("machine.automationAuditLoop"), value: resolvedLoop }] : []),
                         ...(job.recovered ? [{ label: t("machine.automationRecoveredShort"), value: "✓", accent: "#34C759" }] : []),
@@ -315,7 +326,7 @@ export default React.memo(function MachineAutomationPage() {
                 buttons,
             } satisfies Omit<import("./DetailSheet").DetailSheetProps, "onClose">,
         });
-    }, [data.mutateAndReload, data.recentAuditEvents, data.resolveLoopName, data.stopJobSession, getLocalProjectId, machineId, resolveMessageUUIDs, router]);
+    }, [data.mutateAndReload, data.recentAuditEvents, data.resolveLoopName, data.stopJobSession, getLocalProjectId, machineId, resolveMessageUUIDs, resolveSessionTitle, router]);
 
     const handleGuardianPress = React.useCallback((guardian: MachineAutomationGuardian) => {
         const usage = data.guardianUsage.find((e) => e.key === guardian.key);
@@ -357,7 +368,8 @@ export default React.memo(function MachineAutomationPage() {
                 sections: [{
                     rows: [
                         { label: t("machine.automationUpdatedAt"), value: formatTimestamp(guardian.updatedAt) },
-                        { label: t("machine.automationGuardianSession"), value: guardian.sessionId.slice(0, 18) + "…", mono: true },
+                        ...(resolveSessionTitle(guardian.sessionId) ? [{ label: t("machine.automationSession"), value: resolveSessionTitle(guardian.sessionId)! }] : []),
+                        { label: "Session ID", value: guardian.sessionId, mono: true },
                         ...(gProject ? [{ label: t("machine.automationAuditProject"), value: getProjectDisplayName(gProject) }] : []),
                         ...(guardian.loopId ? [{ label: t("machine.automationAuditLoop"), value: data.resolveLoopName(guardian.loopId) ?? guardian.loopId.slice(0, 12) }] : []),
                         ...(usage ? [
@@ -377,7 +389,7 @@ export default React.memo(function MachineAutomationPage() {
                 buttons,
             } satisfies Omit<import("./DetailSheet").DetailSheetProps, "onClose">,
         });
-    }, [data.clearGuardians, data.guardianUsage, data.recentAuditEvents, data.resolveGuardianKeyLabel, data.resolveLoopName, getLocalProjectId, machineId, resolveMessageUUIDs, router]);
+    }, [data.clearGuardians, data.guardianUsage, data.recentAuditEvents, data.resolveGuardianKeyLabel, data.resolveLoopName, getLocalProjectId, machineId, resolveMessageUUIDs, resolveSessionTitle, router]);
 
     const handleAuditEventPress = React.useCallback((event: MachineAutomationAuditEvent) => {
         const relatedJob = data.jobs.find((j) => j.id === event.jobId || j.dedupeKey === event.dedupeKey || (event.sessionId ? j.sessionId === event.sessionId : false));
@@ -408,7 +420,10 @@ export default React.memo(function MachineAutomationPage() {
                     rows: [
                         { label: t("machine.automationUpdatedAt"), value: formatTimestamp(event.occurredAt) },
                         ...(event.message ? [{ label: "Message", value: event.message }] : []),
-                        ...(event.sessionId ? [{ label: t("machine.automationSession"), value: event.sessionId.slice(0, 18) + "…", mono: true }] : []),
+                        ...(event.sessionId ? [
+                            ...(resolveSessionTitle(event.sessionId) ? [{ label: t("machine.automationSession"), value: resolveSessionTitle(event.sessionId)! }] : []),
+                            { label: "Session ID", value: event.sessionId, mono: true },
+                        ] : []),
                         ...(aProject ? [{ label: t("machine.automationAuditProject"), value: getProjectDisplayName(aProject) }] : []),
                         ...(event.loopId ? [{ label: t("machine.automationAuditLoop"), value: data.resolveLoopName(event.loopId) ?? event.loopId.slice(0, 12) }] : []),
                         ...(event.guardianKey ? [{ label: t("machine.automationAuditGuardian"), value: data.resolveGuardianKeyLabel(event.guardianKey) }] : []),

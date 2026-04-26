@@ -15,9 +15,11 @@ function parseTable(lines: string[], startIndex: number): { table: MarkdownBlock
         return { table: null, nextIndex: startIndex };
     }
 
-    // Validate that the second line is a separator containing dashes, which distinguishes tables from plain text
+    // Validate that the second line is a separator containing dashes, which distinguishes tables from plain text.
+    // Accepts both leading-pipe format (| --- | --- |) and bare format (--- | --- | ---).
+    // Requires at least one character (+) so empty lines don't accidentally match.
     const separatorLine = tableLines[1].trim();
-    const isSeparator = /^[|\s\-:=]*$/.test(separatorLine) && separatorLine.includes('-');
+    const isSeparator = /^[|\s\-:=]+$/.test(separatorLine) && separatorLine.includes('-');
 
     if (!isSeparator) {
         return { table: null, nextIndex: startIndex };

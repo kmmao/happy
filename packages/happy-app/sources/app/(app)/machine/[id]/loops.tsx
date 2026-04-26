@@ -14,11 +14,17 @@ import {
     machineRunAgentLoopNow,
     machineAISuggestAgentLoops,
     machineCreateAgentLoop,
+    machineListGitRepos,
+    type GitRepoEntry,
     type MachineAgentLoop,
     type MachineAgentLoopSuggestion,
 } from "@/sync/ops";
+import { TokenStorage } from "@/auth/tokenStorage";
 import { t } from "@/text";
-import { useMachine } from "@/sync/storage";
+import { useMachine, useSettings } from "@/sync/storage";
+import { ProfilePicker } from "@/components/ProfilePicker";
+import { getSupervisorAvailableProfiles } from "@/components/project/supervisorProfileSelection";
+import { DEFAULT_PROFILES } from "@/sync/profileUtils";
 import { utf8ToBase64 } from "@/utils/stringUtils";
 import {
     getLoopFormLayoutMode,
@@ -150,20 +156,43 @@ export default React.memo(function MachineLoopsPage() {
         setEditingAutoDreamProfile,
         autoDreamProfileEditorVisible,
         setAutoDreamProfileEditorVisible,
-        automationQuickBusy,
         profileId,
         projectId,
         load,
-        runAutomationQuickSetup,
         mutateBootstrapProfile,
         mutateAutoDreamProfile,
     } = loopsData;
+
+    const [mutatingLoopId, setMutatingLoopId] = React.useState<string | null>(null);
+    const [editingLoop, setEditingLoop] = React.useState<MachineAgentLoop | null>(null);
+    // AI 生成 loop 状态
+    const [showAIInput, setShowAIInput] = React.useState(false);
+    const [aiDirectory, setAIDirectory] = React.useState("");
+    const [aiGenerating, setAIGenerating] = React.useState(false);
+    const [aiSuggestions, setAISuggestions] = React.useState<MachineAgentLoopSuggestion[]>([]);
+    const [aiAdoptingKey, setAIAdoptingKey] = React.useState<string | null>(null);
+    const [aiAdoptingAll, setAIAdoptingAll] = React.useState(false);
+    // AI 路径选择器状态
+    const [aiRepoPickerOpen, setAIRepoPickerOpen] = React.useState(false);
+    const [aiRepoList, setAIRepoList] = React.useState<GitRepoEntry[]>([]);
+    const [aiRepoLoading, setAIRepoLoading] = React.useState(false);
+    const [aiRepoSearch, setAIRepoSearch] = React.useState("");
+    // AI 生成使用的 AiBackendProfile（null = 用 server 默认 env）
+    const [aiProfileId, setAIProfileId] = React.useState<string | null>(null);
+    const settings = useSettings();
+    const aiProfiles = React.useMemo(() => {
+        const builtIn = DEFAULT_PROFILES.map((p) => ({ id: p.id, name: p.name, isBuiltIn: true as const }));
+        const user = (settings.profiles ?? []).map((p) => ({ id: p.id, name: p.name }));
+        return getSupervisorAvailableProfiles(builtIn, user);
+    }, [settings.profiles]);
 
 const loopSuggestions = useLoopSuggestions({
         machineId,
         profileId,
         projectId,
         load,
+        aiProfileId,
+        loops,
     });
     const {
         suggestions,
@@ -177,16 +206,6 @@ const loopSuggestions = useLoopSuggestions({
         scanBootstrapRepos,
         adoptRepoSuggestions,
     } = loopSuggestions;
-
-    const [mutatingLoopId, setMutatingLoopId] = React.useState<string | null>(null);
-    const [editingLoop, setEditingLoop] = React.useState<MachineAgentLoop | null>(null);
-    // AI 生成 loop 状态
-    const [showAIInput, setShowAIInput] = React.useState(false);
-    const [aiDirectory, setAIDirectory] = React.useState("");
-    const [aiGenerating, setAIGenerating] = React.useState(false);
-    const [aiSuggestions, setAISuggestions] = React.useState<MachineAgentLoopSuggestion[]>([]);
-    const [aiAdoptingKey, setAIAdoptingKey] = React.useState<string | null>(null);
-    const [aiAdoptingAll, setAIAdoptingAll] = React.useState(false);
     const [loopEditorVisible, setLoopEditorVisible] = React.useState(false);
     const [showAutomation, setShowAutomation] = React.useState(true);
     const [searchQuery, setSearchQuery] = React.useState("");
@@ -202,6 +221,30 @@ const loopSuggestions = useLoopSuggestions({
         setLoopEditorVisible(true);
     }, []);
 
+    const handleOpenAIRepoPicker = React.useCallback(async () => {
+        if (!machineId) return;
+        setAIRepoPickerOpen((prev) => !prev);
+        if (aiRepoList.length === 0 && !aiRepoLoading) {
+            setAIRepoLoading(true);
+            try {
+                const repos = await machineListGitRepos(machineId);
+                setAIRepoList([...repos]);
+            } catch {
+                // 静默失败，用户可手动输入
+            } finally {
+                setAIRepoLoading(false);
+            }
+        }
+    }, [machineId, aiRepoList.length, aiRepoLoading]);
+
+    const aiFilteredRepos = React.useMemo(() => {
+        const needle = aiRepoSearch.trim().toLowerCase();
+        if (!needle) return aiRepoList;
+        return aiRepoList.filter(
+            (r) => r.name.toLowerCase().includes(needle) || r.repoPath.toLowerCase().includes(needle),
+        );
+    }, [aiRepoList, aiRepoSearch]);
+
     const handleAIGenerate = React.useCallback(async () => {
         if (!machineId || !aiDirectory.trim()) {
             Modal.alert(t("common.error"), t("machine.agentLoopPathRequired"));
@@ -210,11 +253,18 @@ const loopSuggestions = useLoopSuggestions({
         setAIGenerating(true);
         setAISuggestions([]);
         try {
-            const result = await machineAISuggestAgentLoops(machineId, {
-                directory: aiDirectory.trim(),
-                agent: "claude",
-            });
-            setAISuggestions(result.suggestions ?? []);
+            const credentials = await TokenStorage.getCredentials();
+            if (!credentials) {
+                Modal.alert(t("common.error"), t("errors.unknownError"));
+                return;
+            }
+            const suggestions = await machineAISuggestAgentLoops(
+                machineId,
+                aiDirectory.trim(),
+                credentials.token,
+                aiProfileId ?? undefined,
+            );
+            setAISuggestions(suggestions);
         } catch (error) {
             Modal.alert(t("common.error"), error instanceof Error ? error.message : String(error));
         } finally {
@@ -513,6 +563,15 @@ const loopSuggestions = useLoopSuggestions({
                             </Pressable>
                         </View>
 
+                        {/* AI 配置：共用于 AI 生成和 Bootstrap 扫描 */}
+                        <ProfilePicker
+                            value={aiProfileId}
+                            onChange={setAIProfileId}
+                            profiles={aiProfiles}
+                            defaultOptionLabel={t("supervisor.defaultProfileDefault")}
+                            description={t("supervisor.dimAiProfileDesc")}
+                        />
+
                         {/* 操作行：创建 + AI 生成 */}
                         <View style={styles.loopsActionRow}>
                             <Pressable
@@ -541,32 +600,94 @@ const loopSuggestions = useLoopSuggestions({
                             </Pressable>
                         </View>
 
-                        {/* AI 生成：展开的目录输入 + 生成按钮 */}
+                        {/* AI 生成：展开的目录输入 + 仓库选择器 + 生成按钮 */}
                         {showAIInput && (
-                            <View style={[styles.aiInputRow, { borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}>
-                                <TextInput
-                                    style={[styles.aiDirectoryInput, { color: theme.colors.text }]}
-                                    placeholder={t("machine.agentLoopPathPlaceholder")}
-                                    placeholderTextColor={theme.colors.textSecondary}
-                                    value={aiDirectory}
-                                    onChangeText={setAIDirectory}
-                                    autoCapitalize="none"
-                                    autoCorrect={false}
-                                />
-                                <Pressable
-                                    style={[styles.aiGenerateBtn, {
-                                        backgroundColor: aiGenerating ? theme.colors.surfaceHigh : theme.colors.header.tint,
-                                        opacity: aiGenerating ? 0.7 : 1,
-                                    }]}
-                                    onPress={() => void handleAIGenerate()}
-                                    disabled={aiGenerating}
-                                >
-                                    {aiGenerating ? (
-                                        <ActivityIndicator size="small" color={theme.colors.textSecondary} />
-                                    ) : (
-                                        <Ionicons name="sparkles" size={15} color="#fff" />
-                                    )}
-                                </Pressable>
+                            <View style={styles.aiInputWrap}>
+                                <View style={[styles.aiInputRow, { borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}>
+                                    <TextInput
+                                        style={[styles.aiDirectoryInput, { color: theme.colors.text }]}
+                                        placeholder={t("machine.agentLoopPathPlaceholder")}
+                                        placeholderTextColor={theme.colors.textSecondary}
+                                        value={aiDirectory}
+                                        onChangeText={setAIDirectory}
+                                        autoCapitalize="none"
+                                        autoCorrect={false}
+                                    />
+                                    <Pressable
+                                        style={[styles.aiRepoPickerBtn, {
+                                            borderColor: aiRepoPickerOpen ? theme.colors.primary : theme.colors.divider,
+                                            backgroundColor: aiRepoPickerOpen ? theme.colors.surfaceHigh : "transparent",
+                                        }]}
+                                        onPress={() => void handleOpenAIRepoPicker()}
+                                    >
+                                        {aiRepoLoading ? (
+                                            <ActivityIndicator size="small" color={theme.colors.textSecondary} />
+                                        ) : (
+                                            <Ionicons
+                                                name={aiRepoPickerOpen ? "folder-open-outline" : "folder-outline"}
+                                                size={16}
+                                                color={aiRepoPickerOpen ? theme.colors.primary : theme.colors.textSecondary}
+                                            />
+                                        )}
+                                    </Pressable>
+                                    <Pressable
+                                        style={[styles.aiGenerateBtn, {
+                                            backgroundColor: aiGenerating ? theme.colors.surfaceHigh : theme.colors.header.tint,
+                                            opacity: aiGenerating ? 0.7 : 1,
+                                        }]}
+                                        onPress={() => void handleAIGenerate()}
+                                        disabled={aiGenerating}
+                                    >
+                                        {aiGenerating ? (
+                                            <ActivityIndicator size="small" color={theme.colors.textSecondary} />
+                                        ) : (
+                                            <Ionicons name="sparkles" size={15} color="#fff" />
+                                        )}
+                                    </Pressable>
+                                </View>
+                                {aiRepoPickerOpen && (
+                                    <View style={[styles.aiRepoPickerPanel, { borderColor: theme.colors.divider, backgroundColor: theme.colors.surfaceHigh }]}>
+                                        <View style={[styles.aiRepoSearchBar, { borderBottomColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}>
+                                            <Ionicons name="search-outline" size={14} color={theme.colors.textSecondary} />
+                                            <TextInput
+                                                style={[styles.aiRepoSearchInput, { color: theme.colors.text }]}
+                                                placeholder={t("machine.agentLoopRepoSearch")}
+                                                placeholderTextColor={theme.colors.textSecondary}
+                                                value={aiRepoSearch}
+                                                onChangeText={setAIRepoSearch}
+                                                autoCapitalize="none"
+                                                autoCorrect={false}
+                                            />
+                                        </View>
+                                        {aiFilteredRepos.length === 0 ? (
+                                            <Text style={[styles.aiRepoEmptyText, { color: theme.colors.textSecondary }]}>
+                                                {aiRepoLoading ? t("common.loading") : t("machine.agentLoopRepoEmpty")}
+                                            </Text>
+                                        ) : (
+                                            aiFilteredRepos.map((repo) => (
+                                                <Pressable
+                                                    key={repo.repoPath}
+                                                    style={({ pressed }) => [
+                                                        styles.aiRepoItem,
+                                                        { borderBottomColor: theme.colors.divider, backgroundColor: pressed ? theme.colors.surfaceHigh : "transparent" },
+                                                    ]}
+                                                    onPress={() => {
+                                                        setAIDirectory(repo.repoPath);
+                                                        setAIRepoPickerOpen(false);
+                                                        setAIRepoSearch("");
+                                                    }}
+                                                >
+                                                    <Ionicons name="git-branch-outline" size={14} color={theme.colors.textSecondary} />
+                                                    <View style={styles.aiRepoItemText}>
+                                                        <Text style={[styles.aiRepoItemName, { color: theme.colors.text }]} numberOfLines={1}>{repo.name}</Text>
+                                                        <Text style={[styles.aiRepoItemPath, { color: theme.colors.textSecondary }]} numberOfLines={1}>{repo.repoPath}</Text>
+                                                    </View>
+                                                    <Ionicons name="chevron-forward" size={13} color={theme.colors.textSecondary} />
+                                                </Pressable>
+                                            ))
+                                        )}
+                                    </View>
+                                )}
                             </View>
                         )}
                     </View>
@@ -663,7 +784,6 @@ const loopSuggestions = useLoopSuggestions({
                     bootstrapEntries={bootstrapEntries}
                     showAutomation={showAutomation}
                     setShowAutomation={setShowAutomation}
-                    automationQuickBusy={automationQuickBusy}
                     mutatingBootstrapProfileId={mutatingBootstrapProfileId}
                     mutatingAutoDreamProfileId={mutatingAutoDreamProfileId}
                     bootstrapScanning={bootstrapScanning}
@@ -672,7 +792,6 @@ const loopSuggestions = useLoopSuggestions({
                     setBootstrapProfileEditorVisible={setBootstrapProfileEditorVisible}
                     setEditingAutoDreamProfile={setEditingAutoDreamProfile}
                     setAutoDreamProfileEditorVisible={setAutoDreamProfileEditorVisible}
-                    runAutomationQuickSetup={runAutomationQuickSetup}
                     mutateBootstrapProfile={mutateBootstrapProfile}
                     mutateAutoDreamProfile={mutateAutoDreamProfile}
                     scanBootstrapRepos={scanBootstrapRepos}
@@ -817,6 +936,9 @@ const styles = StyleSheet.create((theme) => ({
         flexDirection: "row",
         gap: 8,
     },
+    aiInputWrap: {
+        gap: 4,
+    },
     aiInputRow: {
         flexDirection: "row",
         alignItems: "center",
@@ -831,6 +953,15 @@ const styles = StyleSheet.create((theme) => ({
         fontSize: 13,
         paddingVertical: 8,
     },
+    aiRepoPickerBtn: {
+        width: 30,
+        height: 30,
+        borderRadius: 7,
+        borderWidth: 1,
+        alignItems: "center",
+        justifyContent: "center",
+        flexShrink: 0,
+    },
     aiGenerateBtn: {
         width: 34,
         height: 34,
@@ -838,6 +969,50 @@ const styles = StyleSheet.create((theme) => ({
         alignItems: "center",
         justifyContent: "center",
         flexShrink: 0,
+    },
+    aiRepoPickerPanel: {
+        borderWidth: 1,
+        borderRadius: 10,
+        overflow: "hidden",
+        maxHeight: 200,
+    },
+    aiRepoSearchBar: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 6,
+        paddingHorizontal: 10,
+        paddingVertical: 7,
+        borderBottomWidth: 1,
+    },
+    aiRepoSearchInput: {
+        flex: 1,
+        fontSize: 13,
+        paddingVertical: 0,
+    },
+    aiRepoEmptyText: {
+        fontSize: 12,
+        textAlign: "center",
+        paddingVertical: 12,
+    },
+    aiRepoItem: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 8,
+        paddingHorizontal: 12,
+        paddingVertical: 9,
+        borderBottomWidth: 1,
+    },
+    aiRepoItemText: {
+        flex: 1,
+        gap: 2,
+    },
+    aiRepoItemName: {
+        fontSize: 13,
+        fontWeight: "600",
+    },
+    aiRepoItemPath: {
+        fontSize: 11,
+        lineHeight: 15,
     },
     loopsActionCreate: {
         flex: 3,

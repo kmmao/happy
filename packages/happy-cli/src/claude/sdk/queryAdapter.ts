@@ -120,7 +120,7 @@ export function mapOptions(opts: QueryOptions): OfficialOptions {
   if (opts.additionalDirectories) result.additionalDirectories = opts.additionalDirectories;
 
   // ── Custom session title (SDK 0.2.119+) ──
-  if (opts.title) (result as OfficialOptions & { title?: string }).title = opts.title;
+  if (opts.title) result.title = opts.title;
 
   // ── Custom plan-mode workflow body (SDK 0.2.119+) ──
   if (opts.planModeInstructions) {
@@ -154,6 +154,15 @@ export function mapOptions(opts: QueryOptions): OfficialOptions {
   // ~85% tool-definition token saving is lost, but the step-based Q&A UI
   // stays reliable — see packages/happy-cli/scripts/patch-sdk-deferred-tools.cjs.
   env.ENABLE_TOOL_SEARCH = "auto:100";
+
+  // SDK 0.2.119 native binary: the `systemPrompt: { type:"preset", append }`
+  // path does NOT reliably inject the append content. As a fallback, we pass
+  // the append text via an env var that claude_remote_launcher.js reads and
+  // injects as `--append-system-prompt` CLI flag — this path always works.
+  if (opts.appendSystemPrompt) {
+    env.HAPPY_APPEND_SYSTEM_PROMPT = opts.appendSystemPrompt;
+  }
+
   result.env = env;
 
   return result;

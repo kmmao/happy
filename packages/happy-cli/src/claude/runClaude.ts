@@ -911,12 +911,11 @@ export async function runClaude(
       // Store reference for hook server callback
       currentSession = sessionInstance;
     },
-    mcpServers: {
-      happy: {
-        type: "http" as const,
-        url: happyServer.url,
-      },
-    },
+    // Happy MCP tools (change_title, update_progress, update_session_summary) are
+    // registered as SDK-native in-process servers in claudeRemoteLauncher.ts.
+    // SDK 0.2.119+ native binary does not reliably forward type:"http" MCP configs
+    // to the spawned Claude Code process, so we no longer pass them here.
+    mcpServers: {},
     session,
     claudeEnvVars: options.claudeEnvVars,
     claudeArgs: options.claudeArgs,

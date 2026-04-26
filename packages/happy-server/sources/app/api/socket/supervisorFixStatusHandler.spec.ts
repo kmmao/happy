@@ -300,6 +300,55 @@ describe("supervisorFixStatusHandler", () => {
         expect(invalidateSessionMock).not.toHaveBeenCalled();
     });
 
+    it("should NOT archive fix session when fixStatus is analyzed", async () => {
+        seedAction({
+            id: ACTION_ID,
+            projectId: PROJECT_ID,
+            accountId: USER_ID,
+            runId: RUN_ID,
+            title: "Analyze the bug",
+            approval: "approved",
+            fixSessionId: FIX_SESSION_ID,
+        });
+        seedSession({ id: FIX_SESSION_ID, active: true });
+
+        await socket.emit("supervisor-fix-status", {
+            actionId: ACTION_ID,
+            projectId: PROJECT_ID,
+            fixStatus: "analyzed",
+            fixSessionId: FIX_SESSION_ID,
+        });
+
+        // Session must NOT be archived so the user can review the analysis results
+        expect(dbMock.session.updateMany).not.toHaveBeenCalled();
+        expect(invalidateSessionMock).not.toHaveBeenCalled();
+    });
+
+    it("should still send push notification when fixStatus is analyzed", async () => {
+        seedAction({
+            id: ACTION_ID,
+            projectId: PROJECT_ID,
+            accountId: USER_ID,
+            runId: RUN_ID,
+            title: "Analyze the bug",
+            approval: "approved",
+            fixSessionId: FIX_SESSION_ID,
+        });
+        seedSession({ id: FIX_SESSION_ID, active: true });
+
+        await socket.emit("supervisor-fix-status", {
+            actionId: ACTION_ID,
+            projectId: PROJECT_ID,
+            fixStatus: "analyzed",
+            fixSessionId: FIX_SESSION_ID,
+        });
+
+        expect(pushMock).toHaveBeenCalledWith(USER_ID, expect.objectContaining({
+            type: "fix_complete",
+            title: "Analysis Complete",
+        }));
+    });
+
     it("should still send push notification on completion", async () => {
         seedAction({
             id: ACTION_ID,

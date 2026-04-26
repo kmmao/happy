@@ -26,7 +26,6 @@ interface LoopAutomationSectionProps {
     readonly bootstrapEntries: readonly RepoBootstrapEntry[];
     readonly showAutomation: boolean;
     readonly setShowAutomation: (fn: (prev: boolean) => boolean) => void;
-    readonly automationQuickBusy: boolean;
     readonly mutatingBootstrapProfileId: string | null;
     readonly mutatingAutoDreamProfileId: string | null;
     readonly bootstrapScanning: boolean;
@@ -35,7 +34,6 @@ interface LoopAutomationSectionProps {
     readonly setBootstrapProfileEditorVisible: (v: boolean) => void;
     readonly setEditingAutoDreamProfile: (p: MachineAutoDreamProfile | null) => void;
     readonly setAutoDreamProfileEditorVisible: (v: boolean) => void;
-    readonly runAutomationQuickSetup: () => Promise<void>;
     readonly mutateBootstrapProfile: (profile: MachineAgentLoopBootstrapProfile, action: "pause" | "resume" | "run-now" | "remove") => Promise<void>;
     readonly mutateAutoDreamProfile: (profile: MachineAutoDreamProfile, action: "pause" | "resume" | "run-now" | "remove") => Promise<void>;
     readonly scanBootstrapRepos: () => Promise<void>;
@@ -113,7 +111,6 @@ export const LoopAutomationSection = React.memo(function LoopAutomationSection(p
         bootstrapEntries,
         showAutomation,
         setShowAutomation,
-        automationQuickBusy,
         mutatingBootstrapProfileId,
         mutatingAutoDreamProfileId,
         bootstrapScanning,
@@ -122,7 +119,6 @@ export const LoopAutomationSection = React.memo(function LoopAutomationSection(p
         setBootstrapProfileEditorVisible,
         setEditingAutoDreamProfile,
         setAutoDreamProfileEditorVisible,
-        runAutomationQuickSetup,
         mutateBootstrapProfile,
         mutateAutoDreamProfile,
         scanBootstrapRepos,
@@ -206,84 +202,19 @@ export const LoopAutomationSection = React.memo(function LoopAutomationSection(p
         >
             {showAutomation ? (
                 <>
+                    {/* ── AI 扫描（主操作，替代一键按钮）── */}
                     <Item
-                        title={t("machine.automationQuickSetupTitle")}
-                        subtitle={t("machine.automationQuickSetupSubtitle")}
-                        subtitleLines={1}
-                        subtitleStyle={styles.quickSetupSubtitle}
-                        icon={<Ionicons name="flash-outline" size={20} color={theme.colors.primary} />}
-                        onPress={() => void runAutomationQuickSetup()}
-                        showChevron
-                        style={styles.automationQuickRow}
-                        rightElement={automationQuickBusy ? <ActivityIndicator size="small" color={theme.colors.textSecondary} /> : undefined}
-                    />
-                    <View style={[styles.automationDivider, { backgroundColor: theme.colors.divider }]} />
-                    {renderSectionBanner(t("machine.agentLoopBootstrapProfiles"), t("machine.agentLoopBootstrapHint"), String(bootstrapProfiles.length), "git-branch-outline", { compact: true }, theme, formLayoutStacked)}
-                    <Item
-                        title={t("machine.automationCreateBootstrapProfile")}
-                        icon={<Ionicons name="add-circle-outline" size={20} color={theme.colors.primary} />}
-                        onPress={() => { setEditingBootstrapProfile(null); setBootstrapProfileEditorVisible(true); }}
-                        showChevron
-                        style={styles.automationActionRow}
-                    />
-                    {bootstrapProfiles.length === 0 ? (
-                        renderEmptyStateCard("git-branch-outline", t("machine.agentLoopBootstrapProfilesEmpty"), undefined, { compact: true }, theme)
-                    ) : bootstrapProfiles.map((profile) => (
-                        <Item
-                            key={profile.id}
-                            title={profile.name || profile.id}
-                            subtitle={getBootstrapProfileSubtitle(profile)}
-                            detail={profile.status}
-                            detailStyle={{ color: getBootstrapProfileStatusColor(profile, theme) }}
-                            icon={<Ionicons name="git-branch-outline" size={20} color={getBootstrapProfileStatusColor(profile, theme)} />}
-                            onPress={() => openBootstrapProfileActions(profile)}
-                            showChevron
-                            style={styles.automationProfileRow}
-                            rightElement={mutatingBootstrapProfileId === profile.id ? <ActivityIndicator size="small" color={theme.colors.textSecondary} /> : undefined}
-                        />
-                    ))}
-
-                    <View style={[styles.automationDivider, { backgroundColor: theme.colors.divider }]} />
-                    {renderSectionBanner(t("machine.autoDreamProfiles"), t("machine.autoDreamHint"), String(autoDreamProfiles.length), "moon-outline", { compact: true }, theme, formLayoutStacked)}
-                    <Item
-                        title={t("machine.automationCreateAutoDreamProfile")}
-                        icon={<Ionicons name="add-circle-outline" size={20} color={theme.colors.textLink} />}
-                        onPress={() => { setEditingAutoDreamProfile(null); setAutoDreamProfileEditorVisible(true); }}
-                        showChevron
-                        style={styles.automationActionRow}
-                    />
-                    {autoDreamProfiles.length === 0 ? (
-                        renderEmptyStateCard("moon-outline", t("machine.autoDreamProfilesEmpty"), undefined, { compact: true }, theme)
-                    ) : autoDreamProfiles.map((profile) => (
-                        <Item
-                            key={profile.id}
-                            title={profile.name || profile.id}
-                            subtitle={getAutoDreamProfileSubtitle(profile)}
-                            detail={profile.status === "running" ? `${profile.status} (${profile.stage})` : profile.status}
-                            detailStyle={{ color: getAutoDreamProfileStatusColor(profile, theme) }}
-                            icon={<Ionicons name="moon-outline" size={20} color={getAutoDreamProfileStatusColor(profile, theme)} />}
-                            onPress={() => openAutoDreamProfileActions(profile)}
-                            showChevron
-                            style={styles.automationProfileRow}
-                            rightElement={mutatingAutoDreamProfileId === profile.id ? <ActivityIndicator size="small" color={theme.colors.textSecondary} /> : undefined}
-                        />
-                    ))}
-
-                    <View style={[styles.automationDivider, { backgroundColor: theme.colors.divider }]} />
-                    {renderSectionBanner(t("machine.agentLoopBootstrap"), t("machine.agentLoopBootstrapHint"), String(bootstrapEntries.length), "search-outline", { compact: true }, theme, formLayoutStacked)}
-                    <Item
-                        title={t("gitHosts.scanRepos")}
-                        detail={bootstrapScanning ? t("common.scanning") : String(bootstrapEntries.length)}
-                        icon={<Ionicons name="search-outline" size={20} color={theme.colors.accentOrange} />}
+                        title={t("machine.agentLoopAIGenerate")}
+                        subtitle={t("machine.agentLoopAIScanHint")}
+                        subtitleLines={2}
+                        icon={<Ionicons name="sparkles-outline" size={20} color={theme.colors.header.tint} />}
                         onPress={() => void scanBootstrapRepos()}
                         showChevron
-                        style={styles.automationActionRow}
+                        style={styles.automationQuickRow}
                         rightElement={bootstrapScanning ? <ActivityIndicator size="small" color={theme.colors.textSecondary} /> : undefined}
                     />
-                    {bootstrapEntries.length === 0 ? (
-                        renderEmptyStateCard("search-outline", t("machine.agentLoopBootstrapEmpty"), undefined, { compact: true }, theme)
-                    ) : bootstrapEntries.map((entry) => {
-                        const missingCount = entry.suggestions.filter((suggestion) => !suggestion.alreadyConfigured).length;
+                    {bootstrapEntries.length > 0 && bootstrapEntries.map((entry) => {
+                        const missingCount = entry.suggestions.filter((s) => !s.alreadyConfigured).length;
                         return (
                             <View key={entry.repo.repoPath} style={[styles.suggestionCard, { borderColor: theme.colors.divider, backgroundColor: theme.colors.surfaceHigh }]}>
                                 <View style={styles.cardHeaderRow}>
@@ -291,14 +222,14 @@ export const LoopAutomationSection = React.memo(function LoopAutomationSection(p
                                         <Text style={[styles.suggestionTitle, { color: theme.colors.text }]}>{entry.repo.name}</Text>
                                         <Text style={[styles.cardPathText, { color: theme.colors.textSecondary }]}>{entry.repo.repoPath}</Text>
                                     </View>
-                                    <Ionicons name="search-outline" size={18} color={theme.colors.accentOrange} />
+                                    <Ionicons name="sparkles-outline" size={16} color={theme.colors.header.tint} />
                                 </View>
                                 <View style={styles.metaPillRow}>
                                     <View style={[styles.metaPill, { borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}>
-                                        <Text style={[styles.metaPillText, { color: theme.colors.textSecondary }]}>{entry.suggestions.length} suggestions</Text>
+                                        <Text style={[styles.metaPillText, { color: theme.colors.textSecondary }]}>{t("machine.agentLoopSuggestionCount", { count: entry.suggestions.length })}</Text>
                                     </View>
                                     <View style={[styles.metaPill, { borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}>
-                                        <Text style={[styles.metaPillText, { color: theme.colors.textSecondary }]}>{missingCount} creatable</Text>
+                                        <Text style={[styles.metaPillText, { color: theme.colors.textSecondary }]}>{t("machine.agentLoopCreatableCount", { count: missingCount })}</Text>
                                     </View>
                                 </View>
                                 <View style={styles.suggestionActions}>
@@ -307,11 +238,9 @@ export const LoopAutomationSection = React.memo(function LoopAutomationSection(p
                                         onPress={() => void adoptRepoSuggestions(entry, false)}
                                         disabled={missingCount === 0 || bootstrappingRepoPath === entry.repo.repoPath}
                                     >
-                                        {bootstrappingRepoPath === entry.repo.repoPath ? (
-                                            <ActivityIndicator size="small" color={theme.colors.textSecondary} />
-                                        ) : (
-                                            <Text style={{ color: theme.colors.text }}>{t("machine.agentLoopBootstrapCreateAll")}</Text>
-                                        )}
+                                        {bootstrappingRepoPath === entry.repo.repoPath
+                                            ? <ActivityIndicator size="small" color={theme.colors.textSecondary} />
+                                            : <Text style={{ color: theme.colors.text }}>{t("machine.agentLoopBootstrapCreateAll")}</Text>}
                                     </Pressable>
                                     <Pressable
                                         style={[styles.inlineSecondaryButton, { borderColor: theme.colors.divider, backgroundColor: theme.colors.surface, opacity: missingCount === 0 ? 0.6 : 1 }]}
@@ -324,6 +253,62 @@ export const LoopAutomationSection = React.memo(function LoopAutomationSection(p
                             </View>
                         );
                     })}
+
+                    {/* ── Bootstrap 配置（定期自动扫描档案）── */}
+                    <View style={[styles.sectionBlock, { borderTopColor: theme.colors.divider }]}>
+                        {renderSectionBanner(t("machine.agentLoopBootstrapProfiles"), t("machine.agentLoopBootstrapHint"), String(bootstrapProfiles.length), "git-branch-outline", undefined, theme, formLayoutStacked)}
+                        <Item
+                            title={t("machine.automationCreateBootstrapProfile")}
+                            icon={<Ionicons name="add-circle-outline" size={20} color={theme.colors.primary} />}
+                            onPress={() => { setEditingBootstrapProfile(null); setBootstrapProfileEditorVisible(true); }}
+                            showChevron
+                            style={styles.automationActionRow}
+                        />
+                        {bootstrapProfiles.length === 0
+                            ? renderEmptyStateCard("git-branch-outline", t("machine.agentLoopBootstrapProfilesEmpty"), undefined, { compact: true }, theme)
+                            : bootstrapProfiles.map((profile) => (
+                                <Item
+                                    key={profile.id}
+                                    title={profile.name || profile.id}
+                                    subtitle={getBootstrapProfileSubtitle(profile)}
+                                    detail={profile.status}
+                                    detailStyle={{ color: getBootstrapProfileStatusColor(profile, theme) }}
+                                    icon={<Ionicons name="git-branch-outline" size={20} color={getBootstrapProfileStatusColor(profile, theme)} />}
+                                    onPress={() => openBootstrapProfileActions(profile)}
+                                    showChevron
+                                    style={styles.automationProfileRow}
+                                    rightElement={mutatingBootstrapProfileId === profile.id ? <ActivityIndicator size="small" color={theme.colors.textSecondary} /> : undefined}
+                                />
+                            ))}
+                    </View>
+
+                    {/* ── Auto-Dream 档案 ── */}
+                    <View style={[styles.sectionBlock, { borderTopColor: theme.colors.divider }]}>
+                        {renderSectionBanner(t("machine.autoDreamProfiles"), t("machine.autoDreamHint"), String(autoDreamProfiles.length), "moon-outline", undefined, theme, formLayoutStacked)}
+                        <Item
+                            title={t("machine.automationCreateAutoDreamProfile")}
+                            icon={<Ionicons name="add-circle-outline" size={20} color={theme.colors.textLink} />}
+                            onPress={() => { setEditingAutoDreamProfile(null); setAutoDreamProfileEditorVisible(true); }}
+                            showChevron
+                            style={styles.automationActionRow}
+                        />
+                        {autoDreamProfiles.length === 0
+                            ? renderEmptyStateCard("moon-outline", t("machine.autoDreamProfilesEmpty"), undefined, { compact: true }, theme)
+                            : autoDreamProfiles.map((profile) => (
+                                <Item
+                                    key={profile.id}
+                                    title={profile.name || profile.id}
+                                    subtitle={getAutoDreamProfileSubtitle(profile)}
+                                    detail={profile.status === "running" ? `${profile.status} (${profile.stage})` : profile.status}
+                                    detailStyle={{ color: getAutoDreamProfileStatusColor(profile, theme) }}
+                                    icon={<Ionicons name="moon-outline" size={20} color={getAutoDreamProfileStatusColor(profile, theme)} />}
+                                    onPress={() => openAutoDreamProfileActions(profile)}
+                                    showChevron
+                                    style={styles.automationProfileRow}
+                                    rightElement={mutatingAutoDreamProfileId === profile.id ? <ActivityIndicator size="small" color={theme.colors.textSecondary} /> : undefined}
+                                />
+                            ))}
+                    </View>
                 </>
             ) : null}
         </ItemGroup>
@@ -504,5 +489,8 @@ const styles = StyleSheet.create((_theme) => ({
     sectionBadgeText: {
         fontSize: 12,
         fontWeight: "700",
+    },
+    sectionBlock: {
+        borderTopWidth: StyleSheet.hairlineWidth,
     },
 }));

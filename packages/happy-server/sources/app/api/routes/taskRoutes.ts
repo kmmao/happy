@@ -33,6 +33,7 @@ const CreateTaskBodySchema = z.object({
     maxAttempts: z.number().int().min(1).max(10).default(3),
     skillIds: z.array(z.string()).max(10).default([]),
     directory: z.string().min(1).max(4096).optional(),
+    profileId: z.string().optional(),
 });
 
 const UpdateTaskBodySchema = z.object({

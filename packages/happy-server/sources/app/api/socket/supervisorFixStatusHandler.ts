@@ -78,13 +78,13 @@ export function supervisorFixStatusHandler(
                 `supervisor-fix-status: action ${data.actionId} → ${data.fixStatus}`,
             );
 
-            // Archive fix session and send notifications on terminal status.
-            // Both completed and failed are terminal: the fix session is done
-            // regardless of outcome (unlike run handler which only archives on completed).
+            // Archive fix session on truly terminal statuses only.
+            // "analyzed" is intentionally excluded: the analyze-first session should
+            // remain accessible so the user can review the analysis results before
+            // deciding whether to proceed with a fix.
             if (
                 data.fixStatus === "completed" ||
-                data.fixStatus === "failed" ||
-                data.fixStatus === "analyzed"
+                data.fixStatus === "failed"
             ) {
                 // Archive the fix session first (before broadcasting status)
                 // so clients see active: false when they query after the status event.
@@ -114,7 +114,14 @@ export function supervisorFixStatusHandler(
                         recipientFilter: { type: "user-scoped-only" },
                     });
                 }
+            }
 
+            // Send push notification for all notable statuses (including analyzed).
+            if (
+                data.fixStatus === "completed" ||
+                data.fixStatus === "failed" ||
+                data.fixStatus === "analyzed"
+            ) {
                 const notifTitle =
                     data.fixStatus === "completed"
                         ? "Fix Applied Successfully"

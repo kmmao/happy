@@ -144,7 +144,10 @@ class AutoOptionSendService {
         const sessions =
             storage.getState().localSettings.autoOptionSendSessions ?? {};
         for (const [sessionId, enabled] of Object.entries(sessions)) {
-            if (enabled) {
+            // Skip sessions already tracked in memory — a reconnect/restore call
+            // must not clobber in-memory state (e.g. user toggled off via
+            // context-invalidated but storage still shows enabled).
+            if (enabled && !this.states.has(sessionId)) {
                 this.states.set(sessionId, {
                     ...createInitialAutoOptionSendState(),
                     enabled: true,
@@ -400,7 +403,24 @@ class AutoOptionSendService {
 
             if (remaining <= 0) {
                 this.clearTimer(sessionId);
-                this.fireTimerFinished(sessionId);
+                // Capture the candidate identity so the deferred callback can verify
+                // the state hasn't changed (re-armed or toggled off) in the interim.
+                const firedHash = state.candidate.optionsHash;
+                const firedStartedAt = state.candidate.startedAt;
+                // Defer to next macrotask so any pending user events (e.g. toggle-off
+                // clicks queued in the same 250 ms window) run first and can cancel.
+                setTimeout(() => {
+                    const latestState = this.states.get(sessionId);
+                    if (
+                        !latestState ||
+                        latestState.status !== "armed" ||
+                        latestState.candidate?.optionsHash !== firedHash ||
+                        latestState.candidate?.startedAt !== firedStartedAt
+                    ) {
+                        return;
+                    }
+                    this.fireTimerFinished(sessionId);
+                }, 0);
             }
         }, 250);
         this.timers.set(sessionId, interval);

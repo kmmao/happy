@@ -139,6 +139,9 @@ class ApiSocket {
       "listRemoteGitRepos",
       "createRemoteWebhook",
       "deleteRemoteWebhook",
+      // AI-powered methods that call external APIs and can be slow
+      "loop-suggest-ai",
+      "loop-suggest",
     ];
     return longRunningMethods.includes(method) ? LONG_TIMEOUT : 30_000;
   }

@@ -691,10 +691,10 @@ const style = StyleSheet.create((theme) => ({
 
   text: {
     ...Typography.default(),
-    fontSize: 16,
-    lineHeight: 24, // Reduced from 28 to 24
-    marginTop: 8,
-    marginBottom: 8,
+    fontSize: 15,
+    lineHeight: 23,
+    marginTop: 6,
+    marginBottom: 6,
     color: theme.colors.text,
     fontWeight: "400",
   },
@@ -963,7 +963,6 @@ const style = StyleSheet.create((theme) => ({
     borderColor: theme.colors.divider,
     borderRadius: 8,
     overflow: "hidden",
-    alignSelf: "flex-start",
     maxWidth: "100%",
   },
   tableScrollView: {
@@ -976,13 +975,14 @@ const style = StyleSheet.create((theme) => ({
     flexDirection: "column",
     borderRightWidth: 1,
     borderRightColor: theme.colors.divider,
+    flexShrink: 1,
   },
   tableColumnLast: {
     borderRightWidth: 0,
   },
   tableCell: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
     borderBottomWidth: 1,
     borderBottomColor: theme.colors.divider,
     alignItems: "flex-start",
@@ -995,18 +995,19 @@ const style = StyleSheet.create((theme) => ({
   },
   tableHeaderCell: {
     backgroundColor: theme.colors.surfaceHigh,
+    paddingVertical: 7,
   },
   tableHeaderText: {
     ...Typography.default("semiBold"),
     color: theme.colors.text,
-    fontSize: 16,
-    lineHeight: 24,
+    fontSize: 13,
+    lineHeight: 18,
   },
   tableCellText: {
     ...Typography.default(),
     color: theme.colors.text,
-    fontSize: 16,
-    lineHeight: 24,
+    fontSize: 13,
+    lineHeight: 18,
   },
   tableFirstColText: {
     ...Typography.default("semiBold"),

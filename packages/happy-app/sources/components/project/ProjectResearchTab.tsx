@@ -441,37 +441,40 @@ export const ProjectResearchTab = React.memo(
                                 syncStatus={syncStatus}
                             />
                         }>
-                            {isRunning && activeRun ? (
-                                /* Running: swap entire form for progress + cancel */
-                                <View style={styles.runningContainer}>
-                                    <SupervisorProgressView
-                                        status={activeRun.status}
-                                        elapsedSeconds={elapsedSeconds}
-                                        dimensionProgress={dimensionProgress}
-                                        analyzingLabel={t("competitorResearch.analyzing")}
-                                    />
-                                    <View style={styles.buttonRow}>
-                                        <Pressable
-                                            style={[styles.button, styles.cancelButton]}
-                                            onPress={doCancel}
-                                            disabled={cancelLoading}
-                                        >
-                                            {cancelLoading ? (
-                                                <ActivityIndicator size="small" color="#fff" />
-                                            ) : (
-                                                <>
-                                                    <Ionicons name="close-circle" size={18} color="#fff" />
-                                                    <Text style={styles.buttonText}>
-                                                        {t("common.cancel")}
-                                                    </Text>
-                                                </>
-                                            )}
-                                        </Pressable>
-                                    </View>
+                            {/* Running view: always mounted to avoid ScrollView height jump on web */}
+                                <View style={isRunning && activeRun ? styles.runningContainer : styles.hidden}>
+                                    {activeRun && (
+                                        <>
+                                            <SupervisorProgressView
+                                                status={activeRun.status}
+                                                elapsedSeconds={elapsedSeconds}
+                                                dimensionProgress={dimensionProgress}
+                                                analyzingLabel={t("competitorResearch.analyzing")}
+                                            />
+                                            <View style={styles.buttonRow}>
+                                                <Pressable
+                                                    style={[styles.button, styles.cancelButton]}
+                                                    onPress={doCancel}
+                                                    disabled={cancelLoading}
+                                                >
+                                                    {cancelLoading ? (
+                                                        <ActivityIndicator size="small" color="#fff" />
+                                                    ) : (
+                                                        <>
+                                                            <Ionicons name="close-circle" size={18} color="#fff" />
+                                                            <Text style={styles.buttonText}>
+                                                                {t("common.cancel")}
+                                                            </Text>
+                                                        </>
+                                                    )}
+                                                </Pressable>
+                                            </View>
+                                        </>
+                                    )}
                                 </View>
-                            ) : (
-                                /* Idle: full form, no disabled state needed */
-                                <>
+
+                                {/* Idle form: always mounted, hidden when running */}
+                                <View style={isRunning ? styles.hidden : undefined}>
                                     <View style={styles.dimensionHeader}>
                                         <Text style={[styles.inputLabel, { color: theme.colors.text }]}>
                                             {t("competitorResearch.dimensionsSection")}
@@ -595,8 +598,7 @@ export const ProjectResearchTab = React.memo(
                                             )}
                                         </Pressable>
                                     </View>
-                                </>
-                            )}
+                                </View>
                         </ItemGroup>
 
                         {/* Reports — compact cards */}
@@ -852,6 +854,9 @@ const styles = StyleSheet.create((theme) => ({
         paddingTop: 16,
         paddingBottom: 4,
         gap: 8,
+    },
+    hidden: {
+        display: "none",
     },
     reportCard: {
         flexDirection: "row",

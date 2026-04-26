@@ -1,11 +1,13 @@
 import * as React from "react";
 import {
     machineCreateAgentLoop,
-    machineListGitRepos,
     machineSuggestAgentLoops,
+    machineAISuggestAgentLoops,
     type GitRepoEntry,
+    type MachineAgentLoop,
     type MachineAgentLoopSuggestion,
 } from "@/sync/ops";
+import { TokenStorage } from "@/auth/tokenStorage";
 import { Modal } from "@/modal";
 import { t } from "@/text";
 
@@ -19,6 +21,10 @@ interface UseLoopSuggestionsParams {
     profileId: string;
     projectId: string;
     load: (kind: "initial" | "refresh") => Promise<void>;
+    /** AiBackendProfile key to use for the AI-powered bootstrap scan. null = server env fallback. */
+    aiProfileId?: string | null;
+    /** Existing loops — bootstrap scan only checks directories already being monitored. */
+    loops: readonly MachineAgentLoop[];
 }
 
 interface UseLoopSuggestionsResult {
@@ -42,6 +48,8 @@ export function useLoopSuggestions({
     profileId,
     projectId,
     load,
+    aiProfileId,
+    loops,
 }: UseLoopSuggestionsParams): UseLoopSuggestionsResult {
     const [suggestions, setSuggestions] = React.useState<MachineAgentLoopSuggestion[]>([]);
     const [suggesting, setSuggesting] = React.useState(false);
@@ -212,26 +220,52 @@ export function useLoopSuggestions({
         if (!machineId) {
             return;
         }
+        // Derive unique directories from existing loops — only check what's already monitored
+        const dirs = [...new Set(
+            loops
+                .map((l) => l.directory.replace(/\/+$/, "").trim())
+                .filter((d) => d.length > 0),
+        )].sort();
+
+        if (dirs.length === 0) {
+            setBootstrapEntries([]);
+            return;
+        }
+
         setBootstrapScanning(true);
         try {
-            const repos = await machineListGitRepos(machineId);
-            const limitedRepos = repos.slice(0, 20);
-            const entries = await Promise.all(limitedRepos.map(async (repo) => {
-                const result = await machineSuggestAgentLoops(machineId, {
-                    directory: repo.repoPath,
-                    agent: "claude",
-                    projectId: projectId.trim() || undefined,
-                    profileId: profileId.trim() || undefined,
-                });
-                return { repo, suggestions: result.suggestions ?? [] } satisfies RepoBootstrapEntry;
-            }));
-            setBootstrapEntries(entries.filter((entry) => entry.suggestions.length > 0));
+            const credentials = await TokenStorage.getCredentials();
+            if (!credentials) {
+                Modal.alert(t("common.error"), t("errors.unknownError"));
+                return;
+            }
+            // Sequential — each directory needs an RPC + server AI call
+            const entries: RepoBootstrapEntry[] = [];
+            for (const dir of dirs) {
+                try {
+                    const suggestions = await machineAISuggestAgentLoops(
+                        machineId,
+                        dir,
+                        credentials.token,
+                        aiProfileId ?? undefined,
+                    );
+                    if (suggestions.length > 0) {
+                        const name = dir.split("/").filter(Boolean).at(-1) ?? dir;
+                        // Construct a minimal GitRepoEntry — UI only needs repoPath + name
+                        const repo: GitRepoEntry = { repoPath: dir, name, remoteUrl: "" };
+                        entries.push({ repo, suggestions });
+                    }
+                } catch {
+                    // One directory failing shouldn't abort the rest
+                }
+            }
+            setBootstrapEntries(entries);
         } catch (error) {
             Modal.alert(t("common.error"), error instanceof Error ? error.message : String(error));
         } finally {
             setBootstrapScanning(false);
         }
-    }, [machineId, profileId, projectId]);
+    }, [machineId, loops, aiProfileId]);
 
     const adoptRepoSuggestions = React.useCallback(async (entry: RepoBootstrapEntry, runNow: boolean) => {
         if (!machineId) {

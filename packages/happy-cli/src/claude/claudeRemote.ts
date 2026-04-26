@@ -325,6 +325,9 @@ export async function claudeRemote(opts: {
     // this when `permissionMode === 'plan'`; passing it unconditionally is a
     // no-op outside plan mode.
     planModeInstructions: HAPPY_PLAN_MODE_INSTRUCTIONS,
+    // Stable link from the Claude Code JSONL back to the Happy session (SDK 0.2.119+).
+    // Only applied to new sessions — resume/continue keeps whatever title was persisted.
+    title: opts.happySessionId,
     // SessionStore @alpha adapter — undefined unless HAPPY_USE_SESSION_STORE=1.
     // When enabled the SDK dual-writes transcript entries to our observer
     // adapter (in-memory) in addition to the usual on-disk JSONL, so we can

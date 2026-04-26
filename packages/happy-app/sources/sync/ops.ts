@@ -8,6 +8,7 @@ import { sync } from "./sync";
 import { storage } from "./storage";
 import type { MachineMetadata } from "./storageTypes";
 import { getErrorMessage } from "@/utils/errors";
+import { getServerUrl } from "./serverConfig";
 import {
   normalizeResolvedRuntimeProfile,
   type ResolvedRuntimeProfile,
@@ -848,16 +849,45 @@ export async function machineSuggestAgentLoops(
   );
 }
 
-/** AI-powered loop suggestion — reads project context and calls Claude API on the CLI side. */
+/**
+ * AI-powered loop suggestion using a two-step approach that mirrors the
+ * dimension prompt generation pattern in supervisorDimensionRoutes:
+ *
+ * 1. CLI RPC "loop-get-context": daemon reads project files (README, package.json,
+ *    CLAUDE.md, directory listing) and returns a context string.
+ * 2. Server POST /v1/agent-loops/suggest-ai: server uses the user's stored AI
+ *    credentials (AiBackendProfile or server env) to call Anthropic/OpenAI and
+ *    generate loop suggestions — no API key needed in the daemon environment.
+ */
 export async function machineAISuggestAgentLoops(
   machineId: string,
-  input: MachineAgentLoopSuggestInput,
-): Promise<{ suggestions: MachineAgentLoopSuggestion[] }> {
-  return apiSocket.machineRPC(
-    machineId,
-    "loop-suggest-ai",
-    input,
-  );
+  directory: string,
+  authToken: string,
+  profileId?: string,
+): Promise<MachineAgentLoopSuggestion[]> {
+  // Step 1: gather project context from CLI daemon
+  const { context } = await apiSocket.machineRPC<
+    { context: string },
+    { directory: string }
+  >(machineId, "loop-get-context", { directory });
+
+  // Step 2: server calls AI with user credentials
+  const response = await fetch(`${getServerUrl()}/v1/agent-loops/suggest-ai`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${authToken}`,
+    },
+    body: JSON.stringify({ directory, context, profileId: profileId ?? null }),
+  });
+
+  if (!response.ok) {
+    const err = (await response.json().catch(() => ({}))) as { error?: string };
+    throw new Error(err.error ?? `AI loop suggestion failed: ${response.status}`);
+  }
+
+  const data = (await response.json()) as { suggestions: MachineAgentLoopSuggestion[] };
+  return data.suggestions ?? [];
 }
 
 
