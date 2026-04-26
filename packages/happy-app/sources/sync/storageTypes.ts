@@ -223,7 +223,7 @@ export interface Session {
   // Do NOT store reducerState itself on Session - it's mutable and should only exist in SessionMessages.
   resolvedModelId?: string | null; // Actual model ID reported by CLI in turn-end (e.g. "claude-opus-4-6")
   needsAttention?: boolean; // true when turn-end received and user hasn't viewed the session
-  starred?: boolean | null; // true when user has starred/bookmarked the session (device-local, persisted in MMKV)
+  starred?: boolean | null; // true when user has starred/bookmarked the session (synced via server preferences, cached in MMKV)
   /** Authoritative SDK session lifecycle state (idle/running/requires_action) */
   sdkSessionState?: "idle" | "running" | "requires_action" | null;
   latestUsage?: {

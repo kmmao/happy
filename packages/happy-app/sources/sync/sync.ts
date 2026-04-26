@@ -1171,7 +1171,8 @@ class Sync {
         session.thinkingMode ||
         session.effortLevel ||
         session.maxBudgetUsd != null ||
-        session.taskBudgetTokens != null;
+        session.taskBudgetTokens != null ||
+        session.starred;
       if (!hasLocalData) continue;
 
       // Trigger sync (debounced, will batch naturally)
@@ -1361,6 +1362,7 @@ class Sync {
           effortLevel: session.effortLevel,
           maxBudgetUsd: session.maxBudgetUsd,
           taskBudgetTokens: session.taskBudgetTokens,
+          starred: session.starred,
         };
 
         const encrypted =

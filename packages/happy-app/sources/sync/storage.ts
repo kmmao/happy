@@ -639,10 +639,11 @@ export const storage = create<StorageState>()((set, get) => {
             savedNeedsAttention[session.id] ??
             false;
 
-          // Resolve starred: prefer existing in-memory (user toggle), then saved MMKV
+          // Resolve starred: prefer in-memory (live toggle) > server value (cross-device) > MMKV cache (local fallback)
           const existingStarred = state.sessions[session.id]?.starred;
           const resolvedStarred =
             existingStarred ??
+            session.starred ??
             savedStarred[session.id] ??
             false;
 
@@ -846,6 +847,16 @@ export const storage = create<StorageState>()((set, get) => {
           }
         });
         saveSessionNeedsAttention(allNeedsAttention);
+
+        // Persist starred changes — write back server-resolved values so MMKV stays in sync across devices
+        const allStarred: Record<string, boolean> = {};
+        Object.entries(mergedSessions).forEach(([id, sess]) => {
+          if (sess.starred) {
+            allStarred[id] = true;
+          }
+        });
+        sessionStarred = allStarred;
+        saveSessionStarred(allStarred);
 
         // Build new unified list view data
         const sessionListViewData = buildSessionListViewData(
@@ -1427,6 +1438,9 @@ export const storage = create<StorageState>()((set, get) => {
           sessionListViewData: buildSessionListViewData(updatedSessions, realtimeSessionSort),
         };
       });
+      // Sync starred state to server so other devices see the change in real time
+      stagePendingSessionPreferences(sessionId);
+      onPreferencesChanged?.(sessionId);
     },
     updateSessionPermissionMode: (sessionId: string, mode: string) => {
       set((state) => {

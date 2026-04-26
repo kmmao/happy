@@ -66,6 +66,7 @@ export function mergeUpdatedSession(
           effortLevel: input.preferences.effortLevel,
           maxBudgetUsd: input.preferences.maxBudgetUsd,
           taskBudgetTokens: input.preferences.taskBudgetTokens,
+          starred: input.preferences.starred,
         }
       : {}),
     updatedAt: input.updatedAt,
