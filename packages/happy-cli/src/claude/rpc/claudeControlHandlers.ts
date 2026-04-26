@@ -46,6 +46,10 @@ import {
   type ReadFileResponse,
   type McpCallRequest,
   type McpCallResponse,
+  type GetContextUsageRequest,
+  type GetContextUsageResponse,
+  type GetMcpServersRequest,
+  type GetMcpServersResponse,
 } from "@kmmao/happy-wire";
 
 // ─── Constants ──────────────────────────────────────────────────────────────
@@ -378,5 +382,92 @@ export function registerClaudeControlHandlers(
     },
   );
 
-  logger.debug("[claudeControl] Registered 6 claude-control:* RPC handlers");
+  // get_context_usage — context window breakdown via SDK getContextUsage()
+  rpcHandlerManager.registerHandler<GetContextUsageRequest, GetContextUsageResponse>(
+    `${scope}:get_context_usage`,
+    async () => {
+      const q = getCurrentQuery();
+      if (!q) {
+        return {
+          categories: [],
+          totalTokens: 0,
+          maxTokens: 200000,
+          percentage: 0,
+          model: "unknown",
+          memoryFiles: [],
+          mcpTools: [],
+        };
+      }
+      try {
+        const raw = await q.getContextUsage();
+        return {
+          categories: raw.categories.map((c) => ({
+            name: c.name,
+            tokens: c.tokens,
+            color: c.color,
+            isDeferred: c.isDeferred,
+          })),
+          totalTokens: raw.totalTokens,
+          maxTokens: raw.maxTokens,
+          percentage: raw.percentage,
+          model: raw.model,
+          memoryFiles: (raw.memoryFiles ?? []).map((f) => ({
+            path: f.path,
+            type: f.type,
+            tokens: f.tokens,
+          })),
+          mcpTools: (raw.mcpTools ?? []).map((t) => ({
+            name: t.name,
+            serverName: t.serverName,
+            tokens: t.tokens,
+            isLoaded: t.isLoaded,
+          })),
+        };
+      } catch (e) {
+        logger.debug("[claudeControl] get_context_usage failed", e);
+        return {
+          categories: [],
+          totalTokens: 0,
+          maxTokens: 200000,
+          percentage: 0,
+          model: "unknown",
+          memoryFiles: [],
+          mcpTools: [],
+        };
+      }
+    },
+  );
+
+  // get_mcp_servers — list active MCP server connections + tool inventory
+  rpcHandlerManager.registerHandler<GetMcpServersRequest, GetMcpServersResponse>(
+    `${scope}:get_mcp_servers`,
+    async () => {
+      const q = getCurrentQuery();
+      if (!q) {
+        return { servers: [] };
+      }
+      try {
+        const statuses = await q.mcpServerStatus();
+        return {
+          servers: statuses.map((s) => ({
+            name: s.name,
+            status: s.status,
+            serverInfo: s.serverInfo,
+            error: s.error,
+            scope: s.scope,
+            toolCount: s.tools?.length,
+            tools: s.tools?.map((tool) => ({
+              name: tool.name,
+              description: tool.description,
+            })),
+          })),
+        };
+      } catch (e) {
+        logger.debug("[claudeControl] get_mcp_servers failed", e);
+        return { servers: [] };
+      }
+    },
+  );
+
+  logger.debug("[claudeControl] Registered 8 claude-control:* RPC handlers");
 }

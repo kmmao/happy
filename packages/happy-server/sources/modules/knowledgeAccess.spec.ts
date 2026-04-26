@@ -8,20 +8,34 @@ import {
 
 describe("knowledgeAccess", () => {
     describe("getInitialTurnBudget", () => {
-        it("seeds high confidence with 7 initial / 14 max", () => {
-            expect(getInitialTurnBudget("high")).toEqual({ initialTurns: 7, maxTurns: 14 });
+        describe("initial session injection (isInitialInjection=true)", () => {
+            it("seeds all confidences with flat 1 initial turn", () => {
+                expect(getInitialTurnBudget("high", true)).toEqual({ initialTurns: 1, maxTurns: 14 });
+                expect(getInitialTurnBudget("medium", true)).toEqual({ initialTurns: 1, maxTurns: 10 });
+                expect(getInitialTurnBudget("low", true)).toEqual({ initialTurns: 1, maxTurns: 6 });
+            });
+
+            it("falls back to medium maxTurns for unknown confidence", () => {
+                expect(getInitialTurnBudget("mystery", true)).toEqual({ initialTurns: 1, maxTurns: 10 });
+            });
         });
 
-        it("seeds medium confidence with 5 initial / 10 max", () => {
-            expect(getInitialTurnBudget("medium")).toEqual({ initialTurns: 5, maxTurns: 10 });
-        });
+        describe("mid-session injection (isInitialInjection=false)", () => {
+            it("seeds high confidence with 7 initial / 14 max", () => {
+                expect(getInitialTurnBudget("high", false)).toEqual({ initialTurns: 7, maxTurns: 14 });
+            });
 
-        it("seeds low confidence with 3 initial / 6 max", () => {
-            expect(getInitialTurnBudget("low")).toEqual({ initialTurns: 3, maxTurns: 6 });
-        });
+            it("seeds medium confidence with 5 initial / 10 max", () => {
+                expect(getInitialTurnBudget("medium", false)).toEqual({ initialTurns: 5, maxTurns: 10 });
+            });
 
-        it("falls back to medium budget for unknown confidence", () => {
-            expect(getInitialTurnBudget("mystery")).toEqual({ initialTurns: 5, maxTurns: 10 });
+            it("seeds low confidence with 3 initial / 6 max", () => {
+                expect(getInitialTurnBudget("low", false)).toEqual({ initialTurns: 3, maxTurns: 6 });
+            });
+
+            it("falls back to medium budget for unknown confidence", () => {
+                expect(getInitialTurnBudget("mystery", false)).toEqual({ initialTurns: 5, maxTurns: 10 });
+            });
         });
     });
 

@@ -34,6 +34,10 @@ import type {
     ReadFileResponse,
     McpCallRequest,
     McpCallResponse,
+    GetContextUsageRequest,
+    GetContextUsageResponse,
+    GetMcpServersRequest,
+    GetMcpServersResponse,
     ClaudeControlMethod,
 } from '@kmmao/happy-wire';
 import { CLAUDE_CONTROL_SCOPE } from '@kmmao/happy-wire';
@@ -148,6 +152,38 @@ export async function invokeMcpCall(
         sessionId,
         methodName('mcp_call'),
         args,
+    );
+}
+
+// ─── get_context_usage ──────────────────────────────────────────────────────
+
+/**
+ * Fetch the current context window usage breakdown from the remote Claude
+ * session. Returns token counts by category (system prompt, messages, tools,
+ * MCP tools, memory files, etc.) along with the model name and total/max/%.
+ *
+ * Returns a zeroed-out response when no query is active yet.
+ */
+export async function fetchContextUsage(sessionId: string): Promise<GetContextUsageResponse> {
+    return apiSocket.sessionRPC<GetContextUsageResponse, GetContextUsageRequest>(
+        sessionId,
+        methodName('get_context_usage'),
+        {},
+    );
+}
+
+// ─── get_mcp_servers ─────────────────────────────────────────────────────────
+
+/**
+ * Fetch the MCP server connection status from the remote Claude session.
+ * Returns the name, connection state, tool inventory, and error details for
+ * each configured MCP server. Returns an empty list when no query is active.
+ */
+export async function fetchMcpServers(sessionId: string): Promise<GetMcpServersResponse> {
+    return apiSocket.sessionRPC<GetMcpServersResponse, GetMcpServersRequest>(
+        sessionId,
+        methodName('get_mcp_servers'),
+        {},
     );
 }
 

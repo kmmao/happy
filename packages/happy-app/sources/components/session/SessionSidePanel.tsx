@@ -95,10 +95,13 @@ export const SessionSidePanel = React.memo<SessionSidePanelProps>(
         );
         const summaryInfo = React.useMemo(() => {
             const captured = knowledgeCount;
-            const referenced = accesses.length;
+            // Exclude evicted and archived entries from the badge count
+            const referenced = accesses.filter(
+                (a) => a.hotStatus !== "evicted" && a.status !== "archived",
+            ).length;
             if (captured === 0 && referenced === 0) return null;
             return { captured, referenced };
-        }, [knowledgeCount, accesses.length]);
+        }, [knowledgeCount, accesses]);
 
         const tabDefinitions = React.useMemo(
             () => getSessionPanelTabDefinitions({ enablePreviewTab, knowledgeBaseEnabled }),

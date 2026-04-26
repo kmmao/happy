@@ -5,7 +5,8 @@
  * Also syncs lastAccessedAt + accessCount on ProjectKnowledge for lifecycle decay.
  *
  * Session-scoped TTL-by-turn (migrate-out countdown):
- *   - On injection: seed turnsRemaining = 1 (use-it-or-lose-it).
+ *   - On initial injection (new session): seed turnsRemaining = 1 (use-it-or-lose-it).
+ *   - On mid-session injection: seed turnsRemaining by confidence (high=7, medium=5, low=3).
  *                   maxTurns varies by confidence (high=14, medium=10, low=6).
  *   - On turn end: hits increment turnsRemaining (up to maxTurns) and hitCount;
  *                  misses decrement turnsRemaining; at ≤ 0 hotStatus becomes "evicted".
@@ -15,11 +16,18 @@
 import { db } from "@/storage/db";
 
 // ─── Initial turn budgets per confidence ───
-// All entries start at 1 (use-it-or-lose-it on first turn).
-// maxTurns still varies by confidence so frequently-referenced
-// high-confidence entries can grow and stay much longer.
+// New-session initial injection: flat 1 turn (use-it-or-lose-it).
+// Mid-session injection (re-fetch after first injection): confidence-based
+// so high-confidence entries get a larger runway without needing hits first.
+// maxTurns still varies by confidence so frequently-referenced entries grow.
 
-const INITIAL_TURNS = 1;
+const INITIAL_SESSION_TURNS = 1;
+
+const MID_SESSION_INITIAL_TURNS: Record<string, number> = {
+    high: 7,
+    medium: 5,
+    low: 3,
+};
 
 const MAX_TURNS: Record<string, number> = {
     high: 14,
@@ -27,8 +35,14 @@ const MAX_TURNS: Record<string, number> = {
     low: 6,
 };
 
-export function getInitialTurnBudget(confidence: string): { initialTurns: number; maxTurns: number } {
-    return { initialTurns: INITIAL_TURNS, maxTurns: MAX_TURNS[confidence] ?? MAX_TURNS.medium };
+export function getInitialTurnBudget(
+    confidence: string,
+    isInitialInjection: boolean,
+): { initialTurns: number; maxTurns: number } {
+    const initialTurns = isInitialInjection
+        ? INITIAL_SESSION_TURNS
+        : (MID_SESSION_INITIAL_TURNS[confidence] ?? MID_SESSION_INITIAL_TURNS.medium);
+    return { initialTurns, maxTurns: MAX_TURNS[confidence] ?? MAX_TURNS.medium };
 }
 
 interface AccessEntry {
@@ -67,6 +81,7 @@ export async function recordKnowledgeAccess(
     sessionId: string,
     projectId: string,
     entries: Array<AccessEntry | string>,
+    isInitialInjection: boolean = true,
 ): Promise<void> {
     if (entries.length === 0) return;
 
@@ -98,7 +113,7 @@ export async function recordKnowledgeAccess(
         ops.push(
             db.knowledgeAccess.createMany({
                 data: toCreate.map((entry) => {
-                    const { initialTurns, maxTurns } = getInitialTurnBudget(entry.confidence);
+                    const { initialTurns, maxTurns } = getInitialTurnBudget(entry.confidence, isInitialInjection);
                     return {
                         sessionId,
                         knowledgeId: entry.id,
@@ -115,9 +130,9 @@ export async function recordKnowledgeAccess(
         );
     }
 
-    // Re-inject: reset countdown to initialTurns and flip back to hot.
+    // Re-inject: reactivation is always mid-session (evicted → hot again).
     for (const entry of toReactivate) {
-        const { initialTurns } = getInitialTurnBudget(entry.confidence);
+        const { initialTurns } = getInitialTurnBudget(entry.confidence, false);
         ops.push(
             db.knowledgeAccess.updateMany({
                 where: { sessionId, knowledgeId: entry.id },

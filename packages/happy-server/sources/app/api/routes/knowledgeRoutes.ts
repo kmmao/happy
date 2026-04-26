@@ -948,7 +948,7 @@ export function knowledgeRoutes(app: Fastify) {
                 return reply.code(404).send({ error: "Knowledge entry not found" });
             }
 
-            const { initialTurns } = getInitialTurnBudget(knowledge.confidence);
+            const { initialTurns } = getInitialTurnBudget(knowledge.confidence, false);
             const updated = await db.knowledgeAccess.updateMany({
                 where: { sessionId, knowledgeId, projectId: id },
                 data: {

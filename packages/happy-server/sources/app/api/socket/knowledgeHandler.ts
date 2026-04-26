@@ -278,12 +278,22 @@ export function knowledgeHandler(userId: string, socket: Socket) {
                 });
             }
 
+            // Detect initial vs mid-session injection:
+            // If no knowledgeAccess rows exist yet for this session, this is the first injection.
+            // Mid-session entries get confidence-based initialTurns (high=7, medium=5, low=3);
+            // initial injection entries get flat 1 (use-it-or-lose-it).
+            const existingAccessCount = entries.length > 0
+                ? await db.knowledgeAccess.count({ where: { sessionId: sid }, take: 1 })
+                : 0;
+            const isInitialInjection = existingAccessCount === 0;
+
             // Fire-and-forget: record access log (writes knowledgeAccess records + bumps counters)
             if (entries.length > 0) {
                 void recordKnowledgeAccess(
                     sid,
                     projectId,
                     entries.map((e) => ({ id: e.id, confidence: e.confidence })),
+                    isInitialInjection,
                 ).then(() => {
                     // Signal the App to refresh injected/referenced views.
                     eventRouter.emitEphemeral({

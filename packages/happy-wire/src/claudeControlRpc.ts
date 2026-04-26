@@ -127,6 +127,62 @@ export const McpCallResponseSchema = z.object({
 export type McpCallRequest = z.infer<typeof McpCallRequestSchema>;
 export type McpCallResponse = z.infer<typeof McpCallResponseSchema>;
 
+// ── get_context_usage ───────────────────────────────────────────────────────
+export const GetContextUsageRequestSchema = z.object({}).strict();
+export const GetContextUsageResponseSchema = z.object({
+    /** Per-category token counts (system prompt, messages, tools, MCP tools, memory files, etc.). */
+    categories: z.array(z.object({
+        name: z.string(),
+        tokens: z.number().int().nonnegative(),
+        /** CSS-style color string for visualization (hex, oklch, etc.). */
+        color: z.string(),
+        /** Whether the category is deferred / not yet loaded. */
+        isDeferred: z.boolean().optional(),
+    })),
+    /** Total tokens consumed so far. */
+    totalTokens: z.number().int().nonnegative(),
+    /** Hard context window limit for the active model. */
+    maxTokens: z.number().int().positive(),
+    /** Percentage of context used (0–100). */
+    percentage: z.number().nonnegative(),
+    /** Active model name (e.g. "claude-opus-4-5"). */
+    model: z.string(),
+    /** CLAUDE.md and memory files loaded into context. */
+    memoryFiles: z.array(z.object({
+        path: z.string(),
+        type: z.string(),
+        tokens: z.number().int().nonnegative(),
+    })),
+    /** MCP tools currently loaded into context. */
+    mcpTools: z.array(z.object({
+        name: z.string(),
+        serverName: z.string(),
+        tokens: z.number().int().nonnegative(),
+        isLoaded: z.boolean().optional(),
+    })),
+}).strict();
+export type GetContextUsageRequest = z.infer<typeof GetContextUsageRequestSchema>;
+export type GetContextUsageResponse = z.infer<typeof GetContextUsageResponseSchema>;
+
+// ── get_mcp_servers ──────────────────────────────────────────────────────────
+export const GetMcpServersRequestSchema = z.object({}).strict();
+export const GetMcpServersResponseSchema = z.object({
+    servers: z.array(z.object({
+        name: z.string(),
+        status: z.enum(['connected', 'failed', 'needs-auth', 'pending', 'disabled']),
+        serverInfo: z.object({ name: z.string(), version: z.string() }).optional(),
+        error: z.string().optional(),
+        scope: z.string().optional(),
+        toolCount: z.number().int().nonnegative().optional(),
+        tools: z.array(z.object({
+            name: z.string(),
+            description: z.string().optional(),
+        })).optional(),
+    })),
+}).strict();
+export type GetMcpServersRequest = z.infer<typeof GetMcpServersRequestSchema>;
+export type GetMcpServersResponse = z.infer<typeof GetMcpServersResponseSchema>;
+
 /**
  * Method name enum — consumers should derive typed handlers from this.
  * When adding a new method, update the CLI handler registration too.
@@ -137,6 +193,8 @@ export const CLAUDE_CONTROL_METHODS = [
     'set_color',
     'read_file',
     'mcp_call',
+    'get_context_usage',
+    'get_mcp_servers',
 ] as const;
 
 export type ClaudeControlMethod = typeof CLAUDE_CONTROL_METHODS[number];
