@@ -12,17 +12,12 @@ import {
   storage,
   useIsDataReady,
   useSession,
-  useSessionMessages,
-  useSetting,
 } from "@/sync/storage";
 import {
   getSessionName,
   useSessionStatus,
-  formatOSPlatform,
-  formatPathRelativeToHome,
   getSessionAvatarId,
   getSessionProviderKey,
-  getSessionProviderLabel,
 } from "@/utils/sessionUtils";
 import * as Clipboard from "expo-clipboard";
 import { Modal } from "@/modal";
@@ -112,8 +107,6 @@ function SessionInfoContent({ session }: { session: Session }) {
   const sessionName = getSessionName(session);
   const sessionStatus = useSessionStatus(session);
   const navigateToSession = useNavigateToSession();
-  const { messages } = useSessionMessages(session.id);
-
   const machine = useMachine(session.metadata?.machineId ?? "");
   const reactivationContext = resolveSessionReactivationContext(session, machine);
   const reactivationMode = reactivationContext?.mode;
@@ -159,7 +152,7 @@ function SessionInfoContent({ session }: { session: Session }) {
   }, [session]);
 
   // Use HappyAction for archiving - it handles errors automatically
-  const [archivingSession, performArchive] = useHappyAction(async () => {
+  const [, performArchive] = useHappyAction(async () => {
     const result = await sessionKill(session.id);
     if (!result.success) {
       throw new HappyError(
@@ -188,7 +181,7 @@ function SessionInfoContent({ session }: { session: Session }) {
   }, [performArchive]);
 
   // Use HappyAction for deletion - it handles errors automatically
-  const [deletingSession, performDelete] = useHappyAction(async () => {
+  const [, performDelete] = useHappyAction(async () => {
     const result = await sessionDelete(session.id);
     if (!result.success) {
       throw new HappyError(
@@ -295,7 +288,7 @@ function SessionInfoContent({ session }: { session: Session }) {
   }, [performReactivation]);
 
   // Fork session — create a new session branching from the current one
-  const [forkingSession, performFork] = useHappyAction(async () => {
+  const [, performFork] = useHappyAction(async () => {
     const forkResult = await sessionForkSession(session.id, {});
     if ("error" in forkResult) {
       throw new HappyError(forkResult.error, false);
