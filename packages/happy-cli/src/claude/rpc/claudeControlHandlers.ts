@@ -270,8 +270,8 @@ export function registerClaudeControlHandlers(
         const init = await q.initializationResult();
         return {
           version:
-            (init as unknown as { claudeCodeVersion?: string })
-              .claudeCodeVersion ?? "unknown",
+            (init as unknown as { claude_code_version?: string })
+              .claude_code_version ?? "unknown",
           happyCliVersion,
         };
       } catch (e) {
