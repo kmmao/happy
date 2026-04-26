@@ -321,10 +321,6 @@ export async function claudeRemote(opts: {
     outputFormat: initial.mode.outputFormat,
     plugins: initial.mode.plugins,
     additionalDirectories: initial.mode.additionalDirectories,
-    // Tag the SDK session with the originating Happy session ID so the
-    // persisted JSONL metadata is reverse-linkable. SDK ignores this when
-    // resuming/continuing (persisted title wins), so it's safe to set always.
-    title: opts.happySessionId || undefined,
     // Happy-flavored plan-mode workflow body (SDK 0.2.119+). SDK only applies
     // this when `permissionMode === 'plan'`; passing it unconditionally is a
     // no-op outside plan mode.
