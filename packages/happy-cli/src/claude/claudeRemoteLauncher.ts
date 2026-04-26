@@ -1898,7 +1898,15 @@ export async function claudeRemoteLauncher(
               permissionHandler.handleModeChange(mode.permissionMode);
               startMidTurnDrain();
 
-              // Knowledge injection: append to first message's system prompt
+              // SDK 0.2.119+ native binary ignores appendSystemPrompt via IPC.
+              // Inject App prompt as <system-reminder> prefix on every user message
+              // so Claude reliably receives the <options> and skill instructions.
+              const appPrompt = msg.mode.appendSystemPrompt;
+              const appPromptPrefix = appPrompt
+                ? `<system-reminder>\n${appPrompt}\n</system-reminder>\n\n`
+                : "";
+
+              // Knowledge injection: prepend to message (appendSystemPrompt path is broken)
               let effectiveKnowledgeContext = knowledgeContext;
 
               if (!knowledgeInjected && knowledgeEnabled) {
@@ -1925,8 +1933,7 @@ export async function claudeRemoteLauncher(
                 }
               } else if (knowledgeInjected && pendingKnowledgeRefresh && knowledgeEnabled) {
                 // Per-turn refresh: check if new knowledge entries exist since last injection.
-                // Instead of re-injecting via appendSystemPrompt (which accumulates tokens),
-                // prepend a lightweight notification to the user message so Claude can use
+                // Prepend a lightweight notification to the user message so Claude can use
                 // the query_project_knowledge MCP tool to fetch relevant details on demand.
                 pendingKnowledgeRefresh = false;
                 const hints = extractKnowledgeHints(msg.message, 8);
@@ -1948,7 +1955,7 @@ export async function claudeRemoteLauncher(
                       const titles = newEntries.map((e) => `"${e.title}"`).join(", ");
                       const hint = `[Knowledge base update: ${newEntries.length} new ${newEntries.length === 1 ? "entry" : "entries"} added (${titles}). Use query_project_knowledge tool if relevant to this task.]\n\n`;
                       return {
-                        message: hint + msg.message,
+                        message: appPromptPrefix + hint + msg.message,
                         mode: msg.mode,
                       };
                     }
@@ -1965,29 +1972,24 @@ export async function claudeRemoteLauncher(
                 const hint = pendingFileHint;
                 pendingFileHint = null;
                 return {
-                  message: hint + msg.message,
+                  message: appPromptPrefix + hint + msg.message,
                   mode: msg.mode,
                 };
               }
 
-              const returnMode = !knowledgeInjected && effectiveKnowledgeContext
-                ? {
-                  ...msg.mode,
-                  appendSystemPrompt: msg.mode.appendSystemPrompt
-                    ? msg.mode.appendSystemPrompt + "\n\n" + effectiveKnowledgeContext
-                    : effectiveKnowledgeContext,
-                }
-                : msg.mode;
+              // First-time knowledge injection: prepend to message instead of mode.appendSystemPrompt
+              // (appendSystemPrompt via IPC is broken in SDK 0.2.119+ native binary)
+              const knowledgePrefix = !knowledgeInjected && effectiveKnowledgeContext
+                ? effectiveKnowledgeContext + "\n\n"
+                : "";
               if (!knowledgeInjected && effectiveKnowledgeContext) {
                 knowledgeInjected = true;
-                // Track injected entry IDs (parse from context — use knowledgeContext from pre-fetch if available)
-                // IDs are tracked separately via knowledgeEntryIds when we have the raw result
-                logger.debug("[knowledge] Injected knowledge into first message system prompt");
+                logger.debug("[knowledge] Injected knowledge into first message");
               }
 
               return {
-                message: msg.message,
-                mode: returnMode,
+                message: appPromptPrefix + knowledgePrefix + msg.message,
+                mode: msg.mode,
               };
             }
 

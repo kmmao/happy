@@ -266,6 +266,19 @@ export async function claudeRemote(opts: {
     ? systemPrompt + "\n\n" + localeInstruction
     : systemPrompt;
 
+  // SDK 0.2.119+ bug: `systemPrompt: { type: "preset", append }` and
+  // `--append-system-prompt` CLI flag are silently ignored by the Claude Code
+  // native binary. As a workaround, we inject both App and CLI system prompts
+  // directly into each user message as <system-reminder> text blocks.
+  // This ensures the instructions (options suggestions, skill usage, etc.)
+  // reliably reach the model regardless of SDK/binary version.
+  const buildSystemReminderPrefix = (mode: EnhancedMode): string => {
+    const appPrompt = mode.appendSystemPrompt; // App's <options> + skill instructions
+    const parts = [appPrompt, effectiveSystemPrompt].filter(Boolean);
+    if (parts.length === 0) return "";
+    return `<system-reminder>\n${parts.join("\n\n")}\n</system-reminder>\n\n`;
+  };
+
   const sdkOptions: QueryOptions = {
     cwd: opts.path,
     resume: startFrom ?? undefined,
@@ -286,9 +299,10 @@ export async function claudeRemote(opts: {
     customSystemPrompt: initial.mode.customSystemPrompt
       ? initial.mode.customSystemPrompt + "\n\n" + effectiveSystemPrompt
       : undefined,
-    appendSystemPrompt: initial.mode.appendSystemPrompt
-      ? initial.mode.appendSystemPrompt + "\n\n" + effectiveSystemPrompt
-      : effectiveSystemPrompt,
+    // SDK 0.2.119+ native binary ignores appendSystemPrompt via IPC — App+CLI
+    // prompts are now injected via buildSystemReminderPrefix() into each user
+    // message. Keep effectiveSystemPrompt here as a best-effort fallback.
+    appendSystemPrompt: effectiveSystemPrompt,
     allowedTools: initial.mode.allowedTools
       ? initial.mode.allowedTools.concat(opts.allowedTools)
       : opts.allowedTools,
@@ -354,7 +368,7 @@ export async function claudeRemote(opts: {
       type: "user",
       message: {
         role: "user",
-        content: initial.message,
+        content: buildSystemReminderPrefix(initial.mode) + initial.message,
       },
       parent_tool_use_id: null,
       session_id: undefined,
@@ -625,7 +639,7 @@ export async function claudeRemote(opts: {
         }
         messages.push({
           type: "user",
-          message: { role: "user", content: next.message },
+          message: { role: "user", content: buildSystemReminderPrefix(next.mode) + next.message },
           parent_tool_use_id: null,
           session_id: undefined,
           ...(next.mode.shouldQuery === false && { shouldQuery: false }),
