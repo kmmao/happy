@@ -231,6 +231,68 @@ async function hasActiveSubscription(userId: string): Promise<boolean> {
 }
 
 export function voiceRoutes(app: Fastify) {
+    /**
+     * POST /v1/voice/tts/proxy
+     *
+     * Server-side proxy for Voicebox TTS requests. Avoids CORS and mixed-content
+     * restrictions when the web app (HTTPS) needs to reach a local or remote
+     * Voicebox service.
+     *
+     * The client sends `{ text, endpoint?, language? }`. The server forwards the
+     * request to the Voicebox REST API and streams the audio response back.
+     */
+    app.post('/v1/voice/tts/proxy', {
+        preHandler: app.authenticate,
+        schema: {
+            body: z.object({
+                text: z.string().min(1).max(5000),
+                endpoint: z.string().url().optional(),
+                language: z.string().optional(),
+            }),
+        },
+    }, async (request, reply) => {
+        const { text, endpoint, language } = request.body;
+
+        const VOICEBOX_DEFAULT = 'http://localhost:17493';
+        const targetEndpoint = endpoint || VOICEBOX_DEFAULT;
+
+        log({ module: 'voice' }, `TTS proxy request: endpoint=${targetEndpoint} textLen=${text.length}`);
+
+        try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 10000);
+
+            const upstreamResp = await fetch(`${targetEndpoint}/tts`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    text,
+                    ...(language ? { language } : {}),
+                }),
+                signal: controller.signal,
+            });
+
+            clearTimeout(timeoutId);
+
+            if (!upstreamResp.ok) {
+                log({ module: 'voice' }, `Voicebox TTS upstream error: ${upstreamResp.status}`);
+                return reply.code(502).send({ error: `Voicebox returned ${upstreamResp.status}` });
+            }
+
+            const contentType = upstreamResp.headers.get('content-type') || 'audio/wav';
+            reply.header('Content-Type', contentType);
+            reply.header('Cache-Control', 'no-store');
+
+            const audioBuffer = await upstreamResp.arrayBuffer();
+            return reply.send(Buffer.from(audioBuffer));
+        } catch (error: unknown) {
+            const isTimeout = error instanceof Error && error.name === 'AbortError';
+            const msg = isTimeout ? 'Voicebox TTS request timed out' : 'Failed to reach Voicebox service';
+            log({ module: 'voice' }, `TTS proxy error: ${error}`);
+            return reply.code(502).send({ error: msg });
+        }
+    });
+
     app.post('/v1/voice/token', {
         preHandler: app.authenticate,
         schema: {

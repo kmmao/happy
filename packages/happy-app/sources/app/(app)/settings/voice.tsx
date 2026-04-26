@@ -17,7 +17,7 @@ import { TokenStorage } from "@/auth/tokenStorage";
 import { getServerUrl } from "@/sync/serverConfig";
 import { config } from "@/config";
 import { checkVoiceboxConnection } from "@/sync/apiVoice";
-import { VOICEBOX_DEFAULT_ENDPOINT } from "@/realtime/voiceConfig";
+import { VOICEBOX_DEFAULT_ENDPOINT, TTS_PROVIDER_LIST, type TtsProvider } from "@/realtime/voiceConfig";
 
 interface ElevenLabsSubscription {
     tier: string;
@@ -121,6 +121,7 @@ function VoiceSettingsScreen() {
     const { theme } = useUnistyles();
     const router = useRouter();
     const [voiceAssistantLanguage] = useSettingMutable("voiceAssistantLanguage");
+    const [ttsProvider, setTtsProvider] = useSettingMutable("ttsProvider");
     const [savedApiKey, setSavedApiKey] = useSettingMutable("elevenLabsApiKey");
 
     // Local draft state — only saved on button press
@@ -237,8 +238,99 @@ function VoiceSettingsScreen() {
                 />
             </ItemGroup>
 
-            {/* ElevenLabs API Key */}
+            {/* TTS Provider Selector */}
             <ItemGroup
+                title={t("settingsVoice.ttsProviderTitle")}
+                footer={t("settingsVoice.ttsProviderDescription")}
+            >
+                {TTS_PROVIDER_LIST.map((provider) => {
+                    const isSelected = ttsProvider === provider.id;
+                    return (
+                        <Pressable
+                            key={provider.id}
+                            onPress={() => setTtsProvider(provider.id as TtsProvider)}
+                            style={({ pressed }) => ({
+                                flexDirection: "row",
+                                alignItems: "center",
+                                paddingHorizontal: 16,
+                                paddingVertical: 12,
+                                backgroundColor: pressed ? theme.colors.divider : "transparent",
+                                gap: 12,
+                            })}
+                        >
+                            <View style={{
+                                width: 22,
+                                height: 22,
+                                borderRadius: 11,
+                                borderWidth: 2,
+                                borderColor: isSelected ? "#007AFF" : theme.colors.divider,
+                                alignItems: "center",
+                                justifyContent: "center",
+                            }}>
+                                {isSelected && (
+                                    <View style={{
+                                        width: 12,
+                                        height: 12,
+                                        borderRadius: 6,
+                                        backgroundColor: "#007AFF",
+                                    }} />
+                                )}
+                            </View>
+                            <View style={{ flex: 1 }}>
+                                <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                                    <Text style={{
+                                        fontSize: 16,
+                                        fontWeight: "500",
+                                        color: theme.colors.text,
+                                    }}>
+                                        {provider.label}
+                                    </Text>
+                                    {!provider.requiresConfig && (
+                                        <View style={{
+                                            backgroundColor: "#34C759",
+                                            borderRadius: 4,
+                                            paddingHorizontal: 5,
+                                            paddingVertical: 1,
+                                        }}>
+                                            <Text style={{ fontSize: 10, color: "#fff", fontWeight: "600" }}>
+                                                FREE
+                                            </Text>
+                                        </View>
+                                    )}
+                                </View>
+                                <Text style={{
+                                    fontSize: 13,
+                                    color: theme.colors.textSecondary,
+                                    marginTop: 2,
+                                }}>
+                                    {provider.description}
+                                </Text>
+                            </View>
+                        </Pressable>
+                    );
+                })}
+
+                {/* Info note for selected zero-config providers */}
+                {ttsProvider === "browser-web-speech" && (
+                    <View style={{ paddingHorizontal: 16, paddingBottom: 12, flexDirection: "row", alignItems: "flex-start", gap: 8 }}>
+                        <Ionicons name="information-circle-outline" size={16} color={theme.colors.textSecondary} style={{ marginTop: 1 }} />
+                        <Text style={{ fontSize: 13, color: theme.colors.textSecondary, flex: 1 }}>
+                            {t("settingsVoice.ttsProviderWebSpeechNote")}
+                        </Text>
+                    </View>
+                )}
+                {ttsProvider === "edge" && (
+                    <View style={{ paddingHorizontal: 16, paddingBottom: 12, flexDirection: "row", alignItems: "flex-start", gap: 8 }}>
+                        <Ionicons name="information-circle-outline" size={16} color={theme.colors.textSecondary} style={{ marginTop: 1 }} />
+                        <Text style={{ fontSize: 13, color: theme.colors.textSecondary, flex: 1 }}>
+                            {t("settingsVoice.ttsProviderEdgeNote")}
+                        </Text>
+                    </View>
+                )}
+            </ItemGroup>
+
+            {/* ElevenLabs API Key — shown only when elevenlabs provider is selected */}
+            {ttsProvider === "elevenlabs" && <ItemGroup
                 title={t("settingsVoice.elevenLabsConfig")}
                 footer={t("settingsVoice.elevenLabsApiKeyDescription")}
             >
@@ -389,10 +481,10 @@ function VoiceSettingsScreen() {
                         </View>
                     </View>
                 )}
-            </ItemGroup>
+            </ItemGroup>}
 
-            {/* Voicebox (Local) TTS */}
-            <ItemGroup
+            {/* Voicebox (Local) TTS — shown only when voicebox provider is selected */}
+            {ttsProvider === "voicebox" && <ItemGroup
                 title={t("settingsVoice.voiceboxConfig")}
                 footer={t("settingsVoice.voiceboxEndpointDescription")}
             >
@@ -524,7 +616,7 @@ function VoiceSettingsScreen() {
                         </Text>
                     </View>
                 )}
-            </ItemGroup>
+            </ItemGroup>}
         </ItemList>
     );
 }

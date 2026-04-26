@@ -135,9 +135,9 @@ export const SettingsSchema = z.object({
       "Language for STT voice input (null = auto from device locale, e.g. 'en-US', 'zh-CN', 'zh-TW')",
     ),
   ttsProvider: z
-    .enum(["edge", "elevenlabs", "voicebox"])
+    .enum(["edge", "elevenlabs", "voicebox", "browser-web-speech"])
     .describe(
-      "TTS provider: 'edge' (free, default), 'elevenlabs' (paid, user's own API key), or 'voicebox' (local Voicebox service)",
+      "TTS provider: 'edge' (free, default), 'elevenlabs' (paid, user's own API key), 'voicebox' (local Voicebox service), or 'browser-web-speech' (zero-cost browser Web Speech API)",
     ),
   voiceboxEndpoint: z
     .string()

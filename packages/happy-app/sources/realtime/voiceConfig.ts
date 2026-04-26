@@ -5,6 +5,57 @@
 export const VOICEBOX_DEFAULT_ENDPOINT = 'http://localhost:17493';
 
 /**
+ * All supported TTS provider identifiers.
+ * Mirrors the `ttsProvider` enum in settings.ts.
+ */
+export type TtsProvider = 'edge' | 'elevenlabs' | 'voicebox' | 'browser-web-speech';
+
+/**
+ * Metadata for each TTS provider, used by the provider selector UI.
+ */
+export interface TtsProviderInfo {
+    /** Provider identifier matching the settings enum value */
+    id: TtsProvider;
+    /** Short display label */
+    label: string;
+    /** One-line description shown below the label */
+    description: string;
+    /** Whether this provider requires additional user configuration */
+    requiresConfig: boolean;
+}
+
+/**
+ * Ordered list of TTS providers.
+ * Free / zero-config options are listed first to lower the barrier for new users.
+ */
+export const TTS_PROVIDER_LIST: readonly TtsProviderInfo[] = [
+    {
+        id: 'browser-web-speech',
+        label: 'Web Speech API',
+        description: 'Zero-cost browser-native TTS — no account required',
+        requiresConfig: false,
+    },
+    {
+        id: 'edge',
+        label: 'Microsoft Edge TTS',
+        description: 'Free high-quality cloud TTS via Microsoft',
+        requiresConfig: false,
+    },
+    {
+        id: 'voicebox',
+        label: 'Voicebox (Local)',
+        description: 'High-quality local TTS — requires Voicebox running on your machine',
+        requiresConfig: true,
+    },
+    {
+        id: 'elevenlabs',
+        label: 'ElevenLabs',
+        description: 'Premium AI voice — requires your own API key',
+        requiresConfig: true,
+    },
+] as const;
+
+/**
  * Static voice context configuration
  */
 export const VOICE_CONFIG = {
