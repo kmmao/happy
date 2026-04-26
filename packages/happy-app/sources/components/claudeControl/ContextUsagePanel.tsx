@@ -1,8 +1,10 @@
 import * as React from "react";
-import { View, Text, AppState, type AppStateStatus } from "react-native";
+import { View, Text, Pressable, ScrollView, AppState, type AppStateStatus } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import Svg, { Circle } from "react-native-svg";
+import { Ionicons } from "@expo/vector-icons";
 import { t } from "@/text";
+import { Modal } from "@/modal";
 import { fetchContextUsage } from "@/sync/apiClaudeControl";
 import { log } from "@/log";
 import type { GetContextUsageResponse } from "@kmmao/happy-wire";
@@ -30,6 +32,33 @@ const CATEGORY_PALETTE = [
 function resolveColor(color: string | undefined, index: number): string {
     if (color && /^#[0-9A-Fa-f]{3,8}$/.test(color)) return color;
     return CATEGORY_PALETTE[index % CATEGORY_PALETTE.length];
+}
+
+// ─── Category detail helpers ──────────────────────────────────────────────────
+
+type DetailRow = { label: string; sub?: string; value: string };
+
+/**
+ * Returns a list of detail rows for categories that have sub-data,
+ * or null if the category has no drillable detail.
+ */
+function resolveDetail(catName: string, data: GetContextUsageResponse): DetailRow[] | null {
+    const lower = catName.toLowerCase();
+    if ((lower.includes("memory") || lower.includes("file")) && data.memoryFiles.length > 0) {
+        return data.memoryFiles.map((f) => ({
+            label: f.path.split("/").pop() ?? f.path,
+            sub: f.path,
+            value: formatTokens(f.tokens),
+        }));
+    }
+    if (lower.includes("mcp") && data.mcpTools.length > 0) {
+        return data.mcpTools.map((tool) => ({
+            label: tool.name,
+            sub: tool.serverName,
+            value: formatTokens(tool.tokens),
+        }));
+    }
+    return null;
 }
 
 function formatTokens(n: number): string {
@@ -139,12 +168,13 @@ export const ContextUsagePanel = React.memo(function ContextUsagePanel({
                         const pct = data.maxTokens > 0
                             ? (cat.tokens / data.maxTokens) * 100
                             : 0;
-                        return (
+                        const detail = resolveDetail(cat.name, data);
+                        const isLast = i === data.categories.length - 1;
+                        const inner = (
                             <View
-                                key={cat.name}
                                 style={[
                                     styles.legendItem,
-                                    i < data.categories.length - 1 && {
+                                    !isLast && {
                                         borderBottomWidth: StyleSheet.hairlineWidth,
                                         borderBottomColor: theme.colors.divider,
                                     },
@@ -154,7 +184,30 @@ export const ContextUsagePanel = React.memo(function ContextUsagePanel({
                                 <Text style={styles.legendName} numberOfLines={1}>{cat.name}</Text>
                                 <Text style={styles.legendPct}>{formatPct(pct)}</Text>
                                 <Text style={styles.legendTokens}>{formatTokens(cat.tokens)}</Text>
+                                {detail ? (
+                                    <Ionicons
+                                        name="chevron-forward"
+                                        size={12}
+                                        color={theme.colors.textSecondary}
+                                        style={{ marginLeft: 0 }}
+                                    />
+                                ) : (
+                                    <View style={{ width: 12 }} />
+                                )}
                             </View>
+                        );
+                        if (!detail) return <View key={cat.name}>{inner}</View>;
+                        return (
+                            <Pressable
+                                key={cat.name}
+                                onPress={() => Modal.show({
+                                    component: CategoryDetailModal,
+                                    props: { title: cat.name, detail },
+                                })}
+                                style={({ pressed }) => pressed ? { opacity: 0.6 } : undefined}
+                            >
+                                {inner}
+                            </Pressable>
                         );
                     })}
                 </View>
@@ -207,6 +260,125 @@ export const ContextUsagePanel = React.memo(function ContextUsagePanel({
         </View>
     );
 });
+
+// ─── CategoryDetailModal ──────────────────────────────────────────────────────
+
+interface CategoryDetailModalProps {
+    title: string;
+    detail: DetailRow[];
+    onClose: () => void;
+}
+
+const CategoryDetailModal = React.memo<CategoryDetailModalProps>(function CategoryDetailModal({
+    title,
+    detail,
+    onClose,
+}) {
+    const { theme } = useUnistyles();
+    const c = theme.colors;
+    return (
+        <View style={[detailModalStyles.container, { backgroundColor: c.surface }]}>
+            {/* Header */}
+            <View style={[detailModalStyles.header, { borderBottomColor: c.divider }]}>
+                <Text style={[detailModalStyles.title, { color: c.text }]} numberOfLines={1}>
+                    {title}
+                </Text>
+                <Pressable onPress={onClose} hitSlop={10} style={detailModalStyles.closeBtn}>
+                    <Ionicons name="close" size={20} color={c.textSecondary} />
+                </Pressable>
+            </View>
+            {/* Rows */}
+            <ScrollView
+                style={detailModalStyles.scroll}
+                contentContainerStyle={detailModalStyles.scrollContent}
+                showsVerticalScrollIndicator={false}
+            >
+                {detail.map((row, i) => (
+                    <View
+                        key={`${row.label}-${i}`}
+                        style={[
+                            detailModalStyles.row,
+                            { borderBottomColor: c.divider },
+                        ]}
+                    >
+                        <View style={detailModalStyles.rowLeft}>
+                            <Text style={[detailModalStyles.rowLabel, { color: c.text }]}>
+                                {row.label}
+                            </Text>
+                            {row.sub ? (
+                                <Text
+                                    style={[detailModalStyles.rowSub, { color: c.textSecondary }]}
+                                    numberOfLines={1}
+                                >
+                                    {row.sub}
+                                </Text>
+                            ) : null}
+                        </View>
+                        <Text style={[detailModalStyles.rowValue, { color: c.textSecondary }]}>
+                            {row.value}
+                        </Text>
+                    </View>
+                ))}
+            </ScrollView>
+        </View>
+    );
+});
+
+const detailModalStyles = StyleSheet.create(() => ({
+    container: {
+        borderRadius: 16,
+        overflow: "hidden",
+        maxHeight: 460,
+    },
+    header: {
+        flexDirection: "row",
+        alignItems: "center",
+        paddingHorizontal: 16,
+        paddingVertical: 14,
+        borderBottomWidth: StyleSheet.hairlineWidth,
+        gap: 8,
+    },
+    title: {
+        flex: 1,
+        fontSize: 15,
+        fontWeight: "600",
+    },
+    closeBtn: {
+        padding: 4,
+    },
+    scroll: {
+        flexGrow: 0,
+    },
+    scrollContent: {
+        paddingVertical: 4,
+    },
+    row: {
+        flexDirection: "row",
+        alignItems: "center",
+        paddingHorizontal: 16,
+        paddingVertical: 10,
+        borderBottomWidth: StyleSheet.hairlineWidth,
+        gap: 12,
+    },
+    rowLeft: {
+        flex: 1,
+        gap: 2,
+    },
+    rowLabel: {
+        fontSize: 13,
+        fontWeight: "500",
+        fontFamily: "Menlo",
+    },
+    rowSub: {
+        fontSize: 11,
+        fontFamily: "Menlo",
+    },
+    rowValue: {
+        fontSize: 12,
+        fontVariant: ["tabular-nums"],
+        flexShrink: 0,
+    },
+}));
 
 // ─── Ring Donut ───────────────────────────────────────────────────────────────
 
