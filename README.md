@@ -39,6 +39,26 @@ happy codex
 | happy-agent | `packages/happy-agent` | 远程 Agent 控制 CLI |
 | happy-wire | `packages/happy-wire` | 共享消息类型和 Zod 校验，发布为 `@kmmao/happy-wire` |
 
+## 🚀 自部署（Self-Hosting）
+
+Happy Coder 支持完全自部署，你可以在自己的 VPS 上一键运行完整后端（PostgreSQL + Redis + MinIO + Server + 自动 SSL），**数据完全在你自己的服务器上**。
+
+```bash
+# 1. 复制环境变量模板并填写配置
+cp packages/happy-server/.env.example packages/happy-server/.env
+nano packages/happy-server/.env
+
+# 2. 一键启动（含数据库迁移和 SSL 证书申请）
+docker compose -f packages/happy-server/docker-compose.yml up -d
+
+# 3. 配置 CLI 连接你的服务器
+HAPPY_SERVER_URL=https://your-domain.com happy
+```
+
+📖 **[查看完整自部署教程 →](docs/self-hosting-guide.md)**（含域名配置、反向代理、SSL、环境变量说明等）
+
+---
+
 ## 本地开发
 
 详见 [docs/local-development.md](docs/local-development.md)。

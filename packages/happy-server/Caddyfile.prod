@@ -1,0 +1,24 @@
+# Happy Server 生产级 Caddy 反向代理配置
+# 自动申请并续期 Let's Encrypt TLS 证书
+#
+# 通过 .env 中的 DOMAIN 变量注入域名，例如：DOMAIN=happy.example.com
+
+{env.DOMAIN} {
+    # 反向代理到 Happy Server，保持 WebSocket / Socket.IO 长连接
+    reverse_proxy server:3005 {
+        flush_interval -1
+    }
+
+    # 安全响应头
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains"
+        X-Content-Type-Options nosniff
+        X-Frame-Options DENY
+        Referrer-Policy strict-origin-when-cross-origin
+    }
+
+    # 访问日志
+    log {
+        output stdout
+    }
+}
