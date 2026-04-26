@@ -9,6 +9,7 @@ import {
   SDKUserMessage,
 } from "@/claude/sdk";
 import type { OnElicitation } from "@/claude/sdk/types";
+import type { SdkBeta } from "@anthropic-ai/claude-agent-sdk";
 import { mapToClaudeMode } from "./utils/permissionMode";
 import { claudeCheckSession } from "./utils/claudeCheckSession";
 import { join, resolve } from "node:path";
@@ -36,9 +37,10 @@ export function resolveModelKey(
   if (modelKey === "default") return undefined;
 
   switch (modelKey) {
-    // Sonnet/Opus now default to 1M context in the App — map the short keys
-    // to the explicit [1m] SDK IDs. Old `-1m` keys are preserved for backward
-    // compatibility with sessions pinned before the 200K/1M merge.
+    // Sonnet/Opus default to 1M context — map short keys to explicit model IDs.
+    // The [1m] suffix is a Happy-internal tracking convention; actual 1M context
+    // is enabled via the `context-1m-2025-08-07` SDK beta (see build1MBetas).
+    // Old `-1m` keys are preserved for backward compatibility with pinned sessions.
     case "sonnet":
     case "sonnet-1m":
       return "claude-sonnet-4-6[1m]";
@@ -54,6 +56,49 @@ export function resolveModelKey(
     default:
       return modelKey;
   }
+}
+
+/** Beta tag required to enable 1M-token context window. */
+const BETA_1M: SdkBeta = "context-1m-2025-08-07";
+
+/**
+ * Returns true when the given App model key should use the 1M context window.
+ * Covers both the new short keys ("sonnet", "opus") and the legacy "-1m" suffixed
+ * variants kept for backward compatibility.
+ */
+export function is1MModelKey(modelKey: string | undefined): boolean {
+  if (!modelKey) return false;
+  switch (modelKey) {
+    case "sonnet":
+    case "sonnet-1m":
+    case "opus":
+    case "opus-1m":
+    case "opus-4-7":
+    case "opus-4-7-1m":
+      return true;
+    default:
+      return false;
+  }
+}
+
+/**
+ * Build the betas array for a session, automatically prepending the 1M context
+ * beta when the model key indicates a 1M-capable model. Caller-supplied betas
+ * (e.g. experimental features from the App) are preserved and de-duplicated.
+ */
+export function buildBetasForModel(
+  modelKey: string | undefined,
+  extraBetas?: SdkBeta[],
+): SdkBeta[] | undefined {
+  const needs1M = is1MModelKey(modelKey);
+  const base: SdkBeta[] = needs1M ? [BETA_1M] : [];
+  if (!extraBetas?.length) return base.length ? base : undefined;
+  // De-duplicate: keep order, avoid adding BETA_1M twice if caller already included it
+  const merged = [...base];
+  for (const b of extraBetas) {
+    if (!merged.includes(b)) merged.push(b);
+  }
+  return merged.length ? merged : undefined;
 }
 
 export async function claudeRemote(opts: {
@@ -329,7 +374,9 @@ export async function claudeRemote(opts: {
     // ── New SDK capabilities ──
     agentProgressSummaries: true,
     enableFileCheckpointing: true,
-    betas: initial.mode.betas,
+    // Automatically include the 1M-context beta for Sonnet/Opus models.
+    // Caller betas (from App mode) are merged and de-duplicated.
+    betas: buildBetasForModel(initial.mode.model, initial.mode.betas),
     agent: initial.mode.agent,
     agents: initial.mode.agents,
     outputFormat: initial.mode.outputFormat,

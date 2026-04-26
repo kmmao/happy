@@ -3,7 +3,7 @@ import { Session } from "./session";
 import { MessageBuffer } from "@/ui/ink/messageBuffer";
 import { RemoteModeDisplay } from "@/ui/ink/RemoteModeDisplay";
 import React from "react";
-import { claudeRemote, resolveModelKey } from "./claudeRemote";
+import { claudeRemote, resolveModelKey, is1MModelKey } from "./claudeRemote";
 import { mapToClaudeMode } from "./utils/permissionMode";
 import { PermissionHandler } from "./utils/permissionHandler";
 import { Future } from "@/utils/future";
@@ -1504,7 +1504,7 @@ export async function claudeRemoteLauncher(
         return hashObject({
           isPlan: mapped === "plan",
           isBypass: mapped === "bypassPermissions",
-          isExtendedContext: m.model?.endsWith("-1m") ?? false,
+          isExtendedContext: is1MModelKey(m.model),
           fallbackModel: m.fallbackModel,
           customSystemPrompt: m.customSystemPrompt,
           appendSystemPrompt: m.appendSystemPrompt,

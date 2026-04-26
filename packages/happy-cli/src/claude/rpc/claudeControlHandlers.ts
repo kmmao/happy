@@ -391,7 +391,7 @@ export function registerClaudeControlHandlers(
         return {
           categories: [],
           totalTokens: 0,
-          maxTokens: 200000,
+          maxTokens: 1000000,
           percentage: 0,
           model: "unknown",
           memoryFiles: [],
@@ -428,7 +428,7 @@ export function registerClaudeControlHandlers(
         return {
           categories: [],
           totalTokens: 0,
-          maxTokens: 200000,
+          maxTokens: 1000000,
           percentage: 0,
           model: "unknown",
           memoryFiles: [],
