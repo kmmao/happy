@@ -12,7 +12,10 @@ import {
     machineRemoveAgentLoop,
     machineResumeAgentLoop,
     machineRunAgentLoopNow,
+    machineAISuggestAgentLoops,
+    machineCreateAgentLoop,
     type MachineAgentLoop,
+    type MachineAgentLoopSuggestion,
 } from "@/sync/ops";
 import { t } from "@/text";
 import { useMachine } from "@/sync/storage";
@@ -177,6 +180,13 @@ const loopSuggestions = useLoopSuggestions({
 
     const [mutatingLoopId, setMutatingLoopId] = React.useState<string | null>(null);
     const [editingLoop, setEditingLoop] = React.useState<MachineAgentLoop | null>(null);
+    // AI 生成 loop 状态
+    const [showAIInput, setShowAIInput] = React.useState(false);
+    const [aiDirectory, setAIDirectory] = React.useState("");
+    const [aiGenerating, setAIGenerating] = React.useState(false);
+    const [aiSuggestions, setAISuggestions] = React.useState<MachineAgentLoopSuggestion[]>([]);
+    const [aiAdoptingKey, setAIAdoptingKey] = React.useState<string | null>(null);
+    const [aiAdoptingAll, setAIAdoptingAll] = React.useState(false);
     const [loopEditorVisible, setLoopEditorVisible] = React.useState(false);
     const [showAutomation, setShowAutomation] = React.useState(true);
     const [searchQuery, setSearchQuery] = React.useState("");
@@ -191,6 +201,72 @@ const loopSuggestions = useLoopSuggestions({
         setEditingLoop(null);
         setLoopEditorVisible(true);
     }, []);
+
+    const handleAIGenerate = React.useCallback(async () => {
+        if (!machineId || !aiDirectory.trim()) {
+            Modal.alert(t("common.error"), t("machine.agentLoopPathRequired"));
+            return;
+        }
+        setAIGenerating(true);
+        setAISuggestions([]);
+        try {
+            const result = await machineAISuggestAgentLoops(machineId, {
+                directory: aiDirectory.trim(),
+                agent: "claude",
+            });
+            setAISuggestions(result.suggestions ?? []);
+        } catch (error) {
+            Modal.alert(t("common.error"), error instanceof Error ? error.message : String(error));
+        } finally {
+            setAIGenerating(false);
+        }
+    }, [machineId, aiDirectory]);
+
+    const adoptAISuggestion = React.useCallback(async (suggestion: MachineAgentLoopSuggestion) => {
+        if (!machineId || suggestion.alreadyConfigured) return;
+        setAIAdoptingKey(suggestion.key);
+        try {
+            const result = await machineCreateAgentLoop(machineId, {
+                name: suggestion.name,
+                directory: suggestion.directory,
+                prompt: suggestion.prompt,
+                intervalMs: suggestion.intervalMs,
+                agent: suggestion.agent,
+                fileWatchEnabled: suggestion.fileWatchEnabled,
+                githubBridgeEnabled: suggestion.githubBridgeEnabled,
+                ciBridgeEnabled: suggestion.ciBridgeEnabled,
+                goal: suggestion.goal,
+                currentFocus: suggestion.currentFocus,
+                maxConsecutiveFailures: suggestion.maxConsecutiveFailures,
+                retryBackoffMs: suggestion.retryBackoffMs,
+                runNow: false,
+            });
+            if (!result.success) throw new Error(result.errorMessage || t("machine.agentLoopCreateFailed"));
+            setAISuggestions((prev) =>
+                prev.map((s) => s.key === suggestion.key ? { ...s, alreadyConfigured: true } : s),
+            );
+            await load("refresh");
+        } catch (error) {
+            Modal.alert(t("common.error"), error instanceof Error ? error.message : String(error));
+        } finally {
+            setAIAdoptingKey(null);
+        }
+    }, [machineId, load]);
+
+    const adoptAllAISuggestions = React.useCallback(async () => {
+        if (!machineId) return;
+        const pending = aiSuggestions.filter((s) => !s.alreadyConfigured);
+        if (pending.length === 0) return;
+        setAIAdoptingAll(true);
+        try {
+            for (const s of pending) {
+                await adoptAISuggestion(s);
+            }
+            Modal.toast(t("machine.agentLoopSuggestionAdoptAllSummary", { count: pending.length }));
+        } catch { /* per-item errors handled in adoptAISuggestion */ } finally {
+            setAIAdoptingAll(false);
+        }
+    }, [machineId, aiSuggestions, adoptAISuggestion]);
 
     const mutateLoop = React.useCallback(async (loop: MachineAgentLoop, action: "pause" | "resume" | "run-now" | "remove" | "event") => {
         if (!machineId) {
@@ -437,19 +513,62 @@ const loopSuggestions = useLoopSuggestions({
                             </Pressable>
                         </View>
 
-                        {/* 新建循环按钮（全宽主操作，AI 建议在 modal 内触发） */}
-                        <Pressable
-                            style={[styles.loopsActionCreate, { backgroundColor: theme.colors.button.primary.background }]}
-                            onPress={openCreateLoopEditor}
-                        >
-                            <Ionicons name="add" size={16} color={theme.colors.button.primary.tint} />
-                            <Text style={[styles.loopsActionCreateText, { color: theme.colors.button.primary.tint }]} numberOfLines={1}>
-                                {t("machine.agentLoopCreate")}
-                            </Text>
-                            <View style={[styles.loopsActionBadge, { backgroundColor: "rgba(255,255,255,0.22)" }]}>
-                                <Text style={[styles.loopsActionBadgeText, { color: theme.colors.button.primary.tint }]}>{`${enabledCount}/${loops.length}`}</Text>
+                        {/* 操作行：创建 + AI 生成 */}
+                        <View style={styles.loopsActionRow}>
+                            <Pressable
+                                style={[styles.loopsActionCreate, { backgroundColor: theme.colors.button.primary.background }]}
+                                onPress={openCreateLoopEditor}
+                            >
+                                <Ionicons name="add" size={16} color={theme.colors.button.primary.tint} />
+                                <Text style={[styles.loopsActionCreateText, { color: theme.colors.button.primary.tint }]} numberOfLines={1}>
+                                    {t("machine.agentLoopCreate")}
+                                </Text>
+                                <View style={[styles.loopsActionBadge, { backgroundColor: "rgba(255,255,255,0.22)" }]}>
+                                    <Text style={[styles.loopsActionBadgeText, { color: theme.colors.button.primary.tint }]}>{`${enabledCount}/${loops.length}`}</Text>
+                                </View>
+                            </Pressable>
+                            <Pressable
+                                style={[styles.loopsActionSuggest, {
+                                    borderColor: showAIInput ? theme.colors.header.tint : theme.colors.divider,
+                                    backgroundColor: showAIInput ? theme.colors.surfaceHigh : theme.colors.surfaceHigh,
+                                }]}
+                                onPress={() => setShowAIInput((prev) => !prev)}
+                            >
+                                <Ionicons name="sparkles-outline" size={16} color={theme.colors.header.tint} />
+                                <Text style={[styles.loopsActionSuggestText, { color: theme.colors.header.tint }]} numberOfLines={1}>
+                                    {t("machine.agentLoopAIGenerate")}
+                                </Text>
+                            </Pressable>
+                        </View>
+
+                        {/* AI 生成：展开的目录输入 + 生成按钮 */}
+                        {showAIInput && (
+                            <View style={[styles.aiInputRow, { borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}>
+                                <TextInput
+                                    style={[styles.aiDirectoryInput, { color: theme.colors.text }]}
+                                    placeholder={t("machine.agentLoopPathPlaceholder")}
+                                    placeholderTextColor={theme.colors.textSecondary}
+                                    value={aiDirectory}
+                                    onChangeText={setAIDirectory}
+                                    autoCapitalize="none"
+                                    autoCorrect={false}
+                                />
+                                <Pressable
+                                    style={[styles.aiGenerateBtn, {
+                                        backgroundColor: aiGenerating ? theme.colors.surfaceHigh : theme.colors.header.tint,
+                                        opacity: aiGenerating ? 0.7 : 1,
+                                    }]}
+                                    onPress={() => void handleAIGenerate()}
+                                    disabled={aiGenerating}
+                                >
+                                    {aiGenerating ? (
+                                        <ActivityIndicator size="small" color={theme.colors.textSecondary} />
+                                    ) : (
+                                        <Ionicons name="sparkles" size={15} color="#fff" />
+                                    )}
+                                </Pressable>
                             </View>
-                        </Pressable>
+                        )}
                     </View>
                     {loading ? (
                         <View style={styles.loopSkeletonBlock}>
@@ -510,6 +629,19 @@ const loopSuggestions = useLoopSuggestions({
                             </View>
                         ))
                     )}
+                    {/* AI 生成建议列表 */}
+                    {aiSuggestions.length > 0 && (
+                        <LoopSuggestionsSection
+                            suggestions={aiSuggestions}
+                            suggestionCreatableCount={aiSuggestions.filter((s) => !s.alreadyConfigured).length}
+                            adoptingAllSuggestions={aiAdoptingAll}
+                            creatingSuggestionKey={aiAdoptingKey}
+                            adoptSuggestion={adoptAISuggestion}
+                            adoptAllSuggestions={adoptAllAISuggestions}
+                            formLayoutStacked={formLayout.modalHeaderStacked}
+                        />
+                    )}
+                    {/* 规则推荐建议列表 */}
                     <LoopSuggestionsSection
                         suggestions={suggestions}
                         suggestionCreatableCount={suggestionCreatableCount}
@@ -684,6 +816,28 @@ const styles = StyleSheet.create((theme) => ({
     loopsActionRow: {
         flexDirection: "row",
         gap: 8,
+    },
+    aiInputRow: {
+        flexDirection: "row",
+        alignItems: "center",
+        borderWidth: 1,
+        borderRadius: 10,
+        paddingHorizontal: 10,
+        paddingVertical: 4,
+        gap: 8,
+    },
+    aiDirectoryInput: {
+        flex: 1,
+        fontSize: 13,
+        paddingVertical: 8,
+    },
+    aiGenerateBtn: {
+        width: 34,
+        height: 34,
+        borderRadius: 8,
+        alignItems: "center",
+        justifyContent: "center",
+        flexShrink: 0,
     },
     loopsActionCreate: {
         flex: 3,

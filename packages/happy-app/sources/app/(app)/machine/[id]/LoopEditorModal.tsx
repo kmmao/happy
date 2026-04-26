@@ -4,7 +4,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { BaseModal } from "@/modal/components/BaseModal";
 import { Modal } from "@/modal";
-import { machineCreateAgentLoop, machineUpdateAgentLoop, machineAISuggestAgentLoops, machineListGitRepos, type MachineAgentLoop, type MachineAgentLoopSuggestion, type GitRepoEntry } from "@/sync/ops";
+import { machineCreateAgentLoop, machineUpdateAgentLoop, machineListGitRepos, type MachineAgentLoop, type GitRepoEntry } from "@/sync/ops";
 import { t } from "@/text";
 import {
     formatDownstreamTriggers,
@@ -109,9 +109,6 @@ export const LoopEditorModal = React.memo(function LoopEditorModal({
     const [environmentText, setEnvironmentText] = React.useState("");
     const [showAdvanced, setShowAdvanced] = React.useState(false);
     const [saving, setSaving] = React.useState(false);
-    const [aiSuggestions, setAiSuggestions] = React.useState<MachineAgentLoopSuggestion[]>([]);
-    const [aiGenerating, setAiGenerating] = React.useState(false);
-    const [adoptingSuggestionKey, setAdoptingSuggestionKey] = React.useState<string | null>(null);
     const [repoPickerOpen, setRepoPickerOpen] = React.useState(false);
     const [repoList, setRepoList] = React.useState<GitRepoEntry[]>([]);
     const [repoLoading, setRepoLoading] = React.useState(false);
@@ -183,68 +180,8 @@ export const LoopEditorModal = React.memo(function LoopEditorModal({
 
     const handleClose = React.useCallback(() => {
         setSaving(false);
-        setAiSuggestions([]);
         onClose();
     }, [onClose]);
-
-    const handleAIGenerate = React.useCallback(async () => {
-        if (!machineId || !directory.trim()) {
-            Modal.alert(t("common.error"), t("machine.agentLoopPathRequired"));
-            return;
-        }
-        setAiGenerating(true);
-        setAiSuggestions([]);
-        try {
-            const result = await machineAISuggestAgentLoops(machineId, {
-                directory: directory.trim(),
-                agent,
-                projectId: projectId.trim() || undefined,
-                profileId: profileId.trim() || undefined,
-            });
-            setAiSuggestions(result.suggestions ?? []);
-        } catch (error) {
-            Modal.alert(t("common.error"), error instanceof Error ? error.message : String(error));
-        } finally {
-            setAiGenerating(false);
-        }
-    }, [agent, directory, machineId, profileId, projectId]);
-
-    const handleAdoptAISuggestion = React.useCallback(async (suggestion: MachineAgentLoopSuggestion) => {
-        if (!machineId) return;
-        setAdoptingSuggestionKey(suggestion.key);
-        try {
-            const result = await machineCreateAgentLoop(machineId, {
-                name: suggestion.name,
-                directory: suggestion.directory,
-                prompt: suggestion.prompt,
-                intervalMs: suggestion.intervalMs,
-                agent: suggestion.agent,
-                profileId: profileId.trim() || undefined,
-                projectId: projectId.trim() || undefined,
-                fileWatchEnabled: suggestion.fileWatchEnabled,
-                githubBridgeEnabled: suggestion.githubBridgeEnabled,
-                ciBridgeEnabled: suggestion.ciBridgeEnabled,
-                goal: suggestion.goal,
-                currentFocus: suggestion.currentFocus,
-                workingMemory: suggestion.workingMemory,
-                maxConsecutiveFailures: suggestion.maxConsecutiveFailures,
-                retryBackoffMs: suggestion.retryBackoffMs,
-                runNow: false,
-            });
-            if (!result.success) {
-                throw new Error(result.errorMessage || t("machine.agentLoopCreateFailed"));
-            }
-            // Mark as adopted in the list
-            setAiSuggestions((prev) =>
-                prev.map((s) => s.key === suggestion.key ? { ...s, alreadyConfigured: true } : s),
-            );
-            onSaved();
-        } catch (error) {
-            Modal.alert(t("common.error"), error instanceof Error ? error.message : String(error));
-        } finally {
-            setAdoptingSuggestionKey(null);
-        }
-    }, [machineId, onSaved, profileId, projectId]);
 
     const handleSave = React.useCallback(async () => {
         if (!machineId) {
@@ -524,79 +461,6 @@ export const LoopEditorModal = React.memo(function LoopEditorModal({
                                 )}
                             </View>
                         )}
-                        {/* AI 生成建议按钮 */}
-                        <Pressable
-                            style={[styles.aiGenerateButton, { borderColor: theme.colors.header.tint, backgroundColor: theme.colors.surfaceHigh, opacity: aiGenerating ? 0.6 : 1 }]}
-                            onPress={() => void handleAIGenerate()}
-                            disabled={aiGenerating}
-                        >
-                            {aiGenerating ? (
-                                <ActivityIndicator size="small" color={theme.colors.header.tint} />
-                            ) : (
-                                <Ionicons name="sparkles-outline" size={15} color={theme.colors.header.tint} />
-                            )}
-                            <Text style={[styles.aiGenerateButtonText, { color: theme.colors.header.tint }]}>
-                                {aiGenerating ? t("common.loading") : t("machine.agentLoopAIGenerate")}
-                            </Text>
-                        </Pressable>
-
-                        {/* AI 建议预览列表 */}
-                        {aiSuggestions.length > 0 && (
-                            <View style={[styles.aiSuggestionsWrap, { borderColor: theme.colors.divider, backgroundColor: theme.colors.surfaceHigh }]}>
-                                <Text style={[styles.aiSuggestionsHeader, { color: theme.colors.textSecondary }]}>
-                                    {`✨ ${aiSuggestions.length} ${t("machine.agentLoopAISuggestionsTitle")}`}
-                                </Text>
-                                {aiSuggestions.map((suggestion) => (
-                                    <View
-                                        key={suggestion.key}
-                                        style={[styles.aiSuggestionCard, { borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}
-                                    >
-                                        <View style={styles.aiSuggestionCardHeader}>
-                                            <View style={styles.aiSuggestionCardTitleRow}>
-                                                <Text style={[styles.aiSuggestionName, { color: theme.colors.text }]} numberOfLines={1}>
-                                                    {suggestion.name}
-                                                </Text>
-                                                <Text style={[styles.aiSuggestionInterval, { color: theme.colors.textSecondary }]}>
-                                                    {`${Math.round(suggestion.intervalMs / 60_000)}m`}
-                                                </Text>
-                                            </View>
-                                            <Text style={[styles.aiSuggestionDesc, { color: theme.colors.textSecondary }]} numberOfLines={2}>
-                                                {suggestion.description || suggestion.goal}
-                                            </Text>
-                                            <Text style={[styles.aiSuggestionPrompt, { color: theme.colors.text }]} numberOfLines={3}>
-                                                {suggestion.prompt}
-                                            </Text>
-                                        </View>
-                                        <Pressable
-                                            style={[
-                                                styles.aiSuggestionAdoptBtn,
-                                                {
-                                                    backgroundColor: suggestion.alreadyConfigured
-                                                        ? theme.colors.surfaceHigh
-                                                        : theme.colors.button.primary.background,
-                                                    opacity: adoptingSuggestionKey === suggestion.key ? 0.6 : 1,
-                                                },
-                                            ]}
-                                            onPress={() => !suggestion.alreadyConfigured && void handleAdoptAISuggestion(suggestion)}
-                                            disabled={suggestion.alreadyConfigured || adoptingSuggestionKey === suggestion.key}
-                                        >
-                                            {adoptingSuggestionKey === suggestion.key ? (
-                                                <ActivityIndicator size="small" color={theme.colors.button.primary.tint} />
-                                            ) : (
-                                                <Text style={{
-                                                    fontSize: 12,
-                                                    fontWeight: "600",
-                                                    color: suggestion.alreadyConfigured ? theme.colors.textSecondary : theme.colors.button.primary.tint,
-                                                }}>
-                                                    {suggestion.alreadyConfigured ? t("machine.agentLoopSuggestionConfigured") : t("machine.agentLoopAdopt")}
-                                                </Text>
-                                            )}
-                                        </Pressable>
-                                    </View>
-                                ))}
-                            </View>
-                        )}
-
                         <Text style={[styles.label, { color: theme.colors.textSecondary }]}>{t("machine.agentLoopInterval")}</Text>
                         <TextInput
                             style={[styles.input, { color: theme.colors.text, borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}
@@ -1114,75 +978,6 @@ const styles = StyleSheet.create((theme) => ({
         justifyContent: "center",
         paddingHorizontal: 14,
         marginTop: 4,
-    },
-    aiGenerateButton: {
-        minHeight: 40,
-        borderRadius: 10,
-        borderWidth: 1,
-        flexDirection: "row",
-        alignItems: "center",
-        justifyContent: "center",
-        gap: 6,
-        paddingHorizontal: 14,
-        marginTop: 4,
-    },
-    aiGenerateButtonText: {
-        fontSize: 13,
-        fontWeight: "600",
-    },
-    aiSuggestionsWrap: {
-        marginTop: 8,
-        borderWidth: 1,
-        borderRadius: 14,
-        overflow: "hidden",
-        gap: 1,
-        padding: 10,
-    },
-    aiSuggestionsHeader: {
-        fontSize: 11,
-        fontWeight: "600",
-        marginBottom: 6,
-        paddingHorizontal: 2,
-    },
-    aiSuggestionCard: {
-        borderWidth: 1,
-        borderRadius: 12,
-        padding: 12,
-        marginBottom: 6,
-        gap: 8,
-    },
-    aiSuggestionCardHeader: {
-        gap: 4,
-    },
-    aiSuggestionCardTitleRow: {
-        flexDirection: "row",
-        alignItems: "center",
-        gap: 8,
-    },
-    aiSuggestionName: {
-        flex: 1,
-        fontSize: 13,
-        fontWeight: "700",
-    },
-    aiSuggestionInterval: {
-        fontSize: 11,
-        fontWeight: "600",
-    },
-    aiSuggestionDesc: {
-        fontSize: 12,
-        lineHeight: 17,
-    },
-    aiSuggestionPrompt: {
-        fontSize: 11,
-        lineHeight: 16,
-        fontStyle: "italic",
-    },
-    aiSuggestionAdoptBtn: {
-        minHeight: 32,
-        borderRadius: 8,
-        alignItems: "center",
-        justifyContent: "center",
-        paddingHorizontal: 12,
     },
     createButton: {
         flex: 1,
