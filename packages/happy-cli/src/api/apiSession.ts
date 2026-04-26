@@ -963,6 +963,19 @@ export class ApiSessionClient extends EventEmitter {
   }
 
   /**
+   * Run a callback once the socket is connected.
+   * Executes immediately if already connected; otherwise registers a one-time
+   * connect listener. Use for best-effort setup events that require an active socket.
+   */
+  runOnConnect(callback: () => void): void {
+    if (this.socket.connected) {
+      callback();
+    } else {
+      this.socket.once("connect", callback);
+    }
+  }
+
+  /**
    * Report a session timeline event. Fire-and-forget, no queueing.
    */
   sessionEvent(

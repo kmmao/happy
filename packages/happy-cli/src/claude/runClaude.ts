@@ -343,6 +343,17 @@ export async function runClaude(
   // Create realtime session FIRST (before SDK metadata extraction)
   const session = api.sessionSyncClient(response);
 
+  // Report worktree context for server-side push notification enrichment.
+  // Sent once the socket is connected (best-effort: drops silently on disconnect).
+  if (worktreeInfo) {
+    session.runOnConnect(() => {
+      session.sessionEvent(response.id, "session_start", `Worktree: ${worktreeInfo.branchName}`, {
+        branch: worktreeInfo.branchName,
+        worktreePath: worktreeInfo.worktreePath,
+      });
+    });
+  }
+
   // On reconnect, server preserves the existing metadata blob (agent state
   // like progress / sessionSummary / summary / tools / slashCommands).
   // Merge our fresh startup fields on top so this new CLI process is

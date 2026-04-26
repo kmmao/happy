@@ -16,6 +16,22 @@ import { debug, log } from "@/utils/log";
 import { randomKeyNaked } from "@/utils/randomKeyNaked";
 import { Socket } from "socket.io";
 
+/**
+ * Look up the git branch for a session that was started in a worktree.
+ * Reads the `session_start` event detail emitted by the CLI when it detects
+ * a Happy-managed git worktree. Returns null when not in a worktree.
+ */
+async function getSessionWorktreeBranch(sessionId: string): Promise<string | null> {
+    const event = await db.sessionEvent.findFirst({
+        where: { sessionId, eventType: "session_start" },
+        orderBy: { createdAt: "asc" },
+        select: { detail: true },
+    });
+    const detail = event?.detail as Record<string, unknown> | null;
+    const branch = detail?.branch;
+    return typeof branch === "string" ? branch : null;
+}
+
 export function sessionUpdateHandler(userId: string, socket: Socket, connection: ClientConnection) {
     socket.on('update-metadata', async (data: any, callback: (response: any) => void) => {
         try {
@@ -303,6 +319,11 @@ export function sessionUpdateHandler(userId: string, socket: Socket, connection:
                 },
             });
             const completedAt = new Date();
+            // Look up worktree branch once for all tasks in this session
+            const worktreeBranch = inProgressTasks.length > 0
+                ? await getSessionWorktreeBranch(sid)
+                : null;
+            const branchPrefix = worktreeBranch ? `[${worktreeBranch}] ` : "";
             for (const task of inProgressTasks) {
                 const updated = await db.task.update({
                     where: { id: task.id },
@@ -317,7 +338,7 @@ export function sessionUpdateHandler(userId: string, socket: Socket, connection:
                     category: "task",
                     eventType: "task.completed",
                     severity: "info",
-                    title: `${taskLabel}: completed`,
+                    title: `${branchPrefix}${taskLabel}: completed`,
                     referenceUrl: updated.sessionId ? `/session/${updated.sessionId}` : undefined,
                     refType: "task",
                     refId: task.id,

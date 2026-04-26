@@ -16,5 +16,14 @@ export const MessageMetaSchema = z.object({
    * Defaults to true when unset (normal turn-triggering message).
    */
   shouldQuery: z.boolean().optional(),
+  /**
+   * Worktree context for sessions running in a git worktree branch.
+   * Injected by the CLI when the session directory is inside a git worktree.
+   * Used by the server to enrich push notification titles with branch info.
+   */
+  worktree: z.object({
+    branch: z.string(),
+    path: z.string().optional(),
+  }).optional(),
 });
 export type MessageMeta = z.infer<typeof MessageMetaSchema>;
