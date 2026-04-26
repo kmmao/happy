@@ -89,7 +89,10 @@ interface UseLoopsDataResult {
 export function useLoopsData({ machineId, rpcReady, pushedLoops, pushedBootstrapProfiles, pushedAutoDreamProfiles }: UseLoopsDataParams): UseLoopsDataResult {
     const loadRef = React.useRef<() => void>(() => {});
     const [loops, setLoops] = React.useState<MachineAgentLoop[]>([]);
-    const [loading, setLoading] = React.useState(true);
+    // Start false: only set true when we are actually about to make RPC calls.
+    // Starting true caused an infinite skeleton when rpcReady was false on mount
+    // (load() returned early without ever calling setLoading(false)).
+    const [loading, setLoading] = React.useState(false);
     const [refreshing, setRefreshing] = React.useState(false);
 
     // Seed from pushed DaemonState: show data instantly while RPC loads full details
