@@ -28,8 +28,6 @@ export interface LoopEditorModalProps {
     editingLoop: MachineAgentLoop | null;
     loopCount: number;
     enabledCount: number;
-    suggesting: boolean;
-    onSuggest: (directory: string, agent: string, projectId: string, profileId: string) => void;
 }
 
 function hasAdvancedFields(loop: MachineAgentLoop): boolean {
@@ -68,8 +66,6 @@ export const LoopEditorModal = React.memo(function LoopEditorModal({
     editingLoop,
     loopCount,
     enabledCount,
-    suggesting,
-    onSuggest,
 }: LoopEditorModalProps) {
     const { theme } = useUnistyles();
     const { width: viewportWidth, height: viewportHeight } = useWindowDimensions();
@@ -528,18 +524,6 @@ export const LoopEditorModal = React.memo(function LoopEditorModal({
                                 )}
                             </View>
                         )}
-                        <Pressable
-                            style={[styles.inlineSecondaryButton, { borderColor: theme.colors.divider, backgroundColor: theme.colors.surface, opacity: suggesting ? 0.6 : 1 }]}
-                            onPress={() => onSuggest(directory, agent, projectId, profileId)}
-                            disabled={suggesting}
-                        >
-                            {suggesting ? (
-                                <ActivityIndicator size="small" color={theme.colors.textSecondary} />
-                            ) : (
-                                <Text style={{ color: theme.colors.text }}>{t("machine.agentLoopSuggest")}</Text>
-                            )}
-                        </Pressable>
-
                         {/* AI 生成建议按钮 */}
                         <Pressable
                             style={[styles.aiGenerateButton, { borderColor: theme.colors.header.tint, backgroundColor: theme.colors.surfaceHigh, opacity: aiGenerating ? 0.6 : 1 }]}

@@ -164,13 +164,11 @@ const loopSuggestions = useLoopSuggestions({
     });
     const {
         suggestions,
-        suggesting,
         creatingSuggestionKey,
         adoptingAllSuggestions,
         bootstrapEntries,
         bootstrapScanning,
         bootstrappingRepoPath,
-        loadSuggestions,
         adoptSuggestion,
         adoptAllSuggestions,
         scanBootstrapRepos,
@@ -560,8 +558,6 @@ const loopSuggestions = useLoopSuggestions({
                 editingLoop={editingLoop}
                 loopCount={loops.length}
                 enabledCount={enabledCount}
-                suggesting={suggesting}
-                onSuggest={(dir, _agent, _projId, _profId) => void loadSuggestions(dir)}
             />
 
             <BootstrapProfileEditorModal
