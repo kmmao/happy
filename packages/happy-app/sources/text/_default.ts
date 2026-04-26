@@ -1318,6 +1318,7 @@ export const en = {
     session: "Session",
     sessionProgress: "Progress",
     sessionCode: "Code",
+    sessionContext: "Context",
     files: "Files",
     changes: "Changes",
     knowledge: "Knowledge",

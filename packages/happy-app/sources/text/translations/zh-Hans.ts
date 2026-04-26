@@ -1286,6 +1286,7 @@ export const zhHans: TranslationStructure = {
     session: "会话",
     sessionProgress: "进度",
     sessionCode: "代码",
+    sessionContext: "上下文",
     files: "文件",
     changes: "变更",
     knowledge: "知识库",

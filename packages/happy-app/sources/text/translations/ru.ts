@@ -1343,6 +1343,7 @@ export const ru: TranslationStructure = {
     session: "Сессия",
     sessionProgress: "Прогресс",
     sessionCode: "Код",
+    sessionContext: "Контекст",
     files: "Файлы",
     changes: "Изменения",
     knowledge: "Знания",

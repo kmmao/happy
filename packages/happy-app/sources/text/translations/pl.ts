@@ -1343,6 +1343,7 @@ export const pl: TranslationStructure = {
     session: "Sesja",
     sessionProgress: "Postęp",
     sessionCode: "Kod",
+    sessionContext: "Kontekst",
     files: "Pliki",
     changes: "Zmiany",
     knowledge: "Wiedza",

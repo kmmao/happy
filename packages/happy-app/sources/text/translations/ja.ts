@@ -1456,6 +1456,7 @@ export const ja: TranslationStructure = {
     session: "セッション",
     sessionProgress: "進捗",
     sessionCode: "コード",
+    sessionContext: "コンテキスト",
     files: "ファイル",
     changes: "変更",
     knowledge: "ナレッジ",

@@ -1286,6 +1286,7 @@ export const zhHant: TranslationStructure = {
     session: "會話",
     sessionProgress: "進度",
     sessionCode: "程式碼",
+    sessionContext: "上下文",
     files: "檔案",
     changes: "變更",
     knowledge: "知識庫",

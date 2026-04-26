@@ -1332,6 +1332,7 @@ export const ca: TranslationStructure = {
     session: "Sessió",
     sessionProgress: "Progrés",
     sessionCode: "Codi",
+    sessionContext: "Context",
     files: "Fitxers",
     changes: "Canvis",
     knowledge: "Coneixement",

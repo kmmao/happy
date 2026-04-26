@@ -1333,6 +1333,7 @@ export const es: TranslationStructure = {
     session: "Sesión",
     sessionProgress: "Progreso",
     sessionCode: "Código",
+    sessionContext: "Contexto",
     files: "Archivos",
     changes: "Cambios",
     knowledge: "Conocimiento",

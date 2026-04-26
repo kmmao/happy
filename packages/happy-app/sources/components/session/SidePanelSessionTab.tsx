@@ -6,17 +6,19 @@ import { t } from "@/text";
 import { SessionProgressPanel } from "./SessionProgressPanel";
 import { SessionGlassTabBar, type SessionGlassTabBarItem } from "./SessionGlassTabBar";
 import { SidePanelCodeTab } from "./SidePanelCodeTab";
+import { SidePanelContextTab } from "./SidePanelContextTab";
 
-type SessionSubTab = "progress" | "code";
+type SessionSubTab = "progress" | "code" | "context";
 
 interface SubTabDef {
     key: SessionSubTab;
-    labelKey: "sidePanel.sessionProgress" | "sidePanel.sessionCode";
+    labelKey: "sidePanel.sessionProgress" | "sidePanel.sessionCode" | "sidePanel.sessionContext";
 }
 
 const SUB_TABS: readonly SubTabDef[] = [
     { key: "progress", labelKey: "sidePanel.sessionProgress" },
     { key: "code", labelKey: "sidePanel.sessionCode" },
+    { key: "context", labelKey: "sidePanel.sessionContext" },
 ];
 
 interface SidePanelSessionTabProps {
@@ -54,6 +56,9 @@ export const SidePanelSessionTab = React.memo<SidePanelSessionTabProps>(
                     )}
                     {activeSubTab === "code" && (
                         <SidePanelCodeTab sessionId={sessionId} />
+                    )}
+                    {activeSubTab === "context" && (
+                        <SidePanelContextTab sessionId={sessionId} />
                     )}
                 </View>
             </View>

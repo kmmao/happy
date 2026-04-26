@@ -1468,6 +1468,7 @@ export const it: TranslationStructure = {
     session: "Sessione",
     sessionProgress: "Progresso",
     sessionCode: "Codice",
+    sessionContext: "Contesto",
     files: "File",
     changes: "Modifiche",
     knowledge: "Conoscenza",
