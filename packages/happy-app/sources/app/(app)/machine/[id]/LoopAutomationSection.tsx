@@ -51,33 +51,33 @@ function renderSectionBanner(
     icon: React.ComponentProps<typeof Ionicons>["name"] | undefined,
     options: { readonly compact?: boolean } | undefined,
     theme: ReturnType<typeof useUnistyles>["theme"],
-    formLayoutStacked: boolean,
+    _formLayoutStacked: boolean,
 ) {
     return (
         <View style={[
             styles.sectionBanner,
             options?.compact ? styles.sectionBannerCompact : null,
-            formLayoutStacked ? styles.sectionBannerStacked : null,
             { borderBottomColor: theme.colors.divider, backgroundColor: theme.colors.surface },
         ]}>
-            <View style={styles.sectionBannerLeading}>
-                {icon ? <Ionicons name={icon} size={options?.compact ? 16 : 18} color={theme.colors.textSecondary} /> : null}
-                <View style={styles.sectionBannerTextWrap}>
+            {icon ? <Ionicons name={icon} size={options?.compact ? 16 : 18} color={theme.colors.textSecondary} /> : null}
+            <View style={styles.sectionBannerTextWrap}>
+                {/* 标题 + 数字徽章内联同行 */}
+                <View style={styles.sectionBannerTitleRow}>
                     <Text style={[
                         styles.sectionBannerTitle,
                         options?.compact ? styles.sectionBannerTitleCompact : null,
                         { color: theme.colors.text },
                     ]}>{title}</Text>
-                    {!options?.compact ? (
-                        <Text style={[styles.sectionBannerSubtitle, { color: theme.colors.textSecondary }]}>{subtitle}</Text>
+                    {badge !== undefined ? (
+                        <View style={[styles.sectionBadge, { borderColor: theme.colors.divider, backgroundColor: theme.colors.surfaceHigh }]}>
+                            <Text style={[styles.sectionBadgeText, { color: theme.colors.textSecondary }]}>{badge}</Text>
+                        </View>
                     ) : null}
                 </View>
+                {subtitle ? (
+                    <Text style={[styles.sectionBannerSubtitle, { color: theme.colors.textSecondary }]} numberOfLines={2}>{subtitle}</Text>
+                ) : null}
             </View>
-            {badge ? (
-                <View style={[styles.sectionBadge, { borderColor: theme.colors.divider, backgroundColor: theme.colors.surfaceHigh }]}>
-                    <Text style={[styles.sectionBadgeText, { color: theme.colors.text }]}>{badge}</Text>
-                </View>
-            ) : null}
         </View>
     );
 }
@@ -209,7 +209,8 @@ export const LoopAutomationSection = React.memo(function LoopAutomationSection(p
                     <Item
                         title={t("machine.automationQuickSetupTitle")}
                         subtitle={t("machine.automationQuickSetupSubtitle")}
-                        subtitleLines={2}
+                        subtitleLines={1}
+                        subtitleStyle={styles.quickSetupSubtitle}
                         icon={<Ionicons name="flash-outline" size={20} color={theme.colors.primary} />}
                         onPress={() => void runAutomationQuickSetup()}
                         showChevron
@@ -329,7 +330,7 @@ export const LoopAutomationSection = React.memo(function LoopAutomationSection(p
     );
 });
 
-const styles = StyleSheet.create((theme) => ({
+const styles = StyleSheet.create((_theme) => ({
     automationGroupHeaderWrap: {
         width: "100%",
         paddingBottom: Platform.select({ ios: 6, default: 8 }),
@@ -354,8 +355,12 @@ const styles = StyleSheet.create((theme) => ({
         marginLeft: 16,
     },
     automationQuickRow: {
-        minHeight: 52,
-        paddingVertical: 6,
+        minHeight: 48,
+        paddingVertical: 4,
+    },
+    quickSetupSubtitle: {
+        fontSize: 11,
+        lineHeight: 15,
     },
     automationActionRow: {
         minHeight: 46,
@@ -456,55 +461,48 @@ const styles = StyleSheet.create((theme) => ({
         lineHeight: 18,
     },
     sectionBanner: {
-        paddingHorizontal: 16,
-        paddingVertical: 14,
+        paddingHorizontal: 12,
+        paddingVertical: 8,
         borderBottomWidth: 1,
         flexDirection: "row",
         alignItems: "center",
-        justifyContent: "space-between",
-        gap: 12,
+        gap: 8,
     },
     sectionBannerCompact: {
         paddingHorizontal: 12,
-        paddingVertical: 8,
+        paddingVertical: 7,
     },
     sectionBannerTitleCompact: {
         fontSize: 14,
         fontWeight: "700",
     },
-    sectionBannerStacked: {
-        alignItems: "flex-start",
-        flexDirection: "column",
-    },
-    sectionBannerLeading: {
-        flex: 1,
-        flexDirection: "row",
-        alignItems: "center",
-        gap: 10,
-    },
     sectionBannerTextWrap: {
         flex: 1,
-        gap: 4,
+        gap: 3,
+    },
+    sectionBannerTitleRow: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 6,
     },
     sectionBannerTitle: {
-        fontSize: 15,
+        fontSize: 14,
         fontWeight: "700",
     },
     sectionBannerSubtitle: {
-        fontSize: 13,
-        lineHeight: 18,
+        fontSize: 12,
+        lineHeight: 17,
     },
     sectionBadge: {
-        minWidth: 44,
-        minHeight: 32,
-        paddingHorizontal: 12,
+        minHeight: 20,
+        paddingHorizontal: 7,
         borderRadius: 999,
         borderWidth: 1,
         alignItems: "center",
         justifyContent: "center",
     },
     sectionBadgeText: {
-        fontSize: 13,
+        fontSize: 12,
         fontWeight: "700",
     },
 }));

@@ -848,6 +848,18 @@ export async function machineSuggestAgentLoops(
   );
 }
 
+/** AI-powered loop suggestion — reads project context and calls Claude API on the CLI side. */
+export async function machineAISuggestAgentLoops(
+  machineId: string,
+  input: MachineAgentLoopSuggestInput,
+): Promise<{ suggestions: MachineAgentLoopSuggestion[] }> {
+  return apiSocket.machineRPC(
+    machineId,
+    "loop-suggest-ai",
+    input,
+  );
+}
+
 
 export async function machineListAgentLoopBootstrapProfiles(
   machineId: string,

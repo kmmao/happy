@@ -25,9 +25,7 @@ import { BootstrapProfileEditorModal } from "./BootstrapProfileEditorModal";
 import { LoopAutomationSection } from "./LoopAutomationSection";
 import { LoopEditorModal } from "./LoopEditorModal";
 import { LoopSuggestionsSection } from "./LoopSuggestionsSection";
-import { OneClickSetupCard } from "./OneClickSetupCard";
 import { BriefSection } from "./BriefSection";
-import { useOneClickSetup } from "./useOneClickSetup";
 import { useLoopsData } from "./useLoopsData";
 import { useLoopSuggestions } from "./useLoopSuggestions";
 import {
@@ -139,7 +137,6 @@ export default React.memo(function MachineLoopsPage() {
         bootstrapProfiles,
         autoDreamProfiles,
         upstreamLoopIdsByLoopId,
-        automationProfilesRef,
         mutatingBootstrapProfileId,
         editingBootstrapProfile,
         setEditingBootstrapProfile,
@@ -154,20 +151,12 @@ export default React.memo(function MachineLoopsPage() {
         profileId,
         projectId,
         load,
-        loadRef,
         runAutomationQuickSetup,
         mutateBootstrapProfile,
         mutateAutoDreamProfile,
     } = loopsData;
 
-    const oneClickSetup = useOneClickSetup(
-        machineId,
-        automationProfilesRef,
-        React.useCallback(() => loadRef.current(), [loadRef]),
-        projectId,
-        profileId,
-    );
-    const loopSuggestions = useLoopSuggestions({
+const loopSuggestions = useLoopSuggestions({
         machineId,
         profileId,
         projectId,
@@ -392,11 +381,6 @@ export default React.memo(function MachineLoopsPage() {
     const enabledCount = React.useMemo(() => loops.filter((loop) => loop.enabled).length, [loops]);
     const suggestionCreatableCount = React.useMemo(() => suggestions.filter((suggestion) => !suggestion.alreadyConfigured).length, [suggestions]);
 
-    const handleSuggestAction = React.useCallback(() => {
-        setEditingLoop(null);
-        setLoopEditorVisible(true);
-    }, []);
-
     const renderEmptyStateCard = (
         icon: React.ComponentProps<typeof Ionicons>["name"],
         title: string,
@@ -424,19 +408,17 @@ export default React.memo(function MachineLoopsPage() {
                 contentContainerStyle={styles.content}
                 refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void load("refresh")} />}
             >
-                <OneClickSetupCard
-                    setup={oneClickSetup}
-                    onRefresh={() => void load("refresh")}
-                />
 
                 <ItemGroup title={t("machine.agentLoops")}>
                     <View style={[styles.loopsIntegratedTop, { borderBottomColor: theme.colors.divider }]}>
-                        <Text style={[styles.loopsIntegratedHint, { color: theme.colors.textSecondary }]} numberOfLines={2}>
-                            {t("machine.loopsFlowSubtitle")}
+                        {/* 区块说明 */}
+                        <Text style={[styles.loopsHintText, { color: theme.colors.textSecondary }]} numberOfLines={2}>
+                            {t("machine.agentLoopsViewAllHint")}
                         </Text>
+                        {/* 搜索栏 + 刷新 */}
                         <View style={styles.searchRow}>
                             <View style={[styles.searchBar, styles.searchBarFlex, { borderColor: theme.colors.divider, backgroundColor: theme.colors.surfaceHigh }]}>
-                                <Ionicons name="search-outline" size={18} color={theme.colors.textSecondary} />
+                                <Ionicons name="search-outline" size={16} color={theme.colors.textSecondary} />
                                 <TextInput
                                     style={[styles.searchInput, { color: theme.colors.text }]}
                                     placeholder={t("machine.agentLoopSearchPlaceholder")}
@@ -452,47 +434,24 @@ export default React.memo(function MachineLoopsPage() {
                                 {refreshing ? (
                                     <ActivityIndicator size="small" color={theme.colors.textSecondary} />
                                 ) : (
-                                    <Ionicons name="refresh-outline" size={18} color={theme.colors.primary} />
+                                    <Ionicons name="refresh-outline" size={16} color={theme.colors.primary} />
                                 )}
                             </Pressable>
                         </View>
-                        <View style={styles.loopsQuickRow}>
-                            <Pressable
-                                style={[styles.loopsQuickChip, { borderColor: theme.colors.divider, backgroundColor: theme.colors.surfaceHigh }]}
-                                onPress={openCreateLoopEditor}
-                            >
-                                <Ionicons name="add-circle-outline" size={18} color={theme.colors.textLink} />
-                                <View style={styles.loopsQuickChipTextCol}>
-                                    <Text style={[styles.loopsQuickChipTitle, { color: theme.colors.text }]} numberOfLines={1}>
-                                        {t("machine.agentLoopCreate")}
-                                    </Text>
-                                </View>
-                                <View style={[styles.loopsQuickChipBadge, { borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}>
-                                    <Text style={[styles.loopsQuickChipBadgeText, { color: theme.colors.textSecondary }]}>{`${enabledCount}/${loops.length}`}</Text>
-                                </View>
-                            </Pressable>
-                            <Pressable
-                                style={[styles.loopsQuickChip, { borderColor: theme.colors.divider, backgroundColor: theme.colors.surfaceHigh }]}
-                                onPress={handleSuggestAction}
-                            >
-                                <Ionicons name="sparkles-outline" size={18} color={theme.colors.header.tint} />
-                                <View style={styles.loopsQuickChipTextCol}>
-                                    <Text style={[styles.loopsQuickChipTitle, { color: theme.colors.text }]} numberOfLines={1}>
-                                        {t("machine.agentLoopSuggest")}
-                                    </Text>
-                                    <Text style={[styles.loopsQuickChipPath, { color: theme.colors.textSecondary }]} numberOfLines={1}>
-                                        {t("machine.agentLoopPathPlaceholder")}
-                                    </Text>
-                                </View>
-                                {suggesting ? (
-                                    <ActivityIndicator size="small" color={theme.colors.textSecondary} />
-                                ) : (
-                                    <View style={[styles.loopsQuickChipBadge, { borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}>
-                                        <Text style={[styles.loopsQuickChipBadgeText, { color: theme.colors.textSecondary }]}>{String(suggestionCreatableCount)}</Text>
-                                    </View>
-                                )}
-                            </Pressable>
-                        </View>
+
+                        {/* 新建循环按钮（全宽主操作，AI 建议在 modal 内触发） */}
+                        <Pressable
+                            style={[styles.loopsActionCreate, { backgroundColor: theme.colors.button.primary.background }]}
+                            onPress={openCreateLoopEditor}
+                        >
+                            <Ionicons name="add" size={16} color={theme.colors.button.primary.tint} />
+                            <Text style={[styles.loopsActionCreateText, { color: theme.colors.button.primary.tint }]} numberOfLines={1}>
+                                {t("machine.agentLoopCreate")}
+                            </Text>
+                            <View style={[styles.loopsActionBadge, { backgroundColor: "rgba(255,255,255,0.22)" }]}>
+                                <Text style={[styles.loopsActionBadgeText, { color: theme.colors.button.primary.tint }]}>{`${enabledCount}/${loops.length}`}</Text>
+                            </View>
+                        </Pressable>
                     </View>
                     {loading ? (
                         <View style={styles.loopSkeletonBlock}>
@@ -716,57 +675,61 @@ const styles = StyleSheet.create((theme) => ({
     },
     loopsIntegratedTop: {
         paddingHorizontal: 10,
-        paddingTop: 4,
-        paddingBottom: 8,
-        gap: 6,
+        paddingTop: 8,
+        paddingBottom: 10,
+        gap: 8,
         borderBottomWidth: 1,
     },
-    loopsIntegratedHint: {
-        fontSize: 11,
-        lineHeight: 15,
+    loopsHintText: {
+        fontSize: 12,
+        lineHeight: 17,
         paddingHorizontal: 2,
     },
-    loopsQuickRow: {
+    loopsActionRow: {
         flexDirection: "row",
-        flexWrap: "wrap",
-        gap: 6,
+        gap: 8,
     },
-    loopsQuickChip: {
-        flex: 1,
-        minWidth: 140,
+    loopsActionCreate: {
+        flex: 3,
         flexDirection: "row",
         alignItems: "center",
         gap: 6,
-        minHeight: 42,
-        borderWidth: 1,
+        minHeight: 40,
         borderRadius: 10,
-        paddingHorizontal: 10,
+        paddingHorizontal: 12,
         paddingVertical: 6,
     },
-    loopsQuickChipTextCol: {
+    loopsActionCreateText: {
         flex: 1,
-        minWidth: 0,
-        gap: 2,
-    },
-    loopsQuickChipTitle: {
         fontSize: 13,
         fontWeight: "700",
     },
-    loopsQuickChipPath: {
-        fontSize: 10,
-        lineHeight: 13,
-    },
-    loopsQuickChipBadge: {
-        minHeight: 26,
-        minWidth: 36,
-        paddingHorizontal: 8,
-        borderRadius: 999,
+    loopsActionSuggest: {
+        flex: 2,
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 6,
+        minHeight: 40,
         borderWidth: 1,
+        borderRadius: 10,
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+    },
+    loopsActionSuggestText: {
+        flex: 1,
+        fontSize: 13,
+        fontWeight: "600",
+    },
+    loopsActionBadge: {
+        minHeight: 22,
+        minWidth: 32,
+        paddingHorizontal: 6,
+        borderRadius: 999,
         alignItems: "center",
         justifyContent: "center",
     },
-    loopsQuickChipBadgeText: {
-        fontSize: 12,
+    loopsActionBadgeText: {
+        fontSize: 11,
         fontWeight: "700",
     },
     refreshIconButton: {

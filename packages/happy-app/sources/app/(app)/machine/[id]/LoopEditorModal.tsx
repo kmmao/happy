@@ -4,7 +4,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { BaseModal } from "@/modal/components/BaseModal";
 import { Modal } from "@/modal";
-import { machineCreateAgentLoop, machineUpdateAgentLoop, type MachineAgentLoop } from "@/sync/ops";
+import { machineCreateAgentLoop, machineUpdateAgentLoop, machineAISuggestAgentLoops, machineListGitRepos, type MachineAgentLoop, type MachineAgentLoopSuggestion, type GitRepoEntry } from "@/sync/ops";
 import { t } from "@/text";
 import {
     formatDownstreamTriggers,
@@ -113,6 +113,13 @@ export const LoopEditorModal = React.memo(function LoopEditorModal({
     const [environmentText, setEnvironmentText] = React.useState("");
     const [showAdvanced, setShowAdvanced] = React.useState(false);
     const [saving, setSaving] = React.useState(false);
+    const [aiSuggestions, setAiSuggestions] = React.useState<MachineAgentLoopSuggestion[]>([]);
+    const [aiGenerating, setAiGenerating] = React.useState(false);
+    const [adoptingSuggestionKey, setAdoptingSuggestionKey] = React.useState<string | null>(null);
+    const [repoPickerOpen, setRepoPickerOpen] = React.useState(false);
+    const [repoList, setRepoList] = React.useState<GitRepoEntry[]>([]);
+    const [repoLoading, setRepoLoading] = React.useState(false);
+    const [repoSearch, setRepoSearch] = React.useState("");
 
     React.useEffect(() => {
         if (visible && editingLoop) {
@@ -180,8 +187,68 @@ export const LoopEditorModal = React.memo(function LoopEditorModal({
 
     const handleClose = React.useCallback(() => {
         setSaving(false);
+        setAiSuggestions([]);
         onClose();
     }, [onClose]);
+
+    const handleAIGenerate = React.useCallback(async () => {
+        if (!machineId || !directory.trim()) {
+            Modal.alert(t("common.error"), t("machine.agentLoopPathRequired"));
+            return;
+        }
+        setAiGenerating(true);
+        setAiSuggestions([]);
+        try {
+            const result = await machineAISuggestAgentLoops(machineId, {
+                directory: directory.trim(),
+                agent,
+                projectId: projectId.trim() || undefined,
+                profileId: profileId.trim() || undefined,
+            });
+            setAiSuggestions(result.suggestions ?? []);
+        } catch (error) {
+            Modal.alert(t("common.error"), error instanceof Error ? error.message : String(error));
+        } finally {
+            setAiGenerating(false);
+        }
+    }, [agent, directory, machineId, profileId, projectId]);
+
+    const handleAdoptAISuggestion = React.useCallback(async (suggestion: MachineAgentLoopSuggestion) => {
+        if (!machineId) return;
+        setAdoptingSuggestionKey(suggestion.key);
+        try {
+            const result = await machineCreateAgentLoop(machineId, {
+                name: suggestion.name,
+                directory: suggestion.directory,
+                prompt: suggestion.prompt,
+                intervalMs: suggestion.intervalMs,
+                agent: suggestion.agent,
+                profileId: profileId.trim() || undefined,
+                projectId: projectId.trim() || undefined,
+                fileWatchEnabled: suggestion.fileWatchEnabled,
+                githubBridgeEnabled: suggestion.githubBridgeEnabled,
+                ciBridgeEnabled: suggestion.ciBridgeEnabled,
+                goal: suggestion.goal,
+                currentFocus: suggestion.currentFocus,
+                workingMemory: suggestion.workingMemory,
+                maxConsecutiveFailures: suggestion.maxConsecutiveFailures,
+                retryBackoffMs: suggestion.retryBackoffMs,
+                runNow: false,
+            });
+            if (!result.success) {
+                throw new Error(result.errorMessage || t("machine.agentLoopCreateFailed"));
+            }
+            // Mark as adopted in the list
+            setAiSuggestions((prev) =>
+                prev.map((s) => s.key === suggestion.key ? { ...s, alreadyConfigured: true } : s),
+            );
+            onSaved();
+        } catch (error) {
+            Modal.alert(t("common.error"), error instanceof Error ? error.message : String(error));
+        } finally {
+            setAdoptingSuggestionKey(null);
+        }
+    }, [machineId, onSaved, profileId, projectId]);
 
     const handleSave = React.useCallback(async () => {
         if (!machineId) {
@@ -327,6 +394,30 @@ export const LoopEditorModal = React.memo(function LoopEditorModal({
         reflectionSummary, retryBackoff, stopOnSuccess, workingMemory,
     ]);
 
+    const handleOpenRepoPicker = React.useCallback(async () => {
+        if (!machineId) return;
+        setRepoPickerOpen((prev) => !prev);
+        if (repoList.length === 0 && !repoLoading) {
+            setRepoLoading(true);
+            try {
+                const repos = await machineListGitRepos(machineId);
+                setRepoList([...repos]);
+            } catch {
+                // silently ignore — user can type manually
+            } finally {
+                setRepoLoading(false);
+            }
+        }
+    }, [machineId, repoList.length, repoLoading]);
+
+    const filteredRepos = React.useMemo(() => {
+        const needle = repoSearch.trim().toLowerCase();
+        if (!needle) return repoList;
+        return repoList.filter(
+            (r) => r.name.toLowerCase().includes(needle) || r.repoPath.toLowerCase().includes(needle),
+        );
+    }, [repoList, repoSearch]);
+
     return (
         <BaseModal visible={visible} onClose={handleClose}>
             <View style={[
@@ -341,16 +432,19 @@ export const LoopEditorModal = React.memo(function LoopEditorModal({
             ]}>
                 <View style={[
                     styles.modalHeader,
-                    formLayout.modalHeaderStacked ? styles.modalHeaderStacked : null,
                     { borderBottomColor: theme.colors.divider, paddingHorizontal: modalMetrics.horizontalPadding },
                 ]}>
-                    <View style={styles.modalHeaderTextWrap}>
-                        <Text style={[styles.modalTitle, { color: theme.colors.text }]}>{editingLoop ? t("machine.agentLoopEdit") : t("machine.agentLoopCreate")}</Text>
-                        <Text style={[styles.modalSubtitle, { color: theme.colors.textSecondary }]}>{editingLoop ? (name.trim() || directory.trim() || t("machine.agentLoopsViewAllHint")) : t("machine.agentLoopsViewAllHint")}</Text>
+                    <View style={styles.modalHeaderTopRow}>
+                        <Text style={[styles.modalTitle, { color: theme.colors.text }]} numberOfLines={1}>
+                            {editingLoop ? t("machine.agentLoopEdit") : t("machine.agentLoopCreate")}
+                        </Text>
+                        <Pressable style={[styles.modalDismissButton, { borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]} onPress={handleClose}>
+                            <Ionicons name="close" size={18} color={theme.colors.textSecondary} />
+                        </Pressable>
                     </View>
-                    <Pressable style={[styles.modalDismissButton, { borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]} onPress={handleClose}>
-                        <Ionicons name="close" size={18} color={theme.colors.textSecondary} />
-                    </Pressable>
+                    <Text style={[styles.modalSubtitle, { color: theme.colors.textSecondary }]} numberOfLines={2}>
+                        {editingLoop ? (name.trim() || directory.trim() || t("machine.agentLoopsViewAllHint")) : t("machine.agentLoopsViewAllHint")}
+                    </Text>
                 </View>
                 <ScrollView style={styles.modalScroll} contentContainerStyle={[styles.modalScrollContent, { paddingHorizontal: modalMetrics.horizontalPadding }]}>
                     <View style={styles.formSection}>
@@ -367,15 +461,73 @@ export const LoopEditorModal = React.memo(function LoopEditorModal({
                             onChangeText={setName}
                         />
                         <Text style={[styles.label, { color: theme.colors.textSecondary }]}>{t("machine.agentLoopPath")}</Text>
-                        <TextInput
-                            style={[styles.input, { color: theme.colors.text, borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}
-                            placeholder={t("machine.agentLoopPathPlaceholder")}
-                            placeholderTextColor={theme.colors.textSecondary}
-                            value={directory}
-                            onChangeText={setDirectory}
-                            autoCapitalize="none"
-                            autoCorrect={false}
-                        />
+                        {/* 目录输入 + 选仓库按钮 */}
+                        <View style={styles.directoryRow}>
+                            <TextInput
+                                style={[styles.input, styles.directoryInput, { color: theme.colors.text, borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}
+                                placeholder={t("machine.agentLoopPathPlaceholder")}
+                                placeholderTextColor={theme.colors.textSecondary}
+                                value={directory}
+                                onChangeText={setDirectory}
+                                autoCapitalize="none"
+                                autoCorrect={false}
+                            />
+                            <Pressable
+                                style={[styles.repoPickerButton, { borderColor: repoPickerOpen ? theme.colors.primary : theme.colors.divider, backgroundColor: repoPickerOpen ? theme.colors.surfaceHigh : theme.colors.surface }]}
+                                onPress={() => void handleOpenRepoPicker()}
+                            >
+                                {repoLoading ? (
+                                    <ActivityIndicator size="small" color={theme.colors.textSecondary} />
+                                ) : (
+                                    <Ionicons name={repoPickerOpen ? "folder-open-outline" : "folder-outline"} size={18} color={repoPickerOpen ? theme.colors.primary : theme.colors.textSecondary} />
+                                )}
+                            </Pressable>
+                        </View>
+
+                        {/* Git 仓库选择列表 */}
+                        {repoPickerOpen && (
+                            <View style={[styles.repoPickerPanel, { borderColor: theme.colors.divider, backgroundColor: theme.colors.surfaceHigh }]}>
+                                <View style={[styles.repoSearchBar, { borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}>
+                                    <Ionicons name="search-outline" size={14} color={theme.colors.textSecondary} />
+                                    <TextInput
+                                        style={[styles.repoSearchInput, { color: theme.colors.text }]}
+                                        placeholder={t("machine.agentLoopRepoSearch")}
+                                        placeholderTextColor={theme.colors.textSecondary}
+                                        value={repoSearch}
+                                        onChangeText={setRepoSearch}
+                                        autoCapitalize="none"
+                                        autoCorrect={false}
+                                    />
+                                </View>
+                                {filteredRepos.length === 0 ? (
+                                    <Text style={[styles.repoEmptyText, { color: theme.colors.textSecondary }]}>
+                                        {repoLoading ? t("common.loading") : t("machine.agentLoopRepoEmpty")}
+                                    </Text>
+                                ) : (
+                                    filteredRepos.map((repo) => (
+                                        <Pressable
+                                            key={repo.repoPath}
+                                            style={({ pressed }) => [
+                                                styles.repoItem,
+                                                { borderBottomColor: theme.colors.divider, backgroundColor: pressed ? theme.colors.surfaceHigh : "transparent" },
+                                            ]}
+                                            onPress={() => {
+                                                setDirectory(repo.repoPath);
+                                                setRepoPickerOpen(false);
+                                                setRepoSearch("");
+                                            }}
+                                        >
+                                            <Ionicons name="git-branch-outline" size={14} color={theme.colors.textSecondary} />
+                                            <View style={styles.repoItemText}>
+                                                <Text style={[styles.repoItemName, { color: theme.colors.text }]} numberOfLines={1}>{repo.name}</Text>
+                                                <Text style={[styles.repoItemPath, { color: theme.colors.textSecondary }]} numberOfLines={1}>{repo.repoPath}</Text>
+                                            </View>
+                                            <Ionicons name="chevron-forward" size={13} color={theme.colors.textSecondary} />
+                                        </Pressable>
+                                    ))
+                                )}
+                            </View>
+                        )}
                         <Pressable
                             style={[styles.inlineSecondaryButton, { borderColor: theme.colors.divider, backgroundColor: theme.colors.surface, opacity: suggesting ? 0.6 : 1 }]}
                             onPress={() => onSuggest(directory, agent, projectId, profileId)}
@@ -387,6 +539,80 @@ export const LoopEditorModal = React.memo(function LoopEditorModal({
                                 <Text style={{ color: theme.colors.text }}>{t("machine.agentLoopSuggest")}</Text>
                             )}
                         </Pressable>
+
+                        {/* AI 生成建议按钮 */}
+                        <Pressable
+                            style={[styles.aiGenerateButton, { borderColor: theme.colors.header.tint, backgroundColor: theme.colors.surfaceHigh, opacity: aiGenerating ? 0.6 : 1 }]}
+                            onPress={() => void handleAIGenerate()}
+                            disabled={aiGenerating}
+                        >
+                            {aiGenerating ? (
+                                <ActivityIndicator size="small" color={theme.colors.header.tint} />
+                            ) : (
+                                <Ionicons name="sparkles-outline" size={15} color={theme.colors.header.tint} />
+                            )}
+                            <Text style={[styles.aiGenerateButtonText, { color: theme.colors.header.tint }]}>
+                                {aiGenerating ? t("common.loading") : t("machine.agentLoopAIGenerate")}
+                            </Text>
+                        </Pressable>
+
+                        {/* AI 建议预览列表 */}
+                        {aiSuggestions.length > 0 && (
+                            <View style={[styles.aiSuggestionsWrap, { borderColor: theme.colors.divider, backgroundColor: theme.colors.surfaceHigh }]}>
+                                <Text style={[styles.aiSuggestionsHeader, { color: theme.colors.textSecondary }]}>
+                                    {`✨ ${aiSuggestions.length} ${t("machine.agentLoopAISuggestionsTitle")}`}
+                                </Text>
+                                {aiSuggestions.map((suggestion) => (
+                                    <View
+                                        key={suggestion.key}
+                                        style={[styles.aiSuggestionCard, { borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}
+                                    >
+                                        <View style={styles.aiSuggestionCardHeader}>
+                                            <View style={styles.aiSuggestionCardTitleRow}>
+                                                <Text style={[styles.aiSuggestionName, { color: theme.colors.text }]} numberOfLines={1}>
+                                                    {suggestion.name}
+                                                </Text>
+                                                <Text style={[styles.aiSuggestionInterval, { color: theme.colors.textSecondary }]}>
+                                                    {`${Math.round(suggestion.intervalMs / 60_000)}m`}
+                                                </Text>
+                                            </View>
+                                            <Text style={[styles.aiSuggestionDesc, { color: theme.colors.textSecondary }]} numberOfLines={2}>
+                                                {suggestion.description || suggestion.goal}
+                                            </Text>
+                                            <Text style={[styles.aiSuggestionPrompt, { color: theme.colors.text }]} numberOfLines={3}>
+                                                {suggestion.prompt}
+                                            </Text>
+                                        </View>
+                                        <Pressable
+                                            style={[
+                                                styles.aiSuggestionAdoptBtn,
+                                                {
+                                                    backgroundColor: suggestion.alreadyConfigured
+                                                        ? theme.colors.surfaceHigh
+                                                        : theme.colors.button.primary.background,
+                                                    opacity: adoptingSuggestionKey === suggestion.key ? 0.6 : 1,
+                                                },
+                                            ]}
+                                            onPress={() => !suggestion.alreadyConfigured && void handleAdoptAISuggestion(suggestion)}
+                                            disabled={suggestion.alreadyConfigured || adoptingSuggestionKey === suggestion.key}
+                                        >
+                                            {adoptingSuggestionKey === suggestion.key ? (
+                                                <ActivityIndicator size="small" color={theme.colors.button.primary.tint} />
+                                            ) : (
+                                                <Text style={{
+                                                    fontSize: 12,
+                                                    fontWeight: "600",
+                                                    color: suggestion.alreadyConfigured ? theme.colors.textSecondary : theme.colors.button.primary.tint,
+                                                }}>
+                                                    {suggestion.alreadyConfigured ? t("machine.agentLoopSuggestionConfigured") : t("machine.agentLoopAdopt")}
+                                                </Text>
+                                            )}
+                                        </Pressable>
+                                    </View>
+                                ))}
+                            </View>
+                        )}
+
                         <Text style={[styles.label, { color: theme.colors.textSecondary }]}>{t("machine.agentLoopInterval")}</Text>
                         <TextInput
                             style={[styles.input, { color: theme.colors.text, borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}
@@ -718,22 +944,17 @@ const styles = StyleSheet.create((theme) => ({
         elevation: 10,
     },
     modalHeader: {
-        flexDirection: "row",
-        alignItems: "center",
-        justifyContent: "space-between",
-        paddingVertical: 16,
+        paddingVertical: 14,
         borderBottomWidth: 1,
-        gap: 16,
-    },
-    modalHeaderStacked: {
-        alignItems: "flex-start",
-        flexDirection: "column",
-    },
-    modalHeaderTextWrap: {
-        flex: 1,
         gap: 4,
     },
+    modalHeaderTopRow: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 12,
+    },
     modalTitle: {
+        flex: 1,
         fontSize: 18,
         fontWeight: "700",
     },
@@ -748,7 +969,7 @@ const styles = StyleSheet.create((theme) => ({
         borderWidth: 1,
         alignItems: "center",
         justifyContent: "center",
-        alignSelf: Platform.OS === "web" ? "auto" : "flex-end",
+        flexShrink: 0,
     },
     modalScroll: {
         width: "100%",
@@ -838,6 +1059,69 @@ const styles = StyleSheet.create((theme) => ({
         flexDirection: Platform.OS === "web" ? "row" : "column",
         gap: 10,
     },
+    directoryRow: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 8,
+    },
+    directoryInput: {
+        flex: 1,
+    },
+    repoPickerButton: {
+        width: 42,
+        height: 42,
+        borderRadius: 10,
+        borderWidth: 1,
+        alignItems: "center",
+        justifyContent: "center",
+        flexShrink: 0,
+    },
+    repoPickerPanel: {
+        borderWidth: 1,
+        borderRadius: 12,
+        overflow: "hidden",
+        marginTop: 2,
+        maxHeight: 220,
+    },
+    repoSearchBar: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 6,
+        paddingHorizontal: 10,
+        paddingVertical: 8,
+        borderBottomWidth: 1,
+        borderBottomColor: "transparent",
+    },
+    repoSearchInput: {
+        flex: 1,
+        fontSize: 13,
+        paddingVertical: 0,
+    },
+    repoEmptyText: {
+        fontSize: 12,
+        textAlign: "center",
+        paddingVertical: 14,
+    },
+    repoItem: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 8,
+        paddingHorizontal: 12,
+        paddingVertical: 10,
+        borderBottomWidth: 1,
+    },
+    repoItemText: {
+        flex: 1,
+        gap: 2,
+    },
+    repoItemName: {
+        fontSize: 13,
+        fontWeight: "600",
+    },
+    repoItemPath: {
+        fontSize: 11,
+        lineHeight: 15,
+    },
     inlineSecondaryButton: {
         minHeight: 40,
         borderRadius: 10,
@@ -846,6 +1130,75 @@ const styles = StyleSheet.create((theme) => ({
         justifyContent: "center",
         paddingHorizontal: 14,
         marginTop: 4,
+    },
+    aiGenerateButton: {
+        minHeight: 40,
+        borderRadius: 10,
+        borderWidth: 1,
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 6,
+        paddingHorizontal: 14,
+        marginTop: 4,
+    },
+    aiGenerateButtonText: {
+        fontSize: 13,
+        fontWeight: "600",
+    },
+    aiSuggestionsWrap: {
+        marginTop: 8,
+        borderWidth: 1,
+        borderRadius: 14,
+        overflow: "hidden",
+        gap: 1,
+        padding: 10,
+    },
+    aiSuggestionsHeader: {
+        fontSize: 11,
+        fontWeight: "600",
+        marginBottom: 6,
+        paddingHorizontal: 2,
+    },
+    aiSuggestionCard: {
+        borderWidth: 1,
+        borderRadius: 12,
+        padding: 12,
+        marginBottom: 6,
+        gap: 8,
+    },
+    aiSuggestionCardHeader: {
+        gap: 4,
+    },
+    aiSuggestionCardTitleRow: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 8,
+    },
+    aiSuggestionName: {
+        flex: 1,
+        fontSize: 13,
+        fontWeight: "700",
+    },
+    aiSuggestionInterval: {
+        fontSize: 11,
+        fontWeight: "600",
+    },
+    aiSuggestionDesc: {
+        fontSize: 12,
+        lineHeight: 17,
+    },
+    aiSuggestionPrompt: {
+        fontSize: 11,
+        lineHeight: 16,
+        fontStyle: "italic",
+    },
+    aiSuggestionAdoptBtn: {
+        minHeight: 32,
+        borderRadius: 8,
+        alignItems: "center",
+        justifyContent: "center",
+        paddingHorizontal: 12,
     },
     createButton: {
         flex: 1,
