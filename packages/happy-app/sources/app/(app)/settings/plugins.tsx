@@ -44,6 +44,10 @@ const RECOMMENDED_MARKETPLACES = [
         repo: "thedotmack/claude-mem",
         description: "Persistent memory system — seamlessly preserve context across sessions",
     },
+    {
+        repo: "nashsu/autocli-skill",
+        description: "AutoCLI - 为 Claude Code 提供 55+ 网站实时数据抓取能力（Twitter/Bilibili/Zhihu 等）",
+    },
 ];
 
 /** Format install count: 233901 → "233.9K" */

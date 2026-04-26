@@ -1,5 +1,5 @@
 import * as React from "react";
-import { View, Text, ActivityIndicator } from "react-native";
+import { View, Text, ActivityIndicator, ScrollView } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
@@ -257,6 +257,24 @@ function PluginDetailScreen() {
             textAlign: "center",
             paddingVertical: 32,
         },
+        tagsContainer: {
+            flexDirection: "row",
+            flexWrap: "wrap",
+            gap: 6,
+            paddingHorizontal: 16,
+            paddingVertical: 10,
+        },
+        tag: {
+            backgroundColor: theme.colors.groupped.background,
+            borderRadius: 12,
+            paddingHorizontal: 10,
+            paddingVertical: 4,
+        },
+        tagText: {
+            fontSize: 12,
+            color: theme.colors.textSecondary,
+            fontWeight: "500",
+        },
     });
 
     if (!pluginKey) {
@@ -274,6 +292,7 @@ function PluginDetailScreen() {
     const author = detail?.author;
     const homepage = detail?.homepage;
     const license = detail?.license;
+    const keywords = detail?.keywords;
     const counts = detail?.counts;
     const subPlugins = detail?.subPlugins;
 
@@ -352,6 +371,19 @@ function PluginDetailScreen() {
                     subtitleLines={2}
                     showChevron={false}
                 />
+                {keywords && keywords.length > 0 && (
+                    <ScrollView
+                        horizontal
+                        showsHorizontalScrollIndicator={false}
+                        contentContainerStyle={styles.tagsContainer}
+                    >
+                        {keywords.map((kw) => (
+                            <View key={kw} style={styles.tag}>
+                                <Text style={styles.tagText}>{kw}</Text>
+                            </View>
+                        ))}
+                    </ScrollView>
+                )}
             </ItemGroup>
 
             {/* Loading indicator */}
