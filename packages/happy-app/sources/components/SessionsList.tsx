@@ -267,6 +267,11 @@ const stylesheet = StyleSheet.create((theme) => ({
     color: theme.colors.textSecondary,
     ...Typography.default(),
   },
+  starButton: {
+    padding: 2,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+  },
   statusRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -793,6 +798,20 @@ const SessionItem = React.memo(
                 >
                   {sessionName}
                 </Text>
+                <Pressable
+                  onPress={(e) => {
+                    e.stopPropagation();
+                    storage.getState().updateSessionStarred(session.id, !session.starred);
+                  }}
+                  hitSlop={8}
+                  style={styles.starButton}
+                >
+                  <Ionicons
+                    name={session.starred ? 'star' : 'star-outline'}
+                    size={14}
+                    color={session.starred ? theme.colors.warning : theme.colors.textSecondary}
+                  />
+                </Pressable>
                 <Text style={styles.sessionTimestamp}>
                   {formatLastSeen(session.updatedAt, false)}
                 </Text>

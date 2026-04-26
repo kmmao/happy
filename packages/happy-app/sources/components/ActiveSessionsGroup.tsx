@@ -154,7 +154,19 @@ const stylesheet = StyleSheet.create((theme, runtime) => ({
     fontSize: 14,
     fontWeight: "500",
     lineHeight: 19,
+    flex: 1,
     ...Typography.default("semiBold"),
+  },
+  starButton: {
+    padding: 2,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+  },
+  starredIconColor: {
+    color: theme.colors.warning,
+  },
+  unstarredIconColor: {
+    color: theme.colors.textSecondary,
   },
   sessionTitleConnected: {
     color: theme.colors.text,
@@ -775,6 +787,20 @@ const CompactSessionRow = React.memo(
                 >
                   {sessionName}
                 </Text>
+                <Pressable
+                  onPress={(e) => {
+                    e.stopPropagation();
+                    storage.getState().updateSessionStarred(session.id, !session.starred);
+                  }}
+                  hitSlop={8}
+                  style={styles.starButton}
+                >
+                  <Ionicons
+                    name={session.starred ? 'star' : 'star-outline'}
+                    size={14}
+                    color={session.starred ? styles.starredIconColor.color : styles.unstarredIconColor.color}
+                  />
+                </Pressable>
               </View>
 
               {/* Issue info line */}

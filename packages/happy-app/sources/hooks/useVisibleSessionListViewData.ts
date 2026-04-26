@@ -23,7 +23,8 @@ export function useVisibleSessionListViewData(): SessionListViewItem[] | null {
             }
 
             if (item.type === 'session') {
-                if (item.session.active) {
+                // Show active sessions OR starred (bookmarked) sessions even when hiding inactive ones
+                if (item.session.active || item.session.starred) {
                     if (pendingProjectGroup) {
                         filtered.push(pendingProjectGroup);
                         pendingProjectGroup = null;

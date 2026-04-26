@@ -332,6 +332,24 @@ export function saveSessionNeedsAttention(attention: Record<string, boolean>) {
   mmkv.set("session-needs-attention", JSON.stringify(attention));
 }
 
+// Starred sessions (user-bookmarked, device-local)
+export function loadSessionStarred(): Record<string, boolean> {
+  const data = mmkv.getString("session-starred");
+  if (data) {
+    try {
+      return JSON.parse(data);
+    } catch (e) {
+      log.error("Failed to parse session starred", e);
+      return {};
+    }
+  }
+  return {};
+}
+
+export function saveSessionStarred(starred: Record<string, boolean>) {
+  mmkv.set("session-starred", JSON.stringify(starred));
+}
+
 // Model mappings per session (maps UI keys like opus/sonnet to provider model IDs)
 export function loadSessionModelMappings(): Record<
   string,

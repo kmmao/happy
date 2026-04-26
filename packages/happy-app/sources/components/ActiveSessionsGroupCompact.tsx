@@ -37,6 +37,7 @@ import {
   useSetting,
   useProjectAliasMap,
   useSessionMessages,
+  storage,
 } from "@/sync/storage";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { isMachineOnline } from "@/utils/machineUtils";
@@ -188,6 +189,18 @@ const stylesheet = StyleSheet.create((theme, runtime) => ({
     color: theme.colors.text,
   },
   sessionTitleDisconnected: {
+    color: theme.colors.textSecondary,
+  },
+  starButton: {
+    padding: 2,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+    marginLeft: 4,
+  },
+  starredIconColor: {
+    color: theme.colors.warning,
+  },
+  unstarredIconColor: {
     color: theme.colors.textSecondary,
   },
   statusDotContainer: {
@@ -818,6 +831,20 @@ const CompactSessionRow = React.memo(
               >
                 {sessionName}
               </Text>
+              <Pressable
+                onPress={(e) => {
+                  e.stopPropagation();
+                  storage.getState().updateSessionStarred(session.id, !session.starred);
+                }}
+                hitSlop={8}
+                style={styles.starButton}
+              >
+                <Ionicons
+                  name={session.starred ? 'star' : 'star-outline'}
+                  size={14}
+                  color={session.starred ? styles.starredIconColor.color : styles.unstarredIconColor.color}
+                />
+              </Pressable>
               {session.latestUsage ? (
                 <Text style={styles.usageLabel}>
                   {formatTokenCountShort(

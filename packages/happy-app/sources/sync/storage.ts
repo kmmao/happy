@@ -32,6 +32,8 @@ import {
   type SessionSdkSettings,
   loadSessionNeedsAttention,
   saveSessionNeedsAttention,
+  loadSessionStarred,
+  saveSessionStarred,
   loadSessionModelMappings,
   saveSessionModelMappings,
   loadSessionCustomModels,
@@ -214,6 +216,7 @@ interface StorageState {
   updateSessionDraft: (sessionId: string, draft: string | null) => void;
   markSessionViewed: (sessionId: string) => void;
   updateSessionPermissionMode: (sessionId: string, mode: string) => void;
+  updateSessionStarred: (sessionId: string, starred: boolean) => void;
   updateSessionModelMode: (sessionId: string, mode: string) => void;
   updateSessionPinnedModelId: (sessionId: string, modelId: string | null) => void;
   updateSessionCustomModels: (
@@ -408,6 +411,7 @@ export const storage = create<StorageState>()((set, get) => {
   let sessionModelModes = loadSessionModelModes();
   let sessionSdkSettings = loadSessionSdkSettings();
   let sessionNeedsAttention = loadSessionNeedsAttention();
+  let sessionStarred = loadSessionStarred();
   let sessionModelMappings = loadSessionModelMappings();
   let sessionCustomModels = loadSessionCustomModels();
   let sessionProfiles = loadSessionProfiles();
@@ -544,6 +548,7 @@ export const storage = create<StorageState>()((set, get) => {
         const savedCustomModelsAll = isInitialLoad ? sessionCustomModels : {};
         const savedProfilesAll = isInitialLoad ? sessionProfiles : {};
         const savedNeedsAttention = isInitialLoad ? sessionNeedsAttention : {};
+        const savedStarred = isInitialLoad ? sessionStarred : {};
 
         // When replace=true (full server refresh), start empty so sessions
         // no longer on the server are removed. Otherwise merge with existing.
@@ -634,6 +639,13 @@ export const storage = create<StorageState>()((set, get) => {
             savedNeedsAttention[session.id] ??
             false;
 
+          // Resolve starred: prefer existing in-memory (user toggle), then saved MMKV
+          const existingStarred = state.sessions[session.id]?.starred;
+          const resolvedStarred =
+            existingStarred ??
+            savedStarred[session.id] ??
+            false;
+
           // Preserve metadata.summary when new metadata doesn't have one
           // (e.g. after session reconnect, CLI sends fresh metadata without summary)
           const existingSummary = state.sessions[session.id]?.metadata?.summary;
@@ -709,6 +721,7 @@ export const storage = create<StorageState>()((set, get) => {
             maxBudgetUsd: resolvedMaxBudgetUsd,
             taskBudgetTokens: resolvedTaskBudgetTokens,
             needsAttention: resolvedNeedsAttention,
+            starred: resolvedStarred || null,
             // Preserve client-only latestUsage — server doesn't return it
             latestUsage: state.sessions[session.id]?.latestUsage,
             ...(preservedResolvedModelId && {
@@ -1384,6 +1397,36 @@ export const storage = create<StorageState>()((set, get) => {
         ...state,
         sessionLastViewed: { ...sessionLastViewed },
       }));
+    },
+    updateSessionStarred: (sessionId: string, starred: boolean) => {
+      set((state) => {
+        const session = state.sessions[sessionId];
+        if (!session) return state;
+
+        const updatedSessions = {
+          ...state.sessions,
+          [sessionId]: {
+            ...session,
+            starred: starred || null,
+          },
+        };
+
+        // Persist only truthy values to save space
+        const allStarred: Record<string, boolean> = {};
+        Object.entries(updatedSessions).forEach(([id, sess]) => {
+          if (sess.starred) allStarred[id] = true;
+        });
+        sessionStarred = allStarred;
+        saveSessionStarred(allStarred);
+
+        // Starred affects list visibility — rebuild the view data
+        const realtimeSessionSort = state.settings?.realtimeSessionSort ?? true;
+        return {
+          ...state,
+          sessions: updatedSessions,
+          sessionListViewData: buildSessionListViewData(updatedSessions, realtimeSessionSort),
+        };
+      });
     },
     updateSessionPermissionMode: (sessionId: string, mode: string) => {
       set((state) => {
