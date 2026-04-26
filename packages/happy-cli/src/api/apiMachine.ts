@@ -26,6 +26,7 @@ import type { AgentLoopBootstrapProfile } from "@/automation/AgentLoopBootstrapS
 import type { AutoDreamCreateInput, AutoDreamMutationResult, AutoDreamUpdateInput } from "@/automation/AutoDreamCoordinator";
 import type { AutoDreamProfile } from "@/automation/AutoDreamStore";
 import type { AgentLoopSuggestInput, AgentLoopSuggestion } from "@/automation/AgentLoopSuggestion";
+import { suggestAgentLoopsWithAI } from "@/automation/AgentLoopSuggestionAI";
 import {
   normalizeResolvedRuntimeProfile,
   type ResolvedRuntimeProfile,
@@ -669,6 +670,12 @@ export class ApiMachineClient {
       const input = params || {};
       if (!input.directory) throw new Error("Directory is required");
       return { suggestions: await suggestAgentLoops(input) };
+    });
+
+    this.rpcHandlerManager.registerHandler("loop-suggest-ai", async (params: any) => {
+      const input = params || {};
+      if (!input.directory) throw new Error("Directory is required");
+      return { suggestions: await suggestAgentLoopsWithAI(input) };
     });
 
     this.rpcHandlerManager.registerHandler("bootstrap-profile-list", async () => {

@@ -318,6 +318,14 @@ export async function suggestDaemonAgentLoops(input: AgentLoopSuggestInput): Pro
   return result.suggestions ?? [];
 }
 
+export async function suggestDaemonAgentLoopsWithAI(input: AgentLoopSuggestInput): Promise<AgentLoopSuggestion[]> {
+  const result = await daemonPost("/loop-suggest-ai", input);
+  if (result.error) {
+    throw new Error(result.error ?? "AI loop suggestion failed");
+  }
+  return result.suggestions ?? [];
+}
+
 export async function listDaemonAgentLoopBootstrapProfiles(): Promise<AgentLoopBootstrapProfile[]> {
   const result = await daemonPost("/bootstrap-profiles");
   if (result.error) {

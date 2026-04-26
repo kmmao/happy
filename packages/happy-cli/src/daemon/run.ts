@@ -64,6 +64,7 @@ import { buildLoopEventFromCiTrigger, selectLoopsForCiBridge, selectLoopsForCiBr
 import { buildCiTriggerFromGitHubActionsWebhook } from "@/automation/GitHubActionsCiAdapter";
 import { buildLoopEventsFromWebhook, selectLoopsForWebhookBridge } from "@/automation/AgentLoopWebhookBridge";
 import { suggestAgentLoops as generateAgentLoopSuggestions } from "@/automation/AgentLoopSuggestion";
+import { suggestAgentLoopsWithAI as generateAgentLoopSuggestionsWithAI } from "@/automation/AgentLoopSuggestionAI";
 import { TrackedSessionRegistry } from "./TrackedSessionRegistry";
 import type { AutomationAuditEvent, AutomationJob } from "@/automation/types";
 import { diagnoseAndReportFixStatus } from "@/supervisor/diagnoseFixStatus";
@@ -1923,6 +1924,9 @@ export async function startDaemon(): Promise<void> {
         },
         suggestAgentLoops: async (input) => {
           return generateAgentLoopSuggestions(input, await agentLoopCoordinator?.listLoops() ?? []);
+        },
+        suggestAgentLoopsWithAI: async (input) => {
+          return generateAgentLoopSuggestionsWithAI(input, await agentLoopCoordinator?.listLoops() ?? []);
         },
         listAgentLoopBootstrapProfiles: async () => {
           return agentLoopBootstrapCoordinator?.listProfiles() ?? [];

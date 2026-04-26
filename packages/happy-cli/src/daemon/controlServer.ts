@@ -446,6 +446,7 @@ export function startDaemonControlServer({
   getKillswitch,
   listAgentLoops,
   suggestAgentLoops,
+  suggestAgentLoopsWithAI,
   listAgentLoopBootstrapProfiles,
   getAgentLoopBootstrapProfile,
   createAgentLoopBootstrapProfile,
@@ -574,6 +575,7 @@ export function startDaemonControlServer({
   emitCiTrigger: (input: { eventId?: string; provider: string; repoPath: string; repoUrl: string; kind: "workflow_run" | "check_run" | "check_suite" | "generic"; status: string; conclusion?: string; workflowName?: string; checkName?: string; branch?: string; sha?: string; title?: string; details?: string; targetLoopId?: string }) => Promise<{ success: boolean; errorMessage?: string }>;
   emitGitHubActionsWebhook: (input: { eventName: "workflow_run" | "check_run" | "check_suite"; payload: unknown; repoPath?: string; targetLoopId?: string }) => Promise<{ success: boolean; errorMessage?: string }>;
   suggestAgentLoops: (input: { directory: string; agent?: "claude" | "codex" | "gemini"; projectId?: string; profileId?: string }) => Promise<Array<{ key: string; name: string; description: string; rationale: string; directory: string; intervalMs: number; agent: "claude" | "codex" | "gemini"; fileWatchEnabled?: boolean; githubBridgeEnabled?: boolean; ciBridgeEnabled?: boolean; eventSourceAllowlist?: string[]; eventKeywordFilters?: string[]; goal?: string; currentFocus?: string; workingMemory?: string; lastReflectionSummary?: string; maxConsecutiveFailures?: number; retryBackoffMs?: number; prompt: string; tags: string[]; confidence: "high" | "medium"; alreadyConfigured: boolean; existingLoopId?: string }>>;
+  suggestAgentLoopsWithAI: (input: { directory: string; agent?: "claude" | "codex" | "gemini"; projectId?: string; profileId?: string }) => Promise<Array<{ key: string; name: string; description: string; rationale: string; directory: string; intervalMs: number; agent: "claude" | "codex" | "gemini"; fileWatchEnabled?: boolean; githubBridgeEnabled?: boolean; ciBridgeEnabled?: boolean; eventSourceAllowlist?: string[]; eventKeywordFilters?: string[]; goal?: string; currentFocus?: string; workingMemory?: string; lastReflectionSummary?: string; maxConsecutiveFailures?: number; retryBackoffMs?: number; prompt: string; tags: string[]; confidence: "high" | "medium"; alreadyConfigured: boolean; existingLoopId?: string }>>;
   listAgentLoopBootstrapProfiles: () => Promise<AgentLoopBootstrapProfile[]>;
   getAgentLoopBootstrapProfile: (profileIdValue: string) => Promise<AgentLoopBootstrapProfile | undefined>;
   createAgentLoopBootstrapProfile: (input: AgentLoopBootstrapCreateInput) => Promise<AgentLoopBootstrapMutationResult>;
@@ -1252,6 +1254,19 @@ export function startDaemonControlServer({
         },
       },
       async (request) => ({ suggestions: await suggestAgentLoops(request.body) }),
+    );
+
+    typed.post(
+      "/loop-suggest-ai",
+      {
+        schema: {
+          body: agentLoopSuggestInputSchema,
+          response: {
+            200: z.object({ suggestions: z.array(agentLoopSuggestionSchema) }),
+          },
+        },
+      },
+      async (request) => ({ suggestions: await suggestAgentLoopsWithAI(request.body) }),
     );
 
     typed.post(
