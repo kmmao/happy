@@ -16,6 +16,8 @@ import { t } from "@/text";
 import { TokenStorage } from "@/auth/tokenStorage";
 import { getServerUrl } from "@/sync/serverConfig";
 import { config } from "@/config";
+import { checkVoiceboxConnection } from "@/sync/apiVoice";
+import { VOICEBOX_DEFAULT_ENDPOINT } from "@/realtime/voiceConfig";
 
 interface ElevenLabsSubscription {
     tier: string;
@@ -26,6 +28,7 @@ interface ElevenLabsSubscription {
 }
 
 type SetupStatus = "idle" | "checking" | "success" | "error";
+type VoiceboxTestStatus = "idle" | "testing" | "ready" | "error";
 
 function useElevenLabsSubscription(apiKey: string | null) {
     const [data, setData] = useState<ElevenLabsSubscription | null>(null);
@@ -124,6 +127,47 @@ function VoiceSettingsScreen() {
     const [draftKey, setDraftKey] = useState(savedApiKey ?? "");
     const [setupStatus, setSetupStatus] = useState<SetupStatus>(savedApiKey ? "success" : "idle");
     const [setupError, setSetupError] = useState<string | null>(null);
+
+    // Voicebox local TTS state
+    const [savedVoiceboxEndpoint, setSavedVoiceboxEndpoint] = useSettingMutable("voiceboxEndpoint");
+    const [draftEndpoint, setDraftEndpoint] = useState(savedVoiceboxEndpoint ?? "");
+    const [vbTestStatus, setVbTestStatus] = useState<VoiceboxTestStatus>(savedVoiceboxEndpoint ? "ready" : "idle");
+    const [vbTestError, setVbTestError] = useState<string | null>(null);
+
+    // Sync Voicebox draft when saved endpoint changes externally
+    useEffect(() => {
+        setDraftEndpoint(savedVoiceboxEndpoint ?? "");
+        if (savedVoiceboxEndpoint) setVbTestStatus("ready");
+    }, [savedVoiceboxEndpoint]);
+
+    const isVbDirty = draftEndpoint !== (savedVoiceboxEndpoint ?? "");
+
+    const handleVoiceboxSave = useCallback(() => {
+        const url = draftEndpoint.trim() || null;
+        setSavedVoiceboxEndpoint(url);
+        setVbTestStatus(url ? "ready" : "idle");
+        setVbTestError(null);
+    }, [draftEndpoint, setSavedVoiceboxEndpoint]);
+
+    const handleVoiceboxTest = useCallback(async () => {
+        setVbTestStatus("testing");
+        setVbTestError(null);
+        const endpoint = draftEndpoint.trim() || null;
+        const ok = await checkVoiceboxConnection(endpoint);
+        if (ok) {
+            setVbTestStatus("ready");
+        } else {
+            setVbTestStatus("error");
+            setVbTestError(t("settingsVoice.voiceboxConnectionError"));
+        }
+    }, [draftEndpoint]);
+
+    const handleVoiceboxClear = useCallback(() => {
+        setDraftEndpoint("");
+        setSavedVoiceboxEndpoint(null);
+        setVbTestStatus("idle");
+        setVbTestError(null);
+    }, [setSavedVoiceboxEndpoint]);
 
     // Sync draft when saved key changes externally
     useEffect(() => {
@@ -343,6 +387,141 @@ function VoiceSettingsScreen() {
                                 {t("settingsVoice.elevenLabsResetIn")} {formatResetTime(subscription.next_character_count_reset_unix)}
                             </Text>
                         </View>
+                    </View>
+                )}
+            </ItemGroup>
+
+            {/* Voicebox (Local) TTS */}
+            <ItemGroup
+                title={t("settingsVoice.voiceboxConfig")}
+                footer={t("settingsVoice.voiceboxEndpointDescription")}
+            >
+                <View style={{ paddingHorizontal: 16, paddingVertical: 12, gap: 12 }}>
+                    <TextInput
+                        style={{
+                            fontSize: 16,
+                            color: theme.colors.input.text,
+                            borderWidth: 1,
+                            borderColor: vbTestStatus === "ready" ? "#34C759"
+                                : vbTestStatus === "error" ? theme.colors.textDestructive
+                                : theme.colors.divider,
+                            borderRadius: 8,
+                            paddingHorizontal: 12,
+                            paddingVertical: 10,
+                        }}
+                        placeholder={t("settingsVoice.voiceboxEndpointPlaceholder")}
+                        placeholderTextColor={theme.colors.input.placeholder}
+                        value={draftEndpoint}
+                        onChangeText={(text) => {
+                            setDraftEndpoint(text);
+                            if (vbTestStatus !== "idle") setVbTestStatus("idle");
+                            setVbTestError(null);
+                        }}
+                        autoCapitalize="none"
+                        autoCorrect={false}
+                        keyboardType="url"
+                        editable={vbTestStatus !== "testing"}
+                    />
+
+                    {/* Action Buttons */}
+                    <View style={{ flexDirection: "row", gap: 8 }}>
+                        <Pressable
+                            onPress={handleVoiceboxTest}
+                            disabled={vbTestStatus === "testing"}
+                            style={({ pressed }) => ({
+                                flex: 1,
+                                backgroundColor: vbTestStatus === "testing"
+                                    ? theme.colors.divider
+                                    : pressed ? "#0066CC" : "#007AFF",
+                                borderRadius: 8,
+                                paddingVertical: 10,
+                                alignItems: "center",
+                                flexDirection: "row",
+                                justifyContent: "center",
+                                gap: 6,
+                            })}
+                        >
+                            {vbTestStatus === "testing" ? (
+                                <ActivityIndicator size="small" color="#fff" />
+                            ) : vbTestStatus === "ready" ? (
+                                <Ionicons name="checkmark-circle" size={18} color="#fff" />
+                            ) : (
+                                <Ionicons name="wifi-outline" size={18} color="#fff" />
+                            )}
+                            <Text style={{ color: "#fff", fontSize: 15, fontWeight: "600" }}>
+                                {vbTestStatus === "testing" ? t("settingsVoice.voiceboxTesting")
+                                    : vbTestStatus === "ready" ? t("settingsVoice.voiceboxReady")
+                                    : t("settingsVoice.voiceboxTest")}
+                            </Text>
+                        </Pressable>
+
+                        <Pressable
+                            onPress={handleVoiceboxSave}
+                            disabled={!isVbDirty || vbTestStatus === "testing"}
+                            style={({ pressed }) => ({
+                                backgroundColor: (!isVbDirty || vbTestStatus === "testing")
+                                    ? theme.colors.divider
+                                    : pressed ? "#28a745" : "#34C759",
+                                borderRadius: 8,
+                                paddingVertical: 10,
+                                paddingHorizontal: 16,
+                                alignItems: "center",
+                                justifyContent: "center",
+                            })}
+                        >
+                            <Text style={{
+                                color: (!isVbDirty || vbTestStatus === "testing") ? theme.colors.textSecondary : "#fff",
+                                fontSize: 15,
+                                fontWeight: "600",
+                            }}>
+                                {t("settingsVoice.voiceboxSave")}
+                            </Text>
+                        </Pressable>
+
+                        {!!savedVoiceboxEndpoint && (
+                            <Pressable
+                                onPress={handleVoiceboxClear}
+                                disabled={vbTestStatus === "testing"}
+                                style={({ pressed }) => ({
+                                    backgroundColor: pressed ? theme.colors.divider : "transparent",
+                                    borderRadius: 8,
+                                    borderWidth: 1,
+                                    borderColor: theme.colors.divider,
+                                    paddingVertical: 10,
+                                    paddingHorizontal: 16,
+                                    alignItems: "center",
+                                })}
+                            >
+                                <Ionicons name="trash-outline" size={18} color={theme.colors.textDestructive} />
+                            </Pressable>
+                        )}
+                    </View>
+                </View>
+
+                {/* Status Messages */}
+                {vbTestStatus === "error" && vbTestError && (
+                    <View style={{ paddingHorizontal: 16, paddingBottom: 12 }}>
+                        <Text style={{ fontSize: 14, color: theme.colors.textDestructive }}>
+                            {vbTestError}
+                        </Text>
+                    </View>
+                )}
+
+                {vbTestStatus === "ready" && (
+                    <View style={{ paddingHorizontal: 16, paddingBottom: 12, flexDirection: "row", alignItems: "center", gap: 6 }}>
+                        <Ionicons name="checkmark-circle" size={16} color="#34C759" />
+                        <Text style={{ fontSize: 14, color: "#34C759" }}>
+                            {t("settingsVoice.voiceboxSetupSuccess")}
+                        </Text>
+                    </View>
+                )}
+
+                {/* Placeholder hint when empty */}
+                {vbTestStatus === "idle" && !savedVoiceboxEndpoint && (
+                    <View style={{ paddingHorizontal: 16, paddingBottom: 12 }}>
+                        <Text style={{ fontSize: 13, color: theme.colors.textSecondary }}>
+                            {t("settingsVoice.voiceboxEndpointLabel")}: {VOICEBOX_DEFAULT_ENDPOINT}
+                        </Text>
                     </View>
                 )}
             </ItemGroup>

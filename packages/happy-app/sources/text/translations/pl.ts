@@ -1407,6 +1407,16 @@ export const pl: TranslationStructure = {
     elevenLabsSetupChecking: "Konfigurowanie...",
     elevenLabsSetupReady: "Gotowe",
     elevenLabsSetupSuccess: "Asystent głosowy skonfigurowany i gotowy do użycia",
+    voiceboxConfig: "Voicebox (lokalny)",
+    voiceboxEndpointLabel: "Adres serwisu",
+    voiceboxEndpointPlaceholder: "http://localhost:17493",
+    voiceboxEndpointDescription: "Lokalny adres serwisu TTS Voicebox. Wymaga uruchomionego Voicebox na Twoim urządzeniu.",
+    voiceboxSave: "Zapisz",
+    voiceboxTest: "Testuj połączenie",
+    voiceboxTesting: "Testowanie...",
+    voiceboxReady: "Połączono",
+    voiceboxSetupSuccess: "Voicebox połączony i gotowy",
+    voiceboxConnectionError: "Nie można połączyć się z serwisem Voicebox",
   },
 
   voiceStatusBar: {

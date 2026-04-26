@@ -1397,6 +1397,16 @@ export const ca: TranslationStructure = {
     elevenLabsSetupChecking: "Configurant...",
     elevenLabsSetupReady: "Preparat",
     elevenLabsSetupSuccess: "Assistent de veu configurat i preparat per usar",
+    voiceboxConfig: "Voicebox (local)",
+    voiceboxEndpointLabel: "URL del servei",
+    voiceboxEndpointPlaceholder: "http://localhost:17493",
+    voiceboxEndpointDescription: "URL del servei TTS local de Voicebox. Requereix que Voicebox estigui en execució al vostre dispositiu.",
+    voiceboxSave: "Desa",
+    voiceboxTest: "Prova la connexió",
+    voiceboxTesting: "Provant...",
+    voiceboxReady: "Connectat",
+    voiceboxSetupSuccess: "Voicebox connectat i llest",
+    voiceboxConnectionError: "No s'ha pogut connectar al servei Voicebox",
   },
 
   voiceStatusBar: {

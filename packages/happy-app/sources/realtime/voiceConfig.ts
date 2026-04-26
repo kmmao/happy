@@ -1,4 +1,10 @@
 /**
+ * Default Voicebox local TTS service endpoint
+ * Voicebox REST API runs on port 17493 by default
+ */
+export const VOICEBOX_DEFAULT_ENDPOINT = 'http://localhost:17493';
+
+/**
  * Static voice context configuration
  */
 export const VOICE_CONFIG = {

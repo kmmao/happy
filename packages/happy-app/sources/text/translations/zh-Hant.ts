@@ -1346,6 +1346,16 @@ export const zhHant: TranslationStructure = {
     elevenLabsSetupChecking: "設定中...",
     elevenLabsSetupReady: "已就緒",
     elevenLabsSetupSuccess: "語音助手已設定完成，可以使用",
+    voiceboxConfig: "Voicebox（本地）",
+    voiceboxEndpointLabel: "服務地址",
+    voiceboxEndpointPlaceholder: "http://localhost:17493",
+    voiceboxEndpointDescription: "本地 Voicebox TTS 服務地址。需要在您的裝置上執行 Voicebox。",
+    voiceboxSave: "儲存",
+    voiceboxTest: "測試連線",
+    voiceboxTesting: "測試中...",
+    voiceboxReady: "已連線",
+    voiceboxSetupSuccess: "Voicebox 已連線且就緒",
+    voiceboxConnectionError: "無法連接至 Voicebox 服務",
   },
 
   voiceStatusBar: {

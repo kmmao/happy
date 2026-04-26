@@ -1516,6 +1516,16 @@ export const ja: TranslationStructure = {
     elevenLabsSetupChecking: "設定中...",
     elevenLabsSetupReady: "準備完了",
     elevenLabsSetupSuccess: "音声アシスタントの設定が完了しました",
+    voiceboxConfig: "Voicebox（ローカル）",
+    voiceboxEndpointLabel: "サービスURL",
+    voiceboxEndpointPlaceholder: "http://localhost:17493",
+    voiceboxEndpointDescription: "ローカルVoicebox TTSサービスのURL。デバイスでVoiceboxが起動している必要があります。",
+    voiceboxSave: "保存",
+    voiceboxTest: "接続テスト",
+    voiceboxTesting: "テスト中...",
+    voiceboxReady: "接続済み",
+    voiceboxSetupSuccess: "Voiceboxが接続され、準備完了です",
+    voiceboxConnectionError: "Voiceboxサービスに接続できませんでした",
   },
 
   voiceStatusBar: {

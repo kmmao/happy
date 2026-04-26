@@ -135,9 +135,15 @@ export const SettingsSchema = z.object({
       "Language for STT voice input (null = auto from device locale, e.g. 'en-US', 'zh-CN', 'zh-TW')",
     ),
   ttsProvider: z
-    .enum(["edge", "elevenlabs"])
+    .enum(["edge", "elevenlabs", "voicebox"])
     .describe(
-      "TTS provider: 'edge' (free, default) or 'elevenlabs' (paid, user's own API key)",
+      "TTS provider: 'edge' (free, default), 'elevenlabs' (paid, user's own API key), or 'voicebox' (local Voicebox service)",
+    ),
+  voiceboxEndpoint: z
+    .string()
+    .nullable()
+    .describe(
+      "Voicebox local TTS service endpoint URL (null uses default http://localhost:17493)",
     ),
   elevenLabsApiKey: z
     .string()
@@ -415,6 +421,7 @@ export const settingsDefaults: Settings = {
   voiceAssistantLanguage: null,
   voiceInputLanguage: null,
   ttsProvider: "edge",
+  voiceboxEndpoint: null,
   elevenLabsApiKey: null,
   elevenLabsVoiceId: null,
   preferredLanguage: null,
