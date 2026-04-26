@@ -40,7 +40,6 @@ import { CodeView } from "@/components/CodeView";
 import { BinaryVersionRow } from "@/components/claudeControl/BinaryVersionRow";
 import { CostBadge } from "@/components/claudeControl/CostBadge";
 import { SessionColorPicker } from "@/components/claudeControl/SessionColorPicker";
-import { ContextUsagePanel } from "@/components/claudeControl/ContextUsagePanel";
 import { Session } from "@/sync/storageTypes";
 import { useHappyAction } from "@/hooks/useHappyAction";
 import { HappyError } from "@/utils/errors";
@@ -666,11 +665,6 @@ function SessionInfoContent({ session }: { session: Session }) {
               Modal.toast(`${t("claudeControl.color.title")}: ${color}`);
             }}
           />
-        </ItemGroup>
-        <ItemGroup title={t("claudeControl.contextUsage.title")}>
-          <View style={{ paddingHorizontal: 16, paddingVertical: 12 }}>
-            <ContextUsagePanel sessionId={session.id} />
-          </View>
         </ItemGroup>
         <ItemGroup title={t("claudeControl.mcpServers.title")}>
           <Item
