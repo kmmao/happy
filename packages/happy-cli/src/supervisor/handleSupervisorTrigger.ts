@@ -64,17 +64,34 @@ async function resolveAgentForSupervisor(
   if (data.agent === "codex") return "codex";
   if (data.agent === "claude") return "claude";
 
+  // Check compatibility field (most reliable — set by built-in profiles like openai, azure-openai)
+  const compat = runtimeProfile?.compatibility;
+  if (compat && compat.codex === true && compat.claude === false) {
+    return "codex";
+  }
+
   const env = runtimeProfile?.environmentVariables ?? {};
+
+  // Check Codex-specific env vars
   if (env.HAPPY_CODEX_BACKEND || env.HAPPY_CODEX_CONFIG_MODE || env.HAPPY_CODEX_MODEL) {
     return "codex";
   }
 
+  // Check OpenAI/Azure env vars (these profiles are Codex-only)
+  if (env.OPENAI_BASE_URL || env.OPENAI_MODEL || env.AZURE_OPENAI_API_VERSION || env.AZURE_OPENAI_DEPLOYMENT_NAME) {
+    return "codex";
+  }
+
+  // For user-defined profiles passed via profileId only, read from local settings
   const profileId = runtimeProfile?.profileId;
   if (profileId) {
     try {
       const settings = await readSettings();
       const profile = settings.profiles.find((p) => p.id === profileId);
       if (profile?.codexConfig) {
+        return "codex";
+      }
+      if (profile?.compatibility?.codex === true && profile?.compatibility?.claude === false) {
         return "codex";
       }
     } catch {

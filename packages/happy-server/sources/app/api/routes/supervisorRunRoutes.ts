@@ -347,18 +347,18 @@ export function supervisorRunRoutes(app: Fastify) {
                 recipientFilter: { type: "user-scoped-only" },
             });
 
-            // Notify daemon(s) to terminate the underlying CLI process
+            // Notify daemon to terminate the underlying CLI process
+            // Supervisor sessions don't have AccessKey records, so use the project's machineId
             if (updated?.sessionId) {
-                const accessKeys = await db.accessKey.findMany({
-                    where: { sessionId: updated.sessionId },
+                const project = await db.project.findUnique({
+                    where: { id },
                     select: { machineId: true },
                 });
-                const machineIds = [...new Set(accessKeys.map((ak) => ak.machineId))];
-                for (const machineId of machineIds) {
+                if (project?.machineId) {
                     eventRouter.emitEphemeral({
                         userId,
                         payload: { type: "session-terminate", sessionId: updated.sessionId, reason: "cancelled" },
-                        recipientFilter: { type: "machine-scoped-only", machineId },
+                        recipientFilter: { type: "machine-scoped-only", machineId: project.machineId },
                     });
                 }
             }
