@@ -2,6 +2,13 @@ import { describe, expect, it } from "vitest";
 import { en } from "./_default";
 import { zhHans } from "./translations/zh-Hans";
 import { zhHant } from "./translations/zh-Hant";
+import { ru } from "./translations/ru";
+import { pl } from "./translations/pl";
+import { es } from "./translations/es";
+import { it as itLang } from "./translations/it";
+import { pt } from "./translations/pt";
+import { ca } from "./translations/ca";
+import { ja } from "./translations/ja";
 
 function getValue(source: Record<string, any>, key: string): any {
     return key.split(".").reduce((acc, segment) => acc?.[segment], source);
@@ -31,6 +38,62 @@ function renderValue(source: Record<string, any>, key: string): string {
     }
     return value;
 }
+
+const nonEnglishTranslations = [
+    ["ru", ru],
+    ["pl", pl],
+    ["es", es],
+    ["it", itLang],
+    ["pt", pt],
+    ["ca", ca],
+    ["zh-Hans", zhHans],
+    ["zh-Hant", zhHant],
+    ["ja", ja],
+] as const;
+
+const guardianCopyKeys = [
+    "machine.automationGuardiansHint",
+    "machine.automationGuardians",
+    "machine.automationGuardiansEmpty",
+    "machine.automationGuardianSession",
+    "machine.automationResetGuardians",
+    "machine.automationResetGuardiansMessage",
+    "machine.automationResetGuardian",
+    "machine.automationResetGuardianMessage",
+    "machine.automationResetGuardianFailed",
+    "machine.automationGuardianUsage",
+    "machine.automationGuardianUsageEmpty",
+    "machine.automationGuardianReuseCount",
+    "machine.automationGuardianReuseRate",
+    "machine.automationGuardianRememberCount",
+    "machine.automationGuardianResetCount",
+    "machine.automationGuardianReuseCountHint",
+    "machine.automationGuardianReuseRateHint",
+    "machine.automationGuardianResetCountHint",
+    "machine.automationGuardianUsageHint",
+    "machine.automationClearAuditHint",
+    "machine.automationAuditHint",
+    "machine.automationAlertsHint",
+    "machine.automationAuditGuardian",
+    "machine.automationAuditEventGuardianReused",
+    "machine.automationAuditEventGuardianRemembered",
+    "machine.automationAuditEventGuardianCleared",
+    "machine.automationOverviewHint",
+    "machine.automationSearchHint",
+    "machine.automationAuditFiltersHint",
+    "machine.automationGuardianFiltersHint",
+    "machine.automationSearchPlaceholder",
+    "machine.automationFilterGuardian",
+    "machine.automationGuardianDetails",
+    "machine.automationGuardianAttached",
+    "machine.automationGuardianPersisted",
+    "machine.automationGuardianRecovered",
+    "machine.automationRecoveredGuardians",
+    "machine.automationGuardianRecoveryNeeded",
+    "machine.automationGuardianRecoveryNeededMessage",
+    "machine.automationSectionGuardians",
+    "machine.automationSectionGuardianUsage",
+] as const;
 
 describe("automation i18n", () => {
     const criticalKeys = [
@@ -132,4 +195,24 @@ describe("automation i18n", () => {
             expect(renderValue(zhHant as any, key)).not.toBe(renderValue(en as any, key));
         });
     }
+
+    for (const key of guardianCopyKeys) {
+        for (const [langCode, translations] of nonEnglishTranslations) {
+            it(`keeps ${key} guardian copy localized in ${langCode}`, () => {
+                const localized = renderValue(translations as any, key);
+
+                expect(localized).not.toBe(renderValue(en as any, key));
+                expect(localized.toLowerCase()).not.toContain("guardian");
+            });
+        }
+    }
+
+    it("uses explicit session reuse wording in Simplified Chinese", () => {
+        expect(renderValue(zhHans as any, "machine.automationGuardianReuseCount")).toBe("会话复用次数");
+    });
+
+    it("uses explicit session reuse wording in Traditional Chinese", () => {
+        expect(renderValue(zhHant as any, "machine.automationGuardianReuseCount")).toBe("會話複用次數");
+    });
+
 });
