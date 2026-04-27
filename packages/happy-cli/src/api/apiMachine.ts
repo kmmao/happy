@@ -316,6 +316,8 @@ export type SupervisorTriggerData = {
   loopIteration?: number;
   /** Unified runtime profile resolved by App/Server before dispatch. */
   runtimeProfile?: ResolvedRuntimeProfile;
+  /** Agent to use for this run. When absent, CLI infers from runtimeProfile. */
+  agent?: string;
 };
 
 export type SupervisorRunStatusData = {

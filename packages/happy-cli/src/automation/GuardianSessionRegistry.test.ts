@@ -60,7 +60,7 @@ describe("GuardianSessionRegistry", () => {
     }, "session-1");
 
     await registry.forgetKey("loop:loop-1");
-    expect(registry.getSnapshot().map((entry) => entry.key)).toEqual(["project:proj-1"]);
+    expect(registry.getSnapshot().map((entry) => entry.key)).toEqual(["project:proj-1:analysis"]);
   });
 
   it("clears all guardians", async () => {

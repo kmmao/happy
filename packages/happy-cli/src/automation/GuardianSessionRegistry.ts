@@ -30,7 +30,8 @@ function buildGuardianKeys(data: SupervisorTriggerData): string[] {
   if (data.loopId) {
     keys.push(`loop:${data.loopId}`);
   }
-  keys.push(`project:${data.projectId}`);
+  // Include trigger type so analysis and research have independent guardian sessions
+  keys.push(`project:${data.projectId}:${data.trigger}`);
   return keys;
 }
 
@@ -130,6 +131,10 @@ export class GuardianSessionRegistry {
     if (changed) {
       await this.flush();
     }
+  }
+
+  async forgetByProjectAndTrigger(projectId: string, trigger: string): Promise<void> {
+    await this.forgetKey(`project:${projectId}:${trigger}`);
   }
 
   async forgetLoop(loopId: string): Promise<void> {

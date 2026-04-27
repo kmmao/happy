@@ -42,6 +42,8 @@ interface EmitResolvedSupervisorRunTriggerInput {
     maxConcurrentAnalysis?: number;
     maxConcurrentFix?: number;
     maxFindings?: number;
+    /** Agent type to use. CLI infers from profile when absent. */
+    agent?: string;
 }
 
 interface EmitConfiguredSupervisorRunTriggerInput
@@ -85,6 +87,7 @@ export async function emitResolvedSupervisorRunTrigger(
             maxConcurrentFix: input.maxConcurrentFix,
             maxFindings: input.maxFindings,
             runtimeProfile: input.resolvedProfile.runtimeProfile,
+            agent: input.agent,
         }),
         recipientFilter: {
             type: "machine-scoped-only",

@@ -45,6 +45,7 @@ export function supervisorRunRoutes(app: Fastify) {
                         }).optional(),
                         profileId: z.string().optional(),
                         runtimeProfile: ResolvedRuntimeProfileSchema.optional(),
+                        agent: z.string().optional(),
                     })
                     .optional(),
             },
@@ -189,6 +190,7 @@ export function supervisorRunRoutes(app: Fastify) {
                 maxConcurrentAnalysis: concurrency.maxAnalysis,
                 maxConcurrentFix: concurrency.maxFix,
                 maxFindings,
+                agent: request.body?.agent,
             });
 
             return reply.send({
@@ -329,7 +331,7 @@ export function supervisorRunRoutes(app: Fastify) {
                 });
             }
 
-            // Fetch the updated run for response
+            // Fetch the updated run for response (also need sessionId for daemon termination)
             const updated = await db.supervisorRun.findUnique({
                 where: { id: runId },
             });
@@ -344,6 +346,22 @@ export function supervisorRunRoutes(app: Fastify) {
                 ),
                 recipientFilter: { type: "user-scoped-only" },
             });
+
+            // Notify daemon(s) to terminate the underlying CLI process
+            if (updated?.sessionId) {
+                const accessKeys = await db.accessKey.findMany({
+                    where: { sessionId: updated.sessionId },
+                    select: { machineId: true },
+                });
+                const machineIds = [...new Set(accessKeys.map((ak) => ak.machineId))];
+                for (const machineId of machineIds) {
+                    eventRouter.emitEphemeral({
+                        userId,
+                        payload: { type: "session-terminate", sessionId: updated.sessionId, reason: "cancelled" },
+                        recipientFilter: { type: "machine-scoped-only", machineId },
+                    });
+                }
+            }
 
             return reply.send({
                 run: updated ? serializeSupervisorRun(updated) : { id: runId },

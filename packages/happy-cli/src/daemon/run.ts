@@ -1563,6 +1563,15 @@ export async function startDaemon(): Promise<void> {
         }
       }
       if (!session.happySessionId) {
+        // Clean up guardian entry even when happySessionId is missing (e.g. webhook timeout)
+        if (session.automationContext?.projectId && session.automationContext?.trigger) {
+          void guardianSessionRegistry.forgetByProjectAndTrigger(
+            session.automationContext.projectId,
+            session.automationContext.trigger,
+          ).catch((error) => {
+            logger.debug(`[DAEMON RUN] Failed to forget guardian by context for PID ${pid}: ${error}`);
+          });
+        }
         return;
       }
       void agentLoopCoordinator?.onJobTerminal({

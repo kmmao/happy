@@ -57,6 +57,34 @@ export interface SupervisorHandlerDeps {
   readonly rememberGuardianSession?: (data: SupervisorTriggerData, sessionId: string) => Promise<void> | void;
 }
 
+async function resolveAgentForSupervisor(
+  data: SupervisorTriggerData,
+  runtimeProfile: ResolvedRuntimeProfile | undefined,
+): Promise<"claude" | "codex"> {
+  if (data.agent === "codex") return "codex";
+  if (data.agent === "claude") return "claude";
+
+  const env = runtimeProfile?.environmentVariables ?? {};
+  if (env.HAPPY_CODEX_BACKEND || env.HAPPY_CODEX_CONFIG_MODE || env.HAPPY_CODEX_MODEL) {
+    return "codex";
+  }
+
+  const profileId = runtimeProfile?.profileId;
+  if (profileId) {
+    try {
+      const settings = await readSettings();
+      const profile = settings.profiles.find((p) => p.id === profileId);
+      if (profile?.codexConfig) {
+        return "codex";
+      }
+    } catch {
+      // fallback to claude
+    }
+  }
+
+  return "claude";
+}
+
 // Track in-flight supervisor runs to prevent duplicate processing
 // Uses Map<runId, addedAt> so stale entries can be auto-cleaned after 30 minutes
 const processingRuns = new Map<string, number>();
@@ -489,11 +517,13 @@ async function handleAnalysisTrigger(
   // 3. Write prompt to temp file in the project
   const promptFilePath = await writePromptFile(repoPath, runId, prompt);
 
+  const agent = await resolveAgentForSupervisor(data, runtimeProfile);
+
   // 4. Spawn session in the project directory (read-only analysis)
   const spawnResult = await spawnSessionWithRetry(deps.spawnSession, {
     directory: repoPath,
     approvedNewDirectoryCreation: false,
-    agent: "claude",
+    agent,
     happySessionId: guardianSessionId,
     profileId: runtimeProfile?.profileId,
     runtimeProfile,
@@ -579,11 +609,13 @@ async function handleResearchTrigger(
   // 3. Write prompt to temp file in the project
   const promptFilePath = await writePromptFile(repoPath, `research-${runId}`, prompt);
 
+  const agent = await resolveAgentForSupervisor(data, runtimeProfile);
+
   // 4. Spawn session in the project directory (read-only research)
   const spawnResult = await spawnSessionWithRetry(deps.spawnSession, {
     directory: repoPath,
     approvedNewDirectoryCreation: false,
-    agent: "claude",
+    agent,
     happySessionId: guardianSessionId,
     profileId: runtimeProfile?.profileId,
     runtimeProfile,

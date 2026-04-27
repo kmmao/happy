@@ -1099,6 +1099,8 @@ export interface SupervisorTriggerOptions {
   maxFindings?: number;
   /** Unified runtime profile resolved by App/Server before dispatch. */
   runtimeProfile?: ResolvedRuntimeProfile;
+  /** Agent to use ("claude" | "codex" | "gemini"). CLI infers from profile when absent. */
+  agent?: string;
 }
 
 export function buildSupervisorTriggerEphemeral(opts: SupervisorTriggerOptions): EphemeralPayload {
