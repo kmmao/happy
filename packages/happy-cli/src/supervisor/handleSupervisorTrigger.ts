@@ -57,49 +57,66 @@ export interface SupervisorHandlerDeps {
   readonly rememberGuardianSession?: (data: SupervisorTriggerData, sessionId: string) => Promise<void> | void;
 }
 
+type AgentResolution =
+  | { agent: "claude" | "codex"; error?: undefined }
+  | { agent?: undefined; error: string };
+
 async function resolveAgentForSupervisor(
   data: SupervisorTriggerData,
   runtimeProfile: ResolvedRuntimeProfile | undefined,
-): Promise<"claude" | "codex"> {
-  if (data.agent === "codex") return "codex";
-  if (data.agent === "claude") return "claude";
+): Promise<AgentResolution> {
+  if (data.agent === "codex") return { agent: "codex" };
+  if (data.agent === "claude") return { agent: "claude" };
+
+  const compat = runtimeProfile?.compatibility;
+  const profileName = runtimeProfile?.profileName ?? runtimeProfile?.profileId ?? "unknown";
 
   // Check compatibility field (most reliable — set by built-in profiles like openai, azure-openai)
-  const compat = runtimeProfile?.compatibility;
-  if (compat && compat.codex === true && compat.claude === false) {
-    return "codex";
+  if (compat) {
+    if (compat.codex === true && compat.claude === false) {
+      return { agent: "codex" };
+    }
+    if (compat.claude === true && compat.codex === false) {
+      return { agent: "claude" };
+    }
+    if (compat.claude === true && compat.codex === true) {
+      return { agent: "claude" };
+    }
+    if (compat.claude === false && compat.codex === false) {
+      return { error: `Profile "${profileName}" is not compatible with either Claude or Codex` };
+    }
   }
 
   const env = runtimeProfile?.environmentVariables ?? {};
 
-  // Check Codex-specific env vars
   if (env.HAPPY_CODEX_BACKEND || env.HAPPY_CODEX_CONFIG_MODE || env.HAPPY_CODEX_MODEL) {
-    return "codex";
+    return { agent: "codex" };
   }
 
-  // Check OpenAI/Azure env vars (these profiles are Codex-only)
   if (env.OPENAI_BASE_URL || env.OPENAI_MODEL || env.AZURE_OPENAI_API_VERSION || env.AZURE_OPENAI_DEPLOYMENT_NAME) {
-    return "codex";
+    return { agent: "codex" };
   }
 
-  // For user-defined profiles passed via profileId only, read from local settings
   const profileId = runtimeProfile?.profileId;
   if (profileId) {
     try {
       const settings = await readSettings();
       const profile = settings.profiles.find((p) => p.id === profileId);
       if (profile?.codexConfig) {
-        return "codex";
+        return { agent: "codex" };
       }
       if (profile?.compatibility?.codex === true && profile?.compatibility?.claude === false) {
-        return "codex";
+        return { agent: "codex" };
+      }
+      if (profile?.compatibility?.claude === false) {
+        return { error: `Profile "${profileName}" is not compatible with Claude and agent type could not be determined` };
       }
     } catch {
-      // fallback to claude
+      // settings read failed — continue to default
     }
   }
 
-  return "claude";
+  return { agent: "claude" };
 }
 
 // Track in-flight supervisor runs to prevent duplicate processing
@@ -504,7 +521,13 @@ async function handleAnalysisTrigger(
   const { runId, projectId, repoPath, trigger } = data;
 
   // Resolve agent BEFORE guardian lookup so the key includes agent type
-  const agent = await resolveAgentForSupervisor(data, runtimeProfile);
+  const resolution = await resolveAgentForSupervisor(data, runtimeProfile);
+  if (resolution.error) {
+    logger.warn(`[SUPERVISOR] Agent resolution failed for analysis ${runId}: ${resolution.error}`);
+    deps.emitSupervisorRunStatus({ runId, projectId, status: "failed", errorMessage: resolution.error });
+    return undefined;
+  }
+  const agent = resolution.agent;
   const guardianSessionId = deps.resolveGuardianSessionId?.({ ...data, agent });
 
   logger.debug(
@@ -603,7 +626,13 @@ async function handleResearchTrigger(
 ): Promise<string | undefined> {
   const { runId, projectId, repoPath, trigger } = data;
 
-  const agent = await resolveAgentForSupervisor(data, runtimeProfile);
+  const resolution = await resolveAgentForSupervisor(data, runtimeProfile);
+  if (resolution.error) {
+    logger.warn(`[SUPERVISOR] Agent resolution failed for research ${runId}: ${resolution.error}`);
+    deps.emitSupervisorRunStatus({ runId, projectId, status: "failed", errorMessage: resolution.error });
+    return undefined;
+  }
+  const agent = resolution.agent;
   const guardianSessionId = deps.resolveGuardianSessionId?.({ ...data, agent });
 
   logger.debug(
