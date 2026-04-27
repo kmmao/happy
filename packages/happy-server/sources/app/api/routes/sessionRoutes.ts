@@ -8,6 +8,7 @@ import { log } from "@/utils/log";
 import { randomKeyNaked } from "@/utils/randomKeyNaked";
 import { allocateUserSeq } from "@/storage/seq";
 import { sessionDelete } from "@/app/session/sessionDelete";
+import { sessionArchive } from "@/app/session/sessionArchive";
 import { activityCache } from "@/app/presence/sessionCache";
 
 type SessionResponseRecord = {
@@ -759,6 +760,32 @@ export function sessionRoutes(app: Fastify) {
       preHandler: app.authenticate,
     },
     unarchiveSessionHandler,
+  );
+
+  // Archive session — server-side fallback when the killSession RPC cannot reach the daemon.
+  // Sets active=false and sends session-terminate to the daemon (no-op if process already gone).
+  app.patch(
+    "/v1/sessions/:sessionId/archive",
+    {
+      schema: {
+        params: z.object({
+          sessionId: z.string(),
+        }),
+      },
+      preHandler: app.authenticate,
+    },
+    async (request, reply) => {
+      const userId = request.userId;
+      const { sessionId } = request.params;
+
+      const archived = await sessionArchive({ uid: userId }, sessionId);
+
+      if (!archived) {
+        return reply.code(404).send({ error: "Session not found or not owned by user" });
+      }
+
+      return reply.send({ success: true });
+    },
   );
 
   // Legacy alias kept for backward compatibility.

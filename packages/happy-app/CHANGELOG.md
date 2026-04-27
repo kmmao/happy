@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.15.1 - 2026-04-28
+
+Fixed an issue where archiving a session would fail with an error when the CLI daemon was offline or the process had already exited.
+
+### Session Management
+- Fixed archive action now falls back to a server-side endpoint when the killSession RPC cannot reach the daemon — ensures sessions are always archived even if the process is already gone
+
 ## 2.15.0 - 2026-04-25
 
 This release brings full profile-per-trigger binding, a restored Git tab, LLM-weighted option scoring, and several session management improvements.

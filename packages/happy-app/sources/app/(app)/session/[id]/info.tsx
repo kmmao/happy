@@ -21,7 +21,7 @@ import {
 } from "@/utils/sessionUtils";
 import * as Clipboard from "expo-clipboard";
 import { Modal } from "@/modal";
-import { sessionKill, sessionDelete, machineSpawnNewSession, sessionForkSession } from "@/sync/ops";
+import { sessionKill, sessionArchive, sessionDelete, machineSpawnNewSession, sessionForkSession } from "@/sync/ops";
 import { reactivateArchivedSession } from "@/sync/sessionResumeFlow";
 import { runWithSessionReactivationGuard } from "@/sync/sessionResumeGuard";
 import { setSessionForkSource } from "@/sync/apiProjects";
@@ -151,14 +151,20 @@ function SessionInfoContent({ session }: { session: Session }) {
     }
   }, [session]);
 
-  // Use HappyAction for archiving - it handles errors automatically
+  // Use HappyAction for archiving - it handles errors automatically.
+  // First tries the killSession RPC (process must be reachable). If that fails
+  // (daemon offline, process already dead, network issue), falls back to the
+  // server-side archive endpoint which forces active=false and signals the daemon.
   const [, performArchive] = useHappyAction(async () => {
-    const result = await sessionKill(session.id);
-    if (!result.success) {
-      throw new HappyError(
-        result.message || t("sessionInfo.failedToArchiveSession"),
-        false,
-      );
+    const rpcResult = await sessionKill(session.id);
+    if (!rpcResult.success) {
+      const fallbackResult = await sessionArchive(session.id);
+      if (!fallbackResult.success) {
+        throw new HappyError(
+          fallbackResult.message || t("sessionInfo.failedToArchiveSession"),
+          false,
+        );
+      }
     }
     // Success - navigate back
     router.back();

@@ -442,7 +442,7 @@ export type EphemeralEvent =
   | {
       type: "session-terminate";
       sessionId: string;
-      reason: "timeout" | "deleted";
+      reason: "timeout" | "deleted" | "archived" | "cancelled";
     }
 ;
 

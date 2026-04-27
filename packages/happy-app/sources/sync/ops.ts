@@ -2371,6 +2371,36 @@ export async function sessionUnarchive(
  */
 export const sessionRestore = sessionUnarchive;
 
+/**
+ * Server-side fallback to archive a session when the killSession RPC cannot
+ * reach the daemon. Sets active=false on the server and signals the daemon
+ * to terminate the process if it is still running.
+ */
+export async function sessionArchive(
+  sessionId: string,
+): Promise<{ success: boolean; message?: string }> {
+  try {
+    const response = await apiSocket.request(`/v1/sessions/${sessionId}/archive`, {
+      method: "PATCH",
+    });
+
+    if (response.ok) {
+      return { success: true };
+    } else {
+      const error = await response.text();
+      return {
+        success: false,
+        message: error || "Failed to archive session",
+      };
+    }
+  } catch (error) {
+    return {
+      success: false,
+      message: getErrorMessage(error),
+    };
+  }
+}
+
 // Export types for external use
 export type {
   SessionBashRequest,

@@ -2,6 +2,15 @@
   "entries": {
     "en": [
       {
+        "version": "2.15.1",
+        "date": "2026-04-28",
+        "summary": "Fixed an issue where archiving a session would fail with an error when the CLI daemon was offline or the process had already exited.",
+        "changes": [
+          "Fixed archive action now falls back to a server-side endpoint when the killSession RPC cannot reach the daemon — ensures sessions are always archived even if the process is already gone"
+        ],
+        "rawMarkdown": "## 2.15.1 - 2026-04-28\n\n\nFixed an issue where archiving a session would fail with an error when the CLI daemon was offline or the process had already exited.\n\n### Session Management\n- Fixed archive action now falls back to a server-side endpoint when the killSession RPC cannot reach the daemon — ensures sessions are always archived even if the process is already gone"
+      },
+      {
         "version": "2.15.0",
         "date": "2026-04-25",
         "summary": "This release brings full profile-per-trigger binding, a restored Git tab, LLM-weighted option scoring, and several session management improvements.",
@@ -591,6 +600,15 @@
     ],
     "zh-Hans": [
       {
+        "version": "2.15.1",
+        "date": "2026-04-28",
+        "summary": "修复了当 CLI daemon 离线或进程已退出时，归档会话操作报错失败的问题。",
+        "changes": [
+          "修复归档操作：当 killSession RPC 无法到达 daemon 时，自动降级到服务端归档接口，确保即使进程已退出也能正常归档会话"
+        ],
+        "rawMarkdown": "## 2.15.1 - 2026-04-28\n\n\n修复了当 CLI daemon 离线或进程已退出时，归档会话操作报错失败的问题。\n\n### 会话管理\n- 修复归档操作：当 killSession RPC 无法到达 daemon 时，自动降级到服务端归档接口，确保即使进程已退出也能正常归档会话"
+      },
+      {
         "version": "2.15.0",
         "date": "2026-04-25",
         "summary": "本次更新带来完整的触发器级 Profile 绑定、Git 标签页恢复、LLM 加权选项评分，以及多项会话管理改进。",
@@ -1159,7 +1177,7 @@
       }
     ]
   },
-  "latestVersion": "2.15.0",
+  "latestVersion": "2.15.1",
   "availableLocales": [
     "en",
     "zh-Hans"
