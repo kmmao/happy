@@ -45,6 +45,10 @@ import {
   normalizeResolvedRuntimeProfile,
   type ResolvedRuntimeProfile,
 } from "@kmmao/happy-wire";
+import {
+  resolveAgentFromRuntimeProfile,
+  type AgentResolution,
+} from "./resolveAgentFromRuntimeProfile";
 
 export interface SupervisorHandlerDeps {
   readonly spawnSession: (
@@ -57,66 +61,13 @@ export interface SupervisorHandlerDeps {
   readonly rememberGuardianSession?: (data: SupervisorTriggerData, sessionId: string) => Promise<void> | void;
 }
 
-type AgentResolution =
-  | { agent: "claude" | "codex"; error?: undefined }
-  | { agent?: undefined; error: string };
-
 async function resolveAgentForSupervisor(
   data: SupervisorTriggerData,
   runtimeProfile: ResolvedRuntimeProfile | undefined,
 ): Promise<AgentResolution> {
   if (data.agent === "codex") return { agent: "codex" };
   if (data.agent === "claude") return { agent: "claude" };
-
-  const compat = runtimeProfile?.compatibility;
-  const profileName = runtimeProfile?.profileName ?? runtimeProfile?.profileId ?? "unknown";
-
-  // Check compatibility field (most reliable — set by built-in profiles like openai, azure-openai)
-  if (compat) {
-    if (compat.codex === true && compat.claude === false) {
-      return { agent: "codex" };
-    }
-    if (compat.claude === true && compat.codex === false) {
-      return { agent: "claude" };
-    }
-    if (compat.claude === true && compat.codex === true) {
-      return { agent: "claude" };
-    }
-    if (compat.claude === false && compat.codex === false) {
-      return { error: `Profile "${profileName}" is not compatible with either Claude or Codex` };
-    }
-  }
-
-  const env = runtimeProfile?.environmentVariables ?? {};
-
-  if (env.HAPPY_CODEX_BACKEND || env.HAPPY_CODEX_CONFIG_MODE || env.HAPPY_CODEX_MODEL) {
-    return { agent: "codex" };
-  }
-
-  if (env.OPENAI_BASE_URL || env.OPENAI_MODEL || env.AZURE_OPENAI_API_VERSION || env.AZURE_OPENAI_DEPLOYMENT_NAME) {
-    return { agent: "codex" };
-  }
-
-  const profileId = runtimeProfile?.profileId;
-  if (profileId) {
-    try {
-      const settings = await readSettings();
-      const profile = settings.profiles.find((p) => p.id === profileId);
-      if (profile?.codexConfig) {
-        return { agent: "codex" };
-      }
-      if (profile?.compatibility?.codex === true && profile?.compatibility?.claude === false) {
-        return { agent: "codex" };
-      }
-      if (profile?.compatibility?.claude === false) {
-        return { error: `Profile "${profileName}" is not compatible with Claude and agent type could not be determined` };
-      }
-    } catch {
-      // settings read failed — continue to default
-    }
-  }
-
-  return { agent: "claude" };
+  return resolveAgentFromRuntimeProfile(runtimeProfile);
 }
 
 // Track in-flight supervisor runs to prevent duplicate processing
@@ -730,6 +681,14 @@ async function handleFixTrigger(
     `[SUPERVISOR] Processing fix ${actionId} for project ${projectId}: "${fixAction.title}"`,
   );
 
+  const resolution = await resolveAgentForSupervisor(data, runtimeProfile);
+  if (resolution.error) {
+    logger.warn(`[SUPERVISOR] Agent resolution failed for fix ${actionId}: ${resolution.error}`);
+    deps.emitSupervisorFixStatus({ actionId, projectId, fixStatus: "failed" });
+    return undefined;
+  }
+  const agent = resolution.agent;
+
   const parentBranch = await resolveParentBranch(repoPath);
   const fetchOk = await fetchOriginBranch(repoPath, parentBranch);
   const startPoint = fetchOk ? `origin/${parentBranch}` : undefined;
@@ -795,7 +754,7 @@ async function handleFixTrigger(
   const spawnResult = await spawnSessionWithRetry(deps.spawnSession, {
     directory: worktreeResult.worktreePath,
     approvedNewDirectoryCreation: true,
-    agent: "claude",
+    agent,
     profileId: runtimeProfile?.profileId,
     runtimeProfile,
     automationContext: {

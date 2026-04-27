@@ -251,6 +251,7 @@ export type WebhookTriggerData = {
   repoPath: string;
   provider: string;
   apiToken?: string;
+  runtimeProfile?: unknown;
 };
 
 export type CiTriggerData = {

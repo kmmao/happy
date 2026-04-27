@@ -19,6 +19,8 @@ import type {
   SpawnSessionOptions,
   SpawnSessionResult,
 } from "@/modules/common/registerCommonHandlers";
+import { normalizeResolvedRuntimeProfile } from "@kmmao/happy-wire";
+import { resolveAgentFromRuntimeProfile } from "@/supervisor/resolveAgentFromRuntimeProfile";
 
 export interface WebhookHandlerDeps {
   readonly spawnSession: (
@@ -40,6 +42,7 @@ export async function handleWebhookTrigger(
   deps: WebhookHandlerDeps,
 ): Promise<{ success: boolean; errorMessage?: string; sessionId?: string }> {
   const { webhookEventId, issueNumber, repoPath, provider, repoUrl } = data;
+  const runtimeProfile = normalizeResolvedRuntimeProfile(data.runtimeProfile);
 
   // Guard against duplicate processing
   if (processingEvents.has(webhookEventId)) {
@@ -133,15 +136,28 @@ export async function handleWebhookTrigger(
       environmentVariables.GITEA_TOKEN = data.apiToken;
     }
 
+    const agentResolution = await resolveAgentFromRuntimeProfile(runtimeProfile);
+    if (agentResolution.error) {
+      logger.warn(`[WEBHOOK] Agent resolution failed for event ${webhookEventId}: ${agentResolution.error}`);
+      deps.emitWebhookStatus({ webhookEventId, status: "failed", errorMessage: agentResolution.error });
+      try { await removeWorktreeForced(repoPath, worktreeResult.branchName); } catch { /* best-effort */ }
+      return { success: false, errorMessage: agentResolution.error };
+    }
+
     const spawnResult = await deps.spawnSession({
       directory: worktreeResult.worktreePath,
       approvedNewDirectoryCreation: true,
-      agent: "claude",
+      agent: agentResolution.agent,
+      profileId: runtimeProfile?.profileId,
+      runtimeProfile,
       automationContext: {
         kind: "webhook",
         dedupeKey: `webhook:${webhookEventId}`,
       },
-      environmentVariables,
+      environmentVariables: {
+        ...runtimeProfile?.environmentVariables,
+        ...environmentVariables,
+      },
     });
 
     if (spawnResult.type !== "success") {
