@@ -74,6 +74,7 @@ export function webhookRoutes(app: Fastify) {
               repoPath: z.string(),
               enabled: z.boolean(),
               createdAt: z.string(),
+              profileId: z.string().nullable(),
             }),
           ),
         },
@@ -98,6 +99,7 @@ export function webhookRoutes(app: Fastify) {
           repoPath: r.repoPath,
           enabled: r.enabled,
           createdAt: r.createdAt.toISOString(),
+          profileId: r.profileId ?? null,
         })),
       );
     },
@@ -121,6 +123,7 @@ export function webhookRoutes(app: Fastify) {
           repoPath: z.string().min(1),
           enabled: z.boolean().default(true),
           callbackUrl: z.string().url().optional(),
+          profileId: z.string().optional(),
         }),
         response: {
           200: z.object({
@@ -144,6 +147,7 @@ export function webhookRoutes(app: Fastify) {
         repoPath: string;
         enabled: boolean;
         callbackUrl?: string;
+        profileId?: string;
       };
 
       const normalizedUrl = body.repoUrl
@@ -183,6 +187,7 @@ export function webhookRoutes(app: Fastify) {
           machineId: body.machineId,
           repoPath: body.repoPath,
           enabled: body.enabled,
+          profileId: body.profileId ?? null,
         },
         update: {
           provider: body.provider,
@@ -195,6 +200,7 @@ export function webhookRoutes(app: Fastify) {
           machineId: body.machineId,
           repoPath: body.repoPath,
           enabled: body.enabled,
+          profileId: body.profileId ?? null,
         },
       });
 
