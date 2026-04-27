@@ -31,6 +31,10 @@ import {
 import { fetchIssueLabelsFromProvider } from "./webhookFetchLabels";
 import { checkDailyRunLimit } from "@/modules/supervisorLimits";
 import { emitConfiguredSupervisorRunTrigger } from "@/modules/supervisorRunTrigger";
+import {
+  isUnifiedRuntimeProfileResolverEnabled,
+  resolveRuntimeProfile,
+} from "@/modules/runtimeProfileResolver";
 
 /**
  * Extract the repository URL from a webhook body.
@@ -118,6 +122,19 @@ export async function dispatchWebhook(
       repoUrl: normalizedUrl,
       provider,
       enabled: true,
+    },
+    select: {
+      id: true,
+      accountId: true,
+      repoUrl: true,
+      webhookSecret: true,
+      apiToken: true,
+      labels: true,
+      authors: true,
+      machineId: true,
+      repoPath: true,
+      provider: true,
+      profileId: true,
     },
     take: 1000,
   });
@@ -350,6 +367,7 @@ async function processRoute(
     machineId: string;
     repoPath: string;
     provider: string;
+    profileId: string | null;
   },
   provider: string,
   rawBody: string,
@@ -388,6 +406,15 @@ async function processRoute(
 
   const decryptedApiToken = decryptRouteApiToken(route);
 
+  let resolvedRuntimeProfile: Awaited<ReturnType<typeof resolveRuntimeProfile>> | null = null;
+  if (isUnifiedRuntimeProfileResolverEnabled()) {
+    resolvedRuntimeProfile = await resolveRuntimeProfile({
+      accountId: route.accountId,
+      explicitProfileId: route.profileId,
+      purpose: "webhook",
+    });
+  }
+
   eventRouter.emitEphemeral({
     userId: route.accountId,
     payload: {
@@ -403,6 +430,7 @@ async function processRoute(
       repoPath: route.repoPath,
       provider,
       apiToken: decryptedApiToken,
+      ...(resolvedRuntimeProfile?.ok ? { runtimeProfile: resolvedRuntimeProfile.runtimeProfile } : {}),
     },
     recipientFilter: {
       type: "machine-scoped-only",

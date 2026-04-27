@@ -675,11 +675,16 @@ model WebhookRoute {
     repoPath      String // Local repo path on the target machine
     enabled          Boolean  @default(true)
     remoteWebhookId  String?  // ID of the webhook created on the Git platform
+
+    // Profile binding — same semantics as Task.profileId / WebhookTrigger.profileId.
+    profileId       String?
+
     createdAt        DateTime @default(now())
     updatedAt        DateTime @updatedAt
 
     @@unique([accountId, repoUrl])
     @@index([repoUrl])
+    @@index([accountId, profileId])
 }
 
 model WebhookEvent {

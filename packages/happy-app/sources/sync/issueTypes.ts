@@ -38,6 +38,7 @@ export interface WebhookRepoConfig {
   readonly secret: string;
   readonly routeId?: string;
   readonly enabled: boolean;
+  readonly profileId?: string;
 }
 
 export interface GitHostMapping {

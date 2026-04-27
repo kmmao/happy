@@ -263,6 +263,7 @@ export type EphemeralEvent =
       repoUrl: string;
       repoPath: string;
       provider: string;
+      runtimeProfile?: ResolvedRuntimeProfile;
     }
   | {
       type: "webhook-issue-linked";
