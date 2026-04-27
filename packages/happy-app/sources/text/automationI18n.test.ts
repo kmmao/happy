@@ -95,6 +95,63 @@ const guardianCopyKeys = [
     "machine.automationSectionGuardianUsage",
 ] as const;
 
+const chineseLoopCopyKeys = [
+    "machine.automationLoopRollup",
+    "machine.automationLoopsTotal",
+    "machine.automationLoopsActive",
+    "machine.automationLoopsBlocked",
+    "machine.automationLoopsPaused",
+    "machine.automationLoopsPendingEvents",
+    "machine.automationLoopsPolicyStopped",
+    "machine.automationOpenLoopsHint",
+    "machine.automationLoopRollupHint",
+    "machine.automationJobsHint",
+    "machine.automationOpenLoops",
+    "machine.automationAuditEventLoopPolicyGated",
+    "machine.automationSectionLoopRollup",
+    "machine.automationSectionJobs",
+    "machine.agentLoops",
+    "machine.agentLoopsViewAll",
+    "machine.agentLoopsEmpty",
+    "machine.agentLoopCreateFailed",
+    "machine.agentLoopUpdateFailed",
+    "machine.agentLoopDownstreamLoops",
+    "machine.agentLoopDownstreamLoopsPlaceholder",
+    "machine.agentLoopUpstreamLoops",
+    "machine.agentLoopOpenUpstreamLoop",
+    "machine.agentLoopOpenDownstreamLoop",
+    "machine.agentLoopBootstrapAutoRunCreated",
+    "machine.agentLoopBootstrapCreateAll",
+    "machine.agentLoopBootstrapCreateAndRun",
+    "machine.agentLoopRemoveMessage",
+    "machine.autoDreamHint",
+] as const;
+
+const chineseBootstrapDreamCopyKeys = [
+    "machine.oneClickIncludeAutomation",
+    "machine.oneClickIncludeAutomationHint",
+    "machine.oneClickDoneAutomationCreated",
+    "machine.oneClickDoneAutomationAlready",
+    "machine.oneClickDoneAutomationBadRoot",
+    "machine.automationQuickSetupTitle",
+    "machine.automationQuickSetupDone",
+    "machine.automationQuickSetupNothingTodo",
+    "machine.autoDreamNoReport",
+    "machine.automationCreateBootstrapProfile",
+    "machine.automationCreateAutoDreamProfile",
+    "machine.agentLoopBootstrapProfiles",
+    "machine.agentLoopBootstrapProfilesEmpty",
+    "machine.agentLoopBootstrapStatus",
+    "machine.bootstrapProfileEdit",
+    "machine.agentLoopBootstrap",
+    "machine.autoDreamProfiles",
+    "machine.autoDreamProfilesEmpty",
+    "machine.autoDreamHint",
+    "machine.autoDreamStage",
+    "machine.autoDreamLatestReport",
+    "machine.autoDreamRemoveMessage",
+] as const;
+
 describe("automation i18n", () => {
     const criticalKeys = [
         "machine.automation",
@@ -205,6 +262,38 @@ describe("automation i18n", () => {
                 expect(localized.toLowerCase()).not.toContain("guardian");
             });
         }
+    }
+
+    for (const key of chineseLoopCopyKeys) {
+        it(`keeps ${key} loop copy localized in zh-Hans`, () => {
+            const localized = renderValue(zhHans as any, key);
+
+            expect(localized).not.toBe(renderValue(en as any, key));
+            expect(localized).not.toMatch(/\bAgent\b|\bLoops?\b|\bloop\b/i);
+        });
+
+        it(`keeps ${key} loop copy localized in zh-Hant`, () => {
+            const localized = renderValue(zhHant as any, key);
+
+            expect(localized).not.toBe(renderValue(en as any, key));
+            expect(localized).not.toMatch(/\bAgent\b|\bLoops?\b|\bloop\b/i);
+        });
+    }
+
+    for (const key of chineseBootstrapDreamCopyKeys) {
+        it(`keeps ${key} bootstrap/dream copy localized in zh-Hans`, () => {
+            const localized = renderValue(zhHans as any, key);
+
+            expect(localized).not.toBe(renderValue(en as any, key));
+            expect(localized).not.toMatch(/Bootstrap|bootstrap|Auto-Dream|\bDream\b|\bdream\b/);
+        });
+
+        it(`keeps ${key} bootstrap/dream copy localized in zh-Hant`, () => {
+            const localized = renderValue(zhHant as any, key);
+
+            expect(localized).not.toBe(renderValue(en as any, key));
+            expect(localized).not.toMatch(/Bootstrap|bootstrap|Auto-Dream|\bDream\b|\bdream\b/);
+        });
     }
 
     it("uses explicit session reuse wording in Simplified Chinese", () => {

@@ -1,8 +1,7 @@
 import React from "react";
 import { View, Text, Pressable, ScrollView } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { useSettingMutable } from "@/sync/storage";
-import { useAllMachines } from "@/sync/storage";
+import { useSettingMutable, useAllMachines, useSettings } from "@/sync/storage";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { Typography } from "@/constants/Typography";
 import { t } from "@/text";
@@ -18,6 +17,8 @@ import type { GitHost, GitHostTab, Provider } from "@/components/settings/git-ho
 import { GitHostBasicForm } from "@/components/settings/git-hosts/GitHostBasicForm";
 import { GitHostAutoIssueForm } from "@/components/settings/git-hosts/GitHostAutoIssueForm";
 import { GitHostWebhookForm } from "@/components/settings/git-hosts/GitHostWebhookForm";
+import { getSupervisorAvailableProfiles } from "@/components/project/supervisorProfileSelection";
+import { DEFAULT_PROFILES } from "@/sync/profileUtils";
 
 // ── Segment Control ────────────────────────────────
 
@@ -77,6 +78,16 @@ export default React.memo(function GitHostsScreen() {
   const { theme } = useUnistyles();
   const [gitHosts, setGitHosts] = useSettingMutable("gitHosts");
   const machines = useAllMachines();
+  const settings = useSettings();
+  const allProfiles = React.useMemo(() => {
+    const builtInProfiles = DEFAULT_PROFILES.map((profile) => ({
+      id: profile.id,
+      name: profile.name,
+      isBuiltIn: true as const,
+    }));
+    const userDefinedProfiles = (settings.profiles ?? []).map((p) => ({ id: p.id, name: p.name }));
+    return getSupervisorAvailableProfiles(builtInProfiles, userDefinedProfiles);
+  }, [settings.profiles]);
   const [showAddForm, setShowAddForm] = React.useState(false);
   const [editIndex, setEditIndex] = React.useState<number | null>(null);
   const [activeTab, setActiveTab] = React.useState<GitHostTab>("basic");
@@ -437,6 +448,7 @@ export default React.memo(function GitHostsScreen() {
                     theme={theme}
                     provider={formProvider}
                     machines={machines}
+                    profiles={allProfiles}
                     formWebhookRepos={formWebhookRepos}
                     onAddRepo={handleAddWebhookRepo}
                     onUpdateRepo={handleUpdateWebhookRepo}

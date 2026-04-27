@@ -47,6 +47,7 @@ export async function upsertWebhookRoute(
       repoPath: repo.repoPath,
       enabled: repo.enabled,
       callbackUrl: getWebhookUrl(provider),
+      profileId: repo.profileId || undefined,
     }),
   });
 

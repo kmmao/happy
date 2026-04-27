@@ -3171,6 +3171,8 @@ export const ru: TranslationStructure = {
     webhookDeleteConfirm: "Удалить этот Webhook и маршрут на сервере?",
     tokenSuffix: "Token",
     webhookCount: (params: { count: number }) => `${params.count} Webhook`,
+    webhookProfileLabel: "Профиль AI-бэкенда",
+    webhookProfileDefault: "По умолчанию (настройки проекта)",
   },
 
   quickCommands: {

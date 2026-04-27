@@ -3149,6 +3149,8 @@ export const pt: TranslationStructure = {
     webhookDeleteConfirm: "Eliminar este Webhook e a rota do servidor?",
     tokenSuffix: "Token",
     webhookCount: (params: { count: number }) => `${params.count} Webhook`,
+    webhookProfileLabel: "Perfil de backend de IA",
+    webhookProfileDefault: "Padrão (configurações do projeto)",
   },
 
   quickCommands: {

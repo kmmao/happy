@@ -8,11 +8,13 @@ import type { WebhookRepoConfig } from "@/sync/issueTypes";
 import type { Theme } from "@/theme";
 import type { Provider } from "./types";
 import { WebhookRepoItem } from "./WebhookRepoItem";
+import type { SupervisorProfileOption } from "@/components/project/supervisorProfileSelection";
 
 interface Props {
     readonly theme: Theme;
     readonly provider: Provider;
     readonly machines: readonly { id: string; metadata?: any }[];
+    readonly profiles: ReadonlyArray<SupervisorProfileOption>;
     readonly formWebhookRepos: WebhookRepoConfig[];
     readonly onAddRepo: () => void;
     readonly onUpdateRepo: (
@@ -33,6 +35,7 @@ export const GitHostWebhookForm = React.memo(function GitHostWebhookForm({
     theme,
     provider,
     machines,
+    profiles,
     formWebhookRepos,
     onAddRepo,
     onUpdateRepo,
@@ -78,6 +81,7 @@ export const GitHostWebhookForm = React.memo(function GitHostWebhookForm({
                     index={idx}
                     provider={provider}
                     machines={machines}
+                    profiles={profiles}
                     theme={theme}
                     onUpdate={onUpdateRepo}
                     onRemove={onRemoveRepo}

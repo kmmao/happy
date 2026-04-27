@@ -29,12 +29,15 @@ import type { Theme } from "@/theme";
 import type { Provider } from "./types";
 import { FieldLabel } from "./FieldLabel";
 import { RepoScanner } from "./RepoScanner";
+import { ProfilePicker } from "@/components/ProfilePicker";
+import type { SupervisorProfileOption } from "@/components/project/supervisorProfileSelection";
 
 interface Props {
     readonly repo: WebhookRepoConfig;
     readonly index: number;
     readonly provider: Provider;
     readonly machines: readonly { id: string; metadata?: any }[];
+    readonly profiles: ReadonlyArray<SupervisorProfileOption>;
     readonly theme: Theme;
     readonly onUpdate: (
         index: number,
@@ -55,6 +58,7 @@ export const WebhookRepoItem = React.memo(function WebhookRepoItem({
     index,
     provider,
     machines,
+    profiles,
     theme,
     onUpdate,
     onRemove,
@@ -457,6 +461,15 @@ export const WebhookRepoItem = React.memo(function WebhookRepoItem({
                 placeholderTextColor={theme.colors.textSecondary}
                 autoCapitalize="none"
                 autoCorrect={false}
+            />
+
+            {/* AI Backend Profile */}
+            <FieldLabel theme={theme}>{t("gitHosts.webhookProfileLabel")}</FieldLabel>
+            <ProfilePicker
+                value={repo.profileId ?? null}
+                onChange={(profileId) => onUpdate(index, { profileId: profileId ?? undefined })}
+                profiles={profiles}
+                defaultOptionLabel={t("gitHosts.webhookProfileDefault")}
             />
 
             {/* Secret */}

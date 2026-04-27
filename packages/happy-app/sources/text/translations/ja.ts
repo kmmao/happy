@@ -3126,6 +3126,8 @@ export const ja: TranslationStructure = {
     webhookDeleteConfirm: "この Webhook リポジトリを削除しサーバールートもクリアしますか？",
     tokenSuffix: "Token",
     webhookCount: (params: { count: number }) => `${params.count} Webhook`,
+    webhookProfileLabel: "AIバックエンドプロファイル",
+    webhookProfileDefault: "デフォルト（プロジェクト設定）",
   },
 
   quickCommands: {
