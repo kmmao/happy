@@ -1,3 +1,4 @@
+import { readFile, unlink } from "node:fs/promises";
 import { render } from "ink";
 import React from "react";
 import { Client as McpClient } from "@modelcontextprotocol/sdk/client/index.js";
@@ -471,6 +472,31 @@ export async function runCodex(opts: {
   const messageQueue = new MessageQueue2<CodexMessageMode>((mode) =>
     hashCodexMode(mode),
   );
+
+  // Inject initial prompt from file (supervisor/webhook-triggered sessions)
+  const supervisorPromptPath = process.env.HAPPY_INITIAL_PROMPT_FILE;
+  if (supervisorPromptPath) {
+    try {
+      const promptContent = await readFile(supervisorPromptPath, "utf-8");
+      if (promptContent.trim()) {
+        messageQueue.push(
+          promptContent,
+          { permissionMode: "bypassPermissions" } as CodexMessageMode,
+          undefined,
+          { priority: "background", kind: "automation", source: "initial-prompt-file" },
+        );
+        logger.debug(
+          `[codex] Injected initial prompt from ${supervisorPromptPath} (${promptContent.length} chars)`,
+        );
+      }
+      await unlink(supervisorPromptPath).catch(() => {});
+      delete process.env.HAPPY_INITIAL_PROMPT_FILE;
+    } catch (error) {
+      logger.debug(
+        `[codex] Failed to read initial prompt file ${supervisorPromptPath}: ${error}`,
+      );
+    }
+  }
 
   // Track current overrides to apply per message
   // Use shared PermissionMode type from api/types for cross-agent compatibility
