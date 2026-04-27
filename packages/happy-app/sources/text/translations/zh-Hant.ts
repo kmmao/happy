@@ -3183,6 +3183,7 @@ export const zhHant: TranslationStructure = {
     tabGit: "Git",
     tabSupervisor: "監控",
     tabHealth: "健康",
+    tabEvents: "事件",
     tabResearch: "調研",
     tabRoles: "角色",
     tabMembers: "成員",

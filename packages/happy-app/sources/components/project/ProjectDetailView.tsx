@@ -9,6 +9,7 @@ import { ProjectSupervisorTab } from "./ProjectSupervisorTab";
 import { ProjectHealthTab } from "./ProjectHealthTab";
 import { ProjectResearchTab, type ResearchSyncStatus } from "./ProjectResearchTab";
 import { ProjectKnowledgeTab } from "./ProjectKnowledgeTab";
+import { ProjectActionsTab } from "./ProjectActionsTab";
 import { ProjectConfigTab } from "./ProjectConfigTab";
 import { layout } from "@/components/layout";
 import { t } from "@/text";
@@ -18,6 +19,9 @@ import { Ionicons } from "@expo/vector-icons";
 import { useIsTablet } from "@/utils/responsive";
 import { resolveUiTabToneColors } from "@/components/tabTone";
 import { resolveActiveTint } from "@/constants/activeTint";
+import { fetchSupervisorActions } from "@/sync/apiSupervisor";
+import { TokenStorage } from "@/auth/tokenStorage";
+import { onProjectEvent } from "@/utils/projectEvents";
 
 import { resolveProjectDetailInitialTab, resolveProjectDetailTabs, type ProjectDetailTabKey } from "./projectDetailTabs";
 import { resolveProjectDetailTabPresentation } from "./projectDetailTabPresentation";
@@ -29,6 +33,7 @@ const TAB_LABELS: Record<TabKey, () => string> = {
     git: () => t("projects.tabGit"),
     supervisor: () => t("projects.tabSupervisor"),
     health: () => t("projects.tabHealth"),
+    events: () => t("projects.tabEvents"),
     research: () => t("projects.tabResearch"),
     knowledge: () => t("projects.tabKnowledge"),
     config: () => t("projects.tabConfig"),
@@ -47,7 +52,26 @@ export const ProjectDetailView = React.memo(
         const [activeTab, setActiveTab] = React.useState<TabKey>("sessions");
         const [researchSyncStatus, setResearchSyncStatus] =
             React.useState<ResearchSyncStatus>("idle");
+        const [pendingEventsCount, setPendingEventsCount] = React.useState(0);
         const knowledgeBaseEnabled = useSetting("knowledgeBase");
+
+        React.useEffect(() => {
+            if (!project.serverId) return;
+            const serverId = project.serverId;
+            async function loadPendingCount() {
+                const credentials = await TokenStorage.getCredentials();
+                if (!credentials) return;
+                try {
+                    const data = await fetchSupervisorActions(credentials, serverId, {
+                        approval: "pending",
+                        limit: 1,
+                    });
+                    setPendingEventsCount(data.total);
+                } catch {}
+            }
+            loadPendingCount();
+            return onProjectEvent("actions-changed", loadPendingCount);
+        }, [project.serverId]);
 
         React.useEffect(() => {
             const sessions = storage.getState().sessions;
@@ -101,6 +125,8 @@ export const ProjectDetailView = React.memo(
                                 presentation.tone,
                                 theme,
                             );
+                            const showEventsBadge =
+                                tab.key === "events" && pendingEventsCount > 0;
                             return (
                                 <Pressable
                                     key={tab.key}
@@ -162,6 +188,21 @@ export const ProjectDetailView = React.memo(
                                         >
                                             {tab.label}
                                         </Text>
+                                        {showEventsBadge && (
+                                            <View
+                                                style={[
+                                                    styles.eventsBadge,
+                                                    isActive && styles.eventsBadgeActive,
+                                                ]}
+                                            >
+                                                <Text style={[
+                                                    styles.eventsBadgeText,
+                                                    isActive && styles.eventsBadgeTextActive,
+                                                ]}>
+                                                    {pendingEventsCount > 99 ? "99+" : pendingEventsCount}
+                                                </Text>
+                                            </View>
+                                        )}
                                     </View>
                                 </Pressable>
                             );
@@ -204,6 +245,15 @@ export const ProjectDetailView = React.memo(
                         }
                     >
                         <ProjectHealthTab project={project} />
+                    </View>
+                    <View
+                        style={
+                            activeTab === "events"
+                                ? styles.tabVisible
+                                : styles.tabHidden
+                        }
+                    >
+                        <ProjectActionsTab project={project} />
                     </View>
                     <View
                         style={
@@ -334,6 +384,26 @@ const styles = StyleSheet.create((theme) => ({
         position: "absolute",
         right: -1,
         top: -1,
+    },
+    eventsBadge: {
+        backgroundColor: "#FF3B30",
+        borderRadius: 8,
+        minWidth: 16,
+        height: 16,
+        alignItems: "center",
+        justifyContent: "center",
+        paddingHorizontal: 4,
+    },
+    eventsBadgeActive: {
+        backgroundColor: "rgba(255,255,255,0.3)",
+    },
+    eventsBadgeText: {
+        ...Typography.default("semiBold"),
+        fontSize: 10,
+        color: "#FFFFFF",
+    },
+    eventsBadgeTextActive: {
+        color: "#FFFFFF",
     },
     content: {
         flex: 1,

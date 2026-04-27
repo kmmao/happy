@@ -3273,6 +3273,7 @@ export const ca: TranslationStructure = {
     tabGit: "Git",
     tabSupervisor: "Supervisor",
     tabHealth: "Salut",
+    tabEvents: "Esdeveniments",
     tabResearch: "Recerca",
     tabRoles: "Roles",
     tabMembers: "Membres",

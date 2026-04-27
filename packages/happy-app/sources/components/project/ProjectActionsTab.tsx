@@ -17,9 +17,11 @@ import { emitProjectEvent, onProjectEvent } from "@/utils/projectEvents";
 import {
     fetchSupervisorActions,
     fetchActionStats,
+    clearAllActions,
     type SupervisorAction,
     type SupervisorActionStats,
 } from "@/sync/apiSupervisor";
+import { useHappyAction } from "@/hooks/useHappyAction";
 import { SupervisorActionCard } from "@/components/project/SupervisorActionCard";
 import { Modal } from "@/modal";
 import { sync } from "@/sync/sync";
@@ -259,6 +261,23 @@ function ProjectActionsTabInner({ project }: ProjectActionsTabProps) {
         }
     }, [projectId, activeTab, actions.length]);
 
+    const [clearAllLoading, doClearAll] = useHappyAction(
+        React.useCallback(async () => {
+            if (!projectId) return;
+            const confirmed = await Modal.confirm(
+                t("supervisor.clearAll"),
+                t("supervisor.clearAllConfirm"),
+                { confirmText: t("common.delete"), destructive: true },
+            );
+            if (!confirmed) return;
+            const credentials = await TokenStorage.getCredentials();
+            if (!credentials) return;
+            const result = await clearAllActions(credentials, projectId);
+            Modal.toast(t("supervisor.clearAllSuccess", { count: result.deletedCount }));
+            await handleUpdated();
+        }, [projectId, handleUpdated]),
+    );
+
     // Subscribe to real-time fix status updates
     React.useEffect(() => {
         const unsubscribe = sync.onSupervisorStatus((event) => {
@@ -343,12 +362,13 @@ function ProjectActionsTabInner({ project }: ProjectActionsTabProps) {
 
     return (
         <View style={styles.container}>
-            {/* Segmented Control */}
-            <View style={styles.tabBar}>
+            {/* Segmented Control + Clear All */}
+            <View style={styles.tabBarRow}>
                 <ScrollView
                     horizontal
                     showsHorizontalScrollIndicator={false}
                     contentContainerStyle={styles.tabBarContent}
+                    style={styles.tabBarScroll}
                 >
                     {TABS.map((tab) => {
                         const isActive = tab === activeTab;
@@ -393,6 +413,19 @@ function ProjectActionsTabInner({ project }: ProjectActionsTabProps) {
                         );
                     })}
                 </ScrollView>
+                {stats !== null && (
+                    <Pressable
+                        style={styles.clearAllInline}
+                        onPress={doClearAll}
+                        disabled={clearAllLoading}
+                    >
+                        {clearAllLoading ? (
+                            <ActivityIndicator size="small" color="#FF3B30" />
+                        ) : (
+                            <Ionicons name="trash-outline" size={16} color="#FF3B30" />
+                        )}
+                    </Pressable>
+                )}
             </View>
 
             {/* Sort & Filter Bar */}
@@ -626,8 +659,13 @@ const styles = StyleSheet.create((theme) => ({
         width: "100%",
         alignSelf: "center",
     },
-    tabBar: {
+    tabBarRow: {
+        flexDirection: "row",
+        alignItems: "center",
         paddingTop: 8,
+    },
+    tabBarScroll: {
+        flex: 1,
     },
     tabBarContent: {
         flexDirection: "row",
@@ -759,5 +797,11 @@ const styles = StyleSheet.create((theme) => ({
         ...Typography.default("semiBold"),
         fontSize: 15,
         color: theme.colors.header.tint,
+    },
+    clearAllInline: {
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        alignItems: "center",
+        justifyContent: "center",
     },
 }));

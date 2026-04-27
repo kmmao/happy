@@ -24,6 +24,10 @@ const PRESENTATIONS: Record<ProjectDetailTabKey, ProjectDetailTabPresentation> =
         icon: "pulse-outline",
         tone: "green",
     },
+    events: {
+        icon: "flash-outline",
+        tone: "orange",
+    },
     research: {
         icon: "search-outline",
         tone: "blue",

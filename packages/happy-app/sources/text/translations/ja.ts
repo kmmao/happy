@@ -3247,6 +3247,7 @@ export const ja: TranslationStructure = {
     tabGit: "Git",
     tabSupervisor: "スーパーバイザー",
     tabHealth: "ヘルス",
+    tabEvents: "イベント",
     tabResearch: "調査",
     tabRoles: "ロール",
     tabMembers: "メンバー",

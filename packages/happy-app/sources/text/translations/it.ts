@@ -3269,6 +3269,7 @@ export const it: TranslationStructure = {
     tabGit: "Git",
     tabSupervisor: "Supervisore",
     tabHealth: "Salute",
+    tabEvents: "Eventi",
     tabResearch: "Ricerca",
     tabRoles: "Roles",
     tabMembers: "Membri",

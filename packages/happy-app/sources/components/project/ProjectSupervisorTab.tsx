@@ -23,8 +23,6 @@ import {
     fetchSupervisorRuns,
     cancelSupervisorRun,
     SupervisorAlreadyRunningError,
-    fetchSupervisorActions,
-    clearAllActions,
     type SupervisorLoop,
     fetchActiveLoop,
     fetchSupervisorSummary,
@@ -34,7 +32,6 @@ import { ItemGroup } from "@/components/ItemGroup";
 import { useRouter } from "expo-router";
 import { sync } from "@/sync/sync";
 import { useSession, useSettings } from "@/sync/storage";
-import { Modal } from "@/modal";
 import { useElapsedSeconds, type DimensionProgress } from "./supervisorUtils";
 import { SupervisorSummaryCard } from "./SupervisorSummaryCard";
 import { SupervisorProgressView } from "./SupervisorProgressView";
@@ -66,7 +63,6 @@ export const ProjectSupervisorTab = React.memo(
         const { theme } = useUnistyles();
         const router = useRouter();
         const [runs, setRuns] = React.useState<SupervisorRun[]>([]);
-        const [pendingActionsTotal, setPendingActionsTotal] = React.useState(0);
         const [summary, setSummary] = React.useState<SupervisorSummary | null>(null);
         const [loaded, setLoaded] = React.useState(false);
         const [refreshing, setRefreshing] = React.useState(false);
@@ -117,18 +113,13 @@ export const ProjectSupervisorTab = React.memo(
             try {
                 const credentials = await TokenStorage.getCredentials();
                 if (!credentials) return;
-                const [runsResult, actionsResult, loopResult, summaryResult] =
+                const [runsResult, loopResult, summaryResult] =
                     await Promise.all([
                         fetchSupervisorRuns(credentials, serverId, { limit: 20 }),
-                        fetchSupervisorActions(credentials, serverId, {
-                            approval: "pending",
-                            limit: 20,
-                        }),
                         fetchActiveLoop(credentials, serverId).catch(() => null),
                         fetchSupervisorSummary(credentials, serverId).catch(() => null),
                     ]);
                 setRuns(runsResult.runs);
-                setPendingActionsTotal(actionsResult.total);
                 setActiveLoop(loopResult);
                 setSummary(summaryResult);
             } catch {
@@ -362,23 +353,6 @@ export const ProjectSupervisorTab = React.memo(
             }, [serverId, activeRun, loadData]),
         );
 
-        const [clearAllLoading, doClearAll] = useHappyAction(
-            React.useCallback(async () => {
-                if (!serverId) return;
-                const confirmed = await Modal.confirm(
-                    t("supervisor.clearAll"),
-                    t("supervisor.clearAllConfirm"),
-                    { confirmText: t("common.delete"), destructive: true },
-                );
-                if (!confirmed) return;
-                const credentials = await TokenStorage.getCredentials();
-                if (!credentials) return;
-                const result = await clearAllActions(credentials, serverId);
-                Modal.toast(t("supervisor.clearAllSuccess", { count: result.deletedCount }));
-                await loadData();
-            }, [serverId, loadData]),
-        );
-
         if (!serverId) {
             return (
                 <SharedStateView
@@ -571,79 +545,6 @@ export const ProjectSupervisorTab = React.memo(
                     </View>
                 </ItemGroup>
 
-                {/* Quick access: pending actions + clear all */}
-                {loaded && (
-                    <ItemGroup>
-                        <Pressable
-                            style={styles.quickActionCard}
-                            onPress={() =>
-                                router.push(`/project/${project.id}/supervisor-actions` as any)
-                            }
-                        >
-                            <View style={styles.quickActionLeft}>
-                                <View
-                                    style={[
-                                        styles.quickActionIconWrap,
-                                        pendingActionsTotal > 0
-                                            ? styles.quickActionIconActive
-                                            : styles.quickActionIconInactive,
-                                    ]}
-                                >
-                                    <Ionicons
-                                        name="clipboard-outline"
-                                        size={20}
-                                        color={
-                                            pendingActionsTotal > 0
-                                                ? "#FFFFFF"
-                                                : theme.colors.textSecondary
-                                        }
-                                    />
-                                </View>
-                                <View>
-                                    <Text style={styles.quickActionTitle}>
-                                        {t("supervisor.viewAllActions")}
-                                    </Text>
-                                    {pendingActionsTotal > 0 && (
-                                        <Text style={styles.quickActionSubtitle}>
-                                            {t("supervisor.pendingActions", { count: pendingActionsTotal })}
-                                        </Text>
-                                    )}
-                                </View>
-                            </View>
-                            <View style={styles.quickActionRight}>
-                                {pendingActionsTotal > 0 && (
-                                    <View style={styles.quickActionBadge}>
-                                        <Text style={styles.quickActionBadgeText}>
-                                            {pendingActionsTotal}
-                                        </Text>
-                                    </View>
-                                )}
-                                <Ionicons
-                                    name="chevron-forward"
-                                    size={18}
-                                    color={theme.colors.textSecondary}
-                                />
-                            </View>
-                        </Pressable>
-                        <Pressable
-                            style={styles.quickActionClearAll}
-                            onPress={doClearAll}
-                            disabled={clearAllLoading}
-                        >
-                            {clearAllLoading ? (
-                                <ActivityIndicator size="small" color="#FF3B30" />
-                            ) : (
-                                <>
-                                    <Ionicons name="trash-outline" size={16} color="#FF3B30" />
-                                    <Text style={styles.clearAllLinkText}>
-                                        {t("supervisor.clearAll")}
-                                    </Text>
-                                </>
-                            )}
-                        </Pressable>
-                    </ItemGroup>
-                )}
-
                 {/* Settings link */}
                 <ItemGroup>
                     <Pressable
@@ -822,77 +723,6 @@ const styles = StyleSheet.create((theme) => ({
         ...Typography.default(),
         fontSize: 13,
         color: theme.colors.textSecondary,
-    },
-    quickActionCard: {
-        flexDirection: "row",
-        alignItems: "center",
-        justifyContent: "space-between",
-        paddingHorizontal: 16,
-        paddingVertical: 14,
-    },
-    quickActionLeft: {
-        flexDirection: "row",
-        alignItems: "center",
-        gap: 12,
-        flex: 1,
-    },
-    quickActionIconWrap: {
-        width: 36,
-        height: 36,
-        borderRadius: 8,
-        alignItems: "center",
-        justifyContent: "center",
-    },
-    quickActionIconActive: {
-        backgroundColor: resolveActiveTint(theme),
-    },
-    quickActionIconInactive: {
-        backgroundColor: theme.colors.surface,
-    },
-    quickActionTitle: {
-        ...Typography.default("semiBold"),
-        fontSize: 15,
-        color: theme.colors.text,
-    },
-    quickActionSubtitle: {
-        ...Typography.default(),
-        fontSize: 12,
-        color: theme.colors.textSecondary,
-        marginTop: 2,
-    },
-    quickActionRight: {
-        flexDirection: "row",
-        alignItems: "center",
-        gap: 8,
-    },
-    quickActionBadge: {
-        backgroundColor: "#FF3B30",
-        borderRadius: 10,
-        minWidth: 20,
-        height: 20,
-        alignItems: "center",
-        justifyContent: "center",
-        paddingHorizontal: 6,
-    },
-    quickActionBadgeText: {
-        ...Typography.default("semiBold"),
-        fontSize: 12,
-        color: "#FFFFFF",
-    },
-    quickActionClearAll: {
-        flexDirection: "row",
-        alignItems: "center",
-        justifyContent: "center",
-        gap: 4,
-        paddingHorizontal: 16,
-        paddingVertical: 14,
-        borderTopWidth: 0.5,
-        borderTopColor: theme.colors.divider,
-    },
-    clearAllLinkText: {
-        ...Typography.default("semiBold"),
-        fontSize: 14,
-        color: "#FF3B30",
     },
     settingsLink: {
         flexDirection: "row",
