@@ -149,20 +149,20 @@ export const ContextUsagePanel = React.memo(function ContextUsagePanel({
                 )}
             </View>
 
-            {/* ── Ring Donut ── */}
-            <View style={styles.donutWrap}>
-                <RingDonut
-                    categories={data.categories}
-                    totalTokens={data.totalTokens}
-                    maxTokens={data.maxTokens}
-                    percentage={data.percentage}
-                    trackColor={theme.colors.divider}
-                />
-            </View>
+            {/* ── Ring Donut + Legend side by side ── */}
+            <View style={styles.contentRow}>
+                <View style={styles.donutWrap}>
+                    <RingDonut
+                        categories={data.categories}
+                        totalTokens={data.totalTokens}
+                        maxTokens={data.maxTokens}
+                        percentage={data.percentage}
+                        trackColor={theme.colors.divider}
+                    />
+                </View>
 
-            {/* ── Category legend ── */}
             {data.categories.length > 0 && (
-                <View style={[styles.card, { backgroundColor: theme.colors.surfaceHighest ?? theme.colors.surface }]}>
+                <View style={[styles.card, styles.legendCard, { backgroundColor: theme.colors.surfaceHighest ?? theme.colors.surface }]}>
                     {data.categories.map((cat, i) => {
                         const color = resolveColor(cat.color, i);
                         const pct = data.maxTokens > 0
@@ -212,6 +212,7 @@ export const ContextUsagePanel = React.memo(function ContextUsagePanel({
                     })}
                 </View>
             )}
+            </View>{/* contentRow */}
 
         </View>
     );
@@ -458,14 +459,25 @@ const styles = StyleSheet.create((theme) => ({
         overflow: "hidden",
         maxWidth: 160,
     },
+    // Row that puts the donut chart and legend side by side
+    contentRow: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 12,
+    },
     donutWrap: {
         alignItems: "center",
-        paddingVertical: 4,
+        justifyContent: "center",
     },
     // Shared card container for legend and file sections
     card: {
         borderRadius: 10,
         overflow: "hidden",
+    },
+    // Legend card in the side-by-side layout takes remaining width
+    legendCard: {
+        flex: 1,
+        alignSelf: "stretch",
     },
     // Legend items inside the card
     legendItem: {
