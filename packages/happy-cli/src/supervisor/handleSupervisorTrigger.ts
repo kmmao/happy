@@ -502,10 +502,13 @@ async function handleAnalysisTrigger(
   deps: SupervisorHandlerDeps,
 ): Promise<string | undefined> {
   const { runId, projectId, repoPath, trigger } = data;
-  const guardianSessionId = deps.resolveGuardianSessionId?.(data);
+
+  // Resolve agent BEFORE guardian lookup so the key includes agent type
+  const agent = await resolveAgentForSupervisor(data, runtimeProfile);
+  const guardianSessionId = deps.resolveGuardianSessionId?.({ ...data, agent });
 
   logger.debug(
-    `[SUPERVISOR] Processing analysis ${runId} for project ${projectId} at ${repoPath} (mode: ${mode ?? "suggest"})${guardianSessionId ? ` reusing=${guardianSessionId}` : ""}`,
+    `[SUPERVISOR] Processing analysis ${runId} for project ${projectId} at ${repoPath} (mode: ${mode ?? "suggest"}) agent=${agent}${guardianSessionId ? ` reusing=${guardianSessionId}` : ""}`,
   );
 
   // 1. Report running status
@@ -533,8 +536,6 @@ async function handleAnalysisTrigger(
 
   // 3. Write prompt to temp file in the project
   const promptFilePath = await writePromptFile(repoPath, runId, prompt);
-
-  const agent = await resolveAgentForSupervisor(data, runtimeProfile);
 
   // 4. Spawn session in the project directory (read-only analysis)
   const spawnResult = await spawnSessionWithRetry(deps.spawnSession, {
@@ -601,10 +602,12 @@ async function handleResearchTrigger(
   deps: SupervisorHandlerDeps,
 ): Promise<string | undefined> {
   const { runId, projectId, repoPath, trigger } = data;
-  const guardianSessionId = deps.resolveGuardianSessionId?.(data);
+
+  const agent = await resolveAgentForSupervisor(data, runtimeProfile);
+  const guardianSessionId = deps.resolveGuardianSessionId?.({ ...data, agent });
 
   logger.debug(
-    `[SUPERVISOR] Processing research ${runId} for project ${projectId} at ${repoPath}${guardianSessionId ? ` reusing=${guardianSessionId}` : ""}`,
+    `[SUPERVISOR] Processing research ${runId} for project ${projectId} at ${repoPath} agent=${agent}${guardianSessionId ? ` reusing=${guardianSessionId}` : ""}`,
   );
 
   // 1. Report running status
@@ -625,8 +628,6 @@ async function handleResearchTrigger(
 
   // 3. Write prompt to temp file in the project
   const promptFilePath = await writePromptFile(repoPath, `research-${runId}`, prompt);
-
-  const agent = await resolveAgentForSupervisor(data, runtimeProfile);
 
   // 4. Spawn session in the project directory (read-only research)
   const spawnResult = await spawnSessionWithRetry(deps.spawnSession, {
