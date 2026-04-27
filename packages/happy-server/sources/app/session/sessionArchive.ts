@@ -34,19 +34,20 @@ export async function sessionArchive(ctx: Context, sessionId: string): Promise<b
             return false;
         }
 
-        if (!session.active) {
-            // Already archived — idempotent, treat as success
-            return true;
+        const now = Date.now();
+        const wasActive = session.active;
+
+        // Only write to DB when there is an actual state change
+        if (wasActive) {
+            await tx.session.update({
+                where: { id: sessionId },
+                data: { active: false, lastActiveAt: new Date(now) },
+            });
         }
 
-        const now = Date.now();
-
-        await tx.session.update({
-            where: { id: sessionId },
-            data: { active: false, lastActiveAt: new Date(now) },
-        });
-
-        // Query machine IDs before the transaction commits so we can notify daemons
+        // Query machine IDs regardless of active state — the process may still be
+        // running even if the session was already marked inactive (e.g. Supervisor
+        // auto-archived the session but the daemon process never received a kill signal)
         const accessKeys = await tx.accessKey.findMany({
             where: { sessionId },
             select: { machineId: true },
@@ -54,17 +55,20 @@ export async function sessionArchive(ctx: Context, sessionId: string): Promise<b
         const machineIds = [...new Set(accessKeys.map((ak) => ak.machineId))];
 
         afterTx(tx, async () => {
-            // Evict heartbeat cache so the session is immediately seen as inactive
-            activityCache.invalidateSession(sessionId);
+            if (wasActive) {
+                // Evict heartbeat cache so the session is immediately seen as inactive
+                activityCache.invalidateSession(sessionId);
 
-            // Notify App clients: session is now inactive
-            eventRouter.emitEphemeral({
-                userId: ctx.uid,
-                payload: buildSessionActivityEphemeral(sessionId, false, now, false),
-                recipientFilter: { type: "user-scoped-only" },
-            });
+                // Notify App clients: session is now inactive
+                eventRouter.emitEphemeral({
+                    userId: ctx.uid,
+                    payload: buildSessionActivityEphemeral(sessionId, false, now, false),
+                    recipientFilter: { type: "user-scoped-only" },
+                });
+            }
 
-            // Signal each daemon that may be running this session to terminate it
+            // Always send session-terminate — the daemon will kill the process if it is
+            // still running, and will silently ignore the event if it is already gone.
             for (const machineId of machineIds) {
                 eventRouter.emitEphemeral({
                     userId: ctx.uid,
@@ -75,7 +79,7 @@ export async function sessionArchive(ctx: Context, sessionId: string): Promise<b
 
             log(
                 { module: "session-archive", userId: ctx.uid, sessionId },
-                `Session archived; terminate signal sent to ${machineIds.length} machine(s)`,
+                `Session archive: wasActive=${wasActive}; terminate signal sent to ${machineIds.length} machine(s)`,
             );
         });
 
