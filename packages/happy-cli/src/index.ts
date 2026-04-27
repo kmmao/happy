@@ -340,6 +340,16 @@ function filterAutomationAudit<T extends { kind: string; status?: string; projec
         }
       }
 
+      for (let ci = 0; ci < codexArgs.args.length; ci++) {
+        if (codexArgs.args[ci] === "--claude-env") {
+          const envArg = codexArgs.args[++ci];
+          if (envArg?.includes("=")) {
+            const eqIdx = envArg.indexOf("=");
+            process.env[envArg.substring(0, eqIdx)] = envArg.substring(eqIdx + 1);
+          }
+        }
+      }
+
       const { credentials } = await authAndSetupMachineIfNeeded();
       await runCodex({
         credentials,

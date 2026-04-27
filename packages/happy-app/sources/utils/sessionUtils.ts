@@ -426,9 +426,14 @@ export function getSessionProviderKey(session: Session): string {
     case "acp":
       return flavor;
     case "claude":
-    case undefined:
-    case null:
       return "claude";
+    case undefined:
+    case null: {
+      const model = session.resolvedModelId?.toLowerCase() ?? "";
+      if (model.includes("gpt") || model.includes("o3-") || model.includes("o4-")) return "codex";
+      if (model.includes("gemini")) return "gemini";
+      return "claude";
+    }
     default:
       return (flavor || "claude").trim() || "claude";
   }
