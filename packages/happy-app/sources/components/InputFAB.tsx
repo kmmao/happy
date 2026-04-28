@@ -573,7 +573,6 @@ const CompactStatus = React.memo(function CompactStatus({
                   ) : null}
                   {modelSummaryText ? (
                     <Text
-                      numberOfLines={1}
                       style={[
                         styles.statusLineText,
                         { color: rpcVisualState.summaryTextColor },
@@ -587,7 +586,7 @@ const CompactStatus = React.memo(function CompactStatus({
 
               {!showSummaryCapsule && detailSegments.length > 0 ? (
                 <View style={styles.statusLine}>
-                  <Text numberOfLines={1} style={styles.statusLineText}>
+                  <Text style={styles.statusLineText}>
                     {detailSegments.map((seg, i) => (
                       <Text key={`${seg.text}-${i}`} style={{ color: seg.color }}>
                         {i > 0 ? <Text style={separatorStyle}> · </Text> : null}
