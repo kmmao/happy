@@ -31,7 +31,8 @@ import { isIssueSessionKey } from "./issueSessionTypes";
 import {
     handleIssueSessionCompletion as issueHandleCompletion,
 } from "./syncIssueHandlers";
-import { deleteMessageCache } from "./messageCache";
+import { deleteMessageCache, deleteHistoryComplete } from "./messageCache";
+import { deleteBackfillBoundary } from "./persistence";
 import { detectNeedsAttention } from "./syncHelpers";
 import { mergeUpdatedSession } from "./updateSessionMerge";
 import { voiceHooks } from "@/realtime/hooks/voiceHooks";
@@ -363,7 +364,9 @@ export function handleDeleteSessionUpdate(
     ctx.pendingOutbox.delete(sessionId);
     ctx.sessionLastSeq.delete(sessionId);
     ctx.deleteLastSeq(sessionId);
+    deleteBackfillBoundary(sessionId);
     deleteMessageCache(sessionId);
+    deleteHistoryComplete(sessionId);
     ctx.sessionMessageLocks.delete(sessionId);
     ctx.sessionMessageQueue.delete(sessionId);
     ctx.sessionQueueProcessing.delete(sessionId);

@@ -128,6 +128,7 @@ import {
   deleteMessageCache,
   loadHistoryComplete,
   saveHistoryComplete,
+  deleteHistoryComplete,
 } from "./messageCache";
 import { fetchAccountProfiles } from "./apiAccountProfiles";
 import { mergeAccountProfiles } from "@/utils/mergeAccountProfiles";
@@ -578,6 +579,7 @@ class Sync {
     this.backfillBoundaries.delete(sessionId);
     deleteBackfillBoundary(sessionId);
     deleteMessageCache(sessionId);
+    deleteHistoryComplete(sessionId);
     // Do NOT delete sessionMessageLocks — we are still inside lock.inLock().
     this.sessionMessageQueue.delete(sessionId);
     this.sessionQueueProcessing.delete(sessionId);
