@@ -83,7 +83,6 @@ import {
   useIsTablet,
 } from "@/utils/responsive";
 import {
-  formatPathRelativeToHome,
   getSessionAvatarId,
   getSessionName,
   getSessionProviderKey,
@@ -346,13 +345,9 @@ export const SessionView = React.memo((props: { id: string }) => {
     // Normal state - show session info
     const isConnected = session.presence === "online";
 
-    const pathSubtitle = session.metadata?.path
-      ? formatPathRelativeToHome(
-          session.metadata.path,
-          session.metadata?.homeDir,
-        )
+    const subtitle = session.metadata?.hostPid != null
+      ? `${t("sessionInfo.processId")} ${session.metadata.hostPid}`
       : undefined;
-    const subtitle = pathSubtitle;
 
     return {
       title: getSessionName(session),
