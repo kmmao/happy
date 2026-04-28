@@ -2123,18 +2123,25 @@ export function useSessionMessages(
   isLoaded: boolean;
   hasOlderMessages: boolean;
 } {
-  return storage(
+  // slice() inside a zustand selector creates a new array reference on every getSnapshot
+  // call, breaking useShallow's equality check and causing React 18's useSyncExternalStore
+  // to detect an inconsistent snapshot → infinite update loop. Keep the selector
+  // returning only stable store references; derive the capped slice via useMemo.
+  const { all, isLoaded } = storage(
     useShallow((state) => {
       const session = state.sessionMessages[sessionId];
-      const all = session?.messages ?? emptyArray;
-      const capped = all.length > limit;
       return {
-        messages: capped ? all.slice(0, limit) : all,
+        all: session?.messages ?? emptyArray,
         isLoaded: session?.isLoaded ?? false,
-        hasOlderMessages: capped,
       };
     }),
   );
+  const capped = all.length > limit;
+  const messages = React.useMemo(
+    () => (capped ? all.slice(0, limit) : all),
+    [all, limit, capped],
+  );
+  return { messages, isLoaded, hasOlderMessages: capped };
 }
 
 const emptyBackgroundTasks: ReadonlyMap<string, BackgroundTaskEntry> = new Map();
