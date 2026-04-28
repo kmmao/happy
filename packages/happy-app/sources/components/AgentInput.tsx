@@ -912,7 +912,8 @@ export const AgentInput = React.memo(
                 style={{
                   flexDirection: "row",
                   alignItems: "center",
-                  flex: 1,
+                  flexShrink: 1,
+                  flexGrow: 0,
                   gap: 11,
                   minWidth: 0,
                 }}
@@ -1050,7 +1051,7 @@ export const AgentInput = React.memo(
                 style={{
                   alignSelf: "flex-end",
                   minWidth: 150,
-                  maxWidth: screenWidth > 700 ? 360 : screenWidth - 80,
+                  maxWidth: screenWidth > 700 ? 360 : screenWidth - 40,
                   marginLeft: 12,
                   borderRadius: 12,
                   borderWidth: props.modelSummaryRpcState && Platform.OS !== "android" ? 1 : 0,
