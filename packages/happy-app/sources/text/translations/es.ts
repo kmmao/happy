@@ -745,6 +745,7 @@ export const es: TranslationStructure = {
     autoOptionSendTitle: "Acciones recomendadas",
     autoOptionSendTitleCountdown: ({ seconds }: { seconds: number }) =>
       `Acciones recomendadas · envío automático de la primera opción en ${seconds}s`,
+    loadOlderMessages: "Cargar mensajes anteriores",
   },
 
   bookmark: {

@@ -711,6 +711,7 @@ export const zhHans: TranslationStructure = {
     autoOptionSendTitle: "推荐操作",
     autoOptionSendTitleCountdown: ({ seconds }: { seconds: number }) =>
       `推荐操作 · ${seconds} 秒后自动发送第一项`,
+    loadOlderMessages: "加载更早的消息",
   },
 
   bookmark: {

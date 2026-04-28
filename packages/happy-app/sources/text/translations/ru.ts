@@ -965,6 +965,7 @@ export const ru: TranslationStructure = {
     autoOptionSendTitle: "Рекомендуемые действия",
     autoOptionSendTitleCountdown: ({ seconds }: { seconds: number }) =>
       `Рекомендуемые действия · первая опция будет отправлена автоматически через ${seconds}с`,
+    loadOlderMessages: "Загрузить более ранние сообщения",
   },
 
   bookmark: {

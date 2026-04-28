@@ -937,10 +937,47 @@ export const storage = create<StorageState>()((set, get) => {
           mergedMessagesMap[message.id] = message;
         });
 
-        // Convert to array and sort by createdAt
-        const messagesArray = Object.values(mergedMessagesMap).sort(
-          (a, b) => b.createdAt - a.createdAt,
+        // Optimized sort: avoid O(n log n) full re-sort on every streaming update.
+        // existingSession.messages is already sorted newest-first (descending createdAt).
+        const newMessages = processedMessages.filter(
+          (m) => !existingSession.messagesMap[m.id],
         );
+        const hasOnlyUpdates =
+          newMessages.length === 0 && processedMessages.length > 0;
+
+        let messagesArray: Message[];
+        if (processedMessages.length === 0) {
+          // Nothing changed
+          messagesArray = existingSession.messages;
+        } else if (hasOnlyUpdates) {
+          // Fast path: only in-place updates — replace references, no sort needed
+          // (createdAt is immutable, so sort order cannot change)
+          messagesArray = existingSession.messages.map(
+            (m) => mergedMessagesMap[m.id] ?? m,
+          );
+        } else if (
+          newMessages.length > 0 &&
+          existingSession.messages.length > 0 &&
+          newMessages.every(
+            (m) => m.createdAt >= (existingSession.messages[0]?.createdAt ?? 0),
+          )
+        ) {
+          // Fast path: all new messages are ≥ newest existing — prepend sorted batch
+          const sortedNew = [...newMessages].sort(
+            (a, b) => b.createdAt - a.createdAt,
+          );
+          const existingMaybeUpdated = processedMessages.some(
+            (m) => existingSession.messagesMap[m.id],
+          )
+            ? existingSession.messages.map((m) => mergedMessagesMap[m.id] ?? m)
+            : existingSession.messages;
+          messagesArray = [...sortedNew, ...existingMaybeUpdated];
+        } else {
+          // Slow path: full re-sort (out-of-order timestamps or first load)
+          messagesArray = Object.values(mergedMessagesMap).sort(
+            (a, b) => b.createdAt - a.createdAt,
+          );
+        }
 
         // Update session with todos and latestUsage
         // IMPORTANT: We extract latestUsage from the mutable reducerState and copy it to the Session object
@@ -2074,16 +2111,27 @@ export function useHasUnreadMessages(sessionId: string): boolean {
   });
 }
 
-export function useSessionMessages(sessionId: string): {
+// Cap displayed messages to bound all downstream O(n) computations in ChatList.
+// Full history is still in messagesMap; this only limits the rendered slice.
+export const MAX_DISPLAY_MESSAGES = 300;
+
+export function useSessionMessages(
+  sessionId: string,
+  limit: number = MAX_DISPLAY_MESSAGES,
+): {
   messages: Message[];
   isLoaded: boolean;
+  hasOlderMessages: boolean;
 } {
   return storage(
     useShallow((state) => {
       const session = state.sessionMessages[sessionId];
+      const all = session?.messages ?? emptyArray;
+      const capped = all.length > limit;
       return {
-        messages: session?.messages ?? emptyArray,
+        messages: capped ? all.slice(0, limit) : all,
         isLoaded: session?.isLoaded ?? false,
+        hasOlderMessages: capped,
       };
     }),
   );

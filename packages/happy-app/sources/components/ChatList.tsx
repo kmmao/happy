@@ -1,14 +1,22 @@
 import * as React from "react";
-import { useSession, useSessionMessages, useSetting } from "@/sync/storage";
+import {
+  useSession,
+  useSessionMessages,
+  useSetting,
+  MAX_DISPLAY_MESSAGES,
+} from "@/sync/storage";
 import {
   FlatList,
   NativeScrollEvent,
   NativeSyntheticEvent,
   Platform,
+  Pressable,
   View,
   ViewToken,
 } from "react-native";
 import { useCallback } from "react";
+import { Text } from "@/components/StyledText";
+import { t } from "@/text";
 import { useHeaderHeight } from "@/utils/responsive";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { MessageView } from "./MessageView";
@@ -30,6 +38,8 @@ export interface ChatListHandle {
   getUserMessageCount: () => number;
 }
 
+const LOAD_MORE_INCREMENT = 100;
+
 export const ChatList = React.memo(
   React.forwardRef<
     ChatListHandle,
@@ -41,13 +51,22 @@ export const ChatList = React.memo(
       contentMaxWidth?: number;
     }
   >((props, ref) => {
-    const { messages } = useSessionMessages(props.session.id);
+    const [displayLimit, setDisplayLimit] = React.useState(MAX_DISPLAY_MESSAGES);
+    const { messages, hasOlderMessages } = useSessionMessages(
+      props.session.id,
+      displayLimit,
+    );
+    const handleLoadMore = React.useCallback(() => {
+      setDisplayLimit((prev) => prev + LOAD_MORE_INCREMENT);
+    }, []);
     return (
       <ChatListInternal
         ref={ref}
         metadata={props.session.metadata}
         sessionId={props.session.id}
         messages={messages}
+        hasOlderMessages={hasOlderMessages}
+        onLoadMore={handleLoadMore}
         permissionModeKey={props.session.permissionMode}
         onScrollAwayFromBottom={props.onScrollAwayFromBottom}
         onScrollActivity={props.onScrollActivity}
@@ -58,19 +77,39 @@ export const ChatList = React.memo(
   }),
 );
 
-const ListHeader = React.memo(() => {
-  const headerHeight = useHeaderHeight();
-  const safeArea = useSafeAreaInsets();
-  return (
-    <View
-      style={{
-        flexDirection: "row",
-        alignItems: "center",
-        height: headerHeight + safeArea.top + 32,
-      }}
-    />
-  );
-});
+const OlderMessagesArea = React.memo(
+  ({
+    hasOlderMessages,
+    onLoadMore,
+  }: {
+    hasOlderMessages: boolean;
+    onLoadMore: () => void;
+  }) => {
+    const headerHeight = useHeaderHeight();
+    const safeArea = useSafeAreaInsets();
+    return (
+      <View>
+        {hasOlderMessages && (
+          <Pressable
+            onPress={onLoadMore}
+            style={{ paddingVertical: 12, alignItems: "center" }}
+          >
+            <Text style={{ opacity: 0.4, fontSize: 12 }}>
+              {t("session.loadOlderMessages")}
+            </Text>
+          </Pressable>
+        )}
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            height: headerHeight + safeArea.top + 32,
+          }}
+        />
+      </View>
+    );
+  },
+);
 
 const ListFooter = React.memo((props: { sessionId: string; contentMaxWidth?: number }) => {
   const session = useSession(props.sessionId)!;
@@ -93,6 +132,8 @@ const ChatListInternal = React.memo(
       metadata: Metadata | null;
       sessionId: string;
       messages: Message[];
+      hasOlderMessages: boolean;
+      onLoadMore: () => void;
       permissionModeKey?: string | null;
       onScrollAwayFromBottom?: (isAway: boolean) => void;
       onScrollActivity?: () => void;
@@ -130,11 +171,13 @@ const ChatListInternal = React.memo(
     // user-text or another ready event, looking for isThinking agent-text messages.
     const thinkingTurnIds = React.useMemo(() => {
       const set = new Set<string>();
+      const MAX_INNER_SCAN = 100; // safety cap per turn
       for (let i = 0; i < props.messages.length; i++) {
         const msg = props.messages[i];
         if (msg.kind === "agent-event" && msg.event.type === "ready") {
           // Scan forward (older messages in the same turn)
-          for (let j = i + 1; j < props.messages.length; j++) {
+          const limit = Math.min(i + 1 + MAX_INNER_SCAN, props.messages.length);
+          for (let j = i + 1; j < limit; j++) {
             const m = props.messages[j];
             if (m.kind === "user-text") break;
             if (m.kind === "agent-event" && m.event.type === "ready") break;
@@ -434,8 +477,15 @@ const ChatListInternal = React.memo(
         scrollEventThrottle={400}
         showsVerticalScrollIndicator={false}
         viewabilityConfigCallbackPairs={viewabilityPairs.current}
+        onEndReached={props.hasOlderMessages ? props.onLoadMore : undefined}
+        onEndReachedThreshold={0.3}
         ListHeaderComponent={<ListFooter sessionId={props.sessionId} contentMaxWidth={props.contentMaxWidth} />}
-        ListFooterComponent={<ListHeader />}
+        ListFooterComponent={
+          <OlderMessagesArea
+            hasOlderMessages={props.hasOlderMessages}
+            onLoadMore={props.onLoadMore}
+          />
+        }
       />
     );
   }),

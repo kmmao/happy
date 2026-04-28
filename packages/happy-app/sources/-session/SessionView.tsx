@@ -42,7 +42,6 @@ import {
   startRealtimeSession,
   stopRealtimeSession,
 } from "@/realtime/RealtimeSession";
-import { gitStatusSync } from "@/sync/gitStatusSync";
 import { sessionInterrupt, sessionStopTask, sessionBash } from "@/sync/ops";
 import { reactivateArchivedSession } from "@/sync/sessionResumeFlow";
 import { runWithSessionReactivationGuard } from "@/sync/sessionResumeGuard";
@@ -118,6 +117,7 @@ import {
   type SessionFollowUpOptionsSnapshot,
 } from "./autoOptionSend";
 import { getSessionContentMaxWidth } from "./sessionContentWidth";
+import { useSessionVisibleEffect } from "./useSessionVisibleEffect";
 import { autoOptionSendService } from "@/sync/autoOptionSendService";
 import {
   getAutoOptionFeedbackStats,
@@ -1169,14 +1169,8 @@ function SessionViewInner({
     [handleMicrophonePress, realtimeStatus],
   );
 
-  // Trigger session visibility and initialize git status sync
-  React.useLayoutEffect(() => {
-    // Trigger session sync
-    sync.onSessionVisible(sessionId);
-
-    // Initialize git status sync for this session
-    gitStatusSync.getSync(sessionId);
-  }, [sessionId, realtimeStatus]);
+  // Avoid layout-blocking work and duplicate refreshes when realtime status changes.
+  useSessionVisibleEffect(sessionId);
 
   const scrollNavProps = {
     onPrevUserMessage: () => {

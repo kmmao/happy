@@ -865,6 +865,7 @@ export const ja: TranslationStructure = {
     autoOptionSendTitle: "推奨アクション",
     autoOptionSendTitleCountdown: ({ seconds }: { seconds: number }) =>
       `${seconds} 秒後に先頭の候補を自動送信`,
+    loadOlderMessages: "以前のメッセージを読み込む",
   },
 
   bookmark: {
