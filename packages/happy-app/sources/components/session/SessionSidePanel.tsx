@@ -10,12 +10,10 @@ import { InputContext } from "@/hooks/useInputContext";
 import {
     useProjectForSession,
     useSessionGitStatus,
-    useSessionKnowledgeCount,
     useSessionProjectGitStatus,
     useSessionProjectSubmodules,
     useSetting,
 } from "@/sync/storage";
-import { useSessionKnowledgeAccesses } from "@/hooks/useSessionKnowledgeAccesses";
 import { useProjectKnowledgeConfig } from "@/hooks/useProjectKnowledgeConfig";
 import { t } from "@/text";
 import { aggregateLineChanges } from "@/utils/gitStatusUtils";
@@ -88,21 +86,6 @@ export const SessionSidePanel = React.memo<SessionSidePanelProps>(
             return { totalAdded, totalRemoved };
         }, [gitStatus, submodules]);
 
-        const knowledgeCount = useSessionKnowledgeCount(sessionId);
-        const { accesses } = useSessionKnowledgeAccesses(
-            project?.serverId ?? undefined,
-            sessionId,
-        );
-        const summaryInfo = React.useMemo(() => {
-            const captured = knowledgeCount;
-            // Exclude evicted and archived entries from the badge count
-            const referenced = accesses.filter(
-                (a) => a.hotStatus !== "evicted" && a.status !== "archived",
-            ).length;
-            if (captured === 0 && referenced === 0) return null;
-            return { captured, referenced };
-        }, [knowledgeCount, accesses]);
-
         const tabDefinitions = React.useMemo(
             () => getSessionPanelTabDefinitions({ enablePreviewTab, knowledgeBaseEnabled }),
             [enablePreviewTab, knowledgeBaseEnabled],
@@ -152,23 +135,9 @@ export const SessionSidePanel = React.memo<SessionSidePanelProps>(
                                     -{formatCompactTabNumber(changesInfo.totalRemoved)}
                                 </Text>
                             </View>
-                        ) : tab.key === "knowledge" && summaryInfo ? (
-                            <View style={styles.metricSecondaryRow}>
-                                <Text
-                                    adjustsFontSizeToFit
-                                    minimumFontScale={0.72}
-                                    numberOfLines={1}
-                                    style={[
-                                        styles.metricSummary,
-                                        { color: theme.colors.textSecondary },
-                                    ]}
-                                >
-                                    {summaryInfo.captured}·{summaryInfo.referenced}
-                                </Text>
-                            </View>
                         ) : undefined,
                 })),
-            [changesInfo, summaryInfo, tabDefinitions, theme],
+            [changesInfo, tabDefinitions, theme],
         );
 
         if (collapsed) {
@@ -303,13 +272,5 @@ const styles = StyleSheet.create(() => ({
         letterSpacing: -0.1,
         ...Typography.mono("semiBold"),
     },
-    metricSummary: {
-        fontSize: 8,
-        lineHeight: 9,
-        includeFontPadding: false,
-        textAlign: "center",
-        flexShrink: 1,
-        letterSpacing: -0.1,
-        ...Typography.default("semiBold"),
-    },
+
 }));
