@@ -31,6 +31,8 @@ import {
   type ChatDisplayItem,
 } from "./chatTimelineDisplay";
 import { TurnTimelineMessageView } from "./TurnTimelineMessageView";
+import { shouldLogChatListTiming } from "./chatListPerformanceTiming";
+import { log } from "@/log";
 
 export interface ChatListHandle {
   scrollToBottom: () => void;
@@ -39,6 +41,9 @@ export interface ChatListHandle {
 }
 
 const LOAD_MORE_INCREMENT = 100;
+const CHAT_LIST_TIMING_THRESHOLD_MS = 8;
+const CHAT_LIST_TIMING_COOLDOWN_MS = 5_000;
+const now = () => (typeof performance !== "undefined" ? performance.now() : Date.now());
 
 export const ChatList = React.memo(
   React.forwardRef<
@@ -145,6 +150,33 @@ const ChatListInternal = React.memo(
     const isAwayRef = React.useRef(false);
     const currentUserMsgIndexRef = React.useRef(-1);
     const experiments = useSetting("experiments");
+    const lastTimingLogAtRef = React.useRef<Record<string, number | null>>({
+      thinkingTurnIds: null,
+      displayItems: null,
+    });
+
+    const logTiming = React.useCallback(
+      (label: "thinkingTurnIds" | "displayItems", durationMs: number) => {
+        const nowMs = now();
+        if (!shouldLogChatListTiming({
+          durationMs,
+          thresholdMs: CHAT_LIST_TIMING_THRESHOLD_MS,
+          nowMs,
+          lastLoggedAtMs: lastTimingLogAtRef.current[label],
+          cooldownMs: CHAT_LIST_TIMING_COOLDOWN_MS,
+        })) {
+          return;
+        }
+        lastTimingLogAtRef.current = {
+          ...lastTimingLogAtRef.current,
+          [label]: nowMs,
+        };
+        log.warn(
+          `[ChatList] ${label} took ${durationMs.toFixed(1)}ms for ${props.messages.length} messages`,
+        );
+      },
+      [props.messages.length],
+    );
 
     // Pre-compute which agent-text messages should show an avatar.
     // In an inverted list, index+1 is the visually "previous" (above) message.
@@ -170,6 +202,7 @@ const ChatListInternal = React.memo(
     // Scan forward (higher index = older) from each ready event until the next
     // user-text or another ready event, looking for isThinking agent-text messages.
     const thinkingTurnIds = React.useMemo(() => {
+      const startedAt = now();
       const set = new Set<string>();
       const MAX_INNER_SCAN = 100; // safety cap per turn
       for (let i = 0; i < props.messages.length; i++) {
@@ -188,13 +221,15 @@ const ChatListInternal = React.memo(
           }
         }
       }
+      logTiming("thinkingTurnIds", now() - startedAt);
       return set;
-    }, [props.messages]);
+    }, [props.messages, logTiming]);
 
     // Filter tool-call messages based on viewInline setting.
     // When viewInline is off, hide main agent tool calls (except special ones).
     const viewInline = useSetting("viewInline");
     const displayItems: ChatDisplayItem[] = React.useMemo(() => {
+      const startedAt = now();
       const visibleMessages = viewInline
         ? props.messages
         : (() => {
@@ -254,10 +289,12 @@ const ChatListInternal = React.memo(
         dedupedMessages.push(msg);
       }
 
-      return buildChatDisplayItems(dedupedMessages, {
+      const items = buildChatDisplayItems(dedupedMessages, {
         showThinkingTimeline: experiments,
       });
-    }, [props.messages, viewInline, experiments]);
+      logTiming("displayItems", now() - startedAt);
+      return items;
+    }, [props.messages, viewInline, experiments, logTiming]);
 
     // Collect user-text message indices in displayItems (not props.messages)
     // since the FlatList now uses displayItems as data.

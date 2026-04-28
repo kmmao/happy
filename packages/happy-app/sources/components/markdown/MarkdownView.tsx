@@ -1,4 +1,5 @@
-import { MarkdownSpan, parseMarkdown } from "./parseMarkdown";
+import { MarkdownSpan } from "./parseMarkdown";
+import { getCachedMarkdownBlocks } from "./markdownParseCache";
 import { parseMarkdownSpans } from "./parseMarkdownSpans";
 import { Link } from "expo-router";
 import * as React from "react";
@@ -32,7 +33,7 @@ export type Option = {
 export const MarkdownView = React.memo(
   (props: { markdown: string; onOptionPress?: (option: Option) => void; optionStatsResolver?: AutoOptionStatsResolver }) => {
     const blocks = React.useMemo(
-      () => parseMarkdown(props.markdown),
+      () => getCachedMarkdownBlocks(props.markdown),
       [props.markdown],
     );
 

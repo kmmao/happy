@@ -16,6 +16,7 @@ import { type Message } from "@/sync/typesMessage";
 import { getAutoOptionFeedbackStats, recordAutoOptionFeedback } from "./autoOptionFeedback";
 import { projectManager } from "./projectManager";
 import { log } from "@/log";
+import { shouldPublishCountdownRemaining } from "./autoOptionCountdown";
 import { scoreOptionsRemote } from "./apiOptionScore";
 import { buildOptionScoringContext } from "@/-session/buildOptionScoringContext";
 import { sync } from "./sync";
@@ -399,7 +400,16 @@ class AutoOptionSendService {
                     Date.now(),
             );
 
-            this.setState(sessionId, { ...state, remainingMs: remaining });
+            const nextState = shouldPublishCountdownRemaining(
+                state.remainingMs,
+                remaining,
+            )
+                ? { ...state, remainingMs: remaining }
+                : state;
+
+            if (nextState !== state) {
+                this.setState(sessionId, nextState);
+            }
 
             if (remaining <= 0) {
                 this.clearTimer(sessionId);
@@ -782,6 +792,10 @@ class AutoOptionSendService {
             ts: Date.now(),
         });
     }
+}
+
+export function createAutoOptionSendServiceForTesting(): AutoOptionSendService {
+    return new AutoOptionSendService();
 }
 
 export const autoOptionSendService = new AutoOptionSendService();
