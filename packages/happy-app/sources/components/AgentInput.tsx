@@ -1120,13 +1120,12 @@ export const AgentInput = React.memo(
                     </View>
                   ) : null}
                   <Text
-                    numberOfLines={1}
-                    ellipsizeMode="tail"
                     style={{
                       flex: 1,
                       fontSize: 11,
                       color: modelSummaryVisualState.summaryTextColor,
                       textAlign: "right",
+                      flexWrap: "wrap",
                       ...Typography.default(),
                     }}
                   >
