@@ -41,7 +41,7 @@ export interface ChatListHandle {
   getUserMessageCount: () => number;
 }
 
-const LOAD_MORE_INCREMENT = 100;
+export const LOAD_MORE_INCREMENT = 100;
 const CHAT_LIST_TIMING_THRESHOLD_MS = 8;
 const CHAT_LIST_TIMING_COOLDOWN_MS = 5_000;
 const now = () => (typeof performance !== "undefined" ? performance.now() : Date.now());
@@ -51,20 +51,18 @@ export const ChatList = React.memo(
     ChatListHandle,
     {
       session: Session;
+      displayLimit: number;
+      onLoadMore: () => void;
       onScrollAwayFromBottom?: (isAway: boolean) => void;
       onScrollActivity?: () => void;
       onVisibleUserMessageChange?: (msgIndex: number) => void;
       contentMaxWidth?: number;
     }
   >((props, ref) => {
-    const [displayLimit, setDisplayLimit] = React.useState(MAX_DISPLAY_MESSAGES);
     const { messages, hasOlderMessages, isBackfilling } = useSessionMessages(
       props.session.id,
-      displayLimit,
+      props.displayLimit,
     );
-    const handleLoadMore = React.useCallback(() => {
-      setDisplayLimit((prev) => prev + LOAD_MORE_INCREMENT);
-    }, []);
     return (
       <ChatListInternal
         ref={ref}
@@ -73,7 +71,7 @@ export const ChatList = React.memo(
         messages={messages}
         hasOlderMessages={hasOlderMessages}
         isBackfilling={isBackfilling}
-        onLoadMore={handleLoadMore}
+        onLoadMore={props.onLoadMore}
         permissionModeKey={props.session.permissionMode}
         onScrollAwayFromBottom={props.onScrollAwayFromBottom}
         onScrollActivity={props.onScrollActivity}

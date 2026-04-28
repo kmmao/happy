@@ -16,7 +16,7 @@ import {
 import type { ModelMode, PermissionMode } from "@/components/modelModeOptions";
 import { getSuggestions } from "@/components/autocomplete/suggestions";
 import { ChatHeaderView } from "@/components/ChatHeaderView";
-import { ChatList, ChatListHandle } from "@/components/ChatList";
+import { ChatList, ChatListHandle, LOAD_MORE_INCREMENT } from "@/components/ChatList";
 import { Deferred } from "@/components/Deferred";
 import { ScrollToBottomButton } from "@/components/ScrollToBottomButton";
 import { OptionsPopover } from "@/components/OptionsPopover";
@@ -59,6 +59,7 @@ import {
   useSocketStatus,
   useSession,
   useSessionMessages,
+  MAX_DISPLAY_MESSAGES,
   useBackgroundTaskEntries,
   useSessionUsage,
   useSessionContextUsage,
@@ -582,7 +583,11 @@ function SessionViewInner({
     sessionColumnHeight > 0 && agentInputHeight > 0
       ? Math.max(80, sessionColumnHeight - agentInputHeight - 8)
       : undefined;
-  const { messages, isLoaded } = useSessionMessages(sessionId);
+  const [displayLimit, setDisplayLimit] = React.useState(MAX_DISPLAY_MESSAGES);
+  const handleLoadMore = React.useCallback(() => {
+    setDisplayLimit((prev) => prev + LOAD_MORE_INCREMENT);
+  }, []);
+  const { messages, isLoaded } = useSessionMessages(sessionId, displayLimit);
   const selectedOptionForEditingRef = React.useRef<{
     text: string;
     optionsHash: string;
@@ -1359,6 +1364,8 @@ function SessionViewInner({
           <ChatList
             ref={chatListRef}
             session={session}
+            displayLimit={displayLimit}
+            onLoadMore={handleLoadMore}
             onScrollAwayFromBottom={setShowScrollToBottom}
             onVisibleUserMessageChange={handleVisibleUserMessage}
             contentMaxWidth={contentMaxWidth}
