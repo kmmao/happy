@@ -1,0 +1,186 @@
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+const {
+    dbMock,
+    emitEphemeralMock,
+    invalidateSessionMock,
+    resetState,
+    seedSession,
+    state,
+} = vi.hoisted(() => {
+    const state = {
+        sessions: [] as Array<{
+            id: string;
+            accountId: string;
+            active: boolean;
+            lastActiveAt: Date;
+        }>,
+    };
+
+    const resetState = () => {
+        state.sessions = [];
+    };
+
+    const seedSession = (input: {
+        id: string;
+        accountId: string;
+        active?: boolean;
+        lastActiveAt?: Date;
+    }) => {
+        state.sessions.push({
+            id: input.id,
+            accountId: input.accountId,
+            active: input.active ?? false,
+            lastActiveAt: input.lastActiveAt ?? new Date(0),
+        });
+    };
+
+    const matchesSessionWhere = (session: (typeof state.sessions)[number], where: any) => {
+        const ids = where?.id?.in;
+        return (
+            Array.isArray(ids) &&
+            ids.includes(session.id) &&
+            session.accountId === where.accountId
+        );
+    };
+
+    const dbMock = {
+        machine: {
+            findFirst: vi.fn(),
+            updateMany: vi.fn(),
+        },
+        session: {
+            updateManyAndReturn: vi.fn(async ({ where, data }: any) => {
+                const updated: typeof state.sessions = [];
+                for (const session of state.sessions) {
+                    if (!matchesSessionWhere(session, where)) continue;
+                    Object.assign(session, data);
+                    updated.push({ ...session });
+                }
+                return updated;
+            }),
+            updateMany: vi.fn(async ({ where, data }: any) => {
+                let count = 0;
+                for (const session of state.sessions) {
+                    if (!matchesSessionWhere(session, where)) continue;
+                    Object.assign(session, data);
+                    count += 1;
+                }
+                return { count };
+            }),
+        },
+        sessionEvent: { findFirst: vi.fn() },
+        projectKnowledge: { count: vi.fn() },
+    };
+
+    const emitEphemeralMock = vi.fn();
+    const invalidateSessionMock = vi.fn();
+
+    return {
+        dbMock,
+        emitEphemeralMock,
+        invalidateSessionMock,
+        resetState,
+        seedSession,
+        state,
+    };
+});
+
+vi.mock("@/storage/db", () => ({ db: dbMock }));
+vi.mock("@/utils/log", () => ({ log: vi.fn() }));
+vi.mock("@/storage/seq", () => ({ allocateUserSeq: vi.fn(async () => 1) }));
+vi.mock("@/utils/randomKeyNaked", () => ({ randomKeyNaked: vi.fn(() => "update-id") }));
+vi.mock("@/modules/supervisorScheduler", () => ({ checkAndTriggerScheduledRuns: vi.fn() }));
+vi.mock("@/modules/supervisorFixWatchdog", () => ({ cleanupStaleFixActions: vi.fn() }));
+vi.mock("@/modules/triggerScheduleRunner", () => ({ checkAndTriggerSchedules: vi.fn() }));
+vi.mock("@/modules/pushSend", () => ({ pushSend: vi.fn() }));
+vi.mock("@/modules/knowledgeConsolidate", () => ({ consolidate: vi.fn() }));
+vi.mock("@/modules/knowledgeEmbedding", () => ({ storeKnowledgeEmbedding: vi.fn() }));
+vi.mock("@/storage/inTx", () => ({ inTx: vi.fn() }));
+vi.mock("@/app/monitoring/metrics2", () => ({
+    machineAliveEventsCounter: { inc: vi.fn() },
+    websocketEventsCounter: { inc: vi.fn() },
+}));
+vi.mock("@/app/presence/sessionCache", () => ({
+    activityCache: {
+        isMachineValid: vi.fn(async () => true),
+        queueMachineUpdate: vi.fn(),
+        invalidateSession: invalidateSessionMock,
+    },
+}));
+vi.mock("@/app/events/eventRouter", () => ({
+    eventRouter: { emitEphemeral: emitEphemeralMock, emitUpdate: vi.fn() },
+    buildMachineActivityEphemeral: vi.fn((machineId: string, active: boolean, activeAt: number) => ({
+        type: "machine-activity",
+        id: machineId,
+        active,
+        activeAt,
+    })),
+    buildSessionActivityEphemeral: vi.fn((sessionId: string, active: boolean, activeAt: number, thinking: boolean) => ({
+        type: "activity",
+        id: sessionId,
+        active,
+        activeAt,
+        thinking,
+    })),
+    buildUpdateMachineUpdate: vi.fn(() => ({ id: "update-id", body: { t: "update-machine" } })),
+    buildKnowledgeCountEphemeral: vi.fn((sessionId: string, knowledgeCount: number) => ({
+        type: "knowledge-count",
+        sessionId,
+        knowledgeCount,
+    })),
+}));
+
+import { machineUpdateHandler } from "./machineUpdateHandler";
+
+function createMockSocket() {
+    const handlers = new Map<string, (...args: any[]) => any>();
+    return {
+        on: vi.fn((event: string, handler: (...args: any[]) => any) => {
+            handlers.set(event, handler);
+        }),
+        trigger(event: string, ...args: any[]) {
+            const handler = handlers.get(event);
+            if (!handler) throw new Error(`No handler registered for ${event}`);
+            return handler(...args);
+        },
+    };
+}
+
+describe("machineUpdateHandler session-sync", () => {
+    const userId = "user-1";
+    let socket: ReturnType<typeof createMockSocket>;
+
+    beforeEach(() => {
+        resetState();
+        vi.clearAllMocks();
+        socket = createMockSocket();
+        machineUpdateHandler(userId, socket as any);
+    });
+
+    it("reactivates daemon-reported live sessions and emits activity updates after server restart", async () => {
+        seedSession({ id: "session-live", accountId: userId, active: false });
+        seedSession({ id: "session-other-user", accountId: "user-2", active: false });
+        const callback = vi.fn();
+
+        await socket.trigger(
+            "session-sync",
+            { sessionIds: ["session-live", "session-other-user", "session-live"] },
+            callback,
+        );
+
+        expect(state.sessions.find((session) => session.id === "session-live")?.active).toBe(true);
+        expect(state.sessions.find((session) => session.id === "session-other-user")?.active).toBe(false);
+        expect(invalidateSessionMock).toHaveBeenCalledWith("session-live");
+        expect(emitEphemeralMock).toHaveBeenCalledWith({
+            userId,
+            payload: expect.objectContaining({
+                type: "activity",
+                id: "session-live",
+                active: true,
+            }),
+            recipientFilter: { type: "user-scoped-only" },
+        });
+        expect(callback).toHaveBeenCalledWith({ ok: true, reactivated: 1 });
+    });
+});
