@@ -6,7 +6,7 @@ import { log } from "@/log";
 const CACHE_PREFIX = "msg-v1-";
 const CACHE_INDEX_KEY = "msg-cache-index";
 const HISTORY_COMPLETE_PREFIX = "msg-history-complete-v1-";
-const MAX_CACHED_MESSAGES = 200;
+const MAX_CACHED_MESSAGES = 350;
 const MAX_CACHED_SESSIONS = 20;
 const CACHE_SCHEMA_VERSION = 1;
 
