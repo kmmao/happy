@@ -1,6 +1,6 @@
 import { machineAliveEventsCounter, websocketEventsCounter } from "@/app/monitoring/metrics2";
 import { activityCache } from "@/app/presence/sessionCache";
-import { buildKnowledgeCountEphemeral, buildMachineActivityEphemeral, buildUpdateMachineUpdate, eventRouter } from "@/app/events/eventRouter";
+import { buildKnowledgeCountEphemeral, buildMachineActivityEphemeral, buildSessionActivityEphemeral, buildUpdateMachineUpdate, eventRouter } from "@/app/events/eventRouter";
 import { log } from "@/utils/log";
 import { db } from "@/storage/db";
 import { Socket } from "socket.io";
@@ -306,25 +306,56 @@ export function machineUpdateHandler(userId: string, socket: Socket) {
     });
 
     // Daemon reconnect: re-activate sessions that are still alive on the daemon side.
-    // Called immediately after the daemon (re-)connects so the server has an accurate
-    // view of which sessions are running without waiting for the 10-min idle timeout.
-    socket.on('session-sync', async (data: { sessionIds: string[] }) => {
+    // Called after the authenticated socket is ready so the server has an accurate
+    // view of which sessions survived a server restart or reconnect window.
+    socket.on('session-sync', async (data: { sessionIds: string[] }, callback?: (response: { ok: boolean; reactivated?: number; error?: string }) => void) => {
         try {
-            const sessionIds = data?.sessionIds;
-            if (!Array.isArray(sessionIds) || sessionIds.length === 0) return;
+            const rawSessionIds = data?.sessionIds;
+            if (!Array.isArray(rawSessionIds)) {
+                callback?.({ ok: false, error: 'Invalid sessionIds' });
+                return;
+            }
 
-            await db.session.updateMany({
+            const sessionIds = [...new Set(
+                rawSessionIds
+                    .filter((sessionId): sessionId is string => typeof sessionId === 'string' && sessionId.length > 0)
+                    .slice(0, 500),
+            )];
+            if (sessionIds.length === 0) {
+                callback?.({ ok: true, reactivated: 0 });
+                return;
+            }
+
+            const activeAt = new Date();
+            const updatedSessions = await db.session.updateManyAndReturn({
                 where: {
                     id: { in: sessionIds },
                     accountId: userId,
                 },
                 data: {
                     active: true,
-                    lastActiveAt: new Date(),
+                    lastActiveAt: activeAt,
                 },
             });
+
+            for (const session of updatedSessions) {
+                activityCache.invalidateSession(session.id);
+                eventRouter.emitEphemeral({
+                    userId,
+                    payload: buildSessionActivityEphemeral(
+                        session.id,
+                        true,
+                        session.lastActiveAt.getTime(),
+                        false,
+                    ),
+                    recipientFilter: { type: 'user-scoped-only' },
+                });
+            }
+
+            callback?.({ ok: true, reactivated: updatedSessions.length });
         } catch (error) {
             log({ module: 'websocket', level: 'error' }, `Error in session-sync: ${error}`);
+            callback?.({ ok: false, error: 'Internal error' });
         }
     });
 

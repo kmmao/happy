@@ -251,6 +251,12 @@ export function startSocket(app: Fastify) {
     taskStatusHandler(socket, userId);
     sessionEventHandler(socket, userId);
     terminalHandler(userId, socket);
+
+    // Authenticated and all event listeners are now registered. Machine/session
+    // clients use this as the reliable readiness barrier before emitting their
+    // initial RPC registrations, daemon state, and session-sync payloads.
+    socket.emit("auth", { success: true, user: userId });
+
     // Ready
     debug({ module: "websocket" }, `User connected: ${userId}`);
   });

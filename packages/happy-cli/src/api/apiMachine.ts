@@ -60,7 +60,10 @@ interface DaemonToServerEvents {
 
   // Sent immediately after (re-)connect to tell the server which sessions are
   // still running so it can restore their active flags after a server restart.
-  "session-sync": (data: { sessionIds: string[] }) => void;
+  "session-sync": (
+    data: { sessionIds: string[] },
+    callback?: (response: { ok: boolean; reactivated?: number; error?: string }) => void,
+  ) => void;
 
   "machine-update-metadata": (
     data: {
@@ -1157,7 +1160,7 @@ export class ApiMachineClient {
     await backoff(async () => {
       const updated = handler(this.machine.daemonState);
 
-      const answer = await this.socket.emitWithAck("machine-update-state", {
+      const answer = await this.socket.timeout(10_000).emitWithAck("machine-update-state", {
         machineId: this.machine.id,
         daemonState: encodeBase64(
           encrypt(
@@ -1209,18 +1212,28 @@ export class ApiMachineClient {
     });
 
     this.socket.on("connect", () => {
-      logger.debug("[API MACHINE] Connected to server");
+      logger.debug("[API MACHINE] Connected to server; waiting for auth-ready");
 
-      // Cancel any pending disconnect cleanup timer
+      // Cancel any pending disconnect cleanup timer as soon as transport is back.
       if (this.disconnectCleanupTimer) {
         clearTimeout(this.disconnectCleanupTimer);
         this.disconnectCleanupTimer = null;
       }
+    });
 
-      // Update daemon state to running
-      // We need to override previous state because the daemon (this process)
-      // has restarted with new PID & port
-      this.updateDaemonState((state) => ({
+    this.socket.on("auth", (data) => {
+      if (!data?.success) {
+        logger.debug("[API MACHINE] Server auth-ready failed");
+        return;
+      }
+
+      logger.debug("[API MACHINE] Authenticated server socket is ready");
+
+      // Update daemon state to running. We intentionally wait for the server's
+      // auth-ready event because the server registers socket listeners after
+      // async token verification; emitting immediately on transport connect can
+      // race and get dropped.
+      void this.updateDaemonState((state) => ({
         ...state,
         status: "running",
         pid: process.pid,
@@ -1231,7 +1244,7 @@ export class ApiMachineClient {
         tunnels: this.tunnelManager?.getLastState() ?? state?.tunnels,
       }));
 
-      // Register all handlers
+      // Register all handlers only after the server-side rpc listener exists.
       this.rpcHandlerManager.onSocketConnect(this.socket);
 
       // Set up terminal streaming handlers
@@ -1256,16 +1269,7 @@ export class ApiMachineClient {
       this.flushPendingFixStatuses();
       this.flushPendingTaskStatuses();
 
-      // Re-activate sessions that are still running on this daemon.
-      // The server cleared all active flags on startup, so we must tell it
-      // which sessions survived the reconnect window.
-      if (this.sessionSyncProvider) {
-        const sessionIds = this.sessionSyncProvider();
-        if (sessionIds.length > 0) {
-          logger.debug(`[API MACHINE] Syncing ${sessionIds.length} active session(s) with server`);
-          this.socket.emit("session-sync", { sessionIds });
-        }
-      }
+      this.syncActiveSessions();
 
       // Start keep-alive
       this.startKeepAlive();
@@ -1413,6 +1417,30 @@ export class ApiMachineClient {
 
     this.socket.io.on("error", (error: any) => {
       logger.debug("[API MACHINE] Socket error:", error);
+    });
+  }
+
+  private syncActiveSessions(): void {
+    if (!this.sessionSyncProvider) {
+      return;
+    }
+
+    const sessionIds = [...new Set(this.sessionSyncProvider())];
+    if (sessionIds.length === 0) {
+      return;
+    }
+
+    logger.debug(`[API MACHINE] Syncing ${sessionIds.length} active session(s) with server`);
+    void backoff(async () => {
+      const response = await this.socket
+        .timeout(10_000)
+        .emitWithAck("session-sync", { sessionIds });
+      if (!response?.ok) {
+        throw new Error(response?.error ?? "session-sync rejected");
+      }
+      logger.debug(`[API MACHINE] Server reactivated ${response.reactivated ?? 0} active session(s)`);
+    }).catch((error) => {
+      logger.debug(`[API MACHINE] Failed to sync active sessions: ${error instanceof Error ? error.message : String(error)}`);
     });
   }
 
