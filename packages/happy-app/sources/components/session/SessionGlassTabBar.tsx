@@ -163,7 +163,9 @@ export const SessionGlassTabBar = React.memo<SessionGlassTabBarProps>(
                         onPress={() => onChange(tab.key)}
                         style={[
                             styles.tabPressable,
-                            scrollable ? styles.tabPressableScroll : styles.tabPressableFill,
+                            scrollable
+                                ? { flexShrink: 0, flexGrow: 0 }
+                                : styles.tabPressableFill,
                             tabMinWidth ? { minWidth: tabMinWidth } : null,
                         ]}
                     >
@@ -233,10 +235,15 @@ export const SessionGlassTabBar = React.memo<SessionGlassTabBarProps>(
             >
                 {scrollable ? (
                     <ScrollView
-                        style={styles.scrollView}
+                        style={{ flex: 1 }}
                         horizontal
                         showsHorizontalScrollIndicator={false}
-                        contentContainerStyle={styles.scrollContent}
+                        contentContainerStyle={{
+                            flexDirection: "row",
+                            alignItems: "center",
+                            gap: 6,
+                            flexGrow: 0,
+                        }}
                     >
                         {tabNodes}
                     </ScrollView>
