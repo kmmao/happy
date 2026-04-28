@@ -1384,6 +1384,28 @@ export interface MachineStaleSessionsCleanResult {
   error?: string;
 }
 
+export interface TrackedSessionInfo {
+  pid: number;
+  happySessionId?: string;
+  spawnId?: string;
+  startedAt?: number;
+}
+
+/** List all daemon-tracked sessions (PID → Happy session ID mapping). */
+export async function machineListTrackedSessions(
+  machineId: string,
+): Promise<{ success: boolean; sessions: TrackedSessionInfo[]; error?: string }> {
+  try {
+    const result = await apiSocket.machineRPC<
+      { sessions: TrackedSessionInfo[] },
+      Record<string, never>
+    >(machineId, "list-tracked-sessions", {});
+    return { success: true, sessions: result.sessions ?? [] };
+  } catch (error) {
+    return { success: false, sessions: [], error: getErrorMessage(error) };
+  }
+}
+
 /** List daemon-tracked sessions whose heartbeat has gone silent or whose pid is dead. */
 export async function machineListStaleSessions(
   machineId: string,

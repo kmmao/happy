@@ -2116,6 +2116,15 @@ export async function startDaemon(): Promise<void> {
     // longer than this without a heartbeat is assumed to be wedged / zombified.
     const STALE_HEARTBEAT_MS = 90_000;
 
+    const listTrackedSessions = () => {
+      return Array.from(pidToTrackedSession.entries()).map(([pid, session]) => ({
+        pid,
+        happySessionId: session.happySessionId,
+        spawnId: session.spawnId,
+        startedAt: session.startedAt,
+      }));
+    };
+
     const listStaleSessions = async () => {
       const now = Date.now();
       const stale: Array<{
@@ -2433,6 +2442,7 @@ export async function startDaemon(): Promise<void> {
         scheduleAutomationStatePublish();
         return result;
       },
+      listTrackedSessions,
       listStaleSessions,
       cleanStaleSessions,
     });

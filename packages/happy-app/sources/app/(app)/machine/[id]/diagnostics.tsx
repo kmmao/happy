@@ -15,15 +15,73 @@ import { Text } from "@/components/StyledText";
 import { Ionicons } from "@expo/vector-icons";
 import {
     machineBash,
-    machineCleanRunawayProcesses,
     machineCleanStaleSessions,
     machineKillProcess,
     machineListStaleSessions,
+    machineListTrackedSessions,
     type StaleSessionInfo,
 } from "@/sync/ops";
+import { sync } from "@/sync/sync";
 import { Modal } from "@/modal";
 import { layout } from "@/components/layout";
 import { t } from "@/text";
+
+// ---------------------------------------------------------------------------
+// Current tool activity hook
+// ---------------------------------------------------------------------------
+
+interface ToolActivity {
+    label: string;
+    ts: number;
+}
+
+const TOOL_STALE_MS = 45_000;
+
+function deriveToolLabel(eventType: string, summary: string): string | null {
+    if (eventType === "session_end" || eventType === "session_start") return null;
+    return summary.length > 55 ? summary.slice(0, 55) + "…" : summary;
+}
+
+function useCurrentToolActivity(): Map<string, ToolActivity> {
+    const [activity, setActivity] = React.useState<Map<string, ToolActivity>>(new Map());
+
+    React.useEffect(() => {
+        const unsub = sync.onSessionEventCreated((event) => {
+            const label = deriveToolLabel(event.eventType, event.summary);
+            setActivity((prev) => {
+                const next = new Map(prev);
+                if (label === null) {
+                    next.delete(event.sessionId);
+                } else {
+                    next.set(event.sessionId, { label, ts: Date.now() });
+                }
+                return next;
+            });
+        });
+
+        const timer = setInterval(() => {
+            const now = Date.now();
+            setActivity((prev) => {
+                const next = new Map(prev);
+                let changed = false;
+                for (const [sid, act] of next) {
+                    if (now - act.ts > TOOL_STALE_MS) {
+                        next.delete(sid);
+                        changed = true;
+                    }
+                }
+                return changed ? next : prev;
+            });
+        }, 10_000);
+
+        return () => {
+            unsub();
+            clearInterval(timer);
+        };
+    }, []);
+
+    return activity;
+}
 
 // ---------------------------------------------------------------------------
 // Types
@@ -105,16 +163,37 @@ function useHappyProcesses(machineId: string | undefined) {
         setIsLoading(true);
         setError(null);
         try {
-            const result = await machineBash(
-                id,
-                "ps aux | grep -E 'happy\\.mjs|dist/index\\.mjs|happy-coder' | grep -v grep",
-                "/",
-            );
-            if (result.success || result.exitCode === 1) {
-                // exitCode 1 means grep found nothing — treat as empty
-                setProcesses(parsePsOutput(result.stdout ?? ""));
+            const [psResult, daemonResult] = await Promise.all([
+                machineBash(
+                    id,
+                    "ps aux | grep -E 'happy\\.mjs|dist/index\\.mjs|happy-coder' | grep -v grep",
+                    "/",
+                ),
+                machineListTrackedSessions(id),
+            ]);
+
+            if (psResult.success || psResult.exitCode === 1) {
+                const parsed = parsePsOutput(psResult.stdout ?? "");
+
+                // Build a PID → happySessionId map from daemon's in-memory registry.
+                // This covers newly-created sessions that were spawned without
+                // --happy-session-id (it's only known after the child registers).
+                if (daemonResult.success && daemonResult.sessions.length > 0) {
+                    const daemonMap = new Map(
+                        daemonResult.sessions
+                            .filter((s) => s.happySessionId)
+                            .map((s) => [s.pid, s.happySessionId!]),
+                    );
+                    for (const proc of parsed) {
+                        if (!proc.sessionId && daemonMap.has(proc.pid)) {
+                            proc.sessionId = daemonMap.get(proc.pid);
+                        }
+                    }
+                }
+
+                setProcesses(parsed);
             } else {
-                setError(result.stderr || result.error || t("diagnostics.errorScanning"));
+                setError(psResult.stderr || psResult.error || t("diagnostics.errorScanning"));
             }
         } catch {
             setError(t("diagnostics.errorScanning"));
@@ -174,10 +253,12 @@ function ProcessRow({
     proc,
     onKill,
     onOpenSession,
+    toolActivity,
 }: {
     proc: HappyProcess;
     onKill: (proc: HappyProcess) => Promise<void>;
     onOpenSession: (sessionId: string) => void;
+    toolActivity?: ToolActivity;
 }) {
     const { theme } = useUnistyles();
     const [isKilling, setIsKilling] = React.useState(false);
@@ -217,6 +298,14 @@ function ProcessRow({
                 <Text style={[rowStyles.cmd, { color: theme.colors.textSecondary }]}>
                     {proc.command}
                 </Text>
+                {toolActivity && (
+                    <View style={rowStyles.toolActivity}>
+                        <View style={[rowStyles.toolDot, { backgroundColor: "#10B981" }]} />
+                        <Text style={[rowStyles.toolLabel, { color: "#10B981" }]} numberOfLines={1}>
+                            {toolActivity.label}
+                        </Text>
+                    </View>
+                )}
                 {canOpenSource && (
                     <Pressable
                         onPress={() => onOpenSession(proc.forkSourceId!)}
@@ -298,6 +387,22 @@ const rowStyles = StyleSheet.create(() => ({
         fontSize: 11,
         fontWeight: "600" as const,
     },
+    toolActivity: {
+        flexDirection: "row" as const,
+        alignItems: "center" as const,
+        gap: 5,
+        marginTop: 3,
+    },
+    toolDot: {
+        width: 6,
+        height: 6,
+        borderRadius: 3,
+    },
+    toolLabel: {
+        fontSize: 11,
+        fontFamily: "Menlo",
+        flex: 1,
+    },
 }));
 
 // ---------------------------------------------------------------------------
@@ -309,8 +414,8 @@ export default React.memo(function DiagnosticsPage() {
     const { theme } = useUnistyles();
     const router = useRouter();
     const { processes, isLoading, error, scan } = useHappyProcesses(machineId);
+    const toolActivity = useCurrentToolActivity();
     const [isCleaning, setIsCleaning] = React.useState(false);
-    const [isSmartCleaning, setIsSmartCleaning] = React.useState(false);
 
     const handleOpenSession = React.useCallback((sessionId: string) => {
         router.push(`/session/${sessionId}` as any);
@@ -331,99 +436,33 @@ export default React.memo(function DiagnosticsPage() {
         }
     }, [machineId, scan]);
 
-    const handleSmartClean = React.useCallback(async () => {
-        setIsSmartCleaning(true);
+    // Unified clean: detect daemon-validated stale sessions and kill them directly.
+    const handleClean = React.useCallback(async () => {
+        setIsCleaning(true);
         try {
             const list = await machineListStaleSessions(machineId!);
             if (!list.success) {
-                Modal.alert(
-                    t("common.error"),
-                    list.error || t("diagnostics.smartCleanFailed"),
-                );
+                Modal.alert(t("common.error"), list.error || t("diagnostics.smartCleanFailed"));
                 return;
             }
             if (list.stale.length === 0) {
-                Modal.alert(
-                    t("common.success"),
-                    t("diagnostics.smartCleanEmpty"),
-                );
+                Modal.alert(t("common.success"), t("diagnostics.smartCleanEmpty"));
                 return;
             }
-            // Preview up to 5 entries so the confirmation makes the impact visible.
-            const previewLines = list.stale
-                .slice(0, 5)
-                .map((s: StaleSessionInfo) => {
-                    const parts: string[] = [`PID ${s.pid}`, s.reason];
-                    if (s.silentMs !== undefined) {
-                        parts.push(`silent ${Math.round(s.silentMs / 1000)}s`);
-                    }
-                    if (s.happySessionId) {
-                        parts.push(s.happySessionId.slice(0, 8));
-                    } else if (s.spawnId) {
-                        parts.push(`sp:${s.spawnId.slice(0, 8)}`);
-                    }
-                    return parts.join(" · ");
-                });
-            const suffix =
-                list.stale.length > 5
-                    ? `\n… +${list.stale.length - 5} more`
-                    : "";
-            const confirmed = await Modal.confirm(
-                t("diagnostics.smartCleanConfirmTitle"),
-                `${t("diagnostics.smartCleanConfirmMessage", { count: list.stale.length })}\n\n${previewLines.join("\n")}${suffix}`,
-            );
-            if (!confirmed) return;
             const pids = list.stale.map((s: StaleSessionInfo) => s.pid);
             const cleaned = await machineCleanStaleSessions(machineId!, pids);
             if (!cleaned.success) {
-                Modal.alert(
-                    t("common.error"),
-                    cleaned.error || t("diagnostics.smartCleanFailed"),
-                );
+                Modal.alert(t("common.error"), cleaned.error || t("diagnostics.smartCleanFailed"));
                 return;
             }
-            Modal.alert(
-                t("common.success"),
-                t("diagnostics.smartCleanSuccess", { killed: cleaned.killed }),
-            );
+            Modal.alert(t("common.success"), t("diagnostics.smartCleanSuccess", { killed: cleaned.killed }));
             await scan();
         } catch {
             Modal.alert(t("common.error"), t("diagnostics.smartCleanFailed"));
         } finally {
-            setIsSmartCleaning(false);
-        }
-    }, [machineId, scan]);
-
-    const handleCleanRunaway = React.useCallback(async () => {
-        const confirmed = await Modal.confirm(
-            t("diagnostics.cleanConfirmTitle"),
-            t("diagnostics.cleanConfirmMessage"),
-        );
-        if (!confirmed) return;
-
-        setIsCleaning(true);
-        try {
-            const result = await machineCleanRunawayProcesses(machineId!);
-            if (result.success) {
-                Modal.alert(
-                    t("common.success"),
-                    t("diagnostics.cleanSuccess", { killed: result.killed }),
-                );
-                await scan();
-            } else {
-                Modal.alert(t("common.error"), t("diagnostics.cleanFailed"));
-            }
-        } catch {
-            Modal.alert(t("common.error"), t("diagnostics.cleanFailed"));
-        } finally {
             setIsCleaning(false);
         }
     }, [machineId, scan]);
-
-    // Runaway processes = daemon, version-check, session, fork
-    const runawayCount = processes.filter(
-        (p) => p.type === "daemon" || p.type === "version-check" || p.type === "session" || p.type === "fork",
-    ).length;
 
     if (isLoading && processes.length === 0) {
         return (
@@ -466,20 +505,19 @@ export default React.memo(function DiagnosticsPage() {
                                 <Ionicons name="refresh-outline" size={16} color={theme.colors.text} />
                             )}
                         </Pressable>
-                        {/* Smart clean — lists stale entries from daemon's tracked registry
-                            and kills only the confirmed ones; safer than Clean Runaway. */}
+                        {/* Unified clean: detects and kills daemon-validated stale sessions */}
                         <Pressable
-                            onPress={handleSmartClean}
-                            disabled={isSmartCleaning}
+                            onPress={handleClean}
+                            disabled={isCleaning}
                             style={({ pressed }) => [
                                 pageStyles.headerBtn,
                                 {
                                     backgroundColor: theme.colors.text + "18",
-                                    opacity: pressed || isSmartCleaning ? 0.6 : 1,
+                                    opacity: pressed || isCleaning ? 0.6 : 1,
                                 },
                             ]}
                         >
-                            {isSmartCleaning ? (
+                            {isCleaning ? (
                                 <ActivityIndicator size="small" color={theme.colors.text} />
                             ) : (
                                 <Ionicons name="flash-outline" size={16} color={theme.colors.text} />
@@ -488,29 +526,6 @@ export default React.memo(function DiagnosticsPage() {
                                 {t("diagnostics.smartClean")}
                             </Text>
                         </Pressable>
-                        {/* Clean runaway */}
-                        {runawayCount > 0 && (
-                            <Pressable
-                                onPress={handleCleanRunaway}
-                                disabled={isCleaning}
-                                style={({ pressed }) => [
-                                    pageStyles.headerBtn,
-                                    {
-                                        backgroundColor: theme.colors.textDestructive + "18",
-                                        opacity: pressed || isCleaning ? 0.6 : 1,
-                                    },
-                                ]}
-                            >
-                                {isCleaning ? (
-                                    <ActivityIndicator size="small" color={theme.colors.textDestructive} />
-                                ) : (
-                                    <Ionicons name="trash-outline" size={16} color={theme.colors.textDestructive} />
-                                )}
-                                <Text style={[pageStyles.cleanBtnText, { color: theme.colors.textDestructive }]}>
-                                    {t("diagnostics.cleanRunaway")}
-                                </Text>
-                            </Pressable>
-                        )}
                     </View>
                 </View>
 
@@ -539,7 +554,13 @@ export default React.memo(function DiagnosticsPage() {
 
                 {/* Process list */}
                 {processes.map((proc) => (
-                    <ProcessRow key={proc.pid} proc={proc} onKill={handleKill} onOpenSession={handleOpenSession} />
+                    <ProcessRow
+                        key={proc.pid}
+                        proc={proc}
+                        onKill={handleKill}
+                        onOpenSession={handleOpenSession}
+                        toolActivity={proc.sessionId ? toolActivity.get(proc.sessionId) : undefined}
+                    />
                 ))}
             </View>
         </ScrollView>

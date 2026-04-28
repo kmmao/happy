@@ -211,9 +211,17 @@ type MachineRpcHandlers = {
   resumeAutoDreamProfile: (profileIdValue: string) => Promise<AutoDreamMutationResult>;
   runAutoDreamProfileNow: (profileIdValue: string) => Promise<AutoDreamMutationResult>;
   removeAutoDreamProfile: (profileIdValue: string) => Promise<AutoDreamMutationResult>;
+  listTrackedSessions: () => TrackedSessionInfo[];
   listStaleSessions: () => Promise<StaleSessionsListResult>;
   cleanStaleSessions: (params: { pids: number[] }) => Promise<StaleSessionsCleanResult>;
 };
+
+export interface TrackedSessionInfo {
+  pid: number;
+  happySessionId?: string;
+  spawnId?: string;
+  startedAt?: number;
+}
 
 export interface StaleSessionInfo {
   pid: number;
@@ -459,6 +467,7 @@ export class ApiMachineClient {
     resumeAutoDreamProfile,
     runAutoDreamProfileNow,
     removeAutoDreamProfile,
+    listTrackedSessions,
     listStaleSessions,
     cleanStaleSessions,
   }: MachineRpcHandlers) {
@@ -592,6 +601,14 @@ export class ApiMachineClient {
         errors: result.errors,
       };
     });
+
+    // List all daemon-tracked sessions (PID → Happy session ID mapping).
+    // Used by diagnostics page to associate processes that were spawned fresh
+    // (without --happy-session-id in their command line) with their Happy session.
+    this.rpcHandlerManager.registerHandler(
+      "list-tracked-sessions",
+      () => ({ sessions: listTrackedSessions() }),
+    );
 
     // List daemon-tracked sessions whose heartbeat has gone silent or whose
     // pid is dead. Does not kill anything — the App should show the list,
