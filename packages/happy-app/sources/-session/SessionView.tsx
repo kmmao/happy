@@ -844,7 +844,11 @@ function SessionViewInner({
   }, []);
 
   // Floating options from AI reply at visible/navigated position (or latest)
-  const effectiveAnchor = showScrollToBottom ? scrollAnchor : -1;
+  // Clamp scrollAnchor to the local messages array length — ChatList may use a
+  // larger displayLimit, producing indices beyond SessionView's message slice.
+  const effectiveAnchor = showScrollToBottom
+    ? Math.min(scrollAnchor, messages.length - 1)
+    : -1;
   const latestOptions = useLatestOptions(messages, effectiveAnchor);
   const latestOptionsHash = React.useMemo(
     () => buildOptionsHash(latestOptions.items),

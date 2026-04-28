@@ -23,6 +23,7 @@ export function extractLatestOptions(
   if (anchorIndex >= 0) {
     for (let i = anchorIndex - 1; i >= 0; i--) {
       const msg = messages[i];
+      if (!msg) break; // anchorIndex may exceed messages.length when ChatList displayLimit > SessionView limit
       if (msg.kind === "user-text") break;
       if (msg.kind === "agent-text") {
         const blocks = parseMarkdown(msg.text);
