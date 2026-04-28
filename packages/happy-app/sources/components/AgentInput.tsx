@@ -1068,8 +1068,8 @@ export const AgentInput = React.memo(
                   disabled={!props.onModelModeChange || availableModels.length === 0}
                   hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
                   style={({ pressed }) => ({
-                    flexDirection: Platform.OS === "android" ? "column" : "row",
-                    alignItems: Platform.OS === "android" ? "flex-end" : "center",
+                    flexDirection: "row",
+                    alignItems: "center",
                     alignSelf: "stretch",
                     paddingLeft: 10,
                     paddingRight: 8,
@@ -1087,10 +1087,10 @@ export const AgentInput = React.memo(
                         : pressed
                           ? 0.9
                           : 1,
-                    gap: Platform.OS === "android" ? 3 : 6,
+                    gap: 6,
                   })}
                 >
-                  {modelSummaryStatusLabel ? (
+                  {modelSummaryStatusLabel && Platform.OS !== "android" ? (
                     <View
                       style={{
                         flexDirection: "row",
@@ -1119,40 +1119,38 @@ export const AgentInput = React.memo(
                       </Text>
                     </View>
                   ) : null}
-                  <View style={{ flexDirection: "row", alignItems: "center", gap: 4, alignSelf: Platform.OS === "android" ? "stretch" : undefined }}>
-                    <Text
-                      style={{
-                        flex: 1,
-                        fontSize: 11,
-                        color: modelSummaryVisualState.summaryTextColor,
-                        textAlign: "right",
-                        ...Typography.default(),
-                      }}
-                    >
-                      {buildRpcSummaryText({
-                        permissionLabel: displayPermissionMode
-                          ? withSandboxSuffix(
-                              displayPermissionMode.name,
-                              permissionModeKey,
-                            )
-                          : null,
-                        modelLabel: props.effectiveModelLabel ?? props.modelMode?.name,
-                        reasoningLabels: getReasoningSummaryLabels({
-                          isCodex,
-                          isGemini,
-                          reasoning: props.reasoning,
-                          translate: t,
-                        }),
-                      })}
-                    </Text>
-                    {!!props.onModelModeChange && availableModels.length > 0 && (
-                      <Ionicons
-                        name="chevron-forward"
-                        size={12}
-                        color={modelSummaryVisualState.summaryTextColor}
-                      />
-                    )}
-                  </View>
+                  <Text
+                    style={{
+                      flex: 1,
+                      fontSize: 11,
+                      color: modelSummaryVisualState.summaryTextColor,
+                      textAlign: "right",
+                      ...Typography.default(),
+                    }}
+                  >
+                    {buildRpcSummaryText({
+                      permissionLabel: displayPermissionMode
+                        ? withSandboxSuffix(
+                            displayPermissionMode.name,
+                            permissionModeKey,
+                          )
+                        : null,
+                      modelLabel: props.effectiveModelLabel ?? props.modelMode?.name,
+                      reasoningLabels: getReasoningSummaryLabels({
+                        isCodex,
+                        isGemini,
+                        reasoning: props.reasoning,
+                        translate: t,
+                      }),
+                    })}
+                  </Text>
+                  {!!props.onModelModeChange && availableModels.length > 0 && (
+                    <Ionicons
+                      name="chevron-forward"
+                      size={12}
+                      color={modelSummaryVisualState.summaryTextColor}
+                    />
+                  )}
                 </Pressable>
               </Animated.View>
             </View>
