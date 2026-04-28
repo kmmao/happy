@@ -1,8 +1,12 @@
+import { Platform, StyleSheet } from "react-native";
+
+const nativeBorderWidth = Platform.OS === "web" ? 1 : StyleSheet.hairlineWidth;
+
 export function getFavoriteSlashChipGlassStyle() {
     return {
         container: {
             borderRadius: 18,
-            borderWidth: 1,
+            borderWidth: nativeBorderWidth,
             overflow: "hidden" as const,
         },
         blur: {
@@ -26,7 +30,7 @@ export function getFloatingGlassChipStyle() {
             marginTop: 8,
             marginBottom: 4,
             borderRadius: 14,
-            borderWidth: 1,
+            borderWidth: nativeBorderWidth,
             overflow: "hidden" as const,
         },
         blur: {
