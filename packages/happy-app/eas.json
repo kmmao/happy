@@ -9,6 +9,10 @@
       "developmentClient": true,
       "distribution": "internal",
       "channel": "development",
+      "cache": {
+        "key": "gradle-v1",
+        "paths": ["~/.gradle/caches", "~/.gradle/wrapper"]
+      },
       "env": {
         "APP_ENV": "development"
       }
@@ -18,6 +22,10 @@
       "developmentClient": true,
       "distribution": "store",
       "channel": "development",
+      "cache": {
+        "key": "gradle-v1",
+        "paths": ["~/.gradle/caches", "~/.gradle/wrapper"]
+      },
       "env": {
         "APP_ENV": "development"
       }
@@ -26,6 +34,10 @@
       "autoIncrement": true,
       "distribution": "internal",
       "channel": "preview",
+      "cache": {
+        "key": "gradle-v1",
+        "paths": ["~/.gradle/caches", "~/.gradle/wrapper"]
+      },
       "env": {
         "APP_ENV": "preview"
       }
@@ -34,6 +46,10 @@
       "autoIncrement": true,
       "distribution": "store",
       "channel": "preview",
+      "cache": {
+        "key": "gradle-v1",
+        "paths": ["~/.gradle/caches", "~/.gradle/wrapper"]
+      },
       "env": {
         "APP_ENV": "preview"
       }
