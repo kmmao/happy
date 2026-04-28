@@ -1,5 +1,30 @@
 # Changelog
 
+## 2.16.0 - 2026-04-28
+
+This release significantly improves chat performance for long sessions and adds an Events tab to the project view, real-time diagnostics, and several Android UI refinements.
+
+### Performance
+- Improved chat performance in long sessions — the message list now stays smooth regardless of conversation length by capping the rendered window to the 300 most recent messages
+- Added "Load earlier messages" to the top of the chat list, with automatic loading when scrolling up
+
+### Project
+- Added Events tab to the project view with a real-time badge showing pending action count
+
+### Diagnostics
+- Added real-time tool activity display in session diagnostics with process linkage
+- Improved diagnostics UI layout and cleanup messaging
+
+### Profiles & Webhooks
+- Added profile picker to webhook route configuration — each webhook can now run under a specific runtime profile
+
+### Session
+- Added session process ID display in the chat header
+
+### Android
+- Fixed model summary text and RPC status pill layout to prevent truncation on smaller screens
+- Fixed chip border and shadow rendering on Android
+
 ## 2.15.1 - 2026-04-28
 
 Fixed an issue where archiving a session would fail with an error when the CLI daemon was offline or the process had already exited.

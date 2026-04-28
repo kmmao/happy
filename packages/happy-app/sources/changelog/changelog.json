@@ -2,6 +2,23 @@
   "entries": {
     "en": [
       {
+        "version": "2.16.0",
+        "date": "2026-04-28",
+        "summary": "This release significantly improves chat performance for long sessions and adds an Events tab to the project view, real-time diagnostics, and several Android UI refinements.",
+        "changes": [
+          "Improved chat performance in long sessions — the message list now stays smooth regardless of conversation length by capping the rendered window to the 300 most recent messages",
+          "Added \"Load earlier messages\" to the top of the chat list, with automatic loading when scrolling up",
+          "Added Events tab to the project view with a real-time badge showing pending action count",
+          "Added real-time tool activity display in session diagnostics with process linkage",
+          "Improved diagnostics UI layout and cleanup messaging",
+          "Added profile picker to webhook route configuration — each webhook can now run under a specific runtime profile",
+          "Added session process ID display in the chat header",
+          "Fixed model summary text and RPC status pill layout to prevent truncation on smaller screens",
+          "Fixed chip border and shadow rendering on Android"
+        ],
+        "rawMarkdown": "## 2.16.0 - 2026-04-28\n\n\nThis release significantly improves chat performance for long sessions and adds an Events tab to the project view, real-time diagnostics, and several Android UI refinements.\n\n### Performance\n- Improved chat performance in long sessions — the message list now stays smooth regardless of conversation length by capping the rendered window to the 300 most recent messages\n- Added \"Load earlier messages\" to the top of the chat list, with automatic loading when scrolling up\n\n### Project\n- Added Events tab to the project view with a real-time badge showing pending action count\n\n### Diagnostics\n- Added real-time tool activity display in session diagnostics with process linkage\n- Improved diagnostics UI layout and cleanup messaging\n\n### Profiles & Webhooks\n- Added profile picker to webhook route configuration — each webhook can now run under a specific runtime profile\n\n### Session\n- Added session process ID display in the chat header\n\n### Android\n- Fixed model summary text and RPC status pill layout to prevent truncation on smaller screens\n- Fixed chip border and shadow rendering on Android"
+      },
+      {
         "version": "2.15.1",
         "date": "2026-04-28",
         "summary": "Fixed an issue where archiving a session would fail with an error when the CLI daemon was offline or the process had already exited.",
@@ -600,6 +617,23 @@
     ],
     "zh-Hans": [
       {
+        "version": "2.16.0",
+        "date": "2026-04-28",
+        "summary": "本次更新大幅改善长时间对话的流畅度，新增项目事件 Tab、实时诊断信息展示，以及多项 Android 界面修复。",
+        "changes": [
+          "改进长会话的聊天性能 — 消息列表始终只渲染最近 300 条消息，无论对话多长都保持流畅",
+          "在聊天列表顶部新增「加载更早的消息」，向上滚动时自动加载历史记录",
+          "新增项目详情页事件 Tab，实时显示待处理操作数量角标",
+          "新增会话诊断页实时工具活动展示，并与进程 ID 关联",
+          "改进诊断 UI 布局及清理提示文案",
+          "新增 Webhook 路由配置中的 Profile 选择器 — 每个 Webhook 现在可以指定独立的运行时 Profile",
+          "新增在聊天头部显示会话进程 ID",
+          "修复模型摘要文字和 RPC 状态胶囊布局，避免在小屏幕上截断",
+          "修复 Android 上芯片边框和阴影渲染异常"
+        ],
+        "rawMarkdown": "## 2.16.0 - 2026-04-28\n\n\n本次更新大幅改善长时间对话的流畅度，新增项目事件 Tab、实时诊断信息展示，以及多项 Android 界面修复。\n\n### 性能\n- 改进长会话的聊天性能 — 消息列表始终只渲染最近 300 条消息，无论对话多长都保持流畅\n- 在聊天列表顶部新增「加载更早的消息」，向上滚动时自动加载历史记录\n\n### 项目\n- 新增项目详情页事件 Tab，实时显示待处理操作数量角标\n\n### 诊断\n- 新增会话诊断页实时工具活动展示，并与进程 ID 关联\n- 改进诊断 UI 布局及清理提示文案\n\n### Profile 与 Webhook\n- 新增 Webhook 路由配置中的 Profile 选择器 — 每个 Webhook 现在可以指定独立的运行时 Profile\n\n### 会话\n- 新增在聊天头部显示会话进程 ID\n\n### Android\n- 修复模型摘要文字和 RPC 状态胶囊布局，避免在小屏幕上截断\n- 修复 Android 上芯片边框和阴影渲染异常"
+      },
+      {
         "version": "2.15.1",
         "date": "2026-04-28",
         "summary": "修复了当 CLI daemon 离线或进程已退出时，归档会话操作报错失败的问题。",
@@ -1177,7 +1211,7 @@
       }
     ]
   },
-  "latestVersion": "2.15.1",
+  "latestVersion": "2.16.0",
   "availableLocales": [
     "en",
     "zh-Hans"
