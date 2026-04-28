@@ -1053,7 +1053,7 @@ export const AgentInput = React.memo(
                   maxWidth: screenWidth > 700 ? 360 : 290,
                   marginLeft: 12,
                   borderRadius: 12,
-                  borderWidth: props.modelSummaryRpcState ? 1 : 0,
+                  borderWidth: props.modelSummaryRpcState && Platform.OS !== "android" ? 1 : 0,
                   borderColor: modelSummaryVisualState.borderColor,
                   backgroundColor: modelSummaryVisualState.backgroundColor,
                   shadowColor: modelSummaryVisualState.glowColor,
@@ -1460,9 +1460,13 @@ export const AgentInput = React.memo(
                             ? theme.dark
                               ? `${accentColor}10`
                               : `${accentColor}18`
-                            : theme.dark
-                              ? `${accentColor}0A`
-                              : `${accentColor}14`,
+                            : Platform.OS === "android"
+                              ? theme.dark
+                                ? `${accentColor}18`
+                                : `${accentColor}22`
+                              : theme.dark
+                                ? `${accentColor}0A`
+                                : `${accentColor}14`,
                         shadowColor: "#000000",
                         shadowOffset: { width: 0, height: 4 },
                         shadowOpacity: theme.dark

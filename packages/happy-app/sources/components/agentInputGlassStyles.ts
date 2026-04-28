@@ -1,6 +1,8 @@
 import { Platform, StyleSheet } from "react-native";
 
-const nativeBorderWidth = Platform.OS === "web" ? 1 : StyleSheet.hairlineWidth;
+// Android doesn't support colored shadow/glow — border without glow looks like a thick outline.
+// Hide border on Android and compensate with slightly higher background opacity.
+const nativeBorderWidth = Platform.select({ web: 1, ios: StyleSheet.hairlineWidth, default: 0 });
 
 export function getFavoriteSlashChipGlassStyle() {
     return {
