@@ -6,6 +6,7 @@ import {
   MAX_DISPLAY_MESSAGES,
 } from "@/sync/storage";
 import {
+  ActivityIndicator,
   FlatList,
   NativeScrollEvent,
   NativeSyntheticEvent,
@@ -57,7 +58,7 @@ export const ChatList = React.memo(
     }
   >((props, ref) => {
     const [displayLimit, setDisplayLimit] = React.useState(MAX_DISPLAY_MESSAGES);
-    const { messages, hasOlderMessages } = useSessionMessages(
+    const { messages, hasOlderMessages, isBackfilling } = useSessionMessages(
       props.session.id,
       displayLimit,
     );
@@ -71,6 +72,7 @@ export const ChatList = React.memo(
         sessionId={props.session.id}
         messages={messages}
         hasOlderMessages={hasOlderMessages}
+        isBackfilling={isBackfilling}
         onLoadMore={handleLoadMore}
         permissionModeKey={props.session.permissionMode}
         onScrollAwayFromBottom={props.onScrollAwayFromBottom}
@@ -85,15 +87,22 @@ export const ChatList = React.memo(
 const OlderMessagesArea = React.memo(
   ({
     hasOlderMessages,
+    isBackfilling,
     onLoadMore,
   }: {
     hasOlderMessages: boolean;
+    isBackfilling: boolean;
     onLoadMore: () => void;
   }) => {
     const headerHeight = useHeaderHeight();
     const safeArea = useSafeAreaInsets();
     return (
       <View>
+        {isBackfilling && !hasOlderMessages && (
+          <View style={{ paddingVertical: 12, alignItems: "center" }}>
+            <ActivityIndicator size="small" />
+          </View>
+        )}
         {hasOlderMessages && (
           <Pressable
             onPress={onLoadMore}
@@ -138,6 +147,7 @@ const ChatListInternal = React.memo(
       sessionId: string;
       messages: Message[];
       hasOlderMessages: boolean;
+      isBackfilling: boolean;
       onLoadMore: () => void;
       permissionModeKey?: string | null;
       onScrollAwayFromBottom?: (isAway: boolean) => void;
@@ -520,6 +530,7 @@ const ChatListInternal = React.memo(
         ListFooterComponent={
           <OlderMessagesArea
             hasOlderMessages={props.hasOlderMessages}
+            isBackfilling={props.isBackfilling}
             onLoadMore={props.onLoadMore}
           />
         }

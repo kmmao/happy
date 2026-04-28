@@ -1,5 +1,20 @@
 # Changelog
 
+## 2.17.0 - 2026-04-29
+
+This release improves the experience when opening long chat sessions and fixes several rendering and layout issues.
+
+### Chat
+- Added a loading indicator at the top of the chat list while older messages are being fetched in the background — you'll now see a spinner instead of a silent wait when opening a session with a long history
+- Fixed a bug where the message loading system could enter an infinite update loop under certain conditions
+
+### Performance
+- Reduced rendering overhead in chat sessions, improving scroll smoothness
+
+### Side Panel
+- Fixed tab bar width adapting correctly to content size on both iOS and Android
+- Fixed horizontal scrolling in the Side Panel tab row so all tabs are reachable
+
 ## 2.16.1 - 2026-04-28
 
 Minor reliability improvement to the chat sync system.

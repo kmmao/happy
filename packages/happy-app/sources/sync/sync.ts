@@ -2150,6 +2150,13 @@ class Sync {
         }
       }
 
+      // Show backfill indicator while filling the gap below the newest batch.
+      // Only fires when boundary !== null (first-load of session with > 300 messages).
+      const isBackfillOperation = boundary !== null;
+      if (isBackfillOperation) {
+        storage.getState().setSessionBackfilling(sessionId, true);
+      }
+      try {
       while (hasMore) {
         // Server caps limit at 500 (v3SessionRoutes getMessagesQuerySchema).
         // Larger pages cut round-trips on long sessions by ~5x.
@@ -2226,6 +2233,11 @@ class Sync {
           afterSeq = maxSeq + 1;
         } else {
           afterSeq = maxSeq;
+        }
+      }
+      } finally {
+        if (isBackfillOperation) {
+          storage.getState().setSessionBackfilling(sessionId, false);
         }
       }
 

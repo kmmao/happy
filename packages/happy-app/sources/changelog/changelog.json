@@ -2,6 +2,19 @@
   "entries": {
     "en": [
       {
+        "version": "2.17.0",
+        "date": "2026-04-29",
+        "summary": "This release improves the experience when opening long chat sessions and fixes several rendering and layout issues.",
+        "changes": [
+          "Added a loading indicator at the top of the chat list while older messages are being fetched in the background — you'll now see a spinner instead of a silent wait when opening a session with a long history",
+          "Fixed a bug where the message loading system could enter an infinite update loop under certain conditions",
+          "Reduced rendering overhead in chat sessions, improving scroll smoothness",
+          "Fixed tab bar width adapting correctly to content size on both iOS and Android",
+          "Fixed horizontal scrolling in the Side Panel tab row so all tabs are reachable"
+        ],
+        "rawMarkdown": "## 2.17.0 - 2026-04-29\n\n\nThis release improves the experience when opening long chat sessions and fixes several rendering and layout issues.\n\n### Chat\n- Added a loading indicator at the top of the chat list while older messages are being fetched in the background — you'll now see a spinner instead of a silent wait when opening a session with a long history\n- Fixed a bug where the message loading system could enter an infinite update loop under certain conditions\n\n### Performance\n- Reduced rendering overhead in chat sessions, improving scroll smoothness\n\n### Side Panel\n- Fixed tab bar width adapting correctly to content size on both iOS and Android\n- Fixed horizontal scrolling in the Side Panel tab row so all tabs are reachable"
+      },
+      {
         "version": "2.16.1",
         "date": "2026-04-28",
         "summary": "Minor reliability improvement to the chat sync system.",
@@ -626,6 +639,19 @@
     ],
     "zh-Hans": [
       {
+        "version": "2.17.0",
+        "date": "2026-04-29",
+        "summary": "本次更新改善了打开长对话时的体验，并修复了若干渲染和布局问题。",
+        "changes": [
+          "在聊天列表顶部新增加载指示器，当后台拉取历史消息时显示 spinner — 打开消息较多的会话时，不再是无提示的等待",
+          "修复消息加载系统在特定条件下可能进入无限更新循环的问题",
+          "降低会话渲染开销，改善滚动流畅度",
+          "修复 Side Panel tab 栏宽度未能正确自适应内容尺寸的问题（iOS 和 Android 均已修复）",
+          "修复 Side Panel tab 行横向滚动，确保所有 tab 均可访问"
+        ],
+        "rawMarkdown": "## 2.17.0 - 2026-04-29\n\n\n本次更新改善了打开长对话时的体验，并修复了若干渲染和布局问题。\n\n### 聊天\n- 在聊天列表顶部新增加载指示器，当后台拉取历史消息时显示 spinner — 打开消息较多的会话时，不再是无提示的等待\n- 修复消息加载系统在特定条件下可能进入无限更新循环的问题\n\n### 性能\n- 降低会话渲染开销，改善滚动流畅度\n\n### Side Panel\n- 修复 Side Panel tab 栏宽度未能正确自适应内容尺寸的问题（iOS 和 Android 均已修复）\n- 修复 Side Panel tab 行横向滚动，确保所有 tab 均可访问"
+      },
+      {
         "version": "2.16.1",
         "date": "2026-04-28",
         "summary": "对聊天同步机制的小幅可靠性改进。",
@@ -1229,7 +1255,7 @@
       }
     ]
   },
-  "latestVersion": "2.16.1",
+  "latestVersion": "2.17.0",
   "availableLocales": [
     "en",
     "zh-Hans"
