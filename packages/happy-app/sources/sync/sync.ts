@@ -493,28 +493,6 @@ class Sync {
     }
   };
 
-  /**
-   * Full refresh for a session: reset message seq to force full re-fetch,
-   * refresh session metadata, and git status.
-   * Used by the manual refresh button in the header.
-   * Returns a promise that resolves when message fetch completes.
-   */
-  refreshSession = async (sessionId: string) => {
-    // Reset lastSeq so fetchMessages does a full re-fetch instead of incremental.
-    // Clear backfill boundary too — it refers to a prior reverse-pagination
-    // batch that may no longer be accurate after the manual refresh.
-    this.sessionLastSeq.delete(sessionId);
-    deleteLastSeq(sessionId);
-    this.backfillBoundaries.delete(sessionId);
-    deleteBackfillBoundary(sessionId);
-
-    const messagesPromise = this.getMessagesSync(sessionId)?.invalidateAndAwait();
-    gitStatusSync.getSync(sessionId).invalidate();
-    this.sessionsSync.invalidate();
-
-    await messagesPromise;
-  };
-
   private getMessagesSync(sessionId: string): InvalidateSync | null {
     if (this.deleted404Sessions.has(sessionId)) {
       return null;

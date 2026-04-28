@@ -1,11 +1,10 @@
 import * as React from "react";
-import { Animated, Easing, View, Text, Platform, Pressable } from "react-native";
+import { View, Text, Platform, Pressable } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { Avatar } from "@/components/Avatar";
-import { hapticsLight } from "@/components/haptics";
 import { Typography } from "@/constants/Typography";
 import { useHeaderHeight } from "@/utils/responsive";
 import { layout } from "@/components/layout";
@@ -19,7 +18,6 @@ interface ChatHeaderViewProps {
   onBackPress?: () => void;
   onAvatarPress?: () => void;
   onPanelPress?: () => void;
-  onRefreshPress?: () => Promise<void> | void;
   avatarId?: string;
   backgroundColor?: string;
   tintColor?: string;
@@ -44,7 +42,6 @@ export const ChatHeaderView: React.FC<ChatHeaderViewProps> = ({
   onBackPress,
   onAvatarPress,
   onPanelPress,
-  onRefreshPress,
   avatarId,
   isConnected = true,
   flavor,
@@ -64,49 +61,6 @@ export const ChatHeaderView: React.FC<ChatHeaderViewProps> = ({
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const headerHeight = useHeaderHeight();
-
-  const spinAnim = React.useRef(new Animated.Value(0)).current;
-  const isSpinning = React.useRef(false);
-
-  const handleRefreshPress = React.useCallback(async () => {
-    if (isSpinning.current || !onRefreshPress) return;
-    isSpinning.current = true;
-    hapticsLight();
-
-    // Start looping spin animation
-    spinAnim.setValue(0);
-    const loopAnim = Animated.loop(
-      Animated.timing(spinAnim, {
-        toValue: 1,
-        duration: 750,
-        easing: Easing.linear,
-        useNativeDriver: true,
-      }),
-    );
-    loopAnim.start();
-
-    try {
-      await onRefreshPress();
-    } finally {
-      // Stop looping and finish one last clean rotation
-      loopAnim.stop();
-      spinAnim.setValue(0);
-      Animated.timing(spinAnim, {
-        toValue: 1,
-        duration: 300,
-        easing: Easing.out(Easing.quad),
-        useNativeDriver: true,
-      }).start(() => {
-        isSpinning.current = false;
-        hapticsLight();
-      });
-    }
-  }, [onRefreshPress, spinAnim]);
-
-  const spinInterpolation = spinAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: ["0deg", "360deg"],
-  });
 
   const handleBackPress = () => {
     if (onBackPress) {
@@ -221,22 +175,6 @@ export const ChatHeaderView: React.FC<ChatHeaderViewProps> = ({
                 size={20}
                 color={theme.colors.header.tint}
               />
-            </Pressable>
-          )}
-
-          {onRefreshPress && (
-            <Pressable
-              onPress={handleRefreshPress}
-              hitSlop={15}
-              style={styles.actionButton}
-            >
-              <Animated.View style={{ transform: [{ rotate: spinInterpolation }] }}>
-                <Ionicons
-                  name="refresh-outline"
-                  size={20}
-                  color={theme.colors.header.tint}
-                />
-              </Animated.View>
             </Pressable>
           )}
 

@@ -411,7 +411,6 @@ export const SessionView = React.memo((props: { id: string }) => {
                 onKnowledgePress={knowledgeCount > 0 ? () => setShowKnowledgeSheet(true) : undefined}
                 onPanelPress={shouldShowMobilePanelButton ? () => setShowMobilePanelSheet(true) : undefined}
                 onBackPress={() => router.back()}
-                onRefreshPress={() => sync.refreshSession(sessionId)}
                 onResumePress={canReactivate ? performReactivation : undefined}
                 onForkPress={session?.forkedFromSessionId ? () => router.push(`/session/${session.forkedFromSessionId!}` as any) : undefined}
                 devButtonState={headerProps.isConnected && hasDevConfig ? "idle" : "hidden"}
