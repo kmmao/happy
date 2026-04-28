@@ -47,6 +47,8 @@ export const SidePanelSessionTab = React.memo<SidePanelSessionTabProps>(
                         activeTab={activeSubTab}
                         onChange={(tabKey) => setActiveSubTab(tabKey as SessionSubTab)}
                         compact
+                        scrollable
+                        tabMinWidth={64}
                     />
                 </View>
 

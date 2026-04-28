@@ -218,6 +218,8 @@ export const SessionSidePanel = React.memo<SessionSidePanelProps>(
                                 tabs={topTabs}
                                 activeTab={effectiveActiveTab}
                                 onChange={(tabKey) => setActiveTab(tabKey as SessionPanelTab)}
+                                scrollable
+                                tabMinWidth={68}
                                 trailingAccessory={(
                                     <Pressable
                                         onPress={onToggleCollapse}
