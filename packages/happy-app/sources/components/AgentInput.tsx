@@ -1050,7 +1050,7 @@ export const AgentInput = React.memo(
                 style={{
                   alignSelf: "flex-end",
                   minWidth: 150,
-                  maxWidth: screenWidth > 700 ? 360 : 290,
+                  maxWidth: screenWidth > 700 ? 360 : screenWidth - 80,
                   marginLeft: 12,
                   borderRadius: 12,
                   borderWidth: props.modelSummaryRpcState && Platform.OS !== "android" ? 1 : 0,
@@ -1090,7 +1090,7 @@ export const AgentInput = React.memo(
                     gap: 6,
                   })}
                 >
-                  {modelSummaryStatusLabel && Platform.OS !== "android" ? (
+                  {modelSummaryStatusLabel ? (
                     <View
                       style={{
                         flexDirection: "row",
@@ -1120,6 +1120,8 @@ export const AgentInput = React.memo(
                     </View>
                   ) : null}
                   <Text
+                    numberOfLines={1}
+                    allowFontScaling={false}
                     style={{
                       flex: 1,
                       fontSize: 11,
