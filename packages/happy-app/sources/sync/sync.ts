@@ -126,8 +126,6 @@ import {
   loadMessageCache,
   saveMessageCache,
   deleteMessageCache,
-  loadHistoryComplete,
-  saveHistoryComplete,
   deleteHistoryComplete,
 } from "./messageCache";
 import { fetchAccountProfiles } from "./apiAccountProfiles";
@@ -179,6 +177,10 @@ class Sync {
   private sessionQueueProcessing = new Set<string>();
   private sessionMessageLocks = new Map<string, AsyncLock>();
   private deleted404Sessions = new Set<string>(); // Guard against re-creating sync for 404'd sessions
+  // Tracks sessions that have completed a full history backfill in this app session.
+  // In-memory only (not persisted) so every app restart re-backfills trimmed sessions,
+  // ensuring users can always access their full message history.
+  private backfilledSessions = new Set<string>();
   private sessionDataKeys = new Map<string, Uint8Array>(); // Store session data encryption keys internally
   private machineDataKeys = new Map<string, Uint8Array>(); // Store machine data encryption keys internally
   private artifactDataKeys = new Map<string, Uint8Array>(); // Store artifact data encryption keys internally
@@ -459,16 +461,19 @@ class Sync {
         storage.getState().restoreMessagesFromCache(sessionId, cached);
         if (cached.isTrimmed) {
           // Cache was truncated — older messages are missing.
-          // If we have not yet completed a full history backfill, leave lastSeq
-          // unset so fetchMessages uses afterSeq=0 and loads the full history.
-          // Once the backfill completes, saveHistoryComplete() is called and
-          // future opens use the normal incremental sync path.
-          if (!loadHistoryComplete(sessionId)) {
+          // If we haven't done a full backfill for this session yet in this app
+          // session, clear lastSeq so fetchMessages uses afterSeq=0 and loads
+          // the full history. After the backfill completes, the session is added
+          // to backfilledSessions so subsequent opens within the same app session
+          // use the normal incremental sync path.
+          // Using in-memory tracking (not persisted) ensures every app restart
+          // re-runs the backfill, so users always have access to full history.
+          if (!this.backfilledSessions.has(sessionId)) {
             // afterSeq will default to 0 → triggers full backfill
             this.sessionLastSeq.delete(sessionId);
             deleteLastSeq(sessionId);
           } else if (!this.sessionLastSeq.has(sessionId)) {
-            // History already complete — use cached lastSeq for incremental sync
+            // Already backfilled this session — use cached lastSeq for incremental sync
             this.sessionLastSeq.set(sessionId, cached.lastSeq);
           }
         } else if (!this.sessionLastSeq.has(sessionId)) {
@@ -2284,9 +2289,10 @@ class Sync {
 
       storage.getState().applyMessagesLoaded(sessionId);
       // If this was a full history fetch (afterSeq started at 0), mark the
-      // session history as complete so future opens use incremental sync only.
+      // session as backfilled so subsequent opens within this app session use
+      // incremental sync only (avoids redundant re-backfill within same session).
       if (initialAfterSeq === 0) {
-        saveHistoryComplete(sessionId);
+        this.backfilledSessions.add(sessionId);
       }
       log.log(
         `💬 fetchMessages completed for session ${sessionId} - processed ${totalNormalized} messages`,
