@@ -1059,8 +1059,8 @@ export const AgentInput = React.memo(
                   shadowColor: modelSummaryVisualState.glowColor,
                   shadowOffset: { width: 0, height: 0 },
                   shadowRadius: props.modelSummaryRpcState === "reconnecting" ? 10 : 6,
-                  shadowOpacity: modelSummaryGlowOpacity,
-                  elevation: props.modelSummaryRpcState === "reconnecting" ? 5 : 1,
+                  shadowOpacity: Platform.OS === "android" ? 0 : modelSummaryGlowOpacity,
+                  elevation: Platform.OS === "android" ? 0 : props.modelSummaryRpcState === "reconnecting" ? 5 : 1,
                 }}
               >
                 <Pressable
@@ -1689,12 +1689,14 @@ export const AgentInput = React.memo(
                     backgroundColor:
                       Platform.OS === "web"
                         ? `${theme.colors.surface}B8`
-                        : `${theme.colors.surface}7A`,
+                        : Platform.OS === "android"
+                          ? `${theme.colors.surface}CC`
+                          : `${theme.colors.surface}7A`,
                     shadowColor: accentColor,
                     shadowOffset: { width: 0, height: 6 },
-                    shadowOpacity: pressed ? 0.08 : 0.16,
+                    shadowOpacity: Platform.OS === "android" ? 0 : (pressed ? 0.08 : 0.16),
                     shadowRadius: 12,
-                    elevation: pressed ? 1 : 2,
+                    elevation: Platform.OS === "android" ? 0 : (pressed ? 1 : 2),
                   })}
                 >
                   <BlurView
