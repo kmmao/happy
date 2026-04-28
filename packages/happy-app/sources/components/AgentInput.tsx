@@ -1050,7 +1050,7 @@ export const AgentInput = React.memo(
                 style={{
                   alignSelf: "flex-end",
                   minWidth: 150,
-                  maxWidth: screenWidth > 700 ? 360 : 260,
+                  maxWidth: screenWidth > 700 ? 360 : 290,
                   marginLeft: 12,
                   borderRadius: 12,
                   borderWidth: props.modelSummaryRpcState ? 1 : 0,
@@ -1095,9 +1095,9 @@ export const AgentInput = React.memo(
                       style={{
                         flexDirection: "row",
                         alignItems: "center",
-                        gap: 5,
-                        paddingHorizontal: 7,
-                        paddingVertical: 3,
+                        gap: Platform.select({ web: 5, default: 4 }),
+                        paddingHorizontal: Platform.select({ web: 7, default: 5 }),
+                        paddingVertical: Platform.select({ web: 3, default: 2 }),
                         borderRadius: 999,
                         backgroundColor: modelSummaryVisualState.pillBackgroundColor,
                         flexShrink: 0,
@@ -1106,7 +1106,7 @@ export const AgentInput = React.memo(
                       <StatusDot
                         color={modelSummaryVisualState.pillDotColor}
                         isPulsing={props.modelSummaryRpcState === "reconnecting"}
-                        size={5}
+                        size={Platform.select({ web: 5, default: 4 })}
                       />
                       <Text
                         style={{
