@@ -1068,8 +1068,8 @@ export const AgentInput = React.memo(
                   disabled={!props.onModelModeChange || availableModels.length === 0}
                   hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
                   style={({ pressed }) => ({
-                    flexDirection: "row",
-                    alignItems: "center",
+                    flexDirection: Platform.OS === "android" ? "column" : "row",
+                    alignItems: Platform.OS === "android" ? "flex-end" : "center",
                     alignSelf: "stretch",
                     paddingLeft: 10,
                     paddingRight: 8,
@@ -1087,7 +1087,7 @@ export const AgentInput = React.memo(
                         : pressed
                           ? 0.9
                           : 1,
-                    gap: 6,
+                    gap: Platform.OS === "android" ? 3 : 6,
                   })}
                 >
                   {modelSummaryStatusLabel ? (
@@ -1119,39 +1119,40 @@ export const AgentInput = React.memo(
                       </Text>
                     </View>
                   ) : null}
-                  <Text
-                    style={{
-                      flex: 1,
-                      fontSize: 11,
-                      color: modelSummaryVisualState.summaryTextColor,
-                      textAlign: "right",
-                      flexWrap: "wrap",
-                      ...Typography.default(),
-                    }}
-                  >
-                    {buildRpcSummaryText({
-                      permissionLabel: displayPermissionMode
-                        ? withSandboxSuffix(
-                            displayPermissionMode.name,
-                            permissionModeKey,
-                          )
-                        : null,
-                      modelLabel: props.effectiveModelLabel ?? props.modelMode?.name,
-                      reasoningLabels: getReasoningSummaryLabels({
-                        isCodex,
-                        isGemini,
-                        reasoning: props.reasoning,
-                        translate: t,
-                      }),
-                    })}
-                  </Text>
-                  {!!props.onModelModeChange && availableModels.length > 0 && (
-                    <Ionicons
-                      name="chevron-forward"
-                      size={12}
-                      color={modelSummaryVisualState.summaryTextColor}
-                    />
-                  )}
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 4, alignSelf: Platform.OS === "android" ? "stretch" : undefined }}>
+                    <Text
+                      style={{
+                        flex: 1,
+                        fontSize: 11,
+                        color: modelSummaryVisualState.summaryTextColor,
+                        textAlign: "right",
+                        ...Typography.default(),
+                      }}
+                    >
+                      {buildRpcSummaryText({
+                        permissionLabel: displayPermissionMode
+                          ? withSandboxSuffix(
+                              displayPermissionMode.name,
+                              permissionModeKey,
+                            )
+                          : null,
+                        modelLabel: props.effectiveModelLabel ?? props.modelMode?.name,
+                        reasoningLabels: getReasoningSummaryLabels({
+                          isCodex,
+                          isGemini,
+                          reasoning: props.reasoning,
+                          translate: t,
+                        }),
+                      })}
+                    </Text>
+                    {!!props.onModelModeChange && availableModels.length > 0 && (
+                      <Ionicons
+                        name="chevron-forward"
+                        size={12}
+                        color={modelSummaryVisualState.summaryTextColor}
+                      />
+                    )}
+                  </View>
                 </Pressable>
               </Animated.View>
             </View>
