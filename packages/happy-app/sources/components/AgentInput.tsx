@@ -1469,11 +1469,11 @@ export const AgentInput = React.memo(
                                 : `${accentColor}14`,
                         shadowColor: "#000000",
                         shadowOffset: { width: 0, height: 4 },
-                        shadowOpacity: theme.dark
+                        shadowOpacity: Platform.OS === "android" ? 0 : theme.dark
                           ? (pressed ? 0.10 : 0.16)
                           : (pressed ? 0.05 : 0.08),
                         shadowRadius: 8,
-                        elevation: pressed ? 1 : 2,
+                        elevation: Platform.OS === "android" ? 0 : (pressed ? 1 : 2),
                       })}
                     >
                       <BlurView
