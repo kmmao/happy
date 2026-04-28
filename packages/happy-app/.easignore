@@ -1,0 +1,19 @@
+# EAS Build ignore — paths relative to monorepo root
+
+# Tauri/web build output (not needed for mobile)
+packages/happy-app/dist/
+packages/happy-app/src-tauri/
+packages/happy-app/.tauri/
+
+# Server package entirely (not needed for mobile build)
+packages/happy-server/
+
+# Other package build outputs
+packages/happy-cli/dist/
+packages/happy-agent/dist/
+packages/happy-wire/dist/
+
+# Dev artifacts
+.logs/
+packages/happy-app/coverage/
+packages/happy-app/.expo/web-build/
