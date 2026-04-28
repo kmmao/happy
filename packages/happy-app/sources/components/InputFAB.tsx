@@ -3,6 +3,7 @@ import * as React from "react";
 import {
   Animated,
   LayoutChangeEvent,
+  Platform,
   Pressable,
   Text,
   View,
@@ -534,6 +535,13 @@ const CompactStatus = React.memo(function CompactStatus({
                   borderColor: rpcVisualState.borderColor,
                   backgroundColor: rpcVisualState.backgroundColor,
                   shadowColor: rpcVisualState.glowColor,
+                  // Android doesn't support colored shadow/glow — border+elevation
+                  // look like a thick green outline instead of a soft halo.
+                  ...(Platform.OS === "android" && {
+                    borderWidth: 0,
+                    elevation: 0,
+                    shadowOpacity: 0,
+                  }),
                 },
               ]}
             >
