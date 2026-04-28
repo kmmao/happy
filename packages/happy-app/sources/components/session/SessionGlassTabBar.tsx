@@ -359,11 +359,9 @@ const styles = StyleSheet.create(() => ({
     },
     labelWrapRegular: {
         height: "100%",
-        width: "100%",
     },
     labelWrapCompact: {
         height: "100%",
-        width: "100%",
     },
     label: {
         textAlign: "center",
