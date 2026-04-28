@@ -1,63 +1,63 @@
 {
-    "name": "monorepo",
-    "private": true,
-    "scripts": {
-        "cli": "yarn workspace happy-coder cli",
-        "codex:refresh-app-server-contract": "yarn workspace @kmmao/happy-coder generate:codex-app-server-notification-contract",
-        "codex:verify-app-server-contract": "yarn workspace @kmmao/happy-coder verify:codex-app-server-notification-contract",
-        "release": "node ./scripts/release.cjs",
-        "web": "yarn workspace happy-app web",
-        "postinstall": "node ./scripts/postinstall.cjs"
-    },
-    "workspaces": {
-        "packages": [
-            "packages/happy-app",
-            "packages/happy-agent",
-            "packages/happy-cli",
-            "packages/happy-server",
-            "packages/happy-wire"
-        ],
-        "nohoist": [
-            "**/zod",
-            "**/react",
-            "**/react-dom",
-            "**/react-native",
-            "**/react-native/**",
-            "**/react-native-edge-to-edge/**",
-            "**/react-native-incall-manager/**"
-        ]
-    },
-    "packageManager": "yarn@1.22.22",
-    "resolutions": {
-        "fast-xml-parser": "^5.7.0",
-        "basic-ftp": ">=5.3.0",
-        "rollup": "^4.59.0",
-        "prismjs": "^1.30.0",
-        "lodash-es": ">=4.18.0",
-        "lodash": ">=4.18.0",
-        "qs": "^6.14.2",
-        "@isaacs/brace-expansion": "^5.0.1",
-        "minimatch": ">=3.1.4",
-        "tar": ">=7.5.11",
-        "undici": ">=6.24.0",
-        "socket.io-parser": ">=4.2.6",
-        "dompurify": ">=3.3.2",
-        "hono": ">=4.12.14",
-        "follow-redirects": ">=1.16.0",
-        "flatted": ">=3.4.2",
-        "@hono/node-server": ">=1.19.10",
-        "express-rate-limit": ">=8.2.2",
-        "fastify": ">=5.8.1",
-        "ajv": ">=8.18.0",
-        "effect": ">=3.20.0",
-        "node-forge": ">=1.4.0",
-        "@xmldom/xmldom": ">=0.9.10",
-        "defu": ">=6.1.5",
-        "path-to-regexp": ">=8.4.0",
-        "picomatch": ">=4.0.4",
-        "vite": ">=7.3.2",
-        "@anthropic-ai/sdk": ">=0.81.0",
-        "yaml": ">=2.8.3",
-        "uuid": ">=14.0.0"
-    }
+  "name": "monorepo",
+  "private": true,
+  "scripts": {
+    "cli": "yarn workspace happy-coder cli",
+    "codex:refresh-app-server-contract": "yarn workspace @kmmao/happy-coder generate:codex-app-server-notification-contract",
+    "codex:verify-app-server-contract": "yarn workspace @kmmao/happy-coder verify:codex-app-server-notification-contract",
+    "release": "node ./scripts/release.cjs",
+    "web": "yarn workspace happy-app web",
+    "postinstall": "node ./scripts/postinstall.cjs"
+  },
+  "workspaces": {
+    "packages": [
+      "packages/happy-app",
+      "packages/happy-agent",
+      "packages/happy-cli",
+      "packages/happy-server",
+      "packages/happy-wire"
+    ],
+    "nohoist": [
+      "**/zod",
+      "**/react",
+      "**/react-dom",
+      "**/react-native",
+      "**/react-native/**",
+      "**/react-native-edge-to-edge/**",
+      "**/react-native-incall-manager/**"
+    ]
+  },
+  "packageManager": "yarn@1.22.22",
+  "resolutions": {
+    "fast-xml-parser": "^5.7.0",
+    "basic-ftp": ">=5.3.0",
+    "rollup": "^4.59.0",
+    "prismjs": "^1.30.0",
+    "lodash-es": ">=4.18.0",
+    "lodash": ">=4.18.0",
+    "qs": "^6.14.2",
+    "@isaacs/brace-expansion": "^5.0.1",
+    "minimatch": ">=3.1.4",
+    "tar": ">=7.5.11",
+    "undici": "^7.0.0",
+    "socket.io-parser": ">=4.2.6",
+    "dompurify": ">=3.3.2",
+    "hono": ">=4.12.14",
+    "follow-redirects": ">=1.16.0",
+    "flatted": ">=3.4.2",
+    "@hono/node-server": ">=1.19.10",
+    "express-rate-limit": ">=8.2.2",
+    "fastify": ">=5.8.1",
+    "ajv": ">=8.18.0",
+    "effect": ">=3.20.0",
+    "node-forge": ">=1.4.0",
+    "@xmldom/xmldom": ">=0.9.10",
+    "defu": ">=6.1.5",
+    "path-to-regexp": ">=8.4.0",
+    "picomatch": ">=4.0.4",
+    "vite": ">=7.3.2",
+    "@anthropic-ai/sdk": ">=0.81.0",
+    "yaml": ">=2.8.3",
+    "uuid": ">=14.0.0"
+  }
 }
