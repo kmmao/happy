@@ -126,6 +126,8 @@ import {
   loadMessageCache,
   saveMessageCache,
   deleteMessageCache,
+  loadHistoryComplete,
+  saveHistoryComplete,
 } from "./messageCache";
 import { fetchAccountProfiles } from "./apiAccountProfiles";
 import { mergeAccountProfiles } from "@/utils/mergeAccountProfiles";
@@ -456,9 +458,16 @@ class Sync {
         storage.getState().restoreMessagesFromCache(sessionId, cached);
         if (cached.isTrimmed) {
           // Cache was truncated — older messages are missing.
-          // Use cached lastSeq for incremental fetch first (to get NEWEST messages fast),
-          // then backfill older messages in the background.
-          if (!this.sessionLastSeq.has(sessionId)) {
+          // If we have not yet completed a full history backfill, leave lastSeq
+          // unset so fetchMessages uses afterSeq=0 and loads the full history.
+          // Once the backfill completes, saveHistoryComplete() is called and
+          // future opens use the normal incremental sync path.
+          if (!loadHistoryComplete(sessionId)) {
+            // afterSeq will default to 0 → triggers full backfill
+            this.sessionLastSeq.delete(sessionId);
+            deleteLastSeq(sessionId);
+          } else if (!this.sessionLastSeq.has(sessionId)) {
+            // History already complete — use cached lastSeq for incremental sync
             this.sessionLastSeq.set(sessionId, cached.lastSeq);
           }
         } else if (!this.sessionLastSeq.has(sessionId)) {
@@ -2055,7 +2064,8 @@ class Sync {
         throw new Error(`Session encryption not ready for ${sessionId}`);
       }
 
-      let afterSeq = this.sessionLastSeq.get(sessionId) ?? 0;
+      const initialAfterSeq = this.sessionLastSeq.get(sessionId) ?? 0;
+      let afterSeq = initialAfterSeq;
       let hasMore = true;
       let totalNormalized = 0;
       let isFirstBatch = true;
@@ -2271,6 +2281,11 @@ class Sync {
       }
 
       storage.getState().applyMessagesLoaded(sessionId);
+      // If this was a full history fetch (afterSeq started at 0), mark the
+      // session history as complete so future opens use incremental sync only.
+      if (initialAfterSeq === 0) {
+        saveHistoryComplete(sessionId);
+      }
       log.log(
         `💬 fetchMessages completed for session ${sessionId} - processed ${totalNormalized} messages`,
       );

@@ -5,6 +5,7 @@ import { log } from "@/log";
 
 const CACHE_PREFIX = "msg-v1-";
 const CACHE_INDEX_KEY = "msg-cache-index";
+const HISTORY_COMPLETE_PREFIX = "msg-history-complete-v1-";
 const MAX_CACHED_MESSAGES = 200;
 const MAX_CACHED_SESSIONS = 20;
 const CACHE_SCHEMA_VERSION = 1;
@@ -120,6 +121,24 @@ export function deleteMessageCache(sessionId: string): void {
   } catch (error) {
     log.log(`Failed to delete message cache for ${sessionId}: ${error}`);
   }
+}
+
+export function loadHistoryComplete(sessionId: string): boolean {
+  const mmkv = getMMKV();
+  if (!mmkv) return false;
+  return mmkv.getBoolean(`${HISTORY_COMPLETE_PREFIX}${sessionId}`) ?? false;
+}
+
+export function saveHistoryComplete(sessionId: string): void {
+  const mmkv = getMMKV();
+  if (!mmkv) return;
+  mmkv.set(`${HISTORY_COMPLETE_PREFIX}${sessionId}`, true);
+}
+
+export function deleteHistoryComplete(sessionId: string): void {
+  const mmkv = getMMKV();
+  if (!mmkv) return;
+  mmkv.delete(`${HISTORY_COMPLETE_PREFIX}${sessionId}`);
 }
 
 export function clearAllMessageCaches(): void {
