@@ -2,6 +2,15 @@
   "entries": {
     "en": [
       {
+        "version": "2.16.1",
+        "date": "2026-04-28",
+        "summary": "Minor reliability improvement to the chat sync system.",
+        "changes": [
+          "Removed the manual reload button from the session header — the sync system now automatically detects and recovers from any message gaps without user intervention"
+        ],
+        "rawMarkdown": "## 2.16.1 - 2026-04-28\n\n\nMinor reliability improvement to the chat sync system.\n\n### Chat\n- Removed the manual reload button from the session header — the sync system now automatically detects and recovers from any message gaps without user intervention"
+      },
+      {
         "version": "2.16.0",
         "date": "2026-04-28",
         "summary": "This release significantly improves chat performance for long sessions and adds an Events tab to the project view, real-time diagnostics, and several Android UI refinements.",
@@ -617,6 +626,15 @@
     ],
     "zh-Hans": [
       {
+        "version": "2.16.1",
+        "date": "2026-04-28",
+        "summary": "对聊天同步机制的小幅可靠性改进。",
+        "changes": [
+          "移除会话 Header 中的手动重载按钮 — 同步系统现在可自动检测并恢复消息缺口，无需用户手动操作"
+        ],
+        "rawMarkdown": "## 2.16.1 - 2026-04-28\n\n\n对聊天同步机制的小幅可靠性改进。\n\n### 聊天\n- 移除会话 Header 中的手动重载按钮 — 同步系统现在可自动检测并恢复消息缺口，无需用户手动操作"
+      },
+      {
         "version": "2.16.0",
         "date": "2026-04-28",
         "summary": "本次更新大幅改善长时间对话的流畅度，新增项目事件 Tab、实时诊断信息展示，以及多项 Android 界面修复。",
@@ -1211,7 +1229,7 @@
       }
     ]
   },
-  "latestVersion": "2.16.0",
+  "latestVersion": "2.16.1",
   "availableLocales": [
     "en",
     "zh-Hans"

@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.16.1 - 2026-04-28
+
+Minor reliability improvement to the chat sync system.
+
+### Chat
+- Removed the manual reload button from the session header — the sync system now automatically detects and recovers from any message gaps without user intervention
+
 ## 2.16.0 - 2026-04-28
 
 This release significantly improves chat performance for long sessions and adds an Events tab to the project view, real-time diagnostics, and several Android UI refinements.
