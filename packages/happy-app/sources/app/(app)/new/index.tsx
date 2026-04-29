@@ -1385,7 +1385,7 @@ function NewSessionWizard() {
 
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
   const useProfileBottomSheet = screenWidth < 700;
-  const overlayMaxHeight = Math.min(screenHeight * 0.6, 600);
+  const overlayMaxHeight = Math.max(300, screenHeight - safeArea.top - safeArea.bottom - 200);
 
   // Machine online status for AgentInput (DRY - reused in info box too)
   const connectionStatus = React.useMemo(() => {

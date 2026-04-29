@@ -1,9 +1,9 @@
 import * as React from 'react';
-import { Platform } from 'react-native';
+import { Platform, ScrollView } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { StyleSheet } from 'react-native-unistyles';
 
-const stylesheet = StyleSheet.create((theme, runtime) => ({
+const stylesheet = StyleSheet.create((theme) => ({
     container: {
         borderRadius: 12,
         overflow: 'hidden',
@@ -27,22 +27,23 @@ interface FloatingOverlayProps {
 
 export const FloatingOverlay = React.memo((props: FloatingOverlayProps) => {
     const styles = stylesheet;
-    const { 
-        children, 
-        maxHeight = 240, 
+    const {
+        children,
+        maxHeight = 240,
         showScrollIndicator = true,
-        keyboardShouldPersistTaps = 'handled' 
+        keyboardShouldPersistTaps = 'handled'
     } = props;
 
     return (
         <Animated.View style={[styles.container, { maxHeight }]}>
-            <Animated.ScrollView
+            <ScrollView
                 style={{ maxHeight }}
                 keyboardShouldPersistTaps={keyboardShouldPersistTaps}
                 showsVerticalScrollIndicator={showScrollIndicator}
+                nestedScrollEnabled
             >
                 {children}
-            </Animated.ScrollView>
+            </ScrollView>
         </Animated.View>
     );
 });
