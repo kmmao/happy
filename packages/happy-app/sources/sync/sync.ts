@@ -1124,6 +1124,7 @@ class Sync {
               effortLevel: preferences.effortLevel,
               maxBudgetUsd: preferences.maxBudgetUsd,
               taskBudgetTokens: preferences.taskBudgetTokens,
+              starred: preferences.starred,
             }
           : {}),
       };
