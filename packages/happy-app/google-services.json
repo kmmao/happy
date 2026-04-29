@@ -7,9 +7,9 @@
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:929084226376:android:916f66f97d38f2b289917d",
+        "mobilesdk_app_id": "1:929084226376:android:9f8dec639dccbc6289917d",
         "android_client_info": {
-          "package_name": "com.ex3ndr.happy"
+          "package_name": "com.zanmi.happy"
         }
       },
       "oauth_client": [],
@@ -26,9 +26,9 @@
     },
     {
       "client_info": {
-        "mobilesdk_app_id": "1:929084226376:android:42e007af009f913989917d",
+        "mobilesdk_app_id": "1:929084226376:android:32d9083ad7a1f02189917d",
         "android_client_info": {
-          "package_name": "com.kmmao.happy"
+          "package_name": "com.zanmi.happy.dev"
         }
       },
       "oauth_client": [],
@@ -45,28 +45,9 @@
     },
     {
       "client_info": {
-        "mobilesdk_app_id": "1:929084226376:android:aee90adffb7cef6a89917d",
+        "mobilesdk_app_id": "1:929084226376:android:1a2d9fcf690f08a589917d",
         "android_client_info": {
-          "package_name": "com.slopus.happy.dev"
-        }
-      },
-      "oauth_client": [],
-      "api_key": [
-        {
-          "current_key": "AIzaSyCNggub0VNuSDq2TXjIVMEI_Vv5icNowt0"
-        }
-      ],
-      "services": {
-        "appinvite_service": {
-          "other_platform_oauth_client": []
-        }
-      }
-    },
-    {
-      "client_info": {
-        "mobilesdk_app_id": "1:929084226376:android:9609dbb86d88532389917d",
-        "android_client_info": {
-          "package_name": "com.slopus.happy.preview"
+          "package_name": "com.zanmi.happy.preview"
         }
       },
       "oauth_client": [],

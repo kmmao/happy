@@ -5,9 +5,9 @@ const name = {
   production: "Happy",
 }[variant];
 const bundleId = {
-  development: "com.slopus.happy.dev",
-  preview: "com.slopus.happy.preview",
-  production: "com.ex3ndr.happy",
+  development: "com.zanmi.happy.dev",
+  preview: "com.zanmi.happy.preview",
+  production: "com.zanmi.happy",
 }[variant];
 const channel = {
   development: "development",
