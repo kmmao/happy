@@ -69,7 +69,7 @@
     "@react-native-masked-view/masked-view": "0.3.2",
     "@react-native-picker/picker": "2.11.4",
     "@react-navigation/drawer": "^7.3.9",
-    "@react-navigation/native": "^7.1.8",
+    "@react-navigation/native": "^7.2.2",
     "@revenuecat/purchases-js": "^1.11.1",
     "@shopify/flash-list": "2.0.2",
     "@shopify/react-native-skia": "2.4.18",
