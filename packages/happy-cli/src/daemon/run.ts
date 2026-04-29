@@ -1625,12 +1625,16 @@ export async function startDaemon(): Promise<void> {
       // Fallback for research/analysis runs: the session reports completion via an
       // HTTP callback (curl inside Claude). That path updates the server DB but never
       // notifies the daemon's local AutomationScheduler, leaving the local job stuck
-      // as "running". Emit the daemon-side status after a short delay so the local
-      // job is finalised. The server ignores the emit if the run is already terminal.
+      // as "running". Only emit "failed" or "cancelled" as fallback — never "completed",
+      // because a successful run MUST be reported by the curl callback which carries
+      // the actual report content. Emitting "completed" here would race with the curl
+      // callback and cause a 409 when the real report arrives.
       const researchInfo = getResearchRunInfo(session.happySessionId);
       if (researchInfo) {
         forgetResearchRun(session.happySessionId);
-        const researchFinalStatus = terminalStatus === "cancelled" ? "cancelled" : terminalStatus;
+        const researchFinalStatus: "failed" | "cancelled" =
+          terminalStatus === "cancelled" ? "cancelled" : "failed";
+        const fallbackDelayMs = terminalStatus === "completed" ? 30_000 : 5_000;
         setTimeout(() => {
           logger.debug(
             `[DAEMON RUN] Emitting fallback ${researchFinalStatus} for research run ${researchInfo.runId} (session ${session.happySessionId})`,
@@ -1639,9 +1643,11 @@ export async function startDaemon(): Promise<void> {
             runId: researchInfo.runId,
             projectId: researchInfo.projectId,
             status: researchFinalStatus,
-            errorMessage: terminalStatus === "failed" ? (terminalError ?? "Session exited with error") : undefined,
+            errorMessage: terminalStatus === "completed"
+              ? "Session exited before reporting results (curl callback may have failed)"
+              : (terminalError ?? "Session exited with error"),
           });
-        }, 5_000);
+        }, fallbackDelayMs);
       }
     };
 

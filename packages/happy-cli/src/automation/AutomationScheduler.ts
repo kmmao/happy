@@ -596,6 +596,10 @@ export class AutomationScheduler {
 
     try {
       const result = await this.runJob(started);
+      const current = this.store.get(job.id);
+      if (current && TERMINAL_STATUSES.has(current.status)) {
+        return;
+      }
       if (result.completion === "session") {
         const running: AutomationJob = {
           ...started,
@@ -625,6 +629,10 @@ export class AutomationScheduler {
       this.reportTaskStatus(completed);
       logger.info(`[AUTOMATION] Completed ${job.kind} job ${job.id}`);
     } catch (error) {
+      const current = this.store.get(job.id);
+      if (current && TERMINAL_STATUSES.has(current.status)) {
+        return;
+      }
       const errorMessage = error instanceof Error ? error.message : String(error);
       const canRetry = started.attempt < started.maxAttempts;
       const failed: AutomationJob = {

@@ -15,6 +15,12 @@ const BUILT_IN_DIMENSION_KEYS = new Set([
     "documentation",
     "performance",
     "uiUx",
+    "typeSafety",
+    "observability",
+    "apiDesign",
+    "buildCI",
+    "featureCompleteness",
+    "integrationCoherence",
 ]);
 
 function titleToKey(title: string): string {

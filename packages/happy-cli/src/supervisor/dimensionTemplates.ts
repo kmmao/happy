@@ -175,6 +175,32 @@ export const dimensionTemplates: Record<string, DimensionTemplate> = {
 - Check if the CI pipeline has a deploy step and whether it requires manual approval for production
 - Verify that build scripts in package.json are consistent with what CI actually runs`,
   },
+
+  featureCompleteness: {
+    key: "featureCompleteness",
+    title: "Feature Completeness",
+    category: "feature-completeness",
+    prompt: `- Look for partially implemented features: routes registered but handler returns 501/TODO
+- Identify UI components that exist but lack data source wiring (empty props, stub data, commented-out fetch calls)
+- Check for frontend pages/screens that have no corresponding backend endpoint or vice versa
+- Search for feature flags or environment toggles that are stale (never enabled in production, or gate code that was shipped long ago)
+- Look for database migrations or schema fields that were added but never read/written by application code
+- Check for event handlers or socket listeners registered but never triggered
+- Identify exported functions/types that have zero consumers (orphaned public API surface)`,
+  },
+
+  integrationCoherence: {
+    key: "integrationCoherence",
+    title: "Integration Coherence",
+    category: "integration-coherence",
+    prompt: `- Identify duplicate implementations: two or more modules that solve the same problem differently (e.g., parallel date formatting utils, multiple HTTP wrappers)
+- Check that new code reuses existing shared utilities (hooks, helpers, modules) instead of reimplementing — search for patterns similar to existing utils
+- Verify data flow consistency: REST vs WebSocket vs RPC usage matches the project's established patterns for each operation type
+- Look for validation inconsistencies: some endpoints using Zod, others doing manual checks, or client and server validating differently
+- Check for state management fragmentation: same data stored in multiple places (local state, global store, URL params) without clear ownership
+- Identify error handling path inconsistencies: some flows showing toast, others using modal, others silently failing
+- Look for naming/convention drift: newer code using different naming patterns than established codebase conventions`,
+  },
 };
 
 /**

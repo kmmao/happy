@@ -97,6 +97,22 @@ const builtInDimensionPrompts: Record<string, string> = {
 • Look for hardcoded environment values in build configs
 • Check if deploy step requires manual approval for production
 • Verify build scripts in package.json match what CI actually runs`,
+
+    featureCompleteness: `• Look for partially implemented features: routes with 501/TODO handlers
+• Identify UI components that lack data source wiring (empty props, stub data)
+• Check for frontend pages with no corresponding backend endpoint or vice versa
+• Search for stale feature flags or environment toggles
+• Look for database fields added but never read/written by application code
+• Check for event handlers or socket listeners registered but never triggered
+• Identify exported functions/types with zero consumers (orphaned API surface)`,
+
+    integrationCoherence: `• Identify duplicate implementations solving the same problem differently
+• Check that new code reuses existing shared utilities instead of reimplementing
+• Verify data flow consistency: REST vs WebSocket vs RPC matches established patterns
+• Look for validation inconsistencies (Zod vs manual checks, client vs server)
+• Check for state management fragmentation (same data in multiple places)
+• Identify error handling path inconsistencies (toast vs modal vs silent failure)
+• Look for naming/convention drift in newer code vs established patterns`,
 };
 
 /** Get the prompt detail text for a built-in dimension key. Returns null for unknown keys. */

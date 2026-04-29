@@ -238,6 +238,86 @@ describe("AutomationScheduler", () => {
     }
   });
 
+  it("does not overwrite terminal jobs when session completion races dispatch", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "happy-automation-scheduler-"));
+    tempDirs.push(dir);
+    let scheduler: AutomationScheduler;
+    scheduler = createScheduler(dir, {
+      runJob: async () => {
+        await scheduler.markJobTerminalByDedupeKey("webhook:event-race", "completed");
+        return { completion: "session", sessionId: "sid-race" };
+      },
+    });
+
+    try {
+      await scheduler.start();
+      await scheduler.enqueueWebhook({
+        type: "webhook-trigger",
+        webhookEventId: "event-race",
+        issueNumber: 9,
+        issueTitle: "Issue",
+        issueBody: "Body",
+        issueAuthor: "alice",
+        issueLabels: [],
+        issueUrl: "https://example.com/issues/9",
+        repoUrl: "https://example.com/repo.git",
+        repoPath: "/tmp/repo",
+        provider: "github",
+      });
+
+      let job = scheduler.getJobsSnapshot()[0];
+      for (let attempt = 0; attempt < 20 && (job?.status === "queued" || job?.status === "dispatching"); attempt++) {
+        await new Promise((resolve) => setTimeout(resolve, 10));
+        job = scheduler.getJobsSnapshot()[0];
+      }
+
+      expect(job?.status).toBe("completed");
+      expect(job?.sessionId).toBeUndefined();
+    } finally {
+      await scheduler.stop();
+    }
+  });
+
+  it("does not overwrite terminal jobs when terminal completion races dispatch failure", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "happy-automation-scheduler-"));
+    tempDirs.push(dir);
+    let scheduler: AutomationScheduler;
+    scheduler = createScheduler(dir, {
+      runJob: async () => {
+        await scheduler.markJobTerminalByDedupeKey("webhook:event-race-failure", "completed");
+        throw new Error("dispatch failed after terminal update");
+      },
+    });
+
+    try {
+      await scheduler.start();
+      await scheduler.enqueueWebhook({
+        type: "webhook-trigger",
+        webhookEventId: "event-race-failure",
+        issueNumber: 10,
+        issueTitle: "Issue",
+        issueBody: "Body",
+        issueAuthor: "alice",
+        issueLabels: [],
+        issueUrl: "https://example.com/issues/10",
+        repoUrl: "https://example.com/repo.git",
+        repoPath: "/tmp/repo",
+        provider: "github",
+      });
+
+      let job = scheduler.getJobsSnapshot()[0];
+      for (let attempt = 0; attempt < 20 && (job?.status === "queued" || job?.status === "dispatching"); attempt++) {
+        await new Promise((resolve) => setTimeout(resolve, 10));
+        job = scheduler.getJobsSnapshot()[0];
+      }
+
+      expect(job?.status).toBe("completed");
+      expect(job?.errorMessage).toBeUndefined();
+    } finally {
+      await scheduler.stop();
+    }
+  });
+
   it("cancels queued jobs", async () => {
     const dir = await mkdtemp(join(tmpdir(), "happy-automation-scheduler-"));
     tempDirs.push(dir);
