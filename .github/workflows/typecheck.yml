@@ -12,6 +12,10 @@ on:
             - 'packages/happy-app/**'
             - '.github/workflows/typecheck.yml'
 
+concurrency:
+    group: typecheck-${{ github.ref }}
+    cancel-in-progress: true
+
 jobs:
     typecheck:
         runs-on: ubuntu-latest
