@@ -1,5 +1,5 @@
 import * as React from "react";
-import { View, Text, TouchableWithoutFeedback, Pressable } from "react-native";
+import { View, Text, Pressable } from "react-native";
 import { useUnistyles } from "react-native-unistyles";
 import { Typography } from "@/constants/Typography";
 import { PermissionMode, ModelMode } from "./PermissionModeSelector";
@@ -63,10 +63,12 @@ export const AgentInputSettingsOverlay = React.memo(
 
         return (
             <>
-                <TouchableWithoutFeedback onPress={onClose}>
-                    <View style={styles.overlayBackdrop} />
-                </TouchableWithoutFeedback>
+                <Pressable
+                    style={styles.overlayBackdrop}
+                    onPress={onClose}
+                />
                 <View
+                    pointerEvents="box-none"
                     style={[
                         styles.settingsOverlay,
                         { paddingHorizontal: screenWidth > 700 ? 0 : 8 },
