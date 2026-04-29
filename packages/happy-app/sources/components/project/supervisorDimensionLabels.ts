@@ -37,6 +37,8 @@ const researchDimensionMap: Record<string, TranslationKey> = {
     community: "competitorResearch.dim_community",
     funding: "competitorResearch.dim_funding",
     userFeedback: "competitorResearch.dim_userFeedback",
+    integrationEffort: "competitorResearch.dim_integrationEffort",
+    codeReusability: "competitorResearch.dim_codeReusability",
 };
 
 // Preflight sync step keys → i18n keys

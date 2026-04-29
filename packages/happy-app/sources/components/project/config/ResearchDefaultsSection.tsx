@@ -11,7 +11,7 @@ interface Props {
     project: Project;
 }
 
-const TOTAL_DIMENSIONS = 8;
+const TOTAL_DIMENSIONS = 10;
 
 export const ResearchDefaultsSection = React.memo<Props>(({ project }) => {
     const { theme } = useUnistyles();

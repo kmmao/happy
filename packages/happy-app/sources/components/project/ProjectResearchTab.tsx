@@ -61,6 +61,8 @@ const RESEARCH_DIMENSIONS = [
     "community",
     "funding",
     "userFeedback",
+    "integrationEffort",
+    "codeReusability",
 ] as const;
 
 type ResearchDimension = (typeof RESEARCH_DIMENSIONS)[number];
@@ -74,6 +76,8 @@ const DIMENSION_LABELS: Record<ResearchDimension, { label: () => string; note: (
     community: { label: () => t("competitorResearch.dim_community"), note: () => t("competitorResearch.dim_community_note") },
     funding: { label: () => t("competitorResearch.dim_funding"), note: () => t("competitorResearch.dim_funding_note") },
     userFeedback: { label: () => t("competitorResearch.dim_userFeedback"), note: () => t("competitorResearch.dim_userFeedback_note") },
+    integrationEffort: { label: () => t("competitorResearch.dim_integrationEffort"), note: () => t("competitorResearch.dim_integrationEffort_note") },
+    codeReusability: { label: () => t("competitorResearch.dim_codeReusability"), note: () => t("competitorResearch.dim_codeReusability_note") },
 };
 
 const defaultDimensions: Record<ResearchDimension, boolean> = {
@@ -85,6 +89,8 @@ const defaultDimensions: Record<ResearchDimension, boolean> = {
     community: false,
     funding: false,
     userFeedback: false,
+    integrationEffort: false,
+    codeReusability: false,
 };
 
 export type ResearchSyncStatus = "idle" | "saving" | "saved" | "failed";

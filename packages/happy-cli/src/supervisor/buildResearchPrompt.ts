@@ -48,6 +48,8 @@ export function buildResearchPrompt(options: ResearchPromptOptions): string {
     maintenance: "Last commit date, release cadence, open issue backlog",
     bundleSize: "Bundle size / runtime performance overhead",
     stackCompatibility: "Compatibility with existing dependencies (no version conflicts)",
+    integrationEffort: "Effort to adopt into this codebase — files to change, new deps, architectural friction",
+    codeReusability: "Patterns, API designs, algorithms worth porting from the candidate",
   };
 
   const competitorsSection = parsedParams.knownCompetitors?.trim()
@@ -59,17 +61,31 @@ ${isOpenSourceMode ? "Use these as additional reference points for comparison." 
 `
     : "";
 
+  const CODE_DIM_LABELS: Record<string, string> = {
+    integrationEffort: "For each competitor feature worth adopting, estimate the integration effort: which modules/files would need changes, what new dependencies are required, and where architectural friction would arise. Read the project source code (not just README) to ground your estimates.",
+    codeReusability: "Identify concrete patterns, API designs, data structures, or algorithms from competitors that could be directly ported or adapted into this codebase. Reference specific file paths in this project where the reused code would live.",
+  };
+
   // In OSS mode: filter out irrelevant dims, always append OSS-specific dims
   const effectiveFocusSection = (() => {
     if (!isOpenSourceMode) {
-      return parsedParams.focusAreas?.trim()
-        ? `
+      const focusRaw = parsedParams.focusAreas?.trim() ?? "";
+      const focusDims = focusRaw.split(",").map((d) => d.trim()).filter(Boolean);
+      const codeAnalysisInstructions = focusDims
+        .filter((d) => CODE_DIM_LABELS[d])
+        .map((d) => `- **${d}**: ${CODE_DIM_LABELS[d]}`)
+        .join("\n");
+      if (!focusRaw) return codeAnalysisInstructions ? `
+## Code-Level Analysis Dimensions
+${codeAnalysisInstructions}
+` : "";
+      return `
 ## Focus Areas (User-Provided)
 The user wants the analysis to focus on:
 
-${parsedParams.focusAreas.trim()}
-`
-        : "";
+${focusRaw}
+${codeAnalysisInstructions ? `\n## Code-Level Analysis Dimensions\n${codeAnalysisInstructions}` : ""}
+`;
     }
     const userDims = (parsedParams.focusAreas ?? "")
       .split(",")
