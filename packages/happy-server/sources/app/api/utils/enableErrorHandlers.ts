@@ -2,6 +2,21 @@ import { log } from "@/utils/log";
 import { Fastify } from "../types";
 import { FastifyError } from "fastify";
 import { apiError } from "./apiError";
+import { IncomingHttpHeaders } from "http";
+
+const SENSITIVE_HEADER_PATTERNS = [/^authorization$/i, /^cookie$/i, /^set-cookie$/i, /^x-happy-/i];
+
+export function sanitizeHeaders(headers: IncomingHttpHeaders): Record<string, string> {
+    const result: Record<string, string> = {};
+    for (const [key, value] of Object.entries(headers)) {
+        if (SENSITIVE_HEADER_PATTERNS.some((re) => re.test(key))) {
+            result[key] = '[REDACTED]';
+        } else {
+            result[key] = Array.isArray(value) ? value.join(', ') : (value ?? '');
+        }
+    }
+    return result;
+}
 
 export function enableErrorHandlers(app: Fastify) {
     // Global error handler
@@ -40,7 +55,8 @@ export function enableErrorHandlers(app: Fastify) {
 
     // Catch-all route for debugging 404s
     app.setNotFoundHandler((request, reply) => {
-        log({ module: '404-handler' }, `404 - Method: ${request.method}, Path: ${request.url}, Headers: ${JSON.stringify(request.headers)}`);
+        const safeHeaders = sanitizeHeaders(request.headers);
+        log({ module: '404-handler', method: request.method, url: request.url, requestId: request.id, headers: safeHeaders }, `404 Not Found`);
         reply.code(404).send(apiError('not-found', 'Not found', { path: request.url, method: request.method }));
     });
 
