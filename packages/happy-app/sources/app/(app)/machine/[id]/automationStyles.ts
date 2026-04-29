@@ -351,6 +351,19 @@ export const styles = StyleSheet.create((theme) => ({
         fontWeight: "600",
         paddingHorizontal: 4,
     },
+    pipelineMetric: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 4,
+        backgroundColor: theme.colors.surfaceHigh,
+        borderRadius: 6,
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+    },
+    pipelineMetricText: {
+        fontSize: 11,
+        fontWeight: "600",
+    },
     pipelineBranchRow: {
         flexDirection: "row",
         alignItems: "flex-start",

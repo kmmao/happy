@@ -46,6 +46,9 @@ function PipelineNode(props: {
     isLast?: boolean;
     isActive?: boolean;
     onPress?: () => void;
+    secondary?: string;
+    secondaryColor?: string;
+    icon?: React.ComponentProps<typeof Ionicons>["name"];
 }) {
     const { theme } = useUnistyles();
     const activeAccent = props.accent ?? theme.colors.textSecondary;
@@ -55,12 +58,25 @@ function PipelineNode(props: {
                 styles.pipelineNode,
                 props.isActive ? { borderColor: activeAccent, backgroundColor: activeAccent + "18" } : null,
             ]}>
+                {props.icon ? (
+                    <Ionicons name={props.icon} size={14} color={props.isActive ? activeAccent : theme.colors.textSecondary} style={{ marginBottom: 1 }} />
+                ) : null}
                 <Text style={[styles.pipelineNodeCount, props.isActive ? { color: activeAccent } : null]}>
                     {props.count}
                 </Text>
                 <Text style={[styles.pipelineNodeLabel, props.isActive ? { color: activeAccent, fontWeight: "700" } : null]} numberOfLines={1}>
                     {props.label}
                 </Text>
+                {props.secondary ? (
+                    <Text style={{
+                        fontSize: 10,
+                        fontWeight: "600",
+                        color: props.secondaryColor ?? theme.colors.textSecondary,
+                        marginTop: 1,
+                    }} numberOfLines={1}>
+                        {props.secondary}
+                    </Text>
+                ) : null}
             </View>
             {!props.isLast ? <Text style={styles.pipelineArrow}>{"→"}</Text> : null}
         </Pressable>
@@ -439,6 +455,8 @@ export default React.memo(function MachineAutomationPage() {
     const activeCount = (data.counts.running ?? 0) + (data.counts.dispatching ?? 0);
     const failedCount = data.counts.failed ?? 0;
     const queuedCount = data.counts.queued ?? 0;
+    const guardianAttachedCount = React.useMemo(() => data.guardians.filter((g) => g.attached).length, [data.guardians]);
+    const guardianRecoveredCount = React.useMemo(() => data.guardians.filter((g) => g.recovered).length, [data.guardians]);
     const hasAlerts = data.alertCards.length > 0;
     const healthColor = isKilled ? "#FF3B30" : failedCount > 0 || hasAlerts ? "#FF9500" : "#34C759";
     const healthLabel = isKilled
@@ -543,7 +561,7 @@ export default React.memo(function MachineAutomationPage() {
                         const subtitle = alert.kind === "anomalies"
                             ? `${t("machine.automationFailed")}: ${failedCount} · ${t("machine.automationWatchdogStops")}: ${data.auditStats?.watchdogStopCount ?? 0}`
                             : alert.kind === "recovered"
-                                ? `${t("machine.automationRecoveredGuardians")}: ${data.guardians.filter((g) => g.recovered).length} · ${t("machine.automationRecoveredJobs")}: ${data.jobs.filter((j) => j.recovered).length}`
+                                ? `${t("machine.automationRecoveredGuardians")}: ${guardianRecoveredCount} · ${t("machine.automationRecoveredJobs")}: ${data.jobs.filter((j) => j.recovered).length}`
                                 : t("machine.automationGuardianRecoveryNeededMessage");
                         return (
                             <View key={alert.kind} style={[styles.dataCard, { borderLeftWidth: 4, borderLeftColor: accent, marginHorizontal: 0, marginVertical: 0 }]}>
@@ -564,11 +582,132 @@ export default React.memo(function MachineAutomationPage() {
             <View style={[styles.pipelineContainer, { marginTop: 4 }]}>
                 <Text style={styles.pipelineTitle}>{t("machine.automationPipelineTitle")}</Text>
                 <View style={styles.pipelineRow}>
-                    <PipelineNode label={t("machine.automationLoopsTotal")} count={data.loopRollup.total} accent="#0A84FF" isActive={activeSection === "loops"} onPress={() => toggleSection("loops")} />
-                    <PipelineNode label={t("machine.automationJobs")} count={data.jobs.length} accent={activeCount > 0 ? "#0A84FF" : undefined} isActive={activeSection === "jobs"} onPress={() => toggleSection("jobs")} />
-                    <PipelineNode label={t("machine.automationGuardians")} count={data.guardians.length} accent={data.guardians.length > 0 ? "#34C759" : undefined} isActive={activeSection === "guardians"} onPress={() => toggleSection("guardians")} />
-                    <PipelineNode label={t("machine.automationAudit")} count={data.recentAuditEvents.length} isLast isActive={activeSection === "audit"} onPress={() => toggleSection("audit")} />
+                    <PipelineNode
+                        label={t("machine.automationLoopsTotal")}
+                        count={data.loopRollup.total}
+                        icon="repeat-outline"
+                        accent="#0A84FF"
+                        isActive={activeSection === "loops"}
+                        onPress={() => toggleSection("loops")}
+                        secondary={
+                            data.loopRollup.active > 0
+                                ? `${data.loopRollup.active} ${t("machine.automationLoopsActive")}`
+                                : data.loopRollup.blocked > 0
+                                    ? `${data.loopRollup.blocked} ${t("machine.automationLoopsBlocked")}`
+                                    : data.loopRollup.total > 0
+                                        ? t("machine.automationPipelineAllIdle")
+                                        : undefined
+                        }
+                        secondaryColor={
+                            data.loopRollup.active > 0 ? "#0A84FF"
+                                : data.loopRollup.blocked > 0 ? "#FF3B30"
+                                    : undefined
+                        }
+                    />
+                    <PipelineNode
+                        label={t("machine.automationJobs")}
+                        count={data.jobs.length}
+                        icon="flash-outline"
+                        accent={activeCount > 0 ? "#0A84FF" : undefined}
+                        isActive={activeSection === "jobs"}
+                        onPress={() => toggleSection("jobs")}
+                        secondary={
+                            activeCount > 0 && failedCount > 0
+                                ? `${activeCount} ${t("machine.automationRunning")} · ${failedCount} ${t("machine.automationFailed")}`
+                                : activeCount > 0
+                                    ? `${activeCount} ${t("machine.automationRunning")}${queuedCount > 0 ? ` · ${queuedCount} ${t("machine.automationQueued")}` : ""}`
+                                    : failedCount > 0
+                                        ? `${failedCount} ${t("machine.automationFailed")}`
+                                        : data.jobs.length > 0
+                                            ? t("machine.automationPipelineAllDone")
+                                            : undefined
+                        }
+                        secondaryColor={
+                            failedCount > 0 ? "#FF3B30"
+                                : activeCount > 0 ? "#0A84FF"
+                                    : data.jobs.length > 0 ? "#34C759"
+                                        : undefined
+                        }
+                    />
+                    <PipelineNode
+                        label={t("machine.automationGuardians")}
+                        count={data.guardians.length}
+                        icon="shield-checkmark-outline"
+                        accent={data.guardians.length > 0 ? "#34C759" : undefined}
+                        isActive={activeSection === "guardians"}
+                        onPress={() => toggleSection("guardians")}
+                        secondary={
+                            data.guardians.length > 0
+                                ? `${guardianAttachedCount} ${t("machine.automationGuardianAttached")}${guardianRecoveredCount > 0 ? ` · ${guardianRecoveredCount} ${t("machine.automationRecoveredShort")}` : ""}`
+                                : undefined
+                        }
+                        secondaryColor={
+                            guardianRecoveredCount > 0 ? "#FF9500"
+                                : guardianAttachedCount > 0 ? "#34C759"
+                                    : undefined
+                        }
+                    />
+                    <PipelineNode
+                        label={t("machine.automationAudit")}
+                        count={data.recentAuditEvents.length}
+                        icon="document-text-outline"
+                        isLast
+                        isActive={activeSection === "audit"}
+                        onPress={() => toggleSection("audit")}
+                        secondary={
+                            (data.auditStats?.watchdogStopCount ?? 0) > 0
+                                ? `${data.auditStats?.watchdogStopCount} ${t("machine.automationWatchdogStops")}`
+                                : data.recentAuditEvents.length > 0
+                                    ? t("machine.automationPipelineHealthy")
+                                    : undefined
+                        }
+                        secondaryColor={
+                            (data.auditStats?.watchdogStopCount ?? 0) > 0 ? "#FF3B30"
+                                : data.recentAuditEvents.length > 0 ? "#34C759"
+                                    : undefined
+                        }
+                    />
                 </View>
+
+                {/* 补充指标条 */}
+                {(queuedCount > 0 || failedCount > 0 || (data.auditStats?.guardianReuseRate ?? 0) > 0 || (data.auditStats?.sessionReattachedCount ?? 0) > 0) ? (
+                    <View style={{
+                        flexDirection: "row",
+                        flexWrap: "wrap",
+                        gap: 6,
+                        marginTop: 8,
+                        paddingTop: 8,
+                        borderTopWidth: 1,
+                        borderTopColor: theme.colors.divider,
+                    }}>
+                        {queuedCount > 0 ? (
+                            <View style={styles.pipelineMetric}>
+                                <Ionicons name="time-outline" size={11} color="#FF9500" />
+                                <Text style={[styles.pipelineMetricText, { color: "#FF9500" }]}>{`${queuedCount} ${t("machine.automationQueued")}`}</Text>
+                            </View>
+                        ) : null}
+                        {failedCount > 0 ? (
+                            <View style={styles.pipelineMetric}>
+                                <Ionicons name="alert-circle-outline" size={11} color="#FF3B30" />
+                                <Text style={[styles.pipelineMetricText, { color: "#FF3B30" }]}>{`${failedCount} ${t("machine.automationFailed")}`}</Text>
+                            </View>
+                        ) : null}
+                        {(data.auditStats?.guardianReuseRate ?? 0) > 0 ? (
+                            <View style={styles.pipelineMetric}>
+                                <Ionicons name="repeat-outline" size={11} color={(data.auditStats?.guardianReuseRate ?? 0) > 0.5 ? "#34C759" : "#FF9500"} />
+                                <Text style={[styles.pipelineMetricText, { color: (data.auditStats?.guardianReuseRate ?? 0) > 0.5 ? "#34C759" : "#FF9500" }]}>
+                                    {`${t("machine.automationGuardianReuseRate")} ${formatRate(data.auditStats?.guardianReuseRate)}`}
+                                </Text>
+                            </View>
+                        ) : null}
+                        {(data.auditStats?.sessionReattachedCount ?? 0) > 0 ? (
+                            <View style={styles.pipelineMetric}>
+                                <Ionicons name="refresh-outline" size={11} color="#34C759" />
+                                <Text style={[styles.pipelineMetricText, { color: "#34C759" }]}>{`${data.auditStats?.sessionReattachedCount} ${t("machine.automationSessionReattachedCount")}`}</Text>
+                            </View>
+                        ) : null}
+                    </View>
+                ) : null}
             </View>
 
             {/* ⑥ 按需展开的区块内容 */}
@@ -803,9 +942,9 @@ export default React.memo(function MachineAutomationPage() {
                                 {/* 状态 chips（只显示非 0） */}
                                 <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
                                     {[
-                                        { key: "attached",  value: data.guardians.filter((g) => g.attached && !g.recovered).length,  label: t("machine.automationGuardianAttached"),  color: "#34C759", icon: "link-outline" as const },
-                                        { key: "persisted", value: data.guardians.filter((g) => !g.attached).length,                 label: t("machine.automationGuardianPersisted"), color: "#8E8E93", icon: "save-outline" as const },
-                                        { key: "recovered", value: data.guardians.filter((g) => g.recovered).length,                  label: t("machine.automationGuardianRecovered"),  color: "#FF9500", icon: "refresh-circle-outline" as const },
+                                        { key: "attached",  value: guardianAttachedCount - guardianRecoveredCount,  label: t("machine.automationGuardianAttached"),  color: "#34C759", icon: "link-outline" as const },
+                                        { key: "persisted", value: data.guardians.length - guardianAttachedCount,    label: t("machine.automationGuardianPersisted"), color: "#8E8E93", icon: "save-outline" as const },
+                                        { key: "recovered", value: guardianRecoveredCount,                           label: t("machine.automationGuardianRecovered"),  color: "#FF9500", icon: "refresh-circle-outline" as const },
                                     ].filter((s) => s.value > 0).map((s) => (
                                         <View key={s.key} style={{ flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: s.color + "14", borderRadius: 8, borderWidth: 1, borderColor: s.color + "40", paddingHorizontal: 10, paddingVertical: 5 }}>
                                             <Ionicons name={s.icon} size={13} color={s.color} />
