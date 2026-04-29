@@ -9,7 +9,7 @@ import { randomKeyNaked } from "@/utils/randomKeyNaked";
 import { checkAndTriggerScheduledRuns } from "@/modules/supervisorScheduler";
 import { cleanupStaleFixActions } from "@/modules/supervisorFixWatchdog";
 import { checkAndTriggerSchedules } from "@/modules/triggerScheduleRunner";
-import { pushSend } from "@/modules/pushSend";
+import { buildBriefPushBody, pushSend } from "@/modules/pushSend";
 import { consolidate } from "@/modules/knowledgeConsolidate";
 import { storeKnowledgeEmbedding } from "@/modules/knowledgeEmbedding";
 import { inTx } from "@/storage/inTx";
@@ -277,7 +277,7 @@ export function machineUpdateHandler(userId: string, socket: Socket) {
                         if (lastSeen > 0) {
                             void pushSend(userId, {
                                 title: `Loop Brief: ${latestBrief.loopName ?? latestBrief.loopId}`,
-                                body: latestBrief.summary,
+                                body: buildBriefPushBody(latestBrief),
                                 data: {
                                     type: "loop_brief",
                                     loopId: latestBrief.loopId,

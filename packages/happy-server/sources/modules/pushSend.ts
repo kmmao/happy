@@ -3,6 +3,7 @@ import { db } from "@/storage/db";
 import { log } from "@/utils/log";
 
 const expo = new Expo();
+const BRIEF_PUSH_BODY_LIMIT = 100;
 
 interface PushPayload {
     title: string;
@@ -11,6 +12,38 @@ interface PushPayload {
     badge?: number;
     sound?: "default" | null;
     categoryId?: string;
+}
+
+export interface BriefPushInput {
+    summary?: unknown;
+    detail?: unknown;
+}
+
+function normalizePushText(value: string): string {
+    return value.replace(/\s+/g, " ").trim();
+}
+
+function truncatePushBody(value: string): string {
+    if (value.length <= BRIEF_PUSH_BODY_LIMIT) return value;
+    return `${value.slice(0, BRIEF_PUSH_BODY_LIMIT - 1).trimEnd()}…`;
+}
+
+function extractBriefDetailLine(detail: string, label: "Goal" | "Current focus"): string | undefined {
+    const match = detail.match(new RegExp(`${label}:\\s*([^\\n]+)`, "i"));
+    return match ? normalizePushText(match[1]) : undefined;
+}
+
+export function buildBriefPushBody(brief: BriefPushInput): string {
+    const detail = typeof brief.detail === "string" ? brief.detail : "";
+    const summary = typeof brief.summary === "string" ? normalizePushText(brief.summary) : "";
+    const goal = extractBriefDetailLine(detail, "Goal");
+    const currentFocus = extractBriefDetailLine(detail, "Current focus");
+    const structuredSummary = [
+        goal ? `Goal: ${goal}` : undefined,
+        currentFocus ? `Current focus: ${currentFocus}` : undefined,
+    ].filter(Boolean).join(" ");
+
+    return truncatePushBody(structuredSummary || summary || "Loop completed");
 }
 
 /**

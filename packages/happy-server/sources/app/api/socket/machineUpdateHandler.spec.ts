@@ -1,9 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const {
+    buildBriefPushBodyMock,
     dbMock,
     emitEphemeralMock,
     invalidateSessionMock,
+    pushSendMock,
     resetState,
     seedSession,
     state,
@@ -75,11 +77,15 @@ const {
 
     const emitEphemeralMock = vi.fn();
     const invalidateSessionMock = vi.fn();
+    const pushSendMock = vi.fn();
+    const buildBriefPushBodyMock = vi.fn(() => "Goal: Keep the project healthy and surface regressions before users hit them. Current focus: Verify…");
 
     return {
+        buildBriefPushBodyMock,
         dbMock,
         emitEphemeralMock,
         invalidateSessionMock,
+        pushSendMock,
         resetState,
         seedSession,
         state,
@@ -93,7 +99,10 @@ vi.mock("@/utils/randomKeyNaked", () => ({ randomKeyNaked: vi.fn(() => "update-i
 vi.mock("@/modules/supervisorScheduler", () => ({ checkAndTriggerScheduledRuns: vi.fn() }));
 vi.mock("@/modules/supervisorFixWatchdog", () => ({ cleanupStaleFixActions: vi.fn() }));
 vi.mock("@/modules/triggerScheduleRunner", () => ({ checkAndTriggerSchedules: vi.fn() }));
-vi.mock("@/modules/pushSend", () => ({ pushSend: vi.fn() }));
+vi.mock("@/modules/pushSend", () => ({
+    buildBriefPushBody: buildBriefPushBodyMock,
+    pushSend: pushSendMock,
+}));
 vi.mock("@/modules/knowledgeConsolidate", () => ({ consolidate: vi.fn() }));
 vi.mock("@/modules/knowledgeEmbedding", () => ({ storeKnowledgeEmbedding: vi.fn() }));
 vi.mock("@/storage/inTx", () => ({ inTx: vi.fn() }));
@@ -182,5 +191,77 @@ describe("machineUpdateHandler session-sync", () => {
             recipientFilter: { type: "user-scoped-only" },
         });
         expect(callback).toHaveBeenCalledWith({ ok: true, reactivated: 1 });
+    });
+
+    it("sends loop brief push body from goal and current focus", async () => {
+        dbMock.machine.findFirst.mockResolvedValue({
+            id: "machine-1",
+            accountId: userId,
+            daemonStateVersion: 0,
+            daemonState: null,
+        });
+        dbMock.machine.updateMany.mockResolvedValue({ count: 1 });
+        const callback = vi.fn();
+
+        await socket.trigger(
+            "machine-update-state",
+            {
+                machineId: "machine-1",
+                expectedVersion: 0,
+                daemonState: JSON.stringify({
+                    recentBriefs: [{
+                        loopId: "loop-1",
+                        loopName: "Nightly review",
+                        status: "completed",
+                        summary: "Nightly review completed — old summary",
+                        detail: [
+                            "Goal: Keep the project healthy and surface regressions before users hit them.",
+                            "Current focus: Verify session ready notifications now include useful structured context.",
+                        ].join("\n\n"),
+                        generatedAt: 1000,
+                        sessionId: "session-1",
+                    }],
+                }),
+            },
+            callback,
+        );
+
+        await socket.trigger(
+            "machine-update-state",
+            {
+                machineId: "machine-1",
+                expectedVersion: 0,
+                daemonState: JSON.stringify({
+                    recentBriefs: [{
+                        loopId: "loop-1",
+                        loopName: "Nightly review",
+                        status: "completed",
+                        summary: "Nightly review completed — old summary",
+                        detail: [
+                            "Goal: Keep the project healthy and surface regressions before users hit them.",
+                            "Current focus: Verify session ready notifications now include useful structured context.",
+                        ].join("\n\n"),
+                        generatedAt: 2000,
+                        sessionId: "session-1",
+                    }],
+                }),
+            },
+            callback,
+        );
+
+        expect(buildBriefPushBodyMock).toHaveBeenCalledWith(expect.objectContaining({
+            loopId: "loop-1",
+            detail: expect.stringContaining("Current focus:"),
+        }));
+        expect(pushSendMock).toHaveBeenCalledTimes(1);
+        expect(pushSendMock).toHaveBeenCalledWith(userId, expect.objectContaining({
+            title: "Loop Brief: Nightly review",
+            body: "Goal: Keep the project healthy and surface regressions before users hit them. Current focus: Verify…",
+            data: {
+                type: "loop_brief",
+                loopId: "loop-1",
+                status: "completed",
+            },
+        }));
     });
 });
