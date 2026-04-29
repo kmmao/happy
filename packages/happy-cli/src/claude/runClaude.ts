@@ -412,9 +412,14 @@ export async function runClaude(
       }
     },
     onStopFailure: (data) => {
-      logger.debug(`[START] StopFailure hook: ${data.error_details ?? data.error?.message ?? "unknown"}`);
+      const rawError = typeof data.error === "string" ? data.error : data.error?.message;
+      const errorType = typeof data.error === "object" ? data.error?.type : (rawError !== "unknown" ? rawError : undefined);
+      const errorMsg = data.error_details
+        ?? data.last_assistant_message
+        ?? (rawError !== "unknown" ? rawError : undefined)
+        ?? "Session stopped unexpectedly";
+      logger.debug(`[START] StopFailure hook: ${errorMsg}`);
       if (currentSession) {
-        const errorMsg = data.error_details ?? data.error?.message ?? "Session stopped unexpectedly";
         currentSession.client.sendSessionEvent({
           type: "message",
           message: `StopFailure: ${errorMsg}`,
@@ -423,7 +428,7 @@ export async function runClaude(
           ...s,
           stopFailure: {
             error: errorMsg,
-            errorType: data.error?.type ?? null,
+            errorType: errorType ?? null,
             lastAssistantMessage: data.last_assistant_message ?? null,
           },
         }));

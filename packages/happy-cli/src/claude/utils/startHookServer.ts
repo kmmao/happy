@@ -149,7 +149,8 @@ export async function startHookServer(options: HookServerOptions): Promise<HookS
     }
 
     function handleStopFailure(data: StopFailureHookData) {
-        logger.debug(`[hookServer] StopFailure hook: ${data.error_details ?? data.error?.message ?? 'unknown'}`);
+        const rawErr = typeof data.error === 'string' ? data.error : data.error?.message;
+        logger.debug(`[hookServer] StopFailure hook: ${data.error_details ?? data.last_assistant_message ?? rawErr ?? 'unknown'}`);
         onStopFailure?.(data);
     }
 
