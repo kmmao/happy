@@ -32,6 +32,19 @@ import {
 } from "./supervisorConstants";
 import { Modal } from "@/modal";
 
+function formatRelativeTime(timestamp: number): string {
+    const diffMs = Date.now() - timestamp;
+    const mins = Math.floor(diffMs / 60_000);
+    if (mins < 1) return "<1m";
+    if (mins < 60) return `${mins}m`;
+    const hours = Math.floor(mins / 60);
+    if (hours < 24) return `${hours}h`;
+    const days = Math.floor(hours / 24);
+    if (days < 30) return `${days}d`;
+    const months = Math.floor(days / 30);
+    return `${months}mo`;
+}
+
 interface SupervisorActionCardProps {
     action: SupervisorAction;
     projectId: string;
@@ -291,6 +304,11 @@ export const SupervisorActionCard = React.memo(
                                 {action.confidence}%
                             </Text>
                         </View>
+                    )}
+                    {action.createdAt > 0 && (
+                        <Text style={styles.timeText}>
+                            {formatRelativeTime(action.createdAt)}
+                        </Text>
                     )}
                 </View>
 
@@ -719,6 +737,12 @@ const styles = StyleSheet.create((theme) => ({
     confidenceText: {
         ...Typography.default("semiBold"),
         fontSize: 11,
+    },
+    timeText: {
+        ...Typography.default(),
+        fontSize: 11,
+        color: theme.colors.textSecondary,
+        opacity: 0.6,
     },
     title: {
         ...Typography.default("semiBold"),
