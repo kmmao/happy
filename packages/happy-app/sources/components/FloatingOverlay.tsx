@@ -1,12 +1,10 @@
 import * as React from 'react';
-import { Platform, ScrollView } from 'react-native';
-import Animated from 'react-native-reanimated';
+import { Platform, ScrollView, View } from 'react-native';
 import { StyleSheet } from 'react-native-unistyles';
 
 const stylesheet = StyleSheet.create((theme) => ({
     container: {
         borderRadius: 12,
-        overflow: 'hidden',
         backgroundColor: theme.colors.surface,
         borderWidth: Platform.OS === 'web' ? 0 : 0.5,
         borderColor: theme.colors.modal.border,
@@ -35,15 +33,15 @@ export const FloatingOverlay = React.memo((props: FloatingOverlayProps) => {
     } = props;
 
     return (
-        <Animated.View style={[styles.container, { maxHeight }]}>
+        <View style={[styles.container, { maxHeight }]}>
             <ScrollView
-                style={{ maxHeight }}
+                style={{ maxHeight, borderRadius: 12 }}
                 keyboardShouldPersistTaps={keyboardShouldPersistTaps}
                 showsVerticalScrollIndicator={showScrollIndicator}
                 nestedScrollEnabled
             >
                 {children}
             </ScrollView>
-        </Animated.View>
+        </View>
     );
 });
