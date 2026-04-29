@@ -1,5 +1,21 @@
 # Changelog
 
+## 2.18.0 - 2026-04-29
+
+This release adds responsive foldable screen support and fixes several UI issues.
+
+### Foldable Screen Support
+- Added responsive layout switching for foldable devices — the app now adapts between phone and tablet layouts when folding or unfolding the screen, powered by Unistyles C++ breakpoint detection
+- Improved layout width calculations to react dynamically to screen size changes instead of using static values computed at startup
+
+### Settings
+- Fixed settings overlay scroll issues on Android and smaller screens by replacing the floating overlay with a centered modal
+
+### Stability
+- Fixed Firebase configuration for push notifications on Android
+- Fixed a potential crash when the scroll anchor exceeded the message list bounds
+- Improved message history loading reliability on app restart
+
 ## 2.17.0 - 2026-04-29
 
 This release improves the experience when opening long chat sessions and fixes several rendering and layout issues.
