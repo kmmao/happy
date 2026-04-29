@@ -38,6 +38,8 @@ export async function pushSend(
             sound: payload.sound ?? "default",
             badge: payload.badge,
             categoryId: payload.categoryId,
+            channelId: "default",
+            priority: "high" as const,
         }));
 
     if (messages.length === 0) return;
