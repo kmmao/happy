@@ -1,6 +1,7 @@
 import { type Fastify } from "../types";
 import { db } from "@/storage/db";
 import { z } from "zod";
+import { apiError } from "../utils/apiError";
 
 const InboxCategorySchema = z.enum([
     "task", "trigger", "supervisor", "session", "knowledge", "system", "decision",
@@ -105,7 +106,7 @@ export function inboxRoutes(app: Fastify) {
                 where: { id, accountId: userId },
             });
             if (!item) {
-                return reply.status(404).send({ error: "not-found" });
+                return reply.status(404).send(apiError('not-found', 'Item not found'));
             }
 
             await db.inboxItem.update({
@@ -150,7 +151,7 @@ export function inboxRoutes(app: Fastify) {
                 where: { id, accountId: userId },
             });
             if (!item) {
-                return reply.status(404).send({ error: "not-found" });
+                return reply.status(404).send(apiError('not-found', 'Item not found'));
             }
 
             await db.inboxItem.delete({ where: { id } });

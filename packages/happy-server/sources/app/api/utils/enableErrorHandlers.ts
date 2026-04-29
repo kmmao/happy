@@ -1,6 +1,7 @@
 import { log } from "@/utils/log";
 import { Fastify } from "../types";
 import { FastifyError } from "fastify";
+import { apiError } from "./apiError";
 
 export function enableErrorHandlers(app: Fastify) {
     // Global error handler
@@ -27,26 +28,20 @@ export function enableErrorHandlers(app: Fastify) {
         const statusCode = error.statusCode || 500;
 
         if (statusCode >= 500) {
-            // Internal server errors - don't expose details
-            return reply.code(statusCode).send({
-                error: 'Internal Server Error',
-                message: 'An unexpected error occurred',
-                statusCode
-            });
+            return reply.code(statusCode).send(
+                apiError('internal-server-error', 'An unexpected error occurred')
+            );
         } else {
-            // Client errors - can expose more details
-            return reply.code(statusCode).send({
-                error: error.name || 'Error',
-                message: error.message || 'An error occurred',
-                statusCode
-            });
+            return reply.code(statusCode).send(
+                apiError(error.code || 'client-error', error.message || 'An error occurred')
+            );
         }
     });
 
     // Catch-all route for debugging 404s
     app.setNotFoundHandler((request, reply) => {
         log({ module: '404-handler' }, `404 - Method: ${request.method}, Path: ${request.url}, Headers: ${JSON.stringify(request.headers)}`);
-        reply.code(404).send({ error: 'Not found', path: request.url, method: request.method });
+        reply.code(404).send(apiError('not-found', 'Not found', { path: request.url, method: request.method }));
     });
 
     // Error hook for additional logging
