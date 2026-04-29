@@ -176,6 +176,14 @@ export interface QueryOptions {
    * Maps to the official SDK's `Options.sessionStore` (@alpha, 0.2.119+).
    */
   sessionStore?: import("@anthropic-ai/claude-agent-sdk").SessionStore;
+  /**
+   * Per-tool configuration for built-in tools.
+   * Used to configure AskUserQuestion's previewFormat so the model emits
+   * markdown preview content in option objects.
+   *
+   * Maps to the official SDK's `Options.toolConfig` (0.2.119+).
+   */
+  toolConfig?: import("@anthropic-ai/claude-agent-sdk").ToolConfig;
 }
 
 /** Query prompt — string or async stream of user messages */

@@ -130,6 +130,9 @@ export function mapOptions(opts: QueryOptions): OfficialOptions {
   // ── SessionStore @alpha adapter (SDK 0.2.119+) ──
   if (opts.sessionStore) result.sessionStore = opts.sessionStore;
 
+  // ── Per-tool configuration (SDK 0.2.119+) ──
+  if (opts.toolConfig) result.toolConfig = opts.toolConfig;
+
   // ── System prompt mapping ──
   if (opts.customSystemPrompt) {
     result.systemPrompt = opts.customSystemPrompt;

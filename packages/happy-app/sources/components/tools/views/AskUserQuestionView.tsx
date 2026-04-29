@@ -17,6 +17,7 @@ import { Ionicons } from "@expo/vector-icons";
 interface QuestionOption {
   label: string;
   description: string;
+  preview?: string;
 }
 
 interface Question {
@@ -175,6 +176,9 @@ const OptionRow = React.memo<{
         </View>
         {option.description ? (
           <Text style={styles.optionDescription}>{option.description}</Text>
+        ) : null}
+        {option.preview ? (
+          <Text style={styles.optionPreview}>{option.preview}</Text>
         ) : null}
       </View>
     </TouchableOpacity>
@@ -752,6 +756,15 @@ const styles = StyleSheet.create((theme) => ({
     fontSize: 13,
     color: theme.colors.textSecondary,
     marginTop: 2,
+  },
+  optionPreview: {
+    fontSize: 12,
+    color: theme.colors.textSecondary,
+    marginTop: 6,
+    fontFamily: "monospace",
+    backgroundColor: theme.colors.surfaceHighest,
+    padding: 6,
+    borderRadius: 4,
   },
 
   // Actions

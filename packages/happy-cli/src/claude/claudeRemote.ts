@@ -394,6 +394,9 @@ export async function claudeRemote(opts: {
     // adapter (in-memory) in addition to the usual on-disk JSONL, so we can
     // study real call cadence before building a production backend.
     sessionStore: createSessionStoreAdapter(),
+    // Enable markdown preview content in AskUserQuestion option objects.
+    // The model emits a `preview` field (markdown text) per option when set.
+    toolConfig: { askUserQuestion: { previewFormat: "markdown" } },
   };
 
   // Track thinking state

@@ -1867,6 +1867,7 @@ export const knownTools = {
                   z.object({
                     label: z.string().describe("Option label"),
                     description: z.string().describe("Option description"),
+                    preview: z.string().optional().describe("Optional markdown preview content for this option"),
                   }),
                 )
                 .describe("Available choices"),
