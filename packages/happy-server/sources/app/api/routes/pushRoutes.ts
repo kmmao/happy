@@ -101,19 +101,33 @@ export function pushRoutes(app: Fastify) {
 
     // Get Push Tokens API
     app.get('/v1/push-tokens', {
-        preHandler: app.authenticate
+        preHandler: app.authenticate,
+        schema: {
+            querystring: z.object({
+                limit: z.coerce.number().int().min(1).max(100).optional(),
+                cursor: z.string().optional()
+            }).optional()
+        }
     }, async (request, reply) => {
         const userId = request.userId;
+        const limit = request.query?.limit ?? 50;
+        const cursor = request.query?.cursor;
 
         try {
-            const tokens = await db.accountPushToken.findMany({
+            const rows = await db.accountPushToken.findMany({
                 where: {
                     accountId: userId
                 },
                 orderBy: {
                     createdAt: 'desc'
-                }
+                },
+                take: limit + 1,
+                ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {})
             });
+
+            const hasNextPage = rows.length > limit;
+            const tokens = hasNextPage ? rows.slice(0, limit) : rows;
+            const nextCursor = hasNextPage ? tokens[tokens.length - 1].id : null;
 
             return reply.send({
                 tokens: tokens.map(t => ({
@@ -121,7 +135,8 @@ export function pushRoutes(app: Fastify) {
                     token: t.token,
                     createdAt: t.createdAt.getTime(),
                     updatedAt: t.updatedAt.getTime()
-                }))
+                })),
+                nextCursor
             });
         } catch (error) {
             return reply.code(500).send({ error: 'Failed to get push tokens' });

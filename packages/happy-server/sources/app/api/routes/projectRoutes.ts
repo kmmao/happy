@@ -26,6 +26,8 @@ export function projectRoutes(app: Fastify) {
                 querystring: z
                     .object({
                         archived: z.coerce.boolean().optional(),
+                        limit: z.coerce.number().int().min(1).max(100).optional(),
+                        cursor: z.string().optional(),
                     })
                     .optional(),
             },
@@ -33,6 +35,8 @@ export function projectRoutes(app: Fastify) {
         async (request, reply) => {
             const userId = request.userId;
             const archived = request.query?.archived;
+            const limit = request.query?.limit ?? 50;
+            const cursor = request.query?.cursor;
 
             const where: { accountId: string; archived?: boolean; path?: { not: { contains: string } } } = {
                 accountId: userId,
@@ -43,19 +47,26 @@ export function projectRoutes(app: Fastify) {
                 where.archived = archived;
             }
 
-            const projects = await db.project.findMany({
+            const rows = await db.project.findMany({
                 where,
                 orderBy: { updatedAt: "desc" },
+                take: limit + 1,
+                ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
                 include: {
                     _count: { select: { sessions: true } },
                 },
             });
+
+            const hasNextPage = rows.length > limit;
+            const projects = hasNextPage ? rows.slice(0, limit) : rows;
+            const nextCursor = hasNextPage ? projects[projects.length - 1].id : null;
 
             return reply.send({
                 projects: projects.map((p) => ({
                     ...serializeProject(p),
                     sessionCount: p._count.sessions,
                 })),
+                nextCursor,
             });
         },
     );

@@ -1461,32 +1461,56 @@ class Sync {
 
     log.log("📊 Sync: Fetching machines...");
     const API_ENDPOINT = getServerUrl();
-    const response = await fetch(`${API_ENDPOINT}/v1/machines`, {
-      headers: {
-        Authorization: `Bearer ${this.credentials.token}`,
-        "Content-Type": "application/json",
-      },
-    });
 
-    if (!response.ok) {
-      log.error(`Failed to fetch machines: ${response.status}`);
-      return;
-    }
-
-    const data = await response.json();
-    log.log(
-      `📊 Sync: Fetched ${Array.isArray(data) ? data.length : 0} machines from server`,
-    );
-    const machines = data as Array<{
+    type MachineItem = {
       id: string;
       metadata: string;
       metadataVersion: number;
       daemonState?: string | null;
       daemonStateVersion?: number;
-      dataEncryptionKey?: string | null; // Add support for per-machine encryption keys
+      dataEncryptionKey?: string | null;
       seq: number;
       active: boolean;
-      activeAt: number; // Changed from lastActiveAt
+      activeAt: number;
+      createdAt: number;
+      updatedAt: number;
+    };
+
+    const allMachines: MachineItem[] = [];
+    let cursor: string | undefined;
+
+    do {
+      const params = new URLSearchParams({ limit: '100' });
+      if (cursor) params.set('cursor', cursor);
+
+      const response = await fetch(`${API_ENDPOINT}/v1/machines?${params}`, {
+        headers: {
+          Authorization: `Bearer ${this.credentials.token}`,
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (!response.ok) {
+        log.error(`Failed to fetch machines: ${response.status}`);
+        return;
+      }
+
+      const data = await response.json() as { machines: MachineItem[]; nextCursor: string | null };
+      allMachines.push(...data.machines);
+      cursor = data.nextCursor ?? undefined;
+    } while (cursor);
+
+    log.log(`📊 Sync: Fetched ${allMachines.length} machines from server`);
+    const machines = allMachines as Array<{
+      id: string;
+      metadata: string;
+      metadataVersion: number;
+      daemonState?: string | null;
+      daemonStateVersion?: number;
+      dataEncryptionKey?: string | null;
+      seq: number;
+      active: boolean;
+      activeAt: number;
       createdAt: number;
       updatedAt: number;
     }>;

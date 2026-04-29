@@ -12,16 +12,23 @@ export function artifactsRoutes(app: Fastify) {
     app.get('/v1/artifacts', {
         preHandler: app.authenticate,
         schema: {
+            querystring: z.object({
+                limit: z.coerce.number().int().min(1).max(100).default(50).optional(),
+                cursor: z.string().optional()
+            }).optional(),
             response: {
-                200: z.array(z.object({
-                    id: z.string(),
-                    header: z.string(),
-                    headerVersion: z.number(),
-                    dataEncryptionKey: z.string(),
-                    seq: z.number(),
-                    createdAt: z.number(),
-                    updatedAt: z.number()
-                })),
+                200: z.object({
+                    artifacts: z.array(z.object({
+                        id: z.string(),
+                        header: z.string(),
+                        headerVersion: z.number(),
+                        dataEncryptionKey: z.string(),
+                        seq: z.number(),
+                        createdAt: z.number(),
+                        updatedAt: z.number()
+                    })),
+                    nextCursor: z.string().nullable()
+                }),
                 500: z.object({
                     error: z.literal('Failed to get artifacts')
                 })
@@ -29,11 +36,15 @@ export function artifactsRoutes(app: Fastify) {
         }
     }, async (request, reply) => {
         const userId = request.userId;
+        const limit = request.query?.limit ?? 50;
+        const cursor = request.query?.cursor;
 
         try {
-            const artifacts = await db.artifact.findMany({
+            const rows = await db.artifact.findMany({
                 where: { accountId: userId },
                 orderBy: { updatedAt: 'desc' },
+                take: limit + 1,
+                ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
                 select: {
                     id: true,
                     header: true,
@@ -45,15 +56,22 @@ export function artifactsRoutes(app: Fastify) {
                 }
             });
 
-            return reply.send(artifacts.map(a => ({
-                id: a.id,
-                header: privacyKit.encodeBase64(a.header),
-                headerVersion: a.headerVersion,
-                dataEncryptionKey: privacyKit.encodeBase64(a.dataEncryptionKey),
-                seq: a.seq,
-                createdAt: a.createdAt.getTime(),
-                updatedAt: a.updatedAt.getTime()
-            })));
+            const hasNextPage = rows.length > limit;
+            const artifacts = hasNextPage ? rows.slice(0, limit) : rows;
+            const nextCursor = hasNextPage ? artifacts[artifacts.length - 1].id : null;
+
+            return reply.send({
+                artifacts: artifacts.map(a => ({
+                    id: a.id,
+                    header: privacyKit.encodeBase64(a.header),
+                    headerVersion: a.headerVersion,
+                    dataEncryptionKey: privacyKit.encodeBase64(a.dataEncryptionKey),
+                    seq: a.seq,
+                    createdAt: a.createdAt.getTime(),
+                    updatedAt: a.updatedAt.getTime()
+                })),
+                nextCursor
+            });
         } catch (error) {
             log({ module: 'api', level: 'error' }, `Failed to get artifacts: ${error}`);
             return reply.code(500).send({ error: 'Failed to get artifacts' });

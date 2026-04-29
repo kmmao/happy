@@ -34,11 +34,8 @@ const ProjectListResponseSchema = z.object({
         machineId: z.string(),
         path: z.string(),
     })),
+    nextCursor: z.string().nullable().optional(),
 });
-
-interface ProjectListResponse {
-    projects: ServerProject[];
-}
 
 interface ProjectResponse {
     project: ServerProject;
@@ -78,32 +75,44 @@ function authHeaders(credentials: AuthCredentials) {
 }
 
 /**
- * Fetch all projects for the authenticated user
+ * Fetch all projects for the authenticated user (paginates through all pages)
  */
 export async function fetchProjects(
     credentials: AuthCredentials,
     archived?: boolean,
 ): Promise<ServerProject[]> {
     const API_ENDPOINT = getServerUrl();
-    const params = archived !== undefined ? `?archived=${archived}` : "";
+    const all: ServerProject[] = [];
+    let cursor: string | undefined;
 
-    return await backoff(async () => {
-        const response = await fetch(
-            `${API_ENDPOINT}/v1/projects${params}`,
-            { headers: authHeaders(credentials) },
-        );
+    do {
+        const qs = new URLSearchParams({ limit: '100' });
+        if (archived !== undefined) qs.set('archived', String(archived));
+        if (cursor) qs.set('cursor', cursor);
 
-        if (!response.ok) {
-            throw new Error(`Failed to fetch projects: ${response.status}`);
-        }
+        const page = await backoff(async () => {
+            const response = await fetch(
+                `${API_ENDPOINT}/v1/projects?${qs}`,
+                { headers: authHeaders(credentials) },
+            );
 
-        const json = await response.json();
-        const parsed = ProjectListResponseSchema.safeParse(json);
-        if (!parsed.success) {
-            throw new Error(`Invalid projects response: ${parsed.error.issues[0]?.message}`);
-        }
-        return parsed.data.projects as unknown as ServerProject[];
-    });
+            if (!response.ok) {
+                throw new Error(`Failed to fetch projects: ${response.status}`);
+            }
+
+            const json = await response.json();
+            const parsed = ProjectListResponseSchema.safeParse(json);
+            if (!parsed.success) {
+                throw new Error(`Invalid projects response: ${parsed.error.issues[0]?.message}`);
+            }
+            return parsed.data;
+        });
+
+        all.push(...(page.projects as unknown as ServerProject[]));
+        cursor = page.nextCursor ?? undefined;
+    } while (cursor);
+
+    return all;
 }
 
 /**

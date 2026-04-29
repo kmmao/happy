@@ -111,27 +111,44 @@ export function machinesRoutes(app: Fastify) {
     // Machines API
     app.get('/v1/machines', {
         preHandler: app.authenticate,
+        schema: {
+            querystring: z.object({
+                limit: z.coerce.number().int().min(1).max(100).optional(),
+                cursor: z.string().optional()
+            }).optional()
+        }
     }, async (request, reply) => {
         const userId = request.userId;
+        const limit = request.query?.limit ?? 50;
+        const cursor = request.query?.cursor;
 
-        const machines = await db.machine.findMany({
+        const rows = await db.machine.findMany({
             where: { accountId: userId },
-            orderBy: { lastActiveAt: 'desc' }
+            orderBy: { lastActiveAt: 'desc' },
+            take: limit + 1,
+            ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {})
         });
 
-        return machines.map(m => ({
-            id: m.id,
-            metadata: m.metadata,
-            metadataVersion: m.metadataVersion,
-            daemonState: m.daemonState,
-            daemonStateVersion: m.daemonStateVersion,
-            dataEncryptionKey: m.dataEncryptionKey ? Buffer.from(m.dataEncryptionKey).toString('base64') : null,
-            seq: m.seq,
-            active: m.active,
-            activeAt: m.lastActiveAt.getTime(),
-            createdAt: m.createdAt.getTime(),
-            updatedAt: m.updatedAt.getTime()
-        }));
+        const hasNextPage = rows.length > limit;
+        const machines = hasNextPage ? rows.slice(0, limit) : rows;
+        const nextCursor = hasNextPage ? machines[machines.length - 1].id : null;
+
+        return reply.send({
+            machines: machines.map(m => ({
+                id: m.id,
+                metadata: m.metadata,
+                metadataVersion: m.metadataVersion,
+                daemonState: m.daemonState,
+                daemonStateVersion: m.daemonStateVersion,
+                dataEncryptionKey: m.dataEncryptionKey ? Buffer.from(m.dataEncryptionKey).toString('base64') : null,
+                seq: m.seq,
+                active: m.active,
+                activeAt: m.lastActiveAt.getTime(),
+                createdAt: m.createdAt.getTime(),
+                updatedAt: m.updatedAt.getTime()
+            })),
+            nextCursor
+        });
     });
 
     // GET /v1/machines/:id - Get single machine by ID

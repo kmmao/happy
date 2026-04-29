@@ -4,26 +4,37 @@ import { getServerUrl } from './serverConfig';
 import { Artifact, ArtifactCreateRequest, ArtifactUpdateRequest, ArtifactUpdateResponse } from './artifactTypes';
 
 /**
- * Fetch all artifacts for the account
+ * Fetch all artifacts for the account (paginates through all pages)
  */
 export async function fetchArtifacts(credentials: AuthCredentials): Promise<Artifact[]> {
     const API_ENDPOINT = getServerUrl();
+    const all: Artifact[] = [];
+    let cursor: string | undefined;
 
-    return await backoff(async () => {
-        const response = await fetch(`${API_ENDPOINT}/v1/artifacts`, {
-            headers: {
-                'Authorization': `Bearer ${credentials.token}`,
-                'Content-Type': 'application/json'
+    do {
+        const params = new URLSearchParams({ limit: '100' });
+        if (cursor) params.set('cursor', cursor);
+
+        const data = await backoff(async () => {
+            const response = await fetch(`${API_ENDPOINT}/v1/artifacts?${params}`, {
+                headers: {
+                    'Authorization': `Bearer ${credentials.token}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (!response.ok) {
+                throw new Error(`Failed to fetch artifacts: ${response.status}`);
             }
+
+            return response.json() as Promise<{ artifacts: Artifact[]; nextCursor: string | null }>;
         });
 
-        if (!response.ok) {
-            throw new Error(`Failed to fetch artifacts: ${response.status}`);
-        }
+        all.push(...data.artifacts);
+        cursor = data.nextCursor ?? undefined;
+    } while (cursor);
 
-        const data = await response.json() as Artifact[];
-        return data;
-    });
+    return all;
 }
 
 /**
