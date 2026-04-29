@@ -21,6 +21,7 @@ describe("sessionPreferencesState", () => {
         effortLevel: undefined,
         maxBudgetUsd: undefined,
         taskBudgetTokens: undefined,
+        starred: null,
       } as any),
     ).toEqual({
       permissionMode: "default",
@@ -35,6 +36,7 @@ describe("sessionPreferencesState", () => {
       effortLevel: null,
       maxBudgetUsd: null,
       taskBudgetTokens: null,
+      starred: null,
     });
   });
 
@@ -68,6 +70,7 @@ describe("sessionPreferencesState", () => {
       effortLevel: "high",
       maxBudgetUsd: 2,
       taskBudgetTokens: 2000,
+      starred: true,
     } as any;
 
     expect(
@@ -84,6 +87,7 @@ describe("sessionPreferencesState", () => {
         effortLevel: null,
         maxBudgetUsd: null,
         taskBudgetTokens: null,
+        starred: true,
       }),
     ).toEqual(
       expect.objectContaining({
@@ -99,6 +103,7 @@ describe("sessionPreferencesState", () => {
         effortLevel: null,
         maxBudgetUsd: null,
         taskBudgetTokens: null,
+        starred: true,
       }),
     );
   });

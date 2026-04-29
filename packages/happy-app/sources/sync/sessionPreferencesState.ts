@@ -14,6 +14,7 @@ type SessionPreferenceSource = Pick<
   | "effortLevel"
   | "maxBudgetUsd"
   | "taskBudgetTokens"
+  | "starred"
 >;
 
 export function normalizeSessionPreferencesSnapshot(
@@ -34,6 +35,7 @@ export function normalizeSessionPreferencesSnapshot(
     maxBudgetUsd: input?.maxBudgetUsd === undefined ? null : input.maxBudgetUsd,
     taskBudgetTokens:
       input?.taskBudgetTokens === undefined ? null : input.taskBudgetTokens,
+    starred: input?.starred ?? null,
   };
 }
 
@@ -76,5 +78,6 @@ export function overlayPendingSessionPreferences(
     effortLevel: normalized.effortLevel,
     maxBudgetUsd: normalized.maxBudgetUsd,
     taskBudgetTokens: normalized.taskBudgetTokens,
+    starred: normalized.starred,
   };
 }
