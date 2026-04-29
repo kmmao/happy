@@ -1,10 +1,9 @@
 import * as React from "react";
-import { View, Text, Pressable } from "react-native";
+import { View, Text, Pressable, Modal as RNModal, ScrollView } from "react-native";
 import { useUnistyles } from "react-native-unistyles";
 import { Typography } from "@/constants/Typography";
 import { PermissionMode, ModelMode } from "./PermissionModeSelector";
 import { hapticsLight } from "./haptics";
-import { FloatingOverlay } from "./FloatingOverlay";
 import { stylesheet } from "./AgentInputStyles";
 import { t } from "@/text";
 import { Metadata } from "@/sync/storageTypes";
@@ -57,26 +56,37 @@ export const AgentInputSettingsOverlay = React.memo(
         const styles = stylesheet;
         const { theme } = useUnistyles();
 
-        if (!visible) {
-            return null;
-        }
-
         return (
-            <>
+            <RNModal
+                visible={visible}
+                transparent
+                animationType="fade"
+                onRequestClose={onClose}
+            >
                 <Pressable
-                    style={styles.overlayBackdrop}
+                    style={{
+                        flex: 1,
+                        backgroundColor: "rgba(0,0,0,0.45)",
+                        justifyContent: "center",
+                        paddingHorizontal: 16,
+                        paddingVertical: 24,
+                    }}
                     onPress={onClose}
-                />
-                <View
-                    pointerEvents="box-none"
-                    style={[
-                        styles.settingsOverlay,
-                        { paddingHorizontal: screenWidth > 700 ? 0 : 8 },
-                    ]}
                 >
-                    <FloatingOverlay
-                        maxHeight={maxHeight ?? 400}
+                    <Pressable
+                        onPress={(e) => e.stopPropagation()}
+                        style={{
+                            maxHeight: "70%",
+                            borderRadius: 16,
+                            overflow: "hidden",
+                            backgroundColor: theme.colors.surface,
+                            borderWidth: 1,
+                            borderColor: theme.colors.divider,
+                        }}
+                    >
+                    <ScrollView
                         keyboardShouldPersistTaps="always"
+                        showsVerticalScrollIndicator
                     >
                         {/* Permission Mode Section */}
                         <View style={styles.overlaySection}>
@@ -622,9 +632,10 @@ export const AgentInputSettingsOverlay = React.memo(
                                 </View>
                             </>
                         )}
-                    </FloatingOverlay>
-                </View>
-            </>
+                    </ScrollView>
+                    </Pressable>
+                </Pressable>
+            </RNModal>
         );
     },
 );
