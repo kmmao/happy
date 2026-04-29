@@ -212,7 +212,6 @@ const HotBadge = React.memo<HotBadgeProps>(({ entry }) => {
 });
 
 const EntryRow = React.memo<EntryRowProps>(({ activeTab, entry, onPress, onEvict, onReinject }) => {
-    const layout = useLayout();
     const { theme } = useUnistyles();
     const typeColor = TYPE_COLORS[entry.entryType] ?? theme.colors.textSecondary;
     const statusColor = STATUS_COLORS[entry.status] ?? theme.colors.textSecondary;
@@ -410,6 +409,14 @@ export const SessionKnowledgeSheet = React.memo<SessionKnowledgeSheetProps>(
             [reinject],
         );
 
+        const handleRefreshActiveTab = React.useCallback(() => {
+            if (activeTab === "changes") {
+                void refreshChanges();
+                return;
+            }
+            void refreshAccesses();
+        }, [activeTab, refreshAccesses, refreshChanges]);
+
         React.useEffect(() => {
             if (inline) {
                 // Inline mode: always mounted, no animation needed.
@@ -466,13 +473,6 @@ export const SessionKnowledgeSheet = React.memo<SessionKnowledgeSheetProps>(
                     ? t("session.knowledgeTabArchive")
                     : t("session.knowledgeTabReferences");
         const currentCount = activeEntries.length;
-        const handleRefreshActiveTab = React.useCallback(() => {
-            if (isChangesTab) {
-                void refreshChanges();
-                return;
-            }
-            void refreshAccesses();
-        }, [isChangesTab, refreshAccesses, refreshChanges]);
 
         const body = (
             <>
