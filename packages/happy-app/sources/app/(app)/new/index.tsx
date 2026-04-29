@@ -1383,8 +1383,9 @@ function NewSessionWizard() {
     router,
   ]);
 
-  const screenWidth = useWindowDimensions().width;
+  const { width: screenWidth, height: screenHeight } = useWindowDimensions();
   const useProfileBottomSheet = screenWidth < 700;
+  const overlayMaxHeight = Math.min(screenHeight * 0.6, 600);
 
   // Machine online status for AgentInput (DRY - reused in info box too)
   const connectionStatus = React.useMemo(() => {
@@ -1797,6 +1798,7 @@ function NewSessionWizard() {
                   effortLevel,
                   onEffortLevelChange: handleEffortLevelChange,
                 }}
+                overlayMaxHeight={overlayMaxHeight}
                 connectionStatus={connectionStatus}
                 machineName={
                   selectedMachine?.metadata?.displayName ||
@@ -2772,6 +2774,7 @@ function NewSessionWizard() {
                 effortLevel,
                 onEffortLevelChange: handleEffortLevelChange,
               }}
+              overlayMaxHeight={overlayMaxHeight}
               connectionStatus={connectionStatus}
               machineName={
                 selectedMachine?.metadata?.displayName ||

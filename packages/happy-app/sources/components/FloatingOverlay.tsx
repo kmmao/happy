@@ -30,7 +30,7 @@ export const FloatingOverlay = React.memo((props: FloatingOverlayProps) => {
     const { 
         children, 
         maxHeight = 240, 
-        showScrollIndicator = false, 
+        showScrollIndicator = true,
         keyboardShouldPersistTaps = 'handled' 
     } = props;
 
