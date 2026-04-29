@@ -76,18 +76,16 @@ export function accountRoutes(app: Fastify) {
                 expectedVersion: z.number().int().min(0),
             }),
             response: {
-                200: z.union([
-                    z.object({
-                        success: z.literal(true),
-                        version: z.number(),
-                    }),
-                    z.object({
-                        success: z.literal(false),
-                        error: z.literal('version-mismatch'),
-                        currentVersion: z.number(),
-                        currentSettings: z.string().nullable(),
-                    }),
-                ]),
+                200: z.object({
+                    success: z.literal(true),
+                    version: z.number(),
+                }),
+                409: z.object({
+                    success: z.literal(false),
+                    error: z.literal('version-mismatch'),
+                    currentVersion: z.number(),
+                    currentSettings: z.string().nullable(),
+                }),
                 500: z.object({
                     success: z.literal(false),
                     error: z.literal('Failed to update account settings'),
@@ -113,7 +111,7 @@ export function accountRoutes(app: Fastify) {
             }
 
             if (currentUser.settingsVersion !== expectedVersion) {
-                return reply.code(200).send({
+                return reply.code(409).send({
                     success: false,
                     error: 'version-mismatch',
                     currentVersion: currentUser.settingsVersion,
@@ -135,7 +133,7 @@ export function accountRoutes(app: Fastify) {
 
             if (count === 0) {
                 const account = await db.account.findUnique({ where: { id: userId } });
-                return reply.code(200).send({
+                return reply.code(409).send({
                     success: false,
                     error: 'version-mismatch',
                     currentVersion: account?.settingsVersion || 0,

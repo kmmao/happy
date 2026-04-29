@@ -186,20 +186,18 @@ export function accessKeysRoutes(app: Fastify) {
                 expectedVersion: z.number().int().min(0)
             }),
             response: {
-                200: z.union([
-                    z.object({
-                        success: z.literal(true),
-                        version: z.number()
-                    }),
-                    z.object({
-                        success: z.literal(false),
-                        error: z.literal('version-mismatch'),
-                        currentVersion: z.number(),
-                        currentData: z.string()
-                    })
-                ]),
+                200: z.object({
+                    success: z.literal(true),
+                    version: z.number()
+                }),
                 404: z.object({
                     error: z.literal('Access key not found')
+                }),
+                409: z.object({
+                    success: z.literal(false),
+                    error: z.literal('version-mismatch'),
+                    currentVersion: z.number(),
+                    currentData: z.string()
                 }),
                 500: z.object({
                     success: z.literal(false),
@@ -230,7 +228,7 @@ export function accessKeysRoutes(app: Fastify) {
 
             // Check version
             if (currentAccessKey.dataVersion !== expectedVersion) {
-                return reply.code(200).send({
+                return reply.code(409).send({
                     success: false,
                     error: 'version-mismatch',
                     currentVersion: currentAccessKey.dataVersion,
@@ -264,7 +262,7 @@ export function accessKeysRoutes(app: Fastify) {
                         }
                     }
                 });
-                return reply.code(200).send({
+                return reply.code(409).send({
                     success: false,
                     error: 'version-mismatch',
                     currentVersion: accessKey?.dataVersion || 0,

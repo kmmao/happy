@@ -107,6 +107,10 @@ export async function updateArtifact(
             if (response.status === 404) {
                 throw new Error('Artifact not found');
             }
+            if (response.status === 409) {
+                const data = await response.json() as ArtifactUpdateResponse;
+                return data;
+            }
             throw new Error(`Failed to update artifact: ${response.status}`);
         }
 

@@ -238,23 +238,21 @@ export function artifactsRoutes(app: Fastify) {
                 expectedBodyVersion: z.number().int().min(0).optional()
             }),
             response: {
-                200: z.union([
-                    z.object({
-                        success: z.literal(true),
-                        headerVersion: z.number().optional(),
-                        bodyVersion: z.number().optional()
-                    }),
-                    z.object({
-                        success: z.literal(false),
-                        error: z.literal('version-mismatch'),
-                        currentHeaderVersion: z.number().optional(),
-                        currentBodyVersion: z.number().optional(),
-                        currentHeader: z.string().optional(),
-                        currentBody: z.string().optional()
-                    })
-                ]),
+                200: z.object({
+                    success: z.literal(true),
+                    headerVersion: z.number().optional(),
+                    bodyVersion: z.number().optional()
+                }),
                 404: z.object({
                     error: z.literal('Artifact not found')
+                }),
+                409: z.object({
+                    success: z.literal(false),
+                    error: z.literal('version-mismatch'),
+                    currentHeaderVersion: z.number().optional(),
+                    currentBodyVersion: z.number().optional(),
+                    currentHeader: z.string().optional(),
+                    currentBody: z.string().optional()
                 }),
                 500: z.object({
                     error: z.literal('Failed to update artifact')
@@ -286,7 +284,7 @@ export function artifactsRoutes(app: Fastify) {
                                  currentArtifact.bodyVersion !== expectedBodyVersion;
 
             if (headerMismatch || bodyMismatch) {
-                return reply.send({
+                return reply.code(409).send({
                     success: false,
                     error: 'version-mismatch',
                     ...(headerMismatch && {
