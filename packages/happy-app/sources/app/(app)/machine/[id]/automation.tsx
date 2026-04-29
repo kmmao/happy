@@ -726,21 +726,15 @@ export default React.memo(function MachineAutomationPage() {
                         }
                     >
                         {data.loopRollup.total === 0 ? (
-                            /* 全 0 时：简洁空状态 */
                             <View style={{ paddingHorizontal: 16, paddingBottom: 16, alignItems: "center", gap: 6 }}>
                                 <Ionicons name="repeat-outline" size={32} color={theme.colors.textSecondary} style={{ opacity: 0.35 }} />
                                 <Text style={{ fontSize: 13, color: theme.colors.textSecondary }}>{t("machine.agentLoopsEmpty")}</Text>
                             </View>
                         ) : (
-                            /* 有数据时：total 大字 + 非 0 状态 chip */
-                            <View style={{ paddingHorizontal: 16, paddingBottom: 14, gap: 10 }}>
-                                {/* Total 大数字 */}
-                                <View style={{ flexDirection: "row", alignItems: "baseline", gap: 6 }}>
-                                    <Text style={{ fontSize: 36, fontWeight: "800", color: theme.colors.text }}>{data.loopRollup.total}</Text>
-                                    <Text style={{ fontSize: 14, color: theme.colors.textSecondary }}>{t("machine.automationLoopsTotal")}</Text>
-                                </View>
-                                {/* 状态 chips（只显示有值的） */}
-                                <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
+                            <View style={{ paddingHorizontal: 16, paddingBottom: 10, gap: 8 }}>
+                                <View style={{ flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: 6 }}>
+                                    <Text style={{ fontSize: 26, fontWeight: "800", color: theme.colors.text }}>{data.loopRollup.total}</Text>
+                                    <Text style={{ fontSize: 13, color: theme.colors.textSecondary, marginRight: 4 }}>{t("machine.automationLoopsTotal")}</Text>
                                     {[
                                         { key: "active",  value: data.loopRollup.active,        label: t("machine.automationLoopsActive"),        color: "#0A84FF", icon: "play-circle-outline" as const },
                                         { key: "blocked", value: data.loopRollup.blocked,        label: t("machine.automationLoopsBlocked"),       color: "#FF3B30", icon: "ban-outline" as const },
@@ -748,22 +742,16 @@ export default React.memo(function MachineAutomationPage() {
                                         { key: "events",  value: data.loopRollup.pendingEvents,  label: t("machine.automationLoopsPendingEvents"), color: "#FF9500", icon: "flash-outline" as const },
                                         { key: "policy",  value: data.loopRollup.policyStopped,  label: t("machine.automationLoopsPolicyStopped"), color: "#FF9500", icon: "shield-outline" as const },
                                     ].filter((s) => s.value > 0).map((s) => (
-                                        <View key={s.key} style={{
-                                            flexDirection: "row", alignItems: "center", gap: 5,
-                                            backgroundColor: s.color + "14",
-                                            borderRadius: 8, borderWidth: 1, borderColor: s.color + "40",
-                                            paddingHorizontal: 10, paddingVertical: 5,
-                                        }}>
-                                            <Ionicons name={s.icon} size={13} color={s.color} />
-                                            <Text style={{ fontSize: 13, fontWeight: "700", color: s.color }}>{s.value}</Text>
-                                            <Text style={{ fontSize: 12, color: s.color }}>{s.label}</Text>
+                                        <View key={s.key} style={{ flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: s.color + "14", borderRadius: 8, borderWidth: 1, borderColor: s.color + "40", paddingHorizontal: 8, paddingVertical: 4 }}>
+                                            <Ionicons name={s.icon} size={12} color={s.color} />
+                                            <Text style={{ fontSize: 12, fontWeight: "700", color: s.color }}>{s.value}</Text>
+                                            <Text style={{ fontSize: 11, color: s.color }}>{s.label}</Text>
                                         </View>
                                     ))}
-                                    {/* 若所有子状态均为 0 只显示 active 占位 */}
                                     {data.loopRollup.active === 0 && data.loopRollup.blocked === 0 && data.loopRollup.paused === 0 && (
-                                        <View style={{ flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: theme.colors.surfaceHigh, borderRadius: 8, borderWidth: 1, borderColor: theme.colors.divider, paddingHorizontal: 10, paddingVertical: 5 }}>
-                                            <Ionicons name="checkmark-circle-outline" size={13} color={theme.colors.textSecondary} />
-                                            <Text style={{ fontSize: 12, color: theme.colors.textSecondary }}>{t("machine.automationCompleted")}</Text>
+                                        <View style={{ flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: theme.colors.surfaceHigh, borderRadius: 8, borderWidth: 1, borderColor: theme.colors.divider, paddingHorizontal: 8, paddingVertical: 4 }}>
+                                            <Ionicons name="checkmark-circle-outline" size={12} color={theme.colors.textSecondary} />
+                                            <Text style={{ fontSize: 11, color: theme.colors.textSecondary }}>{t("machine.automationCompleted")}</Text>
                                         </View>
                                     )}
                                 </View>
@@ -774,46 +762,56 @@ export default React.memo(function MachineAutomationPage() {
 
                 {/* ── Jobs + Timeline ── */}
                 {activeSection === "jobs" ? (
-                    <SectionContainer title={t("machine.automationJobs")}>
+                    <SectionContainer
+                        title={t("machine.automationJobs")}
+                        rightAction={
+                            <Pressable
+                                style={{ flexDirection: "row", alignItems: "center", gap: 4 }}
+                                onPress={() => Modal.alert(t("machine.automationClearTerminal"), t("machine.automationClearTerminalMessage"), [
+                                    { text: t("common.cancel"), style: "cancel" },
+                                    { text: t("machine.automationClearTerminal"), style: "destructive", onPress: () => void data.clearTerminal() },
+                                ])}
+                            >
+                                {data.clearing
+                                    ? <ActivityIndicator size="small" color={theme.colors.textSecondary} />
+                                    : <Ionicons name="trash-outline" size={15} color={theme.colors.textLink} />}
+                                <Text style={{ fontSize: 13, fontWeight: "600", color: theme.colors.textLink }}>{t("machine.automationClearTerminal")}</Text>
+                            </Pressable>
+                        }
+                    >
                         {data.jobs.length === 0 ? (
-                            /* 无任务时 */
                             <View style={{ paddingHorizontal: 16, paddingBottom: 16, alignItems: "center", gap: 6 }}>
                                 <Ionicons name="list-outline" size={32} color={theme.colors.textSecondary} style={{ opacity: 0.35 }} />
                                 <Text style={{ fontSize: 13, color: theme.colors.textSecondary }}>{t("machine.automationDetailsEmpty")}</Text>
                             </View>
                         ) : (
-                            <View style={{ paddingHorizontal: 16, paddingBottom: 14, gap: 10 }}>
-                                {/* Total 大数字 */}
-                                <View style={{ flexDirection: "row", alignItems: "baseline", gap: 6 }}>
-                                    <Text style={{ fontSize: 36, fontWeight: "800", color: theme.colors.text }}>{data.jobs.length}</Text>
-                                    <Text style={{ fontSize: 14, color: theme.colors.textSecondary }}>{t("machine.automationJobs")}</Text>
-                                </View>
-                                {/* 状态 chips（只显示非 0） */}
-                                <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
+                            <View style={{ paddingHorizontal: 16, paddingBottom: 10, gap: 8 }}>
+                                <View style={{ flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: 6 }}>
+                                    <Text style={{ fontSize: 26, fontWeight: "800", color: theme.colors.text }}>{data.jobs.length}</Text>
+                                    <Text style={{ fontSize: 13, color: theme.colors.textSecondary, marginRight: 4 }}>{t("machine.automationJobs")}</Text>
                                     {[
-                                        { key: "active",    value: activeCount,                  label: t("machine.automationRunning"),   color: "#0A84FF", icon: "play-circle-outline" as const },
-                                        { key: "queued",    value: queuedCount,                  label: t("machine.automationQueued"),    color: "#FF9500", icon: "time-outline" as const },
-                                        { key: "failed",    value: failedCount,                  label: t("machine.automationFailed"),    color: "#FF3B30", icon: "alert-circle-outline" as const },
+                                        { key: "active",    value: activeCount,  label: t("machine.automationRunning"),   color: "#0A84FF", icon: "play-circle-outline" as const },
+                                        { key: "queued",    value: queuedCount,  label: t("machine.automationQueued"),    color: "#FF9500", icon: "time-outline" as const },
+                                        { key: "failed",    value: failedCount,  label: t("machine.automationFailed"),    color: "#FF3B30", icon: "alert-circle-outline" as const },
                                     ].filter((s) => s.value > 0).map((s) => (
-                                        <View key={s.key} style={{ flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: s.color + "14", borderRadius: 8, borderWidth: 1, borderColor: s.color + "40", paddingHorizontal: 10, paddingVertical: 5 }}>
-                                            <Ionicons name={s.icon} size={13} color={s.color} />
-                                            <Text style={{ fontSize: 13, fontWeight: "700", color: s.color }}>{s.value}</Text>
-                                            <Text style={{ fontSize: 12, color: s.color }}>{s.label}</Text>
+                                        <View key={s.key} style={{ flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: s.color + "14", borderRadius: 8, borderWidth: 1, borderColor: s.color + "40", paddingHorizontal: 8, paddingVertical: 4 }}>
+                                            <Ionicons name={s.icon} size={12} color={s.color} />
+                                            <Text style={{ fontSize: 12, fontWeight: "700", color: s.color }}>{s.value}</Text>
+                                            <Text style={{ fontSize: 11, color: s.color }}>{s.label}</Text>
                                         </View>
                                     ))}
-                                    {/* 全部完成时显示绿色 chip */}
                                     {activeCount === 0 && queuedCount === 0 && failedCount === 0 && (
-                                        <View style={{ flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: "#34C75914", borderRadius: 8, borderWidth: 1, borderColor: "#34C75940", paddingHorizontal: 10, paddingVertical: 5 }}>
-                                            <Ionicons name="checkmark-circle-outline" size={13} color="#34C759" />
-                                            <Text style={{ fontSize: 13, fontWeight: "700", color: "#34C759" }}>{data.counts.completed ?? 0}</Text>
-                                            <Text style={{ fontSize: 12, color: "#34C759" }}>{t("machine.automationCompleted")}</Text>
+                                        <View style={{ flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: "#34C75914", borderRadius: 8, borderWidth: 1, borderColor: "#34C75940", paddingHorizontal: 8, paddingVertical: 4 }}>
+                                            <Ionicons name="checkmark-circle-outline" size={12} color="#34C759" />
+                                            <Text style={{ fontSize: 12, fontWeight: "700", color: "#34C759" }}>{data.counts.completed ?? 0}</Text>
+                                            <Text style={{ fontSize: 11, color: "#34C759" }}>{t("machine.automationCompleted")}</Text>
                                         </View>
                                     )}
                                 </View>
                             </View>
                         )}
 
-                        {/* 失败任务自动展示 */}
+                        {/* 失败任务自动展示 — 带内联操作按钮 */}
                         {data.filteredJobs.filter((j) => j.status === "failed").map((job) => (
                             <Pressable
                                 key={job.id}
@@ -837,6 +835,35 @@ export default React.memo(function MachineAutomationPage() {
                                 <View style={styles.pillRow}>
                                     <View style={[styles.pill, { borderColor: "#FF3B3040" }]}><Text style={styles.pillText}>{getJobKindLabel(job.kind)}</Text></View>
                                     <View style={[styles.pill, { borderColor: theme.colors.divider }]}><Text style={styles.pillText}>{formatTimestamp(job.updatedAt)}</Text></View>
+                                </View>
+                                {/* 内联操作按钮 */}
+                                <View style={{ flexDirection: "row", gap: 8, marginTop: 2 }}>
+                                    <Pressable
+                                        style={({ pressed }) => ({
+                                            flexDirection: "row", alignItems: "center", gap: 5,
+                                            paddingHorizontal: 12, paddingVertical: 7,
+                                            borderRadius: 8, backgroundColor: "#0A84FF",
+                                            opacity: pressed ? 0.7 : 1,
+                                        })}
+                                        onPress={(e) => { e.stopPropagation(); void data.mutateAndReload(job.id, "retry"); }}
+                                    >
+                                        <Ionicons name="refresh-outline" size={14} color="#fff" />
+                                        <Text style={{ fontSize: 13, fontWeight: "600", color: "#fff" }}>{t("machine.automationRetry")}</Text>
+                                    </Pressable>
+                                    <Pressable
+                                        style={({ pressed }) => ({
+                                            flexDirection: "row", alignItems: "center", gap: 5,
+                                            paddingHorizontal: 12, paddingVertical: 7,
+                                            borderRadius: 8,
+                                            borderWidth: 1, borderColor: theme.colors.divider,
+                                            backgroundColor: theme.colors.surface,
+                                            opacity: pressed ? 0.7 : 1,
+                                        })}
+                                        onPress={(e) => { e.stopPropagation(); void data.removeJob(job.id); }}
+                                    >
+                                        <Ionicons name="trash-outline" size={14} color={theme.colors.textSecondary} />
+                                        <Text style={{ fontSize: 13, fontWeight: "600", color: theme.colors.textSecondary }}>{t("common.delete")}</Text>
+                                    </Pressable>
                                 </View>
                             </Pressable>
                         ))}
@@ -901,18 +928,6 @@ export default React.memo(function MachineAutomationPage() {
                                 </Pressable>
                             );
                         }) : null}
-
-                        {/* 清除终态任务（危险操作底部文字链接） */}
-                        <Pressable
-                            style={{ borderTopWidth: 1, borderTopColor: theme.colors.divider, paddingHorizontal: 16, paddingVertical: 12, flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}
-                            onPress={() => Modal.alert(t("machine.automationClearTerminal"), t("machine.automationClearTerminalMessage"), [
-                                { text: t("common.cancel"), style: "cancel" },
-                                { text: t("machine.automationClearTerminal"), style: "destructive", onPress: () => void data.clearTerminal() },
-                            ])}
-                        >
-                            <Text style={{ fontSize: 14, color: theme.colors.textLink }}>{t("machine.automationClearTerminal")}</Text>
-                            {data.clearing ? <ActivityIndicator size="small" color={theme.colors.textSecondary} /> : <Ionicons name="trash-outline" size={16} color={theme.colors.textLink} />}
-                        </Pressable>
                     </SectionContainer>
                 ) : null}
 
@@ -920,36 +935,31 @@ export default React.memo(function MachineAutomationPage() {
                 {activeSection === "guardians" ? (
                     <SectionContainer title={t("machine.automationGuardians")}>
                         {data.guardians.length === 0 ? (
-                            /* 无 Guardian 时 */
                             <View style={{ paddingHorizontal: 16, paddingBottom: 16, alignItems: "center", gap: 6 }}>
                                 <Ionicons name="shield-outline" size={32} color={theme.colors.textSecondary} style={{ opacity: 0.35 }} />
                                 <Text style={{ fontSize: 13, color: theme.colors.textSecondary }}>{t("machine.automationGuardiansEmpty")}</Text>
                             </View>
                         ) : (
-                            <View style={{ paddingHorizontal: 16, paddingBottom: 14, gap: 10 }}>
-                                {/* Total 大数字 + reuse rate */}
-                                <View style={{ flexDirection: "row", alignItems: "baseline", gap: 6 }}>
-                                    <Text style={{ fontSize: 36, fontWeight: "800", color: theme.colors.text }}>{data.guardians.length}</Text>
-                                    <Text style={{ fontSize: 14, color: theme.colors.textSecondary }}>{t("machine.automationGuardians")}</Text>
+                            <View style={{ paddingHorizontal: 16, paddingBottom: 10, gap: 8 }}>
+                                <View style={{ flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: 6 }}>
+                                    <Text style={{ fontSize: 26, fontWeight: "800", color: theme.colors.text }}>{data.guardians.length}</Text>
+                                    <Text style={{ fontSize: 13, color: theme.colors.textSecondary, marginRight: 4 }}>{t("machine.automationGuardians")}</Text>
                                     {data.auditStats && (
-                                        <View style={{ marginLeft: "auto", backgroundColor: (data.auditStats.guardianReuseRate ?? 0) > 0.5 ? "#34C75918" : "#FF950018", borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4, borderWidth: 1, borderColor: (data.auditStats.guardianReuseRate ?? 0) > 0.5 ? "#34C75940" : "#FF950040" }}>
-                                            <Text style={{ fontSize: 13, fontWeight: "700", color: (data.auditStats.guardianReuseRate ?? 0) > 0.5 ? "#34C759" : "#FF9500" }}>
+                                        <View style={{ backgroundColor: (data.auditStats.guardianReuseRate ?? 0) > 0.5 ? "#34C75918" : "#FF950018", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4, borderWidth: 1, borderColor: (data.auditStats.guardianReuseRate ?? 0) > 0.5 ? "#34C75940" : "#FF950040" }}>
+                                            <Text style={{ fontSize: 12, fontWeight: "700", color: (data.auditStats.guardianReuseRate ?? 0) > 0.5 ? "#34C759" : "#FF9500" }}>
                                                 {`${t("machine.automationGuardianReuseRate")} ${formatRate(data.auditStats.guardianReuseRate)}`}
                                             </Text>
                                         </View>
                                     )}
-                                </View>
-                                {/* 状态 chips（只显示非 0） */}
-                                <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
                                     {[
                                         { key: "attached",  value: guardianAttachedCount - guardianRecoveredCount,  label: t("machine.automationGuardianAttached"),  color: "#34C759", icon: "link-outline" as const },
                                         { key: "persisted", value: data.guardians.length - guardianAttachedCount,    label: t("machine.automationGuardianPersisted"), color: "#8E8E93", icon: "save-outline" as const },
                                         { key: "recovered", value: guardianRecoveredCount,                           label: t("machine.automationGuardianRecovered"),  color: "#FF9500", icon: "refresh-circle-outline" as const },
                                     ].filter((s) => s.value > 0).map((s) => (
-                                        <View key={s.key} style={{ flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: s.color + "14", borderRadius: 8, borderWidth: 1, borderColor: s.color + "40", paddingHorizontal: 10, paddingVertical: 5 }}>
-                                            <Ionicons name={s.icon} size={13} color={s.color} />
-                                            <Text style={{ fontSize: 13, fontWeight: "700", color: s.color }}>{s.value}</Text>
-                                            <Text style={{ fontSize: 12, color: s.color }}>{s.label}</Text>
+                                        <View key={s.key} style={{ flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: s.color + "14", borderRadius: 8, borderWidth: 1, borderColor: s.color + "40", paddingHorizontal: 8, paddingVertical: 4 }}>
+                                            <Ionicons name={s.icon} size={12} color={s.color} />
+                                            <Text style={{ fontSize: 12, fontWeight: "700", color: s.color }}>{s.value}</Text>
+                                            <Text style={{ fontSize: 11, color: s.color }}>{s.label}</Text>
                                         </View>
                                     ))}
                                 </View>
@@ -1022,31 +1032,39 @@ export default React.memo(function MachineAutomationPage() {
                 {activeSection === "audit" ? (
                     <SectionContainer
                         title={t("machine.automationAuditStats")}
-                        rightAction={data.auditStats?.lastEventAt
-                            ? <Text style={{ fontSize: 12, color: theme.colors.textSecondary }}>{formatTimestamp(data.auditStats.lastEventAt)}</Text>
-                            : undefined}
+                        rightAction={
+                            <Pressable
+                                style={{ flexDirection: "row", alignItems: "center", gap: 4 }}
+                                onPress={() => Modal.alert(t("machine.automationClearAudit"), t("machine.automationClearAuditMessage"), [
+                                    { text: t("common.cancel"), style: "cancel" },
+                                    { text: t("machine.automationClearAudit"), style: "destructive", onPress: () => void data.clearAudit() },
+                                ])}
+                            >
+                                {data.clearingAudit
+                                    ? <ActivityIndicator size="small" color={theme.colors.textSecondary} />
+                                    : <Ionicons name="trash-outline" size={15} color={theme.colors.textLink} />}
+                                <Text style={{ fontSize: 13, fontWeight: "600", color: theme.colors.textLink }}>{t("machine.automationClearAudit")}</Text>
+                            </Pressable>
+                        }
                     >
                         {(data.auditStats?.totalEvents ?? 0) === 0 ? (
-                            /* 无审计事件时 */
                             <View style={{ paddingHorizontal: 16, paddingBottom: 16, alignItems: "center", gap: 6 }}>
                                 <Ionicons name="document-text-outline" size={32} color={theme.colors.textSecondary} style={{ opacity: 0.35 }} />
                                 <Text style={{ fontSize: 13, color: theme.colors.textSecondary }}>{t("machine.automationAuditEmpty")}</Text>
                             </View>
                         ) : (
-                            <View style={{ paddingHorizontal: 16, paddingBottom: 14, gap: 10 }}>
-                                {/* Total 大数字 + reuse rate */}
-                                <View style={{ flexDirection: "row", alignItems: "baseline", gap: 6 }}>
-                                    <Text style={{ fontSize: 36, fontWeight: "800", color: theme.colors.text }}>{data.auditStats?.totalEvents ?? 0}</Text>
-                                    <Text style={{ fontSize: 14, color: theme.colors.textSecondary }}>{t("machine.automationTotalAuditEvents")}</Text>
+                            <View style={{ paddingHorizontal: 16, paddingBottom: 10, gap: 8 }}>
+                                <View style={{ flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: 6 }}>
+                                    <Text style={{ fontSize: 26, fontWeight: "800", color: theme.colors.text }}>{data.auditStats?.totalEvents ?? 0}</Text>
+                                    <Text style={{ fontSize: 13, color: theme.colors.textSecondary, marginRight: 4 }}>{t("machine.automationTotalAuditEvents")}</Text>
                                     {data.auditStats && (data.auditStats.guardianReuseRate ?? 0) > 0 && (
-                                        <View style={{ marginLeft: "auto", backgroundColor: (data.auditStats.guardianReuseRate ?? 0) > 0.5 ? "#34C75918" : "#FF950018", borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4, borderWidth: 1, borderColor: (data.auditStats.guardianReuseRate ?? 0) > 0.5 ? "#34C75940" : "#FF950040" }}>
-                                            <Text style={{ fontSize: 13, fontWeight: "700", color: (data.auditStats.guardianReuseRate ?? 0) > 0.5 ? "#34C759" : "#FF9500" }}>
+                                        <View style={{ backgroundColor: (data.auditStats.guardianReuseRate ?? 0) > 0.5 ? "#34C75918" : "#FF950018", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4, borderWidth: 1, borderColor: (data.auditStats.guardianReuseRate ?? 0) > 0.5 ? "#34C75940" : "#FF950040" }}>
+                                            <Text style={{ fontSize: 12, fontWeight: "700", color: (data.auditStats.guardianReuseRate ?? 0) > 0.5 ? "#34C759" : "#FF9500" }}>
                                                 {`${t("machine.automationGuardianReuseRate")} ${formatRate(data.auditStats.guardianReuseRate)}`}
                                             </Text>
                                         </View>
                                     )}
                                 </View>
-                                {/* 异常指标 chips（只显示非 0） */}
                                 <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
                                     {[
                                         { key: "reuse",    value: data.auditStats?.guardianReuseCount ?? 0,      label: t("machine.automationGuardianReuseCount"),      color: "#0A84FF", icon: "repeat-outline" as const },
@@ -1054,17 +1072,16 @@ export default React.memo(function MachineAutomationPage() {
                                         { key: "watchdog", value: data.auditStats?.watchdogStopCount ?? 0,       label: t("machine.automationWatchdogStops"),            color: "#FF3B30", icon: "warning-outline" as const },
                                         { key: "reset",    value: data.auditStats?.guardianResetCount ?? 0,      label: t("machine.automationGuardianResetCount"),       color: "#FF9500", icon: "trash-outline" as const },
                                     ].filter((s) => s.value > 0).map((s) => (
-                                        <View key={s.key} style={{ flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: s.color + "14", borderRadius: 8, borderWidth: 1, borderColor: s.color + "40", paddingHorizontal: 10, paddingVertical: 5 }}>
-                                            <Ionicons name={s.icon} size={13} color={s.color} />
-                                            <Text style={{ fontSize: 13, fontWeight: "700", color: s.color }}>{s.value}</Text>
-                                            <Text style={{ fontSize: 12, color: s.color }}>{s.label}</Text>
+                                        <View key={s.key} style={{ flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: s.color + "14", borderRadius: 8, borderWidth: 1, borderColor: s.color + "40", paddingHorizontal: 8, paddingVertical: 4 }}>
+                                            <Ionicons name={s.icon} size={12} color={s.color} />
+                                            <Text style={{ fontSize: 12, fontWeight: "700", color: s.color }}>{s.value}</Text>
+                                            <Text style={{ fontSize: 11, color: s.color }}>{s.label}</Text>
                                         </View>
                                     ))}
-                                    {/* 全为 0 时显示健康状态 */}
                                     {(data.auditStats?.watchdogStopCount ?? 0) === 0 && (data.auditStats?.guardianResetCount ?? 0) === 0 && (
-                                        <View style={{ flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: "#34C75914", borderRadius: 8, borderWidth: 1, borderColor: "#34C75940", paddingHorizontal: 10, paddingVertical: 5 }}>
-                                            <Ionicons name="checkmark-circle-outline" size={13} color="#34C759" />
-                                            <Text style={{ fontSize: 12, color: "#34C759" }}>{t("common.ok") ?? "无异常"}</Text>
+                                        <View style={{ flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: "#34C75914", borderRadius: 8, borderWidth: 1, borderColor: "#34C75940", paddingHorizontal: 8, paddingVertical: 4 }}>
+                                            <Ionicons name="checkmark-circle-outline" size={12} color="#34C759" />
+                                            <Text style={{ fontSize: 11, color: "#34C759" }}>{t("common.ok") ?? "无异常"}</Text>
                                         </View>
                                     )}
                                 </View>
@@ -1078,41 +1095,26 @@ export default React.memo(function MachineAutomationPage() {
                             expanded={data.showAllAuditEvents}
                             onPress={() => data.setShowAllAuditEvents((c) => !c)}
                         />
-                        {data.showAllAuditEvents ? (
-                            <>
-                                {data.visibleAuditEvents.map((event: MachineAutomationAuditEvent) => {
-                                    const aAccent = getAuditKindAccent(event) ?? theme.colors.divider;
-                                    return (
-                                        <Pressable key={event.id} style={[styles.dataCard, { borderLeftWidth: 4, borderLeftColor: aAccent }]} onPress={() => handleAuditEventPress(event)}>
-                                            <View style={styles.dataCardHeader}>
-                                                <View style={styles.dataCardTitleWrap}>
-                                                    <Text style={styles.dataCardTitle} numberOfLines={1}>{getAuditEventTitle(event)}</Text>
-                                                    <Text style={styles.dataCardSubtitle} numberOfLines={2}>{event.message || getAuditEventSubtitle(event) || t("machine.automationAudit")}</Text>
-                                                </View>
-                                                <Text style={[styles.dataCardTimestamp, { color: aAccent }]}>{formatTimestamp(event.occurredAt)}</Text>
-                                            </View>
-                                            {(event.guardianKey || event.loopId) ? (
-                                                <View style={styles.pillRow}>
-                                                    {event.guardianKey ? <View style={[styles.pill, { borderColor: aAccent + "80" }]}><Text style={styles.pillText}>{data.resolveGuardianKeyLabel(event.guardianKey)}</Text></View> : null}
-                                                    {event.loopId ? <View style={[styles.pill, { borderColor: theme.colors.divider }]}><Text style={styles.pillText}>{data.resolveLoopName(event.loopId) ?? event.loopId.slice(0, 8)}</Text></View> : null}
-                                                </View>
-                                            ) : null}
-                                        </Pressable>
-                                    );
-                                })}
-                                {/* 清除审计日志（危险操作底部） */}
-                                <Pressable
-                                    style={{ borderTopWidth: 1, borderTopColor: theme.colors.divider, paddingHorizontal: 16, paddingVertical: 12, flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}
-                                    onPress={() => Modal.alert(t("machine.automationClearAudit"), t("machine.automationClearAuditMessage"), [
-                                        { text: t("common.cancel"), style: "cancel" },
-                                        { text: t("machine.automationClearAudit"), style: "destructive", onPress: () => void data.clearAudit() },
-                                    ])}
-                                >
-                                    <Text style={{ fontSize: 14, color: theme.colors.textLink }}>{t("machine.automationClearAudit")}</Text>
-                                    {data.clearingAudit ? <ActivityIndicator size="small" color={theme.colors.textSecondary} /> : <Ionicons name="trash-outline" size={16} color={theme.colors.textLink} />}
+                        {data.showAllAuditEvents ? data.visibleAuditEvents.map((event: MachineAutomationAuditEvent) => {
+                            const aAccent = getAuditKindAccent(event) ?? theme.colors.divider;
+                            return (
+                                <Pressable key={event.id} style={[styles.dataCard, { borderLeftWidth: 4, borderLeftColor: aAccent }]} onPress={() => handleAuditEventPress(event)}>
+                                    <View style={styles.dataCardHeader}>
+                                        <View style={styles.dataCardTitleWrap}>
+                                            <Text style={styles.dataCardTitle} numberOfLines={1}>{getAuditEventTitle(event)}</Text>
+                                            <Text style={styles.dataCardSubtitle} numberOfLines={2}>{event.message || getAuditEventSubtitle(event) || t("machine.automationAudit")}</Text>
+                                        </View>
+                                        <Text style={[styles.dataCardTimestamp, { color: aAccent }]}>{formatTimestamp(event.occurredAt)}</Text>
+                                    </View>
+                                    {(event.guardianKey || event.loopId) ? (
+                                        <View style={styles.pillRow}>
+                                            {event.guardianKey ? <View style={[styles.pill, { borderColor: aAccent + "80" }]}><Text style={styles.pillText}>{data.resolveGuardianKeyLabel(event.guardianKey)}</Text></View> : null}
+                                            {event.loopId ? <View style={[styles.pill, { borderColor: theme.colors.divider }]}><Text style={styles.pillText}>{data.resolveLoopName(event.loopId) ?? event.loopId.slice(0, 8)}</Text></View> : null}
+                                        </View>
+                                    ) : null}
                                 </Pressable>
-                            </>
-                        ) : null}
+                            );
+                        }) : null}
                     </SectionContainer>
                 ) : null}
 

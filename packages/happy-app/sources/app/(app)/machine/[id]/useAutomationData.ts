@@ -6,6 +6,7 @@ import {
     machineClearAutomationAudit,
     machineClearAutomationGuardians,
     machineClearAutomationJobs,
+    machineRemoveAutomationJob,
     machineRetryAutomationJob,
     machineStopSession,
     type MachineAutomationAuditEvent,
@@ -407,6 +408,23 @@ export function useAutomationData(params: {
         }
     }, [load, machineId]);
 
+    const removeJob = React.useCallback(async (jobId: string) => {
+        setActiveJobId(jobId);
+        try {
+            const result = await machineRemoveAutomationJob(machineId!, jobId);
+            if (!result.success) {
+                throw new Error(result.errorMessage || t("machine.automationClearFailed"));
+            }
+            await load("refresh");
+        } catch (error) {
+            if (!isRpcMethodUnavailableError(error)) {
+                Modal.alert(t("common.error"), error instanceof Error ? error.message : String(error));
+            }
+        } finally {
+            setActiveJobId(null);
+        }
+    }, [load, machineId]);
+
     const stopJobSession = React.useCallback(async (jobId: string, sessionId: string) => {
         setActiveJobId(jobId);
         try {
@@ -476,6 +494,7 @@ export function useAutomationData(params: {
         clearGuardians,
         clearAudit,
         clearTerminal,
+        removeJob,
         stopJobSession,
     };
 }

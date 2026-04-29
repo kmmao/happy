@@ -407,6 +407,17 @@ export async function machineCancelAutomationJob(
   );
 }
 
+export async function machineRemoveAutomationJob(
+  machineId: string,
+  jobId: string,
+): Promise<{ success: boolean; errorMessage?: string; job?: MachineAutomationJob }> {
+  return apiSocket.machineRPC(
+    machineId,
+    "automation-remove",
+    { jobId },
+  );
+}
+
 export async function machineClearAutomationJobs(
   machineId: string,
 ): Promise<{ success: boolean; errorMessage?: string }> {

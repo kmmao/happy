@@ -177,6 +177,16 @@ export async function retryDaemonAutomationJob(
   return result as AutomationMutationResult;
 }
 
+export async function removeDaemonAutomationJob(
+  jobId: string,
+): Promise<AutomationMutationResult> {
+  const result = await daemonPost("/automation-remove", { jobId });
+  if (result.error) {
+    return { success: false, errorMessage: result.error };
+  }
+  return result as AutomationMutationResult;
+}
+
 export async function clearDaemonAutomationJobs(): Promise<AutomationMutationResult> {
   const result = await daemonPost("/automation-clear");
   if (result.error) {

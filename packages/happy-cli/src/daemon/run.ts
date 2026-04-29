@@ -1790,6 +1790,15 @@ export async function startDaemon(): Promise<void> {
           }
           return automationScheduler.retryJob(jobId);
         },
+        removeAutomationJob: async (jobId) => {
+          if (!automationScheduler) {
+            return {
+              success: false,
+              errorMessage: "Automation scheduler is not ready",
+            };
+          }
+          return automationScheduler.removeJob(jobId);
+        },
         clearAutomationJobs: async () => {
           if (!automationScheduler) {
             return {
@@ -2240,6 +2249,12 @@ export async function startDaemon(): Promise<void> {
           return { success: false, errorMessage: "Automation scheduler is not ready" };
         }
         return automationScheduler.retryJob(jobId);
+      },
+      removeAutomationJob: async (jobId) => {
+        if (!automationScheduler) {
+          return { success: false, errorMessage: "Automation scheduler is not ready" };
+        }
+        return automationScheduler.removeJob(jobId);
       },
       clearAutomationJobs: async () => {
         if (!automationScheduler) {

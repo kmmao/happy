@@ -180,6 +180,7 @@ type MachineRpcHandlers = {
   };
   cancelAutomationJob: (jobId: string) => Promise<AutomationMutationResult>;
   retryAutomationJob: (jobId: string) => Promise<AutomationMutationResult>;
+  removeAutomationJob: (jobId: string) => Promise<AutomationMutationResult>;
   clearAutomationJobs: () => Promise<AutomationMutationResult>;
   clearAutomationGuardians: (params?: { key?: string; sessionId?: string; clearAll?: boolean }) => Promise<{ success: boolean; errorMessage?: string }>;
   clearAutomationAudit: () => Promise<{ success: boolean; errorMessage?: string }>;
@@ -436,6 +437,7 @@ export class ApiMachineClient {
     getAutomationStatus,
     cancelAutomationJob,
     retryAutomationJob,
+    removeAutomationJob,
     clearAutomationJobs,
     clearAutomationGuardians,
     clearAutomationAudit,
@@ -579,6 +581,14 @@ export class ApiMachineClient {
         throw new Error("Job ID is required");
       }
       return retryAutomationJob(jobId);
+    });
+
+    this.rpcHandlerManager.registerHandler("automation-remove", async (params: any) => {
+      const { jobId } = params || {};
+      if (!jobId) {
+        throw new Error("Job ID is required");
+      }
+      return removeAutomationJob(jobId);
     });
 
     this.rpcHandlerManager.registerHandler("automation-clear", async () => {

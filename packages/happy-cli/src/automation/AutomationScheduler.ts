@@ -307,6 +307,21 @@ export class AutomationScheduler {
     return { success: true, job: retried };
   }
 
+  async removeJob(jobId: string): Promise<AutomationMutationResult> {
+    await this.ensureLoaded();
+    const job = this.store.get(jobId);
+    if (!job) {
+      return { success: false, errorMessage: `Automation job ${jobId} not found` };
+    }
+    if (!TERMINAL_STATUSES.has(job.status)) {
+      return { success: false, errorMessage: `Automation job ${jobId} is still ${job.status} and cannot be removed` };
+    }
+    await this.store.remove(job.id);
+    this.notifyChange();
+    logger.info(`[AUTOMATION] Removed ${job.kind} job ${job.id}`);
+    return { success: true, job };
+  }
+
   async clearTerminalJobs(): Promise<AutomationMutationResult> {
     await this.ensureLoaded();
     const jobs = this.store.getAll().filter((job) => TERMINAL_STATUSES.has(job.status));

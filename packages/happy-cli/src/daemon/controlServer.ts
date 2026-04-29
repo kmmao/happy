@@ -439,6 +439,7 @@ export function startDaemonControlServer({
   getAutomationStatus,
   cancelAutomationJob,
   retryAutomationJob,
+  removeAutomationJob,
   clearAutomationJobs,
   clearAutomationGuardians,
   clearAutomationAudit,
@@ -558,6 +559,7 @@ export function startDaemonControlServer({
   };
   cancelAutomationJob: (jobId: string) => Promise<AutomationMutationResult>;
   retryAutomationJob: (jobId: string) => Promise<AutomationMutationResult>;
+  removeAutomationJob: (jobId: string) => Promise<AutomationMutationResult>;
   clearAutomationJobs: () => Promise<AutomationMutationResult>;
   clearAutomationGuardians: (params?: { key?: string; sessionId?: string; clearAll?: boolean }) => Promise<{ success: boolean; errorMessage?: string }>;
   clearAutomationAudit: () => Promise<{ success: boolean; errorMessage?: string }>;
@@ -835,6 +837,21 @@ export function startDaemonControlServer({
         },
       },
       async (request) => retryAutomationJob(request.body.jobId),
+    );
+
+    typed.post(
+      "/automation-remove",
+      {
+        schema: {
+          body: z.object({
+            jobId: z.string(),
+          }),
+          response: {
+            200: automationMutationSchema,
+          },
+        },
+      },
+      async (request) => removeAutomationJob(request.body.jobId),
     );
 
     typed.post(
