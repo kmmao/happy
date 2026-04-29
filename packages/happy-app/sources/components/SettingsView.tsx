@@ -25,7 +25,7 @@ import { useMultiClick } from "@/hooks/useMultiClick";
 import { useAllMachines } from "@/sync/storage";
 import { isMachineOnline } from "@/utils/machineUtils";
 import { useUnistyles } from "react-native-unistyles";
-import { layout } from "@/components/layout";
+import { useLayout } from "@/components/layout";
 import { useHappyAction } from "@/hooks/useHappyAction";
 import { getGitHubOAuthParams, disconnectGitHub } from "@/sync/apiGithub";
 import { disconnectService } from "@/sync/apiServices";
@@ -35,6 +35,7 @@ import { Avatar } from "@/components/Avatar";
 import { t } from "@/text";
 
 export const SettingsView = React.memo(function SettingsView() {
+  const layout = useLayout();
   const { theme } = useUnistyles();
   const router = useRouter();
   const appVersion = Constants.expoConfig?.version || "1.0.0";

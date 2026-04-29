@@ -172,7 +172,7 @@ export const SessionCodeChangesView = React.memo<SessionCodeChangesViewProps>(
   },
 );
 
-const styles = StyleSheet.create(() => ({
+const styles = StyleSheet.create((_, rt) => ({
   legacyContainer: {
     flex: 1,
   },

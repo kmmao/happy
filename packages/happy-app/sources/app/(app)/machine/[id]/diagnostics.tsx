@@ -23,7 +23,7 @@ import {
 } from "@/sync/ops";
 import { sync } from "@/sync/sync";
 import { Modal } from "@/modal";
-import { layout } from "@/components/layout";
+import { screenLayoutMaxWidth } from "@/components/layout";
 import { t } from "@/text";
 
 // ---------------------------------------------------------------------------
@@ -234,7 +234,7 @@ function ProcessTypeLabel({ type }: { type: HappyProcessType }) {
     );
 }
 
-const typeStyles = StyleSheet.create(() => ({
+const typeStyles = StyleSheet.create((_, rt) => ({
     badge: {
         flexDirection: "row" as const,
         alignItems: "center" as const,
@@ -341,7 +341,7 @@ function ProcessRow({
     );
 }
 
-const rowStyles = StyleSheet.create(() => ({
+const rowStyles = StyleSheet.create((_, rt) => ({
     row: {
         flexDirection: "row" as const,
         alignItems: "flex-start" as const,
@@ -567,7 +567,7 @@ export default React.memo(function DiagnosticsPage() {
     );
 });
 
-const pageStyles = StyleSheet.create(() => ({
+const pageStyles = StyleSheet.create((_, rt) => ({
     container: {
         flex: 1,
     },
@@ -576,7 +576,7 @@ const pageStyles = StyleSheet.create(() => ({
     },
     inner: {
         width: "100%",
-        maxWidth: layout.maxWidth,
+        maxWidth: screenLayoutMaxWidth(rt.screen.width, rt.screen.height),
         alignSelf: "center" as const,
         paddingHorizontal: 16,
         paddingTop: 16,

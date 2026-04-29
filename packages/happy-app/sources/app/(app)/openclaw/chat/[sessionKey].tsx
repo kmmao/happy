@@ -23,7 +23,7 @@ import {
 } from "@/openclaw";
 import type { DisplayBlock } from "@/openclaw";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { layout } from "@/components/layout";
+import { useLayout } from "@/components/layout";
 import { MultiTextInput } from "@/components/MultiTextInput";
 import { hapticsLight } from "@/components/haptics";
 import { pickImagesAsBase64 } from "@/utils/imageUpload";
@@ -180,6 +180,7 @@ export default React.memo(function OpenClawChatScreen() {
     }
   }, [sessionKey, inputText, pendingImages, canSend, isSending, dispatch]);
 
+  const layout = useLayout();
   const handleAbort = React.useCallback(async () => {
     if (!sessionKey || !currentRunId) return;
 
@@ -464,7 +465,7 @@ export default React.memo(function OpenClawChatScreen() {
   );
 });
 
-const styles = StyleSheet.create(() => ({
+const styles = StyleSheet.create((_, rt) => ({
   container: {
     flex: 1,
   },

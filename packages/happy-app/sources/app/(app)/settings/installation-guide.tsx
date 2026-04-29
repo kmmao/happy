@@ -5,7 +5,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import * as Clipboard from "expo-clipboard";
 import { Typography } from "@/constants/Typography";
-import { layout } from "@/components/layout";
+import { useLayout } from "@/components/layout";
 import { Modal } from "@/modal";
 import { t } from "@/text";
 
@@ -298,6 +298,7 @@ const CLAUDE_INSTALL_CMD = "curl -fsSL https://claude.ai/install.sh | bash";
 const HAPPY_INSTALL_CMD = "npm install -g @kmmao/happy-coder";
 
 function InstallationGuideScreen() {
+    const layout = useLayout();
     const insets = useSafeAreaInsets();
     const { theme } = require("react-native-unistyles").useUnistyles();
     const [platform, setPlatform] = React.useState<Platform>("mac");

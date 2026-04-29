@@ -9,7 +9,7 @@ import {
   setLastViewedVersion,
 } from "@/changelog";
 import { Typography } from "@/constants/Typography";
-import { layout } from "@/components/layout";
+import { useLayout } from "@/components/layout";
 import { t } from "@/text";
 
 const styles = StyleSheet.create((theme, runtime) => ({
@@ -81,6 +81,7 @@ const styles = StyleSheet.create((theme, runtime) => ({
 }));
 
 function ChangelogScreen() {
+  const layout = useLayout();
   const { theme } = useUnistyles();
   const insets = useSafeAreaInsets();
   const entries = getChangelogEntries();

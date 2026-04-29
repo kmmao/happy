@@ -298,7 +298,7 @@ export const ElicitationBanner = React.memo(({ sessionId, elicitation }: Props) 
     );
 });
 
-const styles = StyleSheet.create(() => ({
+const styles = StyleSheet.create((_, rt) => ({
     container: {
         marginHorizontal: 12,
         marginVertical: 8,

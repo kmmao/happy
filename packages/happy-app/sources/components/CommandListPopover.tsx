@@ -15,8 +15,7 @@ import { Typography } from "@/constants/Typography";
 import { useSettingMutable } from "@/sync/storage";
 import { getAllCommands, CommandItem } from "@/sync/suggestionCommands";
 import { t } from "@/text";
-import { layout } from "./layout";
-
+import { screenLayoutMaxWidth } from "./layout";
 interface CommandListPopoverProps {
   visible: boolean;
   sessionId: string;
@@ -310,7 +309,7 @@ export const CommandListPopover = React.memo(
   },
 );
 
-const styles = StyleSheet.create((theme) => ({
+const styles = StyleSheet.create((theme, rt) => ({
   overlay: {
     ...Platform.select({
       web: { position: "fixed" as any },
@@ -338,7 +337,7 @@ const styles = StyleSheet.create((theme) => ({
     alignItems: "center",
   },
   bubble: {
-    maxWidth: layout.maxWidth - 32,
+    maxWidth: screenLayoutMaxWidth(rt.screen.width, rt.screen.height) - 32,
     width: "90%",
     maxHeight: 420,
     backgroundColor: theme.colors.surface,

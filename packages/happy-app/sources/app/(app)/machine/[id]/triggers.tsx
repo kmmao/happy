@@ -4,7 +4,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { ItemGroup } from "@/components/ItemGroup";
-import { layout } from "@/components/layout";
+import { useLayout } from "@/components/layout";
 import { Modal } from "@/modal";
 import { t } from "@/text";
 import { TokenStorage } from "@/auth/tokenStorage";
@@ -169,6 +169,7 @@ function EmptySection({ message, iconName }: { message: string; iconName: React.
 }
 
 function TriggersPage() {
+    const layout = useLayout();
     const { id: machineId } = useLocalSearchParams<{ id: string }>();
     const router = useRouter();
     const { theme } = useUnistyles();

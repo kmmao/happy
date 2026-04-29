@@ -1,8 +1,7 @@
 import React, { useEffect, useRef } from "react";
 import { Animated, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
-import { layout } from "./layout";
-
+import { useLayout } from "./layout";
 const DOT_COUNT = 3;
 const DOT_SIZE = 7;
 const DOT_GAP = 5;
@@ -13,6 +12,7 @@ const BREATH_DOT_SIZE = 10;
 const FADE_IN_DURATION = 200;
 
 export const TypingBubble = React.memo((props: { contentMaxWidth?: number }) => {
+    const layout = useLayout();
     const fadeAnim = useRef(new Animated.Value(0)).current;
     const breathAnim = useRef(new Animated.Value(0)).current;
     const dotAnims = useRef<Animated.Value[]>(

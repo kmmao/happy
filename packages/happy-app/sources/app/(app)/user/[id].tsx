@@ -10,7 +10,7 @@ import { ItemList } from '@/components/ItemList';
 import { ItemGroup } from '@/components/ItemGroup';
 import { Item } from '@/components/Item';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
-import { layout } from '@/components/layout';
+import { screenLayoutMaxWidth } from '@/components/layout';
 import { useHappyAction } from '@/hooks/useHappyAction';
 import { Modal } from '@/modal';
 import { t } from '@/text';
@@ -252,7 +252,7 @@ function UserProfileScreen() {
     );
 }
 
-const styles = StyleSheet.create((theme) => ({
+const styles = StyleSheet.create((theme, rt) => ({
     loadingContainer: {
         flex: 1,
         justifyContent: 'center',
@@ -272,7 +272,7 @@ const styles = StyleSheet.create((theme) => ({
         textAlign: 'center',
     },
     headerContainer: {
-        maxWidth: layout.maxWidth,
+        maxWidth: screenLayoutMaxWidth(rt.screen.width, rt.screen.height),
         alignSelf: 'center',
         width: '100%',
     },

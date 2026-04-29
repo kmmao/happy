@@ -8,11 +8,12 @@ import { fetchSkills, archiveSkill, deleteSkill } from "@/sync/apiSkills";
 import type { ServerSkill } from "@/sync/apiSkills";
 import { Item } from "@/components/Item";
 import { ItemGroup } from "@/components/ItemGroup";
-import { layout } from "@/components/layout";
+import { useLayout } from "@/components/layout";
 import { Modal } from "@/modal";
 import { t } from "@/text";
 
 function SkillListPage() {
+    const layout = useLayout();
     const router = useRouter();
     const { theme } = useUnistyles();
 

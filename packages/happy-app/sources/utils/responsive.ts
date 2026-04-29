@@ -7,6 +7,7 @@ import {
   calculateHeaderHeight,
 } from "./deviceCalculations";
 import { isRunningOnMac } from "./platform";
+import { useUnistyles } from "react-native-unistyles";
 
 // Re-export calculation functions for use in other components
 export {
@@ -49,75 +50,70 @@ export function getDeviceType(): "phone" | "tablet" {
   });
 }
 
-// Hook to get device type (reactive to dimension changes)
-// Uses screen dimensions for foldable min-width check on native Android to prevent
-// keyboard open/close from flipping tablet↔phone mode on foldables.
-// Window dimensions shrink when keyboard opens (adjustResize mode),
-// but a foldable inner screen doesn't stop being one when keyboard is open.
-// On web, uses window dimensions instead — web has no keyboard resize issue,
-// and screen dimensions don't change on browser resize / split-screen.
+// Hook to get device type (reactive to dimension changes).
+// Uses Unistyles C++ breakpoint for foldable detection — the Nitro bridge reads
+// native screen metrics directly, bypassing RN's Dimensions module which fails
+// to fire change events on Android foldable unfold transitions.
+// Breakpoints: xs:0, sm:300, md:500, lg:800, xl:1200
+// md (500dp) matches the foldable threshold.
 export function useDeviceType(): "phone" | "tablet" {
-  const { width, height } = useWindowDimensions();
-  const screenDimensions = Dimensions.get("screen");
+    const { width, height } = useWindowDimensions();
+    const { rt } = useUnistyles();
 
-  return useMemo(() => {
-    // On web, use max(width, height) for height to prevent keyboard-shrunk
-    // viewport from reducing diagonalInches below the tablet threshold.
-    const stableHeight =
-      Platform.OS === "web" ? Math.max(width, height) : height;
-    const dimensions = calculateDeviceDimensions({
-      widthPoints: width,
-      heightPoints: stableHeight,
-      pointsPerInch: Platform.OS === "ios" ? 163 : 160,
-    });
+    return useMemo(() => {
+        const stableHeight =
+            Platform.OS === "web" ? Math.max(width, height) : height;
+        const dimensions = calculateDeviceDimensions({
+            widthPoints: width,
+            heightPoints: stableHeight,
+            pointsPerInch: Platform.OS === "ios" ? 163 : 160,
+        });
 
-    // On web, use the viewport WIDTH for the foldable min-width check.
-    // Math.min(width, height) is wrong because virtual keyboards shrink height,
-    // making min fall below the foldable threshold and flipping tablet→phone.
-    // Width alone is stable — keyboards don't change viewport width.
-    // On native Android, use screen dimensions to avoid keyboard-triggered flipping.
-    const minWidthPoints =
-      Platform.OS === "ios"
-        ? undefined
-        : Platform.OS === "web"
-          ? width
-          : Math.min(screenDimensions.width, screenDimensions.height);
+        // On Android: derive minWidthPoints from Unistyles breakpoint (C++ layer).
+        // Breakpoint >= md means screen width >= 500dp → tablet territory.
+        const bp = rt.breakpoint;
+        const minWidthPoints =
+            Platform.OS === "ios"
+                ? undefined
+                : bp === "md" || bp === "lg" || bp === "xl"
+                    ? 500
+                    : 0;
 
-    return determineDeviceType({
-      diagonalInches: dimensions.diagonalInches,
-      platform: Platform.OS,
-      // @ts-ignore - isPad is not in the type definitions but exists at runtime on iOS
-      isPad: Platform.OS === "ios" ? Platform.isPad : false,
-      minWidthPoints,
-    });
-  }, [width, height, screenDimensions.width, screenDimensions.height]);
+        return determineDeviceType({
+            diagonalInches: dimensions.diagonalInches,
+            platform: Platform.OS,
+            // @ts-ignore - isPad is not in the type definitions but exists at runtime on iOS
+            isPad: Platform.OS === "ios" ? Platform.isPad : false,
+            minWidthPoints,
+        });
+    }, [width, height, rt.breakpoint]);
 }
 
 // Hook to detect if device is tablet
 export function useIsTablet(): boolean {
-  const deviceType = useDeviceType();
-  return deviceType === "tablet";
+    const deviceType = useDeviceType();
+    return deviceType === "tablet";
 }
 
 // Hook to detect landscape orientation
 export function useIsLandscape(): boolean {
-  const { width, height } = useWindowDimensions();
-  return width > height;
+    const { width, height } = useWindowDimensions();
+    return width > height;
 }
 
 // Hook to get header height based on platform, device type, and orientation
 export function useHeaderHeight(): number {
-  const isLandscape = useIsLandscape();
-  const deviceType = useDeviceType();
+    const isLandscape = useIsLandscape();
+    const deviceType = useDeviceType();
 
-  return useMemo(() => {
-    return calculateHeaderHeight({
-      platform: Platform.OS,
-      isLandscape,
-      // @ts-ignore - isPad is not in the type definitions but exists at runtime on iOS
-      isPad: Platform.OS === "ios" ? Platform.isPad : undefined,
-      deviceType: Platform.OS === "android" ? deviceType : undefined,
-      isMacCatalyst: isRunningOnMac(),
-    });
-  }, [isLandscape, deviceType]);
+    return useMemo(() => {
+        return calculateHeaderHeight({
+            platform: Platform.OS,
+            isLandscape,
+            // @ts-ignore - isPad is not in the type definitions but exists at runtime on iOS
+            isPad: Platform.OS === "ios" ? Platform.isPad : undefined,
+            deviceType: Platform.OS === "android" ? deviceType : undefined,
+            isMacCatalyst: isRunningOnMac(),
+        });
+    }, [isLandscape, deviceType]);
 }

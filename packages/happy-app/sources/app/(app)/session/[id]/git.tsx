@@ -20,7 +20,7 @@ import { storage } from "@/sync/storage";
 import { issueStore } from "@/sync/issueStore";
 import { prStore } from "@/sync/prStore";
 import { useUnistyles, StyleSheet } from "react-native-unistyles";
-import { layout } from "@/components/layout";
+import { screenLayoutMaxWidth } from "@/components/layout";
 import { Text } from "@/components/StyledText";
 import { Typography } from "@/constants/Typography";
 import { t } from "@/text";
@@ -288,10 +288,10 @@ export default React.memo(function GitScreen() {
   );
 });
 
-const styles = StyleSheet.create((theme) => ({
+const styles = StyleSheet.create((theme, rt) => ({
   container: {
     flex: 1,
-    maxWidth: layout.maxWidth,
+    maxWidth: screenLayoutMaxWidth(rt.screen.width, rt.screen.height),
     alignSelf: "center",
     width: "100%",
   },

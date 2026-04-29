@@ -541,7 +541,7 @@ export const CodexPlanSection = React.memo<CodexPlanSectionProps>(
   },
 );
 
-const styles = StyleSheet.create(() => ({
+const styles = StyleSheet.create((_, rt) => ({
   container: {
     borderWidth: 1,
     overflow: "hidden",

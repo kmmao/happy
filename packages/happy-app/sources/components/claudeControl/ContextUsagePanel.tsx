@@ -281,7 +281,7 @@ const CategoryDetailModal = React.memo<CategoryDetailModalProps>(function Catego
     );
 });
 
-const detailModalStyles = StyleSheet.create(() => ({
+const detailModalStyles = StyleSheet.create((_, rt) => ({
     container: {
         borderRadius: 16,
         overflow: "hidden",

@@ -14,7 +14,7 @@ import { Text } from "@/components/StyledText";
 import { MarkdownView } from "@/components/markdown/MarkdownView";
 import { SimpleSyntaxHighlighter } from "@/components/SimpleSyntaxHighlighter";
 import { DiffView } from "@/components/diff/DiffView";
-import { layout } from "@/components/layout";
+import { screenLayoutMaxWidth } from "@/components/layout";
 import { Typography } from "@/constants/Typography";
 import { Modal } from "@/modal";
 import { machineBash } from "@/sync/ops";
@@ -497,7 +497,7 @@ export default function MachineFileViewerScreen() {
   );
 }
 
-const styles = StyleSheet.create((theme) => ({
+const styles = StyleSheet.create((theme, rt) => ({
   container: {
     flex: 1,
     backgroundColor: theme.colors.surface,
@@ -505,7 +505,7 @@ const styles = StyleSheet.create((theme) => ({
   content: {
     padding: 16,
     paddingBottom: 32,
-    maxWidth: layout.maxWidth,
+    maxWidth: screenLayoutMaxWidth(rt.screen.width, rt.screen.height),
     alignSelf: "center",
     width: "100%",
   },

@@ -14,7 +14,7 @@ import { t } from "@/text";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { OpenClawSocket, useOpenClawStatus } from "@/openclaw";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { layout } from "@/components/layout";
+import { useLayout } from "@/components/layout";
 import { MultiTextInput } from "@/components/MultiTextInput";
 import { hapticsLight } from "@/components/haptics";
 
@@ -33,6 +33,7 @@ export default React.memo(function OpenClawNewSessionScreen() {
 
   const hasText = inputText.trim().length > 0;
 
+  const layout = useLayout();
   const handleSend = React.useCallback(async () => {
     if (!inputText.trim() || isSending || !isConnected) return;
 

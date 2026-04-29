@@ -15,7 +15,7 @@ import { Text } from "@/components/StyledText";
 import { Ionicons } from "@expo/vector-icons";
 import { Typography } from "@/constants/Typography";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
-import { layout } from "@/components/layout";
+import { screenLayoutMaxWidth } from "@/components/layout";
 import {
   ISSUE_STATUS_COLORS,
   ISSUE_STATUS_LABELS,
@@ -344,13 +344,13 @@ const MetadataKV = React.memo<{
   );
 });
 
-const styles = StyleSheet.create((theme) => ({
+const styles = StyleSheet.create((theme, rt) => ({
   container: {
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderBottomWidth: Platform.select({ ios: 0.33, default: 1 }),
     gap: 8,
-    maxWidth: layout.maxWidth,
+    maxWidth: screenLayoutMaxWidth(rt.screen.width, rt.screen.height),
     alignSelf: "center",
     width: "100%",
   },

@@ -7,7 +7,7 @@ import { t } from "@/text";
 import { useKnowledgeEvolution } from "@/hooks/useKnowledgeEvolution";
 import { useHappyAction } from "@/hooks/useHappyAction";
 import { EvolutionTimeline } from "@/components/knowledge/EvolutionTimeline";
-import { layout } from "@/components/layout";
+import { screenLayoutMaxWidth } from "@/components/layout";
 import { SharedStateView } from "@/components/SharedStateView";
 
 interface KnowledgeEvolutionViewProps {
@@ -79,14 +79,14 @@ export const KnowledgeEvolutionView = React.memo<KnowledgeEvolutionViewProps>(
     },
 );
 
-const styles = StyleSheet.create((theme) => ({
+const styles = StyleSheet.create((theme, rt) => ({
     scroll: {
         flex: 1,
     },
     scrollContent: {
         paddingVertical: 16,
         paddingBottom: 40,
-        maxWidth: layout.maxWidth,
+        maxWidth: screenLayoutMaxWidth(rt.screen.width, rt.screen.height),
         alignSelf: "center",
         width: "100%",
     },

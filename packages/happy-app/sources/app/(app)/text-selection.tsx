@@ -9,8 +9,7 @@ import { t } from "@/text";
 import * as Clipboard from "expo-clipboard";
 import { Modal } from "@/modal";
 import { Ionicons } from "@expo/vector-icons";
-import { layout } from "@/components/layout";
-
+import { screenLayoutMaxWidth } from "@/components/layout";
 function TextSelectionScreen() {
   const router = useRouter();
   const navigation = useNavigation();
@@ -121,7 +120,7 @@ function TextSelectionScreen() {
   );
 }
 
-const styles = StyleSheet.create((theme) => ({
+const styles = StyleSheet.create((theme, rt) => ({
   container: {
     flex: 1,
     backgroundColor: theme.colors.surface,
@@ -138,7 +137,7 @@ const styles = StyleSheet.create((theme) => ({
   },
   scrollContent: {
     flexGrow: 1,
-    maxWidth: layout.maxWidth,
+    maxWidth: screenLayoutMaxWidth(rt.screen.width, rt.screen.height),
     alignSelf: "center" as const,
     width: "100%" as const,
   },

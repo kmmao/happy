@@ -22,10 +22,11 @@ import {
   calculateDeviceDimensions,
   useHeaderHeight,
 } from "@/utils/responsive";
-import { layout } from "@/components/layout";
+import { useLayout } from "@/components/layout";
 import { isRunningOnMac } from "@/utils/platform";
 
 function DeviceInfo() {
+  const layout = useLayout();
   const insets = useSafeAreaInsets();
   const { width, height } = Dimensions.get("window");
   const windowDims = useWindowDimensions();

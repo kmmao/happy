@@ -14,7 +14,7 @@ import { getDimensionPrompt } from "@/components/project/supervisorDimensionProm
 import { projectManager } from "@/sync/projectManager";
 import { Ionicons } from "@expo/vector-icons";
 import { Modal } from "@/modal";
-import { layout } from "@/components/layout";
+import { screenLayoutMaxWidth } from "@/components/layout";
 import { SEVERITY_COLORS, SEVERITY_KEY_MAP } from "@/components/project/supervisorConstants";
 import { useSettings } from "@/sync/storage";
 import { DEFAULT_PROFILES } from "@/sync/profileUtils";
@@ -1602,14 +1602,14 @@ const ToggleRow = React.memo(
     },
 );
 
-const styles = StyleSheet.create((theme) => ({
+const styles = StyleSheet.create((theme, rt) => ({
     scroll: {
         flex: 1,
         backgroundColor: theme.colors.groupped.background,
     },
     scrollContent: {
         paddingBottom: 32,
-        maxWidth: layout.maxWidth,
+        maxWidth: screenLayoutMaxWidth(rt.screen.width, rt.screen.height),
         alignSelf: "center" as const,
         width: "100%" as const,
     },

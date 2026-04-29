@@ -14,7 +14,7 @@ import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { Ionicons } from "@expo/vector-icons";
 import { ItemGroup } from "@/components/ItemGroup";
 import { Item } from "@/components/Item";
-import { layout } from "@/components/layout";
+import { screenLayoutMaxWidth } from "@/components/layout";
 import { t } from "@/text";
 import { useMachine } from "@/sync/storage";
 import { TailscaleServeContent } from "@/components/machine/TailscaleServeSection";
@@ -191,13 +191,13 @@ export default React.memo(function NetworkPage() {
     );
 });
 
-const styles = StyleSheet.create((theme) => ({
+const styles = StyleSheet.create((theme, rt) => ({
     container: {
         flex: 1,
         backgroundColor: theme.colors.surface,
     },
     content: {
-        maxWidth: layout.maxWidth,
+        maxWidth: screenLayoutMaxWidth(rt.screen.width, rt.screen.height),
         width: "100%",
         alignSelf: "center",
         paddingBottom: 40,

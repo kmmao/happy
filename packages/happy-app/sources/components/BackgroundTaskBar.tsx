@@ -13,7 +13,7 @@
 import * as React from "react";
 import { Animated, Pressable, ScrollView, View, Text, useWindowDimensions } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
-import { layout } from "@/components/layout";
+import { useLayout } from "@/components/layout";
 import { Ionicons } from "@expo/vector-icons";
 import { t } from "@/text";
 import { BackgroundTask } from "@/hooks/useBackgroundTasks";
@@ -254,6 +254,7 @@ function TaskItem({
 }
 
 function BackgroundTaskBarInner({ sessionId, tasks, onViewLog, onClose, onDismiss, onPreview }: Props) {
+    const layout = useLayout();
     const { width: windowWidth } = useWindowDimensions();
     const containerWidth = Math.min(windowWidth, layout.maxWidth);
 
@@ -292,7 +293,7 @@ function BackgroundTaskBarInner({ sessionId, tasks, onViewLog, onClose, onDismis
 
 export const BackgroundTaskBar = React.memo(BackgroundTaskBarInner);
 
-const styles = StyleSheet.create(() => ({
+const styles = StyleSheet.create((_, rt) => ({
     container: {
         paddingVertical: 6,
         paddingHorizontal: 12,

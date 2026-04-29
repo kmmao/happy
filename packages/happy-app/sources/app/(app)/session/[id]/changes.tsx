@@ -3,7 +3,7 @@ import { View } from "react-native";
 import { useLocalSearchParams } from "expo-router";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
-import { layout } from "@/components/layout";
+import { screenLayoutMaxWidth } from "@/components/layout";
 import { SessionCodeChangesView } from "@/components/session/SessionCodeChangesView";
 
 export default React.memo(function ChangesScreen() {
@@ -17,10 +17,10 @@ export default React.memo(function ChangesScreen() {
   );
 });
 
-const styles = StyleSheet.create(() => ({
+const styles = StyleSheet.create((_, rt) => ({
   container: {
     flex: 1,
-    maxWidth: layout.maxWidth,
+    maxWidth: screenLayoutMaxWidth(rt.screen.width, rt.screen.height),
     alignSelf: "center" as const,
     width: "100%",
   },

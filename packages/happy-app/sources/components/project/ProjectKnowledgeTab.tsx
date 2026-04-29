@@ -13,7 +13,7 @@ import { Modal } from "@/modal";
 import { KnowledgeEntryCard } from "./KnowledgeEntryCard";
 import { ProjectProfileCard } from "./ProjectProfileCard";
 
-import { layout } from "@/components/layout";
+import { screenLayoutMaxWidth } from "@/components/layout";
 import { useProject } from "@/hooks/useProjects";
 import { SharedStateView } from "@/components/SharedStateView";
 
@@ -506,13 +506,13 @@ export const ProjectKnowledgeTab = React.memo<ProjectKnowledgeTabProps>(
     },
 );
 
-const styles = StyleSheet.create((theme) => ({
+const styles = StyleSheet.create((theme, rt) => ({
     list: {
         flex: 1,
     },
     listContent: {
         paddingBottom: 32,
-        maxWidth: layout.maxWidth,
+        maxWidth: screenLayoutMaxWidth(rt.screen.width, rt.screen.height),
         alignSelf: "center",
         width: "100%",
     },

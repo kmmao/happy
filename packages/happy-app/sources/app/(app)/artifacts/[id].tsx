@@ -5,7 +5,7 @@ import { useArtifact } from '@/sync/storage';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { StyleSheet } from 'react-native-unistyles';
 import { t } from '@/text';
-import { layout } from '@/components/layout';
+import { useLayout } from '@/components/layout';
 import { Ionicons } from '@expo/vector-icons';
 import { Modal } from '@/modal';
 import { sync } from '@/sync/sync';
@@ -76,6 +76,7 @@ const stylesheet = StyleSheet.create((theme) => ({
 }));
 
 function ArtifactDetailScreen() {
+    const layout = useLayout();
     const styles = stylesheet;
     const { id } = useLocalSearchParams<{ id: string }>();
     const router = useRouter();

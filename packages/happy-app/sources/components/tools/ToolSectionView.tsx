@@ -53,7 +53,7 @@ export const ToolSectionView = React.memo<ToolSectionViewProps>(({
     );
 });
 
-const styles = StyleSheet.create(() => ({
+const styles = StyleSheet.create((_, rt) => ({
     section: {
         overflow: 'visible',
     },

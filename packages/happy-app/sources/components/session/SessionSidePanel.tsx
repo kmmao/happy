@@ -241,7 +241,7 @@ export const SessionSidePanel = React.memo<SessionSidePanelProps>(
     },
 );
 
-const styles = StyleSheet.create(() => ({
+const styles = StyleSheet.create((_, rt) => ({
     headerWrap: {
         paddingHorizontal: 6,
         paddingTop: 6,

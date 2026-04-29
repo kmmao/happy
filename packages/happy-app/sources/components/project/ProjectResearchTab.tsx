@@ -28,7 +28,7 @@ import {
 import { ItemGroup } from "@/components/ItemGroup";
 import { MarkdownView } from "@/components/markdown/MarkdownView";
 import { sync } from "@/sync/sync";
-import { layout } from "@/components/layout";
+import { screenLayoutMaxWidth } from "@/components/layout";
 import {
     loadResearchPrefs,
     saveResearchPrefs,
@@ -783,7 +783,7 @@ const DimensionToggle = React.memo(
     },
 );
 
-const styles = StyleSheet.create((theme) => ({
+const styles = StyleSheet.create((theme, rt) => ({
     container: {
         flex: 1,
     },
@@ -791,7 +791,7 @@ const styles = StyleSheet.create((theme) => ({
         paddingBottom: 32,
     },
     innerContainer: {
-        maxWidth: layout.maxWidth,
+        maxWidth: screenLayoutMaxWidth(rt.screen.width, rt.screen.height),
         width: "100%",
         alignSelf: "center",
         gap: 8,

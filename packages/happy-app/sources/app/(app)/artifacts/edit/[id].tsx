@@ -4,7 +4,7 @@ import { Text } from '@/components/StyledText';
 import { useRouter, Stack, useLocalSearchParams } from 'expo-router';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 import { t } from '@/text';
-import { layout } from '@/components/layout';
+import { useLayout } from '@/components/layout';
 import { Modal } from '@/modal';
 import { sync } from '@/sync/sync';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -86,6 +86,7 @@ const stylesheet = StyleSheet.create((theme) => ({
 }));
 
 function EditArtifactScreen() {
+    const layout = useLayout();
     const { theme } = useUnistyles();
     const styles = stylesheet;
     const router = useRouter();

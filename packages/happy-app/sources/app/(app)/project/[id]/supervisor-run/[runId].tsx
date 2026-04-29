@@ -29,8 +29,7 @@ import {
     SEVERITY_KEY_MAP,
     getConfidenceColor,
 } from "@/components/project/supervisorConstants";
-import { layout } from "@/components/layout";
-
+import { screenLayoutMaxWidth } from "@/components/layout";
 // --- Helpers ---
 
 function formatDate(timestamp: number): string {
@@ -509,7 +508,7 @@ const ComparisonActionCard = React.memo(
 
 // --- Styles ---
 
-const styles = StyleSheet.create((theme) => ({
+const styles = StyleSheet.create((theme, rt) => ({
     centered: {
         flex: 1,
         justifyContent: "center",
@@ -529,7 +528,7 @@ const styles = StyleSheet.create((theme) => ({
     },
     scrollContent: {
         paddingBottom: 32,
-        maxWidth: layout.maxWidth,
+        maxWidth: screenLayoutMaxWidth(rt.screen.width, rt.screen.height),
         alignSelf: "center" as const,
         width: "100%" as const,
     },

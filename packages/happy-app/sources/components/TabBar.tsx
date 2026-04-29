@@ -5,7 +5,7 @@ import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { Ionicons } from "@expo/vector-icons";
 import { t } from "@/text";
 import { Typography } from "@/constants/Typography";
-import { layout } from "@/components/layout";
+import { screenLayoutMaxWidth } from "@/components/layout";
 import { useInboxHasContent } from "@/hooks/useInboxHasContent";
 import {
   resolveAppTabPresentation,
@@ -22,7 +22,7 @@ interface TabBarProps {
   showOpenClaw?: boolean;
 }
 
-const styles = StyleSheet.create((theme) => ({
+const styles = StyleSheet.create((theme, rt) => ({
   outerContainer: {
     backgroundColor: theme.colors.groupped.background,
     borderTopWidth: 1,
@@ -34,7 +34,7 @@ const styles = StyleSheet.create((theme) => ({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "stretch",
-    maxWidth: layout.maxWidth,
+    maxWidth: screenLayoutMaxWidth(rt.screen.width, rt.screen.height),
     width: "100%",
     alignSelf: "center",
     backgroundColor: theme.colors.surface,

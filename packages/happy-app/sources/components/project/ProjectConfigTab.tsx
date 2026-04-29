@@ -1,7 +1,7 @@
 import * as React from "react";
 import { ScrollView } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
-import { layout } from "@/components/layout";
+import { screenLayoutMaxWidth } from "@/components/layout";
 import { Project } from "@/sync/projectManager";
 import { SupervisorConfigSection } from "./config/SupervisorConfigSection";
 import { ResearchDefaultsSection } from "./config/ResearchDefaultsSection";
@@ -31,7 +31,7 @@ export const ProjectConfigTab = React.memo<ProjectConfigTabProps>(
     },
 );
 
-const styles = StyleSheet.create(() => ({
+const styles = StyleSheet.create((_, rt) => ({
     container: {
         flex: 1,
     },
@@ -39,7 +39,7 @@ const styles = StyleSheet.create(() => ({
         paddingHorizontal: 16,
         paddingTop: 8,
         paddingBottom: 40,
-        maxWidth: layout.maxWidth,
+        maxWidth: screenLayoutMaxWidth(rt.screen.width, rt.screen.height),
         alignSelf: "center",
         width: "100%",
         gap: 16,

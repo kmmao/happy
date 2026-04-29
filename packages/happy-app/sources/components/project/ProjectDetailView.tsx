@@ -11,7 +11,7 @@ import { ProjectResearchTab, type ResearchSyncStatus } from "./ProjectResearchTa
 import { ProjectKnowledgeTab } from "./ProjectKnowledgeTab";
 import { ProjectActionsTab } from "./ProjectActionsTab";
 import { ProjectConfigTab } from "./ProjectConfigTab";
-import { layout } from "@/components/layout";
+import { screenLayoutMaxWidth } from "@/components/layout";
 import { t } from "@/text";
 import { storage, useSetting } from "@/sync/storage";
 import { gitStatusSync } from "@/sync/gitStatusSync";
@@ -293,7 +293,7 @@ export const ProjectDetailView = React.memo(
     },
 );
 
-const styles = StyleSheet.create((theme) => ({
+const styles = StyleSheet.create((theme, rt) => ({
     container: {
         flex: 1,
         backgroundColor: theme.colors.groupped.background,
@@ -302,7 +302,7 @@ const styles = StyleSheet.create((theme) => ({
         flexGrow: 0,
         marginTop: 6,
         marginBottom: 8,
-        maxWidth: layout.maxWidth,
+        maxWidth: screenLayoutMaxWidth(rt.screen.width, rt.screen.height),
         alignSelf: "center",
         width: "100%",
     },
@@ -408,7 +408,7 @@ const styles = StyleSheet.create((theme) => ({
     content: {
         flex: 1,
         width: "100%",
-        maxWidth: layout.maxWidth,
+        maxWidth: screenLayoutMaxWidth(rt.screen.width, rt.screen.height),
         alignSelf: "center",
     },
     tabVisible: {

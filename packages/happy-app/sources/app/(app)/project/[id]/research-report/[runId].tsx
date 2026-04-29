@@ -12,7 +12,7 @@ import { t } from "@/text";
 import { TokenStorage } from "@/auth/tokenStorage";
 import { fetchSupervisorRun, type SupervisorRun } from "@/sync/apiSupervisor";
 import { MarkdownView } from "@/components/markdown/MarkdownView";
-import { layout } from "@/components/layout";
+import { screenLayoutMaxWidth } from "@/components/layout";
 import { useProject } from "@/hooks/useProjects";
 
 function ResearchReportScreen() {
@@ -89,7 +89,7 @@ function ResearchReportScreen() {
     );
 }
 
-const styles = StyleSheet.create((theme) => ({
+const styles = StyleSheet.create((theme, rt) => ({
     container: {
         flex: 1,
         backgroundColor: theme.colors.groupped.background,
@@ -98,7 +98,7 @@ const styles = StyleSheet.create((theme) => ({
         paddingBottom: 32,
     },
     innerContainer: {
-        maxWidth: layout.maxWidth,
+        maxWidth: screenLayoutMaxWidth(rt.screen.width, rt.screen.height),
         width: "100%",
         alignSelf: "center",
         paddingHorizontal: 16,

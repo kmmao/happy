@@ -256,7 +256,7 @@ export const ProfilePicker = React.memo<ProfilePickerProps>((props) => {
     );
 });
 
-const styles = StyleSheet.create(() => ({
+const styles = StyleSheet.create((_, rt) => ({
     card: {
         gap: 8,
     },

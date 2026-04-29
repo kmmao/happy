@@ -9,7 +9,7 @@ import {
 import { useLocalSearchParams, useNavigation, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
-import { layout } from "@/components/layout";
+import { screenLayoutMaxWidth } from "@/components/layout";
 import { TokenStorage } from "@/auth/tokenStorage";
 import { Modal } from "@/modal";
 import { t } from "@/text";
@@ -309,7 +309,7 @@ function TaskDetailScreen() {
 
 export default React.memo(TaskDetailScreen);
 
-const styles = StyleSheet.create((theme) => ({
+const styles = StyleSheet.create((theme, rt) => ({
     centered: {
         flex: 1,
         alignItems: "center",
@@ -322,7 +322,7 @@ const styles = StyleSheet.create((theme) => ({
         textAlign: "center",
     },
     content: {
-        maxWidth: layout.maxWidth,
+        maxWidth: screenLayoutMaxWidth(rt.screen.width, rt.screen.height),
         width: "100%",
         alignSelf: "center",
         padding: 16,

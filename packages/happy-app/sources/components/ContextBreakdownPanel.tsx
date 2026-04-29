@@ -189,7 +189,7 @@ export const ContextBreakdownPanel = React.memo(({ items, source, theme }: Props
     );
 });
 
-const styles = StyleSheet.create(() => ({
+const styles = StyleSheet.create((_, rt) => ({
     section: {
         marginTop: 4,
     },

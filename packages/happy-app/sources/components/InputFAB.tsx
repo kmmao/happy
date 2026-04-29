@@ -10,7 +10,7 @@ import {
   useWindowDimensions,
 } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
-import { layout } from "@/components/layout";
+import { screenLayoutMaxWidth } from "@/components/layout";
 import { t } from "@/text";
 import { StatusDot } from "@/components/StatusDot";
 import { Typography } from "@/constants/Typography";
@@ -26,7 +26,7 @@ import {
 } from "@/utils/formatUsage";
 import type { SessionRpcVisualState } from "@/utils/sessionRpcVisualState";
 
-const stylesheet = StyleSheet.create((theme) => ({
+const stylesheet = StyleSheet.create((theme, rt) => ({
   container: {
     position: "absolute",
     left: 0,
@@ -36,7 +36,7 @@ const stylesheet = StyleSheet.create((theme) => ({
     alignItems: "center",
   },
   inner: {
-    maxWidth: layout.maxWidth,
+    maxWidth: screenLayoutMaxWidth(rt.screen.width, rt.screen.height),
     width: "100%",
     flexDirection: "column" as const,
     alignItems: "stretch" as const,

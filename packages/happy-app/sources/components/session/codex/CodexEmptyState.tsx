@@ -51,7 +51,7 @@ export const CodexEmptyState = React.memo(function CodexEmptyState() {
   );
 });
 
-const styles = StyleSheet.create(() => ({
+const styles = StyleSheet.create((_, rt) => ({
   container: {
     flex: 1,
     alignItems: "center",

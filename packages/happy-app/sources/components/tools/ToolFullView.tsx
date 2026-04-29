@@ -13,7 +13,7 @@ import { ToolCall, Message } from "@/sync/typesMessage";
 import { CodeView } from "../CodeView";
 import { Metadata } from "@/sync/storageTypes";
 import { getToolFullViewComponent } from "./views/_all";
-import { layout } from "../layout";
+import { screenLayoutMaxWidth } from "../layout";
 import { useLocalSetting, useLocalSettingMutable } from "@/sync/storage";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { t } from "@/text";
@@ -404,13 +404,13 @@ const RawJsonSection = React.memo(function RawJsonSection({
   );
 });
 
-const styles = StyleSheet.create((theme) => ({
+const styles = StyleSheet.create((theme, rt) => ({
   container: {
     flex: 1,
     paddingTop: 12,
   },
   contentWrapper: {
-    maxWidth: layout.maxWidth,
+    maxWidth: screenLayoutMaxWidth(rt.screen.width, rt.screen.height),
     alignSelf: "center",
     width: "100%",
   },

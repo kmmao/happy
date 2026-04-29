@@ -4,7 +4,7 @@ import { useLocalSearchParams, useNavigation } from "expo-router";
 import { StyleSheet } from "react-native-unistyles";
 import { t } from "@/text";
 import { ProjectActionsTab } from "@/components/project/ProjectActionsTab";
-import { layout } from "@/components/layout";
+import { screenLayoutMaxWidth } from "@/components/layout";
 import { useProject } from "@/hooks/useProjects";
 
 function SupervisorActionsScreen() {
@@ -38,11 +38,11 @@ function SupervisorActionsScreen() {
 
 export default React.memo(SupervisorActionsScreen);
 
-const styles = StyleSheet.create((theme) => ({
+const styles = StyleSheet.create((theme, rt) => ({
     container: {
         flex: 1,
         backgroundColor: theme.colors.groupped.background,
-        maxWidth: layout.maxWidth,
+        maxWidth: screenLayoutMaxWidth(rt.screen.width, rt.screen.height),
         width: "100%",
         alignSelf: "center",
     },

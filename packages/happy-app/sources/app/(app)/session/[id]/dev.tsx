@@ -5,7 +5,7 @@ import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { Ionicons } from "@expo/vector-icons";
 import { Text } from "@/components/StyledText";
 import { Typography } from "@/constants/Typography";
-import { layout } from "@/components/layout";
+import { screenLayoutMaxWidth } from "@/components/layout";
 import { Modal } from "@/modal";
 import { useDevConfig, invalidateDevConfigCache } from "@/hooks/useDevConfig";
 import { useDevSkillCheck } from "@/hooks/useDevSkillCheck";
@@ -343,10 +343,10 @@ export default React.memo(function DevScreen() {
     );
 });
 
-const styles = StyleSheet.create((theme) => ({
+const styles = StyleSheet.create((theme, rt) => ({
     container: {
         flex: 1,
-        maxWidth: layout.maxWidth,
+        maxWidth: screenLayoutMaxWidth(rt.screen.width, rt.screen.height),
         alignSelf: "center" as const,
         width: "100%",
     },

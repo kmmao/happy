@@ -14,7 +14,7 @@ import { Typography } from "@/constants/Typography";
 import { t } from "@/text";
 import { TokenStorage } from "@/auth/tokenStorage";
 import { fetchWebhookEvents, type WebhookEvent } from "@/sync/apiWebhook";
-import { layout } from "@/components/layout";
+import { screenLayoutMaxWidth } from "@/components/layout";
 import { useProject } from "@/hooks/useProjects";
 
 const PAGE_SIZE = 20;
@@ -277,7 +277,7 @@ export default React.memo(WebhookEventsScreen);
 
 // --- Styles ---
 
-const styles = StyleSheet.create((theme) => ({
+const styles = StyleSheet.create((theme, rt) => ({
     centered: {
         flex: 1,
         justifyContent: "center",
@@ -295,7 +295,7 @@ const styles = StyleSheet.create((theme) => ({
     scrollContent: {
         paddingTop: 16,
         paddingBottom: 32,
-        maxWidth: layout.maxWidth,
+        maxWidth: screenLayoutMaxWidth(rt.screen.width, rt.screen.height),
         alignSelf: "center" as const,
         width: "100%" as const,
     },

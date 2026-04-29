@@ -11,7 +11,7 @@ import { ItemGroup } from "@/components/ItemGroup";
 import { ItemList } from "@/components/ItemList";
 import { Modal } from "@/modal";
 import { t } from "@/text";
-import { layout } from "@/components/layout";
+import { useLayout } from "@/components/layout";
 import { useSettingMutable, useProfile } from "@/sync/storage";
 import { sync } from "@/sync/sync";
 import { useUnistyles } from "react-native-unistyles";
@@ -101,6 +101,7 @@ export default React.memo(() => {
     }
   };
 
+  const layout = useLayout();
   const handleLogout = async () => {
     const confirmed = await Modal.confirm(
       t("common.logout"),

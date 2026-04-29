@@ -39,7 +39,7 @@ import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { useIsTablet } from "@/utils/responsive";
 import { requestReview } from "@/utils/requestReview";
 import { UpdateBanner } from "./UpdateBanner";
-import { layout } from "./layout";
+import { useLayout, screenLayoutMaxWidth } from "./layout";
 import { useNavigateToSession } from "@/hooks/useNavigateToSession";
 import { t } from "@/text";
 import { formatTokenCountShort } from "@/utils/formatUsage";
@@ -65,7 +65,7 @@ import {
 } from "@/components/project/projectSessionBadges";
 import { SharedGroupHeader } from "./SharedGroupHeader";
 
-const stylesheet = StyleSheet.create((theme) => ({
+const stylesheet = StyleSheet.create((theme, rt) => ({
   container: {
     flex: 1,
     flexDirection: "row",
@@ -75,7 +75,7 @@ const stylesheet = StyleSheet.create((theme) => ({
   },
   contentContainer: {
     flex: 1,
-    maxWidth: layout.maxWidth,
+    maxWidth: screenLayoutMaxWidth(rt.screen.width, rt.screen.height),
   },
   headerSection: {
     backgroundColor: theme.colors.groupped.background,
@@ -375,6 +375,7 @@ const stylesheet = StyleSheet.create((theme) => ({
 }));
 
 export function SessionsList() {
+    const layout = useLayout();
   const styles = stylesheet;
   const safeArea = useSafeAreaInsets();
   const data = useVisibleSessionListViewData();

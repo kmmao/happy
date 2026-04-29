@@ -94,7 +94,7 @@ import { isVersionSupported, MINIMUM_CLI_VERSION } from "@/utils/versionUtils";
 import { SessionSidePanel, SIDE_PANEL_MIN_WINDOW_WIDTH } from "@/components/session/SessionSidePanel";
 import { MobileSessionPanelSheet } from "@/components/session/MobileSessionPanelSheet";
 import { ResizableDivider, DIVIDER_WIDTH } from "@/components/session/ResizableDivider";
-import { layout } from "@/components/layout";
+import { useLayout } from "@/components/layout";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import * as React from "react";
@@ -250,6 +250,7 @@ export const SessionView = React.memo((props: { id: string }) => {
 
   // Actual container width (excludes sidebar navigator etc.)
   const [containerWidth, setContainerWidth] = React.useState(0);
+  const layout = useLayout();
   const handleContainerLayout = React.useCallback((e: { nativeEvent: { layout: { width: number } } }) => {
     setContainerWidth(e.nativeEvent.layout.width);
   }, []);
@@ -554,6 +555,7 @@ function SessionViewInner({
   session: Session;
   appendToInputRef: { current: (text: string) => void };
 }) {
+  const layout = useLayout();
   const { theme } = useUnistyles();
   const router = useRouter();
   const safeArea = useSafeAreaInsets();

@@ -229,7 +229,7 @@ const McpToolsModal = React.memo<McpToolsModalProps>(function McpToolsModal({
     );
 });
 
-const modalStyles = StyleSheet.create(() => ({
+const modalStyles = StyleSheet.create((_, rt) => ({
     container: {
         borderRadius: 16,
         overflow: "hidden",

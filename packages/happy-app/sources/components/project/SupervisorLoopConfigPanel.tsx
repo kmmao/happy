@@ -82,7 +82,7 @@ function Stepper({
     );
 }
 
-const stepperStyles = StyleSheet.create(() => ({
+const stepperStyles = StyleSheet.create((_, rt) => ({
     container: {
         flexDirection: "row",
         alignItems: "center",

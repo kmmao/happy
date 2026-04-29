@@ -18,7 +18,7 @@ import {
 } from "@/sync/apiSupervisor";
 import { Ionicons } from "@expo/vector-icons";
 import { ItemGroup } from "@/components/ItemGroup";
-import { layout } from "@/components/layout";
+import { screenLayoutMaxWidth } from "@/components/layout";
 import { useProject } from "@/hooks/useProjects";
 
 // --- Helpers ---
@@ -84,7 +84,7 @@ function MetadataRow({ label, value, valueColor }: { label: string; value: strin
     );
 }
 
-const metaStyles = StyleSheet.create((theme) => ({
+const metaStyles = StyleSheet.create((theme, rt) => ({
     row: {
         flexDirection: "row",
         justifyContent: "space-between",
@@ -165,7 +165,7 @@ function IterationTimeline({ runs }: { runs: LoopDetailRun[] }) {
     );
 }
 
-const timelineStyles = StyleSheet.create((theme) => ({
+const timelineStyles = StyleSheet.create((theme, rt) => ({
     container: {},
     item: {
         flexDirection: "row",
@@ -258,7 +258,7 @@ function ActionItem({ action }: { action: LoopDetailAction }) {
     );
 }
 
-const actionStyles = StyleSheet.create((theme) => ({
+const actionStyles = StyleSheet.create((theme, rt) => ({
     container: {
         flexDirection: "row",
         alignItems: "flex-start",
@@ -476,13 +476,13 @@ function SupervisorLoopDetailScreen() {
     );
 }
 
-const styles = StyleSheet.create((theme) => ({
+const styles = StyleSheet.create((theme, rt) => ({
     scroll: {
         flex: 1,
     },
     scrollContent: {
         paddingBottom: 40,
-        maxWidth: layout.maxWidth,
+        maxWidth: screenLayoutMaxWidth(rt.screen.width, rt.screen.height),
     },
     centered: {
         flex: 1,

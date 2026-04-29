@@ -4,7 +4,7 @@ import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { ItemGroup } from "@/components/ItemGroup";
-import { layout } from "@/components/layout";
+import { screenLayoutMaxWidth } from "@/components/layout";
 import { Modal } from "@/modal";
 import {
     machineEmitAgentLoopEvent,
@@ -830,13 +830,13 @@ const loopSuggestions = useLoopSuggestions({
     );
 });
 
-const styles = StyleSheet.create((theme) => ({
+const styles = StyleSheet.create((theme, rt) => ({
     container: {
         flex: 1,
         backgroundColor: theme.colors.groupped.background,
     },
     content: {
-        maxWidth: layout.maxWidth,
+        maxWidth: screenLayoutMaxWidth(rt.screen.width, rt.screen.height),
         width: "100%",
         alignSelf: "center",
         paddingBottom: 32,

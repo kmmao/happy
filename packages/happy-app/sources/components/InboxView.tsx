@@ -9,7 +9,7 @@ import { ItemGroup } from '@/components/ItemGroup';
 import { UpdateBanner } from './UpdateBanner';
 import { Typography } from '@/constants/Typography';
 import { useRouter } from 'expo-router';
-import { layout } from '@/components/layout';
+import { useLayout } from '@/components/layout';
 import { useIsTablet } from '@/utils/responsive';
 import { Header } from './navigation/Header';
 import { Ionicons } from '@expo/vector-icons';
@@ -146,6 +146,7 @@ interface InboxViewProps {
 }
 
 export const InboxView = React.memo(({}: InboxViewProps) => {
+    const layout = useLayout();
     const router = useRouter();
     const friends = useAcceptedFriends();
     const friendRequests = useFriendRequests();

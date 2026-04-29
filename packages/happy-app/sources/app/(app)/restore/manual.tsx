@@ -7,14 +7,14 @@ import { Typography } from '@/constants/Typography';
 import { normalizeSecretKey } from '@/auth/secretKeyBackup';
 import { authGetToken } from '@/auth/authGetToken';
 import { decodeBase64 } from '@/encryption/base64';
-import { layout } from '@/components/layout';
+import { screenLayoutMaxWidth } from '@/components/layout';
 import { Modal } from '@/modal';
 import { t } from '@/text';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 import { log } from '@/log';
 import { Switch } from '@/components/Switch';
 
-const stylesheet = StyleSheet.create((theme) => ({
+const stylesheet = StyleSheet.create((theme, rt) => ({
     scrollView: {
         flex: 1,
         backgroundColor: theme.colors.surface,
@@ -26,7 +26,7 @@ const stylesheet = StyleSheet.create((theme) => ({
     },
     contentWrapper: {
         width: '100%',
-        maxWidth: layout.maxWidth,
+        maxWidth: screenLayoutMaxWidth(rt.screen.width, rt.screen.height),
         paddingVertical: 24,
     },
     instructionText: {

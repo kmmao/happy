@@ -62,7 +62,7 @@ export const OpenClawTypingIndicator = React.memo(
   },
 );
 
-const styles = StyleSheet.create(() => ({
+const styles = StyleSheet.create((_, rt) => ({
   container: {
     flexDirection: "row",
     alignItems: "center",

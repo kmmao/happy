@@ -29,7 +29,7 @@ import {
   useSessionProjectGitStatus,
 } from "@/sync/storage";
 import { useUnistyles, StyleSheet } from "react-native-unistyles";
-import { layout } from "@/components/layout";
+import { screenLayoutMaxWidth } from "@/components/layout";
 import { FileIcon } from "@/components/FileIcon";
 import { Modal } from "@/modal";
 import {
@@ -1258,10 +1258,10 @@ GitChangesTab.displayName = "GitChangesTab";
 
 export { GitChangesTab };
 
-const styles = StyleSheet.create((theme) => ({
+const styles = StyleSheet.create((theme, rt) => ({
   container: {
     flex: 1,
-    maxWidth: layout.maxWidth,
+    maxWidth: screenLayoutMaxWidth(rt.screen.width, rt.screen.height),
     alignSelf: "center",
     width: "100%",
   },

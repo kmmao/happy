@@ -13,7 +13,7 @@ import Constants from "expo-constants";
 import { t } from "@/text";
 import { ProfileEditForm } from "@/components/ProfileEditForm";
 import { AIBackendProfile } from "@/sync/settings";
-import { layout } from "@/components/layout";
+import { useLayout } from "@/components/layout";
 import { callbacks } from "../index";
 import { peekTempData } from "@/utils/tempDataStore";
 import { log } from '@/log';
@@ -60,6 +60,7 @@ function ProfileEditScreen() {
     router.back();
   };
 
+  const layout = useLayout();
   const handleCancel = () => {
     router.back();
   };

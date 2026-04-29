@@ -97,7 +97,7 @@ export const CodexTurnDiffSummary = React.memo<CodexTurnDiffSummaryProps>(
   },
 );
 
-const styles = StyleSheet.create(() => ({
+const styles = StyleSheet.create((_, rt) => ({
   container: {
     borderBottomWidth: 1,
     flexDirection: "row",

@@ -14,7 +14,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StyleSheet } from "react-native-unistyles";
 import { Typography } from "@/constants/Typography";
-import { layout } from "@/components/layout";
+import { screenLayoutMaxWidth } from "@/components/layout";
 import { useNavigateToSession } from "@/hooks/useNavigateToSession";
 import { Pressable } from "react-native";
 import { t } from "@/text";
@@ -26,7 +26,7 @@ interface SessionHistoryItem {
   date?: string;
 }
 
-const styles = StyleSheet.create((theme) => ({
+const styles = StyleSheet.create((theme, rt) => ({
   container: {
     flex: 1,
     flexDirection: "row",
@@ -36,7 +36,7 @@ const styles = StyleSheet.create((theme) => ({
   },
   contentContainer: {
     flex: 1,
-    maxWidth: layout.maxWidth,
+    maxWidth: screenLayoutMaxWidth(rt.screen.width, rt.screen.height),
   },
   dateHeader: {
     backgroundColor: theme.colors.groupped.background,

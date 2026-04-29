@@ -8,7 +8,7 @@ import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { t } from '@/text';
-import { layout } from '@/components/layout';
+import { useLayout } from '@/components/layout';
 import { sync } from '@/sync/sync';
 import { FAB } from '@/components/FAB';
 import { SharedStateView } from '@/components/SharedStateView';
@@ -122,6 +122,7 @@ const stylesheet = StyleSheet.create((theme) => ({
 }));
 
 function ArtifactsScreen() {
+    const layout = useLayout();
     const { theme } = useUnistyles();
     const styles = stylesheet;
     const router = useRouter();

@@ -10,12 +10,13 @@ import { useLocalSearchParams } from "expo-router";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { Ionicons } from "@expo/vector-icons";
 import { Text } from "@/components/StyledText";
-import { layout } from "@/components/layout";
+import { useLayout } from "@/components/layout";
 import { useSessionMessages, useBackgroundTaskEntries } from "@/sync/storage";
 import { loadDismissedTasks } from "@/sync/persistence";
 import * as Clipboard from "expo-clipboard";
 
 export default React.memo(function DebugTasksScreen() {
+    const layout = useLayout();
     const { id: sessionId } = useLocalSearchParams<{ id: string }>();
     const { theme } = useUnistyles();
     const { messages } = useSessionMessages(sessionId);

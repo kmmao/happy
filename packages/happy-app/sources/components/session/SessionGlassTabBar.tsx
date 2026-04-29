@@ -262,7 +262,7 @@ export const SessionGlassTabBar = React.memo<SessionGlassTabBarProps>(
     },
 );
 
-const styles = StyleSheet.create(() => ({
+const styles = StyleSheet.create((_, rt) => ({
     container: {
         width: "100%",
         flexDirection: "row",

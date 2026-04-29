@@ -8,7 +8,7 @@ import {
     Platform
 } from 'react-native';
 import { Typography } from '@/constants/Typography';
-import { layout } from './layout';
+import { screenLayoutMaxWidth } from './layout';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 
 interface ItemChildProps {
@@ -34,7 +34,7 @@ const stylesheet = StyleSheet.create((theme, runtime) => ({
     },
     container: {
         width: '100%',
-        maxWidth: layout.maxWidth,
+        maxWidth: screenLayoutMaxWidth(runtime.screen.width, runtime.screen.height),
         paddingHorizontal: Platform.select({ ios: 0, default: 4 }),
     },
     header: {

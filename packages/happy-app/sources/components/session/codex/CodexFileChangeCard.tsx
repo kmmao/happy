@@ -183,7 +183,7 @@ export const CodexFileChangeCard = React.memo<CodexFileChangeCardProps>(
   },
 );
 
-const styles = StyleSheet.create(() => ({
+const styles = StyleSheet.create((_, rt) => ({
   card: {
     borderWidth: 1,
     overflow: "hidden",

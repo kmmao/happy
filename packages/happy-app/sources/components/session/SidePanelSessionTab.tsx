@@ -68,7 +68,7 @@ export const SidePanelSessionTab = React.memo<SidePanelSessionTabProps>(
     },
 );
 
-const styles = StyleSheet.create(() => ({
+const styles = StyleSheet.create((_, rt) => ({
     headerWrap: {
         paddingHorizontal: 6,
         paddingTop: 0,

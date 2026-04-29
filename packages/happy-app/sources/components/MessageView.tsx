@@ -12,7 +12,7 @@ import {
   ToolCallMessage,
 } from "@/sync/typesMessage";
 import { Metadata } from "@/sync/storageTypes";
-import { layout } from "./layout";
+import { useLayout } from "./layout";
 import { ToolView } from "./tools/ToolView";
 import { AgentEvent } from "@/sync/typesRaw";
 import { sync } from "@/sync/sync";
@@ -43,6 +43,7 @@ export const MessageView = (props: {
   permissionModeKey?: string | null;
   contentMaxWidth?: number;
 }) => {
+  const layout = useLayout();
   return (
     <View style={styles.messageContainer} renderToHardwareTextureAndroid={true}>
       <View style={[styles.messageContent, { maxWidth: props.contentMaxWidth ?? layout.maxWidth }]}>

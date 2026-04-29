@@ -243,7 +243,7 @@ function BackgroundTaskLogSheetInner({ sessionId, task, onClose, onStop, onPrevi
 
 export const BackgroundTaskLogSheet = React.memo(BackgroundTaskLogSheetInner);
 
-const styles = StyleSheet.create(() => ({
+const styles = StyleSheet.create((_, rt) => ({
     container: {
         flex: 1,
     },

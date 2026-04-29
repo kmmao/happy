@@ -16,7 +16,7 @@ import { useAllMachines, useSessions, useSetting } from "@/sync/storage";
 import { sync } from "@/sync/sync";
 import { Ionicons } from "@expo/vector-icons";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
-import { layout } from "@/components/layout";
+import { screenLayoutMaxWidth } from "@/components/layout";
 import { t } from "@/text";
 import { Modal } from "@/modal";
 import {
@@ -31,7 +31,7 @@ import {
 } from "@/sync/ops";
 
 
-const stylesheet = StyleSheet.create((theme) => ({
+const stylesheet = StyleSheet.create((theme, rt) => ({
   container: {
     flex: 1,
     backgroundColor: theme.colors.groupped.background,
@@ -44,7 +44,7 @@ const stylesheet = StyleSheet.create((theme) => ({
   },
   contentWrapper: {
     width: "100%",
-    maxWidth: layout.maxWidth,
+    maxWidth: screenLayoutMaxWidth(rt.screen.width, rt.screen.height),
   },
   emptyContainer: {
     flex: 1,

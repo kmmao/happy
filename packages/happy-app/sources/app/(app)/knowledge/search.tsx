@@ -7,7 +7,7 @@ import { Typography } from "@/constants/Typography";
 import { t } from "@/text";
 import { useKnowledgeSearch, type KnowledgeSearchResult } from "@/hooks/useKnowledgeSearch";
 import { KnowledgeSearchResultCard } from "@/components/knowledge/KnowledgeSearchResultCard";
-import { layout } from "@/components/layout";
+import { screenLayoutMaxWidth } from "@/components/layout";
 import { projectManager } from "@/sync/projectManager";
 import { SharedEmptyState } from "@/components/SharedEmptyState";
 
@@ -115,7 +115,7 @@ function KnowledgeSearchScreen() {
 
 export default React.memo(KnowledgeSearchScreen);
 
-const styles = StyleSheet.create((theme) => ({
+const styles = StyleSheet.create((theme, rt) => ({
     container: {
         flex: 1,
     },
@@ -137,7 +137,7 @@ const styles = StyleSheet.create((theme) => ({
     },
     listContent: {
         paddingBottom: 40,
-        maxWidth: layout.maxWidth,
+        maxWidth: screenLayoutMaxWidth(rt.screen.width, rt.screen.height),
         alignSelf: "center",
         width: "100%",
     },

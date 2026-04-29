@@ -105,7 +105,7 @@ export const CodexCodeTab = React.memo<CodexCodeTabProps>(
   },
 );
 
-const styles = StyleSheet.create(() => ({
+const styles = StyleSheet.create((_, rt) => ({
   container: {
     flex: 1,
   },

@@ -15,7 +15,7 @@ import { sessionReadFile, sessionBash } from "@/sync/ops";
 import { storage } from "@/sync/storage";
 import { Modal } from "@/modal";
 import { useUnistyles, StyleSheet } from "react-native-unistyles";
-import { layout } from "@/components/layout";
+import { useLayout, screenLayoutMaxWidth } from "@/components/layout";
 import { t } from "@/text";
 import { FileIcon } from "@/components/FileIcon";
 import { base64ToUtf8 } from "@/utils/stringUtils";
@@ -28,6 +28,7 @@ interface FileContent {
 }
 
 function FileScreen() {
+    const layout = useLayout();
   const { theme } = useUnistyles();
   const { id: sessionId } = useLocalSearchParams<{ id: string }>();
   const searchParams = useLocalSearchParams();
@@ -530,10 +531,10 @@ function FileScreen() {
   );
 }
 
-const styles = StyleSheet.create((theme) => ({
+const styles = StyleSheet.create((theme, rt) => ({
   container: {
     flex: 1,
-    maxWidth: layout.maxWidth,
+    maxWidth: screenLayoutMaxWidth(rt.screen.width, rt.screen.height),
     alignSelf: "center",
     width: "100%",
   },

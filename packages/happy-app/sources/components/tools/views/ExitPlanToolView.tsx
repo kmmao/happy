@@ -89,7 +89,7 @@ export const ExitPlanToolView = React.memo<ToolViewProps>(({ tool, sessionId }) 
     );
 });
 
-const styles = StyleSheet.create(() => ({
+const styles = StyleSheet.create((_, rt) => ({
     actionsContainer: {
         paddingHorizontal: 8,
         paddingTop: 8,

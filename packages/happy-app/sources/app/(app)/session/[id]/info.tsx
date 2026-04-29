@@ -27,7 +27,7 @@ import { runWithSessionReactivationGuard } from "@/sync/sessionResumeGuard";
 import { setSessionForkSource } from "@/sync/apiProjects";
 import { useAuth } from "@/auth/AuthContext";
 import { useUnistyles } from "react-native-unistyles";
-import { layout } from "@/components/layout";
+import { useLayout } from "@/components/layout";
 import { t } from "@/text";
 import { isVersionSupported, MINIMUM_CLI_VERSION } from "@/utils/versionUtils";
 import { useSessionUpgrade } from "@/hooks/useSessionUpgrade";
@@ -342,6 +342,7 @@ function SessionInfoContent({ session }: { session: Session }) {
     return new Date(timestamp).toLocaleString();
   }, []);
 
+  const layout = useLayout();
   const handleCopyUpdateCommand = useCallback(async () => {
     const updateCommand = "npm install -g @kmmao/happy-coder@latest";
     try {

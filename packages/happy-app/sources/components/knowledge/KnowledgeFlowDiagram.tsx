@@ -218,7 +218,7 @@ function ModeRow({ modeLabel, desc, color, theme }: {
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
-const styles = StyleSheet.create(() => ({
+const styles = StyleSheet.create((_, rt) => ({
     container: {
         width: "100%",
         borderRadius: 16,

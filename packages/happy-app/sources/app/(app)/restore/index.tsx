@@ -7,7 +7,7 @@ import { Typography } from '@/constants/Typography';
 import { encodeBase64 } from '@/encryption/base64';
 import { generateAuthKeyPair, authQRStart } from '@/auth/authQRStart';
 import { authQRWait } from '@/auth/authQRWait';
-import { layout } from '@/components/layout';
+import { screenLayoutMaxWidth } from '@/components/layout';
 import { Modal } from '@/modal';
 import { t } from '@/text';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
@@ -15,7 +15,7 @@ import { QRCode } from '@/components/qr/QRCode';
 import { log } from '@/log';
 import { Switch } from '@/components/Switch';
 
-const stylesheet = StyleSheet.create((theme) => ({
+const stylesheet = StyleSheet.create((theme, rt) => ({
     scrollView: {
         flex: 1,
         backgroundColor: theme.colors.surface,
@@ -24,13 +24,13 @@ const stylesheet = StyleSheet.create((theme) => ({
         flex: 1,
         alignItems: 'center',
         paddingHorizontal: 24,
-        maxWidth: layout.maxWidth,
+        maxWidth: screenLayoutMaxWidth(rt.screen.width, rt.screen.height),
         alignSelf: "center" as const,
         width: "100%" as const,
     },
     contentWrapper: {
         width: '100%',
-        maxWidth: layout.maxWidth,
+        maxWidth: screenLayoutMaxWidth(rt.screen.width, rt.screen.height),
         paddingVertical: 24,
     },
     instructionText: {
@@ -70,7 +70,7 @@ const stylesheet = StyleSheet.create((theme) => ({
         alignItems: 'center',
         justifyContent: 'space-between',
         width: '100%',
-        maxWidth: layout.maxWidth,
+        maxWidth: screenLayoutMaxWidth(rt.screen.width, rt.screen.height),
         marginBottom: 16,
     },
     rememberMeLabel: {

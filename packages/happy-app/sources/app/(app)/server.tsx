@@ -7,12 +7,12 @@ import { ItemGroup } from '@/components/ItemGroup';
 import { ItemList } from '@/components/ItemList';
 import { RoundButton } from '@/components/RoundButton';
 import { Modal } from '@/modal';
-import { layout } from '@/components/layout';
+import { screenLayoutMaxWidth } from '@/components/layout';
 import { t } from '@/text';
 import { getServerUrl, setServerUrl, validateServerUrl, getServerInfo } from '@/sync/serverConfig';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 
-const stylesheet = StyleSheet.create((theme) => ({
+const stylesheet = StyleSheet.create((theme, rt) => ({
     keyboardAvoidingView: {
         flex: 1,
     },
@@ -24,7 +24,7 @@ const stylesheet = StyleSheet.create((theme) => ({
         paddingHorizontal: 16,
         paddingVertical: 12,
         width: '100%',
-        maxWidth: layout.maxWidth,
+        maxWidth: screenLayoutMaxWidth(rt.screen.width, rt.screen.height),
         alignSelf: 'center',
     },
     labelText: {

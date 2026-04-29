@@ -17,7 +17,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useProcessManager } from "@/hooks/useProcessManager";
 import { useHiddenProcesses } from "@/hooks/useHiddenProcesses";
 import { Modal } from "@/modal";
-import { layout } from "@/components/layout";
+import { screenLayoutMaxWidth } from "@/components/layout";
 import { t } from "@/text";
 import type { DetectedPort } from "@/hooks/portDetection";
 import { useMachine } from "@/sync/storage";
@@ -353,7 +353,7 @@ export default React.memo(function ProcessesPage() {
     );
 });
 
-const styles = StyleSheet.create((theme) => ({
+const styles = StyleSheet.create((theme, rt) => ({
     container: {
         flex: 1,
         backgroundColor: theme.colors.surface,
@@ -363,7 +363,7 @@ const styles = StyleSheet.create((theme) => ({
     },
     innerContainer: {
         width: "100%",
-        maxWidth: layout.maxWidth,
+        maxWidth: screenLayoutMaxWidth(rt.screen.width, rt.screen.height),
         alignSelf: "center",
         paddingHorizontal: 16,
         paddingTop: 16,

@@ -16,7 +16,7 @@ import {
 import { BlurView } from "expo-blur";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
-import { layout } from "./layout";
+import { useLayout } from "./layout";
 import { MultiTextInput, KeyPressEvent } from "./MultiTextInput";
 import { Typography } from "@/constants/Typography";
 import { PermissionMode } from "./PermissionModeSelector";
@@ -66,6 +66,7 @@ export type {
 
 export const AgentInput = React.memo(
   React.forwardRef<MultiTextInputHandle, AgentInputProps>((props, ref) => {
+    const layout = useLayout();
     const styles = stylesheet;
     const { theme } = useUnistyles();
     const { width: screenWidth } = useWindowDimensions();
@@ -1050,9 +1051,10 @@ export const AgentInput = React.memo(
               <Animated.View
                 style={{
                   alignSelf: "flex-end",
-                  minWidth: 150,
-                  maxWidth: screenWidth > 700 ? 360 : screenWidth - 40,
-                  marginLeft: 12,
+                  flexShrink: 1,
+                  minWidth: 0,
+                  maxWidth: screenWidth > 700 ? 360 : undefined,
+                  marginLeft: "auto",
                   borderRadius: 12,
                   borderWidth: props.modelSummaryRpcState && Platform.OS !== "android" ? 1 : 0,
                   borderColor: modelSummaryVisualState.borderColor,
@@ -1088,7 +1090,7 @@ export const AgentInput = React.memo(
                         : pressed
                           ? 0.9
                           : 1,
-                    gap: 6,
+                    gap: 3,
                   })}
                 >
                   {modelSummaryStatusLabel ? (
@@ -1124,10 +1126,9 @@ export const AgentInput = React.memo(
                     numberOfLines={1}
                     allowFontScaling={false}
                     style={{
-                      flex: 1,
+                      flexShrink: 1,
                       fontSize: 11,
                       color: modelSummaryVisualState.summaryTextColor,
-                      textAlign: "right",
                       ...Typography.default(),
                     }}
                   >

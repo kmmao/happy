@@ -24,7 +24,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { usePreview, type DetectedPort } from "@/hooks/usePreview";
 import { useHiddenProcesses } from "@/hooks/useHiddenProcesses";
 import { useSession } from "@/sync/storage";
-import { layout } from "@/components/layout";
+import { screenLayoutMaxWidth } from "@/components/layout";
 import { SharedStateView } from "@/components/SharedStateView";
 
 type DiffTab = "before" | "after" | "diff";
@@ -409,7 +409,7 @@ export default React.memo(function PreviewPage() {
   );
 });
 
-const styles = StyleSheet.create((theme) => ({
+const styles = StyleSheet.create((theme, rt) => ({
   container: {
     flex: 1,
     backgroundColor: theme.colors.surface,
@@ -419,7 +419,7 @@ const styles = StyleSheet.create((theme) => ({
   },
   innerContainer: {
     width: "100%",
-    maxWidth: layout.maxWidth,
+    maxWidth: screenLayoutMaxWidth(rt.screen.width, rt.screen.height),
     alignSelf: "center",
     paddingHorizontal: 16,
     paddingTop: 16,

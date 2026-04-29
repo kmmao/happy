@@ -3,7 +3,7 @@ import { Pressable, Text, View } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { Typography } from "@/constants/Typography";
 import { Ionicons } from "@expo/vector-icons";
-import { layout } from "./layout";
+import { screenLayoutMaxWidth } from "./layout";
 import { t } from "@/text";
 import { useAppendToInput } from "@/hooks/useInputContext";
 import { BaseModal } from "@/modal/components/BaseModal";
@@ -207,9 +207,9 @@ export const OptionsPopover = React.memo(
   },
 );
 
-const styles = StyleSheet.create((theme) => ({
+const styles = StyleSheet.create((theme, rt) => ({
   bubble: {
-    maxWidth: layout.maxWidth - 32,
+    maxWidth: screenLayoutMaxWidth(rt.screen.width, rt.screen.height) - 32,
     width: "90%",
     backgroundColor: theme.colors.surface,
     borderRadius: 16,

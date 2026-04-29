@@ -21,7 +21,7 @@ import { Typography } from "@/constants/Typography";
 import { sessionListDirectory, DirectoryEntry } from "@/sync/ops";
 import { storage, useLocalSetting, useSession } from "@/sync/storage";
 import { useUnistyles, StyleSheet } from "react-native-unistyles";
-import { layout } from "@/components/layout";
+import { screenLayoutMaxWidth } from "@/components/layout";
 import { FileIcon } from "@/components/FileIcon";
 import { utf8ToBase64 } from "@/utils/stringUtils";
 import { getFavoriteItemActions } from "./gitBrowseTabFavorites";
@@ -762,10 +762,10 @@ export const GitBrowseTab = React.memo<{
 
 GitBrowseTab.displayName = "GitBrowseTab";
 
-const styles = StyleSheet.create(() => ({
+const styles = StyleSheet.create((_, rt) => ({
     container: {
         flex: 1,
-        maxWidth: layout.maxWidth,
+        maxWidth: screenLayoutMaxWidth(rt.screen.width, rt.screen.height),
         alignSelf: "center",
         width: "100%",
     },

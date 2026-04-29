@@ -23,7 +23,7 @@ import { ItemGroup } from "@/components/ItemGroup";
 import { Item } from "@/components/Item";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { useUnistyles } from "react-native-unistyles";
-import { layout } from "@/components/layout";
+import { useLayout } from "@/components/layout";
 import { t } from "@/text";
 import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { useHeaderHeight } from "@/utils/responsive";
@@ -1388,6 +1388,7 @@ function NewSessionWizard() {
   const overlayMaxHeight = Math.max(300, screenHeight - safeArea.top - safeArea.bottom - 200);
 
   // Machine online status for AgentInput (DRY - reused in info box too)
+  const layout = useLayout();
   const connectionStatus = React.useMemo(() => {
     if (!selectedMachine) return undefined;
     const isOnline = isMachineOnline(selectedMachine);

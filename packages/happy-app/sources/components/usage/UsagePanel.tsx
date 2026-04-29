@@ -10,7 +10,7 @@ import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { useAuth } from "@/auth/AuthContext";
 import { Item } from "@/components/Item";
 import { ItemGroup } from "@/components/ItemGroup";
-import { layout } from "@/components/layout";
+import { screenLayoutMaxWidth } from "@/components/layout";
 import { UsageChart } from "./UsageChart";
 import { UsageBar } from "./UsageBar";
 import {
@@ -25,7 +25,7 @@ import { SharedStateView } from "@/components/SharedStateView";
 
 type TimePeriod = "today" | "7days" | "30days";
 
-const styles = StyleSheet.create((theme) => ({
+const styles = StyleSheet.create((theme, rt) => ({
   container: {
     flex: 1,
   },
@@ -58,7 +58,7 @@ const styles = StyleSheet.create((theme) => ({
   },
   statsConstraint: {
     width: "100%",
-    maxWidth: layout.maxWidth,
+    maxWidth: screenLayoutMaxWidth(rt.screen.width, rt.screen.height),
     paddingHorizontal: Platform.select({ ios: 0, default: 4 }),
   },
   statsContainer: {

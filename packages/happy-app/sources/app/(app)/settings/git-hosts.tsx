@@ -6,7 +6,7 @@ import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { Typography } from "@/constants/Typography";
 import { t } from "@/text";
 import { Modal as HappyModal } from "@/modal/ModalManager";
-import { layout } from "@/components/layout";
+import { useLayout } from "@/components/layout";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useWindowDimensions } from "react-native";
 import {
@@ -264,6 +264,7 @@ export default React.memo(function GitHostsScreen() {
     );
   };
 
+  const layout = useLayout();
   const handleRemoveWebhookRepo = (index: number) => {
     setFormWebhookRepos(formWebhookRepos.filter((_, i) => i !== index));
   };

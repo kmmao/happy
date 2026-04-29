@@ -11,7 +11,7 @@ import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { Typography } from "@/constants/Typography";
 import { t } from "@/text";
 import { Modal as HappyModal } from "@/modal/ModalManager";
-import { layout } from "@/components/layout";
+import { screenLayoutMaxWidth } from "@/components/layout";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useWindowDimensions } from "react-native";
 import type { AIBackendProfile } from "@/sync/settings";
@@ -917,7 +917,7 @@ function ProfileManager({
   );
 }
 
-const styles = StyleSheet.create((theme) => ({
+const styles = StyleSheet.create((theme, rt) => ({
   screen: {
     flex: 1,
     backgroundColor: theme.colors.surface,
@@ -927,7 +927,7 @@ const styles = StyleSheet.create((theme) => ({
   },
   content: {
     width: "100%",
-    maxWidth: layout.maxWidth,
+    maxWidth: screenLayoutMaxWidth(rt.screen.width, rt.screen.height),
     alignSelf: "center",
     gap: 12,
   },
@@ -1227,7 +1227,7 @@ const styles = StyleSheet.create((theme) => ({
   },
   modalContent: {
     width: "100%",
-    maxWidth: Math.min(layout.maxWidth, 600),
+    maxWidth: Math.min(screenLayoutMaxWidth(rt.screen.width, rt.screen.height), 600),
     maxHeight: "90%",
   },
 }));

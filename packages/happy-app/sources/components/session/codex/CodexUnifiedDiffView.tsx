@@ -51,7 +51,7 @@ export const CodexUnifiedDiffView = React.memo<CodexUnifiedDiffViewProps>(
   },
 );
 
-const styles = StyleSheet.create(() => ({
+const styles = StyleSheet.create((_, rt) => ({
   container: {
     borderWidth: 1,
     overflow: "hidden",

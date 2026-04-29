@@ -15,7 +15,7 @@ import { Item } from "@/components/Item";
 import { ItemList } from "@/components/ItemList";
 import { Typography } from "@/constants/Typography";
 import { useUnistyles, StyleSheet } from "react-native-unistyles";
-import { layout } from "@/components/layout";
+import { screenLayoutMaxWidth } from "@/components/layout";
 import { t } from "@/text";
 import { Modal } from "@/modal";
 import {
@@ -482,10 +482,10 @@ export const GitBranchesTab = React.memo<GitBranchesTabProps>(
   },
 );
 
-const styles = StyleSheet.create((theme) => ({
+const styles = StyleSheet.create((theme, rt) => ({
   container: {
     flex: 1,
-    maxWidth: layout.maxWidth,
+    maxWidth: screenLayoutMaxWidth(rt.screen.width, rt.screen.height),
     alignSelf: "center",
     width: "100%",
   },

@@ -25,7 +25,7 @@ import { useHappyAction } from "@/hooks/useHappyAction";
 import { SupervisorActionCard } from "@/components/project/SupervisorActionCard";
 import { Modal } from "@/modal";
 import { sync } from "@/sync/sync";
-import { layout } from "@/components/layout";
+import { screenLayoutMaxWidth } from "@/components/layout";
 import { Project } from "@/sync/projectManager";
 import {
     type SortField,
@@ -651,11 +651,11 @@ export const ProjectActionsTab = React.memo(ProjectActionsTabInner);
 
 // --- Styles ---
 
-const styles = StyleSheet.create((theme) => ({
+const styles = StyleSheet.create((theme, rt) => ({
     container: {
         flex: 1,
         backgroundColor: theme.colors.groupped.background,
-        maxWidth: layout.maxWidth,
+        maxWidth: screenLayoutMaxWidth(rt.screen.width, rt.screen.height),
         width: "100%",
         alignSelf: "center",
     },

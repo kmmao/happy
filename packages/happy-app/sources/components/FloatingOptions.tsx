@@ -5,8 +5,7 @@ import { Typography } from "@/constants/Typography";
 import { Ionicons } from "@expo/vector-icons";
 import { t } from "@/text";
 import { ShimmerOverlay } from "./ShimmerOverlay";
-import { layout } from "./layout";
-
+import { screenLayoutMaxWidth } from "./layout";
 interface FloatingOptionsProps {
   options: string[];
   onOptionPress: (option: string) => void;
@@ -83,7 +82,7 @@ export const FloatingOptions = React.memo(
   },
 );
 
-const styles = StyleSheet.create((theme) => ({
+const styles = StyleSheet.create((theme, rt) => ({
   container: {
     paddingHorizontal: 16,
     paddingBottom: 8,
@@ -91,7 +90,7 @@ const styles = StyleSheet.create((theme) => ({
   },
   innerContainer: {
     width: "100%",
-    maxWidth: layout.maxWidth,
+    maxWidth: screenLayoutMaxWidth(rt.screen.width, rt.screen.height),
     flexDirection: "column",
     gap: 8,
   },

@@ -7,7 +7,7 @@ import { useRouter } from "expo-router";
 import { Avatar } from "@/components/Avatar";
 import { Typography } from "@/constants/Typography";
 import { useHeaderHeight } from "@/utils/responsive";
-import { layout } from "@/components/layout";
+import { screenHeaderMaxWidth } from "@/components/layout";
 import { useUnistyles } from "react-native-unistyles";
 import { DevButton } from "@/components/DevButton";
 import type { DevButtonState } from "@/hooks/useDevButton";
@@ -227,7 +227,7 @@ export const ChatHeaderView: React.FC<ChatHeaderViewProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const styles = StyleSheet.create((_, rt) => ({
   container: {
     position: "relative",
     zIndex: 100,
@@ -241,7 +241,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: Platform.OS === "ios" ? 8 : 16,
     width: "100%",
-    maxWidth: layout.headerMaxWidth,
+    maxWidth: screenHeaderMaxWidth(rt.screen.width, rt.screen.height),
   },
   backButton: {
     marginRight: 8,
@@ -292,4 +292,4 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: "600",
   },
-});
+}));

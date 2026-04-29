@@ -7,7 +7,7 @@ import { useRouter } from "expo-router";
 import { Typography } from "@/constants/Typography";
 import { t } from "@/text";
 import { Modal } from "@/modal";
-import { layout } from "@/components/layout";
+import { useLayout } from "@/components/layout";
 import { SharedStateView } from "@/components/SharedStateView";
 import { useSessionKnowledge, type SessionKnowledgeEntry } from "@/hooks/useSessionKnowledge";
 import { useSessionKnowledgeAccesses, type SessionKnowledgeAccessEntry } from "@/hooks/useSessionKnowledgeAccesses";
@@ -212,6 +212,7 @@ const HotBadge = React.memo<HotBadgeProps>(({ entry }) => {
 });
 
 const EntryRow = React.memo<EntryRowProps>(({ activeTab, entry, onPress, onEvict, onReinject }) => {
+    const layout = useLayout();
     const { theme } = useUnistyles();
     const typeColor = TYPE_COLORS[entry.entryType] ?? theme.colors.textSecondary;
     const statusColor = STATUS_COLORS[entry.status] ?? theme.colors.textSecondary;
@@ -318,6 +319,7 @@ const EntryRow = React.memo<EntryRowProps>(({ activeTab, entry, onPress, onEvict
 
 export const SessionKnowledgeSheet = React.memo<SessionKnowledgeSheetProps>(
     ({ visible, onClose, projectServerId, sessionId, maxHeight = "84%", initialTab = "changes", inline = false }) => {
+    const layout = useLayout();
         const { theme } = useUnistyles();
         const insets = useSafeAreaInsets();
         const router = useRouter();
