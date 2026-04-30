@@ -49,7 +49,7 @@
     "preset": "jest-expo"
   },
   "dependencies": {
-    "@config-plugins/react-native-webrtc": "^12.0.0",
+    "@config-plugins/react-native-webrtc": "^14.0.0",
     "@elevenlabs/react": "^1.0.0",
     "@elevenlabs/react-native": "^1.0.0",
     "@expo/ui": "~55.0.12",
@@ -190,7 +190,6 @@
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",
-    "@expo/config-plugins": "~55.0.5",
     "@expo/ngrok": "^4.1.0",
     "@material/material-color-utilities": "^0.3.0",
     "@stablelib/hex": "^2.0.1",

@@ -1017,10 +1017,10 @@
     "@noble/curves" "1.5.0"
     "@noble/hashes" "1.4.0"
 
-"@config-plugins/react-native-webrtc@^12.0.0":
-  version "12.0.0"
-  resolved "https://registry.npmjs.org/@config-plugins/react-native-webrtc/-/react-native-webrtc-12.0.0.tgz"
-  integrity sha512-EIYR+ArIOFBz8cEHSdPjxqFPhaN+nNeoPnI6iVStctYKZdl6AEgmXq6Qfpds6qyin1W4JP7wq2jJh32OsRfwxg==
+"@config-plugins/react-native-webrtc@^14.0.0":
+  version "14.0.0"
+  resolved "https://registry.yarnpkg.com/@config-plugins/react-native-webrtc/-/react-native-webrtc-14.0.0.tgz#28d946203909bda5600249ae9f436e4c90ecadab"
+  integrity sha512-RUynr1I7WZ4HDi0S1KvWRka3VZpRgGWyE4UPw8V+gvda6o2iv15ACcWo6GsBGJ7OsDoO+Ny/N2L1+MNviqv3LQ==
 
 "@cspotcode/source-map-support@^0.8.0":
   version "0.8.1"
@@ -1513,7 +1513,7 @@
   dependencies:
     node-forge "^1.3.3"
 
-"@expo/config-plugins@^55.0.8", "@expo/config-plugins@~55.0.5", "@expo/config-plugins@~55.0.8":
+"@expo/config-plugins@^55.0.8", "@expo/config-plugins@~55.0.8":
   version "55.0.8"
   resolved "https://registry.yarnpkg.com/@expo/config-plugins/-/config-plugins-55.0.8.tgz#1b3f2b06b941b113ddc920be179b90c86eb82ef9"
   integrity sha512-8WfWTRntTCcowfOS+tHdB0z98gKetTwktg4G5TWkCkXVa8Jt1NUnvzaaU4UHk2vbR2U4N84RyZJFizSwfF6C9g==
