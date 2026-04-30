@@ -124,6 +124,9 @@ export const SettingsSchema = z.object({
     .boolean()
     .nullish()
     .describe("Whether user liked the app when asked"),
+  voiceBackend: z
+    .enum(["elevenlabs", "livekit"])
+    .describe("Realtime voice backend"),
   voiceAssistantLanguage: z
     .string()
     .nullable()
@@ -145,6 +148,14 @@ export const SettingsSchema = z.object({
     .describe(
       "Voicebox local TTS service endpoint URL (null uses default http://localhost:17493)",
     ),
+  livekitApiKey: z
+    .string()
+    .nullable()
+    .describe("User's own LiveKit Cloud API Key (BYOK)"),
+  livekitApiSecret: z
+    .string()
+    .nullable()
+    .describe("User's own LiveKit Cloud API Secret (BYOK)"),
   elevenLabsApiKey: z
     .string()
     .nullable()
@@ -418,10 +429,13 @@ export const settingsDefaults: Settings = {
   realtimeSessionSort: true,
   reviewPromptAnswered: false,
   reviewPromptLikedApp: null,
+  voiceBackend: "elevenlabs",
   voiceAssistantLanguage: null,
   voiceInputLanguage: null,
   ttsProvider: "edge",
   voiceboxEndpoint: null,
+  livekitApiKey: null,
+  livekitApiSecret: null,
   elevenLabsApiKey: null,
   elevenLabsVoiceId: null,
   preferredLanguage: null,

@@ -9,6 +9,7 @@ const GLOBAL_MAX = parseInt(process.env.RATE_LIMIT_MAX ?? "600", 10);
 const GLOBAL_WINDOW_MS = parseInt(process.env.RATE_LIMIT_WINDOW ?? "60000", 10);
 
 export const AUTH_RATE_LIMIT = { max: 10, timeWindow: 60_000 };
+export const LIVEKIT_VERIFY_RATE_LIMIT = { max: 5, timeWindow: 60_000 };
 export const WEBHOOK_INBOUND_RATE_LIMIT = { max: 30, timeWindow: 60_000 };
 
 export async function enableRateLimit(app: Fastify) {

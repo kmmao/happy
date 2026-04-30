@@ -126,6 +126,7 @@ describe("settings", () => {
         realtimeSessionSort: true,
         reviewPromptAnswered: false,
         reviewPromptLikedApp: null,
+        voiceBackend: "elevenlabs",
         voiceAssistantLanguage: null,
         voiceInputLanguage: null,
         ttsProvider: "edge",
@@ -155,6 +156,8 @@ describe("settings", () => {
         webNotifications: false,
         webNotificationsPersistent: false,
         voiceboxEndpoint: null,
+        livekitApiKey: null,
+        livekitApiSecret: null,
       };
       const delta: Partial<Settings> = {
         viewInline: true,
@@ -185,6 +188,7 @@ describe("settings", () => {
         realtimeSessionSort: true,
         reviewPromptAnswered: false,
         reviewPromptLikedApp: null,
+        voiceBackend: "elevenlabs",
         voiceAssistantLanguage: null,
         voiceInputLanguage: null,
         ttsProvider: "edge",
@@ -242,6 +246,7 @@ describe("settings", () => {
         realtimeSessionSort: true,
         reviewPromptAnswered: false,
         reviewPromptLikedApp: null,
+        voiceBackend: "elevenlabs",
         voiceAssistantLanguage: null,
         voiceInputLanguage: null,
         ttsProvider: "edge",
@@ -271,6 +276,8 @@ describe("settings", () => {
         webNotifications: false,
         webNotificationsPersistent: false,
         voiceboxEndpoint: null,
+        livekitApiKey: null,
+        livekitApiSecret: null,
       };
       const delta: Partial<Settings> = {};
       expect(applySettings(currentSettings, delta)).toEqual(currentSettings);
@@ -302,6 +309,7 @@ describe("settings", () => {
         realtimeSessionSort: true,
         reviewPromptAnswered: false,
         reviewPromptLikedApp: null,
+        voiceBackend: "elevenlabs",
         voiceAssistantLanguage: null,
         voiceInputLanguage: null,
         ttsProvider: "edge",
@@ -331,6 +339,8 @@ describe("settings", () => {
         webNotifications: false,
         webNotificationsPersistent: false,
         voiceboxEndpoint: null,
+        livekitApiKey: null,
+        livekitApiSecret: null,
       };
       const delta: Partial<Settings> = {
         viewInline: false,
@@ -367,6 +377,7 @@ describe("settings", () => {
         realtimeSessionSort: true,
         reviewPromptAnswered: false,
         reviewPromptLikedApp: null,
+        voiceBackend: "elevenlabs",
         voiceAssistantLanguage: null,
         voiceInputLanguage: null,
         ttsProvider: "edge",
@@ -396,6 +407,8 @@ describe("settings", () => {
         webNotifications: false,
         webNotificationsPersistent: false,
         voiceboxEndpoint: null,
+        livekitApiKey: null,
+        livekitApiSecret: null,
       };
       expect(applySettings(currentSettings, {})).toEqual(currentSettings);
     });
@@ -441,6 +454,7 @@ describe("settings", () => {
         realtimeSessionSort: true,
         reviewPromptAnswered: false,
         reviewPromptLikedApp: null,
+        voiceBackend: "elevenlabs",
         voiceAssistantLanguage: null,
         voiceInputLanguage: null,
         ttsProvider: "edge",
@@ -470,6 +484,8 @@ describe("settings", () => {
         webNotifications: false,
         webNotificationsPersistent: false,
         voiceboxEndpoint: null,
+        livekitApiKey: null,
+        livekitApiSecret: null,
       };
       const delta: any = {
         viewInline: false,
@@ -526,6 +542,7 @@ describe("settings", () => {
         realtimeSessionSort: true,
         reviewPromptAnswered: false,
         reviewPromptLikedApp: null,
+        voiceBackend: "elevenlabs",
         voiceAssistantLanguage: null,
         voiceInputLanguage: null,
         ttsProvider: "edge",

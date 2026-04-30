@@ -4,6 +4,10 @@
 
 This release adds responsive foldable screen support and fixes several UI issues.
 
+### Voice
+- Added a realtime voice backend selector with LiveKit support alongside the existing ElevenLabs flow
+- Added LiveKit realtime session plumbing that uses server-managed LiveKit Cloud credentials and avoids storing LiveKit API secrets in app settings
+
 ### Foldable Screen Support
 - Added responsive layout switching for foldable devices — the app now adapts between phone and tablet layouts when folding or unfolding the screen, powered by Unistyles C++ breakpoint detection
 - Improved layout width calculations to react dynamically to screen size changes instead of using static values computed at startup

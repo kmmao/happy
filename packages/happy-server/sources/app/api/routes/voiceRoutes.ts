@@ -1,6 +1,10 @@
 import { z } from "zod";
 import * as crypto from "crypto";
+import { AccessToken, RoomServiceClient, type VideoGrant } from "livekit-server-sdk";
+import { RoomAgentDispatch, RoomConfiguration } from "@livekit/protocol";
+import { LIVEKIT_VERIFY_RATE_LIMIT } from "../utils/enableRateLimit";
 import { type Fastify } from "../types";
+import { activityCache } from "@/app/presence/sessionCache";
 import { log } from "@/utils/log";
 
 const VoiceTokenResponseSchema = z.discriminatedUnion('allowed', [
@@ -21,7 +25,95 @@ const VoiceTokenResponseSchema = z.discriminatedUnion('allowed', [
     }),
 ]);
 
+const LiveKitTokenResponseSchema = z.object({
+    token: z.string(),
+    url: z.string(),
+    roomName: z.string(),
+});
+
+const LiveKitVerifyResponseSchema = z.object({
+    valid: z.boolean(),
+    error: z.string().optional(),
+});
+
+const LIVEKIT_AGENT_NAME = "happy-voice";
+const LIVEKIT_ROOM_PREFIX = "happy-voice";
 const VOICE_FREE_LIMIT_SECONDS = 3600;
+
+function normalizeLiveKitCloudUrl(url: string): string | null {
+    let parsed: URL;
+    try {
+        parsed = new URL(url);
+    } catch {
+        return null;
+    }
+
+    if (parsed.protocol !== 'https:' && parsed.protocol !== 'wss:') {
+        return null;
+    }
+
+    if (parsed.hostname !== 'livekit.cloud' && !parsed.hostname.endsWith('.livekit.cloud')) {
+        return null;
+    }
+
+    parsed.protocol = 'https:';
+    return parsed.toString().replace(/\/$/, '');
+}
+
+function getLiveKitConfig(input?: {
+    userApiKey?: string;
+    userApiSecret?: string;
+    userLivekitUrl?: string;
+}): { apiKey: string; apiSecret: string; url: string } | null {
+    const apiKey = input?.userApiKey || process.env.LIVEKIT_API_KEY;
+    const apiSecret = input?.userApiSecret || process.env.LIVEKIT_API_SECRET;
+    const url = input?.userLivekitUrl || process.env.LIVEKIT_URL;
+
+    if (!apiKey || !apiSecret || !url) {
+        return null;
+    }
+
+    const normalizedUrl = normalizeLiveKitCloudUrl(url);
+    if (!normalizedUrl) {
+        return null;
+    }
+
+    return { apiKey, apiSecret, url: normalizedUrl };
+}
+
+async function createLiveKitToken(input: {
+    apiKey: string;
+    apiSecret: string;
+    identity: string;
+    roomName: string;
+    metadata?: string;
+}): Promise<string> {
+    const token = new AccessToken(input.apiKey, input.apiSecret, {
+        identity: input.identity,
+        metadata: input.metadata,
+        ttl: '10m',
+    });
+
+    const grant: VideoGrant = {
+        room: input.roomName,
+        roomJoin: true,
+        canPublish: true,
+        canSubscribe: true,
+    };
+
+    token.addGrant(grant);
+    token.roomConfig = new RoomConfiguration({
+        agents: [
+            new RoomAgentDispatch({
+                agentName: LIVEKIT_AGENT_NAME,
+                metadata: input.metadata,
+            }),
+        ],
+    });
+
+    return await token.toJwt();
+}
+
 
 /**
  * Agent configuration template — replicated to user accounts automatically.
@@ -290,6 +382,93 @@ export function voiceRoutes(app: Fastify) {
             const msg = isTimeout ? 'Voicebox TTS request timed out' : 'Failed to reach Voicebox service';
             log({ module: 'voice' }, `TTS proxy error: ${error}`);
             return reply.code(502).send({ error: msg });
+        }
+    });
+
+    app.post('/v1/voice/livekit-token', {
+        preHandler: app.authenticate,
+        schema: {
+            body: z.object({
+                sessionId: z.string().min(1),
+                userApiKey: z.string().optional(),
+                userApiSecret: z.string().optional(),
+                userLivekitUrl: z.string().url().optional(),
+            }),
+            response: {
+                200: LiveKitTokenResponseSchema,
+                403: z.object({
+                    error: z.string(),
+                }),
+                500: z.object({
+                    error: z.string(),
+                }),
+            },
+        },
+    }, async (request, reply) => {
+        const userId = request.userId;
+        const { sessionId, userApiKey, userApiSecret, userLivekitUrl } = request.body;
+        const isSessionValid = await activityCache.isSessionValid(sessionId, userId);
+
+        if (!isSessionValid) {
+            return reply.code(403).send({ error: 'Session not found' });
+        }
+
+        const livekitConfig = getLiveKitConfig({ userApiKey, userApiSecret, userLivekitUrl });
+
+        if (!livekitConfig) {
+            return reply.code(500).send({ error: 'LiveKit voice service is not configured' });
+        }
+
+        const roomName = `${LIVEKIT_ROOM_PREFIX}-${userId}-${sessionId}`;
+        const metadata = JSON.stringify({ sessionId });
+        const token = await createLiveKitToken({
+            ...livekitConfig,
+            identity: `${userId}-${sessionId}-${crypto.randomUUID()}`,
+            roomName,
+            metadata,
+        });
+
+        reply.header('Cache-Control', 'no-store');
+        return reply.send({
+            token,
+            url: livekitConfig.url,
+            roomName,
+        });
+    });
+
+    app.post('/v1/voice/livekit-verify', {
+        preHandler: app.authenticate,
+        config: { rateLimit: LIVEKIT_VERIFY_RATE_LIMIT },
+        schema: {
+            body: z.object({
+                apiKey: z.string().min(1),
+                apiSecret: z.string().min(1),
+                livekitUrl: z.string().url().optional(),
+            }),
+            response: {
+                200: LiveKitVerifyResponseSchema,
+            },
+        },
+    }, async (request, reply) => {
+        const { apiKey, apiSecret, livekitUrl } = request.body;
+        const url = livekitUrl || process.env.LIVEKIT_URL;
+
+        if (!url) {
+            return reply.send({ valid: false, error: 'LiveKit URL not configured' });
+        }
+
+        const normalizedUrl = normalizeLiveKitCloudUrl(url);
+
+        if (!normalizedUrl) {
+            return reply.send({ valid: false, error: 'Invalid LiveKit URL' });
+        }
+
+        try {
+            const client = new RoomServiceClient(normalizedUrl, apiKey, apiSecret);
+            await client.listRooms([]);
+            return reply.send({ valid: true });
+        } catch {
+            return reply.send({ valid: false, error: 'Invalid LiveKit credentials' });
         }
     });
 

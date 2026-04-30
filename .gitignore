@@ -64,6 +64,8 @@ progress*.txt
 
 # Python virtual environments
 .venv/
+voice-agent/.venv/
+voice-agent/.env.local
 __pycache__/
 
 # Service output/artifacts

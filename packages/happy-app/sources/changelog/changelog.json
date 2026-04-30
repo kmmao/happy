@@ -6,6 +6,8 @@
         "date": "2026-04-29",
         "summary": "This release adds responsive foldable screen support and fixes several UI issues.",
         "changes": [
+          "Added a realtime voice backend selector with LiveKit support alongside the existing ElevenLabs flow",
+          "Added LiveKit realtime session plumbing that uses server-managed LiveKit Cloud credentials and avoids storing LiveKit API secrets in app settings",
           "Added responsive layout switching for foldable devices — the app now adapts between phone and tablet layouts when folding or unfolding the screen, powered by Unistyles C++ breakpoint detection",
           "Improved layout width calculations to react dynamically to screen size changes instead of using static values computed at startup",
           "Fixed settings overlay scroll issues on Android and smaller screens by replacing the floating overlay with a centered modal",
@@ -13,7 +15,7 @@
           "Fixed a potential crash when the scroll anchor exceeded the message list bounds",
           "Improved message history loading reliability on app restart"
         ],
-        "rawMarkdown": "## 2.18.0 - 2026-04-29\n\n\nThis release adds responsive foldable screen support and fixes several UI issues.\n\n### Foldable Screen Support\n- Added responsive layout switching for foldable devices — the app now adapts between phone and tablet layouts when folding or unfolding the screen, powered by Unistyles C++ breakpoint detection\n- Improved layout width calculations to react dynamically to screen size changes instead of using static values computed at startup\n\n### Settings\n- Fixed settings overlay scroll issues on Android and smaller screens by replacing the floating overlay with a centered modal\n\n### Stability\n- Fixed Firebase configuration for push notifications on Android\n- Fixed a potential crash when the scroll anchor exceeded the message list bounds\n- Improved message history loading reliability on app restart"
+        "rawMarkdown": "## 2.18.0 - 2026-04-29\n\n\nThis release adds responsive foldable screen support and fixes several UI issues.\n\n### Voice\n- Added a realtime voice backend selector with LiveKit support alongside the existing ElevenLabs flow\n- Added LiveKit realtime session plumbing that uses server-managed LiveKit Cloud credentials and avoids storing LiveKit API secrets in app settings\n\n### Foldable Screen Support\n- Added responsive layout switching for foldable devices — the app now adapts between phone and tablet layouts when folding or unfolding the screen, powered by Unistyles C++ breakpoint detection\n- Improved layout width calculations to react dynamically to screen size changes instead of using static values computed at startup\n\n### Settings\n- Fixed settings overlay scroll issues on Android and smaller screens by replacing the floating overlay with a centered modal\n\n### Stability\n- Fixed Firebase configuration for push notifications on Android\n- Fixed a potential crash when the scroll anchor exceeded the message list bounds\n- Improved message history loading reliability on app restart"
       },
       {
         "version": "2.17.0",

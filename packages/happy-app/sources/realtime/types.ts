@@ -4,6 +4,9 @@ export interface VoiceSessionConfig {
     token?: string;
     agentId?: string;
     userId?: string;
+    livekitToken?: string;
+    livekitUrl?: string;
+    livekitRoomName?: string;
 }
 
 export interface VoiceSession {

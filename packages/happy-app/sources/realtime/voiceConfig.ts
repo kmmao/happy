@@ -4,6 +4,27 @@
  */
 export const VOICEBOX_DEFAULT_ENDPOINT = 'http://localhost:17493';
 
+export type VoiceBackend = 'elevenlabs' | 'livekit';
+
+export interface VoiceBackendInfo {
+    id: VoiceBackend;
+    label: string;
+    description: string;
+}
+
+export const VOICE_BACKEND_LIST: readonly VoiceBackendInfo[] = [
+    {
+        id: 'elevenlabs',
+        label: 'ElevenLabs',
+        description: 'Premium conversational AI — current default',
+    },
+    {
+        id: 'livekit',
+        label: 'LiveKit',
+        description: 'Open-source realtime voice AI — 1000 free min/month',
+    },
+] as const;
+
 /**
  * All supported TTS provider identifiers.
  * Mirrors the `ttsProvider` enum in settings.ts.

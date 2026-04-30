@@ -1,8 +1,9 @@
 import type { VoiceSession } from './types';
-import { fetchVoiceToken } from '@/sync/apiVoice';
+import { fetchLiveKitToken, fetchVoiceToken } from '@/sync/apiVoice';
 import { sync } from '@/sync/sync';
 import { Modal } from '@/modal';
 import { TokenStorage } from '@/auth/tokenStorage';
+import { storage } from '@/sync/storage';
 import { t } from '@/text';
 import { requestMicrophonePermission, showMicrophonePermissionDeniedAlert } from '@/utils/microphonePermissions';
 
@@ -31,13 +32,28 @@ export async function startRealtimeSession(sessionId: string, initialContext?: s
             return;
         }
 
+        const voiceBackend = storage.getState().settings.voiceBackend;
+
+        if (voiceBackend === 'livekit') {
+            const response = await fetchLiveKitToken(credentials, sessionId);
+
+            currentSessionId = sessionId;
+            voiceSessionStarted = true;
+
+            await voiceSession.startSession({
+                sessionId,
+                initialContext,
+                livekitToken: response.token,
+                livekitUrl: response.url,
+                livekitRoomName: response.roomName,
+            });
+            return;
+        }
+
         const response = await fetchVoiceToken(credentials, sessionId);
-        console.log('[Voice] fetchVoiceToken response:', response);
 
         if (!response.allowed) {
-            console.log('[Voice] Not allowed, presenting paywall...');
             const result = await sync.presentPaywall();
-            console.log('[Voice] Paywall result:', result);
             if (result.purchased) {
                 await startRealtimeSession(sessionId, initialContext);
             }

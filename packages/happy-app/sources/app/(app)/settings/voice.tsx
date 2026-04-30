@@ -16,8 +16,8 @@ import { t } from "@/text";
 import { TokenStorage } from "@/auth/tokenStorage";
 import { getServerUrl } from "@/sync/serverConfig";
 import { config } from "@/config";
-import { checkVoiceboxConnection } from "@/sync/apiVoice";
-import { VOICEBOX_DEFAULT_ENDPOINT, TTS_PROVIDER_LIST, type TtsProvider } from "@/realtime/voiceConfig";
+import { checkVoiceboxConnection, verifyLiveKitCredentials } from "@/sync/apiVoice";
+import { VOICEBOX_DEFAULT_ENDPOINT, TTS_PROVIDER_LIST, VOICE_BACKEND_LIST, type TtsProvider, type VoiceBackend } from "@/realtime/voiceConfig";
 
 interface ElevenLabsSubscription {
     tier: string;
@@ -121,6 +121,7 @@ function VoiceSettingsScreen() {
     const { theme } = useUnistyles();
     const router = useRouter();
     const [voiceAssistantLanguage] = useSettingMutable("voiceAssistantLanguage");
+    const [voiceBackend, setVoiceBackend] = useSettingMutable("voiceBackend");
     const [ttsProvider, setTtsProvider] = useSettingMutable("ttsProvider");
     const [savedApiKey, setSavedApiKey] = useSettingMutable("elevenLabsApiKey");
 
@@ -169,6 +170,64 @@ function VoiceSettingsScreen() {
         setVbTestStatus("idle");
         setVbTestError(null);
     }, [setSavedVoiceboxEndpoint]);
+
+    // LiveKit BYOK state
+    const [savedLkKey, setSavedLkKey] = useSettingMutable("livekitApiKey");
+    const [savedLkSecret, setSavedLkSecret] = useSettingMutable("livekitApiSecret");
+    const [draftLkKey, setDraftLkKey] = useState(savedLkKey ?? "");
+    const [draftLkSecret, setDraftLkSecret] = useState(savedLkSecret ?? "");
+    const [lkVerifyStatus, setLkVerifyStatus] = useState<SetupStatus>(savedLkKey && savedLkSecret ? "success" : "idle");
+    const [lkVerifyError, setLkVerifyError] = useState<string | null>(null);
+
+    useEffect(() => {
+        setDraftLkKey(savedLkKey ?? "");
+        setDraftLkSecret(savedLkSecret ?? "");
+        if (savedLkKey && savedLkSecret) setLkVerifyStatus("success");
+    }, [savedLkKey, savedLkSecret]);
+
+    const isLkDirty = draftLkKey !== (savedLkKey ?? "") || draftLkSecret !== (savedLkSecret ?? "");
+    const hasLkKey = !!savedLkKey && !!savedLkSecret;
+
+    const handleLkSave = useCallback(async () => {
+        const key = draftLkKey.trim();
+        const secret = draftLkSecret.trim();
+        if (!key || !secret) {
+            setSavedLkKey(null);
+            setSavedLkSecret(null);
+            setLkVerifyStatus("idle");
+            setLkVerifyError(null);
+            return;
+        }
+
+        setLkVerifyStatus("checking");
+        setLkVerifyError(null);
+
+        try {
+            const credentials = await TokenStorage.getCredentials();
+            if (!credentials) throw new Error("Not authenticated");
+            const result = await verifyLiveKitCredentials(credentials, key, secret);
+            if (result.valid) {
+                setSavedLkKey(key);
+                setSavedLkSecret(secret);
+                setLkVerifyStatus("success");
+            } else {
+                setLkVerifyStatus("error");
+                setLkVerifyError(result.error || t("settingsVoice.livekitInvalidCredentials"));
+            }
+        } catch (err) {
+            setLkVerifyStatus("error");
+            setLkVerifyError(err instanceof Error ? err.message : "Verification failed");
+        }
+    }, [draftLkKey, draftLkSecret, setSavedLkKey, setSavedLkSecret]);
+
+    const handleLkClear = useCallback(() => {
+        setDraftLkKey("");
+        setDraftLkSecret("");
+        setSavedLkKey(null);
+        setSavedLkSecret(null);
+        setLkVerifyStatus("idle");
+        setLkVerifyError(null);
+    }, [setSavedLkKey, setSavedLkSecret]);
 
     // Sync draft when saved key changes externally
     useEffect(() => {
@@ -237,6 +296,200 @@ function VoiceSettingsScreen() {
                     onPress={() => router.push("/settings/voice/language")}
                 />
             </ItemGroup>
+
+            <ItemGroup
+                title={t("settingsVoice.voiceBackendTitle")}
+                footer={t("settingsVoice.voiceBackendDescription")}
+            >
+                {VOICE_BACKEND_LIST.map((backend) => {
+                    const isSelected = voiceBackend === backend.id;
+                    return (
+                        <Pressable
+                            key={backend.id}
+                            onPress={() => setVoiceBackend(backend.id as VoiceBackend)}
+                            style={({ pressed }) => ({
+                                flexDirection: "row",
+                                alignItems: "center",
+                                paddingHorizontal: 16,
+                                paddingVertical: 12,
+                                backgroundColor: pressed ? theme.colors.divider : "transparent",
+                                gap: 12,
+                            })}
+                        >
+                            <View style={{
+                                width: 22,
+                                height: 22,
+                                borderRadius: 11,
+                                borderWidth: 2,
+                                borderColor: isSelected ? "#007AFF" : theme.colors.divider,
+                                alignItems: "center",
+                                justifyContent: "center",
+                            }}>
+                                {isSelected && (
+                                    <View style={{
+                                        width: 12,
+                                        height: 12,
+                                        borderRadius: 6,
+                                        backgroundColor: "#007AFF",
+                                    }} />
+                                )}
+                            </View>
+                            <View style={{ flex: 1 }}>
+                                <Text style={{
+                                    fontSize: 16,
+                                    fontWeight: "500",
+                                    color: theme.colors.text,
+                                }}>
+                                    {backend.label}
+                                </Text>
+                                <Text style={{
+                                    fontSize: 13,
+                                    color: theme.colors.textSecondary,
+                                    marginTop: 2,
+                                }}>
+                                    {backend.description}
+                                </Text>
+                            </View>
+                        </Pressable>
+                    );
+                })}
+            </ItemGroup>
+
+            {/* LiveKit BYOK Config — shown when livekit backend is selected */}
+            {voiceBackend === "livekit" && (
+                <ItemGroup
+                    title={t("settingsVoice.livekitConfig")}
+                    footer={t("settingsVoice.livekitConfigDescription")}
+                >
+                    <View style={{ paddingHorizontal: 16, paddingVertical: 12, gap: 12 }}>
+                        <TextInput
+                            style={{
+                                fontSize: 16,
+                                color: theme.colors.input.text,
+                                borderWidth: 1,
+                                borderColor: lkVerifyStatus === "success" ? "#34C759"
+                                    : lkVerifyStatus === "error" ? theme.colors.textDestructive
+                                    : theme.colors.divider,
+                                borderRadius: 8,
+                                paddingHorizontal: 12,
+                                paddingVertical: 10,
+                            }}
+                            placeholder={t("settingsVoice.livekitApiKeyPlaceholder")}
+                            placeholderTextColor={theme.colors.input.placeholder}
+                            value={draftLkKey}
+                            onChangeText={(text) => {
+                                setDraftLkKey(text);
+                                if (lkVerifyStatus !== "idle") setLkVerifyStatus("idle");
+                                setLkVerifyError(null);
+                            }}
+                            autoCapitalize="none"
+                            autoCorrect={false}
+                            editable={lkVerifyStatus !== "checking"}
+                        />
+                        <TextInput
+                            style={{
+                                fontSize: 16,
+                                color: theme.colors.input.text,
+                                borderWidth: 1,
+                                borderColor: lkVerifyStatus === "success" ? "#34C759"
+                                    : lkVerifyStatus === "error" ? theme.colors.textDestructive
+                                    : theme.colors.divider,
+                                borderRadius: 8,
+                                paddingHorizontal: 12,
+                                paddingVertical: 10,
+                            }}
+                            placeholder={t("settingsVoice.livekitApiSecretPlaceholder")}
+                            placeholderTextColor={theme.colors.input.placeholder}
+                            value={draftLkSecret}
+                            onChangeText={(text) => {
+                                setDraftLkSecret(text);
+                                if (lkVerifyStatus !== "idle") setLkVerifyStatus("idle");
+                                setLkVerifyError(null);
+                            }}
+                            secureTextEntry
+                            autoCapitalize="none"
+                            autoCorrect={false}
+                            editable={lkVerifyStatus !== "checking"}
+                        />
+
+                        <View style={{ flexDirection: "row", gap: 8 }}>
+                            <Pressable
+                                onPress={handleLkSave}
+                                disabled={lkVerifyStatus === "checking" || (!isLkDirty && lkVerifyStatus === "success")}
+                                style={({ pressed }) => ({
+                                    flex: 1,
+                                    backgroundColor: lkVerifyStatus === "checking" || (!isLkDirty && lkVerifyStatus === "success")
+                                        ? theme.colors.divider
+                                        : pressed ? "#0066CC" : "#007AFF",
+                                    borderRadius: 8,
+                                    paddingVertical: 10,
+                                    alignItems: "center",
+                                    flexDirection: "row",
+                                    justifyContent: "center",
+                                    gap: 6,
+                                })}
+                            >
+                                {lkVerifyStatus === "checking" ? (
+                                    <ActivityIndicator size="small" color="#fff" />
+                                ) : lkVerifyStatus === "success" && !isLkDirty ? (
+                                    <Ionicons name="checkmark-circle" size={18} color="#fff" />
+                                ) : (
+                                    <Ionicons name="save-outline" size={18} color="#fff" />
+                                )}
+                                <Text style={{ color: "#fff", fontSize: 15, fontWeight: "600" }}>
+                                    {lkVerifyStatus === "checking" ? t("settingsVoice.livekitVerifying")
+                                        : lkVerifyStatus === "success" && !isLkDirty ? t("settingsVoice.livekitVerified")
+                                        : t("settingsVoice.livekitSaveVerify")}
+                                </Text>
+                            </Pressable>
+
+                            {hasLkKey && (
+                                <Pressable
+                                    onPress={handleLkClear}
+                                    disabled={lkVerifyStatus === "checking"}
+                                    style={({ pressed }) => ({
+                                        backgroundColor: pressed ? theme.colors.divider : "transparent",
+                                        borderRadius: 8,
+                                        borderWidth: 1,
+                                        borderColor: theme.colors.divider,
+                                        paddingVertical: 10,
+                                        paddingHorizontal: 16,
+                                        alignItems: "center",
+                                    })}
+                                >
+                                    <Ionicons name="trash-outline" size={18} color={theme.colors.textDestructive} />
+                                </Pressable>
+                            )}
+                        </View>
+                    </View>
+
+                    {lkVerifyStatus === "error" && lkVerifyError && (
+                        <View style={{ paddingHorizontal: 16, paddingBottom: 12 }}>
+                            <Text style={{ fontSize: 14, color: theme.colors.textDestructive }}>
+                                {lkVerifyError}
+                            </Text>
+                        </View>
+                    )}
+
+                    {lkVerifyStatus === "success" && !isLkDirty && (
+                        <View style={{ paddingHorizontal: 16, paddingBottom: 12, flexDirection: "row", alignItems: "center", gap: 6 }}>
+                            <Ionicons name="checkmark-circle" size={16} color="#34C759" />
+                            <Text style={{ fontSize: 14, color: "#34C759" }}>
+                                {t("settingsVoice.livekitVerifySuccess")}
+                            </Text>
+                        </View>
+                    )}
+
+                    {lkVerifyStatus === "idle" && !hasLkKey && (
+                        <View style={{ paddingHorizontal: 16, paddingBottom: 12, flexDirection: "row", alignItems: "flex-start", gap: 8 }}>
+                            <Ionicons name="information-circle-outline" size={16} color={theme.colors.textSecondary} style={{ marginTop: 1 }} />
+                            <Text style={{ fontSize: 13, color: theme.colors.textSecondary, flex: 1 }}>
+                                {t("settingsVoice.livekitServerManagedNote")}
+                            </Text>
+                        </View>
+                    )}
+                </ItemGroup>
+            )}
 
             {/* TTS Provider Selector */}
             <ItemGroup
