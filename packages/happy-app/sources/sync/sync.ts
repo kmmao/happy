@@ -87,10 +87,7 @@ import {
   loadLastSeqs,
   saveLastSeq,
   deleteLastSeq,
-  loadBackfillBoundaries,
-  saveBackfillBoundary,
   deleteBackfillBoundary,
-  type BackfillBoundary,
 } from "./persistence";
 import { initializeTracking, tracking } from "@/track";
 import { parseToken } from "@/utils/parseToken";
@@ -138,10 +135,17 @@ import {
 } from "./apiProjects";
 import { resolveFetchedSessionRpcReady } from "./fetchSessionRpcReady";
 import { recoverSessionMetadataAfterDecrypt } from "./sessionMetadataRecovery";
+import { resolveMessageCursorAdvance } from "./messageCursor";
+import {
+  resolveMessageHistoryFetchStrategy,
+  shouldApplyMessagesImmediately,
+  shouldFetchNewestPageFirst,
+} from "./messageFetchStrategy";
 
 type V3GetSessionMessagesResponse = {
   messages: ApiMessage[];
   hasMore: boolean;
+  totalCount?: number;
 };
 
 type V3PostSessionMessagesResponse = {
@@ -171,7 +175,6 @@ class Sync {
   private sendSync = new Map<string, InvalidateSync>();
   private sendAbortControllers = new Map<string, AbortController>();
   private sessionLastSeq = loadLastSeqs();
-  private backfillBoundaries = loadBackfillBoundaries();
   private pendingOutbox = new Map<string, OutboxMessage[]>();
   private sessionMessageQueue = new Map<string, NormalizedMessage[]>();
   private sessionQueueProcessing = new Set<string>();
@@ -461,19 +464,12 @@ class Sync {
         storage.getState().restoreMessagesFromCache(sessionId, cached);
         if (cached.isTrimmed) {
           // Cache was truncated — older messages are missing.
-          // If we haven't done a full backfill for this session yet in this app
-          // session, clear lastSeq so fetchMessages uses afterSeq=0 and loads
-          // the full history. After the backfill completes, the session is added
-          // to backfilledSessions so subsequent opens within the same app session
-          // use the normal incremental sync path.
-          // Using in-memory tracking (not persisted) ensures every app restart
-          // re-runs the backfill, so users always have access to full history.
+          // Always re-run full backfill for trimmed caches because only the
+          // newest messages are persisted between app launches.
           if (!this.backfilledSessions.has(sessionId)) {
-            // afterSeq will default to 0 → triggers full backfill
             this.sessionLastSeq.delete(sessionId);
             deleteLastSeq(sessionId);
           } else if (!this.sessionLastSeq.has(sessionId)) {
-            // Already backfilled this session — use cached lastSeq for incremental sync
             this.sessionLastSeq.set(sessionId, cached.lastSeq);
           }
         } else if (!this.sessionLastSeq.has(sessionId)) {
@@ -490,7 +486,6 @@ class Sync {
         // cover is no longer guaranteed to be in storage.
         this.sessionLastSeq.delete(sessionId);
         deleteLastSeq(sessionId);
-        this.backfillBoundaries.delete(sessionId);
         deleteBackfillBoundary(sessionId);
         log.log(`💬 Reset lastSeq for ${sessionId} — no cache available`);
       }
@@ -581,7 +576,6 @@ class Sync {
     this.pendingOutbox.delete(sessionId);
     this.sessionLastSeq.delete(sessionId);
     deleteLastSeq(sessionId);
-    this.backfillBoundaries.delete(sessionId);
     deleteBackfillBoundary(sessionId);
     deleteMessageCache(sessionId);
     deleteHistoryComplete(sessionId);
@@ -2097,29 +2091,37 @@ class Sync {
       }
 
       const initialAfterSeq = this.sessionLastSeq.get(sessionId) ?? 0;
+      const fetchStrategy = resolveMessageHistoryFetchStrategy({
+        platformOS: Platform.OS,
+        initialAfterSeq,
+      });
+      const shouldApplyImmediately = shouldApplyMessagesImmediately(fetchStrategy);
       let afterSeq = initialAfterSeq;
       let hasMore = true;
       let totalNormalized = 0;
+      let totalProcessedMessages = 0;
       let isFirstBatch = true;
+      let serverTotalCount: number | undefined;
+      let blockedByUnprocessedMessage = false;
+      let pendingCursorSeq: number | null = null;
 
       const historySignalEntries: Array<{
         seq: number;
         content: RawRecord | null | undefined;
       }> = [];
+      const pendingNormalizedMessages: NormalizedMessage[] = [];
+      const applyBatch = (messages: NormalizedMessage[]) => {
+        if (messages.length === 0) {
+          return;
+        }
+        if (shouldApplyImmediately) {
+          this.applyMessages(sessionId, messages);
+        } else {
+          pendingNormalizedMessages.push(...messages);
+        }
+      };
 
-      // When starting from seq 0 (no cache, no persisted lastSeq), fetch the
-      // NEWEST messages first using reverse pagination (before_seq). This way
-      // the user sees the latest content immediately instead of waiting for
-      // all historical messages to load.
-      //
-      // The `boundary` tracks the seq range of the newest batch that has
-      // already been applied — forward backfill must stop at boundary.minSeq-1
-      // since [boundary.minSeq, boundary.maxSeq] is already in storage.
-      // Restored from persistence so an interrupted backfill resumes with the
-      // correct stop-bound rather than re-fetching the already-applied tail.
-      let boundary: BackfillBoundary | null =
-        this.backfillBoundaries.get(sessionId) ?? null;
-      if (afterSeq === 0) {
+      if (shouldFetchNewestPageFirst(fetchStrategy)) {
         const newestResponse = await apiSocket.request(
           `/v3/sessions/${sessionId}/messages?before_seq=2147483647&limit=300`,
         );
@@ -2130,78 +2132,49 @@ class Sync {
           this.cleanupSessionLocally(sessionId);
           throw new NonRetryableError(`Session ${sessionId} not found`);
         }
-        if (newestResponse.ok) {
-          const newestData =
-            (await newestResponse.json()) as V3GetSessionMessagesResponse;
-          const newestMessages = Array.isArray(newestData.messages)
-            ? newestData.messages
-            : [];
-          if (newestMessages.length > 0) {
-            const decryptResult = await this.decryptAndNormalizeBatch(
-              encryption,
-              newestMessages,
-              sessionId,
-            );
-            const normalized = decryptResult.normalized;
-            historySignalEntries.push(...decryptResult.sequencedContents);
+        if (!newestResponse.ok) {
+          throw new Error(
+            `Failed to fetch messages for ${sessionId}: ${newestResponse.status}`,
+          );
+        }
+        const newestData =
+          (await newestResponse.json()) as V3GetSessionMessagesResponse;
+        const newestMessages = Array.isArray(newestData.messages)
+          ? newestData.messages
+          : [];
+        if (newestMessages.length > 0) {
+          const decryptResult = await this.decryptAndNormalizeBatch(
+            encryption,
+            newestMessages,
+            sessionId,
+          );
+          historySignalEntries.push(...decryptResult.sequencedContents);
+          totalNormalized += decryptResult.normalized.length;
+          totalProcessedMessages += decryptResult.processedSeqs.length;
+          applyBatch(decryptResult.normalized);
 
-            totalNormalized += normalized.length;
-            if (normalized.length > 0) {
-              this.applyMessages(sessionId, normalized);
-            }
-            storage.getState().applyMessagesLoaded(sessionId);
-            isFirstBatch = false;
-
-            // Track the seq range covered by the newest batch.
-            // Forward pagination will fill in gaps (if any) below this range.
-            let minNewestSeq = Infinity;
-            let maxNewestSeq = 0;
-            for (const msg of newestMessages) {
-              if (msg.seq < minNewestSeq) minNewestSeq = msg.seq;
-              if (msg.seq > maxNewestSeq) maxNewestSeq = msg.seq;
-            }
-
-            // If there are older messages, backfill with forward pagination
-            // bounded above by minNewestSeq. The newest batch was applied to
-            // storage, but the cursor stays at 0 until backfill reaches the
-            // lower edge of that batch — persisting intermediate cursors is
-            // still safe because each forward batch is applied immediately
-            // (see below), so interrupted backfills resume from the last
-            // fully-applied seq instead of restarting from 0. The boundary
-            // itself is persisted too, so the stop-bound survives crashes.
-            if (newestData.hasMore) {
-              log.log(
-                `💬 fetchMessages: newest batch loaded (seq ${minNewestSeq}-${maxNewestSeq}), backfilling older messages`,
-              );
-              boundary = {
-                minSeq: minNewestSeq,
-                maxSeq: maxNewestSeq,
-                updatedAt: Date.now(),
-              };
-              this.backfillBoundaries.set(sessionId, boundary);
-              saveBackfillBoundary(sessionId, boundary);
-              // afterSeq stays at 0, forward pagination will fill the gap
-              // [1, minNewestSeq - 1]
+          const cursorAdvance = resolveMessageCursorAdvance({
+            afterSeq,
+            rawSeqs: newestMessages.map((message) => message.seq),
+            processedSeqs: decryptResult.processedSeqs,
+          });
+          if (cursorAdvance.cursorSeq !== null) {
+            if (shouldApplyImmediately) {
+              this.sessionLastSeq.set(sessionId, cursorAdvance.cursorSeq);
+              saveLastSeq(sessionId, cursorAdvance.cursorSeq);
             } else {
-              // All messages fit in one batch, no more to fetch
-              this.sessionLastSeq.set(sessionId, maxNewestSeq);
-              saveLastSeq(sessionId, maxNewestSeq);
-              hasMore = false;
+              pendingCursorSeq = cursorAdvance.cursorSeq;
             }
           }
+          if (cursorAdvance.blockedByUnprocessedSeq) {
+            blockedByUnprocessedMessage = true;
+          }
         }
+        hasMore = false;
+        isFirstBatch = false;
       }
 
-      // Show backfill indicator while filling the gap below the newest batch.
-      // Only fires when boundary !== null (first-load of session with > 300 messages).
-      const isBackfillOperation = boundary !== null;
-      if (isBackfillOperation) {
-        storage.getState().setSessionBackfilling(sessionId, true);
-      }
-      try {
       while (hasMore) {
-        // Server caps limit at 500 (v3SessionRoutes getMessagesQuerySchema).
-        // Larger pages cut round-trips on long sessions by ~5x.
         const response = await apiSocket.request(
           `/v3/sessions/${sessionId}/messages?after_seq=${afterSeq}&limit=500`,
         );
@@ -2219,81 +2192,54 @@ class Sync {
         }
         const data = (await response.json()) as V3GetSessionMessagesResponse;
         const messages = Array.isArray(data.messages) ? data.messages : [];
-
-        let maxSeq = afterSeq;
-        for (const message of messages) {
-          if (message.seq > maxSeq) {
-            maxSeq = message.seq;
-          }
-        }
-
         const decryptResult = await this.decryptAndNormalizeBatch(
           encryption,
           messages,
           sessionId,
         );
-        const batchNormalized = decryptResult.normalized;
         historySignalEntries.push(...decryptResult.sequencedContents);
-
-        totalNormalized += batchNormalized.length;
-
-        // Apply every batch immediately. This makes messages durable in
-        // storage so the persisted cursor (below) cannot race ahead of
-        // applied messages, and gives the user progressive loading feedback
-        // on long sessions instead of a long silent gap.
-        if (batchNormalized.length > 0) {
-          this.applyMessages(sessionId, batchNormalized);
-        }
-        if (isFirstBatch) {
+        totalNormalized += decryptResult.normalized.length;
+        totalProcessedMessages += decryptResult.processedSeqs.length;
+        applyBatch(decryptResult.normalized);
+        if (isFirstBatch && shouldApplyImmediately) {
           storage.getState().applyMessagesLoaded(sessionId);
           isFirstBatch = false;
         }
 
-        // Persist the cursor after each batch is applied. Intermediate
-        // persistence is safe because applyMessages above has already made
-        // the batch durable; an interrupted backfill will resume from the
-        // last fully-applied seq rather than redo everything from 0.
-        this.sessionLastSeq.set(sessionId, maxSeq);
-        saveLastSeq(sessionId, maxSeq);
+        const cursorAdvance = resolveMessageCursorAdvance({
+          afterSeq,
+          rawSeqs: messages.map((message) => message.seq),
+          processedSeqs: decryptResult.processedSeqs,
+        });
+        if (cursorAdvance.cursorSeq !== null) {
+          this.sessionLastSeq.set(sessionId, cursorAdvance.cursorSeq);
+          saveLastSeq(sessionId, cursorAdvance.cursorSeq);
+        }
 
         hasMore = !!data.hasMore;
-        // Backfill stops once the gap below the reverse-pagination newest
-        // batch is filled. Messages in [boundary.minSeq, boundary.maxSeq] are
-        // already applied, so we don't need to re-fetch them via forward
-        // pagination. Boundary may come from either this call's reverse
-        // pagination OR from persistence (a prior interrupted attempt), so
-        // the stop-bound is correct across crashes and Web reload paths too.
-        if (boundary && maxSeq >= boundary.minSeq - 1) {
-          hasMore = false;
+        if (!hasMore && data.totalCount !== undefined) {
+          serverTotalCount = data.totalCount;
         }
-        if (hasMore && maxSeq === afterSeq) {
-          // API returned hasMore=true but no new messages (empty page).
-          // Skip past current seq to avoid infinite loop.
+        if (cursorAdvance.blockedByUnprocessedSeq) {
+          blockedByUnprocessedMessage = true;
+          log.warn(
+            `⚠️ fetchMessages: stopped at seq ${cursorAdvance.nextAfterSeq} for ${sessionId} because a message could not be processed`,
+          );
+          hasMore = false;
+        } else if (hasMore && cursorAdvance.stalled) {
           log.log(
             `💬 fetchMessages: pagination stalled at seq ${afterSeq} for ${sessionId}, advancing by 1`,
           );
-          afterSeq = maxSeq + 1;
-        } else {
-          afterSeq = maxSeq;
         }
-      }
-      } finally {
-        if (isBackfillOperation) {
-          storage.getState().setSessionBackfilling(sessionId, false);
-        }
+        afterSeq = cursorAdvance.nextAfterSeq;
       }
 
-      // After the forward backfill fills the gap below the newest batch,
-      // jump the cursor past the already-applied newest batch and clear the
-      // boundary so future incremental fetches start from the true tail.
-      if (boundary) {
-        const currentSeq = this.sessionLastSeq.get(sessionId) ?? 0;
-        if (boundary.maxSeq > currentSeq) {
-          this.sessionLastSeq.set(sessionId, boundary.maxSeq);
-          saveLastSeq(sessionId, boundary.maxSeq);
-        }
-        this.backfillBoundaries.delete(sessionId);
-        deleteBackfillBoundary(sessionId);
+      if (!shouldApplyImmediately && pendingNormalizedMessages.length > 0) {
+        this.applyMessages(sessionId, pendingNormalizedMessages);
+      }
+      if (!shouldApplyImmediately && pendingCursorSeq !== null) {
+        this.sessionLastSeq.set(sessionId, pendingCursorSeq);
+        saveLastSeq(sessionId, pendingCursorSeq);
       }
 
       // Surface side-channel session signals after all messages are merged in seq order.
@@ -2316,12 +2262,22 @@ class Sync {
       // If this was a full history fetch (afterSeq started at 0), mark the
       // session as backfilled so subsequent opens within this app session use
       // incremental sync only (avoids redundant re-backfill within same session).
-      if (initialAfterSeq === 0) {
+      if (initialAfterSeq === 0 && !blockedByUnprocessedMessage) {
         this.backfilledSessions.add(sessionId);
       }
       log.log(
         `💬 fetchMessages completed for session ${sessionId} - processed ${totalNormalized} messages`,
       );
+
+      if (
+        initialAfterSeq === 0 &&
+        serverTotalCount !== undefined &&
+        totalProcessedMessages < serverTotalCount
+      ) {
+        log.warn(
+          `⚠️ fetchMessages: incomplete history for ${sessionId} — processed ${totalProcessedMessages}/${serverTotalCount} messages (${serverTotalCount - totalProcessedMessages} missing, likely decrypt failures)`,
+        );
+      }
 
       // Fetch cumulative usage baseline from server (non-blocking)
       if (this.credentials) {
@@ -2845,15 +2801,23 @@ class Sync {
   ): Promise<{
     normalized: NormalizedMessage[];
     sequencedContents: Array<{ seq: number; content: RawRecord | null | undefined }>;
+    processedSeqs: number[];
   }> {
     const decryptedMessages = await encryption.decryptMessages(rawMessages);
     const normalized: NormalizedMessage[] = [];
     const sequencedContents: Array<{ seq: number; content: RawRecord | null | undefined }> = [];
     let decryptFailCount = 0;
+    const processedSeqs: number[] = [];
+    const failedSeqs: number[] = [];
     for (let i = 0; i < decryptedMessages.length; i++) {
       const decrypted = decryptedMessages[i];
       const rawMessage = rawMessages[i];
-      if (!decrypted) { decryptFailCount++; continue; }
+      if (!decrypted || decrypted.content === null) {
+        decryptFailCount++;
+        failedSeqs.push(rawMessage.seq);
+        continue;
+      }
+      processedSeqs.push(rawMessage.seq);
       sequencedContents.push({ seq: rawMessage.seq, content: decrypted.content });
       const msg = normalizeRawMessage(
         decrypted.id,
@@ -2865,10 +2829,10 @@ class Sync {
     }
     if (decryptFailCount > 0) {
       log.warn(
-        `⚠️ ${decryptFailCount}/${rawMessages.length} messages failed to decrypt for session ${sessionId ?? "unknown"} (possible encryption key mismatch after session reconnect)`,
+        `⚠️ ${decryptFailCount}/${rawMessages.length} messages failed to decrypt for session ${sessionId ?? "unknown"} seqs=[${failedSeqs.join(",")}] (possible encryption key mismatch after session reconnect)`,
       );
     }
-    return { normalized, sequencedContents };
+    return { normalized, sequencedContents, processedSeqs };
   }
 
   private applyMessages = (

@@ -117,6 +117,7 @@ export function deleteMessageCache(sessionId: string): void {
 
   try {
     mmkv.delete(`${CACHE_PREFIX}${sessionId}`);
+    mmkv.delete(`${HISTORY_COMPLETE_PREFIX}${sessionId}`);
     removeCacheIndexEntry(mmkv, sessionId);
   } catch (error) {
     log.log(`Failed to delete message cache for ${sessionId}: ${error}`);
@@ -185,6 +186,7 @@ function updateCacheIndex(mmkv: MMKV, sessionId: string): void {
     const toEvict = sorted.slice(0, sorted.length - MAX_CACHED_SESSIONS);
     for (const entry of toEvict) {
       mmkv.delete(`${CACHE_PREFIX}${entry.sessionId}`);
+      mmkv.delete(`${HISTORY_COMPLETE_PREFIX}${entry.sessionId}`);
     }
     saveCacheIndex(mmkv, sorted.slice(sorted.length - MAX_CACHED_SESSIONS));
   } else {

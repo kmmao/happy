@@ -144,6 +144,14 @@ const {
         return rows.map((row) => selectFields(row as unknown as Record<string, unknown>, args?.select));
     });
 
+    const sessionMessageCount = vi.fn(async (args: any) => {
+        let rows = [...state.messages];
+        if (args?.where?.sessionId) {
+            rows = rows.filter((message) => message.sessionId === args.where.sessionId);
+        }
+        return rows.length;
+    });
+
     const sessionMessageCreate = vi.fn(async (args: any) => {
         const createdAt = new Date(state.nowMs);
         state.nowMs += 1;
@@ -167,6 +175,7 @@ const {
         },
         sessionMessage: {
             findMany: sessionMessageFindMany,
+            count: sessionMessageCount,
             create: sessionMessageCreate
         },
         account: {
@@ -184,6 +193,7 @@ const {
         },
         sessionMessage: {
             findMany: sessionMessageFindMany,
+            count: sessionMessageCount,
             create: sessionMessageCreate
         },
         $transaction: vi.fn(async (fn: any) => fn(txClient))
@@ -311,6 +321,7 @@ describe("v3SessionRoutes", () => {
         const body3 = page3.json();
         expect(body3.messages.map((message: any) => message.seq)).toEqual([5]);
         expect(body3.hasMore).toBe(false);
+        expect(body3.totalCount).toBe(5);
     });
 
     it("returns empty results for empty sessions and after_seq beyond latest", async () => {
