@@ -137,17 +137,6 @@ export const SettingsSchema = z.object({
     .describe(
       "Language for STT voice input (null = auto from device locale, e.g. 'en-US', 'zh-CN', 'zh-TW')",
     ),
-  ttsProvider: z
-    .enum(["edge", "elevenlabs", "voicebox", "browser-web-speech"])
-    .describe(
-      "TTS provider: 'edge' (free, default), 'elevenlabs' (paid, user's own API key), 'voicebox' (local Voicebox service), or 'browser-web-speech' (zero-cost browser Web Speech API)",
-    ),
-  voiceboxEndpoint: z
-    .string()
-    .nullable()
-    .describe(
-      "Voicebox local TTS service endpoint URL (null uses default http://localhost:17493)",
-    ),
   livekitApiKey: z
     .string()
     .nullable()
@@ -156,6 +145,10 @@ export const SettingsSchema = z.object({
     .string()
     .nullable()
     .describe("User's own LiveKit Cloud API Secret (BYOK)"),
+  livekitWssUrl: z
+    .string()
+    .nullable()
+    .describe("User's own LiveKit Cloud WSS URL for BYOK (e.g. wss://xxx.livekit.cloud)"),
   elevenLabsApiKey: z
     .string()
     .nullable()
@@ -432,10 +425,9 @@ export const settingsDefaults: Settings = {
   voiceBackend: "elevenlabs",
   voiceAssistantLanguage: null,
   voiceInputLanguage: null,
-  ttsProvider: "edge",
-  voiceboxEndpoint: null,
   livekitApiKey: null,
   livekitApiSecret: null,
+  livekitWssUrl: null,
   elevenLabsApiKey: null,
   elevenLabsVoiceId: null,
   preferredLanguage: null,

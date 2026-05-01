@@ -1154,12 +1154,12 @@ const styles = StyleSheet.create((theme) => ({
   },
   agentEventContainer: {
     marginHorizontal: 8,
-    alignItems: "center",
     paddingVertical: 8,
   },
   agentEventText: {
     color: theme.colors.agentEventText,
     fontSize: 14,
+    textAlign: "center",
   },
   limitReachedContainer: {
     marginHorizontal: 16,
