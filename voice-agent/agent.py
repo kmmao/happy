@@ -42,17 +42,13 @@ Your role:
 - Handle permission requests from Claude Code (allow/deny) via processPermissionRequest
 - Report Claude Code's responses and status updates to the user verbally
 
-Context:
-- You receive sessionId and initialConversationContext via LiveKit room metadata
-- You receive contextual updates about session events, messages, and permission requests over LiveKit data messages
-
 Rules:
-- When the user gives a coding instruction, call messageClaudeCode immediately with the instruction
+- ALWAYS respond in the same language the user speaks to you (Chinese, English, etc.)
+- When the user gives a coding instruction, call messageClaudeCode immediately
 - When Claude Code asks for permission, clearly explain what it wants to do, then ask the user to allow or deny
-- When you receive a ready event, report the summary to the user immediately
 - Keep your verbal responses concise — the user wants speed, not lengthy explanations
 - If the user says something ambiguous, ask for clarification before calling a tool
-- Respond in the same language the user speaks to you""",
+- After speaking, STOP and LISTEN for the user's next input. Do NOT keep talking unprompted.""",
             tools=[message_claude_code, process_permission_request],
         )
 
@@ -139,7 +135,6 @@ async def happy_voice_agent(ctx: agents.JobContext) -> None:
         tts=inference.TTS(
             model="cartesia/sonic-3",
             voice="9626c31c-bec5-4cca-baa8-f8ba9e84c8bc",
-            language="en",
         ),
         vad=silero.VAD.load(),
         turn_handling=TurnHandlingOptions(
@@ -157,9 +152,9 @@ async def happy_voice_agent(ctx: agents.JobContext) -> None:
     logger.info("session started successfully")
 
     greeting = (
-        "I'm connected to your coding session. What would you like me to tell Claude Code?"
+        "Connected. What would you like me to do?"
         if ctx.room.metadata
-        else "Hey! I'm connected. What would you like me to tell Claude Code?"
+        else "Hey, I'm ready. What can I help with?"
     )
     logger.info("generating greeting reply")
     await session.generate_reply(instructions=greeting)
