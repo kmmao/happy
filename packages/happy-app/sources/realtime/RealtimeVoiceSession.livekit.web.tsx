@@ -25,7 +25,13 @@ class LiveKitVoiceSessionImpl implements VoiceSession {
 
         storage.getState().setRealtimeStatus('connecting');
 
-        const room = new Room();
+        audioElements.forEach(el => el.remove());
+        audioElements.length = 0;
+
+        const room = new Room({
+            audioCaptureDefaults: { autoGainControl: true, noiseSuppression: true, echoCancellation: true },
+            audioOutput: { deviceId: 'default' },
+        });
         roomRef = room;
 
         room.registerRpcMethod('messageClaudeCode', (data) =>
@@ -48,8 +54,11 @@ class LiveKitVoiceSessionImpl implements VoiceSession {
             if (track.kind === Track.Kind.Audio) {
                 const el = track.attach();
                 el.id = `livekit-audio-${track.sid}`;
+                el.autoplay = true;
+                el.setAttribute('playsinline', 'true');
                 document.body.appendChild(el);
                 audioElements.push(el);
+                el.play().catch(() => {});
             }
         });
         room.on(RoomEvent.TrackUnsubscribed, (track: RemoteTrack) => {
@@ -59,7 +68,9 @@ class LiveKitVoiceSessionImpl implements VoiceSession {
         });
 
         await room.connect(config.livekitUrl, config.livekitToken);
+        console.log('[LiveKit] connected, enabling microphone...');
         await room.localParticipant.setMicrophoneEnabled(true);
+        console.log('[LiveKit] microphone enabled, audio tracks:', room.localParticipant.audioTrackPublications.size);
 
         if (config.initialContext) {
             this.sendContextualUpdate(config.initialContext);
