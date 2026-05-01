@@ -34,6 +34,7 @@ const LiveKitTokenResponseSchema = z.object({
 const LiveKitVerifyResponseSchema = z.object({
     valid: z.boolean(),
     error: z.string().optional(),
+    activeRooms: z.number().optional(),
 });
 
 const LIVEKIT_AGENT_NAME = "happy-voice";
@@ -465,8 +466,8 @@ export function voiceRoutes(app: Fastify) {
 
         try {
             const client = new RoomServiceClient(normalizedUrl, apiKey, apiSecret);
-            await client.listRooms([]);
-            return reply.send({ valid: true });
+            const rooms = await client.listRooms([]);
+            return reply.send({ valid: true, activeRooms: rooms.length });
         } catch {
             return reply.send({ valid: false, error: 'Invalid LiveKit credentials' });
         }

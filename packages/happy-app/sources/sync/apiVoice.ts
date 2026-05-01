@@ -78,7 +78,7 @@ export async function verifyLiveKitCredentials(
     apiKey: string,
     apiSecret: string,
     livekitUrl?: string
-): Promise<{ valid: boolean; error?: string }> {
+): Promise<{ valid: boolean; error?: string; activeRooms?: number }> {
     const serverUrl = getServerUrl();
     const response = await fetch(`${serverUrl}/v1/voice/livekit-verify`, {
         method: 'POST',

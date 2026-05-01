@@ -133,6 +133,7 @@ function VoiceSettingsScreen() {
     const [draftLkUrl, setDraftLkUrl] = useState(savedLkWssUrl ?? "");
     const [lkVerifyStatus, setLkVerifyStatus] = useState<SetupStatus>(savedLkKey && savedLkSecret ? "success" : "idle");
     const [lkVerifyError, setLkVerifyError] = useState<string | null>(null);
+    const [lkActiveRooms, setLkActiveRooms] = useState<number | null>(null);
 
     useEffect(() => {
         setDraftLkKey(savedLkKey ?? "");
@@ -174,6 +175,7 @@ function VoiceSettingsScreen() {
                 setSavedLkSecret(secret);
                 setSavedLkWssUrl(url);
                 setLkVerifyStatus("success");
+                setLkActiveRooms(result.activeRooms ?? null);
             } else {
                 setLkVerifyStatus("error");
                 setLkVerifyError(result.error || t("settingsVoice.livekitInvalidCredentials"));
@@ -463,11 +465,43 @@ function VoiceSettingsScreen() {
                     )}
 
                     {lkVerifyStatus === "success" && !isLkDirty && (
-                        <View style={{ paddingHorizontal: 16, paddingBottom: 12, flexDirection: "row", alignItems: "center", gap: 6 }}>
-                            <Ionicons name="checkmark-circle" size={16} color="#34C759" />
-                            <Text style={{ fontSize: 14, color: "#34C759" }}>
-                                {t("settingsVoice.livekitVerifySuccess")}
-                            </Text>
+                        <View style={{ paddingHorizontal: 16, paddingBottom: 12, gap: 8 }}>
+                            <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                                <Ionicons name="checkmark-circle" size={16} color="#34C759" />
+                                <Text style={{ fontSize: 14, color: "#34C759" }}>
+                                    {t("settingsVoice.livekitVerifySuccess")}
+                                </Text>
+                            </View>
+                            <View style={{ gap: 4 }}>
+                                {savedLkWssUrl && (
+                                    <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                                        <Text style={{ fontSize: 13, color: theme.colors.textSecondary }}>
+                                            {t("settingsVoice.livekitProject")}
+                                        </Text>
+                                        <Text style={{ fontSize: 13, color: theme.colors.text }}>
+                                            {savedLkWssUrl.replace(/^wss?:\/\//, "").replace(/\.livekit\.cloud$/, "")}
+                                        </Text>
+                                    </View>
+                                )}
+                                {lkActiveRooms !== null && (
+                                    <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                                        <Text style={{ fontSize: 13, color: theme.colors.textSecondary }}>
+                                            {t("settingsVoice.livekitActiveRooms")}
+                                        </Text>
+                                        <Text style={{ fontSize: 13, color: theme.colors.text }}>
+                                            {lkActiveRooms}
+                                        </Text>
+                                    </View>
+                                )}
+                                <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                                    <Text style={{ fontSize: 13, color: theme.colors.textSecondary }}>
+                                        {t("settingsVoice.livekitMode")}
+                                    </Text>
+                                    <Text style={{ fontSize: 13, color: "#007AFF" }}>
+                                        BYOK
+                                    </Text>
+                                </View>
+                            </View>
                         </View>
                     )}
 
