@@ -134,7 +134,7 @@ async def happy_voice_agent(ctx: agents.JobContext) -> None:
 
     logger.info("creating AgentSession with inference STT/LLM/TTS")
     session = AgentSession(
-        stt=inference.STT(model="deepgram/nova-3"),
+        stt=inference.STT(model="deepgram/nova-3", language="multi"),
         llm=inference.LLM(model="openai/gpt-4.1-mini"),
         tts=inference.TTS(
             model="cartesia/sonic-3",
@@ -155,11 +155,7 @@ async def happy_voice_agent(ctx: agents.JobContext) -> None:
     await session.start(room=ctx.room, agent=HappyVoiceAssistant())
     logger.info("session started successfully")
 
-    greeting = (
-        "Connected. What would you like me to do?"
-        if ctx.room.metadata
-        else "Hey, I'm ready. What can I help with?"
-    )
+    greeting = "Ready."
     logger.info("generating greeting reply")
     await session.generate_reply(instructions=greeting)
     logger.info("greeting reply generated")
