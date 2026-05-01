@@ -2451,6 +2451,9 @@ class Sync {
       await handleUpdateSessionUpdate(updateData, updateData.body, ctx);
     } else if (updateData.body.t === "update-account") {
       await handleUpdateAccountUpdate(updateData, updateData.body, ctx);
+      if (Object.keys(this.pendingSettings).length > 0) {
+        storage.getState().applySettingsLocal(this.pendingSettings);
+      }
     } else if (updateData.body.t === "update-machine") {
       await handleUpdateMachineUpdate(updateData, updateData.body, ctx);
     } else if (updateData.body.t === "relationship-updated") {
