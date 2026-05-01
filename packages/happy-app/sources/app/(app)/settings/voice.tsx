@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from "react";
-import { TextInput, View, Text, ActivityIndicator, Pressable } from "react-native";
+import { TextInput, View, Text, ActivityIndicator, Pressable, Linking } from "react-native";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { Item } from "@/components/Item";
@@ -134,6 +134,8 @@ function VoiceSettingsScreen() {
     const [lkVerifyStatus, setLkVerifyStatus] = useState<SetupStatus>(savedLkKey && savedLkSecret ? "success" : "idle");
     const [lkVerifyError, setLkVerifyError] = useState<string | null>(null);
     const [lkActiveRooms, setLkActiveRooms] = useState<number | null>(null);
+    const [lkTotalParticipants, setLkTotalParticipants] = useState<number | null>(null);
+    const [lkDashboardUrl, setLkDashboardUrl] = useState<string | null>(null);
 
     useEffect(() => {
         setDraftLkKey(savedLkKey ?? "");
@@ -176,6 +178,8 @@ function VoiceSettingsScreen() {
                 setSavedLkWssUrl(url);
                 setLkVerifyStatus("success");
                 setLkActiveRooms(result.activeRooms ?? null);
+                setLkTotalParticipants(result.totalParticipants ?? null);
+                setLkDashboardUrl(result.cloudDashboardUrl ?? null);
             } else {
                 setLkVerifyStatus("error");
                 setLkVerifyError(result.error || t("settingsVoice.livekitInvalidCredentials"));
@@ -489,7 +493,7 @@ function VoiceSettingsScreen() {
                                             {t("settingsVoice.livekitActiveRooms")}
                                         </Text>
                                         <Text style={{ fontSize: 13, color: theme.colors.text }}>
-                                            {lkActiveRooms}
+                                            {lkActiveRooms} {lkTotalParticipants !== null ? `(${lkTotalParticipants} ${t("settingsVoice.livekitParticipants")})` : ""}
                                         </Text>
                                     </View>
                                 )}
@@ -501,6 +505,13 @@ function VoiceSettingsScreen() {
                                         BYOK
                                     </Text>
                                 </View>
+                                {lkDashboardUrl && (
+                                    <Pressable onPress={() => Linking.openURL(lkDashboardUrl)}>
+                                        <Text style={{ fontSize: 13, color: "#007AFF", marginTop: 4 }}>
+                                            {t("settingsVoice.livekitViewUsage")} →
+                                        </Text>
+                                    </Pressable>
+                                )}
                             </View>
                         </View>
                     )}

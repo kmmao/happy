@@ -35,6 +35,8 @@ const LiveKitVerifyResponseSchema = z.object({
     valid: z.boolean(),
     error: z.string().optional(),
     activeRooms: z.number().optional(),
+    totalParticipants: z.number().optional(),
+    cloudDashboardUrl: z.string().optional(),
 });
 
 const LIVEKIT_AGENT_NAME = "happy-voice";
@@ -467,7 +469,14 @@ export function voiceRoutes(app: Fastify) {
         try {
             const client = new RoomServiceClient(normalizedUrl, apiKey, apiSecret);
             const rooms = await client.listRooms([]);
-            return reply.send({ valid: true, activeRooms: rooms.length });
+            const totalParticipants = rooms.reduce((sum, r) => sum + r.numParticipants, 0);
+            const projectSlug = normalizedUrl.replace(/^https?:\/\//, "").replace(/\.livekit\.cloud$/, "");
+            return reply.send({
+                valid: true,
+                activeRooms: rooms.length,
+                totalParticipants,
+                cloudDashboardUrl: `https://cloud.livekit.io/projects/${projectSlug}`,
+            });
         } catch {
             return reply.send({ valid: false, error: 'Invalid LiveKit credentials' });
         }

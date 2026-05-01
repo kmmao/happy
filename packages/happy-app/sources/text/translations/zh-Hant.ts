@@ -1345,6 +1345,8 @@ export const zhHant: TranslationStructure = {
     livekitProject: "專案",
     livekitActiveRooms: "活躍房間",
     livekitMode: "模式",
+    livekitParticipants: "位參與者",
+    livekitViewUsage: "在 LiveKit Cloud 查看用量",
     livekitInvalidCredentials: "無效的 LiveKit 憑證",
     elevenLabsApiKey: "API Key",
     elevenLabsApiKeyPlaceholder: "輸入您的 ElevenLabs API Key",

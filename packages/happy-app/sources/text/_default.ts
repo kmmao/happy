@@ -1380,6 +1380,8 @@ export const en = {
     livekitProject: "Project",
     livekitActiveRooms: "Active rooms",
     livekitMode: "Mode",
+    livekitParticipants: "participants",
+    livekitViewUsage: "View usage on LiveKit Cloud",
     livekitInvalidCredentials: "Invalid LiveKit credentials",
     elevenLabsApiKey: "API Key",
     elevenLabsApiKeyPlaceholder: "Enter your ElevenLabs API key",

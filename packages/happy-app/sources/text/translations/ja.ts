@@ -1515,6 +1515,8 @@ export const ja: TranslationStructure = {
     livekitProject: "プロジェクト",
     livekitActiveRooms: "アクティブルーム",
     livekitMode: "モード",
+    livekitParticipants: "人の参加者",
+    livekitViewUsage: "LiveKit Cloud で使用量を確認",
     livekitInvalidCredentials: "無効な LiveKit 認証情報",
     elevenLabsApiKey: "API キー",
     elevenLabsApiKeyPlaceholder: "ElevenLabs API キーを入力",

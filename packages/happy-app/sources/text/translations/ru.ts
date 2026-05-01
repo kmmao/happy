@@ -1406,6 +1406,8 @@ export const ru: TranslationStructure = {
     livekitProject: "Проект",
     livekitActiveRooms: "Активные комнаты",
     livekitMode: "Режим",
+    livekitParticipants: "участников",
+    livekitViewUsage: "Посмотреть использование в LiveKit Cloud",
     livekitInvalidCredentials: "Недействительные учётные данные LiveKit",
     elevenLabsApiKey: "API-ключ",
     elevenLabsApiKeyPlaceholder: "Введите ваш API-ключ ElevenLabs",
