@@ -1843,6 +1843,12 @@ class Sync {
     // Apply settings to storage
     storage.getState().applySettings(parsedSettings, data.settingsVersion);
 
+    // Re-apply any pending settings that arrived while the sync was in-flight,
+    // so the GET response doesn't overwrite locally-staged but not-yet-POSTed values.
+    if (Object.keys(this.pendingSettings).length > 0) {
+      storage.getState().applySettingsLocal(this.pendingSettings);
+    }
+
     // Sync PostHog opt-out state with settings
     if (tracking) {
       if (parsedSettings.analyticsOptOut) {
