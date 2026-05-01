@@ -128,9 +128,14 @@ server = AgentServer(num_idle_processes=1)
 
 @server.rtc_session(agent_name=AGENT_NAME)
 async def happy_voice_agent(ctx: agents.JobContext) -> None:
+    import logging
+    logger = logging.getLogger("happy-voice")
+    logger.setLevel(logging.DEBUG)
+
+    logger.info("creating AgentSession with inference STT/LLM/TTS")
     session = AgentSession(
         stt=inference.STT(model="deepgram/nova-3", language="multi"),
-        llm=inference.LLM(model="openai/gpt-5.3-chat-latest"),
+        llm=inference.LLM(model="openai/gpt-4.1-mini"),
         tts=inference.TTS(
             model="cartesia/sonic-3",
             voice="9626c31c-bec5-4cca-baa8-f8ba9e84c8bc",
@@ -141,19 +146,24 @@ async def happy_voice_agent(ctx: agents.JobContext) -> None:
             turn_detection=MultilingualModel(),
         ),
     )
+    logger.info("AgentSession created")
 
     @ctx.room.on("data_received")
     def on_data_received(packet: DataPacket) -> None:
         asyncio.create_task(handle_data_message(session, packet.data))
 
+    logger.info("starting session in room %s, participants=%d", ctx.room.name, len(ctx.room.remote_participants))
     await session.start(room=ctx.room, agent=HappyVoiceAssistant())
+    logger.info("session started successfully")
 
     greeting = (
         "I'm connected to your coding session. What would you like me to tell Claude Code?"
         if ctx.room.metadata
         else "Hey! I'm connected. What would you like me to tell Claude Code?"
     )
+    logger.info("generating greeting reply")
     await session.generate_reply(instructions=greeting)
+    logger.info("greeting reply generated")
 
 
 if __name__ == "__main__":

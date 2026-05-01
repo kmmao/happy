@@ -1,11 +1,12 @@
 import React, { useEffect, useRef } from 'react';
-import { Room, RoomEvent, type RpcInvocationData } from 'livekit-client';
+import { Room, RoomEvent, Track, type RpcInvocationData, type RemoteTrack, type RemoteTrackPublication, type RemoteParticipant } from 'livekit-client';
 import { registerVoiceSession } from './RealtimeSession';
 import { realtimeClientTools } from './realtimeClientTools';
 import { storage } from '@/sync/storage';
 import type { VoiceSession, VoiceSessionConfig } from './types';
 
 let roomRef: Room | null = null;
+const audioElements: HTMLAudioElement[] = [];
 const encoder = new TextEncoder();
 
 async function handleRpc(data: RpcInvocationData, handler: (parameters: unknown) => Promise<string>): Promise<string> {
@@ -43,6 +44,19 @@ class LiveKitVoiceSessionImpl implements VoiceSession {
             storage.getState().setRealtimeMode('idle', true);
             storage.getState().clearRealtimeModeDebounce();
         });
+        room.on(RoomEvent.TrackSubscribed, (track: RemoteTrack, _pub: RemoteTrackPublication, _participant: RemoteParticipant) => {
+            if (track.kind === Track.Kind.Audio) {
+                const el = track.attach();
+                el.id = `livekit-audio-${track.sid}`;
+                document.body.appendChild(el);
+                audioElements.push(el);
+            }
+        });
+        room.on(RoomEvent.TrackUnsubscribed, (track: RemoteTrack) => {
+            if (track.kind === Track.Kind.Audio) {
+                track.detach().forEach(el => el.remove());
+            }
+        });
 
         await room.connect(config.livekitUrl, config.livekitToken);
         await room.localParticipant.setMicrophoneEnabled(true);
@@ -58,6 +72,8 @@ class LiveKitVoiceSessionImpl implements VoiceSession {
         if (room) {
             await room.disconnect();
         }
+        audioElements.forEach(el => el.remove());
+        audioElements.length = 0;
         storage.getState().setRealtimeStatus('disconnected');
     }
 
