@@ -30,7 +30,6 @@ class LiveKitVoiceSessionImpl implements VoiceSession {
 
         const room = new Room({
             audioCaptureDefaults: { autoGainControl: true, noiseSuppression: true, echoCancellation: true },
-            audioOutput: { deviceId: 'default' },
         });
         roomRef = room;
 
@@ -54,23 +53,26 @@ class LiveKitVoiceSessionImpl implements VoiceSession {
             if (track.kind === Track.Kind.Audio) {
                 const el = track.attach();
                 el.id = `livekit-audio-${track.sid}`;
-                el.autoplay = true;
-                el.setAttribute('playsinline', 'true');
                 document.body.appendChild(el);
                 audioElements.push(el);
-                el.play().catch(() => {});
+                console.log('[LiveKit] remote audio track attached:', track.sid);
             }
         });
         room.on(RoomEvent.TrackUnsubscribed, (track: RemoteTrack) => {
             if (track.kind === Track.Kind.Audio) {
                 track.detach().forEach(el => el.remove());
+                console.log('[LiveKit] remote audio track detached:', track.sid);
             }
         });
 
         await room.connect(config.livekitUrl, config.livekitToken);
-        console.log('[LiveKit] connected, enabling microphone...');
+
+        await room.startAudio();
+        console.log('[LiveKit] startAudio() called — browser autoplay unlocked');
+
         await room.localParticipant.setMicrophoneEnabled(true);
-        console.log('[LiveKit] microphone enabled, audio tracks:', room.localParticipant.audioTrackPublications.size);
+        const micPub = room.localParticipant.getTrackPublication(Track.Source.Microphone);
+        console.log('[LiveKit] microphone enabled:', !!micPub, 'track:', micPub?.track?.sid ?? 'none');
 
         if (config.initialContext) {
             this.sendContextualUpdate(config.initialContext);
