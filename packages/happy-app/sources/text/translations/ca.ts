@@ -3361,6 +3361,7 @@ export const ca: TranslationStructure = {
     knowledgeFilterHasEvolution: "Amb evolució",
     knowledgeFilterSuperseded: "Reemplaçats",
     knowledgeFilterArchived: "Arxivats",
+    knowledgeFilterRepoMap: "Repo Map",
     knowledgeCategoryUser: "Usuari",
     knowledgeCategoryFeedback: "Comentaris",
     knowledgeCategoryProject: "Projecte",

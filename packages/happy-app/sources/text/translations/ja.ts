@@ -3335,6 +3335,7 @@ export const ja: TranslationStructure = {
     knowledgeFilterHasEvolution: "進化あり",
     knowledgeFilterSuperseded: "置換済み",
     knowledgeFilterArchived: "アーカイブ済み",
+    knowledgeFilterRepoMap: "Repo Map",
     knowledgeCategoryUser: "ユーザー",
     knowledgeCategoryFeedback: "フィードバック",
     knowledgeCategoryProject: "プロジェクト",

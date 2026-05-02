@@ -38,7 +38,7 @@ const KnowledgeTurnEndSchema = z.object({
 const SubmitKnowledgeSchema = z.object({
     sid: z.string().min(1),
     entry: z.object({
-        entryType: z.enum(["discovery", "decision", "fix", "convention", "warning"]).default("discovery"),
+        entryType: z.enum(["discovery", "decision", "fix", "convention", "warning", "repo_map"]).default("discovery"),
         contributorType: z.enum(["session", "supervisor", "user"]).default("session"),
         action: z.enum(["create", "amend", "supersede", "verify"]).default("create"),
         title: z.string().min(1).max(200),
@@ -137,19 +137,21 @@ export function knowledgeHandler(userId: string, socket: Socket) {
 
             // Fire-and-forget: generate embedding for semantic search
             void storeKnowledgeEmbedding(created.id, entry.title, entry.content);
-            // Fire-and-forget: LLM refinement (rewrites title/content/structured in-place)
-            void refineKnowledgeEntry({
-                id: created.id,
-                title: entry.title,
-                content: entry.content,
-                entryType: entry.entryType,
-                tags: JSON.stringify(entry.tags),
-                confidence: entry.confidence,
-                structured: entry.request || entry.outcome
-                    ? JSON.stringify({ request: entry.request, outcome: entry.outcome })
-                    : null,
-                projectId,
-            });
+            // Fire-and-forget: LLM refinement — skip for repo_map (structured file-tree, not prose)
+            if (entry.entryType !== "repo_map") {
+                void refineKnowledgeEntry({
+                    id: created.id,
+                    title: entry.title,
+                    content: entry.content,
+                    entryType: entry.entryType,
+                    tags: JSON.stringify(entry.tags),
+                    confidence: entry.confidence,
+                    structured: entry.request || entry.outcome
+                        ? JSON.stringify({ request: entry.request, outcome: entry.outcome })
+                        : null,
+                    projectId,
+                });
+            }
             trackKnowledgeCreation(projectId);
 
             // Dual-write: persist relatedIds to KnowledgeRelation table

@@ -3379,6 +3379,7 @@ export const ru: TranslationStructure = {
     knowledgeFilterHasEvolution: "Есть эволюция",
     knowledgeFilterSuperseded: "Заменённые",
     knowledgeFilterArchived: "Архив",
+    knowledgeFilterRepoMap: "Repo Map",
     knowledgeCategoryUser: "Пользователь",
     knowledgeCategoryFeedback: "Обратная связь",
     knowledgeCategoryProject: "Проект",

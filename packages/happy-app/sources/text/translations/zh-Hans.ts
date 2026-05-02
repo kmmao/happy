@@ -3270,6 +3270,7 @@ export const zhHans: TranslationStructure = {
     knowledgeFilterHasEvolution: "有演变",
     knowledgeFilterSuperseded: "已替代",
     knowledgeFilterArchived: "已归档",
+    knowledgeFilterRepoMap: "Repo Map",
     knowledgeCategoryUser: "用户",
     knowledgeCategoryFeedback: "反馈",
     knowledgeCategoryProject: "项目",

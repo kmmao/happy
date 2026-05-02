@@ -11,6 +11,7 @@ const LONG_RUNNING_METHODS = new Set([
   "getDirectoryTree",
   "writeFile",
   "listRemoteGitRepos",
+  "generate-repo-map",
 ]);
 const SHORT_TIMEOUT = 30_000;
 const LONG_TIMEOUT = 300_000; // 5 minutes

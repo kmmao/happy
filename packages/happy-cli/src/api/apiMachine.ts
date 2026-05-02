@@ -39,6 +39,7 @@ import type { TunnelManager } from "@/tunnel";
 import { TerminalManager } from "@/terminal/TerminalManager";
 import { killRunawayHappyProcesses } from "@/daemon/doctor";
 import { upgradeSelf } from "@/daemon/upgradeSelf";
+import { generateAndSubmitRepoMap } from "@/knowledge";
 
 
 interface ServerToDaemonEvents {
@@ -910,6 +911,24 @@ export class ApiMachineClient {
       const count = this.terminalManager.getActiveCount();
       this.terminalManager.closeAll();
       return { success: true, closed: count };
+    });
+
+    // Machine-level repo map generator: triggered from App to force-refresh the
+    // codebase structure snapshot stored in the project knowledge base.
+    this.rpcHandlerManager.registerHandler("generate-repo-map", async (params: any) => {
+      const { projectId } = params || {};
+      if (!projectId || typeof projectId !== "string") {
+        return { success: false, error: "projectId is required" };
+      }
+      const result = await generateAndSubmitRepoMap(
+        process.cwd(),
+        configuration.serverUrl,
+        this.token,
+        projectId,
+        undefined,
+        true, // force=true bypasses the "recent exists" check
+      );
+      return { success: result.submitted || result.skipped === true, ...result };
     });
   }
 

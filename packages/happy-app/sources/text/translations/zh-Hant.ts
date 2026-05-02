@@ -3271,6 +3271,7 @@ export const zhHant: TranslationStructure = {
     knowledgeFilterHasEvolution: "有演變",
     knowledgeFilterSuperseded: "已替代",
     knowledgeFilterArchived: "已歸檔",
+    knowledgeFilterRepoMap: "Repo Map",
     knowledgeCategoryUser: "使用者",
     knowledgeCategoryFeedback: "回饋",
     knowledgeCategoryProject: "專案",

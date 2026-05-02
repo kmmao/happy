@@ -7,6 +7,7 @@ export const KnowledgeEntryTypeSchema = z.enum([
   "fix",         // Bug fix record
   "convention",  // Code convention / process rule
   "warning",     // Known pitfall or gotcha
+  "repo_map",    // Static repo structure snapshot (file tree + key exports)
 ]);
 export type KnowledgeEntryType = z.infer<typeof KnowledgeEntryTypeSchema>;
 
