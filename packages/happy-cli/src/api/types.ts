@@ -472,6 +472,8 @@ export type Metadata = {
   sandbox?: SandboxConfig | null;
   dangerouslySkipPermissions?: boolean | null;
   packageScripts?: Record<string, string>;
+  displayName?: string;
+  tags?: string[];
   worktree?: {
     isWorktree: boolean;
     name: string;

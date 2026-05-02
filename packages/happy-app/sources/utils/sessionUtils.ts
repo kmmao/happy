@@ -289,7 +289,9 @@ export function useSessionStatus(session: Session): SessionStatus {
  */
 export function getSessionName(session: Session): string {
   const forkPrefix = session.forkedFromSessionId ? "🔀 " : "";
-  if (session.metadata?.summary) {
+  if (session.metadata?.displayName) {
+    return forkPrefix + session.metadata.displayName;
+  } else if (session.metadata?.summary) {
     return forkPrefix + session.metadata.summary.text;
   } else if (session.metadata) {
     const segments = session.metadata.path.split("/").filter(Boolean);

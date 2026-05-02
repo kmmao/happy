@@ -394,6 +394,8 @@ function NewSessionWizard() {
     return tempSessionData?.prompt || prompt || persistedDraft?.input || "";
   });
   const [isCreating, setIsCreating] = React.useState(false);
+  const [sessionDisplayName, setSessionDisplayName] = React.useState("");
+  const [sessionTagsRaw, setSessionTagsRaw] = React.useState("");
 
   // Slash command popover
   const [showCommandList, setShowCommandList] = React.useState(false);
@@ -1244,6 +1246,14 @@ function NewSessionWizard() {
         });
       }
 
+      const labelEnvVars: Record<string, string> = {};
+      if (sessionDisplayName.trim()) {
+        labelEnvVars.HAPPY_SESSION_NAME = sessionDisplayName.trim();
+      }
+      if (sessionTagsRaw.trim()) {
+        labelEnvVars.HAPPY_SESSION_TAGS = sessionTagsRaw.trim();
+      }
+
       const result = await machineSpawnNewSession({
         machineId: selectedMachineId,
         directory: actualPath,
@@ -1251,7 +1261,7 @@ function NewSessionWizard() {
         agent: agentType,
         profileId: resolvedProfile?.id,
         runtimeProfile,
-        environmentVariables,
+        environmentVariables: { ...environmentVariables, ...labelEnvVars },
       });
 
       if (result.type === "error") {
@@ -1758,6 +1768,66 @@ function NewSessionWizard() {
                 value={sessionType}
                 onChange={setSessionType}
               />
+            </View>
+          </View>
+
+          {/* Session label (optional name + tags) */}
+          <View
+            style={{
+              paddingHorizontal: screenWidth > 700 ? 16 : 8,
+              marginBottom: 8,
+            }}
+          >
+            <View
+              style={{
+                maxWidth: layout.maxWidth,
+                width: "100%",
+                alignSelf: "center",
+                gap: 6,
+              }}
+            >
+              <TextInput
+                value={sessionDisplayName}
+                onChangeText={setSessionDisplayName}
+                placeholder={t("newSession.sessionLabel.namePlaceholder")}
+                placeholderTextColor={theme.colors.textSecondary}
+                style={{
+                  backgroundColor: theme.colors.input.background,
+                  borderRadius: 10,
+                  borderWidth: 0.5,
+                  borderColor: theme.colors.divider,
+                  paddingHorizontal: 12,
+                  paddingVertical: 8,
+                  fontSize: 14,
+                  color: theme.colors.text,
+                  ...Typography.default(),
+                }}
+                autoCapitalize="none"
+                autoCorrect={false}
+                returnKeyType="next"
+              />
+              {sessionDisplayName.trim().length > 0 && (
+                <TextInput
+                  value={sessionTagsRaw}
+                  onChangeText={setSessionTagsRaw}
+                  placeholder={t("newSession.sessionLabel.tagsPlaceholder")}
+                  placeholderTextColor={theme.colors.textSecondary}
+                  style={{
+                    backgroundColor: theme.colors.input.background,
+                    borderRadius: 10,
+                    borderWidth: 0.5,
+                    borderColor: theme.colors.divider,
+                    paddingHorizontal: 12,
+                    paddingVertical: 8,
+                    fontSize: 14,
+                    color: theme.colors.text,
+                    ...Typography.default(),
+                  }}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  returnKeyType="done"
+                />
+              )}
             </View>
           </View>
 

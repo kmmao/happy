@@ -107,6 +107,16 @@ export function createSessionMetadata(
       : {}),
     sandbox: opts.sandbox?.enabled ? opts.sandbox : null,
     dangerouslySkipPermissions: opts.dangerouslySkipPermissions ?? null,
+    ...(process.env.HAPPY_SESSION_NAME?.trim()
+      ? { displayName: process.env.HAPPY_SESSION_NAME.trim() }
+      : {}),
+    ...(process.env.HAPPY_SESSION_TAGS?.trim()
+      ? {
+          tags: process.env.HAPPY_SESSION_TAGS.split(",")
+            .map((tag) => tag.trim())
+            .filter(Boolean),
+        }
+      : {}),
   };
 
   return { state, metadata };

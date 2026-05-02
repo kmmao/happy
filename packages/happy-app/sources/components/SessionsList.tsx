@@ -968,6 +968,19 @@ const SessionItem = React.memo(
                 </Text>
               </View>
             ))}
+            {session.metadata?.tags?.map((tag) => (
+              <View
+                key={`${session.id}-user-tag-${tag}`}
+                style={[styles.tag, { backgroundColor: `${theme.colors.accentBlue}1A` }]}
+              >
+                <Text
+                  style={[styles.tagText, { color: theme.colors.accentBlue }]}
+                  numberOfLines={1}
+                >
+                  {tag}
+                </Text>
+              </View>
+            ))}
             {isAutoOptionSend && (
               <View style={[styles.tag, styles.autoSendBadge]}>
                 <Ionicons
