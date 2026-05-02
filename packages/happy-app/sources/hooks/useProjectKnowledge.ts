@@ -433,5 +433,10 @@ export function useProjectKnowledge(projectServerId: string | undefined) {
         return result;
     }, [projectServerId, refresh]);
 
-    return { entries, archivedEntries, supersededEntries, profile, loading, loadingMore, hasMore, lastRefreshAt, refresh, refreshIfStale, loadMore, updateEntry, deleteEntry, refineEntry, search, regenerateProfile, fetchLifecycle, runDecay, runMerge };
+    const repoMapEntries = React.useMemo(
+        () => entries.filter((e) => e.entryType === "repo_map"),
+        [entries],
+    );
+
+    return { entries, archivedEntries, supersededEntries, profile, loading, loadingMore, hasMore, lastRefreshAt, refresh, refreshIfStale, loadMore, updateEntry, deleteEntry, refineEntry, search, regenerateProfile, fetchLifecycle, runDecay, runMerge, repoMapEntries };
 }

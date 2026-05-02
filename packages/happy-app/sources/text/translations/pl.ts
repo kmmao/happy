@@ -3378,6 +3378,7 @@ export const pl: TranslationStructure = {
     knowledgeFilterHasEvolution: "Ma ewolucję",
     knowledgeFilterSuperseded: "Zastąpione",
     knowledgeFilterArchived: "Zarchiwizowane",
+    knowledgeFilterRepoMap: "Repo Map",
     knowledgeCategoryUser: "Użytkownik",
     knowledgeCategoryFeedback: "Opinia",
     knowledgeCategoryProject: "Projekt",

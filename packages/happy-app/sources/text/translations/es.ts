@@ -3353,6 +3353,7 @@ export const es: TranslationStructure = {
     knowledgeFilterHasEvolution: "Con evolución",
     knowledgeFilterSuperseded: "Reemplazados",
     knowledgeFilterArchived: "Archivados",
+    knowledgeFilterRepoMap: "Repo Map",
     knowledgeCategoryUser: "Usuario",
     knowledgeCategoryFeedback: "Retroalimentación",
     knowledgeCategoryProject: "Proyecto",

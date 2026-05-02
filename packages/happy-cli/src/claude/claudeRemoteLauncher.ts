@@ -42,7 +42,7 @@ import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 import { parseSpecialCommand } from "@/parsers/specialCommands";
 import { executeShellCommand } from "@/utils/shellCommand";
-import { TurnCollector } from "@/knowledge";
+import { TurnCollector, generateRepoMap } from "@/knowledge";
 import type { TurnCollectorConfig } from "@/knowledge";
 import { applyHappyProgressUpdate } from "@/utils/happyProgressMetadata";
 import { applySessionSummaryUpdate } from "@/utils/sessionSummaryMetadata";
@@ -246,6 +246,43 @@ export async function claudeRemoteLauncher(
       logger.debug(`[knowledge] Failed to pre-fetch: ${err}`);
     });
   }
+
+  // Non-blocking: generate and submit repo map on session start so the knowledge
+  // base has an up-to-date file-tree snapshot. Server consolidate handles dedup.
+  if (knowledgeEnabled) {
+    generateRepoMap(session.path).then((mapResult) => {
+      if (mapResult.success) {
+        const dirName = session.path.split("/").filter(Boolean).pop() ?? "project";
+        session.client.submitKnowledge({
+          entryType: "repo_map",
+          contributorType: "session",
+          action: "create",
+          title: `Repo Map: ${dirName}`,
+          content: mapResult.content,
+          tags: ["repo-map", "codebase-structure"],
+          confidence: "high",
+          affectedFiles: mapResult.affectedFiles,
+        });
+        logger.debug(`[repo-map] Submitted repo map for ${dirName} (${mapResult.affectedFiles.length} files)`);
+      }
+    }).catch((err) => {
+      logger.debug(`[repo-map] Failed to generate repo map: ${err}`);
+    });
+  }
+
+  // Project CONTEXT.md: load once per session for injection into the first message.
+  // File lives at <workingDir>/.happy/CONTEXT.md — created by the user or via the App.
+  let contextMdContent: string | null = null;
+  let contextMdInjected = false;
+  readFile(join(session.path, ".happy", "CONTEXT.md"), "utf-8").then((content) => {
+    const trimmed = content.trim();
+    if (trimmed) {
+      contextMdContent = trimmed;
+      logger.debug(`[context] Loaded project CONTEXT.md: ${contextMdContent.length} chars`);
+    }
+  }).catch(() => {
+    // File doesn't exist — no context injection
+  });
 
   async function doInterrupt() {
     logger.debug("[remote]: doInterrupt — graceful interrupt via SDK");
@@ -1463,6 +1500,16 @@ export async function claudeRemoteLauncher(
         pendingKnowledgeRefresh = false;
         pendingFileHint = null;
         currentTurnFilePaths = new Set<string>();
+        // Reset CONTEXT.md injection and re-read for the new session
+        contextMdInjected = false;
+        contextMdContent = null;
+        readFile(join(session.path, ".happy", "CONTEXT.md"), "utf-8").then((content) => {
+          const trimmed = content.trim();
+          if (trimmed) {
+            contextMdContent = trimmed;
+            logger.debug(`[context] Re-loaded project CONTEXT.md after session reset: ${contextMdContent.length} chars`);
+          }
+        }).catch(() => {});
         if (knowledgeEnabled) {
           const mode = (process.env.HAPPY_KNOWLEDGE_MODE as "auto" | "full" | "minimal") || "auto";
           session.client.fetchKnowledge(mode).then((result) => {
@@ -1987,8 +2034,17 @@ export async function claudeRemoteLauncher(
                 logger.debug("[knowledge] Injected knowledge into first message");
               }
 
+              // Project CONTEXT.md: inject once per session before all other prefixes
+              const contextMdPrefix = !contextMdInjected && contextMdContent
+                ? `<project-context>\n${contextMdContent}\n</project-context>\n\n`
+                : "";
+              if (!contextMdInjected && contextMdContent) {
+                contextMdInjected = true;
+                logger.debug("[context] Injected project CONTEXT.md into first message");
+              }
+
               return {
-                message: appPromptPrefix + knowledgePrefix + msg.message,
+                message: contextMdPrefix + appPromptPrefix + knowledgePrefix + msg.message,
                 mode: msg.mode,
               };
             }

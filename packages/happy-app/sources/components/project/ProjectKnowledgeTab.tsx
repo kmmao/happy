@@ -22,7 +22,7 @@ interface ProjectKnowledgeTabProps {
     isActive: boolean;
 }
 
-const FILTER_KEYS = ["all", "discovery", "decision", "fix", "convention", "warning", "has-evolution", "superseded", "archived"] as const;
+const FILTER_KEYS = ["all", "discovery", "decision", "fix", "convention", "warning", "repo_map", "has-evolution", "superseded", "archived"] as const;
 type FilterKey = (typeof FILTER_KEYS)[number];
 
 const CATEGORY_KEYS = ["all", "user", "feedback", "project", "reference"] as const;
@@ -42,6 +42,8 @@ function filterLabel(key: FilterKey): string {
             return t("projects.knowledgeFilterConvention");
         case "warning":
             return t("projects.knowledgeFilterWarning");
+        case "repo_map":
+            return t("projects.knowledgeFilterRepoMap");
         case "has-evolution":
             return t("projects.knowledgeFilterHasEvolution");
         case "superseded":

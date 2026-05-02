@@ -3352,6 +3352,7 @@ export const en = {
     knowledgeFilterHasEvolution: "Has Evolution",
     knowledgeFilterSuperseded: "Superseded",
     knowledgeFilterArchived: "Archived",
+    knowledgeFilterRepoMap: "Repo Map",
     knowledgeCategoryUser: "User",
     knowledgeCategoryFeedback: "Feedback",
     knowledgeCategoryProject: "Project",
