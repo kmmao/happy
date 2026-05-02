@@ -681,6 +681,11 @@ export const ja: TranslationStructure = {
       varValuePlaceholder: "値（例：my-value または ${MY_VAR}）",
       add: "追加",
     },
+    sessionLabel: {
+      title: "セッションラベル（任意）",
+      namePlaceholder: "セッション名（例：database-work、api-changes）",
+      tagsPlaceholder: "タグをカンマ区切りで入力（例：backend, auth）",
+    },
   },
 
   pickPath: {
@@ -4132,6 +4137,16 @@ export const ja: TranslationStructure = {
     viewAll: "すべて表示",
     machineTriggers: "マシントリガー",
     movedToConfigHint: "設定はConfigタブに移動しました",
+    sectionContextMd: "プロジェクトコンテキスト",
+    contextMdDesc: "すべての新しいAgentセッションに自動的に注入されます",
+    contextMdEdit: "CONTEXT.mdを編集",
+    contextMdNoSession: "アクティブなセッションがありません — セッションを開始して編集してください",
+    contextMdTitle: "プロジェクトコンテキストを編集",
+    contextMdSave: "保存",
+    contextMdSaved: "保存しました",
+    contextMdSaveError: "保存に失敗しました",
+    contextMdPlaceholder: "プロジェクトを説明してください：技術スタック、規約、重要なアーキテクチャの決定...",
+    contextMdHint: "プロジェクトリポジトリの .happy/CONTEXT.md に保存されます。",
   },
   suggestions: {
     refresh: "更新",

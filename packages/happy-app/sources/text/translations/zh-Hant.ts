@@ -530,6 +530,11 @@ export const zhHant: TranslationStructure = {
       varValuePlaceholder: "值（例如 my-value 或 ${MY_VAR}）",
       add: "新增",
     },
+    sessionLabel: {
+      title: "工作階段標籤（選填）",
+      namePlaceholder: "為工作階段命名（例如 database-work、api-changes）",
+      tagsPlaceholder: "標籤，逗號分隔（例如 backend, auth）",
+    },
   },
 
   pickPath: {
@@ -4060,6 +4065,16 @@ export const zhHant: TranslationStructure = {
     viewAll: "查看全部",
     machineTriggers: "機器觸發器",
     movedToConfigHint: "設定已移至「設定」分頁",
+    sectionContextMd: "專案上下文",
+    contextMdDesc: "自動注入到每個新 Agent 會話",
+    contextMdEdit: "編輯 CONTEXT.md",
+    contextMdNoSession: "無活躍會話 — 啟動會話後可編輯",
+    contextMdTitle: "編輯專案上下文",
+    contextMdSave: "儲存",
+    contextMdSaved: "已儲存",
+    contextMdSaveError: "儲存失敗",
+    contextMdPlaceholder: "描述您的專案：技術棧、規範、關鍵架構決策...",
+    contextMdHint: "儲存在專案倉庫的 .happy/CONTEXT.md 檔案中。",
   },
   suggestions: {
     refresh: "重新整理",

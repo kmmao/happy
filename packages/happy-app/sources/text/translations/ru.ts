@@ -522,6 +522,11 @@ export const ru: TranslationStructure = {
       varValuePlaceholder: "Значение (напр., my-value или ${MY_VAR})",
       add: "Добавить",
     },
+    sessionLabel: {
+      title: "Метка сессии (необязательно)",
+      namePlaceholder: "Название сессии (напр. database-work, api-changes)",
+      tagsPlaceholder: "Теги через запятую (напр. backend, auth)",
+    },
   },
 
   pickPath: {
@@ -4178,6 +4183,16 @@ export const ru: TranslationStructure = {
     viewAll: "View All",
     machineTriggers: "Machine Triggers",
     movedToConfigHint: "Configuration has been moved to the Config tab",
+    sectionContextMd: "Project Context",
+    contextMdDesc: "Automatically injected into every new agent session",
+    contextMdEdit: "Edit CONTEXT.md",
+    contextMdNoSession: "No active session — start a session to edit",
+    contextMdTitle: "Edit Project Context",
+    contextMdSave: "Save",
+    contextMdSaved: "Saved",
+    contextMdSaveError: "Failed to save",
+    contextMdPlaceholder: "Describe your project: tech stack, conventions, key architecture decisions...",
+    contextMdHint: "Stored at .happy/CONTEXT.md in your project repository.",
   },
   suggestions: {
     refresh: "Обновить",

@@ -247,6 +247,20 @@ export async function claudeRemoteLauncher(
     });
   }
 
+  // Project CONTEXT.md: load once per session for injection into the first message.
+  // File lives at <workingDir>/.happy/CONTEXT.md — created by the user or via the App.
+  let contextMdContent: string | null = null;
+  let contextMdInjected = false;
+  readFile(join(session.path, ".happy", "CONTEXT.md"), "utf-8").then((content) => {
+    const trimmed = content.trim();
+    if (trimmed) {
+      contextMdContent = trimmed;
+      logger.debug(`[context] Loaded project CONTEXT.md: ${contextMdContent.length} chars`);
+    }
+  }).catch(() => {
+    // File doesn't exist — no context injection
+  });
+
   async function doInterrupt() {
     logger.debug("[remote]: doInterrupt — graceful interrupt via SDK");
     if (currentQuery) {
@@ -1463,6 +1477,16 @@ export async function claudeRemoteLauncher(
         pendingKnowledgeRefresh = false;
         pendingFileHint = null;
         currentTurnFilePaths = new Set<string>();
+        // Reset CONTEXT.md injection and re-read for the new session
+        contextMdInjected = false;
+        contextMdContent = null;
+        readFile(join(session.path, ".happy", "CONTEXT.md"), "utf-8").then((content) => {
+          const trimmed = content.trim();
+          if (trimmed) {
+            contextMdContent = trimmed;
+            logger.debug(`[context] Re-loaded project CONTEXT.md after session reset: ${contextMdContent.length} chars`);
+          }
+        }).catch(() => {});
         if (knowledgeEnabled) {
           const mode = (process.env.HAPPY_KNOWLEDGE_MODE as "auto" | "full" | "minimal") || "auto";
           session.client.fetchKnowledge(mode).then((result) => {
@@ -1987,8 +2011,17 @@ export async function claudeRemoteLauncher(
                 logger.debug("[knowledge] Injected knowledge into first message");
               }
 
+              // Project CONTEXT.md: inject once per session before all other prefixes
+              const contextMdPrefix = !contextMdInjected && contextMdContent
+                ? `<project-context>\n${contextMdContent}\n</project-context>\n\n`
+                : "";
+              if (!contextMdInjected && contextMdContent) {
+                contextMdInjected = true;
+                logger.debug("[context] Injected project CONTEXT.md into first message");
+              }
+
               return {
-                message: appPromptPrefix + knowledgePrefix + msg.message,
+                message: contextMdPrefix + appPromptPrefix + knowledgePrefix + msg.message,
                 mode: msg.mode,
               };
             }

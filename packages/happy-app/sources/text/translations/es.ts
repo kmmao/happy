@@ -561,6 +561,11 @@ export const es: TranslationStructure = {
       varValuePlaceholder: "Valor (ej., my-value o ${MY_VAR})",
       add: "Agregar",
     },
+    sessionLabel: {
+      title: "Etiqueta de sesión (opcional)",
+      namePlaceholder: "Nombre de la sesión (ej. database-work, api-changes)",
+      tagsPlaceholder: "Etiquetas separadas por comas (ej. backend, auth)",
+    },
   },
 
   pickPath: {
@@ -4159,6 +4164,16 @@ export const es: TranslationStructure = {
     viewAll: "View All",
     machineTriggers: "Machine Triggers",
     movedToConfigHint: "Configuration has been moved to the Config tab",
+    sectionContextMd: "Project Context",
+    contextMdDesc: "Automatically injected into every new agent session",
+    contextMdEdit: "Edit CONTEXT.md",
+    contextMdNoSession: "No active session — start a session to edit",
+    contextMdTitle: "Edit Project Context",
+    contextMdSave: "Save",
+    contextMdSaved: "Saved",
+    contextMdSaveError: "Failed to save",
+    contextMdPlaceholder: "Describe your project: tech stack, conventions, key architecture decisions...",
+    contextMdHint: "Stored at .happy/CONTEXT.md in your project repository.",
   },
   suggestions: {
     refresh: "Actualizar",

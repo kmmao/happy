@@ -530,6 +530,11 @@ export const zhHans: TranslationStructure = {
       varValuePlaceholder: "值（例如 my-value 或 ${MY_VAR}）",
       add: "添加",
     },
+    sessionLabel: {
+      title: "会话标签（可选）",
+      namePlaceholder: "为会话命名（例如 database-work、api-changes）",
+      tagsPlaceholder: "标签，逗号分隔（例如 backend, auth）",
+    },
   },
 
   pickPath: {
@@ -4054,6 +4059,16 @@ export const zhHans: TranslationStructure = {
     viewAll: "查看全部",
     machineTriggers: "机器触发器",
     movedToConfigHint: "配置已移至\"配置\"标签页",
+    sectionContextMd: "项目上下文",
+    contextMdDesc: "自动注入到每个新 Agent 会话",
+    contextMdEdit: "编辑 CONTEXT.md",
+    contextMdNoSession: "无活跃会话 — 启动会话后可编辑",
+    contextMdTitle: "编辑项目上下文",
+    contextMdSave: "保存",
+    contextMdSaved: "已保存",
+    contextMdSaveError: "保存失败",
+    contextMdPlaceholder: "描述您的项目：技术栈、规范、关键架构决策...",
+    contextMdHint: "存储在项目仓库的 .happy/CONTEXT.md 文件中。",
   },
   suggestions: {
     refresh: "刷新",

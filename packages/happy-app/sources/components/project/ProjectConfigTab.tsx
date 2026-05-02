@@ -8,6 +8,7 @@ import { ResearchDefaultsSection } from "./config/ResearchDefaultsSection";
 import { KnowledgeConfigSection } from "./config/KnowledgeConfigSection";
 import { NotificationProfileSection } from "./config/NotificationProfileSection";
 import { IntegrationsSection } from "./config/IntegrationsSection";
+import { ContextMdSection } from "./config/ContextMdSection";
 
 interface ProjectConfigTabProps {
     project: Project;
@@ -24,6 +25,7 @@ export const ProjectConfigTab = React.memo<ProjectConfigTabProps>(
                 <SupervisorConfigSection project={project} />
                 <ResearchDefaultsSection project={project} />
                 <KnowledgeConfigSection project={project} />
+                <ContextMdSection project={project} />
                 <NotificationProfileSection project={project} />
                 <IntegrationsSection project={project} />
             </ScrollView>
