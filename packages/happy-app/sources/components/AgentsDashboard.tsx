@@ -18,6 +18,7 @@ import { StatusDot } from "@/components/StatusDot";
 import { Typography } from "@/constants/Typography";
 import { useNavigateToSession } from "@/hooks/useNavigateToSession";
 import { t } from "@/text";
+import { sync } from "@/sync/sync";
 
 const CARD_WIDTH = 168;
 
@@ -29,6 +30,15 @@ const AgentCard = React.memo(({ session }: AgentCardProps) => {
     const { theme } = useUnistyles();
     const navigateToSession = useNavigateToSession();
     const { messages } = useSessionMessages(session.id);
+    const [latestInterAgentMessage, setLatestInterAgentMessage] = React.useState<string | null>(null);
+
+    React.useEffect(() => {
+        return sync.onInterAgentMessage((event) => {
+            if (event.fromSessionId === session.id || event.toSessionId === session.id) {
+                setLatestInterAgentMessage(event.message);
+            }
+        });
+    }, [session.id]);
 
     const statusState = getSessionStatusState(session);
     const sessionName = getSessionName(session);
@@ -93,6 +103,14 @@ const AgentCard = React.memo(({ session }: AgentCardProps) => {
                 <Text style={styles.requestPreview} numberOfLines={1}>
                     {latestRequest.text}
                 </Text>
+            ) : null}
+
+            {latestInterAgentMessage ? (
+                <View style={styles.interAgentBubble}>
+                    <Text style={styles.interAgentText} numberOfLines={2}>
+                        {latestInterAgentMessage}
+                    </Text>
+                </View>
             ) : null}
 
             {isWorktree && (
@@ -227,5 +245,20 @@ const styles = StyleSheet.create((theme) => ({
         fontSize: 9,
         color: (theme.colors as any).accentPurple,
         maxWidth: 120,
+    },
+    interAgentBubble: {
+        backgroundColor: (theme.colors as any).accentBlue
+            ? `${(theme.colors as any).accentBlue}22`
+            : "rgba(0,122,255,0.13)",
+        borderRadius: 6,
+        paddingHorizontal: 6,
+        paddingVertical: 3,
+        marginTop: 2,
+    },
+    interAgentText: {
+        ...Typography.default(),
+        fontSize: 9,
+        color: (theme.colors as any).accentBlue ?? "#007AFF",
+        lineHeight: 12,
     },
 }));

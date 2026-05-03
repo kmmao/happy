@@ -165,6 +165,12 @@ interface DaemonToServerEvents {
     exitCode: number;
   }) => void;
 
+  "session:message": (data: {
+    fromSessionId: string;
+    toSessionId: string;
+    message: string;
+  }) => void;
+
 }
 
 type MachineRpcHandlers = {
@@ -1141,6 +1147,11 @@ export class ApiMachineClient {
   ) {
     if (!this.socket.connected) return;
     this.socket.emit("session-event", { sessionId, eventType, summary, detail });
+  }
+
+  sendInterAgentMessage(fromSessionId: string, toSessionId: string, message: string) {
+    if (!this.socket.connected) return;
+    this.socket.emit("session:message", { fromSessionId, toSessionId, message });
   }
 
   private flushPendingFixStatuses() {

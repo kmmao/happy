@@ -996,6 +996,19 @@ export class ApiSessionClient extends EventEmitter {
   }
 
   /**
+   * Forward a plaintext status message to another session's clients.
+   * Used by Swarm child agents to report completion/blocked state to a coordinator.
+   */
+  sendInterAgentMessage(toSessionId: string, message: string) {
+    if (!this.socket.connected) return;
+    this.socket.emit("session:message", {
+      fromSessionId: this.sessionId,
+      toSessionId,
+      message,
+    });
+  }
+
+  /**
    * Emit a task-log chunk as an ephemeral event (not persisted to DB).
    * Used for real-time log streaming from background tasks.
    * Sent unencrypted since it's volatile data over an authenticated TLS connection.

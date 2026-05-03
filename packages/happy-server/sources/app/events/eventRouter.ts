@@ -445,6 +445,13 @@ export type EphemeralEvent =
       sessionId: string;
       reason: "timeout" | "deleted" | "archived" | "cancelled";
     }
+  | {
+      type: "inter-agent-message";
+      fromSessionId: string;
+      toSessionId: string;
+      message: string;
+      sentAt: number;
+    }
 ;
 
 // === EVENT PAYLOAD TYPES ===
@@ -1274,5 +1281,19 @@ export function buildTaskCancelEphemeral(opts: { taskId: string; sessionId?: str
   return {
     type: "task-cancel",
     ...opts,
+  };
+}
+
+export function buildInterAgentMessageEphemeral(opts: {
+  fromSessionId: string;
+  toSessionId: string;
+  message: string;
+}): EphemeralPayload {
+  return {
+    type: "inter-agent-message",
+    fromSessionId: opts.fromSessionId,
+    toSessionId: opts.toSessionId,
+    message: opts.message,
+    sentAt: Date.now(),
   };
 }

@@ -261,6 +261,11 @@ export interface ClientToServerEvents {
     chunk: string;
     offset: number;
   }) => void;
+  "session:message": (data: {
+    fromSessionId: string;
+    toSessionId: string;
+    message: string;
+  }) => void;
 }
 
 /**

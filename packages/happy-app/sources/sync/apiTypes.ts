@@ -377,6 +377,15 @@ export const ApiEphemeralSessionEventCreatedSchema = z.object({
 
 
 
+export const ApiEphemeralInterAgentMessageSchema = z.object({
+    type: z.literal("inter-agent-message"),
+    fromSessionId: z.string(),
+    toSessionId: z.string(),
+    message: z.string(),
+    sentAt: z.number(),
+});
+export type ApiEphemeralInterAgentMessage = z.infer<typeof ApiEphemeralInterAgentMessageSchema>;
+
 export const ApiEphemeralUpdateSchema = z.union([
   ApiEphemeralActivityUpdateSchema,
   ApiEphemeralUsageUpdateSchema,
@@ -394,6 +403,7 @@ export const ApiEphemeralUpdateSchema = z.union([
   ApiEphemeralInboxNewItemSchema,
   ApiEphemeralInboxUnreadCountSchema,
   ApiEphemeralSessionEventCreatedSchema,
+  ApiEphemeralInterAgentMessageSchema,
 ]);
 
 export type ApiEphemeralActivityUpdate = z.infer<

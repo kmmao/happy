@@ -474,6 +474,7 @@ export function startDaemonControlServer({
   emitAgentLoopEvent,
   emitCiTrigger,
   emitGitHubActionsWebhook,
+  sendInterAgentMessage,
 }: {
   getChildren: () => TrackedSession[];
   stopSession: (sessionId: string) => boolean;
@@ -594,6 +595,7 @@ export function startDaemonControlServer({
   resumeAutoDreamProfile: (profileIdValue: string) => Promise<AutoDreamMutationResult>;
   runAutoDreamProfileNow: (profileIdValue: string) => Promise<AutoDreamMutationResult>;
   removeAutoDreamProfile: (profileIdValue: string) => Promise<AutoDreamMutationResult>;
+  sendInterAgentMessage: (fromSessionId: string, toSessionId: string, message: string) => void;
 }): Promise<{ port: number; stop: () => Promise<void> }> {
   return new Promise((resolve) => {
     const app = fastify({ logger: false });
@@ -1284,6 +1286,29 @@ export function startDaemonControlServer({
         },
       },
       async (request) => ({ suggestions: await suggestAgentLoopsWithAI(request.body) }),
+    );
+
+    typed.post(
+      "/inter-agent-message",
+      {
+        schema: {
+          body: z.object({
+            fromSessionId: z.string().min(1),
+            toSessionId: z.string().min(1),
+            message: z.string().max(2000),
+          }),
+          response: {
+            200: z.object({ status: z.literal("ok") }),
+          },
+        },
+      },
+      async (request) => {
+        const body = request.body as { fromSessionId: string; toSessionId: string; message: string };
+        const { fromSessionId, toSessionId, message } = body;
+        logger.debug(`[CONTROL SERVER] Inter-agent message: ${fromSessionId} → ${toSessionId}`);
+        sendInterAgentMessage(fromSessionId, toSessionId, message);
+        return { status: "ok" as const };
+      },
     );
 
     typed.post(

@@ -30,6 +30,7 @@ import { taskLogHandler } from "./socket/taskLogHandler";
 import { taskStatusHandler } from "./socket/taskStatusHandler";
 import { sessionEventHandler } from "./socket/sessionEventHandler";
 import { terminalHandler } from "./socket/terminalHandler";
+import { interAgentMessageHandler } from "./socket/interAgentMessageHandler";
 import { listRpcReadyScopes } from "./socket/listRpcReadyScopes";
 
 export function startSocket(app: Fastify) {
@@ -251,6 +252,7 @@ export function startSocket(app: Fastify) {
     taskStatusHandler(socket, userId);
     sessionEventHandler(socket, userId);
     terminalHandler(userId, socket);
+    interAgentMessageHandler(socket, userId);
 
     // Authenticated and all event listeners are now registered. Machine/session
     // clients use this as the reliable readiness barrier before emitting their

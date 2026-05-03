@@ -781,6 +781,13 @@ export async function startDaemon(): Promise<void> {
       return { known: true, keepAlive };
     };
 
+    // Control port forwarded to spawned child sessions as HAPPY_INTER_AGENT_URL.
+    // Set after the control server starts; captured by the spawnSession closure.
+    let daemonControlPort = 0;
+
+    // Forwarding function wired up after apiMachine is available.
+    let interAgentSend: ((from: string, to: string, msg: string) => void) | undefined;
+
     // Spawn a new session (sessionId reserved for future --resume functionality)
     const spawnSession = async (
       options: SpawnSessionOptions,
@@ -1094,6 +1101,10 @@ export async function startDaemon(): Promise<void> {
           ...filteredDaemonEnv,
           ...sessionScopedEnv,
           HAPPY_SPAWN_ID: spawnId,
+          ...(happySessionId ? { HAPPY_SESSION_ID: happySessionId } : {}),
+          ...(daemonControlPort > 0
+            ? { HAPPY_INTER_AGENT_URL: `http://127.0.0.1:${daemonControlPort}/inter-agent-message` }
+            : {}),
         };
 
         // Fail-fast validation: Check that any auth variables present are fully expanded
@@ -2071,7 +2082,10 @@ export async function startDaemon(): Promise<void> {
           scheduleAutomationStatePublish();
           return result;
         },
+        sendInterAgentMessage: (from, to, msg) => interAgentSend?.(from, to, msg),
       });
+
+    daemonControlPort = controlPort;
 
     // Write initial daemon state (no lock needed for state file)
     const fileState: DaemonLocallyPersistedState = {
@@ -2492,6 +2506,9 @@ export async function startDaemon(): Promise<void> {
 
     // Connect to server
     apiMachine.connect();
+
+    // Wire inter-agent forwarding now that the machine socket is live.
+    interAgentSend = (from, to, msg) => apiMachine.sendInterAgentMessage(from, to, msg);
 
     // Brief ring buffer — keeps last 20 briefs for DaemonState push
     const MAX_RECENT_BRIEFS = 20;

@@ -257,6 +257,12 @@ class Sync {
     detail?: Record<string, unknown>;
     createdAt: number;
   }) => void>();
+  private interAgentMessageListeners = new Set<(event: {
+    fromSessionId: string;
+    toSessionId: string;
+    message: string;
+    sentAt: number;
+  }) => void>();
   private preferencesMigrationDone = false;
   private projectMigrationFailures = new Map<string, number>();
   private pendingSettings: Partial<Settings> = loadPendingSettings();
@@ -2704,6 +2710,19 @@ class Sync {
       }
     }
 
+    // Handle inter-agent-message: notify listeners for Swarm coordination display
+    if (updateData.type === "inter-agent-message") {
+      const msg = {
+        fromSessionId: updateData.fromSessionId,
+        toSessionId: updateData.toSessionId,
+        message: updateData.message,
+        sentAt: updateData.sentAt,
+      };
+      for (const listener of this.interAgentMessageListeners) {
+        listener(msg);
+      }
+    }
+
     // Handle supervisor-loop-status: notify listeners for real-time Loop status updates.
     if (updateData.type === "supervisor-loop-status") {
       const loopEvent = {
@@ -3018,6 +3037,15 @@ class Sync {
     return () => { this.sessionEventCreatedListeners.delete(listener); };
   }
 
+  onInterAgentMessage(listener: (event: {
+    fromSessionId: string;
+    toSessionId: string;
+    message: string;
+    sentAt: number;
+  }) => void): () => void {
+    this.interAgentMessageListeners.add(listener);
+    return () => { this.interAgentMessageListeners.delete(listener); };
+  }
 
   destroy() {
     this.appStateSubscription?.remove();
