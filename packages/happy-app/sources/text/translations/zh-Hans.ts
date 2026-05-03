@@ -55,6 +55,11 @@ export const zhHans: TranslationStructure = {
     categorySystem: "系统",
   },
 
+  agentsDashboard: {
+    sectionTitle: "活跃代理",
+    agentCount: ({ count }: { count: number }) => `${count} 个代理`,
+  },
+
   timeline: {
     title: "时间轴",
     subtitle: "会话活动时间轴",

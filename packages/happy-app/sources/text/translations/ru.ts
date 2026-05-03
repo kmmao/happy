@@ -66,6 +66,11 @@ export const ru: TranslationStructure = {
     categorySystem: "Система",
   },
 
+  agentsDashboard: {
+    sectionTitle: "Активные агенты",
+    agentCount: ({ count }: { count: number }) => `${count} агент${count === 1 ? "" : count < 5 ? "а" : "ов"}`,
+  },
+
   timeline: {
     title: "Лента событий",
     subtitle: "Временная шкала активности сессии",

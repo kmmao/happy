@@ -53,6 +53,11 @@ export const it: TranslationStructure = {
     categorySystem: "Sistema",
   },
 
+  agentsDashboard: {
+    sectionTitle: "Agenti attivi",
+    agentCount: ({ count }: { count: number }) => `${count} agente${count === 1 ? "" : "s"}`,
+  },
+
   timeline: {
     title: "Cronologia",
     subtitle: "Cronologia dell'attività della sessione",

@@ -68,6 +68,11 @@ export const en: TranslationStructure = {
     categorySystem: "System",
   },
 
+  agentsDashboard: {
+    sectionTitle: "Active Agents",
+    agentCount: ({ count }: { count: number }) => `${count} agent${count === 1 ? "" : "s"}`,
+  },
+
   timeline: {
     title: "Timeline",
     subtitle: "Session activity timeline",

@@ -4,7 +4,10 @@ import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 import { SessionsList } from './SessionsList';
 import { EmptyMainScreen } from './EmptyMainScreen';
 import { SharedStateView } from './SharedStateView';
+import { AgentsDashboard } from './AgentsDashboard';
 import { useVisibleSessionListViewData } from '@/hooks/useVisibleSessionListViewData';
+import { useSessions } from '@/sync/storage';
+import { Session } from '@/sync/storageTypes';
 import { t } from '@/text';
 
 const stylesheet = StyleSheet.create((theme) => ({
@@ -40,7 +43,15 @@ const stylesheet = StyleSheet.create((theme) => ({
 export const SessionsListWrapper = React.memo(() => {
     useUnistyles();
     const sessionListViewData = useVisibleSessionListViewData();
+    const allSessions = useSessions();
     const styles = stylesheet;
+
+    const activeSessions = React.useMemo(() => {
+        if (!allSessions) return [] as Session[];
+        return (allSessions as Session[]).filter((item): item is Session =>
+            typeof item !== 'string' && item.active === true
+        );
+    }, [allSessions]);
 
     if (sessionListViewData === null) {
         return (
@@ -66,6 +77,7 @@ export const SessionsListWrapper = React.memo(() => {
 
     return (
         <View style={styles.container}>
+            <AgentsDashboard sessions={activeSessions} />
             <SessionsList />
         </View>
     );

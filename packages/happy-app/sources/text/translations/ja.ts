@@ -56,6 +56,11 @@ export const ja: TranslationStructure = {
     categorySystem: "システム",
   },
 
+  agentsDashboard: {
+    sectionTitle: "アクティブエージェント",
+    agentCount: ({ count }: { count: number }) => `${count}件のエージェント`,
+  },
+
   timeline: {
     title: "タイムライン",
     subtitle: "セッション活動タイムライン",
