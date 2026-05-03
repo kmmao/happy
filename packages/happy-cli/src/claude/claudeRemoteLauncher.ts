@@ -1929,6 +1929,16 @@ export async function claudeRemoteLauncher(
                 logger.debug(
                   "[remote]: non-model mode change detected, pending message for restart",
                 );
+
+                // When switching TO bypass/yolo, immediately sync the permission
+                // handler so any in-flight tool calls are auto-approved and stale
+                // "needs permission" indicators are cleared before the cold restart.
+                const newMappedForRestart = mapToClaudeMode(msg.mode.permissionMode);
+                if (newMappedForRestart === "bypassPermissions") {
+                  permissionHandler.handleModeChange(msg.mode.permissionMode);
+                  permissionHandler.autoApproveAllPending();
+                }
+
                 executionGuard.requestRestart("mode_change");
                 pending = msg;
                 return null;

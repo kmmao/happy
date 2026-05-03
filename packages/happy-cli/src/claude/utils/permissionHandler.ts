@@ -561,6 +561,44 @@ export class PermissionHandler {
   }
 
   /**
+   * Auto-approve all pending permission requests and clear them from agentState.
+   * Used when switching to bypassPermissions/Yolo mode mid-turn to prevent
+   * stale "needs permission" indicators in the App.
+   */
+  autoApproveAllPending(): void {
+    for (const [id, pending] of this.pendingRequests.entries()) {
+      this.responses.set(id, { id, approved: true, receivedAt: Date.now() });
+      pending.resolve({
+        behavior: "allow",
+        updatedInput: (pending.input as Record<string, unknown>) || {},
+      });
+    }
+    const approvedIds = [...this.pendingRequests.keys()];
+    this.pendingRequests.clear();
+
+    if (approvedIds.length > 0) {
+      this.session.client.updateAgentState((currentState) => {
+        const requests = { ...currentState.requests };
+        const completedRequests = { ...currentState.completedRequests };
+        for (const id of approvedIds) {
+          const req = requests[id];
+          if (req) {
+            completedRequests[id] = {
+              ...req,
+              completedAt: Date.now(),
+              status: "approved",
+              reason: "Auto-approved on Yolo mode switch",
+            };
+            delete requests[id];
+          }
+        }
+        return { ...currentState, requests, completedRequests };
+      });
+      logger.debug(`[permission] Auto-approved ${approvedIds.length} pending requests on mode switch`);
+    }
+  }
+
+  /**
    * Sets up the client handler for permission responses
    */
   private setupClientHandler(): void {
