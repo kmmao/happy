@@ -805,14 +805,16 @@ async function handleFixTrigger(
     fixMode,
   });
 
+  const parentSessionId = deps.resolveGuardianSessionId?.(data) ?? undefined;
   logger.debug(
-    `[SUPERVISOR] Fix session ${spawnResult.sessionId} spawned for action ${actionId}`,
+    `[SUPERVISOR] Fix session ${spawnResult.sessionId} spawned for action ${actionId}${parentSessionId ? ` (parent: ${parentSessionId})` : ""}`,
   );
   deps.emitSupervisorFixStatus({
     actionId,
     projectId,
     fixStatus: "running",
     fixSessionId: spawnResult.sessionId,
+    parentSessionId,
   });
   return spawnResult.sessionId;
 }

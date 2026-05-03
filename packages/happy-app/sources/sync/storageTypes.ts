@@ -187,6 +187,7 @@ export interface Session {
   active: boolean;
   activeAt: number;
   forkedFromSessionId?: string | null;
+  parentSessionId?: string | null;
   rpcReady: boolean; // true when at least one RPC method is registered for this session
   metadata: Metadata | null;
   metadataVersion: number;

@@ -151,6 +151,7 @@ model Session {
     preferencesVersion Int              @default(0)
     dataEncryptionKey Bytes?
     forkedFromSessionId String?          // Happy session ID this was forked from
+    parentSessionId   String?          // Parent session ID (e.g. guardian session that spawned this fix agent)
     seq               Int              @default(0)
     active            Boolean          @default(true)
     lastActiveAt      DateTime         @default(now())

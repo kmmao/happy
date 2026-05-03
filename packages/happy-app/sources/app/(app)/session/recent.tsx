@@ -34,6 +34,20 @@ const styles = StyleSheet.create((theme, rt) => ({
     alignItems: "stretch",
     backgroundColor: theme.colors.groupped.background,
   },
+  subAgentBadge: {
+    backgroundColor: theme.colors.textSecondary + "22",
+    borderRadius: 4,
+    paddingHorizontal: 5,
+    paddingVertical: 2,
+    marginLeft: 4,
+    alignSelf: "center",
+  },
+  subAgentBadgeText: {
+    fontSize: 10,
+    color: theme.colors.textSecondary,
+    ...Typography.default("semiBold"),
+    letterSpacing: 0.2,
+  },
   contentContainer: {
     flex: 1,
     maxWidth: screenLayoutMaxWidth(rt.screen.width, rt.screen.height),
@@ -249,6 +263,11 @@ function SessionHistory() {
                 <Text style={styles.sessionTitle} numberOfLines={1}>
                   {sessionName}
                 </Text>
+                {session.parentSessionId ? (
+                  <View style={styles.subAgentBadge}>
+                    <Text style={styles.subAgentBadgeText}>Sub</Text>
+                  </View>
+                ) : null}
                 <SessionProviderTag session={session} includeModel />
               </View>
               <Text style={styles.sessionSubtitle} numberOfLines={1}>

@@ -361,6 +361,7 @@ export type SupervisorFixStatusData = {
   projectId: string;
   fixStatus: "queued" | "running" | "completed" | "failed" | "cancelled" | "analyzed";
   fixSessionId?: string;
+  parentSessionId?: string;
 };
 
 const TAILSCALE_REFRESH_MS = 5 * 60 * 1000; // 5 minutes

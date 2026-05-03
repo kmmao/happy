@@ -302,6 +302,7 @@ export function sessionRoutes(app: Fastify) {
           active: true,
           lastActiveAt: true,
           forkedFromSessionId: true,
+          parentSessionId: true,
         },
       });
 
@@ -334,6 +335,7 @@ export function sessionRoutes(app: Fastify) {
             ? Buffer.from(v.dataEncryptionKey).toString("base64")
             : null,
           forkedFromSessionId: v.forkedFromSessionId ?? null,
+          parentSessionId: v.parentSessionId ?? null,
         })),
         nextCursor,
         hasNext,
@@ -828,6 +830,45 @@ export function sessionRoutes(app: Fastify) {
       const updated = await db.session.update({
         where: { id: sessionId },
         data: { forkedFromSessionId },
+      });
+
+      const updatePayload = buildNewSessionUpdate(updated, updSeq, randomKeyNaked(12));
+      eventRouter.emitUpdate({
+        userId,
+        payload: updatePayload,
+        recipientFilter: { type: "user-scoped-only" },
+      });
+
+      return reply.send({ success: true });
+    },
+  );
+
+  // Set parent session — records which session spawned this one (e.g. supervisor fix agent)
+  app.patch(
+    "/v1/sessions/:sessionId/parent",
+    {
+      preHandler: app.authenticate,
+      schema: {
+        params: z.object({ sessionId: z.string() }),
+        body: z.object({ parentSessionId: z.string() }),
+      },
+    },
+    async (request, reply) => {
+      const userId = request.userId;
+      const { sessionId } = request.params;
+      const { parentSessionId } = request.body;
+
+      const session = await db.session.findFirst({
+        where: { id: sessionId, accountId: userId },
+      });
+      if (!session) {
+        return reply.code(404).send({ error: "Session not found" });
+      }
+
+      const updSeq = await allocateUserSeq(userId);
+      const updated = await db.session.update({
+        where: { id: sessionId },
+        data: { parentSessionId },
       });
 
       const updatePayload = buildNewSessionUpdate(updated, updSeq, randomKeyNaked(12));

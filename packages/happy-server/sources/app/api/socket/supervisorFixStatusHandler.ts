@@ -22,6 +22,7 @@ const supervisorFixStatusSchema = z.object({
     projectId: z.string().min(1),
     fixStatus: z.enum(["running", "completed", "failed", "analyzed"]),
     fixSessionId: z.string().min(1).optional(),
+    parentSessionId: z.string().min(1).optional(),
 });
 
 export function supervisorFixStatusHandler(
@@ -72,6 +73,18 @@ export function supervisorFixStatusHandler(
                 where: { id: data.actionId },
                 data: updateData,
             });
+
+            // When the fix session starts running and a parent session is known, record the hierarchy
+            if (
+                data.fixStatus === "running" &&
+                data.fixSessionId &&
+                data.parentSessionId
+            ) {
+                await db.session.updateMany({
+                    where: { id: data.fixSessionId, accountId: userId },
+                    data: { parentSessionId: data.parentSessionId },
+                });
+            }
 
             log(
                 { module: "supervisor" },
