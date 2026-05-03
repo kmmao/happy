@@ -59,6 +59,7 @@ const defaultConfig = {
         observability: false,
         apiDesign: false,
         buildCI: false,
+        prReview: false,
     },
     autoApprove: {
         semiAutoSeverities: ["low", "medium"] as Severity[],
@@ -719,6 +720,13 @@ function SupervisorSettingsScreen() {
                     onToggle={() => toggleDimension("buildCI")}
                     subtitle={t("supervisor.dimBuildCINote")}
                     onInfo={() => setDimInfoKey("buildCI")}
+                />
+                <ToggleRow
+                    label={t("supervisor.dimPrReview")}
+                    value={config.analysis.prReview}
+                    onToggle={() => toggleDimension("prReview")}
+                    subtitle={t("supervisor.dimPrReviewNote")}
+                    onInfo={() => setDimInfoKey("prReview")}
                     isLast
                 />
             </ItemGroup>

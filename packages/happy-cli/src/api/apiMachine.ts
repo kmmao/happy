@@ -338,6 +338,16 @@ export type SupervisorTriggerData = {
   runtimeProfile?: ResolvedRuntimeProfile;
   /** Agent to use for this run. When absent, CLI infers from runtimeProfile. */
   agent?: string;
+  /** PR metadata for PR-open-triggered review scans. */
+  prContext?: {
+    prNumber: number;
+    prTitle: string;
+    prDescription: string;
+    prUrl: string;
+    headBranch: string;
+    baseBranch: string;
+    author: string;
+  };
 };
 
 export type SupervisorRunStatusData = {

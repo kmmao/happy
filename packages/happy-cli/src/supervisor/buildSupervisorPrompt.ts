@@ -26,6 +26,16 @@ export interface SupervisorPromptOptions {
   readonly customDimensions?: ReadonlyArray<{ key: string; title: string; prompt: string }>;
   /** Changed files (for incremental/push-triggered scans). */
   readonly changedFiles?: readonly string[];
+  /** PR metadata for PR-open-triggered review scans. */
+  readonly prContext?: {
+    prNumber: number;
+    prTitle: string;
+    prDescription: string;
+    prUrl: string;
+    headBranch: string;
+    baseBranch: string;
+    author: string;
+  };
   /** User-defined custom analysis rules (appended to prompt). */
   readonly customRules?: string;
   /** Existing pending/approved actions to avoid duplicating. */
@@ -81,6 +91,21 @@ findings related to these files.
 `
       : "";
 
+  const prContextSection = options.prContext
+    ? `
+## PR Review Context
+This analysis is running for a **pull request**:
+- PR #${options.prContext.prNumber}: ${options.prContext.prTitle}
+- Author: ${options.prContext.author}
+- URL: ${options.prContext.prUrl}
+- Branch: \`${options.prContext.headBranch}\` → \`${options.prContext.baseBranch}\`
+${options.prContext.prDescription ? `- Description: ${options.prContext.prDescription.slice(0, 500)}` : ""}
+
+Focus your analysis on the diff between \`${options.prContext.baseBranch}\` and \`${options.prContext.headBranch}\`.
+Run: \`git diff origin/${options.prContext.baseBranch}...HEAD\` to see the changes.
+`
+    : "";
+
   const customRulesSection =
     options.customRules && options.customRules.trim().length > 0
       ? `
@@ -124,7 +149,7 @@ ${options.customRules.trim()}
 - Run ID: ${options.runId}
 - Trigger: ${options.trigger}
 - Repository: ${options.repoPath}
-${autoModeSection}${incrementalSection}${customRulesSection}${existingActionsSection}## Rules (CRITICAL)
+${autoModeSection}${incrementalSection}${prContextSection}${customRulesSection}${existingActionsSection}## Rules (CRITICAL)
 1. **DO NOT modify any files.** This is a read-only analysis session.
 2. **DO NOT create commits, branches, or PRs.**
 3. **DO NOT run destructive commands** (rm, git reset, etc.).

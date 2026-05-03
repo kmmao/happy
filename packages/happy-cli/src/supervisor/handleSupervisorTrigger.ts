@@ -193,6 +193,7 @@ export async function handleSupervisorTrigger(
     maxFindings,
     loopId,
     loopIteration,
+    prContext,
   } = data;
 
   if (loopId) {
@@ -404,6 +405,7 @@ export async function handleSupervisorTrigger(
           customDimensions,
           existingActions,
           maxFindings,
+          prContext,
           deps,
         );
       }
@@ -467,6 +469,7 @@ async function handleAnalysisTrigger(
   customDimensions: SupervisorTriggerData["customDimensions"],
   existingActions: SupervisorTriggerData["existingActions"],
   maxFindings: number | undefined,
+  prContext: SupervisorTriggerData["prContext"],
   deps: SupervisorHandlerDeps,
 ): Promise<string | undefined> {
   const { runId, projectId, repoPath, trigger } = data;
@@ -501,6 +504,7 @@ async function handleAnalysisTrigger(
     mode,
     dimensions,
     changedFiles,
+    prContext,
     customRules,
     customDimensions,
     existingActions,

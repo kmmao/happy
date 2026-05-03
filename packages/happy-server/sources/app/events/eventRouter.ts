@@ -1111,6 +1111,16 @@ export interface SupervisorTriggerOptions {
   runtimeProfile?: ResolvedRuntimeProfile;
   /** Agent to use ("claude" | "codex" | "gemini"). CLI infers from profile when absent. */
   agent?: string;
+  /** PR metadata for PR-open-triggered review scans. */
+  prContext?: {
+    prNumber: number;
+    prTitle: string;
+    prDescription: string;
+    prUrl: string;
+    headBranch: string;
+    baseBranch: string;
+    author: string;
+  };
 }
 
 export function buildSupervisorTriggerEphemeral(opts: SupervisorTriggerOptions): EphemeralPayload {

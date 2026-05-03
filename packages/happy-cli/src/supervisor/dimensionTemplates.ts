@@ -176,6 +176,20 @@ export const dimensionTemplates: Record<string, DimensionTemplate> = {
 - Verify that build scripts in package.json are consistent with what CI actually runs`,
   },
 
+  prReview: {
+    key: "prReview",
+    title: "PR Code Review",
+    category: "pr-review",
+    prompt: `- Run \`git diff origin/main...HEAD\` (or the base branch from PR context if provided) to see all changes in this PR
+- Scan changed files for security issues: new hardcoded secrets, missing input validation, auth bypasses, injection patterns
+- Review code quality in the diff: unhandled promise rejections, missing error handling, unsafe type assertions, logic bugs
+- Check that new API endpoints have proper authentication, input validation, and rate limiting
+- Look for breaking changes: renamed or removed exports, changed function signatures, incompatible schema migrations
+- Verify new code follows the project's established patterns and conventions (check CLAUDE.md if present)
+- Check if new functionality has corresponding tests; flag significant logic paths without test coverage
+- Look for performance regressions: new N+1 query patterns, missing indexes, synchronous blocking in async paths`,
+  },
+
   featureCompleteness: {
     key: "featureCompleteness",
     title: "Feature Completeness",

@@ -113,6 +113,15 @@ const builtInDimensionPrompts: Record<string, string> = {
 • Check for state management fragmentation (same data in multiple places)
 • Identify error handling path inconsistencies (toast vs modal vs silent failure)
 • Look for naming/convention drift in newer code vs established patterns`,
+
+    prReview: `• Run git diff origin/main...HEAD to see all changes in this PR
+• Scan changed files for security issues: hardcoded secrets, missing input validation, auth bypasses
+• Review code quality in the diff: unhandled errors, unsafe type assertions, logic bugs
+• Check that new API endpoints have proper authentication, validation, and rate limiting
+• Look for breaking changes: renamed/removed exports, changed signatures, incompatible migrations
+• Verify new code follows the project's established patterns and conventions (check CLAUDE.md)
+• Check if new functionality has corresponding tests; flag logic paths without coverage
+• Look for performance regressions: N+1 queries, missing indexes, synchronous blocking in async paths`,
 };
 
 /** Get the prompt detail text for a built-in dimension key. Returns null for unknown keys. */

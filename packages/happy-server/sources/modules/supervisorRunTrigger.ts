@@ -44,6 +44,16 @@ interface EmitResolvedSupervisorRunTriggerInput {
     maxFindings?: number;
     /** Agent type to use. CLI infers from profile when absent. */
     agent?: string;
+    /** PR metadata for PR-open-triggered review scans. */
+    prContext?: {
+        prNumber: number;
+        prTitle: string;
+        prDescription: string;
+        prUrl: string;
+        headBranch: string;
+        baseBranch: string;
+        author: string;
+    };
 }
 
 interface EmitConfiguredSupervisorRunTriggerInput
