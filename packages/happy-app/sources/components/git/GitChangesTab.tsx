@@ -717,7 +717,7 @@ const GitChangesTab = React.memo<{
                   ? t("files.noFilesFound")
                   : t("files.noFilesInProject")}
               </Text>
-              {searchQuery && (
+              {searchQuery ? (
                 <Text
                   style={{
                     fontSize: 14,
@@ -729,11 +729,11 @@ const GitChangesTab = React.memo<{
                 >
                   {t("files.tryDifferentTerm")}
                 </Text>
-              )}
+              ) : null}
             </View>
           ) : (
             <>
-              {searchQuery && (
+              {searchQuery ? (
                 <View
                   style={{
                     backgroundColor: theme.colors.surfaceHigh,
@@ -759,7 +759,7 @@ const GitChangesTab = React.memo<{
                     })}
                   </Text>
                 </View>
-              )}
+              ) : null}
               {searchResults.map((file, index) => (
                 <Item
                   key={`file-${file.fullPath}-${index}`}
@@ -999,7 +999,7 @@ const GitChangesTab = React.memo<{
                         : `${t("files.submodule")}: ${submodule.path}`}
                     </Text>
                   </View>
-                  {submodule.branch && (
+                  {submodule.branch ? (
                     <View
                       style={{
                         flexDirection: "row",
@@ -1023,7 +1023,7 @@ const GitChangesTab = React.memo<{
                         {submodule.branch}
                       </Text>
                     </View>
-                  )}
+                  ) : null}
                 </View>
               );
 
