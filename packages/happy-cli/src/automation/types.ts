@@ -91,6 +91,9 @@ export interface TaskTriggerData {
   // packages/happy-wire/src/tasks.ts (wire 0.14.0+).
   profileId?: string;
   runtimeProfile?: ResolvedRuntimeProfile;
+  // When true, the CLI creates a dedicated git worktree from `directory` at
+  // execution time rather than running directly in `directory` (wire 0.17.0+).
+  worktreeIsolation?: boolean;
 }
 
 export type AutomationJobKind = "supervisor" | "webhook" | "agent_loop" | "task";

@@ -1199,6 +1199,9 @@ export function buildTaskTriggerEphemeral(opts: {
   // keep the pre-0.14.0 payload shape.
   profileId?: string;
   runtimeProfile?: ResolvedRuntimeProfile;
+  // Worktree isolation flag (wire 0.17.0). When true, the CLI creates a
+  // dedicated git worktree from `directory` at execution time.
+  worktreeIsolation?: boolean;
 }): EphemeralPayload {
   return {
     type: "task-trigger",

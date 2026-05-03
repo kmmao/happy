@@ -22,6 +22,7 @@ export interface ServerTask {
     title: string | null;
     promptPreview: string;
     skillNames: string[];
+    worktreeIsolation: boolean;
 }
 
 interface TaskListResponse {
@@ -83,6 +84,9 @@ export async function createTask(
         projectId?: string;
         /** Absolute path on machine (e.g. Git worktree); server requires projectId and validates prefix. */
         directory?: string;
+        /** When true, the CLI creates a dedicated git worktree at execution time. */
+        worktreeIsolation?: boolean;
+        profileId?: string;
     },
 ): Promise<ServerTask> {
     const API_ENDPOINT = getServerUrl();

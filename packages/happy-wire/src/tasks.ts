@@ -65,6 +65,10 @@ export const CreateTaskBodySchema = z.object({
   // when omitted the server falls back to Project.supervisorConfig.defaultProfileId
   // via the unified runtimeProfileResolver (feature-flagged).
   profileId: z.string().optional(),
+  // When true, the CLI creates a dedicated git worktree at execution time
+  // instead of the App creating one upfront. Enables isolation for cron/webhook
+  // triggered tasks as well as manual tasks (wire 0.17.0+).
+  worktreeIsolation: z.boolean().optional(),
 });
 export type CreateTaskBody = z.infer<typeof CreateTaskBodySchema>;
 
@@ -91,6 +95,10 @@ export const TaskTriggerDataSchema = z.object({
   // these are always populated for scheduled/webhook/manual tasks.
   profileId: z.string().optional(),
   runtimeProfile: ResolvedRuntimeProfileSchema.optional(),
+  // When true, the CLI creates a dedicated git worktree from `directory` at
+  // execution time rather than running directly in `directory`. Optional for
+  // backward compatibility (wire 0.17.0+).
+  worktreeIsolation: z.boolean().optional(),
 });
 export type TaskTriggerData = z.infer<typeof TaskTriggerDataSchema>;
 

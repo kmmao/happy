@@ -40,6 +40,7 @@ function NewTaskPage() {
     const [selectedProjectId, setSelectedProjectId] = React.useState<string | null>(null);
     const [maxAttempts, setMaxAttempts] = React.useState("3");
     const [selectedProfileId, setSelectedProfileId] = React.useState<string | null>(null);
+    const [worktreeIsolation, setWorktreeIsolation] = React.useState(false);
 
     const settings = useSettings();
     const allProfiles = React.useMemo(() => {
@@ -77,6 +78,7 @@ function NewTaskPage() {
                     selectedProjectId,
                     selectedProfileId,
                     machineProjects,
+                    worktreeIsolation,
                 });
                 router.back();
             } catch (error) {
@@ -189,6 +191,21 @@ function NewTaskPage() {
                         effectiveLabel={effective?.label}
                     />
                 </View>
+            </ItemGroup>
+
+            {/* Worktree Isolation */}
+            <ItemGroup title={t("tasks.worktreeIsolation")} footer={t("tasks.worktreeIsolationDesc")}>
+                <Item
+                    title={t("tasks.worktreeIsolation")}
+                    rightElement={
+                        <Ionicons
+                            name={worktreeIsolation ? "checkbox" : "square-outline"}
+                            size={22}
+                            color={worktreeIsolation ? theme.colors.textLink : theme.colors.textSecondary}
+                        />
+                    }
+                    onPress={() => setWorktreeIsolation((v) => !v)}
+                />
             </ItemGroup>
 
             {/* Max Attempts */}

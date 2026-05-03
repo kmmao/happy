@@ -118,6 +118,32 @@ async function checkBranchMerged(
   return false;
 }
 
+/**
+ * Generate a human-readable hint explaining how to create a PR or merge the
+ * task's isolated worktree branch once the task has completed.
+ */
+export function generateTaskWorktreePRHint(opts: {
+  readonly branchName: string;
+  readonly parentBranch: string;
+  readonly worktreePath: string;
+}): string {
+  const { branchName, parentBranch, worktreePath } = opts;
+  return [
+    `Task completed in isolated worktree branch '${branchName}'.`,
+    `  Worktree path : ${worktreePath}`,
+    `  Parent branch : ${parentBranch}`,
+    ``,
+    `To create a pull request:`,
+    `  git -C "${worktreePath}" push -u origin ${branchName}`,
+    `  gh pr create --head ${branchName} --base ${parentBranch}`,
+    ``,
+    `To merge directly:`,
+    `  git -C "${worktreePath}" fetch origin ${parentBranch}`,
+    `  git -C "${worktreePath}" rebase origin/${parentBranch}`,
+    `  git checkout ${parentBranch} && git merge --ff-only ${branchName}`,
+  ].join("\n");
+}
+
 async function performCleanup(
   worktreeInfo: WorktreeCleanupInput,
 ): Promise<WorktreeCleanupResult> {

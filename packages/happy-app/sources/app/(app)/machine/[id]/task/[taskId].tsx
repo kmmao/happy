@@ -236,6 +236,11 @@ function TaskDetailScreen() {
                     <View style={styles.chip}>
                         <Text style={styles.chipText}>{`${task.attempt}/${task.maxAttempts}`}</Text>
                     </View>
+                    {task.worktreeIsolation ? (
+                        <View style={styles.chip}>
+                            <Text style={styles.chipText}>{t("tasks.worktreeIsolation")}</Text>
+                        </View>
+                    ) : null}
                 </View>
 
                 {actions.sessionHref ? (

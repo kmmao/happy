@@ -23,6 +23,7 @@ type CreateTaskFn = (credentials: AuthCredentials, body: {
     projectId?: string;
     profileId?: string;
     directory?: string;
+    worktreeIsolation?: boolean;
 }) => Promise<unknown>;
 
 type CreateWorktreeFn = (machineId: string, basePath: string, issueNumber?: number) => Promise<{
@@ -48,6 +49,9 @@ interface SubmitTaskInput {
     selectedProjectId: string | null;
     selectedProfileId?: string | null;
     machineProjects: Project[];
+    // When true, the CLI creates a worktree at execution time; App-side
+    // worktree creation is skipped so the project path is passed as directory.
+    worktreeIsolation?: boolean;
 }
 
 async function resolveDeps(deps: SubmitTaskDeps): Promise<Required<SubmitTaskDeps>> {
@@ -85,14 +89,21 @@ export async function submitTask(
             throw new WorktreeSetupError("resolve_project_path", "Failed to resolve project path");
         }
 
-        const wt = await createWorktreeImpl(input.machineId, proj.key.path);
-        if (!wt.success) {
-            throw new WorktreeSetupError(
-                wt.errorCode === "not_git_repo" ? "not_git_repo" : "create_worktree_failed",
-                wt.error ?? "Failed to create worktree",
-            );
+        if (input.worktreeIsolation) {
+            // CLI-side isolation: pass the project path; the CLI creates the
+            // worktree at execution time via worktreeIsolation flag.
+            taskDirectory = undefined; // server will use project.path
+        } else {
+            // Legacy App-side worktree creation (default when no flag set).
+            const wt = await createWorktreeImpl(input.machineId, proj.key.path);
+            if (!wt.success) {
+                throw new WorktreeSetupError(
+                    wt.errorCode === "not_git_repo" ? "not_git_repo" : "create_worktree_failed",
+                    wt.error ?? "Failed to create worktree",
+                );
+            }
+            taskDirectory = wt.worktreePath;
         }
-        taskDirectory = wt.worktreePath;
     }
 
     await createTaskImpl(input.credentials, {
@@ -103,5 +114,6 @@ export async function submitTask(
         projectId: input.selectedProjectId ?? undefined,
         profileId: input.selectedProfileId ?? undefined,
         directory: taskDirectory,
+        worktreeIsolation: input.worktreeIsolation ?? false,
     });
 }

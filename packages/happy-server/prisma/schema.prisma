@@ -874,6 +874,11 @@ model Task {
     // runtime. NOT NULL constraint is a follow-up migration.
     profileId       String?
 
+    // Worktree isolation (wire 0.17.0 / schema 2026-05-04)
+    // When true, the CLI creates a dedicated git worktree at execution time
+    // rather than running directly in the task directory.
+    worktreeIsolation Boolean @default(false)
+
     // Execution tracking
     sessionId       String?                         // CLI session spawned for this task
     errorMessage    String?

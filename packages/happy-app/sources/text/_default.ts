@@ -2349,6 +2349,8 @@ export const en = {
     restored: "Task restored",
     session: "Session",
     trigger: "Trigger",
+    worktreeIsolation: "Worktree Isolation",
+    worktreeIsolationDesc: "CLI creates a dedicated git branch and worktree at execution time, keeping parallel tasks isolated from each other.",
   },
 
   skills: {

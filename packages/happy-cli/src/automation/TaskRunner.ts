@@ -9,6 +9,7 @@ import type {
   SpawnSessionResult,
 } from "@/modules/common/registerCommonHandlers";
 import type { AutomationAuditEvent, TaskTriggerData } from "./types";
+import { createWorktreeLocal, removeWorktreeForced } from "@/webhook/createWorktreeLocal";
 
 export interface TaskHandlerDeps {
   readonly spawnSession: (
@@ -94,18 +95,36 @@ export async function runTaskJob(
   deps: TaskHandlerDeps,
 ): Promise<{ success: boolean; errorMessage?: string; sessionId?: string }> {
   const resolvedDirectory = resolveTaskDirectory(data.directory);
+
+  // When worktreeIsolation is requested, create a dedicated git worktree so
+  // parallel tasks cannot clobber each other's working tree.
+  let sessionDirectory = resolvedDirectory;
+  let isolatedBranchName: string | undefined;
+  if (data.worktreeIsolation) {
+    const wtResult = await createWorktreeLocal(resolvedDirectory, { prefix: "task" });
+    if (!wtResult.success) {
+      const errorMessage = wtResult.error ?? "Failed to create worktree for task isolation";
+      logger.warn(`[TASK] Worktree isolation requested but failed for ${data.taskId}: ${errorMessage}`);
+      await deps.onTaskStatusChange?.(data.taskId, "failed", undefined, errorMessage);
+      return { success: false, errorMessage };
+    }
+    sessionDirectory = wtResult.worktreePath;
+    isolatedBranchName = wtResult.branchName;
+    logger.debug(`[TASK] Created isolation worktree '${wtResult.branchName}' for task ${data.taskId}`);
+  }
+
   const fullPrompt = buildTaskPrompt(data, deps);
-  const promptFilePath = await writePromptFile(resolvedDirectory, data.taskId, fullPrompt);
+  const promptFilePath = await writePromptFile(sessionDirectory, data.taskId, fullPrompt);
 
   logger.debug(
-    `[TASK] Running task ${data.taskId} at ${resolvedDirectory}`,
+    `[TASK] Running task ${data.taskId} at ${sessionDirectory}`,
   );
 
   await deps.onTaskStatusChange?.(data.taskId, "running");
 
   const agentType = (data.agentType ?? "claude") as "claude" | "codex";
   const spawnResult = await deps.spawnSession({
-    directory: resolvedDirectory,
+    directory: sessionDirectory,
     approvedNewDirectoryCreation: false,
     agent: agentType,
     profileId: data.profileId,
@@ -130,6 +149,8 @@ export async function runTaskJob(
       // Per-role model override: inject into the spawned agent's environment
       ...(data.modelOverride && agentType === "claude" ? { ANTHROPIC_MODEL: data.modelOverride } : {}),
       ...(agentType === "codex" ? { OPENAI_MODEL: LOCKED_CODEX_MODEL } : {}),
+      // Expose worktree branch name so the agent can create a PR on completion
+      ...(isolatedBranchName ? { HAPPY_TASK_WORKTREE_BRANCH: isolatedBranchName } : {}),
     },
   });
 
@@ -151,6 +172,10 @@ export async function runTaskJob(
       return { success: true };
     }
     await cleanupPromptFile(promptFilePath);
+    // Clean up isolated worktree on spawn failure so it doesn't litter the repo.
+    if (isolatedBranchName) {
+      await removeWorktreeForced(resolvedDirectory, isolatedBranchName);
+    }
     await deps.onTaskStatusChange?.(data.taskId, "failed", undefined, errorMessage);
     return { success: false, errorMessage };
   }

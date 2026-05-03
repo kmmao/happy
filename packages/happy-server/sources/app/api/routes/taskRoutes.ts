@@ -34,6 +34,7 @@ const CreateTaskBodySchema = z.object({
     skillIds: z.array(z.string()).max(10).default([]),
     directory: z.string().min(1).max(4096).optional(),
     profileId: z.string().optional(),
+    worktreeIsolation: z.boolean().optional(),
 });
 
 const UpdateTaskBodySchema = z.object({
@@ -147,7 +148,7 @@ export function taskRoutes(app: Fastify) {
         },
         async (request, reply) => {
             const userId = request.userId;
-            const { machineId, prompt, priority, maxAttempts, skillIds, projectId, profileId: bodyProfileId, directory: bodyDirectory } = request.body;
+            const { machineId, prompt, priority, maxAttempts, skillIds, projectId, profileId: bodyProfileId, directory: bodyDirectory, worktreeIsolation } = request.body;
 
             const machine = await db.machine.findFirst({
                 where: { id: machineId, accountId: userId },
@@ -235,6 +236,7 @@ export function taskRoutes(app: Fastify) {
                     triggerType: "manual",
                     status: "dispatching",
                     profileId: taskProfileId,
+                    worktreeIsolation: worktreeIsolation ?? false,
                     ...(skillIds.length > 0
                         ? {
                               skillBindings: {
@@ -268,6 +270,7 @@ export function taskRoutes(app: Fastify) {
                         taskRuntimeProfile?.ok
                             ? taskRuntimeProfile.runtimeProfile
                             : undefined,
+                    worktreeIsolation: task.worktreeIsolation || undefined,
                 }),
                 recipientFilter: {
                     type: "machine-scoped-only",
@@ -508,6 +511,7 @@ export function taskRoutes(app: Fastify) {
                         retryRuntimeProfile?.ok
                             ? retryRuntimeProfile.runtimeProfile
                             : undefined,
+                    worktreeIsolation: task.worktreeIsolation || undefined,
                 }),
                 recipientFilter: {
                     type: "machine-scoped-only",
@@ -930,6 +934,7 @@ function serializeTask(task: Record<string, unknown>): Record<string, unknown> {
         createdAt: Date;
         updatedAt: Date;
         title?: string | null;
+        worktreeIsolation?: boolean;
         skillBindings?: Array<{ skill: { name: string } }>;
     };
 
@@ -951,6 +956,7 @@ function serializeTask(task: Record<string, unknown>): Record<string, unknown> {
         createdAt: t.createdAt.getTime(),
         updatedAt: t.updatedAt.getTime(),
         title: t.title ?? null,
+        worktreeIsolation: t.worktreeIsolation ?? false,
         promptPreview: truncateTaskPrompt(t.prompt, PROMPT_PREVIEW_LIMIT),
         skillNames: t.skillBindings?.map((b) => b.skill.name) ?? [],
     };
