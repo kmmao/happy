@@ -9,7 +9,7 @@
  * - Fix (trigger == "fix"): applies a fix for a specific finding
  */
 
-import { writeFile, mkdir, unlink } from "fs/promises";
+import { writeFile, mkdir, unlink, readFile } from "fs/promises";
 import { join } from "path";
 import { logger } from "@/ui/logger";
 import { withTimeout } from "@/utils/withTimeout";
@@ -597,13 +597,15 @@ async function handleResearchTrigger(
     status: "running",
   });
 
-  // 2. Build the research prompt
+  // 2. Build the research prompt (seed with project-level CONTEXT.md if present)
+  const contextMd = await readContextMd(repoPath);
   const prompt = buildResearchPrompt({
     projectId,
     runId,
     repoPath,
     researchParams,
     serverUrl: deps.serverUrl,
+    contextMd,
   });
 
   // 3. Write prompt to temp file in the project
@@ -727,6 +729,7 @@ async function handleFixTrigger(
     fixStatus: "running",
   });
 
+  const contextMd = await readContextMd(repoPath);
   const prompt = buildFixPrompt({
     projectId,
     actionId,
@@ -743,6 +746,7 @@ async function handleFixTrigger(
     fixStrategy,
     fixMode,
     analyzeAutoFix,
+    contextMd,
   });
 
   const promptDir = join(worktreeResult.worktreePath, ".claude");
@@ -811,6 +815,14 @@ async function handleFixTrigger(
     fixSessionId: spawnResult.sessionId,
   });
   return spawnResult.sessionId;
+}
+
+async function readContextMd(repoPath: string): Promise<string | undefined> {
+  try {
+    return await readFile(join(repoPath, ".happy", "CONTEXT.md"), "utf-8");
+  } catch {
+    return undefined;
+  }
 }
 
 async function writePromptFile(

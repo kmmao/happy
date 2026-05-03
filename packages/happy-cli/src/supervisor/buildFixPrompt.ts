@@ -29,6 +29,8 @@ export interface FixPromptOptions {
   readonly fixStrategy?: "direct" | "pr";
   readonly fixMode?: "fix" | "analyze-first";
   readonly analyzeAutoFix?: boolean;
+  /** Contents of .happy/CONTEXT.md — project-level context so the fix agent knows project constraints */
+  readonly contextMd?: string;
 }
 
 export function buildFixPrompt(options: FixPromptOptions): string {
@@ -42,10 +44,20 @@ ${options.suggestedFix}
 `
     : "";
 
+  const projectContextSection = options.contextMd?.trim()
+    ? `
+## Project Context (.happy/CONTEXT.md)
+The following is the project-level context defined by the user. Use it to understand
+project goals, constraints, and coding conventions before making any changes:
+
+${options.contextMd.trim()}
+`
+    : "";
+
   const reportUrl = `${options.serverUrl}/v1/projects/${options.projectId}/supervisor/actions/${options.actionId}/fix-status`;
 
   if (isAnalyzeFirst) {
-    return buildAnalyzeFirstPrompt(options, suggestedFixSection, reportUrl, strategy);
+    return buildAnalyzeFirstPrompt(options, suggestedFixSection, projectContextSection, reportUrl, strategy);
   }
 
   const processSection = strategy === "direct"
@@ -60,7 +72,7 @@ ${options.suggestedFix}
 - Repository: ${options.repoPath}
 - Category: ${options.category}
 - Severity: ${options.severity}
-
+${projectContextSection}
 ## Worktree
 - Branch: ${options.branchName}
 - Parent branch: ${options.parentBranch}
@@ -89,6 +101,7 @@ Begin fixing now.`;
 function buildAnalyzeFirstPrompt(
   options: FixPromptOptions,
   suggestedFixSection: string,
+  projectContextSection: string,
   reportUrl: string,
   fixStrategy: "direct" | "pr",
 ): string {
@@ -146,7 +159,7 @@ curl -s -X PATCH "${reportUrl}" \\
 - Repository: ${options.repoPath}
 - Category: ${options.category}
 - Severity: ${options.severity}
-
+${projectContextSection}
 ## Worktree
 - Branch: ${options.branchName}
 - Parent branch: ${options.parentBranch}

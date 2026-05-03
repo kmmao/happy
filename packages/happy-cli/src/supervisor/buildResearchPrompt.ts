@@ -13,6 +13,8 @@ export interface ResearchPromptOptions {
   readonly serverUrl: string;
   /** JSON string: { knownCompetitors?: string, focusAreas?: string, additionalNotes?: string, featureDirection?: string } */
   readonly researchParams?: string;
+  /** Contents of .happy/CONTEXT.md — project-level context injected as seed for the research */
+  readonly contextMd?: string;
 }
 
 export function buildResearchPrompt(options: ResearchPromptOptions): string {
@@ -111,6 +113,16 @@ ${parsedParams.additionalNotes.trim()}
 `
     : "";
 
+  const projectContextSection = options.contextMd?.trim()
+    ? `
+## Project Context (.happy/CONTEXT.md)
+The following is the project-level context defined by the user. Use it to understand
+project goals, constraints, and direction when selecting what features/gaps to prioritize:
+
+${options.contextMd.trim()}
+`
+    : "";
+
   const openSourceModeHeader = isOpenSourceMode
     ? `
 ## Mode: Open Source Discovery (PRIORITY)
@@ -162,7 +174,7 @@ For each competitor, analyze:
 - Project ID: ${options.projectId}
 - Run ID: ${options.runId}
 - Repository: ${options.repoPath}
-
+${projectContextSection}
 ## Rules (CRITICAL)
 1. **DO NOT modify any files.** This is a read-only analysis session.
 2. **DO NOT create commits, branches, or PRs.**
