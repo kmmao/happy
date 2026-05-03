@@ -5,6 +5,7 @@ import {
   FlatList,
   ActivityIndicator,
   Linking,
+  ScrollView,
 } from "react-native";
 import { Swipeable } from "react-native-gesture-handler";
 import { Text } from "@/components/StyledText";
@@ -351,6 +352,33 @@ const stylesheet = StyleSheet.create((theme, rt) => ({
     textAlign: "center",
     ...Typography.default("semiBold"),
   },
+  tagFilterBar: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    gap: 6,
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+  },
+  tagFilterChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 999,
+    backgroundColor: theme.colors.surface,
+    borderWidth: 0.5,
+    borderColor: theme.colors.divider,
+  },
+  tagFilterChipActive: {
+    backgroundColor: `${theme.colors.accentBlue}1A`,
+    borderColor: theme.colors.accentBlue,
+  },
+  tagFilterChipText: {
+    fontSize: 12,
+    color: theme.colors.textSecondary,
+    ...Typography.default("semiBold"),
+  },
+  tagFilterChipTextActive: {
+    color: theme.colors.accentBlue,
+  },
   deleteAllContainer: {
     paddingHorizontal: 16,
     paddingTop: 16,
@@ -385,16 +413,69 @@ export function SessionsList() {
   const compactSessionView = useSetting("compactSessionView");
   const router = useRouter();
   const selectable = isTablet;
+
+  const [activeTag, setActiveTag] = React.useState<string | null>(null);
+
+  const allTags = React.useMemo(() => {
+    if (!data) return [];
+    const tagSet = new Set<string>();
+    for (const item of data) {
+      if (item.type === "session") {
+        item.session.metadata?.tags?.forEach((tag) => tagSet.add(tag));
+      } else if (item.type === "active-sessions") {
+        item.sessions.forEach((s) =>
+          s.metadata?.tags?.forEach((tag) => tagSet.add(tag)),
+        );
+      }
+    }
+    return Array.from(tagSet).sort();
+  }, [data]);
+
+  const filteredData = React.useMemo(() => {
+    if (!activeTag || !data) return data;
+    const result: SessionListViewItem[] = [];
+    let pendingHeader: SessionListViewItem | null = null;
+    for (const item of data) {
+      if (item.type === "header") {
+        pendingHeader = item;
+        continue;
+      }
+      if (item.type === "active-sessions") {
+        const matching = item.sessions.filter((s) =>
+          s.metadata?.tags?.includes(activeTag),
+        );
+        if (matching.length > 0) {
+          result.push({ type: "active-sessions", sessions: matching });
+        }
+        pendingHeader = null;
+        continue;
+      }
+      if (item.type === "session") {
+        if (item.session.metadata?.tags?.includes(activeTag)) {
+          if (pendingHeader) {
+            result.push(pendingHeader);
+            pendingHeader = null;
+          }
+          result.push(item);
+        }
+        continue;
+      }
+      pendingHeader = null;
+      result.push(item);
+    }
+    return result;
+  }, [data, activeTag]);
+
   const dataWithSelected = selectable
     ? React.useMemo(() => {
-        return data?.map((item) => ({
+        return filteredData?.map((item) => ({
           ...item,
           selected: pathname.startsWith(
             `/session/${item.type === "session" ? item.session.id : ""}`,
           ),
         }));
-      }, [data, pathname])
-    : data;
+      }, [filteredData, pathname])
+    : filteredData;
 
   // Request review
   React.useEffect(() => {
@@ -506,8 +587,41 @@ export function SessionsList() {
   // Remove this section as we'll use FlatList for all items now
 
   const HeaderComponent = React.useCallback(() => {
-    return <UpdateBanner />;
-  }, []);
+    return (
+      <>
+        <UpdateBanner />
+        {allTags.length > 0 && (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.tagFilterBar}
+          >
+            {allTags.map((tag) => (
+              <Pressable
+                key={tag}
+                style={[
+                  styles.tagFilterChip,
+                  activeTag === tag && styles.tagFilterChipActive,
+                ]}
+                onPress={() =>
+                  setActiveTag((prev) => (prev === tag ? null : tag))
+                }
+              >
+                <Text
+                  style={[
+                    styles.tagFilterChipText,
+                    activeTag === tag && styles.tagFilterChipTextActive,
+                  ]}
+                >
+                  {tag}
+                </Text>
+              </Pressable>
+            ))}
+          </ScrollView>
+        )}
+      </>
+    );
+  }, [allTags, activeTag]);
 
   // Count inactive sessions for "delete all" button
   const inactiveSessionIds = React.useMemo(() => {

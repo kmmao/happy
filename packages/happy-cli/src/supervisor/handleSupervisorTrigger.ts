@@ -540,6 +540,7 @@ async function handleAnalysisTrigger(
       HAPPY_SUPERVISOR_SERVER_URL: deps.serverUrl,
       HAPPY_SUPERVISOR_CALLBACK_TOKEN: data.callbackToken ?? "",
       HAPPY_SUPERVISOR_MACHINE_ID: data.machineId,
+      HAPPY_SESSION_TAGS: "supervisor-analysis",
     },
   });
 
@@ -640,6 +641,7 @@ async function handleResearchTrigger(
       HAPPY_SUPERVISOR_SERVER_URL: deps.serverUrl,
       HAPPY_SUPERVISOR_CALLBACK_TOKEN: data.callbackToken ?? "",
       HAPPY_SUPERVISOR_MACHINE_ID: data.machineId,
+      HAPPY_SESSION_TAGS: "supervisor-research",
     },
   });
 
@@ -781,6 +783,7 @@ async function handleFixTrigger(
       HAPPY_SUPERVISOR_SERVER_URL: deps.serverUrl,
       HAPPY_SUPERVISOR_CALLBACK_TOKEN: data.callbackToken ?? "",
       HAPPY_SUPERVISOR_MACHINE_ID: data.machineId,
+      HAPPY_SESSION_TAGS: "supervisor-fix",
     },
   });
 
