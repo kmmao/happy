@@ -844,6 +844,123 @@ export function taskRoutes(app: Fastify) {
         },
     );
 
+    const SwarmTasksBodySchema = z.object({
+        taskIds: z.array(z.string().min(1)).min(1).max(20),
+        machineId: z.string(),
+    });
+
+    app.post(
+        "/v1/tasks/swarm",
+        {
+            preHandler: app.authenticate,
+            schema: { body: SwarmTasksBodySchema },
+        },
+        async (request, reply) => {
+            const userId = request.userId;
+            const { taskIds, machineId } = request.body;
+
+            const machine = await db.machine.findFirst({
+                where: { id: machineId, accountId: userId },
+            });
+            if (!machine) {
+                return reply.code(404).send({ error: "Machine not found" });
+            }
+
+            const tasks = await db.task.findMany({
+                where: { id: { in: taskIds }, accountId: userId, machineId },
+                include: {
+                    skillBindings: { include: { skill: true } },
+                },
+            });
+
+            const dispatchable = tasks.filter((t) =>
+                ["queued", "failed"].includes(t.status),
+            );
+
+            await Promise.all(
+                dispatchable.map(async (task) => {
+                    let directory = task.directory ?? "~";
+                    let projectSupervisorConfig: string | null = null;
+                    if (task.projectId) {
+                        const project = await db.project.findFirst({
+                            where: { id: task.projectId, accountId: userId },
+                        });
+                        if (project) {
+                            if (!task.directory) directory = project.path;
+                            projectSupervisorConfig = project.supervisorConfig ?? null;
+                        }
+                    }
+
+                    let swarmProfileId: string | undefined = task.profileId ?? undefined;
+                    let swarmRuntimeProfile:
+                        | Awaited<ReturnType<typeof resolveRuntimeProfile>>
+                        | null = null;
+                    if (isUnifiedRuntimeProfileResolverEnabled()) {
+                        swarmRuntimeProfile = await resolveRuntimeProfile({
+                            accountId: userId,
+                            explicitProfileId: task.profileId,
+                            projectSupervisorConfig,
+                            purpose: "task-manual",
+                        });
+                        if (swarmRuntimeProfile.ok) {
+                            swarmProfileId = swarmRuntimeProfile.profileId;
+                        }
+                    }
+
+                    const skillContents =
+                        task.skillBindings.length > 0
+                            ? task.skillBindings.map((b) => ({
+                                  name: b.skill.name,
+                                  content: b.skill.content,
+                              }))
+                            : undefined;
+
+                    await db.task.update({
+                        where: { id: task.id },
+                        data: { status: "dispatching", errorMessage: null },
+                    });
+
+                    const resultToken = await auth.createTaskResultToken({
+                        userId,
+                        taskId: task.id,
+                    });
+
+                    eventRouter.emitEphemeral({
+                        userId,
+                        payload: buildTaskTriggerEphemeral({
+                            taskId: task.id,
+                            prompt: task.prompt,
+                            directory,
+                            priority: task.priority,
+                            projectId: task.projectId ?? undefined,
+                            resultToken,
+                            skillContents,
+                            profileId: swarmProfileId,
+                            runtimeProfile:
+                                swarmRuntimeProfile?.ok
+                                    ? swarmRuntimeProfile.runtimeProfile
+                                    : undefined,
+                            worktreeIsolation: true,
+                        }),
+                        recipientFilter: {
+                            type: "machine-scoped-only",
+                            machineId: task.machineId,
+                        },
+                    });
+                }),
+            );
+
+            log(
+                { module: "task" },
+                `Swarm dispatched ${dispatchable.length}/${taskIds.length} tasks for machine ${machineId}`,
+            );
+            return reply.send({
+                dispatched: dispatchable.length,
+                taskIds: dispatchable.map((t) => t.id),
+            });
+        },
+    );
+
     app.post(
         "/v1/tasks/status",
         {

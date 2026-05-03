@@ -53,11 +53,6 @@ export const es: TranslationStructure = {
     categorySystem: "Sistema",
   },
 
-  agentsDashboard: {
-    sectionTitle: "Agentes activos",
-    agentCount: ({ count }: { count: number }) => `${count} agente${count === 1 ? "" : "s"}`,
-  },
-
   timeline: {
     title: "Línea de tiempo",
     subtitle: "Línea de tiempo de actividad de sesión",
@@ -2354,6 +2349,12 @@ export const es: TranslationStructure = {
     restored: "Tarea restaurada",
     session: "Sesión",
     trigger: "Disparador",
+    worktreeIsolation: "Worktree Isolation",
+    worktreeIsolationDesc: "CLI creates a dedicated git branch and worktree at execution time, keeping parallel tasks isolated from each other.",
+    swarm: "Swarm",
+    swarmDispatched: "Swarm Dispatched",
+    swarmDispatchedMsg: ({ count }: { count: number }) =>
+      `${count} ${count === 1 ? "task" : "tasks"} dispatched in parallel worktrees.`,
   },
 
   skills: {

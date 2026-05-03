@@ -55,11 +55,6 @@ export const zhHant: TranslationStructure = {
     categorySystem: "系統",
   },
 
-  agentsDashboard: {
-    sectionTitle: "活躍代理",
-    agentCount: ({ count }: { count: number }) => `${count} 個代理`,
-  },
-
   timeline: {
     title: "時間軸",
     subtitle: "會話活動時間軸",
@@ -2293,6 +2288,12 @@ export const zhHant: TranslationStructure = {
     restored: "任務已恢復",
     session: "工作階段",
     trigger: "觸發方式",
+    worktreeIsolation: "Worktree 隔離",
+    worktreeIsolationDesc: "CLI 在執行時建立專用 git 分支和工作樹，確保並行任務相互隔離。",
+    swarm: "Swarm",
+    swarmDispatched: "Swarm 已派發",
+    swarmDispatchedMsg: ({ count }: { count: number }) =>
+      `已將 ${count} 個任務並行派發到獨立工作樹。`,
   },
 
   skills: {

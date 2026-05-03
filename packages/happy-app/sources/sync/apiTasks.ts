@@ -197,6 +197,24 @@ export async function updateTask(
     return data.task;
 }
 
+export async function dispatchSwarm(
+    credentials: AuthCredentials,
+    body: { taskIds: string[]; machineId: string },
+): Promise<{ dispatched: number; taskIds: string[] }> {
+    const API_ENDPOINT = getServerUrl();
+
+    const response = await fetch(`${API_ENDPOINT}/v1/tasks/swarm`, {
+        method: "POST",
+        headers: authHeaders(credentials),
+        body: JSON.stringify(body),
+    });
+    if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error((data as Record<string, string>).error ?? `Failed to dispatch swarm: ${response.status}`);
+    }
+    return (await response.json()) as { dispatched: number; taskIds: string[] };
+}
+
 export async function restoreTask(
     credentials: AuthCredentials,
     taskId: string,

@@ -56,11 +56,6 @@ export const ja: TranslationStructure = {
     categorySystem: "システム",
   },
 
-  agentsDashboard: {
-    sectionTitle: "アクティブエージェント",
-    agentCount: ({ count }: { count: number }) => `${count}件のエージェント`,
-  },
-
   timeline: {
     title: "タイムライン",
     subtitle: "セッション活動タイムライン",
@@ -2470,6 +2465,12 @@ export const ja: TranslationStructure = {
     restored: "タスクを復元しました",
     session: "セッション",
     trigger: "トリガー",
+    worktreeIsolation: "Worktree Isolation",
+    worktreeIsolationDesc: "CLI creates a dedicated git branch and worktree at execution time, keeping parallel tasks isolated from each other.",
+    swarm: "Swarm",
+    swarmDispatched: "Swarm Dispatched",
+    swarmDispatchedMsg: ({ count }: { count: number }) =>
+      `${count} ${count === 1 ? "task" : "tasks"} dispatched in parallel worktrees.`,
   },
 
   skills: {

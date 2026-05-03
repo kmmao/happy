@@ -13,6 +13,9 @@ import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { t } from "@/text";
 import { useTasksData } from "./useTasksData";
 import type { ServerTask } from "@/sync/apiTasks";
+import { dispatchSwarm } from "@/sync/apiTasks";
+import { TokenStorage } from "@/auth/tokenStorage";
+import { Modal } from "@/modal";
 import { getTaskStatusBadgeColor } from "./task/taskDetailViewModel";
 
 // ─── constants ────────────────────────────────────────────────────────────────
@@ -47,25 +50,69 @@ type KanbanColumnWithTasks = KanbanColumnDef & { tasks: ServerTask[] };
 
 // ─── KanbanCard ───────────────────────────────────────────────────────────────
 
-function KanbanCard({ task, onPress }: { task: ServerTask; onPress: () => void }) {
+function KanbanCard({
+    task,
+    onPress,
+    onLongPress,
+    selected,
+    swarmMode,
+}: {
+    task: ServerTask;
+    onPress: () => void;
+    onLongPress?: () => void;
+    selected?: boolean;
+    swarmMode?: boolean;
+}) {
     const { theme } = useUnistyles();
     const statusColor = getTaskStatusBadgeColor(task.status);
     const isActive = ["queued", "dispatching", "running"].includes(task.status);
+    const isSwarmable = ["queued", "failed"].includes(task.status);
 
     return (
         <Pressable
             style={({ pressed }) => ({
                 backgroundColor: theme.colors.surface,
                 borderRadius: 10,
-                borderWidth: 1,
-                borderColor: isActive ? statusColor + "44" : theme.colors.divider,
+                borderWidth: selected ? 2 : 1,
+                borderColor: selected
+                    ? "#007AFF"
+                    : swarmMode && isSwarmable
+                      ? "#007AFF44"
+                      : isActive
+                        ? statusColor + "44"
+                        : theme.colors.divider,
                 overflow: "hidden",
-                opacity: pressed ? 0.72 : 1,
+                opacity: pressed ? 0.72 : swarmMode && !isSwarmable ? 0.45 : 1,
             })}
             onPress={onPress}
+            onLongPress={onLongPress}
         >
             {/* top status bar */}
             <View style={{ height: 3, backgroundColor: statusColor }} />
+
+            {/* selection checkmark overlay */}
+            {swarmMode && isSwarmable && (
+                <View
+                    style={{
+                        position: "absolute",
+                        top: 6,
+                        right: 6,
+                        width: 20,
+                        height: 20,
+                        borderRadius: 10,
+                        borderWidth: selected ? 0 : 1.5,
+                        borderColor: selected ? "transparent" : theme.colors.textSecondary,
+                        backgroundColor: selected ? "#007AFF" : "transparent",
+                        justifyContent: "center",
+                        alignItems: "center",
+                        zIndex: 1,
+                    }}
+                >
+                    {selected && (
+                        <Ionicons name="checkmark" size={13} color="#FFF" />
+                    )}
+                </View>
+            )}
 
             <View style={{ padding: 10, gap: 6 }}>
                 {/* time row */}
@@ -141,9 +188,15 @@ function KanbanCard({ task, onPress }: { task: ServerTask; onPress: () => void }
 function KanbanColumn({
     column,
     onTaskPress,
+    onTaskLongPress,
+    selectedIds,
+    swarmMode,
 }: {
     column: KanbanColumnWithTasks;
     onTaskPress: (task: ServerTask) => void;
+    onTaskLongPress?: (task: ServerTask) => void;
+    selectedIds?: Set<string>;
+    swarmMode?: boolean;
 }) {
     const { theme } = useUnistyles();
 
@@ -227,6 +280,9 @@ function KanbanColumn({
                             key={task.id}
                             task={task}
                             onPress={() => onTaskPress(task)}
+                            onLongPress={onTaskLongPress ? () => onTaskLongPress(task) : undefined}
+                            selected={selectedIds?.has(task.id)}
+                            swarmMode={swarmMode}
                         />
                     ))}
                 </View>
@@ -242,6 +298,62 @@ function TaskListPage() {
     const router = useRouter();
     const { theme } = useUnistyles();
     const data = useTasksData(machineId!);
+
+    const [swarmMode, setSwarmMode] = React.useState(false);
+    const [selectedIds, setSelectedIds] = React.useState<Set<string>>(new Set());
+    const [swarmLoading, setSwarmLoading] = React.useState(false);
+
+    const enterSwarmMode = React.useCallback((task: ServerTask) => {
+        const isSwarmable = ["queued", "failed"].includes(task.status);
+        if (!isSwarmable) return;
+        setSwarmMode(true);
+        setSelectedIds(new Set([task.id]));
+    }, []);
+
+    const exitSwarmMode = React.useCallback(() => {
+        setSwarmMode(false);
+        setSelectedIds(new Set());
+    }, []);
+
+    const toggleSelection = React.useCallback((task: ServerTask) => {
+        const isSwarmable = ["queued", "failed"].includes(task.status);
+        if (!isSwarmable) return;
+        setSelectedIds((prev) => {
+            const next = new Set(prev);
+            if (next.has(task.id)) {
+                next.delete(task.id);
+            } else {
+                next.add(task.id);
+            }
+            return next;
+        });
+    }, []);
+
+    const handleSwarmDispatch = React.useCallback(async () => {
+        if (selectedIds.size === 0 || !machineId) return;
+        setSwarmLoading(true);
+        try {
+            const credentials = await TokenStorage.getCredentials();
+            if (!credentials) return;
+            const result = await dispatchSwarm(credentials, {
+                taskIds: Array.from(selectedIds),
+                machineId,
+            });
+            exitSwarmMode();
+            await data.load("refresh");
+            Modal.alert(
+                t("tasks.swarmDispatched"),
+                t("tasks.swarmDispatchedMsg", { count: result.dispatched }),
+                [{ text: t("common.ok") }],
+            );
+        } catch (e) {
+            Modal.alert(t("common.error"), e instanceof Error ? e.message : String(e), [
+                { text: t("common.ok") },
+            ]);
+        } finally {
+            setSwarmLoading(false);
+        }
+    }, [selectedIds, machineId, exitSwarmMode, data]);
 
     const KANBAN_COLUMNS = React.useMemo<KanbanColumnDef[]>(
         () => [
@@ -290,9 +402,13 @@ function TaskListPage() {
 
     const handleTaskPress = React.useCallback(
         (task: ServerTask) => {
+            if (swarmMode) {
+                toggleSelection(task);
+                return;
+            }
             router.push(`/machine/${machineId}/task/${task.id}` as any);
         },
-        [machineId, router],
+        [machineId, router, swarmMode, toggleSelection],
     );
 
     if (data.loading) {
@@ -326,18 +442,86 @@ function TaskListPage() {
                             key={col.key}
                             column={col}
                             onTaskPress={handleTaskPress}
+                            onTaskLongPress={!swarmMode ? enterSwarmMode : undefined}
+                            selectedIds={selectedIds}
+                            swarmMode={swarmMode}
                         />
                     ))}
                 </ScrollView>
             </ScrollView>
 
-            {/* FAB — outside ScrollView so it stays fixed */}
-            <Pressable
-                style={[styles.fab, { backgroundColor: theme.colors.textLink }]}
-                onPress={() => router.push(`/machine/${machineId}/task/new`)}
-            >
-                <Ionicons name="add" size={28} color="#FFF" />
-            </Pressable>
+            {swarmMode ? (
+                /* Swarm action bar */
+                <View
+                    style={{
+                        position: "absolute",
+                        bottom: 0,
+                        left: 0,
+                        right: 0,
+                        backgroundColor: theme.colors.surface,
+                        borderTopWidth: 1,
+                        borderTopColor: theme.colors.divider,
+                        flexDirection: "row",
+                        alignItems: "center",
+                        paddingHorizontal: 16,
+                        paddingVertical: 12,
+                        paddingBottom: 28,
+                        gap: 10,
+                    }}
+                >
+                    <Pressable
+                        style={({ pressed }) => ({
+                            flex: 1,
+                            height: 44,
+                            borderRadius: 12,
+                            borderWidth: 1,
+                            borderColor: theme.colors.divider,
+                            justifyContent: "center",
+                            alignItems: "center",
+                            opacity: pressed ? 0.7 : 1,
+                        })}
+                        onPress={exitSwarmMode}
+                    >
+                        <Text style={{ fontSize: 15, color: theme.colors.textSecondary }}>
+                            {t("common.cancel")}
+                        </Text>
+                    </Pressable>
+                    <Pressable
+                        style={({ pressed }) => ({
+                            flex: 2,
+                            height: 44,
+                            borderRadius: 12,
+                            backgroundColor: selectedIds.size > 0 ? "#007AFF" : theme.colors.divider,
+                            flexDirection: "row",
+                            justifyContent: "center",
+                            alignItems: "center",
+                            gap: 6,
+                            opacity: pressed ? 0.8 : 1,
+                        })}
+                        onPress={() => void handleSwarmDispatch()}
+                        disabled={selectedIds.size === 0 || swarmLoading}
+                    >
+                        {swarmLoading ? (
+                            <ActivityIndicator size="small" color="#FFF" />
+                        ) : (
+                            <>
+                                <Ionicons name="flash" size={16} color="#FFF" />
+                                <Text style={{ fontSize: 15, fontWeight: "600", color: "#FFF" }}>
+                                    {t("tasks.swarm")} ({selectedIds.size})
+                                </Text>
+                            </>
+                        )}
+                    </Pressable>
+                </View>
+            ) : (
+                /* Normal FAB */
+                <Pressable
+                    style={[styles.fab, { backgroundColor: theme.colors.textLink }]}
+                    onPress={() => router.push(`/machine/${machineId}/task/new`)}
+                >
+                    <Ionicons name="add" size={28} color="#FFF" />
+                </Pressable>
+            )}
         </View>
     );
 }

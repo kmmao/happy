@@ -28,7 +28,7 @@ interface Pool {
 
 const pools: Record<SlotType, Pool> = {
   analysis: { active: 0, max: 3, queue: [] },
-  fix: { active: 0, max: 2, queue: [] },
+  fix: { active: 0, max: 5, queue: [] },
 };
 
 /**

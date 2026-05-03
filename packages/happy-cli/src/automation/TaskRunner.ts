@@ -86,6 +86,7 @@ async function cleanupPromptFile(path: string): Promise<void> {
   }
 }
 
+
 function isSessionWebhookTimeout(errorMessage: string): boolean {
   return errorMessage.includes("Session webhook timeout for PID");
 }
