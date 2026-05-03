@@ -110,6 +110,8 @@ services:
     env_file:
       - path: voice-agent/.env.local
         required: false
+    environment:
+      LOG_LEVEL: DEBUG
     restart: unless-stopped
     depends_on:
       server:
