@@ -230,8 +230,8 @@ export const Item = React.memo<ItemProps>((props) => {
           >
             {title}
           </Text>
-          {subtitle &&
-            (() => {
+          {subtitle
+            ? (() => {
               // Allow multiline when requested or when content contains line breaks
               const effectiveLines =
                 subtitleLines !== undefined
@@ -250,12 +250,13 @@ export const Item = React.memo<ItemProps>((props) => {
                   {subtitle}
                 </Text>
               );
-            })()}
+            })()
+            : null}
         </View>
 
         {/* Right Section */}
         <View style={styles.rightSection}>
-          {detail && !rightElement && (
+          {detail && !rightElement ? (
             <Text
               style={[
                 styles.detail,
@@ -266,7 +267,7 @@ export const Item = React.memo<ItemProps>((props) => {
             >
               {detail}
             </Text>
-          )}
+          ) : null}
           {loading && (
             <ActivityIndicator
               size="small"
