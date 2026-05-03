@@ -36,6 +36,10 @@ const PRESENTATIONS: Record<ProjectDetailTabKey, ProjectDetailTabPresentation> =
         icon: "library-outline",
         tone: "purple",
     },
+    traces: {
+        icon: "pulse-outline",
+        tone: "green",
+    },
     config: {
         icon: "settings-outline",
         tone: "teal",

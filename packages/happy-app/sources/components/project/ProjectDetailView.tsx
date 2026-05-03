@@ -11,6 +11,7 @@ import { ProjectResearchTab, type ResearchSyncStatus } from "./ProjectResearchTa
 import { ProjectKnowledgeTab } from "./ProjectKnowledgeTab";
 import { ProjectActionsTab } from "./ProjectActionsTab";
 import { ProjectConfigTab } from "./ProjectConfigTab";
+import { ProjectActionTraceTab } from "./ProjectActionTraceTab";
 import { screenLayoutMaxWidth } from "@/components/layout";
 import { t } from "@/text";
 import { storage, useSetting } from "@/sync/storage";
@@ -36,6 +37,7 @@ const TAB_LABELS: Record<TabKey, () => string> = {
     events: () => t("projects.tabEvents"),
     research: () => t("projects.tabResearch"),
     knowledge: () => t("projects.tabKnowledge"),
+    traces: () => t("projects.tabTraces"),
     config: () => t("projects.tabConfig"),
 };
 
@@ -278,6 +280,15 @@ export const ProjectDetailView = React.memo(
                             <ProjectKnowledgeTab projectId={project.id} isActive={activeTab === "knowledge"} />
                         </View>
                     )}
+                    <View
+                        style={
+                            activeTab === "traces"
+                                ? styles.tabVisible
+                                : styles.tabHidden
+                        }
+                    >
+                        <ProjectActionTraceTab project={project} isActive={activeTab === "traces"} />
+                    </View>
                     <View
                         style={
                             activeTab === "config"
