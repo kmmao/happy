@@ -72,6 +72,7 @@ export interface AgentLoopTriggerData {
   roleId?: string;
   roleName?: string;
   roleType?: string;
+  maxUsdPerRun?: number;
 }
 
 export interface TaskTriggerData {

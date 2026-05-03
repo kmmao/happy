@@ -65,6 +65,12 @@ export interface AgentLoopDefinition {
   notifyEvents?: AgentLoopNotificationEvent[];
   notificationChannels?: AgentLoopNotificationChannel[];
   notificationWebhookUrl?: string;
+  maxUsdPerRun?: number;
+  maxUsdPerDay?: number;
+  todayCostUsd?: number;
+  todayCostWindowStartedAt?: number;
+  totalCostUsd?: number;
+  lastRunCostUsd?: number;
   lastBriefAt?: number;
   lastBriefSummary?: string;
   lastSuccessfulAt?: number;

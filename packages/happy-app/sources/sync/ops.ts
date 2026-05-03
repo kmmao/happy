@@ -531,6 +531,12 @@ export interface MachineAgentLoop {
   notifyEvents?: Array<"completed" | "failed" | "blocked" | "brief">;
   notificationChannels?: Array<"push" | "webhook">;
   notificationWebhookUrl?: string;
+  maxUsdPerRun?: number;
+  maxUsdPerDay?: number;
+  todayCostUsd?: number;
+  todayCostWindowStartedAt?: number;
+  totalCostUsd?: number;
+  lastRunCostUsd?: number;
   lastBriefAt?: number;
   lastBriefSummary?: string;
   lastSuccessfulAt?: number;
@@ -625,6 +631,8 @@ export interface MachineAgentLoopCreateInput {
   notifyEvents?: Array<"completed" | "failed" | "blocked" | "brief">;
   notificationChannels?: Array<"push" | "webhook">;
   notificationWebhookUrl?: string;
+  maxUsdPerRun?: number;
+  maxUsdPerDay?: number;
   runNow?: boolean;
 }
 
@@ -660,6 +668,8 @@ export interface MachineAgentLoopUpdateInput {
   notifyEvents?: Array<"completed" | "failed" | "blocked" | "brief"> | null;
   notificationChannels?: Array<"push" | "webhook"> | null;
   notificationWebhookUrl?: string | null;
+  maxUsdPerRun?: number | null;
+  maxUsdPerDay?: number | null;
 }
 
 export interface MachineAgentLoopBootstrapProfile {

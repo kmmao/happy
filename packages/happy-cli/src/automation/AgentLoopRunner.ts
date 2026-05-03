@@ -86,6 +86,7 @@ export async function runAgentLoopJob(
       HAPPY_AGENT_LOOP_ROLE_ID: data.roleId ?? "",
       HAPPY_AGENT_LOOP_ROLE_NAME: data.roleName ?? "",
       HAPPY_AGENT_LOOP_ROLE_TYPE: data.roleType ?? "",
+      HAPPY_AGENT_LOOP_MAX_USD_PER_RUN: data.maxUsdPerRun !== undefined ? String(data.maxUsdPerRun) : "",
       ...(data.environmentVariables ?? {}),
     },
   });

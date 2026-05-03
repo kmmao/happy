@@ -84,6 +84,8 @@ export interface AgentLoopCreateInput {
   roleId?: string;
   roleName?: string;
   roleType?: string;
+  maxUsdPerRun?: number;
+  maxUsdPerDay?: number;
   runNow?: boolean;
 }
 
@@ -122,6 +124,8 @@ export interface AgentLoopUpdateInput {
   roleId?: string | null;
   roleName?: string | null;
   roleType?: string | null;
+  maxUsdPerRun?: number | null;
+  maxUsdPerDay?: number | null;
 }
 
 export interface AgentLoopEventInput {
@@ -184,6 +188,14 @@ function normalizeAutoRunCounter(loop: Pick<AgentLoopDefinition, "autoRunsToday"
   return { autoRunsToday: 0, autoRunWindowStartedAt: dayStart };
 }
 
+function normalizeDailyCostCounter(loop: Pick<AgentLoopDefinition, "todayCostUsd" | "todayCostWindowStartedAt">, now: number): { todayCostUsd: number; todayCostWindowStartedAt: number } {
+  const dayStart = localDayStartAt(now);
+  if (loop.todayCostWindowStartedAt === dayStart) {
+    return { todayCostUsd: loop.todayCostUsd ?? 0, todayCostWindowStartedAt: dayStart };
+  }
+  return { todayCostUsd: 0, todayCostWindowStartedAt: dayStart };
+}
+
 function isWithinQuietHours(now: number, start: string | undefined, end: string | undefined): boolean {
   if (!start || !end || start === end) {
     return false;
@@ -214,6 +226,12 @@ function evaluateAutoRunPolicy(loop: AgentLoopDefinition, now: number): { allowe
     const counter = normalizeAutoRunCounter(loop, now);
     if (counter.autoRunsToday >= loop.maxAutoRunsPerDay) {
       return { allowed: false, reason: "max-auto-runs" };
+    }
+  }
+  if (loop.maxUsdPerDay) {
+    const costCounter = normalizeDailyCostCounter(loop, now);
+    if (costCounter.todayCostUsd >= loop.maxUsdPerDay) {
+      return { allowed: false, reason: "budget-daily" };
     }
   }
   return { allowed: true };
@@ -439,9 +457,14 @@ export class AgentLoopCoordinator {
       roleId: normalizeOptionalString(input.roleId),
       roleName: normalizeOptionalString(input.roleName),
       roleType: normalizeOptionalString(input.roleType),
+      maxUsdPerRun: normalizeOptionalNumber(input.maxUsdPerRun),
+      maxUsdPerDay: normalizeOptionalNumber(input.maxUsdPerDay),
       consecutiveFailures: 0,
       autoRunsToday: 0,
       autoRunWindowStartedAt: localDayStartAt(now),
+      todayCostUsd: 0,
+      todayCostWindowStartedAt: localDayStartAt(now),
+      totalCostUsd: 0,
       memoryUpdatedAt: now,
       recentEvents: [],
       ...buildLoopRuntimeState("idle", "sleeping", now),
@@ -515,6 +538,8 @@ export class AgentLoopCoordinator {
       roleId: input.roleId === undefined ? existing.roleId : normalizeOptionalString(input.roleId),
       roleName: input.roleName === undefined ? existing.roleName : normalizeOptionalString(input.roleName),
       roleType: input.roleType === undefined ? existing.roleType : normalizeOptionalString(input.roleType),
+      maxUsdPerRun: input.maxUsdPerRun === undefined ? existing.maxUsdPerRun : normalizeOptionalNumber(input.maxUsdPerRun),
+      maxUsdPerDay: input.maxUsdPerDay === undefined ? existing.maxUsdPerDay : normalizeOptionalNumber(input.maxUsdPerDay),
       memoryUpdatedAt: Date.now(),
       updatedAt: Date.now(),
     };
@@ -741,6 +766,7 @@ export class AgentLoopCoordinator {
     status: "completed" | "failed" | "cancelled";
     sessionId?: string;
     errorMessage?: string;
+    sessionCostUsd?: number;
   }): Promise<void> {
     if (!params.loopId) {
       return;
@@ -758,7 +784,15 @@ export class AgentLoopCoordinator {
     const blockedReason = shouldBlock ? (params.errorMessage ?? params.status) : undefined;
     const reachedMaxIterations = Boolean(existing.maxIterations && existing.iteration >= existing.maxIterations);
     const shouldStopOnSuccess = params.status === "completed" && existing.stopOnSuccess === true;
-    const stopReason = shouldBlock ? undefined : (shouldStopOnSuccess ? "stop-on-success" : (reachedMaxIterations ? "max-iterations" : undefined));
+
+    // Accumulate cost tracking
+    const runCost = (params.sessionCostUsd != null && Number.isFinite(params.sessionCostUsd) && params.sessionCostUsd > 0) ? params.sessionCostUsd : 0;
+    const dailyCostCounter = normalizeDailyCostCounter(existing, now);
+    const newTodayCostUsd = dailyCostCounter.todayCostUsd + runCost;
+    const newTotalCostUsd = (existing.totalCostUsd ?? 0) + runCost;
+    const dailyBudgetExceeded = Boolean(existing.maxUsdPerDay && newTodayCostUsd >= existing.maxUsdPerDay);
+
+    const stopReason = shouldBlock ? undefined : (shouldStopOnSuccess ? "stop-on-success" : (reachedMaxIterations ? "max-iterations" : (dailyBudgetExceeded ? "budget-daily" : undefined)));
     const retryBackoffMs = existing.retryBackoffMs ?? existing.intervalMs;
     const completedJobId = existing.activeJobId;
     const persistedMemory = await readAgentLoopMemorySnapshot(existing.directory, existing.id);
@@ -776,6 +810,10 @@ export class AgentLoopCoordinator {
       nextRunAt: failed && !shouldBlock ? now + retryBackoffMs : existing.nextRunAt,
       consecutiveFailures: nextConsecutiveFailures,
       memoryUpdatedAt: persistedMemory ? now : existing.memoryUpdatedAt,
+      todayCostUsd: newTodayCostUsd,
+      todayCostWindowStartedAt: dailyCostCounter.todayCostWindowStartedAt,
+      totalCostUsd: newTotalCostUsd,
+      lastRunCostUsd: runCost > 0 ? runCost : existing.lastRunCostUsd,
       recentEvents: completedJobId
         ? updateRecentEvents(existing, (events) => events.map((event) => event.jobId === completedJobId
           ? {
@@ -1008,6 +1046,7 @@ export class AgentLoopCoordinator {
       roleId: loop.roleId,
       roleName: loop.roleName,
       roleType: loop.roleType,
+      maxUsdPerRun: loop.maxUsdPerRun,
     });
 
     if (result.deduped) {

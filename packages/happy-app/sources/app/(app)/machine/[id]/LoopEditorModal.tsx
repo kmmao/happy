@@ -54,8 +54,16 @@ function hasAdvancedFields(loop: MachineAgentLoop): boolean {
         || loop.maxIterations
         || loop.stopOnSuccess
         || loop.downstreamLoopIds?.length
-        || loop.downstreamTriggerOn?.length,
+        || loop.downstreamTriggerOn?.length
+        || loop.maxUsdPerRun
+        || loop.maxUsdPerDay,
     );
+}
+
+function parsePositiveDecimal(value: string): number | null {
+    if (!value.trim()) return null;
+    const n = parseFloat(value);
+    return Number.isFinite(n) && n > 0 ? n : null;
 }
 
 export const LoopEditorModal = React.memo(function LoopEditorModal({
@@ -107,6 +115,8 @@ export const LoopEditorModal = React.memo(function LoopEditorModal({
     const [downstreamLoopText, setDownstreamLoopText] = React.useState("");
     const [downstreamTriggerText, setDownstreamTriggerText] = React.useState("");
     const [environmentText, setEnvironmentText] = React.useState("");
+    const [maxUsdPerRun, setMaxUsdPerRun] = React.useState("");
+    const [maxUsdPerDay, setMaxUsdPerDay] = React.useState("");
     const [showAdvanced, setShowAdvanced] = React.useState(false);
     const [saving, setSaving] = React.useState(false);
     const [repoPickerOpen, setRepoPickerOpen] = React.useState(false);
@@ -144,6 +154,8 @@ export const LoopEditorModal = React.memo(function LoopEditorModal({
             setDownstreamLoopText(formatLineList(editingLoop.downstreamLoopIds));
             setDownstreamTriggerText(formatDownstreamTriggers(editingLoop.downstreamTriggerOn));
             setEnvironmentText(formatEnvironmentVariables(editingLoop.environmentVariables));
+            setMaxUsdPerRun(editingLoop.maxUsdPerRun ? String(editingLoop.maxUsdPerRun) : "");
+            setMaxUsdPerDay(editingLoop.maxUsdPerDay ? String(editingLoop.maxUsdPerDay) : "");
             setShowAdvanced(hasAdvancedFields(editingLoop));
         } else if (visible && !editingLoop) {
             setName("");
@@ -174,6 +186,8 @@ export const LoopEditorModal = React.memo(function LoopEditorModal({
             setDownstreamLoopText("");
             setDownstreamTriggerText("");
             setEnvironmentText("");
+            setMaxUsdPerRun("");
+            setMaxUsdPerDay("");
             setShowAdvanced(false);
         }
     }, [visible, editingLoop]);
@@ -210,6 +224,16 @@ export const LoopEditorModal = React.memo(function LoopEditorModal({
         const parsedMaxAutoRuns = parsePositiveInteger(maxAutoRuns);
         const parsedMaxIterations = parsePositiveInteger(maxIterations);
         const parsedDownstreamTriggers = parseDownstreamTriggers(downstreamTriggerText);
+        const parsedMaxUsdPerRun = parsePositiveDecimal(maxUsdPerRun);
+        const parsedMaxUsdPerDay = parsePositiveDecimal(maxUsdPerDay);
+        if (maxUsdPerRun.trim() && parsedMaxUsdPerRun == null) {
+            Modal.alert(t("common.error"), t("machine.agentLoopMaxUsdPerRunInvalid"));
+            return;
+        }
+        if (maxUsdPerDay.trim() && parsedMaxUsdPerDay == null) {
+            Modal.alert(t("common.error"), t("machine.agentLoopMaxUsdPerDayInvalid"));
+            return;
+        }
         if (maxFailures.trim() && parsedMaxFailures == null) {
             Modal.alert(t("common.error"), t("machine.agentLoopMaxFailuresInvalid"));
             return;
@@ -277,6 +301,8 @@ export const LoopEditorModal = React.memo(function LoopEditorModal({
                     workingMemory,
                     lastReflectionSummary: reflectionSummary,
                     environmentVariables,
+                    maxUsdPerRun: parsedMaxUsdPerRun ?? null,
+                    maxUsdPerDay: parsedMaxUsdPerDay ?? null,
                 })
                 : await machineCreateAgentLoop(machineId, {
                     name: name.trim() || undefined,
@@ -307,6 +333,8 @@ export const LoopEditorModal = React.memo(function LoopEditorModal({
                     workingMemory: workingMemory.trim() || undefined,
                     lastReflectionSummary: reflectionSummary.trim() || undefined,
                     environmentVariables,
+                    maxUsdPerRun: parsedMaxUsdPerRun ?? undefined,
+                    maxUsdPerDay: parsedMaxUsdPerDay ?? undefined,
                     runNow: true,
                 });
             if (!result.success) {
@@ -323,8 +351,8 @@ export const LoopEditorModal = React.memo(function LoopEditorModal({
         agent, ciBridgeEnabled, cooldown, currentFocus, directory, downstreamLoopText,
         downstreamTriggerText, editingLoop, environmentText, eventKeywordText, eventSourceText,
         fileWatchEnabled, githubBridgeEnabled, goal, handleClose, interval, machineId, maxAutoRuns,
-        maxFailures, maxIterations, name, onSaved, profileId, projectId, prompt, quietEnd, quietStart,
-        reflectionSummary, retryBackoff, stopOnSuccess, workingMemory,
+        maxFailures, maxIterations, maxUsdPerDay, maxUsdPerRun, name, onSaved, profileId, projectId,
+        prompt, quietEnd, quietStart, reflectionSummary, retryBackoff, stopOnSuccess, workingMemory,
     ]);
 
     const handleOpenRepoPicker = React.useCallback(async () => {
@@ -734,6 +762,28 @@ export const LoopEditorModal = React.memo(function LoopEditorModal({
                                     autoCorrect={false}
                                     multiline
                                     textAlignVertical="top"
+                                />
+                                <Text style={[styles.label, { color: theme.colors.textSecondary }]}>{t("machine.agentLoopMaxUsdPerRun")}</Text>
+                                <TextInput
+                                    style={[styles.input, { color: theme.colors.text, borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}
+                                    placeholder={t("machine.agentLoopMaxUsdPerRunPlaceholder")}
+                                    placeholderTextColor={theme.colors.textSecondary}
+                                    value={maxUsdPerRun}
+                                    onChangeText={setMaxUsdPerRun}
+                                    keyboardType="decimal-pad"
+                                    autoCapitalize="none"
+                                    autoCorrect={false}
+                                />
+                                <Text style={[styles.label, { color: theme.colors.textSecondary }]}>{t("machine.agentLoopMaxUsdPerDay")}</Text>
+                                <TextInput
+                                    style={[styles.input, { color: theme.colors.text, borderColor: theme.colors.divider, backgroundColor: theme.colors.surface }]}
+                                    placeholder={t("machine.agentLoopMaxUsdPerDayPlaceholder")}
+                                    placeholderTextColor={theme.colors.textSecondary}
+                                    value={maxUsdPerDay}
+                                    onChangeText={setMaxUsdPerDay}
+                                    keyboardType="decimal-pad"
+                                    autoCapitalize="none"
+                                    autoCorrect={false}
                                 />
                                 <Text style={[styles.label, { color: theme.colors.textSecondary }]}>{t("machine.agentLoopEnvironment")}</Text>
                                 <TextInput

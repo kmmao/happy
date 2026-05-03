@@ -479,6 +479,24 @@ export async function runClaude(
   // Permission modes: Use the unified 7-mode type, mapping happens at SDK boundary in claudeRemote.ts
   let currentPermissionMode: PermissionMode | undefined = initialPermissionMode;
 
+  let currentModel = options.model; // Track current model state
+  let currentFallbackModel: string | undefined = undefined; // Track current fallback model
+  let currentCustomSystemPrompt: string | undefined = undefined; // Track current custom system prompt
+  let currentAppendSystemPrompt: string | undefined = undefined; // Track current append system prompt
+  let currentAllowedTools: string[] | undefined = undefined; // Track current allowed tools
+  let currentDisallowedTools: string[] | undefined = undefined; // Track current disallowed tools
+  let currentMaxBudgetUsd: number | undefined = undefined; // Track current budget
+
+  // Seed per-run budget from agent loop env var so the SDK enforces it from the first query.
+  const agentLoopMaxUsdPerRun = process.env.HAPPY_AGENT_LOOP_MAX_USD_PER_RUN;
+  if (agentLoopMaxUsdPerRun) {
+    const parsed = parseFloat(agentLoopMaxUsdPerRun);
+    if (Number.isFinite(parsed) && parsed > 0) {
+      currentMaxBudgetUsd = parsed;
+      logger.debug(`[START] Agent loop per-run budget: $${parsed}`);
+    }
+  }
+
   // Inject initial prompt from file if env var is set (webhook-triggered sessions)
   const initialPromptFile = process.env.HAPPY_INITIAL_PROMPT_FILE;
   if (initialPromptFile) {
@@ -489,6 +507,7 @@ export async function runClaude(
           promptContent,
           {
             permissionMode: "bypassPermissions",
+            ...(currentMaxBudgetUsd !== undefined ? { maxBudgetUsd: currentMaxBudgetUsd } : {}),
           } as EnhancedMode,
           undefined,
           { priority: "background", kind: "automation", source: "initial-prompt-file" },
@@ -507,13 +526,6 @@ export async function runClaude(
       );
     }
   }
-  let currentModel = options.model; // Track current model state
-  let currentFallbackModel: string | undefined = undefined; // Track current fallback model
-  let currentCustomSystemPrompt: string | undefined = undefined; // Track current custom system prompt
-  let currentAppendSystemPrompt: string | undefined = undefined; // Track current append system prompt
-  let currentAllowedTools: string[] | undefined = undefined; // Track current allowed tools
-  let currentDisallowedTools: string[] | undefined = undefined; // Track current disallowed tools
-  let currentMaxBudgetUsd: number | undefined = undefined; // Track current budget
   let currentTaskBudget: { total: number } | undefined = undefined; // Track current task budget
   let currentThinking: EnhancedMode["thinking"] = undefined; // Track current thinking config
   let currentEffort: EnhancedMode["effort"] = undefined; // Track current effort level
