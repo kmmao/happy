@@ -7,9 +7,9 @@ import {
 } from './dimensionTemplates';
 
 describe('dimensionTemplates', () => {
-    it('should have all 15 dimensions defined', () => {
+    it('should have all 16 dimensions defined', () => {
         const keys = Object.keys(dimensionTemplates);
-        expect(keys).toHaveLength(15);
+        expect(keys).toHaveLength(16);
         expect(keys).toContain('security');
         expect(keys).toContain('dependencies');
         expect(keys).toContain('architecture');
@@ -23,6 +23,7 @@ describe('dimensionTemplates', () => {
         expect(keys).toContain('observability');
         expect(keys).toContain('apiDesign');
         expect(keys).toContain('buildCI');
+        expect(keys).toContain('prReview');
         expect(keys).toContain('featureCompleteness');
         expect(keys).toContain('integrationCoherence');
     });
@@ -90,9 +91,9 @@ describe('getEnabledCategories', () => {
         expect(categories).toEqual([]);
     });
 
-    it('should return all 15 categories when all dimensions enabled', () => {
+    it('should return all 16 categories when all dimensions enabled', () => {
         const allKeys = Object.keys(dimensionTemplates);
         const categories = getEnabledCategories(allKeys);
-        expect(categories).toHaveLength(15);
+        expect(categories).toHaveLength(16);
     });
 });
