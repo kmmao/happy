@@ -223,3 +223,69 @@ export async function prepareAgentLoopPromptArtifacts(
 }
 
 export { MEMORY_HEADINGS };
+
+// ─── Project todo.md ─────────────────────────────────────────────────────────
+
+export interface TodoMdEntry {
+  checked: boolean;
+  text: string;
+  taskId?: string;
+}
+
+export function getProjectTodoMdPath(directory: string): string {
+  return join(directory, ".happy", "todo.md");
+}
+
+const TASK_ID_COMMENT_RE = /<!--\s*task-id:\s*([a-z0-9_-]+)\s*-->/i;
+const CHECKBOX_LINE_RE = /^- \[([ x])\] (.+)$/;
+
+export function parseTodoMd(content: string): TodoMdEntry[] {
+  const entries: TodoMdEntry[] = [];
+  for (const rawLine of content.split(/\r?\n/)) {
+    const line = rawLine.trim();
+    const match = line.match(CHECKBOX_LINE_RE);
+    if (!match) continue;
+    const checked = match[1] === "x";
+    const rest = match[2].trim();
+    const idMatch = rest.match(TASK_ID_COMMENT_RE);
+    const taskId = idMatch?.[1];
+    const text = rest.replace(TASK_ID_COMMENT_RE, "").trim();
+    entries.push({ checked, text, taskId });
+  }
+  return entries;
+}
+
+export function renderTodoMd(entries: TodoMdEntry[], syncedAt?: Date): string {
+  const timestamp = (syncedAt ?? new Date()).toISOString();
+  const lines = [
+    "# Tasks",
+    "",
+    "Edit this file to update task status. Use `- [ ]` for pending and `- [x]` for completed.",
+    "Add new tasks with `- [ ] description`. Task IDs are auto-assigned on next sync.",
+    "",
+    `<!-- last-synced: ${timestamp} -->`,
+    "",
+  ];
+  for (const entry of entries) {
+    const checkbox = entry.checked ? "[x]" : "[ ]";
+    const idSuffix = entry.taskId ? ` <!-- task-id: ${entry.taskId} -->` : "";
+    lines.push(`- ${checkbox} ${entry.text}${idSuffix}`);
+  }
+  lines.push("");
+  return lines.join("\n");
+}
+
+export async function readProjectTodoMd(directory: string): Promise<TodoMdEntry[]> {
+  try {
+    const content = await readFile(getProjectTodoMdPath(directory), "utf-8");
+    return parseTodoMd(content);
+  } catch {
+    return [];
+  }
+}
+
+export async function writeProjectTodoMd(directory: string, entries: TodoMdEntry[], syncedAt?: Date): Promise<void> {
+  const todoDir = join(directory, ".happy");
+  await mkdir(todoDir, { recursive: true });
+  await writeFile(getProjectTodoMdPath(directory), renderTodoMd(entries, syncedAt), "utf-8");
+}

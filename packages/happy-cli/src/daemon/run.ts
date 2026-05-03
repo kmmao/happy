@@ -60,6 +60,8 @@ import { AgentLoopBootstrapCoordinator } from "@/automation/AgentLoopBootstrapCo
 import { AutoDreamCoordinator } from "@/automation/AutoDreamCoordinator";
 import { AutoDreamStore } from "@/automation/AutoDreamStore";
 import { AgentLoopFileWatcher } from "@/automation/AgentLoopFileWatcher";
+import { ProjectTodoWatcher } from "@/automation/ProjectTodoWatcher";
+import { writeProjectTodoMd, type TodoMdEntry } from "@/automation/AgentLoopMemory";
 import { buildLoopEventFromCiTrigger, selectLoopsForCiBridge, selectLoopsForCiBridgeResolved } from "@/automation/AgentLoopCiBridge";
 import { buildCiTriggerFromGitHubActionsWebhook } from "@/automation/GitHubActionsCiAdapter";
 import { buildLoopEventsFromWebhook, selectLoopsForWebhookBridge } from "@/automation/AgentLoopWebhookBridge";
@@ -1664,6 +1666,7 @@ export async function startDaemon(): Promise<void> {
     let agentLoopCoordinator: AgentLoopCoordinator | null = null;
     let agentLoopBootstrapCoordinator: AgentLoopBootstrapCoordinator | null = null;
     let agentLoopFileWatcher: AgentLoopFileWatcher | null = null;
+    let projectTodoWatcher: ProjectTodoWatcher | null = null;
     let autoDreamCoordinator: AutoDreamCoordinator | null = null;
     const getAutomationStatusSnapshot = () => {
       const jobs = automationScheduler?.getJobsSnapshot() ?? [];
@@ -2791,6 +2794,22 @@ export async function startDaemon(): Promise<void> {
     const agentLoopStore = new AgentLoopStore(
       join(configuration.happyHomeDir, "agent-loops.json"),
     );
+    projectTodoWatcher = new ProjectTodoWatcher({
+      onChanged: async (projectId, directory, machineId, entries) => {
+        const result = await apiMachine.syncTodoMdEntries({ machineId, projectId, entries });
+        if (result) {
+          const updated: TodoMdEntry[] = result.tasks.map((t) => ({
+            checked: (t.status as string) === "completed" || (t.status as string) === "cancelled",
+            text: (t.promptPreview as string) ?? String(t.id),
+            taskId: t.id as string,
+          }));
+          await writeProjectTodoMd(directory, updated).catch((err) => {
+            logger.debug(`[TODO SYNC] failed to rewrite todo.md: ${err instanceof Error ? err.message : String(err)}`);
+          });
+        }
+      },
+      logger: (message) => logger.debug(message),
+    });
     agentLoopFileWatcher = new AgentLoopFileWatcher({
       emitEvent: async (loopId, input) => {
         if (!agentLoopCoordinator) {
@@ -2933,6 +2952,9 @@ export async function startDaemon(): Promise<void> {
 
     // Set up task trigger handler: enqueue task jobs from server
     apiMachine.setTaskHandler((data) => {
+      if (data.projectId && data.directory) {
+        projectTodoWatcher?.register(data.projectId, data.directory, machineId);
+      }
       void automationScheduler!
         .enqueueTask({
           type: "task-trigger",
@@ -3227,6 +3249,7 @@ export async function startDaemon(): Promise<void> {
         (async () => {
           // Group 1: Stop automation subsystems (independent, safe to parallelize)
           const group1 = await Promise.allSettled([
+            projectTodoWatcher?.stop(),
             agentLoopFileWatcher?.stop(),
             agentLoopBootstrapCoordinator?.stop(),
             agentLoopCoordinator?.stop(),

@@ -1240,6 +1240,35 @@ export class ApiMachineClient {
     });
   }
 
+  /**
+   * Sync todo.md entries to the server. Creates new tasks and updates status of existing ones.
+   * Returns the updated serialized task list so the caller can re-write todo.md with new task IDs.
+   */
+  async syncTodoMdEntries(params: {
+    machineId: string;
+    projectId: string;
+    entries: Array<{ taskId?: string; checked: boolean; text: string }>;
+  }): Promise<{ tasks: Array<Record<string, unknown>>; created: number; updated: number } | null> {
+    try {
+      const resp = await fetch(`${configuration.serverUrl}/v1/tasks/sync-from-file`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${this.token}`,
+        },
+        body: JSON.stringify(params),
+      });
+      if (!resp.ok) {
+        logger.debug(`[TODO SYNC] sync-from-file returned ${resp.status}`);
+        return null;
+      }
+      return (await resp.json()) as { tasks: Array<Record<string, unknown>>; created: number; updated: number };
+    } catch (err) {
+      logger.debug(`[TODO SYNC] sync-from-file error: ${err instanceof Error ? err.message : String(err)}`);
+      return null;
+    }
+  }
+
   connect() {
     const serverUrl = configuration.serverUrl.replace(/^http/, "ws");
     logger.debug(`[API MACHINE] Connecting to ${serverUrl}`);

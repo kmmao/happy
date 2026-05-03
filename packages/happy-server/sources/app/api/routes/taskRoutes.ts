@@ -629,6 +629,124 @@ export function taskRoutes(app: Fastify) {
         },
     );
 
+    const SyncFromFileBodySchema = z.object({
+        machineId: z.string(),
+        projectId: z.string(),
+        entries: z.array(
+            z.object({
+                taskId: z.string().optional(),
+                checked: z.boolean(),
+                text: z.string().min(1).max(4096),
+            }),
+        ).max(500),
+    });
+
+    app.patch(
+        "/v1/tasks/sync-from-file",
+        {
+            preHandler: app.authenticate,
+            schema: { body: SyncFromFileBodySchema },
+        },
+        async (request, reply) => {
+            const userId = request.userId;
+            const { machineId, projectId, entries } = request.body;
+
+            const machine = await db.machine.findFirst({
+                where: { id: machineId, accountId: userId },
+            });
+            if (!machine) {
+                return reply.code(404).send({ error: "Machine not found" });
+            }
+
+            const project = await db.project.findFirst({
+                where: { id: projectId, accountId: userId },
+            });
+            if (!project) {
+                return reply.code(404).send({ error: "Project not found" });
+            }
+
+            let created = 0;
+            let updated = 0;
+            const resultTasks: Record<string, unknown>[] = [];
+
+            for (const entry of entries) {
+                if (entry.taskId) {
+                    const task = await db.task.findFirst({
+                        where: { id: entry.taskId, accountId: userId, projectId },
+                    });
+                    if (!task) continue;
+
+                    const targetStatus = entry.checked ? "completed" : "queued";
+                    if (task.status === targetStatus) {
+                        resultTasks.push(serializeTask(task));
+                        continue;
+                    }
+
+                    const canComplete = entry.checked && ["queued", "dispatching", "running"].includes(task.status);
+                    const canRestore = !entry.checked && task.status === "completed";
+                    if (!canComplete && !canRestore) {
+                        resultTasks.push(serializeTask(task));
+                        continue;
+                    }
+
+                    const updatedTask = await db.task.update({
+                        where: { id: task.id },
+                        data: {
+                            status: targetStatus,
+                            completedAt: entry.checked ? new Date() : null,
+                        },
+                        include: { skillBindings: { include: { skill: { select: { name: true } } } } },
+                    });
+
+                    eventRouter.emitEphemeral({
+                        userId,
+                        payload: buildTaskStatusChangedEphemeral({
+                            taskId: task.id,
+                            machineId: task.machineId,
+                            status: targetStatus,
+                            completedAt: updatedTask.completedAt?.getTime(),
+                        }),
+                        recipientFilter: { type: "user-scoped-only" },
+                    });
+
+                    resultTasks.push(serializeTask(updatedTask));
+                    updated++;
+                } else {
+                    const newTask = await db.task.create({
+                        data: {
+                            accountId: userId,
+                            projectId,
+                            machineId,
+                            prompt: entry.text,
+                            directory: project.path,
+                            priority: "user",
+                            maxAttempts: 3,
+                            triggerType: "todo-file",
+                            status: "queued",
+                        },
+                        include: { skillBindings: { include: { skill: { select: { name: true } } } } },
+                    });
+
+                    eventRouter.emitEphemeral({
+                        userId,
+                        payload: buildTaskStatusChangedEphemeral({
+                            taskId: newTask.id,
+                            machineId,
+                            status: "queued",
+                        }),
+                        recipientFilter: { type: "user-scoped-only" },
+                    });
+
+                    resultTasks.push(serializeTask(newTask));
+                    created++;
+                }
+            }
+
+            log({ module: "task" }, `todo-file sync for project ${projectId}: created=${created} updated=${updated}`);
+            return reply.send({ tasks: resultTasks, created, updated });
+        },
+    );
+
     app.post(
         "/v1/tasks/result",
         {
