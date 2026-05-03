@@ -2534,31 +2534,6 @@ export async function sessionForkSession(
 }
 
 /**
- * Rewind files to their state at a specific user message.
- * Call with dryRun=true first to preview changes, then dryRun=false to execute.
- */
-export async function sessionRewindFiles(
-    sessionId: string,
-    userMessageId: string,
-    dryRun: boolean,
-): Promise<{
-    canRewind: boolean;
-    error?: string;
-    filesChanged?: string[];
-    insertions?: number;
-    deletions?: number;
-}> {
-    try {
-        return await apiSocket.sessionRPC<
-            { canRewind: boolean; error?: string; filesChanged?: string[]; insertions?: number; deletions?: number },
-            { userMessageId: string; dryRun: boolean }
-        >(sessionId, "rewindFiles", { userMessageId, dryRun });
-    } catch (err) {
-        return { canRewind: false, error: err instanceof Error ? err.message : "Rewind failed" };
-    }
-}
-
-/**
  * Respond to an MCP elicitation request
  */
 export async function sessionElicitationResponse(

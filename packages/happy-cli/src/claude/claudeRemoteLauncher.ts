@@ -180,9 +180,6 @@ export async function claudeRemoteLauncher(
 
   // Track current SDK Query for runtime control (interrupt, stopTask)
   let currentQuery: OfficialQuery | null = null;
-  // Keep last completed query so rewindFiles can be called after a turn ends
-  let lastCompletedQuery: OfficialQuery | null = null;
-
   // Knowledge base: turn-level data collection + injection
   // Default ON — collection runs silently in background (minimal overhead).
   // App setting `knowledgeBase` controls Tab visibility; env HAPPY_KNOWLEDGE_BASE=false to fully disable.
@@ -468,32 +465,6 @@ export async function claudeRemoteLauncher(
         logger.debug(`[remote]: forkSession failed: ${err}`);
         return {
           error: err instanceof Error ? err.message : "Fork failed",
-        };
-      }
-    },
-  );
-
-  // Register RPC handler for rewinding files to a specific user message state
-  session.client.rpcHandlerManager.registerHandler(
-    "rewindFiles",
-    async (args: { userMessageId: string; dryRun?: boolean }) => {
-      const queryForRewind = currentQuery ?? lastCompletedQuery;
-      if (!queryForRewind) {
-        return { canRewind: false, error: "No active query" };
-      }
-      if (!args.userMessageId) {
-        return { canRewind: false, error: "Missing userMessageId" };
-      }
-      try {
-        const result = await queryForRewind.rewindFiles(args.userMessageId, {
-          dryRun: args.dryRun ?? false,
-        });
-        return result;
-      } catch (err) {
-        logger.debug(`[remote]: rewindFiles failed: ${err}`);
-        return {
-          canRewind: false,
-          error: err instanceof Error ? err.message : "Rewind failed",
         };
       }
     },
@@ -2304,8 +2275,6 @@ export async function claudeRemoteLauncher(
         midTurnPushFn = null;
 
         // Clear query reference immediately to prevent stale interrupt/stopTask calls
-        // But preserve a reference for post-turn rewindFiles operations
-        lastCompletedQuery = currentQuery;
         currentQuery = null;
 
         // Terminate all ongoing tool calls

@@ -19,8 +19,7 @@ import { sync } from "@/sync/sync";
 import { Option } from "./markdown/MarkdownView";
 import { useSetting, storage, useProjectForSession } from "@/sync/storage";
 import { getAutoOptionFeedbackStats } from "@/sync/autoOptionFeedback";
-import { sessionCancelQueuedMessage, sessionRewindFiles } from "@/sync/ops";
-import { Modal } from "@/modal";
+import { sessionCancelQueuedMessage } from "@/sync/ops";
 import { AgentDot } from "./AgentDot";
 import { MessageImage } from "./MessageImage";
 import { parseImageRefs } from "@/utils/parseImageRefs";
@@ -144,48 +143,6 @@ function UserTextBlock(props: { message: UserTextMessage; sessionId: string }) {
     [props.sessionId],
   );
 
-  const [rewinding, setRewinding] = React.useState(false);
-  const handleRewind = React.useCallback(async () => {
-    if (rewinding) return;
-    const rewindId = props.message.realId;
-    if (!rewindId) {
-      Modal.alert(t("session.rewindFailed"), t("session.rewindUnavailable"));
-      return;
-    }
-    setRewinding(true);
-    try {
-      const preview = await sessionRewindFiles(props.sessionId, rewindId, true);
-      if (!preview.canRewind) {
-        const errorMsg = preview.error === "No active query"
-          ? t("session.rewindSessionNotActive")
-          : (preview.error ?? t("session.rewindUnavailable"));
-        Modal.alert(t("session.rewindFailed"), errorMsg);
-        return;
-      }
-      const fileCount = preview.filesChanged?.length ?? 0;
-      const stats = [
-        `${fileCount} ${t("session.rewindFiles")}`,
-        preview.insertions != null ? `+${preview.insertions}` : null,
-        preview.deletions != null ? `-${preview.deletions}` : null,
-      ].filter(Boolean).join("  ");
-
-      const confirmed = await Modal.confirm(
-        t("session.rewindTitle"),
-        `${t("session.rewindConfirm")}\n\n${stats}${preview.filesChanged ? "\n" + preview.filesChanged.join("\n") : ""}`,
-        { confirmText: t("session.rewindAction"), destructive: true },
-      );
-      if (!confirmed) return;
-
-      const result = await sessionRewindFiles(props.sessionId, rewindId, false);
-      if (result.canRewind) {
-        Modal.toast(t("session.rewindSuccess"));
-      } else {
-        Modal.alert(t("session.rewindFailed"), result.error ?? t("session.rewindUnknownError"));
-      }
-    } finally {
-      setRewinding(false);
-    }
-  }, [props.sessionId, props.message.realId, rewinding]);
 
   const parsed = React.useMemo(
     () => parseImageRefs(props.message.text),
@@ -268,26 +225,6 @@ function UserTextBlock(props: { message: UserTextMessage; sessionId: string }) {
                 }
               />
             </Pressable>
-            {!isQueued && (
-              <Pressable
-                style={({ pressed }) => [
-                  styles.userBookmarkButton,
-                  (pressed || rewinding) && { opacity: 0.5 },
-                ]}
-                onPress={handleRewind}
-                disabled={rewinding}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                accessibilityLabel={t("session.rewindTitle")}
-                // @ts-expect-error RN Web supports title for tooltip
-                title={t("session.rewindTitle")}
-              >
-                <Ionicons
-                  name="play-back-outline"
-                  size={13}
-                  color={theme.colors.textSecondary}
-                />
-              </Pressable>
-            )}
           </View>
         </View>
       )}
