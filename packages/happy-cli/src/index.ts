@@ -40,6 +40,7 @@ import { handleConnectCommand } from "./commands/connect";
 import { handleSandboxCommand } from "./commands/sandbox";
 import { handleSupervisorCommand } from "./commands/supervisor";
 import { handleLoopCommand } from "./commands/loop";
+import { handleTranscriptCommand } from "./commands/transcript";
 import { spawnHappyCLI } from "./utils/spawnHappyCLI";
 import { claudeCliPath } from "./claude/claudeLocal";
 import { execFileSync } from "node:child_process";
@@ -317,6 +318,18 @@ function filterAutomationAudit<T extends { kind: string; status?: string; projec
         error instanceof Error ? error.message : "Unknown error",
       );
       logger.debug("Loop command error:", error);
+      process.exit(1);
+    }
+    return;
+  } else if (subcommand === "transcript") {
+    try {
+      await handleTranscriptCommand(args.slice(1));
+    } catch (error) {
+      logger.printError(
+        chalk.red("Error:"),
+        error instanceof Error ? error.message : "Unknown error",
+      );
+      logger.debug("Transcript command error:", error);
       process.exit(1);
     }
     return;

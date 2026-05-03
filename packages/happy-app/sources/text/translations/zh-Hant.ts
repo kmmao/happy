@@ -917,6 +917,11 @@ export const zhHant: TranslationStructure = {
     deleteAllArchivedSessions: "刪除所有已封存工作階段",
     deleteAllArchivedWarning: ({ count }: { count: number }) =>
       `將永久刪除 ${count} 個已封存工作階段及其所有訊息。此操作無法復原。`,
+    exportTranscript: "Export Transcript",
+    exportTranscriptSubtitle: "Copy session messages as JSONL to clipboard",
+    exportTranscriptSuccess: "Transcript copied to clipboard",
+    exportTranscriptFailed: "Failed to export transcript",
+    exportTranscriptEmpty: "No messages to export",
   },
 
   components: {
@@ -2288,8 +2293,6 @@ export const zhHant: TranslationStructure = {
     restored: "任務已恢復",
     session: "工作階段",
     trigger: "觸發方式",
-    worktreeIsolation: "Worktree 隔離",
-    worktreeIsolationDesc: "CLI 在執行時建立專用 git 分支和工作樹，確保並行任務相互隔離。",
     swarm: "Swarm",
     swarmDispatched: "Swarm 已派發",
     swarmDispatchedMsg: ({ count }: { count: number }) =>

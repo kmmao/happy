@@ -917,6 +917,11 @@ export const zhHans: TranslationStructure = {
     deleteAllArchivedSessions: "删除所有已归档会话",
     deleteAllArchivedWarning: ({ count }: { count: number }) =>
       `将永久删除 ${count} 个已归档会话及其所有消息。此操作无法撤销。`,
+    exportTranscript: "Export Transcript",
+    exportTranscriptSubtitle: "Copy session messages as JSONL to clipboard",
+    exportTranscriptSuccess: "Transcript copied to clipboard",
+    exportTranscriptFailed: "Failed to export transcript",
+    exportTranscriptEmpty: "No messages to export",
   },
 
   components: {
@@ -2287,8 +2292,6 @@ export const zhHans: TranslationStructure = {
     restored: "任务已恢复",
     session: "会话",
     trigger: "触发方式",
-    worktreeIsolation: "Worktree 隔离",
-    worktreeIsolationDesc: "CLI 在执行时创建专用 git 分支和工作树，确保并行任务相互隔离。",
     swarm: "Swarm",
     swarmDispatched: "Swarm 已派发",
     swarmDispatchedMsg: ({ count }: { count: number }) =>

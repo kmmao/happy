@@ -302,7 +302,6 @@ export function sessionRoutes(app: Fastify) {
           active: true,
           lastActiveAt: true,
           forkedFromSessionId: true,
-          parentSessionId: true,
         },
       });
 
@@ -335,7 +334,6 @@ export function sessionRoutes(app: Fastify) {
             ? Buffer.from(v.dataEncryptionKey).toString("base64")
             : null,
           forkedFromSessionId: v.forkedFromSessionId ?? null,
-          parentSessionId: v.parentSessionId ?? null,
         })),
         nextCursor,
         hasNext,
@@ -843,42 +841,63 @@ export function sessionRoutes(app: Fastify) {
     },
   );
 
-  // Set parent session — records which session spawned this one (e.g. supervisor fix agent)
-  app.patch(
-    "/v1/sessions/:sessionId/parent",
+  // Export session transcript as JSONL (one message per line)
+  app.get(
+    "/v1/sessions/:sessionId/transcript",
     {
-      preHandler: app.authenticate,
       schema: {
-        params: z.object({ sessionId: z.string() }),
-        body: z.object({ parentSessionId: z.string() }),
+        params: z.object({
+          sessionId: z.string(),
+        }),
+        querystring: z
+          .object({
+            format: z.enum(["jsonl", "json"]).default("jsonl"),
+          })
+          .optional(),
       },
+      preHandler: app.authenticate,
     },
     async (request, reply) => {
       const userId = request.userId;
       const { sessionId } = request.params;
-      const { parentSessionId } = request.body;
+      const format = request.query?.format ?? "jsonl";
 
       const session = await db.session.findFirst({
         where: { id: sessionId, accountId: userId },
+        select: { id: true },
       });
+
       if (!session) {
         return reply.code(404).send({ error: "Session not found" });
       }
 
-      const updSeq = await allocateUserSeq(userId);
-      const updated = await db.session.update({
-        where: { id: sessionId },
-        data: { parentSessionId },
+      const messages = await db.sessionMessage.findMany({
+        where: { sessionId },
+        orderBy: { seq: "asc" },
+        select: {
+          id: true,
+          seq: true,
+          localId: true,
+          content: true,
+          createdAt: true,
+        },
       });
 
-      const updatePayload = buildNewSessionUpdate(updated, updSeq, randomKeyNaked(12));
-      eventRouter.emitUpdate({
-        userId,
-        payload: updatePayload,
-        recipientFilter: { type: "user-scoped-only" },
-      });
+      const records = messages.map((m) => ({
+        id: m.id,
+        seq: m.seq,
+        localId: m.localId,
+        content: m.content,
+        createdAt: m.createdAt.getTime(),
+      }));
 
-      return reply.send({ success: true });
+      if (format === "json") {
+        return reply.send({ sessionId, messages: records });
+      }
+
+      reply.header("Content-Type", "application/x-ndjson");
+      const jsonl = records.map((r) => JSON.stringify(r)).join("\n");
+      return reply.send(jsonl);
     },
   );
 

@@ -954,6 +954,11 @@ export const pt: TranslationStructure = {
     deleteAllArchivedSessions: "Excluir todas as sessões arquivadas",
     deleteAllArchivedWarning: ({ count }: { count: number }) =>
       `Isso excluirá permanentemente ${count} sessão(ões) arquivada(s) e todas as suas mensagens. Esta ação não pode ser desfeita.`,
+    exportTranscript: "Export Transcript",
+    exportTranscriptSubtitle: "Copy session messages as JSONL to clipboard",
+    exportTranscriptSuccess: "Transcript copied to clipboard",
+    exportTranscriptFailed: "Failed to export transcript",
+    exportTranscriptEmpty: "No messages to export",
   },
 
   components: {
@@ -2346,8 +2351,6 @@ export const pt: TranslationStructure = {
     restored: "Tarefa restaurada",
     session: "Sessão",
     trigger: "Gatilho",
-    worktreeIsolation: "Worktree Isolation",
-    worktreeIsolationDesc: "CLI creates a dedicated git branch and worktree at execution time, keeping parallel tasks isolated from each other.",
     swarm: "Swarm",
     swarmDispatched: "Swarm Dispatched",
     swarmDispatchedMsg: ({ count }: { count: number }) =>

@@ -957,6 +957,11 @@ export const ca: TranslationStructure = {
     deleteAllArchivedSessions: "Elimina totes les sessions arxivades",
     deleteAllArchivedWarning: ({ count }: { count: number }) =>
       `Això eliminarà permanentment ${count} sessió/ns arxivada/es i tots els seus missatges. Aquesta acció no es pot desfer.`,
+    exportTranscript: "Export Transcript",
+    exportTranscriptSubtitle: "Copy session messages as JSONL to clipboard",
+    exportTranscriptSuccess: "Transcript copied to clipboard",
+    exportTranscriptFailed: "Failed to export transcript",
+    exportTranscriptEmpty: "No messages to export",
   },
 
   components: {
@@ -2349,8 +2354,6 @@ export const ca: TranslationStructure = {
     restored: "Tasca restaurada",
     session: "Sessió",
     trigger: "Activador",
-    worktreeIsolation: "Worktree Isolation",
-    worktreeIsolationDesc: "CLI creates a dedicated git branch and worktree at execution time, keeping parallel tasks isolated from each other.",
     swarm: "Swarm",
     swarmDispatched: "Swarm Dispatched",
     swarmDispatchedMsg: ({ count }: { count: number }) =>

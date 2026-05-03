@@ -12,7 +12,9 @@ import {
   storage,
   useIsDataReady,
   useSession,
+  useSessionMessages,
 } from "@/sync/storage";
+import type { Message } from "@/sync/typesMessage";
 import {
   getSessionName,
   useSessionStatus,
@@ -125,6 +127,32 @@ function SessionInfoContent({ session }: { session: Session }) {
     isMachineOnline(machine);
 
   const { needsUpgrade, machineCliVersion, handleUpgradeDirect: handleUpgradeSession } = useSessionUpgrade(session, machine);
+
+  const { messages: sessionMessages } = useSessionMessages(session.id);
+
+  const [, performExportTranscript] = useHappyAction(async () => {
+    if (sessionMessages.length === 0) {
+      Modal.toast(t("sessionInfo.exportTranscriptEmpty"));
+      return;
+    }
+    const lines = sessionMessages.map((msg: Message) => {
+      if (msg.kind === "user-text") {
+        return JSON.stringify({ role: "user", text: msg.text, createdAt: msg.createdAt });
+      } else if (msg.kind === "agent-text") {
+        return JSON.stringify({ role: "assistant", text: msg.text, createdAt: msg.createdAt });
+      } else if (msg.kind === "tool-call") {
+        return JSON.stringify({ role: "tool", name: msg.tool.name, state: msg.tool.state, createdAt: msg.createdAt });
+      }
+      return null;
+    }).filter((line): line is string => line !== null);
+    const jsonl = lines.join("\n");
+    await Clipboard.setStringAsync(jsonl);
+    Modal.toast(t("sessionInfo.exportTranscriptSuccess"));
+  });
+
+  const handleExportTranscript = useCallback(() => {
+    performExportTranscript();
+  }, [performExportTranscript]);
 
   // Check if CLI version is outdated
   const isCliOutdated =
@@ -616,6 +644,12 @@ function SessionInfoContent({ session }: { session: Session }) {
               onPress={handleDeleteSession}
             />
           )}
+          <Item
+            title={t("sessionInfo.exportTranscript")}
+            subtitle={t("sessionInfo.exportTranscriptSubtitle")}
+            icon={<Ionicons name="document-text-outline" size={29} color="#34C759" />}
+            onPress={handleExportTranscript}
+          />
           <Item
             title={t("timeline.title")}
             subtitle={t("timeline.subtitle")}

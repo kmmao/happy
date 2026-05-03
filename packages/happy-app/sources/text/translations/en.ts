@@ -955,6 +955,11 @@ export const en: TranslationStructure = {
     deleteAllArchivedSessions: "Delete All Archived Sessions",
     deleteAllArchivedWarning: ({ count }: { count: number }) =>
       `This will permanently delete ${count} archived session(s) and all their messages. This cannot be undone.`,
+    exportTranscript: "Export Transcript",
+    exportTranscriptSubtitle: "Copy session messages as JSONL to clipboard",
+    exportTranscriptSuccess: "Transcript copied to clipboard",
+    exportTranscriptFailed: "Failed to export transcript",
+    exportTranscriptEmpty: "No messages to export",
   },
 
   components: {
@@ -2343,8 +2348,6 @@ export const en: TranslationStructure = {
     restored: "Task restored",
     session: "Session",
     trigger: "Trigger",
-    worktreeIsolation: "Worktree Isolation",
-    worktreeIsolationDesc: "CLI creates a dedicated git branch and worktree at execution time, keeping parallel tasks isolated from each other.",
     swarm: "Swarm",
     swarmDispatched: "Swarm Dispatched",
     swarmDispatchedMsg: ({ count }: { count: number }) =>
