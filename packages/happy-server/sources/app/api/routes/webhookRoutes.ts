@@ -3,12 +3,13 @@ import { type Fastify } from "../types";
 import { log } from "@/utils/log";
 import { db } from "@/storage/db";
 import { encryptString, decryptString } from "@/modules/encrypt";
-import { dispatchWebhook } from "@/app/webhook/webhookDispatch";
+import { dispatchWebhook, normalizeRepoUrl } from "@/app/webhook/webhookDispatch";
 import {
     ensureRemoteWebhook,
     deleteRemoteWebhook,
 } from "@/app/webhook/webhookProviderApi";
 import { WEBHOOK_INBOUND_RATE_LIMIT } from "../utils/enableRateLimit";
+import { redis } from "@/storage/redis";
 
 export function webhookRoutes(app: Fastify) {
   // ── Receive webhook from GitHub/Gitea/GitLab ────────────
@@ -336,6 +337,56 @@ export function webhookRoutes(app: Fastify) {
         })),
         total,
       });
+    },
+  );
+
+  // ── List CI runs for a project or repo ─────────────────
+
+  app.get(
+    "/v1/ci/runs",
+    {
+      preHandler: app.authenticate,
+      schema: {
+        querystring: z
+          .object({
+            projectId: z.string().optional(),
+            repoUrl: z.string().optional(),
+          })
+          .optional(),
+      },
+    },
+    async (request, reply) => {
+      const userId = request.userId;
+      let normalizedUrl: string | null = null;
+
+      if (request.query?.projectId) {
+        const project = await db.project.findFirst({
+          where: { id: request.query.projectId, accountId: userId },
+          select: { repoUrl: true },
+        });
+        if (project?.repoUrl) normalizedUrl = project.repoUrl;
+      } else if (request.query?.repoUrl) {
+        normalizedUrl = normalizeRepoUrl(request.query.repoUrl);
+      }
+
+      if (!normalizedUrl) {
+        return reply.send({ runs: [] });
+      }
+
+      const key = `ci:runs:${userId}:${normalizedUrl}`;
+      const members = await redis.zrevrangebyscore(key, "+inf", "-inf", "LIMIT", 0, 10);
+
+      const runs = members
+        .map((m) => {
+          try {
+            return JSON.parse(m);
+          } catch {
+            return null;
+          }
+        })
+        .filter(Boolean);
+
+      reply.send({ runs });
     },
   );
 }

@@ -15,6 +15,8 @@ import { fetchGitBranches } from "@/sync/gitBranches";
 import { BranchPickerModal } from "./BranchPickerModal";
 import type { GitHost } from "@/components/settings/git-hosts/types";
 import { SharedStateView } from "@/components/SharedStateView";
+import { fetchCiRuns, type CiRun } from "@/sync/apiWebhook";
+import { TokenStorage } from "@/auth/tokenStorage";
 
 interface ProjectGitTabProps {
     project: Project;
@@ -119,6 +121,84 @@ function formatTimeAgo(timestamp: number): string {
     return `${days}d ago`;
 }
 
+function getCiRunIcon(run: CiRun): {
+    name: React.ComponentProps<typeof Ionicons>["name"];
+    color: string;
+} {
+    if (run.status === "queued") {
+        return { name: "time-outline", color: "#8E8E93" };
+    }
+    if (run.status === "in_progress") {
+        return { name: "refresh-outline", color: "#007AFF" };
+    }
+    switch (run.conclusion) {
+        case "success":
+            return { name: "checkmark-circle-outline", color: "#34C759" };
+        case "failure":
+            return { name: "close-circle-outline", color: "#FF3B30" };
+        case "timed_out":
+            return { name: "alert-circle-outline", color: "#FF9500" };
+        case "cancelled":
+        case "skipped":
+        case "action_required":
+            return { name: "ellipsis-horizontal-circle-outline", color: "#8E8E93" };
+        default:
+            return { name: "help-circle-outline", color: "#8E8E93" };
+    }
+}
+
+const CiStatusSection = React.memo(({ projectId }: { projectId: string }) => {
+    const { theme } = useUnistyles();
+    const [runs, setRuns] = React.useState<CiRun[]>([]);
+    const [loaded, setLoaded] = React.useState(false);
+
+    React.useEffect(() => {
+        let cancelled = false;
+
+        (async () => {
+            try {
+                const credentials = await TokenStorage.getCredentials();
+                if (!credentials || cancelled) return;
+                const result = await fetchCiRuns(credentials, { projectId });
+                if (!cancelled) {
+                    setRuns(result.runs.slice(0, 5));
+                    setLoaded(true);
+                }
+            } catch {
+                if (!cancelled) setLoaded(true);
+            }
+        })();
+
+        return () => { cancelled = true; };
+    }, [projectId]);
+
+    if (!loaded || runs.length === 0) return null;
+
+    return (
+        <ItemGroup title={t("projects.ciStatus")}>
+            {runs.map((run) => {
+                const icon = getCiRunIcon(run);
+                return (
+                    <Item
+                        key={run.runId}
+                        title={run.name}
+                        subtitle={`${run.branch} · ${formatTimeAgo(new Date(run.updatedAt).getTime())}`}
+                        icon={
+                            <Ionicons
+                                name={icon.name}
+                                size={20}
+                                color={icon.color}
+                            />
+                        }
+                        onPress={run.url ? () => Linking.openURL(run.url) : undefined}
+                        showChevron={!!run.url}
+                    />
+                );
+            })}
+        </ItemGroup>
+    );
+});
+
 const LineChangeDetail = React.memo(
     ({ added, removed }: { added: number; removed: number }) => {
         const { theme } = useUnistyles();
@@ -216,6 +296,11 @@ export const ProjectGitTab = React.memo(({ project }: ProjectGitTabProps) => {
 
     return (
         <ItemList>
+            {/* CI Status */}
+            {project.serverId && (
+                <CiStatusSection projectId={project.serverId} />
+            )}
+
             {/* Branch & Remote */}
             <ItemGroup title={t("projects.branchAndRemote")}>
                 <Item

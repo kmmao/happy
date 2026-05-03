@@ -16,14 +16,19 @@ import { verifyWebhookSignature } from "./webhookVerify";
 import {
   parseWebhookIssue,
   parseWebhookPRMerge,
+  parseWebhookPROpen,
   parseWebhookPush,
+  parseWebhookCiRun,
   getEventTypeHeader,
   getDeliveryId,
 } from "./webhookParsers";
 import type {
   ParsedWebhookIssue,
   ParsedWebhookPRMerge,
+  ParsedWebhookPROpen,
+  ParsedWebhookCiRun,
 } from "./webhookParsers";
+import { redis } from "@/storage/redis";
 import {
   buildSessionActivityEphemeral,
   eventRouter,
@@ -170,6 +175,27 @@ export async function dispatchWebhook(
           headers,
         );
       }
+
+      // Check if it's a PR open event (for supervisor prReview dimension)
+      const prOpen = parseWebhookPROpen(provider, body, eventType);
+      if (prOpen) {
+        return await handlePROpenSupervisorTrigger(
+          normalizedUrl,
+          prOpen,
+          routes,
+          provider,
+          rawBody,
+          headers,
+        );
+      }
+
+      // Check if it's a CI run event (GitHub Actions workflow_run)
+      const ciRun = parseWebhookCiRun(provider, body, eventType);
+      if (ciRun) {
+        await storeCiRunForRoutes(routes, ciRun, provider, rawBody, headers);
+        return { dispatched: true };
+      }
+
       return { dispatched: false, reason: "not_supported_event" };
     }
 
@@ -762,4 +788,231 @@ async function handlePushSupervisorTrigger(
     dispatched: anyTriggered,
     reason: anyTriggered ? undefined : "push_trigger_failed",
   };
+}
+
+/**
+ * Handle a PR open event by triggering a focused prReview supervisor scan
+ * for projects that have push trigger enabled and prReview dimension configured.
+ */
+async function handlePROpenSupervisorTrigger(
+  normalizedRepoUrl: string,
+  prOpen: ParsedWebhookPROpen,
+  routes: Array<{
+    id: string;
+    accountId: string;
+    repoUrl: string;
+    webhookSecret: Uint8Array<ArrayBuffer>;
+    machineId: string;
+    repoPath: string;
+    provider: string;
+  }>,
+  provider: string,
+  rawBody: string,
+  headers: Record<string, string | undefined>,
+): Promise<DispatchResult> {
+  // Find projects with push trigger enabled that have prReview in enabled dimensions
+  const projects = await db.project.findMany({
+    where: {
+      repoUrl: normalizedRepoUrl,
+      archived: false,
+      supervisorPushTriggerEnabled: true,
+      supervisorConfig: { not: null },
+    },
+    select: {
+      id: true,
+      accountId: true,
+      machineId: true,
+      path: true,
+      supervisorMode: true,
+      supervisorEnabledDimensions: true,
+      supervisorCustomRules: true,
+      supervisorConfig: true,
+    },
+    take: 1000,
+  });
+
+  // Only process projects that have prReview dimension enabled
+  const prReviewProjects = projects.filter((p) =>
+    p.supervisorEnabledDimensions?.split(",").map((d) => d.trim()).includes("prReview"),
+  );
+
+  if (prReviewProjects.length === 0) {
+    return { dispatched: false, reason: "no_pr_review_projects" };
+  }
+
+  const results = await Promise.allSettled(
+    prReviewProjects.map(async (project) => {
+      const route = routes.find((r) => r.accountId === project.accountId);
+      if (!route) return false;
+
+      // Verify signature
+      const secret = decryptString(
+        ["webhook-route", `${route.accountId}:${route.repoUrl}`],
+        route.webhookSecret as unknown as Uint8Array<ArrayBuffer>,
+      );
+      const valid = verifyWebhookSignature(provider, secret, rawBody, headers);
+      if (!valid) return false;
+
+      // Check daily limit
+      const limitCheck = await checkDailyRunLimit(project.id);
+      if (!limitCheck.allowed) {
+        log(
+          { module: "webhook" },
+          `PR open trigger: daily limit reached for project ${project.id}`,
+        );
+        return false;
+      }
+
+      // Create run atomically (prevent duplicate runs)
+      const run = await inTx(async (tx) => {
+        const existingRun = await tx.supervisorRun.findFirst({
+          where: {
+            projectId: project.id,
+            accountId: project.accountId,
+            status: { in: ["pending", "running"] },
+          },
+          select: { id: true },
+        });
+        if (existingRun) return null;
+
+        const created = await tx.supervisorRun.create({
+          data: {
+            projectId: project.id,
+            accountId: project.accountId,
+            trigger: "pr-open",
+            status: "pending",
+          },
+        });
+
+        const todayStart = new Date(Date.UTC(
+          new Date().getUTCFullYear(),
+          new Date().getUTCMonth(),
+          new Date().getUTCDate(),
+        ));
+        await tx.project.update({
+          where: { id: project.id },
+          data: {
+            supervisorDailyRunCount: { increment: 1 },
+            supervisorDailyRunCountResetAt: todayStart,
+          },
+        });
+
+        return created;
+      });
+      if (!run) return false;
+
+      // Emit trigger with prReview dimension and PR context
+      await emitConfiguredSupervisorRunTrigger({
+        userId: project.accountId,
+        projectId: project.id,
+        runId: run.id,
+        trigger: "pr-open",
+        machineId: project.machineId,
+        repoPath: project.path,
+        supervisorConfig: project.supervisorConfig,
+        mode: project.supervisorMode ?? undefined,
+        dimensions: ["prReview"],
+        customRules: project.supervisorCustomRules ?? undefined,
+        prContext: {
+          prNumber: prOpen.prNumber,
+          prTitle: prOpen.prTitle,
+          prDescription: prOpen.prDescription,
+          prUrl: prOpen.prUrl,
+          headBranch: prOpen.headBranch,
+          baseBranch: prOpen.baseBranch,
+          author: prOpen.author,
+        },
+      });
+
+      log(
+        { module: "webhook" },
+        `PR open trigger: started supervisor run ${run.id} for project ${project.id} (PR #${prOpen.prNumber}: ${prOpen.prTitle})`,
+      );
+
+      return true;
+    }),
+  );
+
+  let anyTriggered = false;
+  for (const result of results) {
+    if (result.status === "fulfilled" && result.value) {
+      anyTriggered = true;
+    } else if (result.status === "rejected") {
+      log(
+        { module: "webhook", level: "error" },
+        `PR open trigger failed: ${result.reason}`,
+      );
+    }
+  }
+
+  return {
+    dispatched: anyTriggered,
+    reason: anyTriggered ? undefined : "pr_open_trigger_failed",
+  };
+}
+
+/**
+ * Store a CI run event in Redis for each matching webhook route's account.
+ * Uses a sorted set per (accountId, repoUrl) scored by updated_at timestamp.
+ * Keeps at most 10 entries per key with a 7-day TTL.
+ */
+async function storeCiRunForRoutes(
+  routes: Array<{
+    id: string;
+    accountId: string;
+    repoUrl: string;
+    webhookSecret: Uint8Array<ArrayBuffer>;
+  }>,
+  ciRun: ParsedWebhookCiRun,
+  provider: string,
+  rawBody: string,
+  headers: Record<string, string | undefined>,
+): Promise<void> {
+  const seen = new Set<string>();
+
+  for (const route of routes) {
+    // Only process each accountId once for this repoUrl
+    if (seen.has(route.accountId)) continue;
+
+    try {
+      const secret = decryptString(
+        ["webhook-route", `${route.accountId}:${route.repoUrl}`],
+        route.webhookSecret as unknown as Uint8Array<ArrayBuffer>,
+      );
+      if (!verifyWebhookSignature(provider, secret, rawBody, headers)) continue;
+
+      seen.add(route.accountId);
+
+      const key = `ci:runs:${route.accountId}:${route.repoUrl}`;
+      const score = new Date(ciRun.updatedAt).getTime();
+      const member = JSON.stringify({
+        runId: ciRun.runId,
+        name: ciRun.name,
+        branch: ciRun.branch,
+        sha: ciRun.sha,
+        status: ciRun.status,
+        conclusion: ciRun.conclusion,
+        url: ciRun.url,
+        triggerEvent: ciRun.triggerEvent,
+        createdAt: ciRun.createdAt,
+        updatedAt: ciRun.updatedAt,
+      });
+
+      await redis.zadd(key, score, member);
+      // Keep only the 10 most recent runs (remove oldest)
+      await redis.zremrangebyrank(key, 0, -11);
+      // TTL: 7 days
+      await redis.expire(key, 7 * 24 * 3600);
+
+      log(
+        { module: "webhook" },
+        `CI run ${ciRun.runId} (${ciRun.name}) stored for account ${route.accountId}, repo ${route.repoUrl}, status=${ciRun.status} conclusion=${ciRun.conclusion ?? "null"}`,
+      );
+    } catch (error) {
+      log(
+        { module: "webhook", level: "error" },
+        `Failed to store CI run for route ${route.id}: ${error}`,
+      );
+    }
+  }
 }

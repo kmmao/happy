@@ -556,3 +556,200 @@ function extractChangedFilesFromCommits(
   }
   return Array.from(files);
 }
+
+// ── PR Open Parsing (for supervisor pr-review trigger) ────────────────────
+
+/**
+ * Parsed PR open data from a webhook payload.
+ * Used to trigger focused supervisor scans when a PR is opened.
+ */
+export interface ParsedWebhookPROpen {
+  readonly prNumber: number;
+  readonly prTitle: string;
+  readonly prDescription: string;
+  readonly prUrl: string;
+  readonly headBranch: string;
+  readonly baseBranch: string;
+  readonly author: string;
+  readonly repoUrl: string;
+}
+
+const zPROpenBody = z.object({
+  action: z.string(),
+  pull_request: z.object({
+    number: z.number().optional(),
+    title: z.string().nullish(),
+    html_url: z.string().optional(),
+    body: z.string().nullish(),
+    head: z.object({ ref: z.string().optional() }).passthrough().optional(),
+    base: z.object({ ref: z.string().optional() }).passthrough().optional(),
+    user: z.object({ login: z.string().optional() }).passthrough().optional(),
+  }).passthrough(),
+  sender: z.object({ login: z.string().optional() }).passthrough().optional(),
+  repository: z.object({ html_url: z.string().optional() }).passthrough().optional(),
+}).passthrough();
+
+const zGitLabMROpenBody = z.object({
+  object_attributes: z.object({
+    action: z.string(),
+    state: z.string(),
+    iid: z.number().optional(),
+    title: z.string().nullish(),
+    description: z.string().nullish(),
+    url: z.string().optional(),
+    source_branch: z.string().optional(),
+    target_branch: z.string().optional(),
+  }).passthrough(),
+  user: z.object({ username: z.string().optional() }).passthrough().optional(),
+  project: z.object({ web_url: z.string().optional() }).passthrough().optional(),
+}).passthrough();
+
+function parseGitHubOrGiteaPROpen(
+  body: unknown,
+  eventType: string,
+): ParsedWebhookPROpen | null {
+  if (eventType !== "pull_request") return null;
+
+  const parsed = zPROpenBody.safeParse(body);
+  if (!parsed.success) return null;
+  const data = parsed.data;
+
+  if (data.action !== "opened") return null;
+
+  const pr = data.pull_request;
+
+  return {
+    prNumber: pr.number ?? 0,
+    prTitle: pr.title ?? "",
+    prDescription: pr.body ?? "",
+    prUrl: pr.html_url ?? "",
+    headBranch: pr.head?.ref ?? "",
+    baseBranch: pr.base?.ref ?? "main",
+    author: pr.user?.login ?? data.sender?.login ?? "",
+    repoUrl: data.repository?.html_url ?? "",
+  };
+}
+
+function parseGitLabMROpen(
+  body: unknown,
+  eventType: string,
+): ParsedWebhookPROpen | null {
+  if (eventType !== "Merge Request Hook") return null;
+
+  const parsed = zGitLabMROpenBody.safeParse(body);
+  if (!parsed.success) return null;
+  const data = parsed.data;
+
+  const attrs = data.object_attributes;
+  if (attrs.action !== "open") return null;
+
+  return {
+    prNumber: attrs.iid ?? 0,
+    prTitle: attrs.title ?? "",
+    prDescription: attrs.description ?? "",
+    prUrl: attrs.url ?? "",
+    headBranch: attrs.source_branch ?? "",
+    baseBranch: attrs.target_branch ?? "main",
+    author: data.user?.username ?? "",
+    repoUrl: data.project?.web_url ?? "",
+  };
+}
+
+/**
+ * Parse a webhook payload for a PR open event across all providers.
+ */
+export function parseWebhookPROpen(
+  provider: string,
+  body: unknown,
+  eventType: string,
+): ParsedWebhookPROpen | null {
+  switch (provider) {
+    case "github":
+    case "gitea":
+      return parseGitHubOrGiteaPROpen(body, eventType);
+    case "gitlab":
+      return parseGitLabMROpen(body, eventType);
+    default:
+      return null;
+  }
+}
+
+// ── GitHub CI Run Parsing (workflow_run) ───────────────────
+
+/**
+ * Normalized CI run data from a GitHub Actions workflow_run webhook.
+ */
+export interface ParsedWebhookCiRun {
+  readonly runId: number;
+  readonly name: string;
+  readonly branch: string;
+  readonly sha: string;
+  readonly status: string;            // "queued" | "in_progress" | "completed"
+  readonly conclusion: string | null; // "success" | "failure" | "cancelled" | "skipped" | "timed_out" | "action_required" | null
+  readonly url: string;
+  readonly triggerEvent: string;      // "push" | "pull_request" | etc.
+  readonly repoUrl: string;
+  readonly createdAt: string;         // ISO 8601 timestamp
+  readonly updatedAt: string;         // ISO 8601 timestamp
+}
+
+const zGitHubWorkflowRun = z.object({
+  action: z.string(),
+  workflow_run: z.object({
+    id: z.number(),
+    name: z.string(),
+    head_branch: z.string().nullish(),
+    head_sha: z.string(),
+    status: z.string(),
+    conclusion: z.string().nullable().optional(),
+    html_url: z.string(),
+    event: z.string().optional(),
+    created_at: z.string(),
+    updated_at: z.string(),
+  }).passthrough(),
+  repository: z.object({ html_url: z.string().optional() }).passthrough().optional(),
+}).passthrough();
+
+/**
+ * Parse a GitHub workflow_run webhook payload.
+ * Event type header: x-github-event = "workflow_run"
+ */
+export function parseGitHubWorkflowRunWebhook(
+  body: unknown,
+  eventType: string,
+): ParsedWebhookCiRun | null {
+  if (eventType !== "workflow_run") return null;
+
+  const parsed = zGitHubWorkflowRun.safeParse(body);
+  if (!parsed.success) return null;
+  const data = parsed.data;
+
+  const run = data.workflow_run;
+
+  return {
+    runId: run.id,
+    name: run.name,
+    branch: run.head_branch ?? "",
+    sha: run.head_sha,
+    status: run.status,
+    conclusion: run.conclusion ?? null,
+    url: run.html_url,
+    triggerEvent: run.event ?? "",
+    repoUrl: data.repository?.html_url ?? "",
+    createdAt: run.created_at,
+    updatedAt: run.updated_at,
+  };
+}
+
+/**
+ * Parse a CI run event from any supported provider.
+ * Currently only GitHub supports workflow_run events.
+ */
+export function parseWebhookCiRun(
+  provider: string,
+  body: unknown,
+  eventType: string,
+): ParsedWebhookCiRun | null {
+  if (provider !== "github") return null;
+  return parseGitHubWorkflowRunWebhook(body, eventType);
+}
