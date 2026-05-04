@@ -1,11 +1,13 @@
 # World Model：Happy 的终极愿景
 
 _Created: 2026-04-06_
-_Status: 设计阶段_
+_Status: 历史愿景参考_
+
+> **历史参考说明**：本文保留早期 World Model 的概念隐喻和能力设想，其中“项目是世界 / 一个项目 = 一个世界”已不再作为当前重构方向。当前主设计锚点见 [全局 World Model UI 与结构重构方案](./global-world-model-ui-restructure.md)：Happy 当前承载一个主世界，项目只是世界中的事件来源、上下文节点或任务链组成部分；World 还需要预留外部世界接入点，未来形成 Universe / Multiverse。
 
 ## 核心理念
 
-**用户是上帝，项目是世界，Agent 是居民。**
+**历史隐喻：用户是上帝，项目是世界，Agent 是居民。**
 
 > 命名边界规范见：[world-project-naming-guideline.md](./world-project-naming-guideline.md)
 
@@ -21,9 +23,9 @@ _Status: 设计阶段_
 
 ## 概念模型
 
-### 一个项目 = 一个世界 (World)
+### 历史假设：一个项目 = 一个世界 (World)
 
-> 这里的“=”是业务语义映射，不是底层数据模型替换；技术承载层仍以 Project 为主。
+> 这是 2026-04-06 的早期业务语义映射，已降级为历史参考。当前重构方向不再把 Project 视为 World 边界；Project 只是全局主世界中的事件来源、上下文节点或任务链组成部分。
 
 ```
 World {

@@ -26,6 +26,7 @@ This folder documents how Happy works internally, with a focus on protocol, back
 - architecture-project-supervisor.md: Architecture design for Project as first-class citizen with Supervisor Agent.
 - supervisor-operations-guide.md: Project Supervisor operations guide for autonomous code health analysis and fixes.
 - automation-operations-guide.md: Automation / Agent Loop operations guide covering daemon automation, loop management, guardian continuity, and recovered-session troubleshooting.
+- world/global-world-model-ui-restructure.md: 全局 World Model UI 与结构重构主锚点，定义单一主世界、设置入口、全屏 World Shell 与外部世界接入方向。
 - world/world-model-guide.md: World Model 功能指南，覆盖角色、目标、任务、裁决、成员协作与 App 入口。
 - world/world-project-naming-guideline.md: Naming boundary between Project (technical container) and World (governance semantics).
 - world/world-model-activation-plan.md: 世界模型活化方案与阶段跟进（Goal/板子 + Task/管道 + Skill 沉淀，不接 Multica）。
