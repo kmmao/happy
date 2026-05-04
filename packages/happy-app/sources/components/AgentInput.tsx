@@ -866,7 +866,7 @@ export const AgentInput = React.memo(
           )}
 
           {/* File browser overlay */}
-          {props.sessionId && showFileBrowser && (
+          {Boolean(props.sessionId) && showFileBrowser && (
             <>
               <TouchableWithoutFeedback
                 onPress={() => setShowFileBrowser(false)}
@@ -881,7 +881,7 @@ export const AgentInput = React.memo(
               >
                 <View style={[styles.fileBrowserContainer, { maxHeight: overlayMaxHeight }]}>
                   <GitBrowseTab
-                    sessionId={props.sessionId}
+                    sessionId={props.sessionId!}
                     embedded
                     onFileOpen={() => setShowFileBrowser(false)}
                     onReference={(path) => {
@@ -1161,7 +1161,7 @@ export const AgentInput = React.memo(
           )}
 
           {/* Box 1: Context Information (Machine + Path) - Only show if either exists */}
-          {(props.machineName !== undefined || props.currentPath) && (
+          {(props.machineName !== undefined || Boolean(props.currentPath)) && (
             <View
               style={{
                 backgroundColor: theme.colors.surfacePressed,
@@ -1211,7 +1211,7 @@ export const AgentInput = React.memo(
               )}
 
               {/* Path chip */}
-              {props.currentPath && props.onPathClick && (
+              {Boolean(props.currentPath) && props.onPathClick && (
                 <Pressable
                   onPress={() => {
                     hapticsLight();
@@ -1812,7 +1812,7 @@ export const AgentInput = React.memo(
                     )}
 
                     {/* Profile selector button - FIRST */}
-                    {props.profileId && props.onProfileClick && (
+                    {Boolean(props.profileId) && props.onProfileClick && (
                       <Pressable
                         onPress={() => {
                           hapticsLight();
@@ -1889,7 +1889,7 @@ export const AgentInput = React.memo(
                       )}
 
                     {/* Agent selector button */}
-                    {props.agentType && props.onAgentClick && (
+                    {Boolean(props.agentType) && props.onAgentClick && (
                       <Pressable
                         onPress={() => {
                           hapticsLight();
@@ -2041,7 +2041,7 @@ export const AgentInput = React.memo(
                     )}
 
                     {/* File browser button */}
-                    {props.sessionId && (
+                    {Boolean(props.sessionId) && (
                       <Pressable
                         onPress={() => {
                           hapticsLight();

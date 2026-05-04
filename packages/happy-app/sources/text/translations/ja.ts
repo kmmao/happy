@@ -2456,6 +2456,8 @@ export const ja: TranslationStructure = {
     projectNone: "なし",
     worktreeWhenProject:
       "プロジェクトを選ぶと、このタスク用に Git worktree とブランチが作成されます（新規セッションの「Worktree」と同じ動作です）。",
+    worktreeIsolation: "Worktree 分離",
+    worktreeIsolationDesc: "このタスク用に専用の Git worktree を作成し、現在の作業ディレクトリを汚さないようにします。",
     statusQueued: "待機中",
     statusDispatching: "配信中",
     statusRunning: "実行中",
@@ -2483,6 +2485,11 @@ export const ja: TranslationStructure = {
     swarmDispatched: "Swarm Dispatched",
     swarmDispatchedMsg: ({ count }: { count: number }) =>
       `${count} ${count === 1 ? "task" : "tasks"} dispatched in parallel worktrees.`,
+  },
+
+  agentsDashboard: {
+    sectionTitle: "Agent セッション",
+    agentCount: ({ count }: { count: number }) => `合計 ${count} 件`,
   },
 
   skills: {

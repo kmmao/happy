@@ -2340,6 +2340,8 @@ export const es: TranslationStructure = {
     projectNone: "None",
     worktreeWhenProject:
       'When a project is selected, a dedicated Git worktree and branch are created for this task (same as "Worktree" when starting a new session).',
+    worktreeIsolation: "Worktree Isolation",
+    worktreeIsolationDesc: "Create a dedicated Git worktree for this task so the current working directory stays untouched.",
     statusQueued: "Queued",
     statusDispatching: "Dispatching",
     statusRunning: "Running",
@@ -2367,6 +2369,11 @@ export const es: TranslationStructure = {
     swarmDispatched: "Swarm Dispatched",
     swarmDispatchedMsg: ({ count }: { count: number }) =>
       `${count} ${count === 1 ? "task" : "tasks"} dispatched in parallel worktrees.`,
+  },
+
+  agentsDashboard: {
+    sectionTitle: "Agent Sessions",
+    agentCount: ({ count }: { count: number }) => `${count} total`,
   },
 
   skills: {

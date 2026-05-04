@@ -2278,6 +2278,8 @@ export const zhHans: TranslationStructure = {
     projectNone: "无",
     worktreeWhenProject:
       "选择项目后，会为此任务创建独立 Git worktree 与分支（与新建会话中的「Worktree」模式一致）。",
+    worktreeIsolation: "Worktree 隔离",
+    worktreeIsolationDesc: "为此任务创建独立 Git worktree，避免污染当前工作目录。",
     statusQueued: "排队中",
     statusDispatching: "分发中",
     statusRunning: "运行中",
@@ -2305,6 +2307,11 @@ export const zhHans: TranslationStructure = {
     swarmDispatched: "Swarm 已派发",
     swarmDispatchedMsg: ({ count }: { count: number }) =>
       `已将 ${count} 个任务并行派发到独立工作树。`,
+  },
+
+  agentsDashboard: {
+    sectionTitle: "Agent 会话",
+    agentCount: ({ count }: { count: number }) => `共 ${count} 个`,
   },
 
   skills: {

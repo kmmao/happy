@@ -35,6 +35,7 @@ function createTask(overrides: Partial<ServerTask> = {}): ServerTask {
         promptPreview: "Run task",
         title: null,
         skillNames: ["skill-a"],
+        worktreeIsolation: true,
         ...overrides,
     };
 }

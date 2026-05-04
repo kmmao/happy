@@ -2279,6 +2279,8 @@ export const zhHant: TranslationStructure = {
     projectNone: "無",
     worktreeWhenProject:
       "選擇專案後，會為此任務建立獨立 Git worktree 與分支（與新建工作階段中的「Worktree」模式相同）。",
+    worktreeIsolation: "Worktree 隔離",
+    worktreeIsolationDesc: "為此任務建立獨立 Git worktree，避免污染目前工作目錄。",
     statusQueued: "排隊中",
     statusDispatching: "分派中",
     statusRunning: "執行中",
@@ -2306,6 +2308,11 @@ export const zhHant: TranslationStructure = {
     swarmDispatched: "Swarm 已派發",
     swarmDispatchedMsg: ({ count }: { count: number }) =>
       `已將 ${count} 個任務並行派發到獨立工作樹。`,
+  },
+
+  agentsDashboard: {
+    sectionTitle: "Agent 工作階段",
+    agentCount: ({ count }: { count: number }) => `共 ${count} 個`,
   },
 
   skills: {
