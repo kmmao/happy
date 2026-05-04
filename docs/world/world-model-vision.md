@@ -237,7 +237,7 @@ Goal {
 
 ## 实施路径概览
 
-详见 [world-model-roadmap.md](./world-model-roadmap.md)
+详见 [world-model-roadmap.md](./world-model-roadmap.md)（历史项目级路线图参考；当前主方向见 [global-world-model-ui-restructure.md](./global-world-model-ui-restructure.md)）
 
 | Phase | 名称 | 核心交付 | 前置条件 |
 |-------|------|---------|---------|

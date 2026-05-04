@@ -1,6 +1,8 @@
 # World Model 功能指南
 
-> 本文档面向开发者和高级用户，说明世界模型（World Model）子系统的各项功能、配置方式及影响范围。
+> **旧项目级参考说明**：本文记录的是早期“项目级 World / App 世界 Tab / Goal / Decision / WorldMember”方案，保留用于理解历史设计、能力清单和可复用模块。它不再代表当前 UI 与结构重构方向。当前主设计锚点见 [全局 World Model UI 与结构重构方案](./global-world-model-ui-restructure.md)：Happy 当前承载一个主世界，项目只是事件来源、上下文节点或任务链组成部分，World 还需要为外部世界接入预留 `WorldBridge / RemoteWorld / Universe`。
+>
+> 本文档面向开发者和高级用户，说明旧项目级世界模型（World Model）子系统的各项功能、配置方式及影响范围。
 
 ---
 

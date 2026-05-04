@@ -2,7 +2,9 @@
 
 _Created: 2026-04-06_
 _Completed: 2026-04-06_
-_Status: 全部完成_
+_Status: 历史路线图参考_
+
+> **历史参考说明**：本文记录的是早期“项目级 World / Project 承载叙事与法则 / AgentRole / Decision / Goal”路线图。它不再代表当前 UI 与结构重构方向，也不应被直接当成待实现清单。当前主设计锚点见 [全局 World Model UI 与结构重构方案](./global-world-model-ui-restructure.md)：Happy 当前承载一个主世界，项目只是事件来源、上下文节点或任务链组成部分，并预留 `WorldBridge / RemoteWorld / Universe` 外部世界接入方向。
 
 ## 原则
 
@@ -340,7 +342,7 @@ autonomy_score = 1 - (decisions_pending / decisions_total_30d)
 
 | 文档 | 内容 |
 |------|------|
-| [world-model-vision.md](./world-model-vision.md) | 顶层设计和概念模型 |
-| [world-model-multica-analysis.md](./world-model-multica-analysis.md) | Multica 竞品分析 |
-| [world-model-capability-map.md](./world-model-capability-map.md) | 现有能力盘点和缺口分析 |
+| [world-model-vision.md](./world-model-vision.md) | 历史愿景参考；旧项目级概念模型不再代表当前主方向 |
+| [world-model-multica-analysis.md](./world-model-multica-analysis.md) | Multica 竞品参考资料；模式素材需按全局 World 主方案重新筛选 |
+| [world-model-capability-map.md](./world-model-capability-map.md) | 历史能力盘点参考，保留现有系统能力清单；旧 World 映射需按全局主世界方向重算 |
 | **本文** | 分阶段实施路线图 |

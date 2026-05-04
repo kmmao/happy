@@ -1,7 +1,10 @@
 # Multica 竞品分析
 
 _Created: 2026-04-06_
-_Purpose: 分析 Multica 架构，提取可借鉴模式，明确差异化方向_
+_Status: 竞品参考资料_
+_Purpose: 分析 Multica 架构，提取可借鉴模式，明确差异化方向；本文只作为模式素材，不代表当前 World Model UI 与结构重构路线。_
+
+> **参考说明**：本文用于理解 Multica 在 Agent 一等公民、任务生命周期、运行时隔离、两阶段 prompt 等方面的产品/架构模式。文中的“Happy 可借鉴”建议需要按当前主设计锚点重新筛选，不能覆盖 [全局 World Model UI 与结构重构方案](./global-world-model-ui-restructure.md)。当前方向是 Happy 承载一个主世界，项目只是事件来源、上下文节点或任务链组成部分，并预留 `WorldBridge / RemoteWorld / Universe` 外部世界接入能力。
 
 ## 项目概况
 

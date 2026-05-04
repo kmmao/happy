@@ -1,7 +1,10 @@
 # 现有能力 → World Model 映射
 
 _Created: 2026-04-06_
-_Purpose: 盘点 Happy 已有的全部能力，映射到 World Model 概念，识别缺口_
+_Status: 历史能力盘点参考_
+_Purpose: 盘点 Happy 已有能力，保留作为能力清单和重构素材；其中映射到 Goal / 角色 / 项目级 World 的部分属于旧方向，需要按新的全局 World 主方案重新解释。_
+
+> **参考说明**：本文的系统盘点仍有价值，尤其是 Task Queue、Supervisor、Agent Loop、Trigger、Knowledge、Inbox 等能力清单。但文中的 “World Model 映射” 和 “缺口” 基于早期项目级 World 隐喻，不再直接代表当前重构方向。当前主设计锚点见 [全局 World Model UI 与结构重构方案](./global-world-model-ui-restructure.md)：Happy 当前承载一个主世界，项目只是事件来源、上下文节点或任务链组成部分，并预留 `WorldBridge / RemoteWorld / Universe` 外部世界接入方向。
 
 ## 能力全景图
 

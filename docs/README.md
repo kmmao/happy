@@ -27,9 +27,12 @@ This folder documents how Happy works internally, with a focus on protocol, back
 - supervisor-operations-guide.md: Project Supervisor operations guide for autonomous code health analysis and fixes.
 - automation-operations-guide.md: Automation / Agent Loop operations guide covering daemon automation, loop management, guardian continuity, and recovered-session troubleshooting.
 - world/global-world-model-ui-restructure.md: 全局 World Model UI 与结构重构主锚点，定义单一主世界、设置入口、全屏 World Shell 与外部世界接入方向。
-- world/world-model-guide.md: World Model 功能指南，覆盖角色、目标、任务、裁决、成员协作与 App 入口。
-- world/world-project-naming-guideline.md: Naming boundary between Project (technical container) and World (governance semantics).
-- world/world-model-activation-plan.md: 世界模型活化方案与阶段跟进（Goal/板子 + Task/管道 + Skill 沉淀，不接 Multica）。
+- world/world-model-roadmap.md: 旧项目级 World 历史路线图参考，记录早期 Project 叙事/法则、AgentRole、Decision、Goal 实施阶段。
+- world/world-model-capability-map.md: 旧项目级 World 历史能力盘点参考，保留 Task/Supervisor/Agent Loop/Trigger/Knowledge/Inbox 能力清单。
+- world/world-model-multica-analysis.md: Multica 竞品参考资料，保留 Agent 一等公民、任务生命周期、运行时隔离与两阶段 prompt 等模式素材。
+- world/world-model-guide.md: 旧项目级 World 功能参考，覆盖早期角色、目标、任务、裁决、成员协作与 App 世界 Tab 设想。
+- world/world-project-naming-guideline.md: 全局 World 命名边界规范，定义 Project 作为技术承载层、World 作为全局心智层、Bridge/RemoteWorld/Universe 作为跨世界层。
+- world/world-model-activation-plan.md: 旧项目级 World 历史活化跟进记录，记录 Goal/Task/Skill/角色/世界 Tab 串联迭代。
 - plans/codex-config-first-app-server-plan.md: Codex 配置优先与 app-server 主路径改造计划，包含兼容 legacy MCP 的分阶段实施清单。
 
 ## Conventions

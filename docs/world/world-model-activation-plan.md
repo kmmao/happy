@@ -1,14 +1,18 @@
-# 世界模型活化方案（跟进记录）
+# 世界模型活化方案（历史跟进记录）
 
-> **目的**：在**不接 Multica、不做外部联动**的前提下，参考其产品形态，把 Happy 已有 Goal / Task / Skill / 角色与世界叙事串成闭环；本文档用于后续「完全活化」迭代的**唯一跟进锚点**。  
+> **历史参考说明**：本文记录的是早期“项目级 World / Goal / Task / Skill / 角色 / 世界 Tab”活化迭代，不再是当前或后续「完全活化」迭代的唯一跟进锚点。文中提到的 `Goal`、`AgentRole`、`WorldGoalsTab`、`WorldMember`、`Decision` 等实体和 UI 入口需按当前代码重新核验，不能直接作为待实现清单。
+>
+> 当前主设计锚点见 [全局 World Model UI 与结构重构方案](./global-world-model-ui-restructure.md)：Happy 当前承载一个主世界，项目只是事件来源、上下文节点或任务链组成部分，World 需要预留 `WorldBridge / RemoteWorld / Universe` 外部世界接入方向。
+>
+> **原目的**：在**不接 Multica、不做外部联动**的前提下，参考其产品形态，把 Happy 已有 Goal / Task / Skill / 角色与世界叙事串成闭环。  
 > **创建**：2026-04-08  
-> **状态**：跟进中  
+> **状态**：历史活化跟进记录  
 
 **相关文档**：
 
 - [World Model 实施路线图](./world-model-roadmap.md)（历史阶段与已完成项）
-- [World Model 与 Multica 对照分析](./world-model-multica-analysis.md)
-- [World Model 愿景 / 能力图](./world-model-vision.md)、[capability map](./world-model-capability-map.md)
+- [Multica 竞品参考资料](./world-model-multica-analysis.md)
+- [World Model 愿景 / 能力图](./world-model-vision.md)、[历史能力盘点参考](./world-model-capability-map.md)
 
 ---
 
