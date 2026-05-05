@@ -1,11 +1,9 @@
 import * as React from "react";
 import { TokenStorage } from "@/auth/tokenStorage";
-import { fetchTasks } from "@/sync/apiTasks";
-import { fetchInboxItems } from "@/sync/apiInbox";
+import { fetchWorldEvents } from "@/sync/apiWorldEvents";
 import { sync } from "@/sync/sync";
 import { storage } from "@/sync/storage";
 import {
-    adaptTaskToEvent,
     adaptInboxToEvent,
     filterWorldEvents,
     sortEventsByTime,
@@ -39,28 +37,20 @@ export function useWorldEvents(filter?: WorldFilter): UseWorldEventsResult {
                 const credentials = await TokenStorage.getCredentials();
                 if (!credentials) return;
 
-                const [tasksResult, inboxResult] =
-                    await Promise.allSettled([
-                        fetchTasks(credentials, { limit: 50 }),
-                        fetchInboxItems(credentials, { limit: 50 }),
-                    ]);
+                const f = filterRef.current;
+                const result = await fetchWorldEvents(credentials, {
+                    projectId: f?.projectId ?? undefined,
+                    machineId: f?.machineId ?? undefined,
+                    eventTypePrefix: f?.eventTypePrefix ?? undefined,
+                    severity: f?.severity ?? undefined,
+                    limit: MAX_EVENTS,
+                });
 
                 if (cancelled) return;
 
-                const allEvents: WorldEvent[] = [];
+                const allEvents: WorldEvent[] = [...result.events];
 
-                if (tasksResult.status === "fulfilled") {
-                    for (const task of tasksResult.value.tasks) {
-                        allEvents.push(adaptTaskToEvent(task));
-                    }
-                }
-
-                if (inboxResult.status === "fulfilled") {
-                    for (const item of inboxResult.value.items) {
-                        allEvents.push(adaptInboxToEvent(item));
-                    }
-                }
-
+                // Add local sessions (not covered by backend API)
                 const sessions = Object.values(storage.getState().sessions)
                     .sort((a, b) => b.updatedAt - a.updatedAt)
                     .slice(0, 30);
@@ -69,7 +59,7 @@ export function useWorldEvents(filter?: WorldFilter): UseWorldEventsResult {
                     const eventType = session.active ? "session.active" : "session.ended";
                     const path = session.metadata?.path;
                     const name = path ? path.split("/").filter(Boolean).pop() ?? path : session.id.slice(0, 12);
-                    allEvents.push({
+                    const sessionEvent: WorldEvent = {
                         id: `session-${session.id}`,
                         originalId: session.id,
                         eventType,
@@ -82,15 +72,14 @@ export function useWorldEvents(filter?: WorldFilter): UseWorldEventsResult {
                             machineId: session.metadata?.machineId ?? null,
                             sessionId: session.id,
                         },
-                    });
+                    };
+                    // Apply local filter for sessions
+                    if (!f || filterWorldEvents([sessionEvent], f).length > 0) {
+                        allEvents.push(sessionEvent);
+                    }
                 }
 
-                const sorted = sortEventsByTime(allEvents);
-                const filtered = filterRef.current
-                    ? filterWorldEvents(sorted, filterRef.current)
-                    : sorted;
-
-                setEvents(filtered.slice(0, MAX_EVENTS));
+                setEvents(sortEventsByTime(allEvents).slice(0, MAX_EVENTS));
             } finally {
                 if (!cancelled) setLoading(false);
             }
