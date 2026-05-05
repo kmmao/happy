@@ -1,5 +1,5 @@
 import * as React from "react";
-import { View, ScrollView, RefreshControl } from "react-native";
+import { View, ScrollView, RefreshControl, TouchableOpacity, LayoutAnimation } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { Ionicons } from "@expo/vector-icons";
 import { Text } from "@/components/StyledText";
@@ -90,12 +90,18 @@ export const WorldChainMode = React.memo(function WorldChainMode({
 const ChainCard = React.memo(function ChainCard({ chain }: { chain: TaskChain }) {
     const { theme } = useUnistyles();
     const { styles } = useStyles();
+    const [expanded, setExpanded] = React.useState(false);
     const progress = chain.total > 0 ? (chain.completed / chain.total) : 0;
     const hasFailures = chain.failed > 0;
     const isActive = chain.running > 0;
 
+    const handlePress = React.useCallback(() => {
+        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+        setExpanded((v) => !v);
+    }, []);
+
     return (
-        <View style={styles.card}>
+        <TouchableOpacity style={styles.card} onPress={handlePress} activeOpacity={0.7}>
             <View style={styles.cardHeader}>
                 <Ionicons
                     name={isActive ? "flash" : hasFailures ? "alert-circle" : "checkmark-circle"}
@@ -104,6 +110,11 @@ const ChainCard = React.memo(function ChainCard({ chain }: { chain: TaskChain })
                 />
                 <Text style={styles.cardTitle}>{chain.projectLabel}</Text>
                 <Text style={styles.cardCount}>{chain.completed}/{chain.total}</Text>
+                <Ionicons
+                    name={expanded ? "chevron-up" : "chevron-down"}
+                    size={14}
+                    color={theme.colors.textSecondary}
+                />
             </View>
 
             {/* Progress bar */}
@@ -114,16 +125,27 @@ const ChainCard = React.memo(function ChainCard({ chain }: { chain: TaskChain })
                 )}
             </View>
 
-            {/* Step dots */}
-            <View style={styles.steps}>
-                {chain.tasks.slice(-8).map((task) => (
-                    <StepDot key={task.id} event={task} />
-                ))}
-                {chain.total > 8 && (
-                    <Text style={styles.moreText}>+{chain.total - 8}</Text>
-                )}
-            </View>
-        </View>
+            {/* Collapsed: step dots */}
+            {!expanded && (
+                <View style={styles.steps}>
+                    {chain.tasks.slice(-8).map((task) => (
+                        <StepDot key={task.id} event={task} />
+                    ))}
+                    {chain.total > 8 && (
+                        <Text style={styles.moreText}>+{chain.total - 8}</Text>
+                    )}
+                </View>
+            )}
+
+            {/* Expanded: task detail list */}
+            {expanded && (
+                <View style={styles.taskList}>
+                    {chain.tasks.map((task) => (
+                        <TaskRow key={task.id} event={task} />
+                    ))}
+                </View>
+            )}
+        </TouchableOpacity>
     );
 });
 
@@ -139,6 +161,30 @@ function StepDot({ event }: { event: WorldEvent }) {
 
     return (
         <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: color }} />
+    );
+}
+
+function TaskRow({ event }: { event: WorldEvent }) {
+    const { theme } = useUnistyles();
+    const { styles } = useStyles();
+    const status = event.eventType.replace("task.", "");
+    const statusColor = status === "completed"
+        ? theme.colors.success
+        : status === "failed"
+            ? theme.colors.warningCritical
+            : status === "running"
+                ? theme.colors.accentBlue
+                : theme.colors.textSecondary;
+
+    const time = new Date(event.occurredAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+
+    return (
+        <View style={styles.taskRow}>
+            <View style={[styles.taskDot, { backgroundColor: statusColor }]} />
+            <Text style={styles.taskTitle} numberOfLines={1}>{event.title}</Text>
+            <Text style={styles.taskStatus}>{status}</Text>
+            <Text style={styles.taskTime}>{time}</Text>
+        </View>
     );
 }
 
@@ -203,6 +249,37 @@ const useStyles = () => {
         moreText: {
             fontSize: 11,
             color: theme.colors.textSecondary,
+        },
+        taskList: {
+            gap: 6,
+            borderTopWidth: 1,
+            borderTopColor: theme.colors.divider,
+            paddingTop: 8,
+        },
+        taskRow: {
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 8,
+        },
+        taskDot: {
+            width: 6,
+            height: 6,
+            borderRadius: 3,
+        },
+        taskTitle: {
+            flex: 1,
+            fontSize: 13,
+            color: theme.colors.text,
+        },
+        taskStatus: {
+            fontSize: 11,
+            color: theme.colors.textSecondary,
+        },
+        taskTime: {
+            fontSize: 11,
+            color: theme.colors.textSecondary,
+            width: 42,
+            textAlign: "right",
         },
     });
     return { styles };
