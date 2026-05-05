@@ -449,6 +449,8 @@ export default function RootLayout() {
         name="world/index"
         options={{
           headerShown: false,
+          animation: "fade",
+          gestureEnabled: false,
         }}
       />
       <Stack.Screen
