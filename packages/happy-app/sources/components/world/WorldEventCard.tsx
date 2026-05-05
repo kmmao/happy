@@ -20,6 +20,15 @@ function formatFullDate(ts: number): string {
     });
 }
 
+function formatSourceLabel(projectPath?: string | null, projectId?: string | null): string {
+    if (projectPath) {
+        const segments = projectPath.split("/").filter(Boolean);
+        return segments.pop() ?? projectPath;
+    }
+    if (projectId) return projectId.slice(0, 12);
+    return "";
+}
+
 function useSeverityColor(severity: WorldEventSeverity): string {
     const { theme } = useUnistyles();
     if (severity === "critical") return theme.colors.warningCritical;
@@ -64,9 +73,9 @@ export const WorldEventCard = React.memo(function WorldEventCard({
                     <Text style={styles.title} numberOfLines={expanded ? undefined : 2}>
                         {event.title}
                     </Text>
-                    {event.source.projectId && (
+                    {(event.source.projectPath || event.source.projectId) && (
                         <Text style={styles.source} numberOfLines={1}>
-                            {event.source.projectId.slice(0, 20)}
+                            {formatSourceLabel(event.source.projectPath, event.source.projectId)}
                         </Text>
                     )}
 

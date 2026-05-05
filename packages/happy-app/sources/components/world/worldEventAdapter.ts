@@ -39,6 +39,7 @@ export function adaptTaskToEvent(task: ServerTask): WorldEvent {
         source: {
             type: task.projectId ? "project" : "machine",
             projectId: task.projectId,
+            projectPath: task.directory,
             machineId: task.machineId,
             sessionId: task.sessionId,
         },
