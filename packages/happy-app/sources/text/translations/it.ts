@@ -4286,6 +4286,7 @@ export const it: TranslationStructure = {
     laws: "Laws",
     policy: "Policy",
     notSet: "Not set",
+    narrativePlaceholder: "Describe the current direction and goals...",
   },
 } as const;
 

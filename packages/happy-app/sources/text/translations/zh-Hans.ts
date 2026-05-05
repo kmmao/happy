@@ -4183,5 +4183,6 @@ export const zhHans: TranslationStructure = {
     laws: "法则",
     policy: "策略",
     notSet: "未设置",
+    narrativePlaceholder: "描述当前的方向和目标...",
   },
 } as const;

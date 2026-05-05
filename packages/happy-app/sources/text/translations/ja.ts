@@ -4261,5 +4261,6 @@ export const ja: TranslationStructure = {
     laws: "ルール",
     policy: "ポリシー",
     notSet: "未設定",
+    narrativePlaceholder: "現在の方向性と目標を説明してください...",
   },
 } as const;
