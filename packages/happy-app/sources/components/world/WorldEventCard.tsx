@@ -1,9 +1,12 @@
 import * as React from "react";
-import { View, TouchableOpacity, LayoutAnimation } from "react-native";
+import { View, TouchableOpacity, LayoutAnimation, ActivityIndicator } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { Text } from "@/components/StyledText";
+import { TokenStorage } from "@/auth/tokenStorage";
+import { updateActionApproval } from "@/sync/apiSupervisor";
+import { markInboxItemRead, deleteInboxItem } from "@/sync/apiInbox";
 import type { WorldEvent, WorldEventSeverity } from "./worldTypes";
 
 function formatTime(ts: number): string {
@@ -52,6 +55,8 @@ export const WorldEventCard = React.memo(function WorldEventCard({
     const router = useRouter();
     const dotColor = useSeverityColor(event.severity);
     const [expanded, setExpanded] = React.useState(false);
+    const [actionLoading, setActionLoading] = React.useState(false);
+    const [actionDone, setActionDone] = React.useState<string | null>(null);
 
     const handlePress = React.useCallback(() => {
         LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
@@ -107,6 +112,79 @@ export const WorldEventCard = React.memo(function WorldEventCard({
                                     <Text style={styles.openButtonText}>Open Session</Text>
                                 </TouchableOpacity>
                             )}
+                            {/* Inline actions for supervisor events */}
+                            {event.eventType === "supervisor.action_found" && !actionDone && (
+                                <View style={styles.actionRow}>
+                                    <ActionButton
+                                        label="Approve"
+                                        icon="checkmark-circle"
+                                        color={theme.colors.success}
+                                        loading={actionLoading}
+                                        onPress={async () => {
+                                            setActionLoading(true);
+                                            try {
+                                                const creds = await TokenStorage.getCredentials();
+                                                if (!creds || !event.source.projectId) return;
+                                                await updateActionApproval(creds, event.source.projectId, event.originalId, "approved");
+                                                setActionDone("approved");
+                                            } finally { setActionLoading(false); }
+                                        }}
+                                    />
+                                    <ActionButton
+                                        label="Skip"
+                                        icon="close-circle"
+                                        color={theme.colors.textSecondary}
+                                        loading={actionLoading}
+                                        onPress={async () => {
+                                            setActionLoading(true);
+                                            try {
+                                                const creds = await TokenStorage.getCredentials();
+                                                if (!creds || !event.source.projectId) return;
+                                                await updateActionApproval(creds, event.source.projectId, event.originalId, "skipped");
+                                                setActionDone("skipped");
+                                            } finally { setActionLoading(false); }
+                                        }}
+                                    />
+                                </View>
+                            )}
+                            {/* Inline actions for inbox/decision events */}
+                            {event.eventType.startsWith("decision.") && !actionDone && (
+                                <View style={styles.actionRow}>
+                                    <ActionButton
+                                        label="Read"
+                                        icon="checkmark"
+                                        color={theme.colors.success}
+                                        loading={actionLoading}
+                                        onPress={async () => {
+                                            setActionLoading(true);
+                                            try {
+                                                const creds = await TokenStorage.getCredentials();
+                                                if (!creds) return;
+                                                await markInboxItemRead(creds, event.originalId);
+                                                setActionDone("read");
+                                            } finally { setActionLoading(false); }
+                                        }}
+                                    />
+                                    <ActionButton
+                                        label="Dismiss"
+                                        icon="trash-outline"
+                                        color={theme.colors.warningCritical}
+                                        loading={actionLoading}
+                                        onPress={async () => {
+                                            setActionLoading(true);
+                                            try {
+                                                const creds = await TokenStorage.getCredentials();
+                                                if (!creds) return;
+                                                await deleteInboxItem(creds, event.originalId);
+                                                setActionDone("dismissed");
+                                            } finally { setActionLoading(false); }
+                                        }}
+                                    />
+                                </View>
+                            )}
+                            {!!actionDone && (
+                                <Text style={styles.actionDoneText}>{actionDone}</Text>
+                            )}
                         </View>
                     )}
                 </View>
@@ -122,6 +200,30 @@ function DetailRow({ label, value }: { label: string; value: string }) {
             <Text style={styles.detailLabel}>{label}</Text>
             <Text style={styles.detailValue} numberOfLines={1}>{value}</Text>
         </View>
+    );
+}
+
+function ActionButton({ label, icon, color, loading, onPress }: {
+    label: string;
+    icon: string;
+    color: string;
+    loading: boolean;
+    onPress: () => void;
+}) {
+    const { styles } = useStyles();
+    return (
+        <TouchableOpacity
+            style={styles.actionButton}
+            onPress={onPress}
+            disabled={loading}
+            activeOpacity={0.7}
+        >
+            {loading
+                ? <ActivityIndicator size="small" color={color} />
+                : <Ionicons name={icon as any} size={14} color={color} />
+            }
+            <Text style={[styles.actionButtonText, { color }]}>{label}</Text>
+        </TouchableOpacity>
     );
 }
 
@@ -212,6 +314,30 @@ const useStyles = () => {
         openButtonText: {
             fontSize: 13,
             color: theme.colors.textLink,
+        },
+        actionRow: {
+            flexDirection: "row",
+            gap: 8,
+            marginTop: 8,
+        },
+        actionButton: {
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 5,
+            paddingVertical: 6,
+            paddingHorizontal: 12,
+            borderRadius: 6,
+            backgroundColor: theme.colors.surfaceHigh,
+        },
+        actionButtonText: {
+            fontSize: 13,
+            fontWeight: "500",
+        },
+        actionDoneText: {
+            fontSize: 12,
+            color: theme.colors.success,
+            marginTop: 6,
+            fontStyle: "italic",
         },
     });
     return { styles };
