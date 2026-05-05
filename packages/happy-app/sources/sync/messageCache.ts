@@ -8,14 +8,18 @@ const CACHE_INDEX_KEY = "msg-cache-index";
 const HISTORY_COMPLETE_PREFIX = "msg-history-complete-v1-";
 const MAX_CACHED_MESSAGES = 350;
 const MAX_CACHED_SESSIONS = 20;
-const CACHE_SCHEMA_VERSION = 1;
+const CACHE_SCHEMA_VERSION = 2;
 
 interface CachedSessionMessages {
   schemaVersion: number;
   messages: readonly Message[];
   lastSeq: number;
   savedAt: number;
-  isTrimmed: boolean; // true if messages were truncated, lastSeq may not cover full history
+  isTrimmed: boolean;
+  latestUserRequestPreview?: {
+    text: string;
+    isAutoOptionSend: boolean;
+  } | null;
 }
 
 interface CacheIndexEntry {
@@ -63,11 +67,21 @@ export function loadMessageCache(
       !parsed ||
       !Array.isArray(parsed.messages) ||
       typeof parsed.lastSeq !== "number" ||
-      parsed.schemaVersion !== CACHE_SCHEMA_VERSION
+      typeof parsed.savedAt !== "number"
     ) {
       return null;
     }
-    return parsed;
+    if (parsed.schemaVersion === CACHE_SCHEMA_VERSION) {
+      return parsed;
+    }
+    if (parsed.schemaVersion === 1) {
+      return {
+        ...parsed,
+        schemaVersion: CACHE_SCHEMA_VERSION,
+        latestUserRequestPreview: undefined,
+      };
+    }
+    return null;
   } catch (error) {
     log.log(`Failed to load message cache for ${sessionId}: ${error}`);
     return null;
@@ -78,6 +92,10 @@ export function saveMessageCache(
   sessionId: string,
   messages: ReadonlyArray<Message>,
   lastSeq: number,
+  latestUserRequestPreview?: {
+    text: string;
+    isAutoOptionSend: boolean;
+  } | null,
 ): void {
   const mmkv = getMMKV();
   if (!mmkv) {
@@ -85,8 +103,6 @@ export function saveMessageCache(
   }
 
   try {
-    // messages are sorted by createdAt DESC (newest first) from storage.ts
-    // slice(0, N) keeps the newest N messages
     const wasTrimmed = messages.length > MAX_CACHED_MESSAGES;
     const trimmedMessages = wasTrimmed
       ? messages.slice(0, MAX_CACHED_MESSAGES)
@@ -98,11 +114,11 @@ export function saveMessageCache(
       lastSeq,
       savedAt: Date.now(),
       isTrimmed: wasTrimmed,
+      latestUserRequestPreview,
     };
 
     mmkv.set(`${CACHE_PREFIX}${sessionId}`, JSON.stringify(cached));
 
-    // Update index and enforce LRU limit
     updateCacheIndex(mmkv, sessionId);
   } catch (error) {
     log.log(`Failed to save message cache for ${sessionId}: ${error}`);
@@ -180,7 +196,6 @@ function updateCacheIndex(mmkv: MMKV, sessionId: string): void {
   const index = loadCacheIndex(mmkv).filter((e) => e.sessionId !== sessionId);
   index.push({ sessionId, savedAt: Date.now() });
 
-  // Evict oldest entries if over limit
   if (index.length > MAX_CACHED_SESSIONS) {
     const sorted = [...index].sort((a, b) => a.savedAt - b.savedAt);
     const toEvict = sorted.slice(0, sorted.length - MAX_CACHED_SESSIONS);
@@ -198,3 +213,4 @@ function removeCacheIndexEntry(mmkv: MMKV, sessionId: string): void {
   const index = loadCacheIndex(mmkv).filter((e) => e.sessionId !== sessionId);
   saveCacheIndex(mmkv, index);
 }
+

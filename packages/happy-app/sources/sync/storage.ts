@@ -1,8 +1,9 @@
 import { create } from "zustand";
 import { useShallow } from "zustand/react/shallow";
-import { Session, Machine, GitStatus, type SessionPreferences } from "./storageTypes";
+import { Session, Machine, GitStatus, type SessionPreferences, type SessionLatestUserRequestPreview } from "./storageTypes";
 import { createReducer, reducer, ReducerState, BackgroundTaskEntry } from "./reducer/reducer";
 import { Message } from "./typesMessage";
+import { getLatestUserRequestPreview } from "@/utils/sessionUtils";
 import { NormalizedMessage } from "./typesRaw";
 import { isMachineOnline } from "@/utils/machineUtils";
 import { applySettings, Settings } from "./settings";
@@ -395,6 +396,13 @@ function buildSessionListViewData(
   return listData;
 }
 
+function resolveLatestUserRequestPreview(
+  messages: readonly Message[],
+  fallback?: SessionLatestUserRequestPreview | null,
+): SessionLatestUserRequestPreview | null {
+  return getLatestUserRequestPreview(messages) ?? fallback ?? null;
+}
+
 // Callback for syncing preferences to server (registered by sync.ts to avoid circular dependency)
 let onPreferencesChanged: ((sessionId: string) => void) | null = null;
 export function registerPreferencesSyncCallback(
@@ -725,6 +733,10 @@ export const storage = create<StorageState>()((set, get) => {
             taskBudgetTokens: resolvedTaskBudgetTokens,
             needsAttention: resolvedNeedsAttention,
             starred: resolvedStarred || null,
+            latestUserRequestPreview:
+              session.latestUserRequestPreview ??
+              state.sessions[session.id]?.latestUserRequestPreview ??
+              null,
             // Preserve client-only latestUsage — server doesn't return it
             latestUsage: state.sessions[session.id]?.latestUsage,
             ...(preservedResolvedModelId && {
@@ -983,6 +995,13 @@ export const storage = create<StorageState>()((set, get) => {
           );
         }
 
+        const latestUserRequestPreview = session
+          ? resolveLatestUserRequestPreview(
+              messagesArray,
+              session.latestUserRequestPreview,
+            )
+          : null;
+
         // Update session with todos and latestUsage
         // IMPORTANT: We extract latestUsage from the mutable reducerState and copy it to the Session object
         // This ensures latestUsage is available immediately on load, even before messages are fully loaded
@@ -990,7 +1009,8 @@ export const storage = create<StorageState>()((set, get) => {
         const needsUpdate =
           (reducerResult.todos !== undefined ||
             existingSession.reducerState.latestUsage ||
-            existingSession.reducerState.resolvedModelId) &&
+            existingSession.reducerState.resolvedModelId ||
+            latestUserRequestPreview !== (session?.latestUserRequestPreview ?? null)) &&
           session;
 
         if (needsUpdate) {
@@ -1007,6 +1027,7 @@ export const storage = create<StorageState>()((set, get) => {
               ...(reducerResult.todos !== undefined && {
                 todos: reducerResult.todos,
               }),
+              latestUserRequestPreview,
               // Copy latestUsage from reducerState to make it immediately available
               latestUsage: existingSession.reducerState.latestUsage
                 ? {
@@ -1156,7 +1177,7 @@ export const storage = create<StorageState>()((set, get) => {
       }),
     restoreMessagesFromCache: (
       sessionId: string,
-      cached: { messages: readonly Message[]; lastSeq: number },
+      cached: { messages: readonly Message[]; lastSeq: number; latestUserRequestPreview?: SessionLatestUserRequestPreview | null },
     ) =>
       set((state) => {
         // Don't overwrite if we already have messages (fresher than cache)
@@ -1188,8 +1209,30 @@ export const storage = create<StorageState>()((set, get) => {
           }
         }
 
+        const latestUserRequestPreview = resolveLatestUserRequestPreview(
+          cached.messages,
+          cached.latestUserRequestPreview,
+        );
+        const updatedSessions = state.sessions[sessionId]
+          ? {
+              ...state.sessions,
+              [sessionId]: {
+                ...state.sessions[sessionId],
+                latestUserRequestPreview,
+              },
+            }
+          : state.sessions;
+
         return {
           ...state,
+          sessions: updatedSessions,
+          sessionListViewData:
+            updatedSessions !== state.sessions
+              ? buildSessionListViewData(
+                  updatedSessions,
+                  state.settings.realtimeSessionSort ?? true,
+                )
+              : state.sessionListViewData,
           sessionMessages: {
             ...state.sessionMessages,
             [sessionId]: {
@@ -2237,8 +2280,8 @@ export function useAllMachines(): Machine[] {
     useShallow((state) => {
       if (!state.isDataReady) return [];
       return Object.values(state.machines)
-        .sort((a, b) => b.createdAt - a.createdAt)
-        .filter((v) => v.active);
+        .sort((a, b) => (b.activeAt ?? b.lastSeenAt ?? 0) - (a.activeAt ?? a.lastSeenAt ?? 0))
+        .filter(isMachineOnline);
     }),
   );
 }

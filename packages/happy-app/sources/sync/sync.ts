@@ -118,6 +118,7 @@ import type { FeedItem } from "./feedTypes";
 import { UserProfile } from "./friendTypes";
 import { resolveMessageModeMeta } from "./messageMeta";
 import { getSessionUsageSummary } from "./apiUsage";
+import { getLatestUserRequestPreview } from "@/utils/sessionUtils";
 import {
   initMessageCache,
   loadMessageCache,
@@ -2794,7 +2795,10 @@ class Sync {
         const session = storage.getState().sessionMessages[sessionId];
         const lastSeq = this.sessionLastSeq.get(sessionId) ?? 0;
         if (session?.isLoaded && session.messages.length > 0) {
-          saveMessageCache(sessionId, session.messages, lastSeq);
+          const latestRequestPreview =
+            storage.getState().sessions[sessionId]?.latestUserRequestPreview ??
+            getLatestUserRequestPreview(session.messages);
+          saveMessageCache(sessionId, session.messages, lastSeq, latestRequestPreview);
         }
       }, 2000),
     );
@@ -2805,9 +2809,14 @@ class Sync {
       clearTimeout(timer);
       const session = storage.getState().sessionMessages[sessionId];
       const lastSeq = this.sessionLastSeq.get(sessionId) ?? 0;
-      if (session?.isLoaded && session.messages.length > 0) {
-        saveMessageCache(sessionId, session.messages, lastSeq);
-      }
+        const latestRequestPreview =
+          storage.getState().sessions[sessionId]?.latestUserRequestPreview ??
+          (session?.messages.length > 0
+            ? getLatestUserRequestPreview(session.messages)
+            : null);
+        if (session?.isLoaded && session.messages.length > 0) {
+          saveMessageCache(sessionId, session.messages, lastSeq, latestRequestPreview);
+        }
     }
     this.cacheWriteTimers.clear();
   }

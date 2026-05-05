@@ -38,16 +38,16 @@ import { mergeUpdatedSession } from "./updateSessionMerge";
 import { voiceHooks } from "@/realtime/hooks/voiceHooks";
 import { t } from "@/text";
 import { getSessionName } from "@/utils/sessionUtils";
+import { getLatestUserRequestPreview } from "@/utils/sessionUtils";
 import {
     notifyTaskComplete,
     notifyPermissionRequest,
     clearNotifiedRequests,
 } from "@/utils/webNotification";
 
-import type { ApiUpdateContainerSchema } from "./apiTypes";
-import type { z } from "zod";
+import type { ApiUpdateContainer } from "./apiTypes";
 
-type UpdateData = z.infer<typeof ApiUpdateContainerSchema>;
+type UpdateData = ApiUpdateContainer;
 
 /**
  * Context needed by update handlers to access sync state.
@@ -199,6 +199,21 @@ export async function handleNewMessageUpdate(
                         ...session,
                         updatedAt: updateData.createdAt,
                         seq: updateData.seq,
+                        ...(lastMessage?.role === "user"
+                            ? {
+                                latestUserRequestPreview: getLatestUserRequestPreview([
+                                    {
+                                        kind: "user-text",
+                                        id: lastMessage.id,
+                                        realId: null,
+                                        localId: lastMessage.localId,
+                                        createdAt: lastMessage.createdAt,
+                                        text: lastMessage.content.text,
+                                        meta: lastMessage.meta,
+                                    },
+                                ]),
+                            }
+                            : {}),
                         ...(isTaskComplete
                             ? {
                                 thinking: false,

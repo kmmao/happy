@@ -59,21 +59,21 @@ export const MetadataSchema = z.object({
   sessionSummary: sessionSummaryStateSchema.optional(),
   sessionSummaryRefresh: sessionSummaryRefreshStateSchema.optional(),
   machineId: z.string().optional(),
-  claudeSessionId: z.string().optional(), // Claude Code session ID
+  claudeSessionId: z.string().optional(),
   tools: z.array(z.string()).optional(),
   slashCommands: z.array(z.string()).optional(),
   slashCommandDescriptions: z.record(z.string(), z.string()).optional(),
-  homeDir: z.string().optional(), // User's home directory on the machine
-  happyHomeDir: z.string().optional(), // Happy configuration directory
-  hostPid: z.number().optional(), // Process ID of the session
-  startedBy: z.enum(["daemon", "terminal"]).optional(), // How the session was started
-  flavor: z.string().nullish(), // Session flavor/variant identifier
+  homeDir: z.string().optional(),
+  happyHomeDir: z.string().optional(),
+  hostPid: z.number().optional(),
+  startedBy: z.enum(["daemon", "terminal"]).optional(),
+  flavor: z.string().nullish(),
   codex: CodexMetadataSchema.optional(),
-  sandbox: z.any().nullish(), // Sandbox config metadata from CLI (or null when disabled)
-  dangerouslySkipPermissions: z.boolean().nullish(), // Claude --dangerously-skip-permissions mode (or null when unknown)
-  packageScripts: z.record(z.string(), z.string()).optional(), // package.json scripts from working directory
-  displayName: z.string().optional(), // User-defined session display name
-  tags: z.array(z.string()).optional(), // User-defined labels for grouping/filtering
+  sandbox: z.any().nullish(),
+  dangerouslySkipPermissions: z.boolean().nullish(),
+  packageScripts: z.record(z.string(), z.string()).optional(),
+  displayName: z.string().optional(),
+  tags: z.array(z.string()).optional(),
   worktree: z
     .object({
       isWorktree: z.boolean(),
@@ -179,6 +179,11 @@ export const SessionPreferencesSchema = z.object({
 
 export type SessionPreferences = z.infer<typeof SessionPreferencesSchema>;
 
+export type SessionLatestUserRequestPreview = {
+  text: string;
+  isAutoOptionSend: boolean;
+};
+
 export interface Session {
   id: string;
   seq: number;
@@ -188,7 +193,7 @@ export interface Session {
   activeAt: number;
   forkedFromSessionId?: string | null;
   parentSessionId?: string | null;
-  rpcReady: boolean; // true when at least one RPC method is registered for this session
+  rpcReady: boolean;
   metadata: Metadata | null;
   metadataVersion: number;
   agentState: AgentState | null;
@@ -196,38 +201,34 @@ export interface Session {
   preferencesVersion: number;
   thinking: boolean;
   thinkingAt: number;
-  presence: "online" | number; // "online" when active, timestamp when last seen
+  presence: "online" | number;
   todos?: Array<{
     content: string;
     status: "pending" | "in_progress" | "completed";
     priority: "high" | "medium" | "low";
     id: string;
   }>;
-  draft?: string | null; // Local draft message, not synced to server
-  permissionMode?: string | null; // Local permission mode key, not synced to server
-  modelMode?: string | null; // Local model key, not synced to server
-  pinnedModelId?: string | null; // Session-pinned model ID used for outgoing requests to avoid profile drift
+  draft?: string | null;
+  permissionMode?: string | null;
+  modelMode?: string | null;
+  pinnedModelId?: string | null;
   customModels?: Array<{
     id: string;
     name: string;
     description?: string | null;
-  }> | null; // Profile custom models, copied at session creation
-  modelMappings?: Record<string, string> | null; // Maps UI keys (opus/sonnet/haiku) to real model IDs, copied at session creation
-  profileId?: string | null; // AI backend profile ID used when session was created
-  profileName?: string | null; // AI backend profile display name, copied at session creation
-  // SDK reasoning & budget controls (Phase 3A)
-  thinkingMode?: string | null; // "disabled" | "adaptive" | "enabled"
-  thinkingBudget?: number | null; // Budget tokens when thinkingMode is "enabled"
-  effortLevel?: string | null; // "low" | "medium" | "high" | "max" | "xhigh"
-  maxBudgetUsd?: number | null; // Max budget in USD
-  taskBudgetTokens?: number | null; // Task token budget (alpha) — model self-paces within limit
-  // IMPORTANT: latestUsage is extracted from reducerState.latestUsage after message processing.
-  // We store it directly on Session to ensure it's available immediately on load.
-  // Do NOT store reducerState itself on Session - it's mutable and should only exist in SessionMessages.
-  resolvedModelId?: string | null; // Actual model ID reported by CLI in turn-end (e.g. "claude-opus-4-6")
-  needsAttention?: boolean; // true when turn-end received and user hasn't viewed the session
-  starred?: boolean | null; // true when user has starred/bookmarked the session (synced via server preferences, cached in MMKV)
-  /** Authoritative SDK session lifecycle state (idle/running/requires_action) */
+  }> | null;
+  modelMappings?: Record<string, string> | null;
+  profileId?: string | null;
+  profileName?: string | null;
+  thinkingMode?: string | null;
+  thinkingBudget?: number | null;
+  effortLevel?: string | null;
+  maxBudgetUsd?: number | null;
+  taskBudgetTokens?: number | null;
+  resolvedModelId?: string | null;
+  needsAttention?: boolean;
+  starred?: boolean | null;
+  latestUserRequestPreview?: SessionLatestUserRequestPreview | null;
   sdkSessionState?: "idle" | "running" | "requires_action" | null;
   latestUsage?: {
     inputTokens: number;
@@ -255,7 +256,6 @@ export interface Session {
       }
     >;
   } | null;
-  // Transient API retry state — set when SDK is retrying a failed API call, cleared on next success
   apiRetry?: {
     attempt: number;
     maxRetries: number;
@@ -273,70 +273,66 @@ export interface DecryptedMessage {
   createdAt: number;
 }
 
-//
-// Machine states
-//
-
 export const MachineMetadataSchema = z.object({
   host: z.string(),
   platform: z.string(),
   happyCliVersion: z.string(),
-  happyHomeDir: z.string(), // Directory for Happy auth, settings, logs (usually .happy/ or .happy-dev/)
-  homeDir: z.string(), // User's home directory (matches CLI field name)
-  // Optional fields that may be added in future versions
+  happyHomeDir: z.string(),
+  homeDir: z.string(),
   username: z.string().optional(),
   arch: z.string().optional(),
-  displayName: z.string().optional(), // Custom display name for the machine
-  // Daemon status fields
-  daemonLastKnownStatus: z.enum(["running", "shutting-down"]).optional(),
-  daemonLastKnownPid: z.number().optional(),
-  shutdownRequestedAt: z.number().optional(),
-  shutdownSource: z
-    .enum(["happy-app", "happy-cli", "os-signal", "unknown"])
-    .optional(),
+  displayName: z.string().optional(),
+  daemonVersion: z.string().optional(),
+  daemonStatus: z.enum(["running", "stopped", "error"]).optional(),
+  daemonStartedAt: z.number().optional(),
+  daemonError: z.string().optional(),
 });
 
 export type MachineMetadata = z.infer<typeof MachineMetadataSchema>;
 
 export interface Machine {
   id: string;
-  seq: number;
-  createdAt: number;
-  updatedAt: number;
-  active: boolean;
-  activeAt: number; // Changed from lastActiveAt to activeAt for consistency
-  rpcReady: boolean; // true when at least one RPC method is registered on the server
-  metadata: MachineMetadata | null;
+  accountId?: string;
+  seq?: number;
+  host?: string;
+  platform?: string;
+  homeDir?: string;
+  happyHomeDir?: string;
+  metadata?: MachineMetadata | null;
+  connected?: boolean;
+  connectedAt?: number;
+  lastSeenAt?: number;
   metadataVersion: number;
-  daemonState: any | null; // Dynamic daemon state (runtime info)
-  daemonStateVersion: number;
+  createdAt?: number;
+  updatedAt?: number;
+  active?: boolean;
+  activeAt?: number;
+  rpcReady?: boolean;
+  daemonState?: any | null;
+  daemonStateVersion?: number;
 }
-
-//
-// Git Status
-//
 
 export interface GitStatus {
   branch: string | null;
+  ahead?: number;
+  behind?: number;
+  hasUncommittedChanges?: boolean;
+  lastCheckedAt?: number;
+  remoteUrl?: string | null;
+  upstreamBranch?: string | null;
+  aheadCount: number;
+  behindCount: number;
+  lastUpdatedAt: number;
   isDirty: boolean;
+  stagedCount: number;
   modifiedCount: number;
   untrackedCount: number;
-  stagedCount: number;
-  lastUpdatedAt: number;
-  // Line change statistics - separated by staged vs unstaged
+  stashCount: number;
   stagedLinesAdded: number;
   stagedLinesRemoved: number;
   unstagedLinesAdded: number;
   unstagedLinesRemoved: number;
-  // Computed totals
-  linesAdded: number; // stagedLinesAdded + unstagedLinesAdded
-  linesRemoved: number; // stagedLinesRemoved + unstagedLinesRemoved
-  linesChanged: number; // Total lines that were modified (added + removed)
-  // Branch tracking information (from porcelain v2)
-  upstreamBranch?: string | null; // Name of upstream branch
-  aheadCount?: number; // Commits ahead of upstream
-  behindCount?: number; // Commits behind upstream
-  stashCount?: number; // Number of stash entries
-  // Remote URL for provider detection (GitHub/Gitea)
-  remoteUrl?: string | null;
+  linesAdded: number;
+  linesRemoved: number;
+  linesChanged: number;
 }

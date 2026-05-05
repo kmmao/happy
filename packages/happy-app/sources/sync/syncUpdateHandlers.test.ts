@@ -104,6 +104,15 @@ vi.mock("@/text", () => ({
 
 vi.mock("@/utils/sessionUtils", () => ({
   getSessionName: vi.fn(() => "Session"),
+  getLatestUserRequestPreview: vi.fn((messages) => {
+    const message = messages[0];
+    return message
+      ? {
+          text: message.text,
+          isAutoOptionSend: message.meta?.source === "auto-option-send",
+        }
+      : null;
+  }),
 }));
 
 vi.mock("@/utils/webNotification", () => ({
@@ -120,13 +129,15 @@ vi.mock("@/log", () => ({
   },
 }));
 
-import { handleUpdateSessionUpdate } from "./syncUpdateHandlers";
+let handleUpdateSessionUpdate: typeof import("./syncUpdateHandlers").handleUpdateSessionUpdate;
 
 describe("handleUpdateSessionUpdate", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
+  beforeEach(async () => {
+  vi.clearAllMocks();
 
-    mocks.storageState.sessions = {
+  handleUpdateSessionUpdate = (await import("./syncUpdateHandlers")).handleUpdateSessionUpdate;
+
+  mocks.storageState.sessions = {
       "session-1": {
         id: "session-1",
         seq: 1,
