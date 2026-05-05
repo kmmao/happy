@@ -10,10 +10,15 @@ interface ChipDef {
     filter: WorldFilter;
 }
 
+interface ProjectChipInfo {
+    id: string;
+    label: string;
+}
+
 interface WorldFilterChipsProps {
     activeFilter: WorldFilter;
     onFilterChange: (filter: WorldFilter) => void;
-    projectIds?: string[];
+    projects?: ProjectChipInfo[];
 }
 
 function filtersEqual(a: WorldFilter, b: WorldFilter): boolean {
@@ -28,20 +33,21 @@ function filtersEqual(a: WorldFilter, b: WorldFilter): boolean {
 export const WorldFilterChips = React.memo(function WorldFilterChips({
     activeFilter,
     onFilterChange,
-    projectIds = [],
+    projects = [],
 }: WorldFilterChipsProps) {
     const staticChips: ChipDef[] = [
         { label: t("world.filterAll"), filter: {} },
         { label: "task.*", filter: { eventTypePrefix: "task." } },
         { label: "decision.*", filter: { eventTypePrefix: "decision." } },
         { label: "supervisor.*", filter: { eventTypePrefix: "supervisor." } },
-        { label: "⚠️ warning", filter: { severity: "warning" } },
-        { label: "🔴 critical", filter: { severity: "critical" } },
+        { label: "session.*", filter: { eventTypePrefix: "session." } },
+        { label: "⚠️", filter: { severity: "warning" } },
+        { label: "🔴", filter: { severity: "critical" } },
     ];
 
-    const projectChips: ChipDef[] = projectIds.slice(0, 5).map((id) => ({
-        label: id.slice(0, 14),
-        filter: { projectId: id },
+    const projectChips: ChipDef[] = projects.slice(0, 5).map((p) => ({
+        label: p.label,
+        filter: { projectId: p.id },
     }));
 
     const allChips = [...staticChips, ...projectChips];

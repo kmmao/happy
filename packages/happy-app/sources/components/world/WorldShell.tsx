@@ -47,8 +47,12 @@ export const WorldShell = React.memo(function WorldShell() {
 
     const { events, loading, refresh } = useWorldEvents(filter);
 
-    const projectIds = React.useMemo(
-        () => projects.filter((p) => !p.archived).map((p) => p.id),
+    const projectChipInfos = React.useMemo(
+        () => projects.filter((p) => !p.archived).map((p) => {
+            const path = p.key?.path ?? "";
+            const label = path.split("/").filter(Boolean).pop() ?? p.id.slice(0, 10);
+            return { id: p.id, label };
+        }),
         [projects],
     );
 
@@ -143,7 +147,7 @@ export const WorldShell = React.memo(function WorldShell() {
             <WorldFilterChips
                 activeFilter={filter}
                 onFilterChange={setFilter}
-                projectIds={projectIds}
+                projects={projectChipInfos}
             />
 
             {/* Event Stream */}
