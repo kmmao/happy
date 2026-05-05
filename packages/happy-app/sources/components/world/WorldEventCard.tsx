@@ -1,6 +1,8 @@
 import * as React from "react";
 import { View, TouchableOpacity, LayoutAnimation } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
+import { useRouter } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
 import { Text } from "@/components/StyledText";
 import type { WorldEvent, WorldEventSeverity } from "./worldTypes";
 
@@ -45,7 +47,9 @@ export const WorldEventCard = React.memo(function WorldEventCard({
     event,
     onPress,
 }: WorldEventCardProps) {
+    const { theme } = useUnistyles();
     const { styles } = useStyles();
+    const router = useRouter();
     const dotColor = useSeverityColor(event.severity);
     const [expanded, setExpanded] = React.useState(false);
 
@@ -93,6 +97,16 @@ export const WorldEventCard = React.memo(function WorldEventCard({
                                 <DetailRow label="Session" value={event.source.sessionId.slice(0, 16)} />
                             )}
                             <DetailRow label="ID" value={event.originalId.slice(0, 20)} />
+                            {!!event.source.sessionId && (
+                                <TouchableOpacity
+                                    style={styles.openButton}
+                                    onPress={() => router.push(`/(app)/session/${event.source.sessionId}`)}
+                                    activeOpacity={0.7}
+                                >
+                                    <Ionicons name="open-outline" size={14} color={theme.colors.textLink} />
+                                    <Text style={styles.openButtonText}>Open Session</Text>
+                                </TouchableOpacity>
+                            )}
                         </View>
                     )}
                 </View>
@@ -183,6 +197,21 @@ const useStyles = () => {
             flex: 1,
             fontSize: 12,
             color: theme.colors.text,
+        },
+        openButton: {
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 6,
+            marginTop: 6,
+            paddingVertical: 6,
+            paddingHorizontal: 10,
+            borderRadius: 6,
+            backgroundColor: theme.colors.surfaceHigh,
+            alignSelf: "flex-start",
+        },
+        openButtonText: {
+            fontSize: 13,
+            color: theme.colors.textLink,
         },
     });
     return { styles };
