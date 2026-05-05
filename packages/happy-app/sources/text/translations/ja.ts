@@ -4253,6 +4253,8 @@ export const ja: TranslationStructure = {
     exitWorld: "ワールドを終了",
     streamMode: "イベントストリーム",
     noEvents: "イベントはまだありません",
+    emptyTitle: "The Matrix is quiet",
+    emptyDescription: "Programs will appear here as they run. Start a session or trigger a task to see the world come alive.",
     filterAll: "すべて",
     definitionPanel: "ワールド定義",
     narrative: "ナラティブ",

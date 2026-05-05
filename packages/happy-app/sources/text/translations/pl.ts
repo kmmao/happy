@@ -4300,6 +4300,8 @@ export const pl: TranslationStructure = {
     exitWorld: "Exit World",
     streamMode: "Event Stream",
     noEvents: "No events yet",
+    emptyTitle: "The Matrix is quiet",
+    emptyDescription: "Programs will appear here as they run. Start a session or trigger a task to see the world come alive.",
     filterAll: "All",
     definitionPanel: "World Definition",
     narrative: "Narrative",

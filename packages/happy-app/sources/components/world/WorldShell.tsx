@@ -87,7 +87,9 @@ export const WorldShell = React.memo(function WorldShell() {
 
     const ListEmpty = (
         <View style={styles.empty}>
-            <Text style={styles.emptyText}>{t("world.noEvents")}</Text>
+            <Ionicons name="globe" size={48} color={theme.colors.primary} style={{ marginBottom: 16 }} />
+            <Text style={styles.emptyTitle}>{t("world.emptyTitle")}</Text>
+            <Text style={styles.emptyDescription}>{t("world.emptyDescription")}</Text>
         </View>
     );
 
@@ -231,11 +233,20 @@ const useStyles = () => {
         },
         empty: {
             alignItems: "center",
-            paddingTop: 60,
+            paddingTop: 80,
+            paddingHorizontal: 32,
         },
-        emptyText: {
+        emptyTitle: {
+            fontSize: 20,
+            fontWeight: "600",
+            color: theme.colors.text,
+            marginBottom: 8,
+        },
+        emptyDescription: {
+            fontSize: 14,
             color: theme.colors.textSecondary,
-            fontSize: 15,
+            textAlign: "center",
+            lineHeight: 20,
         },
     });
     return { styles };

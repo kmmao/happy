@@ -4175,6 +4175,8 @@ export const zhHans: TranslationStructure = {
     exitWorld: "退出世界",
     streamMode: "事件流",
     noEvents: "暂无事件",
+    emptyTitle: "The Matrix is quiet",
+    emptyDescription: "Programs will appear here as they run. Start a session or trigger a task to see the world come alive.",
     filterAll: "全部",
     definitionPanel: "世界定义",
     narrative: "叙事",
