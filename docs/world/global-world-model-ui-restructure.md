@@ -10,6 +10,34 @@
 
 ---
 
+## 0. 层级声明
+
+**World Model 是 Happy 产品架构的最顶层，凌驾于所有现有概念之上。**
+
+```text
+World（Matrix）                    ← 唯一顶层，包含一切
+├── Project      只是地点标签      ← 不是独立实体，只是 source.projectId
+├── Session      只是一次执行      ← 世界中的一个事件
+├── Task         只是一个步骤      ← 世界中的一个事件
+├── Supervisor   只是规则执行者    ← 世界中的 Agent Smith
+├── Knowledge    只是记忆沉淀      ← 事件的长期压缩
+├── Trigger      只是信号监听      ← 世界中的 Sentinel
+├── Machine      只是运行环境      ← 事件的 source 标签之一
+├── Inbox        只是异常通知      ← 需要 Neo 处理的 Anomaly
+└── Skill        只是能力模板      ← 程序的行为定义
+```
+
+这意味着：
+
+1. **所有现有功能都是 World 的子集** — 项目、会话、任务、机器、触发器、知识库，全部被 World 包含
+2. **World Shell 是终极首屏** — 不是"又一个 Tab"，而是取代项目列表成为产品主入口（Phase 3）
+3. **新功能优先在 World 层面设计** — 先问"这是什么事件"，不是"这属于哪个项目"
+4. **现有页面降级为局部视角** — 项目详情页、机器详情页变成"从 World Shell 跳转进入的上下文详情"
+
+不存在"World 之外的东西"。如果某个概念不能表达为 WorldEvent，那它要么还没被接入 World，要么它不应该存在。
+
+---
+
 ## 1. 当前判断
 
 现有 World 文档的历史主线是：
