@@ -504,8 +504,8 @@ export function reduceAutoOptionSendEvent(
   }
 
   if (event.type === "context-invalidated") {
-    if (event.reason === "options-missing" && state.enabled) {
-      return clearToIdle(state, state.lastCancelReason);
+    if (state.enabled) {
+      return clearToIdle(state, event.reason);
     }
     return clearToOff(state, event.reason);
   }

@@ -150,7 +150,7 @@ describe("autoOptionSend", () => {
     expect(next.candidate).toBeNull();
   });
 
-  it("出现 AskUserQuestion 时会取消并关闭", () => {
+  it("出现 AskUserQuestion 时会暂停但保持启用", () => {
     const armed = reduceAutoOptionSendEvent(
       createInitialAutoOptionSendState(),
       { type: "toggle", enabled: true },
@@ -163,12 +163,12 @@ describe("autoOptionSend", () => {
       createContext({ hasAskUserQuestionVisible: true }),
     );
 
-    expect(next.enabled).toBe(false);
-    expect(next.status).toBe("off");
+    expect(next.enabled).toBe(true);
+    expect(next.status).toBe("idle");
     expect(next.lastCancelReason).toBe("ask-user-question");
   });
 
-  it("用户输入时会取消并关闭", () => {
+  it("用户输入时会暂停但保持启用", () => {
     const armed = reduceAutoOptionSendEvent(
       createInitialAutoOptionSendState(),
       { type: "toggle", enabled: true },
@@ -181,8 +181,8 @@ describe("autoOptionSend", () => {
       createContext({ inputText: "hello" }),
     );
 
-    expect(next.enabled).toBe(false);
-    expect(next.status).toBe("off");
+    expect(next.enabled).toBe(true);
+    expect(next.status).toBe("idle");
     expect(next.lastCancelReason).toBe("user-typed");
   });
 

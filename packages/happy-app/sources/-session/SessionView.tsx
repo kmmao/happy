@@ -929,7 +929,10 @@ function SessionViewInner({
         false,
         "manual",
       );
-      autoOptionSendService.toggle(sessionId, false);
+      autoOptionSendService.dispatch(sessionId, {
+        type: "context-invalidated",
+        reason: "manual-send",
+      });
       setShowOptionsPopover(false);
       sync.sendMessage(sessionId, option);
       trackMessageSent();
