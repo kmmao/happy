@@ -11,7 +11,10 @@ import { useWorldEvents } from "./useWorldEvents";
 import { WorldEventCard } from "./WorldEventCard";
 import { WorldFilterChips } from "./WorldFilterChips";
 import { WorldDefinitionPanel } from "./WorldDefinitionPanel";
+import { WorldChainMode } from "./WorldChainMode";
 import type { WorldEvent, WorldFilter } from "./worldTypes";
+
+type ViewMode = "stream" | "chain";
 
 export const WorldShell = React.memo(function WorldShell() {
     const router = useRouter();
@@ -22,6 +25,7 @@ export const WorldShell = React.memo(function WorldShell() {
     const projects = useProjects();
     const [filter, setFilter] = React.useState<WorldFilter>({});
     const [panelOpen, setPanelOpen] = React.useState(false);
+    const [viewMode, setViewMode] = React.useState<ViewMode>("stream");
 
     const { events, loading, refresh } = useWorldEvents(filter);
 
@@ -118,24 +122,49 @@ export const WorldShell = React.memo(function WorldShell() {
             {/* World Definition Panel */}
             <WorldDefinitionPanel visible={panelOpen} />
 
-            {/* Filter Chips */}
-            <WorldFilterChips
-                activeFilter={filter}
-                onFilterChange={setFilter}
-                projects={projectChipInfos}
-            />
+            {/* View Mode Toggle + Filter Chips */}
+            <View style={styles.modeRow}>
+                <TouchableOpacity
+                    style={[styles.modeTab, viewMode === "stream" && styles.modeTabActive]}
+                    onPress={() => setViewMode("stream")}
+                >
+                    <Text style={[styles.modeTabText, viewMode === "stream" && styles.modeTabTextActive]}>
+                        {t("world.streamMode")}
+                    </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                    style={[styles.modeTab, viewMode === "chain" && styles.modeTabActive]}
+                    onPress={() => setViewMode("chain")}
+                >
+                    <Text style={[styles.modeTabText, viewMode === "chain" && styles.modeTabTextActive]}>
+                        Chains
+                    </Text>
+                </TouchableOpacity>
+            </View>
 
-            {/* Event Stream */}
-            <FlatList
-                data={events}
-                renderItem={renderItem}
-                keyExtractor={keyExtractor}
-                ListEmptyComponent={loading ? null : ListEmpty}
-                refreshControl={
-                    <RefreshControl refreshing={loading} onRefresh={refresh} />
-                }
-                contentContainerStyle={styles.list}
-            />
+            {viewMode === "stream" && (
+                <WorldFilterChips
+                    activeFilter={filter}
+                    onFilterChange={setFilter}
+                    projects={projectChipInfos}
+                />
+            )}
+
+            {/* Content */}
+            {viewMode === "stream" ? (
+                <FlatList
+                    data={events}
+                    renderItem={renderItem}
+                    keyExtractor={keyExtractor}
+                    ListEmptyComponent={loading ? null : ListEmpty}
+                    refreshControl={
+                        <RefreshControl refreshing={loading} onRefresh={refresh} />
+                    }
+                    contentContainerStyle={styles.list}
+                />
+            ) : (
+                <WorldChainMode events={events} loading={loading} onRefresh={refresh} />
+            )}
         </View>
     );
 });
@@ -199,6 +228,28 @@ const useStyles = () => {
         exitButton: {
             padding: 8,
             borderRadius: 16,
+        },
+        modeRow: {
+            flexDirection: "row",
+            paddingHorizontal: 16,
+            paddingTop: 8,
+            gap: 4,
+        },
+        modeTab: {
+            paddingHorizontal: 14,
+            paddingVertical: 6,
+            borderRadius: 14,
+        },
+        modeTabActive: {
+            backgroundColor: theme.colors.primary,
+        },
+        modeTabText: {
+            fontSize: 13,
+            color: theme.colors.textSecondary,
+        },
+        modeTabTextActive: {
+            color: "#fff",
+            fontWeight: "600",
         },
         list: {
             paddingTop: 8,
