@@ -4292,6 +4292,19 @@ export const ru: TranslationStructure = {
       invokerSubtitle: "Запустить инструмент напрямую в удалённой сессии",
     },
   },
+  world: {
+    title: "World",
+    subtitle: "Enter the global agentic workspace",
+    exitWorld: "Exit World",
+    streamMode: "Event Stream",
+    noEvents: "No events yet",
+    filterAll: "All",
+    definitionPanel: "World Definition",
+    narrative: "Narrative",
+    laws: "Laws",
+    policy: "Policy",
+    notSet: "Not set",
+  },
 } as const;
 
 export type TranslationsRu = typeof ru;

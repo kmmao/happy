@@ -4278,6 +4278,19 @@ export const ca: TranslationStructure = {
       invokerSubtitle: "Executar una eina directament a la sessió remota",
     },
   },
+  world: {
+    title: "World",
+    subtitle: "Enter the global agentic workspace",
+    exitWorld: "Exit World",
+    streamMode: "Event Stream",
+    noEvents: "No events yet",
+    filterAll: "All",
+    definitionPanel: "World Definition",
+    narrative: "Narrative",
+    laws: "Laws",
+    policy: "Policy",
+    notSet: "Not set",
+  },
 } as const;
 
 export type TranslationsCa = typeof ca;

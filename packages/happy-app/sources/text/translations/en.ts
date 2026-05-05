@@ -4271,6 +4271,20 @@ export const en: TranslationStructure = {
       invokerSubtitle: "Run a tool directly on the remote session",
     },
   },
+
+  world: {
+    title: "World",
+    subtitle: "Enter the global agentic workspace",
+    exitWorld: "Exit World",
+    streamMode: "Event Stream",
+    noEvents: "No events yet",
+    filterAll: "All",
+    definitionPanel: "World Definition",
+    narrative: "Narrative",
+    laws: "Laws",
+    policy: "Policy",
+    notSet: "Not set",
+  },
 } as const;
 
 export type TranslationsEn = typeof en;

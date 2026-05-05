@@ -446,6 +446,12 @@ export default function RootLayout() {
         }}
       />
       <Stack.Screen
+        name="world/index"
+        options={{
+          headerShown: false,
+        }}
+      />
+      <Stack.Screen
         name="openclaw/index"
         options={{
           headerShown: true,

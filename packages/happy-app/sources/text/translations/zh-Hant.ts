@@ -4174,4 +4174,18 @@ export const zhHant: TranslationStructure = {
       invokerSubtitle: "在遠端工作階段中直接執行工具",
     },
   },
+
+  world: {
+    title: "世界",
+    subtitle: "進入全域 Agent 工作空間",
+    exitWorld: "退出世界",
+    streamMode: "事件流",
+    noEvents: "尚無事件",
+    filterAll: "全部",
+    definitionPanel: "世界定義",
+    narrative: "敘事",
+    laws: "法則",
+    policy: "策略",
+    notSet: "未設定",
+  },
 } as const;

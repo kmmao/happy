@@ -4275,6 +4275,19 @@ export const pt: TranslationStructure = {
       invokerSubtitle: "Executar uma ferramenta diretamente na sessão remota",
     },
   },
+  world: {
+    title: "World",
+    subtitle: "Enter the global agentic workspace",
+    exitWorld: "Exit World",
+    streamMode: "Event Stream",
+    noEvents: "No events yet",
+    filterAll: "All",
+    definitionPanel: "World Definition",
+    narrative: "Narrative",
+    laws: "Laws",
+    policy: "Policy",
+    notSet: "Not set",
+  },
 } as const;
 
 export type TranslationsPt = typeof pt;

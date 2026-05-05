@@ -4246,4 +4246,18 @@ export const ja: TranslationStructure = {
       invokerSubtitle: "リモートセッションで直接ツールを実行する",
     },
   },
+
+  world: {
+    title: "ワールド",
+    subtitle: "グローバルAgentワークスペースへ",
+    exitWorld: "ワールドを終了",
+    streamMode: "イベントストリーム",
+    noEvents: "イベントはまだありません",
+    filterAll: "すべて",
+    definitionPanel: "ワールド定義",
+    narrative: "ナラティブ",
+    laws: "ルール",
+    policy: "ポリシー",
+    notSet: "未設定",
+  },
 } as const;

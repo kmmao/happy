@@ -4168,4 +4168,18 @@ export const zhHans: TranslationStructure = {
       invokerSubtitle: "在远端会话中直接运行工具",
     },
   },
+
+  world: {
+    title: "世界",
+    subtitle: "进入全局 Agent 工作空间",
+    exitWorld: "退出世界",
+    streamMode: "事件流",
+    noEvents: "暂无事件",
+    filterAll: "全部",
+    definitionPanel: "世界定义",
+    narrative: "叙事",
+    laws: "法则",
+    policy: "策略",
+    notSet: "未设置",
+  },
 } as const;
