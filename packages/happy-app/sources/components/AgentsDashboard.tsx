@@ -2,7 +2,6 @@ import React from "react";
 import { View, ScrollView, Pressable, Platform } from "react-native";
 import { Text } from "@/components/StyledText";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
-import { useSessionMessages } from "@/sync/storage";
 import { Session } from "@/sync/storageTypes";
 import { Ionicons } from "@expo/vector-icons";
 import {
@@ -11,7 +10,6 @@ import {
     getSessionStatusState,
     getSessionAvatarId,
     getSessionProviderKey,
-    getLatestUserRequestPreview,
 } from "@/utils/sessionUtils";
 import { Avatar } from "@/components/Avatar";
 import { StatusDot } from "@/components/StatusDot";
@@ -29,7 +27,7 @@ interface AgentCardProps {
 const AgentCard = React.memo(({ session }: AgentCardProps) => {
     const { theme } = useUnistyles();
     const navigateToSession = useNavigateToSession();
-    const { messages } = useSessionMessages(session.id);
+    const latestRequest = session.latestUserRequestPreview;
     const [latestInterAgentMessage, setLatestInterAgentMessage] = React.useState<string | null>(null);
 
     React.useEffect(() => {
@@ -46,7 +44,6 @@ const AgentCard = React.memo(({ session }: AgentCardProps) => {
     const avatarId = getSessionAvatarId(session);
     const provider = getSessionProviderKey(session);
     const isWorktree = session.metadata?.worktree?.isWorktree ?? false;
-    const latestRequest = React.useMemo(() => getLatestUserRequestPreview(messages), [messages]);
 
     const statusColor = React.useMemo(() => {
         switch (statusState) {

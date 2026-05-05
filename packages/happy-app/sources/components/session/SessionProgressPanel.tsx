@@ -652,6 +652,7 @@ export const SessionProgressPanel = React.memo<SessionProgressPanelProps>(
                             {toolMix.total > 0 && (
                                 <ToolMixBar
                                     segments={toolMix.segments}
+                                    otherSegments={toolMix.otherSegments}
                                     otherCount={toolMix.otherCount}
                                     total={toolMix.total}
                                 />
@@ -1141,6 +1142,7 @@ const RhythmCell = React.memo<RhythmCellProps>(function RhythmCell({ label, valu
 
 interface ToolMixBarProps {
     segments: readonly ToolMixSegment[];
+    otherSegments: readonly ToolMixSegment[];
     otherCount: number;
     total: number;
 }
@@ -1152,10 +1154,15 @@ interface ToolMixBarProps {
  */
 const ToolMixBar = React.memo<ToolMixBarProps>(function ToolMixBar({
     segments,
+    otherSegments,
     otherCount,
     total,
 }) {
     const { theme } = useUnistyles();
+    const [isOtherExpanded, setIsOtherExpanded] = React.useState(false);
+    const toggleOtherExpanded = React.useCallback(() => {
+        setIsOtherExpanded((value) => !value);
+    }, []);
     if (total <= 0) return null;
     const entries: Array<{ name: string; count: number; color: string; isOther: boolean }> = segments.map(
         (seg, i) => ({
@@ -1173,6 +1180,11 @@ const ToolMixBar = React.memo<ToolMixBarProps>(function ToolMixBar({
             isOther: true,
         });
     }
+    const otherDetailEntries = otherSegments.map((segment) => ({
+        name: getToolMixSegmentLabel(segment),
+        count: segment.count,
+    }));
+    const otherLabel = t("session.progressToolMixOther");
     return (
         <View style={styles.toolMixBlock}>
             <Text style={[styles.subSectionTitle, { color: theme.colors.textSecondary, marginTop: 0, marginBottom: 4 }]}>
@@ -1191,21 +1203,66 @@ const ToolMixBar = React.memo<ToolMixBarProps>(function ToolMixBar({
                 })}
             </View>
             <View style={styles.toolMixLegend}>
-                {entries.map((entry) => (
-                    <View key={`lg-${entry.name}`} style={styles.toolMixLegendItem}>
-                        <View style={[styles.toolMixLegendDot, { backgroundColor: entry.color }]} />
-                        <Text
-                            style={[styles.toolMixLegendName, { color: theme.colors.text }]}
-                            numberOfLines={1}
-                        >
-                            {entry.name}
-                        </Text>
-                        <Text style={[styles.toolMixLegendCount, { color: theme.colors.textSecondary }]}>
-                            {entry.count}
-                        </Text>
-                    </View>
-                ))}
+                {entries.map((entry) => {
+                    const legendContent = (
+                        <>
+                            <View style={[styles.toolMixLegendDot, { backgroundColor: entry.color }]} />
+                            <Text
+                                style={[styles.toolMixLegendName, { color: theme.colors.text }]}
+                                numberOfLines={1}
+                            >
+                                {entry.name}
+                            </Text>
+                            <Text style={[styles.toolMixLegendCount, { color: theme.colors.textSecondary }]}>
+                                {entry.count}
+                            </Text>
+                            {entry.isOther && otherDetailEntries.length > 0 && (
+                                <Ionicons
+                                    name={isOtherExpanded ? "chevron-up" : "chevron-down"}
+                                    size={12}
+                                    color={theme.colors.textSecondary}
+                                />
+                            )}
+                        </>
+                    );
+                    if (entry.isOther && otherDetailEntries.length > 0) {
+                        return (
+                            <Pressable
+                                key={`lg-${entry.name}`}
+                                style={styles.toolMixLegendItem}
+                                onPress={toggleOtherExpanded}
+                                accessibilityRole="button"
+                                accessibilityLabel={otherLabel}
+                                accessibilityState={{ expanded: isOtherExpanded }}
+                            >
+                                {legendContent}
+                            </Pressable>
+                        );
+                    }
+                    return (
+                        <View key={`lg-${entry.name}`} style={styles.toolMixLegendItem}>
+                            {legendContent}
+                        </View>
+                    );
+                })}
             </View>
+            {isOtherExpanded && otherDetailEntries.length > 0 && (
+                <View style={[styles.toolMixOtherDetails, { borderColor: theme.colors.divider }]}>
+                    {otherDetailEntries.map((entry) => (
+                        <View key={`other-${entry.name}`} style={styles.toolMixOtherDetailItem}>
+                            <Text
+                                style={[styles.toolMixOtherDetailName, { color: theme.colors.text }]}
+                                numberOfLines={1}
+                            >
+                                {entry.name}
+                            </Text>
+                            <Text style={[styles.toolMixOtherDetailText, { color: theme.colors.textSecondary }]}>
+                                {entry.count}
+                            </Text>
+                        </View>
+                    ))}
+                </View>
+            )}
         </View>
     );
 });
@@ -1480,6 +1537,27 @@ const styles = StyleSheet.create({
     },
     toolMixLegendCount: {
         ...Typography.default("regular"),
+        fontSize: 10,
+    },
+    toolMixOtherDetails: {
+        borderTopWidth: 1,
+        marginTop: 2,
+        paddingTop: 6,
+        gap: 4,
+    },
+    toolMixOtherDetailItem: {
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "space-between",
+        gap: 8,
+    },
+    toolMixOtherDetailName: {
+        ...Typography.mono("regular"),
+        fontSize: 10,
+        flex: 1,
+    },
+    toolMixOtherDetailText: {
+        ...Typography.mono("regular"),
         fontSize: 10,
     },
     summaryHeader: {

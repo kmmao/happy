@@ -12,7 +12,6 @@ import { useRouter } from "expo-router";
 import { Session, Machine } from "@/sync/storageTypes";
 import { Ionicons } from "@expo/vector-icons";
 import {
-  getLatestUserRequestPreview,
   getSessionName,
   useSessionStatus,
   getSessionAvatarId,
@@ -35,7 +34,6 @@ import {
   useMachine,
   useSetting,
   useProjectAliasMap,
-  useSessionMessages,
 } from "@/sync/storage";
 import { StyleSheet } from "react-native-unistyles";
 import { isMachineOnline } from "@/utils/machineUtils";
@@ -737,10 +735,7 @@ const CompactSessionRow = React.memo(
       return rawProfileLabel;
     }, [session]);
 
-    const { messages } = useSessionMessages(session.id);
-    const latestRequestPreview = React.useMemo(() => {
-      return getLatestUserRequestPreview(messages);
-    }, [messages]);
+    const latestRequestPreview = session.latestUserRequestPreview;
 
     const itemContent = (
       <View>

@@ -15,12 +15,10 @@ import {
   useHasUnreadMessages,
   useSetting,
   useMachine,
-  useSessionMessages,
   storage,
 } from "@/sync/storage";
 import { Ionicons } from "@expo/vector-icons";
 import {
-  getLatestUserRequestPreview,
   getSessionName,
   useSessionStatus,
   getSessionSubtitle,
@@ -835,10 +833,7 @@ const SessionItem = React.memo(
       return getSessionAvatarId(session);
     }, [session]);
     const hasUnreadMessages = useHasUnreadMessages(session.id);
-    const { messages } = useSessionMessages(session.id);
-    const latestRequestPreview = React.useMemo(() => {
-      return getLatestUserRequestPreview(messages);
-    }, [messages]);
+    const latestRequestPreview = session.latestUserRequestPreview;
     const scopeTone = React.useMemo(
       () => resolveProjectSessionScopeTone(session),
       [session],

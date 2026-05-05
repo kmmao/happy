@@ -621,9 +621,9 @@ export class GitStatusSync {
       lastUpdatedAt: Date.now(),
       // V2-specific fields
       upstreamBranch: statusSummary.branch.upstream || null,
-      aheadCount: trackingInfo?.ahead,
-      behindCount: trackingInfo?.behind,
-      stashCount: statusSummary.stashCount,
+      aheadCount: trackingInfo?.ahead ?? 0,
+      behindCount: trackingInfo?.behind ?? 0,
+      stashCount: statusSummary.stashCount ?? 0,
       remoteUrl,
     };
   }
@@ -668,6 +668,11 @@ export class GitStatusSync {
       linesRemoved,
       linesChanged,
       lastUpdatedAt: Date.now(),
+      upstreamBranch: null,
+      aheadCount: 0,
+      behindCount: 0,
+      stashCount: 0,
+      remoteUrl: null,
     };
   }
 }
