@@ -11,29 +11,7 @@ import { useWorldEvents } from "./useWorldEvents";
 import { WorldEventCard } from "./WorldEventCard";
 import { WorldFilterChips } from "./WorldFilterChips";
 import { WorldDefinitionPanel } from "./WorldDefinitionPanel";
-import type { WorldEvent, WorldFilter, WorldDefinition } from "./worldTypes";
-
-function extractDefinition(
-    supervisorConfig: string | null | undefined,
-    supervisorMode: string | null | undefined,
-): WorldDefinition {
-    if (!supervisorConfig) {
-        return { narrative: null, laws: null, policy: supervisorMode ?? null };
-    }
-    try {
-        const parsed = JSON.parse(supervisorConfig) as {
-            narrative?: string | null;
-            laws?: string | null;
-        };
-        return {
-            narrative: parsed.narrative ?? null,
-            laws: parsed.laws ?? null,
-            policy: supervisorMode ?? null,
-        };
-    } catch {
-        return { narrative: null, laws: null, policy: supervisorMode ?? null };
-    }
-}
+import type { WorldEvent, WorldFilter } from "./worldTypes";
 
 export const WorldShell = React.memo(function WorldShell() {
     const router = useRouter();
@@ -56,11 +34,6 @@ export const WorldShell = React.memo(function WorldShell() {
         [projects],
     );
 
-    const definition = React.useMemo<WorldDefinition>(() => {
-        const first = projects.find((p) => p.supervisorConfig || p.supervisorMode);
-        if (!first) return { narrative: null, laws: null, policy: null };
-        return extractDefinition(first.supervisorConfig, first.supervisorMode ?? null);
-    }, [projects]);
 
     const pendingDecisions = events.filter((e) =>
         e.eventType.startsWith("decision."),
@@ -143,7 +116,7 @@ export const WorldShell = React.memo(function WorldShell() {
             </View>
 
             {/* World Definition Panel */}
-            <WorldDefinitionPanel definition={definition} visible={panelOpen} />
+            <WorldDefinitionPanel visible={panelOpen} />
 
             {/* Filter Chips */}
             <WorldFilterChips
