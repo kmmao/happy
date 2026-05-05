@@ -4,7 +4,7 @@ _Created: 2026-04-06_
 _Completed: 2026-04-06_
 _Status: 历史路线图参考_
 
-> **历史参考说明**：本文记录的是早期“项目级 World / Project 承载叙事与法则 / AgentRole / Decision / Goal”路线图。它不再代表当前 UI 与结构重构方向，也不应被直接当成待实现清单。当前主设计锚点见 [全局 World Model UI 与结构重构方案](./global-world-model-ui-restructure.md)：Happy 当前承载一个主世界，项目只是事件来源、上下文节点或任务链组成部分，并预留 `WorldBridge / RemoteWorld / Universe` 外部世界接入方向。
+> **历史参考说明**：本文记录的是早期“项目级 World / Project 承载叙事与法则 / AgentRole / Decision / Goal”路线图。它不再代表当前 UI 与结构重构方向，也不应被直接当成待实现清单。当前主设计锚点见 [全局 World Model UI 与结构重构方案](./global-world-model-ui-restructure.md)：Happy 当前承载一个主世界，一切皆事件——项目的创建、变化、消亡都是 WorldEvent，`source.projectId` 是可选属性而非独立实体。底层 Project 表作为事件数据源继续存在，但 World Shell 概念层不暴露为一等公民。
 
 ## 原则
 

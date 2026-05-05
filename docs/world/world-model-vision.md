@@ -3,7 +3,7 @@
 _Created: 2026-04-06_
 _Status: 历史愿景参考_
 
-> **历史参考说明**：本文保留早期 World Model 的概念隐喻和能力设想，其中“项目是世界 / 一个项目 = 一个世界”已不再作为当前重构方向。当前主设计锚点见 [全局 World Model UI 与结构重构方案](./global-world-model-ui-restructure.md)：Happy 当前承载一个主世界，项目只是世界中的事件来源、上下文节点或任务链组成部分；World 还需要预留外部世界接入点，未来形成 Universe / Multiverse。
+> **历史参考说明**：本文保留早期 World Model 的概念隐喻和能力设想，其中“项目是世界 / 一个项目 = 一个世界”已不再作为当前重构方向。当前主设计锚点见 [全局 World Model UI 与结构重构方案](./global-world-model-ui-restructure.md)：Happy 当前承载一个主世界，一切皆事件——项目的创建、变化、消亡都是 WorldEvent，`source.projectId` 是可选属性而非独立实体。底层 Project 表作为事件数据源继续存在，但 World Shell 概念��不暴露为一等公民。
 
 ## 核心理念
 

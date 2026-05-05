@@ -2,7 +2,7 @@
 
 > **历史参考说明**：本文记录的是早期“项目级 World / Goal / Task / Skill / 角色 / 世界 Tab”活化迭代，不再是当前或后续「完全活化」迭代的唯一跟进锚点。文中提到的 `Goal`、`AgentRole`、`WorldGoalsTab`、`WorldMember`、`Decision` 等实体和 UI 入口需按当前代码重新核验，不能直接作为待实现清单。
 >
-> 当前主设计锚点见 [全局 World Model UI 与结构重构方案](./global-world-model-ui-restructure.md)：Happy 当前承载一个主世界，项目只是事件来源、上下文节点或任务链组成部分，World 需要预留 `WorldBridge / RemoteWorld / Universe` 外部世界接入方向。
+> 当前主设计锚点见 [全局 World Model UI 与结构重构方案](./global-world-model-ui-restructure.md)：Happy 当前承载一个主世界，一切皆事件——项目的创建、变化、消亡都是 WorldEvent，`source.projectId` 是可选属性而非独立实体。底层 Project 表作为事件数据源继续存在，但 World Shell 概念层不暴露为一等公民。
 >
 > **原目的**：在**不接 Multica、不做外部联动**的前提下，参考其产品形态，把 Happy 已有 Goal / Task / Skill / 角色与世界叙事串成闭环。  
 > **创建**：2026-04-08  

@@ -3,7 +3,7 @@
 _Created: 2026-04-07_  
 _Status: 全局 World 命名边界生效中_
 
-> **当前主锚点**：本文已按 [全局 World Model UI 与结构重构方案](./global-world-model-ui-restructure.md) 更新。早期 “World belongs to Project / 世界是项目的人格” 的项目级隐喻已废弃。当前方向是：Happy 当前承载一个主世界，Project 只是这个世界中的事件来源、上下文节点、任务链组成部分或技术承载对象；未来还要预留 `WorldBridge / RemoteWorld / Universe` 外部世界接入。
+> **当前主锚点**：本文已按 [全局 World Model UI 与结构重构方案](./global-world-model-ui-restructure.md) 更新。早期 “World belongs to Project / 世界是项目的人格” 的项目级隐喻已废弃。当前方向是：**一切皆事件**。Project 不是独立领域对象，项目的创建、变化、消亡都只是 WorldEvent，`source.projectId` 是事件的可选属性。底层 `Project` 表继续存在作为技术承载和事件数据源，但在 World Shell 概念层不作为一等公民暴露。
 
 ## 目标
 
@@ -15,7 +15,7 @@ _Status: 全局 World 命名边界生效中_
 - **全局世界 / 用户心智层 / 跨项目工作模式**：使用 `world`
 - **外部世界接入 / 多世界关系**：使用 `bridge`、`remoteWorld`、`universe`
 
-一句话：**Project belongs to World**。Project 是 World 里的 source / context / location，不是 World 的拥有者；World 是全局工作模式，不是 Project 之上的一个局部语义层。
+一句话：**Project 是事件的 source 属性，不是独立实体**。`source.projectId` 是 WorldEvent 的可选字段；World 是唯一一等公民；底层 `Project` 表作为技术承载继续存在但概念层不暴露。
 
 ## 保留 `project` 的范围（技术承载层）
 
@@ -62,7 +62,7 @@ _Status: 全局 World 命名边界生效中_
 
 ## 长期定位（终态）
 
-**世界不是项目的人格；项目是世界里的事件来源。**
+**一切皆事件。项目的创建、变化、消亡都是 WorldEvent；`source.projectId` 是可选属性，不是必填字段。**
 
 - **用户心智层全局世界化**：World Shell、帮助文档、提示文案、Agent 指令全部使用 `world` 语义。
 - **技术承载层继续 Project**：数据库、API 路由、CLI flag、同步实体在不迁移时继续使用 `project`。
