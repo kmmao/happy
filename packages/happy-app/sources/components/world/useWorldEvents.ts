@@ -2,6 +2,7 @@ import * as React from "react";
 import { TokenStorage } from "@/auth/tokenStorage";
 import { fetchTasks } from "@/sync/apiTasks";
 import { fetchInboxItems } from "@/sync/apiInbox";
+import { sync } from "@/sync/sync";
 import {
     adaptTaskToEvent,
     adaptInboxToEvent,
@@ -16,12 +17,17 @@ interface UseWorldEventsResult {
     refresh: () => void;
 }
 
+const MAX_EVENTS = 200;
+
 export function useWorldEvents(filter?: WorldFilter): UseWorldEventsResult {
     const [events, setEvents] = React.useState<WorldEvent[]>([]);
     const [loading, setLoading] = React.useState(false);
     const [tick, setTick] = React.useState(0);
 
     const refresh = React.useCallback(() => setTick((t) => t + 1), []);
+
+    const filterRef = React.useRef(filter);
+    filterRef.current = filter;
 
     React.useEffect(() => {
         let cancelled = false;
@@ -55,11 +61,11 @@ export function useWorldEvents(filter?: WorldFilter): UseWorldEventsResult {
                 }
 
                 const sorted = sortEventsByTime(allEvents);
-                const filtered = filter
-                    ? filterWorldEvents(sorted, filter)
+                const filtered = filterRef.current
+                    ? filterWorldEvents(sorted, filterRef.current)
                     : sorted;
 
-                setEvents(filtered);
+                setEvents(filtered.slice(0, MAX_EVENTS));
             } finally {
                 if (!cancelled) setLoading(false);
             }
@@ -72,6 +78,50 @@ export function useWorldEvents(filter?: WorldFilter): UseWorldEventsResult {
         };
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [tick, filter?.projectId, filter?.machineId, filter?.eventTypePrefix, filter?.severity]);
+
+    React.useEffect(() => {
+        const unsubTask = sync.onTaskStatusChanged((event) => {
+            const worldEvent: WorldEvent = {
+                id: `task-rt-${event.taskId}-${Date.now()}`,
+                originalId: event.taskId,
+                eventType: `task.${event.status}`,
+                title: event.status === "failed" ? (event.errorMessage ?? "Task failed") : `Task ${event.status}`,
+                summary: event.status,
+                occurredAt: event.completedAt ?? Date.now(),
+                severity: event.status === "failed" ? "critical" : "info",
+                source: {
+                    type: "machine",
+                    machineId: event.machineId ?? null,
+                    sessionId: event.sessionId ?? null,
+                },
+            };
+
+            const f = filterRef.current;
+            if (f) {
+                const [passes] = filterWorldEvents([worldEvent], f);
+                if (!passes) return;
+            }
+
+            setEvents((prev) => [worldEvent, ...prev].slice(0, MAX_EVENTS));
+        });
+
+        const unsubInbox = sync.onInboxNewItem((item) => {
+            const worldEvent = adaptInboxToEvent(item);
+
+            const f = filterRef.current;
+            if (f) {
+                const [passes] = filterWorldEvents([worldEvent], f);
+                if (!passes) return;
+            }
+
+            setEvents((prev) => [worldEvent, ...prev].slice(0, MAX_EVENTS));
+        });
+
+        return () => {
+            unsubTask();
+            unsubInbox();
+        };
+    }, []);
 
     return { events, loading, refresh };
 }
