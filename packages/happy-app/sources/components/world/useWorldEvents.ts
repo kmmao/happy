@@ -3,6 +3,7 @@ import { TokenStorage } from "@/auth/tokenStorage";
 import { fetchTasks } from "@/sync/apiTasks";
 import { fetchInboxItems } from "@/sync/apiInbox";
 import { sync } from "@/sync/sync";
+import { storage } from "@/sync/storage";
 import {
     adaptTaskToEvent,
     adaptInboxToEvent,
@@ -58,6 +59,30 @@ export function useWorldEvents(filter?: WorldFilter): UseWorldEventsResult {
                     for (const item of inboxResult.value.items) {
                         allEvents.push(adaptInboxToEvent(item));
                     }
+                }
+
+                const sessions = Object.values(storage.getState().sessions)
+                    .sort((a, b) => b.updatedAt - a.updatedAt)
+                    .slice(0, 30);
+
+                for (const session of sessions) {
+                    const eventType = session.active ? "session.active" : "session.ended";
+                    const path = session.metadata?.path;
+                    const name = path ? path.split("/").filter(Boolean).pop() ?? path : session.id.slice(0, 12);
+                    allEvents.push({
+                        id: `session-${session.id}`,
+                        originalId: session.id,
+                        eventType,
+                        title: name,
+                        summary: session.active ? "running" : "ended",
+                        occurredAt: session.updatedAt,
+                        severity: "info",
+                        source: {
+                            type: "session",
+                            machineId: session.metadata?.machineId ?? null,
+                            sessionId: session.id,
+                        },
+                    });
                 }
 
                 const sorted = sortEventsByTime(allEvents);
