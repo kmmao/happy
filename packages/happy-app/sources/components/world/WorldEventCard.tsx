@@ -1,5 +1,5 @@
 import * as React from "react";
-import { View, TouchableOpacity } from "react-native";
+import { View, TouchableOpacity, LayoutAnimation } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { Text } from "@/components/StyledText";
 import type { WorldEvent, WorldEventSeverity } from "./worldTypes";
@@ -7,6 +7,17 @@ import type { WorldEvent, WorldEventSeverity } from "./worldTypes";
 function formatTime(ts: number): string {
     const d = new Date(ts);
     return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+}
+
+function formatFullDate(ts: number): string {
+    const d = new Date(ts);
+    return d.toLocaleString([], {
+        month: "short",
+        day: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+    });
 }
 
 function useSeverityColor(severity: WorldEventSeverity): string {
@@ -27,11 +38,18 @@ export const WorldEventCard = React.memo(function WorldEventCard({
 }: WorldEventCardProps) {
     const { styles } = useStyles();
     const dotColor = useSeverityColor(event.severity);
+    const [expanded, setExpanded] = React.useState(false);
+
+    const handlePress = React.useCallback(() => {
+        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+        setExpanded((v) => !v);
+        onPress?.(event);
+    }, [event, onPress]);
 
     return (
         <TouchableOpacity
             style={styles.card}
-            onPress={() => onPress?.(event)}
+            onPress={handlePress}
             activeOpacity={0.7}
         >
             <View style={styles.row}>
@@ -43,7 +61,7 @@ export const WorldEventCard = React.memo(function WorldEventCard({
                         </Text>
                         <Text style={styles.time}>{formatTime(event.occurredAt)}</Text>
                     </View>
-                    <Text style={styles.title} numberOfLines={2}>
+                    <Text style={styles.title} numberOfLines={expanded ? undefined : 2}>
                         {event.title}
                     </Text>
                     {event.source.projectId && (
@@ -51,11 +69,38 @@ export const WorldEventCard = React.memo(function WorldEventCard({
                             {event.source.projectId.slice(0, 20)}
                         </Text>
                     )}
+
+                    {expanded && (
+                        <View style={styles.detail}>
+                            {!!event.summary && (
+                                <DetailRow label="Summary" value={event.summary} />
+                            )}
+                            <DetailRow label="Time" value={formatFullDate(event.occurredAt)} />
+                            <DetailRow label="Source" value={event.source.type} />
+                            {!!event.source.machineId && (
+                                <DetailRow label="Machine" value={event.source.machineId} />
+                            )}
+                            {!!event.source.sessionId && (
+                                <DetailRow label="Session" value={event.source.sessionId.slice(0, 16)} />
+                            )}
+                            <DetailRow label="ID" value={event.originalId.slice(0, 20)} />
+                        </View>
+                    )}
                 </View>
             </View>
         </TouchableOpacity>
     );
 });
+
+function DetailRow({ label, value }: { label: string; value: string }) {
+    const { styles } = useStyles();
+    return (
+        <View style={styles.detailRow}>
+            <Text style={styles.detailLabel}>{label}</Text>
+            <Text style={styles.detailValue} numberOfLines={1}>{value}</Text>
+        </View>
+    );
+}
 
 const useStyles = () => {
     const { theme } = useUnistyles();
@@ -107,6 +152,28 @@ const useStyles = () => {
             fontSize: 11,
             color: theme.colors.textSecondary,
             marginTop: 4,
+        },
+        detail: {
+            marginTop: 8,
+            paddingTop: 8,
+            borderTopWidth: 1,
+            borderTopColor: theme.colors.divider,
+            gap: 4,
+        },
+        detailRow: {
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 8,
+        },
+        detailLabel: {
+            fontSize: 11,
+            color: theme.colors.textSecondary,
+            width: 60,
+        },
+        detailValue: {
+            flex: 1,
+            fontSize: 12,
+            color: theme.colors.text,
         },
     });
     return { styles };
