@@ -21,10 +21,15 @@ export function extractLatestOptions(
   if (messages.length === 0) return emptyResult();
 
   if (anchorIndex >= 0) {
+    let seenUserText = false;
     for (let i = anchorIndex - 1; i >= 0; i--) {
       const msg = messages[i];
-      if (!msg) break; // anchorIndex may exceed messages.length when ChatList displayLimit > SessionView limit
-      if (msg.kind === "user-text") break;
+      if (!msg) break;
+      if (msg.kind === "user-text") {
+        if (seenUserText) break;
+        seenUserText = true;
+        continue;
+      }
       if (msg.kind === "agent-text") {
         const blocks = parseMarkdown(msg.text);
         const optionsBlock = blocks.find((b) => b.type === "options");
