@@ -234,4 +234,120 @@ describe("codexCommandUtils", () => {
       displayName: "tools",
     });
   });
+
+  it("infers git semantics from GitHub CLI commands", () => {
+    expect(
+      getCodexParsedCommandSummary(
+        {
+          command: "gh pr view 123 --json title",
+        },
+        null,
+      ),
+    ).toMatchObject({
+      type: "git",
+      subType: "pr",
+      displayName: "pr",
+    });
+  });
+
+  it("infers write semantics from filesystem mutation commands", () => {
+    expect(
+      getCodexParsedCommandSummary(
+        {
+          command: "mkdir -p packages/happy-app/sources/tmp",
+        },
+        null,
+      ),
+    ).toMatchObject({
+      type: "write",
+      resolvedPath: "packages/happy-app/sources/tmp",
+      displayName: "tmp",
+    });
+  });
+
+  it("infers run semantics from network and process inspection commands", () => {
+    expect(
+      getCodexParsedCommandSummary(
+        {
+          command: "curl -s https://example.com/health",
+        },
+        null,
+      ),
+    ).toMatchObject({
+      type: "run",
+      subType: "script",
+      displayName: "script",
+    });
+
+    expect(
+      getCodexParsedCommandSummary(
+        {
+          command: "lsof -i :3000",
+        },
+        null,
+      ),
+    ).toMatchObject({
+      type: "run",
+      subType: "script",
+      displayName: "script",
+    });
+  });
+
+  it("infers nested semantics from package executor commands", () => {
+    expect(
+      getCodexParsedCommandSummary(
+        {
+          command: "npx tsc --noEmit",
+        },
+        null,
+      ),
+    ).toMatchObject({
+      type: "verify",
+      subType: "typecheck",
+      manager: "npm",
+      displayName: "typecheck",
+    });
+
+    expect(
+      getCodexParsedCommandSummary(
+        {
+          command: "bunx eslint sources",
+        },
+        null,
+      ),
+    ).toMatchObject({
+      type: "verify",
+      subType: "lint",
+      manager: "bun",
+      displayName: "lint",
+    });
+
+    expect(
+      getCodexParsedCommandSummary(
+        {
+          command: "pnpm dlx vitest --run foo.test.ts",
+        },
+        null,
+      ),
+    ).toMatchObject({
+      type: "test",
+      manager: "pnpm",
+      displayName: "vitest",
+    });
+  });
+
+  it("infers server run semantics from docker compose commands", () => {
+    expect(
+      getCodexParsedCommandSummary(
+        {
+          command: "docker compose up -d",
+        },
+        null,
+      ),
+    ).toMatchObject({
+      type: "run",
+      subType: "server",
+      displayName: "server",
+    });
+  });
 });

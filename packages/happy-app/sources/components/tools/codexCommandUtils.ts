@@ -282,13 +282,26 @@ function inferWriteCommand(command: string): Partial<CodexParsedCommand> | null 
   }
 
   if (
-    (executable === "mv" || executable === "cp" || executable === "touch") &&
+    (executable === "mv" ||
+      executable === "cp" ||
+      executable === "touch" ||
+      executable === "mkdir" ||
+      executable === "rm" ||
+      executable === "chmod") &&
     tokens[1]
   ) {
+    const singlePathMutation =
+      executable === "touch" ||
+      executable === "mkdir" ||
+      executable === "rm" ||
+      executable === "chmod";
+
+    const path = singlePathMutation ? getLastNonFlagToken(tokens.slice(1)) : tokens[2] ?? null;
+
     return {
       type: "write",
-      path: executable === "touch" ? tokens[1] : tokens[2] ?? null,
-      name: executable === "touch" ? null : tokens[1] ?? null,
+      path,
+      name: singlePathMutation ? executable : tokens[1] ?? null,
     };
   }
 
@@ -297,6 +310,14 @@ function inferWriteCommand(command: string): Partial<CodexParsedCommand> | null 
 
 function inferGitCommand(command: string): Partial<CodexParsedCommand> | null {
   const tokens = tokenizeCommand(command);
+  if (tokens[0] === "gh") {
+    return {
+      type: "git",
+      subType: tokens[1] ?? "github",
+      name: tokens[1] ?? "github",
+    };
+  }
+
   if (tokens[0] !== "git") {
     return null;
   }
@@ -423,6 +444,10 @@ function getPackageInvocation(command: string): PackageInvocation | null {
     manager !== "npm" &&
     manager !== "bun"
   ) {
+    return null;
+  }
+
+  if (manager === "pnpm" && tokens[1] === "dlx") {
     return null;
   }
 
@@ -612,6 +637,47 @@ function inferFromPackageInvocation(
   };
 }
 
+function inferPackageExecutorCommand(
+  tokens: string[],
+): Partial<CodexParsedCommand> | null {
+  const executable = tokens[0];
+  if (!executable) {
+    return null;
+  }
+
+  let manager: NonNullable<CodexPackageManager> | null = null;
+  let commandTokens: string[] = [];
+
+  if (executable === "npx" && tokens[1]) {
+    manager = "npm";
+    commandTokens = tokens.slice(1);
+  } else if (executable === "bunx" && tokens[1]) {
+    manager = "bun";
+    commandTokens = tokens.slice(1);
+  } else if (executable === "pnpm" && tokens[1] === "dlx" && tokens[2]) {
+    manager = "pnpm";
+    commandTokens = tokens.slice(2);
+  }
+
+  if (!manager || commandTokens.length === 0) {
+    return null;
+  }
+
+  const inferred = inferCommandDetails(commandTokens.join(" "));
+  return {
+    type: inferred?.type ?? "run",
+    subType: inferred?.subType ?? "script",
+    name: inferred?.name ?? commandTokens[0] ?? null,
+    path: inferred?.path ?? null,
+    query: inferred?.query ?? null,
+    manager: inferred?.manager ?? manager,
+    runner: inferred?.runner ?? null,
+    workspace: inferred?.workspace ?? null,
+    rangeStart: inferred?.rangeStart ?? null,
+    rangeEnd: inferred?.rangeEnd ?? null,
+  };
+}
+
 function inferRunCommand(command: string): Partial<CodexParsedCommand> | null {
   const tokens = tokenizeCommand(command);
   const executable = tokens[0];
@@ -627,19 +693,42 @@ function inferRunCommand(command: string): Partial<CodexParsedCommand> | null {
     };
   }
 
+  const packageExecutor = inferPackageExecutorCommand(tokens);
+  if (packageExecutor) {
+    return packageExecutor;
+  }
+
+  if (
+    (executable === "docker" && tokens[1] === "compose") ||
+    executable === "docker-compose"
+  ) {
+    return {
+      type: "run",
+      subType: "server",
+      name: "server",
+    };
+  }
+
   if (
     executable === "node" ||
     executable === "python" ||
     executable === "python3" ||
     executable === "tsx" ||
     executable === "ts-node" ||
-    executable === "docker" ||
-    executable === "docker-compose"
+    executable === "curl" ||
+    executable === "jq" ||
+    executable === "ps" ||
+    executable === "lsof" ||
+    executable === "kill" ||
+    executable === "which" ||
+    executable === "pwd" ||
+    executable === "date" ||
+    executable === "docker"
   ) {
     return {
       type: "run",
-      subType: executable === "docker" || executable === "docker-compose" ? "server" : "script",
-      name: executable === "docker" || executable === "docker-compose" ? "server" : "script",
+      subType: executable === "docker" ? "server" : "script",
+      name: executable === "docker" ? "server" : "script",
     };
   }
 

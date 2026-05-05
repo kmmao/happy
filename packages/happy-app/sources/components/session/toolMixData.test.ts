@@ -48,6 +48,7 @@ describe('computeToolMix', () => {
 
     expect(mix.total).toBe(4);
     expect(mix.otherCount).toBe(0);
+    expect(mix.otherSegments).toEqual([]);
     expect(mix.segments).toEqual([
       { kind: 'semantic', name: 'git', count: 1 },
       { kind: 'semantic', name: 'read', count: 1 },
@@ -89,6 +90,10 @@ describe('computeToolMix', () => {
     expect(mix.segments).toEqual([
       { kind: 'semantic', name: 'git', count: 1 },
       { kind: 'semantic', name: 'search', count: 1 },
+    ]);
+    expect(mix.otherSegments).toEqual([
+      { kind: 'semantic', name: 'test', count: 1 },
+      { kind: 'tool', name: 'Task', count: 1 },
     ]);
     expect(mix.otherCount).toBe(2);
   });

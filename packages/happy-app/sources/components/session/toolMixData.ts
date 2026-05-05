@@ -17,6 +17,7 @@ export interface ToolMixSegment {
 
 export interface ToolMix {
   segments: ToolMixSegment[];
+  otherSegments: ToolMixSegment[];
   otherCount: number;
   total: number;
 }
@@ -116,13 +117,13 @@ export function computeToolMix(
     .sort(compareToolMixSegments);
 
   const segments = sorted.slice(0, topN);
-  const otherCount = sorted
-    .slice(topN)
-    .reduce((sum, segment) => sum + segment.count, 0);
+  const otherSegments = sorted.slice(topN);
+  const otherCount = otherSegments.reduce((sum, segment) => sum + segment.count, 0);
   const total = sorted.reduce((sum, segment) => sum + segment.count, 0);
 
   return {
     segments,
+    otherSegments,
     otherCount,
     total,
   };
