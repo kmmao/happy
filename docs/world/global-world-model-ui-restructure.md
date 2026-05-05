@@ -14,12 +14,14 @@
 
 现有 World 文档的历史主线是：
 
-> 历史隐喻：用户是上帝，项目是世界，Agent 是居民。
+> 旧隐喻：用户是上帝，项目是世界，Agent 是居民。
 
-这个隐喻适合解释早期方向，但会带来两个结构性问题：
+这个隐喻的问题：它把每个 Project 当作一个独立的小世界。就好像说"每栋楼都是一个独立的 Matrix"——但 Matrix 只有一个，楼只是 Matrix 中的一个地点。
 
-1. 它把 World Model 绑定到了 Project 维度，最终做成 `ProjectDetailView` 里的又一个复杂 Tab
-2. 它暗示 Project 是一个独立领域对象（有自己的模型、状态、生命周期管理），而不是事件流上的标签
+旧隐喻导致的技术后果：
+
+1. World Model 绑定到了 Project 维度，做成 `ProjectDetailView` 里的 Tab
+2. Project 变成了独立领域对象（有模型、状态、生命周期），而不是事件流上的地点标签
 
 新的判断是：
 
@@ -36,19 +38,19 @@
 
 ## 2. 产品定位
 
-### 2.1 World Model 是全局模式
+### 2.1 World Shell = Neo 的界面
 
-World Model 应该像一个独立操作系统界面，而不是普通设置页、项目页或会话页。
+World Shell 不是又一个设置页或项目详情页——它是**Neo 看 Matrix 的界面**。
 
-进入后，用户看到的是：
+Neo 进入 Matrix 后能看到什么？
 
-- 当前整个工作宇宙正在发生什么（事件流）
-- 哪些 Agent 正在产生事件
-- 哪些任务链正在推进（事件的因果聚合）
-- 哪些决策需要用户裁决（需要响应的事件）
-- 哪些知识正在积累（事件产生的长期沉淀）
+- **代码在流动**（事件流）— 世界此刻正在发生什么
+- **程序在运行**（Agents）— 哪些 Agent 正在工作
+- **异常在闪烁**（Anomalies）— 有什么需要 Neo 处理
+- **规则在生效**（Laws）— 世界按什么规则运转
+- **意图在推进**（Intents）— Neo 关心的事情进展如何
 
-用户不需要先选择项目。项目只是事件流的一个过滤维度。
+Neo 不需要先"进入某个项目"。项目只是代码流中的一个过滤维度——就像 Neo 可以选择只看某个街区的代码，但他看到的始终是整个 Matrix。
 
 ### 2.2 设置页只是入口，不是承载页
 
@@ -70,34 +72,37 @@ World Model 可以采用类似入口，但产品层级更高：
 
 ## 3. 交互原则
 
-### 3.1 World Shell 独立于现有主界面
+### 3.1 进入 Matrix = 切换到完全不同的界面
 
-World Shell 是全新界面，不应该只是复用 `ProjectDetailView` 的 Tab。
+当 Neo 进入 Matrix，他看到的不是"普通世界加了个滤镜"——而是一个**完全不同的感知模式**。
 
-它需要自己的：
+World Shell 同理。它不是在现有 App 上加一个 Tab，而是整屏切换为新界面：
 
-- 顶层导航
-- 世界状态栏
-- 事件流视图
-- 任务链视图
-- 全局命令输入
-- 裁决入口
-- 返回普通 Happy 模式的出口
+- **状态栏**：世界运行状态（绿灯/黄灯/红灯）
+- **代码流**：事件流视图（Matrix 的代码雨）
+- **意图追踪**：当前推进中的任务（Neo 关心的事）
+- **异常面板**：需要裁决的 Anomaly
+- **规则编辑**：Laws / Narrative / Policy（修改 Source Code）
+- **退出口**：回到普通 Happy（"回到现实世界"）
 
-### 3.2 只有少数路径能回到普通界面
+### 3.2 "回到现实"是显式操作
 
-从 World Shell 回到会话列表或项目页不应该是默认主路径，而是显式操作：
+Neo 在 Matrix 里时，不会一不小心就弹回现实世界。退出需要明确意图：
 
-1. 点击「Exit World」或「回到 Happy」
-2. 输入命令，例如 `/sessions`、`/projects`、`/settings`
-3. 点击某个事件的「打开原始上下文」（跳转到对应会话/项目详情）
-4. 系统要求用户进入普通会话处理权限、认证或连接问题
+1. 点击「Exit World」（= 拔掉管子，回到 Nebuchadnezzar）
+2. 命令：`/sessions`、`/projects`、`/settings`
+3. 点击某个事件的「打开原始上下文」（= 进入 Matrix 中的一个具体场景）
+4. 系统强制退出（认证失败、连接断开 = Matrix 把你踢出来了）
 
-### 3.3 项目是事件，不是实体
+World Shell 是沉浸式体验。普通 Happy 界面是"现实世界"——功能完整但看不到代码流。
 
-这是本文档最核心的原则。在 World 中：
+### 3.3 项目是 Matrix 中的地点，不是独立程序
 
-**项目不存在为独立对象。** 以下行为产生的都是世界事件：
+在 Matrix 里，"第五大道"不是一个程序——它只是一个地理坐标，方便定位事件发生在哪里。
+
+Project 在 World 中同理：**它是事件的发生位置（source 标签），不是独立实体。**
+
+以下行为产生的都是世界事件：
 
 | 行为 | 事件类型 | source.projectId |
 |------|----------|-----------------|
@@ -116,11 +121,11 @@ World Shell 是全新界面，不应该只是复用 `ProjectDetailView` 的 Tab�
 - 项目列表页实质上是 `SELECT DISTINCT source.projectId FROM world_events WHERE ...` 的 facet UI
 - 一个任务链可以关联多个 projectId（跨项目工作流）
 
-### 3.4 World 需要外部世界接入点
+### 3.4 Multiverse：多个 Matrix 可以互联
 
-当前 Happy 先承载一个主世界，但 World 的结构不能封死。它需要预留外部世界接入点，允许未来把其他 Happy 实例、其他用户的 World、OpenClaw/第三方 Agent 世界、企业工作区或远程自治系统接入进来。
+黑客帝国里有多个版本的 Matrix，还有 Machine City 等外部系统。Happy World 同理——当前只有一个 Matrix，但未来可以与其他世界互联。
 
-长期形态不是多个 Project 组成一个 World，而是：
+长期形态：
 
 ```text
 Universe
@@ -873,7 +878,7 @@ WorldShell
 
 ### 5.3 世界定义（World Definition）
 
-World Definition Panel 是用户行使"上帝权力"的地方。它承载三种核心操作：
+World Definition Panel 是 Neo 修改 Matrix 源代码的地方。它承载三种核心操作：
 
 #### 立法（Laws）
 
