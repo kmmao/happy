@@ -2,7 +2,11 @@
 
 > **目的**：重立 World Model 的产品与技术重构锚点。本文档覆盖后续 UI 与结构重构方向，旧的 `docs/world/*` 文档作为参考材料，不再默认代表当前目标形态。
 >
-> **核心转向**：World 是唯一的一等公民。项目不是容器、不是边界、不是节点——项目的创建、变化、消亡本身就是世界事件流中的事件。会话、任务、触发器、知识、Supervisor 结果同理，它们都只是事件。World 本身需要预留外部世界接入点，未来可以把其他世界连接进来，形成 Universe / Multiverse 结构。
+> **核心隐喻：The Matrix。**
+>
+> World Model 就是 Matrix——一个持续运行的世界。里面有无数程序（Agent）各司其职，有规则（Laws）约束一切行为，有代码（事件流）在背后流动。用户是 Neo——能看到代码、能改变规则、能在异常时介入。但大部分时候，世界自己运转，不需要 Neo 干预。
+>
+> 一切皆事件。项目不是容器、不是边界——只是事件流中的 source 标签。World 预留外部世界接入点，未来形成 Multiverse。
 
 ---
 
@@ -19,7 +23,7 @@
 
 新的判断是：
 
-> 用户是上帝，Happy 承载一个主世界。**一切皆事件**。项目的创建是事件，项目的健康变化是事件，项目的归档是事件。项目不拥有事件，项目只是事件的 `source` 属性之一。
+> **Happy 是 Matrix，用户是 Neo。** 世界持续运行，程序（Agent）各司其职，规则（Laws）约束一切。用户能看到代码（事件流）、改变规则、裁决异常——但大部分时候不需要干预。一切皆事件。项目不拥有事件，项目只是事件的 `source` 属性之一。
 
 这意味着：
 
@@ -199,27 +203,414 @@ WorldEvent
 - 项目的"配置变更"就是一个 `project.config_changed` 事件
 - 项目列表只是对事件流的 facet 聚合
 
-### 4.3 事件的聚合：TaskChain
+### 4.3 世界运行模式：The Matrix
 
-分散事件可以被聚合成有因果关系的任务链。TaskChain 不是独立实体，而是事件的视图：
+**World Model 就是 Matrix。**
+
+Matrix 不是一次性构建的产物——它是一个**持续运行的世界**。里面有无数程序各司其职，有规则约束一切，有代码在背后流动。大部分时候，世界自己运转，不需要任何人干预。
+
+#### 概念映射
+
+| The Matrix | Happy World Model |
+|------------|-------------------|
+| Matrix（母体） | World — 持续运行的工作世界 |
+| Source Code（源代码） | Laws + Narrative — 世界的底层规则和方向 |
+| The Architect（建筑师） | 规划者 — 设计世界运行方案（Opus，偶尔调用） |
+| Agent Smith（特工） | 规则执行者 — 维护世界秩序（Supervisor） |
+| Programs（程序） | Worker Agent — 各司其职的执行者（Haiku，大量并行） |
+| The One（Neo） | 用户 — 能看到代码、改变规则、裁决异常 |
+| Anomaly（异常） | 需要裁决的事件 — 世界规则无法自动处理的情况 |
+| Reload（重载） | 重新规划 — 方向不对时重新分解 |
+| Agents 自我复制 | 水平扩展 — 需要更多执行者时自动增加 |
+
+#### 核心原则
+
+**1. 世界永远在运行**
+
+Matrix 不是"建完就停"的建筑——它是永远在跑的系统。Happy World 也一样：
+
+- Agent 在持续监控、持续执行
+- 触发器在持续监听信号
+- Supervisor 在持续检查法则合规
+- 事件在持续产生
+
+用户不需要"启动"世界。世界一直在运行。用户只需要在必要时介入。
+
+**2. 程序不需要理解世界**
+
+Matrix 里的"程序"（门卫、列车员、餐厅老板）不需要知道 Matrix 的全貌。它们只需要执行自己的功能：
+
+- 门卫：检查通行证 → 放行/拒绝
+- 列车员：把人从 A 送到 B
+- 餐厅老板：准备食物
+
+同理，Worker Agent 不需要理解用户的战略目标。它只需要：
+- 接收一个极简指令（"把这个函数从 A 文件移到 B 文件"）
+- 执行
+- 报告完成
+
+**这意味着可以用最便宜的模型（Haiku）大规模并行执行。**
+
+**3. 化复杂为简单**
+
+Matrix 的运行看起来极其复杂——但分解到每个程序的层面，每个程序做的事情都极简。
+
+一个复杂任务在 World 里的分解：
 
 ```text
-TaskChain（事件聚合视图）
-├── chainId
-├── title
-├── intent
-├── status              derived from member events
-├── memberEvents[]      按因果关系排列的事件 ID 列表
-├── sourceProjectIds[]  涉及的项目（从 member events 的 source.projectId 聚合）
-├── blockedBy?          阻塞事件 ID
-└── nextSuggestion?     下一步建议
+用户意图："重构认证模块"（复杂）
+  │
+  ├── Architect 分解（一次性，Opus）：
+  │   → 步骤 1: 列出所有认证相关文件
+  │   → 步骤 2: 提取 token 逻辑到新模块
+  │   → 步骤 3: 提取 session 逻辑到新模块
+  │   → 步骤 4: 更新所有 import
+  │   → 步骤 5: 跑测试
+  │   → 步骤 6: 验收
+  │
+  └── 每个步骤都简单到 Haiku 能做
 ```
 
-注意：
+**4. 多层级自治（Agent 生态）**
 
-- `sourceProjectIds` 是复数——一个任务链可以跨多个项目
-- TaskChain 的状态从成员事件中派生，不是独立维护的字段
-- 早期可以不落库，先由现有 Task、SupervisorAction、SessionEvent 聚合生成
+Matrix 里有不同层级的程序：
+
+```text
+The Architect     → 设计世界规则（用户 + Opus，极少介入）
+Agent Smith       → 执行规则、处理异常（Supervisor，定期运行）
+Sentinels         → 巡逻、监控（Trigger/Cron，持续监听）
+Programs          → 各司其职（Worker Haiku，大量并行）
+```
+
+在 Happy World 中：
+
+| 层级 | 角色 | 模型 | 频率 |
+|------|------|------|------|
+| Architect | 设计、规划、重大决策 | Opus | 极少（一次性分解） |
+| Agent Smith | 监督、纠偏、规则执行 | Sonnet | 定期（Supervisor Loop） |
+| Sentinel | 监控、触发、信号处理 | 系统级 | 持续（Cron/Webhook） |
+| Program | 执行具体工作 | Haiku | 大量并行 |
+
+**关键：只有 Architect 需要"理解力"。其他层级做的都是简单、重复、可大规模并行的工作。**
+
+**5. 异常上升机制（Anomaly Escalation）**
+
+Matrix 大部分时候自我运行。只有出现 Anomaly（规则无法处理的情况）时，才需要更高层级介入：
+
+```text
+Program 执行失败
+  → Sentinel 检测到异常，尝试自动重试
+  → 重试失败 → Agent Smith 介入判断（Sonnet 级决策）
+  → Smith 解决不了 → 上报 Architect（Opus 级决策）
+  → Architect 也无法自动处理 → 呈现给 Neo（用户裁决）
+```
+
+**99% 的异常在 Sentinel 和 Smith 层就解决了。用户只处理真正的 Anomaly。**
+
+**6. 验证即现实**
+
+Matrix 里"现实"就是代码运行的结果。同理，World 里"完成"就是验证通过：
+
+- 测试全绿 = 这部分世界运行正常
+- 类型检查通过 = 结构完整
+- Supervisor 无报警 = 符合法则
+- 用户确认 = Neo 认可
+
+#### 在 World Shell 中的呈现
+
+用户（Neo）进入 World Shell，看到的是**世界的运行状态**：
+
+```text
+🟢 World: Running
+   Programs: 12 active, 3 idle
+   Laws: 5 active, all green
+   Anomalies: 1 pending (需要你的裁决)
+
+   ┌─ Intent: "重构认证模块" ─────────────── 80% ─┐
+   │  ✅ 分析完成  ✅ token 模块  ✅ session 模块  │
+   │  🟡 集成测试 (running...)  ⬜ 验收            │
+   └───────────────────────────────────────────────┘
+```
+
+用户不需要管每个 Program 在做什么。只需要看到：
+- **世界在正常运行吗？**（绿灯 / 黄灯 / 红灯）
+- **有没有需要我处理的异常？**（Anomaly 数量）
+- **我关心的事情进展如何？**（Intent 进度条）
+
+#### 实现映射（技术备注）
+
+> 以下是 Matrix 概念到技术实现的映射：
+
+| Matrix 概念 | 技术实现 | 说明 |
+|------------|---------|------|
+| Matrix 运行 | 事件流持续产生 | 系统始终在线 |
+| Source Code | Laws + Narrative（Project.supervisorConfig） | 世界规则 |
+| Architect 分解 | Planner Task（Opus） | 一次性意图分解 |
+| Agent Smith | Supervisor Loop（Sonnet） | 定期规则检查 |
+| Sentinel | TriggerSchedule / WebhookTrigger | 持续监听 |
+| Program 执行 | Task Queue → CLI Daemon（Haiku） | 大量并行执行 |
+| Neo 看代码 | Stream Mode（事件流列表） | 看到底层发生什么 |
+| Neo 改规则 | Definition Panel（Laws 编辑） | 修改世界法则 |
+| Neo 裁决 | Decision 事件内联操作 | 处理异常 |
+| Anomaly | `decision.requested` 事件 | 需要用户介入 |
+| Reload | `intent.decomposed`（重新规划） | 方向不对时重来 |
+
+#### 事件流表达（技术备注）
+
+| 世界运行 | 事件类型 |
+|---------|---------|
+| 新意图产生 | `intent.created` |
+| Architect 分解意图 | `intent.decomposed` |
+| Program 领取工作 | `step.assigned` |
+| Program 执行中 | `step.started` |
+| Program 完成 | `step.completed` |
+| Program 异常 | `step.failed` |
+| Sentinel 自动重试 | `step.retried` |
+| Smith 介入 | `supervisor.action_found` |
+| 上报 Neo | `decision.requested` |
+| Neo 裁决 | `decision.resolved` |
+| 意图达成 | `intent.completed` |
+| 验证通过 | `intent.verified` |
+
+#### 第一版边界
+
+Phase 1 先让用户能**看到 Matrix 的运行状态**：
+
+- Stream Mode = Neo 看到代码流动
+- Definition Panel = Neo 能查看/修改世界规则
+- Decision 卡片 = Neo 处理 Anomaly
+- Intent 进度 = Neo 关心的事情在推进
+
+Phase 4+ 再实现完整的多层自治：
+- Architect 自动分解（Intent → Steps）
+- Agent Smith 自动纠偏（Supervisor 自动修复）
+- Program 大规模并行（Haiku 蚁群执行）
+- Anomaly 逐层上升机制
+├── description         用户的原始意图描述
+├── orchestratorId      协调者（Planner Agent 或人类）
+├── status              planning | executing | blocked | completed | failed
+├── createdAt
+└── steps[]             分解出的步骤树
+
+Step（步骤，可嵌套）
+├── stepId
+├── intentId            所属意图
+├── parentStepId?       父步骤（null = 顶层步骤）
+├── title               "提取 token 刷新逻辑到独立模块"
+├── assigneeId?         执行者（Agent ID 或 WorldMember ID）
+├── status              pending | assigned | running | blocked | completed | failed
+├── dependencies[]      前置步骤 ID（必须完成才能开始）
+├── order               执行顺序（同层级内）
+└── childSteps[]        子步骤（进一步分解）
+```
+
+#### 事件流表达
+
+整个分解和执行过程通过事件流表达：
+
+| 阶段 | 事件类型 | 含义 |
+|------|----------|------|
+| 创建意图 | `intent.created` | 用户或系统提出一个高层目标 |
+| 分解 | `intent.decomposed` | 协调者把意图拆成步骤树 |
+| 分配 | `step.assigned` | 某个步骤分配给某个 Agent |
+| 开始执行 | `step.started` | Agent 开始处理该步骤 |
+| 阻塞 | `step.blocked` | 步骤遇到阻塞（等待依赖/需要裁决） |
+| 完成 | `step.completed` | 步骤完成，结果汇报给协调者 |
+| 协调决策 | `orchestrator.decision` | 协调者根据进展决定下一步 |
+| 重新分解 | `step.redecomposed` | 发现步骤太大，进一步拆分 |
+| 意图完成 | `intent.completed` | 所有步骤完成，意图达成 |
+
+#### 协调者（Orchestrator）
+
+协调者是管理整个意图执行的角色。它可以是：
+
+- **Planner Agent**：自动分解意图为步骤，分配给合适的 Agent
+- **人类用户**：手动指定步骤和分配
+- **Supervisor**：根据法则和叙事自动生成意图并分解
+
+协调者的核心职责：
+
+1. **分解**：把高层意图拆成可执行的步骤树
+2. **分配**：根据 Agent 能力和负载分配步骤
+3. **监控**：观察步骤执行进展，发现阻塞
+4. **决策**：步骤失败时决定重试/跳过/重新分解
+5. **汇报**：向用户报告整体进展和需要裁决的问题
+
+#### 执行者（Worker Agent）— 蚁群模式
+
+**核心设计原则：执行者不需要理解全局目标。**
+
+就像现实世界的劳动分工——工人不需要理解整栋建筑的设计，只需要按图砌好自己负责的那面墙。这意味着：
+
+- **步骤必须足够小**：小到任何基础模型（Haiku 级别）都能独立完成
+- **步骤必须自包含**：包含所有执行所需的上下文，不需要执行者去"理解"为什么
+- **大量廉价模型并行**：一个 Opus/Sonnet 做一次分解 → 100 个 Haiku 并行执行
+- **执行者是无状态的**：完成一个步骤后，Agent 不保留状态，等待下一个分配
+- **失败是便宜的**：一个 Haiku 失败了，协调者可以换一个重试，成本极低
+
+```text
+成本模型：
+  1 次 Opus 分解 = 100 个小步骤
+  100 个 Haiku 并行执行 ≈ 1 次 Opus 的成本
+  总成本 ≈ 2 次 Opus，但产出 = 100 次独立工作
+```
+
+执行者的行为极其简单：
+
+1. 从队列中领取一个步骤
+2. 读取步骤描述和上下文
+3. 执行（写一个函数 / 修一个 bug / 跑一个测试 / 写一段文档）
+4. 汇报结果（成功 + 产出 / 失败 + 原因）
+5. 回到队列等待下一个步骤
+
+执行者不需要知道：
+- 这个步骤属于哪个更大的目标
+- 其他 Agent 在做什么
+- 整体进度如何
+- 为什么要做这件事
+
+#### 并行与依赖
+
+步骤之间可以有依赖关系，也可以并行执行：
+
+```text
+Intent: "重构认证模块"
+├── Step 1: "分析现有认证流程" (Analyst Agent)
+│   └── 完成后触发 Step 2 和 Step 3
+├── Step 2: "提取 token 逻辑" (Coder Agent A)  ← 依赖 Step 1
+├── Step 3: "提取 session 逻辑" (Coder Agent B) ← 依赖 Step 1
+│   ├── Step 3.1: "迁移 session store"
+│   └── Step 3.2: "更新 session 中间件"         ← 依赖 Step 3.1
+├── Step 4: "集成测试" (Tester Agent)           ← 依赖 Step 2 + Step 3
+└── Step 5: "代码审查 + 合并" (Reviewer Agent)  ← 依赖 Step 4
+```
+
+Step 2 和 Step 3 可以并行执行（不互相依赖），Step 4 必须等两者都完成。
+
+#### 多层协调：小组组长模式
+
+现实世界不是"一个总指挥 + 一万个工人"的二层结构。真实的协作是多层的：
+
+```text
+总指挥（CEO）         → 1 个 Opus，做一次战略分解
+  ├── 部门经理 A      → 1 个 Sonnet，管理模块 A 的执行
+  │   ├── 组长 A1    → 1 个 Haiku，管理 5 个具体步骤
+  │   │   ├── 工人   → Haiku，执行单个步骤
+  │   │   ├── 工人   → Haiku
+  │   │   └── 工人   → Haiku
+  │   └── 组长 A2    → 1 个 Haiku，管理另外 5 个步骤
+  │       ├── 工人   → Haiku
+  │       └── ...
+  └── 部门经理 B      → 1 个 Sonnet，管理模块 B 的执行
+      └── ...
+```
+
+**关键洞察：小组组长本身也可以是廉价模型。**
+
+组长不需要理解全局战略，它只需要：
+1. 接收上级分配的一组步骤
+2. 按顺序/依赖关系派发给工人
+3. 收集工人的完成报告
+4. 处理简单的失败重试（不需要理解为什么失败，只需要重新分配）
+5. 向上级汇报本组完成状态
+
+这形成了一个**分形结构**——每一层的行为模式完全相同，只是作用域不同：
+
+| 层级 | 模型 | 作用域 | 职责 |
+|------|------|--------|------|
+| 总指挥 | Opus | 整个 Intent | 战略分解，高层决策 |
+| 部门经理 | Sonnet | 一个大模块 | 模块级分解，跨组协调 |
+| 小组组长 | Haiku | 5-10 个步骤 | 派发、收集、简单重试 |
+| 工人 | Haiku | 1 个步骤 | 执行，汇报 |
+
+**为什么组长可以是 Haiku？**
+
+组长的工作是**调度**，不是**创造**：
+
+```text
+组长的 prompt 模板（极其简单）：
+
+你管理以下 5 个步骤，按顺序执行：
+1. [步骤描述] — 状态: 待执行
+2. [步骤描述] — 状态: 待执行
+3. ...
+
+规则：
+- 把第一个"待执行"步骤分配出去
+- 收到完成报告后标记为"已完成"，分配下一个
+- 收到失败报告后重试一次，再失败则上报
+- 所有步骤完成后向上级汇报
+```
+
+这个 prompt 不需要任何领域知识，Haiku 完全胜任。
+
+**成本优化效果：**
+
+```text
+传统模式：1 个 Opus 管理 100 个步骤
+  → Opus 上下文窗口被 100 个步骤状态占满
+  → 每次调度决策都消耗 Opus tokens
+  → 成本高，且 Opus 在做简单调度工作
+
+蚁群模式：1 Opus + 5 Sonnet + 20 Haiku 组长 + 100 Haiku 工人
+  → Opus 只做一次战略分解（1 次调用）
+  → Sonnet 各管 20 个步骤（少量调用）
+  → Haiku 组长各管 5 个步骤（廉价调用）
+  → Haiku 工人各执行 1 个步骤（最廉价）
+  → 总成本 ≈ 1 Opus + 5 Sonnet + 120 Haiku ≈ 传统模式的 1/3
+  → 并行度远高于传统模式
+```
+
+**事件流表达：**
+
+多层协调在事件流中的表达：
+
+| 事件 | 含义 |
+|------|------|
+| `orchestrator.delegated` | 上级把一组步骤委托给下级组长 |
+| `orchestrator.group_started` | 组长开始管理自己的步骤组 |
+| `orchestrator.step_dispatched` | 组长把步骤派发给工人 |
+| `orchestrator.step_retried` | 组长决定重试失败步骤 |
+| `orchestrator.group_completed` | 组长向上级报告本组全部完成 |
+| `orchestrator.escalated` | 组长遇到无法处理的问题，上报给上级 |
+
+**升级（Escalation）机制：**
+
+当某一层无法处理问题时，向上升级：
+
+```text
+工人执行失败
+  → 组长重试一次
+  → 再次失败 → 组长上报给部门经理
+  → 部门经理判断：重新分解 / 换策略 / 上报总指挥
+  → 总指挥判断：重新规划 / 请求用户裁决
+```
+
+每次升级产生 `orchestrator.escalated` 事件，在 World Shell 中高亮显示。用户只在最终升级到顶层时才需要介入。
+
+#### 与现有系统的映射
+
+| 新概念 | 现有实现 | 适配方式 |
+|--------|---------|---------|
+| Intent | Goal（概念层） | 前端生成，不落库 |
+| Step | Task（任务队列） | 每个 Step 对应一个 Task |
+| Orchestrator | Planner Task + Supervisor | 复用现有分解逻辑 |
+| Worker | CLI Daemon Agent | 复用现有任务执行 |
+| Dependencies | Task 间无依赖字段 | Phase 1 前端管理，Phase 4+ 考虑后端 |
+
+#### 第一版边界
+
+Phase 1 不实现完整的 Intent 分解系统。先在 Chain Mode 中可视化现有 Task 的父子/关联关系：
+
+- 用 Task 的 `goalId`（如果有）或时间/项目关联来推断步骤树
+- 协调者角色先由用户手动承担（通过创建 Task 并指定依赖）
+- 并行执行复用现有 Task Queue 的并发机制
+
+Phase 4+ 再考虑：
+- Intent 表（持久化意图和步骤树）
+- 自动分解 API
+- 依赖字段（Task 间的前置关系）
+- 协调者 Agent 自动编排
 
 ### 4.4 事件的沉淀：Memory
 
@@ -572,15 +963,44 @@ World Definition 的当前状态是事件的投影：
 - Inbox items → `decision.*`
 - Knowledge entries → `memory.*`
 
-#### B. Chain Mode（任务链视图）
+#### B. Chain Mode（协同执行视图）
 
-展示通过因果关系聚合的事件链：
+展示 Intent 的层级分解和并行执行状态——像项目经理看甘特图：
 
-- 当前推进中的任务链
-- 每条链包含哪些事件
-- 阻塞点在哪里（哪个事件卡住了）
-- 下一步建议
-- 链涉及的 projectIds（作为标签显示，不是主要组织维度）
+```text
+┌─────────────────────────────────────────────────────────────┐
+│ Intent: "重构认证模块"                    🟡 executing       │
+│ Orchestrator: Planner Agent              Progress: 3/5      │
+├─────────────────────────────────────────────────────────────┤
+│                                                              │
+│ ✅ Step 1: 分析现有认证流程              Analyst Agent      │
+│ ├── ✅ Step 2: 提取 token 逻辑          Coder Agent A      │
+│ ├── 🟡 Step 3: 提取 session 逻辑       Coder Agent B      │
+│ │   ├── ✅ Step 3.1: 迁移 session store                    │
+│ │   └── 🟡 Step 3.2: 更新 session 中间件 ← running        │
+│ ├── ⏳ Step 4: 集成测试                  待分配             │
+│ └── ⏳ Step 5: 代码审查 + 合并           待分配             │
+│                                                              │
+│ [阻塞: 无]  [下一步: Step 3.2 完成后触发 Step 4]           │
+└─────────────────────────────────────────────────────────────┘
+```
+
+核心展示：
+
+- **Intent 卡片**：顶层意图 + 整体进度 + 协调者
+- **步骤树**：缩进展示层级关系，每个步骤显示状态 + 执行者
+- **依赖线**：哪些步骤在等待哪些前置完成
+- **并行指示**：同层级的步骤可以并行执行
+- **阻塞高亮**：被阻塞的步骤标红，显示阻塞原因
+- **协调者决策点**：协调者需要做决定的地方（如步骤失败后是否重试）
+
+交互操作：
+
+- 点击 Intent → 展开/折叠步骤树
+- 点击 Step → Inspector 显示该步骤的事件详情
+- 拖拽 Step → 手动调整执行顺序或重新分配
+- 点击「+」→ 手动添加步骤或进一步分解
+- 点击「重新分解」→ 让协调者重新规划剩余步骤
 
 #### C. Density Mode（事件密度视图，替代旧 Map Mode）
 
