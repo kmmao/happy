@@ -1,6 +1,7 @@
 import * as React from "react";
 import { View, FlatList, RefreshControl, TouchableOpacity } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { Text } from "@/components/StyledText";
@@ -37,6 +38,7 @@ function extractDefinition(
 export const WorldShell = React.memo(function WorldShell() {
     const router = useRouter();
     const { theme } = useUnistyles();
+    const insets = useSafeAreaInsets();
     const { styles } = useStyles();
 
     const projects = useProjects();
@@ -85,20 +87,23 @@ export const WorldShell = React.memo(function WorldShell() {
         </View>
     );
 
+    const totalEvents = events.length;
+    const statusColor = pendingDecisions > 0
+        ? theme.colors.warningCritical
+        : activeAgents > 0
+            ? theme.colors.success
+            : theme.colors.textSecondary;
+
     return (
         <View style={styles.container}>
-            {/* Header */}
-            <View style={styles.header}>
+            {/* Header with SafeArea */}
+            <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
                 <TouchableOpacity
                     style={styles.worldButton}
                     onPress={() => setPanelOpen((v) => !v)}
                     activeOpacity={0.7}
                 >
-                    <Ionicons
-                        name="globe-outline"
-                        size={20}
-                        color={theme.colors.primary}
-                    />
+                    <View style={[styles.statusDot, { backgroundColor: statusColor }]} />
                     <Text style={styles.worldTitle}>{t("world.title")}</Text>
                     <Ionicons
                         name={panelOpen ? "chevron-up" : "chevron-down"}
@@ -108,20 +113,26 @@ export const WorldShell = React.memo(function WorldShell() {
                 </TouchableOpacity>
 
                 <View style={styles.stats}>
+                    <View style={styles.badge}>
+                        <Ionicons name="pulse-outline" size={12} color={theme.colors.textSecondary} />
+                        <Text style={styles.badgeText}>{totalEvents}</Text>
+                    </View>
                     {activeAgents > 0 && (
-                        <View style={styles.badge}>
-                            <Text style={styles.badgeText}>⚡ {activeAgents}</Text>
+                        <View style={[styles.badge, styles.badgeActive]}>
+                            <Ionicons name="flash" size={12} color={theme.colors.success} />
+                            <Text style={styles.badgeText}>{activeAgents}</Text>
                         </View>
                     )}
                     {pendingDecisions > 0 && (
-                        <View style={styles.badge}>
-                            <Text style={styles.badgeText}>⚠️ {pendingDecisions}</Text>
+                        <View style={[styles.badge, styles.badgeDecision]}>
+                            <Ionicons name="alert-circle" size={12} color={theme.colors.warningCritical} />
+                            <Text style={styles.badgeText}>{pendingDecisions}</Text>
                         </View>
                     )}
                 </View>
 
                 <TouchableOpacity onPress={handleExit} style={styles.exitButton}>
-                    <Text style={styles.exitText}>{t("world.exitWorld")}</Text>
+                    <Ionicons name="close" size={20} color={theme.colors.textSecondary} />
                 </TouchableOpacity>
             </View>
 
@@ -161,10 +172,15 @@ const useStyles = () => {
             flexDirection: "row",
             alignItems: "center",
             paddingHorizontal: 16,
-            paddingTop: 12,
-            paddingBottom: 8,
+            paddingBottom: 10,
+            backgroundColor: theme.colors.surface,
             borderBottomWidth: 1,
             borderBottomColor: theme.colors.divider,
+        },
+        statusDot: {
+            width: 10,
+            height: 10,
+            borderRadius: 5,
         },
         worldButton: {
             flexDirection: "row",
@@ -183,22 +199,27 @@ const useStyles = () => {
             marginHorizontal: 8,
         },
         badge: {
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 4,
             paddingHorizontal: 8,
-            paddingVertical: 3,
-            borderRadius: 10,
+            paddingVertical: 4,
+            borderRadius: 12,
             backgroundColor: theme.colors.surfaceHigh,
+        },
+        badgeActive: {
+            backgroundColor: theme.colors.surfaceHighest,
+        },
+        badgeDecision: {
+            backgroundColor: theme.colors.surfaceHighest,
         },
         badgeText: {
             fontSize: 12,
             color: theme.colors.text,
         },
         exitButton: {
-            paddingHorizontal: 10,
-            paddingVertical: 6,
-        },
-        exitText: {
-            fontSize: 14,
-            color: theme.colors.textLink,
+            padding: 8,
+            borderRadius: 16,
         },
         list: {
             paddingTop: 8,
