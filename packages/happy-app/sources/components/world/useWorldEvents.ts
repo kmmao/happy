@@ -117,9 +117,61 @@ export function useWorldEvents(filter?: WorldFilter): UseWorldEventsResult {
             setEvents((prev) => [worldEvent, ...prev].slice(0, MAX_EVENTS));
         });
 
+        const unsubSessionEvent = sync.onSessionEventCreated((event) => {
+            const worldEvent: WorldEvent = {
+                id: `session-event-rt-${event.id}`,
+                originalId: event.id,
+                eventType: `session.${event.eventType}`,
+                title: event.summary,
+                summary: "",
+                occurredAt: event.createdAt,
+                severity: "info",
+                source: {
+                    type: "session",
+                    sessionId: event.sessionId,
+                },
+            };
+
+            const f = filterRef.current;
+            if (f) {
+                const [passes] = filterWorldEvents([worldEvent], f);
+                if (!passes) return;
+            }
+
+            setEvents((prev) => [worldEvent, ...prev].slice(0, MAX_EVENTS));
+        });
+
+        const unsubSupervisor = sync.onSupervisorStatus((event) => {
+            const worldEvent: WorldEvent = {
+                id: `supervisor-rt-${event.runId}-${Date.now()}`,
+                originalId: event.runId,
+                eventType: `supervisor.${event.status}`,
+                title: event.currentDimension
+                    ? `Supervisor: ${event.currentDimension} (${event.dimensionIndex ?? 0}/${event.totalDimensions ?? 0})`
+                    : `Supervisor ${event.status}`,
+                summary: event.status,
+                occurredAt: Date.now(),
+                severity: event.status === "failed" ? "critical" : "info",
+                source: {
+                    type: "project",
+                    projectId: event.projectId,
+                },
+            };
+
+            const f = filterRef.current;
+            if (f) {
+                const [passes] = filterWorldEvents([worldEvent], f);
+                if (!passes) return;
+            }
+
+            setEvents((prev) => [worldEvent, ...prev].slice(0, MAX_EVENTS));
+        });
+
         return () => {
             unsubTask();
             unsubInbox();
+            unsubSessionEvent();
+            unsubSupervisor();
         };
     }, []);
 
