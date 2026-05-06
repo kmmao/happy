@@ -259,6 +259,7 @@ export const AskUserQuestionView = React.memo<ToolViewProps>(
       Map<number, Set<number>>
     >(new Map());
     const [isSubmitting, setIsSubmitting] = React.useState(false);
+    const [submitError, setSubmitError] = React.useState(false);
     const [otherTexts, setOtherTexts] = React.useState<Map<number, string>>(
       new Map(),
     );
@@ -339,6 +340,7 @@ export const AskUserQuestionView = React.memo<ToolViewProps>(
       if (!sessionId || !allQuestionsAnswered || isSubmitting) return;
 
       setIsSubmitting(true);
+      setSubmitError(false);
 
       // Build answers as Record<string, string> keyed by question text
       // This matches the AskUserQuestion tool's `answers` parameter schema
@@ -360,21 +362,27 @@ export const AskUserQuestionView = React.memo<ToolViewProps>(
         }
       });
 
+      // tool.permission?.id and tool.id are the same value (SDK tool_use_id).
+      // Fall back to tool.id when permission hasn't arrived yet due to
+      // agentState/tool_use event ordering.
+      const permissionId = tool.permission?.id ?? tool.id;
+      if (!permissionId) {
+        setSubmitError(true);
+        setIsSubmitting(false);
+        return;
+      }
+
       try {
-        // Send answers through the permission channel so the SDK includes
-        // them in updatedInput → tool_result (not as a separate user message)
-        if (tool.permission?.id) {
-          await sessionAllow(
-            sessionId,
-            tool.permission.id,
-            undefined,
-            undefined,
-            undefined,
-            answers,
-          );
-        }
-      } catch (error) {
-        // Intentionally empty — errors are surfaced via the sync layer
+        await sessionAllow(
+          sessionId,
+          permissionId,
+          undefined,
+          undefined,
+          undefined,
+          answers,
+        );
+      } catch {
+        setSubmitError(true);
       } finally {
         setIsSubmitting(false);
       }
@@ -386,6 +394,7 @@ export const AskUserQuestionView = React.memo<ToolViewProps>(
       allQuestionsAnswered,
       isSubmitting,
       tool.permission?.id,
+      tool.id,
     ]);
 
     // Show submitted/completed state
@@ -564,6 +573,7 @@ export const AskUserQuestionView = React.memo<ToolViewProps>(
                     styles.submitButton,
                     (!allQuestionsAnswered || isSubmitting) &&
                       styles.submitButtonDisabled,
+                    submitError && styles.submitButtonError,
                   ]}
                   onPress={handleSubmit}
                   disabled={!allQuestionsAnswered || isSubmitting}
@@ -574,6 +584,17 @@ export const AskUserQuestionView = React.memo<ToolViewProps>(
                       size="small"
                       color={theme.colors.button.primary.tint}
                     />
+                  ) : submitError ? (
+                    <>
+                      <Ionicons
+                        name="refresh"
+                        size={14}
+                        color={theme.colors.button.primary.tint}
+                      />
+                      <Text style={styles.submitButtonText}>
+                        {t("tools.askUserQuestion.submitRetry")}
+                      </Text>
+                    </>
                   ) : (
                     <Text style={styles.submitButtonText}>
                       {t("tools.askUserQuestion.submit")}
@@ -812,6 +833,9 @@ const styles = StyleSheet.create((theme) => ({
   },
   submitButtonDisabled: {
     opacity: 0.5,
+  },
+  submitButtonError: {
+    backgroundColor: theme.colors.warningCritical,
   },
   submitButtonText: {
     color: theme.colors.button.primary.tint,
