@@ -48,12 +48,25 @@ export interface UseImageUploadResult {
  * - `isProcessingImage` (state): drives UI loading indicators
  * - The AsyncLock provides the synchronous mutual exclusion guarantee.
  */
+// Module-level cache keyed by sessionId: survives component unmount when the
+// user switches sessions, so images are restored when they switch back.
+// Cleared when the user sends (clearImages) or removes all images.
+type CachedImageState = {
+  paths: string[];
+  uris: string[];
+  fileNameMap: Map<string, string>;
+};
+const imageStateCache = new Map<string, CachedImageState>();
+
+function getCached(id: string): CachedImageState {
+  return imageStateCache.get(id) ?? { paths: [], uris: [], fileNameMap: new Map() };
+}
+
 export function useImageUpload(sessionId: string): UseImageUploadResult {
-  const [pendingImagePaths, setPendingImagePaths] = React.useState<string[]>(
-    [],
-  );
-  const [pendingImageUris, setPendingImageUris] = React.useState<string[]>([]);
-  const [fileNameMap, setFileNameMap] = React.useState<ReadonlyMap<string, string>>(new Map());
+  const cached = getCached(sessionId);
+  const [pendingImagePaths, setPendingImagePaths] = React.useState<string[]>(cached.paths);
+  const [pendingImageUris, setPendingImageUris] = React.useState<string[]>(cached.uris);
+  const [fileNameMap, setFileNameMap] = React.useState<ReadonlyMap<string, string>>(cached.fileNameMap);
   const [isProcessingImage, setIsProcessingImage] = React.useState(false);
   const mountedRef = React.useRef(true);
   React.useEffect(() => {
@@ -61,6 +74,19 @@ export function useImageUpload(sessionId: string): UseImageUploadResult {
       mountedRef.current = false;
     };
   }, []);
+
+  // Keep the module-level cache in sync so state survives session switches.
+  React.useEffect(() => {
+    if (pendingImagePaths.length === 0 && pendingImageUris.length === 0) {
+      imageStateCache.delete(sessionId);
+    } else {
+      imageStateCache.set(sessionId, {
+        paths: pendingImagePaths,
+        uris: pendingImageUris,
+        fileNameMap: fileNameMap instanceof Map ? fileNameMap : new Map(fileNameMap),
+      });
+    }
+  }, [sessionId, pendingImagePaths, pendingImageUris, fileNameMap]);
 
   // Serialize pick and paste operations to prevent concurrent races
   const uploadLockRef = React.useRef(new AsyncLock());
@@ -309,10 +335,11 @@ export function useImageUpload(sessionId: string): UseImageUploadResult {
   }, []);
 
   const clearImages = React.useCallback(() => {
+    imageStateCache.delete(sessionId);
     setPendingImagePaths([]);
     setPendingImageUris([]);
     setFileNameMap(new Map());
-  }, []);
+  }, [sessionId]);
 
   return {
     pendingImagePaths,
