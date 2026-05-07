@@ -130,7 +130,7 @@ class AutoOptionSendService {
     private semanticControllers = new Map<string, AbortController>();
     private lastSemanticScoredAt = new Map<string, number>();
     private static readonly SEMANTIC_COOLDOWN_MS = 30_000;
-    private static readonly SEMANTIC_SCORE_GAP_THRESHOLD = 15;
+    private static readonly SEMANTIC_SCORE_GAP_THRESHOLD = 8;
 
     /** Called once by sync.ts during init. */
     init(
