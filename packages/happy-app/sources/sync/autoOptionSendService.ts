@@ -129,8 +129,14 @@ class AutoOptionSendService {
     private semanticScores = new Map<string, Map<number, number>>();
     private semanticControllers = new Map<string, AbortController>();
     private lastSemanticScoredAt = new Map<string, number>();
+    private semanticMeta = new Map<string, { modelUsed: string; provider: string }>();
     private static readonly SEMANTIC_COOLDOWN_MS = 30_000;
     private static readonly SEMANTIC_SCORE_GAP_THRESHOLD = 8;
+
+    /** Returns the LLM scoring metadata (model + provider) for a given optionsHash, if available. */
+    getSemanticMeta(optionsHash: string): { modelUsed: string; provider: string } | null {
+        return this.semanticMeta.get(optionsHash) ?? null;
+    }
 
     /** Called once by sync.ts during init. */
     init(
@@ -514,12 +520,18 @@ class AutoOptionSendService {
                 const semanticMap = new Map<number, number>();
                 response.scores.forEach((s, i) => semanticMap.set(i, s));
                 this.semanticScores.set(optionsHash, semanticMap);
+                if (response.modelUsed && response.provider) {
+                    this.semanticMeta.set(optionsHash, { modelUsed: response.modelUsed, provider: response.provider });
+                }
 
                 const projectId = this.resolveProjectId(sessionId);
                 const statsResolver = (optionText: string) =>
                     getAutoOptionFeedbackStats(projectId, optionText);
                 const reranked = rankAndSelectOptions(items, statsResolver, undefined, semanticMap);
 
+                const scoringMeta = (response.modelUsed && response.provider)
+                    ? { modelUsed: response.modelUsed, provider: response.provider }
+                    : undefined;
                 if (reranked.recommendedIndex !== null) {
                     const selected = reranked.ranked.find((item) => item.index === reranked.recommendedIndex);
                     if (selected && selected.text !== current.candidate.recommendedText) {
@@ -530,7 +542,13 @@ class AutoOptionSendService {
                                 recommendedText: selected.text,
                                 qualityScore: selected.score,
                                 qualityReasons: selected.reasons,
+                                scoringMeta,
                             },
+                        });
+                    } else if (scoringMeta && !current.candidate.scoringMeta) {
+                        this.setState(sessionId, {
+                            ...current,
+                            candidate: { ...current.candidate, scoringMeta },
                         });
                     }
                 }

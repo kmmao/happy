@@ -1,5 +1,10 @@
 import { AgentContentView } from "@/components/AgentContentView";
 import { AgentInput } from "@/components/AgentInput";
+import {
+  appendPasteBlocksToMessage,
+  createPasteBlock,
+  type PasteBlock,
+} from "@/components/pasteBlock";
 import { ElicitationBanner } from "@/components/ElicitationBanner";
 import { StopFailureBanner } from "@/components/StopFailureBanner";
 import { InputFAB, InputFABStatusInfo } from "@/components/InputFAB";
@@ -16,6 +21,7 @@ import {
 import type { ModelMode, PermissionMode } from "@/components/modelModeOptions";
 import { getSuggestions } from "@/components/autocomplete/suggestions";
 import { ChatHeaderView } from "@/components/ChatHeaderView";
+import { OptionScoringMetaProvider } from "@/components/markdown/MarkdownView";
 import { ChatList, ChatListHandle, LOAD_MORE_INCREMENT } from "@/components/ChatList";
 import { Deferred } from "@/components/Deferred";
 import { ScrollToBottomButton } from "@/components/ScrollToBottomButton";
@@ -368,8 +374,8 @@ export const SessionView = React.memo((props: { id: string }) => {
   }, [sessionId]);
 
   return (
-    <InputContext.Provider value={{ appendToInput: appendToInputOuter }}>
-      <>
+      <InputContext.Provider value={{ appendToInput: appendToInputOuter }}>
+        <React.Fragment>
       {/* Two-column layout: left (header + content) + divider + right (side panel) */}
       <View style={{ flex: 1, flexDirection: showSidePanelOuter ? "row" : "column" }} onLayout={handleContainerLayout}>
         {/* Left column: header + chat content, capped to layout.maxWidth */}
@@ -530,8 +536,8 @@ export const SessionView = React.memo((props: { id: string }) => {
         projectServerId={sessionProject?.serverId ?? undefined}
         sessionId={sessionId}
       />
-      </>
-    </InputContext.Provider>
+        </React.Fragment>
+      </InputContext.Provider>
   );
 });
 
@@ -567,6 +573,7 @@ function SessionViewInner({
   const isLandscape = useIsLandscape();
   const deviceType = useDeviceType();
   const [message, setMessage] = React.useState("");
+  const [pasteBlocks, setPasteBlocks] = React.useState<PasteBlock[]>([]);
   const [autoOptionSend, setAutoOptionSend] = React.useState(() =>
     autoOptionSendService.getState(sessionId),
   );
@@ -964,6 +971,30 @@ function SessionViewInner({
     setMessage(`/${command} `);
   }, []);
 
+  const handleLargeTextPaste = React.useCallback((text: string) => {
+    setPasteBlocks((prev) => [
+      ...prev,
+      createPasteBlock(`paste-${Date.now()}-${prev.length}`, text, {
+        fallbackPreview: t("session.pastedContent"),
+        summary: (params) => t("session.pastedContentSummary", params),
+      }),
+    ]);
+  }, [t]);
+
+  const handlePasteBlockRemove = React.useCallback((id: string) => {
+    setPasteBlocks((prev) => prev.filter((block) => block.id !== id));
+  }, []);
+
+  const handlePasteBlockExpand = React.useCallback((id: string) => {
+    const block = pasteBlocks.find((item) => item.id === id);
+    if (!block) return;
+    setMessage((current) => {
+      const trimmed = current.trimEnd();
+      return trimmed ? `${trimmed}\n${block.text}` : block.text;
+    });
+    setPasteBlocks((prev) => prev.filter((item) => item.id !== id));
+  }, [pasteBlocks]);
+
   // Append option text to input for editing before sending
   const appendToInput = React.useCallback((text: string) => {
     const isCurrentOption = latestOptions.items.includes(text);
@@ -1063,11 +1094,11 @@ function SessionViewInner({
   // canFire guards work correctly even on timer-triggered paths.
   React.useEffect(() => {
     autoOptionSendService.updateUIContext(sessionId, {
-      inputText: message,
-      hasPendingImages: pendingImagePaths.length > 0,
+      inputText: appendPasteBlocksToMessage(message, pasteBlocks),
+      hasPendingImages: pendingImagePaths.length > 0 || pasteBlocks.length > 0,
       isSttListening: false,
     });
-  }, [sessionId, message, pendingImagePaths]);
+  }, [sessionId, message, pasteBlocks, pendingImagePaths]);
 
   // Collapsible input state
   const collapsibleInput = useCollapsibleInput({
@@ -1077,7 +1108,7 @@ function SessionViewInner({
     needsContinue,
     requiresAction,
     isSttListening: false,
-    hasPendingImages: pendingImagePaths.length > 0,
+    hasPendingImages: pendingImagePaths.length > 0 || pasteBlocks.length > 0,
   });
 
   // Guard against double-tap send — 300ms debounce covers the realistic fat-finger window.
@@ -1449,6 +1480,10 @@ function SessionViewInner({
         disabledPlaceholder={disabledInputPlaceholder}
         value={message}
         onChangeText={setMessage}
+        pasteBlocks={pasteBlocks}
+        onLargeTextPaste={handleLargeTextPaste}
+        onPasteBlockRemove={handlePasteBlockRemove}
+        onPasteBlockExpand={handlePasteBlockExpand}
         sessionId={sessionId}
         overlayMaxHeight={agentInputOverlayMaxHeight}
         permissionMode={permissionMode}
@@ -1488,9 +1523,13 @@ function SessionViewInner({
             sendingRef.current = false;
           }, 300);
 
-          const text = message.trim();
-          // Special commands (/compact, /clear) don't support images — send command only
-          const isSpecialCommand = /^\/(compact|clear)\b/.test(text);
+          const visibleText = message.trim();
+          // Special commands (/compact, /clear) don't support images or paste blocks — send command only
+          const isSpecialCommand = /^\/(compact|clear)\b/.test(visibleText);
+          const text = appendPasteBlocksToMessage(
+            visibleText,
+            isSpecialCommand ? [] : pasteBlocks,
+          );
 
           // Read from ref to avoid stale closure — the ref is always current
           const currentPaths = isSpecialCommand
@@ -1525,14 +1564,15 @@ function SessionViewInner({
           setMessage("");
           clearDraft();
           setPendingImagePaths([]);
+          setPasteBlocks([]);
           const imageCount = currentPaths.length;
           const displayText =
             imageCount > 0
-              ? text ||
+              ? visibleText ||
                 (imageCount === 1
                   ? t("session.sentImage")
                   : t("session.sentImages", { count: imageCount }))
-              : undefined;
+              : visibleText || pasteBlocks[0]?.summary;
           sync.sendMessage(sessionId, finalMessage, displayText, {
             localId: localIdForSend,
           });
@@ -1622,6 +1662,7 @@ function SessionViewInner({
   );
 
   return (
+    <OptionScoringMetaProvider value={autoOptionSend.candidate?.scoringMeta ?? null}>
     <InputContext.Provider value={inputContextValue}>
       {/* CLI Version Warning Overlay - Subtle centered pill */}
       {shouldShowCliWarning && !(isLandscape && deviceType === "phone") && (
@@ -1819,5 +1860,6 @@ function SessionViewInner({
         </Pressable>
       )}
     </InputContext.Provider>
+    </OptionScoringMetaProvider>
   );
 }

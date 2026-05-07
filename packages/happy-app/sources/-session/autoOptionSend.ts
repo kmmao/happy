@@ -48,6 +48,7 @@ export interface AutoOptionCandidate {
   durationMs: number;
   qualityScore: number;
   qualityReasons: string[];
+  scoringMeta?: { modelUsed: string; provider: string };
 }
 
 export interface AutoOptionSendState {

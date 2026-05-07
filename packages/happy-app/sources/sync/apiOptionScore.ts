@@ -4,6 +4,8 @@ import { getServerUrl } from "./serverConfig";
 export interface OptionScoreResponse {
     scores: number[];
     cached: boolean;
+    modelUsed?: string;
+    provider?: string;
 }
 
 export async function scoreOptionsRemote(

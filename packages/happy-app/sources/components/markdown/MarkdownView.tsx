@@ -25,13 +25,19 @@ import { ShimmerOverlay } from "../ShimmerOverlay";
 import { log } from '@/log';
 import { type AutoOptionStatsResolver, rankAndSelectOptions } from "@/-session/autoOptionSend";
 
+// Scoring meta context — provided by SessionView, consumed by RenderOptionsBlock.
+// Avoids prop-threading through ChatList → MessageView → MarkdownView.
+export interface OptionScoringMeta { modelUsed: string; provider: string }
+const OptionScoringMetaContext = React.createContext<OptionScoringMeta | null>(null);
+export const OptionScoringMetaProvider = OptionScoringMetaContext.Provider;
+
 // Option type for callback
 export type Option = {
   title: string;
 };
 
 export const MarkdownView = React.memo(
-  (props: { markdown: string; onOptionPress?: (option: Option) => void; optionStatsResolver?: AutoOptionStatsResolver }) => {
+  (props: { markdown: string; onOptionPress?: (option: Option) => void; optionStatsResolver?: AutoOptionStatsResolver; optionScoringMeta?: { modelUsed: string; provider: string } }) => {
     const blocks = React.useMemo(
       () => getCachedMarkdownBlocks(props.markdown),
       [props.markdown],
@@ -130,6 +136,7 @@ export const MarkdownView = React.memo(
                   selectable={selectable}
                   onOptionPress={props.onOptionPress}
                   statsResolver={props.optionStatsResolver}
+                  scoringMeta={props.optionScoringMeta}
                 />
               );
             } else if (block.type === "plan-card") {
@@ -457,6 +464,20 @@ function RenderCodeBlock(props: {
   );
 }
 
+function shortenModelName(modelUsed: string): string {
+  const lower = modelUsed.toLowerCase();
+  if (lower.includes("opus")) return "Opus";
+  if (lower.includes("sonnet")) return "Sonnet";
+  if (lower.includes("haiku")) return "Haiku";
+  if (lower.includes("gpt-4.5") || lower.includes("gpt-5")) return "GPT-5";
+  if (lower.includes("gpt-4o")) return "GPT-4o";
+  if (lower.includes("gpt-4")) return "GPT-4";
+  if (lower.includes("llama")) return "Llama";
+  // Generic fallback: last segment after last slash or dot
+  const parts = modelUsed.split(/[/.-]/);
+  return parts[parts.length - 1] || modelUsed;
+}
+
 function RenderOptionsBlock(props: {
   items: string[];
   first: boolean;
@@ -464,10 +485,13 @@ function RenderOptionsBlock(props: {
   selectable: boolean;
   onOptionPress?: (option: Option) => void;
   statsResolver?: AutoOptionStatsResolver;
+  scoringMeta?: OptionScoringMeta;
 }) {
   const { toggleBookmark, isBookmarked } = useBookmarks();
   const appendToInput = useAppendToInput();
   const { theme } = useUnistyles();
+  const contextMeta = React.useContext(OptionScoringMetaContext);
+  const scoringMeta = props.scoringMeta ?? contextMeta;
 
   const ranked = React.useMemo(
     () => props.items.length >= 2
@@ -522,6 +546,11 @@ function RenderOptionsBlock(props: {
                       <Text style={style.recommendedText}>
                         {t("tools.askUserQuestion.recommended")}
                       </Text>
+                      {scoringMeta && (
+                        <Text style={style.scoringModelText}>
+                          {shortenModelName(scoringMeta.modelUsed)}
+                        </Text>
+                      )}
                     </View>
                   )}
                 </View>
@@ -592,6 +621,11 @@ function RenderOptionsBlock(props: {
                     <Text style={style.recommendedText}>
                       {t("tools.askUserQuestion.recommended")}
                     </Text>
+                    {props.scoringMeta && (
+                      <Text style={style.scoringModelText}>
+                        {shortenModelName(props.scoringMeta.modelUsed)}
+                      </Text>
+                    )}
                   </View>
                 )}
               </View>
@@ -983,6 +1017,13 @@ const style = StyleSheet.create((theme) => ({
     fontSize: 11,
     fontWeight: "600" as const,
     color: theme.colors.radio.active,
+  },
+  scoringModelText: {
+    ...Typography.mono(),
+    fontSize: 9,
+    color: theme.colors.radio.active,
+    opacity: 0.7,
+    marginLeft: 2,
   },
   scoreBadge: {
     paddingHorizontal: 5,
