@@ -173,6 +173,28 @@ export const MultiTextInput = React.forwardRef<
     [onSelectionChange, onStateChange],
   );
 
+  // Detect whether pasted text looks like code or a log, to auto-wrap in fences.
+  function looksLikeCode(text: string): boolean {
+    const lines = text.split("\n");
+    if (lines.length < 3) return false;
+    if (text.startsWith("```") || text.includes("\n```")) return false;
+    // Java/Kotlin/Python stack traces
+    if (/^\s+at [\w.$<>]+\([\w.]+:\d+\)/.test(text)) return true;
+    // Exception/Error headers
+    if (/\b(Exception|Error|Caused by|NestedServletException):/.test(text)) return true;
+    // Log lines with severity and context brackets
+    if (/\b(ERROR|WARN|INFO|DEBUG|TRACE)\b/.test(text) && /[\[\(]/.test(text)) return true;
+    // Timestamp log prefix
+    if (/\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}/.test(text)) return true;
+    // Source code keywords at line start
+    if (/^(import |package |public class |private |protected |#include|def |function |const |let |var |type |interface |class )/m.test(text)) return true;
+    // JSON object/array
+    if (/^\s*[{[]/.test(text) && text.includes('":')) return true;
+    // XML/HTML
+    if (/^\s*<\w+/.test(text) && text.includes("</")) return true;
+    return false;
+  }
+
   // Intercept clipboard paste to detect images/files and handle text explicitly
   const handlePaste = React.useCallback(
     (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
@@ -214,6 +236,10 @@ export const MultiTextInput = React.forwardRef<
 
       if (!pastedText) return;
 
+      const textToInsert = looksLikeCode(pastedText)
+        ? `\`\`\`\n${pastedText}\n\`\`\``
+        : pastedText;
+
       const textarea = e.currentTarget;
 
       // Use execCommand to preserve browser undo/redo history and trigger
@@ -222,7 +248,7 @@ export const MultiTextInput = React.forwardRef<
       // preserving undo stack — still supported in all major browsers.
       textarea.focus();
       // eslint-disable-next-line @typescript-eslint/no-deprecated
-      document.execCommand("insertText", false, pastedText);
+      document.execCommand("insertText", false, textToInsert);
 
       // Sync React state with the DOM result
       const newValue = textarea.value;
