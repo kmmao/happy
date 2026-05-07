@@ -494,6 +494,16 @@ export class ApiSessionClient extends EventEmitter {
           maxSeq = message.seq;
         }
 
+        // Skip messages already delivered via WebSocket during this fetch.
+        // Race: fetchMessages captures afterSeq at start; if a WebSocket event
+        // delivers seq N and bumps this.lastSeq to N while the HTTP request is
+        // in-flight, the response still includes seq N, causing
+        // routeIncomingMessage (and pendingMessageCallback) to fire twice for
+        // commands like /clear and /compact.
+        if (message.seq <= this.lastSeq) {
+          continue;
+        }
+
         if (message.content?.t !== "encrypted") {
           continue;
         }
