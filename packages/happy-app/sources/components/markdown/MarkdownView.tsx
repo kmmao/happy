@@ -347,6 +347,9 @@ function RenderNumberedListBlock(props: {
   );
 }
 
+const CODE_COLLAPSE_THRESHOLD = 15;
+const CODE_COLLAPSE_PREVIEW = 8;
+
 function RenderCodeBlock(props: {
   content: string;
   language: string | null;
@@ -356,6 +359,18 @@ function RenderCodeBlock(props: {
 }) {
   const [isHovered, setIsHovered] = React.useState(false);
   const [copied, setCopied] = React.useState(false);
+
+  const lineCount = React.useMemo(() => props.content.split("\n").length, [props.content]);
+  const isLong = lineCount > CODE_COLLAPSE_THRESHOLD;
+  const [isExpanded, setIsExpanded] = React.useState(!isLong);
+
+  // Log/text content: wrap lines instead of horizontal scroll
+  const isWrapMode = props.language === "log" || props.language === "text";
+
+  const displayContent = React.useMemo(
+    () => isExpanded ? props.content : props.content.split("\n").slice(0, CODE_COLLAPSE_PREVIEW).join("\n"),
+    [props.content, isExpanded],
+  );
 
   const copyCode = React.useCallback(async () => {
     try {
@@ -384,18 +399,39 @@ function RenderCodeBlock(props: {
           {props.language}
         </Text>
       )}
-      <ScrollView
-        style={{ flexGrow: 0, flexShrink: 0 }}
-        horizontal={true}
-        contentContainerStyle={{ paddingHorizontal: 16, paddingVertical: 16 }}
-        showsHorizontalScrollIndicator={true}
-      >
-        <SimpleSyntaxHighlighter
-          code={props.content}
-          language={props.language}
-          selectable={props.selectable}
-        />
-      </ScrollView>
+      {isWrapMode ? (
+        <View style={{ paddingHorizontal: 16, paddingVertical: 16 }}>
+          <SimpleSyntaxHighlighter
+            code={displayContent}
+            language={props.language}
+            selectable={props.selectable}
+          />
+        </View>
+      ) : (
+        <ScrollView
+          style={{ flexGrow: 0, flexShrink: 0 }}
+          horizontal={true}
+          contentContainerStyle={{ paddingHorizontal: 16, paddingVertical: 16 }}
+          showsHorizontalScrollIndicator={true}
+        >
+          <SimpleSyntaxHighlighter
+            code={displayContent}
+            language={props.language}
+            selectable={props.selectable}
+          />
+        </ScrollView>
+      )}
+      {isLong && (
+        <Pressable
+          onPress={() => setIsExpanded((v) => !v)}
+          style={style.collapseButton}
+          hitSlop={8}
+        >
+          <Text style={style.collapseButtonText}>
+            {isExpanded ? t("common.collapse") : t("session.codeExpandLines", { n: lineCount })}
+          </Text>
+        </Pressable>
+      )}
       <View
         style={[
           style.copyButtonWrapper,
@@ -843,6 +879,17 @@ const style = StyleSheet.create((theme) => ({
   },
   copyButtonContainerHidden: {
     opacity: 0,
+  },
+  collapseButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderTopWidth: 1,
+    borderTopColor: theme.colors.divider,
+  },
+  collapseButtonText: {
+    ...Typography.mono(),
+    color: theme.colors.textLink,
+    fontSize: 12,
   },
   copyButton: {
     backgroundColor: theme.colors.surfaceHighest,
