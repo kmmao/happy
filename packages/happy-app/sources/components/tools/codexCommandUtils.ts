@@ -732,6 +732,33 @@ function inferRunCommand(command: string): Partial<CodexParsedCommand> | null {
     };
   }
 
+  if (
+    executable === "echo" ||
+    executable === "printf" ||
+    executable === "wc" ||
+    executable === "sort" ||
+    executable === "uniq" ||
+    executable === "awk" ||
+    executable === "sed" ||
+    executable === "cut" ||
+    executable === "tr" ||
+    executable === "xargs" ||
+    executable === "basename" ||
+    executable === "dirname" ||
+    executable === "realpath" ||
+    executable === "env" ||
+    executable === "export" ||
+    executable === "source" ||
+    executable === "true" ||
+    executable === "false"
+  ) {
+    return {
+      type: "run",
+      subType: "script",
+      name: "script",
+    };
+  }
+
   return null;
 }
 
@@ -739,6 +766,16 @@ function inferCommandDetails(command: string): Partial<CodexParsedCommand> | nul
   const normalizedCommand = getCodexCommandText(command);
   if (!normalizedCommand) {
     return null;
+  }
+
+  // rtk is a token-killer proxy: strip the `rtk [proxy]` prefix and re-infer.
+  // Meta-commands (gain, discover) have no equivalent tool type → treat as run.
+  const rtkMatch = normalizedCommand.match(/^rtk(?:\s+proxy)?\s+(.+)$/);
+  if (rtkMatch) {
+    return inferCommandDetails(rtkMatch[1]) ?? { type: 'run' };
+  }
+  if (/^rtk(\s|$)/.test(normalizedCommand)) {
+    return { type: 'run' };
   }
 
   const packageInvocation = getPackageInvocation(normalizedCommand);

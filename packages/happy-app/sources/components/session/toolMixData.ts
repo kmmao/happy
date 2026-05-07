@@ -1,5 +1,6 @@
 import {
   getCodexParsedCommandSummary,
+  getCodexCommandText,
   type CodexParsedCommandKind,
 } from '@/components/tools/codexCommandUtils';
 import type { Metadata } from '@/sync/storageTypes';
@@ -27,6 +28,20 @@ function resolveToolMixSegment(
   metadata: Metadata | null,
 ): Omit<ToolMixSegment, 'count'> {
   switch (message.tool.name) {
+    case 'Bash': {
+      const command = getCodexCommandText(
+        typeof message.tool.input === 'object' && message.tool.input !== null
+          ? (message.tool.input as { command?: unknown }).command
+          : message.tool.input,
+      );
+      const summary = command
+        ? getCodexParsedCommandSummary({ command }, metadata)
+        : null;
+      return {
+        kind: 'semantic',
+        name: summary?.type ?? 'run',
+      };
+    }
     case 'CodexBash': {
       const summary = getCodexParsedCommandSummary(message.tool.input, metadata);
       return {
