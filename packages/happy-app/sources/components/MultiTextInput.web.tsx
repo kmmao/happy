@@ -173,6 +173,48 @@ export const MultiTextInput = React.forwardRef<
     [onSelectionChange, onStateChange],
   );
 
+  // Detect the programming/query language of code-like text for syntax highlighting.
+  function detectLanguage(text: string): string | null {
+    // SQL / MyBatis
+    if (
+      /\b(INSERT INTO|SELECT .+ FROM|UPDATE .+ SET|DELETE FROM|CREATE TABLE|DROP TABLE)\b/i.test(text) ||
+      /==>?\s*(Preparing|Parameters):/.test(text) ||
+      /\bSqlSession\b/.test(text)
+    ) return 'sql';
+    // Java stack traces and class paths
+    if (
+      /\bat (com|org|java|javax|sun|io|net)\.[.\w$]+\(/.test(text) ||
+      /\b(NullPointerException|IllegalArgumentException|NestedServletException)\b/.test(text) ||
+      /org\.(apache|springframework)|javax\.servlet/.test(text)
+    ) return 'java';
+    // Python tracebacks and source
+    if (
+      /^Traceback \(most recent call last\):/m.test(text) ||
+      /^\s+File ".+", line \d+/m.test(text) ||
+      /^(from \w+ import |import \w+\n)/m.test(text)
+    ) return 'python';
+    // TypeScript (check before JS — more specific)
+    if (
+      /^(interface |type \w+ =|export (interface|type|enum))/m.test(text) ||
+      /: (string|number|boolean|void|any|never)\b/.test(text)
+    ) return 'typescript';
+    // JavaScript
+    if (
+      /^(const |let |var |function |import |export )/m.test(text) ||
+      /require\(['"]|module\.exports/.test(text)
+    ) return 'javascript';
+    // Go
+    if (/^(func |package \w|type \w+ struct|goroutine \d+)/m.test(text)) return 'go';
+    // Rust
+    if (
+      /^(fn |use |impl |pub (fn|struct|enum)|let mut )/m.test(text) ||
+      /error\[E\d{4}\]/.test(text)
+    ) return 'rust';
+    // Bash/Shell
+    if (/^#!\/(bin|usr)/.test(text) || /^\$ /.test(text)) return 'bash';
+    return null;
+  }
+
   // Detect whether pasted text looks like code or a log, to auto-wrap in fences.
   function looksLikeCode(text: string): boolean {
     const lines = text.split("\n");
@@ -244,7 +286,7 @@ export const MultiTextInput = React.forwardRef<
       if (!pastedText) return;
 
       const textToInsert = looksLikeCode(pastedText)
-        ? `\`\`\`\n${pastedText}\n\`\`\``
+        ? `\`\`\`${detectLanguage(pastedText) ?? ""}\n${pastedText}\n\`\`\``
         : pastedText;
 
       const textarea = e.currentTarget;
