@@ -185,6 +185,11 @@ class Sync {
   // In-memory only (not persisted) so every app restart re-backfills trimmed sessions,
   // ensuring users can always access their full message history.
   private backfilledSessions = new Set<string>();
+  // Tracks recently processed WebSocket message server-IDs per session.
+  // Prevents double-delivery of the same event (e.g. "Context was reset" appearing twice
+  // when the same new-message WebSocket event is processed by both direct delivery and
+  // a subsequent fetch). Capped at 200 entries per session to avoid unbounded growth.
+  private processedWebSocketMessageIds = new Map<string, Set<string>>();
   private sessionDataKeys = new Map<string, Uint8Array>(); // Store session data encryption keys internally
   private machineDataKeys = new Map<string, Uint8Array>(); // Store machine data encryption keys internally
   private artifactDataKeys = new Map<string, Uint8Array>(); // Store artifact data encryption keys internally
@@ -2436,6 +2441,7 @@ class Sync {
       projectsSync: this.projectsSync,
       sessionsSync: this.sessionsSync,
       assumeUsers: this.assumeUsers.bind(this),
+      processedWebSocketMessageIds: this.processedWebSocketMessageIds,
     };
   }
 

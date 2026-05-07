@@ -81,6 +81,7 @@ export type UpdateHandlerContext = {
     projectsSync: { invalidate: () => void };
     sessionsSync: { invalidate: () => void };
     assumeUsers: (userIds: string[]) => Promise<void>;
+    processedWebSocketMessageIds: Map<string, Set<string>>;
 };
 
 // ---------------------------------------------------------------------------
@@ -269,6 +270,25 @@ export async function handleNewMessageUpdate(
                 lastMessage &&
                 currentLastSeq !== undefined &&
                 incomingSeq === currentLastSeq + 1;
+
+            // Guard against the same WebSocket event being processed twice (e.g. after
+            // reconnect or due to any delivery quirk). The server DB message ID is a
+            // stable, unique identifier for each stored message.
+            const msgDbId = body.message.id;
+            let seenIds = ctx.processedWebSocketMessageIds.get(body.sid);
+            if (!seenIds) {
+                seenIds = new Set();
+                ctx.processedWebSocketMessageIds.set(body.sid, seenIds);
+            }
+            if (seenIds.has(msgDbId)) {
+                return;
+            }
+            seenIds.add(msgDbId);
+            // Cap the Set to prevent unbounded growth
+            if (seenIds.size > 200) {
+                const oldest = seenIds.values().next().value as string;
+                seenIds.delete(oldest);
+            }
 
             if (lastMessage) {
                 ctx.enqueueMessages(body.sid, [lastMessage]);
