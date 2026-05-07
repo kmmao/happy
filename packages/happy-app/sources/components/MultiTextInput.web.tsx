@@ -212,6 +212,12 @@ export const MultiTextInput = React.forwardRef<
     ) return 'rust';
     // Bash/Shell
     if (/^#!\/(bin|usr)/.test(text) || /^\$ /.test(text)) return 'bash';
+    // Generic application log (ERROR/WARN/INFO with timestamp or MyBatis markers)
+    if (
+      /\b(ERROR|WARN(?:ING)?|INFO|DEBUG|TRACE)\b/.test(text) ||
+      /\d{2,4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}/.test(text) ||
+      /(?:==>|<==)/.test(text)
+    ) return 'log';
     return null;
   }
 

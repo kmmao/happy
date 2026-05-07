@@ -21,6 +21,44 @@ const openBrackets = Object.keys(bracketPairs);
 const closeBrackets = Object.values(bracketPairs);
 
 /**
+ * Tokenize application log text with line-level severity, timestamp, and marker highlighting.
+ */
+function tokenizeLogFile(text: string): SyntaxToken[] {
+    type MatchEntry = { start: number; end: number; type: string };
+    const entries: MatchEntry[] = [];
+
+    const patterns: Array<{ re: RegExp; type: string }> = [
+        { re: /\bERROR\b/g,                                               type: 'keyword' },
+        { re: /\b(?:WARN(?:ING)?)\b/g,                                   type: 'number' },
+        { re: /\b(?:INFO|DEBUG|TRACE)\b/g,                               type: 'comment' },
+        { re: /\d{2,4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(?:[.,]\d+)?/g, type: 'string' },
+        { re: /@[0-9a-f]{4,}/gi,                                         type: 'number' },
+        { re: /(?:==>|<==)\s*/g,                                         type: 'keyword' },
+        { re: /\bCaused by:/g,                                           type: 'keyword' },
+    ];
+
+    for (const p of patterns) {
+        let m: RegExpExecArray | null;
+        while ((m = p.re.exec(text)) !== null) {
+            entries.push({ start: m.index, end: m.index + m[0].length, type: p.type });
+        }
+    }
+
+    entries.sort((a, b) => a.start - b.start);
+
+    const tokens: SyntaxToken[] = [];
+    let cur = 0;
+    for (const e of entries) {
+        if (e.start < cur) continue;
+        if (e.start > cur) tokens.push({ text: text.slice(cur, e.start), type: 'default' });
+        tokens.push({ text: text.slice(e.start, e.end), type: e.type });
+        cur = e.end;
+    }
+    if (cur < text.length) tokens.push({ text: text.slice(cur), type: 'default' });
+    return tokens;
+}
+
+/**
  * Tokenize code into syntax tokens with type information.
  * Returns an array of tokens, each with text content and a syntax type.
  */
@@ -32,6 +70,10 @@ export function tokenizeCode(code: string, language: string | null): SyntaxToken
     }
 
     const lang = language.toLowerCase();
+
+    if (lang === 'log') {
+        return tokenizeLogFile(code);
+    }
 
     // Language-specific keyword sets
     const keywordSets = {
