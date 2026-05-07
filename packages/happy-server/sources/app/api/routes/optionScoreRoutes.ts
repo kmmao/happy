@@ -21,6 +21,8 @@ export function optionScoreRoutes(app: Fastify) {
                 200: z.object({
                     scores: z.array(z.number()),
                     cached: z.boolean(),
+                    modelUsed: z.string(),
+                    provider: z.string(),
                 }),
                 500: z.object({
                     error: z.string(),

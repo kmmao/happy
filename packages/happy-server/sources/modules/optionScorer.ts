@@ -143,6 +143,8 @@ const CALL_FNS: Record<ScoringProvider, (creds: ScoringCredentials, msg: string)
 interface CacheEntry {
     scores: number[];
     expiresAt: number;
+    modelUsed: string;
+    provider: ScoringProvider;
 }
 
 const cache = new Map<string, CacheEntry>();
@@ -199,6 +201,8 @@ export function parseScores(text: string, expectedCount: number): number[] | nul
 export interface OptionScoreResult {
     scores: number[];
     cached: boolean;
+    modelUsed: string;
+    provider: ScoringProvider;
 }
 
 export async function scoreOptionsWithLLM(
@@ -212,7 +216,7 @@ export async function scoreOptionsWithLLM(
     const key = cacheKey(options, contextSummary);
     const cached = cache.get(key);
     if (cached && cached.expiresAt > Date.now()) {
-        return { scores: cached.scores, cached: true };
+        return { scores: cached.scores, cached: true, modelUsed: cached.modelUsed, provider: cached.provider };
     }
 
     const userMessage = buildUserMessage(options, contextSummary, sessionTitle);
@@ -237,7 +241,8 @@ export async function scoreOptionsWithLLM(
         }
     }
 
-    cache.set(key, { scores, expiresAt: Date.now() + CACHE_TTL_MS });
+    const modelUsed = credentials.model || DEFAULT_SCORING_MODELS[credentials.provider];
+    cache.set(key, { scores, expiresAt: Date.now() + CACHE_TTL_MS, modelUsed, provider: credentials.provider });
 
-    return { scores, cached: false };
+    return { scores, cached: false, modelUsed, provider: credentials.provider };
 }
