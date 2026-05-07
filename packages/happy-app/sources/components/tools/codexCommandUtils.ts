@@ -426,6 +426,25 @@ function inferVerifyCommand(command: string): Partial<CodexParsedCommand> | null
     };
   }
 
+  if (
+    (executable === "cargo" && (tokens[1] === "build" || tokens[1] === "clippy")) ||
+    (executable === "go" && tokens[1] === "build")
+  ) {
+    return {
+      type: "verify",
+      subType: tokens[1],
+      name: tokens[1],
+    };
+  }
+
+  if (executable === "make" || executable === "cmake" || executable === "ninja") {
+    return {
+      type: "verify",
+      subType: "build",
+      name: "build",
+    };
+  }
+
   return null;
 }
 
@@ -750,8 +769,59 @@ function inferRunCommand(command: string): Partial<CodexParsedCommand> | null {
     executable === "export" ||
     executable === "source" ||
     executable === "true" ||
-    executable === "false"
+    executable === "false" ||
+    // Directory navigation / shell builtins
+    executable === "cd" ||
+    executable === "pushd" ||
+    executable === "popd" ||
+    executable === "sleep" ||
+    executable === "wait" ||
+    executable === "mktemp" ||
+    // macOS utilities
+    executable === "open" ||
+    executable === "pbcopy" ||
+    executable === "pbpaste" ||
+    executable === "osascript" ||
+    // Archive tools
+    executable === "tar" ||
+    executable === "zip" ||
+    executable === "unzip" ||
+    executable === "gzip" ||
+    executable === "gunzip" ||
+    executable === "bzip2" ||
+    executable === "xz" ||
+    // Network / remote
+    executable === "ssh" ||
+    executable === "scp" ||
+    executable === "rsync" ||
+    executable === "sftp" ||
+    executable === "wget" ||
+    // Package managers (non-node)
+    executable === "brew" ||
+    executable === "pip" ||
+    executable === "pip3" ||
+    executable === "gem" ||
+    executable === "bundle" ||
+    executable === "composer" ||
+    // Runtimes
+    executable === "ruby" ||
+    executable === "perl" ||
+    executable === "lua" ||
+    executable === "java" ||
+    // CLI tools
+    executable === "happy" ||
+    executable === "diff" ||
+    executable === "patch"
   ) {
+    return {
+      type: "run",
+      subType: "script",
+      name: "script",
+    };
+  }
+
+  // Path-based executables (./script.sh, /usr/local/bin/tool, etc.)
+  if (executable.startsWith("./") || executable.startsWith("/")) {
     return {
       type: "run",
       subType: "script",
