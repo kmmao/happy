@@ -18,6 +18,7 @@ import { projectManager } from "./projectManager";
 import { log } from "@/log";
 import { shouldPublishCountdownRemaining } from "./autoOptionCountdown";
 import { scoreOptionsRemote } from "./apiOptionScore";
+import { generateOptionsRemote } from "./apiOptionGenerate";
 import { buildOptionScoringContext } from "@/-session/buildOptionScoringContext";
 import { sync } from "./sync";
 
@@ -133,9 +134,21 @@ class AutoOptionSendService {
     private static readonly SEMANTIC_COOLDOWN_MS = 30_000;
     private static readonly SEMANTIC_SCORE_GAP_THRESHOLD = 8;
 
+    private generatedOptions = new Map<string, string[]>();
+    private lastGeneratedTurnId = new Map<string, string | null>();
+    private generationControllers = new Map<string, AbortController>();
+    private lastGeneratedAt = new Map<string, number>();
+    private static readonly GENERATION_COOLDOWN_MS = 120_000;
+
     /** Returns the LLM scoring metadata (model + provider) for a given optionsHash, if available. */
     getSemanticMeta(optionsHash: string): { modelUsed: string; provider: string } | null {
         return this.semanticMeta.get(optionsHash) ?? null;
+    }
+
+    /** Returns proactively generated options for a session when no markdown options exist. */
+    getGeneratedOptions(sessionId: string): string[] | null {
+        const opts = this.generatedOptions.get(sessionId);
+        return opts && opts.length >= 2 ? opts : null;
     }
 
     /** Called once by sync.ts during init. */
@@ -180,6 +193,16 @@ class AutoOptionSendService {
     onMessages(sessionId: string): void {
         const state = this.states.get(sessionId);
         if (!state?.enabled) return;
+
+        // Clear generated options when a new user message arrives (new turn started)
+        const messages = storage.getState().sessionMessages[sessionId]?.messages ?? [];
+        const latestMessage = messages[0];
+        if (latestMessage?.kind === "user-text") {
+            this.generatedOptions.delete(sessionId);
+            this.generationControllers.get(sessionId)?.abort();
+            this.generationControllers.delete(sessionId);
+        }
+
         this.checkAndDispatch(sessionId);
     }
 
@@ -326,7 +349,27 @@ class AutoOptionSendService {
         const messages =
             storage.getState().sessionMessages[sessionId]?.messages ?? [];
         const result = buildSnapshotFromMessages(messages);
-        const snapshot = result?.snapshot ?? null;
+        let snapshot = result?.snapshot ?? null;
+        let isFresh = result?.isFresh ?? true;
+
+        // When no markdown options found, fall back to proactively generated options.
+        if (!snapshot) {
+            const generated = this.generatedOptions.get(sessionId);
+            if (generated && generated.length >= 2) {
+                snapshot = {
+                    sourceType: "markdown-options",
+                    sourceMessageId: null,
+                    items: generated,
+                    recommendedIndex: getRecommendedOptionIndex(generated),
+                    optionsHash: buildOptionsHash(generated),
+                };
+                isFresh = true;
+            } else {
+                // Kick off async generation; will re-run checkAndDispatch when ready.
+                void this.triggerOptionGeneration(sessionId, messages);
+            }
+        }
+
         const context = this.buildContext(sessionId, snapshot, messages, Date.now());
 
         const event = snapshot
@@ -336,7 +379,7 @@ class AutoOptionSendService {
         const next = reduceAutoOptionSendEvent(state, event, context);
         // Stale options (previous turn): skip countdown, stay idle
         const final =
-            next.status === "armed" && result && !result.isFresh
+            next.status === "armed" && result && !isFresh
                 ? { ...next, status: "idle" as const, candidate: null, remainingMs: null }
                 : next;
         this.applyStateChange(sessionId, state, final);
@@ -790,6 +833,68 @@ class AutoOptionSendService {
 
     getSemanticScores(optionsHash: string): ReadonlyMap<number, number> | null {
         return this.semanticScores.get(optionsHash) ?? null;
+    }
+
+    private async triggerOptionGeneration(sessionId: string, messages: Message[]): Promise<void> {
+        const state = this.states.get(sessionId);
+        if (!state?.enabled) return;
+
+        // Only generate when session is active (agent finished its turn)
+        const session = storage.getState().sessions[sessionId];
+        if (!session?.active) return;
+
+        // Don't generate if there's a pending AskUserQuestion
+        if (hasPendingAskUserQuestion(messages)) return;
+
+        // Use latest agent-text message id as turn identifier to avoid re-generating
+        const latestAgentMsg = messages.find((m) => m.kind === "agent-text" && !("isThinking" in m && m.isThinking));
+        const turnId = latestAgentMsg?.id ?? null;
+        if (turnId && this.lastGeneratedTurnId.get(sessionId) === turnId) return;
+
+        // Cooldown: don't generate more often than every 2 minutes
+        const now = Date.now();
+        const lastAt = this.lastGeneratedAt.get(sessionId) ?? 0;
+        if (now - lastAt < AutoOptionSendService.GENERATION_COOLDOWN_MS) return;
+
+        // Mark this turn so we don't re-generate
+        this.lastGeneratedTurnId.set(sessionId, turnId);
+        this.lastGeneratedAt.set(sessionId, now);
+
+        const credentials = sync.getCredentials();
+        if (!credentials) return;
+
+        const contextSummary = buildOptionScoringContext(messages, null);
+        const profileId = session.profileId ?? null;
+
+        // Prefer high-quality model for proactive generation
+        const preferredModels: Record<string, string> = {
+            anthropic: "claude-opus-4-7",
+            openai: "gpt-4.5",
+        };
+
+        const controller = new AbortController();
+        this.generationControllers.get(sessionId)?.abort();
+        this.generationControllers.set(sessionId, controller);
+
+        try {
+            const result = await generateOptionsRemote(
+                credentials,
+                contextSummary,
+                null,
+                profileId,
+                JSON.stringify(preferredModels),
+                controller.signal,
+            );
+            this.generationControllers.delete(sessionId);
+
+            if (result.options.length >= 2) {
+                this.generatedOptions.set(sessionId, result.options);
+                // Re-run checkAndDispatch now that we have generated options
+                this.checkAndDispatch(sessionId);
+            }
+        } catch {
+            this.generationControllers.delete(sessionId);
+        }
     }
 
     private resolveProjectId(sessionId: string): string {

@@ -1772,8 +1772,8 @@ function SessionViewInner({
           }
         />
         <OptionsPopover
-          visible={showOptionsPopover && latestOptions.items.length > 0}
-          options={latestOptions.items}
+          visible={showOptionsPopover && (latestOptions.items.length > 0 || (autoOptionSend.enabled && (autoOptionSendService.getGeneratedOptions(sessionId)?.length ?? 0) > 0))}
+          options={latestOptions.items.length > 0 ? latestOptions.items : (autoOptionSendService.getGeneratedOptions(sessionId) ?? [])}
           onOptionPress={handleFloatingOptionPress}
           onCopyOption={(text) => {
             skipDismissOnCloseRef.current = true;

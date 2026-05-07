@@ -51,6 +51,7 @@ import { inboxRoutes } from "./routes/inboxRoutes";
 import { sessionEventRoutes } from "./routes/sessionEventRoutes";
 import { worldEventRoutes } from "./routes/worldEventRoutes";
 import { optionScoreRoutes } from "./routes/optionScoreRoutes";
+import { optionGenerateRoutes } from "./routes/optionGenerateRoutes";
 import { supervisorDimensionRoutes } from "./routes/supervisorDimensionRoutes";
 import { agentLoopSuggestRoutes } from "./routes/agentLoopSuggestRoutes";
 import { isLocalStorage, getLocalFilesDir } from "@/storage/files";
@@ -177,6 +178,7 @@ export async function startApi() {
   sessionEventRoutes(typed);
   worldEventRoutes(typed);
   optionScoreRoutes(typed);
+  optionGenerateRoutes(typed);
   supervisorDimensionRoutes(typed);
   agentLoopSuggestRoutes(typed);
 
