@@ -194,7 +194,9 @@ function SessionInfoContent({ session }: { session: Session }) {
         );
       }
     }
-    // Success - navigate back
+    // Optimistically mark inactive so the session list updates immediately
+    storage.getState().applySessions([{ ...session, active: false }]);
+    // Navigate back to session list
     router.back();
     router.back();
   });
@@ -223,7 +225,7 @@ function SessionInfoContent({ session }: { session: Session }) {
         false,
       );
     }
-    // Success - no alert needed, UI will update to show deleted state
+    storage.getState().deleteSession(session.id);
   });
 
   const handleDeleteSession = useCallback(() => {

@@ -40,7 +40,7 @@ import {
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { isMachineOnline } from "@/utils/machineUtils";
 import { useSessionUpgrade } from "@/hooks/useSessionUpgrade";
-import { machineSpawnNewSession, sessionKill, sessionDelete } from "@/sync/ops";
+import { machineSpawnNewSession, sessionKill, sessionArchive, sessionDelete } from "@/sync/ops";
 import { resolveAbsolutePath } from "@/utils/pathUtils";
 import { Modal } from "@/modal";
 import { t } from "@/text";
@@ -653,13 +653,17 @@ const CompactSessionRow = React.memo(
     }, [session]);
 
     const [archivingSession, performArchive] = useHappyAction(async () => {
-      const result = await sessionKill(session.id);
-      if (!result.success) {
-        throw new HappyError(
-          result.message || t("sessionInfo.failedToArchiveSession"),
-          false,
-        );
+      const rpcResult = await sessionKill(session.id);
+      if (!rpcResult.success) {
+        const fallbackResult = await sessionArchive(session.id);
+        if (!fallbackResult.success) {
+          throw new HappyError(
+            fallbackResult.message || t("sessionInfo.failedToArchiveSession"),
+            false,
+          );
+        }
       }
+      storage.getState().applySessions([{ ...session, active: false }]);
     });
 
     const handleArchive = React.useCallback(() => {

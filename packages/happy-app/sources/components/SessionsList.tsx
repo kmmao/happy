@@ -633,11 +633,17 @@ export function SessionsList() {
 
   const [deletingAll, performDeleteAll] = useHappyAction(async () => {
     const errors: string[] = [];
+    const deleted: string[] = [];
     for (const id of inactiveSessionIds) {
       const result = await sessionDelete(id);
       if (!result.success) {
         errors.push(result.message || id);
+      } else {
+        deleted.push(id);
       }
+    }
+    for (const id of deleted) {
+      storage.getState().deleteSession(id);
     }
     if (errors.length > 0) {
       throw new HappyError(t("sessionInfo.failedToDeleteSession"), false);
@@ -745,6 +751,7 @@ const SessionItem = React.memo(
           false,
         );
       }
+      storage.getState().deleteSession(session.id);
     });
 
     const handleDelete = React.useCallback(() => {
