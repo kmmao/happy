@@ -34,6 +34,7 @@ interface ChatHeaderViewProps {
   onDevPress?: () => void;
   onDevLongPress?: () => void;
   onUpgradePress?: () => void;
+  onReloadPress?: () => void;
 }
 
 export const ChatHeaderView: React.FC<ChatHeaderViewProps> = ({
@@ -56,6 +57,7 @@ export const ChatHeaderView: React.FC<ChatHeaderViewProps> = ({
   onDevPress,
   onDevLongPress,
   onUpgradePress,
+  onReloadPress,
 }) => {
   const { theme } = useUnistyles();
   const router = useRouter();
@@ -188,6 +190,20 @@ export const ChatHeaderView: React.FC<ChatHeaderViewProps> = ({
                 name="arrow-up-circle"
                 size={22}
                 color="#F59E0B"
+              />
+            </Pressable>
+          )}
+
+          {onReloadPress && (
+            <Pressable
+              onPress={onReloadPress}
+              hitSlop={15}
+              style={styles.actionButton}
+            >
+              <Ionicons
+                name="refresh-outline"
+                size={20}
+                color={theme.colors.header.tint}
               />
             </Pressable>
           )}

@@ -515,6 +515,19 @@ class Sync {
     }
   };
 
+  /**
+   * Force a full re-fetch of session messages from the server.
+   * Clears lastSeq and backfill state so the next sync fetches everything
+   * from the beginning, recovering any messages that went missing.
+   */
+  forceReloadMessages = (sessionId: string): void => {
+    this.sessionLastSeq.delete(sessionId);
+    deleteLastSeq(sessionId);
+    deleteBackfillBoundary(sessionId);
+    this.backfilledSessions.delete(sessionId);
+    this.getMessagesSync(sessionId)?.invalidate();
+  };
+
   private getMessagesSync(sessionId: string): InvalidateSync | null {
     if (this.deleted404Sessions.has(sessionId)) {
       return null;

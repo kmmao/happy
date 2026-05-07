@@ -363,6 +363,10 @@ export const SessionView = React.memo((props: { id: string }) => {
     };
   }, [session, isDataReady, sessionId, router, theme]);
 
+  const handleReload = React.useCallback(() => {
+    sync.forceReloadMessages(sessionId);
+  }, [sessionId]);
+
   return (
     <InputContext.Provider value={{ appendToInput: appendToInputOuter }}>
       <>
@@ -419,6 +423,7 @@ export const SessionView = React.memo((props: { id: string }) => {
                 onDevPress={headerProps.isConnected && hasDevConfig ? () => router.push(`/session/${sessionId}/dev` as any) : undefined}
                 onDevLongPress={headerProps.isConnected && hasDevConfig ? () => router.push(`/session/${sessionId}/dev` as any) : undefined}
                 onUpgradePress={needsUpgrade && !upgrading ? handleUpgradeDirect : undefined}
+                onReloadPress={handleReload}
               />
               {/* Voice status bar below header - not on tablet (shown in sidebar) */}
               {!isTablet && realtimeStatus !== "disconnected" && (
