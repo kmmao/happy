@@ -473,7 +473,11 @@ class AutoOptionSendService {
         const heuristicResult = rankAndSelectOptions(items);
         const scores = [...heuristicResult.allScores.values()];
         scores.sort((a, b) => b - a);
-        if (scores.length >= 2 && scores[0] - scores[1] > AutoOptionSendService.SEMANTIC_SCORE_GAP_THRESHOLD) return;
+
+        // When auto-send is active for this session, always call LLM regardless of gap —
+        // the model should be the primary decision-maker, not the heuristic.
+        const isAutoSendActive = storage.getState().localSettings.autoOptionSendSessions?.[sessionId] === true;
+        if (!isAutoSendActive && scores.length >= 2 && scores[0] - scores[1] > AutoOptionSendService.SEMANTIC_SCORE_GAP_THRESHOLD) return;
 
         const credentials = sync.getCredentials();
         if (!credentials) return;
@@ -487,8 +491,16 @@ class AutoOptionSendService {
         const session = storage.getState().sessions[sessionId];
         const profileId = session?.profileId ?? null;
         const scoringOverrides = storage.getState().localSettings.scoringModelOverride ?? {};
-        const modelOverride = Object.keys(scoringOverrides).length > 0
-            ? JSON.stringify(scoringOverrides)
+        // When auto-send is enabled, prefer the highest available model unless user has set a custom override.
+        const autoSendPreferredModels: Record<string, string> = {
+            anthropic: "claude-opus-4-7",
+            openai: "gpt-4.5",
+        };
+        const effectiveOverrides = Object.keys(scoringOverrides).length > 0
+            ? scoringOverrides
+            : isAutoSendActive ? autoSendPreferredModels : {};
+        const modelOverride = Object.keys(effectiveOverrides).length > 0
+            ? JSON.stringify(effectiveOverrides)
             : null;
 
         scoreOptionsRemote(credentials, items, contextSummary, null, profileId, modelOverride, controller.signal)
