@@ -178,20 +178,27 @@ export const MultiTextInput = React.forwardRef<
     const lines = text.split("\n");
     if (lines.length < 3) return false;
     if (text.startsWith("```") || text.includes("\n```")) return false;
-    // Java/Kotlin/Python stack traces
-    if (/^\s+at [\w.$<>]+\([\w.]+:\d+\)/.test(text)) return true;
+    // Java/Kotlin/Python stack traces (with or without leading whitespace)
+    if (/\bat [\w.$<>]+\([\w.]+:\d+\)/.test(text)) return true;
     // Exception/Error headers
     if (/\b(Exception|Error|Caused by|NestedServletException):/.test(text)) return true;
-    // Log lines with severity and context brackets
-    if (/\b(ERROR|WARN|INFO|DEBUG|TRACE)\b/.test(text) && /[\[\(]/.test(text)) return true;
-    // Timestamp log prefix
-    if (/\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}/.test(text)) return true;
+    // Log lines with severity (relaxed: no bracket requirement, covers "ERROR o.jeecg..." format)
+    if (/\b(ERROR|WARN|INFO|DEBUG|TRACE)\s+[\w\[.(]/.test(text)) return true;
+    // Timestamp prefix: YYYY-MM-DD or MM-DD (e.g. 05-08 03:47:03)
+    if (/\d{2,4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}/.test(text)) return true;
     // Source code keywords at line start
     if (/^(import |package |public class |private |protected |#include|def |function |const |let |var |type |interface |class )/m.test(text)) return true;
     // JSON object/array
     if (/^\s*[{[]/.test(text) && text.includes('":')) return true;
     // XML/HTML
     if (/^\s*<\w+/.test(text) && text.includes("</")) return true;
+    // Long average line length with no natural prose sentences → likely code/log
+    const nonEmptyLines = lines.filter((l) => l.trim().length > 0);
+    if (nonEmptyLines.length >= 3) {
+      const avgLen = nonEmptyLines.reduce((s, l) => s + l.length, 0) / nonEmptyLines.length;
+      const hasSentences = /[.!?]\s+[A-Z]/.test(text);
+      if (avgLen >= 80 && !hasSentences) return true;
+    }
     return false;
   }
 
