@@ -11,7 +11,7 @@
 - 新增知识库条目事件（`memory.created`）显示在事件流中，点击可跳转至对应知识库条目
 
 ### 修复
-- 修复 /clear 后 "Context was reset" 重复显示——消息缓存恢复路径中 messageIds 使用内部 ID 而非服务端 DB ID 导致去重失效，已修正
+- 修复 /clear 后 "Context was reset" 重复显示——同步修正缓存恢复路径和事件流处理器中的消息去重逻辑
 
 ## 2.19.0 - 2026-05-08
 

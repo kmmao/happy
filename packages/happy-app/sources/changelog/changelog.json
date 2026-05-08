@@ -10,9 +10,9 @@
           "Added slash command support in the World Shell search bar (`/sessions`, `/knowledge`) for quick navigation",
           "Added Trigger events to the event stream — Cron and Webhook task invocations now appear with a `trigger.*` prefix",
           "Added Knowledge Base entry events (`memory.created`) to the event stream, with tap-to-navigate to the knowledge base entry",
-          "Fixed \"Context was reset\" appearing twice after /clear — resolved a dedup failure in the message cache restore path where internal IDs were used instead of server DB IDs"
+          "Fixed \"Context was reset\" appearing twice after /clear — corrected message dedup in both the cache restore path and the event stream processor"
         ],
-        "rawMarkdown": "## 2.20.0 - 2026-05-09\n\n\nThis release expands the World Shell search bar with quick commands and local filtering, adds Trigger event display and Knowledge Base entry events to the event stream, and fixes duplicate \"Context was reset\" messages after /clear.\n\n### World Shell\n- Added local event stream filtering in the World Shell search bar — type to instantly filter events without a network request\n- Added slash command support in the World Shell search bar (`/sessions`, `/knowledge`) for quick navigation\n- Added Trigger events to the event stream — Cron and Webhook task invocations now appear with a `trigger.*` prefix\n- Added Knowledge Base entry events (`memory.created`) to the event stream, with tap-to-navigate to the knowledge base entry\n\n### Fixes\n- Fixed \"Context was reset\" appearing twice after /clear — resolved a dedup failure in the message cache restore path where internal IDs were used instead of server DB IDs"
+        "rawMarkdown": "## 2.20.0 - 2026-05-09\n\n\nThis release expands the World Shell search bar with quick commands and local filtering, adds Trigger event display and Knowledge Base entry events to the event stream, and fixes duplicate \"Context was reset\" messages after /clear.\n\n### World Shell\n- Added local event stream filtering in the World Shell search bar — type to instantly filter events without a network request\n- Added slash command support in the World Shell search bar (`/sessions`, `/knowledge`) for quick navigation\n- Added Trigger events to the event stream — Cron and Webhook task invocations now appear with a `trigger.*` prefix\n- Added Knowledge Base entry events (`memory.created`) to the event stream, with tap-to-navigate to the knowledge base entry\n\n### Fixes\n- Fixed \"Context was reset\" appearing twice after /clear — corrected message dedup in both the cache restore path and the event stream processor"
       },
       {
         "version": "2.19.0",
@@ -718,9 +718,9 @@
           "新增 World Shell 搜索栏 / 快捷命令（`/sessions`、`/knowledge`），快速跳转对应页面",
           "新增 Trigger 事件显示——Cron 和 Webhook 任务触发事件以 `trigger.*` 前缀显示在事件流中",
           "新增知识库条目事件（`memory.created`）显示在事件流中，点击可跳转至对应知识库条目",
-          "修复 /clear 后 \"Context was reset\" 重复显示——消息缓存恢复路径中 messageIds 使用内部 ID 而非服务端 DB ID 导致去重失效，已修正"
+          "修复 /clear 后 \"Context was reset\" 重复显示——同步修正缓存恢复路径和事件流处理器中的消息去重逻辑"
         ],
-        "rawMarkdown": "## 2.20.0 - 2026-05-09\n\n\n本次更新为 World Shell 搜索栏新增快捷命令与本地过滤，事件流支持 Trigger 事件和知识库条目事件，并修复 /clear 后重复显示 \"Context was reset\" 的问题。\n\n### World Shell\n- 新增 World Shell 搜索栏本地过滤事件流——输入即时过滤，无需网络请求\n- 新增 World Shell 搜索栏 / 快捷命令（`/sessions`、`/knowledge`），快速跳转对应页面\n- 新增 Trigger 事件显示——Cron 和 Webhook 任务触发事件以 `trigger.*` 前缀显示在事件流中\n- 新增知识库条目事件（`memory.created`）显示在事件流中，点击可跳转至对应知识库条目\n\n### 修复\n- 修复 /clear 后 \"Context was reset\" 重复显示——消息缓存恢复路径中 messageIds 使用内部 ID 而非服务端 DB ID 导致去重失效，已修正"
+        "rawMarkdown": "## 2.20.0 - 2026-05-09\n\n\n本次更新为 World Shell 搜索栏新增快捷命令与本地过滤，事件流支持 Trigger 事件和知识库条目事件，并修复 /clear 后重复显示 \"Context was reset\" 的问题。\n\n### World Shell\n- 新增 World Shell 搜索栏本地过滤事件流——输入即时过滤，无需网络请求\n- 新增 World Shell 搜索栏 / 快捷命令（`/sessions`、`/knowledge`），快速跳转对应页面\n- 新增 Trigger 事件显示——Cron 和 Webhook 任务触发事件以 `trigger.*` 前缀显示在事件流中\n- 新增知识库条目事件（`memory.created`）显示在事件流中，点击可跳转至对应知识库条目\n\n### 修复\n- 修复 /clear 后 \"Context was reset\" 重复显示——同步修正缓存恢复路径和事件流处理器中的消息去重逻辑"
       },
       {
         "version": "2.19.0",
