@@ -7,6 +7,7 @@ import { Text } from "@/components/StyledText";
 import { TokenStorage } from "@/auth/tokenStorage";
 import { updateActionApproval } from "@/sync/apiSupervisor";
 import { markInboxItemRead, deleteInboxItem } from "@/sync/apiInbox";
+import { retryTask } from "@/sync/apiTasks";
 import type { WorldEvent, WorldEventSeverity } from "./worldTypes";
 
 function formatTime(ts: number): string {
@@ -193,6 +194,26 @@ export const WorldEventCard = React.memo(function WorldEventCard({
                                                 if (!creds) return;
                                                 await deleteInboxItem(creds, event.originalId);
                                                 setActionDone("dismissed");
+                                            } finally { setActionLoading(false); }
+                                        }}
+                                    />
+                                </View>
+                            )}
+                            {/* Retry action for failed tasks */}
+                            {event.eventType === "task.failed" && !actionDone && (
+                                <View style={styles.actionRow}>
+                                    <ActionButton
+                                        label="Retry"
+                                        icon="refresh"
+                                        color={theme.colors.accentBlue}
+                                        loading={actionLoading}
+                                        onPress={async () => {
+                                            setActionLoading(true);
+                                            try {
+                                                const creds = await TokenStorage.getCredentials();
+                                                if (!creds) return;
+                                                await retryTask(creds, event.originalId);
+                                                setActionDone("retrying");
                                             } finally { setActionLoading(false); }
                                         }}
                                     />
