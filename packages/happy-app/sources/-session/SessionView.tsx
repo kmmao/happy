@@ -75,6 +75,7 @@ import {
   useSetting,
   useMachine,
 } from "@/sync/storage";
+import { useShallow } from "zustand/react/shallow";
 import { useSessionUpgrade } from "@/hooks/useSessionUpgrade";
 import { Session } from "@/sync/storageTypes";
 import { randomUUID } from "expo-crypto";
@@ -848,7 +849,7 @@ function SessionViewInner({
     }
     prevRunningRef.current = isRunning;
   }, [isRunning, session.sdkSessionState, sessionId]);
-  const queuedIds = storage((s) => s.queuedMessageLocalIds[sessionId] ?? []);
+  const queuedIds = storage(useShallow((s) => s.queuedMessageLocalIds[sessionId] ?? []));
   const queuedMessages = React.useMemo(() => {
     if (queuedIds.length === 0) return [];
     return queuedIds
