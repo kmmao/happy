@@ -16,7 +16,11 @@ import type { WorldEvent, WorldFilter } from "./worldTypes";
 
 type ViewMode = "stream" | "chain";
 
-export const WorldShell = React.memo(function WorldShell() {
+interface WorldShellProps {
+    onExit?: () => void;
+}
+
+export const WorldShell = React.memo(function WorldShell({ onExit }: WorldShellProps) {
     const router = useRouter();
     const { theme } = useUnistyles();
     const insets = useSafeAreaInsets();
@@ -48,12 +52,14 @@ export const WorldShell = React.memo(function WorldShell() {
     ).length;
 
     const handleExit = React.useCallback(() => {
-        if (router.canGoBack()) {
+        if (onExit) {
+            onExit();
+        } else if (router.canGoBack()) {
             router.back();
         } else {
             router.replace("/");
         }
-    }, [router]);
+    }, [router, onExit]);
 
     const renderItem = React.useCallback(
         ({ item }: { item: WorldEvent }) => <WorldEventCard event={item} />,

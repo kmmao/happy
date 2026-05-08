@@ -13,6 +13,8 @@ import { Typography } from "@/constants/Typography";
 import { trackAccountCreated, trackAccountRestored } from "@/track";
 import { HomeHeaderNotAuth } from "@/components/HomeHeader";
 import { MainView } from "@/components/MainView";
+import { WorldShell } from "@/components/world/WorldShell";
+import { useLocalSetting } from "@/sync/storage";
 import { t } from "@/text";
 import { log } from '@/log';
 
@@ -25,6 +27,12 @@ function Home() {
 }
 
 function Authenticated() {
+  const devModeEnabled = useLocalSetting("devModeEnabled");
+  const [showMain, setShowMain] = React.useState(false);
+
+  if (devModeEnabled && !showMain) {
+    return <WorldShell onExit={() => setShowMain(true)} />;
+  }
   return <MainView variant="phone" />;
 }
 
