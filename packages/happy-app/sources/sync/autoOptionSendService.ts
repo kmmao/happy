@@ -240,6 +240,12 @@ class AutoOptionSendService {
                 : next;
         this.applyStateChange(sessionId, current, final);
         this.persistEnabled(sessionId, final.enabled);
+
+        // When enabling with no immediately-armable options, trigger checkAndDispatch so
+        // proactive generation can start without waiting for the next onMessages/onReady.
+        if (enabled && final.status === "idle") {
+            this.checkAndDispatch(sessionId);
+        }
     }
 
     /**
@@ -839,9 +845,9 @@ class AutoOptionSendService {
         const state = this.states.get(sessionId);
         if (!state?.enabled) return;
 
-        // Only generate when session is active (agent finished its turn)
+        // Only generate when session exists (not archived)
         const session = storage.getState().sessions[sessionId];
-        if (!session?.active) return;
+        if (!session) return;
 
         // Don't generate if there's a pending AskUserQuestion
         if (hasPendingAskUserQuestion(messages)) return;
