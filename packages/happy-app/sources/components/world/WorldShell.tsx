@@ -6,7 +6,7 @@ import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { Text } from "@/components/StyledText";
 import { t } from "@/text";
-import { useProjects } from "@/sync/storage";
+import { useProjects, useAllMachines } from "@/sync/storage";
 import { useWorldEvents } from "./useWorldEvents";
 import { WorldEventCard } from "./WorldEventCard";
 import { WorldFilterChips } from "./WorldFilterChips";
@@ -27,6 +27,7 @@ export const WorldShell = React.memo(function WorldShell({ onExit }: WorldShellP
     const { styles } = useStyles();
 
     const projects = useProjects();
+    const machines = useAllMachines();
     const [filter, setFilter] = React.useState<WorldFilter>({});
     const [panelOpen, setPanelOpen] = React.useState(false);
     const [viewMode, setViewMode] = React.useState<ViewMode>("stream");
@@ -36,7 +37,7 @@ export const WorldShell = React.memo(function WorldShell({ onExit }: WorldShellP
     const { events, loading, refresh } = useWorldEvents(filter);
 
     const displayEvents = React.useMemo(() => {
-        if (!searchQuery.trim()) return events;
+        if (!searchQuery.trim() || searchQuery.startsWith("/")) return events;
         const q = searchQuery.toLowerCase();
         return events.filter((e) =>
             e.title.toLowerCase().includes(q) ||
@@ -44,6 +45,29 @@ export const WorldShell = React.memo(function WorldShell({ onExit }: WorldShellP
             (e.summary && e.summary.toLowerCase().includes(q)),
         );
     }, [events, searchQuery]);
+
+    // Slash command definitions
+    const slashCommands = React.useMemo(() => {
+        const base = [
+            { cmd: "/new", label: "New Session", icon: "chatbubble-outline" as const, action: () => { router.push("/(app)/new"); setSearchOpen(false); setSearchQuery(""); } },
+        ];
+        const taskCmds = machines.slice(0, 3).map((m) => {
+            const mName = m.metadata?.displayName || m.metadata?.host || m.id.slice(0, 8);
+            return {
+                cmd: `/task ${mName}`,
+                label: `New Task — ${mName}`,
+                icon: "play-outline" as const,
+                action: () => { router.push(`/(app)/machine/${m.id}/task/new`); setSearchOpen(false); setSearchQuery(""); },
+            };
+        });
+        return [...base, ...taskCmds];
+    }, [machines, router]);
+
+    const matchedCommands = React.useMemo(() => {
+        if (!searchQuery.startsWith("/")) return [];
+        const q = searchQuery.toLowerCase();
+        return slashCommands.filter((c) => c.cmd.startsWith(q));
+    }, [searchQuery, slashCommands]);
 
     const projectChipInfos = React.useMemo(
         () => projects.filter((p) => !p.archived).map((p) => {
@@ -193,20 +217,45 @@ export const WorldShell = React.memo(function WorldShell({ onExit }: WorldShellP
                 />
             )}
 
-            {/* Search bar */}
+            {/* Search / command bar */}
             {viewMode === "stream" && searchOpen && (
-                <View style={styles.searchBar}>
-                    <Ionicons name="search" size={16} color={theme.colors.textSecondary} style={{ marginRight: 8 }} />
-                    <TextInput
-                        style={styles.searchInput}
-                        value={searchQuery}
-                        onChangeText={setSearchQuery}
-                        placeholder="Search events…"
-                        placeholderTextColor={theme.colors.textSecondary}
-                        autoFocus
-                        clearButtonMode="while-editing"
-                    />
-                </View>
+                <>
+                    <View style={styles.searchBar}>
+                        <Ionicons
+                            name={searchQuery.startsWith("/") ? "flash-outline" : "search"}
+                            size={16}
+                            color={searchQuery.startsWith("/") ? theme.colors.primary : theme.colors.textSecondary}
+                            style={{ marginRight: 8 }}
+                        />
+                        <TextInput
+                            style={styles.searchInput}
+                            value={searchQuery}
+                            onChangeText={setSearchQuery}
+                            placeholder="Search or type / for commands…"
+                            placeholderTextColor={theme.colors.textSecondary}
+                            autoFocus
+                            clearButtonMode="while-editing"
+                        />
+                    </View>
+                    {matchedCommands.length > 0 && (
+                        <View style={styles.commandList}>
+                            {matchedCommands.map((cmd) => (
+                                <TouchableOpacity
+                                    key={cmd.cmd}
+                                    style={styles.commandItem}
+                                    onPress={cmd.action}
+                                    activeOpacity={0.7}
+                                >
+                                    <Ionicons name={cmd.icon} size={16} color={theme.colors.primary} />
+                                    <View style={{ marginLeft: 10 }}>
+                                        <Text style={styles.commandCmd}>{cmd.cmd}</Text>
+                                        <Text style={styles.commandLabel}>{cmd.label}</Text>
+                                    </View>
+                                </TouchableOpacity>
+                            ))}
+                        </View>
+                    )}
+                </>
             )}
 
             {/* Content */}
@@ -307,6 +356,31 @@ const useStyles = () => {
             flex: 1,
             fontSize: 14,
             color: theme.colors.text,
+        },
+        commandList: {
+            marginHorizontal: 16,
+            marginTop: 4,
+            borderRadius: 10,
+            backgroundColor: theme.colors.surfaceHigh,
+            overflow: "hidden",
+        },
+        commandItem: {
+            flexDirection: "row",
+            alignItems: "center",
+            paddingHorizontal: 14,
+            paddingVertical: 10,
+            borderBottomWidth: 1,
+            borderBottomColor: theme.colors.divider,
+        },
+        commandCmd: {
+            fontSize: 13,
+            fontWeight: "600",
+            color: theme.colors.primary,
+        },
+        commandLabel: {
+            fontSize: 11,
+            color: theme.colors.textSecondary,
+            marginTop: 1,
         },
         modeRow: {
             flexDirection: "row",
