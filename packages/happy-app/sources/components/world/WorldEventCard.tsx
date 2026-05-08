@@ -59,8 +59,11 @@ export const WorldEventCard = React.memo(function WorldEventCard({
     const [actionDone, setActionDone] = React.useState<string | null>(null);
 
     const handlePress = React.useCallback(() => {
-        // Session events: tap to navigate directly instead of expanding
-        if (event.source.sessionId && event.eventType.startsWith("session.")) {
+        // Events with a sessionId: tap to navigate directly to the session
+        const isSessionEvent = event.eventType.startsWith("session.");
+        const isActiveTask = event.eventType.startsWith("task.") &&
+            (event.eventType === "task.running" || event.eventType === "task.completed");
+        if (event.source.sessionId && (isSessionEvent || isActiveTask)) {
             router.push(`/(app)/session/${event.source.sessionId}`);
             onPress?.(event);
             return;
@@ -84,7 +87,11 @@ export const WorldEventCard = React.memo(function WorldEventCard({
                             {event.eventType}
                         </Text>
                         <Text style={styles.time}>{formatTime(event.occurredAt)}</Text>
-                        {event.source.sessionId && event.eventType.startsWith("session.") && (
+                        {event.source.sessionId && (
+                            event.eventType.startsWith("session.") ||
+                            event.eventType === "task.running" ||
+                            event.eventType === "task.completed"
+                        ) && (
                             <Ionicons name="chevron-forward" size={14} color={theme.colors.textLink} style={{ marginLeft: 4 }} />
                         )}
                     </View>
