@@ -1193,10 +1193,23 @@ export const storage = create<StorageState>()((set, get) => {
         }
 
         // Create fresh reducer with pre-populated dedup maps
-        // This ensures subsequent incremental messages are properly deduplicated
+        // This ensures subsequent incremental messages are properly deduplicated.
+        // messageIds keys must be server DB IDs (originalId → internalId), matching
+        // how the reducer populates them during live processing. Using the internal
+        // id (msg.id) as key was wrong — fetched messages arrive with server DB IDs
+        // and the dedup check would silently fail, causing duplicates like
+        // "Context was reset" appearing twice after a cache restore + backfill.
         const reducerState = createReducer();
         for (const msg of cached.messages) {
-          reducerState.messageIds.set(msg.id, msg.id);
+          // Prefer server DB ID as key so the reducer can dedup fetched messages.
+          // UserTextMessage exposes realId; ModeSwitchMessage and others expose realID.
+          const serverDbId =
+            msg.kind === "user-text" ? msg.realId :
+            msg.kind === "agent-event" ? (msg.realID ?? null) :
+            null;
+          if (serverDbId) {
+            reducerState.messageIds.set(serverDbId, msg.id);
+          }
           if (msg.kind === "tool-call" && msg.tool) {
             reducerState.toolIdToMessageId.set(
               msg.tool.permission?.id ?? msg.id,

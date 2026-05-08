@@ -1,5 +1,18 @@
 # Changelog
 
+## 2.20.0 - 2026-05-09
+
+This release expands the World Shell search bar with quick commands and local filtering, adds Trigger event display and Knowledge Base entry events to the event stream, and fixes duplicate "Context was reset" messages after /clear.
+
+### World Shell
+- Added local event stream filtering in the World Shell search bar — type to instantly filter events without a network request
+- Added slash command support in the World Shell search bar (`/sessions`, `/knowledge`) for quick navigation
+- Added Trigger events to the event stream — Cron and Webhook task invocations now appear with a `trigger.*` prefix
+- Added Knowledge Base entry events (`memory.created`) to the event stream, with tap-to-navigate to the knowledge base entry
+
+### Fixes
+- Fixed "Context was reset" appearing twice after /clear — corrected message dedup in both the cache restore path and the event stream processor
+
 ## 2.19.0 - 2026-05-08
 
 This release brings the World Shell event dashboard, improved subagent conversation rendering, structured error feedback, and a wave of session UX improvements.

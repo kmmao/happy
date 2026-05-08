@@ -206,6 +206,8 @@ export type ReducerState = {
     };
     timestamp: number;
   };
+  /** Timestamp of the last "Context was reset" event shown, for deduplicating rapid duplicates */
+  lastContextResetAt?: number;
 };
 
 export function createReducer(): ReducerState {
@@ -1332,7 +1334,28 @@ export function reducer(
     if (msg.role === "event") {
       // Dedup: skip if already processed (e.g. re-fetched via sync)
       if (state.messageIds.has(msg.id)) continue;
+
+      // Content-based dedup for "Context was reset": if two such events arrive
+      // within 5 seconds (different DB IDs, same content — race condition between
+      // WebSocket push and a concurrent API fetch), show only the first one.
+      if (
+        msg.content.type === "message" &&
+        msg.content.message === "Context was reset" &&
+        state.lastContextResetAt !== undefined &&
+        msg.createdAt - state.lastContextResetAt < 5000
+      ) {
+        state.messageIds.set(msg.id, msg.id);
+        continue;
+      }
+
       state.messageIds.set(msg.id, msg.id);
+
+      if (
+        msg.content.type === "message" &&
+        msg.content.message === "Context was reset"
+      ) {
+        state.lastContextResetAt = msg.createdAt;
+      }
 
       let mid = allocateId();
       state.messages.set(mid, {
@@ -1596,6 +1619,7 @@ function convertReducerMessageToMessage(
   } else if (reducerMsg.role === "agent" && reducerMsg.event !== null) {
     const eventMessage: ModeSwitchMessage = {
       id: reducerMsg.id,
+      realID: reducerMsg.realID,
       createdAt: reducerMsg.createdAt,
       kind: "agent-event",
       event: reducerMsg.event,

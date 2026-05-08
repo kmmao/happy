@@ -44,6 +44,8 @@ export type UserTextMessage = {
 export type ModeSwitchMessage = {
   kind: "agent-event";
   id: string;
+  /** Server DB message ID — used for dedup on cache restore */
+  realID?: string | null;
   createdAt: number;
   event: AgentEvent;
   meta?: MessageMeta;

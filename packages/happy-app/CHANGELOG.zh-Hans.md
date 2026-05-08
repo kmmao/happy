@@ -1,5 +1,18 @@
 # 更新日志
 
+## 2.20.0 - 2026-05-09
+
+本次更新为 World Shell 搜索栏新增快捷命令与本地过滤，事件流支持 Trigger 事件和知识库条目事件，并修复 /clear 后重复显示 "Context was reset" 的问题。
+
+### World Shell
+- 新增 World Shell 搜索栏本地过滤事件流——输入即时过滤，无需网络请求
+- 新增 World Shell 搜索栏 / 快捷命令（`/sessions`、`/knowledge`），快速跳转对应页面
+- 新增 Trigger 事件显示——Cron 和 Webhook 任务触发事件以 `trigger.*` 前缀显示在事件流中
+- 新增知识库条目事件（`memory.created`）显示在事件流中，点击可跳转至对应知识库条目
+
+### 修复
+- 修复 /clear 后 "Context was reset" 重复显示——消息缓存恢复路径中 messageIds 使用内部 ID 而非服务端 DB ID 导致去重失效，已修正
+
 ## 2.19.0 - 2026-05-08
 
 本次更新带来了 World Shell 事件仪表盘、子 Agent 完整对话渲染、结构化错误提示，以及大量会话 UX 改进。
