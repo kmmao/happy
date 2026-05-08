@@ -1,5 +1,5 @@
 import * as React from "react";
-import { View, FlatList, RefreshControl, TouchableOpacity } from "react-native";
+import { View, FlatList, RefreshControl, TouchableOpacity, TextInput } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
@@ -30,8 +30,20 @@ export const WorldShell = React.memo(function WorldShell({ onExit }: WorldShellP
     const [filter, setFilter] = React.useState<WorldFilter>({});
     const [panelOpen, setPanelOpen] = React.useState(false);
     const [viewMode, setViewMode] = React.useState<ViewMode>("stream");
+    const [searchOpen, setSearchOpen] = React.useState(false);
+    const [searchQuery, setSearchQuery] = React.useState("");
 
     const { events, loading, refresh } = useWorldEvents(filter);
+
+    const displayEvents = React.useMemo(() => {
+        if (!searchQuery.trim()) return events;
+        const q = searchQuery.toLowerCase();
+        return events.filter((e) =>
+            e.title.toLowerCase().includes(q) ||
+            e.eventType.toLowerCase().includes(q) ||
+            (e.summary && e.summary.toLowerCase().includes(q)),
+        );
+    }, [events, searchQuery]);
 
     const projectChipInfos = React.useMemo(
         () => projects.filter((p) => !p.archived).map((p) => {
@@ -121,6 +133,23 @@ export const WorldShell = React.memo(function WorldShell({ onExit }: WorldShellP
                 </View>
 
                 <TouchableOpacity
+                    onPress={() => {
+                        setSearchOpen((v) => {
+                            if (v) setSearchQuery("");
+                            return !v;
+                        });
+                    }}
+                    style={styles.newSessionButton}
+                    activeOpacity={0.7}
+                >
+                    <Ionicons
+                        name={searchOpen ? "search-circle" : "search"}
+                        size={20}
+                        color={searchOpen ? theme.colors.primary : theme.colors.textSecondary}
+                    />
+                </TouchableOpacity>
+
+                <TouchableOpacity
                     onPress={() => router.push("/(app)/new")}
                     style={styles.newSessionButton}
                     activeOpacity={0.7}
@@ -164,10 +193,26 @@ export const WorldShell = React.memo(function WorldShell({ onExit }: WorldShellP
                 />
             )}
 
+            {/* Search bar */}
+            {viewMode === "stream" && searchOpen && (
+                <View style={styles.searchBar}>
+                    <Ionicons name="search" size={16} color={theme.colors.textSecondary} style={{ marginRight: 8 }} />
+                    <TextInput
+                        style={styles.searchInput}
+                        value={searchQuery}
+                        onChangeText={setSearchQuery}
+                        placeholder="Search events…"
+                        placeholderTextColor={theme.colors.textSecondary}
+                        autoFocus
+                        clearButtonMode="while-editing"
+                    />
+                </View>
+            )}
+
             {/* Content */}
             {viewMode === "stream" ? (
                 <FlatList
-                    data={events}
+                    data={displayEvents}
                     renderItem={renderItem}
                     keyExtractor={keyExtractor}
                     ListEmptyComponent={loading ? null : ListEmpty}
@@ -246,6 +291,22 @@ const useStyles = () => {
         exitButton: {
             padding: 8,
             borderRadius: 16,
+        },
+        searchBar: {
+            flexDirection: "row",
+            alignItems: "center",
+            marginHorizontal: 16,
+            marginTop: 6,
+            marginBottom: 2,
+            paddingHorizontal: 12,
+            paddingVertical: 8,
+            borderRadius: 10,
+            backgroundColor: theme.colors.surfaceHigh,
+        },
+        searchInput: {
+            flex: 1,
+            fontSize: 14,
+            color: theme.colors.text,
         },
         modeRow: {
             flexDirection: "row",
