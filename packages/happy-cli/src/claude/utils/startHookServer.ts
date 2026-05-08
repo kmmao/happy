@@ -76,7 +76,8 @@ export interface SessionHookData {
 export interface StopFailureHookData {
     hook_event_name: 'StopFailure';
     session_id?: string;
-    error?: { type?: string; message?: string };
+    /** SDKAssistantMessageError string (e.g. 'billing_error', 'rate_limit'). Optional for forward compat. */
+    error?: string;
     error_details?: string;
     last_assistant_message?: string;
     [key: string]: unknown;
@@ -149,8 +150,7 @@ export async function startHookServer(options: HookServerOptions): Promise<HookS
     }
 
     function handleStopFailure(data: StopFailureHookData) {
-        const rawErr = typeof data.error === 'string' ? data.error : data.error?.message;
-        logger.debug(`[hookServer] StopFailure hook: ${data.error_details ?? data.last_assistant_message ?? rawErr ?? 'unknown'}`);
+        logger.debug(`[hookServer] StopFailure hook: ${data.error_details ?? data.last_assistant_message ?? data.error ?? 'unknown'}`);
         onStopFailure?.(data);
     }
 

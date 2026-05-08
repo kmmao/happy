@@ -412,11 +412,11 @@ export async function runClaude(
       }
     },
     onStopFailure: (data) => {
-      const rawError = typeof data.error === "string" ? data.error : data.error?.message;
-      const errorType = typeof data.error === "object" ? data.error?.type : (rawError !== "unknown" ? rawError : undefined);
+      // SDK always sends error as SDKAssistantMessageError string (e.g. 'billing_error')
+      const errorType = data.error !== "unknown" ? (data.error ?? undefined) : undefined;
       const errorMsg = data.error_details
         ?? data.last_assistant_message
-        ?? (rawError !== "unknown" ? rawError : undefined)
+        ?? errorType
         ?? "Session stopped unexpectedly";
       logger.debug(`[START] StopFailure hook: ${errorMsg}`);
       if (currentSession) {

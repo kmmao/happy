@@ -4120,6 +4120,18 @@ export const ca: TranslationStructure = {
   stopFailure: {
     title: "La sessió s'ha aturat inesperadament",
     lastMessage: "Últim missatge de l'assistent",
+    errorLabels: {
+      billing_error: "Error de facturació",
+      rate_limit: "Límit de sol·licituds assolit",
+      authentication_failed: "Error d'autenticació",
+      oauth_org_not_allowed: "Organització no permesa",
+      invalid_request: "Sol·licitud no vàlida",
+      server_error: "Error del servidor",
+      max_output_tokens: "Límit de sortida assolit",
+      unknown: "Error desconegut",
+    },
+    billingAction: "Veure facturació →",
+    rateLimitHint: "Les sol·licituds es reintentaran automàticament",
   },
   permissions: {
     microphoneTitle: "Es requereix accés al micròfon",

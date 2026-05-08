@@ -4172,6 +4172,18 @@ export const en = {
   stopFailure: {
     title: "Session Stopped Unexpectedly",
     lastMessage: "Last assistant message",
+    errorLabels: {
+      billing_error: "Billing Error",
+      rate_limit: "Rate Limit Reached",
+      authentication_failed: "Authentication Failed",
+      oauth_org_not_allowed: "Organization Not Allowed",
+      invalid_request: "Invalid Request",
+      server_error: "Server Error",
+      max_output_tokens: "Output Limit Reached",
+      unknown: "Unknown Error",
+    },
+    billingAction: "Check Billing →",
+    rateLimitHint: "Requests will be retried automatically",
   },
 
   permissions: {

@@ -4114,6 +4114,18 @@ export const it: TranslationStructure = {
   stopFailure: {
     title: "Sessione interrotta inaspettatamente",
     lastMessage: "Ultimo messaggio dell'assistente",
+    errorLabels: {
+      billing_error: "Errore di fatturazione",
+      rate_limit: "Limite di richieste raggiunto",
+      authentication_failed: "Autenticazione fallita",
+      oauth_org_not_allowed: "Organizzazione non consentita",
+      invalid_request: "Richiesta non valida",
+      server_error: "Errore del server",
+      max_output_tokens: "Limite di output raggiunto",
+      unknown: "Errore sconosciuto",
+    },
+    billingAction: "Controlla fatturazione →",
+    rateLimitHint: "Le richieste verranno ritentate automaticamente",
   },
   permissions: {
     microphoneTitle: "Accesso al microfono richiesto",

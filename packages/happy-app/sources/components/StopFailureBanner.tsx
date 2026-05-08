@@ -1,5 +1,5 @@
 import * as React from "react";
-import { View, Text, Pressable, ScrollView } from "react-native";
+import { View, Text, Pressable, ScrollView, Linking } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { Ionicons } from "@expo/vector-icons";
 import { t } from "@/text";
@@ -15,12 +15,42 @@ interface Props {
     stopFailure: StopFailureData;
 }
 
+const BILLING_URL = "https://console.anthropic.com/settings/billing";
+
+type KnownErrorType =
+    | "billing_error"
+    | "rate_limit"
+    | "authentication_failed"
+    | "oauth_org_not_allowed"
+    | "invalid_request"
+    | "server_error"
+    | "max_output_tokens"
+    | "unknown";
+
+const KNOWN_ERROR_TYPES: KnownErrorType[] = [
+    "billing_error",
+    "rate_limit",
+    "authentication_failed",
+    "oauth_org_not_allowed",
+    "invalid_request",
+    "server_error",
+    "max_output_tokens",
+    "unknown",
+];
+
+function getErrorLabel(errorType: string | null | undefined): string | null {
+    if (!errorType) return null;
+    if (KNOWN_ERROR_TYPES.includes(errorType as KnownErrorType)) {
+        return t(`stopFailure.errorLabels.${errorType as KnownErrorType}`);
+    }
+    return errorType;
+}
+
 export const StopFailureBanner = React.memo(({ stopFailure }: Props) => {
     const { theme } = useUnistyles();
     const [expanded, setExpanded] = React.useState(false);
     const [dismissed, setDismissed] = React.useState(false);
 
-    // Reset dismissed state when error changes (new StopFailure event)
     React.useEffect(() => {
         setDismissed(false);
         setExpanded(false);
@@ -29,6 +59,15 @@ export const StopFailureBanner = React.memo(({ stopFailure }: Props) => {
     if (dismissed) return null;
 
     const hasLastMessage = !!stopFailure.lastAssistantMessage;
+    const errorLabel = getErrorLabel(stopFailure.errorType);
+    const isBillingError = stopFailure.errorType === "billing_error";
+    const isRateLimit = stopFailure.errorType === "rate_limit";
+
+    const labelColor = isBillingError
+        ? theme.colors.warningCritical
+        : isRateLimit
+        ? theme.colors.warning
+        : theme.colors.textSecondary;
 
     return (
         <View style={[styles.container, { backgroundColor: theme.colors.surface, borderColor: theme.colors.warningCritical }]}>
@@ -37,9 +76,9 @@ export const StopFailureBanner = React.memo(({ stopFailure }: Props) => {
                 <Text style={[styles.title, { color: theme.colors.warningCritical }]}>
                     {t("stopFailure.title")}
                 </Text>
-                {stopFailure.errorType && (
-                    <Text style={[styles.errorType, { color: theme.colors.textSecondary }]}>
-                        {stopFailure.errorType}
+                {errorLabel && (
+                    <Text style={[styles.errorType, { color: labelColor }]}>
+                        {errorLabel}
                     </Text>
                 )}
                 <Pressable onPress={() => setDismissed(true)} hitSlop={8} style={styles.dismissButton}>
@@ -50,6 +89,24 @@ export const StopFailureBanner = React.memo(({ stopFailure }: Props) => {
             <Text style={[styles.errorMessage, { color: theme.colors.text }]} numberOfLines={5}>
                 {stopFailure.error}
             </Text>
+
+            {isBillingError && (
+                <Pressable onPress={() => Linking.openURL(BILLING_URL)} style={styles.actionRow}>
+                    <Ionicons name="card-outline" size={14} color={theme.colors.textLink} />
+                    <Text style={[styles.actionText, { color: theme.colors.textLink }]}>
+                        {t("stopFailure.billingAction")}
+                    </Text>
+                </Pressable>
+            )}
+
+            {isRateLimit && (
+                <View style={styles.actionRow}>
+                    <Ionicons name="time-outline" size={14} color={theme.colors.textSecondary} />
+                    <Text style={[styles.actionText, { color: theme.colors.textSecondary }]}>
+                        {t("stopFailure.rateLimitHint")}
+                    </Text>
+                </View>
+            )}
 
             {hasLastMessage && (
                 <>
@@ -101,6 +158,7 @@ const styles = StyleSheet.create((_, rt) => ({
     },
     errorType: {
         fontSize: 11,
+        fontWeight: "500",
         ...Typography.default(),
     },
     dismissButton: {
@@ -109,6 +167,16 @@ const styles = StyleSheet.create((_, rt) => ({
     errorMessage: {
         fontSize: 14,
         lineHeight: 20,
+        ...Typography.default(),
+    },
+    actionRow: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 4,
+    },
+    actionText: {
+        fontSize: 13,
+        fontWeight: "500",
         ...Typography.default(),
     },
     expandRow: {

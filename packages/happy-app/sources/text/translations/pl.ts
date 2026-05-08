@@ -4136,6 +4136,18 @@ export const pl: TranslationStructure = {
   stopFailure: {
     title: "Sesja niespodziewanie zatrzymana",
     lastMessage: "Ostatnia wiadomość asystenta",
+    errorLabels: {
+      billing_error: "Błąd płatności",
+      rate_limit: "Limit zapytań osiągnięty",
+      authentication_failed: "Błąd uwierzytelniania",
+      oauth_org_not_allowed: "Organizacja niedozwolona",
+      invalid_request: "Nieprawidłowe żądanie",
+      server_error: "Błąd serwera",
+      max_output_tokens: "Osiągnięto limit wyjścia",
+      unknown: "Nieznany błąd",
+    },
+    billingAction: "Sprawdź płatności →",
+    rateLimitHint: "Żądania zostaną automatycznie ponowione",
   },
   permissions: {
     microphoneTitle: "Wymagany dostęp do mikrofonu",

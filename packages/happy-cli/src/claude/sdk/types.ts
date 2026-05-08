@@ -184,6 +184,14 @@ export interface QueryOptions {
    * Maps to the official SDK's `Options.toolConfig` (0.2.119+).
    */
   toolConfig?: import("@anthropic-ai/claude-agent-sdk").ToolConfig;
+  /**
+   * Forward subagent text and thinking blocks as assistant/user messages so
+   * consumers can render complete nested subagent conversation flows.
+   * By default only tool_use/tool_result blocks are forwarded.
+   *
+   * Maps to the official SDK's `Options.forwardSubagentText` (0.2.133+).
+   */
+  forwardSubagentText?: boolean;
 }
 
 /** Query prompt — string or async stream of user messages */

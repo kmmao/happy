@@ -4117,6 +4117,18 @@ export const pt: TranslationStructure = {
   stopFailure: {
     title: "Sessão parou inesperadamente",
     lastMessage: "Última mensagem do assistente",
+    errorLabels: {
+      billing_error: "Erro de cobrança",
+      rate_limit: "Limite de requisições atingido",
+      authentication_failed: "Falha na autenticação",
+      oauth_org_not_allowed: "Organização não permitida",
+      invalid_request: "Requisição inválida",
+      server_error: "Erro do servidor",
+      max_output_tokens: "Limite de saída atingido",
+      unknown: "Erro desconhecido",
+    },
+    billingAction: "Ver cobrança →",
+    rateLimitHint: "As requisições serão repetidas automaticamente",
   },
   permissions: {
     microphoneTitle: "Acesso ao microfone necessário",

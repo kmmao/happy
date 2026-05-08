@@ -374,6 +374,9 @@ export async function claudeRemote(opts: {
     // ── New SDK capabilities ──
     agentProgressSummaries: true,
     enableFileCheckpointing: true,
+    // Forward subagent text/thinking blocks as assistant/user messages so the
+    // App can render complete nested subagent conversation flows (SDK 0.2.133+).
+    forwardSubagentText: true,
     // Automatically include the 1M-context beta for Sonnet/Opus models.
     // Caller betas (from App mode) are merged and de-duplicated.
     betas: buildBetasForModel(initial.mode.model, initial.mode.betas),

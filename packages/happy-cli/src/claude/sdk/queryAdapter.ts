@@ -133,6 +133,9 @@ export function mapOptions(opts: QueryOptions): OfficialOptions {
   // ── Per-tool configuration (SDK 0.2.119+) ──
   if (opts.toolConfig) result.toolConfig = opts.toolConfig;
 
+  // ── Forward subagent text/thinking blocks (SDK 0.2.133+) ──
+  if (opts.forwardSubagentText) result.forwardSubagentText = opts.forwardSubagentText;
+
   // ── System prompt mapping ──
   if (opts.customSystemPrompt) {
     result.systemPrompt = opts.customSystemPrompt;

@@ -4016,6 +4016,18 @@ export const zhHant: TranslationStructure = {
   stopFailure: {
     title: "會話意外停止",
     lastMessage: "最後一條助手訊息",
+    errorLabels: {
+      billing_error: "帳單錯誤",
+      rate_limit: "已達請求頻率限制",
+      authentication_failed: "身份驗證失敗",
+      oauth_org_not_allowed: "組織未授權",
+      invalid_request: "無效請求",
+      server_error: "伺服器錯誤",
+      max_output_tokens: "已達輸出限制",
+      unknown: "未知錯誤",
+    },
+    billingAction: "查看帳單 →",
+    rateLimitHint: "請求將自動重試",
   },
   permissions: {
     microphoneTitle: "需要麥克風權限",

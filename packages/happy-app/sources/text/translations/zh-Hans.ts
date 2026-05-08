@@ -4010,6 +4010,18 @@ export const zhHans: TranslationStructure = {
   stopFailure: {
     title: "会话意外停止",
     lastMessage: "最后一条助手消息",
+    errorLabels: {
+      billing_error: "账单错误",
+      rate_limit: "已达请求频率限制",
+      authentication_failed: "身份验证失败",
+      oauth_org_not_allowed: "组织未授权",
+      invalid_request: "无效请求",
+      server_error: "服务器错误",
+      max_output_tokens: "已达输出限制",
+      unknown: "未知错误",
+    },
+    billingAction: "查看账单 →",
+    rateLimitHint: "请求将自动重试",
   },
   permissions: {
     microphoneTitle: "需要麦克风权限",

@@ -4088,6 +4088,18 @@ export const ja: TranslationStructure = {
   stopFailure: {
     title: "セッションが予期せず停止しました",
     lastMessage: "最後のアシスタントメッセージ",
+    errorLabels: {
+      billing_error: "請求エラー",
+      rate_limit: "レート制限に達しました",
+      authentication_failed: "認証に失敗しました",
+      oauth_org_not_allowed: "組織が許可されていません",
+      invalid_request: "無効なリクエスト",
+      server_error: "サーバーエラー",
+      max_output_tokens: "出力制限に達しました",
+      unknown: "不明なエラー",
+    },
+    billingAction: "請求を確認 →",
+    rateLimitHint: "リクエストは自動的に再試行されます",
   },
   permissions: {
     microphoneTitle: "マイクへのアクセスが必要です",

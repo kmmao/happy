@@ -4134,6 +4134,18 @@ export const ru: TranslationStructure = {
   stopFailure: {
     title: "Сессия неожиданно остановлена",
     lastMessage: "Последнее сообщение ассистента",
+    errorLabels: {
+      billing_error: "Ошибка оплаты",
+      rate_limit: "Превышен лимит запросов",
+      authentication_failed: "Ошибка аутентификации",
+      oauth_org_not_allowed: "Организация не разрешена",
+      invalid_request: "Неверный запрос",
+      server_error: "Ошибка сервера",
+      max_output_tokens: "Достигнут лимит вывода",
+      unknown: "Неизвестная ошибка",
+    },
+    billingAction: "Проверить оплату →",
+    rateLimitHint: "Запросы будут автоматически повторены",
   },
   permissions: {
     microphoneTitle: "Требуется доступ к микрофону",
