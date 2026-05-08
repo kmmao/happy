@@ -43,20 +43,29 @@ export const PasteBlockPreviewModal = React.memo(
         animationType="fade"
         onRequestClose={onClose}
       >
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={t("common.cancel")}
+        <View
           style={{
             flex: 1,
-            backgroundColor: "rgba(0,0,0,0.45)",
             paddingHorizontal: 16,
             paddingVertical: 24,
             justifyContent: "center",
           }}
-          onPress={onClose}
         >
           <Pressable
-            onPress={(event) => event.stopPropagation()}
+            accessible={false}
+            importantForAccessibility="no"
+            style={{
+              position: "absolute",
+              top: 0,
+              right: 0,
+              bottom: 0,
+              left: 0,
+              backgroundColor: "rgba(0,0,0,0.45)",
+            }}
+            onPress={onClose}
+          />
+
+          <View
             style={{
               maxHeight: "78%",
               borderRadius: 18,
@@ -230,8 +239,8 @@ export const PasteBlockPreviewModal = React.memo(
                 </View>
               </View>
             </ScrollView>
-          </Pressable>
-        </Pressable>
+          </View>
+        </View>
       </Modal>
     );
   },

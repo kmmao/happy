@@ -5,6 +5,7 @@ declare module "react-test-renderer" {
     props: Record<string, unknown>;
     findByProps(props: Record<string, unknown>): ReactTestInstance;
     findAllByProps(props: Record<string, unknown>): ReactTestInstance[];
+    findAllByType(type: string): ReactTestInstance[];
   }
 
   export interface ReactTestRenderer {

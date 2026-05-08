@@ -136,4 +136,48 @@ describe("PasteBlockPreviewModal", () => {
 
     expect(events).toEqual(["close", "remove:paste-1"]);
   });
+
+  it("does not nest pressable buttons inside each other on web", () => {
+    let renderer!: ReactTestRenderer;
+
+    act(() => {
+      renderer = create(
+        React.createElement(PasteBlockPreviewModal, {
+          visible: true,
+          block,
+          onClose: () => undefined,
+          onSave: () => undefined,
+          onRemove: () => undefined,
+        }),
+      );
+    });
+
+    const pressables = renderer.root.findAllByType("Pressable");
+
+    for (const pressable of pressables) {
+      expect(pressable.findAllByType("Pressable")).toHaveLength(1);
+    }
+  });
+
+  it("keeps the backdrop hidden from the accessibility tree", () => {
+    let renderer!: ReactTestRenderer;
+
+    act(() => {
+      renderer = create(
+        React.createElement(PasteBlockPreviewModal, {
+          visible: true,
+          block,
+          onClose: () => undefined,
+          onSave: () => undefined,
+        }),
+      );
+    });
+
+    const hiddenBackdrop = renderer.root.findByProps({
+      accessible: false,
+      importantForAccessibility: "no",
+    });
+
+    expect(hiddenBackdrop.props.accessibilityLabel).toBeUndefined();
+  });
 });
