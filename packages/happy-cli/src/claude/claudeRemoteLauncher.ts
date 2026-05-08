@@ -201,6 +201,8 @@ export async function claudeRemoteLauncher(
   const turnCollector = knowledgeEnabled ? new TurnCollector(turnCollectorConfig) : null;
   let knowledgeInjected = false; // Track whether knowledge was already injected
   let knowledgeContext: string | null = null; // Cached knowledge for system prompt
+  let worldConfig: { narrative: string; laws: string; policy: string } | null = null;
+  let worldConfigInjected = false;
   let pendingKnowledgeRefresh = false; // Whether a per-turn refresh is pending
   // Injected knowledge entries (id → metadata). Used both for dedup and for per-turn hit detection.
   let knowledgeEntries = new Map<string, { id: string; title: string; tags: string[] }>();
@@ -226,6 +228,14 @@ export async function claudeRemoteLauncher(
       turnCollector.updateConfig(patch);
     }
   }
+
+  // Pre-fetch global world config (narrative/laws) for injection (non-blocking)
+  session.client.fetchWorldConfig().then((cfg) => {
+    if (cfg && (cfg.narrative || cfg.laws)) {
+      worldConfig = cfg;
+      logger.debug(`[world-config] Loaded narrative=${!!cfg.narrative}, laws=${!!cfg.laws}`);
+    }
+  }).catch(() => {});
 
   // Pre-fetch knowledge context for injection (non-blocking)
   if (knowledgeEnabled) {
@@ -1466,6 +1476,7 @@ export async function claudeRemoteLauncher(
         );
         // Reset knowledge injection state for the new session (/clear creates a new session)
         knowledgeInjected = false;
+        worldConfigInjected = false;
         knowledgeContext = null;
         knowledgeEntries = new Map();
         pendingKnowledgeRefresh = false;
@@ -2015,6 +2026,15 @@ export async function claudeRemoteLauncher(
                 logger.debug("[knowledge] Injected knowledge into first message");
               }
 
+              // World config injection: inject narrative/laws once per session
+              const worldConfigPrefix = !worldConfigInjected && worldConfig
+                ? buildWorldConfigPrefix(worldConfig)
+                : "";
+              if (!worldConfigInjected && worldConfig && worldConfigPrefix) {
+                worldConfigInjected = true;
+                logger.debug("[world-config] Injected world narrative/laws into first message");
+              }
+
               // Project CONTEXT.md: inject once per session before all other prefixes
               const contextMdPrefix = !contextMdInjected && contextMdContent
                 ? `<project-context>\n${contextMdContent}\n</project-context>\n\n`
@@ -2025,7 +2045,7 @@ export async function claudeRemoteLauncher(
               }
 
               return {
-                message: contextMdPrefix + appPromptPrefix + knowledgePrefix + msg.message,
+                message: contextMdPrefix + appPromptPrefix + worldConfigPrefix + knowledgePrefix + msg.message,
                 mode: msg.mode,
               };
             }
@@ -2499,4 +2519,16 @@ function extractKnowledgeHints(message: string, maxHints: number): string[] {
     .map((w) => w.replace(/[^a-zA-Z0-9_\-.]/g, ""))
     .filter((w) => w.length >= 3 && !/^\d+$/.test(w) && !stopWords.has(w.toLowerCase()));
   return [...cjkHints, ...asciiHints].slice(0, maxHints);
+}
+
+function buildWorldConfigPrefix(cfg: { narrative?: string; laws?: string }): string {
+  const parts: string[] = [];
+  if (cfg.narrative?.trim()) {
+    parts.push(`## World Narrative\n${cfg.narrative.trim()}`);
+  }
+  if (cfg.laws?.trim()) {
+    parts.push(`## World Laws\nThe following rules MUST be followed in all actions:\n${cfg.laws.trim()}`);
+  }
+  if (parts.length === 0) return "";
+  return `<system-reminder>\n# World Context\n\n${parts.join("\n\n")}\n</system-reminder>\n\n`;
 }

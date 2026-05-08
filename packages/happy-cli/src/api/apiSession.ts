@@ -1123,6 +1123,21 @@ export class ApiSessionClient extends EventEmitter {
     }
   }
 
+  /**
+   * Fetch global world config (narrative + laws + policy) from UserKVStore via socket.
+   * Returns null if not configured or on error.
+   */
+  async fetchWorldConfig(): Promise<{ narrative: string; laws: string; policy: string } | null> {
+    try {
+      const result = await this.socket.timeout(5_000).emitWithAck("fetch-world-config", {
+        sid: this.sessionId,
+      });
+      return result ?? null;
+    } catch {
+      return null;
+    }
+  }
+
   private emitUsageReport(
     key: string,
     tokens: { [key: string]: number; total: number },
