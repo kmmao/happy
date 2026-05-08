@@ -120,6 +120,14 @@ export const WorldShell = React.memo(function WorldShell({ onExit }: WorldShellP
                     )}
                 </View>
 
+                <TouchableOpacity
+                    onPress={() => router.push("/(app)/new")}
+                    style={styles.newSessionButton}
+                    activeOpacity={0.7}
+                >
+                    <Ionicons name="add" size={22} color={theme.colors.primary} />
+                </TouchableOpacity>
+
                 <TouchableOpacity onPress={handleExit} style={styles.exitButton}>
                     <Ionicons name="close" size={20} color={theme.colors.textSecondary} />
                 </TouchableOpacity>
@@ -230,6 +238,10 @@ const useStyles = () => {
         badgeText: {
             fontSize: 12,
             color: theme.colors.text,
+        },
+        newSessionButton: {
+            padding: 6,
+            borderRadius: 16,
         },
         exitButton: {
             padding: 8,
