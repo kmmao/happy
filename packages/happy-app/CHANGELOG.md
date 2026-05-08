@@ -1,5 +1,59 @@
 # Changelog
 
+## 2.19.0 - 2026-05-08
+
+This release brings the World Shell event dashboard, improved subagent conversation rendering, structured error feedback, and a wave of session UX improvements.
+
+### World Shell
+- Added World Shell — a Matrix-themed global event stream interface that displays real-time events across all active agent sessions
+- Added Chain Mode in World Shell — groups tasks by project with progress indicators and click-to-expand details
+- Added inline verdicts in the event feed (Approve / Skip / Read / Dismiss) without leaving World Shell
+- Added Definition Panel for editing World Laws and Policy directly in World Shell
+- Added Filter Chips with friendly project path labels for filtering events by project
+- Added "+" button in the World Shell header to create new sessions instantly
+- Added click-to-navigate on task and session event cards — jumps directly to the relevant session
+- Improved World Shell with a Matrix-themed welcome state when the event stream is empty
+- Improved World Shell with full-screen fade animation and disabled gesture-back for immersive focus
+
+### Session UX
+- Added queued-message floating banner while AI is running — tap "Send Now" to interrupt and deliver immediately
+- Added "Show full content" expand button on compressed message bubbles
+- Added paste preview — pasted content shows a preview block before sending
+- Added automatic language detection and syntax highlighting when pasting code or log output
+- Added code block folding for long assistant responses
+- Added log-format syntax highlighting (log language)
+- Added content refresh button in the session header
+- Improved footprint panel with Bash sub-classification and full operation type coverage
+- Fixed session list refreshing immediately after archive or delete (optimistic update)
+- Fixed duplicate display of /clear and /compact command responses
+
+### Agent Error Feedback
+- Added structured error labels in the session-stopped banner — billing errors now show a "Check Billing" link; rate limit errors show an automatic-retry notice
+- Improved StopFailure error type display with localized labels across 10 languages
+
+### Subagent Support
+- Improved subagent conversation rendering — text and thinking blocks from sub-agents are now forwarded as full messages, enabling richer nested conversation display
+
+### Auto-Send
+- Added LLM model name badge on recommendation chips so you know which model scored the suggestion
+- Improved auto-send scoring — LLM takes full responsibility for recommendation ranking when auto-send is active
+- Fixed auto-send not triggering the countdown when follow-up options arrive
+
+### Voice
+- Improved LiveKit verification flow — shows project info, participant count, and Cloud Dashboard link on success
+- Fixed audio auto-play and microphone noise-cancellation configuration on web
+
+### Multi-Agent
+- Added multi-session dashboard (Octogent-style overview of concurrent agents)
+- Added automatic Worktree creation per task with full lifecycle management
+- Added one-click parallel agent dispatch from the task list
+
+### Fixes
+- Fixed SessionView infinite update loop
+- Fixed input box image preview disappearing after switching sessions
+- Fixed AskUserQuestion submit button race condition
+- Fixed Yolo mode permission requests not cleaning up on mode switch
+
 ## 2.18.0 - 2026-04-29
 
 This release adds responsive foldable screen support and fixes several UI issues.
