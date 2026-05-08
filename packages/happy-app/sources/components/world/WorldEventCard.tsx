@@ -69,6 +69,12 @@ export const WorldEventCard = React.memo(function WorldEventCard({
             onPress?.(event);
             return;
         }
+        // Memory events: navigate to knowledge entry detail
+        if (event.eventType === "memory.created" && event.source.projectId) {
+            router.push(`/(app)/project/${event.source.projectId}/knowledge/${event.originalId}/evolution`);
+            onPress?.(event);
+            return;
+        }
         LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
         setExpanded((v) => !v);
         onPress?.(event);
@@ -88,13 +94,13 @@ export const WorldEventCard = React.memo(function WorldEventCard({
                             {event.eventType}
                         </Text>
                         <Text style={styles.time}>{formatTime(event.occurredAt)}</Text>
-                        {event.source.sessionId && (
+                        {(event.source.sessionId && (
                             event.eventType.startsWith("session.") ||
                             event.eventType === "task.running" ||
                             event.eventType === "task.completed"
-                        ) && (
+                        )) || (event.eventType === "memory.created" && event.source.projectId) ? (
                             <Ionicons name="chevron-forward" size={14} color={theme.colors.textLink} style={{ marginLeft: 4 }} />
-                        )}
+                        ) : null}
                     </View>
                     <Text style={styles.title} numberOfLines={expanded ? undefined : 2}>
                         {event.title}
