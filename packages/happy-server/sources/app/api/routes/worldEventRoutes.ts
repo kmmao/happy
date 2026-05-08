@@ -34,21 +34,24 @@ function mapSeverity(raw: string): WorldEventSeverity {
     return "info";
 }
 
-function taskEventType(status: string): string {
+function taskEventType(status: string, triggerType?: string): string {
+    const prefix = (triggerType === "cron" || triggerType === "webhook")
+        ? `trigger.${triggerType}`
+        : "task";
     switch (status) {
         case "queued":
         case "dispatching":
-            return "task.queued";
+            return `${prefix}.queued`;
         case "running":
-            return "task.running";
+            return `${prefix}.running`;
         case "completed":
-            return "task.completed";
+            return `${prefix}.completed`;
         case "failed":
-            return "task.failed";
+            return `${prefix}.failed`;
         case "cancelled":
-            return "task.cancelled";
+            return `${prefix}.cancelled`;
         default:
-            return "task.updated";
+            return `${prefix}.updated`;
     }
 }
 
@@ -115,6 +118,7 @@ export function worldEventRoutes(app: Fastify) {
                         projectId: true,
                         machineId: true,
                         sessionId: true,
+                        triggerType: true,
                         updatedAt: true,
                         completedAt: true,
                     },
@@ -168,7 +172,7 @@ export function worldEventRoutes(app: Fastify) {
                 events.push({
                     id: `task-${task.id}`,
                     originalId: task.id,
-                    eventType: taskEventType(task.status),
+                    eventType: taskEventType(task.status, task.triggerType),
                     title: task.title ?? task.prompt.slice(0, 80),
                     summary: task.status,
                     occurredAt: (task.completedAt ?? task.updatedAt).getTime(),

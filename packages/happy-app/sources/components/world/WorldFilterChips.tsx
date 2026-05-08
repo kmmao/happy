@@ -42,6 +42,7 @@ export const WorldFilterChips = React.memo(function WorldFilterChips({
         { label: "supervisor.*", filter: { eventTypePrefix: "supervisor." } },
         { label: "session.*", filter: { eventTypePrefix: "session." } },
         { label: "memory.*", filter: { eventTypePrefix: "memory." } },
+        { label: "trigger.*", filter: { eventTypePrefix: "trigger." } },
         { label: "⚠️", filter: { severity: "warning" } },
         { label: "🔴", filter: { severity: "critical" } },
     ];
