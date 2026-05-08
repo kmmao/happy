@@ -587,6 +587,8 @@ export const zhHans: TranslationStructure = {
     appendToInput: "编辑后发送",
     messageQueued: "已排队",
     cancelQueued: "取消",
+    messagesQueued: ({ n }: { n: number }) => `${n} 条消息排队中`,
+    sendNow: "立即发送",
     noMessages: "暂无消息",
     contextSummaryTitle: "上一会话的上下文",
     created: ({ time }: { time: string }) => `创建于 ${time}`,

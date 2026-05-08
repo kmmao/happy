@@ -603,6 +603,8 @@ export const en = {
     appendToInput: "Edit in input",
     messageQueued: "Queued",
     cancelQueued: "Cancel",
+    messagesQueued: ({ n }: { n: number }) => `${n} message${n === 1 ? "" : "s"} queued`,
+    sendNow: "Send now",
     noMessages: "No messages yet",
     created: ({ time }: { time: string }) => `Created ${time}`,
     contextSummaryTitle: "Context from previous session",

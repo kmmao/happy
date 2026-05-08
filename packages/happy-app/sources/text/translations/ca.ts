@@ -617,6 +617,8 @@ export const ca: TranslationStructure = {
     appendToInput: "Edita al camp d'entrada",
     messageQueued: "En cua",
     cancelQueued: "Cancel·la",
+    messagesQueued: ({ n }: { n: number }) => `${n} missatge${n === 1 ? "" : "s"} en cua`,
+    sendNow: "Envia ara",
     noMessages: "Encara no hi ha missatges",
     contextSummaryTitle: "Context de la sessió anterior",
     created: ({ time }: { time: string }) => `Creat ${time}`,

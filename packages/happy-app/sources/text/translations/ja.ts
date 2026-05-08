@@ -739,6 +739,8 @@ export const ja: TranslationStructure = {
     appendToInput: "入力欄で編集",
     messageQueued: "キュー中",
     cancelQueued: "キャンセル",
+    messagesQueued: ({ n }: { n: number }) => `${n}件のメッセージが待機中`,
+    sendNow: "今すぐ送信",
     noMessages: "メッセージはまだありません",
     contextSummaryTitle: "前のセッションのコンテキスト",
     created: ({ time }: { time: string }) => `${time}に作成`,

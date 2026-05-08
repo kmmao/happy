@@ -48,7 +48,8 @@ import {
   startRealtimeSession,
   stopRealtimeSession,
 } from "@/realtime/RealtimeSession";
-import { sessionInterrupt, sessionStopTask, sessionBash } from "@/sync/ops";
+import { sessionInterrupt, sessionStopTask, sessionBash, sessionCancelQueuedMessage } from "@/sync/ops";
+import { QueueBanner } from "@/components/QueueBanner";
 import { reactivateArchivedSession } from "@/sync/sessionResumeFlow";
 import { runWithSessionReactivationGuard } from "@/sync/sessionResumeGuard";
 import { resolveSessionReactivationContext } from "@/hooks/sessionResumeSupport";
@@ -847,6 +848,38 @@ function SessionViewInner({
     }
     prevRunningRef.current = isRunning;
   }, [isRunning, session.sdkSessionState, sessionId]);
+  const queuedIds = storage((s) => s.queuedMessageLocalIds[sessionId] ?? []);
+  const queuedMessages = React.useMemo(() => {
+    if (queuedIds.length === 0) return [];
+    return queuedIds
+      .map((localId) => {
+        const msg = messages.find(
+          (m) => m.kind === "user-text" && m.localId === localId,
+        );
+        if (!msg || msg.kind !== "user-text") return null;
+        const raw = msg.displayText || msg.text;
+        const displayText = raw.includes("[image:")
+          ? t("session.sentImage")
+          : raw;
+        return { localId, displayText };
+      })
+      .filter((m): m is { localId: string; displayText: string } => m !== null);
+  }, [queuedIds, messages]);
+
+  const handleCancelQueuedItem = React.useCallback(
+    async (localId: string) => {
+      const cancelled = await sessionCancelQueuedMessage(sessionId, localId);
+      if (cancelled) {
+        storage.getState().removeQueuedMessageId(sessionId, localId);
+      }
+    },
+    [sessionId],
+  );
+
+  const handleSendNow = React.useCallback(() => {
+    sessionInterrupt(sessionId);
+  }, [sessionId]);
+
   const rawPromptSuggestion = usePromptSuggestion(sessionId);
   const needsContinue = useNeedsContinue(sessionId);
   const alwaysShowContextSize = useSetting("alwaysShowContextSize");
@@ -1476,6 +1509,12 @@ function SessionViewInner({
         onClose={() => setViewingTask(null)}
         onStop={handleCloseTask}
         onPreview={handlePreview}
+      />
+      <QueueBanner
+        queuedMessages={queuedMessages}
+        onSendNow={handleSendNow}
+        onCancelItem={handleCancelQueuedItem}
+        isRunning={isRunning}
       />
       <View onLayout={(e) => setAgentInputHeight(e.nativeEvent.layout.height)}>
       <AgentInput

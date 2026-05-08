@@ -844,6 +844,8 @@ export const ru: TranslationStructure = {
     appendToInput: "Редактировать в поле ввода",
     messageQueued: "В очереди",
     cancelQueued: "Отменить",
+    messagesQueued: ({ n }: { n: number }) => `${n} сообщ. в очереди`,
+    sendNow: "Отправить сейчас",
     noMessages: "Сообщений пока нет",
     contextSummaryTitle: "Контекст из предыдущей сессии",
     created: ({ time }: { time: string }) => `Создано ${time}`,

@@ -627,6 +627,8 @@ export const pl: TranslationStructure = {
     appendToInput: "Edytuj w polu wpisywania",
     messageQueued: "W kolejce",
     cancelQueued: "Anuluj",
+    messagesQueued: ({ n }: { n: number }) => `${n} wiadom. w kolejce`,
+    sendNow: "Wyślij teraz",
     noMessages: "Brak wiadomości",
     contextSummaryTitle: "Kontekst z poprzedniej sesji",
     created: ({ time }: { time: string }) => `Utworzono ${time}`,

@@ -587,6 +587,8 @@ export const zhHant: TranslationStructure = {
     appendToInput: "編輯後發送",
     messageQueued: "已排隊",
     cancelQueued: "取消",
+    messagesQueued: ({ n }: { n: number }) => `${n} 則訊息排隊中`,
+    sendNow: "立即發送",
     noMessages: "暫無訊息",
     contextSummaryTitle: "上一工作階段的上下文",
     created: ({ time }: { time: string }) => `建立於 ${time}`,

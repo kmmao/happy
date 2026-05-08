@@ -619,6 +619,8 @@ export const es: TranslationStructure = {
     appendToInput: "Editar en el campo de entrada",
     messageQueued: "En cola",
     cancelQueued: "Cancelar",
+    messagesQueued: ({ n }: { n: number }) => `${n} mensaje${n === 1 ? "" : "s"} en cola`,
+    sendNow: "Enviar ahora",
     noMessages: "Aún no hay mensajes",
     contextSummaryTitle: "Contexto de la sesión anterior",
     created: ({ time }: { time: string }) => `Creado ${time}`,
