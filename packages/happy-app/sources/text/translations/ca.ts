@@ -606,6 +606,9 @@ export const ca: TranslationStructure = {
     fileTooLarge: "El fitxer és massa gran per enviar",
     fileUploadFailed: ({ failed, total }: { failed: number; total: number }) =>
       `${failed} de ${total} fitxers no s'han pogut pujar`,
+    pastedContent: "Pasted content",
+    pastedContentSummary: ({ preview, lines }: { preview: string; lines: number }) =>
+      `${preview} · ${lines} ${lines === 1 ? "line" : "lines"}`,
     cameraPermissionRequired: "Cal permís de la càmera per fer fotos",
     dropFilesHere: "Deixa els fitxers aquí",
     imageLoadFailed: "No s'ha pogut carregar la imatge",

@@ -742,6 +742,9 @@ export const it: TranslationStructure = {
     fileTooLarge: "Il file è troppo grande per essere inviato",
     fileUploadFailed: ({ failed, total }: { failed: number; total: number }) =>
       `${failed} di ${total} file non sono stati caricati`,
+    pastedContent: "Pasted content",
+    pastedContentSummary: ({ preview, lines }: { preview: string; lines: number }) =>
+      `${preview} · ${lines} ${lines === 1 ? "line" : "lines"}`,
     cameraPermissionRequired: "È necessario il permesso della fotocamera per scattare foto",
     dropFilesHere: "Rilascia i file qui",
     imageLoadFailed: "Impossibile caricare l'immagine",

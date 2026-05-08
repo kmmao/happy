@@ -1,6 +1,7 @@
 import { PermissionMode, ModelMode } from "./PermissionModeSelector";
 import { Metadata } from "@/sync/storageTypes";
 import type { SessionRpcVisualState } from "@/utils/sessionRpcVisualState";
+import type { PasteBlock } from "./pasteBlock";
 
 /** SDK reasoning & budget settings */
 export interface ReasoningProps {
@@ -121,6 +122,10 @@ export interface AgentInputProps {
     commands?: CommandProps;
     images?: ImageProps;
     onShellCommand?: (command: string) => void;
+    pasteBlocks?: PasteBlock[];
+    onLargeTextPaste?: (text: string) => void;
+    onPasteBlockRemove?: (id: string) => void;
+    onPasteBlockExpand?: (id: string) => void;
     packageScripts?: Record<string, string>;
     promptSuggestion?: string | null;
     onPromptSuggestionPress?: (text: string) => void;

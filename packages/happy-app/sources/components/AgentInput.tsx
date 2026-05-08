@@ -49,6 +49,7 @@ import { stylesheet, FAVORITE_CHIP_GRADIENTS, getFavoriteSlashChipGlassStyle, ge
 import { ContextProgressBar } from "./ContextProgressBar";
 import { AttachButton, type AttachAction } from "./AttachButton";
 import { AgentInputSettingsOverlay } from "./AgentInputSettingsOverlay";
+import { PasteBlockPreviewModal } from "./PasteBlockPreviewModal";
 import { getReasoningSummaryLabels } from "./reasoningEffort";
 import {
   buildRpcSummaryText,
@@ -76,10 +77,18 @@ export const AgentInput = React.memo(
 
     const hasText = props.value.trim().length > 0;
     const hasImages = (props.images?.imagePaths?.length ?? 0) > 0;
-    const canSend = hasText || hasImages;
+    const hasPasteBlocks = (props.pasteBlocks?.length ?? 0) > 0;
+    const canSend = hasText || hasImages || hasPasteBlocks;
 
     // Lightbox state for full-screen image preview
     const [previewUri, setPreviewUri] = React.useState<string | null>(null);
+    const [previewPasteBlock, setPreviewPasteBlock] = React.useState<
+      import("./pasteBlock").PasteBlock | null
+    >(null);
+
+    const closePasteBlockPreview = React.useCallback(() => {
+      setPreviewPasteBlock(null);
+    }, []);
 
     // Check if this is a Codex or Gemini session
     // Use metadata.flavor for existing sessions, agentType prop for new sessions
@@ -1399,6 +1408,93 @@ export const AgentInput = React.memo(
               </ScrollView>
             )}
 
+            {/* Pasted text blocks */}
+            {hasPasteBlocks && (
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={{
+                  paddingHorizontal: 8,
+                  paddingTop: hasImages ? 0 : 10,
+                  paddingBottom: 4,
+                  gap: 8,
+                }}
+              >
+                {(props.pasteBlocks ?? []).map((block) => (
+                  <View
+                    key={block.id}
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "center",
+                      backgroundColor: theme.colors.surfacePressed,
+                      borderRadius: 10,
+                      borderWidth: 1,
+                      borderColor: theme.colors.divider,
+                      height: 36,
+                      maxWidth: 260,
+                    }}
+                  >
+                    <Pressable
+                      onPress={() => setPreviewPasteBlock(block)}
+                      style={({ pressed }) => ({
+                        flexDirection: "row",
+                        alignItems: "center",
+                        gap: 6,
+                        paddingLeft: 8,
+                        paddingRight: props.onPasteBlockRemove ? 2 : 8,
+                        opacity: pressed ? 0.7 : 1,
+                        flexShrink: 1,
+                      })}
+                    >
+                      <Ionicons
+                        name="clipboard-outline"
+                        size={14}
+                        color={theme.colors.accentBlue}
+                      />
+                      <Text
+                        style={{
+                          fontSize: 12,
+                          color: theme.colors.text,
+                          ...Typography.default("semiBold"),
+                          flexShrink: 1,
+                        }}
+                        numberOfLines={1}
+                        ellipsizeMode="tail"
+                      >
+                        {block.summary}
+                      </Text>
+                    </Pressable>
+                    {props.onPasteBlockRemove && (
+                      <Pressable
+                        onPress={() => props.onPasteBlockRemove?.(block.id)}
+                        hitSlop={{ top: 8, bottom: 8, left: 4, right: 8 }}
+                        style={({ pressed }) => ({
+                          opacity: pressed ? 0.4 : 0.7,
+                          padding: 4,
+                          paddingRight: 6,
+                        })}
+                      >
+                        <Ionicons
+                          name="close-circle"
+                          size={17}
+                          color={theme.colors.textSecondary}
+                        />
+                      </Pressable>
+                    )}
+                  </View>
+                ))}
+              </ScrollView>
+            )}
+
+            {/* Paste block preview */}
+            <PasteBlockPreviewModal
+              visible={previewPasteBlock !== null}
+              block={previewPasteBlock}
+              onClose={closePasteBlockPreview}
+              onExpand={(id) => props.onPasteBlockExpand?.(id)}
+              onRemove={props.onPasteBlockRemove}
+            />
+
             {/* Full-screen image preview lightbox */}
             <RNModal
               visible={previewUri !== null}
@@ -1764,6 +1860,7 @@ export const AgentInput = React.memo(
                 maxHeight={120}
                 onImagePaste={props.images?.onImagePaste}
                 onFilePaste={props.images?.onFilePaste}
+                onLargeTextPaste={props.onLargeTextPaste}
               />
             </View>
 

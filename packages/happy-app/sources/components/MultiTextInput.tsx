@@ -58,6 +58,7 @@ interface MultiTextInputProps {
   onStateChange?: (state: TextInputState) => void;
   onImagePaste?: (blob: Blob) => void;
   onFilePaste?: (file: File) => void;
+  onLargeTextPaste?: (text: string) => void;
 }
 
 export const MultiTextInput = React.forwardRef<

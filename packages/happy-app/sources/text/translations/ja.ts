@@ -728,6 +728,9 @@ export const ja: TranslationStructure = {
     fileTooLarge: "ファイルが大きすぎて送信できません",
     fileUploadFailed: ({ failed, total }: { failed: number; total: number }) =>
       `${total}件中${failed}件のファイルのアップロードに失敗しました`,
+    pastedContent: "Pasted content",
+    pastedContentSummary: ({ preview, lines }: { preview: string; lines: number }) =>
+      `${preview} · ${lines} ${lines === 1 ? "line" : "lines"}`,
     cameraPermissionRequired: "写真を撮るにはカメラの権限が必要です",
     dropFilesHere: "ここにファイルをドロップ",
     imageLoadFailed: "画像の読み込みに失敗しました",

@@ -1,7 +1,14 @@
 declare module "react-test-renderer" {
   import type * as React from "react";
 
+  export interface ReactTestInstance {
+    props: Record<string, unknown>;
+    findByProps(props: Record<string, unknown>): ReactTestInstance;
+    findAllByProps(props: Record<string, unknown>): ReactTestInstance[];
+  }
+
   export interface ReactTestRenderer {
+    root: ReactTestInstance;
     update(element: React.ReactElement | null): void;
     unmount(): void;
   }

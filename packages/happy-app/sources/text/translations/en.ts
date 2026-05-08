@@ -606,6 +606,9 @@ export const en: TranslationStructure = {
     fileTooLarge: "File is too large to send",
     fileUploadFailed: ({ failed, total }: { failed: number; total: number }) =>
       `${failed} of ${total} files failed to upload`,
+    pastedContent: "Pasted content",
+    pastedContentSummary: ({ preview, lines }: { preview: string; lines: number }) =>
+      `${preview} · ${lines} ${lines === 1 ? "line" : "lines"}`,
     cameraPermissionRequired: "Camera permission is required to take photos",
     dropFilesHere: "Drop files here",
     imageLoadFailed: "Failed to load image",

@@ -576,6 +576,9 @@ export const zhHans: TranslationStructure = {
     fileTooLarge: "文件太大，无法发送",
     fileUploadFailed: ({ failed, total }: { failed: number; total: number }) =>
       `${failed}/${total} 个文件上传失败`,
+    pastedContent: "粘贴内容",
+    pastedContentSummary: ({ preview, lines }: { preview: string; lines: number }) =>
+      `${preview} · ${lines} 行`,
     cameraPermissionRequired: "需要相机权限才能拍照",
     dropFilesHere: "拖放文件到此处",
     imageLoadFailed: "图片加载失败",

@@ -3,6 +3,7 @@ import { View } from "react-native";
 import { useUnistyles } from "react-native-unistyles";
 import TextareaAutosize from "react-textarea-autosize";
 import { Typography } from "@/constants/Typography";
+import { shouldCreatePasteBlock } from "./pasteBlock";
 
 export type SupportedKey =
   | "Enter"
@@ -52,6 +53,7 @@ interface MultiTextInputProps {
   onStateChange?: (state: TextInputState) => void;
   onImagePaste?: (blob: Blob) => void;
   onFilePaste?: (file: File) => void;
+  onLargeTextPaste?: (text: string) => void;
 }
 
 export const MultiTextInput = React.forwardRef<
@@ -69,16 +71,19 @@ export const MultiTextInput = React.forwardRef<
     onStateChange,
     onImagePaste,
     onFilePaste,
+    onLargeTextPaste,
   } = props;
 
   const { theme } = useUnistyles();
   const textareaRef = React.useRef<HTMLTextAreaElement>(null);
+  const shiftPressedRef = React.useRef(false);
 
   // Convert maxHeight to approximate maxRows (assuming ~24px line height)
   const maxRows = Math.floor(maxHeight / 24);
 
   const handleKeyDown = React.useCallback(
     (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+      shiftPressedRef.current = e.shiftKey;
       if (!onKeyPress) return;
 
       const isComposing =
@@ -131,6 +136,13 @@ export const MultiTextInput = React.forwardRef<
       }
     },
     [onKeyPress],
+  );
+
+  const handleKeyUp = React.useCallback(
+    (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+      shiftPressedRef.current = e.shiftKey;
+    },
+    [],
   );
 
   const handleChange = React.useCallback(
@@ -291,6 +303,11 @@ export const MultiTextInput = React.forwardRef<
 
       if (!pastedText) return;
 
+      if (!shiftPressedRef.current && onLargeTextPaste && shouldCreatePasteBlock(pastedText)) {
+        onLargeTextPaste(pastedText);
+        return;
+      }
+
       const textToInsert = looksLikeCode(pastedText)
         ? `\`\`\`${detectLanguage(pastedText) ?? ""}\n${pastedText}\n\`\`\``
         : pastedText;
@@ -318,7 +335,7 @@ export const MultiTextInput = React.forwardRef<
         onSelectionChange(selection);
       }
     },
-    [onImagePaste, onFilePaste, onChangeText, onStateChange, onSelectionChange],
+    [onImagePaste, onFilePaste, onLargeTextPaste, onChangeText, onStateChange, onSelectionChange],
   );
 
   // Imperative handle for direct control
@@ -387,6 +404,7 @@ export const MultiTextInput = React.forwardRef<
         onChange={handleChange}
         onSelect={handleSelect}
         onKeyDown={handleKeyDown}
+        onKeyUp={handleKeyUp}
         onPaste={handlePaste}
         maxRows={maxRows}
         autoCapitalize="sentences"

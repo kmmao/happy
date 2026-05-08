@@ -833,6 +833,9 @@ export const ru: TranslationStructure = {
     fileTooLarge: "Файл слишком большой для отправки",
     fileUploadFailed: ({ failed, total }: { failed: number; total: number }) =>
       `${failed} из ${total} файлов не удалось загрузить`,
+    pastedContent: "Pasted content",
+    pastedContentSummary: ({ preview, lines }: { preview: string; lines: number }) =>
+      `${preview} · ${lines} ${lines === 1 ? "line" : "lines"}`,
     cameraPermissionRequired: "Для съёмки фото необходимо разрешение камеры",
     dropFilesHere: "Перетащите файлы сюда",
     imageLoadFailed: "Не удалось загрузить изображение",
