@@ -4,25 +4,31 @@ import { Modal, Pressable, ScrollView, Text, View } from "react-native";
 import { useUnistyles } from "react-native-unistyles";
 import { Typography } from "@/constants/Typography";
 import { t } from "@/text";
+import { MultiTextInput } from "./MultiTextInput";
 import type { PasteBlock } from "./pasteBlock";
 
 interface PasteBlockPreviewModalProps {
   visible: boolean;
   block: PasteBlock | null;
   onClose: () => void;
-  onExpand: (id: string) => void;
+  onSave: (id: string, text: string) => void;
   onRemove?: (id: string) => void;
 }
 
 export const PasteBlockPreviewModal = React.memo(
-  ({ visible, block, onClose, onExpand, onRemove }: PasteBlockPreviewModalProps) => {
+  ({ visible, block, onClose, onSave, onRemove }: PasteBlockPreviewModalProps) => {
     const { theme } = useUnistyles();
+    const [draftText, setDraftText] = React.useState(block?.text ?? "");
 
-    const handleExpand = React.useCallback(() => {
+    React.useEffect(() => {
+      setDraftText(block?.text ?? "");
+    }, [block?.id, block?.text]);
+
+    const handleSave = React.useCallback(() => {
       if (!block) return;
       onClose();
-      onExpand(block.id);
-    }, [block, onClose, onExpand]);
+      onSave(block.id, draftText);
+    }, [block, onClose, onSave, draftText]);
 
     const handleRemove = React.useCallback(() => {
       if (!block) return;
@@ -126,16 +132,26 @@ export const PasteBlockPreviewModal = React.memo(
                 }}
               >
                 <Text
-                  selectable
                   style={{
-                    fontSize: 13,
-                    lineHeight: 19,
-                    color: theme.colors.text,
-                    ...Typography.mono(),
+                    marginBottom: 8,
+                    fontSize: 12,
+                    color: theme.colors.textSecondary,
+                    ...Typography.default("semiBold"),
                   }}
                 >
-                  {block?.text}
+                  {t("session.pastedContent")}
                 </Text>
+                <MultiTextInput
+                  value={draftText}
+                  onChangeText={setDraftText}
+                  placeholder={t("session.pastedContent")}
+                  maxHeight={240}
+                  paddingTop={0}
+                  paddingBottom={0}
+                  paddingLeft={0}
+                  paddingRight={0}
+                  editable
+                />
               </View>
 
               <View
@@ -182,15 +198,15 @@ export const PasteBlockPreviewModal = React.memo(
                           ...Typography.default("semiBold"),
                         }}
                       >
-                        {t("common.cancel")}
+                        {t("common.remove")}
                       </Text>
                     </Pressable>
                   )}
 
                   <Pressable
                     accessibilityRole="button"
-                    accessibilityLabel={t("session.appendToInput")}
-                    onPress={handleExpand}
+                    accessibilityLabel={t("common.save")}
+                    onPress={handleSave}
                     style={({ pressed }) => ({
                       minHeight: 34,
                       paddingHorizontal: 14,
@@ -208,7 +224,7 @@ export const PasteBlockPreviewModal = React.memo(
                         ...Typography.default("semiBold"),
                       }}
                     >
-                      {t("session.appendToInput")}
+                      {t("common.save")}
                     </Text>
                   </Pressable>
                 </View>

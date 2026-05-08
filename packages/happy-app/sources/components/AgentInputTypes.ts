@@ -125,7 +125,7 @@ export interface AgentInputProps {
     pasteBlocks?: PasteBlock[];
     onLargeTextPaste?: (text: string) => void;
     onPasteBlockRemove?: (id: string) => void;
-    onPasteBlockExpand?: (id: string) => void;
+    onPasteBlockSave?: (id: string, text: string) => void;
     packageScripts?: Record<string, string>;
     promptSuggestion?: string | null;
     onPromptSuggestionPress?: (text: string) => void;

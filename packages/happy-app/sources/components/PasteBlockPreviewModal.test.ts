@@ -37,6 +37,7 @@ vi.mock("react-native", async () => {
     Pressable: createHost("Pressable"),
     ScrollView: createHost("ScrollView"),
     Text: createHost("Text"),
+    TextInput: createHost("TextInput"),
     TouchableWithoutFeedback: createHost("TouchableWithoutFeedback"),
     View: createHost("View"),
     useWindowDimensions: () => ({ width: 1024, height: 768, scale: 1, fontScale: 1 }),
@@ -57,6 +58,9 @@ vi.mock("react-native-unistyles", () => ({
             background: "#111",
             tint: "#fff",
           },
+        },
+        input: {
+          text: "#111",
         },
       },
     },
@@ -82,7 +86,7 @@ describe("PasteBlockPreviewModal", () => {
     vi.clearAllMocks();
   });
 
-  it("shows content and expands the selected paste block", () => {
+  it("saves edited text back to the selected paste block", () => {
     const events: string[] = [];
     let renderer!: ReactTestRenderer;
 
@@ -92,23 +96,19 @@ describe("PasteBlockPreviewModal", () => {
           visible: true,
           block,
           onClose: () => events.push("close"),
-          onExpand: (id) => events.push(`expand:${id}`),
+          onSave: (id: string, text: string) => events.push(`save:${id}:${text}`),
         }),
       );
     });
 
-    expect(
-      renderer.root.findAllByProps({ accessibilityLabel: "session.appendToInput" }),
-    ).toHaveLength(2);
-
     act(() => {
-      const expandButton = renderer.root.findByProps({
-        accessibilityLabel: "session.appendToInput",
-      }) as unknown as { props: { onPress: () => void } };
-      expandButton.props.onPress();
+      const saveButton = renderer.root.findByProps({ accessibilityLabel: "common.save" }) as unknown as {
+        props: { onPress: () => void };
+      };
+      saveButton.props.onPress();
     });
 
-    expect(events).toEqual(["close", "expand:paste-1"]);
+    expect(events).toEqual(["close", "save:paste-1:line 1\nline 2\nline 3"]);
   });
 
   it("removes the block from the preview modal", () => {
@@ -121,7 +121,7 @@ describe("PasteBlockPreviewModal", () => {
           visible: true,
           block,
           onClose: () => events.push("close"),
-          onExpand: (id) => events.push(`expand:${id}`),
+          onSave: (id: string, text: string) => events.push(`save:${id}:${text}`),
           onRemove: (id) => events.push(`remove:${id}`),
         }),
       );

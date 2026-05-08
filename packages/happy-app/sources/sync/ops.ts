@@ -9,10 +9,15 @@ import { storage } from "./storage";
 import type { MachineMetadata } from "./storageTypes";
 import { getErrorMessage } from "@/utils/errors";
 import { getServerUrl } from "./serverConfig";
-import {
-  normalizeResolvedRuntimeProfile,
-  type ResolvedRuntimeProfile,
-} from "@kmmao/happy-wire";
+type ResolvedRuntimeProfile = {
+  profileId?: string;
+  profileName?: string;
+  source?: "built-in-profile" | "account-profile" | "local-profile" | "ad-hoc";
+  trust?: "trusted" | "untrusted";
+  environmentVariables?: Record<string, string>;
+  defaultModelMode?: string;
+  [key: string]: unknown;
+};
 
 // Strict type definitions for all operations
 
@@ -126,10 +131,6 @@ interface SessionRipgrepResponse {
 }
 
 // Kill session operation types
-interface SessionKillRequest {
-  // No parameters needed
-}
-
 interface SessionKillResponse {
   success: boolean;
   message: string;
@@ -195,9 +196,9 @@ export async function machineSpawnNewSession(
   } = options;
 
   try {
-    const normalizedRuntimeProfile = normalizeResolvedRuntimeProfile(
-      runtimeProfile,
-    );
+    const normalizedRuntimeProfile = runtimeProfile
+      ? (await import("@kmmao/happy-wire")).normalizeResolvedRuntimeProfile(runtimeProfile)
+      : null;
     if (runtimeProfile && !normalizedRuntimeProfile) {
       return {
         type: "error",
@@ -240,7 +241,7 @@ export async function machineSpawnNewSession(
       happySessionId,
       forkSourceId,
       profileId: profileId ?? normalizedRuntimeProfile?.profileId,
-      runtimeProfile: normalizedRuntimeProfile,
+      runtimeProfile: normalizedRuntimeProfile ?? undefined,
       environmentVariables: mergedEnvironmentVariables,
     });
     return result;
@@ -2363,7 +2364,7 @@ export async function sessionDelete(
     });
 
     if (response.ok) {
-      const result = await response.json();
+      await response.json();
       return { success: true };
     } else {
       const error = await response.text();
@@ -2442,6 +2443,25 @@ export async function sessionArchive(
       message: getErrorMessage(error),
     };
   }
+}
+
+export async function archiveSessionWithKill(
+  sessionId: string,
+): Promise<{ success: boolean; message?: string }> {
+  const killResult = await sessionKill(sessionId);
+  const archiveResult = await sessionArchive(sessionId);
+
+  if (!archiveResult.success) {
+    return {
+      success: false,
+      message:
+        archiveResult.message ||
+        killResult.message ||
+        "Failed to archive session",
+    };
+  }
+
+  return { success: true };
 }
 
 // Export types for external use
@@ -2594,12 +2614,21 @@ export async function machineTerminalList(
     }
 }
 
+type MachineTerminalSpawnOptions = {
+    shell?: string;
+    cwd?: string;
+    cols?: number;
+    rows?: number;
+    sessionId?: string;
+    terminalId?: string;
+};
+
 export async function machineTerminalSpawn(
     machineId: string,
-    options?: { shell?: string; cwd?: string; cols?: number; rows?: number; sessionId?: string; terminalId?: string },
+    options?: MachineTerminalSpawnOptions,
 ): Promise<TerminalSpawnResult> {
     try {
-        return await apiSocket.machineRPC<TerminalSpawnResult, typeof options>(
+        return await apiSocket.machineRPC<TerminalSpawnResult, MachineTerminalSpawnOptions>(
             machineId,
             "terminal-spawn",
             options ?? {},

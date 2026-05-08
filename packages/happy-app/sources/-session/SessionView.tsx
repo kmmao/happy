@@ -985,15 +985,18 @@ function SessionViewInner({
     setPasteBlocks((prev) => prev.filter((block) => block.id !== id));
   }, []);
 
-  const handlePasteBlockExpand = React.useCallback((id: string) => {
-    const block = pasteBlocks.find((item) => item.id === id);
-    if (!block) return;
-    setMessage((current) => {
-      const trimmed = current.trimEnd();
-      return trimmed ? `${trimmed}\n${block.text}` : block.text;
-    });
-    setPasteBlocks((prev) => prev.filter((item) => item.id !== id));
-  }, [pasteBlocks]);
+  const handlePasteBlockSave = React.useCallback((id: string, text: string) => {
+    setPasteBlocks((prev) =>
+      prev.map((block) =>
+        block.id !== id
+          ? block
+          : createPasteBlock(id, text, {
+              fallbackPreview: t("session.pastedContent"),
+              summary: (params) => t("session.pastedContentSummary", params),
+            }),
+      ),
+    );
+  }, [t]);
 
   // Append option text to input for editing before sending
   const appendToInput = React.useCallback((text: string) => {
@@ -1483,7 +1486,7 @@ function SessionViewInner({
         pasteBlocks={pasteBlocks}
         onLargeTextPaste={handleLargeTextPaste}
         onPasteBlockRemove={handlePasteBlockRemove}
-        onPasteBlockExpand={handlePasteBlockExpand}
+        onPasteBlockSave={handlePasteBlockSave}
         sessionId={sessionId}
         overlayMaxHeight={agentInputOverlayMaxHeight}
         permissionMode={permissionMode}

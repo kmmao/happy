@@ -19,7 +19,7 @@ import {
 import { useRouter } from "expo-router";
 import { t } from "@/text";
 import { Modal } from "@/modal";
-import { sessionDelete, sessionKill, sessionArchive } from "@/sync/ops";
+import { sessionDelete, archiveSessionWithKill } from "@/sync/ops";
 import { useHappyAction } from "@/hooks/useHappyAction";
 import { HappyError } from "@/utils/errors";
 import { SessionProviderTag } from "@/components/session/SessionProviderTag";
@@ -45,15 +45,12 @@ const SessionRow = React.memo(({ session, showDivider }: { session: Session; sho
     const swipeableRef = React.useRef<Swipeable | null>(null);
     const isSwipeOpen = React.useRef(false);
     const [archiving, performArchive] = useHappyAction(async () => {
-        const rpcResult = await sessionKill(session.id);
-        if (!rpcResult.success) {
-            const fallbackResult = await sessionArchive(session.id);
-            if (!fallbackResult.success) {
-                throw new HappyError(
-                    fallbackResult.message || t("sessionInfo.failedToArchiveSession"),
-                    false,
-                );
-            }
+        const result = await archiveSessionWithKill(session.id);
+        if (!result.success) {
+            throw new HappyError(
+                result.message || t("sessionInfo.failedToArchiveSession"),
+                false,
+            );
         }
         storage.getState().applySessions([{ ...session, active: false }]);
     });

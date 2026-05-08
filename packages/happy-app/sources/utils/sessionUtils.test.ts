@@ -382,5 +382,16 @@ describe('sessionUtils', () => {
 
             expect(getSessionStatusState(session)).toBe('permission_required');
         });
+
+        it('treats null requests as no pending permission requests', () => {
+            const session = createSession({
+                sdkSessionState: 'requires_action',
+                agentState: {
+                    requests: null,
+                },
+            } as Partial<Session>);
+
+            expect(getSessionStatusState(session)).toBe('needs_attention');
+        });
     });
 });

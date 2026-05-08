@@ -1,20 +1,24 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { machineRPCMock, sessionRPCMock, storageState } = vi.hoisted(() => ({
-  machineRPCMock: vi.fn(),
-  sessionRPCMock: vi.fn(),
-  storageState: {
-    sessions: {} as Record<string, { rpcReady: boolean } | undefined>,
-    settings: {
-      knowledgeBase: false,
+const { machineRPCMock, sessionRPCMock, requestMock, storageState } = vi.hoisted(
+  () => ({
+    machineRPCMock: vi.fn(),
+    sessionRPCMock: vi.fn(),
+    requestMock: vi.fn(),
+    storageState: {
+      sessions: {} as Record<string, { rpcReady: boolean } | undefined>,
+      settings: {
+        knowledgeBase: false,
+      },
     },
-  },
-}));
+  }),
+);
 
 vi.mock("./apiSocket", () => ({
   apiSocket: {
     sessionRPC: sessionRPCMock,
     machineRPC: machineRPCMock,
+    request: requestMock,
   },
 }));
 
@@ -29,6 +33,7 @@ vi.mock("./sync", () => ({
 }));
 
 import {
+  archiveSessionWithKill,
   machineCleanRunawayProcesses,
   machineSpawnNewSession,
   sessionBash,
@@ -41,6 +46,7 @@ describe("ops session RPC guards", () => {
   beforeEach(() => {
     machineRPCMock.mockReset();
     sessionRPCMock.mockReset();
+    requestMock.mockReset();
     storageState.sessions = {};
   });
 
@@ -113,6 +119,48 @@ describe("ops session RPC guards", () => {
       success: true,
       message: "killed",
     });
+  });
+
+  it("会在 kill 成功后继续发起 archive 请求", async () => {
+    storageState.sessions["session-3"] = { rpcReady: true };
+    sessionRPCMock.mockResolvedValue({
+      success: true,
+      message: "killed",
+    });
+    requestMock.mockResolvedValue({
+      ok: true,
+      json: vi.fn().mockResolvedValue({}),
+      text: vi.fn(),
+    });
+
+    const result = await archiveSessionWithKill("session-3");
+
+    expect(sessionRPCMock).toHaveBeenCalledWith("session-3", "killSession", {});
+    expect(requestMock).toHaveBeenCalledWith("/v1/sessions/session-3/archive", {
+      method: "PATCH",
+    });
+    expect(result).toEqual({ success: true });
+  });
+
+  it("会在 kill 失败时仍继续发起 archive 请求", async () => {
+    storageState.sessions["session-4"] = { rpcReady: true };
+    sessionRPCMock.mockResolvedValue({
+      success: false,
+      message: "kill failed",
+    });
+    requestMock.mockResolvedValue({
+      ok: true,
+      json: vi.fn().mockResolvedValue({}),
+      text: vi.fn(),
+    });
+
+    const result = await archiveSessionWithKill("session-4");
+
+    expect(sessionRPCMock).toHaveBeenCalledWith("session-4", "killSession", {});
+    expect(requestMock).toHaveBeenCalledWith("/v1/sessions/session-4/archive", {
+      method: "PATCH",
+    });
+    expect(result).toEqual({ success: true });
   });
 
   it("会在 runtime profile 非法时短路 machineSpawnNewSession", async () => {

@@ -23,7 +23,7 @@ import {
 } from "@/utils/sessionUtils";
 import * as Clipboard from "expo-clipboard";
 import { Modal } from "@/modal";
-import { sessionKill, sessionArchive, sessionDelete, machineSpawnNewSession, sessionForkSession } from "@/sync/ops";
+import { archiveSessionWithKill, sessionDelete, machineSpawnNewSession, sessionForkSession } from "@/sync/ops";
 import { reactivateArchivedSession } from "@/sync/sessionResumeFlow";
 import { runWithSessionReactivationGuard } from "@/sync/sessionResumeGuard";
 import { setSessionForkSource } from "@/sync/apiProjects";
@@ -180,19 +180,13 @@ function SessionInfoContent({ session }: { session: Session }) {
   }, [session]);
 
   // Use HappyAction for archiving - it handles errors automatically.
-  // First tries the killSession RPC (process must be reachable). If that fails
-  // (daemon offline, process already dead, network issue), falls back to the
-  // server-side archive endpoint which forces active=false and signals the daemon.
   const [, performArchive] = useHappyAction(async () => {
-    const rpcResult = await sessionKill(session.id);
-    if (!rpcResult.success) {
-      const fallbackResult = await sessionArchive(session.id);
-      if (!fallbackResult.success) {
-        throw new HappyError(
-          fallbackResult.message || t("sessionInfo.failedToArchiveSession"),
-          false,
-        );
-      }
+    const result = await archiveSessionWithKill(session.id);
+    if (!result.success) {
+      throw new HappyError(
+        result.message || t("sessionInfo.failedToArchiveSession"),
+        false,
+      );
     }
     // Optimistically mark inactive so the session list updates immediately
     storage.getState().applySessions([{ ...session, active: false }]);

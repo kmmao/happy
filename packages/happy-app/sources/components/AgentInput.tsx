@@ -1491,7 +1491,7 @@ export const AgentInput = React.memo(
               visible={previewPasteBlock !== null}
               block={previewPasteBlock}
               onClose={closePasteBlockPreview}
-              onExpand={(id) => props.onPasteBlockExpand?.(id)}
+              onSave={(id, text) => props.onPasteBlockSave?.(id, text)}
               onRemove={props.onPasteBlockRemove}
             />
 
