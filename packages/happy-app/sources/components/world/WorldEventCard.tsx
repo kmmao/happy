@@ -59,10 +59,16 @@ export const WorldEventCard = React.memo(function WorldEventCard({
     const [actionDone, setActionDone] = React.useState<string | null>(null);
 
     const handlePress = React.useCallback(() => {
+        // Session events: tap to navigate directly instead of expanding
+        if (event.source.sessionId && event.eventType.startsWith("session.")) {
+            router.push(`/(app)/session/${event.source.sessionId}`);
+            onPress?.(event);
+            return;
+        }
         LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
         setExpanded((v) => !v);
         onPress?.(event);
-    }, [event, onPress]);
+    }, [event, onPress, router]);
 
     return (
         <TouchableOpacity
@@ -78,6 +84,9 @@ export const WorldEventCard = React.memo(function WorldEventCard({
                             {event.eventType}
                         </Text>
                         <Text style={styles.time}>{formatTime(event.occurredAt)}</Text>
+                        {event.source.sessionId && event.eventType.startsWith("session.") && (
+                            <Ionicons name="chevron-forward" size={14} color={theme.colors.textLink} style={{ marginLeft: 4 }} />
+                        )}
                     </View>
                     <Text style={styles.title} numberOfLines={expanded ? undefined : 2}>
                         {event.title}
