@@ -619,6 +619,7 @@ export const pl: TranslationStructure = {
     pastedContent: "Pasted content",
     pastedContentSummary: ({ preview, lines }: { preview: string; lines: number }) =>
       `${preview} · ${lines} ${lines === 1 ? "line" : "lines"}`,
+    viewFullContent: "Pokaż pełną treść",
     cameraPermissionRequired: "Wymagane uprawnienia do aparatu",
     dropFilesHere: "Upuść pliki tutaj",
     imageLoadFailed: "Nie udało się załadować obrazu",

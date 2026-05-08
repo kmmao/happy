@@ -595,6 +595,7 @@ export const en = {
     pastedContent: "Pasted content",
     pastedContentSummary: ({ preview, lines }: { preview: string; lines: number }) =>
       `${preview} · ${lines} ${lines === 1 ? "line" : "lines"}`,
+    viewFullContent: "View full content",
     cameraPermissionRequired: "Camera permission is required to take photos",
     dropFilesHere: "Drop files here",
     imageLoadFailed: "Failed to load image",

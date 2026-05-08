@@ -836,6 +836,7 @@ export const ru: TranslationStructure = {
     pastedContent: "Pasted content",
     pastedContentSummary: ({ preview, lines }: { preview: string; lines: number }) =>
       `${preview} · ${lines} ${lines === 1 ? "line" : "lines"}`,
+    viewFullContent: "Показать полный текст",
     cameraPermissionRequired: "Для съёмки фото необходимо разрешение камеры",
     dropFilesHere: "Перетащите файлы сюда",
     imageLoadFailed: "Не удалось загрузить изображение",

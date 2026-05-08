@@ -2,7 +2,9 @@ import * as React from "react";
 import { View, Text, Pressable } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { Ionicons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
 import { MarkdownView } from "./markdown/MarkdownView";
+import { storeTempText } from "@/sync/persistence";
 import { Typography } from "@/constants/Typography";
 import { t } from "@/text";
 import {
@@ -121,6 +123,7 @@ function UserTextBlock(props: { message: UserTextMessage; sessionId: string }) {
   const { toggleBookmark, isBookmarked } = useBookmarks();
   const appendToInput = useAppendToInput();
   const { theme } = useUnistyles();
+  const router = useRouter();
 
   const queuedIds = storage((s) => s.queuedMessageLocalIds[props.sessionId]);
   const isQueued =
@@ -154,6 +157,12 @@ function UserTextBlock(props: { message: UserTextMessage; sessionId: string }) {
       ? parsed.text
       : props.message.displayText || props.message.text;
 
+  const hasFullContent =
+    parsed.imagePaths.length === 0 &&
+    props.message.displayText != null &&
+    props.message.displayText.length > 0 &&
+    props.message.text !== props.message.displayText;
+
   // Hidden synthetic messages (e.g. auto-summary triggers from the CLI) send
   // an empty `displayText` so the Agent sees the underlying prompt but the
   // chat surface stays clean. Short-circuit the whole block so the row-spacing
@@ -185,6 +194,20 @@ function UserTextBlock(props: { message: UserTextMessage; sessionId: string }) {
               markdown={displayText}
               onOptionPress={handleOptionPress}
             />
+            {hasFullContent && (
+              <Pressable
+                onPress={() => {
+                  const textId = storeTempText(props.message.text);
+                  router.push(`/text-selection?textId=${textId}`);
+                }}
+                style={styles.expandFullButton}
+                hitSlop={8}
+              >
+                <Text style={styles.expandFullButtonText}>
+                  {t("session.viewFullContent")}
+                </Text>
+              </Pressable>
+            )}
           </View>
           <View style={styles.userActionsRow}>
             <Pressable
@@ -986,6 +1009,18 @@ const styles = StyleSheet.create((theme) => ({
     borderRadius: 12,
     marginBottom: 2,
     flexShrink: 1,
+  },
+  expandFullButton: {
+    paddingHorizontal: 0,
+    paddingVertical: 6,
+    borderTopWidth: 1,
+    borderTopColor: theme.colors.divider,
+    marginTop: 4,
+  },
+  expandFullButtonText: {
+    ...Typography.mono(),
+    color: theme.colors.textLink,
+    fontSize: 12,
   },
   queuedIndicator: {
     flexDirection: "row",

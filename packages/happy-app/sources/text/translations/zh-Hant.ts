@@ -579,6 +579,7 @@ export const zhHant: TranslationStructure = {
     pastedContent: "貼上內容",
     pastedContentSummary: ({ preview, lines }: { preview: string; lines: number }) =>
       `${preview} · ${lines} 行`,
+    viewFullContent: "查看完整內容",
     cameraPermissionRequired: "需要相機權限才能拍照",
     dropFilesHere: "拖放檔案到此處",
     imageLoadFailed: "圖片載入失敗",

@@ -731,6 +731,7 @@ export const ja: TranslationStructure = {
     pastedContent: "Pasted content",
     pastedContentSummary: ({ preview, lines }: { preview: string; lines: number }) =>
       `${preview} · ${lines} ${lines === 1 ? "line" : "lines"}`,
+    viewFullContent: "全文を表示",
     cameraPermissionRequired: "写真を撮るにはカメラの権限が必要です",
     dropFilesHere: "ここにファイルをドロップ",
     imageLoadFailed: "画像の読み込みに失敗しました",
