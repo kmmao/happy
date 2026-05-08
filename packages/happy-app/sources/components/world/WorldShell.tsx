@@ -50,6 +50,7 @@ export const WorldShell = React.memo(function WorldShell({ onExit }: WorldShellP
     const slashCommands = React.useMemo(() => {
         const base = [
             { cmd: "/new", label: "New Session", icon: "chatbubble-outline" as const, action: () => { router.push("/(app)/new"); setSearchOpen(false); setSearchQuery(""); } },
+            { cmd: "/sessions", label: "Go to Session List", icon: "list-outline" as const, action: () => { setSearchOpen(false); setSearchQuery(""); if (onExit) { onExit(); } else if (router.canGoBack()) { router.back(); } else { router.replace("/"); } } },
         ];
         const taskCmds = machines.slice(0, 3).map((m) => {
             const mName = m.metadata?.displayName || m.metadata?.host || m.id.slice(0, 8);
@@ -61,7 +62,7 @@ export const WorldShell = React.memo(function WorldShell({ onExit }: WorldShellP
             };
         });
         return [...base, ...taskCmds];
-    }, [machines, router]);
+    }, [machines, router, onExit]);
 
     const matchedCommands = React.useMemo(() => {
         if (!searchQuery.startsWith("/")) return [];
