@@ -51,6 +51,7 @@ export const WorldShell = React.memo(function WorldShell({ onExit }: WorldShellP
         const base = [
             { cmd: "/new", label: "New Session", icon: "chatbubble-outline" as const, action: () => { router.push("/(app)/new"); setSearchOpen(false); setSearchQuery(""); } },
             { cmd: "/sessions", label: "Go to Session List", icon: "list-outline" as const, action: () => { setSearchOpen(false); setSearchQuery(""); if (onExit) { onExit(); } else if (router.canGoBack()) { router.back(); } else { router.replace("/"); } } },
+            { cmd: "/knowledge", label: "Search Knowledge Base", icon: "library-outline" as const, action: () => { router.push("/(app)/knowledge/search"); setSearchOpen(false); setSearchQuery(""); } },
         ];
         const taskCmds = machines.slice(0, 3).map((m) => {
             const mName = m.metadata?.displayName || m.metadata?.host || m.id.slice(0, 8);
