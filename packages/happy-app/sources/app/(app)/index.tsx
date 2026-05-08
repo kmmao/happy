@@ -5,7 +5,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as React from "react";
 import { encodeBase64 } from "@/encryption/base64";
 import { authGetToken } from "@/auth/authGetToken";
-import { router, useRouter } from "expo-router";
+import { router, useRouter, useFocusEffect } from "expo-router";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { getRandomBytesAsync } from "expo-crypto";
 import { useIsLandscape } from "@/utils/responsive";
@@ -29,6 +29,16 @@ function Home() {
 function Authenticated() {
   const devModeEnabled = useLocalSetting("devModeEnabled");
   const [showMain, setShowMain] = React.useState(false);
+
+  // Reset to World Shell whenever the home screen regains focus
+  // (e.g. user navigated to a session then came back)
+  useFocusEffect(
+    React.useCallback(() => {
+      if (devModeEnabled) {
+        setShowMain(false);
+      }
+    }, [devModeEnabled]),
+  );
 
   if (devModeEnabled && !showMain) {
     return <WorldShell onExit={() => setShowMain(true)} />;
