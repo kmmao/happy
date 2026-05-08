@@ -94,8 +94,15 @@ export function worldEventRoutes(app: Fastify) {
             const actionWhere: Record<string, unknown> = { accountId: userId };
             if (projectId) actionWhere.projectId = projectId;
 
+            // Knowledge filter (via project.accountId join)
+            const knowledgeWhere: Record<string, unknown> = {
+                project: { accountId: userId },
+                status: "active",
+            };
+            if (projectId) knowledgeWhere.projectId = projectId;
+
             // Parallel fetch — each source capped at limit to bound memory
-            const [tasks, inboxItems, supervisorActions] = await Promise.all([
+            const [tasks, inboxItems, supervisorActions, knowledgeEntries] = await Promise.all([
                 db.task.findMany({
                     where: taskWhere,
                     orderBy: { updatedAt: "desc" },
@@ -137,6 +144,19 @@ export function worldEventRoutes(app: Fastify) {
                         description: true,
                         severity: true,
                         projectId: true,
+                        createdAt: true,
+                    },
+                }),
+                db.projectKnowledge.findMany({
+                    where: knowledgeWhere,
+                    orderBy: { createdAt: "desc" },
+                    take: Math.min(limit, 20), // cap knowledge entries separately
+                    select: {
+                        id: true,
+                        entryType: true,
+                        tags: true,
+                        projectId: true,
+                        confidence: true,
                         createdAt: true,
                     },
                 }),
@@ -190,6 +210,28 @@ export function worldEventRoutes(app: Fastify) {
                     source: {
                         type: "project",
                         projectId: action.projectId,
+                    },
+                });
+            }
+
+            for (const entry of knowledgeEntries) {
+                // title is encrypted — use entryType + tags as a human-readable label
+                let tags: string[] = [];
+                try { tags = JSON.parse(entry.tags) as string[]; } catch { /* empty */ }
+                const label = tags.length > 0
+                    ? `${entry.entryType}: ${tags.slice(0, 3).join(", ")}`
+                    : entry.entryType;
+                events.push({
+                    id: `memory-${entry.id}`,
+                    originalId: entry.id,
+                    eventType: "memory.created",
+                    title: label,
+                    summary: `${entry.entryType} · ${entry.confidence}`,
+                    occurredAt: entry.createdAt.getTime(),
+                    severity: "info",
+                    source: {
+                        type: "project",
+                        projectId: entry.projectId,
                     },
                 });
             }
