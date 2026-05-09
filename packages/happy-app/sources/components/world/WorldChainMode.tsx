@@ -2,6 +2,7 @@ import * as React from "react";
 import { View, ScrollView, RefreshControl, TouchableOpacity, LayoutAnimation } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { Ionicons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
 import { Text } from "@/components/StyledText";
 import { t } from "@/text";
 import type { WorldEvent } from "./worldTypes";
@@ -213,8 +214,8 @@ const IntentCard = React.memo(function IntentCard({ chain }: { chain: IntentChai
 
             {expanded && (
                 <View style={styles.taskList}>
-                    {chain.steps.map((step) => (
-                        <TaskRow key={step.id} event={step} />
+                    {chain.steps.map((step, idx) => (
+                        <TaskRow key={step.id} event={step} stepIndex={idx + 1} />
                     ))}
                 </View>
             )}
@@ -301,10 +302,13 @@ function StepDot({ event }: { event: WorldEvent }) {
     );
 }
 
-function TaskRow({ event }: { event: WorldEvent }) {
+function TaskRow({ event, stepIndex }: { event: WorldEvent; stepIndex?: number }) {
     const { theme } = useUnistyles();
     const { styles } = useStyles();
+    const router = useRouter();
     const status = extractStatus(event.eventType);
+    const sessionId = event.source.sessionId;
+    const tappable = !!sessionId;
     const statusColor = status === "completed"
         ? theme.colors.success
         : status === "failed"
@@ -315,14 +319,34 @@ function TaskRow({ event }: { event: WorldEvent }) {
 
     const time = new Date(event.occurredAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 
-    return (
-        <View style={styles.taskRow}>
-            <View style={[styles.taskDot, { backgroundColor: statusColor }]} />
+    const inner = (
+        <View style={[styles.taskRow, tappable && styles.taskRowTappable]}>
+            {stepIndex !== undefined ? (
+                <Text style={[styles.stepIndex, { color: statusColor }]}>{stepIndex}.</Text>
+            ) : (
+                <View style={[styles.taskDot, { backgroundColor: statusColor }]} />
+            )}
             <Text style={styles.taskTitle} numberOfLines={1}>{event.title}</Text>
-            <Text style={styles.taskStatus}>{status}</Text>
+            <Text style={[styles.taskStatus, { color: statusColor }]}>{status}</Text>
+            {tappable && (
+                <Ionicons name="chevron-forward" size={12} color={theme.colors.textSecondary} />
+            )}
             <Text style={styles.taskTime}>{time}</Text>
         </View>
     );
+
+    if (tappable) {
+        return (
+            <TouchableOpacity
+                onPress={() => router.push(`/(app)/session/${sessionId}`)}
+                activeOpacity={0.6}
+            >
+                {inner}
+            </TouchableOpacity>
+        );
+    }
+
+    return inner;
 }
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
@@ -414,6 +438,15 @@ const useStyles = () => {
             flexDirection: "row",
             alignItems: "center",
             gap: 8,
+            paddingVertical: 2,
+        },
+        taskRowTappable: {
+            paddingVertical: 4,
+        },
+        stepIndex: {
+            fontSize: 12,
+            fontWeight: "600",
+            width: 18,
         },
         taskDot: {
             width: 6,
