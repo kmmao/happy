@@ -2,6 +2,17 @@
   "entries": {
     "en": [
       {
+        "version": "2.25.0",
+        "date": "2026-05-10",
+        "summary": "This release polishes the World Shell definition panel, improves the session permission experience, and cleans up internal event handling.",
+        "changes": [
+          "Added policy mode descriptions — the automation policy selector in the World Definition panel now shows a one-line explanation below the current option, so you can see what each mode (disabled, suggest, semi-auto, auto) does without guessing",
+          "Added permission sheet — tapping the \"Needs Permission\" chip in a session now opens a permission-approval sheet directly, instead of requiring you to navigate into the session to resolve it",
+          "Fixed \"Needs Permission\" status bar label to be tappable — the label in the session status bar now responds to taps in the same way as the chip"
+        ],
+        "rawMarkdown": "## 2.25.0 - 2026-05-10\n\n\nThis release polishes the World Shell definition panel, improves the session permission experience, and cleans up internal event handling.\n\n### World Shell — Definition Panel\n- Added policy mode descriptions — the automation policy selector in the World Definition panel now shows a one-line explanation below the current option, so you can see what each mode (disabled, suggest, semi-auto, auto) does without guessing\n\n### Session\n- Added permission sheet — tapping the \"Needs Permission\" chip in a session now opens a permission-approval sheet directly, instead of requiring you to navigate into the session to resolve it\n- Fixed \"Needs Permission\" status bar label to be tappable — the label in the session status bar now responds to taps in the same way as the chip"
+      },
+      {
         "version": "2.24.0",
         "date": "2026-05-09",
         "summary": "This release rounds out the World Shell with a compact event view, full search and filtering in Chain Mode, and a more accurate active-agent counter.",
@@ -770,6 +781,17 @@
     ],
     "zh-Hans": [
       {
+        "version": "2.25.0",
+        "date": "2026-05-10",
+        "summary": "本次更新完善了 World Shell 定义面板的策略说明，改进了会话权限体验，并优化了内部事件处理逻辑。",
+        "changes": [
+          "新增策略模式说明——World 定义面板中的自动化策略选择器现在在当前选项下方显示一行说明，让你无需猜测每个模式（disabled、suggest、semi-auto、auto）的含义",
+          "新增权限审批面板——点击会话中的\"需要权限\"标签现在可直接打开权限审批面板，无需先进入会话再处理",
+          "修复会话状态栏中\"需要权限\"标签不可点击的问题，现在与标签芯片的响应方式保持一致"
+        ],
+        "rawMarkdown": "## 2.25.0 - 2026-05-10\n\n\n本次更新完善了 World Shell 定义面板的策略说明，改进了会话权限体验，并优化了内部事件处理逻辑。\n\n### World Shell — 定义面板\n- 新增策略模式说明——World 定义面板中的自动化策略选择器现在在当前选项下方显示一行说明，让你无需猜测每个模式（disabled、suggest、semi-auto、auto）的含义\n\n### 会话\n- 新增权限审批面板——点击会话中的\"需要权限\"标签现在可直接打开权限审批面板，无需先进入会话再处理\n- 修复会话状态栏中\"需要权限\"标签不可点击的问题，现在与标签芯片的响应方式保持一致"
+      },
+      {
         "version": "2.24.0",
         "date": "2026-05-09",
         "summary": "本次更新完善了 World Shell 的紧凑事件视图、Chain Mode 的搜索与筛选功能，并修复了活跃 Agent 计数不准确的问题。",
@@ -1515,7 +1537,7 @@
       }
     ]
   },
-  "latestVersion": "2.24.0",
+  "latestVersion": "2.25.0",
   "availableLocales": [
     "en",
     "zh-Hans"

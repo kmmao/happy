@@ -1,5 +1,16 @@
 # Changelog
 
+## 2.25.0 - 2026-05-10
+
+This release polishes the World Shell definition panel, improves the session permission experience, and cleans up internal event handling.
+
+### World Shell — Definition Panel
+- Added policy mode descriptions — the automation policy selector in the World Definition panel now shows a one-line explanation below the current option, so you can see what each mode (disabled, suggest, semi-auto, auto) does without guessing
+
+### Session
+- Added permission sheet — tapping the "Needs Permission" chip in a session now opens a permission-approval sheet directly, instead of requiring you to navigate into the session to resolve it
+- Fixed "Needs Permission" status bar label to be tappable — the label in the session status bar now responds to taps in the same way as the chip
+
 ## 2.24.0 - 2026-05-09
 
 This release rounds out the World Shell with a compact event view, full search and filtering in Chain Mode, and a more accurate active-agent counter.
