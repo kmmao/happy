@@ -387,6 +387,28 @@ export const ApiEphemeralInterAgentMessageSchema = z.object({
 });
 export type ApiEphemeralInterAgentMessage = z.infer<typeof ApiEphemeralInterAgentMessageSchema>;
 
+export const ApiEphemeralWorldEventCreatedSchema = z.object({
+    type: z.literal("world-event-created"),
+    event: z.object({
+        id: z.string(),
+        eventType: z.string(),
+        title: z.string(),
+        summary: z.string(),
+        occurredAt: z.number(),
+        severity: z.enum(["info", "warning", "critical"]),
+        source: z.object({
+            type: z.string(),
+            projectId: z.string().nullable().optional(),
+            projectPath: z.string().nullable().optional(),
+            machineId: z.string().nullable().optional(),
+            sessionId: z.string().nullable().optional(),
+        }),
+        originalId: z.string(),
+        parentTaskId: z.string().nullable().optional(),
+    }),
+});
+export type ApiEphemeralWorldEventCreated = z.infer<typeof ApiEphemeralWorldEventCreatedSchema>;
+
 export const ApiEphemeralUpdateSchema = z.union([
   ApiEphemeralActivityUpdateSchema,
   ApiEphemeralUsageUpdateSchema,
@@ -405,6 +427,7 @@ export const ApiEphemeralUpdateSchema = z.union([
   ApiEphemeralInboxUnreadCountSchema,
   ApiEphemeralSessionEventCreatedSchema,
   ApiEphemeralInterAgentMessageSchema,
+  ApiEphemeralWorldEventCreatedSchema,
 ]);
 
 export type ApiEphemeralActivityUpdate = z.infer<

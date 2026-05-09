@@ -1,6 +1,6 @@
 import { db } from "@/storage/db";
 import { log } from "@/utils/log";
-import { eventRouter, buildInboxNewItemEphemeral, buildInboxUnreadCountEphemeral } from "@/app/events/eventRouter";
+import { eventRouter, buildInboxNewItemEphemeral, buildInboxUnreadCountEphemeral, buildWorldEventCreatedEphemeral } from "@/app/events/eventRouter";
 import { pushSend } from "./pushSend";
 
 const DEDUP_WINDOW_MS = 60 * 60 * 1000; // 1 hour
@@ -71,12 +71,35 @@ export async function inboxCreate(input: InboxCreateInput): Promise<void> {
             createdAt: item.createdAt.getTime(),
         };
 
-        // Emit new item ephemeral
+        // Emit new item ephemeral (specific channel for backward compat)
         eventRouter.emitEphemeral({
             userId: input.accountId,
             payload: buildInboxNewItemEphemeral(serialized),
             recipientFilter: { type: "user-scoped-only" },
         });
+
+        // Emit unified world event channel
+        {
+            const mapSeverity = (s: string): "info" | "warning" | "critical" =>
+                s === "error" || s === "critical" ? "critical" : s === "warning" ? "warning" : "info";
+            eventRouter.emitEphemeral({
+                userId: input.accountId,
+                payload: buildWorldEventCreatedEphemeral({
+                    id: `inbox-${item.id}`,
+                    eventType: `decision.${item.eventType}`,
+                    title: item.title,
+                    summary: item.body ?? "",
+                    occurredAt: item.createdAt.getTime(),
+                    severity: mapSeverity(item.severity),
+                    source: {
+                        type: item.refType === "project" ? "project" : "system",
+                        projectId: item.refType === "project" ? (item.refId ?? null) : null,
+                    },
+                    originalId: item.id,
+                }),
+                recipientFilter: { type: "user-scoped-only" },
+            });
+        }
 
         // Emit updated unread count
         const unreadCount = await db.inboxItem.count({

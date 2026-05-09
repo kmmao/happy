@@ -453,6 +453,26 @@ export type EphemeralEvent =
       message: string;
       sentAt: number;
     }
+  | {
+      type: "world-event-created";
+      event: {
+        id: string;
+        eventType: string;
+        title: string;
+        summary: string;
+        occurredAt: number;
+        severity: "info" | "warning" | "critical";
+        source: {
+          type: "project" | "machine" | "session" | "trigger" | "agent" | "system";
+          projectId?: string | null;
+          projectPath?: string | null;
+          machineId?: string | null;
+          sessionId?: string | null;
+        };
+        originalId: string;
+        parentTaskId?: string | null;
+      };
+    }
 ;
 
 // === EVENT PAYLOAD TYPES ===
@@ -1307,5 +1327,28 @@ export function buildInterAgentMessageEphemeral(opts: {
     toSessionId: opts.toSessionId,
     message: opts.message,
     sentAt: Date.now(),
+  };
+}
+
+export function buildWorldEventCreatedEphemeral(event: {
+  id: string;
+  eventType: string;
+  title: string;
+  summary: string;
+  occurredAt: number;
+  severity: "info" | "warning" | "critical";
+  source: {
+    type: "project" | "machine" | "session" | "trigger" | "agent" | "system";
+    projectId?: string | null;
+    projectPath?: string | null;
+    machineId?: string | null;
+    sessionId?: string | null;
+  };
+  originalId: string;
+  parentTaskId?: string | null;
+}): EphemeralPayload {
+  return {
+    type: "world-event-created",
+    event,
   };
 }

@@ -10,6 +10,7 @@ import { refineKnowledgeEntry } from "@/modules/knowledgeRefiner";
 import {
     buildKnowledgeAccessUpdateEphemeral,
     buildKnowledgeCountEphemeral,
+    buildWorldEventCreatedEphemeral,
     eventRouter,
 } from "@/app/events/eventRouter";
 import { inTx } from "@/storage/inTx";
@@ -182,6 +183,33 @@ export function knowledgeHandler(userId: string, socket: Socket) {
                 payload: buildKnowledgeCountEphemeral(sid, knowledgeCount),
                 recipientFilter: { type: "user-scoped-only" },
             });
+
+            // Push unified world event so Stream Mode shows memory.created in real-time
+            {
+                let tags: string[] = [];
+                try { tags = JSON.parse(created.tags) as string[]; } catch { /* ignore */ }
+                const label = tags.length > 0
+                    ? `${created.entryType}: ${tags.slice(0, 3).join(", ")}`
+                    : created.entryType;
+                eventRouter.emitEphemeral({
+                    userId,
+                    payload: buildWorldEventCreatedEphemeral({
+                        id: `memory-${created.id}`,
+                        eventType: "memory.created",
+                        title: label,
+                        summary: `${created.entryType} · ${created.confidence}`,
+                        occurredAt: created.createdAt.getTime(),
+                        severity: "info",
+                        source: {
+                            type: "project",
+                            projectId: created.projectId,
+                            sessionId: created.sessionId ?? null,
+                        },
+                        originalId: created.id,
+                    }),
+                    recipientFilter: { type: "user-scoped-only" },
+                });
+            }
 
             log({ module: "knowledge" }, `Knowledge ${action.type}: "${entry.title.slice(0, 50)}" for project ${projectId}`);
         } catch (err) {

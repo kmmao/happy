@@ -169,11 +169,43 @@ export function useWorldEvents(filter?: WorldFilter): UseWorldEventsResult {
             setEvents((prev) => [worldEvent, ...prev].slice(0, MAX_EVENTS));
         });
 
+        // Unified world-event-created channel — covers memory.* and any future event types
+        const unsubWorldEvent = sync.onWorldEventCreated((raw) => {
+            const worldEvent: WorldEvent = {
+                id: raw.id,
+                originalId: raw.originalId,
+                eventType: raw.eventType,
+                title: raw.title,
+                summary: raw.summary,
+                occurredAt: raw.occurredAt,
+                severity: raw.severity,
+                source: {
+                    type: raw.source.type as WorldEvent["source"]["type"],
+                    projectId: raw.source.projectId ?? null,
+                    projectPath: raw.source.projectPath ?? null,
+                    machineId: raw.source.machineId ?? null,
+                    sessionId: raw.source.sessionId ?? null,
+                },
+                parentTaskId: raw.parentTaskId ?? null,
+            };
+
+            const f = filterRef.current;
+            if (f && !filterWorldEvents([worldEvent], f).length) return;
+            setEvents((prev) => {
+                // Skip if an event with the same originalId already arrived via a specific channel
+                if (prev.some((e) => e.originalId === worldEvent.originalId && e.eventType === worldEvent.eventType)) {
+                    return prev;
+                }
+                return [worldEvent, ...prev].slice(0, MAX_EVENTS);
+            });
+        });
+
         return () => {
             unsubTask();
             unsubInbox();
             unsubSessionEvent();
             unsubSupervisor();
+            unsubWorldEvent();
         };
     }, []);
 

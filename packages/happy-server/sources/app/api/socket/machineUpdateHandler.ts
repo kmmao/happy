@@ -1,6 +1,6 @@
 import { machineAliveEventsCounter, websocketEventsCounter } from "@/app/monitoring/metrics2";
 import { activityCache } from "@/app/presence/sessionCache";
-import { buildKnowledgeCountEphemeral, buildMachineActivityEphemeral, buildSessionActivityEphemeral, buildUpdateMachineUpdate, eventRouter } from "@/app/events/eventRouter";
+import { buildKnowledgeCountEphemeral, buildMachineActivityEphemeral, buildSessionActivityEphemeral, buildUpdateMachineUpdate, buildWorldEventCreatedEphemeral, eventRouter } from "@/app/events/eventRouter";
 import { log } from "@/utils/log";
 import { db } from "@/storage/db";
 import { Socket } from "socket.io";
@@ -418,6 +418,33 @@ export function machineUpdateHandler(userId: string, socket: Socket) {
 
                 void storeKnowledgeEmbedding(created.id, turn.title ?? "", turn.content ?? "");
                 updatedSessionIds.add(sessionId);
+
+                // Push unified world event for Stream Mode real-time updates
+                {
+                    let tags: string[] = [];
+                    try { tags = JSON.parse(created.tags) as string[]; } catch { /* ignore */ }
+                    const label = tags.length > 0
+                        ? `${created.entryType}: ${tags.slice(0, 3).join(", ")}`
+                        : created.entryType;
+                    eventRouter.emitEphemeral({
+                        userId,
+                        payload: buildWorldEventCreatedEphemeral({
+                            id: `memory-${created.id}`,
+                            eventType: "memory.created",
+                            title: label,
+                            summary: `${created.entryType} · ${created.confidence}`,
+                            occurredAt: created.createdAt.getTime(),
+                            severity: "info",
+                            source: {
+                                type: "project",
+                                projectId: created.projectId,
+                                sessionId: created.sessionId ?? null,
+                            },
+                            originalId: created.id,
+                        }),
+                        recipientFilter: { type: "user-scoped-only" },
+                    });
+                }
             }
 
             // Notify App once per affected session so the "changes" tab updates in real time.
