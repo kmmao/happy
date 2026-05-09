@@ -234,7 +234,7 @@ export const WorldShell = React.memo(function WorldShell({ onExit }: WorldShellP
                 </TouchableOpacity>
             </View>
 
-            {viewMode === "stream" && (
+            {viewMode !== "agents" && (
                 <WorldFilterChips
                     activeFilter={filter}
                     onFilterChange={setFilter}
@@ -243,26 +243,26 @@ export const WorldShell = React.memo(function WorldShell({ onExit }: WorldShellP
             )}
 
             {/* Search / command bar */}
-            {viewMode === "stream" && searchOpen && (
+            {viewMode !== "agents" && searchOpen && (
                 <>
                     <View style={styles.searchBar}>
                         <Ionicons
-                            name={searchQuery.startsWith("/") ? "flash-outline" : "search"}
+                            name={viewMode === "stream" && searchQuery.startsWith("/") ? "flash-outline" : "search"}
                             size={16}
-                            color={searchQuery.startsWith("/") ? theme.colors.primary : theme.colors.textSecondary}
+                            color={viewMode === "stream" && searchQuery.startsWith("/") ? theme.colors.primary : theme.colors.textSecondary}
                             style={{ marginRight: 8 }}
                         />
                         <TextInput
                             style={styles.searchInput}
                             value={searchQuery}
                             onChangeText={setSearchQuery}
-                            placeholder="Search or type / for commands…"
+                            placeholder={viewMode === "chain" ? "Search chains…" : "Search or type / for commands…"}
                             placeholderTextColor={theme.colors.textSecondary}
                             autoFocus
                             clearButtonMode="while-editing"
                         />
                     </View>
-                    {matchedCommands.length > 0 && (
+                    {viewMode === "stream" && matchedCommands.length > 0 && (
                         <View style={styles.commandList}>
                             {matchedCommands.map((cmd) => (
                                 <TouchableOpacity
@@ -296,7 +296,12 @@ export const WorldShell = React.memo(function WorldShell({ onExit }: WorldShellP
                     contentContainerStyle={compact ? styles.listCompact : styles.list}
                 />
             ) : viewMode === "chain" ? (
-                <WorldChainMode events={events} loading={loading} onRefresh={refresh} />
+                <WorldChainMode
+                    events={events}
+                    loading={loading}
+                    onRefresh={refresh}
+                    searchQuery={searchQuery.startsWith("/") ? "" : searchQuery}
+                />
             ) : (
                 <WorldAgentMode />
             )}

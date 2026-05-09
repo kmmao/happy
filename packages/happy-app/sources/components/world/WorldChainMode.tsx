@@ -17,16 +17,29 @@ interface WorldChainModeProps {
     events: WorldEvent[];
     loading: boolean;
     onRefresh: () => void;
+    searchQuery?: string;
 }
 
 export const WorldChainMode = React.memo(function WorldChainMode({
     events,
     loading,
     onRefresh,
+    searchQuery = "",
 }: WorldChainModeProps) {
     const { theme } = useUnistyles();
     const { styles } = useStyles();
-    const chains = React.useMemo(() => groupIntoChains(events), [events]);
+    const chains = React.useMemo(() => {
+        const all = groupIntoChains(events);
+        const q = searchQuery.trim().toLowerCase();
+        if (!q) return all;
+        return all.filter((chain) =>
+            chain.kind === "intent"
+                ? chain.parentEvent.title.toLowerCase().includes(q) ||
+                  chain.steps.some((s) => s.title.toLowerCase().includes(q))
+                : chain.projectLabel.toLowerCase().includes(q) ||
+                  chain.tasks.some((t) => t.title.toLowerCase().includes(q)),
+        );
+    }, [events, searchQuery]);
 
     if (chains.length === 0 && !loading) {
         return (
