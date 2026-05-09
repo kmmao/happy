@@ -1,5 +1,16 @@
 # Changelog
 
+## 2.23.0 - 2026-05-09
+
+World Shell now has an Agents tab — see every machine and its active sessions at a glance, with live status indicators.
+
+### World Shell — Agent Mode
+- Added "Agents" tab to the World Shell — groups all active sessions by machine, showing each session's real-time state (running, thinking, needs attention, stuck, idle)
+- Added "stuck" detection — sessions that have been idle for more than 10 minutes are flagged with an amber indicator so nothing slips through unnoticed
+- Added tap-to-navigate on every session row — tap any session to open it directly
+- Added pull-to-refresh support — pull down to resync machine and session state
+- Fixed "Chains" tab label to use localized text instead of hardcoded English
+
 ## 2.22.0 - 2026-05-09
 
 This release makes the World Shell Chain Mode fully interactive — every step, dot, and Intent title is now tappable and navigates directly to its execution session.

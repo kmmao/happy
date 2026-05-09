@@ -2,6 +2,19 @@
   "entries": {
     "en": [
       {
+        "version": "2.23.0",
+        "date": "2026-05-09",
+        "summary": "World Shell now has an Agents tab — see every machine and its active sessions at a glance, with live status indicators.",
+        "changes": [
+          "Added \"Agents\" tab to the World Shell — groups all active sessions by machine, showing each session's real-time state (running, thinking, needs attention, stuck, idle)",
+          "Added \"stuck\" detection — sessions that have been idle for more than 10 minutes are flagged with an amber indicator so nothing slips through unnoticed",
+          "Added tap-to-navigate on every session row — tap any session to open it directly",
+          "Added pull-to-refresh support — pull down to resync machine and session state",
+          "Fixed \"Chains\" tab label to use localized text instead of hardcoded English"
+        ],
+        "rawMarkdown": "## 2.23.0 - 2026-05-09\n\n\nWorld Shell now has an Agents tab — see every machine and its active sessions at a glance, with live status indicators.\n\n### World Shell — Agent Mode\n- Added \"Agents\" tab to the World Shell — groups all active sessions by machine, showing each session's real-time state (running, thinking, needs attention, stuck, idle)\n- Added \"stuck\" detection — sessions that have been idle for more than 10 minutes are flagged with an amber indicator so nothing slips through unnoticed\n- Added tap-to-navigate on every session row — tap any session to open it directly\n- Added pull-to-refresh support — pull down to resync machine and session state\n- Fixed \"Chains\" tab label to use localized text instead of hardcoded English"
+      },
+      {
         "version": "2.22.0",
         "date": "2026-05-09",
         "summary": "This release makes the World Shell Chain Mode fully interactive — every step, dot, and Intent title is now tappable and navigates directly to its execution session.",
@@ -744,6 +757,19 @@
     ],
     "zh-Hans": [
       {
+        "version": "2.23.0",
+        "date": "2026-05-09",
+        "summary": "World Shell 新增 Agents 标签页——一眼看清每台机器上的活跃会话及实时状态。",
+        "changes": [
+          "新增 \"Agents\" 标签页——以机器为维度展示所有活跃会话，实时显示各会话状态（running、thinking、needs attention、stuck、idle）",
+          "新增\"卡住\"检测——空闲超过 10 分钟的活跃会话会以橙色标注，防止任务静默挂起被遗漏",
+          "新增会话行点击跳转——点击任意会话行可直接打开该会话",
+          "新增下拉刷新——下拉可重新同步机器与会话状态",
+          "修复\"链路\"标签文本改用本地化文字，不再硬编码英文"
+        ],
+        "rawMarkdown": "## 2.23.0 - 2026-05-09\n\n\nWorld Shell 新增 Agents 标签页——一眼看清每台机器上的活跃会话及实时状态。\n\n### World Shell — Agent Mode\n- 新增 \"Agents\" 标签页——以机器为维度展示所有活跃会话，实时显示各会话状态（running、thinking、needs attention、stuck、idle）\n- 新增\"卡住\"检测——空闲超过 10 分钟的活跃会话会以橙色标注，防止任务静默挂起被遗漏\n- 新增会话行点击跳转——点击任意会话行可直接打开该会话\n- 新增下拉刷新——下拉可重新同步机器与会话状态\n- 修复\"链路\"标签文本改用本地化文字，不再硬编码英文"
+      },
+      {
         "version": "2.22.0",
         "date": "2026-05-09",
         "summary": "本次更新让 World Shell Chain Mode 完全可交互——每个步骤行、圆点和 Intent 标题均可点击，直接跳转至对应的执行会话。",
@@ -1463,7 +1489,7 @@
       }
     ]
   },
-  "latestVersion": "2.22.0",
+  "latestVersion": "2.23.0",
   "availableLocales": [
     "en",
     "zh-Hans"
