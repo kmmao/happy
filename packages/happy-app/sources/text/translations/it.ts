@@ -4129,6 +4129,7 @@ export const it: TranslationStructure = {
     rateLimitHint: "Le richieste verranno ritentate automaticamente",
   },
   permissions: {
+    sheetTitle: "Autorizzazione richiesta",
     microphoneTitle: "Accesso al microfono richiesto",
     microphoneCanAsk: "Happy ha bisogno dell'accesso al microfono per la chat vocale. Concedi il permesso quando richiesto.",
     microphoneSettings: "Happy ha bisogno dell'accesso al microfono per la chat vocale. Abilita l'accesso al microfono nelle impostazioni del dispositivo.",

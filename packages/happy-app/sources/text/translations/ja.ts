@@ -4103,6 +4103,7 @@ export const ja: TranslationStructure = {
     rateLimitHint: "リクエストは自動的に再試行されます",
   },
   permissions: {
+    sheetTitle: "権限が必要です",
     microphoneTitle: "マイクへのアクセスが必要です",
     microphoneCanAsk: "Happy は音声チャットのためにマイクへのアクセスが必要です。プロンプトが表示されたら許可してください。",
     microphoneSettings: "Happy は音声チャットのためにマイクへのアクセスが必要です。デバイスの設定でマイクのアクセスを有効にしてください。",

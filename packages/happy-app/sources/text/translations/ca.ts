@@ -4135,6 +4135,7 @@ export const ca: TranslationStructure = {
     rateLimitHint: "Les sol·licituds es reintentaran automàticament",
   },
   permissions: {
+    sheetTitle: "Es requereix permís",
     microphoneTitle: "Es requereix accés al micròfon",
     microphoneCanAsk: "Happy necessita accés al vostre micròfon per al xat de veu. Concediu el permís quan se us demani.",
     microphoneSettings: "Happy necessita accés al vostre micròfon per al xat de veu. Activeu l'accés al micròfon a la configuració del dispositiu.",

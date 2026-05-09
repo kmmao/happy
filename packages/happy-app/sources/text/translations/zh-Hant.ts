@@ -4031,6 +4031,7 @@ export const zhHant: TranslationStructure = {
     rateLimitHint: "請求將自動重試",
   },
   permissions: {
+    sheetTitle: "需要權限",
     microphoneTitle: "需要麥克風權限",
     microphoneCanAsk: "Happy 需要存取您的麥克風以進行語音聊天。請在提示時授予權限。",
     microphoneSettings: "Happy 需要存取您的麥克風以進行語音聊天。請在裝置設定中啟用麥克風權限。",

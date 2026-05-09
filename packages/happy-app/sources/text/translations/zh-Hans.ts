@@ -4025,6 +4025,7 @@ export const zhHans: TranslationStructure = {
     rateLimitHint: "请求将自动重试",
   },
   permissions: {
+    sheetTitle: "需要权限",
     microphoneTitle: "需要麦克风权限",
     microphoneCanAsk: "Happy 需要访问您的麦克风以进行语音聊天。请在提示时授予权限。",
     microphoneSettings: "Happy 需要访问您的麦克风以进行语音聊天。请在设备设置中启用麦克风权限。",

@@ -4151,6 +4151,7 @@ export const pl: TranslationStructure = {
     rateLimitHint: "Żądania zostaną automatycznie ponowione",
   },
   permissions: {
+    sheetTitle: "Wymagane uprawnienie",
     microphoneTitle: "Wymagany dostęp do mikrofonu",
     microphoneCanAsk: "Happy potrzebuje dostępu do mikrofonu do czatu głosowego. Proszę udzielić pozwolenia po wyświetleniu monitu.",
     microphoneSettings: "Happy potrzebuje dostępu do mikrofonu do czatu głosowego. Włącz dostęp do mikrofonu w ustawieniach urządzenia.",

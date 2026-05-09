@@ -116,7 +116,8 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useUnistyles } from "react-native-unistyles";
-import { Message } from "@/sync/typesMessage";
+import { Message, ToolCall } from "@/sync/typesMessage";
+import { PermissionSheet } from "@/components/tools/PermissionSheet";
 import {
   buildOptionsHash,
   extractContextKeywords,
@@ -137,6 +138,30 @@ import { buildRpcSummaryText } from "@/components/rpcSummaryVisualState";
 import { getReasoningSummaryLabels } from "@/components/reasoningEffort";
 import { hackMode } from "@/sync/modeHacks";
 
+
+type PendingPermissionInfo = {
+  toolName: string;
+  toolInput: any;
+  permission: NonNullable<ToolCall["permission"]>;
+};
+
+function findPendingPermission(messages: readonly Message[]): PendingPermissionInfo | null {
+  for (const msg of messages) {
+    if (msg.kind !== "tool-call") continue;
+    const tool = msg.tool;
+    if (
+      tool.permission?.status === "pending" &&
+      tool.name !== "AskUserQuestion"
+    ) {
+      return { toolName: tool.name, toolInput: tool.input, permission: tool.permission };
+    }
+    if (msg.children.length > 0) {
+      const found = findPendingPermission(msg.children);
+      if (found) return found;
+    }
+  }
+  return null;
+}
 
 function hasPendingAskUserQuestion(messages: readonly Message[]): boolean {
   for (const msg of messages) {
@@ -800,6 +825,18 @@ function SessionViewInner({
   const isCodex = flavor === "codex";
   const isGemini = flavor === "gemini";
   const requiresAction = session.sdkSessionState === "requires_action";
+  const [showPermissionSheet, setShowPermissionSheet] = React.useState(false);
+  const pendingPermission = React.useMemo(
+    () => (requiresAction ? findPendingPermission(messages) : null),
+    [requiresAction, messages],
+  );
+
+  // Auto-close the sheet when the permission is resolved
+  React.useEffect(() => {
+    if (!requiresAction) {
+      setShowPermissionSheet(false);
+    }
+  }, [requiresAction]);
 
   const sessionStateLogKey = React.useMemo(() => JSON.stringify({
     sdkSessionState: session.sdkSessionState ?? null,
@@ -1278,9 +1315,14 @@ function SessionViewInner({
   }, []);
 
   const handleRequiresActionPress = React.useCallback(() => {
-    chatListRef.current?.scrollToBottom();
-    setScrollAnchor(-1);
-  }, []);
+    if (pendingPermission) {
+      setShowPermissionSheet(true);
+    } else {
+      // Fallback: scroll to bottom if no specific permission found
+      chatListRef.current?.scrollToBottom();
+      setScrollAnchor(-1);
+    }
+  }, [pendingPermission]);
 
   // Permission mode color mapping
   const permissionModeKey = permissionMode?.key;
@@ -1712,6 +1754,7 @@ function SessionViewInner({
   );
 
   return (
+    <>
     <OptionScoringMetaProvider value={autoOptionSend.candidate?.scoringMeta ?? null}>
     <InputContext.Provider value={inputContextValue}>
       {/* CLI Version Warning Overlay - Subtle centered pill */}
@@ -1911,5 +1954,17 @@ function SessionViewInner({
       )}
     </InputContext.Provider>
     </OptionScoringMetaProvider>
+    {showPermissionSheet && pendingPermission != null && (
+      <PermissionSheet
+        visible={showPermissionSheet}
+        sessionId={sessionId}
+        toolName={pendingPermission.toolName}
+        toolInput={pendingPermission.toolInput}
+        permission={pendingPermission.permission}
+        metadata={session.metadata ?? null}
+        onClose={() => setShowPermissionSheet(false)}
+      />
+    )}
+    </>
   );
 }
