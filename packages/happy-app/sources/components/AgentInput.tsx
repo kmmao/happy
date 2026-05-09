@@ -930,13 +930,22 @@ export const AgentInput = React.memo(
               >
                 {props.connectionStatus && (
                   <>
-                    <View
-                      style={{
+                    <Pressable
+                      onPress={
+                        props.requiresAction && props.onRequiresActionPress
+                          ? props.onRequiresActionPress
+                          : undefined
+                      }
+                      disabled={!props.requiresAction || !props.onRequiresActionPress}
+                      hitSlop={6}
+                      style={({ pressed }) => ({
                         flexDirection: "row",
                         alignItems: "center",
                         gap: 4,
                         minWidth: 0,
-                      }}
+                        opacity:
+                          props.requiresAction && pressed ? 0.6 : 1,
+                      })}
                     >
                       <StatusDot
                         color={props.connectionStatus.dotColor}
@@ -953,7 +962,7 @@ export const AgentInput = React.memo(
                       >
                         {props.connectionStatus.text}
                       </Text>
-                    </View>
+                    </Pressable>
                     {props.connectionStatus.cliStatus && (
                       <>
                         <View
