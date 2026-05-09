@@ -48,7 +48,7 @@ import {
   startRealtimeSession,
   stopRealtimeSession,
 } from "@/realtime/RealtimeSession";
-import { sessionInterrupt, sessionStopTask, sessionBash, sessionCancelQueuedMessage } from "@/sync/ops";
+import { sessionInterrupt, sessionStopTask, sessionBash } from "@/sync/ops";
 import { QueueBanner } from "@/components/QueueBanner";
 import { reactivateArchivedSession } from "@/sync/sessionResumeFlow";
 import { runWithSessionReactivationGuard } from "@/sync/sessionResumeGuard";
@@ -75,7 +75,6 @@ import {
   useSetting,
   useMachine,
 } from "@/sync/storage";
-import { useShallow } from "zustand/react/shallow";
 import { useSessionUpgrade } from "@/hooks/useSessionUpgrade";
 import { Session } from "@/sync/storageTypes";
 import { randomUUID } from "expo-crypto";
@@ -95,7 +94,6 @@ import {
   getSessionName,
   getSessionProviderKey,
   isSessionRunning,
-  shouldClearQueuedMessagesOnTransition,
   useSessionStatus,
 } from "@/utils/sessionUtils";
 import { isVersionSupported, MINIMUM_CLI_VERSION } from "@/utils/versionUtils";
@@ -836,46 +834,38 @@ function SessionViewInner({
     }
   }, [sessionId, sessionStateLogKey]);
 
-  // Clear queued message markers when AI fully leaves the running state,
-  // but keep them during requires_action because the turn is waiting on user input.
-  const prevRunningRef = React.useRef(isRunning);
-  React.useEffect(() => {
-    if (shouldClearQueuedMessagesOnTransition({
-      prevIsRunning: prevRunningRef.current,
-      nextIsRunning: isRunning,
-      nextSdkSessionState: session.sdkSessionState ?? null,
-    })) {
-      storage.getState().clearQueuedMessageIds(sessionId);
-    }
-    prevRunningRef.current = isRunning;
-  }, [isRunning, session.sdkSessionState, sessionId]);
-  const queuedIds = storage(useShallow((s) => s.queuedMessageLocalIds[sessionId] ?? []));
-  const queuedMessages = React.useMemo(() => {
-    if (queuedIds.length === 0) return [];
-    return queuedIds
-      .map((localId) => {
-        const msg = messages.find(
-          (m) => m.kind === "user-text" && m.localId === localId,
-        );
-        if (!msg || msg.kind !== "user-text") return null;
-        const raw = msg.displayText || msg.text;
-        const displayText = raw.includes("[image:")
-          ? t("session.sentImage")
-          : raw;
-        return { localId, displayText };
-      })
-      .filter((m): m is { localId: string; displayText: string } => m !== null);
-  }, [queuedIds, messages]);
+  // Pending queue: messages held locally while AI is running, sent one by one after each turn.
+  const [pendingQueue, setPendingQueue] = React.useState<
+    Array<{ localId: string; message: string; displayText?: string }>
+  >([]);
+  const pendingQueueRef = React.useRef(pendingQueue);
+  pendingQueueRef.current = pendingQueue;
 
-  const handleCancelQueuedItem = React.useCallback(
-    async (localId: string) => {
-      const cancelled = await sessionCancelQueuedMessage(sessionId, localId);
-      if (cancelled) {
-        storage.getState().removeQueuedMessageId(sessionId, localId);
-      }
-    },
-    [sessionId],
+  // Drain one message from the pending queue each time the AI becomes idle.
+  React.useEffect(() => {
+    if (!isRunning && pendingQueueRef.current.length > 0) {
+      const next = pendingQueueRef.current[0]!;
+      setPendingQueue((prev) => prev.slice(1));
+      sync.sendMessage(sessionId, next.message, next.displayText, {
+        localId: next.localId,
+      });
+    }
+  }, [isRunning, sessionId]);
+
+  const queuedMessages = React.useMemo(
+    () =>
+      pendingQueue.map((item) => ({
+        localId: item.localId,
+        displayText: (item.displayText ?? item.message).includes("[image:")
+          ? t("session.sentImage")
+          : (item.displayText ?? item.message.slice(0, 200)),
+      })),
+    [pendingQueue],
   );
+
+  const handleCancelQueuedItem = React.useCallback((localId: string) => {
+    setPendingQueue((prev) => prev.filter((m) => m.localId !== localId));
+  }, []);
 
   const handleSendNow = React.useCallback(() => {
     sessionInterrupt(sessionId);
@@ -1599,10 +1589,6 @@ function SessionViewInner({
           }
 
           const localIdForSend = randomUUID();
-          // Mark as queued before sending if AI is currently thinking
-          if (sessionStatus.state === "thinking") {
-            storage.getState().addQueuedMessageId(sessionId, localIdForSend);
-          }
           Keyboard.dismiss();
           setMessage("");
           clearDraft();
@@ -1616,9 +1602,16 @@ function SessionViewInner({
                   ? t("session.sentImage")
                   : t("session.sentImages", { count: imageCount }))
               : visibleText || pasteBlocks[0]?.summary;
-          sync.sendMessage(sessionId, finalMessage, displayText, {
-            localId: localIdForSend,
-          });
+          if (sessionStatus.state === "thinking") {
+            setPendingQueue((prev) => [
+              ...prev,
+              { localId: localIdForSend, message: finalMessage, displayText },
+            ]);
+          } else {
+            sync.sendMessage(sessionId, finalMessage, displayText, {
+              localId: localIdForSend,
+            });
+          }
           trackMessageSent();
         }}
         onMicPress={micButtonState.onMicPress}

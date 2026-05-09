@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.20.1 - 2026-05-09
+
+This patch fixes real-time Trigger event prefixes in the World Shell event stream and resolves a duplicate /compact dedup edge case.
+
+### Fixes
+- Fixed real-time Cron and Webhook task events not displaying with the correct `trigger.cron.*` / `trigger.webhook.*` prefix in World Shell — the server now propagates `triggerType` through all `task-status-changed` socket events
+- Fixed an edge case where /compact lifecycle messages could appear twice in the event stream processor
+
 ## 2.20.0 - 2026-05-09
 
 This release expands the World Shell search bar with quick commands and local filtering, adds Trigger event display and Knowledge Base entry events to the event stream, and fixes duplicate "Context was reset" messages after /clear.

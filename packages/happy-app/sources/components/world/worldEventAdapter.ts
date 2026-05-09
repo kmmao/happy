@@ -16,14 +16,17 @@ function mapTaskStatus(status: string): WorldEventSeverity {
     return "info";
 }
 
-function taskEventType(status: string): string {
+function taskEventType(status: string, triggerType?: string): string {
+    const prefix = (triggerType === "cron" || triggerType === "webhook")
+        ? `trigger.${triggerType}`
+        : "task";
     switch (status) {
-        case "queued": return "task.queued";
-        case "running": return "task.running";
-        case "completed": return "task.completed";
-        case "failed": return "task.failed";
-        case "cancelled": return "task.cancelled";
-        default: return "task.updated";
+        case "queued": return `${prefix}.queued`;
+        case "running": return `${prefix}.running`;
+        case "completed": return `${prefix}.completed`;
+        case "failed": return `${prefix}.failed`;
+        case "cancelled": return `${prefix}.cancelled`;
+        default: return `${prefix}.updated`;
     }
 }
 
@@ -31,7 +34,7 @@ export function adaptTaskToEvent(task: ServerTask): WorldEvent {
     return {
         id: `task-${task.id}`,
         originalId: task.id,
-        eventType: taskEventType(task.status),
+        eventType: taskEventType(task.status, task.triggerType),
         title: task.title ?? task.promptPreview.slice(0, 80),
         summary: task.status,
         occurredAt: task.updatedAt,

@@ -1,5 +1,13 @@
 # 更新日志
 
+## 2.20.1 - 2026-05-09
+
+本次补丁修复 World Shell 实时 Trigger 事件前缀显示异常，并修复 /compact 消息去重的边缘情况。
+
+### 修复
+- 修复 World Shell 中 Cron 和 Webhook 任务的实时状态事件未显示正确的 `trigger.cron.*` / `trigger.webhook.*` 前缀——Server 现在通过所有 `task-status-changed` socket 事件传递 `triggerType` 字段
+- 修复 /compact 生命周期消息在事件流处理器中可能重复显示的边缘情况
+
 ## 2.20.0 - 2026-05-09
 
 本次更新为 World Shell 搜索栏新增快捷命令与本地过滤，事件流支持 Trigger 事件和知识库条目事件，并修复 /clear 后重复显示 "Context was reset" 的问题。
