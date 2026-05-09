@@ -2233,15 +2233,17 @@ export const AgentInput = React.memo(
                           color={theme.colors.button.primary.tint}
                         />
                       ) : canSend ? (
-                        <Octicons
-                          name="arrow-up"
-                          size={16}
-                          color={theme.colors.button.primary.tint}
-                          style={[
-                            styles.sendButtonIcon,
-                            { marginTop: Platform.OS === "web" ? 2 : 0 },
-                          ]}
-                        />
+                        props.sendIcon ?? (
+                          <Octicons
+                            name="arrow-up"
+                            size={16}
+                            color={theme.colors.button.primary.tint}
+                            style={[
+                              styles.sendButtonIcon,
+                              { marginTop: Platform.OS === "web" ? 2 : 0 },
+                            ]}
+                          />
+                        )
                       ) : props.onMicPress && !props.isMicActive ? (
                         <Image
                           source={require("@/assets/images/icon-voice-white.png")}

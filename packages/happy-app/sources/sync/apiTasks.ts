@@ -23,6 +23,7 @@ export interface ServerTask {
     promptPreview: string;
     skillNames: string[];
     worktreeIsolation: boolean;
+    parentTaskId: string | null;
 }
 
 interface TaskListResponse {

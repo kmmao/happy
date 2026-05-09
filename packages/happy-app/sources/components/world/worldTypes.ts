@@ -25,6 +25,7 @@ export interface WorldEvent {
     severity: WorldEventSeverity;
     source: WorldEventSource;
     originalId: string;
+    parentTaskId?: string | null;
 }
 
 export interface WorldFilter {

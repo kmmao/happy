@@ -21,67 +21,68 @@ interface QueueBannerProps {
 
 export const QueueBanner = React.memo(({ queuedMessages, onSendNow, onSendItemNow, onCancelItem, isRunning }: QueueBannerProps) => {
     const { theme } = useUnistyles();
-    const [expanded, setExpanded] = React.useState(false);
     const count = queuedMessages.length;
 
     if (count === 0) return null;
 
     return (
-        <View style={styles.container}>
-            <Pressable
-                style={styles.header}
-                onPress={() => setExpanded((v) => !v)}
-            >
+        <View style={[styles.container, { borderTopColor: theme.colors.divider }]}>
+            {/* Header row */}
+            <View style={styles.header}>
                 <Ionicons
                     name="time-outline"
-                    size={13}
+                    size={12}
                     color={theme.colors.textSecondary}
-                    style={{ marginRight: 6 }}
+                    style={{ marginRight: 5 }}
                 />
-                <Text style={styles.label} numberOfLines={1}>
+                <Text style={[styles.headerLabel, { color: theme.colors.textSecondary }]}>
                     {t("session.messagesQueued", { n: count })}
                 </Text>
-                <Ionicons
-                    name={expanded ? "chevron-down" : "chevron-up"}
-                    size={13}
-                    color={theme.colors.textSecondary}
-                    style={{ marginLeft: 4 }}
-                />
                 {isRunning && (
-                    <View style={styles.sendNowButton}>
-                        <Pressable
-                            onPress={onSendNow}
-                            hitSlop={8}
-                            style={({ pressed }) => [
-                                styles.sendNowPressable,
-                                { backgroundColor: theme.colors.button.primary.background },
-                                pressed && { opacity: 0.8 },
-                            ]}
-                        >
-                            <Text style={[styles.sendNowText, { color: theme.colors.button.primary.tint }]}>
-                                {t("session.sendNow")}
-                            </Text>
-                        </Pressable>
-                    </View>
+                    <Pressable
+                        onPress={onSendNow}
+                        hitSlop={8}
+                        style={({ pressed }) => [
+                            styles.sendNowPill,
+                            { backgroundColor: `${theme.colors.button.primary.background}18` },
+                            pressed && { opacity: 0.7 },
+                        ]}
+                    >
+                        <Ionicons
+                            name="play"
+                            size={9}
+                            color={theme.colors.button.primary.background}
+                        />
+                        <Text style={[styles.sendNowText, { color: theme.colors.button.primary.background }]}>
+                            {t("session.sendNow")}
+                        </Text>
+                    </Pressable>
                 )}
-            </Pressable>
+            </View>
 
-            {expanded && (
-                <View style={[styles.list, { borderTopColor: theme.colors.divider }]}>
-                    {queuedMessages.map((msg) => (
-                        <View key={msg.localId} style={[styles.listItem, { borderBottomColor: theme.colors.divider }]}>
-                            <Text style={styles.itemText} numberOfLines={1}>
-                                {msg.displayText}
-                            </Text>
+            {/* Message chips — always expanded */}
+            <View style={styles.list}>
+                {queuedMessages.map((msg) => (
+                    <View
+                        key={msg.localId}
+                        style={[
+                            styles.chip,
+                            { backgroundColor: `${theme.colors.textSecondary}12` },
+                        ]}
+                    >
+                        <Text style={[styles.chipText, { color: theme.colors.textSecondary }]} numberOfLines={1}>
+                            {msg.displayText}
+                        </Text>
+                        <View style={styles.chipActions}>
                             {isRunning && onSendItemNow && (
                                 <Pressable
                                     onPress={() => onSendItemNow(msg.localId)}
                                     hitSlop={8}
-                                    style={({ pressed }) => ({ opacity: pressed ? 0.5 : 0.8 })}
+                                    style={({ pressed }) => ({ opacity: pressed ? 0.4 : 0.8 })}
                                 >
                                     <Ionicons
                                         name="play-circle-outline"
-                                        size={16}
+                                        size={15}
                                         color={theme.colors.button.primary.background}
                                     />
                                 </Pressable>
@@ -89,65 +90,68 @@ export const QueueBanner = React.memo(({ queuedMessages, onSendNow, onSendItemNo
                             <Pressable
                                 onPress={() => onCancelItem(msg.localId)}
                                 hitSlop={8}
-                                style={({ pressed }) => ({ opacity: pressed ? 0.5 : 0.7 })}
+                                style={({ pressed }) => ({ opacity: pressed ? 0.4 : 0.6 })}
                             >
-                                <Ionicons name="close" size={14} color={theme.colors.textSecondary} />
+                                <Ionicons name="close-circle" size={15} color={theme.colors.textSecondary} />
                             </Pressable>
                         </View>
-                    ))}
-                </View>
-            )}
+                    </View>
+                ))}
+            </View>
         </View>
     );
 });
 
 QueueBanner.displayName = "QueueBanner";
 
-const styles = StyleSheet.create((theme) => ({
+const styles = StyleSheet.create(() => ({
     container: {
-        backgroundColor: theme.colors.surfaceHigh,
         borderTopWidth: 1,
-        borderTopColor: theme.colors.divider,
+        paddingHorizontal: 12,
+        paddingTop: 6,
+        paddingBottom: 6,
     },
     header: {
         flexDirection: "row",
         alignItems: "center",
-        paddingHorizontal: 14,
-        paddingVertical: 8,
+        marginBottom: 5,
     },
-    label: {
+    headerLabel: {
         ...Typography.default(),
-        fontSize: 12,
-        color: theme.colors.textSecondary,
+        fontSize: 11,
         flex: 1,
     },
-    sendNowButton: {
-        marginLeft: 8,
-    },
-    sendNowPressable: {
-        paddingHorizontal: 10,
-        paddingVertical: 4,
+    sendNowPill: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 4,
+        paddingHorizontal: 8,
+        paddingVertical: 3,
         borderRadius: 999,
     },
     sendNowText: {
         ...Typography.default("semiBold"),
-        fontSize: 12,
+        fontSize: 11,
     },
     list: {
-        borderTopWidth: 1,
+        gap: 4,
     },
-    listItem: {
+    chip: {
         flexDirection: "row",
         alignItems: "center",
-        paddingHorizontal: 14,
-        paddingVertical: 7,
-        borderBottomWidth: 1,
-        gap: 8,
+        paddingHorizontal: 10,
+        paddingVertical: 5,
+        borderRadius: 8,
+        gap: 6,
     },
-    itemText: {
+    chipText: {
         ...Typography.default(),
         fontSize: 12,
-        color: theme.colors.textSecondary,
         flex: 1,
+    },
+    chipActions: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 6,
     },
 }));

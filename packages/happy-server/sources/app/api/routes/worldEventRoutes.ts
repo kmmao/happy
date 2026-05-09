@@ -22,10 +22,12 @@ interface WorldEvent {
     source: {
         type: WorldEventSourceType;
         projectId?: string | null;
+        projectPath?: string | null;
         machineId?: string | null;
         sessionId?: string | null;
     };
     originalId: string;
+    parentTaskId?: string | null;
 }
 
 function mapSeverity(raw: string): WorldEventSeverity {
@@ -119,6 +121,8 @@ export function worldEventRoutes(app: Fastify) {
                         machineId: true,
                         sessionId: true,
                         triggerType: true,
+                        directory: true,
+                        parentTaskId: true,
                         updatedAt: true,
                         completedAt: true,
                     },
@@ -180,9 +184,11 @@ export function worldEventRoutes(app: Fastify) {
                     source: {
                         type: task.projectId ? "project" : "machine",
                         projectId: task.projectId,
+                        projectPath: task.directory ?? null,
                         machineId: task.machineId,
                         sessionId: task.sessionId,
                     },
+                    parentTaskId: task.parentTaskId ?? null,
                 });
             }
 

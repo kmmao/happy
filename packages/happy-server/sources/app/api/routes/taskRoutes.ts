@@ -35,6 +35,7 @@ const CreateTaskBodySchema = z.object({
     directory: z.string().min(1).max(4096).optional(),
     profileId: z.string().optional(),
     worktreeIsolation: z.boolean().optional(),
+    parentTaskId: z.string().optional(),
 });
 
 const UpdateTaskBodySchema = z.object({
@@ -148,7 +149,7 @@ export function taskRoutes(app: Fastify) {
         },
         async (request, reply) => {
             const userId = request.userId;
-            const { machineId, prompt, priority, maxAttempts, skillIds, projectId, profileId: bodyProfileId, directory: bodyDirectory, worktreeIsolation } = request.body;
+            const { machineId, prompt, priority, maxAttempts, skillIds, projectId, profileId: bodyProfileId, directory: bodyDirectory, worktreeIsolation, parentTaskId } = request.body;
 
             const machine = await db.machine.findFirst({
                 where: { id: machineId, accountId: userId },
@@ -237,6 +238,7 @@ export function taskRoutes(app: Fastify) {
                     status: "dispatching",
                     profileId: taskProfileId,
                     worktreeIsolation: worktreeIsolation ?? false,
+                    parentTaskId: parentTaskId ?? null,
                     ...(skillIds.length > 0
                         ? {
                               skillBindings: {
@@ -1058,6 +1060,7 @@ function serializeTask(task: Record<string, unknown>): Record<string, unknown> {
         updatedAt: Date;
         title?: string | null;
         worktreeIsolation?: boolean;
+        parentTaskId?: string | null;
         skillBindings?: Array<{ skill: { name: string } }>;
     };
 
@@ -1080,6 +1083,7 @@ function serializeTask(task: Record<string, unknown>): Record<string, unknown> {
         updatedAt: t.updatedAt.getTime(),
         title: t.title ?? null,
         worktreeIsolation: t.worktreeIsolation ?? false,
+        parentTaskId: t.parentTaskId ?? null,
         promptPreview: truncateTaskPrompt(t.prompt, PROMPT_PREVIEW_LIMIT),
         skillNames: t.skillBindings?.map((b) => b.skill.name) ?? [],
     };

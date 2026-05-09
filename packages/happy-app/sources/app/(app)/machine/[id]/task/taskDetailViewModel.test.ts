@@ -36,6 +36,7 @@ function createTask(overrides: Partial<ServerTask> = {}): ServerTask {
         title: null,
         skillNames: ["skill-a"],
         worktreeIsolation: true,
+        parentTaskId: null,
         ...overrides,
     };
 }

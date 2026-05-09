@@ -156,29 +156,6 @@ function hasPendingAskUserQuestion(messages: readonly Message[]): boolean {
   return false;
 }
 
-function QueueModeHint() {
-  const { theme } = useUnistyles();
-  return (
-    <View
-      style={{
-        flexDirection: "row",
-        alignItems: "center",
-        gap: 5,
-        paddingHorizontal: 14,
-        paddingVertical: 5,
-        backgroundColor: theme.colors.surfaceHigh,
-        borderTopWidth: 1,
-        borderTopColor: theme.colors.divider,
-      }}
-    >
-      <Ionicons name="time-outline" size={11} color={theme.colors.textSecondary} />
-      <Text style={{ fontSize: 11, color: theme.colors.textSecondary }}>
-        {t("session.queueModeHint")}
-      </Text>
-    </View>
-  );
-}
-
 export const SessionView = React.memo((props: { id: string }) => {
   const sessionId = props.id;
   const router = useRouter();
@@ -1541,9 +1518,6 @@ function SessionViewInner({
         onCancelItem={handleCancelQueuedItem}
         isRunning={isRunning}
       />
-      {isRunning && pendingQueue.length === 0 && (
-        <QueueModeHint />
-      )}
       <View onLayout={(e) => setAgentInputHeight(e.nativeEvent.layout.height)}>
       <AgentInput
         placeholder={t("session.inputPlaceholder")}
@@ -1584,6 +1558,9 @@ function SessionViewInner({
         modelSummaryRpcState={modelSummaryRpcState}
         isInputDisabled={isSessionInputDisabled}
         isSendDisabled={isSessionInputDisabled}
+        sendIcon={isRunning ? (
+          <Ionicons name="time-outline" size={17} color={theme.colors.button.primary.tint} />
+        ) : undefined}
         onSend={() => {
           // Prevent double-tap sending duplicate messages
           if (sendingRef.current) return;

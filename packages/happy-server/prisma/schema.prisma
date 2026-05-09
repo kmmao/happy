@@ -886,6 +886,11 @@ model Task {
     dispatchedAt    DateTime?
     completedAt     DateTime?
 
+    // Parent-child relationship for Intent → Steps decomposition
+    parentTaskId    String?
+    parentTask      Task?    @relation("TaskChildren", fields: [parentTaskId], references: [id], onDelete: SetNull)
+    childTasks      Task[]   @relation("TaskChildren")
+
     // Skill bindings
     skillBindings   TaskSkillBinding[]
 
@@ -898,6 +903,7 @@ model Task {
     @@index([projectId])
     @@index([accountId, createdAt(sort: Desc)])
     @@index([accountId, profileId])
+    @@index([parentTaskId])
 }
 
 //

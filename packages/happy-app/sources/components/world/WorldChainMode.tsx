@@ -12,7 +12,18 @@ interface WorldChainModeProps {
     onRefresh: () => void;
 }
 
-interface TaskChain {
+interface IntentChain {
+    kind: "intent";
+    parentEvent: WorldEvent;
+    steps: WorldEvent[];
+    running: number;
+    completed: number;
+    failed: number;
+    total: number;
+}
+
+interface ProjectChain {
+    kind: "project";
     projectLabel: string;
     projectId: string | null;
     tasks: WorldEvent[];
@@ -22,36 +33,93 @@ interface TaskChain {
     total: number;
 }
 
-function groupIntoChains(events: WorldEvent[]): TaskChain[] {
-    const taskEvents = events.filter((e) => e.eventType.startsWith("task."));
+type Chain = IntentChain | ProjectChain;
+
+function extractStatus(eventType: string): string {
+    return eventType.split(".").pop() ?? eventType;
+}
+
+function isRunning(e: WorldEvent): boolean { return extractStatus(e.eventType) === "running"; }
+function isCompleted(e: WorldEvent): boolean { return extractStatus(e.eventType) === "completed"; }
+function isFailed(e: WorldEvent): boolean { return extractStatus(e.eventType) === "failed"; }
+
+function groupIntoChains(events: WorldEvent[]): Chain[] {
+    const taskEvents = events.filter(
+        (e) => e.eventType.startsWith("task.") || e.eventType.startsWith("trigger."),
+    );
+
+    const byId = new Map<string, WorldEvent>();
+    for (const e of taskEvents) byId.set(e.originalId, e);
+
+    // group children by their parentTaskId
+    const childrenByParent = new Map<string, WorldEvent[]>();
+    const childIds = new Set<string>();
+    for (const e of taskEvents) {
+        if (e.parentTaskId) {
+            childIds.add(e.originalId);
+            const list = childrenByParent.get(e.parentTaskId) ?? [];
+            list.push(e);
+            childrenByParent.set(e.parentTaskId, list);
+        }
+    }
+
+    // build IntentChains from parents that have known children
+    const usedAsParent = new Set<string>();
+    const intentChains: IntentChain[] = [];
+    for (const [parentId, steps] of childrenByParent) {
+        const parentEvent = byId.get(parentId);
+        if (!parentEvent) continue; // parent not in visible window — skip
+        usedAsParent.add(parentId);
+        const sorted = steps.slice().sort((a, b) => a.occurredAt - b.occurredAt);
+        intentChains.push({
+            kind: "intent",
+            parentEvent,
+            steps: sorted,
+            running: sorted.filter(isRunning).length,
+            completed: sorted.filter(isCompleted).length,
+            failed: sorted.filter(isFailed).length,
+            total: sorted.length,
+        });
+    }
+
+    // orphan tasks: not a child, not a parent-with-visible-children
+    const orphans = taskEvents.filter(
+        (e) => !childIds.has(e.originalId) && !usedAsParent.has(e.originalId),
+    );
 
     const byProject = new Map<string, WorldEvent[]>();
-    for (const event of taskEvents) {
-        const key = event.source.projectPath
-            ?? event.source.projectId
-            ?? "_no_project";
+    for (const e of orphans) {
+        const key = e.source.projectPath ?? e.source.projectId ?? "_no_project";
         const list = byProject.get(key) ?? [];
-        list.push(event);
+        list.push(e);
         byProject.set(key, list);
     }
 
-    const chains: TaskChain[] = [];
+    const projectChains: ProjectChain[] = [];
     for (const [key, tasks] of byProject) {
         const label = key === "_no_project"
             ? "Unassigned"
             : key.split("/").filter(Boolean).pop() ?? key;
-        chains.push({
+        const sorted = tasks.slice().sort((a, b) => a.occurredAt - b.occurredAt);
+        projectChains.push({
+            kind: "project",
             projectLabel: label,
             projectId: tasks[0]?.source.projectId ?? null,
-            tasks: tasks.sort((a, b) => a.occurredAt - b.occurredAt),
-            running: tasks.filter((ti) => ti.eventType === "task.running").length,
-            completed: tasks.filter((ti) => ti.eventType === "task.completed").length,
-            failed: tasks.filter((ti) => ti.eventType === "task.failed").length,
-            total: tasks.length,
+            tasks: sorted,
+            running: sorted.filter(isRunning).length,
+            completed: sorted.filter(isCompleted).length,
+            failed: sorted.filter(isFailed).length,
+            total: sorted.length,
         });
     }
 
-    return chains.sort((a, b) => b.running - a.running || b.total - a.total);
+    const sortFn = (a: { running: number; total: number }, b: { running: number; total: number }) =>
+        b.running - a.running || b.total - a.total;
+
+    return [
+        ...intentChains.sort(sortFn),
+        ...projectChains.sort(sortFn),
+    ];
 }
 
 export const WorldChainMode = React.memo(function WorldChainMode({
@@ -80,14 +148,83 @@ export const WorldChainMode = React.memo(function WorldChainMode({
             contentContainerStyle={styles.list}
             refreshControl={<RefreshControl refreshing={loading} onRefresh={onRefresh} />}
         >
-            {chains.map((chain) => (
-                <ChainCard key={chain.projectLabel} chain={chain} />
-            ))}
+            {chains.map((chain) =>
+                chain.kind === "intent"
+                    ? <IntentCard key={chain.parentEvent.id} chain={chain} />
+                    : <ChainCard key={chain.projectLabel} chain={chain} />,
+            )}
         </ScrollView>
     );
 });
 
-const ChainCard = React.memo(function ChainCard({ chain }: { chain: TaskChain }) {
+// ─── IntentCard ───────────────────────────────────────────────────────────────
+
+const IntentCard = React.memo(function IntentCard({ chain }: { chain: IntentChain }) {
+    const { theme } = useUnistyles();
+    const { styles } = useStyles();
+    const [expanded, setExpanded] = React.useState(false);
+
+    const progress = chain.total > 0 ? chain.completed / chain.total : 0;
+    const hasFailures = chain.failed > 0;
+    const isActive = chain.running > 0;
+
+    const handlePress = React.useCallback(() => {
+        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+        setExpanded((v) => !v);
+    }, []);
+
+    return (
+        <TouchableOpacity style={[styles.card, styles.intentCard]} onPress={handlePress} activeOpacity={0.7}>
+            <View style={styles.cardHeader}>
+                <Ionicons
+                    name={isActive ? "flash" : hasFailures ? "alert-circle" : "checkmark-circle"}
+                    size={16}
+                    color={isActive ? theme.colors.success : hasFailures ? theme.colors.warningCritical : theme.colors.textSecondary}
+                />
+                <View style={styles.intentBadge}>
+                    <Text style={styles.intentBadgeText}>Intent</Text>
+                </View>
+                <Text style={styles.cardTitle} numberOfLines={1}>{chain.parentEvent.title}</Text>
+                <Text style={styles.cardCount}>{chain.completed}/{chain.total}</Text>
+                <Ionicons
+                    name={expanded ? "chevron-up" : "chevron-down"}
+                    size={14}
+                    color={theme.colors.textSecondary}
+                />
+            </View>
+
+            <View style={styles.progressBar}>
+                <View style={[styles.progressFill, { width: `${Math.round(progress * 100)}%` as any }]} />
+                {chain.failed > 0 && (
+                    <View style={[styles.progressFailed, { width: `${Math.round((chain.failed / chain.total) * 100)}%` as any }]} />
+                )}
+            </View>
+
+            {!expanded && (
+                <View style={styles.steps}>
+                    {chain.steps.slice(-8).map((step) => (
+                        <StepDot key={step.id} event={step} />
+                    ))}
+                    {chain.total > 8 && (
+                        <Text style={styles.moreText}>+{chain.total - 8}</Text>
+                    )}
+                </View>
+            )}
+
+            {expanded && (
+                <View style={styles.taskList}>
+                    {chain.steps.map((step) => (
+                        <TaskRow key={step.id} event={step} />
+                    ))}
+                </View>
+            )}
+        </TouchableOpacity>
+    );
+});
+
+// ─── ProjectChainCard ─────────────────────────────────────────────────────────
+
+const ChainCard = React.memo(function ChainCard({ chain }: { chain: ProjectChain }) {
     const { theme } = useUnistyles();
     const { styles } = useStyles();
     const [expanded, setExpanded] = React.useState(false);
@@ -117,7 +254,6 @@ const ChainCard = React.memo(function ChainCard({ chain }: { chain: TaskChain })
                 />
             </View>
 
-            {/* Progress bar */}
             <View style={styles.progressBar}>
                 <View style={[styles.progressFill, { width: `${Math.round(progress * 100)}%` as any }]} />
                 {chain.failed > 0 && (
@@ -125,7 +261,6 @@ const ChainCard = React.memo(function ChainCard({ chain }: { chain: TaskChain })
                 )}
             </View>
 
-            {/* Collapsed: step dots */}
             {!expanded && (
                 <View style={styles.steps}>
                     {chain.tasks.slice(-8).map((task) => (
@@ -137,7 +272,6 @@ const ChainCard = React.memo(function ChainCard({ chain }: { chain: TaskChain })
                 </View>
             )}
 
-            {/* Expanded: task detail list */}
             {expanded && (
                 <View style={styles.taskList}>
                     {chain.tasks.map((task) => (
@@ -149,13 +283,16 @@ const ChainCard = React.memo(function ChainCard({ chain }: { chain: TaskChain })
     );
 });
 
+// ─── Shared sub-components ────────────────────────────────────────────────────
+
 function StepDot({ event }: { event: WorldEvent }) {
     const { theme } = useUnistyles();
-    const color = event.eventType === "task.completed"
+    const status = extractStatus(event.eventType);
+    const color = status === "completed"
         ? theme.colors.success
-        : event.eventType === "task.failed"
+        : status === "failed"
             ? theme.colors.warningCritical
-            : event.eventType === "task.running"
+            : status === "running"
                 ? theme.colors.accentBlue
                 : theme.colors.textSecondary;
 
@@ -167,7 +304,7 @@ function StepDot({ event }: { event: WorldEvent }) {
 function TaskRow({ event }: { event: WorldEvent }) {
     const { theme } = useUnistyles();
     const { styles } = useStyles();
-    const status = event.eventType.replace("task.", "");
+    const status = extractStatus(event.eventType);
     const statusColor = status === "completed"
         ? theme.colors.success
         : status === "failed"
@@ -187,6 +324,8 @@ function TaskRow({ event }: { event: WorldEvent }) {
         </View>
     );
 }
+
+// ─── Styles ───────────────────────────────────────────────────────────────────
 
 const useStyles = () => {
     const { theme } = useUnistyles();
@@ -210,10 +349,25 @@ const useStyles = () => {
             padding: 14,
             gap: 10,
         },
+        intentCard: {
+            borderLeftWidth: 3,
+            borderLeftColor: theme.colors.accentBlue,
+        },
         cardHeader: {
             flexDirection: "row",
             alignItems: "center",
             gap: 8,
+        },
+        intentBadge: {
+            backgroundColor: theme.colors.accentBlue + "22",
+            borderRadius: 4,
+            paddingHorizontal: 5,
+            paddingVertical: 1,
+        },
+        intentBadgeText: {
+            fontSize: 10,
+            color: theme.colors.accentBlue,
+            fontWeight: "600",
         },
         cardTitle: {
             flex: 1,

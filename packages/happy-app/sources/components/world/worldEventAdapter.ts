@@ -46,6 +46,7 @@ export function adaptTaskToEvent(task: ServerTask): WorldEvent {
             machineId: task.machineId,
             sessionId: task.sessionId,
         },
+        parentTaskId: task.parentTaskId,
     };
 }
 
