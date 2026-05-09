@@ -3278,4 +3278,92 @@ describe('reducer', () => {
             expect(textMessages[0].text).toBe('你好');
         });
     });
+
+    // ---------------------------------------------------------------------------
+    // Phase 5 dedup — event messages (role="event", content.type="message")
+    // ---------------------------------------------------------------------------
+    describe('Phase 5 event message dedup', () => {
+        const makeEventMsg = (id: string, message: string, createdAt = 1000): NormalizedMessage => ({
+            id,
+            localId: null,
+            createdAt,
+            role: 'event',
+            content: { type: 'message', message },
+            isSidechain: false,
+        });
+
+        it('Context was reset — renders once on first delivery', () => {
+            const state = createReducer();
+            const result = reducer(state, [makeEventMsg('db-ctx-1', 'Context was reset')]);
+            const events = result.messages.filter(m => m.kind === 'agent-event');
+            expect(events).toHaveLength(1);
+        });
+
+        it('Context was reset — server DB ID stored as messageIds key after processing', () => {
+            const state = createReducer();
+            reducer(state, [makeEventMsg('db-ctx-1', 'Context was reset')]);
+            // key must be server DB ID (msg.id), not an internal allocateId() value
+            expect(state.messageIds.has('db-ctx-1')).toBe(true);
+        });
+
+        it('Context was reset — deduplicated when same server DB ID re-delivered (WebSocket + fetch race)', () => {
+            const state = createReducer();
+            // First delivery (WebSocket direct)
+            reducer(state, [makeEventMsg('db-ctx-1', 'Context was reset', 1000)]);
+            // Second delivery (HTTP fetch path, same server DB ID)
+            const result2 = reducer(state, [makeEventMsg('db-ctx-1', 'Context was reset', 1000)]);
+            expect(result2.messages.filter(m => m.kind === 'agent-event')).toHaveLength(0);
+        });
+
+        it('Context was reset — same-batch duplicate only shown once', () => {
+            const state = createReducer();
+            const result = reducer(state, [
+                makeEventMsg('db-ctx-1', 'Context was reset', 1000),
+                makeEventMsg('db-ctx-1', 'Context was reset', 1000),
+            ]);
+            expect(result.messages.filter(m => m.kind === 'agent-event')).toHaveLength(1);
+        });
+
+        it('Compaction started — server DB ID stored as messageIds key', () => {
+            const state = createReducer();
+            reducer(state, [makeEventMsg('db-comp-start-1', 'Compaction started')]);
+            expect(state.messageIds.has('db-comp-start-1')).toBe(true);
+        });
+
+        it('Compaction completed — deduplicated on re-delivery', () => {
+            const state = createReducer();
+            reducer(state, [makeEventMsg('db-comp-done-1', 'Compaction completed', 1000)]);
+            const result2 = reducer(state, [makeEventMsg('db-comp-done-1', 'Compaction completed', 1000)]);
+            expect(result2.messages.filter(m => m.kind === 'agent-event')).toHaveLength(0);
+        });
+
+        it('distinct server DB IDs within 5s window — content-deduped, not shown twice', () => {
+            const state = createReducer();
+            reducer(state, [makeEventMsg('db-ctx-1', 'Context was reset', 1000)]);
+            // Same content, different DB ID, only 1s later — within the 5s dedup window
+            const result2 = reducer(state, [makeEventMsg('db-ctx-2', 'Context was reset', 2000)]);
+            // Content-based dedup suppresses this as a likely race-condition duplicate
+            expect(result2.messages.filter(m => m.kind === 'agent-event')).toHaveLength(0);
+            // Both IDs are still marked as seen so they won't reappear
+            expect(state.messageIds.has('db-ctx-2')).toBe(true);
+        });
+
+        it('distinct server DB IDs more than 5s apart — both shown', () => {
+            const state = createReducer();
+            reducer(state, [makeEventMsg('db-ctx-1', 'Context was reset', 1000)]);
+            // Same content, different DB ID, 6s later — outside the dedup window
+            const result2 = reducer(state, [makeEventMsg('db-ctx-2', 'Context was reset', 7001)]);
+            expect(result2.messages.filter(m => m.kind === 'agent-event')).toHaveLength(1);
+        });
+
+        it('resulting ModeSwitchMessage carries the server DB ID as realID', () => {
+            const state = createReducer();
+            const result = reducer(state, [makeEventMsg('db-ctx-1', 'Context was reset')]);
+            const eventMsg = result.messages.find(m => m.kind === 'agent-event');
+            expect(eventMsg).toBeDefined();
+            if (eventMsg?.kind === 'agent-event') {
+                expect(eventMsg.realID).toBe('db-ctx-1');
+            }
+        });
+    });
 });
