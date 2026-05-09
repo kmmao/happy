@@ -163,16 +163,24 @@ export const WorldChainMode = React.memo(function WorldChainMode({
 const IntentCard = React.memo(function IntentCard({ chain }: { chain: IntentChain }) {
     const { theme } = useUnistyles();
     const { styles } = useStyles();
+    const router = useRouter();
     const [expanded, setExpanded] = React.useState(false);
 
     const progress = chain.total > 0 ? chain.completed / chain.total : 0;
     const hasFailures = chain.failed > 0;
     const isActive = chain.running > 0;
+    const parentSessionId = chain.parentEvent.source.sessionId;
 
     const handlePress = React.useCallback(() => {
         LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
         setExpanded((v) => !v);
     }, []);
+
+    const handleTitlePress = React.useCallback(() => {
+        if (parentSessionId) {
+            router.push(`/(app)/session/${parentSessionId}`);
+        }
+    }, [parentSessionId, router]);
 
     return (
         <TouchableOpacity style={[styles.card, styles.intentCard]} onPress={handlePress} activeOpacity={0.7}>
@@ -182,10 +190,20 @@ const IntentCard = React.memo(function IntentCard({ chain }: { chain: IntentChai
                     size={16}
                     color={isActive ? theme.colors.success : hasFailures ? theme.colors.warningCritical : theme.colors.textSecondary}
                 />
-                <View style={styles.intentBadge}>
-                    <Text style={styles.intentBadgeText}>Intent</Text>
-                </View>
-                <Text style={styles.cardTitle} numberOfLines={1}>{chain.parentEvent.title}</Text>
+                <TouchableOpacity
+                    style={styles.intentTitleArea}
+                    onPress={parentSessionId ? handleTitlePress : undefined}
+                    activeOpacity={parentSessionId ? 0.5 : 1}
+                    disabled={!parentSessionId}
+                >
+                    <View style={styles.intentBadge}>
+                        <Text style={styles.intentBadgeText}>Intent</Text>
+                    </View>
+                    <Text style={styles.cardTitle} numberOfLines={1}>{chain.parentEvent.title}</Text>
+                    {parentSessionId && (
+                        <Ionicons name="open-outline" size={11} color={theme.colors.accentBlue} style={{ marginLeft: 2 }} />
+                    )}
+                </TouchableOpacity>
                 <Text style={styles.cardCount}>{chain.completed}/{chain.total}</Text>
                 <Ionicons
                     name={expanded ? "chevron-up" : "chevron-down"}
@@ -398,6 +416,12 @@ const useStyles = () => {
             alignItems: "center",
             gap: 8,
         },
+        intentTitleArea: {
+            flex: 1,
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 6,
+        },
         intentBadge: {
             backgroundColor: theme.colors.accentBlue + "22",
             borderRadius: 4,
@@ -411,6 +435,7 @@ const useStyles = () => {
         },
         cardTitle: {
             flex: 1,
+            flexShrink: 1,
             fontSize: 15,
             fontWeight: "600",
             color: theme.colors.text,
