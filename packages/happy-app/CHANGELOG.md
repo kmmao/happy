@@ -1,5 +1,18 @@
 # Changelog
 
+## 2.24.0 - 2026-05-09
+
+This release rounds out the World Shell with a compact event view, full search and filtering in Chain Mode, and a more accurate active-agent counter.
+
+### World Shell — Stream Mode
+- Added Density Mode toggle — tap the density icon in the header to switch the Event Stream to a compact single-line layout, showing event type, title, and time without expanding; tap again to return to the normal card view
+- Fixed active-agent count in the header to show the true number of unique active sessions instead of counting duplicate events for the same session
+
+### World Shell — Chain Mode
+- Added text search to Chain Mode — open the search bar while in Chains view to filter Intent and Project chains by title; matching is done across parent titles, step titles, and task titles
+- Added Filter chips to Chain Mode — the project filter chips now appear in Chain Mode as well, so you can narrow chains to a specific project
+- Fixed empty search state — when a search query yields no matching chains, the view now shows a dedicated "no results" icon and message instead of the generic empty-state placeholder
+
 ## 2.23.0 - 2026-05-09
 
 World Shell now has an Agents tab — see every machine and its active sessions at a glance, with live status indicators.
