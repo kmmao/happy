@@ -6,7 +6,7 @@ import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { Text } from "@/components/StyledText";
 import { t } from "@/text";
-import { useProjects, useAllMachines } from "@/sync/storage";
+import { useProjects, useAllMachines, useAllSessions } from "@/sync/storage";
 import { useWorldEvents } from "./useWorldEvents";
 import { WorldEventCard } from "./WorldEventCard";
 import { WorldFilterChips } from "./WorldFilterChips";
@@ -29,9 +29,11 @@ export const WorldShell = React.memo(function WorldShell({ onExit }: WorldShellP
 
     const projects = useProjects();
     const machines = useAllMachines();
+    const allSessions = useAllSessions();
     const [filter, setFilter] = React.useState<WorldFilter>({});
     const [panelOpen, setPanelOpen] = React.useState(false);
     const [viewMode, setViewMode] = React.useState<ViewMode>("stream");
+    const [compact, setCompact] = React.useState(false);
     const [searchOpen, setSearchOpen] = React.useState(false);
     const [searchQuery, setSearchQuery] = React.useState("");
 
@@ -86,9 +88,7 @@ export const WorldShell = React.memo(function WorldShell({ onExit }: WorldShellP
         e.eventType.startsWith("decision."),
     ).length;
 
-    const activeAgents = events.filter(
-        (e) => e.eventType === "task.running" || e.eventType === "session.started",
-    ).length;
+    const activeAgents = allSessions.filter((s) => s.active).length;
 
     const handleExit = React.useCallback(() => {
         if (onExit) {
@@ -101,8 +101,8 @@ export const WorldShell = React.memo(function WorldShell({ onExit }: WorldShellP
     }, [router, onExit]);
 
     const renderItem = React.useCallback(
-        ({ item }: { item: WorldEvent }) => <WorldEventCard event={item} />,
-        [],
+        ({ item }: { item: WorldEvent }) => <WorldEventCard event={item} compact={compact} />,
+        [compact],
     );
 
     const keyExtractor = React.useCallback((item: WorldEvent) => item.id, []);
@@ -158,6 +158,20 @@ export const WorldShell = React.memo(function WorldShell({ onExit }: WorldShellP
                         </View>
                     )}
                 </View>
+
+                {viewMode === "stream" && (
+                    <TouchableOpacity
+                        onPress={() => setCompact((v) => !v)}
+                        style={styles.newSessionButton}
+                        activeOpacity={0.7}
+                    >
+                        <Ionicons
+                            name="reorder-three-outline"
+                            size={20}
+                            color={compact ? theme.colors.primary : theme.colors.textSecondary}
+                        />
+                    </TouchableOpacity>
+                )}
 
                 <TouchableOpacity
                     onPress={() => {
@@ -279,7 +293,7 @@ export const WorldShell = React.memo(function WorldShell({ onExit }: WorldShellP
                     refreshControl={
                         <RefreshControl refreshing={loading} onRefresh={refresh} />
                     }
-                    contentContainerStyle={styles.list}
+                    contentContainerStyle={compact ? styles.listCompact : styles.list}
                 />
             ) : viewMode === "chain" ? (
                 <WorldChainMode events={events} loading={loading} onRefresh={refresh} />
@@ -419,6 +433,10 @@ const useStyles = () => {
         },
         list: {
             paddingTop: 8,
+            paddingBottom: 24,
+        },
+        listCompact: {
+            paddingTop: 4,
             paddingBottom: 24,
         },
         empty: {

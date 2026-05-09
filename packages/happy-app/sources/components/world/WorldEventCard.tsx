@@ -44,11 +44,24 @@ function useSeverityColor(severity: WorldEventSeverity): string {
 
 interface WorldEventCardProps {
     event: WorldEvent;
+    compact?: boolean;
     onPress?: (event: WorldEvent) => void;
+}
+
+function isNavigableEvent(event: WorldEvent): boolean {
+    return (
+        !!(event.source.sessionId && (
+            event.eventType.startsWith("session.") ||
+            event.eventType === "task.running" ||
+            event.eventType === "task.completed"
+        )) ||
+        (event.eventType === "memory.created" && !!event.source.projectId)
+    );
 }
 
 export const WorldEventCard = React.memo(function WorldEventCard({
     event,
+    compact = false,
     onPress,
 }: WorldEventCardProps) {
     const { theme } = useUnistyles();
@@ -58,18 +71,18 @@ export const WorldEventCard = React.memo(function WorldEventCard({
     const [expanded, setExpanded] = React.useState(false);
     const [actionLoading, setActionLoading] = React.useState(false);
     const [actionDone, setActionDone] = React.useState<string | null>(null);
+    const navigable = isNavigableEvent(event);
 
     const handlePress = React.useCallback(() => {
-        // Events with a sessionId: tap to navigate directly to the session
-        const isSessionEvent = event.eventType.startsWith("session.");
-        const isActiveTask = event.eventType.startsWith("task.") &&
-            (event.eventType === "task.running" || event.eventType === "task.completed");
-        if (event.source.sessionId && (isSessionEvent || isActiveTask)) {
+        if (event.source.sessionId && (
+            event.eventType.startsWith("session.") ||
+            event.eventType === "task.running" ||
+            event.eventType === "task.completed"
+        )) {
             router.push(`/(app)/session/${event.source.sessionId}`);
             onPress?.(event);
             return;
         }
-        // Memory events: navigate to knowledge entry detail
         if (event.eventType === "memory.created" && event.source.projectId) {
             router.push(`/(app)/project/${event.source.projectId}/knowledge/${event.originalId}/evolution`);
             onPress?.(event);
@@ -79,6 +92,24 @@ export const WorldEventCard = React.memo(function WorldEventCard({
         setExpanded((v) => !v);
         onPress?.(event);
     }, [event, onPress, router]);
+
+    if (compact) {
+        return (
+            <TouchableOpacity
+                style={styles.compactCard}
+                onPress={handlePress}
+                activeOpacity={0.7}
+            >
+                <View style={[styles.compactDot, { backgroundColor: dotColor }]} />
+                <Text style={styles.compactType} numberOfLines={1}>{event.eventType}</Text>
+                <Text style={styles.compactTitle} numberOfLines={1}>{event.title}</Text>
+                <Text style={styles.compactTime}>{formatTime(event.occurredAt)}</Text>
+                {navigable && (
+                    <Ionicons name="chevron-forward" size={12} color={theme.colors.textLink} />
+                )}
+            </TouchableOpacity>
+        );
+    }
 
     return (
         <TouchableOpacity
@@ -381,6 +412,40 @@ const useStyles = () => {
             color: theme.colors.success,
             marginTop: 6,
             fontStyle: "italic",
+        },
+        compactCard: {
+            flexDirection: "row" as const,
+            alignItems: "center" as const,
+            gap: 6,
+            marginHorizontal: 16,
+            marginVertical: 1,
+            paddingHorizontal: 10,
+            paddingVertical: 5,
+            borderRadius: 8,
+            backgroundColor: theme.colors.surfaceHigh,
+        },
+        compactDot: {
+            width: 6,
+            height: 6,
+            borderRadius: 3,
+            flexShrink: 0,
+        },
+        compactType: {
+            fontSize: 11,
+            color: theme.colors.textSecondary,
+            width: 88,
+            flexShrink: 0,
+        },
+        compactTitle: {
+            flex: 1,
+            fontSize: 13,
+            color: theme.colors.text,
+        },
+        compactTime: {
+            fontSize: 11,
+            color: theme.colors.textSecondary,
+            width: 36,
+            textAlign: "right" as const,
         },
     });
     return { styles };
