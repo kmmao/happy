@@ -26,7 +26,7 @@ async function reapStaleTasks(): Promise<void> {
                 status: "running",
                 updatedAt: { lt: new Date(now.getTime() - RUNNING_TIMEOUT_MS) },
             },
-            select: { id: true, machineId: true, accountId: true, projectId: true, title: true },
+            select: { id: true, machineId: true, accountId: true, projectId: true, title: true, triggerType: true },
         });
 
         const staleDispatching = await db.task.findMany({
@@ -34,7 +34,7 @@ async function reapStaleTasks(): Promise<void> {
                 status: "dispatching",
                 createdAt: { lt: new Date(now.getTime() - DISPATCHING_TIMEOUT_MS) },
             },
-            select: { id: true, machineId: true, accountId: true, projectId: true, title: true },
+            select: { id: true, machineId: true, accountId: true, projectId: true, title: true, triggerType: true },
         });
 
         const staleTasks = [
@@ -70,6 +70,7 @@ async function reapStaleTasks(): Promise<void> {
                     taskId: task.id,
                     machineId: task.machineId,
                     status: "failed",
+                    triggerType: task.triggerType,
                     errorMessage,
                     completedAt: now.getTime(),
                 }),

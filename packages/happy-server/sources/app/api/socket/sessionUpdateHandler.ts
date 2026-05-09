@@ -350,6 +350,7 @@ export function sessionUpdateHandler(userId: string, socket: Socket, connection:
                         taskId: task.id,
                         machineId: task.machineId,
                         status: "completed",
+                        triggerType: task.triggerType,
                         sessionId: updated.sessionId ?? undefined,
                         completedAt: completedAt.getTime(),
                     }),

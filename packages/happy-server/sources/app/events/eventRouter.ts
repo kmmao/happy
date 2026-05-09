@@ -378,6 +378,7 @@ export type EphemeralEvent =
       sessionId?: string;
       errorMessage?: string;
       completedAt?: number;
+      triggerType?: string;
     }
   | {
       type: "inbox-new-item";
@@ -1235,6 +1236,7 @@ export function buildTaskStatusChangedEphemeral(opts: {
   sessionId?: string;
   errorMessage?: string;
   completedAt?: number;
+  triggerType?: string;
 }): EphemeralPayload {
   return {
     type: "task-status-changed",

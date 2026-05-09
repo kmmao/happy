@@ -380,6 +380,7 @@ export function taskRoutes(app: Fastify) {
                     machineId: task.machineId,
                     status: "cancelled",
                     completedAt: updated.completedAt?.getTime(),
+                    triggerType: task.triggerType,
                 }),
                 recipientFilter: { type: "user-scoped-only" },
             });
@@ -600,6 +601,7 @@ export function taskRoutes(app: Fastify) {
                     taskId: task.id,
                     machineId: task.machineId,
                     status: "queued",
+                    triggerType: task.triggerType,
                 }),
                 recipientFilter: { type: "user-scoped-only" },
             });
@@ -709,6 +711,7 @@ export function taskRoutes(app: Fastify) {
                             machineId: task.machineId,
                             status: targetStatus,
                             completedAt: updatedTask.completedAt?.getTime(),
+                            triggerType: task.triggerType,
                         }),
                         recipientFilter: { type: "user-scoped-only" },
                     });
@@ -737,6 +740,7 @@ export function taskRoutes(app: Fastify) {
                             taskId: newTask.id,
                             machineId,
                             status: "queued",
+                            triggerType: "todo-file",
                         }),
                         recipientFilter: { type: "user-scoped-only" },
                     });
@@ -835,6 +839,7 @@ export function taskRoutes(app: Fastify) {
                     sessionId: updated.sessionId ?? undefined,
                     errorMessage: updated.errorMessage ?? undefined,
                     completedAt: updated.completedAt?.getTime(),
+                    triggerType: task.triggerType,
                 }),
                 recipientFilter: { type: "user-scoped-only" },
             });
@@ -1019,6 +1024,7 @@ export function taskRoutes(app: Fastify) {
                     sessionId: updated.sessionId ?? undefined,
                     errorMessage: updated.errorMessage ?? undefined,
                     completedAt: updated.completedAt?.getTime(),
+                    triggerType: task.triggerType,
                 }),
                 recipientFilter: { type: "user-scoped-only" },
             });

@@ -110,6 +110,7 @@ export function taskStatusHandler(socket: Socket, userId: string): void {
                     sessionId: updated.sessionId ?? undefined,
                     errorMessage: updated.errorMessage ?? undefined,
                     completedAt: updated.completedAt?.getTime(),
+                    triggerType: task.triggerType,
                 }),
                 recipientFilter: { type: "user-scoped-only" },
             });

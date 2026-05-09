@@ -224,6 +224,7 @@ class Sync {
     sessionId?: string;
     errorMessage?: string;
     completedAt?: number;
+    triggerType?: string;
   }) => void>();
   private supervisorLoopStatusListeners = new Set<(event: {
     loopId: string;
@@ -2705,6 +2706,7 @@ class Sync {
           sessionId: updateData.sessionId,
           errorMessage: updateData.errorMessage,
           completedAt: updateData.completedAt,
+          triggerType: updateData.triggerType,
         });
       }
     }
@@ -3025,6 +3027,7 @@ class Sync {
     sessionId?: string;
     errorMessage?: string;
     completedAt?: number;
+    triggerType?: string;
   }) => void): () => void {
     this.taskStatusListeners.add(listener);
     return () => { this.taskStatusListeners.delete(listener); };

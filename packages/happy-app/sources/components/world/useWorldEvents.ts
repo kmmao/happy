@@ -95,10 +95,13 @@ export function useWorldEvents(filter?: WorldFilter): UseWorldEventsResult {
 
     React.useEffect(() => {
         const unsubTask = sync.onTaskStatusChanged((event) => {
+            const eventPrefix = (event.triggerType === "cron" || event.triggerType === "webhook")
+                ? `trigger.${event.triggerType}`
+                : "task";
             const worldEvent: WorldEvent = {
                 id: `task-rt-${event.taskId}-${Date.now()}`,
                 originalId: event.taskId,
-                eventType: `task.${event.status}`,
+                eventType: `${eventPrefix}.${event.status}`,
                 title: event.status === "failed" ? (event.errorMessage ?? "Task failed") : `Task ${event.status}`,
                 summary: event.status,
                 occurredAt: event.completedAt ?? Date.now(),

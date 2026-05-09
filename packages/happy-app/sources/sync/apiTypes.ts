@@ -338,6 +338,7 @@ export const ApiEphemeralTaskStatusChangedSchema = z.object({
     sessionId: z.string().optional(),
     errorMessage: z.string().optional(),
     completedAt: z.number().optional(),
+    triggerType: z.string().optional(),
 });
 
 export const ApiEphemeralInboxNewItemSchema = z.object({
