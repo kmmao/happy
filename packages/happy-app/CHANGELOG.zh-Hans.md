@@ -1,5 +1,17 @@
 # 更新日志
 
+## 2.21.0 - 2026-05-09
+
+本次更新为 World Shell 带来 Chain Mode Intent 分解功能，并修复 AI 运行中发送消息的队列问题。
+
+### World Shell — Chain Mode
+- 新增 Chain Mode Intent 分解——具有父子关系的任务现在以 Intent 卡片形式展示（显示父任务），其下列出带序号的 Steps，并附有进度条和展开/折叠切换
+- 新增 Chain Mode 对 `trigger.*` 事件的支持——Cron 和 Webhook 任务现在与普通任务一同显示，不再被静默排除
+- 改进 Project Chain 分组，现在显示项目目录名而非原始项目 ID
+
+### 会话
+- 修复 AI 运行中发送消息的队列问题——AI 运行时发送的消息现在本地暂存，待 AI 空闲后按序发送，同时支持单条消息提前立即发送
+
 ## 2.20.1 - 2026-05-09
 
 本次补丁修复 World Shell 实时 Trigger 事件前缀显示异常，并修复 /compact 消息去重的边缘情况。

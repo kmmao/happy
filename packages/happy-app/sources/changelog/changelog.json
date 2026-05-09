@@ -2,6 +2,18 @@
   "entries": {
     "en": [
       {
+        "version": "2.21.0",
+        "date": "2026-05-09",
+        "summary": "This release brings Chain Mode Intent decomposition to the World Shell and fixes session message queueing for mid-session sends.",
+        "changes": [
+          "Added Intent decomposition in Chain Mode — tasks with parent-child relationships now render as an Intent card (showing the parent task) with numbered Steps beneath it, complete with a progress bar and expand/collapse toggle",
+          "Added support for `trigger.*` events in Chain Mode — Cron and Webhook tasks now appear alongside regular tasks instead of being silently excluded",
+          "Improved Project Chain grouping to display the project directory name instead of the raw project ID",
+          "Fixed message queueing during active AI sessions — messages sent while the AI is running are now locally buffered, delivered in order once idle, with the option to send each message immediately if needed"
+        ],
+        "rawMarkdown": "## 2.21.0 - 2026-05-09\n\n\nThis release brings Chain Mode Intent decomposition to the World Shell and fixes session message queueing for mid-session sends.\n\n### World Shell — Chain Mode\n- Added Intent decomposition in Chain Mode — tasks with parent-child relationships now render as an Intent card (showing the parent task) with numbered Steps beneath it, complete with a progress bar and expand/collapse toggle\n- Added support for `trigger.*` events in Chain Mode — Cron and Webhook tasks now appear alongside regular tasks instead of being silently excluded\n- Improved Project Chain grouping to display the project directory name instead of the raw project ID\n\n### Session\n- Fixed message queueing during active AI sessions — messages sent while the AI is running are now locally buffered, delivered in order once idle, with the option to send each message immediately if needed"
+      },
+      {
         "version": "2.20.1",
         "date": "2026-05-09",
         "summary": "This patch fixes real-time Trigger event prefixes in the World Shell event stream and resolves a duplicate /compact dedup edge case.",
@@ -720,6 +732,18 @@
     ],
     "zh-Hans": [
       {
+        "version": "2.21.0",
+        "date": "2026-05-09",
+        "summary": "本次更新为 World Shell 带来 Chain Mode Intent 分解功能，并修复 AI 运行中发送消息的队列问题。",
+        "changes": [
+          "新增 Chain Mode Intent 分解——具有父子关系的任务现在以 Intent 卡片形式展示（显示父任务），其下列出带序号的 Steps，并附有进度条和展开/折叠切换",
+          "新增 Chain Mode 对 `trigger.*` 事件的支持——Cron 和 Webhook 任务现在与普通任务一同显示，不再被静默排除",
+          "改进 Project Chain 分组，现在显示项目目录名而非原始项目 ID",
+          "修复 AI 运行中发送消息的队列问题——AI 运行时发送的消息现在本地暂存，待 AI 空闲后按序发送，同时支持单条消息提前立即发送"
+        ],
+        "rawMarkdown": "## 2.21.0 - 2026-05-09\n\n\n本次更新为 World Shell 带来 Chain Mode Intent 分解功能，并修复 AI 运行中发送消息的队列问题。\n\n### World Shell — Chain Mode\n- 新增 Chain Mode Intent 分解——具有父子关系的任务现在以 Intent 卡片形式展示（显示父任务），其下列出带序号的 Steps，并附有进度条和展开/折叠切换\n- 新增 Chain Mode 对 `trigger.*` 事件的支持——Cron 和 Webhook 任务现在与普通任务一同显示，不再被静默排除\n- 改进 Project Chain 分组，现在显示项目目录名而非原始项目 ID\n\n### 会话\n- 修复 AI 运行中发送消息的队列问题——AI 运行时发送的消息现在本地暂存，待 AI 空闲后按序发送，同时支持单条消息提前立即发送"
+      },
+      {
         "version": "2.20.1",
         "date": "2026-05-09",
         "summary": "本次补丁修复 World Shell 实时 Trigger 事件前缀显示异常，并修复 /compact 消息去重的边缘情况。",
@@ -1415,7 +1439,7 @@
       }
     ]
   },
-  "latestVersion": "2.20.1",
+  "latestVersion": "2.21.0",
   "availableLocales": [
     "en",
     "zh-Hans"

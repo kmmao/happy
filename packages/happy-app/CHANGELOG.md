@@ -1,5 +1,17 @@
 # Changelog
 
+## 2.21.0 - 2026-05-09
+
+This release brings Chain Mode Intent decomposition to the World Shell and fixes session message queueing for mid-session sends.
+
+### World Shell — Chain Mode
+- Added Intent decomposition in Chain Mode — tasks with parent-child relationships now render as an Intent card (showing the parent task) with numbered Steps beneath it, complete with a progress bar and expand/collapse toggle
+- Added support for `trigger.*` events in Chain Mode — Cron and Webhook tasks now appear alongside regular tasks instead of being silently excluded
+- Improved Project Chain grouping to display the project directory name instead of the raw project ID
+
+### Session
+- Fixed message queueing during active AI sessions — messages sent while the AI is running are now locally buffered, delivered in order once idle, with the option to send each message immediately if needed
+
 ## 2.20.1 - 2026-05-09
 
 This patch fixes real-time Trigger event prefixes in the World Shell event stream and resolves a duplicate /compact dedup edge case.
