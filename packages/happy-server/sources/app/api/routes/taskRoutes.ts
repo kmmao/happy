@@ -757,6 +757,86 @@ export function taskRoutes(app: Fastify) {
         },
     );
 
+    /**
+     * Spawn a child task from within a running task session.
+     * Auth: HAPPY_TASK_RESULT_TOKEN (same token used for /v1/tasks/result).
+     * The spawned task inherits machineId, projectId, and directory from the parent
+     * unless overridden. parentTaskId is automatically set to the authenticated task.
+     */
+    app.post(
+        "/v1/tasks/spawn-child",
+        {
+            preHandler: authenticateTaskResult,
+            schema: {
+                body: z.object({
+                    taskId: z.string(),
+                    prompt: z.string().min(1),
+                    directory: z.string().min(1).max(4096).optional(),
+                    priority: TaskPrioritySchema.default("background"),
+                    maxAttempts: z.number().int().min(1).max(10).default(3),
+                }),
+            },
+        },
+        async (request, reply) => {
+            const { taskId, prompt, directory: bodyDirectory, priority, maxAttempts } = request.body;
+            const userId = request.userId;
+
+            const parent = await db.task.findFirst({
+                where: { id: taskId, accountId: userId },
+            });
+            if (!parent) {
+                return reply.code(404).send({ error: "Parent task not found" });
+            }
+
+            const directory = bodyDirectory ?? parent.directory ?? "~";
+
+            const child = await db.task.create({
+                data: {
+                    accountId: userId,
+                    projectId: parent.projectId,
+                    machineId: parent.machineId,
+                    prompt,
+                    directory,
+                    priority,
+                    maxAttempts,
+                    triggerType: "manual",
+                    status: "dispatching",
+                    profileId: parent.profileId,
+                    parentTaskId: parent.id,
+                },
+            });
+
+            const resultToken = await auth.createTaskResultToken({ userId, taskId: child.id });
+
+            eventRouter.emitEphemeral({
+                userId,
+                payload: buildTaskTriggerEphemeral({
+                    taskId: child.id,
+                    prompt: child.prompt,
+                    directory,
+                    priority: child.priority,
+                    projectId: parent.projectId ?? undefined,
+                    resultToken,
+                    profileId: parent.profileId ?? undefined,
+                }),
+                recipientFilter: { type: "machine-scoped-only", machineId: parent.machineId },
+            });
+
+            eventRouter.emitEphemeral({
+                userId,
+                payload: buildTaskStatusChangedEphemeral({
+                    taskId: child.id,
+                    machineId: child.machineId,
+                    status: "queued",
+                    triggerType: child.triggerType,
+                }),
+                recipientFilter: { type: "user-scoped-only" },
+            });
+
+            return reply.code(201).send({ task: serializeTask(child) });
+        },
+    );
+
     app.post(
         "/v1/tasks/result",
         {

@@ -40,6 +40,7 @@ function buildTaskPrompt(data: TaskTriggerData, deps?: Pick<TaskHandlerDeps, "se
 
   if (deps?.serverUrl && data.resultToken) {
     const reportUrl = `${deps.serverUrl.replace(/\/$/, "")}/v1/tasks/result`;
+    const spawnUrl = `${deps.serverUrl.replace(/\/$/, "")}/v1/tasks/spawn-child`;
     parts.push("## Task Result Reporting\n");
     parts.push(
       [
@@ -51,6 +52,19 @@ function buildTaskPrompt(data: TaskTriggerData, deps?: Pick<TaskHandlerDeps, "se
         'Use outcome: "failed" when the task cannot be completed due to an execution error.',
         'Use outcome: "blocked" when progress requires human input, a decision, or an external dependency.',
         "Always include summary as a short human-readable sentence explaining the result.",
+      ].join("\n"),
+    );
+    parts.push("---\n");
+    parts.push("## Spawning Child Tasks\n");
+    parts.push(
+      [
+        "You can break your work into parallel sub-tasks by spawning child tasks.",
+        `POST to HAPPY_TASK_SPAWN_URL (value: ${spawnUrl}).`,
+        "Authenticate with Authorization: Bearer $HAPPY_TASK_RESULT_TOKEN.",
+        'Send JSON: { "taskId": "$HAPPY_TASK_ID", "prompt": "...", "directory": "$HAPPY_TASK_DIR", "priority": "background" }.',
+        "The spawned task runs independently on the same machine and is linked to this task as its parent.",
+        "You can spawn multiple child tasks in parallel, then continue or wait for them to complete.",
+        "Use child tasks for independently parallelizable steps; keep each child prompt focused and self-contained.",
       ].join("\n"),
     );
     parts.push("---\n");
@@ -147,6 +161,8 @@ export async function runTaskJob(
       ...(deps.serverUrl ? { HAPPY_TASK_SERVER_URL: deps.serverUrl } : {}),
       ...(data.resultToken ? { HAPPY_TASK_RESULT_TOKEN: data.resultToken } : {}),
       ...(deps.serverUrl ? { HAPPY_TASK_REPORT_URL: `${deps.serverUrl.replace(/\/$/, "")}/v1/tasks/result` } : {}),
+      ...(deps.serverUrl ? { HAPPY_TASK_SPAWN_URL: `${deps.serverUrl.replace(/\/$/, "")}/v1/tasks/spawn-child` } : {}),
+      HAPPY_TASK_DIR: sessionDirectory,
       // Per-role model override: inject into the spawned agent's environment
       ...(data.modelOverride && agentType === "claude" ? { ANTHROPIC_MODEL: data.modelOverride } : {}),
       ...(agentType === "codex" ? { OPENAI_MODEL: LOCKED_CODEX_MODEL } : {}),
