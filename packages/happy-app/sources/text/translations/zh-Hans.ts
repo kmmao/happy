@@ -4215,5 +4215,9 @@ export const zhHans: TranslationStructure = {
     agentModeEmptyDescription: "当连接的机器上有活跃会话时，Agent 会出现在这里。",
     agentIdle: "空闲",
     noChainResults: "没有符合搜索条件的链",
+    policyDescDisabled: "纯手动——不执行任何自动操作",
+    policyDescSuggest: "提供建议，等待你确认后再执行",
+    policyDescSemiAuto: "自动处理常规操作，异常情况上报人工",
+    policyDescAuto: "完全自治——无需等待，自动执行所有决策",
   },
 } as const;

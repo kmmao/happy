@@ -150,12 +150,20 @@ export const WorldDefinitionPanel = React.memo(function WorldDefinitionPanel({
                         </View>
 
                         {/* Policy */}
-                        <View style={styles.fieldRow}>
-                            <Text style={styles.fieldLabel}>{t("world.policy")}</Text>
-                            <TouchableOpacity style={styles.policyButton} onPress={cyclePolicy} activeOpacity={0.7}>
-                                <Text style={styles.policyText}>{policy}</Text>
-                                <Ionicons name="chevron-forward" size={12} color={theme.colors.textSecondary} />
-                            </TouchableOpacity>
+                        <View style={styles.fieldColumn}>
+                            <View style={styles.fieldRow}>
+                                <Text style={styles.fieldLabel}>{t("world.policy")}</Text>
+                                <TouchableOpacity style={styles.policyButton} onPress={cyclePolicy} activeOpacity={0.7}>
+                                    <Text style={styles.policyText}>{policy}</Text>
+                                    <Ionicons name="chevron-forward" size={12} color={theme.colors.textSecondary} />
+                                </TouchableOpacity>
+                            </View>
+                            <Text style={styles.policyDesc}>
+                                {policy === "disabled" ? t("world.policyDescDisabled") :
+                                 policy === "suggest" ? t("world.policyDescSuggest") :
+                                 policy === "semi-auto" ? t("world.policyDescSemiAuto") :
+                                 t("world.policyDescAuto")}
+                            </Text>
                         </View>
 
                         {/* Save */}
@@ -225,6 +233,12 @@ const useStyles = () => {
         policyText: {
             fontSize: 13,
             color: theme.colors.text,
+        },
+        policyDesc: {
+            fontSize: 11,
+            color: theme.colors.textSecondary,
+            fontStyle: "italic" as const,
+            paddingHorizontal: 2,
         },
         saveButton: {
             flexDirection: "row",

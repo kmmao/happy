@@ -4221,5 +4221,9 @@ export const zhHant: TranslationStructure = {
     agentModeEmptyDescription: "Agents will appear here when sessions are active on connected machines.",
     agentIdle: "閒置",
     noChainResults: "沒有符合搜尋條件的鏈路",
+    policyDescDisabled: "Manual only — no automated actions",
+    policyDescSuggest: "Suggests next steps, waits for your confirmation",
+    policyDescSemiAuto: "Handles routine actions automatically, escalates exceptions",
+    policyDescAuto: "Fully autonomous — acts on all decisions without waiting",
   },
 } as const;

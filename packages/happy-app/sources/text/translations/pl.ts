@@ -4340,6 +4340,10 @@ export const pl: TranslationStructure = {
     agentModeEmptyDescription: "Agents will appear here when sessions are active on connected machines.",
     agentIdle: "Bezczynny",
     noChainResults: "Brak łańcuchów pasujących do wyszukiwania",
+    policyDescDisabled: "Manual only — no automated actions",
+    policyDescSuggest: "Suggests next steps, waits for your confirmation",
+    policyDescSemiAuto: "Handles routine actions automatically, escalates exceptions",
+    policyDescAuto: "Fully autonomous — acts on all decisions without waiting",
   },
 } as const;
 

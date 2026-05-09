@@ -4324,6 +4324,10 @@ export const ca: TranslationStructure = {
     agentModeEmptyDescription: "Agents will appear here when sessions are active on connected machines.",
     agentIdle: "Inactiu",
     noChainResults: "Cap cadena coincideix amb la cerca",
+    policyDescDisabled: "Manual only — no automated actions",
+    policyDescSuggest: "Suggests next steps, waits for your confirmation",
+    policyDescSemiAuto: "Handles routine actions automatically, escalates exceptions",
+    policyDescAuto: "Fully autonomous — acts on all decisions without waiting",
   },
 } as const;
 

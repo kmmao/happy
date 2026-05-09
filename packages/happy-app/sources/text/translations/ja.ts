@@ -4293,5 +4293,9 @@ export const ja: TranslationStructure = {
     agentModeEmptyDescription: "Agents will appear here when sessions are active on connected machines.",
     agentIdle: "待機中",
     noChainResults: "検索に一致するチェーンがありません",
+    policyDescDisabled: "Manual only — no automated actions",
+    policyDescSuggest: "Suggests next steps, waits for your confirmation",
+    policyDescSemiAuto: "Handles routine actions automatically, escalates exceptions",
+    policyDescAuto: "Fully autonomous — acts on all decisions without waiting",
   },
 } as const;
