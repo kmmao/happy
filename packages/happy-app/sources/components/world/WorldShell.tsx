@@ -12,9 +12,10 @@ import { WorldEventCard } from "./WorldEventCard";
 import { WorldFilterChips } from "./WorldFilterChips";
 import { WorldDefinitionPanel } from "./WorldDefinitionPanel";
 import { WorldChainMode } from "./WorldChainMode";
+import { WorldAgentMode } from "./WorldAgentMode";
 import type { WorldEvent, WorldFilter } from "./worldTypes";
 
-type ViewMode = "stream" | "chain";
+type ViewMode = "stream" | "chain" | "agents";
 
 interface WorldShellProps {
     onExit?: () => void;
@@ -206,7 +207,15 @@ export const WorldShell = React.memo(function WorldShell({ onExit }: WorldShellP
                     onPress={() => setViewMode("chain")}
                 >
                     <Text style={[styles.modeTabText, viewMode === "chain" && styles.modeTabTextActive]}>
-                        Chains
+                        {t("world.chainMode")}
+                    </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                    style={[styles.modeTab, viewMode === "agents" && styles.modeTabActive]}
+                    onPress={() => setViewMode("agents")}
+                >
+                    <Text style={[styles.modeTabText, viewMode === "agents" && styles.modeTabTextActive]}>
+                        {t("world.agentMode")}
                     </Text>
                 </TouchableOpacity>
             </View>
@@ -272,8 +281,10 @@ export const WorldShell = React.memo(function WorldShell({ onExit }: WorldShellP
                     }
                     contentContainerStyle={styles.list}
                 />
-            ) : (
+            ) : viewMode === "chain" ? (
                 <WorldChainMode events={events} loading={loading} onRefresh={refresh} />
+            ) : (
+                <WorldAgentMode />
             )}
         </View>
     );

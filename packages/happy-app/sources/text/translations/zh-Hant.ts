@@ -4214,5 +4214,10 @@ export const zhHant: TranslationStructure = {
     policy: "策略",
     notSet: "未設定",
     narrativePlaceholder: "描述目前的方向和目標...",
+    chainMode: "鏈路",
+    agentMode: "Agents",
+    noAgents: "目前無活躍 Agent",
+    agentModeEmptyDescription: "Agents will appear here when sessions are active on connected machines.",
+    agentIdle: "閒置",
   },
 } as const;

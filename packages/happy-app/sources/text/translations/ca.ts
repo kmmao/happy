@@ -4317,6 +4317,11 @@ export const ca: TranslationStructure = {
     policy: "Policy",
     notSet: "Not set",
     narrativePlaceholder: "Describe the current direction and goals...",
+    chainMode: "Chains",
+    agentMode: "Agents",
+    noAgents: "No active agents",
+    agentModeEmptyDescription: "Agents will appear here when sessions are active on connected machines.",
+    agentIdle: "Inactiu",
   },
 } as const;
 

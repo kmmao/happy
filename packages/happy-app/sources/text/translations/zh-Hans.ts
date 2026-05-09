@@ -4208,5 +4208,10 @@ export const zhHans: TranslationStructure = {
     policy: "策略",
     notSet: "未设置",
     narrativePlaceholder: "描述当前的方向和目标...",
+    chainMode: "链路",
+    agentMode: "Agents",
+    noAgents: "暂无活跃 Agent",
+    agentModeEmptyDescription: "当连接的机器上有活跃会话时，Agent 会出现在这里。",
+    agentIdle: "空闲",
   },
 } as const;

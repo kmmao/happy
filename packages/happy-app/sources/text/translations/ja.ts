@@ -4286,5 +4286,10 @@ export const ja: TranslationStructure = {
     policy: "ポリシー",
     notSet: "未設定",
     narrativePlaceholder: "現在の方向性と目標を説明してください...",
+    chainMode: "Chains",
+    agentMode: "Agents",
+    noAgents: "No active agents",
+    agentModeEmptyDescription: "Agents will appear here when sessions are active on connected machines.",
+    agentIdle: "待機中",
   },
 } as const;
