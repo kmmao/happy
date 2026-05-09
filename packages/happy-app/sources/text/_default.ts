@@ -605,6 +605,7 @@ export const en = {
     cancelQueued: "Cancel",
     messagesQueued: ({ n }: { n: number }) => `${n} message${n === 1 ? "" : "s"} queued`,
     sendNow: "Send now",
+    queueModeHint: "AI is running — next message will be queued",
     noMessages: "No messages yet",
     created: ({ time }: { time: string }) => `Created ${time}`,
     contextSummaryTitle: "Context from previous session",

@@ -14,11 +14,12 @@ interface QueuedMessageItem {
 interface QueueBannerProps {
     queuedMessages: QueuedMessageItem[];
     onSendNow: () => void;
+    onSendItemNow?: (localId: string) => void;
     onCancelItem: (localId: string) => void;
     isRunning?: boolean;
 }
 
-export const QueueBanner = React.memo(({ queuedMessages, onSendNow, onCancelItem, isRunning }: QueueBannerProps) => {
+export const QueueBanner = React.memo(({ queuedMessages, onSendNow, onSendItemNow, onCancelItem, isRunning }: QueueBannerProps) => {
     const { theme } = useUnistyles();
     const [expanded, setExpanded] = React.useState(false);
     const count = queuedMessages.length;
@@ -72,6 +73,19 @@ export const QueueBanner = React.memo(({ queuedMessages, onSendNow, onCancelItem
                             <Text style={styles.itemText} numberOfLines={1}>
                                 {msg.displayText}
                             </Text>
+                            {isRunning && onSendItemNow && (
+                                <Pressable
+                                    onPress={() => onSendItemNow(msg.localId)}
+                                    hitSlop={8}
+                                    style={({ pressed }) => ({ opacity: pressed ? 0.5 : 0.8 })}
+                                >
+                                    <Ionicons
+                                        name="play-circle-outline"
+                                        size={16}
+                                        color={theme.colors.button.primary.background}
+                                    />
+                                </Pressable>
+                            )}
                             <Pressable
                                 onPress={() => onCancelItem(msg.localId)}
                                 hitSlop={8}

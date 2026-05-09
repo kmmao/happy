@@ -617,6 +617,7 @@ export const pt: TranslationStructure = {
     cancelQueued: "Cancelar",
     messagesQueued: ({ n }: { n: number }) => `${n} mensagem${n === 1 ? "" : "s"} na fila`,
     sendNow: "Enviar agora",
+    queueModeHint: "IA em execução — a próxima mensagem será enfileirada",
     noMessages: "Sem mensagens ainda",
     contextSummaryTitle: "Contexto da sessão anterior",
     created: ({ time }: { time: string }) => `Criado ${time}`,

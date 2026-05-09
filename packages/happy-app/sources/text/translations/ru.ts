@@ -846,6 +846,7 @@ export const ru: TranslationStructure = {
     cancelQueued: "Отменить",
     messagesQueued: ({ n }: { n: number }) => `${n} сообщ. в очереди`,
     sendNow: "Отправить сейчас",
+    queueModeHint: "AI работает — следующее сообщение встанет в очередь",
     noMessages: "Сообщений пока нет",
     contextSummaryTitle: "Контекст из предыдущей сессии",
     created: ({ time }: { time: string }) => `Создано ${time}`,

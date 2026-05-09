@@ -19,9 +19,8 @@ import { ToolView } from "./tools/ToolView";
 import { AgentEvent } from "@/sync/typesRaw";
 import { sync } from "@/sync/sync";
 import { Option } from "./markdown/MarkdownView";
-import { useSetting, storage, useProjectForSession } from "@/sync/storage";
+import { useSetting, useProjectForSession } from "@/sync/storage";
 import { getAutoOptionFeedbackStats } from "@/sync/autoOptionFeedback";
-import { sessionCancelQueuedMessage } from "@/sync/ops";
 import { AgentDot } from "./AgentDot";
 import { MessageImage } from "./MessageImage";
 import { parseImageRefs } from "@/utils/parseImageRefs";
@@ -124,20 +123,6 @@ function UserTextBlock(props: { message: UserTextMessage; sessionId: string }) {
   const appendToInput = useAppendToInput();
   const { theme } = useUnistyles();
   const router = useRouter();
-
-  const queuedIds = storage((s) => s.queuedMessageLocalIds[props.sessionId]);
-  const isQueued =
-    props.message.localId != null &&
-    (queuedIds ?? []).includes(props.message.localId);
-
-  const handleCancelQueued = React.useCallback(async () => {
-    const localId = props.message.localId;
-    if (!localId) return;
-    const cancelled = await sessionCancelQueuedMessage(props.sessionId, localId);
-    if (cancelled) {
-      storage.getState().removeQueuedMessageId(props.sessionId, localId);
-    }
-  }, [props.sessionId, props.message.localId]);
 
   const handleOptionPress = React.useCallback(
     (option: Option) => {
@@ -249,38 +234,6 @@ function UserTextBlock(props: { message: UserTextMessage; sessionId: string }) {
               />
             </Pressable>
           </View>
-        </View>
-      )}
-      {isQueued && (
-        <View style={styles.queuedIndicator}>
-          <Ionicons
-            name="time-outline"
-            size={11}
-            color={theme.colors.textSecondary}
-          />
-          <Text
-            style={[styles.queuedText, { color: theme.colors.textSecondary }]}
-          >
-            {t("session.messageQueued")}
-          </Text>
-          <Pressable
-            onPress={handleCancelQueued}
-            hitSlop={8}
-            style={({ pressed }) => [
-              styles.cancelQueuedButton,
-              { backgroundColor: theme.colors.surfaceHighest },
-              pressed && { opacity: 0.7 },
-            ]}
-          >
-            <Text
-              style={[
-                styles.cancelQueuedText,
-                { color: theme.colors.textSecondary },
-              ]}
-            >
-              {t("session.cancelQueued")}
-            </Text>
-          </Pressable>
         </View>
       )}
     </View>
@@ -1021,28 +974,6 @@ const styles = StyleSheet.create((theme) => ({
     ...Typography.mono(),
     color: theme.colors.textLink,
     fontSize: 12,
-  },
-  queuedIndicator: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 3,
-    marginBottom: 12,
-    marginRight: 4,
-    opacity: 0.6,
-  },
-  queuedText: {
-    fontSize: 11,
-    ...Typography.default(),
-  },
-  cancelQueuedButton: {
-    marginLeft: 4,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-  },
-  cancelQueuedText: {
-    fontSize: 11,
-    ...Typography.default(),
   },
   agentMessageRow: {
     flexDirection: "row",

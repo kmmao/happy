@@ -156,6 +156,29 @@ function hasPendingAskUserQuestion(messages: readonly Message[]): boolean {
   return false;
 }
 
+function QueueModeHint() {
+  const { theme } = useUnistyles();
+  return (
+    <View
+      style={{
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 5,
+        paddingHorizontal: 14,
+        paddingVertical: 5,
+        backgroundColor: theme.colors.surfaceHigh,
+        borderTopWidth: 1,
+        borderTopColor: theme.colors.divider,
+      }}
+    >
+      <Ionicons name="time-outline" size={11} color={theme.colors.textSecondary} />
+      <Text style={{ fontSize: 11, color: theme.colors.textSecondary }}>
+        {t("session.queueModeHint")}
+      </Text>
+    </View>
+  );
+}
+
 export const SessionView = React.memo((props: { id: string }) => {
   const sessionId = props.id;
   const router = useRouter();
@@ -871,6 +894,16 @@ function SessionViewInner({
     sessionInterrupt(sessionId);
   }, [sessionId]);
 
+  const handleSendItemNow = React.useCallback((localId: string) => {
+    setPendingQueue((prev) => {
+      const idx = prev.findIndex((m) => m.localId === localId);
+      if (idx <= 0) return prev;
+      const item = prev[idx]!;
+      return [item, ...prev.slice(0, idx), ...prev.slice(idx + 1)];
+    });
+    sessionInterrupt(sessionId);
+  }, [sessionId]);
+
   const rawPromptSuggestion = usePromptSuggestion(sessionId);
   const needsContinue = useNeedsContinue(sessionId);
   const alwaysShowContextSize = useSetting("alwaysShowContextSize");
@@ -1504,9 +1537,13 @@ function SessionViewInner({
       <QueueBanner
         queuedMessages={queuedMessages}
         onSendNow={handleSendNow}
+        onSendItemNow={handleSendItemNow}
         onCancelItem={handleCancelQueuedItem}
         isRunning={isRunning}
       />
+      {isRunning && pendingQueue.length === 0 && (
+        <QueueModeHint />
+      )}
       <View onLayout={(e) => setAgentInputHeight(e.nativeEvent.layout.height)}>
       <AgentInput
         placeholder={t("session.inputPlaceholder")}
