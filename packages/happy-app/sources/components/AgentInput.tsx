@@ -937,14 +937,14 @@ export const AgentInput = React.memo(
                           : undefined
                       }
                       disabled={!props.requiresAction || !props.onRequiresActionPress}
-                      hitSlop={6}
+                      hitSlop={8}
                       style={({ pressed }) => ({
                         flexDirection: "row",
                         alignItems: "center",
                         gap: 4,
                         minWidth: 0,
-                        opacity:
-                          props.requiresAction && pressed ? 0.6 : 1,
+                        opacity: props.requiresAction && pressed ? 0.5 : 1,
+                        cursor: props.requiresAction ? ("pointer" as any) : undefined,
                       })}
                     >
                       <StatusDot
@@ -957,11 +957,21 @@ export const AgentInput = React.memo(
                           fontSize: 11,
                           color: props.connectionStatus.color,
                           ...Typography.default(),
+                          textDecorationLine: props.requiresAction
+                            ? "underline"
+                            : "none",
                         }}
                         numberOfLines={1}
                       >
                         {props.connectionStatus.text}
                       </Text>
+                      {props.requiresAction && (
+                        <Ionicons
+                          name="chevron-forward"
+                          size={10}
+                          color={props.connectionStatus.color}
+                        />
+                      )}
                     </Pressable>
                     {props.connectionStatus.cliStatus && (
                       <>

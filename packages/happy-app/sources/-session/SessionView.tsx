@@ -826,10 +826,26 @@ function SessionViewInner({
   const isGemini = flavor === "gemini";
   const requiresAction = session.sdkSessionState === "requires_action";
   const [showPermissionSheet, setShowPermissionSheet] = React.useState(false);
-  const pendingPermission = React.useMemo(
-    () => (requiresAction ? findPendingPermission(messages) : null),
-    [requiresAction, messages],
-  );
+  const pendingPermission = React.useMemo(() => {
+    if (!requiresAction) return null;
+    // Prefer agentState.requests — available even when the permission message
+    // has scrolled past the MAX_DISPLAY_MESSAGES pagination window.
+    const requests = session.agentState?.requests;
+    if (requests) {
+      const entries = Object.entries(requests);
+      const entry = entries.find(([, req]) => req.tool !== "AskUserQuestion");
+      if (entry) {
+        const [permId, req] = entry;
+        return {
+          toolName: req.tool,
+          toolInput: req.arguments,
+          permission: { id: permId, status: "pending" as const },
+        };
+      }
+    }
+    // Fallback: search the visible messages tree
+    return findPendingPermission(messages);
+  }, [requiresAction, session.agentState?.requests, messages]);
 
   // Auto-close the sheet when the permission is resolved
   React.useEffect(() => {
