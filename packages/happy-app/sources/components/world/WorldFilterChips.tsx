@@ -10,7 +10,7 @@ interface ChipDef {
     filter: WorldFilter;
 }
 
-interface ProjectChipInfo {
+interface SourceChipInfo {
     id: string;
     label: string;
 }
@@ -18,7 +18,8 @@ interface ProjectChipInfo {
 interface WorldFilterChipsProps {
     activeFilter: WorldFilter;
     onFilterChange: (filter: WorldFilter) => void;
-    projects?: ProjectChipInfo[];
+    projects?: SourceChipInfo[];
+    machines?: SourceChipInfo[];
 }
 
 function filtersEqual(a: WorldFilter, b: WorldFilter): boolean {
@@ -34,6 +35,7 @@ export const WorldFilterChips = React.memo(function WorldFilterChips({
     activeFilter,
     onFilterChange,
     projects = [],
+    machines = [],
 }: WorldFilterChipsProps) {
     const staticChips: ChipDef[] = [
         { label: t("world.filterAll"), filter: {} },
@@ -47,12 +49,17 @@ export const WorldFilterChips = React.memo(function WorldFilterChips({
         { label: "🔴", filter: { severity: "critical" } },
     ];
 
-    const projectChips: ChipDef[] = projects.slice(0, 5).map((p) => ({
+    const projectChips: ChipDef[] = projects.slice(0, 4).map((p) => ({
         label: p.label,
         filter: { projectId: p.id },
     }));
 
-    const allChips = [...staticChips, ...projectChips];
+    const machineChips: ChipDef[] = machines.slice(0, 3).map((m) => ({
+        label: `🖥 ${m.label}`,
+        filter: { machineId: m.id },
+    }));
+
+    const allChips = [...staticChips, ...projectChips, ...machineChips];
 
     return (
         <ScrollView

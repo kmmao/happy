@@ -20,6 +20,38 @@ interface UseWorldEventsResult {
 
 const MAX_EVENTS = 200;
 
+function buildSessionLifecycleEvent(
+    sessionId: string,
+    isActive: boolean,
+    occurredAt: number,
+): WorldEvent {
+    const state = storage.getState();
+    const session = state.sessions[sessionId];
+    const project = state.getProjectForSession(sessionId);
+
+    const path = session?.metadata?.path;
+    const name = path
+        ? path.split("/").filter(Boolean).pop() ?? path
+        : sessionId.slice(0, 12);
+
+    return {
+        id: `session-lifecycle-${sessionId}-${occurredAt}`,
+        originalId: sessionId,
+        eventType: isActive ? "session.started" : "session.completed",
+        title: name,
+        summary: isActive ? "started" : "completed",
+        occurredAt,
+        severity: "info",
+        source: {
+            type: "session",
+            projectId: project?.serverId ?? null,
+            projectPath: path ?? null,
+            machineId: session?.metadata?.machineId ?? null,
+            sessionId,
+        },
+    };
+}
+
 export function useWorldEvents(filter?: WorldFilter): UseWorldEventsResult {
     const [events, setEvents] = React.useState<WorldEvent[]>([]);
     const [loading, setLoading] = React.useState(false);
@@ -30,6 +62,7 @@ export function useWorldEvents(filter?: WorldFilter): UseWorldEventsResult {
     const filterRef = React.useRef(filter);
     filterRef.current = filter;
 
+    // ── Initial load ─────────────────────────────────────────────────────────
     React.useEffect(() => {
         let cancelled = false;
 
@@ -52,30 +85,17 @@ export function useWorldEvents(filter?: WorldFilter): UseWorldEventsResult {
 
                 const allEvents: WorldEvent[] = [...result.events];
 
-                // Add local sessions (not covered by backend API)
+                // Synthesise session lifecycle events from local store
                 const sessions = Object.values(storage.getState().sessions)
                     .sort((a, b) => b.updatedAt - a.updatedAt)
                     .slice(0, 30);
 
                 for (const session of sessions) {
-                    const eventType = session.active ? "session.active" : "session.ended";
-                    const path = session.metadata?.path;
-                    const name = path ? path.split("/").filter(Boolean).pop() ?? path : session.id.slice(0, 12);
-                    const sessionEvent: WorldEvent = {
-                        id: `session-${session.id}`,
-                        originalId: session.id,
-                        eventType,
-                        title: name,
-                        summary: session.active ? "running" : "ended",
-                        occurredAt: session.updatedAt,
-                        severity: "info",
-                        source: {
-                            type: "session",
-                            machineId: session.metadata?.machineId ?? null,
-                            sessionId: session.id,
-                        },
-                    };
-                    // Apply local filter for sessions
+                    const sessionEvent = buildSessionLifecycleEvent(
+                        session.id,
+                        session.active,
+                        session.updatedAt,
+                    );
                     if (!f || filterWorldEvents([sessionEvent], f).length > 0) {
                         allEvents.push(sessionEvent);
                     }
@@ -89,12 +109,11 @@ export function useWorldEvents(filter?: WorldFilter): UseWorldEventsResult {
 
         load();
 
-        return () => {
-            cancelled = true;
-        };
+        return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [tick, filter?.projectId, filter?.machineId, filter?.eventTypePrefix, filter?.severity]);
 
+    // ── Realtime: task / inbox / session-timeline / supervisor ───────────────
     React.useEffect(() => {
         const unsubTask = sync.onTaskStatusChanged((event) => {
             const eventPrefix = (event.triggerType === "cron" || event.triggerType === "webhook")
@@ -116,52 +135,37 @@ export function useWorldEvents(filter?: WorldFilter): UseWorldEventsResult {
             };
 
             const f = filterRef.current;
-            if (f) {
-                const [passes] = filterWorldEvents([worldEvent], f);
-                if (!passes) return;
-            }
-
+            if (f && !filterWorldEvents([worldEvent], f).length) return;
             setEvents((prev) => [worldEvent, ...prev].slice(0, MAX_EVENTS));
         });
 
         const unsubInbox = sync.onInboxNewItem((item) => {
             const worldEvent = adaptInboxToEvent(item);
-
             const f = filterRef.current;
-            if (f) {
-                const [passes] = filterWorldEvents([worldEvent], f);
-                if (!passes) return;
-            }
-
+            if (f && !filterWorldEvents([worldEvent], f).length) return;
             setEvents((prev) => [worldEvent, ...prev].slice(0, MAX_EVENTS));
         });
 
         const unsubSessionEvent = sync.onSessionEventCreated((event) => {
-            const session = storage.getState().sessions[event.sessionId];
+            const state = storage.getState();
+            const session = state.sessions[event.sessionId];
+            // Resolve projectId from projectManager so session events are filterable by project
+            const project = state.getProjectForSession(event.sessionId);
             const worldEvent = adaptSessionEventToEvent(
                 event,
-                null,
+                project?.serverId ?? null,
                 session?.metadata?.machineId ?? null,
             );
 
             const f = filterRef.current;
-            if (f) {
-                const [passes] = filterWorldEvents([worldEvent], f);
-                if (!passes) return;
-            }
-
+            if (f && !filterWorldEvents([worldEvent], f).length) return;
             setEvents((prev) => [worldEvent, ...prev].slice(0, MAX_EVENTS));
         });
 
         const unsubSupervisor = sync.onSupervisorStatus((event) => {
             const worldEvent = adaptSupervisorStatusToEvent(event);
-
             const f = filterRef.current;
-            if (f) {
-                const [passes] = filterWorldEvents([worldEvent], f);
-                if (!passes) return;
-            }
-
+            if (f && !filterWorldEvents([worldEvent], f).length) return;
             setEvents((prev) => [worldEvent, ...prev].slice(0, MAX_EVENTS));
         });
 
@@ -171,6 +175,41 @@ export function useWorldEvents(filter?: WorldFilter): UseWorldEventsResult {
             unsubSessionEvent();
             unsubSupervisor();
         };
+    }, []);
+
+    // ── Realtime: session lifecycle via Zustand store ─────────────────────────
+    // session.active: false→true emits session.started; true→false emits session.completed
+    React.useEffect(() => {
+        const unsub = storage.subscribe((state, prevState) => {
+            if (state.sessions === prevState.sessions) return;
+
+            const now = Date.now();
+            const newEvents: WorldEvent[] = [];
+            const f = filterRef.current;
+
+            for (const [sessionId, session] of Object.entries(state.sessions)) {
+                const prev = prevState.sessions[sessionId];
+
+                const activeFlipped = prev !== undefined && prev.active !== session.active;
+                const brandNew = prev === undefined && session.active;
+                if (!activeFlipped && !brandNew) continue;
+
+                const worldEvent = buildSessionLifecycleEvent(
+                    sessionId,
+                    session.active,
+                    session.active ? session.activeAt : now,
+                );
+
+                if (f && !filterWorldEvents([worldEvent], f).length) continue;
+                newEvents.push(worldEvent);
+            }
+
+            if (newEvents.length > 0) {
+                setEvents((prev) => [...newEvents, ...prev].slice(0, MAX_EVENTS));
+            }
+        });
+
+        return unsub;
     }, []);
 
     return { events, loading, refresh };

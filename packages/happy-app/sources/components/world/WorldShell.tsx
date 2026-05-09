@@ -13,9 +13,11 @@ import { WorldFilterChips } from "./WorldFilterChips";
 import { WorldDefinitionPanel } from "./WorldDefinitionPanel";
 import { WorldChainMode } from "./WorldChainMode";
 import { WorldAgentMode } from "./WorldAgentMode";
+import { WorldDensityMode } from "./WorldDensityMode";
+import { WorldEventInspector } from "./WorldEventInspector";
 import type { WorldEvent, WorldFilter } from "./worldTypes";
 
-type ViewMode = "stream" | "chain" | "agents";
+type ViewMode = "stream" | "chain" | "agents" | "density";
 
 interface WorldShellProps {
     onExit?: () => void;
@@ -32,6 +34,7 @@ export const WorldShell = React.memo(function WorldShell({ onExit }: WorldShellP
     const allSessions = useAllSessions();
     const [filter, setFilter] = React.useState<WorldFilter>({});
     const [panelOpen, setPanelOpen] = React.useState(false);
+    const [selectedEvent, setSelectedEvent] = React.useState<WorldEvent | null>(null);
     const [viewMode, setViewMode] = React.useState<ViewMode>("stream");
     const [compact, setCompact] = React.useState(false);
     const [searchOpen, setSearchOpen] = React.useState(false);
@@ -83,6 +86,16 @@ export const WorldShell = React.memo(function WorldShell({ onExit }: WorldShellP
         [projects],
     );
 
+    const machineChipInfos = React.useMemo(
+        () => machines
+            .filter((m) => m.connected)
+            .map((m) => ({
+                id: m.id,
+                label: m.metadata?.displayName ?? m.metadata?.host ?? m.id.slice(0, 10),
+            })),
+        [machines],
+    );
+
 
     const pendingDecisions = events.filter((e) =>
         e.eventType.startsWith("decision."),
@@ -100,9 +113,15 @@ export const WorldShell = React.memo(function WorldShell({ onExit }: WorldShellP
         }
     }, [router, onExit]);
 
+    const handleEventPress = React.useCallback((event: WorldEvent) => {
+        setSelectedEvent(event);
+    }, []);
+
     const renderItem = React.useCallback(
-        ({ item }: { item: WorldEvent }) => <WorldEventCard event={item} compact={compact} />,
-        [compact],
+        ({ item }: { item: WorldEvent }) => (
+            <WorldEventCard event={item} compact={compact} onPress={handleEventPress} />
+        ),
+        [compact, handleEventPress],
     );
 
     const keyExtractor = React.useCallback((item: WorldEvent) => item.id, []);
@@ -232,18 +251,27 @@ export const WorldShell = React.memo(function WorldShell({ onExit }: WorldShellP
                         {t("world.agentMode")}
                     </Text>
                 </TouchableOpacity>
+                <TouchableOpacity
+                    style={[styles.modeTab, viewMode === "density" && styles.modeTabActive]}
+                    onPress={() => setViewMode("density")}
+                >
+                    <Text style={[styles.modeTabText, viewMode === "density" && styles.modeTabTextActive]}>
+                        {t("world.densityMode")}
+                    </Text>
+                </TouchableOpacity>
             </View>
 
-            {viewMode !== "agents" && (
+            {viewMode !== "agents" && viewMode !== "density" && (
                 <WorldFilterChips
                     activeFilter={filter}
                     onFilterChange={setFilter}
                     projects={projectChipInfos}
+                    machines={machineChipInfos}
                 />
             )}
 
             {/* Search / command bar */}
-            {viewMode !== "agents" && searchOpen && (
+            {viewMode !== "agents" && viewMode !== "density" && searchOpen && (
                 <>
                     <View style={styles.searchBar}>
                         <Ionicons
@@ -302,9 +330,24 @@ export const WorldShell = React.memo(function WorldShell({ onExit }: WorldShellP
                     onRefresh={refresh}
                     searchQuery={searchQuery.startsWith("/") ? "" : searchQuery}
                 />
+            ) : viewMode === "density" ? (
+                <WorldDensityMode
+                    events={events}
+                    loading={loading}
+                    onRefresh={refresh}
+                    onNavigateToStream={(f) => {
+                        setFilter(f);
+                        setViewMode("stream");
+                    }}
+                />
             ) : (
                 <WorldAgentMode />
             )}
+
+            <WorldEventInspector
+                event={selectedEvent}
+                onClose={() => setSelectedEvent(null)}
+            />
         </View>
     );
 });
