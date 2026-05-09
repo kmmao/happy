@@ -1,5 +1,15 @@
 # Changelog
 
+## 2.22.0 - 2026-05-09
+
+This release makes the World Shell Chain Mode fully interactive — every step, dot, and Intent title is now tappable and navigates directly to its execution session.
+
+### World Shell — Chain Mode
+- Added tap-to-navigate on expanded Step rows — tapping a step that has an execution session opens that session directly; steps not yet running show no tap affordance
+- Added tap-to-navigate on collapsed StepDots — the small colored dots in the folded card state are also tappable, with an expanded hit area for easy tapping
+- Added tap-to-navigate on the Intent title — tapping the Intent badge and title area navigates to the parent task's execution session, with a small link icon as a visual cue
+- Improved Intent title area layout so the badge, title, and link icon sit inline without affecting the collapse toggle
+
 ## 2.21.0 - 2026-05-09
 
 This release brings Chain Mode Intent decomposition to the World Shell and fixes session message queueing for mid-session sends.

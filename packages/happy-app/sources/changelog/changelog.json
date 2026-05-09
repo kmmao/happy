@@ -2,6 +2,18 @@
   "entries": {
     "en": [
       {
+        "version": "2.22.0",
+        "date": "2026-05-09",
+        "summary": "This release makes the World Shell Chain Mode fully interactive — every step, dot, and Intent title is now tappable and navigates directly to its execution session.",
+        "changes": [
+          "Added tap-to-navigate on expanded Step rows — tapping a step that has an execution session opens that session directly; steps not yet running show no tap affordance",
+          "Added tap-to-navigate on collapsed StepDots — the small colored dots in the folded card state are also tappable, with an expanded hit area for easy tapping",
+          "Added tap-to-navigate on the Intent title — tapping the Intent badge and title area navigates to the parent task's execution session, with a small link icon as a visual cue",
+          "Improved Intent title area layout so the badge, title, and link icon sit inline without affecting the collapse toggle"
+        ],
+        "rawMarkdown": "## 2.22.0 - 2026-05-09\n\n\nThis release makes the World Shell Chain Mode fully interactive — every step, dot, and Intent title is now tappable and navigates directly to its execution session.\n\n### World Shell — Chain Mode\n- Added tap-to-navigate on expanded Step rows — tapping a step that has an execution session opens that session directly; steps not yet running show no tap affordance\n- Added tap-to-navigate on collapsed StepDots — the small colored dots in the folded card state are also tappable, with an expanded hit area for easy tapping\n- Added tap-to-navigate on the Intent title — tapping the Intent badge and title area navigates to the parent task's execution session, with a small link icon as a visual cue\n- Improved Intent title area layout so the badge, title, and link icon sit inline without affecting the collapse toggle"
+      },
+      {
         "version": "2.21.0",
         "date": "2026-05-09",
         "summary": "This release brings Chain Mode Intent decomposition to the World Shell and fixes session message queueing for mid-session sends.",
@@ -732,6 +744,18 @@
     ],
     "zh-Hans": [
       {
+        "version": "2.22.0",
+        "date": "2026-05-09",
+        "summary": "本次更新让 World Shell Chain Mode 完全可交互——每个步骤行、圆点和 Intent 标题均可点击，直接跳转至对应的执行会话。",
+        "changes": [
+          "新增展开态 Step 行点击跳转——点击有执行会话的步骤行可直接打开该会话，尚未运行的步骤不显示点击反馈",
+          "新增折叠态 StepDot 点击跳转——卡片折叠时的彩色小圆点同样支持点击跳转，并扩大了点击热区方便触控",
+          "新增 Intent 标题点击跳转——点击 Intent badge 与标题区域可跳转到父任务的执行会话，右侧显示链接小图标作为视觉提示",
+          "改进 Intent 标题区域布局，badge、标题和链接图标水平排列，不影响折叠/展开切换"
+        ],
+        "rawMarkdown": "## 2.22.0 - 2026-05-09\n\n\n本次更新让 World Shell Chain Mode 完全可交互——每个步骤行、圆点和 Intent 标题均可点击，直接跳转至对应的执行会话。\n\n### World Shell — Chain Mode\n- 新增展开态 Step 行点击跳转——点击有执行会话的步骤行可直接打开该会话，尚未运行的步骤不显示点击反馈\n- 新增折叠态 StepDot 点击跳转——卡片折叠时的彩色小圆点同样支持点击跳转，并扩大了点击热区方便触控\n- 新增 Intent 标题点击跳转——点击 Intent badge 与标题区域可跳转到父任务的执行会话，右侧显示链接小图标作为视觉提示\n- 改进 Intent 标题区域布局，badge、标题和链接图标水平排列，不影响折叠/展开切换"
+      },
+      {
         "version": "2.21.0",
         "date": "2026-05-09",
         "summary": "本次更新为 World Shell 带来 Chain Mode Intent 分解功能，并修复 AI 运行中发送消息的队列问题。",
@@ -1439,7 +1463,7 @@
       }
     ]
   },
-  "latestVersion": "2.21.0",
+  "latestVersion": "2.22.0",
   "availableLocales": [
     "en",
     "zh-Hans"
