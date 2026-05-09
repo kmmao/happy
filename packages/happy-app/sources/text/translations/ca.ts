@@ -4322,6 +4322,7 @@ export const ca: TranslationStructure = {
     noAgents: "No active agents",
     agentModeEmptyDescription: "Agents will appear here when sessions are active on connected machines.",
     agentIdle: "Inactiu",
+    noChainResults: "Cap cadena coincideix amb la cerca",
   },
 } as const;
 

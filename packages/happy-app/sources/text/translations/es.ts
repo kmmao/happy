@@ -4317,6 +4317,7 @@ export const es: TranslationStructure = {
     noAgents: "No active agents",
     agentModeEmptyDescription: "Agents will appear here when sessions are active on connected machines.",
     agentIdle: "Inactivo",
+    noChainResults: "No hay cadenas que coincidan con la búsqueda",
   },
 } as const;
 

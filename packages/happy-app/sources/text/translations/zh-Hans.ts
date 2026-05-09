@@ -4213,5 +4213,6 @@ export const zhHans: TranslationStructure = {
     noAgents: "暂无活跃 Agent",
     agentModeEmptyDescription: "当连接的机器上有活跃会话时，Agent 会出现在这里。",
     agentIdle: "空闲",
+    noChainResults: "没有符合搜索条件的链",
   },
 } as const;

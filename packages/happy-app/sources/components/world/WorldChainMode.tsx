@@ -42,13 +42,20 @@ export const WorldChainMode = React.memo(function WorldChainMode({
     }, [events, searchQuery]);
 
     if (chains.length === 0 && !loading) {
+        const isFiltered = !!searchQuery.trim();
         return (
             <ScrollView
                 contentContainerStyle={styles.empty}
                 refreshControl={<RefreshControl refreshing={loading} onRefresh={onRefresh} />}
             >
-                <Ionicons name="git-branch-outline" size={40} color={theme.colors.textSecondary} />
-                <Text style={styles.emptyText}>{t("world.noEvents")}</Text>
+                <Ionicons
+                    name={isFiltered ? "search-outline" : "git-branch-outline"}
+                    size={40}
+                    color={theme.colors.textSecondary}
+                />
+                <Text style={styles.emptyText}>
+                    {isFiltered ? t("world.noChainResults") : t("world.noEvents")}
+                </Text>
             </ScrollView>
         );
     }

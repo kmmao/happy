@@ -4336,6 +4336,7 @@ export const ru: TranslationStructure = {
     noAgents: "No active agents",
     agentModeEmptyDescription: "Agents will appear here when sessions are active on connected machines.",
     agentIdle: "Простой",
+    noChainResults: "Нет цепочек, соответствующих поиску",
   },
 } as const;
 

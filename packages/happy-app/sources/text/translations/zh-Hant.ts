@@ -4219,5 +4219,6 @@ export const zhHant: TranslationStructure = {
     noAgents: "目前無活躍 Agent",
     agentModeEmptyDescription: "Agents will appear here when sessions are active on connected machines.",
     agentIdle: "閒置",
+    noChainResults: "沒有符合搜尋條件的鏈路",
   },
 } as const;
