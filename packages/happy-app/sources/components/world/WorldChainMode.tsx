@@ -288,6 +288,8 @@ const ChainCard = React.memo(function ChainCard({ chain }: { chain: ProjectChain
 
 function StepDot({ event }: { event: WorldEvent }) {
     const { theme } = useUnistyles();
+    const router = useRouter();
+    const sessionId = event.source.sessionId;
     const status = extractStatus(event.eventType);
     const color = status === "completed"
         ? theme.colors.success
@@ -297,9 +299,23 @@ function StepDot({ event }: { event: WorldEvent }) {
                 ? theme.colors.accentBlue
                 : theme.colors.textSecondary;
 
-    return (
+    const dot = (
         <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: color }} />
     );
+
+    if (sessionId) {
+        return (
+            <TouchableOpacity
+                onPress={() => router.push(`/(app)/session/${sessionId}`)}
+                activeOpacity={0.6}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+                {dot}
+            </TouchableOpacity>
+        );
+    }
+
+    return dot;
 }
 
 function TaskRow({ event, stepIndex }: { event: WorldEvent; stepIndex?: number }) {
