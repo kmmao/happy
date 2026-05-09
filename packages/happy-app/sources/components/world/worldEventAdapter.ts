@@ -2,8 +2,16 @@ import type { ServerTask } from "@/sync/apiTasks";
 import type { ServerInboxItem } from "@/sync/apiInbox";
 import type { SupervisorAction } from "@/sync/apiSupervisor";
 import type { ServerSessionEvent } from "@/sync/apiSessionEvents";
-// adaptSupervisorActionToEvent and adaptSessionEventToEvent are available for future use
 import type { WorldEvent, WorldEventSeverity } from "./worldTypes";
+
+export interface SupervisorStatusPayload {
+    projectId: string;
+    status: string;
+    runId: string;
+    currentDimension?: string;
+    dimensionIndex?: number;
+    totalDimensions?: number;
+}
 
 function mapSeverity(raw: string): WorldEventSeverity {
     if (raw === "critical" || raw === "high") return "critical";
@@ -78,6 +86,24 @@ export function adaptSupervisorActionToEvent(action: SupervisorAction): WorldEve
         source: {
             type: "project",
             projectId: action.projectId,
+        },
+    };
+}
+
+export function adaptSupervisorStatusToEvent(event: SupervisorStatusPayload): WorldEvent {
+    return {
+        id: `supervisor-rt-${event.runId}-${Date.now()}`,
+        originalId: event.runId,
+        eventType: `supervisor.${event.status}`,
+        title: event.currentDimension
+            ? `Supervisor: ${event.currentDimension} (${event.dimensionIndex ?? 0}/${event.totalDimensions ?? 0})`
+            : `Supervisor ${event.status}`,
+        summary: event.status,
+        occurredAt: Date.now(),
+        severity: event.status === "failed" ? "critical" : "info",
+        source: {
+            type: "project",
+            projectId: event.projectId,
         },
     };
 }

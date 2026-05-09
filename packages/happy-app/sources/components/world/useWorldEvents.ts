@@ -5,6 +5,8 @@ import { sync } from "@/sync/sync";
 import { storage } from "@/sync/storage";
 import {
     adaptInboxToEvent,
+    adaptSessionEventToEvent,
+    adaptSupervisorStatusToEvent,
     filterWorldEvents,
     sortEventsByTime,
 } from "./worldEventAdapter";
@@ -135,19 +137,12 @@ export function useWorldEvents(filter?: WorldFilter): UseWorldEventsResult {
         });
 
         const unsubSessionEvent = sync.onSessionEventCreated((event) => {
-            const worldEvent: WorldEvent = {
-                id: `session-event-rt-${event.id}`,
-                originalId: event.id,
-                eventType: `session.${event.eventType}`,
-                title: event.summary,
-                summary: "",
-                occurredAt: event.createdAt,
-                severity: "info",
-                source: {
-                    type: "session",
-                    sessionId: event.sessionId,
-                },
-            };
+            const session = storage.getState().sessions[event.sessionId];
+            const worldEvent = adaptSessionEventToEvent(
+                event,
+                null,
+                session?.metadata?.machineId ?? null,
+            );
 
             const f = filterRef.current;
             if (f) {
@@ -159,21 +154,7 @@ export function useWorldEvents(filter?: WorldFilter): UseWorldEventsResult {
         });
 
         const unsubSupervisor = sync.onSupervisorStatus((event) => {
-            const worldEvent: WorldEvent = {
-                id: `supervisor-rt-${event.runId}-${Date.now()}`,
-                originalId: event.runId,
-                eventType: `supervisor.${event.status}`,
-                title: event.currentDimension
-                    ? `Supervisor: ${event.currentDimension} (${event.dimensionIndex ?? 0}/${event.totalDimensions ?? 0})`
-                    : `Supervisor ${event.status}`,
-                summary: event.status,
-                occurredAt: Date.now(),
-                severity: event.status === "failed" ? "critical" : "info",
-                source: {
-                    type: "project",
-                    projectId: event.projectId,
-                },
-            };
+            const worldEvent = adaptSupervisorStatusToEvent(event);
 
             const f = filterRef.current;
             if (f) {
