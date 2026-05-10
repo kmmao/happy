@@ -1,12 +1,14 @@
 import * as React from "react";
 import { View, ScrollView, RefreshControl, TouchableOpacity, LayoutAnimation } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
+import DraggableFlatList, { ScaleDecorator, type RenderItemParams } from "react-native-draggable-flatlist";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { Text } from "@/components/StyledText";
 import { t } from "@/text";
 import type { WorldEvent } from "./worldTypes";
 import {
+    type Chain,
     type IntentChain,
     type ProjectChain,
     extractStatus,
@@ -29,6 +31,7 @@ export const WorldChainMode = React.memo(function WorldChainMode({
 }: WorldChainModeProps) {
     const { theme } = useUnistyles();
     const { styles } = useStyles();
+
     const chains = React.useMemo(() => {
         const all = groupIntoChains(events);
         const q = searchQuery.trim().toLowerCase();
@@ -41,6 +44,24 @@ export const WorldChainMode = React.memo(function WorldChainMode({
                   chain.tasks.some((t) => t.title.toLowerCase().includes(q)),
         );
     }, [events, searchQuery]);
+
+    // Ordered chains: synced from computed chains, user drag changes local order
+    const [orderedChains, setOrderedChains] = React.useState<Chain[]>(chains);
+    React.useEffect(() => { setOrderedChains(chains); }, [chains]);
+
+    const keyExtractor = React.useCallback(
+        (chain: Chain) => chain.kind === "intent" ? chain.parentEvent.id : `project-${chain.projectLabel}`,
+        [],
+    );
+
+    const renderItem = React.useCallback(({ item: chain, drag, isActive }: RenderItemParams<Chain>) => (
+        <ScaleDecorator activeScale={0.97}>
+            {chain.kind === "intent"
+                ? <IntentCard chain={chain} drag={drag} isActive={isActive} />
+                : <ChainCard chain={chain} drag={drag} isActive={isActive} />
+            }
+        </ScaleDecorator>
+    ), []);
 
     if (chains.length === 0 && !loading) {
         const isFiltered = !!searchQuery.trim();
@@ -62,26 +83,44 @@ export const WorldChainMode = React.memo(function WorldChainMode({
     }
 
     return (
-        <ScrollView
+        <DraggableFlatList
+            data={orderedChains}
+            onDragEnd={({ data }) => setOrderedChains(data)}
+            keyExtractor={keyExtractor}
+            renderItem={renderItem}
             contentContainerStyle={styles.list}
             refreshControl={<RefreshControl refreshing={loading} onRefresh={onRefresh} />}
-        >
-            {chains.map((chain) =>
-                chain.kind === "intent"
-                    ? <IntentCard key={chain.parentEvent.id} chain={chain} />
-                    : <ChainCard key={chain.projectLabel} chain={chain} />,
-            )}
-        </ScrollView>
+            activationDistance={12}
+        />
     );
 });
 
 // ─── IntentCard ───────────────────────────────────────────────────────────────
 
-const IntentCard = React.memo(function IntentCard({ chain }: { chain: IntentChain }) {
+const IntentCard = React.memo(function IntentCard({
+    chain,
+    drag,
+    isActive: isDragging,
+}: {
+    chain: IntentChain;
+    drag: () => void;
+    isActive: boolean;
+}) {
     const { theme } = useUnistyles();
     const { styles } = useStyles();
     const router = useRouter();
     const [expanded, setExpanded] = React.useState(false);
+    const [localSteps, setLocalSteps] = React.useState<WorldEvent[]>(chain.steps);
+
+    React.useEffect(() => { setLocalSteps(chain.steps); }, [chain.steps]);
+
+    const moveStep = React.useCallback((idx: number, dir: -1 | 1) => {
+        const swap = idx + dir;
+        if (swap < 0 || swap >= localSteps.length) return;
+        const next = [...localSteps];
+        [next[idx], next[swap]] = [next[swap], next[idx]];
+        setLocalSteps(next);
+    }, [localSteps]);
 
     const progress = chain.total > 0 ? chain.completed / chain.total : 0;
     const pct = Math.round(progress * 100);
@@ -91,9 +130,10 @@ const IntentCard = React.memo(function IntentCard({ chain }: { chain: IntentChai
     const parentSessionId = chain.parentEvent.source.sessionId;
 
     const handlePress = React.useCallback(() => {
+        if (isDragging) return;
         LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
         setExpanded((v) => !v);
-    }, []);
+    }, [isDragging]);
 
     const handleTitlePress = React.useCallback(() => {
         if (parentSessionId) {
@@ -129,6 +169,10 @@ const IntentCard = React.memo(function IntentCard({ chain }: { chain: IntentChai
                     size={14}
                     color={theme.colors.textSecondary}
                 />
+                {/* Drag handle — long press to start dragging the whole card */}
+                <TouchableOpacity onLongPress={drag} hitSlop={8} style={styles.dragHandle} activeOpacity={0.6}>
+                    <Ionicons name="reorder-three" size={18} color={theme.colors.textSecondary} />
+                </TouchableOpacity>
             </View>
 
             {/* Progress bar + percentage */}
@@ -181,13 +225,15 @@ const IntentCard = React.memo(function IntentCard({ chain }: { chain: IntentChai
 
             {expanded && (
                 <View style={styles.taskList}>
-                    {chain.steps.map((step, idx) => (
+                    {localSteps.map((step, idx) => (
                         <TaskRow
                             key={step.id}
                             event={step}
                             stepIndex={idx + 1}
-                            priorEvents={chain.steps.slice(0, idx)}
-                            isLast={idx === chain.steps.length - 1}
+                            priorEvents={localSteps.slice(0, idx)}
+                            isLast={idx === localSteps.length - 1}
+                            onMoveUp={idx > 0 ? () => moveStep(idx, -1) : undefined}
+                            onMoveDown={idx < localSteps.length - 1 ? () => moveStep(idx, 1) : undefined}
                         />
                     ))}
                 </View>
@@ -198,10 +244,30 @@ const IntentCard = React.memo(function IntentCard({ chain }: { chain: IntentChai
 
 // ─── ProjectChainCard ─────────────────────────────────────────────────────────
 
-const ChainCard = React.memo(function ChainCard({ chain }: { chain: ProjectChain }) {
+const ChainCard = React.memo(function ChainCard({
+    chain,
+    drag,
+    isActive: isDragging,
+}: {
+    chain: ProjectChain;
+    drag: () => void;
+    isActive: boolean;
+}) {
     const { theme } = useUnistyles();
     const { styles } = useStyles();
     const [expanded, setExpanded] = React.useState(false);
+    const [localTasks, setLocalTasks] = React.useState<WorldEvent[]>(chain.tasks);
+
+    React.useEffect(() => { setLocalTasks(chain.tasks); }, [chain.tasks]);
+
+    const moveTask = React.useCallback((idx: number, dir: -1 | 1) => {
+        const swap = idx + dir;
+        if (swap < 0 || swap >= localTasks.length) return;
+        const next = [...localTasks];
+        [next[idx], next[swap]] = [next[swap], next[idx]];
+        setLocalTasks(next);
+    }, [localTasks]);
+
     const progress = chain.total > 0 ? (chain.completed / chain.total) : 0;
     const pct = Math.round(progress * 100);
     const hasFailures = chain.failed > 0;
@@ -228,6 +294,9 @@ const ChainCard = React.memo(function ChainCard({ chain }: { chain: ProjectChain
                     size={14}
                     color={theme.colors.textSecondary}
                 />
+                <TouchableOpacity onLongPress={drag} hitSlop={8} style={styles.dragHandle} activeOpacity={0.6}>
+                    <Ionicons name="reorder-three" size={18} color={theme.colors.textSecondary} />
+                </TouchableOpacity>
             </View>
 
             <View style={styles.progressRow}>
@@ -278,12 +347,14 @@ const ChainCard = React.memo(function ChainCard({ chain }: { chain: ProjectChain
 
             {expanded && (
                 <View style={styles.taskList}>
-                    {chain.tasks.map((task, idx) => (
+                    {localTasks.map((task, idx) => (
                         <TaskRow
                             key={task.id}
                             event={task}
-                            priorEvents={chain.tasks.slice(0, idx)}
-                            isLast={idx === chain.tasks.length - 1}
+                            priorEvents={localTasks.slice(0, idx)}
+                            isLast={idx === localTasks.length - 1}
+                            onMoveUp={idx > 0 ? () => moveTask(idx, -1) : undefined}
+                            onMoveDown={idx < localTasks.length - 1 ? () => moveTask(idx, 1) : undefined}
                         />
                     ))}
                 </View>
@@ -337,11 +408,15 @@ function TaskRow({
     stepIndex,
     priorEvents = [],
     isLast = true,
+    onMoveUp,
+    onMoveDown,
 }: {
     event: WorldEvent;
     stepIndex?: number;
     priorEvents?: WorldEvent[];
     isLast?: boolean;
+    onMoveUp?: () => void;
+    onMoveDown?: () => void;
 }) {
     const { theme } = useUnistyles();
     const { styles } = useStyles();
@@ -351,6 +426,7 @@ function TaskRow({
     const blocked = isBlocked(event, priorEvents);
     const sessionId = event.source.sessionId;
     const tappable = !!sessionId;
+    const reorderable = !!(onMoveUp || onMoveDown);
 
     const statusColor = blocked
         ? theme.colors.warning
@@ -395,6 +471,35 @@ function TaskRow({
                 <Text style={[styles.taskTime, status === "running" && { color: theme.colors.accentBlue }]}>
                     {duration}
                 </Text>
+                {/* ↑↓ reorder buttons — shown when parent provides handlers */}
+                {reorderable && (
+                    <View style={styles.reorderBtns}>
+                        <TouchableOpacity
+                            onPress={onMoveUp}
+                            disabled={!onMoveUp}
+                            hitSlop={6}
+                            activeOpacity={0.5}
+                        >
+                            <Ionicons
+                                name="chevron-up"
+                                size={14}
+                                color={onMoveUp ? theme.colors.textLink : theme.colors.divider}
+                            />
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            onPress={onMoveDown}
+                            disabled={!onMoveDown}
+                            hitSlop={6}
+                            activeOpacity={0.5}
+                        >
+                            <Ionicons
+                                name="chevron-down"
+                                size={14}
+                                color={onMoveDown ? theme.colors.textLink : theme.colors.divider}
+                            />
+                        </TouchableOpacity>
+                    </View>
+                )}
             </View>
         </View>
     );
@@ -587,6 +692,15 @@ const useStyles = () => {
             color: theme.colors.textSecondary,
             width: 42,
             textAlign: "right",
+        },
+        dragHandle: {
+            paddingLeft: 8,
+            paddingVertical: 2,
+        },
+        reorderBtns: {
+            flexDirection: "column",
+            gap: 1,
+            marginLeft: 2,
         },
     });
     return { styles };
