@@ -86,7 +86,7 @@ export async function inboxCreate(input: InboxCreateInput): Promise<void> {
                 userId: input.accountId,
                 payload: buildWorldEventCreatedEphemeral({
                     id: `inbox-${item.id}`,
-                    eventType: `decision.${item.eventType}`,
+                    eventType: input.category === "trigger" ? item.eventType : `decision.${item.eventType}`,
                     title: item.title,
                     summary: item.body ?? "",
                     occurredAt: item.createdAt.getTime(),

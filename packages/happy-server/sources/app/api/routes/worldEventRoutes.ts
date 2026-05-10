@@ -134,6 +134,7 @@ export function worldEventRoutes(app: Fastify) {
                     take: limit,
                     select: {
                         id: true,
+                        category: true,
                         eventType: true,
                         severity: true,
                         title: true,
@@ -195,10 +196,14 @@ export function worldEventRoutes(app: Fastify) {
             }
 
             for (const item of inboxItems) {
+                // trigger events are informational (not decisions); keep their native eventType
+                const inboxEventType = item.category === "trigger"
+                    ? item.eventType
+                    : `decision.${item.eventType}`;
                 events.push({
                     id: `inbox-${item.id}`,
                     originalId: item.id,
-                    eventType: `decision.${item.eventType}`,
+                    eventType: inboxEventType,
                     title: item.title,
                     summary: item.body ?? "",
                     occurredAt: item.createdAt.getTime(),

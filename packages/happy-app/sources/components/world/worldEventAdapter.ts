@@ -59,10 +59,14 @@ export function adaptTaskToEvent(task: ServerTask): WorldEvent {
 }
 
 export function adaptInboxToEvent(item: ServerInboxItem): WorldEvent {
+    // trigger category events are informational (not decisions); keep their native eventType
+    const eventType = item.category === "trigger"
+        ? item.eventType
+        : `decision.${item.eventType}`;
     return {
         id: `inbox-${item.id}`,
         originalId: item.id,
-        eventType: `decision.${item.eventType}`,
+        eventType,
         title: item.title,
         summary: item.body ?? "",
         occurredAt: item.createdAt,
