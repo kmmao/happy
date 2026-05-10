@@ -20,10 +20,12 @@ interface WorldConfig {
 
 interface WorldDefinitionPanelProps {
     visible: boolean;
+    onSaved?: (changes: { narrative: boolean; laws: boolean; policy: boolean }) => void;
 }
 
 export const WorldDefinitionPanel = React.memo(function WorldDefinitionPanel({
     visible,
+    onSaved,
 }: WorldDefinitionPanelProps) {
     const { theme } = useUnistyles();
     const { styles } = useStyles();
@@ -35,6 +37,9 @@ export const WorldDefinitionPanel = React.memo(function WorldDefinitionPanel({
     const [savedVersion, setSavedVersion] = React.useState(-1);
     const [loading, setLoading] = React.useState(false);
     const [saving, setSaving] = React.useState(false);
+
+    // Track last-saved values to detect changes on next save
+    const lastSaved = React.useRef<WorldConfig>({ narrative: "", laws: "", policy: "suggest" });
 
     // Load global world config from KV on mount
     React.useEffect(() => {
@@ -49,10 +54,14 @@ export const WorldDefinitionPanel = React.memo(function WorldDefinitionPanel({
                 if (item) {
                     try {
                         const cfg = JSON.parse(item.value) as Partial<WorldConfig>;
-                        setNarrative(cfg.narrative ?? "");
-                        setLaws(cfg.laws ?? "");
-                        setPolicy(cfg.policy ?? "suggest");
+                        const n = cfg.narrative ?? "";
+                        const l = cfg.laws ?? "";
+                        const p = cfg.policy ?? "suggest";
+                        setNarrative(n);
+                        setLaws(l);
+                        setPolicy(p);
                         setSavedVersion(item.version);
+                        lastSaved.current = { narrative: n, laws: l, policy: p };
                     } catch {
                         // ignore parse errors, keep defaults
                     }
@@ -78,9 +87,11 @@ export const WorldDefinitionPanel = React.memo(function WorldDefinitionPanel({
         try {
             const credentials = await TokenStorage.getCredentials();
             if (!credentials) return;
+            const trimmedNarrative = narrative.trim();
+            const trimmedLaws = laws.trim();
             const config: WorldConfig = {
-                narrative: narrative.trim(),
-                laws: laws.trim(),
+                narrative: trimmedNarrative,
+                laws: trimmedLaws,
                 policy,
             };
             const newVersion = await kvSet(
@@ -90,10 +101,21 @@ export const WorldDefinitionPanel = React.memo(function WorldDefinitionPanel({
                 savedVersion,
             );
             setSavedVersion(newVersion);
+
+            // Detect what changed and notify parent for Stream Mode event injection
+            const changes = {
+                narrative: trimmedNarrative !== lastSaved.current.narrative,
+                laws: trimmedLaws !== lastSaved.current.laws,
+                policy: policy !== lastSaved.current.policy,
+            };
+            lastSaved.current = { narrative: trimmedNarrative, laws: trimmedLaws, policy };
+            if (onSaved && (changes.narrative || changes.laws || changes.policy)) {
+                onSaved(changes);
+            }
         } finally {
             setSaving(false);
         }
-    }, [narrative, laws, policy, savedVersion]);
+    }, [narrative, laws, policy, savedVersion, onSaved]);
 
     const cyclePolicy = React.useCallback(() => {
         setPolicy((prev) => {

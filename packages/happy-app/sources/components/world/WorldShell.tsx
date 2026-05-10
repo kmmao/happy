@@ -43,15 +43,71 @@ export const WorldShell = React.memo(function WorldShell({ onExit, initialFilter
 
     const { events, loading, refresh } = useWorldEvents(filter);
 
+    // Local events injected immediately after user actions (e.g. world definition changes)
+    const [localEvents, setLocalEvents] = React.useState<WorldEvent[]>([]);
+
+    const handleConfigSaved = React.useCallback(
+        (changes: { narrative: boolean; laws: boolean; policy: boolean }) => {
+            const now = Date.now();
+            const newEvents: WorldEvent[] = [];
+            if (changes.narrative) {
+                newEvents.push({
+                    id: `world-rt-narrative-${now}`,
+                    originalId: `world-narrative-${now}`,
+                    eventType: "world.narrative_updated",
+                    title: "Narrative updated",
+                    summary: "",
+                    occurredAt: now,
+                    severity: "info",
+                    source: { type: "system" },
+                });
+            }
+            if (changes.laws) {
+                newEvents.push({
+                    id: `world-rt-laws-${now}`,
+                    originalId: `world-laws-${now}`,
+                    eventType: "world.laws_updated",
+                    title: "Laws updated",
+                    summary: "",
+                    occurredAt: now,
+                    severity: "info",
+                    source: { type: "system" },
+                });
+            }
+            if (changes.policy) {
+                newEvents.push({
+                    id: `world-rt-policy-${now}`,
+                    originalId: `world-policy-${now}`,
+                    eventType: "world.policy_updated",
+                    title: "Policy updated",
+                    summary: "",
+                    occurredAt: now,
+                    severity: "info",
+                    source: { type: "system" },
+                });
+            }
+            if (newEvents.length > 0) {
+                setLocalEvents((prev) => [...newEvents, ...prev].slice(0, 50));
+            }
+        },
+        [],
+    );
+
+    // Merge local (immediate) events with server events for the Stream view
+    const allEvents = React.useMemo(
+        () => [...localEvents, ...events],
+        [localEvents, events],
+    );
+
     const displayEvents = React.useMemo(() => {
-        if (!searchQuery.trim() || searchQuery.startsWith("/")) return events;
+        if (!searchQuery.trim() || searchQuery.startsWith("/")) return allEvents;
         const q = searchQuery.toLowerCase();
-        return events.filter((e) =>
+        return allEvents.filter((e) =>
             e.title.toLowerCase().includes(q) ||
             e.eventType.toLowerCase().includes(q) ||
             (e.summary && e.summary.toLowerCase().includes(q)),
         );
-    }, [events, searchQuery]);
+    }, [allEvents, searchQuery]);
 
     // Slash command definitions
     const slashCommands = React.useMemo(() => {
@@ -98,7 +154,7 @@ export const WorldShell = React.memo(function WorldShell({ onExit, initialFilter
     );
 
 
-    const pendingDecisions = events.filter((e) =>
+    const pendingDecisions = allEvents.filter((e) =>
         e.eventType.startsWith("decision."),
     ).length;
 
@@ -135,7 +191,7 @@ export const WorldShell = React.memo(function WorldShell({ onExit, initialFilter
         </View>
     );
 
-    const totalEvents = events.length;
+    const totalEvents = allEvents.length;
     const statusColor = pendingDecisions > 0
         ? theme.colors.warningCritical
         : activeAgents > 0
@@ -224,7 +280,7 @@ export const WorldShell = React.memo(function WorldShell({ onExit, initialFilter
             </View>
 
             {/* World Definition Panel */}
-            <WorldDefinitionPanel visible={panelOpen} />
+            <WorldDefinitionPanel visible={panelOpen} onSaved={handleConfigSaved} />
 
             {/* View Mode Toggle + Filter Chips */}
             <View style={styles.modeRow}>
@@ -326,14 +382,14 @@ export const WorldShell = React.memo(function WorldShell({ onExit, initialFilter
                 />
             ) : viewMode === "chain" ? (
                 <WorldChainMode
-                    events={events}
+                    events={allEvents}
                     loading={loading}
                     onRefresh={refresh}
                     searchQuery={searchQuery.startsWith("/") ? "" : searchQuery}
                 />
             ) : viewMode === "density" ? (
                 <WorldDensityMode
-                    events={events}
+                    events={allEvents}
                     loading={loading}
                     onRefresh={refresh}
                     onNavigateToStream={(f) => {
