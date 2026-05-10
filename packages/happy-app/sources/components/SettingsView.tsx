@@ -262,7 +262,7 @@ export const SettingsView = React.memo(function SettingsView() {
                     }
                   />
                 }
-                onPress={() => router.push(`/machine/${machine.id}`)}
+                onPress={() => router.push(`/world?machineId=${machine.id}` as any)}
               />
             );
           })}

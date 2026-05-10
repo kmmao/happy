@@ -202,6 +202,14 @@ const MachineCard = React.memo(function MachineCard({ group }: { group: AgentMac
 
     const allSessions = [...group.activeSessions, ...group.recentSessions];
 
+    const router = useRouter();
+    const handleStreamPress = React.useCallback((e: { stopPropagation: () => void }) => {
+        e.stopPropagation();
+        if (group.machineId) {
+            router.push(`/world?machineId=${group.machineId}` as any);
+        }
+    }, [group.machineId, router]);
+
     return (
         <TouchableOpacity style={styles.card} onPress={toggle} activeOpacity={0.7}>
             <View style={styles.cardHeader}>
@@ -214,6 +222,11 @@ const MachineCard = React.memo(function MachineCard({ group }: { group: AgentMac
                 )}
                 {!group.isOnline && (
                     <Text style={styles.offlineLabel}>offline</Text>
+                )}
+                {!!group.machineId && (
+                    <TouchableOpacity onPress={handleStreamPress} hitSlop={8} activeOpacity={0.7}>
+                        <Ionicons name="pulse-outline" size={15} color={theme.colors.textLink} />
+                    </TouchableOpacity>
                 )}
                 <Ionicons
                     name={expanded ? "chevron-up" : "chevron-down"}
