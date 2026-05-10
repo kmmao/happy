@@ -26,6 +26,7 @@ export interface WorldEvent {
     source: WorldEventSource;
     originalId: string;
     parentTaskId?: string | null;
+    referenceUrl?: string | null;
 }
 
 export interface WorldFilter {

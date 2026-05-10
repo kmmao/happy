@@ -28,6 +28,7 @@ interface WorldEvent {
     };
     originalId: string;
     parentTaskId?: string | null;
+    referenceUrl?: string | null;
 }
 
 function mapSeverity(raw: string): WorldEventSeverity {
@@ -139,6 +140,7 @@ export function worldEventRoutes(app: Fastify) {
                         body: true,
                         refType: true,
                         refId: true,
+                        referenceUrl: true,
                         createdAt: true,
                     },
                 }),
@@ -205,6 +207,7 @@ export function worldEventRoutes(app: Fastify) {
                         type: item.refType === "project" ? "project" : "system",
                         projectId: item.refType === "project" ? item.refId : null,
                     },
+                    referenceUrl: item.referenceUrl ?? null,
                 });
             }
 

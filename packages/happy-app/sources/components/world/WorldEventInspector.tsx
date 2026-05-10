@@ -187,7 +187,33 @@ export const WorldEventInspector = React.memo(function WorldEventInspector({
                                     }
                                 />
                             )}
-                            {!!event.source.projectId && (
+                            {/* referenceUrl: for decisions, link directly to the relevant context page */}
+                            {!!event.referenceUrl && event.eventType.startsWith("decision.") && (() => {
+                                const url = event.referenceUrl!;
+                                const sessionMatch = url.match(/\/session\/([^/?]+)/);
+                                const projectMatch = url.match(/\/project\/([^/?]+)/);
+                                const icon = sessionMatch
+                                    ? "chatbubble-outline" as const
+                                    : "folder-outline" as const;
+                                const label = sessionMatch
+                                    ? t("world.openSession")
+                                    : t("world.openProject");
+                                const path = sessionMatch
+                                    ? `/(app)/session/${sessionMatch[1]}`
+                                    : projectMatch
+                                        ? `/(app)/project/${projectMatch[1]}`
+                                        : null;
+                                if (!path) return null;
+                                return (
+                                    <NavButton
+                                        key="ref-url"
+                                        icon={icon}
+                                        label={label}
+                                        onPress={() => handleNavigate(path)}
+                                    />
+                                );
+                            })()}
+                            {!!event.source.projectId && !event.eventType.startsWith("decision.") && (
                                 <NavButton
                                     icon="folder-outline"
                                     label={t("world.openProject")}
@@ -251,36 +277,46 @@ export const WorldEventInspector = React.memo(function WorldEventInspector({
                                     </View>
                                 )}
 
-                                {event.eventType.startsWith("decision.") && (
-                                    <View style={styles.actionRow}>
-                                        <ActionButton
-                                            label={t("world.actionRead")}
-                                            icon="checkmark"
-                                            color={theme.colors.success}
-                                            loading={actionLoading}
-                                            onPress={() =>
-                                                handleAction(async () => {
-                                                    const creds = await TokenStorage.getCredentials();
-                                                    if (!creds) return;
-                                                    await markInboxItemRead(creds, event.originalId);
-                                                }, "read")
-                                            }
-                                        />
-                                        <ActionButton
-                                            label={t("world.actionDismiss")}
-                                            icon="trash-outline"
-                                            color={theme.colors.warningCritical}
-                                            loading={actionLoading}
-                                            onPress={() =>
-                                                handleAction(async () => {
-                                                    const creds = await TokenStorage.getCredentials();
-                                                    if (!creds) return;
-                                                    await deleteInboxItem(creds, event.originalId);
-                                                }, "dismissed")
-                                            }
-                                        />
-                                    </View>
-                                )}
+                                {event.eventType.startsWith("decision.") && (() => {
+                                    // Category-specific read label derived from eventType prefix
+                                    const inner = event.eventType;
+                                    const readLabel =
+                                        inner.includes("task.failed") || inner.includes("task.cancelled")
+                                            ? "Acknowledge"
+                                            : inner.includes("supervisor")
+                                                ? "Mark Reviewed"
+                                                : t("world.actionRead");
+                                    return (
+                                        <View style={styles.actionRow}>
+                                            <ActionButton
+                                                label={readLabel}
+                                                icon="checkmark-circle-outline"
+                                                color={theme.colors.success}
+                                                loading={actionLoading}
+                                                onPress={() =>
+                                                    handleAction(async () => {
+                                                        const creds = await TokenStorage.getCredentials();
+                                                        if (!creds) return;
+                                                        await markInboxItemRead(creds, event.originalId);
+                                                    }, "acknowledged")
+                                                }
+                                            />
+                                            <ActionButton
+                                                label={t("world.actionDismiss")}
+                                                icon="trash-outline"
+                                                color={theme.colors.warningCritical}
+                                                loading={actionLoading}
+                                                onPress={() =>
+                                                    handleAction(async () => {
+                                                        const creds = await TokenStorage.getCredentials();
+                                                        if (!creds) return;
+                                                        await deleteInboxItem(creds, event.originalId);
+                                                    }, "dismissed")
+                                                }
+                                            />
+                                        </View>
+                                    );
+                                })()}
 
                                 {event.eventType === "task.failed" && (
                                     <View style={styles.actionRow}>

@@ -348,6 +348,10 @@ export const WorldShell = React.memo(function WorldShell({ onExit, initialFilter
             <WorldEventInspector
                 event={selectedEvent}
                 onClose={() => setSelectedEvent(null)}
+                onActionDone={() => {
+                    setSelectedEvent(null);
+                    refresh();
+                }}
             />
         </View>
     );
