@@ -4358,6 +4358,12 @@ export const ca: TranslationStructure = {
     densityTotal: "total",
     densityRecent: "30 min",
     densityLastActivity: "last active",
+    emptyFilterTitle: "No matching events",
+    emptyFilterDesc: "No events match the current filter. Try clearing it.",
+    emptyClearFilter: "Clear filter",
+    emptyActionNewSession: "New Session",
+    emptyActionQueueTask: "Queue Task",
+    emptyQuickStart: "Type / for commands",
   },
 } as const;
 

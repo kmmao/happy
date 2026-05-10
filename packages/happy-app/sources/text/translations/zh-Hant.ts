@@ -4255,5 +4255,11 @@ export const zhHant: TranslationStructure = {
     densityTotal: "總計",
     densityRecent: "30分鐘",
     densityLastActivity: "最近活躍",
+    emptyFilterTitle: "No matching events",
+    emptyFilterDesc: "No events match the current filter. Try clearing it.",
+    emptyClearFilter: "Clear filter",
+    emptyActionNewSession: "New Session",
+    emptyActionQueueTask: "Queue Task",
+    emptyQuickStart: "Type / for commands",
   },
 } as const;

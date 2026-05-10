@@ -183,11 +183,60 @@ export const WorldShell = React.memo(function WorldShell({ onExit, initialFilter
 
     const keyExtractor = React.useCallback((item: WorldEvent) => item.id, []);
 
-    const ListEmpty = (
+    const hasActiveFilter = !!(filter.projectId || filter.machineId || filter.eventTypePrefix || filter.severity);
+
+    const ListEmpty = hasActiveFilter ? (
+        // Filtered empty state — quick escape
         <View style={styles.empty}>
-            <Ionicons name="globe" size={48} color={theme.colors.primary} style={{ marginBottom: 16 }} />
+            <Ionicons name="search-outline" size={44} color={theme.colors.textSecondary} style={{ marginBottom: 12 }} />
+            <Text style={styles.emptyTitle}>{t("world.emptyFilterTitle")}</Text>
+            <Text style={styles.emptyDescription}>{t("world.emptyFilterDesc")}</Text>
+            <TouchableOpacity
+                style={styles.emptyClearBtn}
+                onPress={() => setFilter({})}
+                activeOpacity={0.7}
+            >
+                <Ionicons name="close-circle" size={14} color={theme.colors.primary} />
+                <Text style={styles.emptyClearText}>{t("world.emptyClearFilter")}</Text>
+            </TouchableOpacity>
+        </View>
+    ) : (
+        // First-run / onboarding empty state with quick actions
+        <View style={styles.empty}>
+            <Ionicons name="globe-outline" size={52} color={theme.colors.primary} style={{ marginBottom: 14 }} />
             <Text style={styles.emptyTitle}>{t("world.emptyTitle")}</Text>
             <Text style={styles.emptyDescription}>{t("world.emptyDescription")}</Text>
+
+            <View style={styles.emptyActions}>
+                <TouchableOpacity
+                    style={styles.emptyActionBtn}
+                    onPress={() => router.push("/(app)/new")}
+                    activeOpacity={0.7}
+                >
+                    <Ionicons name="chatbubble-outline" size={16} color={theme.colors.primary} />
+                    <Text style={styles.emptyActionText}>{t("world.emptyActionNewSession")}</Text>
+                </TouchableOpacity>
+
+                {machines.length > 0 && (
+                    <TouchableOpacity
+                        style={styles.emptyActionBtn}
+                        onPress={() => router.push(`/(app)/machine/${machines[0].id}/task/new` as any)}
+                        activeOpacity={0.7}
+                    >
+                        <Ionicons name="flash-outline" size={16} color={theme.colors.primary} />
+                        <Text style={styles.emptyActionText}>{t("world.emptyActionQueueTask")}</Text>
+                    </TouchableOpacity>
+                )}
+            </View>
+
+            <TouchableOpacity
+                style={styles.emptyCommandHint}
+                onPress={() => { setSearchOpen(true); setViewMode("stream"); }}
+                activeOpacity={0.7}
+            >
+                <Ionicons name="terminal-outline" size={12} color={theme.colors.textSecondary} />
+                <Text style={styles.emptyCommandText}>{t("world.emptyQuickStart")}</Text>
+            </TouchableOpacity>
         </View>
     );
 
@@ -564,6 +613,57 @@ const useStyles = () => {
             color: theme.colors.textSecondary,
             textAlign: "center",
             lineHeight: 20,
+            marginBottom: 4,
+        },
+        emptyClearBtn: {
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 6,
+            marginTop: 16,
+            paddingHorizontal: 16,
+            paddingVertical: 8,
+            borderRadius: 20,
+            backgroundColor: theme.colors.primary + "18",
+        },
+        emptyClearText: {
+            fontSize: 14,
+            fontWeight: "500",
+            color: theme.colors.primary,
+        },
+        emptyActions: {
+            flexDirection: "row",
+            gap: 10,
+            marginTop: 20,
+            flexWrap: "wrap",
+            justifyContent: "center",
+        },
+        emptyActionBtn: {
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 7,
+            paddingHorizontal: 16,
+            paddingVertical: 10,
+            borderRadius: 20,
+            backgroundColor: theme.colors.surfaceHigh,
+            borderWidth: 1,
+            borderColor: theme.colors.divider,
+        },
+        emptyActionText: {
+            fontSize: 14,
+            fontWeight: "500",
+            color: theme.colors.text,
+        },
+        emptyCommandHint: {
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 5,
+            marginTop: 24,
+            paddingVertical: 4,
+        },
+        emptyCommandText: {
+            fontSize: 12,
+            color: theme.colors.textSecondary,
+            fontStyle: "italic",
         },
     });
     return { styles };

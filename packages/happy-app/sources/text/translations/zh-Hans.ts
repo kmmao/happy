@@ -4249,5 +4249,11 @@ export const zhHans: TranslationStructure = {
     densityTotal: "总计",
     densityRecent: "30分钟",
     densityLastActivity: "最近活跃",
+    emptyFilterTitle: "无匹配事件",
+    emptyFilterDesc: "当前过滤条件下没有事件。试试清除过滤。",
+    emptyClearFilter: "清除过滤",
+    emptyActionNewSession: "新建会话",
+    emptyActionQueueTask: "添加任务",
+    emptyQuickStart: "输入 / 使用命令",
   },
 } as const;
