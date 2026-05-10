@@ -9,6 +9,7 @@ export interface IntentChain {
     running: number;
     completed: number;
     failed: number;
+    blocked: number;
     total: number;
 }
 
@@ -20,6 +21,7 @@ export interface ProjectChain {
     running: number;
     completed: number;
     failed: number;
+    blocked: number;
     total: number;
 }
 
@@ -34,6 +36,18 @@ export function extractStatus(eventType: string): string {
 export function isRunning(e: WorldEvent): boolean { return extractStatus(e.eventType) === "running"; }
 export function isCompleted(e: WorldEvent): boolean { return extractStatus(e.eventType) === "completed"; }
 export function isFailed(e: WorldEvent): boolean { return extractStatus(e.eventType) === "failed"; }
+export function isQueued(e: WorldEvent): boolean { return extractStatus(e.eventType) === "queued"; }
+
+/** A queued task is "blocked" when a prior sibling in the same chain has failed. */
+export function isBlocked(event: WorldEvent, priorEvents: WorldEvent[]): boolean {
+    return isQueued(event) && priorEvents.some(isFailed);
+}
+
+function countBlocked(sorted: WorldEvent[]): number {
+    return sorted.reduce((acc, e, idx) => {
+        return acc + (isBlocked(e, sorted.slice(0, idx)) ? 1 : 0);
+    }, 0);
+}
 
 // ─── Core grouping logic ──────────────────────────────────────────────────────
 
@@ -72,6 +86,7 @@ export function groupIntoChains(events: WorldEvent[]): Chain[] {
             running: sorted.filter(isRunning).length,
             completed: sorted.filter(isCompleted).length,
             failed: sorted.filter(isFailed).length,
+            blocked: countBlocked(sorted),
             total: sorted.length,
         });
     }
@@ -103,6 +118,7 @@ export function groupIntoChains(events: WorldEvent[]): Chain[] {
             running: sorted.filter(isRunning).length,
             completed: sorted.filter(isCompleted).length,
             failed: sorted.filter(isFailed).length,
+            blocked: countBlocked(sorted),
             total: sorted.length,
         });
     }

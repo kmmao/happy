@@ -11,6 +11,7 @@ import {
     type ProjectChain,
     extractStatus,
     groupIntoChains,
+    isBlocked,
 } from "./worldChainUtils";
 
 interface WorldChainModeProps {
@@ -83,7 +84,9 @@ const IntentCard = React.memo(function IntentCard({ chain }: { chain: IntentChai
     const [expanded, setExpanded] = React.useState(false);
 
     const progress = chain.total > 0 ? chain.completed / chain.total : 0;
+    const pct = Math.round(progress * 100);
     const hasFailures = chain.failed > 0;
+    const hasBlocked = chain.blocked > 0;
     const isActive = chain.running > 0;
     const parentSessionId = chain.parentEvent.source.sessionId;
 
@@ -128,12 +131,42 @@ const IntentCard = React.memo(function IntentCard({ chain }: { chain: IntentChai
                 />
             </View>
 
-            <View style={styles.progressBar}>
-                <View style={[styles.progressFill, { width: `${Math.round(progress * 100)}%` as any }]} />
-                {chain.failed > 0 && (
-                    <View style={[styles.progressFailed, { width: `${Math.round((chain.failed / chain.total) * 100)}%` as any }]} />
-                )}
+            {/* Progress bar + percentage */}
+            <View style={styles.progressRow}>
+                <View style={styles.progressBar}>
+                    <View style={[styles.progressFill, { width: `${pct}%` as any }]} />
+                    {chain.failed > 0 && (
+                        <View style={[styles.progressFailed, { width: `${Math.round((chain.failed / chain.total) * 100)}%` as any }]} />
+                    )}
+                </View>
+                <Text style={[styles.progressPct, hasFailures && { color: theme.colors.warningCritical }]}>
+                    {pct}%
+                </Text>
             </View>
+
+            {/* Status chips */}
+            {(isActive || hasFailures || hasBlocked) && (
+                <View style={styles.chipRow}>
+                    {isActive && (
+                        <View style={[styles.chip, { backgroundColor: theme.colors.success + "22" }]}>
+                            <Ionicons name="flash" size={10} color={theme.colors.success} />
+                            <Text style={[styles.chipText, { color: theme.colors.success }]}>{chain.running}</Text>
+                        </View>
+                    )}
+                    {hasBlocked && (
+                        <View style={[styles.chip, { backgroundColor: theme.colors.warning + "22" }]}>
+                            <Ionicons name="pause-circle" size={10} color={theme.colors.warning} />
+                            <Text style={[styles.chipText, { color: theme.colors.warning }]}>{chain.blocked} blocked</Text>
+                        </View>
+                    )}
+                    {hasFailures && (
+                        <View style={[styles.chip, { backgroundColor: theme.colors.warningCritical + "22" }]}>
+                            <Ionicons name="alert-circle" size={10} color={theme.colors.warningCritical} />
+                            <Text style={[styles.chipText, { color: theme.colors.warningCritical }]}>{chain.failed} failed</Text>
+                        </View>
+                    )}
+                </View>
+            )}
 
             {!expanded && (
                 <View style={styles.steps}>
@@ -149,7 +182,13 @@ const IntentCard = React.memo(function IntentCard({ chain }: { chain: IntentChai
             {expanded && (
                 <View style={styles.taskList}>
                     {chain.steps.map((step, idx) => (
-                        <TaskRow key={step.id} event={step} stepIndex={idx + 1} />
+                        <TaskRow
+                            key={step.id}
+                            event={step}
+                            stepIndex={idx + 1}
+                            priorEvents={chain.steps.slice(0, idx)}
+                            isLast={idx === chain.steps.length - 1}
+                        />
                     ))}
                 </View>
             )}
@@ -164,7 +203,9 @@ const ChainCard = React.memo(function ChainCard({ chain }: { chain: ProjectChain
     const { styles } = useStyles();
     const [expanded, setExpanded] = React.useState(false);
     const progress = chain.total > 0 ? (chain.completed / chain.total) : 0;
+    const pct = Math.round(progress * 100);
     const hasFailures = chain.failed > 0;
+    const hasBlocked = chain.blocked > 0;
     const isActive = chain.running > 0;
 
     const handlePress = React.useCallback(() => {
@@ -189,12 +230,40 @@ const ChainCard = React.memo(function ChainCard({ chain }: { chain: ProjectChain
                 />
             </View>
 
-            <View style={styles.progressBar}>
-                <View style={[styles.progressFill, { width: `${Math.round(progress * 100)}%` as any }]} />
-                {chain.failed > 0 && (
-                    <View style={[styles.progressFailed, { width: `${Math.round((chain.failed / chain.total) * 100)}%` as any }]} />
-                )}
+            <View style={styles.progressRow}>
+                <View style={styles.progressBar}>
+                    <View style={[styles.progressFill, { width: `${pct}%` as any }]} />
+                    {chain.failed > 0 && (
+                        <View style={[styles.progressFailed, { width: `${Math.round((chain.failed / chain.total) * 100)}%` as any }]} />
+                    )}
+                </View>
+                <Text style={[styles.progressPct, hasFailures && { color: theme.colors.warningCritical }]}>
+                    {pct}%
+                </Text>
             </View>
+
+            {(isActive || hasFailures || hasBlocked) && (
+                <View style={styles.chipRow}>
+                    {isActive && (
+                        <View style={[styles.chip, { backgroundColor: theme.colors.success + "22" }]}>
+                            <Ionicons name="flash" size={10} color={theme.colors.success} />
+                            <Text style={[styles.chipText, { color: theme.colors.success }]}>{chain.running}</Text>
+                        </View>
+                    )}
+                    {hasBlocked && (
+                        <View style={[styles.chip, { backgroundColor: theme.colors.warning + "22" }]}>
+                            <Ionicons name="pause-circle" size={10} color={theme.colors.warning} />
+                            <Text style={[styles.chipText, { color: theme.colors.warning }]}>{chain.blocked} blocked</Text>
+                        </View>
+                    )}
+                    {hasFailures && (
+                        <View style={[styles.chip, { backgroundColor: theme.colors.warningCritical + "22" }]}>
+                            <Ionicons name="alert-circle" size={10} color={theme.colors.warningCritical} />
+                            <Text style={[styles.chipText, { color: theme.colors.warningCritical }]}>{chain.failed} failed</Text>
+                        </View>
+                    )}
+                </View>
+            )}
 
             {!expanded && (
                 <View style={styles.steps}>
@@ -209,8 +278,13 @@ const ChainCard = React.memo(function ChainCard({ chain }: { chain: ProjectChain
 
             {expanded && (
                 <View style={styles.taskList}>
-                    {chain.tasks.map((task) => (
-                        <TaskRow key={task.id} event={task} />
+                    {chain.tasks.map((task, idx) => (
+                        <TaskRow
+                            key={task.id}
+                            event={task}
+                            priorEvents={chain.tasks.slice(0, idx)}
+                            isLast={idx === chain.tasks.length - 1}
+                        />
                     ))}
                 </View>
             )}
@@ -252,36 +326,76 @@ function StepDot({ event }: { event: WorldEvent }) {
     return dot;
 }
 
-function TaskRow({ event, stepIndex }: { event: WorldEvent; stepIndex?: number }) {
+function formatDuration(ms: number): string {
+    if (ms < 60_000) return `${Math.floor(ms / 1000)}s`;
+    if (ms < 3_600_000) return `${Math.floor(ms / 60_000)}m`;
+    return `${Math.floor(ms / 3_600_000)}h`;
+}
+
+function TaskRow({
+    event,
+    stepIndex,
+    priorEvents = [],
+    isLast = true,
+}: {
+    event: WorldEvent;
+    stepIndex?: number;
+    priorEvents?: WorldEvent[];
+    isLast?: boolean;
+}) {
     const { theme } = useUnistyles();
     const { styles } = useStyles();
     const router = useRouter();
+    const now = Date.now();
     const status = extractStatus(event.eventType);
+    const blocked = isBlocked(event, priorEvents);
     const sessionId = event.source.sessionId;
     const tappable = !!sessionId;
-    const statusColor = status === "completed"
-        ? theme.colors.success
-        : status === "failed"
-            ? theme.colors.warningCritical
-            : status === "running"
-                ? theme.colors.accentBlue
-                : theme.colors.textSecondary;
 
-    const time = new Date(event.occurredAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    const statusColor = blocked
+        ? theme.colors.warning
+        : status === "completed"
+            ? theme.colors.success
+            : status === "failed"
+                ? theme.colors.warningCritical
+                : status === "running"
+                    ? theme.colors.accentBlue
+                    : theme.colors.textSecondary;
+
+    const displayStatus = blocked ? "blocked" : status;
+
+    const duration = status === "running"
+        ? formatDuration(now - event.occurredAt)
+        : new Date(event.occurredAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 
     const inner = (
-        <View style={[styles.taskRow, tappable && styles.taskRowTappable]}>
-            {stepIndex !== undefined ? (
-                <Text style={[styles.stepIndex, { color: statusColor }]}>{stepIndex}.</Text>
-            ) : (
-                <View style={[styles.taskDot, { backgroundColor: statusColor }]} />
-            )}
-            <Text style={styles.taskTitle} numberOfLines={1}>{event.title}</Text>
-            <Text style={[styles.taskStatus, { color: statusColor }]}>{status}</Text>
-            {tappable && (
-                <Ionicons name="chevron-forward" size={12} color={theme.colors.textSecondary} />
-            )}
-            <Text style={styles.taskTime}>{time}</Text>
+        <View style={styles.taskRowOuter}>
+            {/* Dependency connector line */}
+            <View style={styles.connectorCol}>
+                <View style={[styles.connectorLine, { backgroundColor: theme.colors.divider }]} />
+                {isLast && <View style={styles.connectorCapSpacer} />}
+            </View>
+
+            <View style={[
+                styles.taskRow,
+                tappable && styles.taskRowTappable,
+                blocked && { backgroundColor: theme.colors.warning + "15", borderRadius: 6 },
+            ]}>
+                {stepIndex !== undefined ? (
+                    <Text style={[styles.stepIndex, { color: statusColor }]}>{stepIndex}.</Text>
+                ) : (
+                    <View style={[styles.taskDot, { backgroundColor: statusColor }]} />
+                )}
+                <Text style={styles.taskTitle} numberOfLines={1}>{event.title}</Text>
+                {blocked && <Ionicons name="pause-circle" size={11} color={theme.colors.warning} />}
+                <Text style={[styles.taskStatus, { color: statusColor }]}>{displayStatus}</Text>
+                {tappable && (
+                    <Ionicons name="chevron-forward" size={12} color={theme.colors.textSecondary} />
+                )}
+                <Text style={[styles.taskTime, status === "running" && { color: theme.colors.accentBlue }]}>
+                    {duration}
+                </Text>
+            </View>
         </View>
     );
 
@@ -360,12 +474,25 @@ const useStyles = () => {
             fontSize: 13,
             color: theme.colors.textSecondary,
         },
+        progressRow: {
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 8,
+        },
         progressBar: {
+            flex: 1,
             height: 4,
             borderRadius: 2,
             backgroundColor: theme.colors.divider,
             flexDirection: "row",
             overflow: "hidden",
+        },
+        progressPct: {
+            fontSize: 12,
+            fontWeight: "600",
+            color: theme.colors.textSecondary,
+            width: 34,
+            textAlign: "right",
         },
         progressFill: {
             height: 4,
@@ -374,6 +501,22 @@ const useStyles = () => {
         progressFailed: {
             height: 4,
             backgroundColor: theme.colors.warningCritical,
+        },
+        chipRow: {
+            flexDirection: "row",
+            gap: 6,
+        },
+        chip: {
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 4,
+            paddingHorizontal: 7,
+            paddingVertical: 3,
+            borderRadius: 10,
+        },
+        chipText: {
+            fontSize: 11,
+            fontWeight: "500",
         },
         steps: {
             flexDirection: "row",
@@ -386,19 +529,39 @@ const useStyles = () => {
             color: theme.colors.textSecondary,
         },
         taskList: {
-            gap: 6,
+            gap: 0,
             borderTopWidth: 1,
             borderTopColor: theme.colors.divider,
             paddingTop: 8,
         },
+        taskRowOuter: {
+            flexDirection: "row",
+            alignItems: "stretch",
+        },
+        connectorCol: {
+            width: 14,
+            alignItems: "center",
+        },
+        connectorLine: {
+            flex: 1,
+            width: 2,
+            borderRadius: 1,
+            marginTop: 6,
+            marginBottom: 0,
+        },
+        connectorCapSpacer: {
+            height: 6,
+        },
         taskRow: {
+            flex: 1,
             flexDirection: "row",
             alignItems: "center",
             gap: 8,
-            paddingVertical: 2,
+            paddingVertical: 5,
+            paddingHorizontal: 4,
         },
         taskRowTappable: {
-            paddingVertical: 4,
+            paddingVertical: 6,
         },
         stepIndex: {
             fontSize: 12,
