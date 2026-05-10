@@ -1,8 +1,10 @@
 import * as React from "react";
-import { View, TouchableOpacity } from "react-native";
+import { View, TouchableOpacity, ActivityIndicator } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { Ionicons } from "@expo/vector-icons";
 import { Text } from "@/components/StyledText";
+import { TokenStorage } from "@/auth/tokenStorage";
+import { updateActionApproval } from "@/sync/apiSupervisor";
 import type { WorldEvent, WorldEventSeverity } from "./worldTypes";
 
 function formatTime(ts: number): string {
@@ -41,9 +43,26 @@ export const WorldEventCard = React.memo(function WorldEventCard({
     const { styles } = useStyles();
     const dotColor = useSeverityColor(event.severity);
 
+    const isSupervisorAction = event.eventType === "supervisor.action_found";
+    const [actionLoading, setActionLoading] = React.useState(false);
+    const [actionDone, setActionDone] = React.useState<string | null>(null);
+
     const handlePress = React.useCallback(() => {
         onPress?.(event);
     }, [event, onPress]);
+
+    const handleAction = React.useCallback(async (approval: "approved" | "skipped") => {
+        if (!event.source.projectId) return;
+        setActionLoading(true);
+        try {
+            const creds = await TokenStorage.getCredentials();
+            if (!creds) return;
+            await updateActionApproval(creds, event.source.projectId, event.originalId, approval);
+            setActionDone(approval);
+        } finally {
+            setActionLoading(false);
+        }
+    }, [event.source.projectId, event.originalId]);
 
     if (compact) {
         return (
@@ -63,7 +82,7 @@ export const WorldEventCard = React.memo(function WorldEventCard({
 
     return (
         <TouchableOpacity
-            style={styles.card}
+            style={[styles.card, isSupervisorAction && !actionDone && styles.cardAction]}
             onPress={handlePress}
             activeOpacity={0.7}
         >
@@ -92,6 +111,48 @@ export const WorldEventCard = React.memo(function WorldEventCard({
                     )}
                 </View>
             </View>
+
+            {/* Inline actions for supervisor.action_found */}
+            {isSupervisorAction && !!event.source.projectId && (
+                <View style={styles.inlineActions}>
+                    {actionDone ? (
+                        <View style={styles.actionDoneRow}>
+                            <Ionicons
+                                name={actionDone === "approved" ? "checkmark-circle" : "close-circle"}
+                                size={14}
+                                color={actionDone === "approved" ? theme.colors.success : theme.colors.textSecondary}
+                            />
+                            <Text style={[styles.actionDoneText, { color: actionDone === "approved" ? theme.colors.success : theme.colors.textSecondary }]}>
+                                {actionDone}
+                            </Text>
+                        </View>
+                    ) : (
+                        <>
+                            <TouchableOpacity
+                                style={[styles.inlineBtn, styles.inlineBtnApprove]}
+                                onPress={(e) => { e.stopPropagation?.(); void handleAction("approved"); }}
+                                disabled={actionLoading}
+                                activeOpacity={0.7}
+                            >
+                                {actionLoading
+                                    ? <ActivityIndicator size="small" color={theme.colors.success} />
+                                    : <Ionicons name="checkmark" size={13} color={theme.colors.success} />
+                                }
+                                <Text style={[styles.inlineBtnText, { color: theme.colors.success }]}>Approve</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={[styles.inlineBtn, styles.inlineBtnSkip]}
+                                onPress={(e) => { e.stopPropagation?.(); void handleAction("skipped"); }}
+                                disabled={actionLoading}
+                                activeOpacity={0.7}
+                            >
+                                <Ionicons name="close" size={13} color={theme.colors.textSecondary} />
+                                <Text style={[styles.inlineBtnText, { color: theme.colors.textSecondary }]}>Skip</Text>
+                            </TouchableOpacity>
+                        </>
+                    )}
+                </View>
+            )}
         </TouchableOpacity>
     );
 });
@@ -146,6 +207,45 @@ const useStyles = () => {
             fontSize: 11,
             color: theme.colors.textSecondary,
             marginTop: 4,
+        },
+        cardAction: {
+            borderLeftWidth: 2,
+            borderLeftColor: theme.colors.warning,
+        },
+        inlineActions: {
+            flexDirection: "row",
+            gap: 8,
+            marginTop: 8,
+            paddingTop: 8,
+            borderTopWidth: 1,
+            borderTopColor: theme.colors.divider,
+        },
+        inlineBtn: {
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 5,
+            paddingHorizontal: 12,
+            paddingVertical: 6,
+            borderRadius: 8,
+        },
+        inlineBtnApprove: {
+            backgroundColor: theme.colors.success + "18",
+        },
+        inlineBtnSkip: {
+            backgroundColor: theme.colors.surfaceHighest,
+        },
+        inlineBtnText: {
+            fontSize: 13,
+            fontWeight: "500",
+        },
+        actionDoneRow: {
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 6,
+        },
+        actionDoneText: {
+            fontSize: 13,
+            fontStyle: "italic",
         },
         compactCard: {
             flexDirection: "row" as const,
