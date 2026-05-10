@@ -21,9 +21,10 @@ type ViewMode = "stream" | "chain" | "agents" | "density";
 
 interface WorldShellProps {
     onExit?: () => void;
+    initialFilter?: WorldFilter;
 }
 
-export const WorldShell = React.memo(function WorldShell({ onExit }: WorldShellProps) {
+export const WorldShell = React.memo(function WorldShell({ onExit, initialFilter }: WorldShellProps) {
     const router = useRouter();
     const { theme } = useUnistyles();
     const insets = useSafeAreaInsets();
@@ -32,7 +33,7 @@ export const WorldShell = React.memo(function WorldShell({ onExit }: WorldShellP
     const projects = useProjects();
     const machines = useAllMachines();
     const allSessions = useAllSessions();
-    const [filter, setFilter] = React.useState<WorldFilter>({});
+    const [filter, setFilter] = React.useState<WorldFilter>(initialFilter ?? {});
     const [panelOpen, setPanelOpen] = React.useState(false);
     const [selectedEvent, setSelectedEvent] = React.useState<WorldEvent | null>(null);
     const [viewMode, setViewMode] = React.useState<ViewMode>("stream");

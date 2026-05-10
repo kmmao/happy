@@ -25,7 +25,7 @@ export const ProjectListView = React.memo(() => {
 
     const handleProjectPress = React.useCallback(
         (projectId: string) => {
-            router.push(`/project/${projectId}`);
+            router.push(`/world?projectId=${projectId}` as any);
         },
         [router],
     );
