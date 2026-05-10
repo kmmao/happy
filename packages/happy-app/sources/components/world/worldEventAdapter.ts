@@ -71,6 +71,7 @@ export function adaptInboxToEvent(item: ServerInboxItem): WorldEvent {
             type: item.refType === "project" ? "project" : "system",
             projectId: item.refType === "project" ? item.refId : null,
         },
+        referenceUrl: item.referenceUrl ?? null,
     };
 }
 
