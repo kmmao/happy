@@ -2,6 +2,34 @@
   "entries": {
     "en": [
       {
+        "version": "2.26.0",
+        "date": "2026-05-10",
+        "summary": "This is the largest World Shell update to date — completing Phase 1 through Phase 4, bringing a fully functional global event workspace with real-time streaming, drag-to-reorder chains, decision workflows, and more.",
+        "changes": [
+          "Added WorldEventInspector — tap any event card to open a bottom-sheet detail panel with full event info, navigation links (Open Session, Open Project, Open Machine), and action buttons (Approve/Skip/Retry)",
+          "Added supervisor.action_found inline Approve/Skip buttons — Supervisor events now show Approve and Skip buttons directly on the card in Stream Mode, without needing to open the Inspector",
+          "Added world definition change events — editing Narrative, Laws, or Policy in the Definition Panel now produces a world.* event in the Stream so changes are traceable",
+          "Added trigger.fired events — cron and webhook trigger activations now correctly appear as trigger.cron_fired / trigger.webhook_fired events; the trigger.* filter chip now works as expected",
+          "Added real-time session lifecycle events — session.started and session.completed appear live via Zustand state subscription (no manual refresh needed)",
+          "Added unified world-event-created WebSocket push — a new socket channel delivers all world events (including memory.created) in real-time without polling",
+          "Improved empty state — the Stream Mode empty state now has two variants: a filter-aware \"no matching events\" state with a Clear Filter button, and a first-run onboarding state with quick-action buttons (New Session, Queue Task) and a command-bar hint",
+          "Fixed trigger.* filter chip — trigger activation events were incorrectly prefixed with decision., preventing the chip from matching; this is now resolved",
+          "Added intent progress percentage — each Intent card now shows the completion percentage (e.g. 67%) alongside the progress bar",
+          "Added status chips — Intent and Project chain cards now display running / blocked / failed count chips when relevant",
+          "Added blocked task highlight — a queued task that follows a failed sibling is marked as \"blocked\" with an orange background and pause icon",
+          "Added dependency connector line — expanded task lists show a vertical connector line on the left to indicate sequential order",
+          "Added running task duration — tasks currently in the \"running\" state display how long they have been running (e.g. 45s, 3m)",
+          "Added drag-to-reorder — long-press the reorder handle (≡) on an Intent or Project card to drag it up or down in the list; use ↑↓ buttons in expanded step lists to adjust individual step order",
+          "Fixed decision context navigation — Inspector now shows an \"Open Session\" or \"Open Project\" link derived from the referenceUrl in decision events",
+          "Added Density Mode (4th view tab) — groups all events by source project/machine, showing event counts with a heat-bar visualization; tap a card to switch to Stream Mode filtered to that project",
+          "Added URL parameter support — /world?projectId=X and /world?machineId=X automatically apply the corresponding filter on entry",
+          "Improved project list navigation — tapping a project in the Projects list now enters World Shell pre-filtered to that project instead of going to the project detail page",
+          "Improved machine navigation — tapping a machine in Settings now enters World Shell pre-filtered to that machine; the Agent Mode machine card gains a pulse icon for the same action",
+          "Fixed \"Needs Permission\" label — tapping the permission chip in the session status bar reliably opens the permission approval sheet"
+        ],
+        "rawMarkdown": "## 2.26.0 - 2026-05-10\n\n\nThis is the largest World Shell update to date — completing Phase 1 through Phase 4, bringing a fully functional global event workspace with real-time streaming, drag-to-reorder chains, decision workflows, and more.\n\n### World Shell — Stream Mode\n- Added WorldEventInspector — tap any event card to open a bottom-sheet detail panel with full event info, navigation links (Open Session, Open Project, Open Machine), and action buttons (Approve/Skip/Retry)\n- Added supervisor.action_found inline Approve/Skip buttons — Supervisor events now show Approve and Skip buttons directly on the card in Stream Mode, without needing to open the Inspector\n- Added world definition change events — editing Narrative, Laws, or Policy in the Definition Panel now produces a world.* event in the Stream so changes are traceable\n- Added trigger.fired events — cron and webhook trigger activations now correctly appear as trigger.cron_fired / trigger.webhook_fired events; the trigger.* filter chip now works as expected\n- Added real-time session lifecycle events — session.started and session.completed appear live via Zustand state subscription (no manual refresh needed)\n- Added unified world-event-created WebSocket push — a new socket channel delivers all world events (including memory.created) in real-time without polling\n- Improved empty state — the Stream Mode empty state now has two variants: a filter-aware \"no matching events\" state with a Clear Filter button, and a first-run onboarding state with quick-action buttons (New Session, Queue Task) and a command-bar hint\n- Fixed trigger.* filter chip — trigger activation events were incorrectly prefixed with decision., preventing the chip from matching; this is now resolved\n\n### World Shell — Chain Mode\n- Added intent progress percentage — each Intent card now shows the completion percentage (e.g. 67%) alongside the progress bar\n- Added status chips — Intent and Project chain cards now display running / blocked / failed count chips when relevant\n- Added blocked task highlight — a queued task that follows a failed sibling is marked as \"blocked\" with an orange background and pause icon\n- Added dependency connector line — expanded task lists show a vertical connector line on the left to indicate sequential order\n- Added running task duration — tasks currently in the \"running\" state display how long they have been running (e.g. 45s, 3m)\n- Added drag-to-reorder — long-press the reorder handle (≡) on an Intent or Project card to drag it up or down in the list; use ↑↓ buttons in expanded step lists to adjust individual step order\n- Fixed decision context navigation — Inspector now shows an \"Open Session\" or \"Open Project\" link derived from the referenceUrl in decision events\n\n### World Shell — Density Mode\n- Added Density Mode (4th view tab) — groups all events by source project/machine, showing event counts with a heat-bar visualization; tap a card to switch to Stream Mode filtered to that project\n\n### World Shell — Navigation & Routing\n- Added URL parameter support — /world?projectId=X and /world?machineId=X automatically apply the corresponding filter on entry\n- Improved project list navigation — tapping a project in the Projects list now enters World Shell pre-filtered to that project instead of going to the project detail page\n- Improved machine navigation — tapping a machine in Settings now enters World Shell pre-filtered to that machine; the Agent Mode machine card gains a pulse icon for the same action\n\n### Session\n- Fixed \"Needs Permission\" label — tapping the permission chip in the session status bar reliably opens the permission approval sheet"
+      },
+      {
         "version": "2.25.0",
         "date": "2026-05-10",
         "summary": "This release polishes the World Shell definition panel, improves the session permission experience, and cleans up internal event handling.",
@@ -781,6 +809,34 @@
     ],
     "zh-Hans": [
       {
+        "version": "2.26.0",
+        "date": "2026-05-10",
+        "summary": "这是迄今为止规模最大的 World Shell 更新——完成了 Phase 1 至 Phase 4 的全部功能，带来全功能的全局事件工作空间，包含实时事件流、链路拖拽重排、决策工作流等众多改进。",
+        "changes": [
+          "新增 WorldEventInspector——点击任意事件卡片，打开底部面板查看完整事件信息，包括导航链接（打开会话、项目、机器）及操作按钮（批准/跳过/重试）",
+          "新增 supervisor.action_found 内联操作按钮——Supervisor 事件卡片现在直接显示批准和跳过按钮，无需打开 Inspector",
+          "新增 World 定义变更事件——在定义面板中编辑叙事、法则或策略后，事件流中会立即出现对应的 world.* 事件，便于追踪变更历史",
+          "新增 trigger.fired 事件——Cron 和 Webhook 触发器激活时，现在正确以 trigger.cron_fired / trigger.webhook_fired 显示在事件流中；trigger.* 过滤芯片现可正常使用",
+          "新增会话生命周期实时事件——session.started 和 session.completed 通过 Zustand 订阅实时推送，无需手动刷新",
+          "新增统一 WebSocket 推送通道（world-event-created）——所有 World 事件（包括 memory.created）均通过新的 Socket 通道实时推送，无需轮询",
+          "改进空状态界面——事件流空状态现在分为两种：有过滤器时显示\"无匹配事件\"提示并带清除过滤按钮；首次进入时显示快捷操作按钮（新建会话、添加任务）和命令栏提示",
+          "修复 trigger.* 过滤芯片——触发器事件之前被错误地加上 decision. 前缀，导致过滤芯片无法匹配；已修复",
+          "新增意图进度百分比——每张 Intent 卡片现在在进度条旁显示完成百分比（如 67%）",
+          "新增状态统计芯片——Intent 和 Project 链路卡片在有相关数据时，显示运行中/阻塞/失败计数标签",
+          "新增阻塞任务高亮——位于已失败任务之后的排队任务被标记为\"blocked\"，以橙色背景和暂停图标显示",
+          "新增依赖关系连接线——展开的任务列表左侧显示竖线连接器，表示顺序依赖关系",
+          "新增运行时长显示——正在执行的任务显示已运行时长（如 45s、3m）",
+          "新增拖拽重排——长按卡片右侧的排序图标（≡）可上下拖拽 Intent/Project 卡片调整优先级；展开的步骤列表可使用 ↑↓ 按钮调整顺序",
+          "修复决策事件上下文导航——Inspector 现在根据 decision 事件中的 referenceUrl 显示\"打开会话\"或\"打开项目\"链接",
+          "新增密度视图（第4个标签）——按来源项目/机器对所有事件分组，展示事件计数和热度进度条；点击卡片可切换到已过滤的事件流模式",
+          "新增 URL 参数支持——/world?projectId=X 和 /world?machineId=X 进入时自动应用对应过滤",
+          "改进项目列表导航——点击项目列表中的项目，现在进入已过滤该项目的 World Shell，而非进入项目详情页",
+          "改进机器导航——设置页中点击机器，现在进入已过滤该机器的 World Shell；Agent 视图中的机器卡片新增跳转事件流的快捷按钮",
+          "修复\"需要权限\"标签——点击会话状态栏中的权限标签，现在可以稳定地打开权限审批面板"
+        ],
+        "rawMarkdown": "## 2.26.0 - 2026-05-10\n\n\n这是迄今为止规模最大的 World Shell 更新——完成了 Phase 1 至 Phase 4 的全部功能，带来全功能的全局事件工作空间，包含实时事件流、链路拖拽重排、决策工作流等众多改进。\n\n### World Shell — 事件流模式\n- 新增 WorldEventInspector——点击任意事件卡片，打开底部面板查看完整事件信息，包括导航链接（打开会话、项目、机器）及操作按钮（批准/跳过/重试）\n- 新增 supervisor.action_found 内联操作按钮——Supervisor 事件卡片现在直接显示批准和跳过按钮，无需打开 Inspector\n- 新增 World 定义变更事件——在定义面板中编辑叙事、法则或策略后，事件流中会立即出现对应的 world.* 事件，便于追踪变更历史\n- 新增 trigger.fired 事件——Cron 和 Webhook 触发器激活时，现在正确以 trigger.cron_fired / trigger.webhook_fired 显示在事件流中；trigger.* 过滤芯片现可正常使用\n- 新增会话生命周期实时事件——session.started 和 session.completed 通过 Zustand 订阅实时推送，无需手动刷新\n- 新增统一 WebSocket 推送通道（world-event-created）——所有 World 事件（包括 memory.created）均通过新的 Socket 通道实时推送，无需轮询\n- 改进空状态界面——事件流空状态现在分为两种：有过滤器时显示\"无匹配事件\"提示并带清除过滤按钮；首次进入时显示快捷操作按钮（新建会话、添加任务）和命令栏提示\n- 修复 trigger.* 过滤芯片——触发器事件之前被错误地加上 decision. 前缀，导致过滤芯片无法匹配；已修复\n\n### World Shell — 链路模式（Chain Mode）\n- 新增意图进度百分比——每张 Intent 卡片现在在进度条旁显示完成百分比（如 67%）\n- 新增状态统计芯片——Intent 和 Project 链路卡片在有相关数据时，显示运行中/阻塞/失败计数标签\n- 新增阻塞任务高亮——位于已失败任务之后的排队任务被标记为\"blocked\"，以橙色背景和暂停图标显示\n- 新增依赖关系连接线——展开的任务列表左侧显示竖线连接器，表示顺序依赖关系\n- 新增运行时长显示——正在执行的任务显示已运行时长（如 45s、3m）\n- 新增拖拽重排——长按卡片右侧的排序图标（≡）可上下拖拽 Intent/Project 卡片调整优先级；展开的步骤列表可使用 ↑↓ 按钮调整顺序\n- 修复决策事件上下文导航——Inspector 现在根据 decision 事件中的 referenceUrl 显示\"打开会话\"或\"打开项目\"链接\n\n### World Shell — 密度视图（Density Mode）\n- 新增密度视图（第4个标签）——按来源项目/机器对所有事件分组，展示事件计数和热度进度条；点击卡片可切换到已过滤的事件流模式\n\n### World Shell — 导航与路由\n- 新增 URL 参数支持——/world?projectId=X 和 /world?machineId=X 进入时自动应用对应过滤\n- 改进项目列表导航——点击项目列表中的项目，现在进入已过滤该项目的 World Shell，而非进入项目详情页\n- 改进机器导航——设置页中点击机器，现在进入已过滤该机器的 World Shell；Agent 视图中的机器卡片新增跳转事件流的快捷按钮\n\n### 会话\n- 修复\"需要权限\"标签——点击会话状态栏中的权限标签，现在可以稳定地打开权限审批面板"
+      },
+      {
         "version": "2.25.0",
         "date": "2026-05-10",
         "summary": "本次更新完善了 World Shell 定义面板的策略说明，改进了会话权限体验，并优化了内部事件处理逻辑。",
@@ -1537,7 +1593,7 @@
       }
     ]
   },
-  "latestVersion": "2.25.0",
+  "latestVersion": "2.26.0",
   "availableLocales": [
     "en",
     "zh-Hans"
