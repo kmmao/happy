@@ -960,6 +960,12 @@ function SessionViewInner({
     () => buildOptionsHash(latestOptions.items),
     [latestOptions.items],
   );
+  React.useEffect(() => {
+    if (latestOptions.items.length >= 2) {
+      autoOptionSendService.triggerScoringIfNeeded(sessionId, latestOptions.items, latestOptionsHash);
+    }
+  }, [sessionId, latestOptionsHash]);
+
   const sessionContextKeywords = React.useMemo(() => {
     const recentTexts: string[] = [];
     let count = 0;

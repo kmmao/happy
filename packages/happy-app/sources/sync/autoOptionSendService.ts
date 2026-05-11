@@ -841,6 +841,56 @@ class AutoOptionSendService {
         return this.semanticScores.get(optionsHash) ?? null;
     }
 
+    /**
+     * Trigger LLM scoring for the given options without requiring auto-send to be enabled.
+     * Used to show AI-scored badges (✨) in OptionsPopover for any session with 2+ options.
+     */
+    triggerScoringIfNeeded(sessionId: string, items: string[], optionsHash: string): void {
+        if (items.length < 2) return;
+        if (this.semanticScores.has(optionsHash)) return;
+
+        const now = Date.now();
+        const lastScored = this.lastSemanticScoredAt.get(sessionId) ?? 0;
+        if (now - lastScored < AutoOptionSendService.SEMANTIC_COOLDOWN_MS) return;
+
+        const credentials = sync.getCredentials();
+        if (!credentials) return;
+
+        const session = storage.getState().sessions[sessionId];
+        if (!session) return;
+
+        const messages = storage.getState().sessionMessages[sessionId]?.messages ?? [];
+        const contextSummary = buildOptionScoringContext(messages, null);
+        const profileId = session.profileId ?? null;
+
+        const scoringOverrides = storage.getState().localSettings.scoringModelOverride ?? {};
+        const modelOverride = Object.keys(scoringOverrides).length > 0
+            ? JSON.stringify(scoringOverrides)
+            : null;
+
+        const controller = new AbortController();
+        this.cancelSemanticScoring(sessionId);
+        this.semanticControllers.set(sessionId, controller);
+        this.lastSemanticScoredAt.set(sessionId, now);
+
+        scoreOptionsRemote(credentials, items, contextSummary, null, profileId, modelOverride, controller.signal)
+            .then((response) => {
+                this.semanticControllers.delete(sessionId);
+                if (this.semanticScores.has(optionsHash)) return;
+
+                const semanticMap = new Map<number, number>();
+                response.scores.forEach((s, i) => semanticMap.set(i, s));
+                this.semanticScores.set(optionsHash, semanticMap);
+                if (response.modelUsed && response.provider) {
+                    this.semanticMeta.set(optionsHash, { modelUsed: response.modelUsed, provider: response.provider });
+                }
+                this.notify(sessionId);
+            })
+            .catch(() => {
+                this.semanticControllers.delete(sessionId);
+            });
+    }
+
     private async triggerOptionGeneration(sessionId: string, messages: Message[]): Promise<void> {
         const state = this.states.get(sessionId);
         if (!state?.enabled) return;
