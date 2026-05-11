@@ -152,6 +152,7 @@ export const WorldAgentMode = React.memo(function WorldAgentMode() {
     if (groups.length === 0) {
         return (
             <ScrollView
+                style={styles.flex1}
                 contentContainerStyle={styles.empty}
                 refreshControl={<RefreshControl refreshing={loading} onRefresh={onRefresh} />}
             >
@@ -164,6 +165,7 @@ export const WorldAgentMode = React.memo(function WorldAgentMode() {
 
     return (
         <ScrollView
+            style={styles.flex1}
             contentContainerStyle={styles.list}
             refreshControl={<RefreshControl refreshing={loading} onRefresh={onRefresh} />}
         >
@@ -271,6 +273,7 @@ const SessionRow = React.memo(function SessionRow({ info }: { info: AgentSession
     const router = useRouter();
     const now = Date.now();
 
+    const isUrgent = info.status === "requires_action" || info.session.needsAttention;
     const statusColor =
         info.status === "running" || info.status === "thinking"
             ? theme.colors.success
@@ -280,17 +283,34 @@ const SessionRow = React.memo(function SessionRow({ info }: { info: AgentSession
                     ? theme.colors.warningCritical
                     : theme.colors.textSecondary;
 
+    // Show full path shortened as "…/parent/dir"
+    const fullPath = info.session.metadata?.path ?? null;
+    const shortPath = fullPath
+        ? fullPath.split("/").filter(Boolean).slice(-2).join("/")
+        : null;
+
     const handlePress = React.useCallback(() => {
         router.push(`/(app)/session/${info.session.id}`);
     }, [info.session.id, router]);
 
     return (
-        <TouchableOpacity style={styles.sessionRow} onPress={handlePress} activeOpacity={0.6}>
+        <TouchableOpacity
+            style={[
+                styles.sessionRow,
+                isUrgent && { backgroundColor: theme.colors.warning + "18", borderRadius: 8 },
+            ]}
+            onPress={handlePress}
+            activeOpacity={0.6}
+        >
             <Ionicons name={STATUS_ICON[info.status]} size={14} color={statusColor} />
-            <Text style={styles.sessionName} numberOfLines={1}>{info.displayName}</Text>
-            {info.session.needsAttention && (
-                <View style={[styles.attentionDot, { backgroundColor: theme.colors.warning }]} />
-            )}
+            <View style={styles.sessionInfo}>
+                <Text style={styles.sessionName} numberOfLines={1}>{info.displayName}</Text>
+                {shortPath && shortPath !== info.displayName && (
+                    <Text style={styles.sessionPath} numberOfLines={1}>
+                        {shortPath}
+                    </Text>
+                )}
+            </View>
             <Text style={[styles.statusLabel, { color: statusColor }]}>{info.status}</Text>
             <Text style={styles.timeLabel}>{relativeTime(info.session.activeAt, now)}</Text>
             <Ionicons name="chevron-forward" size={12} color={theme.colors.textSecondary} />
@@ -303,6 +323,9 @@ const SessionRow = React.memo(function SessionRow({ info }: { info: AgentSession
 const useStyles = () => {
     const { theme } = useUnistyles();
     const styles = StyleSheet.create({
+        flex1: {
+            flex: 1,
+        },
         list: {
             padding: 16,
             gap: 12,
@@ -390,11 +413,19 @@ const useStyles = () => {
             alignItems: "center",
             gap: 8,
             paddingVertical: 5,
+            paddingHorizontal: 4,
+        },
+        sessionInfo: {
+            flex: 1,
+            gap: 1,
         },
         sessionName: {
-            flex: 1,
             fontSize: 13,
             color: theme.colors.text,
+        },
+        sessionPath: {
+            fontSize: 11,
+            color: theme.colors.textSecondary,
         },
         attentionDot: {
             width: 6,

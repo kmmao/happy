@@ -156,6 +156,7 @@ export const WorldDensityMode = React.memo(function WorldDensityMode({
     if (densities.length === 0 && !loading) {
         return (
             <ScrollView
+                style={styles.flex1}
                 contentContainerStyle={styles.empty}
                 refreshControl={<RefreshControl refreshing={loading} onRefresh={onRefresh} />}
             >
@@ -168,6 +169,7 @@ export const WorldDensityMode = React.memo(function WorldDensityMode({
 
     return (
         <ScrollView
+            style={styles.flex1}
             contentContainerStyle={styles.list}
             refreshControl={<RefreshControl refreshing={loading} onRefresh={onRefresh} />}
         >
@@ -314,9 +316,12 @@ function TypeChip({ prefix, count }: { prefix: string; count: number }) {
     const icon = TYPE_ICONS[prefix] ?? "ellipse";
     return (
         <View style={typeChipStyle}>
-            <Ionicons name={icon} size={10} color={color} />
+            <Ionicons name={icon} size={12} color={color} />
+            <Text style={{ fontSize: 12, color: theme.colors.text, fontWeight: "500" }}>
+                {count}
+            </Text>
             <Text style={{ fontSize: 11, color: theme.colors.textSecondary }}>
-                {prefix} {count}
+                {prefix}
             </Text>
         </View>
     );
@@ -325,8 +330,8 @@ function TypeChip({ prefix, count }: { prefix: string; count: number }) {
 const typeChipStyle = {
     flexDirection: "row" as const,
     alignItems: "center" as const,
-    gap: 3,
-    marginRight: 10,
+    gap: 4,
+    marginRight: 12,
     marginBottom: 2,
 };
 
@@ -335,6 +340,9 @@ const typeChipStyle = {
 const useStyles = () => {
     const { theme } = useUnistyles();
     const styles = StyleSheet.create({
+        flex1: {
+            flex: 1,
+        },
         list: {
             padding: 16,
             gap: 12,
@@ -362,11 +370,11 @@ const useStyles = () => {
             overflow: "hidden",
         },
         heatBarTrack: {
-            height: 3,
+            height: 4,
             backgroundColor: theme.colors.divider,
         },
         heatBarFill: {
-            height: 3,
+            height: 4,
             borderRadius: 2,
         },
         cardBody: {
