@@ -1369,9 +1369,9 @@ function NewSessionWizard() {
       log.error("Failed to start session", error);
       let errorMessage = t("newSession.failedToStart");
       if (error instanceof Error) {
-        if (error.message.includes("timeout")) {
+        if (error.message?.includes("timeout")) {
           errorMessage = t("newSession.sessionTimeout");
-        } else if (error.message.includes("Socket not connected")) {
+        } else if (error.message?.includes("Socket not connected")) {
           errorMessage = t("newSession.notConnectedToServer");
         }
       }

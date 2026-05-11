@@ -8,6 +8,7 @@ import type { WorldFilter } from "./worldTypes";
 interface ChipDef {
     label: string;
     filter: WorldFilter;
+    activeColor?: string;
 }
 
 interface SourceChipInfo {
@@ -45,8 +46,8 @@ export const WorldFilterChips = React.memo(function WorldFilterChips({
         { label: "session.*", filter: { eventTypePrefix: "session." } },
         { label: "memory.*", filter: { eventTypePrefix: "memory." } },
         { label: "trigger.*", filter: { eventTypePrefix: "trigger." } },
-        { label: "⚠️", filter: { severity: "warning" } },
-        { label: "🔴", filter: { severity: "critical" } },
+        { label: "⚠️", filter: { severity: "warning" }, activeColor: "#F59E0B" },
+        { label: "🔴", filter: { severity: "critical" }, activeColor: "#EF4444" },
     ];
 
     const projectChips: ChipDef[] = projects.slice(0, 4).map((p) => ({
@@ -72,6 +73,7 @@ export const WorldFilterChips = React.memo(function WorldFilterChips({
                     key={chip.label}
                     label={chip.label}
                     active={filtersEqual(activeFilter, chip.filter)}
+                    activeColor={chip.activeColor}
                     onPress={() => onFilterChange(chip.filter)}
                 />
             ))}
@@ -84,24 +86,27 @@ const containerStyle = {
     paddingVertical: 8,
     gap: 8,
     flexDirection: "row" as const,
+    alignItems: "center" as const,
 };
 
 interface ChipProps {
     label: string;
     active: boolean;
+    activeColor?: string;
     onPress: () => void;
 }
 
-const Chip = React.memo(function Chip({ label, active, onPress }: ChipProps) {
+const Chip = React.memo(function Chip({ label, active, activeColor, onPress }: ChipProps) {
     const { theme } = useUnistyles();
+    const resolvedColor = active ? (activeColor ?? theme.colors.primary) : "transparent";
     const styles = StyleSheet.create({
         chip: {
             paddingHorizontal: 12,
             paddingVertical: 6,
             borderRadius: 16,
-            backgroundColor: active ? theme.colors.primary : theme.colors.surfaceHigh,
+            backgroundColor: active ? resolvedColor : theme.colors.surfaceHigh,
             borderWidth: 1,
-            borderColor: active ? theme.colors.primary : theme.colors.divider,
+            borderColor: active ? resolvedColor : theme.colors.divider,
         },
         label: {
             fontSize: 13,

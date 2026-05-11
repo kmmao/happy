@@ -25,7 +25,7 @@ import { OptionScoringMetaProvider } from "@/components/markdown/MarkdownView";
 import { ChatList, ChatListHandle, LOAD_MORE_INCREMENT } from "@/components/ChatList";
 import { Deferred } from "@/components/Deferred";
 import { ScrollToBottomButton } from "@/components/ScrollToBottomButton";
-import { OptionsPopover } from "@/components/OptionsPopover";
+import { OptionsPopover, type OptionItem } from "@/components/OptionsPopover";
 import { SessionKnowledgeSheet } from "@/components/knowledge/SessionKnowledgeSheet";
 import { EmptyMessages } from "@/components/EmptyMessages";
 import { SharedStateView } from "@/components/SharedStateView";
@@ -1319,7 +1319,9 @@ function SessionViewInner({
       chatListRef.current?.scrollToUserMessage("prev");
     },
     hasUserMessages: (chatListRef.current?.getUserMessageCount() ?? 0) > 0,
-    optionCount: latestOptions.items.length,
+    optionCount: latestOptions.items.length > 0
+      ? latestOptions.items.length
+      : (autoOptionSend.enabled ? (autoOptionSendService.getGeneratedOptions(sessionId)?.length ?? 0) : 0),
     onOptionsPress: () => setShowOptionsPopover(true),
     bookmarkCount: bookmarks.length,
     onBookmarksPress: () => setShowBookmarksPopover(true),
@@ -1882,7 +1884,7 @@ function SessionViewInner({
         />
         <OptionsPopover
           visible={showOptionsPopover && (latestOptions.items.length > 0 || (autoOptionSend.enabled && (autoOptionSendService.getGeneratedOptions(sessionId)?.length ?? 0) > 0))}
-          options={latestOptions.items.length > 0 ? latestOptions.items : (autoOptionSendService.getGeneratedOptions(sessionId) ?? [])}
+          options={latestOptions.items.length > 0 ? latestOptions.items : (autoOptionSendService.getGeneratedOptions(sessionId) ?? []).map((text): OptionItem => ({ text, source: "ai" }))}
           onOptionPress={handleFloatingOptionPress}
           onCopyOption={(text) => {
             skipDismissOnCloseRef.current = true;

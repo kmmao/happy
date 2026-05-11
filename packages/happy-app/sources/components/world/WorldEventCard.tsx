@@ -7,6 +7,22 @@ import { TokenStorage } from "@/auth/tokenStorage";
 import { updateActionApproval } from "@/sync/apiSupervisor";
 import type { WorldEvent, WorldEventSeverity } from "./worldTypes";
 
+// Maps event type prefix → accent color (matches DensityMode TYPE_COLORS)
+const TYPE_COLORS: Record<string, string> = {
+    "task": "#3B82F6",
+    "session": "#22C55E",
+    "supervisor": "#F59E0B",
+    "memory": "#8B5CF6",
+    "trigger": "#EC4899",
+    "decision": "#EF4444",
+    "world": "#5e52a7",
+};
+
+function getTypeColor(eventType: string): string {
+    const prefix = eventType.split(".")[0];
+    return TYPE_COLORS[prefix] ?? "";
+}
+
 function formatTime(ts: number): string {
     const d = new Date(ts);
     return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
@@ -41,7 +57,9 @@ export const WorldEventCard = React.memo(function WorldEventCard({
 }: WorldEventCardProps) {
     const { theme } = useUnistyles();
     const { styles } = useStyles();
-    const dotColor = useSeverityColor(event.severity);
+    const severityColor = useSeverityColor(event.severity);
+    const typeColor = getTypeColor(event.eventType);
+    const borderColor = typeColor || theme.colors.divider;
 
     const isSupervisorAction = event.eventType === "supervisor.action_found";
     const [actionLoading, setActionLoading] = React.useState(false);
@@ -67,12 +85,16 @@ export const WorldEventCard = React.memo(function WorldEventCard({
     if (compact) {
         return (
             <TouchableOpacity
-                style={styles.compactCard}
+                style={[styles.compactCard, { borderLeftColor: borderColor }]}
                 onPress={handlePress}
                 activeOpacity={0.7}
             >
-                <View style={[styles.compactDot, { backgroundColor: dotColor }]} />
-                <Text style={styles.compactType} numberOfLines={1}>{event.eventType}</Text>
+                <Text
+                    style={[styles.compactType, typeColor ? { color: typeColor } : {}]}
+                    numberOfLines={1}
+                >
+                    {event.eventType}
+                </Text>
                 <Text style={styles.compactTitle} numberOfLines={1}>{event.title}</Text>
                 <Text style={styles.compactTime}>{formatTime(event.occurredAt)}</Text>
                 <Ionicons name="chevron-forward" size={12} color={theme.colors.textSecondary} />
@@ -80,37 +102,48 @@ export const WorldEventCard = React.memo(function WorldEventCard({
         );
     }
 
+    const sourceLabel = formatSourceLabel(event.source.projectPath, event.source.projectId);
+
     return (
         <TouchableOpacity
-            style={[styles.card, isSupervisorAction && !actionDone && styles.cardAction]}
+            style={[
+                styles.card,
+                { borderLeftColor: borderColor },
+                isSupervisorAction && !actionDone && styles.cardAction,
+            ]}
             onPress={handlePress}
             activeOpacity={0.7}
         >
-            <View style={styles.row}>
-                <View style={[styles.dot, { backgroundColor: dotColor }]} />
-                <View style={styles.content}>
-                    <View style={styles.headerRow}>
-                        <Text style={styles.eventType} numberOfLines={1}>
-                            {event.eventType}
-                        </Text>
-                        <Text style={styles.time}>{formatTime(event.occurredAt)}</Text>
-                        <Ionicons
-                            name="chevron-forward"
-                            size={14}
-                            color={theme.colors.textSecondary}
-                            style={{ marginLeft: 4 }}
-                        />
-                    </View>
-                    <Text style={styles.title} numberOfLines={2}>
-                        {event.title}
-                    </Text>
-                    {(event.source.projectPath || event.source.projectId) && (
-                        <Text style={styles.source} numberOfLines={1}>
-                            {formatSourceLabel(event.source.projectPath, event.source.projectId)}
-                        </Text>
-                    )}
-                </View>
+            <View style={styles.headerRow}>
+                <Text
+                    style={[styles.eventType, typeColor ? { color: typeColor } : {}]}
+                    numberOfLines={1}
+                >
+                    {event.eventType}
+                </Text>
+                <Text style={styles.time}>{formatTime(event.occurredAt)}</Text>
+                <Ionicons
+                    name="chevron-forward"
+                    size={13}
+                    color={theme.colors.textSecondary}
+                    style={{ marginLeft: 2 }}
+                />
             </View>
+
+            <Text style={styles.title} numberOfLines={2}>
+                {event.title}
+            </Text>
+
+            {sourceLabel ? (
+                <Text style={styles.source} numberOfLines={1}>
+                    · {sourceLabel}
+                </Text>
+            ) : null}
+
+            {/* Severity indicator — only for warning/critical */}
+            {event.severity !== "info" && (
+                <View style={[styles.severityDot, { backgroundColor: severityColor }]} />
+            )}
 
             {/* Inline actions for supervisor.action_found */}
             {isSupervisorAction && !!event.source.projectId && (
@@ -166,32 +199,20 @@ const useStyles = () => {
             marginHorizontal: 16,
             marginVertical: 4,
             paddingHorizontal: 12,
-            paddingVertical: 10,
-        },
-        row: {
-            flexDirection: "row",
-            alignItems: "flex-start",
-        },
-        dot: {
-            width: 8,
-            height: 8,
-            borderRadius: 4,
-            marginTop: 5,
-            marginRight: 10,
-        },
-        content: {
-            flex: 1,
+            paddingTop: 9,
+            paddingBottom: 10,
+            borderLeftWidth: 3,
         },
         headerRow: {
             flexDirection: "row",
-            justifyContent: "space-between",
             alignItems: "center",
-            marginBottom: 2,
+            marginBottom: 4,
         },
         eventType: {
-            fontSize: 11,
-            color: theme.colors.textSecondary,
             flex: 1,
+            fontSize: 11,
+            fontWeight: "500",
+            color: theme.colors.textSecondary,
         },
         time: {
             fontSize: 11,
@@ -199,18 +220,26 @@ const useStyles = () => {
             marginLeft: 8,
         },
         title: {
-            fontSize: 14,
+            fontSize: 15,
+            fontWeight: "500",
             color: theme.colors.text,
-            lineHeight: 20,
+            lineHeight: 21,
         },
         source: {
             fontSize: 11,
             color: theme.colors.textSecondary,
             marginTop: 4,
         },
+        severityDot: {
+            position: "absolute",
+            top: 10,
+            right: 28,
+            width: 6,
+            height: 6,
+            borderRadius: 3,
+        },
         cardAction: {
-            borderLeftWidth: 2,
-            borderLeftColor: theme.colors.warning,
+            borderLeftColor: "#F59E0B",
         },
         inlineActions: {
             flexDirection: "row",
@@ -257,15 +286,11 @@ const useStyles = () => {
             paddingVertical: 5,
             borderRadius: 8,
             backgroundColor: theme.colors.surfaceHigh,
-        },
-        compactDot: {
-            width: 6,
-            height: 6,
-            borderRadius: 3,
-            flexShrink: 0,
+            borderLeftWidth: 3,
         },
         compactType: {
             fontSize: 11,
+            fontWeight: "500",
             color: theme.colors.textSecondary,
             width: 88,
             flexShrink: 0,

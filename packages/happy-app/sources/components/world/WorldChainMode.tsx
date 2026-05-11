@@ -558,14 +558,14 @@ const useStyles = () => {
             gap: 6,
         },
         intentBadge: {
-            backgroundColor: theme.colors.accentBlue + "22",
+            backgroundColor: theme.colors.accentBlue,
             borderRadius: 4,
             paddingHorizontal: 5,
-            paddingVertical: 1,
+            paddingVertical: 2,
         },
         intentBadgeText: {
             fontSize: 10,
-            color: theme.colors.accentBlue,
+            color: "#fff",
             fontWeight: "600",
         },
         cardTitle: {
@@ -586,8 +586,8 @@ const useStyles = () => {
         },
         progressBar: {
             flex: 1,
-            height: 4,
-            borderRadius: 2,
+            height: 5,
+            borderRadius: 3,
             backgroundColor: theme.colors.divider,
             flexDirection: "row",
             overflow: "hidden",
@@ -600,11 +600,11 @@ const useStyles = () => {
             textAlign: "right",
         },
         progressFill: {
-            height: 4,
-            backgroundColor: theme.colors.success,
+            height: 5,
+            backgroundColor: "#3B82F6",
         },
         progressFailed: {
-            height: 4,
+            height: 5,
             backgroundColor: theme.colors.warningCritical,
         },
         chipRow: {

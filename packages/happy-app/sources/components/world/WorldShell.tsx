@@ -266,20 +266,22 @@ export const WorldShell = React.memo(function WorldShell({ onExit, initialFilter
                 </TouchableOpacity>
 
                 <View style={styles.stats}>
-                    <View style={styles.badge}>
-                        <Ionicons name="pulse-outline" size={12} color={theme.colors.textSecondary} />
-                        <Text style={styles.badgeText}>{totalEvents}</Text>
-                    </View>
                     {activeAgents > 0 && (
                         <View style={[styles.badge, styles.badgeActive]}>
                             <Ionicons name="flash" size={12} color={theme.colors.success} />
-                            <Text style={styles.badgeText}>{activeAgents}</Text>
+                            <Text style={[styles.badgeText, { color: theme.colors.success }]}>{activeAgents}</Text>
                         </View>
                     )}
                     {pendingDecisions > 0 && (
                         <View style={[styles.badge, styles.badgeDecision]}>
                             <Ionicons name="alert-circle" size={12} color={theme.colors.warningCritical} />
-                            <Text style={styles.badgeText}>{pendingDecisions}</Text>
+                            <Text style={[styles.badgeText, { color: theme.colors.warningCritical }]}>{pendingDecisions}</Text>
+                        </View>
+                    )}
+                    {activeAgents === 0 && pendingDecisions === 0 && (
+                        <View style={styles.badge}>
+                            <Ionicons name="pulse-outline" size={12} color={theme.colors.textSecondary} />
+                            <Text style={styles.badgeText}>{totalEvents}</Text>
                         </View>
                     )}
                 </View>
@@ -331,43 +333,39 @@ export const WorldShell = React.memo(function WorldShell({ onExit, initialFilter
             {/* World Definition Panel */}
             <WorldDefinitionPanel visible={panelOpen} onSaved={handleConfigSaved} />
 
-            {/* View Mode Toggle + Filter Chips */}
+            {/* View Mode Toggle */}
             <View style={styles.modeRow}>
-                <TouchableOpacity
-                    style={[styles.modeTab, viewMode === "stream" && styles.modeTabActive]}
-                    onPress={() => setViewMode("stream")}
-                >
-                    <Text style={[styles.modeTabText, viewMode === "stream" && styles.modeTabTextActive]}>
-                        {t("world.streamMode")}
-                    </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                    style={[styles.modeTab, viewMode === "chain" && styles.modeTabActive]}
-                    onPress={() => setViewMode("chain")}
-                >
-                    <Text style={[styles.modeTabText, viewMode === "chain" && styles.modeTabTextActive]}>
-                        {t("world.chainMode")}
-                    </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                    style={[styles.modeTab, viewMode === "agents" && styles.modeTabActive]}
-                    onPress={() => setViewMode("agents")}
-                >
-                    <Text style={[styles.modeTabText, viewMode === "agents" && styles.modeTabTextActive]}>
-                        {t("world.agentMode")}
-                    </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                    style={[styles.modeTab, viewMode === "density" && styles.modeTabActive]}
-                    onPress={() => setViewMode("density")}
-                >
-                    <Text style={[styles.modeTabText, viewMode === "density" && styles.modeTabTextActive]}>
-                        {t("world.densityMode")}
-                    </Text>
-                </TouchableOpacity>
+                {(
+                    [
+                        { key: "stream",  label: t("world.streamMode"),  icon: "pulse" },
+                        { key: "chain",   label: t("world.chainMode"),   icon: "git-branch" },
+                        { key: "agents",  label: t("world.agentMode"),   icon: "hardware-chip" },
+                        { key: "density", label: t("world.densityMode"), icon: "grid" },
+                    ] as const
+                ).map(({ key, label, icon }) => {
+                    const active = viewMode === key;
+                    return (
+                        <TouchableOpacity
+                            key={key}
+                            style={[styles.modeTab, active && styles.modeTabActive]}
+                            onPress={() => setViewMode(key)}
+                            activeOpacity={0.7}
+                        >
+                            <Ionicons
+                                name={icon}
+                                size={13}
+                                color={active ? theme.colors.primary : theme.colors.textSecondary}
+                            />
+                            <Text style={[styles.modeTabText, active && styles.modeTabTextActive]}>
+                                {label}
+                            </Text>
+                        </TouchableOpacity>
+                    );
+                })}
             </View>
+            <View style={styles.modeRowDivider} />
 
-            {viewMode !== "agents" && viewMode !== "density" && (
+            {viewMode === "chain" && (
                 <WorldFilterChips
                     activeFilter={filter}
                     onFilterChange={setFilter}
@@ -535,7 +533,7 @@ const useStyles = () => {
             paddingHorizontal: 12,
             paddingVertical: 8,
             borderRadius: 10,
-            backgroundColor: theme.colors.surfaceHigh,
+            backgroundColor: theme.colors.input.background,
         },
         searchInput: {
             flex: 1,
@@ -569,24 +567,33 @@ const useStyles = () => {
         },
         modeRow: {
             flexDirection: "row",
-            paddingHorizontal: 16,
+            paddingHorizontal: 12,
             paddingTop: 8,
-            gap: 4,
+            gap: 0,
+        },
+        modeRowDivider: {
+            height: 1,
+            backgroundColor: theme.colors.divider,
+            marginTop: 0,
         },
         modeTab: {
-            paddingHorizontal: 14,
-            paddingVertical: 6,
-            borderRadius: 14,
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 5,
+            paddingHorizontal: 12,
+            paddingVertical: 8,
+            borderBottomWidth: 2,
+            borderBottomColor: "transparent",
         },
         modeTabActive: {
-            backgroundColor: theme.colors.primary,
+            borderBottomColor: theme.colors.primary,
         },
         modeTabText: {
             fontSize: 13,
             color: theme.colors.textSecondary,
         },
         modeTabTextActive: {
-            color: "#fff",
+            color: theme.colors.primary,
             fontWeight: "600",
         },
         list: {

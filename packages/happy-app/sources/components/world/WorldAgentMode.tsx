@@ -213,7 +213,12 @@ const MachineCard = React.memo(function MachineCard({ group }: { group: AgentMac
     return (
         <TouchableOpacity style={styles.card} onPress={toggle} activeOpacity={0.7}>
             <View style={styles.cardHeader}>
-                <View style={[styles.statusDot, { backgroundColor: dotColor }]} />
+                <View style={[
+                    styles.statusDotWrap,
+                    hasRunning && group.isOnline && styles.statusDotRing,
+                ]}>
+                    <View style={[styles.statusDot, { backgroundColor: dotColor }]} />
+                </View>
                 <Text style={styles.machineName} numberOfLines={1}>{group.machineLabel}</Text>
                 {group.activeSessions.length > 0 && (
                     <View style={[styles.badge, hasRunning && styles.badgeActive]}>
@@ -330,6 +335,16 @@ const useStyles = () => {
             alignItems: "center",
             gap: 8,
         },
+        statusDotWrap: {
+            width: 14,
+            height: 14,
+            borderRadius: 7,
+            alignItems: "center",
+            justifyContent: "center",
+        },
+        statusDotRing: {
+            backgroundColor: theme.colors.success + "33",
+        },
         statusDot: {
             width: 8,
             height: 8,
@@ -337,7 +352,7 @@ const useStyles = () => {
         },
         machineName: {
             flex: 1,
-            fontSize: 15,
+            fontSize: 16,
             fontWeight: "600",
             color: theme.colors.text,
         },

@@ -16,7 +16,23 @@ import { TokenStorage } from "@/auth/tokenStorage";
 import { updateActionApproval } from "@/sync/apiSupervisor";
 import { markInboxItemRead, deleteInboxItem } from "@/sync/apiInbox";
 import { retryTask } from "@/sync/apiTasks";
-import type { WorldEvent, WorldEventSeverity } from "./worldTypes";
+import type { WorldEvent } from "./worldTypes";
+
+// Consistent with WorldEventCard TYPE_COLORS
+const TYPE_COLORS: Record<string, string> = {
+    "task": "#3B82F6",
+    "session": "#22C55E",
+    "supervisor": "#F59E0B",
+    "memory": "#8B5CF6",
+    "trigger": "#EC4899",
+    "decision": "#EF4444",
+    "world": "#5e52a7",
+};
+
+function getTypeColor(eventType: string): string {
+    const prefix = eventType.split(".")[0];
+    return TYPE_COLORS[prefix] ?? "";
+}
 
 function formatFullDate(ts: number): string {
     const d = new Date(ts);
@@ -41,15 +57,6 @@ function formatSourceLabel(
     return "";
 }
 
-function getSeverityColor(
-    severity: WorldEventSeverity,
-    theme: ReturnType<typeof useUnistyles>["theme"],
-): string {
-    if (severity === "critical") return theme.colors.warningCritical;
-    if (severity === "warning") return theme.colors.warning;
-    return theme.colors.textSecondary;
-}
-
 interface Props {
     event: WorldEvent | null;
     onClose: () => void;
@@ -67,13 +74,14 @@ export const WorldEventInspector = React.memo(function WorldEventInspector({
     const [actionLoading, setActionLoading] = React.useState(false);
     const [actionDone, setActionDone] = React.useState<string | null>(null);
 
-    // Reset action state when a different event is opened
     React.useEffect(() => {
         setActionDone(null);
         setActionLoading(false);
     }, [event?.id]);
 
-    const dotColor = event ? getSeverityColor(event.severity, theme) : theme.colors.textSecondary;
+    const typeColor = event
+        ? (getTypeColor(event.eventType) || theme.colors.textSecondary)
+        : theme.colors.textSecondary;
 
     const handleNavigate = React.useCallback(
         (path: string) => {
@@ -105,14 +113,13 @@ export const WorldEventInspector = React.memo(function WorldEventInspector({
             onRequestClose={onClose}
         >
             <SafeAreaView style={styles.root}>
-                {/* Handle bar + close */}
+                {/* Handle + header */}
                 <View style={styles.header}>
                     <View style={styles.handle} />
                     <View style={styles.titleRow}>
-                        <View style={[styles.severityDot, { backgroundColor: dotColor }]} />
                         <Text style={styles.headerTitle}>{t("world.inspector")}</Text>
                         <TouchableOpacity onPress={onClose} style={styles.closeButton} activeOpacity={0.7}>
-                            <Ionicons name="close" size={22} color={theme.colors.textSecondary} />
+                            <Ionicons name="close" size={20} color={theme.colors.textSecondary} />
                         </TouchableOpacity>
                     </View>
                 </View>
@@ -123,10 +130,14 @@ export const WorldEventInspector = React.memo(function WorldEventInspector({
                         contentContainerStyle={styles.scrollContent}
                         showsVerticalScrollIndicator={false}
                     >
-                        {/* Event type badge */}
+                        {/* Event type badge — filled tint, uses TYPE_COLORS */}
                         <View style={styles.badgeRow}>
-                            <View style={[styles.badge, { borderColor: dotColor }]}>
-                                <Text style={[styles.badgeText, { color: dotColor }]}>
+                            <View style={[
+                                styles.typeBadge,
+                                { backgroundColor: typeColor + "20", borderColor: typeColor + "60" },
+                            ]}>
+                                <View style={[styles.typeDot, { backgroundColor: typeColor }]} />
+                                <Text style={[styles.typeBadgeText, { color: typeColor }]}>
                                     {event.eventType}
                                 </Text>
                             </View>
@@ -144,10 +155,7 @@ export const WorldEventInspector = React.memo(function WorldEventInspector({
                             {!!(event.source.projectPath || event.source.projectId) && (
                                 <DetailRow
                                     label={t("world.eventSource")}
-                                    value={formatSourceLabel(
-                                        event.source.projectPath,
-                                        event.source.projectId,
-                                    )}
+                                    value={formatSourceLabel(event.source.projectPath, event.source.projectId)}
                                 />
                             )}
                             {!!event.source.machineId && (
@@ -170,15 +178,15 @@ export const WorldEventInspector = React.memo(function WorldEventInspector({
                             {!!event.source.sessionId && (
                                 <NavButton
                                     icon="chatbubble-outline"
+                                    accentColor="#22C55E"
                                     label={t("world.openSession")}
-                                    onPress={() =>
-                                        handleNavigate(`/(app)/session/${event.source.sessionId}`)
-                                    }
+                                    onPress={() => handleNavigate(`/(app)/session/${event.source.sessionId}`)}
                                 />
                             )}
                             {event.eventType === "memory.created" && !!event.source.projectId && (
                                 <NavButton
                                     icon="library-outline"
+                                    accentColor="#8B5CF6"
                                     label={t("world.openKnowledge")}
                                     onPress={() =>
                                         handleNavigate(
@@ -187,27 +195,21 @@ export const WorldEventInspector = React.memo(function WorldEventInspector({
                                     }
                                 />
                             )}
-                            {/* referenceUrl: for decisions, link directly to the relevant context page */}
                             {!!event.referenceUrl && event.eventType.startsWith("decision.") && (() => {
                                 const url = event.referenceUrl!;
                                 const sessionMatch = url.match(/\/session\/([^/?]+)/);
                                 const projectMatch = url.match(/\/project\/([^/?]+)/);
-                                const icon = sessionMatch
-                                    ? "chatbubble-outline" as const
-                                    : "folder-outline" as const;
-                                const label = sessionMatch
-                                    ? t("world.openSession")
-                                    : t("world.openProject");
+                                const icon = sessionMatch ? "chatbubble-outline" as const : "folder-outline" as const;
+                                const label = sessionMatch ? t("world.openSession") : t("world.openProject");
                                 const path = sessionMatch
                                     ? `/(app)/session/${sessionMatch[1]}`
-                                    : projectMatch
-                                        ? `/(app)/project/${projectMatch[1]}`
-                                        : null;
+                                    : projectMatch ? `/(app)/project/${projectMatch[1]}` : null;
                                 if (!path) return null;
                                 return (
                                     <NavButton
                                         key="ref-url"
                                         icon={icon}
+                                        accentColor={sessionMatch ? "#22C55E" : "#3B82F6"}
                                         label={label}
                                         onPress={() => handleNavigate(path)}
                                     />
@@ -216,19 +218,17 @@ export const WorldEventInspector = React.memo(function WorldEventInspector({
                             {!!event.source.projectId && !event.eventType.startsWith("decision.") && (
                                 <NavButton
                                     icon="folder-outline"
+                                    accentColor="#3B82F6"
                                     label={t("world.openProject")}
-                                    onPress={() =>
-                                        handleNavigate(`/(app)/project/${event.source.projectId}`)
-                                    }
+                                    onPress={() => handleNavigate(`/(app)/project/${event.source.projectId}`)}
                                 />
                             )}
                             {!!event.source.machineId && (
                                 <NavButton
                                     icon="desktop-outline"
+                                    accentColor="#F59E0B"
                                     label={t("world.openMachine")}
-                                    onPress={() =>
-                                        handleNavigate(`/(app)/machine/${event.source.machineId}/tasks`)
-                                    }
+                                    onPress={() => handleNavigate(`/(app)/machine/${event.source.machineId}/tasks`)}
                                 />
                             )}
                         </View>
@@ -242,17 +242,13 @@ export const WorldEventInspector = React.memo(function WorldEventInspector({
                                             label={t("world.actionApprove")}
                                             icon="checkmark-circle"
                                             color={theme.colors.success}
+                                            bgColor={theme.colors.success + "18"}
                                             loading={actionLoading}
                                             onPress={() =>
                                                 handleAction(async () => {
                                                     const creds = await TokenStorage.getCredentials();
                                                     if (!creds || !event.source.projectId) return;
-                                                    await updateActionApproval(
-                                                        creds,
-                                                        event.source.projectId,
-                                                        event.originalId,
-                                                        "approved",
-                                                    );
+                                                    await updateActionApproval(creds, event.source.projectId, event.originalId, "approved");
                                                 }, "approved")
                                             }
                                         />
@@ -260,17 +256,13 @@ export const WorldEventInspector = React.memo(function WorldEventInspector({
                                             label={t("world.actionSkip")}
                                             icon="close-circle"
                                             color={theme.colors.textSecondary}
+                                            bgColor={theme.colors.surfaceHigh}
                                             loading={actionLoading}
                                             onPress={() =>
                                                 handleAction(async () => {
                                                     const creds = await TokenStorage.getCredentials();
                                                     if (!creds || !event.source.projectId) return;
-                                                    await updateActionApproval(
-                                                        creds,
-                                                        event.source.projectId,
-                                                        event.originalId,
-                                                        "skipped",
-                                                    );
+                                                    await updateActionApproval(creds, event.source.projectId, event.originalId, "skipped");
                                                 }, "skipped")
                                             }
                                         />
@@ -278,7 +270,6 @@ export const WorldEventInspector = React.memo(function WorldEventInspector({
                                 )}
 
                                 {event.eventType.startsWith("decision.") && (() => {
-                                    // Category-specific read label derived from eventType prefix
                                     const inner = event.eventType;
                                     const readLabel =
                                         inner.includes("task.failed") || inner.includes("task.cancelled")
@@ -292,6 +283,7 @@ export const WorldEventInspector = React.memo(function WorldEventInspector({
                                                 label={readLabel}
                                                 icon="checkmark-circle-outline"
                                                 color={theme.colors.success}
+                                                bgColor={theme.colors.success + "18"}
                                                 loading={actionLoading}
                                                 onPress={() =>
                                                     handleAction(async () => {
@@ -305,6 +297,7 @@ export const WorldEventInspector = React.memo(function WorldEventInspector({
                                                 label={t("world.actionDismiss")}
                                                 icon="trash-outline"
                                                 color={theme.colors.warningCritical}
+                                                bgColor={theme.colors.warningCritical + "18"}
                                                 loading={actionLoading}
                                                 onPress={() =>
                                                     handleAction(async () => {
@@ -324,6 +317,7 @@ export const WorldEventInspector = React.memo(function WorldEventInspector({
                                             label={t("world.actionRetry")}
                                             icon="refresh"
                                             color={theme.colors.accentBlue}
+                                            bgColor={theme.colors.accentBlue + "18"}
                                             loading={actionLoading}
                                             onPress={() =>
                                                 handleAction(async () => {
@@ -358,29 +352,33 @@ function DetailRow({ label, value }: { label: string; value: string }) {
     return (
         <View style={styles.detailRow}>
             <Text style={styles.detailLabel}>{label}</Text>
-            <Text style={styles.detailValue} numberOfLines={3}>
-                {value}
-            </Text>
+            <Text style={styles.detailValue} numberOfLines={3}>{value}</Text>
         </View>
     );
 }
 
 function NavButton({
     icon,
+    accentColor,
     label,
     onPress,
 }: {
     icon: React.ComponentProps<typeof Ionicons>["name"];
+    accentColor: string;
     label: string;
     onPress: () => void;
 }) {
     const { theme } = useUnistyles();
     const { styles } = useStyles();
     return (
-        <TouchableOpacity style={styles.navButton} onPress={onPress} activeOpacity={0.7}>
-            <Ionicons name={icon} size={18} color={theme.colors.textLink} />
+        <TouchableOpacity
+            style={[styles.navButton, { borderLeftColor: accentColor }]}
+            onPress={onPress}
+            activeOpacity={0.7}
+        >
+            <Ionicons name={icon} size={18} color={accentColor} />
             <Text style={styles.navButtonText}>{label}</Text>
-            <Ionicons name="chevron-forward" size={16} color={theme.colors.textLink} />
+            <Ionicons name="chevron-forward" size={14} color={theme.colors.textSecondary} />
         </TouchableOpacity>
     );
 }
@@ -389,19 +387,21 @@ function ActionButton({
     label,
     icon,
     color,
+    bgColor,
     loading,
     onPress,
 }: {
     label: string;
     icon: string;
     color: string;
+    bgColor: string;
     loading: boolean;
     onPress: () => void;
 }) {
     const { styles } = useStyles();
     return (
         <TouchableOpacity
-            style={styles.actionButton}
+            style={[styles.actionButton, { backgroundColor: bgColor }]}
             onPress={onPress}
             disabled={loading}
             activeOpacity={0.7}
@@ -424,8 +424,8 @@ const useStyles = () => {
             backgroundColor: theme.colors.surface,
         },
         header: {
-            paddingHorizontal: 16,
-            paddingBottom: 8,
+            paddingHorizontal: 20,
+            paddingBottom: 10,
             borderBottomWidth: 1,
             borderBottomColor: theme.colors.divider,
         },
@@ -435,19 +435,13 @@ const useStyles = () => {
             borderRadius: 2,
             backgroundColor: theme.colors.divider,
             alignSelf: "center",
-            marginTop: 8,
-            marginBottom: 12,
+            marginTop: 10,
+            marginBottom: 14,
         },
         titleRow: {
             flexDirection: "row",
             alignItems: "center",
-            gap: 8,
-            marginBottom: 4,
-        },
-        severityDot: {
-            width: 8,
-            height: 8,
-            borderRadius: 4,
+            marginBottom: 2,
         },
         headerTitle: {
             flex: 1,
@@ -456,7 +450,9 @@ const useStyles = () => {
             color: theme.colors.text,
         },
         closeButton: {
-            padding: 4,
+            padding: 6,
+            borderRadius: 16,
+            backgroundColor: theme.colors.surfaceHigh,
         },
         scroll: {
             flex: 1,
@@ -469,15 +465,23 @@ const useStyles = () => {
         badgeRow: {
             flexDirection: "row",
         },
-        badge: {
+        typeBadge: {
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 6,
             borderWidth: 1,
-            borderRadius: 6,
-            paddingHorizontal: 8,
-            paddingVertical: 3,
+            borderRadius: 8,
+            paddingHorizontal: 10,
+            paddingVertical: 5,
         },
-        badgeText: {
+        typeDot: {
+            width: 6,
+            height: 6,
+            borderRadius: 3,
+        },
+        typeBadgeText: {
             fontSize: 12,
-            fontWeight: "500",
+            fontWeight: "600",
         },
         eventTitle: {
             fontSize: 20,
@@ -488,7 +492,7 @@ const useStyles = () => {
         detailSection: {
             gap: 10,
             backgroundColor: theme.colors.surfaceHigh,
-            borderRadius: 10,
+            borderRadius: 12,
             padding: 14,
         },
         detailRow: {
@@ -499,7 +503,7 @@ const useStyles = () => {
         detailLabel: {
             fontSize: 12,
             color: theme.colors.textSecondary,
-            width: 64,
+            width: 68,
             paddingTop: 1,
         },
         detailValue: {
@@ -517,12 +521,13 @@ const useStyles = () => {
             backgroundColor: theme.colors.surfaceHigh,
             borderRadius: 10,
             paddingHorizontal: 14,
-            paddingVertical: 14,
+            paddingVertical: 13,
+            borderLeftWidth: 3,
         },
         navButtonText: {
             flex: 1,
             fontSize: 15,
-            color: theme.colors.textLink,
+            color: theme.colors.text,
             fontWeight: "500",
         },
         actionSection: {
@@ -538,10 +543,9 @@ const useStyles = () => {
             alignItems: "center",
             justifyContent: "center",
             gap: 6,
-            paddingVertical: 12,
+            paddingVertical: 13,
             paddingHorizontal: 16,
             borderRadius: 10,
-            backgroundColor: theme.colors.surfaceHigh,
         },
         actionButtonText: {
             fontSize: 14,
