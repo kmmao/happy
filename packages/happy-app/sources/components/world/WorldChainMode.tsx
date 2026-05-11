@@ -67,6 +67,7 @@ export const WorldChainMode = React.memo(function WorldChainMode({
         const isFiltered = !!searchQuery.trim();
         return (
             <ScrollView
+                style={styles.flex1}
                 contentContainerStyle={styles.empty}
                 refreshControl={<RefreshControl refreshing={loading} onRefresh={onRefresh} />}
             >
@@ -84,6 +85,7 @@ export const WorldChainMode = React.memo(function WorldChainMode({
 
     return (
         <DraggableFlatList
+            style={styles.flex1}
             data={orderedChains}
             onDragEnd={({ data }) => setOrderedChains(data)}
             keyExtractor={keyExtractor}
@@ -213,12 +215,12 @@ const IntentCard = React.memo(function IntentCard({
             )}
 
             {!expanded && (
-                <View style={styles.steps}>
-                    {chain.steps.slice(-8).map((step) => (
-                        <StepDot key={step.id} event={step} />
+                <View style={styles.miniList}>
+                    {chain.steps.slice(-4).map((step) => (
+                        <MiniStepRow key={step.id} event={step} />
                     ))}
-                    {chain.total > 8 && (
-                        <Text style={styles.moreText}>+{chain.total - 8}</Text>
+                    {chain.total > 4 && (
+                        <Text style={styles.moreText}>+{chain.total - 4} more</Text>
                     )}
                 </View>
             )}
@@ -247,7 +249,7 @@ const IntentCard = React.memo(function IntentCard({
 const ChainCard = React.memo(function ChainCard({
     chain,
     drag,
-    isActive: isDragging,
+    isActive: _isDragging,
 }: {
     chain: ProjectChain;
     drag: () => void;
@@ -335,12 +337,12 @@ const ChainCard = React.memo(function ChainCard({
             )}
 
             {!expanded && (
-                <View style={styles.steps}>
-                    {chain.tasks.slice(-8).map((task) => (
-                        <StepDot key={task.id} event={task} />
+                <View style={styles.miniList}>
+                    {chain.tasks.slice(-4).map((task) => (
+                        <MiniStepRow key={task.id} event={task} />
                     ))}
-                    {chain.total > 8 && (
-                        <Text style={styles.moreText}>+{chain.total - 8}</Text>
+                    {chain.total > 4 && (
+                        <Text style={styles.moreText}>+{chain.total - 4} more</Text>
                     )}
                 </View>
             )}
@@ -365,11 +367,12 @@ const ChainCard = React.memo(function ChainCard({
 
 // ─── Shared sub-components ────────────────────────────────────────────────────
 
-function StepDot({ event }: { event: WorldEvent }) {
+function MiniStepRow({ event }: { event: WorldEvent }) {
     const { theme } = useUnistyles();
     const router = useRouter();
-    const sessionId = event.source.sessionId;
     const status = extractStatus(event.eventType);
+    const sessionId = event.source.sessionId;
+
     const color = status === "completed"
         ? theme.colors.success
         : status === "failed"
@@ -378,8 +381,21 @@ function StepDot({ event }: { event: WorldEvent }) {
                 ? theme.colors.accentBlue
                 : theme.colors.textSecondary;
 
-    const dot = (
-        <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: color }} />
+    const icon: keyof typeof Ionicons.glyphMap =
+        status === "completed" ? "checkmark-circle" :
+        status === "failed" ? "close-circle" :
+        status === "running" ? "flash" : "radio-button-off";
+
+    const inner = (
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 6, paddingVertical: 2 }}>
+            <Ionicons name={icon} size={13} color={color} />
+            <Text
+                numberOfLines={1}
+                style={{ flex: 1, fontSize: 12, color: theme.colors.text }}
+            >
+                {event.title}
+            </Text>
+        </View>
     );
 
     if (sessionId) {
@@ -387,15 +403,14 @@ function StepDot({ event }: { event: WorldEvent }) {
             <TouchableOpacity
                 onPress={() => router.push(`/(app)/session/${sessionId}`)}
                 activeOpacity={0.6}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             >
-                {dot}
+                {inner}
             </TouchableOpacity>
         );
     }
-
-    return dot;
+    return inner;
 }
+
 
 function formatDuration(ms: number): string {
     if (ms < 60_000) return `${Math.floor(ms / 1000)}s`;
@@ -523,6 +538,9 @@ function TaskRow({
 const useStyles = () => {
     const { theme } = useUnistyles();
     const styles = StyleSheet.create({
+        flex1: {
+            flex: 1,
+        },
         list: {
             padding: 16,
             gap: 12,
@@ -623,6 +641,10 @@ const useStyles = () => {
             fontSize: 11,
             fontWeight: "500",
         },
+        miniList: {
+            gap: 2,
+            paddingTop: 2,
+        },
         steps: {
             flexDirection: "row",
             alignItems: "center",
@@ -632,6 +654,7 @@ const useStyles = () => {
         moreText: {
             fontSize: 11,
             color: theme.colors.textSecondary,
+            paddingTop: 2,
         },
         taskList: {
             gap: 0,
