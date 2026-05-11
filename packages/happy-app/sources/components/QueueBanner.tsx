@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import * as React from "react";
-import { Pressable, View } from "react-native";
+import { Pressable, ScrollView, View } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { Typography } from "@/constants/Typography";
 import { Text } from "./StyledText";
@@ -26,7 +26,7 @@ export const QueueBanner = React.memo(({ queuedMessages, onSendNow, onSendItemNo
     if (count === 0) return null;
 
     return (
-        <View style={[styles.container, { borderTopColor: theme.colors.divider }]}>
+        <View style={styles.container}>
             {/* Header row */}
             <View style={styles.header}>
                 <Ionicons
@@ -60,8 +60,12 @@ export const QueueBanner = React.memo(({ queuedMessages, onSendNow, onSendItemNo
                 )}
             </View>
 
-            {/* Message chips — always expanded */}
-            <View style={styles.list}>
+            {/* Message chips — horizontal scroll */}
+            <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.list}
+            >
                 {queuedMessages.map((msg) => (
                     <View
                         key={msg.localId}
@@ -97,7 +101,7 @@ export const QueueBanner = React.memo(({ queuedMessages, onSendNow, onSendItemNo
                         </View>
                     </View>
                 ))}
-            </View>
+            </ScrollView>
         </View>
     );
 });
@@ -106,7 +110,6 @@ QueueBanner.displayName = "QueueBanner";
 
 const styles = StyleSheet.create(() => ({
     container: {
-        borderTopWidth: 1,
         paddingHorizontal: 12,
         paddingTop: 6,
         paddingBottom: 6,
@@ -134,7 +137,9 @@ const styles = StyleSheet.create(() => ({
         fontSize: 11,
     },
     list: {
-        gap: 4,
+        flexDirection: "row",
+        gap: 6,
+        paddingBottom: 2,
     },
     chip: {
         flexDirection: "row",
@@ -143,11 +148,12 @@ const styles = StyleSheet.create(() => ({
         paddingVertical: 5,
         borderRadius: 8,
         gap: 6,
+        maxWidth: 200,
     },
     chipText: {
         ...Typography.default(),
         fontSize: 12,
-        flex: 1,
+        flexShrink: 1,
     },
     chipActions: {
         flexDirection: "row",

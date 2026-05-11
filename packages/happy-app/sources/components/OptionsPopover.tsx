@@ -103,6 +103,17 @@ export const OptionsPopover = React.memo(
                               : { backgroundColor: theme.colors.box.warning.background },
                           ]}
                         >
+                          {llmScoredIndices?.has(index) && (
+                            <Ionicons
+                              name="sparkles"
+                              size={9}
+                              color={
+                                (scores.get(index) ?? 0) >= 70
+                                  ? theme.colors.radio.active
+                                  : theme.colors.box.warning.text
+                              }
+                            />
+                          )}
                           <Text
                             style={[
                               styles.scoreBadgeText,
@@ -111,7 +122,7 @@ export const OptionsPopover = React.memo(
                                 : { color: theme.colors.box.warning.text },
                             ]}
                           >
-                            {scores.get(index)}{llmScoredIndices?.has(index) ? "+" : ""}
+                            {scores.get(index)}
                           </Text>
                         </View>
                       )}
@@ -138,16 +149,17 @@ export const OptionsPopover = React.memo(
                         style={[
                           styles.sourceTag,
                           option.source === "ai"
-                            ? {
-                                backgroundColor:
-                                  theme.colors.radio.active + "20",
-                              }
-                            : {
-                                backgroundColor:
-                                  theme.colors.box.warning.background,
-                              },
+                            ? { backgroundColor: theme.colors.radio.active + "20" }
+                            : { backgroundColor: theme.colors.box.warning.background },
                         ]}
                       >
+                        {option.source === "ai" && (
+                          <Ionicons
+                            name="sparkles"
+                            size={9}
+                            color={theme.colors.radio.active}
+                          />
+                        )}
                         <Text
                           style={[
                             styles.sourceTagText,
@@ -275,6 +287,9 @@ const styles = StyleSheet.create((theme, rt) => ({
     flexShrink: 1,
   },
   scoreBadge: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: 2,
     paddingHorizontal: 5,
     paddingVertical: 1,
     borderRadius: 4,
@@ -305,6 +320,9 @@ const styles = StyleSheet.create((theme, rt) => ({
     ...Typography.default("semiBold"),
   },
   sourceTag: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: 2,
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 4,
