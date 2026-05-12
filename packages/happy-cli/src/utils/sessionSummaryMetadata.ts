@@ -74,10 +74,36 @@ function mergeStringArrays(
   return merged;
 }
 
+function applyListSummary(
+  metadata: Metadata,
+  summary: SessionSummaryState,
+): Metadata["progress"] {
+  const progress = metadata.progress;
+  if (!progress?.lists || progress.lists.length === 0) return progress;
+  const activeId = progress.currentListId;
+  const lists = progress.lists.map((list) => {
+    const isActive = activeId ? list.id === activeId : false;
+    if (!isActive) return list;
+    const prev = list.summary;
+    return {
+      ...list,
+      summary: {
+        goal: summary.goal,
+        currentFocus: summary.currentFocus,
+        keyDecisions: mergeStringArrays(prev?.keyDecisions, summary.keyDecisions),
+        openQuestions: summary.openQuestions,
+        impactScope: mergeStringArrays(prev?.impactScope, summary.impactScope),
+        updatedAt: summary.updatedAt,
+      },
+    };
+  });
+  return { ...progress, lists };
+}
+
 export function applySessionSummaryUpdate<T extends Metadata>(
   metadata: T,
   input: ApplySessionSummaryUpdateInput,
-): T & Pick<Metadata, "sessionSummary" | "sessionSummaryRefresh"> {
+): T & Pick<Metadata, "sessionSummary" | "sessionSummaryRefresh" | "progress"> {
   const updatedAt = input.now ?? Date.now();
   const prev = metadata.sessionSummary;
   const sessionSummary: SessionSummaryState = {
@@ -92,6 +118,7 @@ export function applySessionSummaryUpdate<T extends Metadata>(
   return {
     ...metadata,
     sessionSummary,
+    progress: applyListSummary(metadata, sessionSummary),
     sessionSummaryRefresh: applyRefreshAck(
       metadata.sessionSummaryRefresh,
       input.requestId,

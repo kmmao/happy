@@ -296,7 +296,15 @@ export const SessionProgressPanel = React.memo<SessionProgressPanelProps>(
             [session?.metadata?.progress, data, pinnedListId],
         );
         const counts = React.useMemo(() => countTodoProgress(checklist.todos), [checklist.todos]);
-        const summary = session?.metadata?.sessionSummary;
+        const summary = React.useMemo(() => {
+            if (checklist.listId) {
+                const list = session?.metadata?.progress?.lists?.find(
+                    (l) => l.id === checklist.listId,
+                );
+                if (list?.summary) return list.summary;
+            }
+            return session?.metadata?.sessionSummary;
+        }, [checklist.listId, session?.metadata]);
         const summaryRefreshDebug = React.useMemo(
             () =>
                 resolveSessionSummaryRefreshDebugState(

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import type { Metadata } from "@/api/types";
 import { applySessionSummaryUpdate } from "./sessionSummaryMetadata";
 
 describe("applySessionSummaryUpdate", () => {
@@ -288,6 +289,111 @@ describe("applySessionSummaryUpdate", () => {
     );
 
     expect(result.sessionSummary?.openQuestions).toEqual(["New question?"]);
+  });
+
+  it("writes summary into the active list when progress has lists", () => {
+    const result = applySessionSummaryUpdate(
+      {
+        path: "/tmp/project",
+        host: "test-host",
+        homeDir: "/Users/test",
+        happyHomeDir: "/Users/test/.happy",
+        happyLibDir: "/Users/test/.happy/lib",
+        happyToolsDir: "/Users/test/.happy/tools",
+        progress: {
+          lists: [
+            {
+              id: "list-1",
+              todos: [],
+              startedAt: 1,
+              updatedAt: 1,
+            },
+            {
+              id: "list-2",
+              todos: [],
+              startedAt: 2,
+              updatedAt: 2,
+            },
+          ],
+          currentListId: "list-2",
+          updatedAt: 2,
+        },
+      } as Metadata,
+      {
+        goal: "Ship feature X",
+        currentFocus: "Wiring up the API",
+        keyDecisions: ["Used REST over gRPC"],
+        now: 100,
+      },
+    );
+
+    const list1 = result.progress?.lists?.find((l) => l.id === "list-1");
+    const list2 = result.progress?.lists?.find((l) => l.id === "list-2");
+    expect(list1?.summary).toBeUndefined();
+    expect(list2?.summary).toMatchObject({
+      goal: "Ship feature X",
+      currentFocus: "Wiring up the API",
+      keyDecisions: ["Used REST over gRPC"],
+      updatedAt: 100,
+    });
+  });
+
+  it("appends keyDecisions into existing list summary without duplicates", () => {
+    const result = applySessionSummaryUpdate(
+      {
+        path: "/tmp/project",
+        host: "test-host",
+        homeDir: "/Users/test",
+        happyHomeDir: "/Users/test/.happy",
+        happyLibDir: "/Users/test/.happy/lib",
+        happyToolsDir: "/Users/test/.happy/tools",
+        progress: {
+          lists: [
+            {
+              id: "list-1",
+              todos: [],
+              startedAt: 1,
+              updatedAt: 1,
+              summary: {
+                goal: "Old goal",
+                keyDecisions: ["Decision A"],
+                updatedAt: 50,
+              },
+            },
+          ],
+          currentListId: "list-1",
+          updatedAt: 1,
+        },
+      } as Metadata,
+      {
+        goal: "New goal",
+        keyDecisions: ["Decision A", "Decision B"],
+        now: 100,
+      },
+    );
+
+    const list1 = result.progress?.lists?.find((l) => l.id === "list-1");
+    expect(list1?.summary?.keyDecisions).toEqual(["Decision A", "Decision B"]);
+  });
+
+  it("skips list summary update when no progress lists exist", () => {
+    const result = applySessionSummaryUpdate(
+      {
+        path: "/tmp/project",
+        host: "test-host",
+        homeDir: "/Users/test",
+        happyHomeDir: "/Users/test/.happy",
+        happyLibDir: "/Users/test/.happy/lib",
+        happyToolsDir: "/Users/test/.happy/tools",
+      },
+      {
+        goal: "A goal",
+        now: 100,
+      },
+    );
+
+    expect(result.progress).toBeUndefined();
+    expect(result.sessionSummary?.goal).toBe("A goal");
   });
 
   it("does not clear a different active request when applying a non-active requestId", () => {

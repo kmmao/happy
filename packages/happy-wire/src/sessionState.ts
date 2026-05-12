@@ -43,6 +43,20 @@ export const sessionProgressTodoSchema = z.object({
 export type SessionProgressTodo = z.infer<typeof sessionProgressTodoSchema>;
 
 /**
+ * Live narrative summary updated at milestones, not per tool call. Arrays
+ * are full-rewrite for simplicity (no append/remove deltas).
+ */
+export const sessionSummaryStateSchema = z.object({
+  goal: z.string(),
+  currentFocus: z.string().optional(),
+  keyDecisions: z.array(z.string()).optional(),
+  openQuestions: z.array(z.string()).optional(),
+  impactScope: z.array(z.string()).optional(),
+  updatedAt: z.number(),
+});
+export type SessionSummaryState = z.infer<typeof sessionSummaryStateSchema>;
+
+/**
  * One task list = one "generation" of the checklist. A session can contain
  * multiple generations across time; the auto-mirror hook partitions them
  * by a boundary heuristic (prior list fully completed + low overlap).
@@ -75,6 +89,12 @@ export const sessionProgressListSchema = z.object({
    * list lifecycle, even if subsequent TodoWrite calls keep it all done.
    */
   summaryGeneratedAt: z.number().optional(),
+  /**
+   * Narrative summary scoped to this list. Written by the CLI when
+   * `update_session_summary` is called while this list is active. Allows
+   * the App to show per-list goal/decisions when the user switches tabs.
+   */
+  summary: sessionSummaryStateSchema.optional(),
 });
 export type SessionProgressList = z.infer<typeof sessionProgressListSchema>;
 
@@ -101,20 +121,6 @@ export const sessionProgressStateSchema = z.object({
   updatedAt: z.number(),
 });
 export type SessionProgressState = z.infer<typeof sessionProgressStateSchema>;
-
-/**
- * Live narrative summary updated at milestones, not per tool call. Arrays
- * are full-rewrite for simplicity (no append/remove deltas).
- */
-export const sessionSummaryStateSchema = z.object({
-  goal: z.string(),
-  currentFocus: z.string().optional(),
-  keyDecisions: z.array(z.string()).optional(),
-  openQuestions: z.array(z.string()).optional(),
-  impactScope: z.array(z.string()).optional(),
-  updatedAt: z.number(),
-});
-export type SessionSummaryState = z.infer<typeof sessionSummaryStateSchema>;
 
 /**
  * Active request for request-level summary refresh confirmation.
