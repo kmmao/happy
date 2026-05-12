@@ -422,9 +422,11 @@ export const SessionProgressPanel = React.memo<SessionProgressPanelProps>(
                                     {t("session.progressTodosSection")}
                                 </Text>
                                 {tabs.length > 1 && (
-                                    <Text style={[styles.sectionCount, { color: theme.colors.textSecondary }]}>
-                                        {tabs.length}
-                                    </Text>
+                                    <View style={[styles.tabCountBadge, { backgroundColor: theme.colors.textSecondary + "1F", borderColor: theme.colors.textSecondary + "55" }]}>
+                                        <Text style={[styles.tabCountBadgeText, { color: theme.colors.textSecondary }]}>
+                                            {tabs.length}
+                                        </Text>
+                                    </View>
                                 )}
                                 {hasChecklistState && (
                                     <>
@@ -1257,6 +1259,19 @@ const styles = StyleSheet.create({
     timeHint: {
         ...Typography.default("regular"),
         fontSize: 11,
+    },
+    tabCountBadge: {
+        paddingHorizontal: 6,
+        paddingVertical: 2,
+        borderRadius: 4,
+        borderWidth: 1,
+        minWidth: 20,
+        alignItems: "center",
+    },
+    tabCountBadgeText: {
+        ...Typography.default("semiBold"),
+        fontSize: 9,
+        letterSpacing: 0.4,
     },
     sourceBadge: {
         paddingHorizontal: 6,
