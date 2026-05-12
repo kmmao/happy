@@ -213,7 +213,7 @@ export const QueueBanner = React.memo(({ queuedMessages, onSendNow, onSendItemNo
                         ]}
                         onPress={() => onOpenPreview?.(msg)}
                     >
-                        <Text style={[styles.chipText, { color: theme.colors.textSecondary }]} numberOfLines={1}>
+                        <Text style={[styles.chipText, { color: theme.colors.textSecondary }]}>
                             {msg.displayText}
                         </Text>
                         <View style={styles.chipActions}>
@@ -287,7 +287,6 @@ const styles = StyleSheet.create(() => ({
         paddingVertical: 5,
         borderRadius: 8,
         gap: 6,
-        maxWidth: 200,
     },
     chipText: {
         ...Typography.default(),

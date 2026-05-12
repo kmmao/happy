@@ -145,6 +145,15 @@ type PendingPermissionInfo = {
   permission: NonNullable<ToolCall["permission"]>;
 };
 
+// Stable empty array reference for Zustand selectors — avoids returning a fresh
+// `[]` on every render, which would defeat the default Object.is equality check
+// and trigger an infinite re-render loop.
+const EMPTY_PENDING_QUEUE: ReadonlyArray<{
+  localId: string;
+  message: string;
+  displayText?: string;
+}> = [];
+
 function findPendingPermission(messages: readonly Message[]): PendingPermissionInfo | null {
   for (const msg of messages) {
     if (msg.kind !== "tool-call") continue;
@@ -889,7 +898,9 @@ function SessionViewInner({
 
   // Pending queue: messages held locally while AI is running, sent one by one after each turn.
   // Stored in Zustand so the queue survives tab/session switches.
-  const pendingQueue = storage((s) => s.sessionPendingQueues[sessionId] ?? []);
+  const pendingQueue = storage(
+    (s) => s.sessionPendingQueues[sessionId] ?? EMPTY_PENDING_QUEUE,
+  );
   const [previewQueueItem, setPreviewQueueItem] = React.useState<QueuedMessageItem | null>(null);
   const pendingQueueRef = React.useRef(pendingQueue);
   pendingQueueRef.current = pendingQueue;
