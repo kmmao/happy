@@ -378,16 +378,8 @@ export function reducer(
         };
       }
 
-      // Show session summary if we have any useful data
-      const hasStats =
-        msg.content.totalCostUsd !== undefined ||
-        msg.content.modelUsage !== undefined ||
-        msg.content.usage !== undefined ||
-        msg.content.model !== undefined ||
-        msg.content.durationMs !== undefined;
-      if (!hasStats) {
-        continue;
-      }
+      // Always fall through to Phase 5 — even with no stats data we render
+      // a minimal "Turn end" badge so every turn boundary is visible.
       // Fall through to Phase 5 to render as session summary line
     }
 
