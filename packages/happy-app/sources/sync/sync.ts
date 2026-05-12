@@ -6,6 +6,7 @@ import { Encryption } from "@/sync/encryption/encryption";
 import { SessionEncryption } from "@/sync/encryption/sessionEncryption";
 import { decodeBase64 } from "@/encryption/base64";
 import { storage, registerPreferencesSyncCallback } from "./storage";
+import { isSessionRunning } from "@/utils/sessionUtils";
 import {
   ApiEphemeralUpdateSchema,
   ApiMessage,
@@ -741,6 +742,14 @@ class Sync {
     const session = state.sessions[sessionId];
     if (!session) {
       log.error(`Session ${sessionId} not found in storage`);
+      return;
+    }
+
+    // If the session is currently running, queue the message instead of sending.
+    // This covers cross-client scenarios (e.g. AI started from Web, user sends from App).
+    if (isSessionRunning(session) && !options?.continue) {
+      const localId = options?.localId ?? randomUUID();
+      storage.getState().appendToPendingQueue(sessionId, { localId, message: text, displayText });
       return;
     }
 
