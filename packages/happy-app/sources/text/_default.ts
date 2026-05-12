@@ -595,6 +595,8 @@ export const en = {
     pastedContent: "Pasted content",
     pastedContentSummary: ({ preview, lines }: { preview: string; lines: number }) =>
       `${preview} · ${lines} ${lines === 1 ? "line" : "lines"}`,
+    pastedTextChip: ({ index, lines }: { index: number; lines: number }) =>
+      `[Pasted text #${index} +${lines} lines]`,
     viewFullContent: "View full content",
     autoSent: "Auto-sent",
     cameraPermissionRequired: "Camera permission is required to take photos",

@@ -1439,7 +1439,7 @@ export const AgentInput = React.memo(
                   gap: 8,
                 }}
               >
-                {(props.pasteBlocks ?? []).map((block) => (
+                {(props.pasteBlocks ?? []).map((block, blockIndex) => (
                   <View
                     key={block.id}
                     style={{
@@ -1480,7 +1480,7 @@ export const AgentInput = React.memo(
                         numberOfLines={1}
                         ellipsizeMode="tail"
                       >
-                        {block.summary}
+                        {t("session.pastedTextChip", { index: blockIndex + 1, lines: block.lineCount })}
                       </Text>
                     </Pressable>
                     {props.onPasteBlockRemove && (

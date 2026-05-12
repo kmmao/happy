@@ -619,6 +619,8 @@ export const pl: TranslationStructure = {
     pastedContent: "Pasted content",
     pastedContentSummary: ({ preview, lines }: { preview: string; lines: number }) =>
       `${preview} · ${lines} ${lines === 1 ? "line" : "lines"}`,
+    pastedTextChip: ({ index, lines }: { index: number; lines: number }) =>
+      `[Wklejony tekst #${index} +${lines} linii]`,
     viewFullContent: "Pokaż pełną treść",
     cameraPermissionRequired: "Wymagane uprawnienia do aparatu",
     dropFilesHere: "Upuść pliki tutaj",

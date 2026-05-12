@@ -731,6 +731,8 @@ export const ja: TranslationStructure = {
     pastedContent: "Pasted content",
     pastedContentSummary: ({ preview, lines }: { preview: string; lines: number }) =>
       `${preview} · ${lines} ${lines === 1 ? "line" : "lines"}`,
+    pastedTextChip: ({ index, lines }: { index: number; lines: number }) =>
+      `[貼り付けテキスト #${index} +${lines} 行]`,
     viewFullContent: "全文を表示",
     cameraPermissionRequired: "写真を撮るにはカメラの権限が必要です",
     dropFilesHere: "ここにファイルをドロップ",

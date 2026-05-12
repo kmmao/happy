@@ -611,6 +611,8 @@ export const es: TranslationStructure = {
     pastedContent: "Pasted content",
     pastedContentSummary: ({ preview, lines }: { preview: string; lines: number }) =>
       `${preview} · ${lines} ${lines === 1 ? "line" : "lines"}`,
+    pastedTextChip: ({ index, lines }: { index: number; lines: number }) =>
+      `[Texto pegado #${index} +${lines} líneas]`,
     viewFullContent: "Ver contenido completo",
     cameraPermissionRequired: "Se requiere permiso de cámara para tomar fotos",
     dropFilesHere: "Suelta los archivos aquí",

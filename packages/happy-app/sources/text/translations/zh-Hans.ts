@@ -579,6 +579,8 @@ export const zhHans: TranslationStructure = {
     pastedContent: "粘贴内容",
     pastedContentSummary: ({ preview, lines }: { preview: string; lines: number }) =>
       `${preview} · ${lines} 行`,
+    pastedTextChip: ({ index, lines }: { index: number; lines: number }) =>
+      `[粘贴文本 #${index} +${lines} 行]`,
     viewFullContent: "查看完整内容",
     cameraPermissionRequired: "需要相机权限才能拍照",
     dropFilesHere: "拖放文件到此处",

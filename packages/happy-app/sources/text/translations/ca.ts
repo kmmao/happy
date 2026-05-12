@@ -609,6 +609,8 @@ export const ca: TranslationStructure = {
     pastedContent: "Pasted content",
     pastedContentSummary: ({ preview, lines }: { preview: string; lines: number }) =>
       `${preview} · ${lines} ${lines === 1 ? "line" : "lines"}`,
+    pastedTextChip: ({ index, lines }: { index: number; lines: number }) =>
+      `[Text enganxat #${index} +${lines} línies]`,
     viewFullContent: "Veure el contingut complet",
     cameraPermissionRequired: "Cal permís de la càmera per fer fotos",
     dropFilesHere: "Deixa els fitxers aquí",
