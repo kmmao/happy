@@ -28,7 +28,16 @@ export interface TurnTimelineDisplayItem {
   readonly steps: readonly TurnTimelineStep[];
 }
 
-export type ChatDisplayItem = Message | TurnTimelineDisplayItem;
+export interface TurnStartSeparatorItem {
+  readonly kind: "turn-start-separator";
+  readonly id: string;
+}
+
+export function isTurnStartSeparator(item: ChatDisplayItem): item is TurnStartSeparatorItem {
+  return (item as TurnStartSeparatorItem).kind === "turn-start-separator";
+}
+
+export type ChatDisplayItem = Message | TurnTimelineDisplayItem | TurnStartSeparatorItem;
 
 export interface CollapsedTimelineSteps {
   readonly visibleSteps: readonly TurnTimelineStep[];
@@ -263,9 +272,10 @@ export function buildChatDisplayItems(
   });
 
   if (!options.showThinkingTimeline) {
-    return sourceMessages.filter(
+    const filtered = sourceMessages.filter(
       (message) => !analysis.hiddenPreviewIds.has(message.id),
     );
+    return injectTurnStartSeparators(filtered);
   }
 
   const bundlesByAnchorId = new Map<string, TurnTimelineDisplayItem>();
@@ -323,11 +333,11 @@ export function buildChatDisplayItems(
     }
   }
 
-  const items: ChatDisplayItem[] = [];
+  const rawItems: ChatDisplayItem[] = [];
   for (const message of sourceMessages) {
     const bundle = bundlesByAnchorId.get(message.id);
     if (bundle) {
-      items.push(bundle);
+      rawItems.push(bundle);
       continue;
     }
     if (analysis.hiddenPreviewIds.has(message.id)) {
@@ -336,8 +346,29 @@ export function buildChatDisplayItems(
     if (skippedIds.has(message.id)) {
       continue;
     }
-    items.push(message);
+    rawItems.push(message);
   }
 
-  return items;
+  return injectTurnStartSeparators(rawItems);
+}
+
+// Injects a separator item before each user-text message that is preceded by
+// agent content (newest-first list, so "preceded" means lower array index).
+function injectTurnStartSeparators(items: ChatDisplayItem[]): ChatDisplayItem[] {
+  const result: ChatDisplayItem[] = [];
+  for (let i = 0; i < items.length; i++) {
+    const item = items[i];
+    if (
+      item.kind === "user-text" &&
+      i > 0
+    ) {
+      const prev = items[i - 1]!;
+      const prevKind = (prev as ChatDisplayItem).kind;
+      if (prevKind !== "user-text" && prevKind !== "turn-start-separator") {
+        result.push({ kind: "turn-start-separator", id: `turn-start:${item.id}` });
+      }
+    }
+    result.push(item);
+  }
+  return result;
 }

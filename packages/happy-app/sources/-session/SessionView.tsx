@@ -888,9 +888,8 @@ function SessionViewInner({
   }, [sessionId, sessionStateLogKey]);
 
   // Pending queue: messages held locally while AI is running, sent one by one after each turn.
-  const [pendingQueue, setPendingQueue] = React.useState<
-    Array<{ localId: string; message: string; displayText?: string }>
-  >([]);
+  // Stored in Zustand so the queue survives tab/session switches.
+  const pendingQueue = storage((s) => s.sessionPendingQueues[sessionId] ?? []);
   const [previewQueueItem, setPreviewQueueItem] = React.useState<QueuedMessageItem | null>(null);
   const pendingQueueRef = React.useRef(pendingQueue);
   pendingQueueRef.current = pendingQueue;
@@ -898,11 +897,12 @@ function SessionViewInner({
   // Drain one message from the pending queue each time the AI becomes idle.
   React.useEffect(() => {
     if (!isRunning && pendingQueueRef.current.length > 0) {
-      const next = pendingQueueRef.current[0]!;
-      setPendingQueue((prev) => prev.slice(1));
-      sync.sendMessage(sessionId, next.message, next.displayText, {
-        localId: next.localId,
-      });
+      const next = storage.getState().shiftPendingQueue(sessionId);
+      if (next) {
+        sync.sendMessage(sessionId, next.message, next.displayText, {
+          localId: next.localId,
+        });
+      }
     }
   }, [isRunning, sessionId]);
 
@@ -926,20 +926,15 @@ function SessionViewInner({
   );
 
   const handleCancelQueuedItem = React.useCallback((localId: string) => {
-    setPendingQueue((prev) => prev.filter((m) => m.localId !== localId));
-  }, []);
+    storage.getState().removePendingQueueItem(sessionId, localId);
+  }, [sessionId]);
 
   const handleSendNow = React.useCallback(() => {
     sessionInterrupt(sessionId);
   }, [sessionId]);
 
   const handleSendItemNow = React.useCallback((localId: string) => {
-    setPendingQueue((prev) => {
-      const idx = prev.findIndex((m) => m.localId === localId);
-      if (idx <= 0) return prev;
-      const item = prev[idx]!;
-      return [item, ...prev.slice(0, idx), ...prev.slice(idx + 1)];
-    });
+    storage.getState().reorderPendingQueueItemToFront(sessionId, localId);
     sessionInterrupt(sessionId);
   }, [sessionId]);
 
@@ -1057,16 +1052,13 @@ function SessionViewInner({
       });
       setShowOptionsPopover(false);
       if (sessionStatus.state === "thinking") {
-        setPendingQueue((prev) => [
-          ...prev,
-          { localId: randomUUID(), message: option },
-        ]);
+        storage.getState().appendToPendingQueue(sessionId, { localId: randomUUID(), message: option });
       } else {
         sync.sendMessage(sessionId, option);
       }
       trackMessageSent();
     },
-    [sessionId, latestOptionsHash, sessionStatus.state, setPendingQueue],
+    [sessionId, latestOptionsHash, sessionStatus.state],
   );
 
   const { bookmarks, toggleBookmark } = useBookmarks();
@@ -1076,16 +1068,13 @@ function SessionViewInner({
     (option: string) => {
       setShowBookmarksPopover(false);
       if (sessionStatus.state === "thinking") {
-        setPendingQueue((prev) => [
-          ...prev,
-          { localId: randomUUID(), message: option },
-        ]);
+        storage.getState().appendToPendingQueue(sessionId, { localId: randomUUID(), message: option });
       } else {
         sync.sendMessage(sessionId, option);
       }
       trackMessageSent();
     },
-    [sessionId, sessionStatus.state, setPendingQueue],
+    [sessionId, sessionStatus.state],
   );
 
   // Slash command popover
@@ -1715,10 +1704,7 @@ function SessionViewInner({
                   : t("session.sentImages", { count: imageCount }))
               : visibleText || pasteBlocks[0]?.summary;
           if (sessionStatus.state === "thinking") {
-            setPendingQueue((prev) => [
-              ...prev,
-              { localId: localIdForSend, message: finalMessage, displayText },
-            ]);
+            storage.getState().appendToPendingQueue(sessionId, { localId: localIdForSend, message: finalMessage, displayText });
           } else {
             sync.sendMessage(sessionId, finalMessage, displayText, {
               localId: localIdForSend,

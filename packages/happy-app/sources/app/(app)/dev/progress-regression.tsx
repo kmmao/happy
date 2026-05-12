@@ -7,6 +7,7 @@ import { TurnTimelineMessageView } from "@/components/TurnTimelineMessageView";
 import {
   buildChatDisplayItems,
   isTurnTimelineDisplayItem,
+  isTurnStartSeparator,
 } from "@/components/chatTimelineDisplay";
 import {
   progressRegressionMessages,
@@ -42,7 +43,7 @@ export default React.memo(function ProgressRegressionScreen() {
               isLatestAgent={index === 0}
               permissionModeKey="default"
             />
-          ) : (
+          ) : isTurnStartSeparator(item) ? null : (
             <MessageView
               message={item}
               metadata={progressRegressionMetadata}

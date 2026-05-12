@@ -140,11 +140,13 @@ interface StorageState {
   setPromptSuggestion: (sessionId: string, suggestion: string | null) => void;
   sessionNeedsContinue: Record<string, boolean>;
   setNeedsContinue: (sessionId: string, value: boolean) => void;
-  // Queued message tracking (in-memory only, not persisted)
-  queuedMessageLocalIds: Record<string, string[]>;
-  addQueuedMessageId: (sessionId: string, localId: string) => void;
-  removeQueuedMessageId: (sessionId: string, localId: string) => void;
-  clearQueuedMessageIds: (sessionId: string) => void;
+  // Pending message queue per session (in-memory only, survives tab switches)
+  sessionPendingQueues: Record<string, Array<{ localId: string; message: string; displayText?: string }>>;
+  appendToPendingQueue: (sessionId: string, item: { localId: string; message: string; displayText?: string }) => void;
+  shiftPendingQueue: (sessionId: string) => { localId: string; message: string; displayText?: string } | undefined;
+  removePendingQueueItem: (sessionId: string, localId: string) => void;
+  reorderPendingQueueItemToFront: (sessionId: string, localId: string) => void;
+  clearPendingQueue: (sessionId: string) => void;
   machines: Record<string, Machine>;
   artifacts: Record<string, DecryptedArtifact>; // New artifacts storage
   friends: Record<string, UserProfile>; // All relationships (friends, pending, requested, etc.)
@@ -478,34 +480,60 @@ export const storage = create<StorageState>()((set, get) => {
           [sessionId]: value,
         },
       })),
-    queuedMessageLocalIds: {},
-    addQueuedMessageId: (sessionId: string, localId: string) =>
+    sessionPendingQueues: {},
+    appendToPendingQueue: (sessionId, item) =>
       set((prev) => ({
-        queuedMessageLocalIds: {
-          ...prev.queuedMessageLocalIds,
-          [sessionId]: [
-            ...(prev.queuedMessageLocalIds[sessionId] ?? []),
-            localId,
-          ],
+        sessionPendingQueues: {
+          ...prev.sessionPendingQueues,
+          [sessionId]: [...(prev.sessionPendingQueues[sessionId] ?? []), item],
         },
       })),
-    removeQueuedMessageId: (sessionId: string, localId: string) =>
+    shiftPendingQueue: (sessionId) => {
+      let shifted: { localId: string; message: string; displayText?: string } | undefined;
       set((prev) => {
-        const current = prev.queuedMessageLocalIds[sessionId];
-        if (!current) return prev;
-        const filtered = current.filter((id) => id !== localId);
-        if (filtered.length === current.length) return prev;
+        const queue = prev.sessionPendingQueues[sessionId];
+        if (!queue || queue.length === 0) return prev;
+        shifted = queue[0];
         return {
-          queuedMessageLocalIds: {
-            ...prev.queuedMessageLocalIds,
+          sessionPendingQueues: {
+            ...prev.sessionPendingQueues,
+            [sessionId]: queue.slice(1),
+          },
+        };
+      });
+      return shifted;
+    },
+    removePendingQueueItem: (sessionId, localId) =>
+      set((prev) => {
+        const queue = prev.sessionPendingQueues[sessionId];
+        if (!queue) return prev;
+        const filtered = queue.filter((m) => m.localId !== localId);
+        if (filtered.length === queue.length) return prev;
+        return {
+          sessionPendingQueues: {
+            ...prev.sessionPendingQueues,
             [sessionId]: filtered,
           },
         };
       }),
-    clearQueuedMessageIds: (sessionId: string) =>
+    reorderPendingQueueItemToFront: (sessionId, localId) =>
       set((prev) => {
-        const { [sessionId]: _, ...rest } = prev.queuedMessageLocalIds;
-        return { queuedMessageLocalIds: rest };
+        const queue = prev.sessionPendingQueues[sessionId];
+        if (!queue) return prev;
+        const idx = queue.findIndex((m) => m.localId === localId);
+        if (idx <= 0) return prev;
+        const item = queue[idx]!;
+        return {
+          sessionPendingQueues: {
+            ...prev.sessionPendingQueues,
+            [sessionId]: [item, ...queue.slice(0, idx), ...queue.slice(idx + 1)],
+          },
+        };
+      }),
+    clearPendingQueue: (sessionId) =>
+      set((prev) => {
+        const { [sessionId]: _, ...rest } = prev.sessionPendingQueues;
+        return { sessionPendingQueues: rest };
       }),
     realtimeStatus: "disconnected",
     realtimeMode: "idle",

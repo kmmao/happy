@@ -29,6 +29,7 @@ import { parseLegacyCodexDiffPreview } from "./tools/codexDiffCompat";
 import {
   buildChatDisplayItems,
   isTurnTimelineDisplayItem,
+  isTurnStartSeparator,
   type ChatDisplayItem,
 } from "./chatTimelineDisplay";
 import { TurnTimelineMessageView } from "./TurnTimelineMessageView";
@@ -332,7 +333,7 @@ const ChatListInternal = React.memo(
       let messageIndex = 0;
       for (let displayIndex = 0; displayIndex < displayItems.length; displayIndex += 1) {
         const item = displayItems[displayIndex]!;
-        if (isTurnTimelineDisplayItem(item)) {
+        if (isTurnTimelineDisplayItem(item) || isTurnStartSeparator(item)) {
           continue;
         }
         while (
@@ -467,6 +468,16 @@ const ChatListInternal = React.memo(
     const keyExtractor = useCallback((item: ChatDisplayItem) => item.id, []);
     const renderItem = useCallback(
       ({ item }: { item: ChatDisplayItem }) => {
+        if (isTurnStartSeparator(item)) {
+          return (
+            <View style={{ flexDirection: "row", alignItems: "center", paddingHorizontal: 16, paddingVertical: 6, opacity: 0.45 }}>
+              <View style={{ flex: 1, height: 1, backgroundColor: "#888" }} />
+              <Text style={{ marginHorizontal: 8, fontSize: 10, color: "#888" }}>{t("message.turnStart")}</Text>
+              <View style={{ flex: 1, height: 1, backgroundColor: "#888" }} />
+            </View>
+          );
+        }
+
         if (isTurnTimelineDisplayItem(item)) {
           const timelineHasAvatar = item.steps.some(
             (step) =>
