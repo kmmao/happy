@@ -12,6 +12,10 @@ This monorepo contains multiple packages, each with its own changelog:
 
 ## Recent Highlights
 
+### 2026-05-13
+
+- **happy-cli 0.78.0** — Upgraded Claude Agent SDK to 0.2.139, added "Move to background" button for converting foreground tasks to background via `Query.backgroundTasks()`.
+
 ### 2026-04-24
 
 - **happy-app 2.14.1** — Restored XHigh effort option for Opus 4.7, fixed long-session message loading on PC Web, reduced 404 cache window to 3s.

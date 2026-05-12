@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.78.0 - 2026-05-13
+
+Upgraded Claude Agent SDK and added background tasks support.
+
+- Upgraded `@anthropic-ai/claude-agent-sdk` from 0.2.133 to 0.2.139
+- Added `SDKPermissionDeniedMessage` type export for auto-denied tool call events
+- Added "Move to background" button in App input bar (visible during thinking/waiting state), allowing users to convert foreground Bash commands and subagents to background tasks via `Query.backgroundTasks()` — equivalent to Ctrl+B in the CLI
+- Registered `backgroundTasks` RPC handler for remote control from App
+
 ## 0.71.39 - 2026-04-18
 
 - Added per-list file change attribution: Edit/Write/MultiEdit/NotebookEdit tool calls now record their `tool_use.id` into the currently active progress list's `toolCallIds`. The App can render a per-list file change summary (file count, edits, line adds/deletes) that matches the existing side panel "代码" tab style, so users can see which tab touched which files. Requires `@kmmao/happy-wire@^0.11.9`.
