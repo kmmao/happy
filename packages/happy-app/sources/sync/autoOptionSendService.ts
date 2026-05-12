@@ -635,7 +635,22 @@ class AutoOptionSendService {
             storage.getState().sessionMessages[sessionId]?.messages ?? [];
         const result = buildSnapshotFromMessages(messages);
         const now = Date.now();
-        const context = this.buildContext(sessionId, result?.snapshot ?? null, messages, now);
+        // Fall back to generatedOptions when no markdown options exist,
+        // so canFire's isContextReady check passes for AI-generated candidates.
+        let snapshotForFire = result?.snapshot ?? null;
+        if (!snapshotForFire) {
+            const generated = this.generatedOptions.get(sessionId);
+            if (generated && generated.length >= 2) {
+                snapshotForFire = {
+                    sourceType: "markdown-options",
+                    sourceMessageId: null,
+                    items: generated,
+                    recommendedIndex: getRecommendedOptionIndex(generated),
+                    optionsHash: buildOptionsHash(generated),
+                };
+            }
+        }
+        const context = this.buildContext(sessionId, snapshotForFire, messages, now);
 
         const readyState = reduceAutoOptionSendEvent(
             state,
