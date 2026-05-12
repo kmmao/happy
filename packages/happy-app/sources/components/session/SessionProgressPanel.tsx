@@ -421,6 +421,11 @@ export const SessionProgressPanel = React.memo<SessionProgressPanelProps>(
                                 <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
                                     {t("session.progressTodosSection")}
                                 </Text>
+                                {tabs.length > 1 && (
+                                    <Text style={[styles.sectionCount, { color: theme.colors.textSecondary }]}>
+                                        {tabs.length}
+                                    </Text>
+                                )}
                                 {hasChecklistState && (
                                     <>
                                         <SourceBadge source={checklist.source} />
@@ -434,23 +439,6 @@ export const SessionProgressPanel = React.memo<SessionProgressPanelProps>(
                                         )}
                                     </>
                                 )}
-                                <Pressable
-                                    onPress={handleRefreshProgress}
-                                    hitSlop={8}
-                                    style={[styles.refreshButton, { borderColor: theme.colors.textLink + "55" }]}
-                                    accessibilityRole="button"
-                                    accessibilityLabel={t("session.progressRefreshActionLabel")}
-                                >
-                                    <Ionicons
-                                        name="refresh-outline"
-                                        size={12}
-                                        color={theme.colors.textLink}
-                                        style={styles.refreshIcon}
-                                    />
-                                    <Text style={[styles.refreshText, { color: theme.colors.textLink }]}>
-                                        {t("session.progressRefreshActionLabel")}
-                                    </Text>
-                                </Pressable>
                             </View>
                             {tabs.length > 1 && (
                                 <ChecklistTabRow
@@ -734,11 +722,7 @@ const ChecklistTabRow = React.memo<ChecklistTabRowProps>(function ChecklistTabRo
 }) {
     const { theme } = useUnistyles();
     return (
-        <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.tabRow}
-        >
+        <View style={styles.tabRow}>
             {tabs.map((tab) => {
                 const active = tab.id === selectedId ||
                     (selectedId === null && tab.active);
@@ -769,7 +753,7 @@ const ChecklistTabRow = React.memo<ChecklistTabRowProps>(function ChecklistTabRo
                     </Pressable>
                 );
             })}
-        </ScrollView>
+        </View>
     );
 });
 
@@ -1377,6 +1361,7 @@ const styles = StyleSheet.create({
     },
     tabRow: {
         flexDirection: "row",
+        flexWrap: "wrap",
         gap: 6,
         paddingVertical: 6,
     },
