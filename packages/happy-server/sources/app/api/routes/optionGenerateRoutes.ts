@@ -74,7 +74,7 @@ async function resolveCredentials(accountId: string, profileId: string | null) {
 
     const profile = decryptAiBackendProfile(accountId, rows[0].profileKey, rows[0].encryptedPayload);
     const env = getAiBackendProfileEnvironmentVariables(profile);
-    return detectProviderFromEnv(env);
+    return detectProviderFromEnv(env) ?? fallbackFromServerEnv();
 }
 
 function fallbackFromServerEnv() {
