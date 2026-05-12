@@ -868,7 +868,8 @@ export const ja: TranslationStructure = {
     autoOptionSendLabel: "自動",
     autoOptionSendActiveLabel: "自動 · ON",
     autoOptionSendCountdown: ({ seconds }: { seconds: number }) => `自動 ${seconds}秒`,
-    autoOptionSendTitle: "推奨アクション",
+    autoSent: "自動送信",
+        autoOptionSendTitle: "推奨アクション",
     autoOptionSendTitleCountdown: ({ seconds }: { seconds: number }) =>
       `${seconds} 秒後に先頭の候補を自動送信`,
     loadOlderMessages: "以前のメッセージを読み込む",

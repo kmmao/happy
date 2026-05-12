@@ -714,7 +714,8 @@ export const zhHant: TranslationStructure = {
     autoOptionSendLabel: "自動",
     autoOptionSendActiveLabel: "自動 · 開",
     autoOptionSendCountdown: ({ seconds }: { seconds: number }) => `自動 ${seconds}秒`,
-    autoOptionSendTitle: "推薦操作",
+    autoSent: "已自動發送",
+        autoOptionSendTitle: "推薦操作",
     autoOptionSendTitleCountdown: ({ seconds }: { seconds: number }) =>
       `推薦操作 · ${seconds} 秒後自動傳送第一項`,
     loadOlderMessages: "載入更早的訊息",

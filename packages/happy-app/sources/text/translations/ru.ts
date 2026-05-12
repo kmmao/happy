@@ -973,7 +973,8 @@ export const ru: TranslationStructure = {
     autoOptionSendLabel: "Авто",
     autoOptionSendActiveLabel: "Авто · ВКЛ",
     autoOptionSendCountdown: ({ seconds }: { seconds: number }) => `Авто ${seconds}с`,
-    autoOptionSendTitle: "Рекомендуемые действия",
+    autoSent: "Авто",
+        autoOptionSendTitle: "Рекомендуемые действия",
     autoOptionSendTitleCountdown: ({ seconds }: { seconds: number }) =>
       `Рекомендуемые действия · первая опция будет отправлена автоматически через ${seconds}с`,
     loadOlderMessages: "Загрузить более ранние сообщения",

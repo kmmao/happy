@@ -185,6 +185,12 @@ function UserTextBlock(props: { message: UserTextMessage; sessionId: string }) {
               markdown={displayText}
               onOptionPress={handleOptionPress}
             />
+            {props.message.meta?.source === "auto-option-send" && (
+              <View style={styles.autoSentBadge}>
+                <Ionicons name="sparkles" size={9} color={theme.colors.radio.active} />
+                <Text style={styles.autoSentBadgeText}>{t("session.autoSent")}</Text>
+              </View>
+            )}
             {hasFullContent && (
               <Pressable
                 onPress={() => {
@@ -974,6 +980,19 @@ const styles = StyleSheet.create((theme) => ({
     borderRadius: 12,
     marginBottom: 2,
     flexShrink: 1,
+  },
+  autoSentBadge: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    alignSelf: "flex-end" as const,
+    gap: 3,
+    marginTop: 4,
+    marginBottom: 2,
+  },
+  autoSentBadgeText: {
+    fontSize: 10,
+    color: theme.colors.radio.active,
+    opacity: 0.8,
   },
   expandFullButton: {
     paddingHorizontal: 0,

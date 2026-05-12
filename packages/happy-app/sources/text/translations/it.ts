@@ -882,7 +882,8 @@ export const it: TranslationStructure = {
     autoOptionSendLabel: "Auto",
     autoOptionSendActiveLabel: "Auto · ON",
     autoOptionSendCountdown: ({ seconds }: { seconds: number }) => `Auto ${seconds}s`,
-    autoOptionSendTitle: "Azioni consigliate",
+    autoSent: "Auto",
+        autoOptionSendTitle: "Azioni consigliate",
     autoOptionSendTitleCountdown: ({ seconds }: { seconds: number }) =>
       `Azioni consigliate · invio automatico della prima opzione tra ${seconds}s`,
     loadOlderMessages: "Carica messaggi precedenti",
