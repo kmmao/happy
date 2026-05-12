@@ -755,6 +755,7 @@ export const it: TranslationStructure = {
     cancelQueued: "Annulla",
     messagesQueued: ({ n }: { n: number }) => `${n} messaggio${n === 1 ? "" : "i"} in coda`,
     sendNow: "Invia ora",
+    queuedMessagePreview: "Anteprima messaggio",
     queueModeHint: "AI in esecuzione — il prossimo messaggio verrà accodato",
     noMessages: "Ancora nessun messaggio",
     contextSummaryTitle: "Contesto dalla sessione precedente",

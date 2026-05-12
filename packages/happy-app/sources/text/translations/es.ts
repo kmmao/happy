@@ -621,6 +621,7 @@ export const es: TranslationStructure = {
     cancelQueued: "Cancelar",
     messagesQueued: ({ n }: { n: number }) => `${n} mensaje${n === 1 ? "" : "s"} en cola`,
     sendNow: "Enviar ahora",
+    queuedMessagePreview: "Vista previa",
     queueModeHint: "IA en ejecución — el próximo mensaje se pondrá en cola",
     noMessages: "Aún no hay mensajes",
     contextSummaryTitle: "Contexto de la sesión anterior",

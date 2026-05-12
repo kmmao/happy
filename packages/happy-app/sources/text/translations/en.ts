@@ -619,6 +619,7 @@ export const en: TranslationStructure = {
     cancelQueued: "Cancel",
     messagesQueued: ({ n }: { n: number }) => `${n} message${n === 1 ? "" : "s"} queued`,
     sendNow: "Send now",
+    queuedMessagePreview: "Message Preview",
     queueModeHint: "AI is running — next message will be queued",
     noMessages: "No messages yet",
     contextSummaryTitle: "Context from previous session",

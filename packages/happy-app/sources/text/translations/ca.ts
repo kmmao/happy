@@ -619,6 +619,7 @@ export const ca: TranslationStructure = {
     cancelQueued: "Cancel·la",
     messagesQueued: ({ n }: { n: number }) => `${n} missatge${n === 1 ? "" : "s"} en cua`,
     sendNow: "Envia ara",
+    queuedMessagePreview: "Vista prèvia",
     queueModeHint: "IA en execució — el proper missatge s'afegirà a la cua",
     noMessages: "Encara no hi ha missatges",
     contextSummaryTitle: "Context de la sessió anterior",

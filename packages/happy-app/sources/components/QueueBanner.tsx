@@ -1,7 +1,8 @@
 import { Ionicons } from "@expo/vector-icons";
 import * as React from "react";
-import { Pressable, ScrollView, View } from "react-native";
+import { Image, Modal, Pressable, ScrollView, TouchableOpacity, View } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Typography } from "@/constants/Typography";
 import { Text } from "./StyledText";
 import { t } from "@/text";
@@ -9,6 +10,7 @@ import { t } from "@/text";
 interface QueuedMessageItem {
     localId: string;
     displayText: string;
+    fullMessage?: string;
 }
 
 interface QueueBannerProps {
@@ -19,9 +21,124 @@ interface QueueBannerProps {
     isRunning?: boolean;
 }
 
+/** Parse [image: /path] tags out of a message string. Returns alternating text/image segments. */
+function parseMessageSegments(message: string): Array<{ type: "text"; text: string } | { type: "image"; uri: string }> {
+    const segments: Array<{ type: "text"; text: string } | { type: "image"; uri: string }> = [];
+    const imageRegex = /\[image:\s*([^\]]+)\]/g;
+    let lastIndex = 0;
+    let match: RegExpExecArray | null;
+
+    while ((match = imageRegex.exec(message)) !== null) {
+        if (match.index > lastIndex) {
+            const text = message.slice(lastIndex, match.index).trim();
+            if (text) segments.push({ type: "text", text });
+        }
+        segments.push({ type: "image", uri: match[1]!.trim() });
+        lastIndex = match.index + match[0].length;
+    }
+
+    const remaining = message.slice(lastIndex).trim();
+    if (remaining) segments.push({ type: "text", text: remaining });
+
+    return segments;
+}
+
+interface PreviewModalProps {
+    item: QueuedMessageItem | null;
+    onClose: () => void;
+    onSendNow?: () => void;
+}
+
+const PreviewModal = React.memo(({ item, onClose, onSendNow }: PreviewModalProps) => {
+    const { theme } = useUnistyles();
+    const insets = useSafeAreaInsets();
+
+    if (!item) return null;
+
+    const segments = parseMessageSegments(item.fullMessage ?? item.displayText);
+
+    return (
+        <Modal
+            visible={true}
+            transparent
+            animationType="fade"
+            onRequestClose={onClose}
+            statusBarTranslucent
+        >
+            <Pressable style={modalStyles.backdrop} onPress={onClose}>
+                <Pressable
+                    style={[modalStyles.sheet, { paddingBottom: insets.bottom + 16 }]}
+                    onPress={() => {}}
+                >
+                    {/* Handle bar */}
+                    <View style={modalStyles.handle} />
+
+                    {/* Header */}
+                    <View style={modalStyles.modalHeader}>
+                        <Text style={[modalStyles.modalTitle, { color: theme.colors.text }]}>
+                            {t("session.queuedMessagePreview")}
+                        </Text>
+                        <TouchableOpacity onPress={onClose} hitSlop={10} style={modalStyles.closeBtn}>
+                            <Ionicons name="close" size={20} color={theme.colors.textSecondary} />
+                        </TouchableOpacity>
+                    </View>
+
+                    {/* Content */}
+                    <ScrollView
+                        style={modalStyles.scrollView}
+                        contentContainerStyle={modalStyles.scrollContent}
+                        showsVerticalScrollIndicator={false}
+                    >
+                        {segments.length > 0 ? (
+                            segments.map((seg, idx) =>
+                                seg.type === "image" ? (
+                                    <View key={idx} style={modalStyles.imageWrapper}>
+                                        <Image
+                                            source={{ uri: seg.uri.startsWith("/") ? `file://${seg.uri}` : seg.uri }}
+                                            style={modalStyles.previewImage}
+                                            resizeMode="contain"
+                                        />
+                                    </View>
+                                ) : (
+                                    <Text key={idx} style={[modalStyles.fullText, { color: theme.colors.text }]}>
+                                        {seg.text}
+                                    </Text>
+                                )
+                            )
+                        ) : (
+                            <Text style={[modalStyles.fullText, { color: theme.colors.textSecondary }]}>
+                                {item.displayText}
+                            </Text>
+                        )}
+                    </ScrollView>
+
+                    {/* Send Now button */}
+                    {onSendNow && (
+                        <View style={[modalStyles.footer, { borderTopColor: theme.colors.divider }]}>
+                            <TouchableOpacity
+                                style={[modalStyles.sendNowBtn, { backgroundColor: theme.colors.button.primary.background }]}
+                                onPress={onSendNow}
+                                activeOpacity={0.8}
+                            >
+                                <Ionicons name="play" size={14} color={theme.colors.button.primary.tint} />
+                                <Text style={[modalStyles.sendNowBtnText, { color: theme.colors.button.primary.tint }]}>
+                                    {t("session.sendNow")}
+                                </Text>
+                            </TouchableOpacity>
+                        </View>
+                    )}
+                </Pressable>
+            </Pressable>
+        </Modal>
+    );
+});
+
+PreviewModal.displayName = "PreviewModal";
+
 export const QueueBanner = React.memo(({ queuedMessages, onSendNow, onSendItemNow, onCancelItem, isRunning }: QueueBannerProps) => {
     const { theme } = useUnistyles();
     const count = queuedMessages.length;
+    const [previewItem, setPreviewItem] = React.useState<QueuedMessageItem | null>(null);
 
     if (count === 0) return null;
 
@@ -67,12 +184,14 @@ export const QueueBanner = React.memo(({ queuedMessages, onSendNow, onSendItemNo
                 contentContainerStyle={styles.list}
             >
                 {queuedMessages.map((msg) => (
-                    <View
+                    <Pressable
                         key={msg.localId}
-                        style={[
+                        style={({ pressed }) => [
                             styles.chip,
                             { backgroundColor: `${theme.colors.textSecondary}12` },
+                            pressed && { opacity: 0.7 },
                         ]}
+                        onPress={() => setPreviewItem(msg)}
                     >
                         <Text style={[styles.chipText, { color: theme.colors.textSecondary }]} numberOfLines={1}>
                             {msg.displayText}
@@ -99,9 +218,21 @@ export const QueueBanner = React.memo(({ queuedMessages, onSendNow, onSendItemNo
                                 <Ionicons name="close-circle" size={15} color={theme.colors.textSecondary} />
                             </Pressable>
                         </View>
-                    </View>
+                    </Pressable>
                 ))}
             </ScrollView>
+
+            <PreviewModal
+                item={previewItem}
+                onClose={() => setPreviewItem(null)}
+                onSendNow={isRunning && onSendItemNow && previewItem
+                    ? () => {
+                        onSendItemNow(previewItem.localId);
+                        setPreviewItem(null);
+                    }
+                    : undefined
+                }
+            />
         </View>
     );
 });
@@ -159,5 +290,84 @@ const styles = StyleSheet.create(() => ({
         flexDirection: "row",
         alignItems: "center",
         gap: 6,
+    },
+}));
+
+const modalStyles = StyleSheet.create((theme) => ({
+    backdrop: {
+        flex: 1,
+        backgroundColor: "rgba(0,0,0,0.5)",
+        justifyContent: "flex-end",
+    },
+    sheet: {
+        backgroundColor: theme.colors.surface,
+        borderTopLeftRadius: 16,
+        borderTopRightRadius: 16,
+        paddingTop: 10,
+        maxHeight: "85%",
+    },
+    handle: {
+        width: 36,
+        height: 4,
+        borderRadius: 2,
+        backgroundColor: theme.colors.textSecondary + "40",
+        alignSelf: "center",
+        marginBottom: 10,
+    },
+    modalHeader: {
+        flexDirection: "row",
+        alignItems: "center",
+        paddingHorizontal: 16,
+        paddingBottom: 12,
+        borderBottomWidth: 1,
+        borderBottomColor: theme.colors.divider,
+    },
+    modalTitle: {
+        ...Typography.default("semiBold"),
+        fontSize: 15,
+        flex: 1,
+    },
+    closeBtn: {
+        padding: 4,
+    },
+    scrollView: {
+        maxHeight: 500,
+    },
+    scrollContent: {
+        padding: 16,
+        gap: 12,
+    },
+    fullText: {
+        ...Typography.default(),
+        fontSize: 14,
+        lineHeight: 22,
+    },
+    imageWrapper: {
+        borderRadius: 10,
+        overflow: "hidden",
+        backgroundColor: theme.colors.surfaceHigh,
+        alignItems: "center",
+    },
+    previewImage: {
+        width: "100%",
+        height: 260,
+    },
+    footer: {
+        borderTopWidth: 1,
+        paddingHorizontal: 16,
+        paddingTop: 12,
+        paddingBottom: 4,
+    },
+    sendNowBtn: {
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 7,
+        paddingVertical: 12,
+        borderRadius: 12,
+    },
+    sendNowBtnText: {
+        ...Typography.default("semiBold"),
+        fontSize: 15,
     },
 }));

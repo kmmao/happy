@@ -741,6 +741,7 @@ export const ja: TranslationStructure = {
     cancelQueued: "キャンセル",
     messagesQueued: ({ n }: { n: number }) => `${n}件のメッセージが待機中`,
     sendNow: "今すぐ送信",
+    queuedMessagePreview: "メッセージプレビュー",
     queueModeHint: "AIが実行中 — 次のメッセージはキューに追加されます",
     noMessages: "メッセージはまだありません",
     contextSummaryTitle: "前のセッションのコンテキスト",

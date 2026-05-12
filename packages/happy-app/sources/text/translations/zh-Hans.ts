@@ -589,6 +589,7 @@ export const zhHans: TranslationStructure = {
     cancelQueued: "取消",
     messagesQueued: ({ n }: { n: number }) => `${n} 条消息排队中`,
     sendNow: "立即发送",
+    queuedMessagePreview: "消息预览",
     queueModeHint: "AI 运行中，下一条消息将自动排队",
     noMessages: "暂无消息",
     contextSummaryTitle: "上一会话的上下文",

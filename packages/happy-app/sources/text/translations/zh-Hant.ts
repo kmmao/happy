@@ -589,6 +589,7 @@ export const zhHant: TranslationStructure = {
     cancelQueued: "取消",
     messagesQueued: ({ n }: { n: number }) => `${n} 則訊息排隊中`,
     sendNow: "立即發送",
+    queuedMessagePreview: "訊息預覽",
     queueModeHint: "AI 執行中，下一則訊息將自動排隊",
     noMessages: "暫無訊息",
     contextSummaryTitle: "上一工作階段的上下文",

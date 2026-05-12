@@ -629,6 +629,7 @@ export const pl: TranslationStructure = {
     cancelQueued: "Anuluj",
     messagesQueued: ({ n }: { n: number }) => `${n} wiadom. w kolejce`,
     sendNow: "Wyślij teraz",
+    queuedMessagePreview: "Podgląd wiadomości",
     queueModeHint: "AI działa — następna wiadomość trafi do kolejki",
     noMessages: "Brak wiadomości",
     contextSummaryTitle: "Kontekst z poprzedniej sesji",
