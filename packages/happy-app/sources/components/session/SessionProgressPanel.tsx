@@ -19,15 +19,7 @@ import {
     type ChecklistTabSummary,
     type ProgressTodo,
 } from "./sessionProgressData";
-import {
-    getProgressRefreshPromptKey,
-} from "./sessionProgressPrompts";
 import { buildProgressTodoActionSheet } from "./sessionProgressTodoActions";
-import {
-    buildSessionSummaryRefreshDebugText,
-    resolveSessionSummaryRefreshDebugState,
-    type SessionSummaryRefreshDebugState,
-} from "./sessionSummaryRefreshPresentation";
 import {
     FileChangeItem,
 } from "./SidePanelCodeTab";
@@ -40,7 +32,6 @@ import { CodexPlanSection } from "@/components/session/codex/CodexPlanSection";
 import {
     resolveCodexPlanData,
 } from "@/components/session/codex/codexProgressPresentation";
-import { CodexSummarySection } from "@/components/session/codex/CodexSummarySection";
 import type { ToolMixSemanticKind, ToolMixSegment } from "@/components/session/toolMixData";
 import { computeToolMix } from "@/components/session/toolMixData";
 import Svg, { Path } from "react-native-svg";
@@ -241,19 +232,6 @@ export const SessionProgressPanel = React.memo<SessionProgressPanelProps>(
         const session = useSession(sessionId);
         const appendToInput = useAppendToInput();
         const isCodex = session?.metadata?.flavor?.toLowerCase() === "codex";
-        const progressRefreshPromptKey = React.useMemo(
-            () => getProgressRefreshPromptKey(session?.metadata?.flavor),
-            [session?.metadata?.flavor],
-        );
-
-        const handleRefreshProgress = React.useCallback(() => {
-            appendToInput(t(progressRefreshPromptKey));
-        }, [appendToInput, progressRefreshPromptKey]);
-
-        const handleRefreshSummary = React.useCallback(() => {
-            appendToInput(t("session.progressSummaryRefreshPrompt"));
-        }, [appendToInput]);
-
         const handleTodoTap = React.useCallback(
             (todo: ProgressTodo) => {
                 const sheet = buildProgressTodoActionSheet({
@@ -297,22 +275,6 @@ export const SessionProgressPanel = React.memo<SessionProgressPanelProps>(
             [session?.metadata?.progress, data, pinnedListId],
         );
         const counts = React.useMemo(() => countTodoProgress(checklist.todos), [checklist.todos]);
-        const summary = React.useMemo(() => {
-            if (checklist.listId) {
-                const list = session?.metadata?.progress?.lists?.find(
-                    (l) => l.id === checklist.listId,
-                );
-                if (list?.summary) return list.summary;
-            }
-            return session?.metadata?.sessionSummary;
-        }, [checklist.listId, session?.metadata]);
-        const summaryRefreshDebug = React.useMemo(
-            () =>
-                resolveSessionSummaryRefreshDebugState(
-                    session?.metadata?.sessionSummaryRefresh,
-                ),
-            [session?.metadata?.sessionSummaryRefresh],
-        );
         const codexPlan = React.useMemo(
             () => resolveCodexPlanData(checklist, messages),
             [checklist, messages],
@@ -749,189 +711,6 @@ const ChecklistTabRow = React.memo<ChecklistTabRowProps>(function ChecklistTabRo
     );
 });
 
-interface SummaryCardProps {
-    summary:
-        | {
-              goal: string;
-              currentFocus?: string;
-              keyDecisions?: string[];
-              openQuestions?: string[];
-              impactScope?: string[];
-              updatedAt: number;
-          }
-        | undefined;
-    summaryRefreshDebug: SessionSummaryRefreshDebugState | null;
-    onRefresh: () => void;
-    nowMs: number;
-}
-
-const SummaryCard = React.memo<SummaryCardProps>(function SummaryCard({
-    summary,
-    summaryRefreshDebug,
-    onRefresh,
-    nowMs,
-}) {
-    const { theme } = useUnistyles();
-    const [expanded, setExpanded] = React.useState(false);
-    const refreshDebugText = React.useMemo(
-        () =>
-            summaryRefreshDebug
-                ? buildSessionSummaryRefreshDebugText(summaryRefreshDebug, {
-                    relativeTimeLabel: formatRelativeTime(
-                        summaryRefreshDebug.timestamp,
-                        nowMs,
-                    ),
-                    pending: (params) =>
-                        t("session.progressSummaryRefreshPendingDebug", params),
-                    applied: (params) =>
-                        t("session.progressSummaryRefreshAppliedDebug", params),
-                    superseded: (params) =>
-                        t(
-                            "session.progressSummaryRefreshSupersededDebug",
-                            params,
-                        ),
-                })
-                : null,
-        [summaryRefreshDebug, nowMs],
-    );
-    const hasDetails = !!summary && (
-        (summary.keyDecisions && summary.keyDecisions.length > 0) ||
-        (summary.openQuestions && summary.openQuestions.length > 0) ||
-        (summary.impactScope && summary.impactScope.length > 0)
-    );
-
-    return (
-        <GlassCard style={styles.summaryCard}>
-            <View style={styles.summaryHeader}>
-                <Ionicons name="book-outline" size={14} color={theme.colors.primary} />
-                <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
-                    {t("session.progressSummarySection")}
-                </Text>
-                {summary && (
-                    <Text style={[styles.timeHint, { color: theme.colors.textSecondary }]}>
-                        {formatRelativeTime(summary.updatedAt, nowMs)}
-                    </Text>
-                )}
-                <Pressable
-                    onPress={onRefresh}
-                    hitSlop={8}
-                    style={[styles.refreshButton, { borderColor: theme.colors.textLink + "55" }]}
-                    accessibilityRole="button"
-                    accessibilityLabel={t("session.progressSummaryRefreshLabel")}
-                >
-                    <Ionicons
-                        name="refresh-outline"
-                        size={12}
-                        color={theme.colors.textLink}
-                        style={styles.refreshIcon}
-                    />
-                    <Text style={[styles.refreshText, { color: theme.colors.textLink }]}>
-                        {t("session.progressSummaryRefreshLabel")}
-                    </Text>
-                </Pressable>
-            </View>
-            {refreshDebugText && (
-                <Text
-                    style={[
-                        styles.summaryRefreshDebugText,
-                        { color: theme.colors.textSecondary },
-                    ]}
-                >
-                    {refreshDebugText}
-                </Text>
-            )}
-            {summary ? (
-                <View style={styles.summaryBody}>
-                    <SummaryLine label={t("session.progressSummaryGoal")} value={summary.goal} />
-                    {summary.currentFocus && (
-                        <SummaryLine
-                            label={t("session.progressSummaryCurrentFocus")}
-                            value={summary.currentFocus}
-                        />
-                    )}
-                    {hasDetails && (
-                        <Pressable onPress={() => setExpanded((prev) => !prev)} hitSlop={6} style={styles.expandButton}>
-                            <Text style={[styles.expandText, { color: theme.colors.textLink }]}>
-                                {expanded
-                                    ? t("session.progressSummaryCollapse")
-                                    : t("session.progressSummaryExpand", {
-                                        decisions: summary.keyDecisions?.length ?? 0,
-                                        questions: summary.openQuestions?.length ?? 0,
-                                        scopes: summary.impactScope?.length ?? 0,
-                                    })}
-                            </Text>
-                        </Pressable>
-                    )}
-                    {expanded && summary.keyDecisions && summary.keyDecisions.length > 0 && (
-                        <SummaryBulletList
-                            title={t("session.progressSummaryDecisions")}
-                            items={summary.keyDecisions}
-                        />
-                    )}
-                    {expanded && summary.openQuestions && summary.openQuestions.length > 0 && (
-                        <SummaryBulletList
-                            title={t("session.progressSummaryOpenQuestions")}
-                            items={summary.openQuestions}
-                        />
-                    )}
-                    {expanded && summary.impactScope && summary.impactScope.length > 0 && (
-                        <SummaryBulletList
-                            title={t("session.progressSummaryImpactScope")}
-                            items={summary.impactScope}
-                        />
-                    )}
-                </View>
-            ) : (
-                <Text style={[styles.emptyText, { color: theme.colors.textSecondary, textAlign: "left" }]}>
-                    {t("session.progressSummaryEmpty")}
-                </Text>
-            )}
-        </GlassCard>
-    );
-});
-
-interface SummaryLineProps {
-    label: string;
-    value: string;
-}
-const SummaryLine = React.memo<SummaryLineProps>(function SummaryLine({ label, value }) {
-    const { theme } = useUnistyles();
-    return (
-        <View style={styles.summaryLineRow}>
-            <Text style={[styles.summaryLabel, { color: theme.colors.textSecondary }]}>
-                {label}
-            </Text>
-            <Text style={[styles.summaryValue, { color: theme.colors.text }]}>{value}</Text>
-        </View>
-    );
-});
-
-interface SummaryBulletListProps {
-    title: string;
-    items: readonly string[];
-}
-const SummaryBulletList = React.memo<SummaryBulletListProps>(function SummaryBulletList({
-    title,
-    items,
-}) {
-    const { theme } = useUnistyles();
-    return (
-        <View style={styles.summaryBulletBlock}>
-            <Text style={[styles.subSectionTitle, { color: theme.colors.textSecondary }]}>
-                {title}
-            </Text>
-            {items.map((item, i) => (
-                <Text
-                    key={`${i}-${item}`}
-                    style={[styles.summaryBulletItem, { color: theme.colors.text }]}
-                >
-                    {`• ${item}`}
-                </Text>
-            ))}
-        </View>
-    );
-});
-
 interface SourceBadgeProps {
     source: ChecklistSource;
 }
@@ -1272,22 +1051,6 @@ const styles = StyleSheet.create({
         borderRadius: 4,
         borderWidth: 1,
     },
-    refreshButton: {
-        flexDirection: "row",
-        alignItems: "center",
-        gap: 3,
-        paddingHorizontal: 6,
-        paddingVertical: 3,
-        borderRadius: 6,
-        borderWidth: 1,
-    },
-    refreshIcon: {
-        marginRight: 0,
-    },
-    refreshText: {
-        ...Typography.default("semiBold"),
-        fontSize: 10,
-    },
     sourceBadgeText: {
         ...Typography.default("semiBold"),
         fontSize: 9,
@@ -1423,16 +1186,6 @@ const styles = StyleSheet.create({
         marginTop: 4,
         marginBottom: 2,
     },
-    expandButton: {
-        paddingVertical: 4,
-    },
-    expandText: {
-        ...Typography.default("semiBold"),
-        fontSize: 11,
-    },
-    summaryCard: {
-        gap: 8,
-    },
     glassCard: {
         borderRadius: 14,
         borderWidth: 1,
@@ -1549,43 +1302,6 @@ const styles = StyleSheet.create({
     toolMixOtherDetailText: {
         ...Typography.mono("regular"),
         fontSize: 10,
-    },
-    summaryHeader: {
-        flexDirection: "row",
-        alignItems: "center",
-        gap: 6,
-    },
-    summaryRefreshDebugText: {
-        ...Typography.mono("regular"),
-        fontSize: 11,
-        lineHeight: 15,
-        marginBottom: 8,
-    },
-    summaryBody: {
-        gap: 4,
-    },
-    summaryLineRow: {
-        gap: 2,
-    },
-    summaryLabel: {
-        ...Typography.default("semiBold"),
-        fontSize: 10,
-        textTransform: "uppercase",
-        letterSpacing: 0.4,
-    },
-    summaryValue: {
-        ...Typography.default("regular"),
-        fontSize: 13,
-        lineHeight: 18,
-    },
-    summaryBulletBlock: {
-        gap: 2,
-        marginTop: 4,
-    },
-    summaryBulletItem: {
-        ...Typography.default("regular"),
-        fontSize: 12,
-        lineHeight: 16,
     },
     listFilesBlock: {
         gap: 0,
