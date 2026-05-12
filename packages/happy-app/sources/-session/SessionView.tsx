@@ -1191,29 +1191,39 @@ function SessionViewInner({
 
   // While the user is viewing this session, notify the service about context
   // changes (typing, ask-user-question) so it can pause appropriately.
+  const hasServiceOptions = autoOptionSend.status === "armed" || autoOptionSend.status === "ready";
   React.useEffect(() => {
     if (!autoOptionSend.enabled) return;
     if (
       message.trim().length === 0 &&
       !hasPendingAskUserQuestionVisible &&
-      currentOptionsSnapshot
+      (currentOptionsSnapshot || hasServiceOptions)
     ) {
       return;
     }
-    autoOptionSendService.dispatch(sessionId, {
-      type: "context-invalidated",
-      reason:
+    const reason =
         message.trim().length > 0
           ? "user-typed"
           : hasPendingAskUserQuestionVisible
             ? "ask-user-question"
-            : "options-missing",
+            : "options-missing";
+    console.log('[autoSend.effect→invalidate]', {
+      reason,
+      status: autoOptionSend.status,
+      hasSnapshot: !!currentOptionsSnapshot,
+      hasServiceOpts: hasServiceOptions,
+      msgLen: message.trim().length,
+    });
+    autoOptionSendService.dispatch(sessionId, {
+      type: "context-invalidated",
+      reason,
     });
   }, [
     autoOptionSend.enabled,
     message,
     hasPendingAskUserQuestionVisible,
     currentOptionsSnapshot,
+    hasServiceOptions,
     sessionId,
   ]);
 

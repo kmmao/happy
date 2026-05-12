@@ -381,7 +381,7 @@ describe('reducerTracer', () => {
             expect(state.orphanMessages.size).toBe(0);
         });
 
-        it('should not orphan non-uuid parent references', () => {
+        it('should buffer non-uuid parent references as orphans until parent arrives', () => {
             const state = createTracer();
 
             const orphanSubagent: NormalizedMessage = {
@@ -399,9 +399,33 @@ describe('reducerTracer', () => {
             };
 
             const firstPass = traceMessages(state, [orphanSubagent]);
-            expect(firstPass).toHaveLength(1);
-            expect(firstPass[0].id).toBe('subagent-child');
-            expect(firstPass[0].sidechainId).toBeUndefined();
+            expect(firstPass).toHaveLength(0);
+            expect(state.orphanMessages.has('tool-call-late')).toBe(true);
+
+            // When the Agent tool-call arrives with matching _subagentId, orphan is flushed
+            const agentToolCall: NormalizedMessage = {
+                id: 'agent-msg',
+                localId: null,
+                createdAt: 1600,
+                role: 'agent',
+                isSidechain: false,
+                content: [{
+                    type: 'tool-call',
+                    id: 'tool-use-id',
+                    name: 'Agent',
+                    input: { prompt: 'do something', _subagentId: 'tool-call-late' },
+                    description: null,
+                    uuid: 'agent-uuid',
+                    parentUUID: null
+                }]
+            };
+
+            const secondPass = traceMessages(state, [agentToolCall]);
+            // flushed orphan + agent-msg itself
+            expect(secondPass).toHaveLength(2);
+            expect(secondPass[0].id).toBe('subagent-child');
+            expect(secondPass[0].sidechainId).toBe('agent-msg');
+            expect(secondPass[1].id).toBe('agent-msg');
             expect(state.orphanMessages.has('tool-call-late')).toBe(false);
         });
 

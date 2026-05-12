@@ -55,9 +55,12 @@ export const TaskView = React.memo<ToolViewProps>(
     const showAgentActivity = useSetting("showAgentActivity");
     const filtered: FilteredTool[] = [];
     const taskStatusItems: TaskStatusEntry[] = [];
+    const agentTexts: { id: string; text: string; createdAt: number }[] = [];
 
     for (let m of messages) {
-      if (m.kind === "tool-call") {
+      if (m.kind === "agent-text" && !m.taskStatus && !m.isThinking && m.text) {
+        agentTexts.push({ id: m.id, text: m.text, createdAt: m.createdAt });
+      } else if (m.kind === "tool-call") {
         const knownTool = knownTools[
           m.tool.name as keyof typeof knownTools
         ] as any;
@@ -383,6 +386,25 @@ export const TaskView = React.memo<ToolViewProps>(
         fontFamily: "monospace",
         opacity: 0.7,
       },
+      agentTextOuter: {
+        marginHorizontal: 4,
+        marginTop: 6,
+        overflow: "hidden" as const,
+      },
+      agentTextContent: {
+        borderLeftWidth: 2,
+        borderLeftColor: theme.colors.accentTeal + "40",
+        borderRadius: 6,
+        paddingLeft: 10,
+        paddingRight: 8,
+        ...(Platform.OS === "web"
+          ? { zoom: 0.8 } as any
+          : {
+              transform: [{ scale: 0.85 }],
+              transformOrigin: "top left" as any,
+              width: "117.6%",
+            }),
+      },
     });
 
     const expandTools = useSetting("expandTools");
@@ -404,7 +426,12 @@ export const TaskView = React.memo<ToolViewProps>(
       });
     }, []);
 
-    if (filtered.length === 0 && taskStatusItems.length === 0) {
+    // Take only the last agent-text block (the final subagent summary/output)
+    const lastAgentText = showAgentActivity && agentTexts.length > 0
+      ? agentTexts[agentTexts.length - 1]
+      : null;
+
+    if (filtered.length === 0 && taskStatusItems.length === 0 && !lastAgentText) {
       return null;
     }
 
@@ -471,8 +498,22 @@ export const TaskView = React.memo<ToolViewProps>(
         </View>
       ) : null;
 
+    const renderAgentText = () =>
+      lastAgentText ? (
+        <View style={styles.agentTextOuter}>
+          <View style={styles.agentTextContent}>
+            <MarkdownView markdown={lastAgentText.text} />
+          </View>
+        </View>
+      ) : null;
+
     if (filtered.length === 0) {
-      return renderTaskStatus();
+      return (
+        <View style={styles.container}>
+          {renderTaskStatus()}
+          {renderAgentText()}
+        </View>
+      );
     }
 
     // Summary stats for collapsed view
@@ -841,6 +882,7 @@ export const TaskView = React.memo<ToolViewProps>(
             </Pressable>
           </View>
         )}
+        {renderAgentText()}
       </View>
     );
   },

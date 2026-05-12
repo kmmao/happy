@@ -238,13 +238,20 @@ class AutoOptionSendService {
     toggle(sessionId: string, enabled: boolean): void {
         const current =
             this.states.get(sessionId) ?? createInitialAutoOptionSendState();
+        // When re-enabling, clear stale lastAutoSentKey — onMessages skips the
+        // reset while disabled, so re-toggle would inherit a stale key that
+        // blocks canFire from sending the same option set.
+        const effective = enabled && current.lastAutoSentKey !== null
+            ? { ...current, lastAutoSentKey: null }
+            : current;
         const messages =
             storage.getState().sessionMessages[sessionId]?.messages ?? [];
         const result = buildSnapshotFromMessages(messages);
+        const session = storage.getState().sessions[sessionId];
         const context = this.buildContext(sessionId, result?.snapshot ?? null, messages, Date.now());
 
         const next = reduceAutoOptionSendEvent(
-            current,
+            effective,
             { type: "toggle", enabled },
             context,
         );
@@ -256,7 +263,23 @@ class AutoOptionSendService {
         this.applyStateChange(sessionId, current, final);
         this.persistEnabled(sessionId, final.enabled);
 
-        console.log('[autoSend.toggle]', { enabled, finalStatus: final.status, sessionId: sessionId.slice(-8) });
+        console.log('[autoSend.toggle]', {
+            enabled,
+            finalStatus: final.status,
+            nextStatus: next.status,
+            sid: sessionId.slice(-8),
+            hasSnapshot: !!result,
+            isFresh: result?.isFresh,
+            optionCount: result?.snapshot?.items?.length ?? 0,
+            sessionActive: session?.active,
+            sessionExists: !!session,
+            msgCount: messages.length,
+            prevStatus: current.status,
+            lastSentKey: current.lastAutoSentKey?.slice(0, 30),
+            ctxSnapshot: !!context.snapshot,
+            ctxInput: context.inputText.length,
+            ctxAskUQ: context.hasAskUserQuestionVisible,
+        });
         // When enabling with no immediately-armable options, trigger checkAndDispatch so
         // proactive generation can start without waiting for the next onMessages/onReady.
         if (enabled && final.status === "idle") {

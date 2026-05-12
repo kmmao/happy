@@ -114,12 +114,6 @@ function getParentUuid(message: NormalizedMessage): string | null {
   return null;
 }
 
-function isUuidLike(value: string): boolean {
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
-    value,
-  );
-}
-
 // Process orphan messages recursively when their parent becomes available
 function processOrphans(
   state: TracerState,
@@ -325,19 +319,10 @@ export function traceMessages(
           results.push(...orphanResults);
         }
       } else {
-        // For non-UUID parent references (e.g. subagent ids), treat as standalone
-        // when no parent mapping exists. CLI mapper is expected to resolve/sequence
-        // subagent ownership, so app should not permanently orphan these messages.
-        if (!isUuidLike(parentUuid)) {
-          state.processedIds.add(message.id);
-          const tracedMessage: TracedMessage = {
-            ...message,
-          };
-          results.push(tracedMessage);
-          continue;
-        }
-
-        // Parent not yet processed - buffer this message as an orphan
+        // Parent not yet processed - buffer this message as an orphan.
+        // This covers both UUID-based parents and non-UUID subagent IDs
+        // (CUIDs) — the Agent tool-call arriving later will flush them
+        // via processOrphans when _subagentId is registered.
         const orphans = state.orphanMessages.get(parentUuid) || [];
         orphans.push(message);
         state.orphanMessages.set(parentUuid, orphans);
