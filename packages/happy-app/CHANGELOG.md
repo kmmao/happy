@@ -2,130 +2,37 @@
 
 ## 2.26.0 - 2026-05-10
 
-This is the largest World Shell update to date — completing Phase 1 through Phase 4, bringing a fully functional global event workspace with real-time streaming, drag-to-reorder chains, decision workflows, and more.
-
-### World Shell — Stream Mode
-- Added WorldEventInspector — tap any event card to open a bottom-sheet detail panel with full event info, navigation links (Open Session, Open Project, Open Machine), and action buttons (Approve/Skip/Retry)
-- Added supervisor.action_found inline Approve/Skip buttons — Supervisor events now show Approve and Skip buttons directly on the card in Stream Mode, without needing to open the Inspector
-- Added world definition change events — editing Narrative, Laws, or Policy in the Definition Panel now produces a world.* event in the Stream so changes are traceable
-- Added trigger.fired events — cron and webhook trigger activations now correctly appear as trigger.cron_fired / trigger.webhook_fired events; the trigger.* filter chip now works as expected
-- Added real-time session lifecycle events — session.started and session.completed appear live via Zustand state subscription (no manual refresh needed)
-- Added unified world-event-created WebSocket push — a new socket channel delivers all world events (including memory.created) in real-time without polling
-- Improved empty state — the Stream Mode empty state now has two variants: a filter-aware "no matching events" state with a Clear Filter button, and a first-run onboarding state with quick-action buttons (New Session, Queue Task) and a command-bar hint
-- Fixed trigger.* filter chip — trigger activation events were incorrectly prefixed with decision., preventing the chip from matching; this is now resolved
-
-### World Shell — Chain Mode
-- Added intent progress percentage — each Intent card now shows the completion percentage (e.g. 67%) alongside the progress bar
-- Added status chips — Intent and Project chain cards now display running / blocked / failed count chips when relevant
-- Added blocked task highlight — a queued task that follows a failed sibling is marked as "blocked" with an orange background and pause icon
-- Added dependency connector line — expanded task lists show a vertical connector line on the left to indicate sequential order
-- Added running task duration — tasks currently in the "running" state display how long they have been running (e.g. 45s, 3m)
-- Added drag-to-reorder — long-press the reorder handle (≡) on an Intent or Project card to drag it up or down in the list; use ↑↓ buttons in expanded step lists to adjust individual step order
-- Fixed decision context navigation — Inspector now shows an "Open Session" or "Open Project" link derived from the referenceUrl in decision events
-
-### World Shell — Density Mode
-- Added Density Mode (4th view tab) — groups all events by source project/machine, showing event counts with a heat-bar visualization; tap a card to switch to Stream Mode filtered to that project
-
-### World Shell — Navigation & Routing
-- Added URL parameter support — /world?projectId=X and /world?machineId=X automatically apply the corresponding filter on entry
-- Improved project list navigation — tapping a project in the Projects list now enters World Shell pre-filtered to that project instead of going to the project detail page
-- Improved machine navigation — tapping a machine in Settings now enters World Shell pre-filtered to that machine; the Agent Mode machine card gains a pulse icon for the same action
+This release improves the session permission experience.
 
 ### Session
 - Fixed "Needs Permission" label — tapping the permission chip in the session status bar reliably opens the permission approval sheet
-
-## 2.25.0 - 2026-05-10
-
-This release polishes the World Shell definition panel, improves the session permission experience, and cleans up internal event handling.
-
-### World Shell — Definition Panel
-- Added policy mode descriptions — the automation policy selector in the World Definition panel now shows a one-line explanation below the current option, so you can see what each mode (disabled, suggest, semi-auto, auto) does without guessing
-
-### Session
 - Added permission sheet — tapping the "Needs Permission" chip in a session now opens a permission-approval sheet directly, instead of requiring you to navigate into the session to resolve it
 - Fixed "Needs Permission" status bar label to be tappable — the label in the session status bar now responds to taps in the same way as the chip
 
-## 2.24.0 - 2026-05-09
-
-This release rounds out the World Shell with a compact event view, full search and filtering in Chain Mode, and a more accurate active-agent counter.
-
-### World Shell — Stream Mode
-- Added Density Mode toggle — tap the density icon in the header to switch the Event Stream to a compact single-line layout, showing event type, title, and time without expanding; tap again to return to the normal card view
-- Fixed active-agent count in the header to show the true number of unique active sessions instead of counting duplicate events for the same session
-
-### World Shell — Chain Mode
-- Added text search to Chain Mode — open the search bar while in Chains view to filter Intent and Project chains by title; matching is done across parent titles, step titles, and task titles
-- Added Filter chips to Chain Mode — the project filter chips now appear in Chain Mode as well, so you can narrow chains to a specific project
-- Fixed empty search state — when a search query yields no matching chains, the view now shows a dedicated "no results" icon and message instead of the generic empty-state placeholder
-
-## 2.23.0 - 2026-05-09
-
-World Shell now has an Agents tab — see every machine and its active sessions at a glance, with live status indicators.
-
-### World Shell — Agent Mode
-- Added "Agents" tab to the World Shell — groups all active sessions by machine, showing each session's real-time state (running, thinking, needs attention, stuck, idle)
-- Added "stuck" detection — sessions that have been idle for more than 10 minutes are flagged with an amber indicator so nothing slips through unnoticed
-- Added tap-to-navigate on every session row — tap any session to open it directly
-- Added pull-to-refresh support — pull down to resync machine and session state
-- Fixed "Chains" tab label to use localized text instead of hardcoded English
-
-## 2.22.0 - 2026-05-09
-
-This release makes the World Shell Chain Mode fully interactive — every step, dot, and Intent title is now tappable and navigates directly to its execution session.
-
-### World Shell — Chain Mode
-- Added tap-to-navigate on expanded Step rows — tapping a step that has an execution session opens that session directly; steps not yet running show no tap affordance
-- Added tap-to-navigate on collapsed StepDots — the small colored dots in the folded card state are also tappable, with an expanded hit area for easy tapping
-- Added tap-to-navigate on the Intent title — tapping the Intent badge and title area navigates to the parent task's execution session, with a small link icon as a visual cue
-- Improved Intent title area layout so the badge, title, and link icon sit inline without affecting the collapse toggle
-
 ## 2.21.0 - 2026-05-09
 
-This release brings Chain Mode Intent decomposition to the World Shell and fixes session message queueing for mid-session sends.
-
-### World Shell — Chain Mode
-- Added Intent decomposition in Chain Mode — tasks with parent-child relationships now render as an Intent card (showing the parent task) with numbered Steps beneath it, complete with a progress bar and expand/collapse toggle
-- Added support for `trigger.*` events in Chain Mode — Cron and Webhook tasks now appear alongside regular tasks instead of being silently excluded
-- Improved Project Chain grouping to display the project directory name instead of the raw project ID
+This release fixes session message queueing for mid-session sends.
 
 ### Session
 - Fixed message queueing during active AI sessions — messages sent while the AI is running are now locally buffered, delivered in order once idle, with the option to send each message immediately if needed
 
 ## 2.20.1 - 2026-05-09
 
-This patch fixes real-time Trigger event prefixes in the World Shell event stream and resolves a duplicate /compact dedup edge case.
+This patch resolves a duplicate /compact dedup edge case.
 
 ### Fixes
-- Fixed real-time Cron and Webhook task events not displaying with the correct `trigger.cron.*` / `trigger.webhook.*` prefix in World Shell — the server now propagates `triggerType` through all `task-status-changed` socket events
 - Fixed an edge case where /compact lifecycle messages could appear twice in the event stream processor
 
 ## 2.20.0 - 2026-05-09
 
-This release expands the World Shell search bar with quick commands and local filtering, adds Trigger event display and Knowledge Base entry events to the event stream, and fixes duplicate "Context was reset" messages after /clear.
-
-### World Shell
-- Added local event stream filtering in the World Shell search bar — type to instantly filter events without a network request
-- Added slash command support in the World Shell search bar (`/sessions`, `/knowledge`) for quick navigation
-- Added Trigger events to the event stream — Cron and Webhook task invocations now appear with a `trigger.*` prefix
-- Added Knowledge Base entry events (`memory.created`) to the event stream, with tap-to-navigate to the knowledge base entry
+This release fixes duplicate "Context was reset" messages after /clear.
 
 ### Fixes
 - Fixed "Context was reset" appearing twice after /clear — corrected message dedup in both the cache restore path and the event stream processor
 
 ## 2.19.0 - 2026-05-08
 
-This release brings the World Shell event dashboard, improved subagent conversation rendering, structured error feedback, and a wave of session UX improvements.
-
-### World Shell
-- Added World Shell — a Matrix-themed global event stream interface that displays real-time events across all active agent sessions
-- Added Chain Mode in World Shell — groups tasks by project with progress indicators and click-to-expand details
-- Added inline verdicts in the event feed (Approve / Skip / Read / Dismiss) without leaving World Shell
-- Added Definition Panel for editing World Laws and Policy directly in World Shell
-- Added Filter Chips with friendly project path labels for filtering events by project
-- Added "+" button in the World Shell header to create new sessions instantly
-- Added click-to-navigate on task and session event cards — jumps directly to the relevant session
-- Improved World Shell with a Matrix-themed welcome state when the event stream is empty
-- Improved World Shell with full-screen fade animation and disabled gesture-back for immersive focus
+This release brings improved subagent conversation rendering, structured error feedback, and a wave of session UX improvements.
 
 ### Session UX
 - Added queued-message floating banner while AI is running — tap "Send Now" to interrupt and deliver immediately

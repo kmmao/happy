@@ -2,130 +2,37 @@
 
 ## 2.26.0 - 2026-05-10
 
-这是迄今为止规模最大的 World Shell 更新——完成了 Phase 1 至 Phase 4 的全部功能，带来全功能的全局事件工作空间，包含实时事件流、链路拖拽重排、决策工作流等众多改进。
-
-### World Shell — 事件流模式
-- 新增 WorldEventInspector——点击任意事件卡片，打开底部面板查看完整事件信息，包括导航链接（打开会话、项目、机器）及操作按钮（批准/跳过/重试）
-- 新增 supervisor.action_found 内联操作按钮——Supervisor 事件卡片现在直接显示批准和跳过按钮，无需打开 Inspector
-- 新增 World 定义变更事件——在定义面板中编辑叙事、法则或策略后，事件流中会立即出现对应的 world.* 事件，便于追踪变更历史
-- 新增 trigger.fired 事件——Cron 和 Webhook 触发器激活时，现在正确以 trigger.cron_fired / trigger.webhook_fired 显示在事件流中；trigger.* 过滤芯片现可正常使用
-- 新增会话生命周期实时事件——session.started 和 session.completed 通过 Zustand 订阅实时推送，无需手动刷新
-- 新增统一 WebSocket 推送通道（world-event-created）——所有 World 事件（包括 memory.created）均通过新的 Socket 通道实时推送，无需轮询
-- 改进空状态界面——事件流空状态现在分为两种：有过滤器时显示"无匹配事件"提示并带清除过滤按钮；首次进入时显示快捷操作按钮（新建会话、添加任务）和命令栏提示
-- 修复 trigger.* 过滤芯片——触发器事件之前被错误地加上 decision. 前缀，导致过滤芯片无法匹配；已修复
-
-### World Shell — 链路模式（Chain Mode）
-- 新增意图进度百分比——每张 Intent 卡片现在在进度条旁显示完成百分比（如 67%）
-- 新增状态统计芯片——Intent 和 Project 链路卡片在有相关数据时，显示运行中/阻塞/失败计数标签
-- 新增阻塞任务高亮——位于已失败任务之后的排队任务被标记为"blocked"，以橙色背景和暂停图标显示
-- 新增依赖关系连接线——展开的任务列表左侧显示竖线连接器，表示顺序依赖关系
-- 新增运行时长显示——正在执行的任务显示已运行时长（如 45s、3m）
-- 新增拖拽重排——长按卡片右侧的排序图标（≡）可上下拖拽 Intent/Project 卡片调整优先级；展开的步骤列表可使用 ↑↓ 按钮调整顺序
-- 修复决策事件上下文导航——Inspector 现在根据 decision 事件中的 referenceUrl 显示"打开会话"或"打开项目"链接
-
-### World Shell — 密度视图（Density Mode）
-- 新增密度视图（第4个标签）——按来源项目/机器对所有事件分组，展示事件计数和热度进度条；点击卡片可切换到已过滤的事件流模式
-
-### World Shell — 导航与路由
-- 新增 URL 参数支持——/world?projectId=X 和 /world?machineId=X 进入时自动应用对应过滤
-- 改进项目列表导航——点击项目列表中的项目，现在进入已过滤该项目的 World Shell，而非进入项目详情页
-- 改进机器导航——设置页中点击机器，现在进入已过滤该机器的 World Shell；Agent 视图中的机器卡片新增跳转事件流的快捷按钮
+本次更新改进了会话权限体验。
 
 ### 会话
 - 修复"需要权限"标签——点击会话状态栏中的权限标签，现在可以稳定地打开权限审批面板
-
-## 2.25.0 - 2026-05-10
-
-本次更新完善了 World Shell 定义面板的策略说明，改进了会话权限体验，并优化了内部事件处理逻辑。
-
-### World Shell — 定义面板
-- 新增策略模式说明——World 定义面板中的自动化策略选择器现在在当前选项下方显示一行说明，让你无需猜测每个模式（disabled、suggest、semi-auto、auto）的含义
-
-### 会话
 - 新增权限审批面板——点击会话中的"需要权限"标签现在可直接打开权限审批面板，无需先进入会话再处理
 - 修复会话状态栏中"需要权限"标签不可点击的问题，现在与标签芯片的响应方式保持一致
 
-## 2.24.0 - 2026-05-09
-
-本次更新完善了 World Shell 的紧凑事件视图、Chain Mode 的搜索与筛选功能，并修复了活跃 Agent 计数不准确的问题。
-
-### World Shell — 事件流模式
-- 新增 Density Mode 切换——点击 Header 中的密度图标，可将事件流切换为紧凑单行布局，仅显示事件类型、标题和时间，无展开/折叠；再次点击恢复普通卡片视图
-- 修复 Header 中活跃 Agent 计数，改为统计唯一活跃会话数，不再因同一会话产生多条事件而重复计数
-
-### World Shell — Chain Mode
-- 新增 Chain Mode 文字搜索——在链式视图中打开搜索栏，可按标题筛选 Intent 和 Project 链；搜索范围涵盖父任务标题、步骤标题和任务标题
-- 新增 Chain Mode 项目筛选——项目 Filter 芯片现在在 Chain Mode 下同样显示，可将链列表缩小到指定项目
-- 修复搜索无结果时的空状态——搜索查询无匹配链时，现在显示专用的"无结果"图标和提示，不再显示通用空状态占位符
-
-## 2.23.0 - 2026-05-09
-
-World Shell 新增 Agents 标签页——一眼看清每台机器上的活跃会话及实时状态。
-
-### World Shell — Agent Mode
-- 新增 "Agents" 标签页——以机器为维度展示所有活跃会话，实时显示各会话状态（running、thinking、needs attention、stuck、idle）
-- 新增"卡住"检测——空闲超过 10 分钟的活跃会话会以橙色标注，防止任务静默挂起被遗漏
-- 新增会话行点击跳转——点击任意会话行可直接打开该会话
-- 新增下拉刷新——下拉可重新同步机器与会话状态
-- 修复"链路"标签文本改用本地化文字，不再硬编码英文
-
-## 2.22.0 - 2026-05-09
-
-本次更新让 World Shell Chain Mode 完全可交互——每个步骤行、圆点和 Intent 标题均可点击，直接跳转至对应的执行会话。
-
-### World Shell — Chain Mode
-- 新增展开态 Step 行点击跳转——点击有执行会话的步骤行可直接打开该会话，尚未运行的步骤不显示点击反馈
-- 新增折叠态 StepDot 点击跳转——卡片折叠时的彩色小圆点同样支持点击跳转，并扩大了点击热区方便触控
-- 新增 Intent 标题点击跳转——点击 Intent badge 与标题区域可跳转到父任务的执行会话，右侧显示链接小图标作为视觉提示
-- 改进 Intent 标题区域布局，badge、标题和链接图标水平排列，不影响折叠/展开切换
-
 ## 2.21.0 - 2026-05-09
 
-本次更新为 World Shell 带来 Chain Mode Intent 分解功能，并修复 AI 运行中发送消息的队列问题。
-
-### World Shell — Chain Mode
-- 新增 Chain Mode Intent 分解——具有父子关系的任务现在以 Intent 卡片形式展示（显示父任务），其下列出带序号的 Steps，并附有进度条和展开/折叠切换
-- 新增 Chain Mode 对 `trigger.*` 事件的支持——Cron 和 Webhook 任务现在与普通任务一同显示，不再被静默排除
-- 改进 Project Chain 分组，现在显示项目目录名而非原始项目 ID
+本次更新修复 AI 运行中发送消息的队列问题。
 
 ### 会话
 - 修复 AI 运行中发送消息的队列问题——AI 运行时发送的消息现在本地暂存，待 AI 空闲后按序发送，同时支持单条消息提前立即发送
 
 ## 2.20.1 - 2026-05-09
 
-本次补丁修复 World Shell 实时 Trigger 事件前缀显示异常，并修复 /compact 消息去重的边缘情况。
+本次补丁修复 /compact 消息去重的边缘情况。
 
 ### 修复
-- 修复 World Shell 中 Cron 和 Webhook 任务的实时状态事件未显示正确的 `trigger.cron.*` / `trigger.webhook.*` 前缀——Server 现在通过所有 `task-status-changed` socket 事件传递 `triggerType` 字段
 - 修复 /compact 生命周期消息在事件流处理器中可能重复显示的边缘情况
 
 ## 2.20.0 - 2026-05-09
 
-本次更新为 World Shell 搜索栏新增快捷命令与本地过滤，事件流支持 Trigger 事件和知识库条目事件，并修复 /clear 后重复显示 "Context was reset" 的问题。
-
-### World Shell
-- 新增 World Shell 搜索栏本地过滤事件流——输入即时过滤，无需网络请求
-- 新增 World Shell 搜索栏 / 快捷命令（`/sessions`、`/knowledge`），快速跳转对应页面
-- 新增 Trigger 事件显示——Cron 和 Webhook 任务触发事件以 `trigger.*` 前缀显示在事件流中
-- 新增知识库条目事件（`memory.created`）显示在事件流中，点击可跳转至对应知识库条目
+本次更新修复 /clear 后重复显示 "Context was reset" 的问题。
 
 ### 修复
 - 修复 /clear 后 "Context was reset" 重复显示——同步修正缓存恢复路径和事件流处理器中的消息去重逻辑
 
 ## 2.19.0 - 2026-05-08
 
-本次更新带来了 World Shell 事件仪表盘、子 Agent 完整对话渲染、结构化错误提示，以及大量会话 UX 改进。
-
-### World Shell
-- 新增 World Shell — Matrix 世界观主题的全局事件流界面，实时展示所有活跃 Agent 会话的事件
-- 新增 World Shell Chain Mode — 按项目分组显示任务进度，点击可展开任务详情
-- 新增事件流内联裁决（Approve / Skip / Read / Dismiss），无需离开 World Shell
-- 新增 Definition Panel，可在 World Shell 中直接编辑世界法则（Laws）和 Policy
-- 新增 Filter Chips，支持按项目路径过滤事件，显示友好名称
-- 新增 World Shell Header 的"+"按钮，一键直接创建新会话
-- 新增 task 和 session 事件卡片点击直接跳转至对应会话
-- 改进 World Shell 空状态为 Matrix 主题欢迎界面
-- 改进 World Shell 全屏独占 fade 动画并禁用手势返回，提升沉浸感
+本次更新带来了子 Agent 完整对话渲染、结构化错误提示，以及大量会话 UX 改进。
 
 ### 会话体验
 - 新增排队消息悬浮 Banner — AI 运行时排队的消息显示浮层，点击「立即发送」可打断并立即投递
