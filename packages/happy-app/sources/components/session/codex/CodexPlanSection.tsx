@@ -1,5 +1,5 @@
 import * as React from "react";
-import { Pressable, ScrollView, View } from "react-native";
+import { Pressable, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
@@ -12,6 +12,7 @@ import {
 import { type FileChange } from "@/components/session/codeChangeTypes";
 import {
   type ChecklistTab,
+  type ChecklistTabSummary,
   countTodoProgress,
   type ProgressTodo,
 } from "@/components/session/sessionProgressData";
@@ -20,7 +21,6 @@ import { t } from "@/text";
 
 interface CodexPlanSectionProps {
   plan: CodexPlanData;
-  onRefresh: () => void;
   onTodoTap: (todo: ProgressTodo) => void;
   nowMs: number;
   listFileChanges: readonly FileChange[];
@@ -64,10 +64,40 @@ function getTodoMeta(
   };
 }
 
+const CodexInlineListSummary = React.memo<{ summary: ChecklistTabSummary }>(
+  function CodexInlineListSummary({ summary }) {
+    const { theme } = useUnistyles();
+    const hasDecisions = summary.keyDecisions && summary.keyDecisions.length > 0;
+    return (
+      <View style={styles.inlineSummary}>
+        <Text style={[styles.inlineSummaryGoal, { color: theme.colors.codex.textPrimary }]}>
+          {summary.goal}
+        </Text>
+        {summary.currentFocus ? (
+          <Text style={[styles.inlineSummaryFocus, { color: theme.colors.codex.textSecondary }]}>
+            {summary.currentFocus}
+          </Text>
+        ) : null}
+        {hasDecisions ? (
+          <View style={styles.inlineSummaryDecisions}>
+            {summary.keyDecisions!.map((d, i) => (
+              <Text
+                key={`${i}-${d}`}
+                style={[styles.inlineSummaryDecisionItem, { color: theme.colors.codex.textSecondary }]}
+              >
+                {`• ${d}`}
+              </Text>
+            ))}
+          </View>
+        ) : null}
+      </View>
+    );
+  },
+);
+
 export const CodexPlanSection = React.memo<CodexPlanSectionProps>(
   function CodexPlanSection({
     plan,
-    onRefresh,
     onTodoTap,
     nowMs,
     listFileChanges,
@@ -169,41 +199,28 @@ export const CodexPlanSection = React.memo<CodexPlanSectionProps>(
               </View>
             </View>
 
-            <Pressable
-              onPress={onRefresh}
-              hitSlop={8}
-              style={[
-                styles.refreshButton,
-                {
-                  borderColor: theme.colors.codex.borderActive,
-                  backgroundColor: theme.colors.codex.accentSoft,
-                  borderRadius: theme.codex.radius.chip,
-                  paddingHorizontal: theme.codex.spacing.chipX,
-                  paddingVertical: theme.codex.spacing.chipY + 2,
-                },
-              ]}
-              accessibilityRole="button"
-              accessibilityLabel={t("session.progressRefreshActionLabel")}
-            >
-              <Ionicons
-                name="refresh-outline"
-                size={12}
-                color={theme.colors.codex.accent}
-              />
-              <Text
-                style={[styles.refreshText, { color: theme.colors.codex.accent }]}
+            {tabs.length > 1 ? (
+              <View
+                style={[
+                  styles.tabCountBadge,
+                  {
+                    borderColor: theme.colors.codex.chipBorder,
+                    backgroundColor: theme.colors.codex.chipBg,
+                    borderRadius: theme.codex.radius.chip,
+                    paddingHorizontal: theme.codex.spacing.chipX,
+                    paddingVertical: theme.codex.spacing.chipY,
+                  },
+                ]}
               >
-                {t("session.progressRefreshActionLabel")}
-              </Text>
-            </Pressable>
+                <Text style={[styles.tabCountBadgeText, { color: theme.colors.codex.textSecondary }]}>
+                  {tabs.length}
+                </Text>
+              </View>
+            ) : null}
           </View>
 
           {tabs.length > 1 ? (
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.tabsRow}
-            >
+            <View style={styles.tabsRow}>
               {tabs.map((tab) => {
                 const isSelected = tab.id === selectedTab?.id;
                 const isActive = tab.active;
@@ -240,10 +257,7 @@ export const CodexPlanSection = React.memo<CodexPlanSectionProps>(
                     accessibilityRole="button"
                     accessibilityState={{ selected: isSelected }}
                   >
-                    <Text
-                      style={[styles.tabChipText, { color }]}
-                      numberOfLines={1}
-                    >
+                    <Text style={[styles.tabChipText, { color }]}>
                       {tab.label}
                     </Text>
                     <Text style={[styles.tabChipCount, { color }]}>
@@ -252,7 +266,11 @@ export const CodexPlanSection = React.memo<CodexPlanSectionProps>(
                   </Pressable>
                 );
               })}
-            </ScrollView>
+            </View>
+          ) : null}
+
+          {selectedTab?.summary ? (
+            <CodexInlineListSummary summary={selectedTab.summary} />
           ) : null}
         </View>
 
@@ -590,6 +608,8 @@ const styles = StyleSheet.create((_, rt) => ({
     fontWeight: "600",
   },
   tabsRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
     gap: 8,
     paddingBottom: 2,
   },
@@ -602,7 +622,7 @@ const styles = StyleSheet.create((_, rt) => ({
   tabChipText: {
     fontSize: 11,
     fontWeight: "600",
-    maxWidth: 120,
+    flexShrink: 1,
   },
   tabChipCount: {
     fontSize: 11,
@@ -643,7 +663,6 @@ const styles = StyleSheet.create((_, rt) => ({
   selectedListChipText: {
     fontSize: 11,
     fontWeight: "600",
-    maxWidth: 120,
   },
   explanationCard: {
     borderWidth: 1,
@@ -705,5 +724,36 @@ const styles = StyleSheet.create((_, rt) => ({
     paddingBottom: 14,
     fontSize: 13,
     lineHeight: 18,
+  },
+  tabCountBadge: {
+    borderWidth: 1,
+    alignItems: "center",
+    minWidth: 20,
+  },
+  tabCountBadgeText: {
+    fontSize: 9,
+    fontWeight: "600",
+    letterSpacing: 0.4,
+  },
+  inlineSummary: {
+    gap: 2,
+    paddingVertical: 4,
+  },
+  inlineSummaryGoal: {
+    fontSize: 12,
+    fontWeight: "600",
+    lineHeight: 16,
+  },
+  inlineSummaryFocus: {
+    fontSize: 11,
+    lineHeight: 15,
+  },
+  inlineSummaryDecisions: {
+    gap: 1,
+    marginTop: 2,
+  },
+  inlineSummaryDecisionItem: {
+    fontSize: 11,
+    lineHeight: 15,
   },
 }));

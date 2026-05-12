@@ -386,15 +386,8 @@ export const SessionProgressPanel = React.memo<SessionProgressPanelProps>(
             >
                 {isCodex ? (
                     <>
-                        <CodexSummarySection
-                            summary={summary}
-                            summaryRefreshDebug={summaryRefreshDebug}
-                            onRefresh={handleRefreshSummary}
-                            nowMs={nowMs}
-                        />
                         <CodexPlanSection
                             plan={codexPlan}
-                            onRefresh={handleRefreshProgress}
                             onTodoTap={handleTodoTap}
                             nowMs={nowMs}
                             listFileChanges={listFileChanges}
