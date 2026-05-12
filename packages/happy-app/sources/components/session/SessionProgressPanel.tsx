@@ -412,10 +412,6 @@ export const SessionProgressPanel = React.memo<SessionProgressPanelProps>(
                 style={{ flex: 1 }}
                 contentContainerStyle={styles.scrollContent}
             >
-                <Text style={[styles.subtitle, { color: theme.colors.textSecondary }]}>
-                    {t("session.progressSubtitle")}
-                </Text>
-
                 {isCodex ? (
                     <>
                         <CodexSummarySection
