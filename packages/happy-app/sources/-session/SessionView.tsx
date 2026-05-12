@@ -1067,10 +1067,17 @@ function SessionViewInner({
   const handleBookmarkOptionPress = React.useCallback(
     (option: string) => {
       setShowBookmarksPopover(false);
-      sync.sendMessage(sessionId, option);
+      if (sessionStatus.state === "thinking") {
+        setPendingQueue((prev) => [
+          ...prev,
+          { localId: randomUUID(), message: option },
+        ]);
+      } else {
+        sync.sendMessage(sessionId, option);
+      }
       trackMessageSent();
     },
-    [sessionId],
+    [sessionId, sessionStatus.state, setPendingQueue],
   );
 
   // Slash command popover
