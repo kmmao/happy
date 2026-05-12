@@ -1048,10 +1048,17 @@ function SessionViewInner({
         reason: "manual-send",
       });
       setShowOptionsPopover(false);
-      sync.sendMessage(sessionId, option);
+      if (sessionStatus.state === "thinking") {
+        setPendingQueue((prev) => [
+          ...prev,
+          { localId: randomUUID(), message: option },
+        ]);
+      } else {
+        sync.sendMessage(sessionId, option);
+      }
       trackMessageSent();
     },
-    [sessionId, latestOptionsHash],
+    [sessionId, latestOptionsHash, sessionStatus.state, setPendingQueue],
   );
 
   const { bookmarks, toggleBookmark } = useBookmarks();
