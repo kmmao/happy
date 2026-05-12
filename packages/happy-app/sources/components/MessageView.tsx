@@ -19,7 +19,8 @@ import { ToolView } from "./tools/ToolView";
 import { AgentEvent } from "@/sync/typesRaw";
 import { sync } from "@/sync/sync";
 import { Option } from "./markdown/MarkdownView";
-import { useSetting, useProjectForSession } from "@/sync/storage";
+import { useSetting, useProjectForSession, useSession } from "@/sync/storage";
+import { isSessionRunning } from "@/utils/sessionUtils";
 import { getAutoOptionFeedbackStats } from "@/sync/autoOptionFeedback";
 import { AgentDot } from "./AgentDot";
 import { MessageImage } from "./MessageImage";
@@ -123,12 +124,17 @@ function UserTextBlock(props: { message: UserTextMessage; sessionId: string }) {
   const appendToInput = useAppendToInput();
   const { theme } = useUnistyles();
   const router = useRouter();
+  const session = useSession(props.sessionId);
 
   const handleOptionPress = React.useCallback(
     (option: Option) => {
-      sync.sendMessage(props.sessionId, option.title);
+      if (session && isSessionRunning(session)) {
+        appendToInput(option.title);
+      } else {
+        sync.sendMessage(props.sessionId, option.title);
+      }
     },
-    [props.sessionId],
+    [props.sessionId, session, appendToInput],
   );
 
 
@@ -250,6 +256,8 @@ function AgentTextBlock(props: {
   const experiments = useSetting("experiments");
   const expandThinkingByDefault = useSetting("expandThinkingByDefault");
   const { theme } = useUnistyles();
+  const appendToInput = useAppendToInput();
+  const session = useSession(props.sessionId);
   const [thinkingExpanded, setThinkingExpanded] = React.useState(
     expandThinkingByDefault,
   );
@@ -258,9 +266,13 @@ function AgentTextBlock(props: {
   }, [expandThinkingByDefault]);
   const handleOptionPress = React.useCallback(
     (option: Option) => {
-      sync.sendMessage(props.sessionId, option.title);
+      if (session && isSessionRunning(session)) {
+        appendToInput(option.title);
+      } else {
+        sync.sendMessage(props.sessionId, option.title);
+      }
     },
-    [props.sessionId],
+    [props.sessionId, session, appendToInput],
   );
   const project = useProjectForSession(props.sessionId);
   const optionStatsProjectId = project?.id ?? `session:${props.sessionId}`;

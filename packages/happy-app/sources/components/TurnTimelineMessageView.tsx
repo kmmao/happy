@@ -15,7 +15,9 @@ import { sync } from "@/sync/sync";
 import { getThinkingLabelTitle } from "./messageProgress";
 import { type Metadata } from "@/sync/storageTypes";
 import { t } from "@/text";
-import { useSetting } from "@/sync/storage";
+import { useSetting, useSession } from "@/sync/storage";
+import { isSessionRunning } from "@/utils/sessionUtils";
+import { useAppendToInput } from "@/hooks/useInputContext";
 import {
   summarizeHiddenTimelineSteps,
   type HiddenTimelineSummaryKind,
@@ -241,6 +243,8 @@ function ThinkingTimelineStep(props: {
 }) {
   const { theme } = useUnistyles();
   const expandThinkingByDefault = useSetting("expandThinkingByDefault");
+  const appendToInput = useAppendToInput();
+  const session = useSession(props.sessionId);
   const [expanded, setExpanded] = React.useState(expandThinkingByDefault);
   React.useEffect(() => {
     setExpanded(expandThinkingByDefault);
@@ -251,9 +255,13 @@ function ThinkingTimelineStep(props: {
     : t("sessionInfo.thinking");
   const handleOptionPress = React.useCallback(
     (option: Option) => {
-      sync.sendMessage(props.sessionId, option.title);
+      if (session && isSessionRunning(session)) {
+        appendToInput(option.title);
+      } else {
+        sync.sendMessage(props.sessionId, option.title);
+      }
     },
-    [props.sessionId],
+    [props.sessionId, session, appendToInput],
   );
 
   return (
@@ -551,7 +559,7 @@ export const TurnTimelineMessageView = React.memo(function TurnTimelineMessageVi
   );
 });
 
-const styles = StyleSheet.create((theme) => ({
+const styles = StyleSheet.create((_theme) => ({
   messageRow: {
     flexDirection: "row",
   },
