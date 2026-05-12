@@ -461,7 +461,6 @@ export const SessionProgressPanel = React.memo<SessionProgressPanelProps>(
                             <InlineListSummary
                                 listId={checklist.listId}
                                 metadata={session?.metadata}
-                                globalSummary={session?.metadata?.sessionSummary}
                             />
 
                             {hasTodos ? (
@@ -662,13 +661,11 @@ export const SessionProgressPanel = React.memo<SessionProgressPanelProps>(
 interface InlineListSummaryProps {
     listId: string | undefined;
     metadata: { progress?: { lists?: readonly { id: string; summary?: ChecklistTabSummary }[] } | null } | null | undefined;
-    globalSummary: ChecklistTabSummary | undefined;
 }
 
 const InlineListSummary = React.memo<InlineListSummaryProps>(function InlineListSummary({
     listId,
     metadata,
-    globalSummary,
 }) {
     const { theme } = useUnistyles();
     const summary = React.useMemo(() => {
@@ -676,8 +673,8 @@ const InlineListSummary = React.memo<InlineListSummaryProps>(function InlineList
             const list = metadata?.progress?.lists?.find((l) => l.id === listId);
             if (list?.summary) return list.summary;
         }
-        return globalSummary;
-    }, [listId, metadata, globalSummary]);
+        return undefined;
+    }, [listId, metadata]);
 
     if (!summary) return null;
 
