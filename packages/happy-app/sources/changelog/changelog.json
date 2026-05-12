@@ -2,6 +2,32 @@
   "entries": {
     "en": [
       {
+        "version": "2.27.0",
+        "date": "2026-05-12",
+        "summary": "This release adds Turn separators, message metadata badges, smart auto-send improvements, and fixes message queue reliability across sessions and clients.",
+        "changes": [
+          "Added Turn start/end separators in chat — each AI turn now shows a clear boundary with usage stats (tokens, cost, duration) and thinking mode badge (Adaptive/Enabled)",
+          "Improved Turn-end badge to always display — removed the hasStats skip logic that hid badges in certain conditions",
+          "Added model/mode/reasoning metadata badge on user message bubbles — see which model, permission mode, and thinking setting was used for each request",
+          "Fixed message queue lost when switching sessions — queue is now stored globally and survives tab/session switches",
+          "Fixed message queue lost on page refresh — queue is now persisted to local storage",
+          "Fixed cross-client message queueing — messages sent from App while AI is running on Web now correctly queue instead of sending directly",
+          "Improved queue chip text to show full content without truncation",
+          "Added AI-powered option scoring — options with 2+ choices automatically get LLM scoring with ✨ badge showing which model ranked them",
+          "Added auto-sent message badge — messages sent by auto-send now display a ✨ indicator in the chat",
+          "Fixed auto-send not triggering after toggle — resolved turn dedup and stale options blocking generation",
+          "Fixed auto-send firing heuristic recommendation instead of LLM-ranked best option",
+          "Improved generation cooldown from 120s to 10s for faster option availability",
+          "Added inline session summary below each checklist tab — summary follows tab selection instead of showing in a popup",
+          "Fixed checklist labels no longer truncated — full content is always visible",
+          "Improved tab count display to use badge style instead of plain numbers",
+          "Added slide-up/down animation for queue message preview overlay",
+          "Fixed preview auto-closing when the previewed message is cancelled from the queue",
+          "Fixed sync auth race condition — added 3s retry when credentials are not yet available"
+        ],
+        "rawMarkdown": "## 2.27.0 - 2026-05-12\n\n\nThis release adds Turn separators, message metadata badges, smart auto-send improvements, and fixes message queue reliability across sessions and clients.\n\n### Turn Separators\n- Added Turn start/end separators in chat — each AI turn now shows a clear boundary with usage stats (tokens, cost, duration) and thinking mode badge (Adaptive/Enabled)\n- Improved Turn-end badge to always display — removed the hasStats skip logic that hid badges in certain conditions\n\n### Message Metadata\n- Added model/mode/reasoning metadata badge on user message bubbles — see which model, permission mode, and thinking setting was used for each request\n\n### Message Queue\n- Fixed message queue lost when switching sessions — queue is now stored globally and survives tab/session switches\n- Fixed message queue lost on page refresh — queue is now persisted to local storage\n- Fixed cross-client message queueing — messages sent from App while AI is running on Web now correctly queue instead of sending directly\n- Improved queue chip text to show full content without truncation\n\n### Auto-Send\n- Added AI-powered option scoring — options with 2+ choices automatically get LLM scoring with ✨ badge showing which model ranked them\n- Added auto-sent message badge — messages sent by auto-send now display a ✨ indicator in the chat\n- Fixed auto-send not triggering after toggle — resolved turn dedup and stale options blocking generation\n- Fixed auto-send firing heuristic recommendation instead of LLM-ranked best option\n- Improved generation cooldown from 120s to 10s for faster option availability\n\n### Progress Panel\n- Added inline session summary below each checklist tab — summary follows tab selection instead of showing in a popup\n- Fixed checklist labels no longer truncated — full content is always visible\n- Improved tab count display to use badge style instead of plain numbers\n\n### Queue Preview\n- Added slide-up/down animation for queue message preview overlay\n- Fixed preview auto-closing when the previewed message is cancelled from the queue\n\n### Fixes\n- Fixed sync auth race condition — added 3s retry when credentials are not yet available"
+      },
+      {
         "version": "2.26.0",
         "date": "2026-05-10",
         "summary": "This release improves the session permission experience.",
@@ -726,6 +752,32 @@
     ],
     "zh-Hans": [
       {
+        "version": "2.27.0",
+        "date": "2026-05-12",
+        "summary": "本次更新新增 Turn 分隔符、消息元信息标签、智能自动发送改进，并修复消息队列在会话切换和跨客户端时的可靠性问题。",
+        "changes": [
+          "新增聊天中 Turn 开始/结束分隔符——每轮 AI 回复显示清晰的边界标记，附带使用统计（token 数、费用、时长）和思考模式标签（Adaptive/Enabled）",
+          "修复 Turn-end badge 在某些情况下不显示的问题——移除 hasStats 跳过逻辑",
+          "新增用户消息气泡右下角的 model/mode/reasoning 元信息标签——可查看每条消息使用的模型、权限模式和思考设置",
+          "修复切换会话后消息队列丢失——队列数据现在全局存储，切换会话不再丢失",
+          "修复刷新页面后消息队列丢失——队列数据持久化到本地存储",
+          "修复跨客户端消息不入队——在 App 上发送消息时，若 AI 在 Web 端运行中，消息会正确进入队列而非直接发送",
+          "改进队列消息显示——chip 文本自适应宽度，完整显示内容不再截断",
+          "新增 AI 智能选项评分——2 个以上选项时自动触发 LLM 评分，显示 ✨ 标签表明评分模型",
+          "新增自动发送消息标识——由自动发送功能发出的消息在聊天中显示 ✨ 标记",
+          "修复开启自动发送后无反应——解决 turn 去重和过期选项阻断生成的问题",
+          "修复自动发送选择启发式推荐而非 LLM 最优推荐的问题",
+          "改进生成冷却期从 120s 降至 10s，加快选项可用速度",
+          "新增内联会话概要——概要显示在清单 tab 下方，切换 tab 时跟随变化",
+          "修复清单标签截断——标签内容完整显示，不再省略",
+          "改进 tab 计数显示——从纯数字改为 badge 标签样式",
+          "新增队列消息预览弹窗的入场/退场 slide 动画",
+          "修复取消队列消息时预览弹窗未自动关闭的问题",
+          "修复 sync 认证竞争条件——凭证未就绪时 3s 后自动重试"
+        ],
+        "rawMarkdown": "## 2.27.0 - 2026-05-12\n\n\n本次更新新增 Turn 分隔符、消息元信息标签、智能自动发送改进，并修复消息队列在会话切换和跨客户端时的可靠性问题。\n\n### Turn 分隔符\n- 新增聊天中 Turn 开始/结束分隔符——每轮 AI 回复显示清晰的边界标记，附带使用统计（token 数、费用、时长）和思考模式标签（Adaptive/Enabled）\n- 修复 Turn-end badge 在某些情况下不显示的问题——移除 hasStats 跳过逻辑\n\n### 消息元信息\n- 新增用户消息气泡右下角的 model/mode/reasoning 元信息标签——可查看每条消息使用的模型、权限模式和思考设置\n\n### 消息队列\n- 修复切换会话后消息队列丢失——队列数据现在全局存储，切换会话不再丢失\n- 修复刷新页面后消息队列丢失——队列数据持久化到本地存储\n- 修复跨客户端消息不入队——在 App 上发送消息时，若 AI 在 Web 端运行中，消息会正确进入队列而非直接发送\n- 改进队列消息显示——chip 文本自适应宽度，完整显示内容不再截断\n\n### 自动发送\n- 新增 AI 智能选项评分——2 个以上选项时自动触发 LLM 评分，显示 ✨ 标签表明评分模型\n- 新增自动发送消息标识——由自动发送功能发出的消息在聊天中显示 ✨ 标记\n- 修复开启自动发送后无反应——解决 turn 去重和过期选项阻断生成的问题\n- 修复自动发送选择启发式推荐而非 LLM 最优推荐的问题\n- 改进生成冷却期从 120s 降至 10s，加快选项可用速度\n\n### 进度面板\n- 新增内联会话概要——概要显示在清单 tab 下方，切换 tab 时跟随变化\n- 修复清单标签截断——标签内容完整显示，不再省略\n- 改进 tab 计数显示——从纯数字改为 badge 标签样式\n\n### 队列预览\n- 新增队列消息预览弹窗的入场/退场 slide 动画\n- 修复取消队列消息时预览弹窗未自动关闭的问题\n\n### 修复\n- 修复 sync 认证竞争条件——凭证未就绪时 3s 后自动重试"
+      },
+      {
         "version": "2.26.0",
         "date": "2026-05-10",
         "summary": "本次更新改进了会话权限体验。",
@@ -1427,7 +1479,7 @@
       }
     ]
   },
-  "latestVersion": "2.26.0",
+  "latestVersion": "2.27.0",
   "availableLocales": [
     "en",
     "zh-Hans"

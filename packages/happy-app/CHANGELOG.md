@@ -1,5 +1,41 @@
 # Changelog
 
+## 2.27.0 - 2026-05-12
+
+This release adds Turn separators, message metadata badges, smart auto-send improvements, and fixes message queue reliability across sessions and clients.
+
+### Turn Separators
+- Added Turn start/end separators in chat — each AI turn now shows a clear boundary with usage stats (tokens, cost, duration) and thinking mode badge (Adaptive/Enabled)
+- Improved Turn-end badge to always display — removed the hasStats skip logic that hid badges in certain conditions
+
+### Message Metadata
+- Added model/mode/reasoning metadata badge on user message bubbles — see which model, permission mode, and thinking setting was used for each request
+
+### Message Queue
+- Fixed message queue lost when switching sessions — queue is now stored globally and survives tab/session switches
+- Fixed message queue lost on page refresh — queue is now persisted to local storage
+- Fixed cross-client message queueing — messages sent from App while AI is running on Web now correctly queue instead of sending directly
+- Improved queue chip text to show full content without truncation
+
+### Auto-Send
+- Added AI-powered option scoring — options with 2+ choices automatically get LLM scoring with ✨ badge showing which model ranked them
+- Added auto-sent message badge — messages sent by auto-send now display a ✨ indicator in the chat
+- Fixed auto-send not triggering after toggle — resolved turn dedup and stale options blocking generation
+- Fixed auto-send firing heuristic recommendation instead of LLM-ranked best option
+- Improved generation cooldown from 120s to 10s for faster option availability
+
+### Progress Panel
+- Added inline session summary below each checklist tab — summary follows tab selection instead of showing in a popup
+- Fixed checklist labels no longer truncated — full content is always visible
+- Improved tab count display to use badge style instead of plain numbers
+
+### Queue Preview
+- Added slide-up/down animation for queue message preview overlay
+- Fixed preview auto-closing when the previewed message is cancelled from the queue
+
+### Fixes
+- Fixed sync auth race condition — added 3s retry when credentials are not yet available
+
 ## 2.26.0 - 2026-05-10
 
 This release improves the session permission experience.
