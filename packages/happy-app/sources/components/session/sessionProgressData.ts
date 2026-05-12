@@ -267,10 +267,7 @@ function normalizeLegacyTodos(
 }
 
 function deriveLabelFromTodos(todos: readonly ProgressTodo[]): string | undefined {
-    const first = todos[0]?.content;
-    if (!first) return undefined;
-    const max = 32;
-    return first.length <= max ? first : first.slice(0, max - 1) + "…";
+    return todos[0]?.content;
 }
 
 function normalizeProgressLists(
