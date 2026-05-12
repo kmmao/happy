@@ -219,6 +219,15 @@ export interface ResolvedChecklist {
     blockers?: string[];
 }
 
+export interface ChecklistTabSummary {
+    goal: string;
+    currentFocus?: string;
+    keyDecisions?: string[];
+    openQuestions?: string[];
+    impactScope?: string[];
+    updatedAt: number;
+}
+
 export interface ChecklistTab {
     id: string;
     label: string;
@@ -228,6 +237,7 @@ export interface ChecklistTab {
     total: number;
     updatedAt: number;
     archivedAt?: number;
+    summary?: ChecklistTabSummary;
 }
 
 type MetadataProgress = NonNullable<Metadata["progress"]>;
@@ -406,6 +416,7 @@ export function getChecklistTabs(
             total: todos.length,
             updatedAt: list.updatedAt,
             archivedAt: list.archivedAt,
+            summary: list.summary ?? undefined,
         };
     });
 }
