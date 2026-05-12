@@ -266,34 +266,6 @@ export const SessionProgressPanel = React.memo<SessionProgressPanelProps>(
             [appendToInput, session?.metadata?.flavor],
         );
 
-        const handleShowSummary = React.useCallback(
-            (summary: ChecklistTabSummary) => {
-                const lines: string[] = [];
-                lines.push(`${t("session.progressSummaryGoal")}: ${summary.goal}`);
-                if (summary.currentFocus) {
-                    lines.push(`${t("session.progressSummaryCurrentFocus")}: ${summary.currentFocus}`);
-                }
-                if (summary.keyDecisions && summary.keyDecisions.length > 0) {
-                    lines.push(`\n${t("session.progressSummaryDecisions")}:`);
-                    for (const d of summary.keyDecisions) lines.push(`  • ${d}`);
-                }
-                if (summary.openQuestions && summary.openQuestions.length > 0) {
-                    lines.push(`\n${t("session.progressSummaryOpenQuestions")}:`);
-                    for (const q of summary.openQuestions) lines.push(`  • ${q}`);
-                }
-                if (summary.impactScope && summary.impactScope.length > 0) {
-                    lines.push(`\n${t("session.progressSummaryImpactScope")}:`);
-                    for (const s of summary.impactScope) lines.push(`  • ${s}`);
-                }
-                Modal.alert(
-                    t("session.progressSummarySection"),
-                    lines.join("\n"),
-                    [{ text: t("common.ok") }],
-                );
-            },
-            [],
-        );
-
         // Tick every 30s so relative time labels stay fresh without re-rendering
         // the rest of the App.
         const [nowMs, setNowMs] = React.useState(() => Date.now());
@@ -489,7 +461,6 @@ export const SessionProgressPanel = React.memo<SessionProgressPanelProps>(
                                             prev === id ? null : id,
                                         )
                                     }
-                                    onShowSummary={handleShowSummary}
                                 />
                             )}
                             {checklist.updatedAt !== null && (
@@ -499,6 +470,11 @@ export const SessionProgressPanel = React.memo<SessionProgressPanelProps>(
                                     {checklist.currentStage ? ` · ${checklist.currentStage}` : ""}
                                 </Text>
                             )}
+                            <InlineListSummary
+                                listId={checklist.listId}
+                                metadata={session?.metadata}
+                                globalSummary={session?.metadata?.sessionSummary}
+                            />
 
                             {hasTodos ? (
                                 <>
@@ -695,18 +671,66 @@ export const SessionProgressPanel = React.memo<SessionProgressPanelProps>(
     },
 );
 
+interface InlineListSummaryProps {
+    listId: string | undefined;
+    metadata: { progress?: { lists?: readonly { id: string; summary?: ChecklistTabSummary }[] } | null } | null | undefined;
+    globalSummary: ChecklistTabSummary | undefined;
+}
+
+const InlineListSummary = React.memo<InlineListSummaryProps>(function InlineListSummary({
+    listId,
+    metadata,
+    globalSummary,
+}) {
+    const { theme } = useUnistyles();
+    const summary = React.useMemo(() => {
+        if (listId) {
+            const list = metadata?.progress?.lists?.find((l) => l.id === listId);
+            if (list?.summary) return list.summary;
+        }
+        return globalSummary;
+    }, [listId, metadata, globalSummary]);
+
+    if (!summary) return null;
+
+    const hasDecisions = summary.keyDecisions && summary.keyDecisions.length > 0;
+
+    return (
+        <View style={styles.inlineSummary}>
+            <Text style={[styles.inlineSummaryGoal, { color: theme.colors.text }]}>
+                {summary.goal}
+            </Text>
+            {summary.currentFocus && (
+                <Text style={[styles.inlineSummaryFocus, { color: theme.colors.textSecondary }]}>
+                    {summary.currentFocus}
+                </Text>
+            )}
+            {hasDecisions && (
+                <View style={styles.inlineSummaryDecisions}>
+                    {summary.keyDecisions!.map((d, i) => (
+                        <Text
+                            key={`${i}-${d}`}
+                            style={[styles.inlineSummaryDecisionItem, { color: theme.colors.textSecondary }]}
+                        >
+                            {`• ${d}`}
+                        </Text>
+                    ))}
+                </View>
+            )}
+        </View>
+    );
+});
+
 interface ChecklistTabRowProps {
     tabs: readonly ChecklistTab[];
     selectedId: string | null;
     onSelect: (id: string) => void;
-    onShowSummary: (summary: ChecklistTabSummary) => void;
 }
 
 const ChecklistTabRow = React.memo<ChecklistTabRowProps>(function ChecklistTabRow({
     tabs,
     selectedId,
     onSelect,
-    onShowSummary,
 }) {
     const { theme } = useUnistyles();
     return (
@@ -726,42 +750,23 @@ const ChecklistTabRow = React.memo<ChecklistTabRowProps>(function ChecklistTabRo
                     ? theme.colors.textLink + "55"
                     : "transparent";
                 return (
-                    <View key={tab.id} style={styles.tabChipRow}>
-                        <Pressable
-                            onPress={() => onSelect(tab.id)}
-                            style={[
-                                styles.tabChip,
-                                { backgroundColor: bg, borderColor: border },
-                            ]}
-                            accessibilityRole="button"
-                            accessibilityState={{ selected: active }}
-                        >
-                            <Text
-                                style={[styles.tabChipText, { color }]}
-                                numberOfLines={1}
-                            >
-                                {tab.label}
-                            </Text>
-                            <Text style={[styles.tabChipCount, { color }]}>
-                                {`${tab.completed}/${tab.total}`}
-                            </Text>
-                        </Pressable>
-                        {tab.summary && (
-                            <Pressable
-                                onPress={() => onShowSummary(tab.summary!)}
-                                hitSlop={6}
-                                style={styles.tabSummaryIcon}
-                                accessibilityRole="button"
-                                accessibilityLabel={t("session.progressSummarySection")}
-                            >
-                                <Ionicons
-                                    name="information-circle-outline"
-                                    size={16}
-                                    color={active ? theme.colors.textLink : theme.colors.textSecondary}
-                                />
-                            </Pressable>
-                        )}
-                    </View>
+                    <Pressable
+                        key={tab.id}
+                        onPress={() => onSelect(tab.id)}
+                        style={[
+                            styles.tabChip,
+                            { backgroundColor: bg, borderColor: border },
+                        ]}
+                        accessibilityRole="button"
+                        accessibilityState={{ selected: active }}
+                    >
+                        <Text style={[styles.tabChipText, { color }]}>
+                            {tab.label}
+                        </Text>
+                        <Text style={[styles.tabChipCount, { color }]}>
+                            {`${tab.completed}/${tab.total}`}
+                        </Text>
+                    </Pressable>
                 );
             })}
         </ScrollView>
@@ -1347,18 +1352,33 @@ const styles = StyleSheet.create({
         alignSelf: "center",
         marginRight: 4,
     },
+    inlineSummary: {
+        gap: 2,
+        paddingVertical: 4,
+    },
+    inlineSummaryGoal: {
+        ...Typography.default("semiBold"),
+        fontSize: 12,
+        lineHeight: 16,
+    },
+    inlineSummaryFocus: {
+        ...Typography.default("regular"),
+        fontSize: 11,
+        lineHeight: 15,
+    },
+    inlineSummaryDecisions: {
+        gap: 1,
+        marginTop: 2,
+    },
+    inlineSummaryDecisionItem: {
+        ...Typography.default("regular"),
+        fontSize: 11,
+        lineHeight: 15,
+    },
     tabRow: {
         flexDirection: "row",
         gap: 6,
         paddingVertical: 6,
-    },
-    tabChipRow: {
-        flexDirection: "row",
-        alignItems: "center",
-        gap: 2,
-    },
-    tabSummaryIcon: {
-        padding: 2,
     },
     tabChip: {
         flexDirection: "row",
@@ -1368,12 +1388,11 @@ const styles = StyleSheet.create({
         paddingVertical: 5,
         borderRadius: 999,
         borderWidth: 1,
-        maxWidth: 200,
     },
     tabChipText: {
         ...Typography.default("semiBold"),
         fontSize: 11,
-        maxWidth: 140,
+        flexShrink: 1,
     },
     tabChipCount: {
         ...Typography.default("regular"),
