@@ -90,6 +90,7 @@ export const MessageView = (props: {
   showAvatar?: boolean;
   isLatestAgent?: boolean;
   hasTurnsWithThinking?: boolean;
+  thinkingMode?: "adaptive" | "enabled" | null;
   permissionModeKey?: string | null;
   contentMaxWidth?: number;
 }) => {
@@ -105,6 +106,7 @@ export const MessageView = (props: {
           showAvatar={props.showAvatar}
           isLatestAgent={props.isLatestAgent}
           hasTurnsWithThinking={props.hasTurnsWithThinking}
+          thinkingMode={props.thinkingMode}
           permissionModeKey={props.permissionModeKey}
         />
       </View>
@@ -121,6 +123,7 @@ function RenderBlock(props: {
   showAvatar?: boolean;
   isLatestAgent?: boolean;
   hasTurnsWithThinking?: boolean;
+  thinkingMode?: "adaptive" | "enabled" | null;
   permissionModeKey?: string | null;
 }): React.ReactElement {
   switch (props.message.kind) {
@@ -158,6 +161,7 @@ function RenderBlock(props: {
           metadata={props.metadata}
           sessionUsage={props.message.sessionUsage}
           hasTurnsWithThinking={props.hasTurnsWithThinking}
+          thinkingMode={props.thinkingMode}
         />
       );
 
@@ -731,6 +735,7 @@ function AgentEventBlock(props: {
     totalCostUsd?: number;
   };
   hasTurnsWithThinking?: boolean;
+  thinkingMode?: "adaptive" | "enabled" | null;
 }) {
   const { theme } = useUnistyles();
   if (props.event.type === "switch") {
@@ -838,21 +843,27 @@ function AgentEventBlock(props: {
 
     return (
       <View style={styles.turnStatsContainer}>
-        {props.hasTurnsWithThinking && (
-          <View
-            style={[
-              styles.turnStatBadge,
-              {
-                backgroundColor: theme.colors.agentEventText + "12",
-                borderColor: theme.colors.agentEventText + "20",
-              },
-            ]}
-          >
-            <Text style={styles.turnStatBadgeText}>
-              {t("message.thinkingMarker")}
-            </Text>
-          </View>
-        )}
+        {props.hasTurnsWithThinking && (() => {
+          const thinkingLabel =
+            props.thinkingMode === "adaptive"
+              ? t("agentInput.thinking.adaptive")
+              : props.thinkingMode === "enabled"
+                ? t("agentInput.thinking.enabled")
+                : t("message.thinkingMarker");
+          return (
+            <View
+              style={[
+                styles.turnStatBadge,
+                {
+                  backgroundColor: theme.colors.agentEventText + "12",
+                  borderColor: theme.colors.agentEventText + "20",
+                },
+              ]}
+            >
+              <Text style={styles.turnStatBadgeText}>{thinkingLabel}</Text>
+            </View>
+          );
+        })()}
         {modelStr && (
           <View
             style={[

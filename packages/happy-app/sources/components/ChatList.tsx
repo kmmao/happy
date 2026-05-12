@@ -209,28 +209,39 @@ const ChatListInternal = React.memo(
     // (lower index) the agent-text/tool-call messages of that turn (higher index).
     // Scan forward (higher index = older) from each ready event until the next
     // user-text or another ready event, looking for isThinking agent-text messages.
+    // Map: ready-event id → thinking mode ("adaptive"|"enabled"|null).
+    // Entry only present when the turn had actual thinking messages.
     const thinkingTurnIds = React.useMemo(() => {
       const startedAt = now();
-      const set = new Set<string>();
+      const map = new Map<string, "adaptive" | "enabled" | null>();
       const MAX_INNER_SCAN = 100; // safety cap per turn
       for (let i = 0; i < props.messages.length; i++) {
         const msg = props.messages[i];
         if (msg.kind === "agent-event" && msg.event.type === "ready") {
+          let hasThinkingMsg = false;
+          let thinkingMode: "adaptive" | "enabled" | null = null;
           // Scan forward (older messages in the same turn)
           const limit = Math.min(i + 1 + MAX_INNER_SCAN, props.messages.length);
           for (let j = i + 1; j < limit; j++) {
             const m = props.messages[j];
-            if (m.kind === "user-text") break;
-            if (m.kind === "agent-event" && m.event.type === "ready") break;
-            if (m.kind === "agent-text" && m.isThinking) {
-              set.add(msg.id);
+            if (m.kind === "user-text") {
+              const mt = m.meta?.thinking?.type;
+              thinkingMode = mt === "adaptive" || mt === "enabled" ? mt : null;
               break;
             }
+            if (m.kind === "agent-event" && m.event.type === "ready") break;
+            if (m.kind === "agent-text" && m.isThinking) {
+              hasThinkingMsg = true;
+              // Don't break — continue to find user-text for thinking mode
+            }
+          }
+          if (hasThinkingMsg) {
+            map.set(msg.id, thinkingMode);
           }
         }
       }
       logTiming("thinkingTurnIds", now() - startedAt);
-      return set;
+      return map;
     }, [props.messages, logTiming]);
 
     // Filter tool-call messages based on viewInline setting.
@@ -477,7 +488,7 @@ const ChatListInternal = React.memo(
           );
         }
 
-        const hasThinking =
+        const isReadyWithThinking =
           item.kind === "agent-event" &&
           item.event.type === "ready" &&
           thinkingTurnIds.has(item.id);
@@ -488,7 +499,8 @@ const ChatListInternal = React.memo(
             sessionId={props.sessionId}
             showAvatar={showAvatarMap.get(item.id) ?? false}
             isLatestAgent={item.id === latestAgentId}
-            hasTurnsWithThinking={hasThinking}
+            hasTurnsWithThinking={isReadyWithThinking}
+            thinkingMode={isReadyWithThinking ? (thinkingTurnIds.get(item.id) ?? null) : null}
             permissionModeKey={props.permissionModeKey}
             contentMaxWidth={props.contentMaxWidth}
           />
