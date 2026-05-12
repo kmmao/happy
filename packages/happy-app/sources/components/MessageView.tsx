@@ -32,6 +32,55 @@ import { parseLegacyCodexDiffPreview } from "./tools/codexDiffCompat";
 import { parseLegacyCodexPlanPreview } from "./tools/codexPlanCompat";
 import { parseCodexServicePreview } from "./tools/codexServiceCompat";
 import { CodexDiffView } from "./tools/views/CodexDiffView";
+import type { MessageMeta } from "@/sync/typesMessageMeta";
+
+function buildUserMetaBadgeText(meta: MessageMeta | undefined): string | null {
+  if (!meta) return null;
+  const parts: string[] = [];
+
+  if (meta.permissionMode && meta.permissionMode !== "default") {
+    const known: Record<string, string> = {
+      acceptEdits: t("agentInput.permissionMode.acceptEdits"),
+      plan: t("agentInput.permissionMode.plan"),
+      dontAsk: t("agentInput.permissionMode.dontAsk"),
+      auto: t("agentInput.permissionMode.auto"),
+      bypassPermissions: t("agentInput.permissionMode.bypassPermissions"),
+      yolo: t("agentInput.permissionMode.bypassPermissions"),
+      readOnly: t("agentInput.codexPermissionMode.readOnly"),
+      safeYolo: t("agentInput.codexPermissionMode.safeYolo"),
+    };
+    const label = known[meta.permissionMode];
+    if (label) parts.push(label);
+  }
+
+  if (meta.model) {
+    parts.push(formatModelName(meta.model));
+  }
+
+  if (meta.effort) {
+    const effortLabels: Record<string, string> = {
+      low: t("agentInput.effort.low"),
+      medium: t("agentInput.effort.medium"),
+      high: t("agentInput.effort.high"),
+      max: t("agentInput.effort.max"),
+      xhigh: t("agentInput.effort.xhigh"),
+    };
+    const label = effortLabels[meta.effort];
+    if (label) parts.push(label);
+  }
+
+  const thinkingType = meta.thinking?.type;
+  if (thinkingType && thinkingType !== "adaptive") {
+    const thinkingLabels: Record<string, string> = {
+      enabled: t("agentInput.thinking.enabled"),
+      disabled: t("agentInput.thinking.disabled"),
+    };
+    const label = thinkingLabels[thinkingType];
+    if (label) parts.push(label);
+  }
+
+  return parts.length > 0 ? parts.join(" · ") : null;
+}
 
 export const MessageView = (props: {
   message: Message;
@@ -137,6 +186,10 @@ function UserTextBlock(props: { message: UserTextMessage; sessionId: string }) {
     [props.sessionId, session, appendToInput],
   );
 
+  const metaBadgeText = React.useMemo(
+    () => buildUserMetaBadgeText(props.message.meta),
+    [props.message.meta],
+  );
 
   const parsed = React.useMemo(
     () => parseImageRefs(props.message.text),
@@ -185,6 +238,9 @@ function UserTextBlock(props: { message: UserTextMessage; sessionId: string }) {
               markdown={displayText}
               onOptionPress={handleOptionPress}
             />
+            {metaBadgeText != null && (
+              <Text style={styles.messageMeta}>{metaBadgeText}</Text>
+            )}
             {props.message.meta?.source === "auto-option-send" && (
               <View style={styles.autoSentBadge}>
                 <Ionicons name="sparkles" size={9} color={theme.colors.radio.active} />
@@ -980,6 +1036,15 @@ const styles = StyleSheet.create((theme) => ({
     borderRadius: 12,
     marginBottom: 2,
     flexShrink: 1,
+  },
+  messageMeta: {
+    ...Typography.default(),
+    fontSize: 10,
+    color: theme.colors.textSecondary,
+    opacity: 0.65,
+    alignSelf: "flex-end" as const,
+    marginTop: 4,
+    marginBottom: 2,
   },
   autoSentBadge: {
     flexDirection: "row" as const,
