@@ -912,6 +912,7 @@ function SessionViewInner({
         displayText: (item.displayText ?? item.message).includes("[image:")
           ? t("session.sentImage")
           : (item.displayText ?? item.message.slice(0, 200)),
+        fullMessage: item.message,
       })),
     [pendingQueue],
   );
@@ -961,11 +962,17 @@ function SessionViewInner({
     [latestOptions.items],
   );
   React.useEffect(() => {
-    if (latestOptions.items.length >= 2) {
-      autoOptionSendService.triggerScoringIfNeeded(sessionId, latestOptions.items, latestOptionsHash);
-    } else if (latestOptions.items.length === 0) {
-      autoOptionSendService.triggerGenerationIfNeeded(sessionId);
-    }
+    const run = () => {
+      if (latestOptions.items.length >= 2) {
+        autoOptionSendService.triggerScoringIfNeeded(sessionId, latestOptions.items, latestOptionsHash);
+      } else if (latestOptions.items.length === 0) {
+        autoOptionSendService.triggerGenerationIfNeeded(sessionId);
+      }
+    };
+    run();
+    // Retry after 3s in case sync wasn't authenticated on initial render
+    const timer = setTimeout(run, 3000);
+    return () => clearTimeout(timer);
   }, [sessionId, latestOptionsHash]);
 
   const sessionContextKeywords = React.useMemo(() => {
