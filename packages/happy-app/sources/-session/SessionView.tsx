@@ -906,6 +906,13 @@ function SessionViewInner({
     }
   }, [isRunning, sessionId]);
 
+  // Auto-close preview when the previewed item is removed from the queue.
+  React.useEffect(() => {
+    if (previewQueueItem && !pendingQueue.some((m) => m.localId === previewQueueItem.localId)) {
+      setPreviewQueueItem(null);
+    }
+  }, [pendingQueue, previewQueueItem]);
+
   const queuedMessages = React.useMemo(
     () =>
       pendingQueue.map((item) => ({
