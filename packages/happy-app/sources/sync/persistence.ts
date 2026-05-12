@@ -169,6 +169,32 @@ export function saveSessionDrafts(drafts: Record<string, string>) {
   mmkv.set("session-drafts", JSON.stringify(drafts));
 }
 
+export type PendingQueueItem = { localId: string; message: string; displayText?: string };
+
+export function loadPendingQueues(): Record<string, PendingQueueItem[]> {
+  const raw = mmkv.getString("session-pending-queues");
+  if (raw) {
+    try {
+      return JSON.parse(raw);
+    } catch (e) {
+      log.error("Failed to parse pending queues", e);
+      return {};
+    }
+  }
+  return {};
+}
+
+export function savePendingQueues(queues: Record<string, PendingQueueItem[]>) {
+  const filtered = Object.fromEntries(
+    Object.entries(queues).filter(([, q]) => q.length > 0),
+  );
+  if (Object.keys(filtered).length === 0) {
+    mmkv.delete("session-pending-queues");
+  } else {
+    mmkv.set("session-pending-queues", JSON.stringify(filtered));
+  }
+}
+
 export function loadNewSessionDraft(): NewSessionDraft | null {
   const raw = mmkv.getString(NEW_SESSION_DRAFT_KEY);
   if (!raw) {

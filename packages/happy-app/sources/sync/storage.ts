@@ -44,6 +44,8 @@ import {
   loadPendingSessionPreferences,
   savePendingSessionPreferences,
   deleteSessionBookmarks,
+  loadPendingQueues,
+  savePendingQueues,
 } from "./persistence";
 import type { PermissionModeKey } from "@/components/PermissionModeSelector";
 import type { CustomerInfo } from "./revenueCat/types";
@@ -429,6 +431,7 @@ export const storage = create<StorageState>()((set, get) => {
   let sessionProfiles = loadSessionProfiles();
   let pendingSessionPreferences = loadPendingSessionPreferences();
   let sessionLastViewed = loadSessionLastViewed();
+  const savedPendingQueues = loadPendingQueues();
 
   const stagePendingSessionPreferences = (sessionId: string) => {
     const session = get().sessions[sessionId];
@@ -480,14 +483,16 @@ export const storage = create<StorageState>()((set, get) => {
           [sessionId]: value,
         },
       })),
-    sessionPendingQueues: {},
-    appendToPendingQueue: (sessionId, item) =>
+    sessionPendingQueues: savedPendingQueues,
+    appendToPendingQueue: (sessionId, item) => {
       set((prev) => ({
         sessionPendingQueues: {
           ...prev.sessionPendingQueues,
           [sessionId]: [...(prev.sessionPendingQueues[sessionId] ?? []), item],
         },
-      })),
+      }));
+      savePendingQueues(get().sessionPendingQueues);
+    },
     shiftPendingQueue: (sessionId) => {
       let shifted: { localId: string; message: string; displayText?: string } | undefined;
       set((prev) => {
@@ -501,9 +506,10 @@ export const storage = create<StorageState>()((set, get) => {
           },
         };
       });
+      if (shifted) savePendingQueues(get().sessionPendingQueues);
       return shifted;
     },
-    removePendingQueueItem: (sessionId, localId) =>
+    removePendingQueueItem: (sessionId, localId) => {
       set((prev) => {
         const queue = prev.sessionPendingQueues[sessionId];
         if (!queue) return prev;
@@ -515,8 +521,10 @@ export const storage = create<StorageState>()((set, get) => {
             [sessionId]: filtered,
           },
         };
-      }),
-    reorderPendingQueueItemToFront: (sessionId, localId) =>
+      });
+      savePendingQueues(get().sessionPendingQueues);
+    },
+    reorderPendingQueueItemToFront: (sessionId, localId) => {
       set((prev) => {
         const queue = prev.sessionPendingQueues[sessionId];
         if (!queue) return prev;
@@ -529,12 +537,16 @@ export const storage = create<StorageState>()((set, get) => {
             [sessionId]: [item, ...queue.slice(0, idx), ...queue.slice(idx + 1)],
           },
         };
-      }),
-    clearPendingQueue: (sessionId) =>
+      });
+      savePendingQueues(get().sessionPendingQueues);
+    },
+    clearPendingQueue: (sessionId) => {
       set((prev) => {
         const { [sessionId]: _, ...rest } = prev.sessionPendingQueues;
         return { sessionPendingQueues: rest };
-      }),
+      });
+      savePendingQueues(get().sessionPendingQueues);
+    },
     realtimeStatus: "disconnected",
     realtimeMode: "idle",
     socketStatus: "disconnected",
