@@ -272,29 +272,65 @@ export const MultiTextInput = React.forwardRef<
       if (items && (onImagePaste || onFilePaste)) {
         const IMAGE_EXTS = /\.(jpe?g|png|gif|webp|bmp|heic|heif|svg)$/i;
 
-        // Diagnostic: log clipboard items to help debug duplicate paste issues
-        const fileItems = Array.from(items).filter((i) => i.kind === "file");
-        if (fileItems.length > 0) {
-          log.log(
-            `[paste] clipboardData.items: total=${items.length}, files=${fileItems.length}, types=${fileItems.map((i) => `${i.type}/${(i.getAsFile()?.size ?? "?")}B`).join(",")}`,
-          );
-        }
-
+        // Capture file items synchronously while clipboardData is still valid
+        const capturedFiles: { file: File; isImage: boolean }[] = [];
         for (const item of Array.from(items)) {
           if (item.kind !== "file") continue;
           const file = item.getAsFile();
           if (!file) continue;
+          capturedFiles.push({
+            file,
+            isImage: item.type.startsWith("image/") || IMAGE_EXTS.test(file.name),
+          });
+        }
 
-          const isImage = item.type.startsWith("image/") || IMAGE_EXTS.test(file.name);
+        if (capturedFiles.length > 0) {
+          e.preventDefault();
 
-          if (isImage && onImagePaste) {
-            e.preventDefault();
-            onImagePaste(file);
+          log.log(
+            `[paste] clipboardData files=${capturedFiles.length}, types=${capturedFiles.map((f) => `${f.file.type}/${f.file.size}B`).join(",")}`,
+          );
+
+          // Use navigator.clipboard.read() for fresh clipboard data.
+          // Chrome may serve stale data in e.clipboardData.items when the
+          // clipboard was updated (e.g. macOS screenshot) after the page
+          // last gained focus. The modern Clipboard API always reads the
+          // current OS clipboard.
+          if (typeof navigator?.clipboard?.read === "function" && onImagePaste) {
+            void (async () => {
+              try {
+                const clipboardItems = await navigator.clipboard.read();
+                for (const ci of clipboardItems) {
+                  const imageType = ci.types.find((t: string) => t.startsWith("image/"));
+                  if (imageType) {
+                    const blob = await ci.getType(imageType);
+                    log.log(`[paste] clipboard.read() image: ${imageType}/${blob.size}B`);
+                    onImagePaste(blob);
+                    return;
+                  }
+                }
+              } catch (err) {
+                log.log("[paste] clipboard.read() failed, using fallback", err);
+              }
+              // Fallback: use synchronously captured file from clipboardData
+              const first = capturedFiles[0];
+              if (first.isImage && onImagePaste) {
+                onImagePaste(first.file);
+              } else if (!first.isImage && onFilePaste) {
+                onFilePaste(first.file);
+              }
+            })();
             return;
           }
-          if (!isImage && onFilePaste) {
-            e.preventDefault();
-            onFilePaste(file);
+
+          // No modern Clipboard API — use legacy clipboardData directly
+          const first = capturedFiles[0];
+          if (first.isImage && onImagePaste) {
+            onImagePaste(first.file);
+            return;
+          }
+          if (!first.isImage && onFilePaste) {
+            onFilePaste(first.file);
             return;
           }
         }

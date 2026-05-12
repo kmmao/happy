@@ -62,24 +62,6 @@ function getCached(id: string): CachedImageState {
   return imageStateCache.get(id) ?? { paths: [], uris: [], fileNameMap: new Map() };
 }
 
-/**
- * Compute a fast fingerprint from a Blob for deduplication.
- * Uses the first 8KB of content + total size to avoid reading large blobs fully.
- */
-export async function computeBlobHash(blob: Blob): Promise<string> {
-  const SAMPLE_SIZE = 8192;
-  const sample = blob.slice(0, Math.min(blob.size, SAMPLE_SIZE));
-  const buffer = await sample.arrayBuffer();
-  const bytes = new Uint8Array(buffer);
-  // Simple FNV-1a 32-bit hash — fast and sufficient for dedup within a session
-  let hash = 0x811c9dc5;
-  for (let i = 0; i < bytes.length; i++) {
-    hash ^= bytes[i];
-    hash = Math.imul(hash, 0x01000193);
-  }
-  return `${blob.size}:${(hash >>> 0).toString(36)}`;
-}
-
 export function useImageUpload(sessionId: string): UseImageUploadResult {
   const cached = getCached(sessionId);
   const [pendingImagePaths, setPendingImagePaths] = React.useState<string[]>(cached.paths);
@@ -92,11 +74,6 @@ export function useImageUpload(sessionId: string): UseImageUploadResult {
       mountedRef.current = false;
     };
   }, []);
-
-  // Track content hashes of already-pasted image blobs to deduplicate.
-  // Prevents repeated pastes when Chrome clipboard retains old items
-  // or the user Cmd+V without the clipboard having updated yet.
-  const pastedHashesRef = React.useRef(new Set<string>());
 
   // Keep the module-level cache in sync so state survives session switches.
   React.useEffect(() => {
@@ -164,28 +141,16 @@ export function useImageUpload(sessionId: string): UseImageUploadResult {
     async (blob: Blob) => {
       try {
         if (pendingImagePathsRef.current.length >= MAX_IMAGES) return;
-
-        // Deduplicate: compute a fast content hash from the blob's first 8KB + size.
-        // Skips re-uploading the same image when Chrome clipboard retains old items.
-        const hashKey = await computeBlobHash(blob);
-        if (pastedHashesRef.current.has(hashKey)) {
-          log.log("handleImagePaste: skipped duplicate blob", hashKey);
-          return;
-        }
-
         await uploadLockRef.current.inLock(async () => {
           // Re-check under lock — a concurrent pick may have filled it
           if (pendingImagePathsRef.current.length >= MAX_IMAGES) return;
           if (!mountedRef.current) return;
-          // Re-check dedup under lock (another paste may have added it)
-          if (pastedHashesRef.current.has(hashKey)) return;
           setIsProcessingImage(true);
           try {
             const base64 = await blobToResizedBase64(blob);
             if (pendingImagePathsRef.current.length >= MAX_IMAGES) return;
             const path = await uploadBase64Image(sessionId, base64);
             if (!mountedRef.current) return;
-            pastedHashesRef.current.add(hashKey);
             setPendingImagePaths((prev) =>
               prev.length >= MAX_IMAGES ? prev : [...prev, path],
             );
@@ -371,7 +336,6 @@ export function useImageUpload(sessionId: string): UseImageUploadResult {
 
   const clearImages = React.useCallback(() => {
     imageStateCache.delete(sessionId);
-    pastedHashesRef.current.clear();
     setPendingImagePaths([]);
     setPendingImageUris([]);
     setFileNameMap(new Map());
