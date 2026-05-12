@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import * as React from "react";
-import { Image, Pressable, ScrollView, TouchableOpacity, View } from "react-native";
+import { Animated, Image, Pressable, ScrollView, TouchableOpacity, View } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Typography } from "@/constants/Typography";
@@ -55,10 +55,33 @@ export const QueuePreviewOverlay = React.memo(({ item, onClose, onSendNow }: Que
     const insets = useSafeAreaInsets();
     const segments = parseMessageSegments(item.fullMessage ?? item.displayText);
 
+    const translateY = React.useRef(new Animated.Value(320)).current;
+    const backdropOpacity = React.useRef(new Animated.Value(0)).current;
+
+    React.useEffect(() => {
+        Animated.parallel([
+            Animated.timing(translateY, {
+                toValue: 0,
+                duration: 280,
+                useNativeDriver: true,
+            }),
+            Animated.timing(backdropOpacity, {
+                toValue: 1,
+                duration: 240,
+                useNativeDriver: true,
+            }),
+        ]).start();
+    }, [translateY, backdropOpacity]);
+
     return (
         <View style={modalStyles.overlay} pointerEvents="box-none">
-            <Pressable style={modalStyles.backdrop} onPress={onClose} />
-            <View style={[modalStyles.sheet, { paddingBottom: insets.bottom + 16 }]}>
+            <Animated.View
+                style={[modalStyles.backdrop, { opacity: backdropOpacity }]}
+                pointerEvents="auto"
+            >
+                <Pressable style={modalStyles.backdropPress} onPress={onClose} />
+            </Animated.View>
+            <Animated.View style={[modalStyles.sheet, { paddingBottom: insets.bottom + 16, transform: [{ translateY }] }]}>
                 {/* Handle bar */}
                 <View style={modalStyles.handle} />
 
@@ -116,7 +139,7 @@ export const QueuePreviewOverlay = React.memo(({ item, onClose, onSendNow }: Que
                         </TouchableOpacity>
                     </View>
                 )}
-            </View>
+            </Animated.View>
         </View>
     );
 });
@@ -277,6 +300,9 @@ const modalStyles = StyleSheet.create((theme) => ({
     backdrop: {
         ...StyleSheet.absoluteFillObject,
         backgroundColor: "rgba(0,0,0,0.5)",
+    },
+    backdropPress: {
+        flex: 1,
     },
     sheet: {
         backgroundColor: theme.colors.surface,
