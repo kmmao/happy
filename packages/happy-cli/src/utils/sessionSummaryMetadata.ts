@@ -57,17 +57,35 @@ function applyRefreshAck(
   };
 }
 
+function mergeStringArrays(
+  existing: readonly string[] | undefined,
+  incoming: readonly string[] | undefined,
+): string[] | undefined {
+  if (!incoming || incoming.length === 0) return existing ? [...existing] : undefined;
+  if (!existing || existing.length === 0) return [...incoming];
+  const seen = new Set(existing);
+  const merged = [...existing];
+  for (const item of incoming) {
+    if (!seen.has(item)) {
+      merged.push(item);
+      seen.add(item);
+    }
+  }
+  return merged;
+}
+
 export function applySessionSummaryUpdate<T extends Metadata>(
   metadata: T,
   input: ApplySessionSummaryUpdateInput,
 ): T & Pick<Metadata, "sessionSummary" | "sessionSummaryRefresh"> {
   const updatedAt = input.now ?? Date.now();
+  const prev = metadata.sessionSummary;
   const sessionSummary: SessionSummaryState = {
     goal: input.goal,
     currentFocus: input.currentFocus,
-    keyDecisions: input.keyDecisions,
+    keyDecisions: mergeStringArrays(prev?.keyDecisions, input.keyDecisions),
     openQuestions: input.openQuestions,
-    impactScope: input.impactScope,
+    impactScope: mergeStringArrays(prev?.impactScope, input.impactScope),
     updatedAt,
   };
 

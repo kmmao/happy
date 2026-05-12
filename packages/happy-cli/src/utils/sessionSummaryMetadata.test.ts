@@ -209,6 +209,87 @@ describe("applySessionSummaryUpdate", () => {
     ]);
   });
 
+  it("appends new keyDecisions to existing ones without duplicates", () => {
+    const result = applySessionSummaryUpdate(
+      {
+        path: "/tmp/project",
+        host: "test-host",
+        homeDir: "/Users/test",
+        happyHomeDir: "/Users/test/.happy",
+        happyLibDir: "/Users/test/.happy/lib",
+        happyToolsDir: "/Users/test/.happy/tools",
+        sessionSummary: {
+          goal: "Build feature X",
+          keyDecisions: ["Chose approach A", "Used library B"],
+          impactScope: ["auth module"],
+          updatedAt: 50,
+        },
+      },
+      {
+        goal: "Build feature X (phase 2)",
+        keyDecisions: ["Used library B", "Switched to strategy C"],
+        impactScope: ["auth module", "payments module"],
+        now: 100,
+      },
+    );
+
+    expect(result.sessionSummary).toMatchObject({
+      goal: "Build feature X (phase 2)",
+      keyDecisions: ["Chose approach A", "Used library B", "Switched to strategy C"],
+      impactScope: ["auth module", "payments module"],
+      updatedAt: 100,
+    });
+  });
+
+  it("preserves existing keyDecisions when incoming is empty", () => {
+    const result = applySessionSummaryUpdate(
+      {
+        path: "/tmp/project",
+        host: "test-host",
+        homeDir: "/Users/test",
+        happyHomeDir: "/Users/test/.happy",
+        happyLibDir: "/Users/test/.happy/lib",
+        happyToolsDir: "/Users/test/.happy/tools",
+        sessionSummary: {
+          goal: "Old goal",
+          keyDecisions: ["Decision 1"],
+          updatedAt: 50,
+        },
+      },
+      {
+        goal: "New goal",
+        now: 100,
+      },
+    );
+
+    expect(result.sessionSummary?.keyDecisions).toEqual(["Decision 1"]);
+  });
+
+  it("replaces openQuestions on each update (not appended)", () => {
+    const result = applySessionSummaryUpdate(
+      {
+        path: "/tmp/project",
+        host: "test-host",
+        homeDir: "/Users/test",
+        happyHomeDir: "/Users/test/.happy",
+        happyLibDir: "/Users/test/.happy/lib",
+        happyToolsDir: "/Users/test/.happy/tools",
+        sessionSummary: {
+          goal: "Old goal",
+          openQuestions: ["Old question?"],
+          updatedAt: 50,
+        },
+      },
+      {
+        goal: "New goal",
+        openQuestions: ["New question?"],
+        now: 100,
+      },
+    );
+
+    expect(result.sessionSummary?.openQuestions).toEqual(["New question?"]);
+  });
+
   it("does not clear a different active request when applying a non-active requestId", () => {
     const result = applySessionSummaryUpdate(
       {
