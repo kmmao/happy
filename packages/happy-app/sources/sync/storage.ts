@@ -63,6 +63,25 @@ import {
   overlayPendingSessionPreferences,
 } from "./sessionPreferencesState";
 
+// Stable descending comparator for messages.
+// When createdAt is identical, use kind priority so that in the newest-first
+// array user-text comes before ready events, which come before agent content.
+// Final tie-breaker is the id string to guarantee deterministic order.
+const MESSAGE_KIND_PRIORITY: Record<string, number> = {
+    "user-text": 0,
+    "agent-event": 1,
+    "agent-text": 2,
+    "tool-call": 3,
+};
+function compareMessagesDesc(a: Message, b: Message): number {
+    const dt = b.createdAt - a.createdAt;
+    if (dt !== 0) return dt;
+    const pa = MESSAGE_KIND_PRIORITY[a.kind] ?? 9;
+    const pb = MESSAGE_KIND_PRIORITY[b.kind] ?? 9;
+    if (pa !== pb) return pa - pb;
+    return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+}
+
 // Debounce timer for realtimeMode changes
 let realtimeModeDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 const REALTIME_MODE_DEBOUNCE_MS = 150;
@@ -865,9 +884,7 @@ export const storage = create<StorageState>()((set, get) => {
               mergedMessagesMap[message.id] = message;
             });
 
-            const messagesArray = Object.values(mergedMessagesMap).sort(
-              (a, b) => b.createdAt - a.createdAt,
-            );
+            const messagesArray = Object.values(mergedMessagesMap).sort(compareMessagesDesc);
 
             updatedSessionMessages[session.id] = {
               messages: messagesArray,
@@ -1019,9 +1036,7 @@ export const storage = create<StorageState>()((set, get) => {
           )
         ) {
           // Fast path: all new messages are ≥ newest existing — prepend sorted batch
-          const sortedNew = [...newMessages].sort(
-            (a, b) => b.createdAt - a.createdAt,
-          );
+          const sortedNew = [...newMessages].sort(compareMessagesDesc);
           const existingMaybeUpdated = processedMessages.some(
             (m) => existingSession.messagesMap[m.id],
           )
@@ -1030,9 +1045,7 @@ export const storage = create<StorageState>()((set, get) => {
           messagesArray = [...sortedNew, ...existingMaybeUpdated];
         } else {
           // Slow path: full re-sort (out-of-order timestamps or first load)
-          messagesArray = Object.values(mergedMessagesMap).sort(
-            (a, b) => b.createdAt - a.createdAt,
-          );
+          messagesArray = Object.values(mergedMessagesMap).sort(compareMessagesDesc);
         }
 
         const latestUserRequestPreview = session
@@ -1143,9 +1156,7 @@ export const storage = create<StorageState>()((set, get) => {
               messagesMap[message.id] = message;
             });
 
-            messages = Object.values(messagesMap).sort(
-              (a, b) => b.createdAt - a.createdAt,
-            );
+            messages = Object.values(messagesMap).sort(compareMessagesDesc);
           }
 
           // Extract latestUsage and resolvedModelId from reducerState if available and update session

@@ -4,6 +4,12 @@ import { StyleSheet } from "react-native-unistyles";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
+import Animated, {
+    useSharedValue,
+    useAnimatedStyle,
+    withTiming,
+    Easing,
+} from "react-native-reanimated";
 import { Avatar } from "@/components/Avatar";
 import { Typography } from "@/constants/Typography";
 import { useHeaderHeight } from "@/utils/responsive";
@@ -63,6 +69,18 @@ export const ChatHeaderView: React.FC<ChatHeaderViewProps> = ({
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const headerHeight = useHeaderHeight();
+
+  const reloadRotation = useSharedValue(0);
+  const reloadAnimatedStyle = useAnimatedStyle(() => ({
+      transform: [{ rotate: `${reloadRotation.value}deg` }],
+  }));
+  const handleReloadPress = React.useCallback(() => {
+      reloadRotation.value = withTiming(reloadRotation.value + 360, {
+          duration: 600,
+          easing: Easing.out(Easing.cubic),
+      });
+      onReloadPress?.();
+  }, [onReloadPress, reloadRotation]);
 
   const handleBackPress = () => {
     if (onBackPress) {
@@ -196,15 +214,17 @@ export const ChatHeaderView: React.FC<ChatHeaderViewProps> = ({
 
           {onReloadPress && (
             <Pressable
-              onPress={onReloadPress}
+              onPress={handleReloadPress}
               hitSlop={15}
               style={styles.actionButton}
             >
-              <Ionicons
-                name="refresh-outline"
-                size={20}
-                color={theme.colors.header.tint}
-              />
+              <Animated.View style={reloadAnimatedStyle}>
+                <Ionicons
+                  name="refresh-outline"
+                  size={20}
+                  color={theme.colors.header.tint}
+                />
+              </Animated.View>
             </Pressable>
           )}
 
