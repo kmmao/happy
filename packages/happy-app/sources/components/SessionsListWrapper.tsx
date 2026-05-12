@@ -5,6 +5,7 @@ import { SessionsList } from './SessionsList';
 import { EmptyMainScreen } from './EmptyMainScreen';
 import { SharedStateView } from './SharedStateView';
 import { AgentsDashboard } from './AgentsDashboard';
+import { UpdateBanner } from './UpdateBanner';
 import { useVisibleSessionListViewData } from '@/hooks/useVisibleSessionListViewData';
 import { useSessions } from '@/sync/storage';
 import { Session } from '@/sync/storageTypes';
@@ -75,10 +76,13 @@ export const SessionsListWrapper = React.memo(() => {
         );
     }
 
+    const showAgentsDashboard = activeSessions.length >= 2;
+
     return (
         <View style={styles.container}>
+            {showAgentsDashboard && <UpdateBanner />}
             <AgentsDashboard sessions={activeSessions} />
-            <SessionsList />
+            <SessionsList hideUpdateBanner={showAgentsDashboard} />
         </View>
     );
 });

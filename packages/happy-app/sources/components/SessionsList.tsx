@@ -400,7 +400,11 @@ const stylesheet = StyleSheet.create((theme, rt) => ({
   },
 }));
 
-export function SessionsList() {
+interface SessionsListProps {
+  hideUpdateBanner?: boolean;
+}
+
+export function SessionsList({ hideUpdateBanner }: SessionsListProps = {}) {
     const layout = useLayout();
   const styles = stylesheet;
   const safeArea = useSafeAreaInsets();
@@ -587,7 +591,7 @@ export function SessionsList() {
   const HeaderComponent = React.useCallback(() => {
     return (
       <>
-        <UpdateBanner />
+        {!hideUpdateBanner && <UpdateBanner />}
         {allTags.length > 0 && (
           <ScrollView
             horizontal
