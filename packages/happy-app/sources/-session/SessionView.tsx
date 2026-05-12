@@ -49,7 +49,7 @@ import {
   stopRealtimeSession,
 } from "@/realtime/RealtimeSession";
 import { sessionInterrupt, sessionStopTask, sessionBash } from "@/sync/ops";
-import { QueueBanner } from "@/components/QueueBanner";
+import { QueueBanner, QueuePreviewOverlay, type QueuedMessageItem } from "@/components/QueueBanner";
 import { reactivateArchivedSession } from "@/sync/sessionResumeFlow";
 import { runWithSessionReactivationGuard } from "@/sync/sessionResumeGuard";
 import { resolveSessionReactivationContext } from "@/hooks/sessionResumeSupport";
@@ -891,6 +891,7 @@ function SessionViewInner({
   const [pendingQueue, setPendingQueue] = React.useState<
     Array<{ localId: string; message: string; displayText?: string }>
   >([]);
+  const [previewQueueItem, setPreviewQueueItem] = React.useState<QueuedMessageItem | null>(null);
   const pendingQueueRef = React.useRef(pendingQueue);
   pendingQueueRef.current = pendingQueue;
 
@@ -1605,6 +1606,7 @@ function SessionViewInner({
         onSendNow={handleSendNow}
         onSendItemNow={handleSendItemNow}
         onCancelItem={handleCancelQueuedItem}
+        onOpenPreview={setPreviewQueueItem}
         isRunning={isRunning}
       />
       <View onLayout={(e) => setAgentInputHeight(e.nativeEvent.layout.height)}>
@@ -1961,6 +1963,19 @@ function SessionViewInner({
           title={t("session.bookmarkOption")}
           onRemoveOption={(text) => toggleBookmark(text, "ai")}
         />
+        {previewQueueItem != null && (
+          <QueuePreviewOverlay
+            item={previewQueueItem}
+            onClose={() => setPreviewQueueItem(null)}
+            onSendNow={isRunning && handleSendItemNow
+              ? () => {
+                  handleSendItemNow(previewQueueItem.localId);
+                  setPreviewQueueItem(null);
+                }
+              : undefined
+            }
+          />
+        )}
       </View>
 
       {/* Back button for landscape phone mode when header is hidden */}

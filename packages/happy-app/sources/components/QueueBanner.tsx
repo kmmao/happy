@@ -1,13 +1,13 @@
 import { Ionicons } from "@expo/vector-icons";
 import * as React from "react";
-import { Image, Modal, Pressable, ScrollView, TouchableOpacity, View } from "react-native";
+import { Image, Pressable, ScrollView, TouchableOpacity, View } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Typography } from "@/constants/Typography";
 import { Text } from "./StyledText";
 import { t } from "@/text";
 
-interface QueuedMessageItem {
+export interface QueuedMessageItem {
     localId: string;
     displayText: string;
     fullMessage?: string;
@@ -18,6 +18,7 @@ interface QueueBannerProps {
     onSendNow: () => void;
     onSendItemNow?: (localId: string) => void;
     onCancelItem: (localId: string) => void;
+    onOpenPreview?: (item: QueuedMessageItem) => void;
     isRunning?: boolean;
 }
 
@@ -43,102 +44,88 @@ function parseMessageSegments(message: string): Array<{ type: "text"; text: stri
     return segments;
 }
 
-interface PreviewModalProps {
-    item: QueuedMessageItem | null;
+interface QueuePreviewOverlayProps {
+    item: QueuedMessageItem;
     onClose: () => void;
     onSendNow?: () => void;
 }
 
-const PreviewModal = React.memo(({ item, onClose, onSendNow }: PreviewModalProps) => {
+export const QueuePreviewOverlay = React.memo(({ item, onClose, onSendNow }: QueuePreviewOverlayProps) => {
     const { theme } = useUnistyles();
     const insets = useSafeAreaInsets();
-
-    if (!item) return null;
-
     const segments = parseMessageSegments(item.fullMessage ?? item.displayText);
 
     return (
-        <Modal
-            visible={true}
-            transparent
-            animationType="fade"
-            onRequestClose={onClose}
-            statusBarTranslucent
-        >
-            <Pressable style={modalStyles.backdrop} onPress={onClose}>
-                <Pressable
-                    style={[modalStyles.sheet, { paddingBottom: insets.bottom + 16 }]}
-                    onPress={() => {}}
-                >
-                    {/* Handle bar */}
-                    <View style={modalStyles.handle} />
+        <View style={modalStyles.overlay} pointerEvents="box-none">
+            <Pressable style={modalStyles.backdrop} onPress={onClose} />
+            <View style={[modalStyles.sheet, { paddingBottom: insets.bottom + 16 }]}>
+                {/* Handle bar */}
+                <View style={modalStyles.handle} />
 
-                    {/* Header */}
-                    <View style={modalStyles.modalHeader}>
-                        <Text style={[modalStyles.modalTitle, { color: theme.colors.text }]}>
-                            {t("session.queuedMessagePreview")}
+                {/* Header */}
+                <View style={[modalStyles.modalHeader, { borderBottomColor: theme.colors.divider }]}>
+                    <Text style={[modalStyles.modalTitle, { color: theme.colors.text }]}>
+                        {t("session.queuedMessagePreview")}
+                    </Text>
+                    <TouchableOpacity onPress={onClose} hitSlop={10} style={modalStyles.closeBtn}>
+                        <Ionicons name="close" size={20} color={theme.colors.textSecondary} />
+                    </TouchableOpacity>
+                </View>
+
+                {/* Content */}
+                <ScrollView
+                    style={modalStyles.scrollView}
+                    contentContainerStyle={modalStyles.scrollContent}
+                    showsVerticalScrollIndicator={false}
+                >
+                    {segments.length > 0 ? (
+                        segments.map((seg, idx) =>
+                            seg.type === "image" ? (
+                                <View key={idx} style={[modalStyles.imageWrapper, { backgroundColor: theme.colors.surfaceHigh }]}>
+                                    <Image
+                                        source={{ uri: seg.uri.startsWith("/") ? `file://${seg.uri}` : seg.uri }}
+                                        style={modalStyles.previewImage}
+                                        resizeMode="contain"
+                                    />
+                                </View>
+                            ) : (
+                                <Text key={idx} style={[modalStyles.fullText, { color: theme.colors.text }]}>
+                                    {seg.text}
+                                </Text>
+                            )
+                        )
+                    ) : (
+                        <Text style={[modalStyles.fullText, { color: theme.colors.textSecondary }]}>
+                            {item.displayText}
                         </Text>
-                        <TouchableOpacity onPress={onClose} hitSlop={10} style={modalStyles.closeBtn}>
-                            <Ionicons name="close" size={20} color={theme.colors.textSecondary} />
+                    )}
+                </ScrollView>
+
+                {/* Send Now button */}
+                {onSendNow && (
+                    <View style={[modalStyles.footer, { borderTopColor: theme.colors.divider }]}>
+                        <TouchableOpacity
+                            style={[modalStyles.sendNowBtn, { backgroundColor: theme.colors.button.primary.background }]}
+                            onPress={onSendNow}
+                            activeOpacity={0.8}
+                        >
+                            <Ionicons name="play" size={14} color={theme.colors.button.primary.tint} />
+                            <Text style={[modalStyles.sendNowBtnText, { color: theme.colors.button.primary.tint }]}>
+                                {t("session.sendNow")}
+                            </Text>
                         </TouchableOpacity>
                     </View>
-
-                    {/* Content */}
-                    <ScrollView
-                        style={modalStyles.scrollView}
-                        contentContainerStyle={modalStyles.scrollContent}
-                        showsVerticalScrollIndicator={false}
-                    >
-                        {segments.length > 0 ? (
-                            segments.map((seg, idx) =>
-                                seg.type === "image" ? (
-                                    <View key={idx} style={modalStyles.imageWrapper}>
-                                        <Image
-                                            source={{ uri: seg.uri.startsWith("/") ? `file://${seg.uri}` : seg.uri }}
-                                            style={modalStyles.previewImage}
-                                            resizeMode="contain"
-                                        />
-                                    </View>
-                                ) : (
-                                    <Text key={idx} style={[modalStyles.fullText, { color: theme.colors.text }]}>
-                                        {seg.text}
-                                    </Text>
-                                )
-                            )
-                        ) : (
-                            <Text style={[modalStyles.fullText, { color: theme.colors.textSecondary }]}>
-                                {item.displayText}
-                            </Text>
-                        )}
-                    </ScrollView>
-
-                    {/* Send Now button */}
-                    {onSendNow && (
-                        <View style={[modalStyles.footer, { borderTopColor: theme.colors.divider }]}>
-                            <TouchableOpacity
-                                style={[modalStyles.sendNowBtn, { backgroundColor: theme.colors.button.primary.background }]}
-                                onPress={onSendNow}
-                                activeOpacity={0.8}
-                            >
-                                <Ionicons name="play" size={14} color={theme.colors.button.primary.tint} />
-                                <Text style={[modalStyles.sendNowBtnText, { color: theme.colors.button.primary.tint }]}>
-                                    {t("session.sendNow")}
-                                </Text>
-                            </TouchableOpacity>
-                        </View>
-                    )}
-                </Pressable>
-            </Pressable>
-        </Modal>
+                )}
+            </View>
+        </View>
     );
 });
 
-PreviewModal.displayName = "PreviewModal";
+QueuePreviewOverlay.displayName = "QueuePreviewOverlay";
 
-export const QueueBanner = React.memo(({ queuedMessages, onSendNow, onSendItemNow, onCancelItem, isRunning }: QueueBannerProps) => {
+export const QueueBanner = React.memo(({ queuedMessages, onSendNow, onSendItemNow, onCancelItem, onOpenPreview, isRunning }: QueueBannerProps) => {
     const { theme } = useUnistyles();
     const count = queuedMessages.length;
-    const [previewItem, setPreviewItem] = React.useState<QueuedMessageItem | null>(null);
 
     if (count === 0) return null;
 
@@ -191,7 +178,7 @@ export const QueueBanner = React.memo(({ queuedMessages, onSendNow, onSendItemNo
                             { backgroundColor: `${theme.colors.textSecondary}12` },
                             pressed && { opacity: 0.7 },
                         ]}
-                        onPress={() => setPreviewItem(msg)}
+                        onPress={() => onOpenPreview?.(msg)}
                     >
                         <Text style={[styles.chipText, { color: theme.colors.textSecondary }]} numberOfLines={1}>
                             {msg.displayText}
@@ -221,18 +208,6 @@ export const QueueBanner = React.memo(({ queuedMessages, onSendNow, onSendItemNo
                     </Pressable>
                 ))}
             </ScrollView>
-
-            <PreviewModal
-                item={previewItem}
-                onClose={() => setPreviewItem(null)}
-                onSendNow={isRunning && onSendItemNow && previewItem
-                    ? () => {
-                        onSendItemNow(previewItem.localId);
-                        setPreviewItem(null);
-                    }
-                    : undefined
-                }
-            />
         </View>
     );
 });
@@ -294,10 +269,14 @@ const styles = StyleSheet.create(() => ({
 }));
 
 const modalStyles = StyleSheet.create((theme) => ({
-    backdrop: {
-        flex: 1,
-        backgroundColor: "rgba(0,0,0,0.5)",
+    overlay: {
+        ...StyleSheet.absoluteFillObject,
+        zIndex: 999,
         justifyContent: "flex-end",
+    },
+    backdrop: {
+        ...StyleSheet.absoluteFillObject,
+        backgroundColor: "rgba(0,0,0,0.5)",
     },
     sheet: {
         backgroundColor: theme.colors.surface,
@@ -320,7 +299,6 @@ const modalStyles = StyleSheet.create((theme) => ({
         paddingHorizontal: 16,
         paddingBottom: 12,
         borderBottomWidth: 1,
-        borderBottomColor: theme.colors.divider,
     },
     modalTitle: {
         ...Typography.default("semiBold"),
@@ -345,7 +323,6 @@ const modalStyles = StyleSheet.create((theme) => ({
     imageWrapper: {
         borderRadius: 10,
         overflow: "hidden",
-        backgroundColor: theme.colors.surfaceHigh,
         alignItems: "center",
     },
     previewImage: {
