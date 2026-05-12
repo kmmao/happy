@@ -1946,13 +1946,9 @@ export async function claudeRemoteLauncher(
               permissionHandler.handleModeChange(mode.permissionMode);
               startMidTurnDrain();
 
-              // SDK 0.2.119+ native binary ignores appendSystemPrompt via IPC.
-              // Inject App prompt as <system-reminder> prefix on every user message
-              // so Claude reliably receives the <options> and skill instructions.
-              const appPrompt = msg.mode.appendSystemPrompt;
-              const appPromptPrefix = appPrompt
-                ? `<system-reminder>\n${appPrompt}\n</system-reminder>\n\n`
-                : "";
+              // App prompt (appendSystemPrompt) injection is handled by
+              // claudeRemote.ts buildSystemReminderPrefix(). Do NOT inject here
+              // — it causes the same content to appear twice in each message.
 
               // Knowledge injection: prepend to message (appendSystemPrompt path is broken)
               let effectiveKnowledgeContext = knowledgeContext;
@@ -2003,7 +1999,7 @@ export async function claudeRemoteLauncher(
                       const titles = newEntries.map((e) => `"${e.title}"`).join(", ");
                       const hint = `[Knowledge base update: ${newEntries.length} new ${newEntries.length === 1 ? "entry" : "entries"} added (${titles}). Use query_project_knowledge tool if relevant to this task.]\n\n`;
                       return {
-                        message: appPromptPrefix + hint + msg.message,
+                        message: hint + msg.message,
                         mode: msg.mode,
                       };
                     }
@@ -2020,7 +2016,7 @@ export async function claudeRemoteLauncher(
                 const hint = pendingFileHint;
                 pendingFileHint = null;
                 return {
-                  message: appPromptPrefix + hint + msg.message,
+                  message: hint + msg.message,
                   mode: msg.mode,
                 };
               }
@@ -2054,7 +2050,7 @@ export async function claudeRemoteLauncher(
               }
 
               return {
-                message: contextMdPrefix + appPromptPrefix + worldConfigPrefix + knowledgePrefix + msg.message,
+                message: contextMdPrefix + worldConfigPrefix + knowledgePrefix + msg.message,
                 mode: msg.mode,
               };
             }

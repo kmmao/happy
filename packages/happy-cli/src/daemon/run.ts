@@ -92,6 +92,11 @@ const SESSION_WEBHOOK_TIMEOUT_MS = Math.max(
   Number.parseInt(process.env.HAPPY_SESSION_WEBHOOK_TIMEOUT_MS ?? "90000", 10) || 90_000,
 );
 
+/** Shell-escape a string for safe interpolation into tmux commands. */
+function shellescape(s: string): string {
+    return "'" + s.replace(/'/g, "'\\''") + "'";
+}
+
 // Prepare initial metadata
 export const initialMachineMetadata: MachineMetadata = {
   host: os.hostname(),
@@ -1183,21 +1188,17 @@ export async function startDaemon(): Promise<void> {
                 : "claude";
           const resumeArg =
             sessionId && /^[0-9a-f-]+$/i.test(sessionId)
-              ? ` --resume ${sessionId}`
+              ? ` --resume ${shellescape(sessionId)}`
               : "";
           const happySessionArg = happySessionId
-            ? ` --happy-session-id ${happySessionId}`
+            ? ` --happy-session-id ${shellescape(happySessionId)}`
             : "";
           const forkSourceArg = forkSourceId
-            ? ` --happy-fork-source ${forkSourceId}`
+            ? ` --happy-fork-source ${shellescape(forkSourceId)}`
             : "";
-          // Build --claude-env args for tmux command so profile env vars survive
-          // Claude Code SDK settings.json overrides
           const claudeEnvArgs = Object.entries(sessionScopedEnv)
             .map(([key, value]) => {
-              // Escape single quotes in values for shell safety
-              const escaped = value.replace(/'/g, "'\\''");
-              return ` --claude-env '${key}=${escaped}'`;
+              return ` --claude-env ${shellescape(key + "=" + value)}`;
             })
             .join("");
           const fullCommand = `node --no-warnings --no-deprecation ${cliPath} ${agent} --happy-starting-mode remote --started-by daemon${resumeArg}${happySessionArg}${forkSourceArg}${claudeEnvArgs}`;
