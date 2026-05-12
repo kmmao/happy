@@ -69,11 +69,7 @@ function normalizeCodexPlanTodos(
 }
 
 function deriveLabel(todos: readonly ProgressTodo[]): string | undefined {
-  const first = todos[0]?.content;
-  if (!first) {
-    return undefined;
-  }
-  return first.length <= 32 ? first : `${first.slice(0, 31)}…`;
+  return todos[0]?.content;
 }
 
 type MirrorCodexPlanArgs = {

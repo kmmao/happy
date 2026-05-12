@@ -774,11 +774,7 @@ export async function claudeRemoteLauncher(
                   `[progress-mirror] ${mirrored.length} todos (boundary=${isBoundary ? "yes" : "no"}, old=${oldTodos.length}, intersect=${intersection})`,
                 );
 
-                const label = mirrored[0]
-                  ? mirrored[0].content.length > 32
-                    ? mirrored[0].content.slice(0, 31) + "…"
-                    : mirrored[0].content
-                  : undefined;
+                const label = mirrored[0]?.content;
 
                 let nextLists = lists;
                 let nextCurrentId = currentId;
