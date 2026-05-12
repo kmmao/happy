@@ -1,9 +1,9 @@
 import * as React from "react";
+import { useUnistyles } from "react-native-unistyles";
 import {
   useSession,
   useSessionMessages,
   useSetting,
-  MAX_DISPLAY_MESSAGES,
 } from "@/sync/storage";
 import {
   ActivityIndicator,
@@ -158,6 +158,7 @@ const ChatListInternal = React.memo(
     const flatListRef = React.useRef<FlatList>(null);
     const isAwayRef = React.useRef(false);
     const currentUserMsgIndexRef = React.useRef(-1);
+    const { theme } = useUnistyles();
     const experiments = useSetting("experiments");
     const lastTimingLogAtRef = React.useRef<Record<string, number | null>>({
       thinkingTurnIds: null,
@@ -470,10 +471,22 @@ const ChatListInternal = React.memo(
       ({ item }: { item: ChatDisplayItem }) => {
         if (isTurnStartSeparator(item)) {
           return (
-            <View style={{ flexDirection: "row", alignItems: "center", paddingHorizontal: 16, paddingVertical: 6, opacity: 0.45 }}>
-              <View style={{ flex: 1, height: 1, backgroundColor: "#888" }} />
-              <Text style={{ marginHorizontal: 8, fontSize: 10, color: "#888" }}>{t("message.turnStart")}</Text>
-              <View style={{ flex: 1, height: 1, backgroundColor: "#888" }} />
+            <View style={{ paddingHorizontal: 16, paddingTop: 4, paddingBottom: 2 }}>
+              <View
+                style={{
+                  alignSelf: "flex-start",
+                  paddingHorizontal: 8,
+                  paddingVertical: 3,
+                  borderRadius: 6,
+                  borderWidth: 1,
+                  borderColor: theme.colors.agentEventText + "20",
+                  backgroundColor: theme.colors.agentEventText + "0E",
+                }}
+              >
+                <Text style={{ fontSize: 11, color: theme.colors.agentEventText, opacity: 0.6 }}>
+                  {t("message.turnStart")}
+                </Text>
+              </View>
             </View>
           );
         }
@@ -525,6 +538,7 @@ const ChatListInternal = React.memo(
         showAvatarMap,
         latestAgentId,
         thinkingTurnIds,
+        theme,
       ],
     );
     return (

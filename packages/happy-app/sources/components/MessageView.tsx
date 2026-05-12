@@ -838,14 +838,20 @@ function AgentEventBlock(props: {
       (sessionCost !== undefined && sessionCost > 0);
 
     if (!hasParts) {
-      // Always render a minimal turn-end separator even without stats data
       return (
-        <View style={[styles.turnStatsContainer, { paddingVertical: 2 }]}>
-          <View style={{ flex: 1, height: 1, backgroundColor: theme.colors.divider, opacity: 0.5 }} />
-          <Text style={[styles.turnStatBadgeText, { color: theme.colors.textSecondary, opacity: 0.45, marginHorizontal: 8 }]}>
-            {t("message.turnEnd")}
-          </Text>
-          <View style={{ flex: 1, height: 1, backgroundColor: theme.colors.divider, opacity: 0.5 }} />
+        <View style={styles.turnStatsContainer}>
+          <View
+            style={[
+              styles.turnStatBadge,
+              {
+                backgroundColor: theme.colors.agentEventText + "0E",
+                borderColor: theme.colors.agentEventText + "20",
+                opacity: 0.6,
+              },
+            ]}
+          >
+            <Text style={styles.turnStatBadgeText}>{t("message.turnEnd")}</Text>
+          </View>
         </View>
       );
     }
