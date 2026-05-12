@@ -4,6 +4,7 @@ import { useUnistyles } from "react-native-unistyles";
 import TextareaAutosize from "react-textarea-autosize";
 import { Typography } from "@/constants/Typography";
 import { shouldCreatePasteBlock } from "./pasteBlock";
+import { log } from "@/log";
 
 export type SupportedKey =
   | "Enter"
@@ -270,6 +271,14 @@ export const MultiTextInput = React.forwardRef<
       // Check for file/image paste first
       if (items && (onImagePaste || onFilePaste)) {
         const IMAGE_EXTS = /\.(jpe?g|png|gif|webp|bmp|heic|heif|svg)$/i;
+
+        // Diagnostic: log clipboard items to help debug duplicate paste issues
+        const fileItems = Array.from(items).filter((i) => i.kind === "file");
+        if (fileItems.length > 0) {
+          log.log(
+            `[paste] clipboardData.items: total=${items.length}, files=${fileItems.length}, types=${fileItems.map((i) => `${i.type}/${(i.getAsFile()?.size ?? "?")}B`).join(",")}`,
+          );
+        }
 
         for (const item of Array.from(items)) {
           if (item.kind !== "file") continue;

@@ -67,6 +67,7 @@ import {
 } from "@/utils/imageUpload";
 import { encodeBase64 } from "@/encryption/base64";
 import { uploadRawFile } from "@/utils/imageUpload.shared";
+import { computeBlobHash } from "@/hooks/useImageUpload";
 import { useCLIDetection } from "@/hooks/useCLIDetection";
 import {
   useEnvironmentVariables,
@@ -438,6 +439,9 @@ function NewSessionWizard() {
     }, []),
   );
 
+  // Track pasted blob hashes to deduplicate repeated pastes (same as useImageUpload)
+  const pastedNewSessionHashesRef = React.useRef(new Set<string>());
+
   // Handle clipboard image paste in new session wizard (web only)
   // Unlike SessionView which uploads immediately, we store base64 locally
   // and upload after session creation (consistent with doPickImage flow)
@@ -446,7 +450,10 @@ function NewSessionWizard() {
       ? async (blob: Blob) => {
           if (pendingImagesRef.current.length >= MAX_IMAGES) return;
           try {
+            const hashKey = await computeBlobHash(blob);
+            if (pastedNewSessionHashesRef.current.has(hashKey)) return;
             const base64 = await blobToResizedBase64(blob);
+            pastedNewSessionHashesRef.current.add(hashKey);
             setPendingImages((prev) => {
               if (prev.length >= MAX_IMAGES) return prev;
               return [...prev, { id: `${randomUUID()}.jpg`, base64 }];
