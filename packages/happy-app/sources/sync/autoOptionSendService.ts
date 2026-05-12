@@ -141,7 +141,10 @@ class AutoOptionSendService {
     private lastGeneratedTurnId = new Map<string, string | null>();
     private generationControllers = new Map<string, AbortController>();
     private lastGeneratedAt = new Map<string, number>();
+    private lastPassiveGeneratedAt = new Map<string, number>();
     private static readonly GENERATION_COOLDOWN_MS = 120_000;
+    /** Shorter cooldown for passive (UI display) generation — turn dedup is the primary guard. */
+    private static readonly PASSIVE_GENERATION_COOLDOWN_MS = 5_000;
 
     /** Returns the LLM scoring metadata (model + provider) for a given optionsHash, if available. */
     getSemanticMeta(optionsHash: string): { modelUsed: string; provider: string } | null {
@@ -926,14 +929,14 @@ class AutoOptionSendService {
         if (turnId && this.lastGeneratedTurnId.get(sessionId) === turnId) return;
 
         const now = Date.now();
-        const lastAt = this.lastGeneratedAt.get(sessionId) ?? 0;
-        if (now - lastAt < AutoOptionSendService.GENERATION_COOLDOWN_MS) return;
+        const lastAt = this.lastPassiveGeneratedAt.get(sessionId) ?? 0;
+        if (now - lastAt < AutoOptionSendService.PASSIVE_GENERATION_COOLDOWN_MS) return;
 
         const credentials = sync.getCredentials();
         if (!credentials) return;
 
         this.lastGeneratedTurnId.set(sessionId, turnId);
-        this.lastGeneratedAt.set(sessionId, now);
+        this.lastPassiveGeneratedAt.set(sessionId, now);
 
         const sessionTitle = session.metadata?.displayName ?? session.metadata?.summary?.text ?? null;
         const contextSummary = buildOptionScoringContext(messages, sessionTitle);
