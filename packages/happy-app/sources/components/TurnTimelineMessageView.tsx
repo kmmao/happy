@@ -54,16 +54,6 @@ function formatCost(costUsd: number): string {
   return `$${costUsd.toFixed(2)}`;
 }
 
-function formatOffset(ms: number): string {
-  if (ms <= 0) {
-    return "+0s";
-  }
-  if (ms < 1000) {
-    return `+${Math.round(ms)}ms`;
-  }
-  return `+${(ms / 1000).toFixed(ms >= 10000 ? 0 : 1)}s`;
-}
-
 function getTurnSummary(item: TurnTimelineDisplayItem): {
   model: string | null;
   duration: string | null;
@@ -239,7 +229,6 @@ function getHiddenSummaryIcon(
 function ThinkingTimelineStep(props: {
   step: Extract<TurnTimelineStep, { kind: "thinking" }>;
   sessionId: string;
-  offsetLabel: string;
 }) {
   const { theme } = useUnistyles();
   const expandThinkingByDefault = useSetting("expandThinkingByDefault");
@@ -286,9 +275,6 @@ function ThinkingTimelineStep(props: {
             {label}
           </Text>
         </View>
-        <Text style={[styles.offsetText, { color: theme.colors.textSecondary }]}>
-          {props.offsetLabel}
-        </Text>
       </View>
       {expanded ? (
         <View
@@ -336,11 +322,6 @@ export const TurnTimelineMessageView = React.memo(function TurnTimelineMessageVi
       ),
     [props.item.steps, props.metadata, collapsedSteps.visibleSteps.length],
   );
-  const firstStepTime =
-    visibleSteps.length > 0
-      ? visibleSteps[0]!.message.createdAt
-      : props.item.readyMessage.createdAt;
-
   return (
     <View style={styles.messageRow}>
       <View style={styles.avatarSlot}>
@@ -416,7 +397,6 @@ export const TurnTimelineMessageView = React.memo(function TurnTimelineMessageVi
 
           <View style={styles.stepsColumn}>
             {visibleSteps.map((step, index) => {
-              const offsetLabel = formatOffset(step.message.createdAt - firstStepTime);
               const showRail = index < visibleSteps.length - 1;
               return (
                 <View key={step.message.id} style={styles.stepRow}>
@@ -446,29 +426,16 @@ export const TurnTimelineMessageView = React.memo(function TurnTimelineMessageVi
                       <ThinkingTimelineStep
                         step={step}
                         sessionId={props.sessionId}
-                        offsetLabel={offsetLabel}
                       />
                     ) : (
-                      <View style={styles.toolStepWrap}>
-                        <View style={styles.toolStepMetaRow}>
-                          <Text
-                            style={[
-                              styles.offsetText,
-                              { color: theme.colors.textSecondary },
-                            ]}
-                          >
-                            {offsetLabel}
-                          </Text>
-                        </View>
-                        <ToolView
-                          tool={step.message.tool}
-                          metadata={props.metadata}
-                          messages={step.message.children}
-                          sessionId={props.sessionId}
-                          messageId={step.message.id}
-                          permissionModeKey={props.permissionModeKey}
-                        />
-                      </View>
+                      <ToolView
+                        tool={step.message.tool}
+                        metadata={props.metadata}
+                        messages={step.message.children}
+                        sessionId={props.sessionId}
+                        messageId={step.message.id}
+                        permissionModeKey={props.permissionModeKey}
+                      />
                     )}
                   </View>
                 </View>
@@ -654,18 +621,6 @@ const styles = StyleSheet.create((_theme) => ({
     fontSize: 13,
     fontWeight: "600",
     flex: 1,
-  },
-  offsetText: {
-    fontSize: 11,
-    fontFamily: "monospace",
-  },
-  toolStepWrap: {
-    gap: 2,
-  },
-  toolStepMetaRow: {
-    flexDirection: "row",
-    justifyContent: "flex-end",
-    paddingHorizontal: 4,
   },
   stepsToggle: {
     alignSelf: "flex-start",

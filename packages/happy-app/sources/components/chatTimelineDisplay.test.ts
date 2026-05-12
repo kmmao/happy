@@ -72,7 +72,7 @@ describe("buildChatDisplayItems", () => {
       showThinkingTimeline: true,
     });
 
-    expect(displayItems).toHaveLength(2);
+    expect(displayItems).toHaveLength(3);
     expect(isTurnTimelineDisplayItem(displayItems[0]!)).toBe(true);
     if (isTurnTimelineDisplayItem(displayItems[0]!)) {
       expect(displayItems[0].readyMessage.id).toBe("ready-1");
@@ -81,6 +81,7 @@ describe("buildChatDisplayItems", () => {
         "tool-1",
       ]);
     }
+    expect(displayItems[1]!.kind).toBe("turn-start-separator");
   });
 
   it("keeps messages separate when there is no thinking step", () => {
@@ -101,7 +102,7 @@ describe("buildChatDisplayItems", () => {
       showThinkingTimeline: true,
     });
 
-    expect(displayItems).toHaveLength(3);
+    expect(displayItems).toHaveLength(4);
     expect(isTurnTimelineDisplayItem(displayItems[0]!)).toBe(false);
   });
 
@@ -181,7 +182,7 @@ describe("buildChatDisplayItems", () => {
       showThinkingTimeline: true,
     });
 
-    expect(displayItems).toHaveLength(3);
+    expect(displayItems).toHaveLength(4);
     expect(displayItems.some((item) => item.id === "plan-preview-1")).toBe(false);
     expect(displayItems.some((item) => item.id === "progress-tool-1")).toBe(true);
     expect(displayItems.some((item) => item.id === "thinking-hide-1")).toBe(true);
@@ -259,6 +260,7 @@ describe("buildChatDisplayItems", () => {
     expect(displayItems.map((item) => item.id)).toEqual([
       "plan-preview-refresh",
       "progress-tool-refresh",
+      "turn-start:user-refresh",
       "user-refresh",
     ]);
   });

@@ -354,6 +354,10 @@ export function buildChatDisplayItems(
 
 // Injects a separator item before each user-text message that is preceded by
 // agent content (newest-first list, so "preceded" means lower array index).
+// Also fixes mis-sorted ready events: when a ready event (turn-end) from the
+// previous turn has a createdAt newer than the user-text that starts the next
+// turn (clock skew / network delay), move it after the user-text so the stats
+// visually stay with the turn they belong to.
 function injectTurnStartSeparators(items: ChatDisplayItem[]): ChatDisplayItem[] {
   const result: ChatDisplayItem[] = [];
   for (let i = 0; i < items.length; i++) {
@@ -365,10 +369,39 @@ function injectTurnStartSeparators(items: ChatDisplayItem[]): ChatDisplayItem[] 
       const prev = items[i - 1]!;
       const prevKind = (prev as ChatDisplayItem).kind;
       if (prevKind !== "user-text" && prevKind !== "turn-start-separator") {
+        // A ready event immediately before a user-text with no agent content
+        // in between means the ready belongs to a PREVIOUS turn but landed
+        // here due to timestamp skew. Move it after the user-text.
+        if (isReadyDisplayItem(prev) && !hasAgentContentBetween(items, i)) {
+          const readyItem = result.pop()!;
+          result.push({ kind: "turn-start-separator", id: `turn-start:${item.id}` });
+          result.push(item);
+          result.push(readyItem);
+          continue;
+        }
         result.push({ kind: "turn-start-separator", id: `turn-start:${item.id}` });
       }
     }
     result.push(item);
   }
   return result;
+}
+
+function isReadyDisplayItem(item: ChatDisplayItem): boolean {
+  return item.kind === "agent-event" && (item as ModeSwitchMessage).event.type === "ready";
+}
+
+// In the newest-first array, check whether any agent content (thinking/tool-call/
+// agent-text) exists between the ready event at items[userIdx-1] and the next
+// older ready or user-text. If agent content exists, the ready belongs to this
+// turn (normal). If not, it's a stray from a previous turn.
+function hasAgentContentBetween(items: ChatDisplayItem[], userIdx: number): boolean {
+  for (let j = userIdx - 2; j >= 0; j--) {
+    const scan = items[j]!;
+    if (scan.kind === "user-text") break;
+    if (isReadyDisplayItem(scan)) break;
+    if (scan.kind === "agent-text" || scan.kind === "tool-call") return true;
+    if (scan.kind === "turn-timeline") return true;
+  }
+  return false;
 }

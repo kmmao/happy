@@ -230,19 +230,24 @@ const taskToolDef = {
     tool: ToolCall;
     messages?: Message[];
   }) => {
-    // Check if there would be any filtered tasks
     const messages = opts.messages || [];
-    for (let m of messages) {
+    for (const m of messages) {
       if (
         m.kind === "tool-call" &&
         (m.tool.state === "running" ||
           m.tool.state === "completed" ||
           m.tool.state === "error")
       ) {
-        return false; // Has active sub-tasks, show expanded
+        return false;
+      }
+      if (m.kind === "agent-text" && m.taskStatus) {
+        return false;
+      }
+      if (m.kind === "agent-text" && !m.taskStatus && !m.isThinking && m.text) {
+        return false;
       }
     }
-    return true; // No active sub-tasks, render as minimal
+    return true;
   },
   input: z
     .object({
