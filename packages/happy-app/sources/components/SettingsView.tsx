@@ -325,18 +325,6 @@ export const SettingsView = React.memo(function SettingsView() {
         )}
       </ItemGroup>
 
-      {/* World Model — only shown in dev/developer mode */}
-      {(__DEV__ || devModeEnabled) && (
-        <ItemGroup title={t("world.title")}>
-          <Item
-            title={t("world.title")}
-            subtitle={t("world.subtitle")}
-            icon={<Ionicons name="globe-outline" size={29} color={theme.colors.primary} />}
-            onPress={() => router.push("/(app)/world")}
-          />
-        </ItemGroup>
-      )}
-
       {/* OpenClaw — only shown when enabled in Features settings */}
       {openClawEnabled && (
         <ItemGroup title={t("openclaw.title")}>

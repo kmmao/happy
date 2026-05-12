@@ -270,23 +270,6 @@ class Sync {
     message: string;
     sentAt: number;
   }) => void>();
-  private worldEventCreatedListeners = new Set<(event: {
-    id: string;
-    eventType: string;
-    title: string;
-    summary: string;
-    occurredAt: number;
-    severity: "info" | "warning" | "critical";
-    source: {
-      type: string;
-      projectId?: string | null;
-      projectPath?: string | null;
-      machineId?: string | null;
-      sessionId?: string | null;
-    };
-    originalId: string;
-    parentTaskId?: string | null;
-  }) => void>();
   private preferencesMigrationDone = false;
   private projectMigrationFailures = new Map<string, number>();
   private pendingSettings: Partial<Settings> = loadPendingSettings();
@@ -2762,13 +2745,6 @@ class Sync {
       }
     }
 
-    // Handle world-event-created: unified world event channel for Stream Mode real-time updates
-    if (updateData.type === "world-event-created" && updateData.event) {
-      for (const listener of this.worldEventCreatedListeners) {
-        listener(updateData.event);
-      }
-    }
-
     // Handle supervisor-loop-status: notify listeners for real-time Loop status updates.
     if (updateData.type === "supervisor-loop-status") {
       const loopEvent = {
@@ -3100,27 +3076,6 @@ class Sync {
   }) => void): () => void {
     this.interAgentMessageListeners.add(listener);
     return () => { this.interAgentMessageListeners.delete(listener); };
-  }
-
-  onWorldEventCreated(listener: (event: {
-    id: string;
-    eventType: string;
-    title: string;
-    summary: string;
-    occurredAt: number;
-    severity: "info" | "warning" | "critical";
-    source: {
-      type: string;
-      projectId?: string | null;
-      projectPath?: string | null;
-      machineId?: string | null;
-      sessionId?: string | null;
-    };
-    originalId: string;
-    parentTaskId?: string | null;
-  }) => void): () => void {
-    this.worldEventCreatedListeners.add(listener);
-    return () => { this.worldEventCreatedListeners.delete(listener); };
   }
 
   destroy() {
