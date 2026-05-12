@@ -378,9 +378,21 @@ export function reducer(
         };
       }
 
-      // Always fall through to Phase 5 — even with no stats data we render
-      // a minimal "Turn end" badge so every turn boundary is visible.
-      // Fall through to Phase 5 to render as session summary line
+      // Create the rendered message directly here.
+      // Cannot rely on "fall through to Phase 5" — state.messageIds.set() above
+      // causes Phase 5's dedup check to skip this message entirely.
+      const readyMid = allocateId();
+      state.messages.set(readyMid, {
+        id: readyMid,
+        realID: msg.id,
+        role: "agent",
+        createdAt: msg.createdAt,
+        event: msg.content,
+        tool: null,
+        text: null,
+        meta: msg.meta,
+      });
+      changed.add(readyMid);
     }
 
     // Per-request usage stats: update cumulative usage only, no longer rendered.
