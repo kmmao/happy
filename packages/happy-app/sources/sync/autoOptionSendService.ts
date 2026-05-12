@@ -866,6 +866,7 @@ class AutoOptionSendService {
      * Used to show AI-scored badges (✨) in OptionsPopover for any session with 2+ options.
      */
     triggerScoringIfNeeded(sessionId: string, items: string[], optionsHash: string): void {
+        console.log('[autoOption] triggerScoringIfNeeded called', { items: items.length, cached: this.semanticScores.has(optionsHash) });
         if (items.length < 2) return;
         if (this.semanticScores.has(optionsHash)) return;
 
@@ -924,6 +925,7 @@ class AutoOptionSendService {
      */
     triggerGenerationIfNeeded(sessionId: string): void {
         const session = storage.getState().sessions[sessionId];
+        console.log('[autoOption] triggerGenerationIfNeeded', { hasSession: !!session, sessionId });
         if (!session) return;
 
         const messages = storage.getState().sessionMessages[sessionId]?.messages ?? [];
@@ -931,13 +933,18 @@ class AutoOptionSendService {
 
         const latestAgentMsg = messages.find((m) => m.kind === "agent-text" && !("isThinking" in m && m.isThinking));
         const turnId = latestAgentMsg?.id ?? null;
+        const turnCached = turnId ? this.lastGeneratedTurnId.get(sessionId) === turnId : false;
+        console.log('[autoOption] generation turnId check', { turnId, turnCached });
         if (turnId && this.lastGeneratedTurnId.get(sessionId) === turnId) return;
 
         const now = Date.now();
         const lastAt = this.lastPassiveGeneratedAt.get(sessionId) ?? 0;
+        const cooldownBlocked = now - lastAt < AutoOptionSendService.PASSIVE_GENERATION_COOLDOWN_MS;
+        console.log('[autoOption] generation cooldown', { elapsed: now - lastAt, blocked: cooldownBlocked });
         if (now - lastAt < AutoOptionSendService.PASSIVE_GENERATION_COOLDOWN_MS) return;
 
         const credentials = sync.getCredentials();
+        console.log('[autoOption] generation credentials', { hasCredentials: !!credentials });
         if (!credentials) return;
 
         this.lastGeneratedTurnId.set(sessionId, turnId);
@@ -946,6 +953,7 @@ class AutoOptionSendService {
         const sessionTitle = session.metadata?.displayName ?? session.metadata?.summary?.text ?? null;
         const contextSummary = buildOptionScoringContext(messages, sessionTitle);
         const profileId = session.profileId ?? null;
+        console.log('[autoOption] generation starting', { profileId, contextSummary: contextSummary.slice(0, 100) });
 
         const preferredModels: Record<string, string> = {
             anthropic: "claude-opus-4-7",

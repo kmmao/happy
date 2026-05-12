@@ -127,11 +127,27 @@ function buildUserMessage(contextSummary: string, sessionTitle: string | null): 
 
 function parseOptions(text: string): string[] | null {
     const cleaned = text.replace(/^```(?:json)?\n?/, "").replace(/\n?```$/, "").trim();
-    const match = cleaned.match(/\[[\s\S]*?\]/);
-    if (!match) return null;
+
+    // Try direct JSON parse first (ideal case: LLM returned pure JSON array)
+    try {
+        const directParsed = JSON.parse(cleaned) as unknown;
+        if (Array.isArray(directParsed)) {
+            const options: string[] = [];
+            for (const v of directParsed) {
+                if (typeof v === "string" && v.trim().length > 0) options.push(v.trim().slice(0, 80));
+            }
+            return options.length >= 2 ? options.slice(0, 4) : null;
+        }
+    } catch { /* fall through */ }
+
+    // Fallback: extract from first [ to last ] to handle brackets inside string values
+    const start = cleaned.indexOf("[");
+    const end = cleaned.lastIndexOf("]");
+    if (start === -1 || end <= start) return null;
+    const jsonStr = cleaned.slice(start, end + 1);
 
     try {
-        const parsed = JSON.parse(match[0]) as unknown;
+        const parsed = JSON.parse(jsonStr) as unknown;
         if (!Array.isArray(parsed)) return null;
         const options: string[] = [];
         for (const v of parsed) {
