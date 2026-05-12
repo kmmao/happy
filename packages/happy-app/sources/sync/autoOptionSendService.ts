@@ -377,7 +377,13 @@ class AutoOptionSendService {
         let snapshot = result?.snapshot ?? null;
         let isFresh = result?.isFresh ?? true;
 
-        // When no markdown options found, fall back to proactively generated options.
+        // Treat stale markdown options as absent so we fall through to generation.
+        // Stale = user sent a message after the AI gave options (options are from previous turn).
+        if (!isFresh) {
+            snapshot = null;
+        }
+
+        // When no markdown options found (or stale), fall back to proactively generated options.
         if (!snapshot) {
             const generated = this.generatedOptions.get(sessionId);
             if (generated && generated.length >= 2) {
