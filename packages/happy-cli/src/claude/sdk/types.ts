@@ -36,6 +36,8 @@ export type {
   ListSubagentsOptions,
   // SDK 0.2.119+ additions
   SDKMirrorErrorMessage,
+  // SDK 0.2.139+ additions
+  SDKPermissionDeniedMessage,
 } from "@anthropic-ai/claude-agent-sdk";
 
 export {

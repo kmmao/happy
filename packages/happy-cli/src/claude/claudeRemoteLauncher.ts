@@ -330,11 +330,24 @@ export async function claudeRemoteLauncher(
     session.client.sendSessionProtocolMessage(envelope);
   }
 
+  async function doBackgroundTasks(args: { toolUseId?: string }) {
+    logger.debug(`[remote]: doBackgroundTasks — toolUseId=${args.toolUseId ?? "all"}`);
+    if (!currentQuery) return { success: false };
+    try {
+      const result = await currentQuery.backgroundTasks(args.toolUseId);
+      return { success: result };
+    } catch (e) {
+      logger.debug("[remote]: backgroundTasks() failed", e);
+      return { success: false };
+    }
+  }
+
   // When to abort
   session.client.rpcHandlerManager.registerHandler("abort", doAbort); // When abort clicked
   session.client.rpcHandlerManager.registerHandler("switch", doSwitch); // When switch clicked
   session.client.rpcHandlerManager.registerHandler("interrupt", doInterrupt); // Graceful interrupt
   session.client.rpcHandlerManager.registerHandler("stopTask", doStopTask); // Stop background task
+  session.client.rpcHandlerManager.registerHandler("backgroundTasks", doBackgroundTasks); // Move foreground tasks to background
 
   // Claude Control sidebar RPCs (SDK 0.2.119+ — see claudeControlRpc.ts wire schemas)
   const sessionCostTracker = new SessionCostTracker();

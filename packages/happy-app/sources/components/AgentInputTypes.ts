@@ -59,6 +59,7 @@ export interface AgentInputProps {
     reasoning?: ReasoningProps;
     metadata?: Metadata | null;
     onAbort?: () => void | Promise<void>;
+    onBackgroundTasks?: () => void | Promise<void>;
     showAbortButton?: boolean;
     connectionStatus?: {
         text: string;

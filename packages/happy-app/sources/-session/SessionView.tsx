@@ -48,7 +48,7 @@ import {
   startRealtimeSession,
   stopRealtimeSession,
 } from "@/realtime/RealtimeSession";
-import { sessionInterrupt, sessionStopTask, sessionBash } from "@/sync/ops";
+import { sessionInterrupt, sessionStopTask, sessionBash, sessionBackgroundTasks } from "@/sync/ops";
 import { QueueBanner, QueuePreviewOverlay, type QueuedMessageItem } from "@/components/QueueBanner";
 import { reactivateArchivedSession } from "@/sync/sessionResumeFlow";
 import { runWithSessionReactivationGuard } from "@/sync/sessionResumeGuard";
@@ -1736,6 +1736,11 @@ function SessionViewInner({
         onMicPress={micButtonState.onMicPress}
         isMicActive={micButtonState.isMicActive}
         onAbort={() => sessionInterrupt(sessionId)}
+        onBackgroundTasks={
+          sessionStatus.state === "thinking" || sessionStatus.state === "waiting"
+            ? () => sessionBackgroundTasks(sessionId)
+            : undefined
+        }
         showAbortButton={
           sessionStatus.state === "thinking" ||
           sessionStatus.state === "waiting"

@@ -2001,6 +2001,16 @@ export async function sessionStopTask(
 }
 
 /**
+ * Move foreground Bash/subagent tasks to background (equivalent to Ctrl+B in CLI)
+ */
+export async function sessionBackgroundTasks(
+  sessionId: string,
+  toolUseId?: string,
+): Promise<void> {
+  await apiSocket.sessionRPC(sessionId, "backgroundTasks", { toolUseId });
+}
+
+/**
  * Allow a permission request
  */
 export async function sessionAllow(

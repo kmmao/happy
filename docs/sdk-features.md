@@ -69,6 +69,9 @@ Cold restart detection uses `coldModeHash()` in `claudeRemoteLauncher.ts` to com
 
 ## SDK Version
 
-Current: `@anthropic-ai/claude-agent-sdk@0.2.56`
+Current: `@anthropic-ai/claude-agent-sdk@0.2.139`
 
-Model capabilities (`supportsEffort`, `supportedEffortLevels`, `supportsAdaptiveThinking`) are fully typed in the SDK since this version.
+### Version History
+- **0.2.139**: `SDKPermissionDeniedMessage` (auto-denied tool calls), `Query.backgroundTasks()`, `resolveSettings()`, hook `args`/`continueOnBlock`, `defaultView` setting
+- **0.2.133**: `forwardSubagentText` option for complete subagent conversation flows
+- **0.2.119**: `title`, `planModeInstructions`, `sessionStore`, `toolConfig`, model capabilities (`supportsEffort`, `supportedEffortLevels`, `supportsAdaptiveThinking`)
