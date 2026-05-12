@@ -207,6 +207,10 @@ class AutoOptionSendService {
             this.generatedOptions.delete(sessionId);
             this.generationControllers.get(sessionId)?.abort();
             this.generationControllers.delete(sessionId);
+            // New user turn starts: reset lastAutoSentKey so the next AI response can arm auto-send again
+            if (state.lastAutoSentKey !== null) {
+                this.states.set(sessionId, { ...state, lastAutoSentKey: null });
+            }
         }
 
         this.checkAndDispatch(sessionId);
