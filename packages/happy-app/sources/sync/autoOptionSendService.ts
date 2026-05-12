@@ -654,10 +654,36 @@ class AutoOptionSendService {
                 };
             }
         }
+        // If LLM semantic scoring completed during the countdown, apply its recommendation
+        // before firing. This fixes the race where heuristic-ranked option is sent even
+        // though LLM ranked a different option higher.
+        let currentState = state;
+        if (state.candidate && snapshotForFire) {
+            const semanticScores = this.semanticScores.get(state.candidate.optionsHash);
+            if (semanticScores) {
+                const reranked = rankAndSelectOptions(snapshotForFire.items, undefined, undefined, semanticScores);
+                const best = reranked.recommendedIndex !== null
+                    ? reranked.ranked.find((r) => r.index === reranked.recommendedIndex)
+                    : null;
+                if (best && best.text !== state.candidate.recommendedText) {
+                    currentState = {
+                        ...state,
+                        candidate: {
+                            ...state.candidate,
+                            recommendedText: best.text,
+                            qualityScore: best.score,
+                            qualityReasons: best.reasons,
+                        },
+                    };
+                    this.states.set(sessionId, currentState);
+                }
+            }
+        }
+
         const context = this.buildContext(sessionId, snapshotForFire, messages, now);
 
         const readyState = reduceAutoOptionSendEvent(
-            state,
+            currentState,
             { type: "timer-finished" },
             context,
         );
