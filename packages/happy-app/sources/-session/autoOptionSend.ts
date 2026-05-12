@@ -466,7 +466,9 @@ function canFire(
   const candidate = buildAutoOptionCandidate(context);
   if (!candidate) return false;
 
-  if (candidate.recommendedText !== state.candidate.recommendedText) return false;
+  // Don't check recommendedText: LLM scoring may have updated state.candidate.recommendedText
+  // during the countdown while buildAutoOptionCandidate omits semantic scores,
+  // causing a false mismatch that silently blocks firing.
   if (candidate.optionsHash !== state.candidate.optionsHash) return false;
   if (context.snapshot!.sourceMessageId !== state.candidate.sourceMessageId) return false;
   if (state.lastAutoSentKey === buildAutoSentKey(state.candidate)) return false;
