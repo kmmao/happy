@@ -1,6 +1,6 @@
 # AutoSend Architecture
 
-> 最后更新：2026-05-12  
+> 最后更新：2026-05-13  
 > 适用版本：happy-app ≥ 2.26.0
 
 ## 功能简介
@@ -228,6 +228,51 @@ Claude 回复
 | `MAX_TOTAL` | 1800 chars | `buildOptionScoringContext.ts` |
 | Server score cache TTL | 5min | `optionScorer.ts` |
 | Server score cache size | 200 entries | `optionScorer.ts` |
+
+---
+
+## 消息来源标识
+
+### Auto-sent 消息的视觉标记
+
+auto-send 发出的消息气泡右下角显示 `✨ Auto-sent`（各语言本地化）。
+
+**实现机制**：
+- `sync.sendMessage()` 调用时传入 `options.source = "auto-option-send"`
+- 该值写入 `message.meta.source`（`typesMessageMeta.ts` 的 Zod schema 已定义）
+- `MessageView.tsx` 的 `UserTextBlock` 检测 `message.meta?.source === "auto-option-send"`
+- 匹配时在气泡内渲染 badge：`<Ionicons name="sparkles" />` + i18n key `session.autoSent`
+
+**关键文件**：
+- `sync/typesMessageMeta.ts` — `source: z.enum(["auto-option-send"])` 字段定义
+- `sync/sync.ts:787` — `...(options?.source && { source: options.source })` 写入 meta
+- `components/MessageView.tsx` — `UserTextBlock` 渲染逻辑 + `autoSentBadge` 样式
+- `text/translations/*.ts` — `session.autoSent` key（10 个语言）
+
+**用户识别效果**：
+
+```
+┌─────────────────────────────────────┐
+│  更新 CHANGELOG.md 记录本次改动...   │
+│                       ✨ Auto-sent  │
+└─────────────────────────────────────┘
+```
+
+---
+
+## 推荐选项的确定机制
+
+### 时序问题与修复
+
+auto-send 的推荐选项由两个阶段决定：
+
+1. **Arm 时（heuristic）**：`buildAutoOptionCandidate` 调用 `rankAndSelectOptions(items, statsResolver, contextKeywords)`，无语义分，结果写入 `state.candidate.recommendedText`
+
+2. **LLM Scoring 返回后（semantic）**：`triggerSemanticScoring` 的 `.then()` 回调更新 `state.candidate.recommendedText` 为语义分最高的选项
+
+3. **Fire 时（final check）**：`fireTimerFinished` 在发送前检查 `semanticScores`，若已就绪则用 `rankAndSelectOptions(items, undefined, undefined, semanticScores)` 重新确定最优推荐，覆盖可能落后的 heuristic 结果
+
+这确保即使 LLM scoring 在 15s 倒计时结束前才返回，auto-send 也能发送语义分最高的选项，而不是启动时的 heuristic 推荐。
 
 ---
 
