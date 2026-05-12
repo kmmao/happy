@@ -16,8 +16,8 @@ export interface ScoringCredentials {
 }
 
 const DEFAULT_SCORING_MODELS: Record<ScoringProvider, string> = {
-    anthropic: "claude-haiku-4-5-20251001",
-    openai: "gpt-5.4-mini",
+    anthropic: "claude-sonnet-4-6",
+    openai: "gpt-4o-mini",
     ollama: "llama3",
 };
 

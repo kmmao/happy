@@ -963,6 +963,8 @@ function SessionViewInner({
   React.useEffect(() => {
     if (latestOptions.items.length >= 2) {
       autoOptionSendService.triggerScoringIfNeeded(sessionId, latestOptions.items, latestOptionsHash);
+    } else if (latestOptions.items.length === 0) {
+      autoOptionSendService.triggerGenerationIfNeeded(sessionId);
     }
   }, [sessionId, latestOptionsHash]);
 
@@ -1327,7 +1329,7 @@ function SessionViewInner({
     hasUserMessages: (chatListRef.current?.getUserMessageCount() ?? 0) > 0,
     optionCount: latestOptions.items.length > 0
       ? latestOptions.items.length
-      : (autoOptionSend.enabled ? (autoOptionSendService.getGeneratedOptions(sessionId)?.length ?? 0) : 0),
+      : (autoOptionSendService.getGeneratedOptions(sessionId)?.length ?? 0),
     onOptionsPress: () => setShowOptionsPopover(true),
     bookmarkCount: bookmarks.length,
     onBookmarksPress: () => setShowBookmarksPopover(true),
@@ -1889,7 +1891,7 @@ function SessionViewInner({
           }
         />
         <OptionsPopover
-          visible={showOptionsPopover && (latestOptions.items.length > 0 || (autoOptionSend.enabled && (autoOptionSendService.getGeneratedOptions(sessionId)?.length ?? 0) > 0))}
+          visible={showOptionsPopover && (latestOptions.items.length > 0 || (autoOptionSendService.getGeneratedOptions(sessionId)?.length ?? 0) > 0)}
           options={latestOptions.items.length > 0 ? latestOptions.items : (autoOptionSendService.getGeneratedOptions(sessionId) ?? []).map((text): OptionItem => ({ text, source: "ai" }))}
           onOptionPress={handleFloatingOptionPress}
           onCopyOption={(text) => {

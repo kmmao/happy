@@ -11,7 +11,7 @@ export function optionScoreRoutes(app: Fastify) {
         preHandler: app.authenticate,
         schema: {
             body: z.object({
-                options: z.array(z.string().max(200)).min(1).max(10),
+                options: z.array(z.string().max(2000)).min(1).max(10),
                 contextSummary: z.string().max(2000),
                 sessionTitle: z.string().max(200).nullable(),
                 profileId: z.string().max(200).nullable(),
@@ -32,7 +32,6 @@ export function optionScoreRoutes(app: Fastify) {
     }, async (request, reply) => {
         const { options, contextSummary, sessionTitle, profileId, modelOverride } = request.body;
         const accountId = request.userId;
-
         try {
             const credentials = await resolveCredentials(accountId, profileId);
             if (!credentials) {
@@ -77,7 +76,7 @@ async function resolveCredentials(accountId: string, profileId: string | null) {
 
     const profile = decryptAiBackendProfile(accountId, rows[0].profileKey, rows[0].encryptedPayload);
     const env = getAiBackendProfileEnvironmentVariables(profile);
-    return detectProviderFromEnv(env);
+    return detectProviderFromEnv(env) ?? fallbackFromServerEnv();
 }
 
 function fallbackFromServerEnv() {

@@ -131,6 +131,9 @@ class AutoOptionSendService {
     private semanticControllers = new Map<string, AbortController>();
     private lastSemanticScoredAt = new Map<string, number>();
     private semanticMeta = new Map<string, { modelUsed: string; provider: string }>();
+    /** Separate cooldown/controller for passive (UI badge) scoring, independent from auto-send scoring. */
+    private passiveScoringControllers = new Map<string, AbortController>();
+    private lastPassiveScoredAt = new Map<string, number>();
     private static readonly SEMANTIC_COOLDOWN_MS = 30_000;
     private static readonly SEMANTIC_SCORE_GAP_THRESHOLD = 8;
 
@@ -507,6 +510,14 @@ class AutoOptionSendService {
         }
     }
 
+    private cancelPassiveScoring(sessionId: string): void {
+        const controller = this.passiveScoringControllers.get(sessionId);
+        if (controller) {
+            controller.abort();
+            this.passiveScoringControllers.delete(sessionId);
+        }
+    }
+
     private triggerSemanticScoring(sessionId: string): void {
         const state = this.states.get(sessionId);
         if (!state?.candidate) return;
@@ -537,13 +548,14 @@ class AutoOptionSendService {
         const credentials = sync.getCredentials();
         if (!credentials) return;
 
-        const contextSummary = buildOptionScoringContext(messages, null);
+        const session = storage.getState().sessions[sessionId];
+        const sessionTitle = session?.metadata?.displayName ?? session?.metadata?.summary?.text ?? null;
+        const contextSummary = buildOptionScoringContext(messages, sessionTitle);
         const controller = new AbortController();
         this.cancelSemanticScoring(sessionId);
         this.semanticControllers.set(sessionId, controller);
         this.lastSemanticScoredAt.set(sessionId, now);
 
-        const session = storage.getState().sessions[sessionId];
         const profileId = session?.profileId ?? null;
         const scoringOverrides = storage.getState().localSettings.scoringModelOverride ?? {};
         // When auto-send is enabled, prefer the highest available model unless user has set a custom override.
@@ -850,7 +862,7 @@ class AutoOptionSendService {
         if (this.semanticScores.has(optionsHash)) return;
 
         const now = Date.now();
-        const lastScored = this.lastSemanticScoredAt.get(sessionId) ?? 0;
+        const lastScored = this.lastPassiveScoredAt.get(sessionId) ?? 0;
         if (now - lastScored < AutoOptionSendService.SEMANTIC_COOLDOWN_MS) return;
 
         const credentials = sync.getCredentials();
@@ -860,7 +872,8 @@ class AutoOptionSendService {
         if (!session) return;
 
         const messages = storage.getState().sessionMessages[sessionId]?.messages ?? [];
-        const contextSummary = buildOptionScoringContext(messages, null);
+        const sessionTitle = session.metadata?.displayName ?? session.metadata?.summary?.text ?? null;
+        const contextSummary = buildOptionScoringContext(messages, sessionTitle);
         const profileId = session.profileId ?? null;
 
         const scoringOverrides = storage.getState().localSettings.scoringModelOverride ?? {};
@@ -869,13 +882,13 @@ class AutoOptionSendService {
             : null;
 
         const controller = new AbortController();
-        this.cancelSemanticScoring(sessionId);
-        this.semanticControllers.set(sessionId, controller);
-        this.lastSemanticScoredAt.set(sessionId, now);
+        this.cancelPassiveScoring(sessionId);
+        this.passiveScoringControllers.set(sessionId, controller);
+        this.lastPassiveScoredAt.set(sessionId, now);
 
         scoreOptionsRemote(credentials, items, contextSummary, null, profileId, modelOverride, controller.signal)
             .then((response) => {
-                this.semanticControllers.delete(sessionId);
+                this.passiveScoringControllers.delete(sessionId);
                 if (this.semanticScores.has(optionsHash)) return;
 
                 const semanticMap = new Map<number, number>();
@@ -884,11 +897,79 @@ class AutoOptionSendService {
                 if (response.modelUsed && response.provider) {
                     this.semanticMeta.set(optionsHash, { modelUsed: response.modelUsed, provider: response.provider });
                 }
-                this.notify(sessionId);
+                // Shallow-copy state to produce new reference, forcing useMemo recompute in SessionView
+                const current = this.states.get(sessionId);
+                if (current) {
+                    this.setState(sessionId, { ...current });
+                } else {
+                    this.notify(sessionId);
+                }
             })
             .catch(() => {
-                this.semanticControllers.delete(sessionId);
+                this.passiveScoringControllers.delete(sessionId);
             });
+    }
+
+    /**
+     * Trigger LLM option generation without requiring auto-send to be enabled.
+     * Used when there are no markdown options, so any session can get AI-suggested next steps.
+     */
+    triggerGenerationIfNeeded(sessionId: string): void {
+        const session = storage.getState().sessions[sessionId];
+        if (!session) return;
+
+        const messages = storage.getState().sessionMessages[sessionId]?.messages ?? [];
+        if (hasPendingAskUserQuestion(messages)) return;
+
+        const latestAgentMsg = messages.find((m) => m.kind === "agent-text" && !("isThinking" in m && m.isThinking));
+        const turnId = latestAgentMsg?.id ?? null;
+        if (turnId && this.lastGeneratedTurnId.get(sessionId) === turnId) return;
+
+        const now = Date.now();
+        const lastAt = this.lastGeneratedAt.get(sessionId) ?? 0;
+        if (now - lastAt < AutoOptionSendService.GENERATION_COOLDOWN_MS) return;
+
+        const credentials = sync.getCredentials();
+        if (!credentials) return;
+
+        this.lastGeneratedTurnId.set(sessionId, turnId);
+        this.lastGeneratedAt.set(sessionId, now);
+
+        const sessionTitle = session.metadata?.displayName ?? session.metadata?.summary?.text ?? null;
+        const contextSummary = buildOptionScoringContext(messages, sessionTitle);
+        const profileId = session.profileId ?? null;
+
+        const preferredModels: Record<string, string> = {
+            anthropic: "claude-opus-4-7",
+            openai: "gpt-4.5",
+        };
+
+        const controller = new AbortController();
+        this.generationControllers.get(sessionId)?.abort();
+        this.generationControllers.set(sessionId, controller);
+
+        generateOptionsRemote(
+            credentials,
+            contextSummary,
+            null,
+            profileId,
+            JSON.stringify(preferredModels),
+            controller.signal,
+        ).then((result) => {
+            this.generationControllers.delete(sessionId);
+            if (result.options.length >= 2) {
+                this.generatedOptions.set(sessionId, result.options);
+                const current = this.states.get(sessionId);
+                if (current) {
+                    this.setState(sessionId, { ...current });
+                } else {
+                    this.notify(sessionId);
+                }
+                this.checkAndDispatch(sessionId);
+            }
+        }).catch(() => {
+            this.generationControllers.delete(sessionId);
+        });
     }
 
     private async triggerOptionGeneration(sessionId: string, messages: Message[]): Promise<void> {
@@ -919,7 +1000,8 @@ class AutoOptionSendService {
         const credentials = sync.getCredentials();
         if (!credentials) return;
 
-        const contextSummary = buildOptionScoringContext(messages, null);
+        const sessionTitle = session.metadata?.displayName ?? session.metadata?.summary?.text ?? null;
+        const contextSummary = buildOptionScoringContext(messages, sessionTitle);
         const profileId = session.profileId ?? null;
 
         // Prefer high-quality model for proactive generation
