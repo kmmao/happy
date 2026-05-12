@@ -57,21 +57,31 @@ export const QueuePreviewOverlay = React.memo(({ item, onClose, onSendNow }: Que
 
     const translateY = React.useRef(new Animated.Value(320)).current;
     const backdropOpacity = React.useRef(new Animated.Value(0)).current;
+    const isClosingRef = React.useRef(false);
 
     React.useEffect(() => {
         Animated.parallel([
-            Animated.timing(translateY, {
-                toValue: 0,
-                duration: 280,
-                useNativeDriver: true,
-            }),
-            Animated.timing(backdropOpacity, {
-                toValue: 1,
-                duration: 240,
-                useNativeDriver: true,
-            }),
+            Animated.timing(translateY, { toValue: 0, duration: 280, useNativeDriver: true }),
+            Animated.timing(backdropOpacity, { toValue: 1, duration: 240, useNativeDriver: true }),
         ]).start();
     }, [translateY, backdropOpacity]);
+
+    const animateClose = React.useCallback((callback: () => void) => {
+        if (isClosingRef.current) return;
+        isClosingRef.current = true;
+        Animated.parallel([
+            Animated.timing(translateY, { toValue: 320, duration: 220, useNativeDriver: true }),
+            Animated.timing(backdropOpacity, { toValue: 0, duration: 180, useNativeDriver: true }),
+        ]).start(() => callback());
+    }, [translateY, backdropOpacity]);
+
+    const handleClose = React.useCallback(() => {
+        animateClose(onClose);
+    }, [animateClose, onClose]);
+
+    const handleSendNow = React.useCallback(() => {
+        if (onSendNow) animateClose(onSendNow);
+    }, [animateClose, onSendNow]);
 
     return (
         <View style={modalStyles.overlay} pointerEvents="box-none">
@@ -79,7 +89,7 @@ export const QueuePreviewOverlay = React.memo(({ item, onClose, onSendNow }: Que
                 style={[modalStyles.backdrop, { opacity: backdropOpacity }]}
                 pointerEvents="auto"
             >
-                <Pressable style={modalStyles.backdropPress} onPress={onClose} />
+                <Pressable style={modalStyles.backdropPress} onPress={handleClose} />
             </Animated.View>
             <Animated.View style={[modalStyles.sheet, { paddingBottom: insets.bottom + 16, transform: [{ translateY }] }]}>
                 {/* Handle bar */}
@@ -90,7 +100,7 @@ export const QueuePreviewOverlay = React.memo(({ item, onClose, onSendNow }: Que
                     <Text style={[modalStyles.modalTitle, { color: theme.colors.text }]}>
                         {t("session.queuedMessagePreview")}
                     </Text>
-                    <TouchableOpacity onPress={onClose} hitSlop={10} style={modalStyles.closeBtn}>
+                    <TouchableOpacity onPress={handleClose} hitSlop={10} style={modalStyles.closeBtn}>
                         <Ionicons name="close" size={20} color={theme.colors.textSecondary} />
                     </TouchableOpacity>
                 </View>
@@ -129,7 +139,7 @@ export const QueuePreviewOverlay = React.memo(({ item, onClose, onSendNow }: Que
                     <View style={[modalStyles.footer, { borderTopColor: theme.colors.divider }]}>
                         <TouchableOpacity
                             style={[modalStyles.sendNowBtn, { backgroundColor: theme.colors.button.primary.background }]}
-                            onPress={onSendNow}
+                            onPress={handleSendNow}
                             activeOpacity={0.8}
                         >
                             <Ionicons name="play" size={14} color={theme.colors.button.primary.tint} />
