@@ -217,6 +217,7 @@ export class ApiSessionClient extends EventEmitter {
   private currentTurnUsage: Usage | null = null;
   private accumulatedTurnUsage: Usage | null = null;
   private modelModeKey: string | undefined;
+  private subagentFlushTimer: ReturnType<typeof setTimeout> | null = null;
   private readonly sendSync: InvalidateSync;
   private readonly receiveSync: InvalidateSync;
   // Track last reported cumulative cost to compute deltas.
@@ -553,29 +554,40 @@ export class ApiSessionClient extends EventEmitter {
     const MAX_BATCH_SIZE = 100;
 
     while (this.pendingOutbox.length > 0) {
-      const batch = this.pendingOutbox.slice(0, MAX_BATCH_SIZE);
-      const response = await axios.post<V3PostSessionMessagesResponse>(
-        `${configuration.serverUrl}/v3/sessions/${encodeURIComponent(this.sessionId)}/messages`,
-        {
-          messages: batch,
-        },
-        {
-          headers: this.authHeaders(),
-          timeout: 60000,
-        },
-      );
+      const batch = this.pendingOutbox.splice(0, MAX_BATCH_SIZE);
+      try {
+        const response = await axios.post<V3PostSessionMessagesResponse>(
+          `${configuration.serverUrl}/v3/sessions/${encodeURIComponent(this.sessionId)}/messages`,
+          {
+            messages: batch,
+          },
+          {
+            headers: this.authHeaders(),
+            timeout: 60000,
+          },
+        );
 
-      this.pendingOutbox.splice(0, batch.length);
-
-      const messages = Array.isArray(response.data.messages)
-        ? response.data.messages
-        : [];
-      const maxSeq = messages.reduce(
-        (acc, message) => (message.seq > acc ? message.seq : acc),
-        this.lastSeq,
-      );
-      this.lastSeq = maxSeq;
+        const messages = Array.isArray(response.data.messages)
+          ? response.data.messages
+          : [];
+        const maxSeq = messages.reduce(
+          (acc, message) => (message.seq > acc ? message.seq : acc),
+          this.lastSeq,
+        );
+        this.lastSeq = maxSeq;
+      } catch (e) {
+        this.pendingOutbox.unshift(...batch);
+        throw e;
+      }
     }
+  }
+
+  private scheduleSubagentFlush() {
+    if (this.subagentFlushTimer) return;
+    this.subagentFlushTimer = setTimeout(() => {
+      this.subagentFlushTimer = null;
+      void this.flushOutbox();
+    }, 50);
   }
 
   private enqueueMessage(content: unknown, invalidate: boolean = true) {
@@ -616,6 +628,12 @@ export class ApiSessionClient extends EventEmitter {
 
     for (const envelope of mapped.envelopes) {
       this.sendSessionProtocolMessage(envelope);
+    }
+
+    // Subagent messages bypass InvalidateSync's single-flight limit so the App
+    // sees tool-by-tool progress instead of a single batch at the end.
+    if (mappedSubagent) {
+      this.scheduleSubagentFlush();
     }
     // Track usage from assistant messages
     if (body.type === "assistant" && body.message?.usage) {
@@ -1348,6 +1366,10 @@ export class ApiSessionClient extends EventEmitter {
 
   async close() {
     logger.debug("[API] socket.close() called");
+    if (this.subagentFlushTimer !== null) {
+      clearTimeout(this.subagentFlushTimer);
+      this.subagentFlushTimer = null;
+    }
     this.sendSync.stop();
     this.receiveSync.stop();
     this.socket.close();
