@@ -344,10 +344,10 @@ export async function claudeRemote(opts: {
     customSystemPrompt: initial.mode.customSystemPrompt
       ? initial.mode.customSystemPrompt + "\n\n" + effectiveSystemPrompt
       : undefined,
-    // SDK 0.2.119+ native binary ignores appendSystemPrompt via IPC — App+CLI
-    // prompts are now injected via buildSystemReminderPrefix() into each user
-    // message. Keep effectiveSystemPrompt here as a best-effort fallback.
-    appendSystemPrompt: effectiveSystemPrompt,
+    // All system prompts are injected via buildSystemReminderPrefix() into each
+    // user message. Do NOT also pass appendSystemPrompt — SDK now honours it,
+    // causing the same content to appear twice.
+    appendSystemPrompt: undefined,
     allowedTools: initial.mode.allowedTools
       ? initial.mode.allowedTools.concat(opts.allowedTools)
       : opts.allowedTools,
