@@ -446,14 +446,17 @@ export async function claudeRemoteLauncher(
         return s.slice(0, MAX_CONTENT_BYTES) + "\n…[truncated]";
       }
 
-      function extractContent(record: Record<string, unknown>): string {
+      /** Extract raw content from a JSONL record. When `raw` is true,
+       *  return the full text without truncation (used for system-reminder splitting). */
+      function extractContent(record: Record<string, unknown>, raw = false): string {
+        const t = raw ? (s: string) => s : truncate;
         // message.content (user/assistant) — may be string or array
         const msg = record.message as Record<string, unknown> | undefined;
         if (msg) {
           const c = msg.content;
-          if (typeof c === "string") return truncate(c);
+          if (typeof c === "string") return t(c);
           if (Array.isArray(c)) {
-            return truncate(
+            return t(
               c
                 .map((b: unknown) => {
                   if (typeof b === "object" && b !== null) {
@@ -478,19 +481,19 @@ export async function claudeRemoteLauncher(
               const parsed = JSON.parse(stdout) as Record<string, unknown>;
               const hookOut = parsed.hookSpecificOutput as Record<string, unknown> | undefined;
               const additional = hookOut?.additionalContext;
-              if (typeof additional === "string") return truncate(additional);
+              if (typeof additional === "string") return t(additional);
             } catch { /* not JSON */ }
-            return truncate(stdout);
+            return t(stdout);
           }
-          const rawContent = att.content;
-          if (typeof rawContent === "string") return truncate(rawContent);
-          return truncate(JSON.stringify(att));
+          const attContent = att.content;
+          if (typeof attContent === "string") return t(attContent);
+          return t(JSON.stringify(att));
         }
         // summary record
-        if (typeof record.summary === "string") return truncate(record.summary);
+        if (typeof record.summary === "string") return t(record.summary);
         // fallback — dump everything except bulky sub-objects
         const { message: _m, attachment: _a, ...rest } = record;
-        return truncate(JSON.stringify(rest));
+        return t(JSON.stringify(rest));
       }
 
       /** Decide whether a JSONL record belongs to the requested category. */
@@ -514,11 +517,62 @@ export async function claudeRemoteLauncher(
           && type !== "file-history-snapshot" && type !== "last-prompt";
       }
 
+      /**
+       * For "Messages" category, split user messages into system-reminder
+       * blocks + the actual user text so the breakdown is transparent.
+       */
+      function splitSystemReminders(
+        fullContent: string,
+        record: Record<string, unknown>,
+      ): DetailItem[] {
+        const results: DetailItem[] = [];
+        const uuid = typeof record.uuid === "string" ? record.uuid : undefined;
+        const ts = typeof record.timestamp === "string" ? record.timestamp : undefined;
+
+        // Extract all <system-reminder>...</system-reminder> blocks
+        const sysReminderRegex = /<system-reminder>([\s\S]*?)<\/system-reminder>/g;
+        let match: RegExpExecArray | null;
+        let lastIndex = 0;
+        const userParts: string[] = [];
+
+        while ((match = sysReminderRegex.exec(fullContent)) !== null) {
+          // Collect text before this system-reminder
+          const before = fullContent.slice(lastIndex, match.index).trim();
+          if (before) userParts.push(before);
+          lastIndex = match.index + match[0].length;
+
+          results.push({
+            type: "system-reminder",
+            role: "injected",
+            content: truncate(match[1].trim()),
+            uuid,
+            timestamp: ts,
+          });
+        }
+
+        // Remaining text after last system-reminder = actual user message
+        const tail = fullContent.slice(lastIndex).trim();
+        if (tail) userParts.push(tail);
+        const userText = userParts.join("\n").trim();
+        if (userText) {
+          results.push({
+            type: "user",
+            role: "user",
+            content: truncate(userText),
+            uuid,
+            timestamp: ts,
+          });
+        }
+
+        return results;
+      }
+
       try {
         const projectDir = getProjectPath(session.path);
         const filePath = join(projectDir, `${currentSessionId}.jsonl`);
         const rawContent = await readFile(filePath, "utf-8");
         const items: DetailItem[] = [];
+        const isMessages = category.toLowerCase().includes("message");
 
         for (const line of rawContent.split("\n")) {
           if (!line.trim()) continue;
@@ -529,14 +583,24 @@ export async function claudeRemoteLauncher(
             continue;
           }
           if (!matchesCategory(record, category)) continue;
+
           const msg = record.message as Record<string, unknown> | undefined;
-          items.push({
-            type: String(record.type ?? "unknown"),
-            role: typeof msg?.role === "string" ? msg.role : undefined,
-            content: extractContent(record),
-            uuid: typeof record.uuid === "string" ? record.uuid : undefined,
-            timestamp: typeof record.timestamp === "string" ? record.timestamp : undefined,
-          });
+          // For user messages in Messages category, get raw content (no truncation)
+          // so system-reminder blocks can be split out before individual truncation.
+          const needsSplit = isMessages && String(record.type) === "user";
+          const content = extractContent(record, needsSplit);
+
+          if (needsSplit && content.includes("<system-reminder>")) {
+            items.push(...splitSystemReminders(content, record));
+          } else {
+            items.push({
+              type: String(record.type ?? "unknown"),
+              role: typeof msg?.role === "string" ? msg.role : undefined,
+              content,
+              uuid: typeof record.uuid === "string" ? record.uuid : undefined,
+              timestamp: typeof record.timestamp === "string" ? record.timestamp : undefined,
+            });
+          }
         }
 
         return { items, category, totalItems: items.length };
