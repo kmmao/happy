@@ -39,11 +39,14 @@ export const SidePanelGitPanel = React.memo<SidePanelGitPanelProps>(
         const [isRefreshing, setIsRefreshing] = React.useState(false);
         const { theme } = useUnistyles();
 
+        const [refreshTrigger, setRefreshTrigger] = React.useState(0);
+
         const handleRefresh = React.useCallback(async () => {
             if (isRefreshing) return;
             setIsRefreshing(true);
             try {
                 await gitStatusSync.invalidateAndAwait(sessionId);
+                setRefreshTrigger((n) => n + 1);
             } finally {
                 setIsRefreshing(false);
             }
@@ -197,6 +200,7 @@ export const SidePanelGitPanel = React.memo<SidePanelGitPanelProps>(
                     }}
                 >
                     <GitChangesTab
+                        key={`changes-${refreshTrigger}`}
                         sessionId={sessionId}
                         repoPath={selectedRepoPath ?? undefined}
                         compact
@@ -212,6 +216,7 @@ export const SidePanelGitPanel = React.memo<SidePanelGitPanelProps>(
                     }}
                 >
                     <GitHistoryTab
+                        key={`history-${refreshTrigger}`}
                         sessionId={sessionId}
                         repoPath={selectedRepoPath ?? undefined}
                         onPullDown={hasSubmodules ? handlePullDown : undefined}
@@ -225,6 +230,7 @@ export const SidePanelGitPanel = React.memo<SidePanelGitPanelProps>(
                     }}
                 >
                     <GitBranchesTab
+                        key={`branches-${refreshTrigger}`}
                         sessionId={sessionId}
                         repoPath={selectedRepoPath ?? undefined}
                         onPullDown={hasSubmodules ? handlePullDown : undefined}
@@ -238,6 +244,7 @@ export const SidePanelGitPanel = React.memo<SidePanelGitPanelProps>(
                     }}
                 >
                     <GitStashTab
+                        key={`stash-${refreshTrigger}`}
                         sessionId={sessionId}
                         repoPath={selectedRepoPath ?? undefined}
                         onPullDown={hasSubmodules ? handlePullDown : undefined}
@@ -251,6 +258,7 @@ export const SidePanelGitPanel = React.memo<SidePanelGitPanelProps>(
                     }}
                 >
                     <GitIssuesTab
+                        key={`issues-${refreshTrigger}`}
                         sessionId={sessionId}
                         gitStatus={gitStatus}
                         submodules={submodules}
@@ -265,6 +273,7 @@ export const SidePanelGitPanel = React.memo<SidePanelGitPanelProps>(
                     }}
                 >
                     <GitPRsTab
+                        key={`prs-${refreshTrigger}`}
                         sessionId={sessionId}
                         gitStatus={gitStatus}
                         submodules={submodules}
