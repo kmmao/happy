@@ -490,14 +490,15 @@ const SubcategoryListModal = React.memo<SubcategoryListModalProps>(function Subc
                                                     },
                                                 });
                                             } else if (subcat.name === "unattributed") {
-                                                // Show actual system-reminder content from JSONL
+                                                // SDK internal overhead — not decomposable via JSONL
                                                 Modal.show({
-                                                    component: ContextContentModal,
+                                                    component: CategoryDetailModal,
                                                     props: {
-                                                        sessionId,
-                                                        category,
-                                                        subcategory: "system-reminder",
-                                                        subcategoryLabel: `${subcatLabel(subcat.name)} (${formatTokens(subcat.count)})`,
+                                                        title: `${subcatLabel(subcat.name)} (${formatTokens(subcat.count)})`,
+                                                        detail: [
+                                                            { label: t("claudeControl.contextUsage.subcatUnattributedDesc"), value: "" },
+                                                            { label: "Total", value: formatTokens(subcat.count) },
+                                                        ],
                                                     },
                                                 });
                                             } else {
