@@ -51,6 +51,25 @@ export function readClaudeSettings(): ClaudeSettings | null {
 }
 
 /**
+ * Read MCP server configurations from Claude's settings.json
+ *
+ * Returns the mcpServers record so callers can merge it with their own
+ * MCP definitions before passing to the SDK. Happy-owned MCPs should
+ * always be spread last so they take precedence over user-defined ones.
+ *
+ * @returns Record of MCP server configs, or {} if none / unreadable
+ */
+export function readClaudeMcpServers(): Record<string, unknown> {
+  const settings = readClaudeSettings();
+  if (!settings?.mcpServers || typeof settings.mcpServers !== 'object') {
+    return {};
+  }
+  const servers = settings.mcpServers as Record<string, unknown>;
+  logger.debug(`[ClaudeSettings] Found ${Object.keys(servers).length} mcpServers in Claude settings: ${Object.keys(servers).join(', ')}`);
+  return servers;
+}
+
+/**
  * Check if Co-Authored-By lines should be included in commit messages
  * based on Claude's settings
  * 

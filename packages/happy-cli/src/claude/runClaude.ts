@@ -13,6 +13,7 @@ import { EnhancedMode, PermissionMode } from "./loop";
 import { MessageQueue2 } from "@/utils/MessageQueue2";
 import { hashObject } from "@/utils/deterministicJson";
 import { startCaffeinate, stopCaffeinate } from "@/utils/caffeinate";
+import { readClaudeMcpServers } from "@/claude/utils/claudeSettings";
 import { extractSDKMetadataAsync } from "@/claude/sdk/metadataExtractor";
 import { parseSpecialCommand } from "@/parsers/specialCommands";
 import { executeShellCommand } from "@/utils/shellCommand";
@@ -301,7 +302,7 @@ export async function runClaude(
         abort: new AbortController().signal,
         claudeEnvVars: options.claudeEnvVars,
         claudeArgs: options.claudeArgs,
-        mcpServers: {},
+        mcpServers: { ...readClaudeMcpServers() },
         allowedTools: [],
         sandboxConfig,
       });
@@ -941,9 +942,8 @@ export async function runClaude(
     },
     // Happy MCP tools (change_title, update_progress, update_session_summary) are
     // registered as SDK-native in-process servers in claudeRemoteLauncher.ts.
-    // SDK 0.2.119+ native binary does not reliably forward type:"http" MCP configs
-    // to the spawned Claude Code process, so we no longer pass them here.
-    mcpServers: {},
+    // Merge user's ~/.claude/settings.json mcpServers so they are available in the session.
+    mcpServers: { ...readClaudeMcpServers() },
     session,
     claudeEnvVars: options.claudeEnvVars,
     claudeArgs: options.claudeArgs,
