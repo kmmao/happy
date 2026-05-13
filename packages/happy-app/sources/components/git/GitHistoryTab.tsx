@@ -330,8 +330,6 @@ const CommitItem = React.memo<CommitItemProps>(function CommitItem({
   );
 });
 
-const PAGE_SIZE = 20;
-
 const SCROLL_COLLAPSE_THRESHOLD = 20;
 
 export const GitHistoryTab = React.memo<{
@@ -349,9 +347,12 @@ export const GitHistoryTab = React.memo<{
   const [expandedCommitHash, setExpandedCommitHash] = React.useState<
     string | null
   >(null);
+  const loadMoreCancelledRef = React.useRef(false);
 
   const loadInitial = React.useCallback(async () => {
+    loadMoreCancelledRef.current = true;
     setIsLoading(true);
+    setIsLoadingMore(false);
     setError(null);
     try {
       const page = await fetchGitHistory(sessionId, 0, repoPath);
@@ -361,6 +362,7 @@ export const GitHistoryTab = React.memo<{
       setError(t("git.historyLoadError"));
     } finally {
       setIsLoading(false);
+      loadMoreCancelledRef.current = false;
     }
   }, [sessionId, repoPath]);
 
@@ -372,12 +374,23 @@ export const GitHistoryTab = React.memo<{
     setIsLoadingMore(true);
     try {
       const page = await fetchGitHistory(sessionId, commits.length, repoPath);
-      setCommits((prev) => [...prev, ...page.commits]);
+      if (loadMoreCancelledRef.current) {
+        return;
+      }
+      setCommits((prev) => {
+        const existingHashes = new Set(prev.map((c) => c.hash));
+        const newCommits = page.commits.filter(
+          (c) => !existingHashes.has(c.hash),
+        );
+        return [...prev, ...newCommits];
+      });
       setHasMore(page.hasMore);
     } catch {
       // Silently ignore - keep existing commits
     } finally {
-      setIsLoadingMore(false);
+      if (!loadMoreCancelledRef.current) {
+        setIsLoadingMore(false);
+      }
     }
   }, [sessionId, repoPath, commits.length, isLoadingMore, hasMore]);
 
