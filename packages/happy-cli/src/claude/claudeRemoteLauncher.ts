@@ -416,6 +416,136 @@ export async function claudeRemoteLauncher(
     },
   );
 
+  // Register RPC handler to return full content of a context category by
+  // reading and parsing the current session JSONL file.
+  session.client.rpcHandlerManager.registerHandler(
+    "claude-control:get_context_detail",
+    async (args: { category?: string }) => {
+      const category = typeof args?.category === "string" ? args.category.trim() : "";
+      if (!category) {
+        return { items: [], category: "", totalItems: 0 };
+      }
+
+      const currentSessionId = session.sessionId;
+      if (!currentSessionId) {
+        return { items: [], category, totalItems: 0 };
+      }
+
+      type DetailItem = {
+        type: string;
+        role?: string;
+        content: string;
+        uuid?: string;
+        timestamp?: string;
+      };
+
+      const MAX_CONTENT_BYTES = 10 * 1024; // 10 KB per item
+
+      function truncate(s: string): string {
+        if (s.length <= MAX_CONTENT_BYTES) return s;
+        return s.slice(0, MAX_CONTENT_BYTES) + "\n…[truncated]";
+      }
+
+      function extractContent(record: Record<string, unknown>): string {
+        // message.content (user/assistant) — may be string or array
+        const msg = record.message as Record<string, unknown> | undefined;
+        if (msg) {
+          const c = msg.content;
+          if (typeof c === "string") return truncate(c);
+          if (Array.isArray(c)) {
+            return truncate(
+              c
+                .map((b: unknown) => {
+                  if (typeof b === "object" && b !== null) {
+                    const block = b as Record<string, unknown>;
+                    if (block.type === "text") return String(block.text ?? "");
+                    if (block.type === "tool_use") return `[tool_use: ${block.name}] ${JSON.stringify(block.input ?? {})}`;
+                    if (block.type === "tool_result") return `[tool_result] ${JSON.stringify(block.content ?? "")}`;
+                  }
+                  return "";
+                })
+                .filter(Boolean)
+                .join("\n"),
+            );
+          }
+        }
+        // attachment record — expose stdout additionalContext or raw content
+        const att = record.attachment as Record<string, unknown> | undefined;
+        if (att) {
+          const stdout = att.stdout as string | undefined;
+          if (stdout) {
+            try {
+              const parsed = JSON.parse(stdout) as Record<string, unknown>;
+              const hookOut = parsed.hookSpecificOutput as Record<string, unknown> | undefined;
+              const additional = hookOut?.additionalContext;
+              if (typeof additional === "string") return truncate(additional);
+            } catch { /* not JSON */ }
+            return truncate(stdout);
+          }
+          const rawContent = att.content;
+          if (typeof rawContent === "string") return truncate(rawContent);
+          return truncate(JSON.stringify(att));
+        }
+        // summary record
+        if (typeof record.summary === "string") return truncate(record.summary);
+        // fallback — dump everything except bulky sub-objects
+        const { message: _m, attachment: _a, ...rest } = record;
+        return truncate(JSON.stringify(rest));
+      }
+
+      /** Decide whether a JSONL record belongs to the requested category. */
+      function matchesCategory(record: Record<string, unknown>, cat: string): boolean {
+        const lower = cat.toLowerCase();
+        const type = String(record.type ?? "");
+        if (lower.includes("message")) {
+          return type === "user" || type === "assistant";
+        }
+        if (lower.includes("system prompt") || lower === "system") {
+          return type === "system";
+        }
+        if (lower.includes("autocompact") || lower.includes("compact")) {
+          return type === "summary";
+        }
+        if (lower.includes("skill") || lower.includes("agent") || lower.includes("memory") || lower.includes("attachment")) {
+          return type === "attachment";
+        }
+        // Default: accept any record except non-content bookkeeping entries
+        return type !== "custom-title" && type !== "queue-operation"
+          && type !== "file-history-snapshot" && type !== "last-prompt";
+      }
+
+      try {
+        const projectDir = getProjectPath(session.path);
+        const filePath = join(projectDir, `${currentSessionId}.jsonl`);
+        const rawContent = await readFile(filePath, "utf-8");
+        const items: DetailItem[] = [];
+
+        for (const line of rawContent.split("\n")) {
+          if (!line.trim()) continue;
+          let record: Record<string, unknown>;
+          try {
+            record = JSON.parse(line) as Record<string, unknown>;
+          } catch {
+            continue;
+          }
+          if (!matchesCategory(record, category)) continue;
+          const msg = record.message as Record<string, unknown> | undefined;
+          items.push({
+            type: String(record.type ?? "unknown"),
+            role: typeof msg?.role === "string" ? msg.role : undefined,
+            content: extractContent(record),
+            uuid: typeof record.uuid === "string" ? record.uuid : undefined,
+            timestamp: typeof record.timestamp === "string" ? record.timestamp : undefined,
+          });
+        }
+
+        return { items, category, totalItems: items.length };
+      } catch {
+        return { items: [], category, totalItems: 0 };
+      }
+    },
+  );
+
   // Register RPC handler for App to fetch plan file content
   session.client.rpcHandlerManager.registerHandler(
     "getPlanFileContent",
