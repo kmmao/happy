@@ -4200,6 +4200,7 @@ export const zhHant: TranslationStructure = {
       subcatRedirectedContext: "重定向情境",
       subcatUnattributed: "其他",
       subcatLoading: "載入子分類中…",
+      subcatBreakdownNote: "全對話 token 按類型細分，可能跨多個上下文分類",
     },
     mcpServers: {
       title: "MCP 伺服器",

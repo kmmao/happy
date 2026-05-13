@@ -4318,6 +4318,7 @@ export const ru: TranslationStructure = {
       subcatRedirectedContext: "Перенаправленный контекст",
       subcatUnattributed: "Другое",
       subcatLoading: "Загрузка подкатегорий…",
+      subcatBreakdownNote: "Полная разбивка токенов диалога по всем категориям контекста",
     },
     mcpServers: {
       title: "MCP серверы",

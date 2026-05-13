@@ -1,5 +1,5 @@
 import * as React from "react";
-import { View, Text, Pressable, ScrollView, AppState, type AppStateStatus } from "react-native";
+import { View, Text, Pressable, ScrollView, FlatList, AppState, useWindowDimensions, type AppStateStatus } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import Svg, { Circle } from "react-native-svg";
 import { Ionicons } from "@expo/vector-icons";
@@ -42,6 +42,61 @@ type DetailRow = { label: string; sub?: string; value: string };
  * Returns a list of detail rows for categories that have sub-data,
  * or null if the category has no drillable detail.
  */
+// Human-readable labels for SDK attachment type names
+const ATTACHMENT_TYPE_LABELS: Record<string, string> = {
+    hook_success: "Hook Results (Success)",
+    hook_failure: "Hook Results (Failed)",
+    async_hook_response: "Async Hook Responses",
+    nested_memory: "Memory Files",
+    skill_listing: "Skill Listings",
+    hook_additional_context: "Hook Context",
+    diagnostics: "Diagnostics",
+    todo_reminder: "Todo Reminders",
+    mcp_instructions_delta: "MCP Instructions",
+    system_reminder: "System Reminders",
+    new_diagnostics: "New Diagnostics",
+    image: "Images",
+    file: "Files",
+    pdf: "PDFs",
+};
+
+function attachmentLabel(name: string): string {
+    return ATTACHMENT_TYPE_LABELS[name] ?? name.replace(/_/g, " ");
+}
+
+/**
+ * Resolve SDK messageBreakdown into detail rows for subcategories
+ * that don't have JSONL-based drill-down (toolCall, toolResult, attachment).
+ */
+function resolveSubcatBreakdown(
+    subcatName: string,
+    mb: GetContextUsageResponse["messageBreakdown"] | undefined,
+): DetailRow[] | null {
+    if (!mb) return null;
+    if (subcatName === "toolCall" && mb.toolCallsByType.length > 0) {
+        return mb.toolCallsByType.map((t) => ({
+            label: t.name,
+            value: formatTokens(t.callTokens),
+        }));
+    }
+    if (subcatName === "toolResult" && mb.toolCallsByType.length > 0) {
+        return mb.toolCallsByType
+            .filter((t) => t.resultTokens > 0)
+            .map((t) => ({
+                label: t.name,
+                value: formatTokens(t.resultTokens),
+            }));
+    }
+    if (subcatName === "attachment" && mb.attachmentsByType.length > 0) {
+        return mb.attachmentsByType.map((a) => ({
+            label: attachmentLabel(a.name),
+            sub: a.name,
+            value: formatTokens(a.tokens),
+        }));
+    }
+    return null;
+}
+
 function resolveDetail(catName: string, data: GetContextUsageResponse): DetailRow[] | null {
     const lower = catName.toLowerCase();
     if ((lower.includes("memory") || lower.includes("file")) && data.memoryFiles.length > 0) {
@@ -339,6 +394,7 @@ const SubcategoryListModal = React.memo<SubcategoryListModalProps>(function Subc
 }) {
     const { theme } = useUnistyles();
     const c = theme.colors;
+    const { height: screenHeight } = useWindowDimensions();
 
     // When messageBreakdown is available, use it directly (no RPC needed).
     // Otherwise fall back to the JSONL-based summaryOnly RPC.
@@ -374,7 +430,7 @@ const SubcategoryListModal = React.memo<SubcategoryListModalProps>(function Subc
     }, [sessionId, category, hasBreakdown]);
 
     return (
-        <View style={[subcatModalStyles.container, { backgroundColor: c.surface }]}>
+        <View style={[subcatModalStyles.container, { backgroundColor: c.surface, maxHeight: screenHeight * 0.8 }]}>
             {/* Header */}
             <View style={[subcatModalStyles.header, { borderBottomColor: c.divider }]}>
                 <Text style={[subcatModalStyles.title, { color: c.text }]} numberOfLines={1}>
@@ -384,6 +440,11 @@ const SubcategoryListModal = React.memo<SubcategoryListModalProps>(function Subc
                     <Ionicons name="close" size={20} color={c.textSecondary} />
                 </Pressable>
             </View>
+
+            {/* Note explaining the breakdown covers all categories */}
+            <Text style={[subcatModalStyles.note, { color: c.textSecondary }]}>
+                {t("claudeControl.contextUsage.subcatBreakdownNote")}
+            </Text>
 
             {state.status === "loading" && (
                 <View style={subcatModalStyles.center}>
@@ -402,7 +463,7 @@ const SubcategoryListModal = React.memo<SubcategoryListModalProps>(function Subc
             )}
 
             {state.status === "done" && (
-                <View>
+                <ScrollView style={subcatModalStyles.scroll} showsVerticalScrollIndicator={false}>
                     {state.subcategories.map((subcat, i) => {
                         const isLast = i === state.subcategories.length - 1;
                         const iconName = SUBCAT_ICONS[subcat.name] ?? "document-text-outline";
@@ -410,11 +471,30 @@ const SubcategoryListModal = React.memo<SubcategoryListModalProps>(function Subc
                         const jsonlSubcategory = subcat.name === "user" || subcat.name === "system-reminder" || subcat.name === "assistant"
                             ? subcat.name
                             : undefined; // No JSONL drill-down for SDK-only categories
+                        // SDK-only categories can still drill down if breakdown data exists
+                        const hasBreakdownDetail = !jsonlSubcategory && resolveSubcatBreakdown(subcat.name, messageBreakdown) != null;
+                        const canDrillDown = !!jsonlSubcategory || hasBreakdownDetail;
                         return (
                             <Pressable
                                 key={subcat.name}
                                 onPress={() => {
-                                    if (!jsonlSubcategory) return; // No drill-down available
+                                    // SDK-only categories: show per-type breakdown via CategoryDetailModal
+                                    if (!jsonlSubcategory) {
+                                        const detail = resolveSubcatBreakdown(subcat.name, messageBreakdown);
+                                        if (detail && detail.length > 0) {
+                                            onClose();
+                                            setTimeout(() => {
+                                                Modal.show({
+                                                    component: CategoryDetailModal,
+                                                    props: {
+                                                        title: subcatLabel(subcat.name),
+                                                        detail,
+                                                    },
+                                                });
+                                            }, 150);
+                                        }
+                                        return;
+                                    }
                                     onClose();
                                     setTimeout(() => {
                                         Modal.show({
@@ -428,7 +508,7 @@ const SubcategoryListModal = React.memo<SubcategoryListModalProps>(function Subc
                                         });
                                     }, 150);
                                 }}
-                                style={({ pressed }) => pressed ? { opacity: jsonlSubcategory ? 0.6 : 1 } : undefined}
+                                style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}
                             >
                                 <View
                                     style={[
@@ -443,7 +523,7 @@ const SubcategoryListModal = React.memo<SubcategoryListModalProps>(function Subc
                                     <Text style={[subcatModalStyles.rowCount, { color: c.textSecondary }]}>
                                         {formatTokens(subcat.count)}
                                     </Text>
-                                    {jsonlSubcategory ? (
+                                    {canDrillDown ? (
                                         <Ionicons name="chevron-forward" size={12} color={c.textSecondary} />
                                     ) : (
                                         <View style={{ width: 12 }} />
@@ -452,7 +532,7 @@ const SubcategoryListModal = React.memo<SubcategoryListModalProps>(function Subc
                             </Pressable>
                         );
                     })}
-                </View>
+                </ScrollView>
             )}
         </View>
     );
@@ -464,6 +544,7 @@ const subcatModalStyles = StyleSheet.create(() => ({
         overflow: "hidden",
         width: "100%",
         maxWidth: 720,
+        // maxHeight applied inline via screenHeight * 0.8
     },
     header: {
         flexDirection: "row",
@@ -480,6 +561,14 @@ const subcatModalStyles = StyleSheet.create(() => ({
     },
     closeBtn: {
         padding: 4,
+    },
+    note: {
+        fontSize: 11,
+        paddingHorizontal: 16,
+        paddingVertical: 6,
+    },
+    scroll: {
+        flexGrow: 0,
     },
     center: {
         paddingVertical: 32,
@@ -590,6 +679,7 @@ const ContextContentModal = React.memo<ContextContentModalProps>(function Contex
 }) {
     const { theme } = useUnistyles();
     const c = theme.colors;
+    const { height: screenHeight } = useWindowDimensions();
     const [state, setState] = React.useState<
         | { status: "loading" }
         | { status: "error" }
@@ -598,7 +688,7 @@ const ContextContentModal = React.memo<ContextContentModalProps>(function Contex
 
     React.useEffect(() => {
         let cancelled = false;
-        fetchContextDetail(sessionId, category, subcategory ? { subcategory } : undefined)
+        fetchContextDetail(sessionId, category, { ...(subcategory ? { subcategory } : {}), limit: 50 })
             .then((res) => {
                 if (!cancelled) setState({ status: "done", data: res });
             })
@@ -609,7 +699,7 @@ const ContextContentModal = React.memo<ContextContentModalProps>(function Contex
     }, [sessionId, category, subcategory]);
 
     return (
-        <View style={[contentModalStyles.container, { backgroundColor: c.surface }]}>
+        <View style={[contentModalStyles.container, { backgroundColor: c.surface, maxHeight: screenHeight * 0.85 }]}>
             {/* Header */}
             <View style={[contentModalStyles.header, { borderBottomColor: c.divider }]}>
                 <Text style={[contentModalStyles.title, { color: c.text }]} numberOfLines={1}>
@@ -637,35 +727,36 @@ const ContextContentModal = React.memo<ContextContentModalProps>(function Contex
             )}
 
             {state.status === "done" && (
-                <>
+                <View style={{ flex: 1, flexShrink: 1 }}>
                     <View style={[contentModalStyles.countRow, { borderBottomColor: c.divider }]}>
                         <Text style={[contentModalStyles.countText, { color: c.textSecondary }]}>
-                            {t("claudeControl.contextUsage.detailItems").replace("{n}", String(state.data.totalItems))}
+                            {state.data.items.length < state.data.totalItems
+                                ? `${state.data.totalItems} items · showing latest ${state.data.items.length}`
+                                : t("claudeControl.contextUsage.detailItems").replace("{n}", String(state.data.totalItems))}
                         </Text>
                     </View>
-                    <ScrollView
-                        style={contentModalStyles.scroll}
+                    <FlatList
+                        data={state.data.items}
+                        keyExtractor={(item, idx) => item.uuid ?? String(idx)}
+                        renderItem={({ item }) => <ContentItem item={item} />}
+                        style={{ flex: 1 }}
                         contentContainerStyle={contentModalStyles.scrollContent}
                         showsVerticalScrollIndicator={false}
-                    >
-                        {state.data.items.map((item, idx) => (
-                            <ContentItem
-                                key={item.uuid ?? String(idx)}
-                                item={item}
-                            />
-                        ))}
-                    </ScrollView>
-                </>
+                        initialNumToRender={10}
+                        maxToRenderPerBatch={10}
+                        windowSize={5}
+                    />
+                </View>
             )}
         </View>
     );
 });
 
-const contentModalStyles = StyleSheet.create((_, rt) => ({
+const contentModalStyles = StyleSheet.create(() => ({
     container: {
         borderRadius: 16,
         overflow: "hidden",
-        maxHeight: "85%",
+        // maxHeight applied inline via screenHeight * 0.85
         minHeight: 180,
         width: "100%",
         maxWidth: 720,
@@ -760,8 +851,9 @@ const CategoryDetailModal = React.memo<CategoryDetailModalProps>(function Catego
 }) {
     const { theme } = useUnistyles();
     const c = theme.colors;
+    const { height: screenHeight } = useWindowDimensions();
     return (
-        <View style={[detailModalStyles.container, { backgroundColor: c.surface }]}>
+        <View style={[detailModalStyles.container, { backgroundColor: c.surface, maxHeight: screenHeight * 0.8 }]}>
             {/* Header */}
             <View style={[detailModalStyles.header, { borderBottomColor: c.divider }]}>
                 <Text style={[detailModalStyles.title, { color: c.text }]} numberOfLines={1}>
@@ -808,11 +900,13 @@ const CategoryDetailModal = React.memo<CategoryDetailModalProps>(function Catego
     );
 });
 
-const detailModalStyles = StyleSheet.create((_, rt) => ({
+const detailModalStyles = StyleSheet.create(() => ({
     container: {
         borderRadius: 16,
         overflow: "hidden",
-        maxHeight: 460,
+        width: "100%",
+        maxWidth: 720,
+        // maxHeight applied inline via screenHeight * 0.8
     },
     header: {
         flexDirection: "row",

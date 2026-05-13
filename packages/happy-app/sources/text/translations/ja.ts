@@ -4272,6 +4272,7 @@ export const ja: TranslationStructure = {
       subcatRedirectedContext: "リダイレクトされたコンテキスト",
       subcatUnattributed: "その他",
       subcatLoading: "サブカテゴリを読み込み中…",
+      subcatBreakdownNote: "全会話のトークン内訳（複数のコンテキストカテゴリにまたがる場合があります）",
     },
     mcpServers: {
       title: "MCPサーバー",

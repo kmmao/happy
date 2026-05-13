@@ -420,13 +420,14 @@ export async function claudeRemoteLauncher(
   // reading and parsing the current session JSONL file.
   session.client.rpcHandlerManager.registerHandler(
     "claude-control:get_context_detail",
-    async (args: { category?: string; summaryOnly?: boolean; subcategory?: string }) => {
+    async (args: { category?: string; summaryOnly?: boolean; subcategory?: string; limit?: number }) => {
       const category = typeof args?.category === "string" ? args.category.trim() : "";
       if (!category) {
         return { items: [], category: "", totalItems: 0 };
       }
       const summaryOnly = args?.summaryOnly === true;
       const subcategory = typeof args?.subcategory === "string" ? args.subcategory.trim() : "";
+      const limit = typeof args?.limit === "number" && args.limit > 0 ? args.limit : 50;
 
       const currentSessionId = session.sessionId;
       if (!currentSessionId) {
@@ -656,7 +657,10 @@ export async function claudeRemoteLauncher(
           }
         }
 
-        return { items, category, totalItems: items.length };
+        const totalItems = items.length;
+        // Return only the latest `limit` items to avoid huge responses
+        const limitedItems = totalItems > limit ? items.slice(totalItems - limit) : items;
+        return { items: limitedItems, category, totalItems };
       } catch {
         return { items: [], category, totalItems: 0 };
       }

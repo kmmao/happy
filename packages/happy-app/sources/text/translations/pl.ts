@@ -4320,6 +4320,7 @@ export const pl: TranslationStructure = {
       subcatRedirectedContext: "Przekierowany kontekst",
       subcatUnattributed: "Inne",
       subcatLoading: "Ładowanie podkategorii…",
+      subcatBreakdownNote: "Pełny podział tokenów rozmowy według wszystkich kategorii kontekstu",
     },
     mcpServers: {
       title: "Serwery MCP",

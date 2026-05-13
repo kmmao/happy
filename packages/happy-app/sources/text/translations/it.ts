@@ -4298,6 +4298,7 @@ export const it: TranslationStructure = {
       subcatRedirectedContext: "Contesto reindirizzato",
       subcatUnattributed: "Altro",
       subcatLoading: "Caricamento sottocategorie…",
+      subcatBreakdownNote: "Ripartizione completa dei token della conversazione in tutte le categorie di contesto",
     },
     mcpServers: {
       title: "Server MCP",

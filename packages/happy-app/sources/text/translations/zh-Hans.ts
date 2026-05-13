@@ -4194,6 +4194,7 @@ export const zhHans: TranslationStructure = {
       subcatRedirectedContext: "重定向上下文",
       subcatUnattributed: "其他",
       subcatLoading: "加载子分类中…",
+      subcatBreakdownNote: "全对话 token 按类型细分，可能跨多个上下文分类",
     },
     mcpServers: {
       title: "MCP 服务器",
