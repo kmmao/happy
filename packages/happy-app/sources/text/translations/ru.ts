@@ -4305,6 +4305,9 @@ export const ru: TranslationStructure = {
       mcpTools: "MCP инструменты",
       noMemoryFiles: "Не загружено",
       noMcpTools: "Не загружено",
+      detailLoading: "Loading content…",
+      detailError: "Failed to load content",
+      detailItems: "{n} items",
     },
     mcpServers: {
       title: "MCP серверы",

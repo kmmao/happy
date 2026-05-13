@@ -38,6 +38,8 @@ import type {
     GetContextUsageResponse,
     GetMcpServersRequest,
     GetMcpServersResponse,
+    GetContextDetailRequest,
+    GetContextDetailResponse,
     ClaudeControlMethod,
 } from '@kmmao/happy-wire';
 import { CLAUDE_CONTROL_SCOPE } from '@kmmao/happy-wire';
@@ -169,6 +171,24 @@ export async function fetchContextUsage(sessionId: string): Promise<GetContextUs
         sessionId,
         methodName('get_context_usage'),
         {},
+    );
+}
+
+// ─── get_context_detail ──────────────────────────────────────────────────────
+
+/**
+ * Fetch the full content of a context category by reading the CLI's session
+ * JSONL file. Returns a list of parsed records (messages, attachments, etc.)
+ * with their text content, truncated at 10 KB per item.
+ */
+export async function fetchContextDetail(
+    sessionId: string,
+    category: string,
+): Promise<GetContextDetailResponse> {
+    return apiSocket.sessionRPC<GetContextDetailResponse, GetContextDetailRequest>(
+        sessionId,
+        methodName('get_context_detail'),
+        { category },
     );
 }
 

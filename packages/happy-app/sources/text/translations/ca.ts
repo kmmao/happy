@@ -4291,6 +4291,9 @@ export const ca: TranslationStructure = {
       mcpTools: "Eines MCP",
       noMemoryFiles: "Cap carregat",
       noMcpTools: "Cap carregat",
+      detailLoading: "Loading content…",
+      detailError: "Failed to load content",
+      detailItems: "{n} items",
     },
     mcpServers: {
       title: "Servidors MCP",

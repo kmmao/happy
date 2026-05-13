@@ -4259,6 +4259,9 @@ export const ja: TranslationStructure = {
       mcpTools: "MCPツール",
       noMemoryFiles: "未読み込み",
       noMcpTools: "未読み込み",
+      detailLoading: "Loading content…",
+      detailError: "Failed to load content",
+      detailItems: "{n} items",
     },
     mcpServers: {
       title: "MCPサーバー",

@@ -4181,6 +4181,9 @@ export const zhHans: TranslationStructure = {
       mcpTools: "MCP 工具",
       noMemoryFiles: "未加载",
       noMcpTools: "未加载",
+      detailLoading: "加载内容中…",
+      detailError: "加载失败",
+      detailItems: "{n} 条",
     },
     mcpServers: {
       title: "MCP 服务器",

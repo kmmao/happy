@@ -4288,6 +4288,9 @@ export const pt: TranslationStructure = {
       mcpTools: "Ferramentas MCP",
       noMemoryFiles: "Nenhum carregado",
       noMcpTools: "Nenhum carregado",
+      detailLoading: "Loading content…",
+      detailError: "Failed to load content",
+      detailItems: "{n} items",
     },
     mcpServers: {
       title: "Servidores MCP",

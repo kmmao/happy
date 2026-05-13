@@ -5,9 +5,9 @@ import Svg, { Circle } from "react-native-svg";
 import { Ionicons } from "@expo/vector-icons";
 import { t } from "@/text";
 import { Modal } from "@/modal";
-import { fetchContextUsage } from "@/sync/apiClaudeControl";
+import { fetchContextUsage, fetchContextDetail } from "@/sync/apiClaudeControl";
 import { log } from "@/log";
-import type { GetContextUsageResponse } from "@kmmao/happy-wire";
+import type { GetContextUsageResponse, GetContextDetailResponse } from "@kmmao/happy-wire";
 
 // Refresh every 30s while active — context changes with each Claude turn
 const REFRESH_INTERVAL_MS = 30_000;
@@ -168,8 +168,11 @@ export const ContextUsagePanel = React.memo(function ContextUsagePanel({
                         const pct = data.maxTokens > 0
                             ? (cat.tokens / data.maxTokens) * 100
                             : 0;
-                        const detail = resolveDetail(cat.name, data);
+                        const legacyDetail = resolveDetail(cat.name, data);
                         const isLast = i === data.categories.length - 1;
+                        // "Free space" has no backing content — not drillable
+                        const isFreeSpace = cat.name.toLowerCase().includes("free");
+                        const isClickable = !isFreeSpace;
                         const inner = (
                             <View
                                 style={[
@@ -184,7 +187,7 @@ export const ContextUsagePanel = React.memo(function ContextUsagePanel({
                                 <Text style={styles.legendName} numberOfLines={1}>{cat.name}</Text>
                                 <Text style={styles.legendPct}>{formatPct(pct)}</Text>
                                 <Text style={styles.legendTokens}>{formatTokens(cat.tokens)}</Text>
-                                {detail ? (
+                                {isClickable ? (
                                     <Ionicons
                                         name="chevron-forward"
                                         size={12}
@@ -196,13 +199,29 @@ export const ContextUsagePanel = React.memo(function ContextUsagePanel({
                                 )}
                             </View>
                         );
-                        if (!detail) return <View key={cat.name}>{inner}</View>;
+                        if (!isClickable) return <View key={cat.name}>{inner}</View>;
+                        // Legacy detail (memory files / MCP tools) shown via existing modal
+                        if (legacyDetail) {
+                            return (
+                                <Pressable
+                                    key={cat.name}
+                                    onPress={() => Modal.show({
+                                        component: CategoryDetailModal,
+                                        props: { title: cat.name, detail: legacyDetail },
+                                    })}
+                                    style={({ pressed }) => pressed ? { opacity: 0.6 } : undefined}
+                                >
+                                    {inner}
+                                </Pressable>
+                            );
+                        }
+                        // All other categories — open full content modal via RPC
                         return (
                             <Pressable
                                 key={cat.name}
                                 onPress={() => Modal.show({
-                                    component: CategoryDetailModal,
-                                    props: { title: cat.name, detail },
+                                    component: ContextContentModal,
+                                    props: { sessionId, category: cat.name },
                                 })}
                                 style={({ pressed }) => pressed ? { opacity: 0.6 } : undefined}
                             >
@@ -217,6 +236,188 @@ export const ContextUsagePanel = React.memo(function ContextUsagePanel({
         </View>
     );
 });
+
+// ─── ContextContentModal ─────────────────────────────────────────────────────
+// Full content viewer for a context category — fetches records via RPC and
+// shows them in a scrollable list with monospace text.
+
+interface ContextContentModalProps {
+    sessionId: string;
+    category: string;
+    onClose: () => void;
+}
+
+const ContextContentModal = React.memo<ContextContentModalProps>(function ContextContentModal({
+    sessionId,
+    category,
+    onClose,
+}) {
+    const { theme } = useUnistyles();
+    const c = theme.colors;
+    const [state, setState] = React.useState<
+        | { status: "loading" }
+        | { status: "error" }
+        | { status: "done"; data: GetContextDetailResponse }
+    >({ status: "loading" });
+
+    React.useEffect(() => {
+        let cancelled = false;
+        fetchContextDetail(sessionId, category)
+            .then((res) => {
+                if (!cancelled) setState({ status: "done", data: res });
+            })
+            .catch(() => {
+                if (!cancelled) setState({ status: "error" });
+            });
+        return () => { cancelled = true; };
+    }, [sessionId, category]);
+
+    return (
+        <View style={[contentModalStyles.container, { backgroundColor: c.surface }]}>
+            {/* Header */}
+            <View style={[contentModalStyles.header, { borderBottomColor: c.divider }]}>
+                <Text style={[contentModalStyles.title, { color: c.text }]} numberOfLines={1}>
+                    {category}
+                </Text>
+                <Pressable onPress={onClose} hitSlop={10} style={contentModalStyles.closeBtn}>
+                    <Ionicons name="close" size={20} color={c.textSecondary} />
+                </Pressable>
+            </View>
+
+            {state.status === "loading" && (
+                <View style={contentModalStyles.center}>
+                    <Text style={[contentModalStyles.muted, { color: c.textSecondary }]}>
+                        {t("claudeControl.contextUsage.detailLoading")}
+                    </Text>
+                </View>
+            )}
+
+            {state.status === "error" && (
+                <View style={contentModalStyles.center}>
+                    <Text style={[contentModalStyles.muted, { color: c.textSecondary }]}>
+                        {t("claudeControl.contextUsage.detailError")}
+                    </Text>
+                </View>
+            )}
+
+            {state.status === "done" && (
+                <>
+                    <View style={[contentModalStyles.countRow, { borderBottomColor: c.divider }]}>
+                        <Text style={[contentModalStyles.countText, { color: c.textSecondary }]}>
+                            {t("claudeControl.contextUsage.detailItems").replace("{n}", String(state.data.totalItems))}
+                        </Text>
+                    </View>
+                    <ScrollView
+                        style={contentModalStyles.scroll}
+                        contentContainerStyle={contentModalStyles.scrollContent}
+                        showsVerticalScrollIndicator={false}
+                    >
+                        {state.data.items.map((item, idx) => (
+                            <View
+                                key={item.uuid ?? String(idx)}
+                                style={[
+                                    contentModalStyles.itemCard,
+                                    { backgroundColor: c.surfaceHighest ?? c.surface, borderColor: c.divider },
+                                ]}
+                            >
+                                <View style={contentModalStyles.itemHeader}>
+                                    <Text style={[contentModalStyles.itemBadge, { backgroundColor: c.divider, color: c.textSecondary }]}>
+                                        {item.role ? `${item.type} · ${item.role}` : item.type}
+                                    </Text>
+                                    {item.timestamp ? (
+                                        <Text style={[contentModalStyles.itemTime, { color: c.textSecondary }]} numberOfLines={1}>
+                                            {item.timestamp.slice(11, 19)}
+                                        </Text>
+                                    ) : null}
+                                </View>
+                                <Text
+                                    style={[contentModalStyles.itemContent, { color: c.text }]}
+                                    selectable
+                                >
+                                    {item.content}
+                                </Text>
+                            </View>
+                        ))}
+                    </ScrollView>
+                </>
+            )}
+        </View>
+    );
+});
+
+const contentModalStyles = StyleSheet.create((_, rt) => ({
+    container: {
+        borderRadius: 16,
+        overflow: "hidden",
+        maxHeight: 560,
+        minHeight: 180,
+    },
+    header: {
+        flexDirection: "row",
+        alignItems: "center",
+        paddingHorizontal: 16,
+        paddingVertical: 14,
+        borderBottomWidth: StyleSheet.hairlineWidth,
+        gap: 8,
+    },
+    title: {
+        flex: 1,
+        fontSize: 15,
+        fontWeight: "600",
+    },
+    closeBtn: {
+        padding: 4,
+    },
+    countRow: {
+        paddingHorizontal: 16,
+        paddingVertical: 6,
+        borderBottomWidth: StyleSheet.hairlineWidth,
+    },
+    countText: {
+        fontSize: 11,
+    },
+    center: {
+        paddingVertical: 32,
+        alignItems: "center",
+    },
+    muted: {
+        fontSize: 13,
+    },
+    scroll: {
+        flexGrow: 0,
+    },
+    scrollContent: {
+        padding: 12,
+        gap: 10,
+    },
+    itemCard: {
+        borderRadius: 8,
+        borderWidth: StyleSheet.hairlineWidth,
+        padding: 10,
+        gap: 6,
+    },
+    itemHeader: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 8,
+    },
+    itemBadge: {
+        fontSize: 10,
+        fontWeight: "600",
+        paddingHorizontal: 6,
+        paddingVertical: 2,
+        borderRadius: 4,
+        overflow: "hidden",
+    },
+    itemTime: {
+        fontSize: 10,
+    },
+    itemContent: {
+        fontSize: 12,
+        fontFamily: "Menlo",
+        lineHeight: 17,
+    },
+}));
 
 // ─── CategoryDetailModal ──────────────────────────────────────────────────────
 
