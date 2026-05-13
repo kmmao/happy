@@ -439,8 +439,11 @@ export async function claudeRemoteLauncher(
         timestamp?: string;
       };
 
+      const MAX_CONTENT_BYTES = 50 * 1024; // 50 KB per item
+
       function truncate(s: string): string {
-        return s;
+        if (s.length <= MAX_CONTENT_BYTES) return s;
+        return s.slice(0, MAX_CONTENT_BYTES) + "\n…[truncated]";
       }
 
       /** Extract raw content from a JSONL record. When `raw` is true,
