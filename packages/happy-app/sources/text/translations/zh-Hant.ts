@@ -4190,6 +4190,7 @@ export const zhHant: TranslationStructure = {
       detailLoading: "載入內容中…",
       detailError: "載入失敗",
       detailItems: "{n} 條",
+      detailLines: "行 — 點擊展開",
     },
     mcpServers: {
       title: "MCP 伺服器",

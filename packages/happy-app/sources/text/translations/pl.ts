@@ -4310,6 +4310,7 @@ export const pl: TranslationStructure = {
       detailLoading: "Loading content…",
       detailError: "Failed to load content",
       detailItems: "{n} items",
+      detailLines: "wierszy — kliknij, aby rozwinąć",
     },
     mcpServers: {
       title: "Serwery MCP",

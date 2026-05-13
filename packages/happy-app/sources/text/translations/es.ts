@@ -4289,6 +4289,7 @@ export const es: TranslationStructure = {
       detailLoading: "Loading content…",
       detailError: "Failed to load content",
       detailItems: "{n} items",
+      detailLines: "líneas — toca para expandir",
     },
     mcpServers: {
       title: "Servidores MCP",

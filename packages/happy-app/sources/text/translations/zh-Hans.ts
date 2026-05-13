@@ -4184,6 +4184,7 @@ export const zhHans: TranslationStructure = {
       detailLoading: "加载内容中…",
       detailError: "加载失败",
       detailItems: "{n} 条",
+      detailLines: "行 — 点击展开",
     },
     mcpServers: {
       title: "MCP 服务器",

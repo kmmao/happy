@@ -4262,6 +4262,7 @@ export const ja: TranslationStructure = {
       detailLoading: "Loading content…",
       detailError: "Failed to load content",
       detailItems: "{n} items",
+      detailLines: "行 — タップで展開",
     },
     mcpServers: {
       title: "MCPサーバー",

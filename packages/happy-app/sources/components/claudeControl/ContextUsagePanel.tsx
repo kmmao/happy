@@ -237,6 +237,67 @@ export const ContextUsagePanel = React.memo(function ContextUsagePanel({
     );
 });
 
+// ─── ContentItem (collapsible) ───────────────────────────────────────────────
+
+const COLLAPSED_LINES = 6;
+
+interface ContentItemProps {
+    item: GetContextDetailResponse["items"][number];
+}
+
+const ContentItem = React.memo<ContentItemProps>(function ContentItem({ item }) {
+    const { theme } = useUnistyles();
+    const c = theme.colors;
+    const [expanded, setExpanded] = React.useState(false);
+    const lineCount = React.useMemo(() => (item.content.match(/\n/g) ?? []).length + 1, [item.content]);
+    const isLong = lineCount > COLLAPSED_LINES;
+
+    return (
+        <View
+            style={[
+                contentModalStyles.itemCard,
+                { backgroundColor: c.surfaceHighest ?? c.surface, borderColor: c.divider },
+            ]}
+        >
+            <Pressable
+                style={contentModalStyles.itemHeader}
+                onPress={() => isLong && setExpanded((v) => !v)}
+            >
+                <Text style={[contentModalStyles.itemBadge, { backgroundColor: c.divider, color: c.textSecondary }]}>
+                    {item.role ? `${item.type} · ${item.role}` : item.type}
+                </Text>
+                {item.timestamp ? (
+                    <Text style={[contentModalStyles.itemTime, { color: c.textSecondary }]} numberOfLines={1}>
+                        {item.timestamp.slice(11, 19)}
+                    </Text>
+                ) : null}
+                {isLong && (
+                    <Ionicons
+                        name={expanded ? "chevron-up" : "chevron-down"}
+                        size={12}
+                        color={c.textSecondary}
+                        style={{ marginLeft: "auto" }}
+                    />
+                )}
+            </Pressable>
+            <Text
+                style={[contentModalStyles.itemContent, { color: c.text }]}
+                selectable={expanded}
+                numberOfLines={expanded ? undefined : COLLAPSED_LINES}
+            >
+                {item.content}
+            </Text>
+            {isLong && !expanded && (
+                <Pressable onPress={() => setExpanded(true)}>
+                    <Text style={[contentModalStyles.expandHint, { color: c.primary }]}>
+                        {`${lineCount} ${t("claudeControl.contextUsage.detailLines")}`}
+                    </Text>
+                </Pressable>
+            )}
+        </View>
+    );
+});
+
 // ─── ContextContentModal ─────────────────────────────────────────────────────
 // Full content viewer for a context category — fetches records via RPC and
 // shows them in a scrollable list with monospace text.
@@ -313,30 +374,10 @@ const ContextContentModal = React.memo<ContextContentModalProps>(function Contex
                         showsVerticalScrollIndicator={false}
                     >
                         {state.data.items.map((item, idx) => (
-                            <View
+                            <ContentItem
                                 key={item.uuid ?? String(idx)}
-                                style={[
-                                    contentModalStyles.itemCard,
-                                    { backgroundColor: c.surfaceHighest ?? c.surface, borderColor: c.divider },
-                                ]}
-                            >
-                                <View style={contentModalStyles.itemHeader}>
-                                    <Text style={[contentModalStyles.itemBadge, { backgroundColor: c.divider, color: c.textSecondary }]}>
-                                        {item.role ? `${item.type} · ${item.role}` : item.type}
-                                    </Text>
-                                    {item.timestamp ? (
-                                        <Text style={[contentModalStyles.itemTime, { color: c.textSecondary }]} numberOfLines={1}>
-                                            {item.timestamp.slice(11, 19)}
-                                        </Text>
-                                    ) : null}
-                                </View>
-                                <Text
-                                    style={[contentModalStyles.itemContent, { color: c.text }]}
-                                    selectable
-                                >
-                                    {item.content}
-                                </Text>
-                            </View>
+                                item={item}
+                            />
                         ))}
                     </ScrollView>
                 </>
@@ -349,8 +390,11 @@ const contentModalStyles = StyleSheet.create((_, rt) => ({
     container: {
         borderRadius: 16,
         overflow: "hidden",
-        maxHeight: 560,
+        maxHeight: "85%",
         minHeight: 180,
+        width: "100%",
+        maxWidth: 720,
+        flexShrink: 1,
     },
     header: {
         flexDirection: "row",
@@ -384,7 +428,7 @@ const contentModalStyles = StyleSheet.create((_, rt) => ({
         fontSize: 13,
     },
     scroll: {
-        flexGrow: 0,
+        flex: 1,
     },
     scrollContent: {
         padding: 12,
@@ -395,6 +439,7 @@ const contentModalStyles = StyleSheet.create((_, rt) => ({
         borderWidth: StyleSheet.hairlineWidth,
         padding: 10,
         gap: 6,
+        overflow: "hidden",
     },
     itemHeader: {
         flexDirection: "row",
@@ -416,6 +461,12 @@ const contentModalStyles = StyleSheet.create((_, rt) => ({
         fontSize: 12,
         fontFamily: "Menlo",
         lineHeight: 17,
+        flexShrink: 1,
+    },
+    expandHint: {
+        fontSize: 11,
+        fontWeight: "500",
+        paddingTop: 4,
     },
 }));
 

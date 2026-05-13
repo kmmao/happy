@@ -4308,6 +4308,7 @@ export const ru: TranslationStructure = {
       detailLoading: "Loading content…",
       detailError: "Failed to load content",
       detailItems: "{n} items",
+      detailLines: "строк — нажмите для раскрытия",
     },
     mcpServers: {
       title: "MCP серверы",
