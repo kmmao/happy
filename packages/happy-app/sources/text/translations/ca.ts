@@ -4304,7 +4304,7 @@ export const ca: TranslationStructure = {
       subcatRedirectedContext: "Context redirigit",
       subcatRedirectedContextDesc: "Context de cicles de compactació anteriors o redirigit de sub-agents",
       subcatUnattributed: "Altres",
-      subcatUnattributedDesc: "Injeccions del sistema, context de hooks, diagnòstics i altres despeses no atribuïdes",
+      subcatUnattributedDesc: "Inclou CLAUDE.md, Rules, Memory, llistes de Skills i altres injeccions de system-reminder — toca per veure el contingut",
       subcatLoading: "Carregant subcategories…",
       subcatBreakdownNote: "Desglossament complet dels tokens de la conversa en totes les categories de context",
     },

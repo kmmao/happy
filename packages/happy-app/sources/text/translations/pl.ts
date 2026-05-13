@@ -4320,7 +4320,7 @@ export const pl: TranslationStructure = {
       subcatRedirectedContext: "Przekierowany kontekst",
       subcatRedirectedContextDesc: "Kontekst przeniesiony z poprzednich cykli kompakcji lub przekierowany z sub-agentów",
       subcatUnattributed: "Inne",
-      subcatUnattributedDesc: "Wstrzyknięcia systemowe, kontekst hooków, diagnostyka i inne narzuty",
+      subcatUnattributedDesc: "Zawiera CLAUDE.md, Rules, Memory, listy umiejętności i inne wstrzyknięcia system-reminder — dotknij, aby zobaczyć",
       subcatLoading: "Ładowanie podkategorii…",
       subcatBreakdownNote: "Pełny podział tokenów rozmowy według wszystkich kategorii kontekstu",
     },

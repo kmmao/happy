@@ -4200,7 +4200,7 @@ export const zhHant: TranslationStructure = {
       subcatRedirectedContext: "重定向情境",
       subcatRedirectedContextDesc: "來自上次壓縮週期或子 Agent 轉發的上下文",
       subcatUnattributed: "其他",
-      subcatUnattributedDesc: "系統注入、Hook 上下文、診斷資訊等未歸類到具體訊息類型的開銷",
+      subcatUnattributedDesc: "包含 CLAUDE.md、Rules、Memory、Skill 清單等 system-reminder 注入內容，點擊查看詳情",
       subcatLoading: "載入子分類中…",
       subcatBreakdownNote: "全對話 token 按類型細分，可能跨多個上下文分類",
     },

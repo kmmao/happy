@@ -4299,7 +4299,7 @@ export const es: TranslationStructure = {
       subcatRedirectedContext: "Contexto redirigido",
       subcatRedirectedContextDesc: "Contexto de ciclos de compactación anteriores o redirigido de sub-agentes",
       subcatUnattributed: "Otros",
-      subcatUnattributedDesc: "Inyecciones del sistema, contexto de hooks, diagnósticos y otros gastos no atribuidos a un tipo de mensaje específico",
+      subcatUnattributedDesc: "Incluye CLAUDE.md, Rules, Memory, listas de Skills y otras inyecciones de system-reminder — toca para ver el contenido",
       subcatLoading: "Cargando subcategorías…",
       subcatBreakdownNote: "Desglose completo de tokens de la conversación en todas las categorías de contexto",
     },

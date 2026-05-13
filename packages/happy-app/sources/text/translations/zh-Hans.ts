@@ -4194,7 +4194,7 @@ export const zhHans: TranslationStructure = {
       subcatRedirectedContext: "重定向上下文",
       subcatRedirectedContextDesc: "来自上次压缩周期或子 Agent 转发的上下文",
       subcatUnattributed: "其他",
-      subcatUnattributedDesc: "SDK 消息帧格式化、turn 分隔符、JSON 结构等内部开销（不可优化）",
+      subcatUnattributedDesc: "包含 CLAUDE.md、Rules、Memory、Skill 列表等 system-reminder 注入内容，点击查看详情",
       subcatLoading: "加载子分类中…",
       subcatBreakdownNote: "全对话 token 按类型细分，可能跨多个上下文分类",
     },

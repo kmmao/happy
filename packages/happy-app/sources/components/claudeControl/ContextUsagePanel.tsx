@@ -284,7 +284,7 @@ export const ContextUsagePanel = React.memo(function ContextUsagePanel({
                                     key={cat.name}
                                     onPress={() => Modal.show({
                                         component: SubcategoryListModal,
-                                        props: { sessionId, category: cat.name, messageBreakdown: data.messageBreakdown },
+                                        props: { sessionId, category: cat.name, messageBreakdown: data.messageBreakdown, categoryTokens: cat.tokens },
                                     })}
                                     style={({ pressed }) => pressed ? { opacity: 0.6 } : undefined}
                                 >
@@ -345,6 +345,8 @@ interface SubcategoryListModalProps {
     category: string;
     /** Pre-fetched messageBreakdown from getContextUsage — avoids extra RPC when available. */
     messageBreakdown?: GetContextUsageResponse["messageBreakdown"];
+    /** Token count of the Messages category — used to normalize subcategory tokens. */
+    categoryTokens?: number;
     onClose: () => void;
 }
 
@@ -371,25 +373,52 @@ function subcatLabel(name: string): string {
     return name;
 }
 
-/** Build subcategory rows from SDK messageBreakdown (token-level detail). */
+/**
+ * Build subcategory rows from SDK messageBreakdown (token-level detail).
+ * When `categoryTokens` is provided, normalizes all subcategory values
+ * so their sum equals the Messages category total — the SDK's raw
+ * messageBreakdown spans ALL categories, not just Messages.
+ */
 function breakdownToRows(
     mb: NonNullable<GetContextUsageResponse["messageBreakdown"]>,
+    categoryTokens?: number,
 ): { name: string; count: number }[] {
-    const rows: { name: string; count: number }[] = [];
-    if (mb.userMessageTokens > 0) rows.push({ name: "user", count: mb.userMessageTokens });
-    if (mb.assistantMessageTokens > 0) rows.push({ name: "assistant", count: mb.assistantMessageTokens });
-    if (mb.toolCallTokens > 0) rows.push({ name: "toolCall", count: mb.toolCallTokens });
-    if (mb.toolResultTokens > 0) rows.push({ name: "toolResult", count: mb.toolResultTokens });
-    if (mb.attachmentTokens > 0) rows.push({ name: "attachment", count: mb.attachmentTokens });
-    if (mb.redirectedContextTokens > 0) rows.push({ name: "redirectedContext", count: mb.redirectedContextTokens });
-    if (mb.unattributedTokens > 0) rows.push({ name: "unattributed", count: mb.unattributedTokens });
-    return rows;
+    const raw: { name: string; count: number }[] = [];
+    if (mb.userMessageTokens > 0) raw.push({ name: "user", count: mb.userMessageTokens });
+    if (mb.assistantMessageTokens > 0) raw.push({ name: "assistant", count: mb.assistantMessageTokens });
+    if (mb.toolCallTokens > 0) raw.push({ name: "toolCall", count: mb.toolCallTokens });
+    if (mb.toolResultTokens > 0) raw.push({ name: "toolResult", count: mb.toolResultTokens });
+    if (mb.attachmentTokens > 0) raw.push({ name: "attachment", count: mb.attachmentTokens });
+    if (mb.redirectedContextTokens > 0) raw.push({ name: "redirectedContext", count: mb.redirectedContextTokens });
+    if (mb.unattributedTokens > 0) raw.push({ name: "unattributed", count: mb.unattributedTokens });
+
+    // Normalize so subcategories sum to the Messages category total
+    if (categoryTokens != null && categoryTokens > 0) {
+        const rawTotal = raw.reduce((s, r) => s + r.count, 0);
+        if (rawTotal > 0 && rawTotal !== categoryTokens) {
+            const scale = categoryTokens / rawTotal;
+            let remaining = categoryTokens;
+            for (let i = 0; i < raw.length; i++) {
+                if (i === raw.length - 1) {
+                    // Last item gets the remainder to avoid rounding drift
+                    raw[i].count = remaining;
+                } else {
+                    raw[i].count = Math.round(raw[i].count * scale);
+                    remaining -= raw[i].count;
+                }
+            }
+            // Drop rows that normalized to 0
+            return raw.filter((r) => r.count > 0);
+        }
+    }
+    return raw;
 }
 
 const SubcategoryListModal = React.memo<SubcategoryListModalProps>(function SubcategoryListModal({
     sessionId,
     category,
     messageBreakdown,
+    categoryTokens,
     onClose,
 }) {
     const { theme } = useUnistyles();
@@ -404,7 +433,7 @@ const SubcategoryListModal = React.memo<SubcategoryListModalProps>(function Subc
         | { status: "error" }
         | { status: "done"; subcategories: { name: string; count: number }[] }
     >(hasBreakdown
-        ? { status: "done", subcategories: breakdownToRows(messageBreakdown!) }
+        ? { status: "done", subcategories: breakdownToRows(messageBreakdown!, categoryTokens) }
         : { status: "loading" },
     );
 
@@ -490,15 +519,15 @@ const SubcategoryListModal = React.memo<SubcategoryListModalProps>(function Subc
                                                     },
                                                 });
                                             } else if (subcat.name === "unattributed") {
-                                                // SDK internal overhead — not decomposable via JSONL
+                                                // Unattributed tokens are mostly system-reminder injections
+                                                // (CLAUDE.md, Rules, Memory, Skills, etc.) — open JSONL drill-down
                                                 Modal.show({
-                                                    component: CategoryDetailModal,
+                                                    component: ContextContentModal,
                                                     props: {
-                                                        title: `${subcatLabel(subcat.name)} (${formatTokens(subcat.count)})`,
-                                                        detail: [
-                                                            { label: t("claudeControl.contextUsage.subcatUnattributedDesc"), value: "" },
-                                                            { label: "Total", value: formatTokens(subcat.count) },
-                                                        ],
+                                                        sessionId,
+                                                        category,
+                                                        subcategory: "system-reminder",
+                                                        subcategoryLabel: `${subcatLabel(subcat.name)} (${formatTokens(subcat.count)})`,
                                                     },
                                                 });
                                             } else {

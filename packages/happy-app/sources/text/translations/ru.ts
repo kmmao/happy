@@ -4318,7 +4318,7 @@ export const ru: TranslationStructure = {
       subcatRedirectedContext: "Перенаправленный контекст",
       subcatRedirectedContextDesc: "Контекст из предыдущих циклов сжатия или перенаправленный от суб-агентов",
       subcatUnattributed: "Другое",
-      subcatUnattributedDesc: "Системные инъекции, контекст хуков, диагностика и прочие накладные расходы",
+      subcatUnattributedDesc: "Включает CLAUDE.md, Rules, Memory, списки навыков и другие system-reminder инъекции — нажмите для просмотра",
       subcatLoading: "Загрузка подкатегорий…",
       subcatBreakdownNote: "Полная разбивка токенов диалога по всем категориям контекста",
     },
