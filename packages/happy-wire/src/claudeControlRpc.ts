@@ -164,6 +164,36 @@ export const GetContextUsageResponseSchema = z.object({
 export type GetContextUsageRequest = z.infer<typeof GetContextUsageRequestSchema>;
 export type GetContextUsageResponse = z.infer<typeof GetContextUsageResponseSchema>;
 
+// ── get_context_detail ──────────────────────────────────────────────────────
+export const GetContextDetailRequestSchema = z.object({
+    /**
+     * Category name from getContextUsage (e.g. "Messages", "System prompt",
+     * "Skills", "Custom agents", "Autocompact buffer", "Memory files").
+     */
+    category: z.string().min(1).max(128),
+}).strict();
+export const GetContextDetailResponseSchema = z.object({
+    /** Parsed JSONL records for the requested category. */
+    items: z.array(z.object({
+        /** JSONL record type (user, assistant, attachment, system, summary, etc.) */
+        type: z.string(),
+        /** Role when applicable (user / assistant) */
+        role: z.string().optional(),
+        /** Full text content of the record. Truncated at 10 KB per item. */
+        content: z.string(),
+        /** UUID of the JSONL record */
+        uuid: z.string().optional(),
+        /** ISO timestamp of the record */
+        timestamp: z.string().optional(),
+    })),
+    /** Category name echoed back for display */
+    category: z.string(),
+    /** Total number of matching items */
+    totalItems: z.number().int().nonnegative(),
+}).strict();
+export type GetContextDetailRequest = z.infer<typeof GetContextDetailRequestSchema>;
+export type GetContextDetailResponse = z.infer<typeof GetContextDetailResponseSchema>;
+
 // ── get_mcp_servers ──────────────────────────────────────────────────────────
 export const GetMcpServersRequestSchema = z.object({}).strict();
 export const GetMcpServersResponseSchema = z.object({
@@ -195,6 +225,7 @@ export const CLAUDE_CONTROL_METHODS = [
     'mcp_call',
     'get_context_usage',
     'get_mcp_servers',
+    'get_context_detail',
 ] as const;
 
 export type ClaudeControlMethod = typeof CLAUDE_CONTROL_METHODS[number];
