@@ -50,6 +50,7 @@ export const SessionSidePanel = React.memo<SessionSidePanelProps>(
         const enablePreviewTab = useSetting("enablePreviewTab");
         const [activeTab, setActiveTab] = React.useState<SessionPanelTab>("session");
         const [previewingFile, setPreviewingFile] = React.useState<string | null>(null);
+        const [previewingRepoPath, setPreviewingRepoPath] = React.useState<string | null>(null);
         const inputContext = React.useContext(InputContext);
         const project = useProjectForSession(sessionId);
         const { config: knowledgeConfig } = useProjectKnowledgeConfig(
@@ -59,12 +60,14 @@ export const SessionSidePanel = React.memo<SessionSidePanelProps>(
         // out; once the GET returns, the flag reflects the real project setting.
         const knowledgeBaseEnabled = knowledgeConfig?.enabled ?? true;
 
-        const handleFilePress = React.useCallback((fullPath: string) => {
+        const handleFilePress = React.useCallback((fullPath: string, repoPath?: string) => {
             setPreviewingFile(fullPath);
+            setPreviewingRepoPath(repoPath ?? null);
         }, []);
 
         const handleClosePreview = React.useCallback(() => {
             setPreviewingFile(null);
+            setPreviewingRepoPath(null);
         }, []);
 
         const handleReference = React.useCallback(
@@ -173,6 +176,7 @@ export const SessionSidePanel = React.memo<SessionSidePanelProps>(
                     <SidePanelFilePreview
                         sessionId={sessionId}
                         filePath={previewingFile}
+                        repoPath={previewingRepoPath ?? undefined}
                         onClose={handleClosePreview}
                     />
                 ) : (

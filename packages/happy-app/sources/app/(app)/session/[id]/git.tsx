@@ -11,6 +11,7 @@ import { GitIssuesTab } from "@/components/git/issues/GitIssuesTab";
 import { GitPRsTab } from "@/components/git/prs/GitPRsTab";
 import { GitRepoSelector } from "@/components/git/GitRepoSelector";
 import { GitBranchHeader } from "@/components/git/GitBranchHeader";
+import { SidePanelFilePreview } from "@/components/session/SidePanelFilePreview";
 import {
   useSessionGitStatus,
   useSessionProjectGitStatus,
@@ -34,6 +35,8 @@ export default React.memo(function GitScreen() {
   );
   const [isRepoSelectorExpanded, setIsRepoSelectorExpanded] =
     React.useState(false);
+  const [previewingFile, setPreviewingFile] = React.useState<string | null>(null);
+  const [previewingRepoPath, setPreviewingRepoPath] = React.useState<string | null>(null);
   const { theme } = useUnistyles();
 
   const projectGitStatus = useSessionProjectGitStatus(sessionId);
@@ -121,6 +124,35 @@ export default React.memo(function GitScreen() {
     setIsRepoSelectorExpanded(true);
   }, []);
 
+  // Convert git-relative path to absolute path for file preview (with diff)
+  const handleFilePress = React.useCallback(
+    (gitRelativePath: string, submodulePath?: string) => {
+      const repoBase = submodulePath ?? selectedRepoPath;
+      const basePath = repoBase
+        ? `${sessionPath}/${repoBase}`
+        : sessionPath;
+      setPreviewingFile(`${basePath}/${gitRelativePath}`);
+      setPreviewingRepoPath(basePath);
+    },
+    [sessionPath, selectedRepoPath],
+  );
+
+  if (previewingFile) {
+    return (
+      <View style={[styles.container, { backgroundColor: theme.colors.surface }]}>
+        <SidePanelFilePreview
+          sessionId={sessionId}
+          filePath={previewingFile}
+          repoPath={previewingRepoPath ?? undefined}
+          onClose={() => {
+            setPreviewingFile(null);
+            setPreviewingRepoPath(null);
+          }}
+        />
+      </View>
+    );
+  }
+
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.surface }]}>
       {hasSubmodules && (
@@ -201,6 +233,7 @@ export default React.memo(function GitScreen() {
         <GitChangesTab
           sessionId={sessionId}
           repoPath={selectedRepoPath ?? undefined}
+          onFilePress={handleFilePress}
           onPullDown={hasSubmodules ? handlePullDown : undefined}
           onScrollUp={hasSubmodules ? handleScrollUp : undefined}
         />

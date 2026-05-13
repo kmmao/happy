@@ -28,7 +28,7 @@ import { useUnistyles } from "react-native-unistyles";
 
 interface SidePanelGitPanelProps {
     sessionId: string;
-    onFilePress?: (fullPath: string) => void;
+    onFilePress?: (fullPath: string, repoPath?: string) => void;
 }
 
 export const SidePanelGitPanel = React.memo<SidePanelGitPanelProps>(
@@ -120,7 +120,7 @@ export const SidePanelGitPanel = React.memo<SidePanelGitPanelProps>(
                 const basePath = repoBase
                     ? `${sessionPath}/${repoBase}`
                     : sessionPath;
-                onFilePress?.(`${basePath}/${gitRelativePath}`);
+                onFilePress?.(`${basePath}/${gitRelativePath}`, basePath);
             },
             [sessionPath, selectedRepoPath, onFilePress],
         );

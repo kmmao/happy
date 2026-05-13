@@ -47,6 +47,7 @@ export const MobileSessionPanelSheet = React.memo<MobileSessionPanelSheetProps>(
         const enablePreviewTab = useSetting("enablePreviewTab");
         const [activeTab, setActiveTab] = React.useState<SessionPanelTab>("session");
         const [previewingFile, setPreviewingFile] = React.useState<string | null>(null);
+        const [previewingRepoPath, setPreviewingRepoPath] = React.useState<string | null>(null);
         const inputContext = React.useContext(InputContext);
         const session = useSession(sessionId);
         const sessionTitle = session ? getSessionName(session) : "Panel";
@@ -91,8 +92,9 @@ export const MobileSessionPanelSheet = React.memo<MobileSessionPanelSheetProps>(
             [inputContext, onClose],
         );
 
-        const handleFilePress = React.useCallback((fullPath: string) => {
+        const handleFilePress = React.useCallback((fullPath: string, repoPath?: string) => {
             setPreviewingFile(fullPath);
+            setPreviewingRepoPath(repoPath ?? null);
         }, []);
 
         const renderContent = () => {
@@ -101,7 +103,11 @@ export const MobileSessionPanelSheet = React.memo<MobileSessionPanelSheetProps>(
                     <SidePanelFilePreview
                         sessionId={sessionId}
                         filePath={previewingFile}
-                        onClose={() => setPreviewingFile(null)}
+                        repoPath={previewingRepoPath ?? undefined}
+                        onClose={() => {
+                            setPreviewingFile(null);
+                            setPreviewingRepoPath(null);
+                        }}
                     />
                 );
             }
@@ -118,7 +124,7 @@ export const MobileSessionPanelSheet = React.memo<MobileSessionPanelSheetProps>(
                         />
                     );
                 case "changes":
-                    return <SidePanelGitPanel sessionId={sessionId} />;
+                    return <SidePanelGitPanel sessionId={sessionId} onFilePress={handleFilePress} />;
                 case "knowledge":
                     return <SidePanelSummaryTab sessionId={sessionId} />;
                 case "session":

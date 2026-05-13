@@ -48,10 +48,12 @@ interface SidePanelFilePreviewProps {
     sessionId: string;
     filePath: string;
     onClose: () => void;
+    /** Git repo root for diff — defaults to session path when omitted */
+    repoPath?: string;
 }
 
 export const SidePanelFilePreview = React.memo<SidePanelFilePreviewProps>(
-    function SidePanelFilePreview({ sessionId, filePath, onClose }) {
+    function SidePanelFilePreview({ sessionId, filePath, onClose, repoPath }) {
         const { theme } = useUnistyles();
         const [content, setContent] = React.useState<string | null>(null);
         const [diffContent, setDiffContent] = React.useState<string | null>(null);
@@ -87,13 +89,18 @@ export const SidePanelFilePreview = React.memo<SidePanelFilePreviewProps>(
                 const session = storage.getState().sessions[sessionId];
                 const sessionPath = session?.metadata?.path;
 
-                // Fetch diff
-                if (sessionPath) {
+                // Fetch diff — use repoPath (submodule root) when provided, else session root
+                const diffCwd = repoPath ?? sessionPath;
+                if (diffCwd) {
                     try {
-                        const escapedPath = filePath.replace(/'/g, "'\\''");
+                        // Make path relative to the git repo root so git diff works for submodules
+                        const relativePath = filePath.startsWith(diffCwd + "/")
+                            ? filePath.slice(diffCwd.length + 1)
+                            : filePath;
+                        const escapedPath = relativePath.replace(/'/g, "'\\''");
                         const diffResp = await sessionBash(sessionId, {
                             command: `git diff --no-ext-diff -- '${escapedPath}'`,
-                            cwd: sessionPath,
+                            cwd: diffCwd,
                             timeout: 5000,
                         });
                         if (!cancelled && diffResp.success && (diffResp.stdout ?? "").trim()) {
