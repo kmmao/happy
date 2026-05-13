@@ -4188,6 +4188,11 @@ export const zhHans: TranslationStructure = {
       subcatUser: "用户消息",
       subcatSystemReminder: "系统注入",
       subcatAssistant: "AI 回复",
+      subcatToolCall: "工具调用",
+      subcatToolResult: "工具结果",
+      subcatAttachment: "附件",
+      subcatRedirectedContext: "重定向上下文",
+      subcatUnattributed: "其他",
       subcatLoading: "加载子分类中…",
     },
     mcpServers: {

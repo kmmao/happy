@@ -4352,6 +4352,11 @@ export const en = {
       subcatUser: "User Messages",
       subcatSystemReminder: "System Injections",
       subcatAssistant: "Assistant Replies",
+      subcatToolCall: "Tool Calls",
+      subcatToolResult: "Tool Results",
+      subcatAttachment: "Attachments",
+      subcatRedirectedContext: "Redirected Context",
+      subcatUnattributed: "Other",
       subcatLoading: "Loading subcategories…",
     },
     mcpServers: {

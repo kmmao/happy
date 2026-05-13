@@ -422,6 +422,38 @@ export function registerClaudeControlHandlers(
             tokens: t.tokens,
             isLoaded: t.isLoaded,
           })),
+          messageBreakdown: raw.messageBreakdown
+            ? {
+                toolCallTokens: raw.messageBreakdown.toolCallTokens,
+                toolResultTokens: raw.messageBreakdown.toolResultTokens,
+                attachmentTokens: raw.messageBreakdown.attachmentTokens,
+                assistantMessageTokens: raw.messageBreakdown.assistantMessageTokens,
+                userMessageTokens: raw.messageBreakdown.userMessageTokens,
+                redirectedContextTokens: raw.messageBreakdown.redirectedContextTokens,
+                unattributedTokens: raw.messageBreakdown.unattributedTokens,
+                toolCallsByType: (raw.messageBreakdown.toolCallsByType ?? []).map((t) => ({
+                  name: t.name,
+                  callTokens: t.callTokens,
+                  resultTokens: t.resultTokens,
+                })),
+                attachmentsByType: (raw.messageBreakdown.attachmentsByType ?? []).map((a) => ({
+                  name: a.name,
+                  tokens: a.tokens,
+                })),
+              }
+            : undefined,
+          systemPromptSections: raw.systemPromptSections?.map((s) => ({
+            name: s.name,
+            tokens: s.tokens,
+          })),
+          apiUsage: raw.apiUsage
+            ? {
+                inputTokens: raw.apiUsage.input_tokens,
+                outputTokens: raw.apiUsage.output_tokens,
+                cacheCreationInputTokens: raw.apiUsage.cache_creation_input_tokens,
+                cacheReadInputTokens: raw.apiUsage.cache_read_input_tokens,
+              }
+            : undefined,
         };
       } catch (e) {
         logger.debug("[claudeControl] get_context_usage failed", e);

@@ -4292,6 +4292,11 @@ export const it: TranslationStructure = {
       subcatUser: "Messaggi dell'utente",
       subcatSystemReminder: "Iniezioni di sistema",
       subcatAssistant: "Risposte dell'assistente",
+      subcatToolCall: "Chiamate agli strumenti",
+      subcatToolResult: "Risultati degli strumenti",
+      subcatAttachment: "Allegati",
+      subcatRedirectedContext: "Contesto reindirizzato",
+      subcatUnattributed: "Altro",
       subcatLoading: "Caricamento sottocategorie…",
     },
     mcpServers: {

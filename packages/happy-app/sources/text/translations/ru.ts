@@ -4312,6 +4312,11 @@ export const ru: TranslationStructure = {
       subcatUser: "Сообщения пользователя",
       subcatSystemReminder: "Системные инъекции",
       subcatAssistant: "Ответы ассистента",
+      subcatToolCall: "Вызовы инструментов",
+      subcatToolResult: "Результаты инструментов",
+      subcatAttachment: "Вложения",
+      subcatRedirectedContext: "Перенаправленный контекст",
+      subcatUnattributed: "Другое",
       subcatLoading: "Загрузка подкатегорий…",
     },
     mcpServers: {

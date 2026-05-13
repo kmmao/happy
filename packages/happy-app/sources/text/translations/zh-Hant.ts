@@ -4194,6 +4194,11 @@ export const zhHant: TranslationStructure = {
       subcatUser: "使用者訊息",
       subcatSystemReminder: "系統注入",
       subcatAssistant: "AI 回覆",
+      subcatToolCall: "工具呼叫",
+      subcatToolResult: "工具結果",
+      subcatAttachment: "附件",
+      subcatRedirectedContext: "重定向情境",
+      subcatUnattributed: "其他",
       subcatLoading: "載入子分類中…",
     },
     mcpServers: {

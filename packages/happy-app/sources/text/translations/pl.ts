@@ -4314,6 +4314,11 @@ export const pl: TranslationStructure = {
       subcatUser: "Wiadomości użytkownika",
       subcatSystemReminder: "Wstrzyknięcia systemowe",
       subcatAssistant: "Odpowiedzi asystenta",
+      subcatToolCall: "Wywołania narzędzi",
+      subcatToolResult: "Wyniki narzędzi",
+      subcatAttachment: "Załączniki",
+      subcatRedirectedContext: "Przekierowany kontekst",
+      subcatUnattributed: "Inne",
       subcatLoading: "Ładowanie podkategorii…",
     },
     mcpServers: {

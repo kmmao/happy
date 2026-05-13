@@ -4298,6 +4298,11 @@ export const ca: TranslationStructure = {
       subcatUser: "Missatges de l'usuari",
       subcatSystemReminder: "Injeccions del sistema",
       subcatAssistant: "Respostes de l'assistent",
+      subcatToolCall: "Crides d'eines",
+      subcatToolResult: "Resultats d'eines",
+      subcatAttachment: "Fitxers adjunts",
+      subcatRedirectedContext: "Context redirigit",
+      subcatUnattributed: "Altres",
       subcatLoading: "Carregant subcategories…",
     },
     mcpServers: {

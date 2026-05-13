@@ -58,6 +58,12 @@ function resolveDetail(catName: string, data: GetContextUsageResponse): DetailRo
             value: formatTokens(tool.tokens),
         }));
     }
+    if (lower.includes("system") && (data.systemPromptSections ?? []).length > 0) {
+        return (data.systemPromptSections ?? []).map((s) => ({
+            label: s.name,
+            value: formatTokens(s.tokens),
+        }));
+    }
     return null;
 }
 
@@ -223,7 +229,29 @@ export const ContextUsagePanel = React.memo(function ContextUsagePanel({
                                     key={cat.name}
                                     onPress={() => Modal.show({
                                         component: SubcategoryListModal,
-                                        props: { sessionId, category: cat.name },
+                                        props: { sessionId, category: cat.name, messageBreakdown: data.messageBreakdown },
+                                    })}
+                                    style={({ pressed }) => pressed ? { opacity: 0.6 } : undefined}
+                                >
+                                    {inner}
+                                </Pressable>
+                            );
+                        }
+                        // System prompt — show per-section breakdown when available
+                        const isSystemPrompt = cat.name.toLowerCase().includes("system prompt");
+                        if (isSystemPrompt && data.systemPromptSections && data.systemPromptSections.length > 0) {
+                            return (
+                                <Pressable
+                                    key={cat.name}
+                                    onPress={() => Modal.show({
+                                        component: CategoryDetailModal,
+                                        props: {
+                                            title: cat.name,
+                                            detail: data.systemPromptSections!.map((s) => ({
+                                                label: s.name,
+                                                value: formatTokens(s.tokens),
+                                            })),
+                                        },
                                     })}
                                     style={({ pressed }) => pressed ? { opacity: 0.6 } : undefined}
                                 >
@@ -260,6 +288,8 @@ export const ContextUsagePanel = React.memo(function ContextUsagePanel({
 interface SubcategoryListModalProps {
     sessionId: string;
     category: string;
+    /** Pre-fetched messageBreakdown from getContextUsage — avoids extra RPC when available. */
+    messageBreakdown?: GetContextUsageResponse["messageBreakdown"];
     onClose: () => void;
 }
 
@@ -267,39 +297,81 @@ const SUBCAT_ICONS: Record<string, string> = {
     "user": "person-outline",
     "system-reminder": "code-slash-outline",
     "assistant": "chatbubble-ellipses-outline",
+    "toolCall": "code-slash-outline",
+    "toolResult": "return-down-back-outline",
+    "attachment": "attach-outline",
+    "redirectedContext": "git-branch-outline",
+    "unattributed": "ellipsis-horizontal-outline",
 };
 
 function subcatLabel(name: string): string {
     if (name === "user") return t("claudeControl.contextUsage.subcatUser");
     if (name === "system-reminder") return t("claudeControl.contextUsage.subcatSystemReminder");
     if (name === "assistant") return t("claudeControl.contextUsage.subcatAssistant");
+    if (name === "toolCall") return t("claudeControl.contextUsage.subcatToolCall");
+    if (name === "toolResult") return t("claudeControl.contextUsage.subcatToolResult");
+    if (name === "attachment") return t("claudeControl.contextUsage.subcatAttachment");
+    if (name === "redirectedContext") return t("claudeControl.contextUsage.subcatRedirectedContext");
+    if (name === "unattributed") return t("claudeControl.contextUsage.subcatUnattributed");
     return name;
+}
+
+/** Build subcategory rows from SDK messageBreakdown (token-level detail). */
+function breakdownToRows(
+    mb: NonNullable<GetContextUsageResponse["messageBreakdown"]>,
+): { name: string; count: number }[] {
+    const rows: { name: string; count: number }[] = [];
+    if (mb.userMessageTokens > 0) rows.push({ name: "user", count: mb.userMessageTokens });
+    if (mb.assistantMessageTokens > 0) rows.push({ name: "assistant", count: mb.assistantMessageTokens });
+    if (mb.toolCallTokens > 0) rows.push({ name: "toolCall", count: mb.toolCallTokens });
+    if (mb.toolResultTokens > 0) rows.push({ name: "toolResult", count: mb.toolResultTokens });
+    if (mb.attachmentTokens > 0) rows.push({ name: "attachment", count: mb.attachmentTokens });
+    if (mb.redirectedContextTokens > 0) rows.push({ name: "redirectedContext", count: mb.redirectedContextTokens });
+    if (mb.unattributedTokens > 0) rows.push({ name: "unattributed", count: mb.unattributedTokens });
+    return rows;
 }
 
 const SubcategoryListModal = React.memo<SubcategoryListModalProps>(function SubcategoryListModal({
     sessionId,
     category,
+    messageBreakdown,
     onClose,
 }) {
     const { theme } = useUnistyles();
     const c = theme.colors;
+
+    // When messageBreakdown is available, use it directly (no RPC needed).
+    // Otherwise fall back to the JSONL-based summaryOnly RPC.
+    const hasBreakdown = messageBreakdown != null;
     const [state, setState] = React.useState<
         | { status: "loading" }
         | { status: "error" }
-        | { status: "done"; subcategories: GetContextDetailResponse["subcategories"] }
-    >({ status: "loading" });
+        | { status: "done"; subcategories: { name: string; count: number }[] }
+    >(hasBreakdown
+        ? { status: "done", subcategories: breakdownToRows(messageBreakdown!) }
+        : { status: "loading" },
+    );
 
     React.useEffect(() => {
+        if (hasBreakdown) return; // Already resolved from props
         let cancelled = false;
         fetchContextDetail(sessionId, category, { summaryOnly: true })
             .then((res) => {
-                if (!cancelled) setState({ status: "done", subcategories: res.subcategories ?? [] });
+                if (!cancelled) {
+                    setState({
+                        status: "done",
+                        subcategories: (res.subcategories ?? []).map((s) => ({
+                            name: s.name,
+                            count: s.count,
+                        })),
+                    });
+                }
             })
             .catch(() => {
                 if (!cancelled) setState({ status: "error" });
             });
         return () => { cancelled = true; };
-    }, [sessionId, category]);
+    }, [sessionId, category, hasBreakdown]);
 
     return (
         <View style={[subcatModalStyles.container, { backgroundColor: c.surface }]}>
@@ -331,28 +403,32 @@ const SubcategoryListModal = React.memo<SubcategoryListModalProps>(function Subc
 
             {state.status === "done" && (
                 <View>
-                    {(state.subcategories ?? []).map((subcat, i) => {
-                        const isLast = i === (state.subcategories?.length ?? 0) - 1;
+                    {state.subcategories.map((subcat, i) => {
+                        const isLast = i === state.subcategories.length - 1;
                         const iconName = SUBCAT_ICONS[subcat.name] ?? "document-text-outline";
+                        // Map breakdown names to JSONL subcategory filters for drill-down
+                        const jsonlSubcategory = subcat.name === "user" || subcat.name === "system-reminder" || subcat.name === "assistant"
+                            ? subcat.name
+                            : undefined; // No JSONL drill-down for SDK-only categories
                         return (
                             <Pressable
                                 key={subcat.name}
                                 onPress={() => {
+                                    if (!jsonlSubcategory) return; // No drill-down available
                                     onClose();
-                                    // Small delay so the first modal closes before the second opens
                                     setTimeout(() => {
                                         Modal.show({
                                             component: ContextContentModal,
                                             props: {
                                                 sessionId,
                                                 category,
-                                                subcategory: subcat.name,
+                                                subcategory: jsonlSubcategory,
                                                 subcategoryLabel: subcatLabel(subcat.name),
                                             },
                                         });
                                     }, 150);
                                 }}
-                                style={({ pressed }) => pressed ? { opacity: 0.6 } : undefined}
+                                style={({ pressed }) => pressed ? { opacity: jsonlSubcategory ? 0.6 : 1 } : undefined}
                             >
                                 <View
                                     style={[
@@ -367,7 +443,11 @@ const SubcategoryListModal = React.memo<SubcategoryListModalProps>(function Subc
                                     <Text style={[subcatModalStyles.rowCount, { color: c.textSecondary }]}>
                                         {formatTokens(subcat.count)}
                                     </Text>
-                                    <Ionicons name="chevron-forward" size={12} color={c.textSecondary} />
+                                    {jsonlSubcategory ? (
+                                        <Ionicons name="chevron-forward" size={12} color={c.textSecondary} />
+                                    ) : (
+                                        <View style={{ width: 12 }} />
+                                    )}
                                 </View>
                             </Pressable>
                         );

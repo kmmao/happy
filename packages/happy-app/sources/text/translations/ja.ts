@@ -4266,6 +4266,11 @@ export const ja: TranslationStructure = {
       subcatUser: "ユーザーメッセージ",
       subcatSystemReminder: "システム注入",
       subcatAssistant: "AIの返信",
+      subcatToolCall: "ツール呼び出し",
+      subcatToolResult: "ツール結果",
+      subcatAttachment: "添付ファイル",
+      subcatRedirectedContext: "リダイレクトされたコンテキスト",
+      subcatUnattributed: "その他",
       subcatLoading: "サブカテゴリを読み込み中…",
     },
     mcpServers: {

@@ -160,6 +160,37 @@ export const GetContextUsageResponseSchema = z.object({
         tokens: z.number().int().nonnegative(),
         isLoaded: z.boolean().optional(),
     })),
+    /** Messages 内部 token 细分（SDK messageBreakdown）。仅 SDK 0.2.139+ 返回。 */
+    messageBreakdown: z.object({
+        toolCallTokens: z.number().int().nonnegative(),
+        toolResultTokens: z.number().int().nonnegative(),
+        attachmentTokens: z.number().int().nonnegative(),
+        assistantMessageTokens: z.number().int().nonnegative(),
+        userMessageTokens: z.number().int().nonnegative(),
+        redirectedContextTokens: z.number().int().nonnegative(),
+        unattributedTokens: z.number().int().nonnegative(),
+        toolCallsByType: z.array(z.object({
+            name: z.string(),
+            callTokens: z.number().int().nonnegative(),
+            resultTokens: z.number().int().nonnegative(),
+        })),
+        attachmentsByType: z.array(z.object({
+            name: z.string(),
+            tokens: z.number().int().nonnegative(),
+        })),
+    }).optional(),
+    /** System Prompt 各段 token 细分。 */
+    systemPromptSections: z.array(z.object({
+        name: z.string(),
+        tokens: z.number().int().nonnegative(),
+    })).optional(),
+    /** API 实际用量（input/output/cache hit/miss）。 */
+    apiUsage: z.object({
+        inputTokens: z.number().int().nonnegative(),
+        outputTokens: z.number().int().nonnegative(),
+        cacheCreationInputTokens: z.number().int().nonnegative(),
+        cacheReadInputTokens: z.number().int().nonnegative(),
+    }).nullable().optional(),
 }).strict();
 export type GetContextUsageRequest = z.infer<typeof GetContextUsageRequestSchema>;
 export type GetContextUsageResponse = z.infer<typeof GetContextUsageResponseSchema>;
