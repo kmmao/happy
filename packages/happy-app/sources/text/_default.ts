@@ -4349,6 +4349,10 @@ export const en = {
       detailError: "Failed to load content",
       detailItems: "{n} items",
       detailLines: "lines — tap to expand",
+      subcatUser: "User Messages",
+      subcatSystemReminder: "System Injections",
+      subcatAssistant: "Assistant Replies",
+      subcatLoading: "Loading subcategories…",
     },
     mcpServers: {
       title: "MCP Servers",

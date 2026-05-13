@@ -420,11 +420,13 @@ export async function claudeRemoteLauncher(
   // reading and parsing the current session JSONL file.
   session.client.rpcHandlerManager.registerHandler(
     "claude-control:get_context_detail",
-    async (args: { category?: string }) => {
+    async (args: { category?: string; summaryOnly?: boolean; subcategory?: string }) => {
       const category = typeof args?.category === "string" ? args.category.trim() : "";
       if (!category) {
         return { items: [], category: "", totalItems: 0 };
       }
+      const summaryOnly = args?.summaryOnly === true;
+      const subcategory = typeof args?.subcategory === "string" ? args.subcategory.trim() : "";
 
       const currentSessionId = session.sessionId;
       if (!currentSessionId) {
@@ -574,6 +576,48 @@ export async function claudeRemoteLauncher(
         const items: DetailItem[] = [];
         const isMessages = category.toLowerCase().includes("message");
 
+        // For summaryOnly mode on Messages: count subcategories without loading content
+        if (summaryOnly && isMessages) {
+          const counts: Record<string, number> = {
+            "user": 0,
+            "system-reminder": 0,
+            "assistant": 0,
+          };
+          for (const line of rawContent.split("\n")) {
+            if (!line.trim()) continue;
+            let record: Record<string, unknown>;
+            try {
+              record = JSON.parse(line) as Record<string, unknown>;
+            } catch {
+              continue;
+            }
+            if (!matchesCategory(record, category)) continue;
+            const type = String(record.type ?? "");
+            if (type === "assistant") {
+              counts["assistant"]++;
+            } else if (type === "user") {
+              // Count actual user text vs system-reminder blocks
+              const rawMsg = extractContent(record, true);
+              const sysReminderMatches = rawMsg.match(/<system-reminder>[\s\S]*?<\/system-reminder>/g);
+              if (sysReminderMatches) {
+                counts["system-reminder"] += sysReminderMatches.length;
+              }
+              // Only count as user if there's non-reminder content
+              const stripped = rawMsg.replace(/<system-reminder>[\s\S]*?<\/system-reminder>/g, "").trim();
+              if (stripped) counts["user"]++;
+            }
+          }
+          const LABELS: Record<string, string> = {
+            "user": "User Messages",
+            "system-reminder": "System Injections",
+            "assistant": "Assistant Replies",
+          };
+          const subcategories = Object.entries(counts)
+            .filter(([, count]) => count > 0)
+            .map(([name, count]) => ({ name, label: LABELS[name] ?? name, count }));
+          return { items: [], category, totalItems: 0, subcategories };
+        }
+
         for (const line of rawContent.split("\n")) {
           if (!line.trim()) continue;
           let record: Record<string, unknown>;
@@ -591,10 +635,19 @@ export async function claudeRemoteLauncher(
           const content = extractContent(record, needsSplit);
 
           if (needsSplit && content.includes("<system-reminder>")) {
-            items.push(...splitSystemReminders(content, record));
+            const split = splitSystemReminders(content, record);
+            if (subcategory) {
+              // Filter to only the requested subcategory
+              items.push(...split.filter((item) => item.type === subcategory));
+            } else {
+              items.push(...split);
+            }
           } else {
+            const itemType = String(record.type ?? "unknown");
+            // Filter by subcategory if specified
+            if (subcategory && itemType !== subcategory) continue;
             items.push({
-              type: String(record.type ?? "unknown"),
+              type: itemType,
               role: typeof msg?.role === "string" ? msg.role : undefined,
               content,
               uuid: typeof record.uuid === "string" ? record.uuid : undefined,

@@ -184,11 +184,12 @@ export async function fetchContextUsage(sessionId: string): Promise<GetContextUs
 export async function fetchContextDetail(
     sessionId: string,
     category: string,
+    options?: { summaryOnly?: boolean; subcategory?: string },
 ): Promise<GetContextDetailResponse> {
     return apiSocket.sessionRPC<GetContextDetailResponse, GetContextDetailRequest>(
         sessionId,
         methodName('get_context_detail'),
-        { category },
+        { category, ...options },
     );
 }
 

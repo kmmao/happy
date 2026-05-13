@@ -4311,6 +4311,10 @@ export const pl: TranslationStructure = {
       detailError: "Failed to load content",
       detailItems: "{n} items",
       detailLines: "wierszy — kliknij, aby rozwinąć",
+      subcatUser: "Wiadomości użytkownika",
+      subcatSystemReminder: "Wstrzyknięcia systemowe",
+      subcatAssistant: "Odpowiedzi asystenta",
+      subcatLoading: "Ładowanie podkategorii…",
     },
     mcpServers: {
       title: "Serwery MCP",

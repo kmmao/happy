@@ -171,15 +171,25 @@ export const GetContextDetailRequestSchema = z.object({
      * "Skills", "Custom agents", "Autocompact buffer", "Memory files").
      */
     category: z.string().min(1).max(128),
+    /**
+     * When true, return only subcategory counts (no item content).
+     * Only meaningful for the "Messages" category.
+     */
+    summaryOnly: z.boolean().optional(),
+    /**
+     * Filter to a specific subcategory within "Messages".
+     * One of: "user", "system-reminder", "assistant".
+     */
+    subcategory: z.string().optional(),
 }).strict();
 export const GetContextDetailResponseSchema = z.object({
-    /** Parsed JSONL records for the requested category. */
+    /** Parsed JSONL records for the requested category. Empty when summaryOnly=true. */
     items: z.array(z.object({
         /** JSONL record type (user, assistant, attachment, system, summary, etc.) */
         type: z.string(),
         /** Role when applicable (user / assistant) */
         role: z.string().optional(),
-        /** Full text content of the record. Truncated at 10 KB per item. */
+        /** Full text content of the record. Truncated at 50 KB per item. */
         content: z.string(),
         /** UUID of the JSONL record */
         uuid: z.string().optional(),
@@ -190,6 +200,18 @@ export const GetContextDetailResponseSchema = z.object({
     category: z.string(),
     /** Total number of matching items */
     totalItems: z.number().int().nonnegative(),
+    /**
+     * Subcategory breakdown for "Messages" when summaryOnly=true.
+     * Each entry has a key, display label, and item count.
+     */
+    subcategories: z.array(z.object({
+        /** Subcategory key: "user" | "system-reminder" | "assistant" */
+        name: z.string(),
+        /** Human-readable label */
+        label: z.string(),
+        /** Number of items in this subcategory */
+        count: z.number().int().nonnegative(),
+    })).optional(),
 }).strict();
 export type GetContextDetailRequest = z.infer<typeof GetContextDetailRequestSchema>;
 export type GetContextDetailResponse = z.infer<typeof GetContextDetailResponseSchema>;

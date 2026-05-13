@@ -4191,6 +4191,10 @@ export const zhHant: TranslationStructure = {
       detailError: "載入失敗",
       detailItems: "{n} 條",
       detailLines: "行 — 點擊展開",
+      subcatUser: "使用者訊息",
+      subcatSystemReminder: "系統注入",
+      subcatAssistant: "AI 回覆",
+      subcatLoading: "載入子分類中…",
     },
     mcpServers: {
       title: "MCP 伺服器",

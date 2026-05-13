@@ -215,6 +215,22 @@ export const ContextUsagePanel = React.memo(function ContextUsagePanel({
                                 </Pressable>
                             );
                         }
+                        // Messages category — two-level drill-down via SubcategoryListModal
+                        const isMessages = cat.name.toLowerCase().includes("message");
+                        if (isMessages) {
+                            return (
+                                <Pressable
+                                    key={cat.name}
+                                    onPress={() => Modal.show({
+                                        component: SubcategoryListModal,
+                                        props: { sessionId, category: cat.name },
+                                    })}
+                                    style={({ pressed }) => pressed ? { opacity: 0.6 } : undefined}
+                                >
+                                    {inner}
+                                </Pressable>
+                            );
+                        }
                         // All other categories — open full content modal via RPC
                         return (
                             <Pressable
@@ -236,6 +252,179 @@ export const ContextUsagePanel = React.memo(function ContextUsagePanel({
         </View>
     );
 });
+
+// ─── SubcategoryListModal ─────────────────────────────────────────────────────
+// Two-level drill-down for "Messages": first load subcategory counts (no content),
+// then let the user pick a subcategory to open the full ContextContentModal.
+
+interface SubcategoryListModalProps {
+    sessionId: string;
+    category: string;
+    onClose: () => void;
+}
+
+const SUBCAT_ICONS: Record<string, string> = {
+    "user": "person-outline",
+    "system-reminder": "code-slash-outline",
+    "assistant": "chatbubble-ellipses-outline",
+};
+
+function subcatLabel(name: string): string {
+    if (name === "user") return t("claudeControl.contextUsage.subcatUser");
+    if (name === "system-reminder") return t("claudeControl.contextUsage.subcatSystemReminder");
+    if (name === "assistant") return t("claudeControl.contextUsage.subcatAssistant");
+    return name;
+}
+
+const SubcategoryListModal = React.memo<SubcategoryListModalProps>(function SubcategoryListModal({
+    sessionId,
+    category,
+    onClose,
+}) {
+    const { theme } = useUnistyles();
+    const c = theme.colors;
+    const [state, setState] = React.useState<
+        | { status: "loading" }
+        | { status: "error" }
+        | { status: "done"; subcategories: GetContextDetailResponse["subcategories"] }
+    >({ status: "loading" });
+
+    React.useEffect(() => {
+        let cancelled = false;
+        fetchContextDetail(sessionId, category, { summaryOnly: true })
+            .then((res) => {
+                if (!cancelled) setState({ status: "done", subcategories: res.subcategories ?? [] });
+            })
+            .catch(() => {
+                if (!cancelled) setState({ status: "error" });
+            });
+        return () => { cancelled = true; };
+    }, [sessionId, category]);
+
+    return (
+        <View style={[subcatModalStyles.container, { backgroundColor: c.surface }]}>
+            {/* Header */}
+            <View style={[subcatModalStyles.header, { borderBottomColor: c.divider }]}>
+                <Text style={[subcatModalStyles.title, { color: c.text }]} numberOfLines={1}>
+                    {category}
+                </Text>
+                <Pressable onPress={onClose} hitSlop={10} style={subcatModalStyles.closeBtn}>
+                    <Ionicons name="close" size={20} color={c.textSecondary} />
+                </Pressable>
+            </View>
+
+            {state.status === "loading" && (
+                <View style={subcatModalStyles.center}>
+                    <Text style={[subcatModalStyles.muted, { color: c.textSecondary }]}>
+                        {t("claudeControl.contextUsage.subcatLoading")}
+                    </Text>
+                </View>
+            )}
+
+            {state.status === "error" && (
+                <View style={subcatModalStyles.center}>
+                    <Text style={[subcatModalStyles.muted, { color: c.textSecondary }]}>
+                        {t("claudeControl.contextUsage.detailError")}
+                    </Text>
+                </View>
+            )}
+
+            {state.status === "done" && (
+                <View>
+                    {(state.subcategories ?? []).map((subcat, i) => {
+                        const isLast = i === (state.subcategories?.length ?? 0) - 1;
+                        const iconName = SUBCAT_ICONS[subcat.name] ?? "document-text-outline";
+                        return (
+                            <Pressable
+                                key={subcat.name}
+                                onPress={() => {
+                                    onClose();
+                                    // Small delay so the first modal closes before the second opens
+                                    setTimeout(() => {
+                                        Modal.show({
+                                            component: ContextContentModal,
+                                            props: {
+                                                sessionId,
+                                                category,
+                                                subcategory: subcat.name,
+                                                subcategoryLabel: subcatLabel(subcat.name),
+                                            },
+                                        });
+                                    }, 150);
+                                }}
+                                style={({ pressed }) => pressed ? { opacity: 0.6 } : undefined}
+                            >
+                                <View
+                                    style={[
+                                        subcatModalStyles.row,
+                                        !isLast && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: c.divider },
+                                    ]}
+                                >
+                                    <Ionicons name={iconName as never} size={16} color={c.textSecondary} />
+                                    <Text style={[subcatModalStyles.rowLabel, { color: c.text }]} numberOfLines={1}>
+                                        {subcatLabel(subcat.name)}
+                                    </Text>
+                                    <Text style={[subcatModalStyles.rowCount, { color: c.textSecondary }]}>
+                                        {formatTokens(subcat.count)}
+                                    </Text>
+                                    <Ionicons name="chevron-forward" size={12} color={c.textSecondary} />
+                                </View>
+                            </Pressable>
+                        );
+                    })}
+                </View>
+            )}
+        </View>
+    );
+});
+
+const subcatModalStyles = StyleSheet.create(() => ({
+    container: {
+        borderRadius: 16,
+        overflow: "hidden",
+        width: "100%",
+        maxWidth: 720,
+    },
+    header: {
+        flexDirection: "row",
+        alignItems: "center",
+        paddingHorizontal: 16,
+        paddingVertical: 14,
+        borderBottomWidth: StyleSheet.hairlineWidth,
+        gap: 8,
+    },
+    title: {
+        flex: 1,
+        fontSize: 15,
+        fontWeight: "600",
+    },
+    closeBtn: {
+        padding: 4,
+    },
+    center: {
+        paddingVertical: 32,
+        alignItems: "center",
+    },
+    muted: {
+        fontSize: 13,
+    },
+    row: {
+        flexDirection: "row",
+        alignItems: "center",
+        paddingHorizontal: 16,
+        paddingVertical: 14,
+        gap: 10,
+    },
+    rowLabel: {
+        flex: 1,
+        fontSize: 14,
+        fontWeight: "500",
+    },
+    rowCount: {
+        fontSize: 12,
+        fontVariant: ["tabular-nums"],
+    },
+}));
 
 // ─── ContentItem (collapsible) ───────────────────────────────────────────────
 
@@ -305,12 +494,18 @@ const ContentItem = React.memo<ContentItemProps>(function ContentItem({ item }) 
 interface ContextContentModalProps {
     sessionId: string;
     category: string;
+    /** Optional subcategory filter (e.g. "user", "system-reminder", "assistant") */
+    subcategory?: string;
+    /** Display label for the subcategory, shown in the header */
+    subcategoryLabel?: string;
     onClose: () => void;
 }
 
 const ContextContentModal = React.memo<ContextContentModalProps>(function ContextContentModal({
     sessionId,
     category,
+    subcategory,
+    subcategoryLabel,
     onClose,
 }) {
     const { theme } = useUnistyles();
@@ -323,7 +518,7 @@ const ContextContentModal = React.memo<ContextContentModalProps>(function Contex
 
     React.useEffect(() => {
         let cancelled = false;
-        fetchContextDetail(sessionId, category)
+        fetchContextDetail(sessionId, category, subcategory ? { subcategory } : undefined)
             .then((res) => {
                 if (!cancelled) setState({ status: "done", data: res });
             })
@@ -331,14 +526,14 @@ const ContextContentModal = React.memo<ContextContentModalProps>(function Contex
                 if (!cancelled) setState({ status: "error" });
             });
         return () => { cancelled = true; };
-    }, [sessionId, category]);
+    }, [sessionId, category, subcategory]);
 
     return (
         <View style={[contentModalStyles.container, { backgroundColor: c.surface }]}>
             {/* Header */}
             <View style={[contentModalStyles.header, { borderBottomColor: c.divider }]}>
                 <Text style={[contentModalStyles.title, { color: c.text }]} numberOfLines={1}>
-                    {category}
+                    {subcategoryLabel ?? category}
                 </Text>
                 <Pressable onPress={onClose} hitSlop={10} style={contentModalStyles.closeBtn}>
                     <Ionicons name="close" size={20} color={c.textSecondary} />
