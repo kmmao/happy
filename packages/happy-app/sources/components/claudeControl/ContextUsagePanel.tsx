@@ -471,19 +471,17 @@ const SubcategoryListModal = React.memo<SubcategoryListModalProps>(function Subc
                         const jsonlSubcategory = subcat.name === "user" || subcat.name === "system-reminder" || subcat.name === "assistant"
                             ? subcat.name
                             : undefined; // No JSONL drill-down for SDK-only categories
-                        // SDK-only categories can still drill down if breakdown data exists
-                        const hasBreakdownDetail = !jsonlSubcategory && resolveSubcatBreakdown(subcat.name, messageBreakdown) != null;
-                        const canDrillDown = !!jsonlSubcategory || hasBreakdownDetail;
+                        // All subcategories are clickable
                         return (
                             <Pressable
                                 key={subcat.name}
                                 onPress={() => {
-                                    // SDK-only categories: show per-type breakdown via CategoryDetailModal
+                                    // SDK-only categories: show per-type breakdown or content
                                     if (!jsonlSubcategory) {
                                         const detail = resolveSubcatBreakdown(subcat.name, messageBreakdown);
-                                        if (detail && detail.length > 0) {
-                                            onClose();
-                                            setTimeout(() => {
+                                        onClose();
+                                        setTimeout(() => {
+                                            if (detail && detail.length > 0) {
                                                 Modal.show({
                                                     component: CategoryDetailModal,
                                                     props: {
@@ -491,8 +489,35 @@ const SubcategoryListModal = React.memo<SubcategoryListModalProps>(function Subc
                                                         detail,
                                                     },
                                                 });
-                                            }, 150);
-                                        }
+                                            } else if (subcat.name === "unattributed") {
+                                                // Unattributed = message-internal overhead (formatting, delimiters, etc.)
+                                                Modal.show({
+                                                    component: CategoryDetailModal,
+                                                    props: {
+                                                        title: subcatLabel(subcat.name),
+                                                        detail: [
+                                                            { label: t("claudeControl.contextUsage.subcatUnattributedDesc"), value: "" },
+                                                            { label: "Total", value: formatTokens(subcat.count) },
+                                                        ],
+                                                    },
+                                                });
+                                            } else {
+                                                // redirectedContext etc. — show description
+                                                const descKey = subcat.name === "redirectedContext"
+                                                    ? "claudeControl.contextUsage.subcatRedirectedContextDesc"
+                                                    : "";
+                                                const rows: DetailRow[] = [];
+                                                if (descKey) rows.push({ label: t(descKey), value: "" });
+                                                rows.push({ label: "Total", value: formatTokens(subcat.count) });
+                                                Modal.show({
+                                                    component: CategoryDetailModal,
+                                                    props: {
+                                                        title: subcatLabel(subcat.name),
+                                                        detail: rows,
+                                                    },
+                                                });
+                                            }
+                                        }, 150);
                                         return;
                                     }
                                     onClose();
@@ -523,11 +548,7 @@ const SubcategoryListModal = React.memo<SubcategoryListModalProps>(function Subc
                                     <Text style={[subcatModalStyles.rowCount, { color: c.textSecondary }]}>
                                         {formatTokens(subcat.count)}
                                     </Text>
-                                    {canDrillDown ? (
-                                        <Ionicons name="chevron-forward" size={12} color={c.textSecondary} />
-                                    ) : (
-                                        <View style={{ width: 12 }} />
-                                    )}
+                                    <Ionicons name="chevron-forward" size={12} color={c.textSecondary} />
                                 </View>
                             </Pressable>
                         );
