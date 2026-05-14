@@ -3623,6 +3623,11 @@ export const en: TranslationStructure = {
       "Install agent-browser on the CLI machine to use the preview feature. Run: npm install -g @anthropic-ai/agent-browser",
     emptyHint:
       "Select a dev server or enter a URL to capture a screenshot of your frontend.",
+    liveMode: "Live",
+    screenshotMode: "Screenshot",
+    annotate: "Annotate",
+    sendFeedback: "Send to Session",
+    feedbackSent: "Feedback sent to session",
     otherPorts: ({ count }: { count: number }) =>
       `${count} other non-web ports`,
     portsFoundCount: ({ count }: { count: number }) =>

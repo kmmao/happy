@@ -3637,6 +3637,11 @@ export const ca: TranslationStructure = {
       "Instal·la agent-browser a la màquina CLI per utilitzar la funció de vista prèvia. Executa: npm install -g @anthropic-ai/agent-browser",
     emptyHint:
       "Selecciona un servidor de desenvolupament o introdueix una URL per capturar una vista prèvia.",
+    liveMode: "En directe",
+    screenshotMode: "Captura",
+    annotate: "Anotar",
+    sendFeedback: "Enviar a la sessió",
+    feedbackSent: "Comentari enviat a la sessió",
     otherPorts: ({ count }: { count: number }) =>
       `${count} altres ports no web`,
     portsFoundCount: ({ count }: { count: number }) => `${count} ports trobats`,

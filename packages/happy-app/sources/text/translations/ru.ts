@@ -3651,6 +3651,11 @@ export const ru: TranslationStructure = {
       "Установите agent-browser на машине CLI для использования предпросмотра. Выполните: npm install -g @anthropic-ai/agent-browser",
     emptyHint:
       "Выберите сервер разработки или введите URL для создания скриншота фронтенда.",
+    liveMode: "Live",
+    screenshotMode: "Скриншот",
+    annotate: "Аннотация",
+    sendFeedback: "Отправить в сессию",
+    feedbackSent: "Отзыв отправлен в сессию",
     otherPorts: ({ count }: { count: number }) =>
       `Ещё ${count} не-веб портов`,
     portsFoundCount: ({ count }: { count: number }) => `Найдено портов: ${count}`,
