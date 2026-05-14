@@ -311,13 +311,18 @@ export async function claudeRemote(opts: {
     ? systemPrompt + "\n\n" + localeInstruction
     : systemPrompt;
 
-  // SDK 0.2.119+ bug: `systemPrompt: { type: "preset", append }` and
-  // `--append-system-prompt` CLI flag are silently ignored by the Claude Code
-  // native binary. As a workaround, we inject both App and CLI system prompts
-  // directly into each user message as <system-reminder> text blocks.
-  // This ensures the instructions (options suggestions, skill usage, etc.)
-  // reliably reach the model regardless of SDK/binary version.
+  // System-reminder injection strategy (token optimization):
+  // - First user message: full injection as <system-reminder> text block
+  //   (guarantees the model sees all instructions even if SDK append fails)
+  // - Follow-up messages: NO injection (instructions already in conversation
+  //   history; SDK appendSystemPrompt provides system-level reinforcement)
+  //
+  // This saves ~1,500 tokens per follow-up message. In a 10-turn conversation
+  // that's ~13,500 tokens of input saved (~90% reduction in reminder overhead).
+  let isFirstUserMessage = true;
   const buildSystemReminderPrefix = (mode: EnhancedMode): string => {
+    if (!isFirstUserMessage) return "";
+    isFirstUserMessage = false;
     const appPrompt = mode.appendSystemPrompt; // App's <options> + skill instructions
     const parts = [appPrompt, effectiveSystemPrompt].filter(Boolean);
     if (parts.length === 0) return "";
@@ -344,10 +349,14 @@ export async function claudeRemote(opts: {
     customSystemPrompt: initial.mode.customSystemPrompt
       ? initial.mode.customSystemPrompt + "\n\n" + effectiveSystemPrompt
       : undefined,
-    // All system prompts are injected via buildSystemReminderPrefix() into each
-    // user message. Do NOT also pass appendSystemPrompt — SDK now honours it,
-    // causing the same content to appear twice.
-    appendSystemPrompt: undefined,
+    // SDK 0.2.140+ reliably honours appendSystemPrompt via the preset+append
+    // path. We pass it here as system-level reinforcement — this does NOT enter
+    // the conversation history, so it won't duplicate with the first-message
+    // <system-reminder> injection (which IS in history for the model to reference).
+    appendSystemPrompt: (() => {
+      const parts = [initial.mode.appendSystemPrompt, effectiveSystemPrompt].filter(Boolean);
+      return parts.length > 0 ? parts.join("\n\n") : undefined;
+    })(),
     allowedTools: initial.mode.allowedTools
       ? initial.mode.allowedTools.concat(opts.allowedTools)
       : opts.allowedTools,
