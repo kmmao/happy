@@ -33,8 +33,12 @@ const PRODUCT_IDENTIFIER_KEYS = new Set<string>([
     "machine.tailscaleIp",
     "machine.tailscaleServes",
     "settingsVoice.elevenLabsConfig",
+    "settingsVoice.livekitConfig",
     "agentInput.context.sourceSdkCategories",
     "agentInput.context.sourceFallback",
+    "installGuide.codexTitle",
+    "installGuide.geminiTitle",
+    "claudeControl.version.happyCli",
 ]);
 
 const PRODUCT_IDENTIFIER_KEY_PATTERNS: RegExp[] = [
@@ -59,6 +63,8 @@ const PLACEHOLDER_KEYS = new Set<string>([
     "preview.urlPlaceholder",
     "sub2api.apiUrlPlaceholder",
     "sub2api.emailPlaceholder",
+    "settingsVoice.livekitApiSecretPlaceholder",
+    "settingsVoice.livekitApiKeyPlaceholder",
 ]);
 
 const PLACEHOLDER_VALUE_PATTERNS: RegExp[] = [
