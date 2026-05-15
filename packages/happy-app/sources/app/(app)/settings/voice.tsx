@@ -262,7 +262,7 @@ function VoiceSettingsScreen() {
                 <Item
                     title={t("settingsVoice.preferredLanguage")}
                     subtitle={t("settingsVoice.preferredLanguageSubtitle")}
-                    icon={<Ionicons name="language-outline" size={29} color="#007AFF" />}
+                    icon={<Ionicons name="language-outline" size={29} color={theme.colors.accentBlue} />}
                     detail={getLanguageDisplayName(currentLanguage)}
                     onPress={() => router.push("/settings/voice/language")}
                 />

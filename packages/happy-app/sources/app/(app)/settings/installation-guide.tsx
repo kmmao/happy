@@ -1,6 +1,6 @@
 import React from "react";
 import { ScrollView, View, Text, Pressable } from "react-native";
-import { StyleSheet } from "react-native-unistyles";
+import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import * as Clipboard from "expo-clipboard";
@@ -198,9 +198,10 @@ function CodeBlock({ code, theme }: { code: string; theme: { colors: { textSecon
 }
 
 function Tip({ text }: { text: string }) {
+    const { theme } = useUnistyles();
     return (
         <View style={styles.tipContainer}>
-            <Ionicons name="bulb-outline" size={14} color="#FF9500" style={styles.tipIcon} />
+            <Ionicons name="bulb-outline" size={14} color={theme.colors.accentOrange} style={styles.tipIcon} />
             <Text style={styles.tipText}>{text}</Text>
         </View>
     );

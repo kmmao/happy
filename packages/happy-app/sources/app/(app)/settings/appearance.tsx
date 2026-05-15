@@ -156,7 +156,7 @@ function AppearanceSettingsScreen() {
       >
         <Item
           title={t("settingsLanguage.currentLanguage")}
-          icon={<Ionicons name="language-outline" size={29} color="#007AFF" />}
+          icon={<Ionicons name="language-outline" size={29} color={theme.colors.accentBlue} />}
           detail={getLanguageDisplayText()}
           onPress={() => router.push("/settings/language")}
         />
@@ -170,7 +170,7 @@ function AppearanceSettingsScreen() {
         <Item
           title={t("settingsAppearance.compactSessionView")}
           subtitle={t("settingsAppearance.compactSessionViewDescription")}
-          icon={<Ionicons name="albums-outline" size={29} color="#5856D6" />}
+          icon={<Ionicons name="albums-outline" size={29} color={theme.colors.accentPurple} />}
           rightElement={
             <Switch
               value={compactSessionView}
@@ -181,7 +181,7 @@ function AppearanceSettingsScreen() {
         <Item
           title={t("settingsAppearance.collapsibleInput")}
           subtitle={t("settingsAppearance.collapsibleInputDescription")}
-          icon={<Ionicons name="resize-outline" size={29} color="#5856D6" />}
+          icon={<Ionicons name="resize-outline" size={29} color={theme.colors.accentPurple} />}
           rightElement={
             <Switch
               value={collapsibleInput}
@@ -193,7 +193,7 @@ function AppearanceSettingsScreen() {
           title={t("settingsAppearance.realtimeSessionSort")}
           subtitle={t("settingsAppearance.realtimeSessionSortDescription")}
           icon={
-            <Ionicons name="swap-vertical-outline" size={29} color="#5856D6" />
+            <Ionicons name="swap-vertical-outline" size={29} color={theme.colors.accentPurple} />
           }
           rightElement={
             <Switch
@@ -206,7 +206,7 @@ function AppearanceSettingsScreen() {
           title={t("settingsAppearance.inlineToolCalls")}
           subtitle={t("settingsAppearance.inlineToolCallsDescription")}
           icon={
-            <Ionicons name="code-slash-outline" size={29} color="#5856D6" />
+            <Ionicons name="code-slash-outline" size={29} color={theme.colors.accentPurple} />
           }
           rightElement={
             <Switch value={viewInline} onValueChange={setViewInline} />
@@ -216,7 +216,7 @@ function AppearanceSettingsScreen() {
           title={t("settingsAppearance.expandTodoLists")}
           subtitle={t("settingsAppearance.expandTodoListsDescription")}
           icon={
-            <Ionicons name="checkmark-done-outline" size={29} color="#5856D6" />
+            <Ionicons name="checkmark-done-outline" size={29} color={theme.colors.accentPurple} />
           }
           rightElement={
             <Switch value={expandTodos} onValueChange={setExpandTodos} />
@@ -225,7 +225,7 @@ function AppearanceSettingsScreen() {
         <Item
           title={t("settingsAppearance.expandToolDetails")}
           subtitle={t("settingsAppearance.expandToolDetailsDescription")}
-          icon={<Ionicons name="build-outline" size={29} color="#5856D6" />}
+          icon={<Ionicons name="build-outline" size={29} color={theme.colors.accentPurple} />}
           rightElement={
             <Switch value={expandTools} onValueChange={setExpandTools} />
           }
@@ -233,7 +233,7 @@ function AppearanceSettingsScreen() {
         <Item
           title={t("settingsAppearance.showLineNumbersInDiffs")}
           subtitle={t("settingsAppearance.showLineNumbersInDiffsDescription")}
-          icon={<Ionicons name="list-outline" size={29} color="#5856D6" />}
+          icon={<Ionicons name="list-outline" size={29} color={theme.colors.accentPurple} />}
           rightElement={
             <Switch
               value={showLineNumbers}
@@ -247,7 +247,7 @@ function AppearanceSettingsScreen() {
             "settingsAppearance.showLineNumbersInToolViewsDescription",
           )}
           icon={
-            <Ionicons name="code-working-outline" size={29} color="#5856D6" />
+            <Ionicons name="code-working-outline" size={29} color={theme.colors.accentPurple} />
           }
           rightElement={
             <Switch
@@ -263,7 +263,7 @@ function AppearanceSettingsScreen() {
             <Ionicons
               name="return-down-forward-outline"
               size={29}
-              color="#5856D6"
+              color={theme.colors.accentPurple}
             />
           }
           rightElement={
@@ -277,7 +277,7 @@ function AppearanceSettingsScreen() {
           title={t("settingsAppearance.expandDiffsByDefault")}
           subtitle={t("settingsAppearance.expandDiffsByDefaultDescription")}
           icon={
-            <Ionicons name="expand-outline" size={29} color="#5856D6" />
+            <Ionicons name="expand-outline" size={29} color={theme.colors.accentPurple} />
           }
           rightElement={
             <Switch
@@ -289,7 +289,7 @@ function AppearanceSettingsScreen() {
         <Item
           title={t("settingsAppearance.alwaysShowContextSize")}
           subtitle={t("settingsAppearance.alwaysShowContextSizeDescription")}
-          icon={<Ionicons name="analytics-outline" size={29} color="#5856D6" />}
+          icon={<Ionicons name="analytics-outline" size={29} color={theme.colors.accentPurple} />}
           rightElement={
             <Switch
               value={alwaysShowContextSize}
@@ -301,7 +301,7 @@ function AppearanceSettingsScreen() {
           title={t("settingsAppearance.avatarStyle")}
           subtitle={t("settingsAppearance.avatarStyleDescription")}
           icon={
-            <Ionicons name="person-circle-outline" size={29} color="#5856D6" />
+            <Ionicons name="person-circle-outline" size={29} color={theme.colors.accentPurple} />
           }
           detail={
             displayStyle === "pixelated"
@@ -330,7 +330,7 @@ function AppearanceSettingsScreen() {
         <Item
           title={t("settingsAppearance.showFlavorIcons")}
           subtitle={t("settingsAppearance.showFlavorIconsDescription")}
-          icon={<Ionicons name="apps-outline" size={29} color="#5856D6" />}
+          icon={<Ionicons name="apps-outline" size={29} color={theme.colors.accentPurple} />}
           rightElement={
             <Switch
               value={showFlavorIcons}
@@ -347,7 +347,7 @@ function AppearanceSettingsScreen() {
         <Item
           title={t("settingsAppearance.expandThinkingByDefault")}
           subtitle={t("settingsAppearance.expandThinkingByDefaultDescription")}
-          icon={<Ionicons name="bulb-outline" size={29} color="#FF9500" />}
+          icon={<Ionicons name="bulb-outline" size={29} color={theme.colors.accentOrange} />}
           rightElement={
             <Switch
               value={expandThinkingByDefault}
