@@ -4200,6 +4200,7 @@ export const zhHans: TranslationStructure = {
       subcatRedirectedContextDesc: "来自上次压缩周期或子 Agent 转发的上下文",
       subcatUnattributed: "其他",
       subcatUnattributedDesc: "包含 CLAUDE.md、Rules、Memory、Skill 列表等 system-reminder 注入内容，点击查看详情",
+      subcatUnattributedRemaining: "其他开销",
       subcatLoading: "加载子分类中…",
       subcatBreakdownNote: "全对话 token 按类型细分，可能跨多个上下文分类",
     },

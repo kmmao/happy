@@ -400,6 +400,23 @@ export function registerClaudeControlHandlers(
       }
       try {
         const raw = await q.getContextUsage();
+        logger.debug("[claudeControl] get_context_usage raw", JSON.stringify({
+          categoryNames: raw.categories.map((c) => `${c.name}:${c.tokens}`),
+          totalTokens: raw.totalTokens,
+          maxTokens: raw.maxTokens,
+          systemPromptSections: raw.systemPromptSections,
+          memoryFilesCount: raw.memoryFiles?.length,
+          mcpToolsCount: raw.mcpTools?.length,
+          messageBreakdown: raw.messageBreakdown ? {
+            user: raw.messageBreakdown.userMessageTokens,
+            assistant: raw.messageBreakdown.assistantMessageTokens,
+            toolCall: raw.messageBreakdown.toolCallTokens,
+            toolResult: raw.messageBreakdown.toolResultTokens,
+            attachment: raw.messageBreakdown.attachmentTokens,
+            redirected: raw.messageBreakdown.redirectedContextTokens,
+            unattributed: raw.messageBreakdown.unattributedTokens,
+          } : "none",
+        }));
         return {
           categories: raw.categories.map((c) => ({
             name: c.name,

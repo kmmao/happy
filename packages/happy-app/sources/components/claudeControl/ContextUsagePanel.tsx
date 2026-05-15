@@ -284,7 +284,7 @@ export const ContextUsagePanel = React.memo(function ContextUsagePanel({
                                     key={cat.name}
                                     onPress={() => Modal.show({
                                         component: SubcategoryListModal,
-                                        props: { sessionId, category: cat.name, messageBreakdown: data.messageBreakdown, categoryTokens: cat.tokens },
+                                        props: { sessionId, category: cat.name, messageBreakdown: data.messageBreakdown, categoryTokens: cat.tokens, systemPromptSections: data.systemPromptSections },
                                     })}
                                     style={({ pressed }) => pressed ? { opacity: 0.6 } : undefined}
                                 >
@@ -347,6 +347,8 @@ interface SubcategoryListModalProps {
     messageBreakdown?: GetContextUsageResponse["messageBreakdown"];
     /** Token count of the Messages category — used to normalize subcategory tokens. */
     categoryTokens?: number;
+    /** System prompt per-section breakdown — used to detail "unattributed" tokens. */
+    systemPromptSections?: GetContextUsageResponse["systemPromptSections"];
     onClose: () => void;
 }
 
@@ -419,6 +421,7 @@ const SubcategoryListModal = React.memo<SubcategoryListModalProps>(function Subc
     category,
     messageBreakdown,
     categoryTokens,
+    systemPromptSections,
     onClose,
 }) {
     const { theme } = useUnistyles();
@@ -519,17 +522,37 @@ const SubcategoryListModal = React.memo<SubcategoryListModalProps>(function Subc
                                                     },
                                                 });
                                             } else if (subcat.name === "unattributed") {
-                                                // Unattributed tokens are mostly system-reminder injections
-                                                // (CLAUDE.md, Rules, Memory, Skills, etc.) — open JSONL drill-down
-                                                Modal.show({
-                                                    component: ContextContentModal,
-                                                    props: {
-                                                        sessionId,
-                                                        category,
-                                                        subcategory: "system-reminder",
-                                                        subcategoryLabel: `${subcatLabel(subcat.name)} (${formatTokens(subcat.count)})`,
-                                                    },
-                                                });
+                                                if (systemPromptSections && systemPromptSections.length > 0) {
+                                                    const detail: DetailRow[] = systemPromptSections.map((s) => ({
+                                                        label: s.name,
+                                                        value: formatTokens(s.tokens),
+                                                    }));
+                                                    const sectionsTotal = systemPromptSections.reduce((sum, s) => sum + s.tokens, 0);
+                                                    const remaining = subcat.count - sectionsTotal;
+                                                    if (remaining > 0) {
+                                                        detail.push({
+                                                            label: t("claudeControl.contextUsage.subcatUnattributedRemaining"),
+                                                            value: formatTokens(remaining),
+                                                        });
+                                                    }
+                                                    Modal.show({
+                                                        component: CategoryDetailModal,
+                                                        props: {
+                                                            title: `${subcatLabel(subcat.name)} (${formatTokens(subcat.count)})`,
+                                                            detail,
+                                                        },
+                                                    });
+                                                } else {
+                                                    Modal.show({
+                                                        component: ContextContentModal,
+                                                        props: {
+                                                            sessionId,
+                                                            category,
+                                                            subcategory: "system-reminder",
+                                                            subcategoryLabel: `${subcatLabel(subcat.name)} (${formatTokens(subcat.count)})`,
+                                                        },
+                                                    });
+                                                }
                                             } else {
                                                 // redirectedContext etc. — show description
                                                 const descKey = subcat.name === "redirectedContext"

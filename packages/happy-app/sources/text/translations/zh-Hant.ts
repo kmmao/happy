@@ -4206,6 +4206,7 @@ export const zhHant: TranslationStructure = {
       subcatRedirectedContextDesc: "來自上次壓縮週期或子 Agent 轉發的上下文",
       subcatUnattributed: "其他",
       subcatUnattributedDesc: "包含 CLAUDE.md、Rules、Memory、Skill 清單等 system-reminder 注入內容，點擊查看詳情",
+      subcatUnattributedRemaining: "其他開銷",
       subcatLoading: "載入子分類中…",
       subcatBreakdownNote: "全對話 token 按類型細分，可能跨多個上下文分類",
     },

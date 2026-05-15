@@ -4278,6 +4278,7 @@ export const ja: TranslationStructure = {
       subcatRedirectedContextDesc: "前回のコンパクション周期から引き継がれた、またはサブエージェントからリダイレクトされたコンテキスト",
       subcatUnattributed: "その他",
       subcatUnattributedDesc: "CLAUDE.md、Rules、Memory、Skill一覧などの system-reminder 注入を含みます。タップで内容を確認",
+      subcatUnattributedRemaining: "その他のオーバーヘッド",
       subcatLoading: "サブカテゴリを読み込み中…",
       subcatBreakdownNote: "全会話のトークン内訳（複数のコンテキストカテゴリにまたがる場合があります）",
     },

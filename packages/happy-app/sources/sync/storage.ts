@@ -1416,7 +1416,7 @@ export const storage = create<StorageState>()((set, get) => {
           state.localSettings,
           delta,
         );
-        saveLocalSettings(updatedLocalSettings);
+        queueMicrotask(() => saveLocalSettings(updatedLocalSettings));
         return {
           ...state,
           localSettings: updatedLocalSettings,

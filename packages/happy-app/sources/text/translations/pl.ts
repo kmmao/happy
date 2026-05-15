@@ -4326,6 +4326,7 @@ export const pl: TranslationStructure = {
       subcatRedirectedContextDesc: "Kontekst przeniesiony z poprzednich cykli kompakcji lub przekierowany z sub-agentów",
       subcatUnattributed: "Inne",
       subcatUnattributedDesc: "Zawiera CLAUDE.md, Rules, Memory, listy umiejętności i inne wstrzyknięcia system-reminder — dotknij, aby zobaczyć",
+      subcatUnattributedRemaining: "Inne narzuty",
       subcatLoading: "Ładowanie podkategorii…",
       subcatBreakdownNote: "Pełny podział tokenów rozmowy według wszystkich kategorii kontekstu",
     },
