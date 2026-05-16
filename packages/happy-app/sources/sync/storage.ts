@@ -153,6 +153,7 @@ interface StorageState {
   sessionsData: SessionListItem[] | null; // Legacy - to be removed
   sessionListViewData: SessionListViewItem[] | null;
   sessionMessages: Record<string, SessionMessages>;
+  sessionMessagesLRU: string[];
   sessionGitStatus: Record<string, GitStatus | null>;
   sessionKnowledgeCount: Record<string, number>;
   sessionKnowledgeAccessRevision: Record<string, number>;
@@ -426,6 +427,54 @@ function resolveLatestUserRequestPreview(
   return getLatestUserRequestPreview(messages) ?? fallback ?? null;
 }
 
+// Maximum number of sessions whose full message history is kept in memory at once.
+// Older sessions are evicted when this limit is exceeded; they reload on demand.
+const MAX_LOADED_SESSIONS = 3;
+
+/**
+ * Updates the LRU access order and evicts the oldest session messages when the
+ * limit is exceeded. Sessions with `presence === "online"` are never evicted
+ * because they receive live WebSocket updates.
+ */
+function applySessionMessagesLRU(
+    sessionId: string,
+    sessionMessages: Record<string, SessionMessages>,
+    sessionMessagesLRU: string[],
+    sessions: Record<string, Session>,
+): { sessionMessages: Record<string, SessionMessages>; sessionMessagesLRU: string[] } {
+    // Move sessionId to front of LRU (most recently used)
+    const nextLRU = [sessionId, ...sessionMessagesLRU.filter((id) => id !== sessionId)];
+
+    // Evict tail entries that exceed the cap, skipping online sessions
+    let evictedMessages = sessionMessages;
+    let evictedLRU = nextLRU;
+
+    if (nextLRU.length > MAX_LOADED_SESSIONS) {
+        const toKeep = new Set<string>();
+        const toCheck = [...nextLRU];
+        for (const id of toCheck) {
+            if (toKeep.size < MAX_LOADED_SESSIONS) {
+                toKeep.add(id);
+            } else if (sessions[id]?.presence === "online") {
+                // Always keep online sessions; remove them from LRU tracking
+                // so they don't block eviction of other sessions
+                toKeep.add(id);
+            }
+        }
+
+        const evicted = toCheck.filter((id) => !toKeep.has(id));
+        if (evicted.length > 0) {
+            evictedMessages = { ...sessionMessages };
+            for (const id of evicted) {
+                delete evictedMessages[id];
+            }
+            evictedLRU = toCheck.filter((id) => toKeep.has(id));
+        }
+    }
+
+    return { sessionMessages: evictedMessages, sessionMessagesLRU: evictedLRU };
+}
+
 // Callback for syncing preferences to server (registered by sync.ts to avoid circular dependency)
 let onPreferencesChanged: ((sessionId: string) => void) | null = null;
 export function registerPreferencesSyncCallback(
@@ -482,6 +531,7 @@ export const storage = create<StorageState>()((set, get) => {
     sessionsData: null, // Legacy - to be removed
     sessionListViewData: null,
     sessionMessages: {},
+    sessionMessagesLRU: [],
     sessionGitStatus: {},
     sessionKnowledgeCount: {},
     sessionKnowledgeAccessRevision: {},
@@ -877,19 +927,47 @@ export const storage = create<StorageState>()((set, get) => {
 
             // Always update the session messages, even if no new messages were created
             // This ensures the reducer state is updated with the new AgentState
-            const mergedMessagesMap = {
-              ...existingSessionMessages.messagesMap,
-            };
-            processedMessages.forEach((message) => {
-              mergedMessagesMap[message.id] = message;
-            });
+            let messagesMap: Record<string, Message>;
+            let messagesArray: Message[];
 
-            const messagesArray = Object.values(mergedMessagesMap).sort(compareMessagesDesc);
+            if (processedMessages.length === 0) {
+              // No messages produced — reuse existing references (zero allocation)
+              messagesMap = existingSessionMessages.messagesMap;
+              messagesArray = existingSessionMessages.messages;
+            } else {
+              // Apply same fast-path strategy as applyMessages
+              messagesMap = { ...existingSessionMessages.messagesMap };
+              for (const message of processedMessages) {
+                messagesMap[message.id] = message;
+              }
+              const newMsgs = processedMessages.filter(
+                (m) => !existingSessionMessages.messagesMap[m.id],
+              );
+              if (newMsgs.length === 0) {
+                // Only updates — no sort needed
+                messagesArray = existingSessionMessages.messages.map(
+                  (m) => messagesMap[m.id] ?? m,
+                );
+              } else if (
+                existingSessionMessages.messages.length > 0 &&
+                newMsgs.every(
+                  (m) => m.createdAt >= (existingSessionMessages.messages[0]?.createdAt ?? 0),
+                )
+              ) {
+                // New messages are newest — prepend
+                const sortedNew = [...newMsgs].sort(compareMessagesDesc);
+                messagesArray = [...sortedNew, ...existingSessionMessages.messages.map(
+                  (m) => messagesMap[m.id] ?? m,
+                )];
+              } else {
+                messagesArray = Object.values(messagesMap).sort(compareMessagesDesc);
+              }
+            }
 
             updatedSessionMessages[session.id] = {
               messages: messagesArray,
-              messagesMap: mergedMessagesMap,
-              reducerState: existingSessionMessages.reducerState, // The reducer modifies state in-place, so this has the updates
+              messagesMap,
+              reducerState: existingSessionMessages.reducerState,
               isLoaded: existingSessionMessages.isLoaded,
               isBackfilling: existingSessionMessages.isBackfilling,
             };
@@ -1004,12 +1082,6 @@ export const storage = create<StorageState>()((set, get) => {
           hasReadyEvent = true;
         }
 
-        // Merge messages
-        const mergedMessagesMap = { ...existingSession.messagesMap };
-        processedMessages.forEach((message) => {
-          mergedMessagesMap[message.id] = message;
-        });
-
         // Optimized sort: avoid O(n log n) full re-sort on every streaming update.
         // existingSession.messages is already sorted newest-first (descending createdAt).
         const newMessages = processedMessages.filter(
@@ -1019,12 +1091,19 @@ export const storage = create<StorageState>()((set, get) => {
           newMessages.length === 0 && processedMessages.length > 0;
 
         let messagesArray: Message[];
+        let mergedMessagesMap: Record<string, Message>;
+
         if (processedMessages.length === 0) {
-          // Nothing changed
+          // Nothing changed — reuse existing references entirely (zero GC)
           messagesArray = existingSession.messages;
+          mergedMessagesMap = existingSession.messagesMap;
         } else if (hasOnlyUpdates) {
           // Fast path: only in-place updates — replace references, no sort needed
-          // (createdAt is immutable, so sort order cannot change)
+          // Build a minimal map overlay instead of copying the entire map
+          mergedMessagesMap = { ...existingSession.messagesMap };
+          for (const message of processedMessages) {
+            mergedMessagesMap[message.id] = message;
+          }
           messagesArray = existingSession.messages.map(
             (m) => mergedMessagesMap[m.id] ?? m,
           );
@@ -1036,6 +1115,10 @@ export const storage = create<StorageState>()((set, get) => {
           )
         ) {
           // Fast path: all new messages are ≥ newest existing — prepend sorted batch
+          mergedMessagesMap = { ...existingSession.messagesMap };
+          for (const message of processedMessages) {
+            mergedMessagesMap[message.id] = message;
+          }
           const sortedNew = [...newMessages].sort(compareMessagesDesc);
           const existingMaybeUpdated = processedMessages.some(
             (m) => existingSession.messagesMap[m.id],
@@ -1045,6 +1128,10 @@ export const storage = create<StorageState>()((set, get) => {
           messagesArray = [...sortedNew, ...existingMaybeUpdated];
         } else {
           // Slow path: full re-sort (out-of-order timestamps or first load)
+          mergedMessagesMap = { ...existingSession.messagesMap };
+          for (const message of processedMessages) {
+            mergedMessagesMap[message.id] = message;
+          }
           messagesArray = Object.values(mergedMessagesMap).sort(compareMessagesDesc);
         }
 
@@ -1106,20 +1193,30 @@ export const storage = create<StorageState>()((set, get) => {
               )
             : state.sessionListViewData;
 
+        const updatedSessionMessagesRaw = {
+          ...state.sessionMessages,
+          [sessionId]: {
+            ...existingSession,
+            messages: messagesArray,
+            messagesMap: mergedMessagesMap,
+            reducerState: existingSession.reducerState,
+            isLoaded: true,
+          },
+        };
+        const { sessionMessages: evictedSessionMessages, sessionMessagesLRU } =
+          applySessionMessagesLRU(
+            sessionId,
+            updatedSessionMessagesRaw,
+            state.sessionMessagesLRU,
+            updatedSessions,
+          );
+
         return {
           ...state,
           sessions: updatedSessions,
           sessionListViewData: nextSessionListViewData,
-          sessionMessages: {
-            ...state.sessionMessages,
-            [sessionId]: {
-              ...existingSession,
-              messages: messagesArray,
-              messagesMap: mergedMessagesMap,
-              reducerState: existingSession.reducerState, // Explicitly include the mutated reducer state
-              isLoaded: true,
-            },
-          },
+          sessionMessages: evictedSessionMessages,
+          sessionMessagesLRU,
         };
       });
 
@@ -1206,7 +1303,14 @@ export const storage = create<StorageState>()((set, get) => {
           };
         }
 
-        return result;
+        const { sessionMessages: evictedSessionMessages, sessionMessagesLRU } =
+          applySessionMessagesLRU(
+            sessionId,
+            result.sessionMessages,
+            state.sessionMessagesLRU,
+            result.sessions,
+          );
+        return { ...result, sessionMessages: evictedSessionMessages, sessionMessagesLRU };
       });
 
       if (pinnedModelIdChanged) {
@@ -1287,6 +1391,24 @@ export const storage = create<StorageState>()((set, get) => {
             }
           : state.sessions;
 
+        const updatedSessionMessagesRaw = {
+          ...state.sessionMessages,
+          [sessionId]: {
+            messages: cached.messages as Message[],
+            messagesMap,
+            reducerState,
+            isLoaded: true,
+            isBackfilling: false,
+          } satisfies SessionMessages,
+        };
+        const { sessionMessages: evictedSessionMessages, sessionMessagesLRU } =
+          applySessionMessagesLRU(
+            sessionId,
+            updatedSessionMessagesRaw,
+            state.sessionMessagesLRU,
+            updatedSessions,
+          );
+
         return {
           ...state,
           sessions: updatedSessions,
@@ -1297,16 +1419,8 @@ export const storage = create<StorageState>()((set, get) => {
                   state.settings.realtimeSessionSort ?? true,
                 )
               : state.sessionListViewData,
-          sessionMessages: {
-            ...state.sessionMessages,
-            [sessionId]: {
-              messages: [...cached.messages],
-              messagesMap,
-              reducerState,
-              isLoaded: true,
-              isBackfilling: false,
-            } satisfies SessionMessages,
-          },
+          sessionMessages: evictedSessionMessages,
+          sessionMessagesLRU,
         };
       }),
     applySessionUsageBaseline: (
@@ -2012,6 +2126,11 @@ export const storage = create<StorageState>()((set, get) => {
         const { [sessionId]: deletedMessages, ...remainingSessionMessages } =
           state.sessionMessages;
 
+        // Remove from LRU tracking
+        const remainingSessionMessagesLRU = state.sessionMessagesLRU.filter(
+          (id) => id !== sessionId,
+        );
+
         // Remove session git status if it exists
         const { [sessionId]: deletedGitStatus, ...remainingGitStatus } =
           state.sessionGitStatus;
@@ -2075,6 +2194,7 @@ export const storage = create<StorageState>()((set, get) => {
           ...state,
           sessions: remainingSessions,
           sessionMessages: remainingSessionMessages,
+          sessionMessagesLRU: remainingSessionMessagesLRU,
           sessionGitStatus: remainingGitStatus,
           sessionPromptSuggestions: remainingPromptSuggestions,
           sessionLastViewed: { ...sessionLastViewed },
