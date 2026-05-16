@@ -54,14 +54,14 @@ const SENSITIVITY_OPTIONS: SegmentedOption<SensitivityKey>[] = [
 ];
 
 const COLLECTION_ITEMS: {
-    key: "trackFileEdits" | "trackToolCalls" | "trackTokens";
+    key: "trackFileEdits" | "trackTokens" | "summaryEnabled";
     icon: keyof typeof Ionicons.glyphMap;
-    labelKey: "knowledgeConfigTrackFileEdits" | "knowledgeConfigTrackToolCalls" | "knowledgeConfigTrackTokens";
-    hintKey: "knowledgeConfigTrackFileEditsHint" | "knowledgeConfigTrackToolCallsHint" | "knowledgeConfigTrackTokensHint";
+    labelKey: "knowledgeConfigTrackFileEdits" | "knowledgeConfigTrackTokens" | "knowledgeConfigSummary";
+    hintKey: "knowledgeConfigTrackFileEditsHint" | "knowledgeConfigTrackTokensHint" | "knowledgeConfigSummaryHint";
 }[] = [
     { key: "trackFileEdits", icon: "document-text-outline", labelKey: "knowledgeConfigTrackFileEdits", hintKey: "knowledgeConfigTrackFileEditsHint" },
-    { key: "trackToolCalls", icon: "hammer-outline", labelKey: "knowledgeConfigTrackToolCalls", hintKey: "knowledgeConfigTrackToolCallsHint" },
     { key: "trackTokens", icon: "chatbubbles-outline", labelKey: "knowledgeConfigTrackTokens", hintKey: "knowledgeConfigTrackTokensHint" },
+    { key: "summaryEnabled", icon: "reader-outline", labelKey: "knowledgeConfigSummary", hintKey: "knowledgeConfigSummaryHint" },
 ];
 
 const LIFECYCLE_ITEMS: {

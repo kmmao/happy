@@ -13,7 +13,7 @@ import { z } from "zod";
 const MERGE_CLUSTER_SIMILARITY = 0.75;
 const MERGE_MIN_CLUSTER_SIZE = 2;
 const MERGE_MAX_CLUSTER_SIZE = 5;
-const MERGE_MAX_CLUSTERS_PER_RUN = 3;
+const MERGE_MAX_CLUSTERS_PER_RUN = 5;
 const MAX_RETRIES = 2;
 
 // ─── Types ───
@@ -38,7 +38,7 @@ interface ClusterEntry {
 const MergedKnowledgeSchema = z.object({
     title: z.string().max(200),
     content: z.string().max(4000),
-    entryType: z.enum(["discovery", "decision", "fix", "convention", "warning"]),
+    entryType: z.enum(["discovery", "decision", "fix", "convention", "warning", "summary"]),
     confidence: z.enum(["high", "medium", "low"]),
     tags: z.array(z.string().max(50)).max(10),
 });

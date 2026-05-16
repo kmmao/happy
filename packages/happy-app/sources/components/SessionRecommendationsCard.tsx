@@ -12,6 +12,7 @@ const ENTRY_ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
     fix: "build-outline",
     discovery: "bulb-outline",
     convention: "document-text-outline",
+    summary: "reader-outline",
 };
 
 const stylesheet = StyleSheet.create((theme) => ({

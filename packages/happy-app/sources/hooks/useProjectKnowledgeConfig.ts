@@ -16,8 +16,8 @@ export interface KnowledgeConfig {
     mode: "auto" | "full" | "minimal";
     sensitivity: "conservative" | "balanced" | "aggressive";
     trackFileEdits: boolean;
-    trackToolCalls: boolean;
     trackTokens: boolean;
+    summaryEnabled: boolean;
     decayEnabled: boolean;
     mergeEnabled: boolean;
     refineEnabled: boolean;

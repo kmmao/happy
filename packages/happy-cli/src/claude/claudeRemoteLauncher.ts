@@ -193,12 +193,6 @@ export async function claudeRemoteLauncher(
   if (process.env.HAPPY_KNOWLEDGE_TRACK_FILE_EDITS !== undefined) {
     turnCollectorConfig.trackFileEdits = process.env.HAPPY_KNOWLEDGE_TRACK_FILE_EDITS !== "false";
   }
-  if (process.env.HAPPY_KNOWLEDGE_TRACK_TOOL_CALLS !== undefined) {
-    turnCollectorConfig.trackToolCalls = process.env.HAPPY_KNOWLEDGE_TRACK_TOOL_CALLS !== "false";
-  }
-  if (process.env.HAPPY_KNOWLEDGE_TRACK_TOKENS !== undefined) {
-    turnCollectorConfig.trackTokens = process.env.HAPPY_KNOWLEDGE_TRACK_TOKENS !== "false";
-  }
   const turnCollector = knowledgeEnabled ? new TurnCollector(turnCollectorConfig) : null;
   let knowledgeInjected = false; // Track whether knowledge was already injected
   let knowledgeContext: string | null = null; // Cached knowledge for system prompt
@@ -211,11 +205,12 @@ export async function claudeRemoteLauncher(
   let currentTurnFilePaths = new Set<string>(); // Files edited in the current turn
 
   // Sync server-side knowledgeConfig to TurnCollector at runtime
+  let summaryEnabled = true;
   function syncKnowledgeConfig(cfg: {
     sensitivity?: string;
     trackFileEdits?: boolean;
-    trackToolCalls?: boolean;
     trackTokens?: boolean;
+    summaryEnabled?: boolean;
   } | undefined): void {
     if (!cfg || !turnCollector) return;
     const patch: Partial<TurnCollectorConfig> = {};
@@ -223,8 +218,8 @@ export async function claudeRemoteLauncher(
       patch.sensitivity = cfg.sensitivity;
     }
     if (cfg.trackFileEdits !== undefined) patch.trackFileEdits = cfg.trackFileEdits;
-    if (cfg.trackToolCalls !== undefined) patch.trackToolCalls = cfg.trackToolCalls;
     if (cfg.trackTokens !== undefined) patch.trackTokens = cfg.trackTokens;
+    if (cfg.summaryEnabled !== undefined) summaryEnabled = cfg.summaryEnabled;
     if (Object.keys(patch).length > 0) {
       turnCollector.updateConfig(patch);
     }
@@ -2406,7 +2401,7 @@ export async function claudeRemoteLauncher(
                       contributorType: "session",
                       action: "create",
                       title: turn.userMessage.split("\n")[0].slice(0, 200) || "Session activity",
-                      content: turn.assistantText.slice(0, 2000),
+                      content: turn.assistantText.slice(0, 4000),
                       request: turn.userMessage.slice(0, 500),
                       outcome: turn.fileEdits.length > 0
                         ? `Modified ${turn.fileEdits.length} file(s): ${turn.fileEdits.map((f) => f.path).join(", ").slice(0, 500)}`
@@ -2586,7 +2581,7 @@ export async function claudeRemoteLauncher(
                   contributorType: "session",
                   action: "create",
                   title: turn.userMessage.split("\n")[0].slice(0, 200) || "Session activity",
-                  content: turn.assistantText.slice(0, 2000),
+                  content: turn.assistantText.slice(0, 4000),
                   request: turn.userMessage.slice(0, 500),
                   outcome: turn.fileEdits.length > 0
                     ? `Modified ${turn.fileEdits.length} file(s): ${turn.fileEdits.map((f) => f.path).join(", ").slice(0, 500)}`
@@ -2597,6 +2592,23 @@ export async function claudeRemoteLauncher(
                   affectedFiles: turn.fileEdits.map((f) => f.path),
                 });
               }
+            }
+
+            // Generate and submit session-end summary (respects project config toggle)
+            const summary = summaryEnabled ? turnCollector.buildSessionSummary() : null;
+            if (summary) {
+              logger.debug(`[knowledge] Submitting session summary (${summary.fileEdits.length} files, ${summary.outputTokens} tokens)`);
+              session.client.submitKnowledge({
+                entryType: "summary",
+                contributorType: "session",
+                action: "create",
+                title: summary.userMessage.slice(0, 200) || "Session summary",
+                content: summary.assistantText.slice(0, 4000),
+                tags: extractTags(summary.fileEdits),
+                confidence: "high",
+                model: summary.model,
+                affectedFiles: summary.fileEdits.map((f) => f.path),
+              });
             }
           }
         } catch (err) {

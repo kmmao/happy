@@ -39,7 +39,7 @@ const KnowledgeTurnEndSchema = z.object({
 const SubmitKnowledgeSchema = z.object({
     sid: z.string().min(1),
     entry: z.object({
-        entryType: z.enum(["discovery", "decision", "fix", "convention", "warning", "repo_map"]).default("discovery"),
+        entryType: z.enum(["discovery", "decision", "fix", "convention", "warning", "repo_map", "summary"]).default("discovery"),
         contributorType: z.enum(["session", "supervisor", "user"]).default("session"),
         action: z.enum(["create", "amend", "supersede", "verify"]).default("create"),
         title: z.string().min(1).max(200),

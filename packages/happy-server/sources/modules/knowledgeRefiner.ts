@@ -45,7 +45,7 @@ interface FilterResult {
 const RefinedKnowledgeSchema = z.object({
     title: z.string().max(200),
     content: z.string().max(2000),
-    entryType: z.enum(["discovery", "decision", "fix", "convention", "warning"]),
+    entryType: z.enum(["discovery", "decision", "fix", "convention", "warning", "summary"]),
     category: z.enum(["user", "feedback", "project", "reference"]).optional(),
     confidence: z.enum(["high", "medium", "low"]),
     tags: z.array(z.string().max(50)).max(10),

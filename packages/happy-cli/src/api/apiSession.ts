@@ -1125,8 +1125,8 @@ export class ApiSessionClient extends EventEmitter {
       mode: "auto" | "full" | "minimal";
       sensitivity: "conservative" | "balanced" | "aggressive";
       trackFileEdits: boolean;
-      trackToolCalls: boolean;
       trackTokens: boolean;
+      summaryEnabled: boolean;
     };
   } | null> {
     try {

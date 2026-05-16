@@ -24,7 +24,7 @@ import { resolveKnowledgeConfig } from "@/modules/knowledgeConfigResolver";
 // Inline Zod schemas (mirrors @kmmao/happy-wire/knowledge.ts)
 // Server uses CommonJS resolution which can't import ESM-only wire values directly.
 
-const KnowledgeEntryTypeEnum = z.enum(["discovery", "decision", "fix", "convention", "warning", "repo_map"]);
+const KnowledgeEntryTypeEnum = z.enum(["discovery", "decision", "fix", "convention", "warning", "repo_map", "summary"]);
 const KnowledgeCategoryEnum = z.enum(["user", "feedback", "project", "reference"]);
 const KnowledgeContributorTypeEnum = z.enum(["session", "supervisor", "user"]);
 const KnowledgeActionEnum = z.enum(["create", "amend", "supersede", "verify"]);

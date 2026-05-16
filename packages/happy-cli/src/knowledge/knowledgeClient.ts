@@ -55,7 +55,7 @@ export class KnowledgeClient {
           contributorType: "session",
           action: "create",
           title: this.generateTitle(turn),
-          content: turn.assistantText.slice(0, 2000),
+          content: turn.assistantText.slice(0, 4000),
           request: turn.userMessage.slice(0, 500),
           findings: undefined,
           analysis: undefined,
