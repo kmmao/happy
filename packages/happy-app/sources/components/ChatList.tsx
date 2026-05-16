@@ -192,7 +192,10 @@ const ChatListInternal = React.memo(
     // In an inverted list, index+1 is the visually "previous" (above) message.
     // Show avatar on the first agent-text in a consecutive run.
     // Also find the latest (newest) agent-text message ID (index 0 = newest).
-    const { showAvatarMap, latestAgentId } = React.useMemo(() => {
+    // Stored in refs so renderItem stays stable across messages updates.
+    const showAvatarMapRef = React.useRef(new Map<string, boolean>());
+    const latestAgentIdRef = React.useRef<string | null>(null);
+    React.useMemo(() => {
       const map = new Map<string, boolean>();
       let latestId: string | null = null;
       for (let i = 0; i < props.messages.length; i++) {
@@ -203,26 +206,22 @@ const ChatListInternal = React.memo(
           map.set(msg.id, !prev || prev.kind !== "agent-text");
         }
       }
-      return { showAvatarMap: map, latestAgentId: latestId };
+      showAvatarMapRef.current = map;
+      latestAgentIdRef.current = latestId;
     }, [props.messages]);
 
     // For each "ready" agent-event, check if the same turn had thinking messages.
-    // In the inverted list (index 0 = newest), a turn's ready event precedes
-    // (lower index) the agent-text/tool-call messages of that turn (higher index).
-    // Scan forward (higher index = older) from each ready event until the next
-    // user-text or another ready event, looking for isThinking agent-text messages.
-    // Map: ready-event id → thinking mode ("adaptive"|"enabled"|null).
-    // Entry only present when the turn had actual thinking messages.
-    const thinkingTurnIds = React.useMemo(() => {
+    // Stored in ref so renderItem stays stable.
+    const thinkingTurnIdsRef = React.useRef(new Map<string, "adaptive" | "enabled" | null>());
+    React.useMemo(() => {
       const startedAt = now();
       const map = new Map<string, "adaptive" | "enabled" | null>();
-      const MAX_INNER_SCAN = 100; // safety cap per turn
+      const MAX_INNER_SCAN = 100;
       for (let i = 0; i < props.messages.length; i++) {
         const msg = props.messages[i];
         if (msg.kind === "agent-event" && msg.event.type === "ready") {
           let hasThinkingMsg = false;
           let thinkingMode: "adaptive" | "enabled" | null = null;
-          // Scan forward (older messages in the same turn)
           const limit = Math.min(i + 1 + MAX_INNER_SCAN, props.messages.length);
           for (let j = i + 1; j < limit; j++) {
             const m = props.messages[j];
@@ -234,7 +233,6 @@ const ChatListInternal = React.memo(
             if (m.kind === "agent-event" && m.event.type === "ready") break;
             if (m.kind === "agent-text" && m.isThinking) {
               hasThinkingMsg = true;
-              // Don't break — continue to find user-text for thinking mode
             }
           }
           if (hasThinkingMsg) {
@@ -243,7 +241,7 @@ const ChatListInternal = React.memo(
         }
       }
       logTiming("thinkingTurnIds", now() - startedAt);
-      return map;
+      thinkingTurnIdsRef.current = map;
     }, [props.messages, logTiming]);
 
     // Filter tool-call messages based on viewInline setting.
@@ -495,10 +493,10 @@ const ChatListInternal = React.memo(
           const timelineHasAvatar = item.steps.some(
             (step) =>
               step.kind === "thinking" &&
-              (showAvatarMap.get(step.message.id) ?? false),
+              (showAvatarMapRef.current.get(step.message.id) ?? false),
           );
           const timelineIsLatest = item.steps.some(
-            (step) => step.kind === "thinking" && step.message.id === latestAgentId,
+            (step) => step.kind === "thinking" && step.message.id === latestAgentIdRef.current,
           );
           return (
             <TurnTimelineMessageView
@@ -515,16 +513,16 @@ const ChatListInternal = React.memo(
         const isReadyWithThinking =
           item.kind === "agent-event" &&
           item.event.type === "ready" &&
-          thinkingTurnIds.has(item.id);
+          thinkingTurnIdsRef.current.has(item.id);
         return (
           <MessageView
             message={item}
             metadata={props.metadata}
             sessionId={props.sessionId}
-            showAvatar={showAvatarMap.get(item.id) ?? false}
-            isLatestAgent={item.id === latestAgentId}
+            showAvatar={showAvatarMapRef.current.get(item.id) ?? false}
+            isLatestAgent={item.id === latestAgentIdRef.current}
             hasTurnsWithThinking={isReadyWithThinking}
-            thinkingMode={isReadyWithThinking ? (thinkingTurnIds.get(item.id) ?? null) : null}
+            thinkingMode={isReadyWithThinking ? (thinkingTurnIdsRef.current.get(item.id) ?? null) : null}
             permissionModeKey={props.permissionModeKey}
             contentMaxWidth={props.contentMaxWidth}
           />
@@ -535,9 +533,6 @@ const ChatListInternal = React.memo(
         props.sessionId,
         props.permissionModeKey,
         props.contentMaxWidth,
-        showAvatarMap,
-        latestAgentId,
-        thinkingTurnIds,
         theme,
       ],
     );
