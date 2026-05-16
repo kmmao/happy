@@ -197,6 +197,7 @@ export interface InputFABStatusInfo {
   completedTurnsDurationMs?: number;
   isThinking?: boolean;
   turnStartedAt?: number;
+  onStatusPress?: () => void;
 }
 
 interface InputFABProps {
@@ -511,7 +512,16 @@ const CompactStatus = React.memo(function CompactStatus({
       {showExternalStatus || showStatusCard ? (
         <View style={styles.statusShell}>
           {showExternalStatus ? (
-            <View style={styles.statusInlineGroup}>
+            <Pressable
+              onPress={info.onStatusPress}
+              disabled={!info.onStatusPress}
+              accessibilityRole={info.onStatusPress ? "button" : undefined}
+              hitSlop={8}
+              style={({ pressed }) => [
+                styles.statusInlineGroup,
+                pressed && info.onStatusPress ? { opacity: 0.55 } : null,
+              ]}
+            >
               <StatusDot
                 color={info.statusDotColor}
                 isPulsing={info.isPulsing}
@@ -519,11 +529,24 @@ const CompactStatus = React.memo(function CompactStatus({
               />
               <Text
                 numberOfLines={1}
-                style={[styles.activityText, { color: info.statusColor }]}
+                style={[
+                  styles.activityText,
+                  {
+                    color: info.statusColor,
+                    textDecorationLine: info.onStatusPress ? "underline" : "none",
+                  },
+                ]}
               >
                 {info.statusText}
               </Text>
-            </View>
+              {info.onStatusPress ? (
+                <Ionicons
+                  name="chevron-forward"
+                  size={10}
+                  color={info.statusColor}
+                />
+              ) : null}
+            </Pressable>
           ) : null}
 
           {showStatusCard ? (
