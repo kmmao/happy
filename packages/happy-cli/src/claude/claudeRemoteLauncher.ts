@@ -46,6 +46,7 @@ import { executeShellCommand } from "@/utils/shellCommand";
 import { TurnCollector, generateRepoMap } from "@/knowledge";
 import type { TurnCollectorConfig } from "@/knowledge";
 import { applyHappyProgressUpdate } from "@/utils/happyProgressMetadata";
+import { TaskMirrorState } from "@/utils/taskMirrorState";
 import { applySessionSummaryUpdate } from "@/utils/sessionSummaryMetadata";
 import {
   buildAutoSummarySyntheticPrompt,
@@ -830,6 +831,10 @@ export async function claudeRemoteLauncher(
   // turn boundaries below.
   let _requestingEventSentThisTurn = false;
 
+  // Tracks TaskCreate/TaskUpdate tool calls from Claude Code runtime
+  // (Opus 4.6+) and converts them to TodoWrite-compatible progress mirror.
+  const taskMirrorState = new TaskMirrorState();
+
   function onMessage(message: SDKMessage) {
     // End-to-end perf: log total latency on first assistant response per turn
     if (!_perfTurnFirstResponseLogged && message.type === "assistant" && _perfTurnSocketReceivedAt) {
@@ -909,6 +914,52 @@ export async function claudeRemoteLauncher(
       }
     } catch (err) {
       logger.debug(`[knowledge] Error collecting turn data: ${err}`);
+    }
+
+    // Auto-mirror TaskCreate/TaskUpdate → metadata.progress.
+    // Claude Code (Opus 4.6+) replaced SDK-native TodoWrite with runtime
+    // TaskCreate/TaskUpdate tools. These don't produce the oldTodos/newTodos
+    // shaped tool_use_result, so we track state from assistant tool_use blocks.
+    if (message.type === "assistant") {
+      try {
+        const aMsg = message as SDKAssistantMessage;
+        if (aMsg.message.content && Array.isArray(aMsg.message.content)) {
+          let taskMirrorChanged = false;
+          for (const c of aMsg.message.content) {
+            if (
+              c.type === "tool_use" &&
+              (c.name === "TaskCreate" || c.name === "TaskUpdate" || c.name === "TaskList") &&
+              c.input &&
+              typeof c.input === "object"
+            ) {
+              const changed = taskMirrorState.processToolUse(
+                c.name,
+                c.input as Record<string, unknown>,
+                c.id as string | undefined,
+              );
+              if (changed) taskMirrorChanged = true;
+            }
+          }
+          if (taskMirrorChanged && taskMirrorState.hasTasks()) {
+            const todos = taskMirrorState.getTodos();
+            let shouldTriggerAutoSummary = false;
+            session.client.updateMetadata((m) => {
+              const result = applyHappyProgressUpdate(m, { todos });
+              shouldTriggerAutoSummary = result.shouldTriggerAutoSummary;
+              return result.metadata;
+            });
+            if (shouldTriggerAutoSummary) {
+              logger.debug("[task-mirror] Checklist completed, triggering auto-summary");
+              session.client.sendSyntheticUserMessage(buildAutoSummarySyntheticPrompt(), {
+                displayText: "",
+                sentFrom: HAPPY_AUTO_SUMMARY_SOURCE,
+              });
+            }
+          }
+        }
+      } catch (err) {
+        logger.debug(`[task-mirror] Error mirroring TaskCreate/TaskUpdate: ${err}`);
+      }
     }
 
     // Auto-mirror TodoWrite → metadata.progress. Reads SDK-native
@@ -1128,6 +1179,43 @@ export async function claudeRemoteLauncher(
         }
       } catch (err) {
         logger.debug(`[progress-mirror] Error mirroring TodoWrite: ${err}`);
+      }
+    }
+
+    // TaskCreate/TaskList result reconciliation: extract real task IDs from
+    // TaskCreate results and reconcile full state from TaskList results.
+    if (message.type === "user" && taskMirrorState.hasTasks()) {
+      try {
+        const uMsg = message as SDKUserMessage;
+        const content = uMsg.message?.content;
+        if (Array.isArray(content)) {
+          let reconciled = false;
+          for (const c of content) {
+            const block = c as unknown as Record<string, unknown>;
+            if (block.type !== "tool_result" || typeof block.tool_use_id !== "string") continue;
+            const resultContent = block.content;
+            const text = typeof resultContent === "string"
+              ? resultContent
+              : Array.isArray(resultContent)
+                ? (resultContent as Array<Record<string, unknown>>)
+                    .filter((b) => b.type === "text" && typeof b.text === "string")
+                    .map((b) => b.text as string)
+                    .join("\n")
+                : "";
+            if (!text) continue;
+            const changed = taskMirrorState.processToolResult(block.tool_use_id as string, text);
+            if (changed) reconciled = true;
+          }
+          if (reconciled) {
+            const todos = taskMirrorState.getTodos();
+            session.client.updateMetadata((m) => {
+              const result = applyHappyProgressUpdate(m, { todos });
+              return result.metadata;
+            });
+          }
+        }
+      } catch (err) {
+        logger.debug(`[task-mirror] Error processing tool_result: ${err}`);
       }
     }
 
