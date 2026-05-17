@@ -32,6 +32,8 @@ export const sessionProgressTodoSchema = z.object({
   status: sessionProgressTodoStatusSchema,
   /** SDK-native: imperative-present form shown when status is in_progress. */
   activeForm: z.string().optional(),
+  /** Longer description of the task (from TaskCreate's description field). */
+  description: z.string().optional(),
   /** Optional phase/stage label a step belongs to, e.g. "Phase 2". */
   stage: z.string().optional(),
   /**

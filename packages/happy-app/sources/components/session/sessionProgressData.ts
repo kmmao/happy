@@ -8,6 +8,8 @@ export interface ProgressTodo {
     status: ProgressTodoStatus;
     /** SDK-native imperative-present form shown for in_progress status. */
     activeForm?: string;
+    /** Longer description of the task (from TaskCreate's description field). */
+    description?: string;
     /** SDK signal: item marked completed without sufficient verification. */
     verificationNudgeNeeded?: boolean;
     priority?: "high" | "medium" | "low";
@@ -251,6 +253,7 @@ function mapMetadataTodo(todo: MetadataProgressList["todos"][number]): ProgressT
         content: todo.content,
         status: todo.status,
         activeForm: todo.activeForm,
+        description: todo.description,
         verificationNudgeNeeded: todo.verificationNudgeNeeded,
     };
 }

@@ -47,8 +47,9 @@ const STATUS_META: Record<ProgressTodo["status"], { icon: keyof typeof Ionicons.
     pending: { icon: "square-outline", colorKey: "textSecondary" },
 };
 
-const FOOTPRINT_CHART_BUCKETS = 24;
-const FOOTPRINT_CHART_HEIGHT = 88;
+const SPARKLINE_BUCKETS = 32;
+const SPARKLINE_HEIGHT = 80;
+
 const TOOL_MIX_TOP_N = Infinity;
 /** Palette used by ToolMixBar; falls back if theme keys are missing. */
 const TOOL_MIX_PALETTE = [
@@ -128,23 +129,21 @@ interface ActivityBucket {
     tool: number;
 }
 
-/**
- * Bucket messages into `count` equal time slices between the session's first
- * and last messages, counting user-text / agent-text / tool-call kinds per
- * bucket. Result powers the three sparklines in the 足迹 panel.
- */
-function buildActivitySeries(
+interface SparklineData {
+    buckets: ActivityBucket[];
+    startMs: number;
+    endMs: number;
+}
+
+function buildSparklineData(
     messages: readonly Message[],
     count: number,
-): ActivityBucket[] {
+): SparklineData {
     const buckets: ActivityBucket[] = Array.from({ length: count }, () => ({
-        user: 0,
-        agent: 0,
-        tool: 0,
+        user: 0, agent: 0, tool: 0,
     }));
-    if (messages.length === 0) return buckets;
+    if (messages.length === 0) return { buckets, startMs: 0, endMs: 0 };
 
-    // Walk the message tree to find first/last createdAt and collect leaves.
     type Leaf = { createdAt: number; kind: Message["kind"] };
     const leaves: Leaf[] = [];
     const walk = (msg: Message) => {
@@ -154,7 +153,7 @@ function buildActivitySeries(
         }
     };
     for (const m of messages) walk(m);
-    if (leaves.length === 0) return buckets;
+    if (leaves.length === 0) return { buckets, startMs: 0, endMs: 0 };
 
     let minTs = leaves[0].createdAt;
     let maxTs = leaves[0].createdAt;
@@ -165,14 +164,56 @@ function buildActivitySeries(
     const span = Math.max(1, maxTs - minTs);
 
     for (const leaf of leaves) {
-        const ratio = (leaf.createdAt - minTs) / span;
-        const idx = Math.min(count - 1, Math.floor(ratio * count));
+        const idx = Math.min(count - 1, Math.floor(((leaf.createdAt - minTs) / span) * count));
         if (leaf.kind === "user-text") buckets[idx].user += 1;
         else if (leaf.kind === "agent-text") buckets[idx].agent += 1;
         else if (leaf.kind === "tool-call") buckets[idx].tool += 1;
     }
-    return buckets;
+    return { buckets, startMs: minTs, endMs: maxTs };
 }
+
+function buildSmoothPath(
+    values: readonly number[],
+    max: number,
+    width: number,
+    height: number,
+): { stroke: string; fill: string } {
+    if (values.length === 0 || max <= 0) return { stroke: "", fill: "" };
+    const pad = 4;
+    const usable = height - pad;
+    const step = values.length > 1 ? width / (values.length - 1) : 0;
+    const pts = values.map((v, i) => {
+        const x = i * step;
+        const y = usable - (Math.min(1, v / max)) * usable + 2;
+        return [x, y] as const;
+    });
+    if (pts.length === 1) {
+        const [, y] = pts[0];
+        return {
+            stroke: `M 0 ${y.toFixed(1)} L ${width.toFixed(1)} ${y.toFixed(1)}`,
+            fill: `M 0 ${y.toFixed(1)} L ${width.toFixed(1)} ${y.toFixed(1)} L ${width.toFixed(1)} ${height} L 0 ${height} Z`,
+        };
+    }
+    const stroke = pts.map(([x, y], i) => {
+        if (i === 0) return `M ${x.toFixed(1)} ${y.toFixed(1)}`;
+        const [px, py] = pts[i - 1];
+        const cx = (px + x) / 2;
+        return `C ${cx.toFixed(1)} ${py.toFixed(1)} ${cx.toFixed(1)} ${y.toFixed(1)} ${x.toFixed(1)} ${y.toFixed(1)}`;
+    }).join(" ");
+    const last = pts[pts.length - 1];
+    const fill = `${stroke} L ${last[0].toFixed(1)} ${height} L ${pts[0][0].toFixed(1)} ${height} Z`;
+    return { stroke, fill };
+}
+
+function formatTimeLabel(ms: number): string {
+    const d = new Date(ms);
+    const M = d.getMonth() + 1;
+    const D = d.getDate();
+    const hh = String(d.getHours()).padStart(2, '0');
+    const mm = String(d.getMinutes()).padStart(2, '0');
+    return `${M}/${D} ${hh}:${mm}`;
+}
+
 
 interface GlassCardProps {
     children: React.ReactNode;
@@ -285,8 +326,8 @@ export const SessionProgressPanel = React.memo<SessionProgressPanelProps>(
         // Per-bucket activity curves (user turns / agent turns / tool calls).
         // Bucketing spans the full session timeline into a fixed count so the
         // three sparklines share an X axis and can be visually compared.
-        const activitySeries = React.useMemo(
-            () => buildActivitySeries(messages, FOOTPRINT_CHART_BUCKETS),
+        const sparkline = React.useMemo(
+            () => buildSparklineData(messages, SPARKLINE_BUCKETS),
             [messages],
         );
         const rhythm = React.useMemo(
@@ -469,7 +510,20 @@ export const SessionProgressPanel = React.memo<SessionProgressPanelProps>(
                                                         color={color}
                                                         style={styles.todoIcon}
                                                     />
-                                                    <Text style={textStyle}>{displayContent}</Text>
+                                                    <View style={styles.todoTextBlock}>
+                                                        <Text style={textStyle}>{displayContent}</Text>
+                                                        {todo.description ? (
+                                                            <Text
+                                                                style={[
+                                                                    styles.todoDescription,
+                                                                    { color: theme.colors.textSecondary },
+                                                                ]}
+                                                                numberOfLines={2}
+                                                            >
+                                                                {todo.description}
+                                                            </Text>
+                                                        ) : null}
+                                                    </View>
                                                     {showNudge && (
                                                         <Ionicons
                                                             name="alert-circle-outline"
@@ -584,7 +638,7 @@ export const SessionProgressPanel = React.memo<SessionProgressPanelProps>(
                     {hasFootprint ? (
                         <>
                             <FootprintChart
-                                series={activitySeries}
+                                sparkline={sparkline}
                                 userTurns={data.userTurns}
                                 agentTurns={data.agentTurns}
                                 toolCalls={data.toolCalls}
@@ -741,95 +795,39 @@ const LegendDot = React.memo<LegendDotProps>(({ color, label }) => (
 ));
 
 interface FootprintChartProps {
-    series: readonly ActivityBucket[];
+    sparkline: SparklineData;
     userTurns: number;
     agentTurns: number;
     toolCalls: number;
 }
 
-/**
- * Build a smooth filled path through `values` (length N), normalized by `max`.
- * X spans 0..width evenly; Y inverted so higher values sit near the top.
- * Returns both the stroke path (line) and fill path (line closed to baseline).
- */
-function buildSparklinePath(
-    values: readonly number[],
-    max: number,
-    width: number,
-    height: number,
-    padBottom: number,
-): { stroke: string; fill: string } {
-    if (values.length === 0 || max <= 0) {
-        return { stroke: "", fill: "" };
-    }
-    const usableHeight = height - padBottom;
-    const step = values.length > 1 ? width / (values.length - 1) : 0;
-    const points: Array<[number, number]> = values.map((v, i) => {
-        const x = i * step;
-        const ratio = Math.max(0, Math.min(1, v / max));
-        const y = usableHeight - ratio * usableHeight + 2;
-        return [x, y];
-    });
-    if (points.length === 1) {
-        const [x, y] = points[0];
-        const stroke = `M ${x} ${y}`;
-        return { stroke, fill: "" };
-    }
-
-    // Monotone-ish smoothing: use catmull-rom → cubic bezier.
-    const stroke = points
-        .map(([x, y], i) => {
-            if (i === 0) return `M ${x.toFixed(2)} ${y.toFixed(2)}`;
-            const [px, py] = points[i - 1];
-            const cx = (px + x) / 2;
-            return `C ${cx.toFixed(2)} ${py.toFixed(2)} ${cx.toFixed(2)} ${y.toFixed(2)} ${x.toFixed(2)} ${y.toFixed(2)}`;
-        })
-        .join(" ");
-    const last = points[points.length - 1];
-    const first = points[0];
-    const fill = `${stroke} L ${last[0].toFixed(2)} ${height} L ${first[0].toFixed(2)} ${height} Z`;
-    return { stroke, fill };
-}
-
 const FootprintChart = React.memo<FootprintChartProps>(function FootprintChart({
-    series,
+    sparkline,
     userTurns,
     agentTurns,
     toolCalls,
 }) {
     const { theme } = useUnistyles();
     const [width, setWidth] = React.useState(0);
+    const { buckets, startMs, endMs } = sparkline;
+    const h = SPARKLINE_HEIGHT;
 
-    const userMax = Math.max(1, ...series.map((b) => b.user));
-    const agentMax = Math.max(1, ...series.map((b) => b.agent));
-    const toolMax = Math.max(1, ...series.map((b) => b.tool));
-    const h = FOOTPRINT_CHART_HEIGHT;
-
-    const userPath = buildSparklinePath(
-        series.map((b) => b.user),
-        userMax,
-        width,
-        h,
-        4,
-    );
-    const agentPath = buildSparklinePath(
-        series.map((b) => b.agent),
-        agentMax,
-        width,
-        h,
-        4,
-    );
-    const toolPath = buildSparklinePath(
-        series.map((b) => b.tool),
-        toolMax,
-        width,
-        h,
-        4,
-    );
+    const userMax = Math.max(1, ...buckets.map((b) => b.user));
+    const agentMax = Math.max(1, ...buckets.map((b) => b.agent));
+    const toolMax = Math.max(1, ...buckets.map((b) => b.tool));
 
     const userColor = theme.colors.textSecondary;
     const agentColor = theme.colors.accentBlue;
     const toolColor = theme.colors.accentPurple;
+
+    const paths = React.useMemo(() => {
+        if (width <= 0) return null;
+        return {
+            user: buildSmoothPath(buckets.map((b) => b.user), userMax, width, h),
+            agent: buildSmoothPath(buckets.map((b) => b.agent), agentMax, width, h),
+            tool: buildSmoothPath(buckets.map((b) => b.tool), toolMax, width, h),
+        };
+    }, [buckets, userMax, agentMax, toolMax, width, h]);
 
     const hasData = userTurns > 0 || agentTurns > 0 || toolCalls > 0;
 
@@ -839,17 +837,27 @@ const FootprintChart = React.memo<FootprintChartProps>(function FootprintChart({
                 style={[styles.chartSurface, { borderColor: theme.colors.divider }]}
                 onLayout={(e) => setWidth(e.nativeEvent.layout.width)}
             >
-                {width > 0 && hasData && (
+                {width > 0 && hasData && paths && (
                     <Svg width={width} height={h} pointerEvents="none">
-                        <Path d={toolPath.fill} fill={toolColor + "22"} />
-                        <Path d={toolPath.stroke} stroke={toolColor} strokeWidth={1.5} fill="none" />
-                        <Path d={agentPath.fill} fill={agentColor + "22"} />
-                        <Path d={agentPath.stroke} stroke={agentColor} strokeWidth={1.5} fill="none" />
-                        <Path d={userPath.fill} fill={userColor + "1F"} />
-                        <Path d={userPath.stroke} stroke={userColor} strokeWidth={1.5} fill="none" />
+                        <Path d={paths.tool.fill} fill={toolColor + "22"} />
+                        <Path d={paths.tool.stroke} stroke={toolColor} strokeWidth={1.5} fill="none" />
+                        <Path d={paths.agent.fill} fill={agentColor + "22"} />
+                        <Path d={paths.agent.stroke} stroke={agentColor} strokeWidth={1.5} fill="none" />
+                        <Path d={paths.user.fill} fill={userColor + "1F"} />
+                        <Path d={paths.user.stroke} stroke={userColor} strokeWidth={1.5} fill="none" />
                     </Svg>
                 )}
             </View>
+            {startMs > 0 && endMs > 0 && startMs !== endMs && (
+                <View style={styles.chartTimeRow}>
+                    <Text style={[styles.chartTimeLabel, { color: theme.colors.textSecondary }]}>
+                        {formatTimeLabel(startMs)}
+                    </Text>
+                    <Text style={[styles.chartTimeLabel, { color: theme.colors.textSecondary }]}>
+                        {formatTimeLabel(endMs)}
+                    </Text>
+                </View>
+            )}
             <View style={styles.chartLegend}>
                 <ChartLegendItem color={userColor} label={t("session.progressUserTurns", { n: userTurns })} />
                 <ChartLegendItem color={agentColor} label={t("session.progressAgentTurns", { n: agentTurns })} />
@@ -860,8 +868,7 @@ const FootprintChart = React.memo<FootprintChartProps>(function FootprintChart({
 });
 
 const ChartLegendItem = React.memo<{ color: string; label: string }>(function ChartLegendItem({
-    color,
-    label,
+    color, label,
 }) {
     return (
         <View style={styles.chartLegendItem}>
@@ -1151,11 +1158,19 @@ const styles = StyleSheet.create({
         ...Typography.default("regular"),
         fontSize: 10,
     },
+    todoTextBlock: {
+        flex: 1,
+        gap: 2,
+    },
     todoText: {
         ...Typography.default("regular"),
         fontSize: 13,
         lineHeight: 18,
-        flex: 1,
+    },
+    todoDescription: {
+        ...Typography.default("regular"),
+        fontSize: 11,
+        lineHeight: 15,
     },
     blockersBlock: {
         gap: 2,
@@ -1196,13 +1211,22 @@ const styles = StyleSheet.create({
         gap: 8,
     },
     chartBlock: {
-        gap: 8,
+        gap: 6,
         marginTop: 4,
     },
     chartSurface: {
         borderRadius: 10,
         borderWidth: 1,
         overflow: "hidden",
+    },
+    chartTimeRow: {
+        flexDirection: "row",
+        justifyContent: "space-between",
+        paddingHorizontal: 2,
+    },
+    chartTimeLabel: {
+        ...Typography.mono("regular"),
+        fontSize: 9,
     },
     chartLegend: {
         flexDirection: "row",

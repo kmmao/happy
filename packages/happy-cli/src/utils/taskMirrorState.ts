@@ -14,6 +14,7 @@ export interface TaskMirrorTodo {
   content: string;
   status: "pending" | "in_progress" | "completed";
   activeForm?: string;
+  description?: string;
 }
 
 interface TaskEntry {
@@ -21,6 +22,7 @@ interface TaskEntry {
   content: string;
   status: "pending" | "in_progress" | "completed";
   activeForm?: string;
+  description?: string;
 }
 
 interface PendingCreate {
@@ -114,6 +116,7 @@ export class TaskMirrorState {
       content: t.content,
       status: t.status,
       activeForm: t.activeForm,
+      description: t.description,
     }));
   }
 
@@ -149,6 +152,7 @@ export class TaskMirrorState {
         content: subject,
         status,
         activeForm: existing?.activeForm,
+        description: existing?.description,
       });
     }
 
@@ -193,6 +197,10 @@ export class TaskMirrorState {
       typeof input.activeForm === "string" && input.activeForm.length > 0
         ? input.activeForm
         : undefined;
+    const description =
+      typeof input.description === "string" && input.description.length > 0
+        ? input.description
+        : undefined;
 
     // Optimistically assign sequential ID; will be corrected from result
     const id = String(this.nextId);
@@ -203,6 +211,7 @@ export class TaskMirrorState {
       content: subject,
       status: "pending",
       activeForm,
+      description,
     });
 
     if (toolUseId) {
@@ -241,6 +250,11 @@ export class TaskMirrorState {
 
     if (typeof input.activeForm === "string" && input.activeForm !== entry.activeForm) {
       entry.activeForm = input.activeForm.length > 0 ? input.activeForm : undefined;
+      changed = true;
+    }
+
+    if (typeof input.description === "string" && input.description !== entry.description) {
+      entry.description = input.description.length > 0 ? input.description : undefined;
       changed = true;
     }
 

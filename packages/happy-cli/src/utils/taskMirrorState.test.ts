@@ -13,8 +13,18 @@ describe("TaskMirrorState", () => {
       expect(changed).toBe(true);
       expect(state.hasTasks()).toBe(true);
       expect(state.getTodos()).toEqual([
-        { content: "Fix the bug", status: "pending", activeForm: undefined },
+        { content: "Fix the bug", status: "pending", activeForm: undefined, description: "Something is broken" },
       ]);
+    });
+
+    it("preserves description from TaskCreate", () => {
+      const state = new TaskMirrorState();
+      state.processToolUse("TaskCreate", {
+        subject: "Fix bug",
+        description: "Something is broken in auth",
+      });
+
+      expect(state.getTodos()[0]?.description).toBe("Something is broken in auth");
     });
 
     it("preserves activeForm from TaskCreate", () => {
@@ -192,9 +202,9 @@ describe("TaskMirrorState", () => {
 
       expect(changed).toBe(true);
       expect(state.getTodos()).toEqual([
-        { content: "Fix the bug", status: "completed", activeForm: undefined },
-        { content: "Write tests", status: "in_progress", activeForm: undefined },
-        { content: "Deploy", status: "pending", activeForm: undefined },
+        { content: "Fix the bug", status: "completed", activeForm: undefined, description: undefined },
+        { content: "Write tests", status: "in_progress", activeForm: undefined, description: undefined },
+        { content: "Deploy", status: "pending", activeForm: undefined, description: undefined },
       ]);
     });
 
