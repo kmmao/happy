@@ -323,7 +323,7 @@ export async function claudeRemote(opts: {
   const buildSystemReminderPrefix = (mode: EnhancedMode): string => {
     if (!isFirstUserMessage) return "";
     isFirstUserMessage = false;
-    const appPrompt = mode.appendSystemPrompt; // App's <options> + skill instructions
+    const appPrompt = mode.appendSystemPrompt;
     const parts = [appPrompt, effectiveSystemPrompt].filter(Boolean);
     if (parts.length === 0) return "";
     return `<system-reminder>\n${parts.join("\n\n")}\n</system-reminder>\n\n`;
@@ -349,10 +349,7 @@ export async function claudeRemote(opts: {
     customSystemPrompt: initial.mode.customSystemPrompt
       ? initial.mode.customSystemPrompt + "\n\n" + effectiveSystemPrompt
       : undefined,
-    // SDK 0.2.140+ reliably honours appendSystemPrompt via the preset+append
-    // path. We pass it here as system-level reinforcement — this does NOT enter
-    // the conversation history, so it won't duplicate with the first-message
-    // <system-reminder> injection (which IS in history for the model to reference).
+    // System-level reinforcement via SDK (does NOT enter conversation history).
     appendSystemPrompt: (() => {
       const parts = [initial.mode.appendSystemPrompt, effectiveSystemPrompt].filter(Boolean);
       return parts.length > 0 ? parts.join("\n\n") : undefined;
