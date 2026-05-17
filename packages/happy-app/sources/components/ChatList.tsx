@@ -54,13 +54,15 @@ export const ChatList = React.memo(
       session: Session;
       displayLimit: number;
       onLoadMore: () => void;
+      onFetchOlderMessages?: () => void;
+      isFetchingOlder?: boolean;
       onScrollAwayFromBottom?: (isAway: boolean) => void;
       onScrollActivity?: () => void;
       onVisibleUserMessageChange?: (msgIndex: number) => void;
       contentMaxWidth?: number;
     }
   >((props, ref) => {
-    const { messages, hasOlderMessages, isBackfilling } = useSessionMessages(
+    const { messages, hasOlderMessages, hasServerOlderMessages, isBackfilling } = useSessionMessages(
       props.session.id,
       props.displayLimit,
     );
@@ -71,8 +73,11 @@ export const ChatList = React.memo(
         sessionId={props.session.id}
         messages={messages}
         hasOlderMessages={hasOlderMessages}
+        hasServerOlderMessages={hasServerOlderMessages}
         isBackfilling={isBackfilling}
+        isFetchingOlder={props.isFetchingOlder ?? false}
         onLoadMore={props.onLoadMore}
+        onFetchOlderMessages={props.onFetchOlderMessages}
         permissionModeKey={props.session.permissionMode}
         onScrollAwayFromBottom={props.onScrollAwayFromBottom}
         onScrollActivity={props.onScrollActivity}
@@ -86,12 +91,18 @@ export const ChatList = React.memo(
 const OlderMessagesArea = React.memo(
   ({
     hasOlderMessages,
+    hasServerOlderMessages,
     isBackfilling,
+    isFetchingOlder,
     onLoadMore,
+    onFetchOlderMessages,
   }: {
     hasOlderMessages: boolean;
+    hasServerOlderMessages: boolean;
     isBackfilling: boolean;
+    isFetchingOlder: boolean;
     onLoadMore: () => void;
+    onFetchOlderMessages?: () => void;
   }) => {
     const headerHeight = useHeaderHeight();
     const safeArea = useSafeAreaInsets();
@@ -110,6 +121,21 @@ const OlderMessagesArea = React.memo(
             <Text style={{ opacity: 0.4, fontSize: 12 }}>
               {t("session.loadOlderMessages")}
             </Text>
+          </Pressable>
+        )}
+        {!hasOlderMessages && !isBackfilling && hasServerOlderMessages && (
+          <Pressable
+            onPress={onFetchOlderMessages}
+            disabled={isFetchingOlder}
+            style={{ paddingVertical: 12, alignItems: "center" }}
+          >
+            {isFetchingOlder ? (
+              <ActivityIndicator size="small" />
+            ) : (
+              <Text style={{ opacity: 0.4, fontSize: 12 }}>
+                {t("session.loadOlderMessages")}
+              </Text>
+            )}
           </Pressable>
         )}
         <View
@@ -146,8 +172,11 @@ const ChatListInternal = React.memo(
       sessionId: string;
       messages: Message[];
       hasOlderMessages: boolean;
+      hasServerOlderMessages: boolean;
       isBackfilling: boolean;
+      isFetchingOlder: boolean;
       onLoadMore: () => void;
+      onFetchOlderMessages?: () => void;
       permissionModeKey?: string | null;
       onScrollAwayFromBottom?: (isAway: boolean) => void;
       onScrollActivity?: () => void;
@@ -564,8 +593,11 @@ const ChatListInternal = React.memo(
         ListFooterComponent={
           <OlderMessagesArea
             hasOlderMessages={props.hasOlderMessages}
+            hasServerOlderMessages={props.hasServerOlderMessages}
             isBackfilling={props.isBackfilling}
+            isFetchingOlder={props.isFetchingOlder}
             onLoadMore={props.onLoadMore}
+            onFetchOlderMessages={props.onFetchOlderMessages}
           />
         }
       />

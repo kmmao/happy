@@ -158,10 +158,7 @@ function findPendingPermission(messages: readonly Message[]): PendingPermissionI
   for (const msg of messages) {
     if (msg.kind !== "tool-call") continue;
     const tool = msg.tool;
-    if (
-      tool.permission?.status === "pending" &&
-      tool.name !== "AskUserQuestion"
-    ) {
+    if (tool.permission?.status === "pending") {
       return { toolName: tool.name, toolInput: tool.input, permission: tool.permission };
     }
     if (msg.children.length > 0) {
@@ -341,7 +338,7 @@ export const SessionView = React.memo((props: { id: string }) => {
   const handlePanelResizeEnd = React.useCallback(() => {
     setDragPanelWidth((prev) => {
       if (prev !== null) {
-        storage.getState().applyLocalSettings({ sidePanelWidth: prev });
+        queueMicrotask(() => storage.getState().applyLocalSettings({ sidePanelWidth: prev }));
       }
       return null;
     });
@@ -635,6 +632,15 @@ function SessionViewInner({
   const handleLoadMore = React.useCallback(() => {
     setDisplayLimit((prev) => prev + LOAD_MORE_INCREMENT);
   }, []);
+  const [isFetchingOlder, setIsFetchingOlder] = React.useState(false);
+  const handleFetchOlderMessages = React.useCallback(async () => {
+    setIsFetchingOlder(true);
+    try {
+      await sync.fetchOlderMessages(sessionId);
+    } finally {
+      setIsFetchingOlder(false);
+    }
+  }, [sessionId]);
   const { messages, isLoaded } = useSessionMessages(sessionId, displayLimit);
   const selectedOptionForEditingRef = React.useRef<{
     text: string;
@@ -834,15 +840,17 @@ function SessionViewInner({
   const isCodex = flavor === "codex";
   const isGemini = flavor === "gemini";
   const requiresAction = session.sdkSessionState === "requires_action";
+  const hasPendingPermission = sessionStatus.state === "permission_required";
   const [showPermissionSheet, setShowPermissionSheet] = React.useState(false);
   const pendingPermission = React.useMemo(() => {
-    if (!requiresAction) return null;
+    if (!hasPendingPermission) return null;
     // Prefer agentState.requests — available even when the permission message
     // has scrolled past the MAX_DISPLAY_MESSAGES pagination window.
     const requests = session.agentState?.requests;
     if (requests) {
       const entries = Object.entries(requests);
-      const entry = entries.find(([, req]) => req.tool !== "AskUserQuestion");
+      const entry =
+        entries.find(([, req]) => req.tool === "AskUserQuestion") ?? entries[0];
       if (entry) {
         const [permId, req] = entry;
         return {
@@ -854,14 +862,14 @@ function SessionViewInner({
     }
     // Fallback: search the visible messages tree
     return findPendingPermission(messages);
-  }, [requiresAction, session.agentState?.requests, messages]);
+  }, [hasPendingPermission, session.agentState?.requests, messages]);
 
   // Auto-close the sheet when the permission is resolved
   React.useEffect(() => {
-    if (!requiresAction) {
+    if (!hasPendingPermission) {
       setShowPermissionSheet(false);
     }
-  }, [requiresAction]);
+  }, [hasPendingPermission]);
 
   const sessionStateLogKey = React.useMemo(() => JSON.stringify({
     sdkSessionState: session.sdkSessionState ?? null,
@@ -874,9 +882,11 @@ function SessionViewInner({
     statusState: sessionStatus.state,
     isRunning,
     requiresAction,
+    hasPendingPermission,
   }), [
     isRunning,
     requiresAction,
+    hasPendingPermission,
     session.agentState?.elicitation,
     session.agentState?.requests,
     session.needsAttention,
@@ -1520,14 +1530,14 @@ function SessionViewInner({
       completedTurnsDurationMs: usageSource?.completedTurnsDurationMs,
       isThinking: isRunning,
       turnStartedAt,
-      onStatusPress: requiresAction ? handleRequiresActionPress : undefined,
+      onStatusPress: hasPendingPermission ? handleRequiresActionPress : undefined,
     }),
     [
       sessionStatus.statusText,
       sessionStatus.statusColor,
       sessionStatus.statusDotColor,
       sessionStatus.isPulsing,
-      requiresAction,
+      hasPendingPermission,
       handleRequiresActionPress,
       displayPermissionLabel,
       permissionMode?.name,
@@ -1554,6 +1564,8 @@ function SessionViewInner({
             session={session}
             displayLimit={displayLimit}
             onLoadMore={handleLoadMore}
+            onFetchOlderMessages={handleFetchOlderMessages}
+            isFetchingOlder={isFetchingOlder}
             onScrollAwayFromBottom={setShowScrollToBottom}
             onVisibleUserMessageChange={handleVisibleUserMessage}
             contentMaxWidth={contentMaxWidth}
@@ -1813,7 +1825,7 @@ function SessionViewInner({
         onContinuePress={() => {
           sync.sendMessage(sessionId, "", undefined, { continue: true });
         }}
-        requiresAction={requiresAction}
+        requiresAction={hasPendingPermission || requiresAction}
         onRequiresActionPress={handleRequiresActionPress}
         totalDurationMs={usageSource?.totalDurationMs}
         completedTurnsDurationMs={usageSource?.completedTurnsDurationMs}

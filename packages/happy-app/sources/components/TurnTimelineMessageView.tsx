@@ -54,8 +54,15 @@ function formatCost(costUsd: number): string {
   return `$${costUsd.toFixed(2)}`;
 }
 
+interface ModelUsageInfo {
+  model: string;
+  tokens: string;
+  cacheHitRate: number | null;
+}
+
 function getTurnSummary(item: TurnTimelineDisplayItem): {
   model: string | null;
+  models: ModelUsageInfo[];
   duration: string | null;
   turns: number | null;
   totalTokens: string | null;
@@ -66,6 +73,7 @@ function getTurnSummary(item: TurnTimelineDisplayItem): {
   if (event.type !== "ready") {
     return {
       model: null,
+      models: [],
       duration: null,
       turns: null,
       totalTokens: null,
@@ -76,9 +84,11 @@ function getTurnSummary(item: TurnTimelineDisplayItem): {
 
   let totalTokens: number | null = null;
   let cacheHitRate: number | null = null;
+  const models: ModelUsageInfo[] = [];
 
   if (event.modelUsage) {
-    const usageItems = Object.values(event.modelUsage);
+    const entries = Object.entries(event.modelUsage);
+    const usageItems = entries.map(([, v]) => v);
     totalTokens = usageItems.reduce(
       (sum, usage) =>
         sum +
@@ -103,6 +113,39 @@ function getTurnSummary(item: TurnTimelineDisplayItem): {
     if (totalCacheRead > 0 && totalInput > 0) {
       cacheHitRate = Math.round((totalCacheRead / totalInput) * 100);
     }
+
+    // Build per-model breakdown when multiple models are used
+    if (entries.length > 1) {
+      // Sort: primary model first, then by token count descending
+      const primaryModel = event.model ? formatModelName(event.model) : null;
+      const sorted = entries
+        .map(([model, usage]) => {
+          const t =
+            usage.inputTokens +
+            usage.outputTokens +
+            usage.cacheReadInputTokens +
+            usage.cacheCreationInputTokens;
+          const cr = usage.cacheReadInputTokens;
+          const inp =
+            usage.inputTokens +
+            usage.cacheReadInputTokens +
+            usage.cacheCreationInputTokens;
+          const hit = cr > 0 && inp > 0 ? Math.round((cr / inp) * 100) : null;
+          return { model: formatModelName(model), tokens: t, cacheHitRate: hit };
+        })
+        .sort((a, b) => {
+          if (a.model === primaryModel) return -1;
+          if (b.model === primaryModel) return 1;
+          return b.tokens - a.tokens;
+        });
+      for (const s of sorted) {
+        models.push({
+          model: s.model,
+          tokens: formatTokenCount(s.tokens),
+          cacheHitRate: s.cacheHitRate,
+        });
+      }
+    }
   } else if (item.readyMessage.sessionUsage) {
     totalTokens =
       item.readyMessage.sessionUsage.totalInputTokens +
@@ -119,6 +162,7 @@ function getTurnSummary(item: TurnTimelineDisplayItem): {
     event.totalCostUsd ?? item.readyMessage.sessionUsage?.totalCostUsd ?? null;
 
   return {
+    models,
     model: event.model ? formatModelName(event.model) : null,
     duration:
       typeof event.durationMs === "number" ? formatDuration(event.durationMs) : null,
@@ -160,6 +204,8 @@ function getHiddenSummaryLabel(
   switch (kind) {
     case "thinking":
       return t("sessionInfo.thinking");
+    case "agent":
+      return "Agent";
     case "read":
       return t("tools.names.readFile");
     case "write":
@@ -196,6 +242,8 @@ function getHiddenSummaryIcon(
   switch (kind) {
     case "thinking":
       return "sparkles-outline";
+    case "agent":
+      return "git-branch-outline";
     case "read":
       return "document-text-outline";
     case "write":
@@ -344,15 +392,34 @@ export const TurnTimelineMessageView = React.memo(function TurnTimelineMessageVi
           ]}
         >
           <View style={styles.summaryRow}>
-            {summary.model ? (
-              <StepMeta
-                icon="sparkles-outline"
-                label={summary.model}
-                color={theme.colors.accentPurple}
-                backgroundColor={theme.colors.accentPurple + "12"}
-                borderColor={theme.colors.accentPurple + "24"}
-              />
-            ) : null}
+            {summary.models.length > 1 ? (
+              summary.models.map((m, i) => (
+                <StepMeta
+                  key={i}
+                  icon={i === 0 ? "sparkles-outline" : "git-branch-outline"}
+                  label={
+                    m.cacheHitRate !== null
+                      ? `${m.model} ${m.tokens} ↓${m.cacheHitRate}%`
+                      : `${m.model} ${m.tokens}`
+                  }
+                  color={i === 0 ? theme.colors.accentPurple : theme.colors.accentTeal}
+                  backgroundColor={(i === 0 ? theme.colors.accentPurple : theme.colors.accentTeal) + "12"}
+                  borderColor={(i === 0 ? theme.colors.accentPurple : theme.colors.accentTeal) + "24"}
+                />
+              ))
+            ) : (
+              <>
+                {summary.model ? (
+                  <StepMeta
+                    icon="sparkles-outline"
+                    label={summary.model}
+                    color={theme.colors.accentPurple}
+                    backgroundColor={theme.colors.accentPurple + "12"}
+                    borderColor={theme.colors.accentPurple + "24"}
+                  />
+                ) : null}
+              </>
+            )}
             {summary.duration ? (
               <StepMeta
                 icon="flash-outline"
@@ -371,7 +438,7 @@ export const TurnTimelineMessageView = React.memo(function TurnTimelineMessageVi
                 borderColor={theme.colors.textSecondary + "18"}
               />
             ) : null}
-            {summary.totalTokens ? (
+            {summary.models.length <= 1 && summary.totalTokens ? (
               <StepMeta
                 icon="layers-outline"
                 label={
@@ -408,7 +475,11 @@ export const TurnTimelineMessageView = React.memo(function TurnTimelineMessageVi
                           backgroundColor:
                             step.kind === "thinking"
                               ? theme.colors.textSecondary
-                              : theme.colors.accentBlue,
+                              : step.kind === "tool-call" &&
+                                  (step.message.tool.name === "Agent" ||
+                                    step.message.tool.name === "Task")
+                                ? theme.colors.accentTeal
+                                : theme.colors.accentBlue,
                         },
                       ]}
                     />

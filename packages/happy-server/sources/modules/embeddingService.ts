@@ -10,6 +10,7 @@ import { log } from "@/utils/log";
  *   OLLAMA_URL=http://localhost:11434   (default)
  *   OLLAMA_EMBED_MODEL=bge-m3          (default, 1024-dim, multilingual)
  *   OPENAI_API_KEY=sk-...
+ *   EMBEDDING_BASE_URL=https://api.openai.com/v1 (default)
  *   OPENAI_EMBED_MODEL=text-embedding-3-small (default)
  */
 
@@ -25,17 +26,13 @@ function detectProvider(): EmbeddingProvider {
     const explicit = process.env.EMBEDDING_PROVIDER;
     if (explicit === "ollama" || explicit === "openai") return explicit;
 
-    // Auto-detect: prefer Ollama (local, free)
-    if (getOllamaUrl()) return "ollama";
-    if (getOpenAIKey()) return "openai";
+    if (getOpenAIKey() || process.env.EMBEDDING_BASE_URL || process.env.OPENAI_BASE_URL) return "openai";
+    if (process.env.OLLAMA_URL) return "ollama";
     return "none";
 }
 
 function getOllamaUrl(): string | null {
-    const url = process.env.OLLAMA_URL || "http://localhost:11434";
-    // Only use Ollama if explicitly configured or if default URL is reachable
-    // We always try the default URL — Ollama is local and free
-    return process.env.OLLAMA_URL ? url : (process.env.EMBEDDING_PROVIDER === "ollama" ? url : url);
+    return process.env.OLLAMA_URL || (process.env.EMBEDDING_PROVIDER === "ollama" ? "http://localhost:11434" : null);
 }
 
 function getOllamaModel(): string {
@@ -43,8 +40,12 @@ function getOllamaModel(): string {
 }
 
 function getOpenAIKey(): string | null {
-    const key = process.env.OPENAI_API_KEY || process.env.EMBEDDING_API_KEY || "";
+    const key = process.env.EMBEDDING_API_KEY || process.env.OPENAI_API_KEY || "";
     return key.length > 0 ? key : null;
+}
+
+function getOpenAIBaseUrl(): string {
+    return (process.env.EMBEDDING_BASE_URL || process.env.OPENAI_BASE_URL || "https://api.openai.com/v1").replace(/\/+$/, "");
 }
 
 function getOpenAIModel(): string {
@@ -131,7 +132,7 @@ async function openaiEmbed(text: string): Promise<number[] | null> {
     if (!apiKey) return null;
 
     try {
-        const response = await fetch("https://api.openai.com/v1/embeddings", {
+        const response = await fetch(`${getOpenAIBaseUrl()}/embeddings`, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
@@ -166,7 +167,7 @@ async function openaiEmbedBatch(texts: string[]): Promise<number[][] | null> {
     if (!apiKey) return null;
 
     try {
-        const response = await fetch("https://api.openai.com/v1/embeddings", {
+        const response = await fetch(`${getOpenAIBaseUrl()}/embeddings`, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",

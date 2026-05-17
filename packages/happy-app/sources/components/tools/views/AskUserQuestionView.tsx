@@ -258,12 +258,16 @@ export const AskUserQuestionView = React.memo<ToolViewProps>(
     const [selections, setSelections] = React.useState<
       Map<number, Set<number>>
     >(new Map());
+    const selectionsRef = React.useRef(selections);
     const [isSubmitting, setIsSubmitting] = React.useState(false);
     const [submitError, setSubmitError] = React.useState(false);
     const [otherTexts, setOtherTexts] = React.useState<Map<number, string>>(
       new Map(),
     );
     const [activeStep, setActiveStep] = React.useState(0);
+    React.useEffect(() => {
+      selectionsRef.current = selections;
+    }, [selections]);
     // Parse input
     const input = tool.input as AskUserQuestionInput | undefined;
     const questions = input?.questions;
@@ -330,6 +334,7 @@ export const AskUserQuestionView = React.memo<ToolViewProps>(
             }
           }
 
+          selectionsRef.current = newMap;
           return newMap;
         });
       },
@@ -337,7 +342,18 @@ export const AskUserQuestionView = React.memo<ToolViewProps>(
     );
 
     const handleSubmit = React.useCallback(async () => {
-      if (!sessionId || !allQuestionsAnswered || isSubmitting) return;
+      const currentSelections = selectionsRef.current;
+      const isAnsweredNow = questions.every((q, qIndex) => {
+        const selected = currentSelections.get(qIndex);
+        if (!selected || selected.size === 0) return false;
+        const otherIndex = q.options.length;
+        if (selected.has(otherIndex)) {
+          const text = otherTexts.get(qIndex);
+          return !!text && text.trim().length > 0;
+        }
+        return true;
+      });
+      if (!sessionId || !isAnsweredNow || isSubmitting) return;
 
       setIsSubmitting(true);
       setSubmitError(false);
@@ -346,7 +362,7 @@ export const AskUserQuestionView = React.memo<ToolViewProps>(
       // This matches the AskUserQuestion tool's `answers` parameter schema
       const answers: Record<string, string> = {};
       questions.forEach((q, qIndex) => {
-        const selected = selections.get(qIndex);
+        const selected = currentSelections.get(qIndex);
         if (selected && selected.size > 0) {
           const otherIndex = q.options.length;
           const selectedLabels = Array.from(selected)
@@ -389,9 +405,7 @@ export const AskUserQuestionView = React.memo<ToolViewProps>(
     }, [
       sessionId,
       questions,
-      selections,
       otherTexts,
-      allQuestionsAnswered,
       isSubmitting,
       tool.permission?.id,
       tool.id,

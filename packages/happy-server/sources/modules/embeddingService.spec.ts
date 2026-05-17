@@ -62,9 +62,47 @@ describe("embeddingService", () => {
             expect(body.dimensions).toBe(1024);
         });
 
+        it("should use custom embedding base URL", async () => {
+            vi.stubEnv("EMBEDDING_BASE_URL", "http://localhost:8999/v1/");
+            const fakeEmbedding = Array.from({ length: 1024 }, () => 0.1);
+            mockFetch.mockResolvedValueOnce({
+                ok: true,
+                json: async () => ({
+                    data: [{ embedding: fakeEmbedding }],
+                }),
+            });
+
+            const result = await generateEmbedding("test text");
+
+            expect(result).toEqual(fakeEmbedding);
+            const [url] = mockFetch.mock.calls[0];
+            expect(url).toBe("http://localhost:8999/v1/embeddings");
+        });
+
+        it("should use OPENAI_BASE_URL when embedding base URL is not configured", async () => {
+            vi.stubEnv("EMBEDDING_BASE_URL", "");
+            vi.stubEnv("OPENAI_BASE_URL", "http://localhost:8999/v1/");
+            const fakeEmbedding = Array.from({ length: 1024 }, () => 0.1);
+            mockFetch.mockResolvedValueOnce({
+                ok: true,
+                json: async () => ({
+                    data: [{ embedding: fakeEmbedding }],
+                }),
+            });
+
+            await generateEmbedding("test text");
+
+            const [url] = mockFetch.mock.calls[0];
+            expect(url).toBe("http://localhost:8999/v1/embeddings");
+        });
+
         it("should return null when no provider is configured", async () => {
             vi.stubEnv("EMBEDDING_PROVIDER", "");
             vi.stubEnv("OPENAI_API_KEY", "");
+            vi.stubEnv("EMBEDDING_API_KEY", "");
+            vi.stubEnv("EMBEDDING_BASE_URL", "");
+            vi.stubEnv("OPENAI_BASE_URL", "");
+            vi.stubEnv("OLLAMA_URL", "");
             const result = await generateEmbedding("test text");
             expect(result).toBeNull();
         });
@@ -105,6 +143,21 @@ describe("embeddingService", () => {
             expect(result).toHaveLength(2);
             expect(result![0]).toHaveLength(1024);
             expect(result![1]).toHaveLength(1024);
+        });
+
+        it("should use custom embedding base URL for batch input", async () => {
+            vi.stubEnv("EMBEDDING_BASE_URL", "http://localhost:8999/v1");
+            mockFetch.mockResolvedValueOnce({
+                ok: true,
+                json: async () => ({
+                    data: [{ embedding: Array.from({ length: 1024 }, () => 0.1), index: 0 }],
+                }),
+            });
+
+            await generateEmbeddings(["text one"]);
+
+            const [url] = mockFetch.mock.calls[0];
+            expect(url).toBe("http://localhost:8999/v1/embeddings");
         });
 
         it("should return null on failure", async () => {

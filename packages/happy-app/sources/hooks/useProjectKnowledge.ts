@@ -64,6 +64,13 @@ export interface LifecycleStats {
     totalRelations: number;
 }
 
+export interface LifecycleTrendPoint {
+    date: string;
+    created: number;
+    superseded: number;
+    archived: number;
+}
+
 interface UpdateEntryResponse {
     entry: KnowledgeEntry;
 }
@@ -401,6 +408,25 @@ export function useProjectKnowledge(projectServerId: string | undefined) {
         }
     }, [projectServerId]);
 
+    const fetchLifecycleTrend = React.useCallback(async () => {
+        if (!projectServerId) return null;
+        const credentials = await TokenStorage.getCredentials();
+        if (!credentials) return null;
+
+        const API_ENDPOINT = getServerUrl();
+        try {
+            const res = await fetch(
+                `${API_ENDPOINT}/v1/projects/${projectServerId}/knowledge/lifecycle-trend`,
+                { headers: authHeaders(credentials.token) },
+            );
+            if (!res.ok) return null;
+            const data = (await res.json()) as { trend: LifecycleTrendPoint[] };
+            return data.trend;
+        } catch {
+            return null;
+        }
+    }, [projectServerId]);
+
     const runDecay = React.useCallback(async () => {
         if (!projectServerId) return null;
         const credentials = await TokenStorage.getCredentials();
@@ -438,5 +464,5 @@ export function useProjectKnowledge(projectServerId: string | undefined) {
         [entries],
     );
 
-    return { entries, archivedEntries, supersededEntries, profile, loading, loadingMore, hasMore, lastRefreshAt, refresh, refreshIfStale, loadMore, updateEntry, deleteEntry, refineEntry, search, regenerateProfile, fetchLifecycle, runDecay, runMerge, repoMapEntries };
+    return { entries, archivedEntries, supersededEntries, profile, loading, loadingMore, hasMore, lastRefreshAt, refresh, refreshIfStale, loadMore, updateEntry, deleteEntry, refineEntry, search, regenerateProfile, fetchLifecycle, fetchLifecycleTrend, runDecay, runMerge, repoMapEntries };
 }

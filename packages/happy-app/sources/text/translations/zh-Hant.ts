@@ -3317,6 +3317,7 @@ export const zhHant: TranslationStructure = {
     knowledgeLifecycleActive: "活躍",
     knowledgeLifecycleSuperseded: "已替代",
     knowledgeLifecycleArchived: "已歸檔",
+    knowledgeLifecycleTrendHint: "滑動查看每日詳情",
     knowledgeLifecycleRelations: "關係",
     knowledgeRunDecay: "執行歸檔",
     knowledgeRunMerge: "執行合併",

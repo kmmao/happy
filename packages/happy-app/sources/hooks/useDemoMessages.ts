@@ -27,6 +27,7 @@ export function useDemoMessages(messages: Message[]) {
                     reducerState: createReducer(),
                     isLoaded: true,
                     isBackfilling: false,
+                    hasServerOlderMessages: false,
                 }
             }
         }));

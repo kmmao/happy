@@ -194,6 +194,77 @@ export function knowledgeLifecycleRoutes(app: Fastify) {
         },
     );
 
+    // ─── Knowledge lifecycle trend (30-day daily series) ───
+    app.get(
+        "/v1/projects/:id/knowledge/lifecycle-trend",
+        {
+            preHandler: app.authenticate,
+            schema: {
+                params: z.object({ id: z.string() }),
+            },
+        },
+        async (request, reply) => {
+            const userId = request.userId;
+            const { id } = request.params;
+
+            const project = await db.project.findFirst({
+                where: { id, accountId: userId },
+            });
+            if (!project) {
+                return reply.code(404).send({ error: "Project not found" });
+            }
+
+            const rows = await db.$queryRaw<Array<{ date: string; created: bigint; superseded: bigint; archived: bigint }>>`
+                WITH days AS (
+                    SELECT generate_series(
+                        date_trunc('day', NOW() - INTERVAL '29 days'),
+                        date_trunc('day', NOW()),
+                        INTERVAL '1 day'
+                    )::date AS day
+                )
+                SELECT
+                    d.day::text AS date,
+                    COALESCE(c.created, 0) AS created,
+                    COALESCE(s.superseded, 0) AS superseded,
+                    COALESCE(a.archived, 0) AS archived
+                FROM days d
+                LEFT JOIN (
+                    SELECT date_trunc('day', "createdAt")::date AS day, COUNT(*) AS created
+                    FROM "ProjectKnowledge"
+                    WHERE "projectId" = ${id}
+                        AND "createdAt" >= NOW() - INTERVAL '30 days'
+                    GROUP BY 1
+                ) c ON c.day = d.day
+                LEFT JOIN (
+                    SELECT date_trunc('day', "updatedAt")::date AS day, COUNT(*) AS superseded
+                    FROM "ProjectKnowledge"
+                    WHERE "projectId" = ${id}
+                        AND status = 'superseded'
+                        AND "updatedAt" >= NOW() - INTERVAL '30 days'
+                    GROUP BY 1
+                ) s ON s.day = d.day
+                LEFT JOIN (
+                    SELECT date_trunc('day', "updatedAt")::date AS day, COUNT(*) AS archived
+                    FROM "ProjectKnowledge"
+                    WHERE "projectId" = ${id}
+                        AND status = 'archived'
+                        AND "updatedAt" >= NOW() - INTERVAL '30 days'
+                    GROUP BY 1
+                ) a ON a.day = d.day
+                ORDER BY d.day
+            `;
+
+            return reply.send({
+                trend: rows.map((row) => ({
+                    date: row.date,
+                    created: Number(row.created),
+                    superseded: Number(row.superseded),
+                    archived: Number(row.archived),
+                })),
+            });
+        },
+    );
+
     // ─── Manual merge trigger ───
     app.post(
         "/v1/projects/:id/knowledge/merge",

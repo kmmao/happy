@@ -129,6 +129,7 @@ interface SessionMessages {
   reducerState: ReducerState;
   isLoaded: boolean;
   isBackfilling: boolean;
+  hasServerOlderMessages: boolean;
 }
 
 // Machine type is now imported from storageTypes - represents persisted machine data
@@ -202,6 +203,8 @@ interface StorageState {
     messages: NormalizedMessage[],
   ) => { changed: string[]; hasReadyEvent: boolean };
   applyMessagesLoaded: (sessionId: string) => void;
+  setHasServerOlderMessages: (sessionId: string, value: boolean) => void;
+  applyOlderMessages: (sessionId: string, messages: NormalizedMessage[]) => void;
   setSessionBackfilling: (sessionId: string, value: boolean) => void;
   restoreMessagesFromCache: (
     sessionId: string,
@@ -970,6 +973,7 @@ export const storage = create<StorageState>()((set, get) => {
               reducerState: existingSessionMessages.reducerState,
               isLoaded: existingSessionMessages.isLoaded,
               isBackfilling: existingSessionMessages.isBackfilling,
+              hasServerOlderMessages: existingSessionMessages.hasServerOlderMessages,
             };
 
             // IMPORTANT: Copy latestUsage from reducerState to Session for immediate availability
@@ -1059,6 +1063,7 @@ export const storage = create<StorageState>()((set, get) => {
           reducerState: createReducer(),
           isLoaded: false,
           isBackfilling: false,
+          hasServerOlderMessages: false,
         };
 
         // Get the session's agentState if available
@@ -1287,6 +1292,7 @@ export const storage = create<StorageState>()((set, get) => {
                 messagesMap,
                 isLoaded: true,
                 isBackfilling: false,
+                hasServerOlderMessages: false,
               } satisfies SessionMessages,
             },
           };
@@ -1318,6 +1324,47 @@ export const storage = create<StorageState>()((set, get) => {
         onPreferencesChanged?.(sessionId);
       }
     },
+    setHasServerOlderMessages: (sessionId: string, value: boolean) =>
+      set((state) => {
+        const existing = state.sessionMessages[sessionId];
+        if (!existing) return state;
+        return {
+          ...state,
+          sessionMessages: {
+            ...state.sessionMessages,
+            [sessionId]: { ...existing, hasServerOlderMessages: value },
+          },
+        };
+      }),
+    applyOlderMessages: (sessionId: string, messages: NormalizedMessage[]) =>
+      set((state) => {
+        const existing = state.sessionMessages[sessionId];
+        if (!existing || messages.length === 0) return state;
+
+        // Process through a fresh reducer to get properly typed Message[]
+        const freshReducerState = createReducer();
+        const reducerResult = reducer(freshReducerState, messages, undefined);
+
+        const messagesMap = { ...existing.messagesMap };
+        const newMessages: Message[] = [];
+        for (const msg of reducerResult.messages) {
+          if (!messagesMap[msg.id]) {
+            messagesMap[msg.id] = msg;
+            newMessages.push(msg);
+          }
+        }
+        if (newMessages.length === 0) return state;
+
+        // Sort descending (newest first) after merging
+        const allMessages = [...existing.messages, ...newMessages].sort(compareMessagesDesc);
+        return {
+          ...state,
+          sessionMessages: {
+            ...state.sessionMessages,
+            [sessionId]: { ...existing, messages: allMessages, messagesMap },
+          },
+        };
+      }),
     setSessionBackfilling: (sessionId: string, value: boolean) =>
       set((state) => {
         const existing = state.sessionMessages[sessionId];
@@ -1399,6 +1446,7 @@ export const storage = create<StorageState>()((set, get) => {
             reducerState,
             isLoaded: true,
             isBackfilling: false,
+            hasServerOlderMessages: false,
           } satisfies SessionMessages,
         };
         const { sessionMessages: evictedSessionMessages, sessionMessagesLRU } =
@@ -2367,19 +2415,21 @@ export function useSessionMessages(
   messages: Message[];
   isLoaded: boolean;
   hasOlderMessages: boolean;
+  hasServerOlderMessages: boolean;
   isBackfilling: boolean;
 } {
   // slice() inside a zustand selector creates a new array reference on every getSnapshot
   // call, breaking useShallow's equality check and causing React 18's useSyncExternalStore
   // to detect an inconsistent snapshot → infinite update loop. Keep the selector
   // returning only stable store references; derive the capped slice via useMemo.
-  const { all, isLoaded, isBackfilling } = storage(
+  const { all, isLoaded, isBackfilling, hasServerOlderMessages } = storage(
     useShallow((state) => {
       const session = state.sessionMessages[sessionId];
       return {
         all: session?.messages ?? emptyArray,
         isLoaded: session?.isLoaded ?? false,
         isBackfilling: session?.isBackfilling ?? false,
+        hasServerOlderMessages: session?.hasServerOlderMessages ?? false,
       };
     }),
   );
@@ -2388,7 +2438,7 @@ export function useSessionMessages(
     () => (capped ? all.slice(0, limit) : all),
     [all, limit, capped],
   );
-  return { messages, isLoaded, hasOlderMessages: capped, isBackfilling };
+  return { messages, isLoaded, hasOlderMessages: capped, hasServerOlderMessages, isBackfilling };
 }
 
 const emptyBackgroundTasks: ReadonlyMap<string, BackgroundTaskEntry> = new Map();

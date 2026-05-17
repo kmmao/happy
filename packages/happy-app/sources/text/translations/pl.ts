@@ -3429,6 +3429,7 @@ export const pl: TranslationStructure = {
     knowledgeLifecycleActive: "Aktywne",
     knowledgeLifecycleSuperseded: "Zastąpione",
     knowledgeLifecycleArchived: "Zarchiwizowane",
+    knowledgeLifecycleTrendHint: "Przesuń, aby zobaczyć szczegóły dnia",
     knowledgeLifecycleRelations: "Relacje",
     knowledgeRunDecay: "Archiwizuj",
     knowledgeRunMerge: "Scal",

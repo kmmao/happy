@@ -186,6 +186,7 @@ class Sync {
   // In-memory only (not persisted) so every app restart re-backfills trimmed sessions,
   // ensuring users can always access their full message history.
   private backfilledSessions = new Set<string>();
+  private sessionOldestSeq = new Map<string, number>();
   // Tracks recently processed WebSocket message server-IDs per session.
   // Prevents double-delivery of the same event (e.g. "Context was reset" appearing twice
   // when the same new-message WebSocket event is processed by both direct delivery and
@@ -527,7 +528,42 @@ class Sync {
     deleteLastSeq(sessionId);
     deleteBackfillBoundary(sessionId);
     this.backfilledSessions.delete(sessionId);
+    this.sessionOldestSeq.delete(sessionId);
     this.getMessagesSync(sessionId)?.invalidate();
+  };
+
+  fetchOlderMessages = async (sessionId: string): Promise<void> => {
+    const oldestSeq = this.sessionOldestSeq.get(sessionId);
+    if (oldestSeq === undefined || oldestSeq <= 1) {
+      storage.getState().setHasServerOlderMessages(sessionId, false);
+      return;
+    }
+
+    const encryption = this.encryption.getSessionEncryption(sessionId);
+    if (!encryption) return;
+
+    const response = await apiSocket.request(
+      `/v3/sessions/${sessionId}/messages?before_seq=${oldestSeq}&limit=300`,
+    );
+    if (!response.ok) return;
+
+    const data = (await response.json()) as V3GetSessionMessagesResponse;
+    const messages = Array.isArray(data.messages) ? data.messages : [];
+
+    if (messages.length > 0) {
+      const decryptResult = await this.decryptAndNormalizeBatch(
+        encryption,
+        messages,
+        sessionId,
+      );
+      if (decryptResult.normalized.length > 0) {
+        storage.getState().applyOlderMessages(sessionId, decryptResult.normalized);
+      }
+      const minSeq = Math.min(...messages.map((m) => m.seq));
+      this.sessionOldestSeq.set(sessionId, minSeq);
+    }
+
+    storage.getState().setHasServerOlderMessages(sessionId, data.hasMore);
   };
 
   private getMessagesSync(sessionId: string): InvalidateSync | null {
@@ -2211,6 +2247,12 @@ class Sync {
           if (cursorAdvance.blockedByUnprocessedSeq) {
             blockedByUnprocessedMessage = true;
           }
+
+          const minSeq = Math.min(...newestMessages.map((m) => m.seq));
+          this.sessionOldestSeq.set(sessionId, minSeq);
+          storage.getState().setHasServerOlderMessages(sessionId, newestData.hasMore);
+        } else {
+          storage.getState().setHasServerOlderMessages(sessionId, false);
         }
         hasMore = false;
         isFirstBatch = false;

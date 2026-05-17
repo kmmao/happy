@@ -3316,6 +3316,7 @@ export const zhHans: TranslationStructure = {
     knowledgeLifecycleActive: "活跃",
     knowledgeLifecycleSuperseded: "已替代",
     knowledgeLifecycleArchived: "已归档",
+    knowledgeLifecycleTrendHint: "滑动查看每日详情",
     knowledgeLifecycleRelations: "关系",
     knowledgeRunDecay: "执行归档",
     knowledgeRunMerge: "执行合并",

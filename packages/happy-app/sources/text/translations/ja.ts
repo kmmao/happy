@@ -3381,6 +3381,7 @@ export const ja: TranslationStructure = {
     knowledgeLifecycleActive: "アクティブ",
     knowledgeLifecycleSuperseded: "更新済み",
     knowledgeLifecycleArchived: "アーカイブ",
+    knowledgeLifecycleTrendHint: "スライドして日別詳細を表示",
     knowledgeLifecycleRelations: "関係",
     knowledgeRunDecay: "アーカイブ実行",
     knowledgeRunMerge: "マージ実行",

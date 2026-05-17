@@ -3425,6 +3425,7 @@ export const ru: TranslationStructure = {
     knowledgeLifecycleActive: "Активные",
     knowledgeLifecycleSuperseded: "Заменённые",
     knowledgeLifecycleArchived: "Архив",
+    knowledgeLifecycleTrendHint: "Проведите для просмотра деталей по дням",
     knowledgeLifecycleRelations: "Связи",
     knowledgeRunDecay: "Архивировать",
     knowledgeRunMerge: "Объединить",

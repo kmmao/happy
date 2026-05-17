@@ -3404,6 +3404,7 @@ export const es: TranslationStructure = {
     knowledgeLifecycleActive: "Activos",
     knowledgeLifecycleSuperseded: "Reemplazados",
     knowledgeLifecycleArchived: "Archivados",
+    knowledgeLifecycleTrendHint: "Desliza para ver detalles diarios",
     knowledgeLifecycleRelations: "Relaciones",
     knowledgeRunDecay: "Archivar",
     knowledgeRunMerge: "Fusionar",

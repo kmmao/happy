@@ -522,9 +522,34 @@ export const TaskView = React.memo<ToolViewProps>(
     ).length;
     const runningCount = filtered.filter((ti) => ti.state === "running").length;
     const errorCount = filtered.filter((ti) => ti.state === "error").length;
+    const agentCount = filtered.filter(
+      (ti) => ti.tool.name === "Agent",
+    ).length;
 
     const renderSummaryBadges = () => (
       <>
+        {agentCount > 0 && (
+          <View
+            style={[
+              styles.statBadge,
+              { backgroundColor: theme.colors.accentPurple + "15" },
+            ]}
+          >
+            <Ionicons
+              name="git-branch-outline"
+              size={10}
+              color={theme.colors.accentPurple}
+            />
+            <Text
+              style={[
+                styles.statBadgeText,
+                { color: theme.colors.accentPurple },
+              ]}
+            >
+              {agentCount} {agentCount === 1 ? "agent" : "agents"}
+            </Text>
+          </View>
+        )}
         <View style={styles.statBadge}>
           <Ionicons
             name="construct-outline"

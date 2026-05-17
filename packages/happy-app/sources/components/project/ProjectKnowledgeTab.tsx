@@ -6,12 +6,13 @@ import { Typography } from "@/constants/Typography";
 import { resolveActiveTint } from "@/constants/activeTint";
 import { t } from "@/text";
 import { useRouter } from "expo-router";
-import { useProjectKnowledge, type LifecycleStats } from "@/hooks/useProjectKnowledge";
+import { useProjectKnowledge, type LifecycleStats, type LifecycleTrendPoint } from "@/hooks/useProjectKnowledge";
 import { useProjectKnowledgeConfig } from "@/hooks/useProjectKnowledgeConfig";
 import { useHappyAction } from "@/hooks/useHappyAction";
 import { Modal } from "@/modal";
 import { KnowledgeEntryCard } from "./KnowledgeEntryCard";
 import { ProjectProfileCard } from "./ProjectProfileCard";
+import { KnowledgeLifecycleTrendChart } from "./KnowledgeLifecycleTrendChart";
 
 import { screenLayoutMaxWidth } from "@/components/layout";
 import { useProject } from "@/hooks/useProjects";
@@ -97,6 +98,7 @@ export const ProjectKnowledgeTab = React.memo<ProjectKnowledgeTabProps>(
             refineEntry,
             regenerateProfile,
             fetchLifecycle,
+            fetchLifecycleTrend,
             runDecay,
             runMerge,
         } = useProjectKnowledge(projectServerId ?? undefined);
@@ -114,11 +116,13 @@ export const ProjectKnowledgeTab = React.memo<ProjectKnowledgeTabProps>(
         const showLifecycle = decayEnabled || mergeEnabled;
 
         const [lifecycleStats, setLifecycleStats] = React.useState<LifecycleStats | null>(null);
+        const [trendData, setTrendData] = React.useState<LifecycleTrendPoint[] | null>(null);
         React.useEffect(() => {
             if (showLifecycle && isActive) {
                 void fetchLifecycle().then((s) => { if (s) setLifecycleStats(s); });
+                void fetchLifecycleTrend().then((td) => { if (td) setTrendData(td); });
             }
-        }, [showLifecycle, isActive, fetchLifecycle]);
+        }, [showLifecycle, isActive, fetchLifecycle, fetchLifecycleTrend]);
 
         const [decaying, doDecay] = useHappyAction(async () => {
             const result = await runDecay();
@@ -332,6 +336,9 @@ export const ProjectKnowledgeTab = React.memo<ProjectKnowledgeTabProps>(
                                     </Text>
                                 </Pressable>
                             </View>
+                            {trendData && trendData.some((d) => d.created + d.superseded + d.archived > 0) && (
+                                <KnowledgeLifecycleTrendChart data={trendData} />
+                            )}
                             <View style={styles.lifecycleActions}>
                                 {decayEnabled && (
                                     <Pressable
@@ -452,7 +459,7 @@ export const ProjectKnowledgeTab = React.memo<ProjectKnowledgeTabProps>(
                     </View>
                 </View>
             ),
-            [profile, activeFilter, activeCategory, hasCategories, theme, refreshStatusText, refreshing, loading, showLifecycle, lifecycleStats, decayEnabled, mergeEnabled, decaying, merging, doDecay, doMerge, doRefresh, doRegenerate, regenerating, knowledgeConfig, configIsCustomized, configSaving, updateConfig, resetConfig],
+            [profile, activeFilter, activeCategory, hasCategories, theme, refreshStatusText, refreshing, loading, showLifecycle, lifecycleStats, trendData, decayEnabled, mergeEnabled, decaying, merging, doDecay, doMerge, doRefresh, doRegenerate, regenerating, knowledgeConfig, configIsCustomized, configSaving, updateConfig, resetConfig],
         );
 
         const EmptyComponent = React.useMemo(

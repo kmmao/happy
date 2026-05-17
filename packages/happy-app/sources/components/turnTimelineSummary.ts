@@ -4,6 +4,7 @@ import { getCodexParsedCommandSummary } from "./tools/codexCommandUtils";
 
 export type HiddenTimelineSummaryKind =
   | "thinking"
+  | "agent"
   | "read"
   | "write"
   | "search"
@@ -37,6 +38,9 @@ function classifyHiddenStep(
   }
 
   switch (step.message.tool.name) {
+    case "Agent":
+    case "Task":
+      return "agent";
     case "CodexBash": {
       const summary = getCodexParsedCommandSummary(step.message.tool.input, metadata);
       return (summary?.type ?? "tool") as HiddenTimelineSummaryKind;
@@ -54,6 +58,7 @@ function classifyHiddenStep(
 
 const SUMMARY_PRIORITY: HiddenTimelineSummaryKind[] = [
   "thinking",
+  "agent",
   "read",
   "write",
   "search",

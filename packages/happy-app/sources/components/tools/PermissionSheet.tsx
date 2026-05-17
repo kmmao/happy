@@ -12,6 +12,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { PermissionFooter } from "./PermissionFooter";
 import { formatPermissionParams } from "@/utils/formatPermissionParams";
 import { t } from "@/text";
+import { getToolViewComponent } from "./views/_all";
 import type { ToolCall } from "@/sync/typesMessage";
 import type { Metadata } from "@/sync/storageTypes";
 import { Typography } from "@/constants/Typography";
@@ -29,6 +30,18 @@ type Props = {
 export const PermissionSheet = React.memo(
     ({ visible, sessionId, toolName, toolInput, permission, metadata, onClose }: Props) => {
         const { theme } = useUnistyles();
+        const SpecificToolView = getToolViewComponent(toolName);
+        const tool: ToolCall = React.useMemo(() => ({
+            name: toolName,
+            state: "running",
+            input: toolInput,
+            createdAt: Date.now(),
+            startedAt: null,
+            completedAt: null,
+            description: null,
+            permission,
+        }), [permission, toolInput, toolName]);
+        const useSpecificToolView = toolName === "AskUserQuestion" && SpecificToolView != null;
 
         // Auto-close once the permission is no longer pending
         React.useEffect(() => {
@@ -158,14 +171,24 @@ export const PermissionSheet = React.memo(
                             }}
                         />
 
-                        {/* Permission buttons (reuses existing PermissionFooter) */}
-                        <PermissionFooter
-                            permission={permission}
-                            sessionId={sessionId}
-                            toolName={toolName}
-                            toolInput={toolInput}
-                            metadata={metadata}
-                        />
+                        {useSpecificToolView && SpecificToolView ? (
+                            <View style={{ paddingHorizontal: 16, paddingTop: 12 }}>
+                                <SpecificToolView
+                                    tool={tool}
+                                    metadata={metadata}
+                                    messages={[]}
+                                    sessionId={sessionId}
+                                />
+                            </View>
+                        ) : (
+                            <PermissionFooter
+                                permission={permission}
+                                sessionId={sessionId}
+                                toolName={toolName}
+                                toolInput={toolInput}
+                                metadata={metadata}
+                            />
+                        )}
                     </ScrollView>
                 </SafeAreaView>
             </Modal>
