@@ -46,6 +46,8 @@ import type {
     ReconnectMcpServerResponse,
     ToggleMcpServerRequest,
     ToggleMcpServerResponse,
+    ApplySettingsRequest,
+    ApplySettingsResponse,
     ClaudeControlMethod,
 } from '@kmmao/happy-wire';
 import { CLAUDE_CONTROL_SCOPE } from '@kmmao/happy-wire';
@@ -269,6 +271,35 @@ export async function toggleMcpServer(
         sessionId,
         methodName('toggle_mcp_server'),
         { serverName, enabled },
+    );
+}
+
+// ─── Helpers ────────────────────────────────────────────────────────────────
+
+/**
+// ─── apply_settings (SDK 0.3.142+) ─────────────────────────────────────────
+
+/**
+ * Dynamically merge partial settings into the running session's flag settings
+ * layer via `Query.applyFlagSettings()`. Flag settings sit above
+ * user/project/local settings and below managed policy settings.
+ *
+ * Use cases:
+ *   - Update permission rules (allow/deny) without cold restart
+ *   - Change hooks configuration
+ *   - Toggle MCP server approval settings
+ *
+ * @param settings - Partial Settings object; only supplied keys are merged.
+ *   Pass `null` for a key to clear it from the flag layer.
+ */
+export async function applySettings(
+    sessionId: string,
+    settings: Record<string, unknown>,
+): Promise<ApplySettingsResponse> {
+    return apiSocket.sessionRPC<ApplySettingsResponse, ApplySettingsRequest>(
+        sessionId,
+        methodName('apply_settings'),
+        { settings },
     );
 }
 

@@ -57,6 +57,8 @@ import {
   type ReconnectMcpServerResponse,
   type ToggleMcpServerRequest,
   type ToggleMcpServerResponse,
+  type ApplySettingsRequest,
+  type ApplySettingsResponse,
 } from "@kmmao/happy-wire";
 
 // ─── Constants ──────────────────────────────────────────────────────────────
@@ -581,5 +583,21 @@ export function registerClaudeControlHandlers(
     },
   );
 
-  logger.debug("[claudeControl] Registered 11 claude-control:* RPC handlers");
+  // apply_settings — hot-swap Settings-layer fields via applyFlagSettings() (SDK 0.3.142+)
+  rpcHandlerManager.registerHandler<ApplySettingsRequest, ApplySettingsResponse>(
+    `${scope}:apply_settings`,
+    async (req) => {
+      const q = getCurrentQuery();
+      if (!q) {
+        throw new Error("No active query — cannot apply settings");
+      }
+      await q.applyFlagSettings(req.settings as Record<string, unknown>);
+      logger.debug(
+        `[claudeControl] apply_settings keys=${Object.keys(req.settings).join(",")}`,
+      );
+      return { success: true };
+    },
+  );
+
+  logger.debug("[claudeControl] Registered 12 claude-control:* RPC handlers");
 }

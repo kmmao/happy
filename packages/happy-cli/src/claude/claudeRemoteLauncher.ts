@@ -1902,6 +1902,7 @@ export async function claudeRemoteLauncher(
       // It intentionally excludes fields that can be hot-swapped:
       //   - model: hot-swapped via setModel() (within same context window tier)
       //   - permissionMode (between non-plan, non-bypass modes): via setPermissionMode()
+      //   - allowedTools / disallowedTools: via applyFlagSettings({ permissions }) (SDK 0.3.142+)
       // Cold restart is required for:
       //   - plan ↔ non-plan: different tool sets (ExitPlanMode etc.)
       //   - bypassPermissions ↔ other: AskUserQuestion disallowedTools changes
@@ -1917,8 +1918,6 @@ export async function claudeRemoteLauncher(
           fallbackModel: m.fallbackModel,
           customSystemPrompt: m.customSystemPrompt,
           appendSystemPrompt: m.appendSystemPrompt,
-          allowedTools: m.allowedTools,
-          disallowedTools: m.disallowedTools,
           maxBudgetUsd: m.maxBudgetUsd,
           thinking: m.thinking,
           effort: m.effort,
@@ -2266,11 +2265,17 @@ export async function claudeRemoteLauncher(
                 // Mode changed. Check if cold-restart fields are unchanged (hot-swappable).
                 const newColdHash = coldModeHash(msg.mode);
                 if (currentColdHash && newColdHash === currentColdHash) {
-                  // Only hot-swappable fields changed (model and/or permissionMode)
+                  // Only hot-swappable fields changed (model, permissionMode,
+                  // allowedTools, disallowedTools). Actual SDK calls happen in
+                  // claudeRemote.ts when the message is delivered to the query.
                   const changed = [
                     mode?.model !== msg.mode.model && "model",
                     mode?.permissionMode !== msg.mode.permissionMode &&
                       "permissionMode",
+                    JSON.stringify(mode?.allowedTools) !== JSON.stringify(msg.mode.allowedTools) &&
+                      "allowedTools",
+                    JSON.stringify(mode?.disallowedTools) !== JSON.stringify(msg.mode.disallowedTools) &&
+                      "disallowedTools",
                   ]
                     .filter(Boolean)
                     .join(", ");
