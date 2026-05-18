@@ -19,6 +19,7 @@ import { AskUserQuestionView } from "./AskUserQuestionView";
 import { GeminiEditView } from "./GeminiEditView";
 import { GeminiExecuteView } from "./GeminiExecuteView";
 import { HappyUpdateProgressView } from "./HappyUpdateProgressView";
+import { TaskManagementView } from "./TaskManagementView";
 
 export type ToolViewProps = {
   tool: ToolCall;
@@ -46,6 +47,9 @@ export const toolViewRegistry: Record<string, ToolViewComponent> = {
   Task: TaskView,
   Agent: TaskView,
   AskUserQuestion: AskUserQuestionView,
+  TaskCreate: TaskManagementView,
+  TaskUpdate: TaskManagementView,
+  TaskList: TaskManagementView,
   mcp__happy__update_progress: HappyUpdateProgressView,
   // Gemini tools (lowercase)
   edit: GeminiEditView,
@@ -92,3 +96,4 @@ export { AskUserQuestionView } from "./AskUserQuestionView";
 export { GeminiEditView } from "./GeminiEditView";
 export { GeminiExecuteView } from "./GeminiExecuteView";
 export { HappyUpdateProgressView } from "./HappyUpdateProgressView";
+export { TaskManagementView } from "./TaskManagementView";

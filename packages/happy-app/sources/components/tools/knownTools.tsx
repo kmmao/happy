@@ -910,6 +910,122 @@ export const knownTools = {
       return t("tools.names.todoList");
     },
   },
+  TaskCreate: {
+    title: (opts: { metadata: Metadata | null; tool: ToolCall }) => {
+      if (typeof opts.tool.input?.subject === "string" && opts.tool.input.subject) {
+        return opts.tool.input.subject;
+      }
+      return t("tools.names.taskCreate");
+    },
+    icon: ICON_TODO,
+    noStatus: true,
+    minimal: false,
+    flat: true,
+    input: z
+      .object({
+        subject: z.string().optional().describe("Task title"),
+        description: z.string().optional().describe("Task description"),
+        activeForm: z.string().optional().describe("Active form text"),
+      })
+      .partial()
+      .passthrough(),
+    extractDescription: (opts: { metadata: Metadata | null; tool: ToolCall }) => {
+      if (typeof opts.tool.input?.description === "string" && opts.tool.input.description) {
+        return opts.tool.input.description.slice(0, 120);
+      }
+      return t("tools.names.taskCreate");
+    },
+  },
+  TaskUpdate: {
+    title: (opts: { metadata: Metadata | null; tool: ToolCall }) => {
+      if (typeof opts.tool.input?.subject === "string" && opts.tool.input.subject) {
+        return opts.tool.input.subject;
+      }
+      const taskId = opts.tool.input?.taskId;
+      if (typeof taskId === "string") {
+        return `${t("tools.names.taskUpdate")} #${taskId}`;
+      }
+      return t("tools.names.taskUpdate");
+    },
+    icon: ICON_TODO,
+    noStatus: true,
+    minimal: (opts: { metadata: Metadata | null; tool: ToolCall }) => {
+      const input = opts.tool.input;
+      if (!input) return true;
+      if (typeof input.subject === "string" || typeof input.description === "string") {
+        return false;
+      }
+      return true;
+    },
+    flat: true,
+    input: z
+      .object({
+        taskId: z.string().optional().describe("Task ID"),
+        status: z.string().optional().describe("New status"),
+        subject: z.string().optional().describe("New subject"),
+        description: z.string().optional().describe("New description"),
+        activeForm: z.string().optional().describe("Active form text"),
+      })
+      .partial()
+      .passthrough(),
+    extractDescription: (opts: { metadata: Metadata | null; tool: ToolCall }) => {
+      const input = opts.tool.input;
+      if (typeof input?.status === "string") {
+        return input.status;
+      }
+      return null;
+    },
+  },
+  TaskList: {
+    title: t("tools.names.taskList"),
+    icon: ICON_TODO,
+    noStatus: true,
+    minimal: (opts: { metadata: Metadata | null; tool: ToolCall }) => {
+      const result = opts.tool.result;
+      if (result && Array.isArray(result)) {
+        return result.length === 0;
+      }
+      if (result && typeof result === "object" && Array.isArray((result as any).tasks)) {
+        return (result as any).tasks.length === 0;
+      }
+      return opts.tool.state !== "completed";
+    },
+    flat: true,
+    input: z.object({}).partial().passthrough(),
+    extractDescription: (opts: { metadata: Metadata | null; tool: ToolCall }) => {
+      const result = opts.tool.result;
+      let tasks: any[] | null = null;
+      if (result && Array.isArray(result)) {
+        tasks = result;
+      } else if (result && typeof result === "object" && Array.isArray((result as any).tasks)) {
+        tasks = (result as any).tasks;
+      }
+      if (tasks) {
+        const total = tasks.length;
+        const completed = tasks.filter((t: any) => t.status === "completed").length;
+        return `${completed}/${total}`;
+      }
+      return t("tools.names.taskList");
+    },
+  },
+  TaskGet: {
+    title: (opts: { metadata: Metadata | null; tool: ToolCall }) => {
+      const taskId = opts.tool.input?.taskId;
+      if (typeof taskId === "string") {
+        return `${t("tools.names.taskGet")} #${taskId}`;
+      }
+      return t("tools.names.taskGet");
+    },
+    icon: ICON_TODO,
+    noStatus: true,
+    minimal: true,
+    input: z
+      .object({
+        taskId: z.string().optional().describe("Task ID"),
+      })
+      .partial()
+      .passthrough(),
+  },
   WebSearch: {
     title: (opts: { metadata: Metadata | null; tool: ToolCall }) => {
       if (typeof opts.tool.input.query === "string") {
@@ -1922,6 +2038,7 @@ export const knownTools = {
     noStatus?: boolean;
     hideDefaultError?: boolean;
     hidden?: boolean;
+    flat?: boolean;
     isMutable?: boolean;
     input?: z.ZodObject<any>;
     result?: z.ZodObject<any>;

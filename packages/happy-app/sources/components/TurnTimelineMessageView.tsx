@@ -6,7 +6,6 @@ import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { AgentDot } from "./AgentDot";
 import { MarkdownView, type Option } from "./markdown/MarkdownView";
 import {
-  collapseTurnTimelineSteps,
   type TurnTimelineDisplayItem,
   type TurnTimelineStep,
 } from "./chatTimelineDisplay";
@@ -18,10 +17,6 @@ import { t } from "@/text";
 import { useSetting, useSession } from "@/sync/storage";
 import { isSessionRunning } from "@/utils/sessionUtils";
 import { useAppendToInput } from "@/hooks/useInputContext";
-import {
-  summarizeHiddenTimelineSteps,
-  type HiddenTimelineSummaryKind,
-} from "./turnTimelineSummary";
 
 function formatModelName(model: string): string {
   return model.replace(/-\d{8}$/, "");
@@ -198,82 +193,6 @@ function StepMeta(props: {
   );
 }
 
-function getHiddenSummaryLabel(
-  kind: HiddenTimelineSummaryKind,
-): string {
-  switch (kind) {
-    case "thinking":
-      return t("sessionInfo.thinking");
-    case "agent":
-      return "Agent";
-    case "read":
-      return t("tools.names.readFile");
-    case "write":
-      return t("tools.names.writeFile");
-    case "search":
-      return t("tools.names.search");
-    case "list_files":
-      return t("tools.names.listFiles");
-    case "verify":
-      return t("tools.names.verify");
-    case "test":
-      return t("tools.names.test");
-    case "git":
-      return t("tools.names.git");
-    case "package":
-      return t("tools.names.package");
-    case "run":
-      return t("tools.names.run");
-    case "patch":
-      return t("tools.names.applyChanges");
-    case "diff":
-      return t("tools.names.viewDiff");
-    case "progress":
-      return t("session.progressTodosSection");
-    case "tool":
-    default:
-      return t("timeline.typeToolCall");
-  }
-}
-
-function getHiddenSummaryIcon(
-  kind: HiddenTimelineSummaryKind,
-): keyof typeof Ionicons.glyphMap {
-  switch (kind) {
-    case "thinking":
-      return "sparkles-outline";
-    case "agent":
-      return "git-branch-outline";
-    case "read":
-      return "document-text-outline";
-    case "write":
-      return "create-outline";
-    case "search":
-      return "search-outline";
-    case "list_files":
-      return "folder-open-outline";
-    case "verify":
-      return "checkmark-done-outline";
-    case "test":
-      return "flask-outline";
-    case "git":
-      return "git-branch-outline";
-    case "package":
-      return "cube-outline";
-    case "run":
-      return "play-outline";
-    case "patch":
-      return "construct-outline";
-    case "diff":
-      return "git-compare-outline";
-    case "progress":
-      return "list-outline";
-    case "tool":
-    default:
-      return "extension-puzzle-outline";
-  }
-}
-
 function ThinkingTimelineStep(props: {
   step: Extract<TurnTimelineStep, { kind: "thinking" }>;
   sessionId: string;
@@ -351,25 +270,6 @@ export const TurnTimelineMessageView = React.memo(function TurnTimelineMessageVi
 }) {
   const { theme } = useUnistyles();
   const summary = React.useMemo(() => getTurnSummary(props.item), [props.item]);
-  const [stepsExpanded, setStepsExpanded] = React.useState(false);
-  React.useEffect(() => {
-    setStepsExpanded(false);
-  }, [props.item.steps]);
-  const collapsedSteps = React.useMemo(
-    () => collapseTurnTimelineSteps(props.item.steps, 4),
-    [props.item.steps],
-  );
-  const visibleSteps = stepsExpanded
-    ? props.item.steps
-    : collapsedSteps.visibleSteps;
-  const hiddenStepSummary = React.useMemo(
-    () =>
-      summarizeHiddenTimelineSteps(
-        props.item.steps.slice(collapsedSteps.visibleSteps.length),
-        props.metadata,
-      ),
-    [props.item.steps, props.metadata, collapsedSteps.visibleSteps.length],
-  );
   return (
     <View style={styles.messageRow}>
       <View style={styles.avatarSlot}>
@@ -382,15 +282,27 @@ export const TurnTimelineMessageView = React.memo(function TurnTimelineMessageVi
         ) : null}
       </View>
       <View style={styles.contentColumn}>
-        <View
-          style={[
-            styles.container,
-            {
-              backgroundColor: theme.colors.surfaceHigh,
-              borderColor: theme.colors.divider,
-            },
-          ]}
-        >
+          <View style={styles.stepsColumn}>
+            {props.item.steps.map((step) => (
+                <View key={step.message.id} style={styles.stepContent}>
+                    {step.kind === "thinking" ? (
+                      <ThinkingTimelineStep
+                        step={step}
+                        sessionId={props.sessionId}
+                      />
+                    ) : (
+                      <ToolView
+                        tool={step.message.tool}
+                        metadata={props.metadata}
+                        messages={step.message.children}
+                        sessionId={props.sessionId}
+                        messageId={step.message.id}
+                        permissionModeKey={props.permissionModeKey}
+                      />
+                    )}
+                </View>
+            ))}
+          </View>
           <View style={styles.summaryRow}>
             {summary.models.length > 1 ? (
               summary.models.map((m, i) => (
@@ -461,137 +373,6 @@ export const TurnTimelineMessageView = React.memo(function TurnTimelineMessageVi
               />
             ) : null}
           </View>
-
-          <View style={styles.stepsColumn}>
-            {visibleSteps.map((step, index) => {
-              const showRail = index < visibleSteps.length - 1;
-              return (
-                <View key={step.message.id} style={styles.stepRow}>
-                  <View style={styles.railColumn}>
-                    <View
-                      style={[
-                        styles.railDot,
-                        {
-                          backgroundColor:
-                            step.kind === "thinking"
-                              ? theme.colors.textSecondary
-                              : step.kind === "tool-call" &&
-                                  (step.message.tool.name === "Agent" ||
-                                    step.message.tool.name === "Task")
-                                ? theme.colors.accentTeal
-                                : theme.colors.accentBlue,
-                        },
-                      ]}
-                    />
-                    {showRail ? (
-                      <View
-                        style={[
-                          styles.railLine,
-                          { backgroundColor: theme.colors.divider },
-                        ]}
-                      />
-                    ) : null}
-                  </View>
-                  <View style={styles.stepContent}>
-                    {step.kind === "thinking" ? (
-                      <ThinkingTimelineStep
-                        step={step}
-                        sessionId={props.sessionId}
-                      />
-                    ) : (
-                      <ToolView
-                        tool={step.message.tool}
-                        metadata={props.metadata}
-                        messages={step.message.children}
-                        sessionId={props.sessionId}
-                        messageId={step.message.id}
-                        permissionModeKey={props.permissionModeKey}
-                      />
-                    )}
-                  </View>
-                </View>
-              );
-            })}
-          </View>
-          {collapsedSteps.didCollapse ? (
-            <Pressable
-              onPress={() => setStepsExpanded((value) => !value)}
-              hitSlop={8}
-              style={styles.stepsToggle}
-            >
-              <View style={styles.stepsToggleMain}>
-                <Text
-                  style={[
-                    styles.stepsToggleText,
-                    { color: theme.colors.accentBlue },
-                  ]}
-                >
-                  {stepsExpanded
-                    ? t("sidePanel.collapse")
-                    : t("session.progressShowAll", {
-                        n: collapsedSteps.hiddenCount,
-                      })}
-                </Text>
-                <Ionicons
-                  name={stepsExpanded ? "chevron-up" : "chevron-down"}
-                  size={12}
-                  color={theme.colors.accentBlue}
-                />
-              </View>
-              {!stepsExpanded && hiddenStepSummary.items.length > 0 ? (
-                <View style={styles.stepsToggleSummary}>
-                  {hiddenStepSummary.items.map((item) => (
-                    <View
-                      key={`hidden-${item.kind}`}
-                      style={[
-                        styles.hiddenTypeChip,
-                        {
-                          backgroundColor: theme.colors.accentBlue + "10",
-                          borderColor: theme.colors.accentBlue + "18",
-                        },
-                      ]}
-                    >
-                      <Ionicons
-                        name={getHiddenSummaryIcon(item.kind)}
-                        size={10}
-                        color={theme.colors.accentBlue}
-                      />
-                      <Text
-                        numberOfLines={1}
-                        style={[
-                          styles.hiddenTypeChipText,
-                          { color: theme.colors.accentBlue },
-                        ]}
-                      >
-                        {getHiddenSummaryLabel(item.kind)} {item.count}
-                      </Text>
-                    </View>
-                  ))}
-                  {hiddenStepSummary.otherCount > 0 ? (
-                    <View
-                      style={[
-                        styles.hiddenTypeChip,
-                        {
-                          backgroundColor: theme.colors.textSecondary + "10",
-                          borderColor: theme.colors.textSecondary + "18",
-                        },
-                      ]}
-                    >
-                      <Text
-                        style={[
-                          styles.hiddenTypeChipText,
-                          { color: theme.colors.textSecondary },
-                        ]}
-                      >
-                        {t("session.progressToolMixOther")} {hiddenStepSummary.otherCount}
-                      </Text>
-                    </View>
-                  ) : null}
-                </View>
-              ) : null}
-            </Pressable>
-          ) : null}
-        </View>
       </View>
     </View>
   );
@@ -610,17 +391,11 @@ const styles = StyleSheet.create((_theme) => ({
     flex: 1,
     minWidth: 0,
   },
-  container: {
-    borderWidth: 1,
-    borderRadius: 16,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    gap: 10,
-  },
   summaryRow: {
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 6,
+    marginTop: 4,
   },
   metaBadge: {
     flexDirection: "row",
@@ -638,29 +413,7 @@ const styles = StyleSheet.create((_theme) => ({
   stepsColumn: {
     gap: 2,
   },
-  stepRow: {
-    flexDirection: "row",
-    alignItems: "stretch",
-    gap: 10,
-  },
-  railColumn: {
-    width: 14,
-    alignItems: "center",
-  },
-  railDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 999,
-    marginTop: 10,
-  },
-  railLine: {
-    width: 2,
-    flex: 1,
-    marginTop: 6,
-    borderRadius: 999,
-  },
   stepContent: {
-    flex: 1,
     minWidth: 0,
   },
   thinkingCard: {
@@ -692,39 +445,5 @@ const styles = StyleSheet.create((_theme) => ({
     fontSize: 13,
     fontWeight: "600",
     flex: 1,
-  },
-  stepsToggle: {
-    alignSelf: "flex-start",
-    gap: 6,
-    marginLeft: 24,
-    marginTop: 2,
-  },
-  stepsToggleMain: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-  },
-  stepsToggleText: {
-    fontSize: 12,
-    fontWeight: "600",
-  },
-  stepsToggleSummary: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 6,
-  },
-  hiddenTypeChip: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    borderWidth: 1,
-    borderRadius: 999,
-    paddingHorizontal: 7,
-    paddingVertical: 3,
-    maxWidth: 180,
-  },
-  hiddenTypeChipText: {
-    fontSize: 11,
-    fontWeight: "600",
   },
 }));

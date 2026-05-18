@@ -457,6 +457,18 @@ export const ToolView = React.memo<ToolViewProps>((props) => {
       />
     ) : null;
 
+  const isFlat = knownTool?.flat === true && SpecificToolView && !minimal;
+  if (isFlat) {
+    return (
+      <SpecificToolView
+        tool={tool}
+        metadata={props.metadata}
+        messages={props.messages ?? []}
+        sessionId={sessionId}
+      />
+    );
+  }
+
   if (useMergedInlineToolView && SpecificToolView) {
     return (
       <View
