@@ -641,7 +641,7 @@ function SessionViewInner({
       setIsFetchingOlder(false);
     }
   }, [sessionId]);
-  const { messages, isLoaded } = useSessionMessages(sessionId, displayLimit);
+  const { messages, isLoaded, loadingProgress } = useSessionMessages(sessionId, displayLimit);
   const selectedOptionForEditingRef = React.useRef<{
     text: string;
     optionsHash: string;
@@ -1611,7 +1611,18 @@ function SessionViewInner({
             <EmptyMessages session={session} />
           )
         ) : (
-          <ActivityIndicator size="small" color={theme.colors.textSecondary} />
+          <>
+            <ActivityIndicator size="small" color={theme.colors.textSecondary} />
+            {loadingProgress !== null && loadingProgress.total > 0 && (
+              <Text style={{ color: theme.colors.textSecondary, fontSize: 12, marginTop: 8 }}>
+                {t("session.loadingProgress", {
+                  percent: Math.round((loadingProgress.loaded / loadingProgress.total) * 100),
+                  loaded: loadingProgress.loaded,
+                  total: loadingProgress.total,
+                })}
+              </Text>
+            )}
+          </>
         )}
       </>
     ) : null;

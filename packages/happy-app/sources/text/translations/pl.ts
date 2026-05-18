@@ -598,6 +598,7 @@ export const pl: TranslationStructure = {
   },
 
   session: {
+    loadingProgress: ({ percent, loaded, total }: { percent: number; loaded: number; total: number }) => `Ładowanie ${percent}% (${loaded}/${total})`,
     inputPlaceholder: "Wpisz wiadomość...",
     startedByDaemon: "daemon",
     sentImage: "Wysłano obraz",
@@ -1258,6 +1259,10 @@ export const pl: TranslationStructure = {
       applyChanges: "Zaktualizuj plik",
       viewDiff: "Bieżące zmiany pliku",
       question: "Pytanie",
+      taskCreate: "Utwórz zadanie",
+      taskUpdate: "Zaktualizuj zadanie",
+      taskList: "Lista zadań",
+      taskGet: "Pobierz zadanie",
     },
     desc: {
       terminalCmd: ({ cmd }: { cmd: string }) => `Terminal(cmd: ${cmd})`,
@@ -4329,6 +4334,7 @@ export const pl: TranslationStructure = {
       subcatUnattributed: "Inne",
       subcatUnattributedDesc: "Zawiera CLAUDE.md, Rules, Memory, listy umiejętności i inne wstrzyknięcia system-reminder — dotknij, aby zobaczyć",
       subcatUnattributedRemaining: "Inne narzuty",
+      subcatUnattributedSkills: "Skills",
       subcatLoading: "Ładowanie podkategorii…",
       subcatBreakdownNote: "Pełny podział tokenów rozmowy według wszystkich kategorii kontekstu",
     },

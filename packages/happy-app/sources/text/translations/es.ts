@@ -590,6 +590,7 @@ export const es: TranslationStructure = {
   },
 
   session: {
+    loadingProgress: ({ percent, loaded, total }: { percent: number; loaded: number; total: number }) => `Cargando ${percent}% (${loaded}/${total})`,
     inputPlaceholder: "Escriba un mensaje ...",
     startedByDaemon: "daemon",
     sentImage: "Imagen enviada",
@@ -1249,6 +1250,10 @@ export const es: TranslationStructure = {
       applyChanges: "Actualizar archivo",
       viewDiff: "Cambios del archivo actual",
       question: "Pregunta",
+      taskCreate: "Crear tarea",
+      taskUpdate: "Actualizar tarea",
+      taskList: "Lista de tareas",
+      taskGet: "Obtener tarea",
     },
     desc: {
       terminalCmd: ({ cmd }: { cmd: string }) => `Terminal(cmd: ${cmd})`,
@@ -4308,6 +4313,7 @@ export const es: TranslationStructure = {
       subcatUnattributed: "Otros",
       subcatUnattributedDesc: "Incluye CLAUDE.md, Rules, Memory, listas de Skills y otras inyecciones de system-reminder — toca para ver el contenido",
       subcatUnattributedRemaining: "Otros gastos generales",
+      subcatUnattributedSkills: "Skills",
       subcatLoading: "Cargando subcategorías…",
       subcatBreakdownNote: "Desglose completo de tokens de la conversación en todas las categorías de contexto",
     },

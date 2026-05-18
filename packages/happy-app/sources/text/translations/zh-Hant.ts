@@ -558,6 +558,7 @@ export const zhHant: TranslationStructure = {
   },
 
   session: {
+    loadingProgress: ({ percent, loaded, total }: { percent: number; loaded: number; total: number }) => `載入中 ${percent}%（${loaded}/${total}）`,
     inputPlaceholder: "輸入訊息...",
     startedByDaemon: "守護程序",
     sentImage: "已傳送一張圖片",
@@ -1206,6 +1207,10 @@ export const zhHant: TranslationStructure = {
       applyChanges: "更新檔案",
       viewDiff: "目前檔案更改",
       question: "問題",
+      taskCreate: "建立任務",
+      taskUpdate: "更新任務",
+      taskList: "任務列表",
+      taskGet: "取得任務",
     },
     askUserQuestion: {
       submit: "提交答案",
@@ -4209,6 +4214,7 @@ export const zhHant: TranslationStructure = {
       subcatUnattributed: "其他",
       subcatUnattributedDesc: "包含 CLAUDE.md、Rules、Memory、Skill 清單等 system-reminder 注入內容，點擊查看詳情",
       subcatUnattributedRemaining: "其他開銷",
+      subcatUnattributedSkills: "Skills",
       subcatLoading: "載入子分類中…",
       subcatBreakdownNote: "全對話 token 按類型細分，可能跨多個上下文分類",
     },

@@ -709,6 +709,7 @@ export const ja: TranslationStructure = {
   },
 
   session: {
+    loadingProgress: ({ percent, loaded, total }: { percent: number; loaded: number; total: number }) => `読み込み中 ${percent}%（${loaded}/${total}）`,
     inputPlaceholder: "メッセージを入力...",
     startedByDaemon: "デーモン",
     sentImage: "画像を送信しました",
@@ -1386,6 +1387,10 @@ export const ja: TranslationStructure = {
       applyChanges: "ファイルを更新",
       viewDiff: "現在のファイル変更",
       question: "質問",
+      taskCreate: "タスクを作成",
+      taskUpdate: "タスクを更新",
+      taskList: "タスクリスト",
+      taskGet: "タスクを取得",
     },
     desc: {
       terminalCmd: ({ cmd }: { cmd: string }) => `ターミナル(cmd: ${cmd})`,
@@ -4281,6 +4286,7 @@ export const ja: TranslationStructure = {
       subcatUnattributed: "その他",
       subcatUnattributedDesc: "CLAUDE.md、Rules、Memory、Skill一覧などの system-reminder 注入を含みます。タップで内容を確認",
       subcatUnattributedRemaining: "その他のオーバーヘッド",
+      subcatUnattributedSkills: "Skills",
       subcatLoading: "サブカテゴリを読み込み中…",
       subcatBreakdownNote: "全会話のトークン内訳（複数のコンテキストカテゴリにまたがる場合があります）",
     },

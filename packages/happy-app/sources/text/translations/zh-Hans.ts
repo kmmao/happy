@@ -558,6 +558,7 @@ export const zhHans: TranslationStructure = {
   },
 
   session: {
+    loadingProgress: ({ percent, loaded, total }: { percent: number; loaded: number; total: number }) => `加载中 ${percent}%（${loaded}/${total}）`,
     inputPlaceholder: "输入消息...",
     startedByDaemon: "守护进程",
     sentImage: "已发送一张图片",
@@ -1206,6 +1207,10 @@ export const zhHans: TranslationStructure = {
       applyChanges: "更新文件",
       viewDiff: "当前文件更改",
       question: "问题",
+      taskCreate: "创建任务",
+      taskUpdate: "更新任务",
+      taskList: "任务列表",
+      taskGet: "获取任务",
     },
     desc: {
       terminalCmd: ({ cmd }: { cmd: string }) => `终端(命令: ${cmd})`,
@@ -4203,6 +4208,7 @@ export const zhHans: TranslationStructure = {
       subcatUnattributed: "其他",
       subcatUnattributedDesc: "包含 CLAUDE.md、Rules、Memory、Skill 列表等 system-reminder 注入内容，点击查看详情",
       subcatUnattributedRemaining: "其他开销",
+      subcatUnattributedSkills: "Skills",
       subcatLoading: "加载子分类中…",
       subcatBreakdownNote: "全对话 token 按类型细分，可能跨多个上下文分类",
     },

@@ -574,6 +574,8 @@ export const en = {
   },
 
   session: {
+    loadingProgress: ({ percent, loaded, total }: { percent: number; loaded: number; total: number }) =>
+      `Loading ${percent}% (${loaded}/${total})`,
     inputPlaceholder: "Type a message ...",
     startedByDaemon: "daemon",
     sentImage: "Sent an image",
@@ -1234,6 +1236,10 @@ export const en = {
       applyChanges: "Update file",
       viewDiff: "Current file changes",
       question: "Question",
+      taskCreate: "Create Task",
+      taskUpdate: "Update Task",
+      taskList: "Task List",
+      taskGet: "Get Task",
     },
     askUserQuestion: {
       submit: "Submit Answer",
@@ -4367,6 +4373,7 @@ export const en = {
       subcatUnattributed: "Other",
       subcatUnattributedDesc: "Includes CLAUDE.md, Rules, Memory, Skill listings, and other system-reminder injections — click to view content",
       subcatUnattributedRemaining: "Other overhead",
+      subcatUnattributedSkills: "Skills",
       subcatLoading: "Loading subcategories…",
       subcatBreakdownNote: "Full conversation token breakdown across all context categories",
     },

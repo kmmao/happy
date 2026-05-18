@@ -130,6 +130,7 @@ interface SessionMessages {
   isLoaded: boolean;
   isBackfilling: boolean;
   hasServerOlderMessages: boolean;
+  loadingProgress: { loaded: number; total: number } | null;
 }
 
 // Machine type is now imported from storageTypes - represents persisted machine data
@@ -206,6 +207,7 @@ interface StorageState {
   setHasServerOlderMessages: (sessionId: string, value: boolean) => void;
   applyOlderMessages: (sessionId: string, messages: NormalizedMessage[]) => void;
   setSessionBackfilling: (sessionId: string, value: boolean) => void;
+  setSessionLoadingProgress: (sessionId: string, progress: { loaded: number; total: number } | null) => void;
   restoreMessagesFromCache: (
     sessionId: string,
     cached: { messages: readonly Message[]; lastSeq: number },
@@ -974,6 +976,7 @@ export const storage = create<StorageState>()((set, get) => {
               isLoaded: existingSessionMessages.isLoaded,
               isBackfilling: existingSessionMessages.isBackfilling,
               hasServerOlderMessages: existingSessionMessages.hasServerOlderMessages,
+              loadingProgress: existingSessionMessages.loadingProgress,
             };
 
             // IMPORTANT: Copy latestUsage from reducerState to Session for immediate availability
@@ -1293,6 +1296,7 @@ export const storage = create<StorageState>()((set, get) => {
                 isLoaded: true,
                 isBackfilling: false,
                 hasServerOlderMessages: false,
+                loadingProgress: null,
               } satisfies SessionMessages,
             },
           };
@@ -1304,6 +1308,7 @@ export const storage = create<StorageState>()((set, get) => {
               [sessionId]: {
                 ...existingSession,
                 isLoaded: true,
+                loadingProgress: null,
               } satisfies SessionMessages,
             },
           };
@@ -1377,6 +1382,18 @@ export const storage = create<StorageState>()((set, get) => {
           },
         };
       }),
+    setSessionLoadingProgress: (sessionId: string, progress: { loaded: number; total: number } | null) =>
+      set((state) => {
+        const existing = state.sessionMessages[sessionId];
+        if (!existing) return state;
+        return {
+          ...state,
+          sessionMessages: {
+            ...state.sessionMessages,
+            [sessionId]: { ...existing, loadingProgress: progress },
+          },
+        };
+      }),
     restoreMessagesFromCache: (
       sessionId: string,
       cached: { messages: readonly Message[]; lastSeq: number; latestUserRequestPreview?: SessionLatestUserRequestPreview | null },
@@ -1447,6 +1464,7 @@ export const storage = create<StorageState>()((set, get) => {
             isLoaded: true,
             isBackfilling: false,
             hasServerOlderMessages: false,
+            loadingProgress: null,
           } satisfies SessionMessages,
         };
         const { sessionMessages: evictedSessionMessages, sessionMessagesLRU } =
@@ -2417,12 +2435,13 @@ export function useSessionMessages(
   hasOlderMessages: boolean;
   hasServerOlderMessages: boolean;
   isBackfilling: boolean;
+  loadingProgress: { loaded: number; total: number } | null;
 } {
   // slice() inside a zustand selector creates a new array reference on every getSnapshot
   // call, breaking useShallow's equality check and causing React 18's useSyncExternalStore
   // to detect an inconsistent snapshot → infinite update loop. Keep the selector
   // returning only stable store references; derive the capped slice via useMemo.
-  const { all, isLoaded, isBackfilling, hasServerOlderMessages } = storage(
+  const { all, isLoaded, isBackfilling, hasServerOlderMessages, loadingProgress } = storage(
     useShallow((state) => {
       const session = state.sessionMessages[sessionId];
       return {
@@ -2430,6 +2449,7 @@ export function useSessionMessages(
         isLoaded: session?.isLoaded ?? false,
         isBackfilling: session?.isBackfilling ?? false,
         hasServerOlderMessages: session?.hasServerOlderMessages ?? false,
+        loadingProgress: session?.loadingProgress ?? null,
       };
     }),
   );
@@ -2438,7 +2458,7 @@ export function useSessionMessages(
     () => (capped ? all.slice(0, limit) : all),
     [all, limit, capped],
   );
-  return { messages, isLoaded, hasOlderMessages: capped, hasServerOlderMessages, isBackfilling };
+  return { messages, isLoaded, hasOlderMessages: capped, hasServerOlderMessages, isBackfilling, loadingProgress };
 }
 
 const emptyBackgroundTasks: ReadonlyMap<string, BackgroundTaskEntry> = new Map();

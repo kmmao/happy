@@ -814,6 +814,7 @@ export const ru: TranslationStructure = {
   },
 
   session: {
+    loadingProgress: ({ percent, loaded, total }: { percent: number; loaded: number; total: number }) => `Загрузка ${percent}% (${loaded}/${total})`,
     inputPlaceholder: "Введите сообщение...",
     startedByDaemon: "демон",
     sentImage: "Отправлено изображение",
@@ -1258,6 +1259,10 @@ export const ru: TranslationStructure = {
       applyChanges: "Обновить файл",
       viewDiff: "Текущие изменения файла",
       question: "Вопрос",
+      taskCreate: "Создать задачу",
+      taskUpdate: "Обновить задачу",
+      taskList: "Список задач",
+      taskGet: "Получить задачу",
     },
     desc: {
       terminalCmd: ({ cmd }: { cmd: string }) => `Терминал(команда: ${cmd})`,
@@ -4327,6 +4332,7 @@ export const ru: TranslationStructure = {
       subcatUnattributed: "Другое",
       subcatUnattributedDesc: "Включает CLAUDE.md, Rules, Memory, списки навыков и другие system-reminder инъекции — нажмите для просмотра",
       subcatUnattributedRemaining: "Прочие затраты",
+      subcatUnattributedSkills: "Skills",
       subcatLoading: "Загрузка подкатегорий…",
       subcatBreakdownNote: "Полная разбивка токенов диалога по всем категориям контекста",
     },

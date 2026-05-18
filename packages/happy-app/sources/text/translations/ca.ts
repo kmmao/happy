@@ -588,6 +588,7 @@ export const ca: TranslationStructure = {
   },
 
   session: {
+    loadingProgress: ({ percent, loaded, total }: { percent: number; loaded: number; total: number }) => `Carregant ${percent}% (${loaded}/${total})`,
     inputPlaceholder: "Escriu un missatge...",
     startedByDaemon: "daemon",
     sentImage: "Imatge enviada",
@@ -1248,6 +1249,10 @@ export const ca: TranslationStructure = {
       applyChanges: "Actualitza fitxer",
       viewDiff: "Canvis del fitxer actual",
       question: "Pregunta",
+      taskCreate: "Crea tasca",
+      taskUpdate: "Actualitza tasca",
+      taskList: "Llista de tasques",
+      taskGet: "Obtén tasca",
     },
     desc: {
       terminalCmd: ({ cmd }: { cmd: string }) => `Terminal(cmd: ${cmd})`,
@@ -4313,6 +4318,7 @@ export const ca: TranslationStructure = {
       subcatUnattributed: "Altres",
       subcatUnattributedDesc: "Inclou CLAUDE.md, Rules, Memory, llistes de Skills i altres injeccions de system-reminder — toca per veure el contingut",
       subcatUnattributedRemaining: "Altra sobrecàrrega",
+      subcatUnattributedSkills: "Skills",
       subcatLoading: "Carregant subcategories…",
       subcatBreakdownNote: "Desglossament complet dels tokens de la conversa en totes les categories de context",
     },

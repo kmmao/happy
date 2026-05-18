@@ -2300,8 +2300,14 @@ class Sync {
         }
 
         hasMore = !!data.hasMore;
-        if (!hasMore && data.totalCount !== undefined) {
+        if (data.totalCount !== undefined) {
           serverTotalCount = data.totalCount;
+        }
+        if (serverTotalCount !== undefined && serverTotalCount > 0) {
+          storage.getState().setSessionLoadingProgress(sessionId, {
+            loaded: totalProcessedMessages,
+            total: serverTotalCount,
+          });
         }
         if (cursorAdvance.blockedByUnprocessedSeq) {
           blockedByUnprocessedMessage = true;
