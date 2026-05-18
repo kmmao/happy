@@ -23,19 +23,28 @@ export function createBackoff(
         onError?: (e: any, failuresCount: number) => void,
         minDelay?: number,
         maxDelay?: number,
-        maxFailureCount?: number
+        maxFailureCount?: number,
+        maxRetries?: number,
     }): BackoffFunc {
     return async <T>(callback: () => Promise<T>): Promise<T> => {
         let currentFailureCount = 0;
         const minDelay = opts && opts.minDelay !== undefined ? opts.minDelay : 250;
         const maxDelay = opts && opts.maxDelay !== undefined ? opts.maxDelay : 1000;
         const maxFailureCount = opts && opts.maxFailureCount !== undefined ? opts.maxFailureCount : 50;
+        const maxRetries = opts && opts.maxRetries !== undefined ? opts.maxRetries : 100;
+        let totalRetries = 0;
         while (true) {
             try {
                 return await callback();
             } catch (e) {
                 if (e instanceof NonRetryableError) {
                     throw e;
+                }
+                totalRetries++;
+                if (totalRetries >= maxRetries) {
+                    throw new NonRetryableError(
+                        `Backoff exhausted after ${totalRetries} retries: ${e instanceof Error ? e.message : String(e)}`
+                    );
                 }
                 if (currentFailureCount < maxFailureCount) {
                     currentFailureCount++;
@@ -50,4 +59,4 @@ export function createBackoff(
     };
 }
 
-export let backoff = createBackoff({ onError: (e) => { log.warn(e); } });
+export let backoff = createBackoff({ onError: (e) => { log.warn(e); }, maxRetries: 100 });

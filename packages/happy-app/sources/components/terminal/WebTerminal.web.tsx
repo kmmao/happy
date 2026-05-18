@@ -223,6 +223,11 @@ function WebTerminalComponent({ machineId, cwd, sessionId, terminalId: terminalI
         }
 
         init().catch((err) => {
+            if (terminalRef.current) {
+                terminalRef.current.dispose();
+                terminalRef.current = null;
+            }
+            fitAddonRef.current = null;
             if (mounted) {
                 setState("error");
                 setErrorMsg(err.message || t("webTerminal.initFailed"));

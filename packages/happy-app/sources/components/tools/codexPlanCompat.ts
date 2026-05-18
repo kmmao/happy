@@ -8,15 +8,22 @@ export type LegacyCodexPlanPreview = {
   items: LegacyCodexPlanItem[];
 };
 
+const planCache = new Map<string, LegacyCodexPlanPreview | null>();
+
 export function parseLegacyCodexPlanPreview(
   markdown: string,
 ): LegacyCodexPlanPreview | null {
+  const cached = planCache.get(markdown);
+  if (cached !== undefined) return cached;
+
   const lines = markdown
     .split("\n")
     .map((line) => line.trim())
     .filter((line) => line.length > 0);
 
   if (lines.length < 2) {
+    if (planCache.size > 500) planCache.clear();
+    planCache.set(markdown, null);
     return null;
   }
 
@@ -46,12 +53,8 @@ export function parseLegacyCodexPlanPreview(
     })
     .filter((item): item is LegacyCodexPlanItem => item !== null);
 
-  if (items.length === 0) {
-    return null;
-  }
-
-  return {
-    explanation,
-    items,
-  };
+  const result = items.length === 0 ? null : { explanation, items };
+  if (planCache.size > 500) planCache.clear();
+  planCache.set(markdown, result);
+  return result;
 }

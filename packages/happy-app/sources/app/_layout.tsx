@@ -31,6 +31,7 @@ import { setServerUrl } from "@/sync/serverConfig";
 import { useTrackScreens } from "@/track/useTrackScreens";
 import { RealtimeProvider } from "@/realtime/RealtimeProvider";
 import { FaviconPermissionIndicator } from "@/components/web/FaviconPermissionIndicator";
+import { WebErrorBoundary, setupWebErrorHandlers } from "@/components/web/WebErrorBoundary";
 import { CommandPaletteProvider } from "@/components/CommandPalette/CommandPaletteProvider";
 import { StatusBarProvider } from "@/components/StatusBarProvider";
 // import * as SystemUI from 'expo-system-ui';
@@ -198,6 +199,10 @@ export default function RootLayout() {
     credentials: AuthCredentials | null;
   } | null>(null);
   React.useEffect(() => {
+    setupWebErrorHandlers();
+  }, []);
+
+  React.useEffect(() => {
     (async () => {
       try {
         await loadFonts();
@@ -310,9 +315,9 @@ export default function RootLayout() {
   }
 
   return (
-    <>
+    <WebErrorBoundary>
       <FaviconPermissionIndicator />
       {providers}
-    </>
+    </WebErrorBoundary>
   );
 }

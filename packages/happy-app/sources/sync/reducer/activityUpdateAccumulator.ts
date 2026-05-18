@@ -4,11 +4,33 @@ export class ActivityUpdateAccumulator {
     private pendingUpdates = new Map<string, ApiEphemeralActivityUpdate>();
     private lastEmittedStates = new Map<string, { active: boolean; thinking: boolean; activeAt: number }>();
     private timeoutId: ReturnType<typeof setTimeout> | null = null;
+    private isHidden = false;
+    private visibilityHandler: (() => void) | null = null;
 
     constructor(
         private flushHandler: (updates: Map<string, ApiEphemeralActivityUpdate>) => void,
         private debounceDelay: number = 500
-    ) {}
+    ) {
+        if (typeof document !== 'undefined') {
+            this.visibilityHandler = () => {
+                if (document.visibilityState === 'hidden') {
+                    this.isHidden = true;
+                    // Cancel debounce timer — don't flush into a hidden tab
+                    if (this.timeoutId) {
+                        clearTimeout(this.timeoutId);
+                        this.timeoutId = null;
+                    }
+                } else {
+                    this.isHidden = false;
+                    // Single coalesced flush when tab becomes visible again
+                    if (this.pendingUpdates.size > 0) {
+                        this.flushPendingUpdates();
+                    }
+                }
+            };
+            document.addEventListener('visibilitychange', this.visibilityHandler);
+        }
+    }
 
     addUpdate(update: ApiEphemeralActivityUpdate): void {
         const sessionId = update.id;
@@ -35,14 +57,16 @@ export class ActivityUpdateAccumulator {
             // Add the immediate update to pending updates
             this.pendingUpdates.set(sessionId, update);
 
-            // Flush all pending updates together (batched)
-            this.flushPendingUpdates();
+            // Don't flush while tab is hidden — defer to visibilitychange handler
+            if (!this.isHidden) {
+                this.flushPendingUpdates();
+            }
         } else {
             // Accumulate for debounced emission (only timestamp updates)
             this.pendingUpdates.set(sessionId, update);
 
-            // Only start a new timer if one isn't already running
-            if (!this.timeoutId) {
+            // Don't start a timer while hidden — flush will happen on visibility restore
+            if (!this.isHidden && !this.timeoutId) {
                 this.timeoutId = setTimeout(() => {
                     this.flushPendingUpdates();
                     this.timeoutId = null;
@@ -80,6 +104,10 @@ export class ActivityUpdateAccumulator {
             this.timeoutId = null;
         }
         this.pendingUpdates.clear();
+        if (this.visibilityHandler && typeof document !== 'undefined') {
+            document.removeEventListener('visibilitychange', this.visibilityHandler);
+            this.visibilityHandler = null;
+        }
     }
 
     reset(): void {
