@@ -29,6 +29,11 @@ import { z } from "zod";
 import { formatClaudeMessageForInk } from "@/ui/messageFormatterInk";
 import { logger } from "@/ui/logger";
 import { SDKToLogConverter } from "./utils/sdkToLogConverter";
+import {
+  mapStreamEventToEnvelope,
+  createStreamEventMapperState,
+  type StreamEventMapperState,
+} from "./utils/streamEventMapper";
 import { PLAN_FAKE_REJECT } from "./sdk/prompts";
 import { readClaudeMcpServers } from "@/claude/utils/claudeSettings";
 import { fetchMcpRegistryServers } from "@/claude/utils/mcpRegistryReader";
@@ -838,7 +843,27 @@ export async function claudeRemoteLauncher(
   // (Opus 4.6+) and converts them to TodoWrite-compatible progress mirror.
   const taskMirrorState = new TaskMirrorState();
 
+  // Stream event mapper state — reset per query cycle.
+  let streamEventState: StreamEventMapperState = createStreamEventMapperState();
+
   function onMessage(message: SDKMessage) {
+    // ── Stream events (partial messages) → text-delta envelopes ────────
+    // Intercept before the rest of the pipeline. stream_event messages
+    // carry raw API SSE chunks (text_delta, thinking_delta) that are
+    // too granular for the JSONL log but perfect for real-time App UI.
+    if (message.type === "stream_event") {
+      const turnId = session.client.currentTurnId;
+      const envelope = mapStreamEventToEnvelope(
+        message as unknown as Parameters<typeof mapStreamEventToEnvelope>[0],
+        streamEventState,
+        turnId,
+      );
+      if (envelope) {
+        session.client.sendSessionProtocolMessage(envelope);
+      }
+      return; // Don't pass stream events through the rest of the pipeline
+    }
+
     // End-to-end perf: log total latency on first assistant response per turn
     if (!_perfTurnFirstResponseLogged && message.type === "assistant" && _perfTurnSocketReceivedAt) {
       _perfTurnFirstResponseLogged = true;
@@ -2228,6 +2253,7 @@ export async function claudeRemoteLauncher(
               _perfTurnSocketReceivedAt = p.mode._perfSocketReceivedAt;
               _perfTurnFirstResponseLogged = false;
               _requestingEventSentThisTurn = false;
+              streamEventState = createStreamEventMapperState();
               permissionHandler.handleModeChange(p.mode.permissionMode);
               startMidTurnDrain();
               return p;
@@ -2289,6 +2315,7 @@ export async function claudeRemoteLauncher(
                   _perfTurnSocketReceivedAt = msg.mode._perfSocketReceivedAt;
                   _perfTurnFirstResponseLogged = false;
                   _requestingEventSentThisTurn = false;
+                  streamEventState = createStreamEventMapperState();
                   permissionHandler.handleModeChange(mode.permissionMode);
                   startMidTurnDrain();
                   return {
@@ -2324,6 +2351,7 @@ export async function claudeRemoteLauncher(
               _perfTurnSocketReceivedAt = msg.mode._perfSocketReceivedAt;
               _perfTurnFirstResponseLogged = false;
               _requestingEventSentThisTurn = false;
+              streamEventState = createStreamEventMapperState();
               permissionHandler.handleModeChange(mode.permissionMode);
               startMidTurnDrain();
 

@@ -223,6 +223,14 @@ export interface QueryOptions {
    * Maps to the official SDK's `Options.forwardSubagentText` (0.2.133+).
    */
   forwardSubagentText?: boolean;
+  /**
+   * Include partial/streaming message events (SDKPartialAssistantMessage)
+   * in the query output. When true, the SDK emits `type: 'stream_event'`
+   * for each API SSE chunk, enabling real-time text-delta forwarding.
+   *
+   * Maps to the official SDK's `Options.includePartialMessages` (0.3.143+).
+   */
+  includePartialMessages?: boolean;
 }
 
 /** Query prompt — string or async stream of user messages */

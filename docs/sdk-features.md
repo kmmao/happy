@@ -19,6 +19,7 @@ This document describes which features from the official `@anthropic-ai/claude-a
 | **listSessions()** / **getSessionInfo()** | Yes | No | No |
 | **deleteSession()** / **renameSession()** | Yes | No | No |
 | **getSessionMessages()** | Yes | No | No |
+| **includePartialMessages** (streaming) | Yes | N/A (native) | N/A (native) |
 | Basic session protocol (messages, tool calls) | Yes | Yes | Yes |
 | Permission mode (default/acceptEdits/bypassPermissions/plan) | Yes | Mapped (read-only/safe-yolo/yolo) | Yes |
 
@@ -42,6 +43,18 @@ Set once at query start via `mapOptions()` in `queryAdapter.ts`. Cannot be hot-s
 - **CLI**: Enabled by default (`promptSuggestions: true` in `claudeRemote.ts`)
 - **Protocol**: `{ t: "prompt-suggestion", suggestion: string }` event via happy-wire
 - **App**: Extracted from session envelope, displayed as a pressable chip in `AgentInput.tsx`, cleared on user send
+
+### includePartialMessages (Real-time Streaming)
+
+- **CLI**: Enabled by default (`includePartialMessages: true` in `claudeRemote.ts`)
+- **SDK**: Emits `SDKPartialAssistantMessage` (`type: 'stream_event'`) for each API SSE chunk
+- **Mapping**: `streamEventMapper.ts` extracts `content_block_delta` events:
+  - `text_delta` → `{ t: "text-delta", stream, delta, thinking: false }`
+  - `thinking_delta` → `{ t: "text-delta", stream, delta, thinking: true }`
+  - Other event types (message_start/stop, content_block_start/stop, input_json_delta) → silently dropped
+- **Transport**: Envelopes sent directly via `sendSessionProtocolMessage()`, bypassing the JSONL log pipeline
+- **App**: Already renders `text-delta` events (built for Codex/ACP backends); no App changes needed
+- **State**: `StreamEventMapperState` assigns unique stream IDs per content block; reset per turn
 
 ### Model Capabilities (supportsEffort, supportedEffortLevels, supportsAdaptiveThinking)
 
@@ -89,6 +102,8 @@ The hot-swap is triggered in `claudeRemote.ts` when a new turn arrives with diff
 | `packages/happy-cli/src/claude/claudeRemoteLauncher.ts` | Outer loop with cold restart and message forwarding |
 | `packages/happy-cli/src/claude/rpc/claudeControlHandlers.ts` | RPC handlers including `apply_settings` → `applyFlagSettings()` |
 | `packages/happy-app/sources/sync/apiClaudeControl.ts` | App-side RPC client for claude-control methods |
+| `packages/happy-cli/src/claude/utils/streamEventMapper.ts` | SDK stream_event → text-delta session protocol mapping |
+| `packages/happy-cli/src/claude/utils/flagSettingsPatch.ts` | EnhancedMode diff → applyFlagSettings patch builder |
 | `packages/happy-wire/src/sessionProtocol.ts` | Protocol schema (prompt-suggestion event, etc.) |
 
 ## Session Management (SDK 0.3.143+)

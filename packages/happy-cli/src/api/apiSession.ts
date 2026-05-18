@@ -225,6 +225,11 @@ export class ApiSessionClient extends EventEmitter {
   private lastReportedCumulativeCost = 0;
   private lastReportedModelCosts: Record<string, number> = {};
 
+  /** Current session protocol turn ID, or null if no turn is open. */
+  get currentTurnId(): string | null {
+    return this.claudeSessionProtocolState.currentTurnId;
+  }
+
   constructor(token: string, session: Session) {
     super();
     this.token = token;
