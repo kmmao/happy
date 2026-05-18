@@ -8,6 +8,7 @@ import { Modal } from "@/modal";
 import { fetchContextUsage, fetchContextDetail } from "@/sync/apiClaudeControl";
 import { log } from "@/log";
 import type { GetContextUsageResponse, GetContextDetailResponse } from "@kmmao/happy-wire";
+import { FileViewer } from "./FileViewer";
 
 // Refresh every 30s while active — context changes with each Claude turn
 const REFRESH_INTERVAL_MS = 30_000;
@@ -36,7 +37,7 @@ function resolveColor(color: string | undefined, index: number): string {
 
 // ─── Category detail helpers ──────────────────────────────────────────────────
 
-type DetailRow = { label: string; sub?: string; value: string };
+type DetailRow = { label: string; sub?: string; value: string; onPress?: () => void };
 
 /**
  * Returns a list of detail rows for categories that have sub-data,
@@ -120,6 +121,78 @@ function resolveDetail(catName: string, data: GetContextUsageResponse): DetailRo
         }));
     }
     return null;
+}
+
+function buildUnattributedFallback(
+    sessionId: string,
+    memoryFiles: GetContextUsageResponse["memoryFiles"],
+    mcpTools: GetContextUsageResponse["mcpTools"],
+    categories: GetContextUsageResponse["categories"],
+    totalUnattributed: number,
+    reopenSelf?: () => void,
+): DetailRow[] {
+    const rows: DetailRow[] = [];
+    let accounted = 0;
+
+    for (const f of memoryFiles) {
+        const filePath = f.path;
+        rows.push({
+            label: filePath.split("/").pop() ?? filePath,
+            sub: filePath,
+            value: formatTokens(f.tokens),
+            onPress: () => Modal.show({
+                component: FileViewer,
+                props: { sessionId, path: filePath },
+            }),
+        });
+        accounted += f.tokens;
+    }
+
+    const mcpByServer = new Map<string, { tokens: number; count: number; tools: typeof mcpTools }>();
+    for (const tool of mcpTools) {
+        const entry = mcpByServer.get(tool.serverName) ?? { tokens: 0, count: 0, tools: [] as typeof mcpTools };
+        entry.tokens += tool.tokens;
+        entry.count += 1;
+        entry.tools.push(tool);
+        mcpByServer.set(tool.serverName, entry);
+    }
+    for (const [server, { tokens, count, tools }] of mcpByServer) {
+        rows.push({
+            label: `${server} (${count} tools)`,
+            value: formatTokens(tokens),
+            onPress: () => Modal.show({
+                component: CategoryDetailModal,
+                props: {
+                    title: server,
+                    detail: tools.map((tt) => ({
+                        label: tt.name,
+                        value: formatTokens(tt.tokens),
+                    })),
+                    onBack: reopenSelf,
+                },
+            }),
+        });
+        accounted += tokens;
+    }
+
+    const skillsCat = categories.find((c) => c.name.toLowerCase().includes("skill"));
+    if (skillsCat && skillsCat.tokens > 0) {
+        rows.push({
+            label: t("claudeControl.contextUsage.subcatUnattributedSkills"),
+            value: formatTokens(skillsCat.tokens),
+        });
+        accounted += skillsCat.tokens;
+    }
+
+    const remaining = totalUnattributed - accounted;
+    if (remaining > 0) {
+        rows.push({
+            label: t("claudeControl.contextUsage.subcatUnattributedRemaining"),
+            value: formatTokens(remaining),
+        });
+    }
+
+    return rows;
 }
 
 function formatTokens(n: number): string {
@@ -284,7 +357,7 @@ export const ContextUsagePanel = React.memo(function ContextUsagePanel({
                                     key={cat.name}
                                     onPress={() => Modal.show({
                                         component: SubcategoryListModal,
-                                        props: { sessionId, category: cat.name, messageBreakdown: data.messageBreakdown, categoryTokens: cat.tokens, systemPromptSections: data.systemPromptSections },
+                                        props: { sessionId, category: cat.name, messageBreakdown: data.messageBreakdown, categoryTokens: cat.tokens, systemPromptSections: data.systemPromptSections, memoryFiles: data.memoryFiles, mcpTools: data.mcpTools, categories: data.categories },
                                     })}
                                     style={({ pressed }) => pressed ? { opacity: 0.6 } : undefined}
                                 >
@@ -349,6 +422,12 @@ interface SubcategoryListModalProps {
     categoryTokens?: number;
     /** System prompt per-section breakdown — used to detail "unattributed" tokens. */
     systemPromptSections?: GetContextUsageResponse["systemPromptSections"];
+    /** Memory/CLAUDE.md files — fallback breakdown for "unattributed" when systemPromptSections unavailable. */
+    memoryFiles?: GetContextUsageResponse["memoryFiles"];
+    /** MCP tools — fallback breakdown for "unattributed" when systemPromptSections unavailable. */
+    mcpTools?: GetContextUsageResponse["mcpTools"];
+    /** Top-level categories — used to extract Skills token count for fallback breakdown. */
+    categories?: GetContextUsageResponse["categories"];
     onClose: () => void;
 }
 
@@ -377,43 +456,45 @@ function subcatLabel(name: string): string {
 
 /**
  * Build subcategory rows from SDK messageBreakdown (token-level detail).
- * When `categoryTokens` is provided, normalizes all subcategory values
+ * When `categoryTokens` is provided, normalizes message-level values
  * so their sum equals the Messages category total — the SDK's raw
  * messageBreakdown spans ALL categories, not just Messages.
+ * "unattributed" is excluded from normalization (it's system context,
+ * not part of Messages) and appended with its raw value.
  */
 function breakdownToRows(
     mb: NonNullable<GetContextUsageResponse["messageBreakdown"]>,
     categoryTokens?: number,
 ): { name: string; count: number }[] {
-    const raw: { name: string; count: number }[] = [];
-    if (mb.userMessageTokens > 0) raw.push({ name: "user", count: mb.userMessageTokens });
-    if (mb.assistantMessageTokens > 0) raw.push({ name: "assistant", count: mb.assistantMessageTokens });
-    if (mb.toolCallTokens > 0) raw.push({ name: "toolCall", count: mb.toolCallTokens });
-    if (mb.toolResultTokens > 0) raw.push({ name: "toolResult", count: mb.toolResultTokens });
-    if (mb.attachmentTokens > 0) raw.push({ name: "attachment", count: mb.attachmentTokens });
-    if (mb.redirectedContextTokens > 0) raw.push({ name: "redirectedContext", count: mb.redirectedContextTokens });
-    if (mb.unattributedTokens > 0) raw.push({ name: "unattributed", count: mb.unattributedTokens });
+    const normalizable: { name: string; count: number }[] = [];
+    if (mb.userMessageTokens > 0) normalizable.push({ name: "user", count: mb.userMessageTokens });
+    if (mb.assistantMessageTokens > 0) normalizable.push({ name: "assistant", count: mb.assistantMessageTokens });
+    if (mb.toolCallTokens > 0) normalizable.push({ name: "toolCall", count: mb.toolCallTokens });
+    if (mb.toolResultTokens > 0) normalizable.push({ name: "toolResult", count: mb.toolResultTokens });
+    if (mb.attachmentTokens > 0) normalizable.push({ name: "attachment", count: mb.attachmentTokens });
+    if (mb.redirectedContextTokens > 0) normalizable.push({ name: "redirectedContext", count: mb.redirectedContextTokens });
 
-    // Normalize so subcategories sum to the Messages category total
     if (categoryTokens != null && categoryTokens > 0) {
-        const rawTotal = raw.reduce((s, r) => s + r.count, 0);
+        const rawTotal = normalizable.reduce((s, r) => s + r.count, 0);
         if (rawTotal > 0 && rawTotal !== categoryTokens) {
             const scale = categoryTokens / rawTotal;
             let remaining = categoryTokens;
-            for (let i = 0; i < raw.length; i++) {
-                if (i === raw.length - 1) {
-                    // Last item gets the remainder to avoid rounding drift
-                    raw[i].count = remaining;
+            for (let i = 0; i < normalizable.length; i++) {
+                if (i === normalizable.length - 1) {
+                    normalizable[i].count = remaining;
                 } else {
-                    raw[i].count = Math.round(raw[i].count * scale);
-                    remaining -= raw[i].count;
+                    normalizable[i].count = Math.round(normalizable[i].count * scale);
+                    remaining -= normalizable[i].count;
                 }
             }
-            // Drop rows that normalized to 0
-            return raw.filter((r) => r.count > 0);
         }
     }
-    return raw;
+
+    const result = normalizable.filter((r) => r.count > 0);
+    if (mb.unattributedTokens > 0) {
+        result.push({ name: "unattributed", count: mb.unattributedTokens });
+    }
+    return result;
 }
 
 const SubcategoryListModal = React.memo<SubcategoryListModalProps>(function SubcategoryListModal({
@@ -421,12 +502,17 @@ const SubcategoryListModal = React.memo<SubcategoryListModalProps>(function Subc
     category,
     messageBreakdown,
     categoryTokens,
+    memoryFiles,
+    mcpTools,
+    categories,
     systemPromptSections,
     onClose,
 }) {
     const { theme } = useUnistyles();
     const c = theme.colors;
-    const { height: screenHeight } = useWindowDimensions();
+    const { width: screenWidth, height: screenHeight } = useWindowDimensions();
+    const modalWidth = Math.min(screenWidth - 32, 560);
+    const modalMaxHeight = Math.min(screenHeight * 0.75, 600);
 
     // When messageBreakdown is available, use it directly (no RPC needed).
     // Otherwise fall back to the JSONL-based summaryOnly RPC.
@@ -462,7 +548,7 @@ const SubcategoryListModal = React.memo<SubcategoryListModalProps>(function Subc
     }, [sessionId, category, hasBreakdown]);
 
     return (
-        <View style={[subcatModalStyles.container, { backgroundColor: c.surface, maxHeight: screenHeight * 0.8 }]}>
+        <View style={[subcatModalStyles.container, { backgroundColor: c.surface, width: modalWidth, maxHeight: modalMaxHeight }]}>
             {/* Header */}
             <View style={[subcatModalStyles.header, { borderBottomColor: c.divider }]}>
                 <Text style={[subcatModalStyles.title, { color: c.text }]} numberOfLines={1}>
@@ -511,6 +597,10 @@ const SubcategoryListModal = React.memo<SubcategoryListModalProps>(function Subc
                                     // SDK-only categories: show per-type breakdown or content
                                     if (!jsonlSubcategory) {
                                         const detail = resolveSubcatBreakdown(subcat.name, messageBreakdown);
+                                        const reopenSubcatList = () => Modal.show({
+                                            component: SubcategoryListModal,
+                                            props: { sessionId, category, messageBreakdown, categoryTokens, systemPromptSections, memoryFiles, mcpTools, categories },
+                                        });
                                         onClose();
                                         setTimeout(() => {
                                             if (detail && detail.length > 0) {
@@ -519,18 +609,19 @@ const SubcategoryListModal = React.memo<SubcategoryListModalProps>(function Subc
                                                     props: {
                                                         title: subcatLabel(subcat.name),
                                                         detail,
+                                                        onBack: reopenSubcatList,
                                                     },
                                                 });
                                             } else if (subcat.name === "unattributed") {
                                                 if (systemPromptSections && systemPromptSections.length > 0) {
-                                                    const detail: DetailRow[] = systemPromptSections.map((s) => ({
+                                                    const sDetail: DetailRow[] = systemPromptSections.map((s) => ({
                                                         label: s.name,
                                                         value: formatTokens(s.tokens),
                                                     }));
                                                     const sectionsTotal = systemPromptSections.reduce((sum, s) => sum + s.tokens, 0);
                                                     const remaining = subcat.count - sectionsTotal;
                                                     if (remaining > 0) {
-                                                        detail.push({
+                                                        sDetail.push({
                                                             label: t("claudeControl.contextUsage.subcatUnattributedRemaining"),
                                                             value: formatTokens(remaining),
                                                         });
@@ -539,17 +630,33 @@ const SubcategoryListModal = React.memo<SubcategoryListModalProps>(function Subc
                                                         component: CategoryDetailModal,
                                                         props: {
                                                             title: `${subcatLabel(subcat.name)} (${formatTokens(subcat.count)})`,
-                                                            detail,
+                                                            detail: sDetail,
+                                                            onBack: reopenSubcatList,
                                                         },
                                                     });
+                                                } else if (memoryFiles && mcpTools && categories &&
+                                                           (memoryFiles.length > 0 || mcpTools.length > 0)) {
+                                                    const showFallback = () => {
+                                                        const fallbackDetail = buildUnattributedFallback(
+                                                            sessionId, memoryFiles, mcpTools, categories, subcat.count, showFallback,
+                                                        );
+                                                        Modal.show({
+                                                            component: CategoryDetailModal,
+                                                            props: {
+                                                                title: `${subcatLabel(subcat.name)} (${formatTokens(subcat.count)})`,
+                                                                detail: fallbackDetail,
+                                                                onBack: reopenSubcatList,
+                                                            },
+                                                        });
+                                                    };
+                                                    showFallback();
                                                 } else {
                                                     Modal.show({
-                                                        component: ContextContentModal,
+                                                        component: CategoryDetailModal,
                                                         props: {
-                                                            sessionId,
-                                                            category,
-                                                            subcategory: "system-reminder",
-                                                            subcategoryLabel: `${subcatLabel(subcat.name)} (${formatTokens(subcat.count)})`,
+                                                            title: subcatLabel(subcat.name),
+                                                            detail: [{ label: "Total", value: formatTokens(subcat.count) }],
+                                                            onBack: reopenSubcatList,
                                                         },
                                                     });
                                                 }
@@ -566,6 +673,7 @@ const SubcategoryListModal = React.memo<SubcategoryListModalProps>(function Subc
                                                     props: {
                                                         title: subcatLabel(subcat.name),
                                                         detail: rows,
+                                                        onBack: reopenSubcatList,
                                                     },
                                                 });
                                             }
@@ -615,9 +723,6 @@ const subcatModalStyles = StyleSheet.create(() => ({
     container: {
         borderRadius: 16,
         overflow: "hidden",
-        width: "100%",
-        maxWidth: 720,
-        // maxHeight applied inline via screenHeight * 0.8
     },
     header: {
         flexDirection: "row",
@@ -914,21 +1019,35 @@ const contentModalStyles = StyleSheet.create(() => ({
 interface CategoryDetailModalProps {
     title: string;
     detail: DetailRow[];
+    /** When provided, shows a back arrow that closes this modal and calls onBack to reopen the parent. */
+    onBack?: () => void;
     onClose: () => void;
 }
 
 const CategoryDetailModal = React.memo<CategoryDetailModalProps>(function CategoryDetailModal({
     title,
     detail,
+    onBack,
     onClose,
 }) {
     const { theme } = useUnistyles();
     const c = theme.colors;
-    const { height: screenHeight } = useWindowDimensions();
+    const { width: screenWidth, height: screenHeight } = useWindowDimensions();
+    const modalWidth = Math.min(screenWidth - 32, 560);
+    const modalMaxHeight = Math.min(screenHeight * 0.75, 600);
     return (
-        <View style={[detailModalStyles.container, { backgroundColor: c.surface, maxHeight: screenHeight * 0.8 }]}>
+        <View style={[detailModalStyles.container, { backgroundColor: c.surface, width: modalWidth, maxHeight: modalMaxHeight }]}>
             {/* Header */}
             <View style={[detailModalStyles.header, { borderBottomColor: c.divider }]}>
+                {onBack ? (
+                    <Pressable
+                        onPress={() => { onClose(); setTimeout(onBack, 150); }}
+                        hitSlop={10}
+                        style={detailModalStyles.backBtn}
+                    >
+                        <Ionicons name="chevron-back" size={20} color={c.textSecondary} />
+                    </Pressable>
+                ) : null}
                 <Text style={[detailModalStyles.title, { color: c.text }]} numberOfLines={1}>
                     {title}
                 </Text>
@@ -942,32 +1061,48 @@ const CategoryDetailModal = React.memo<CategoryDetailModalProps>(function Catego
                 contentContainerStyle={detailModalStyles.scrollContent}
                 showsVerticalScrollIndicator={false}
             >
-                {detail.map((row, i) => (
-                    <View
-                        key={`${row.label}-${i}`}
-                        style={[
-                            detailModalStyles.row,
-                            { borderBottomColor: c.divider },
-                        ]}
-                    >
-                        <View style={detailModalStyles.rowLeft}>
-                            <Text style={[detailModalStyles.rowLabel, { color: c.text }]}>
-                                {row.label}
-                            </Text>
-                            {row.sub ? (
-                                <Text
-                                    style={[detailModalStyles.rowSub, { color: c.textSecondary }]}
-                                    numberOfLines={1}
-                                >
-                                    {row.sub}
+                {detail.map((row, i) => {
+                    const inner = (
+                        <View
+                            style={[
+                                detailModalStyles.row,
+                                { borderBottomColor: c.divider },
+                            ]}
+                        >
+                            <View style={detailModalStyles.rowLeft}>
+                                <Text style={[detailModalStyles.rowLabel, { color: c.text }]}>
+                                    {row.label}
                                 </Text>
+                                {row.sub ? (
+                                    <Text
+                                        style={[detailModalStyles.rowSub, { color: c.textSecondary }]}
+                                        numberOfLines={1}
+                                    >
+                                        {row.sub}
+                                    </Text>
+                                ) : null}
+                            </View>
+                            <Text style={[detailModalStyles.rowValue, { color: c.textSecondary }]}>
+                                {row.value}
+                            </Text>
+                            {row.onPress ? (
+                                <Ionicons name="chevron-forward" size={12} color={c.textSecondary} />
                             ) : null}
                         </View>
-                        <Text style={[detailModalStyles.rowValue, { color: c.textSecondary }]}>
-                            {row.value}
-                        </Text>
-                    </View>
-                ))}
+                    );
+                    if (row.onPress) {
+                        return (
+                            <Pressable
+                                key={`${row.label}-${i}`}
+                                onPress={() => { onClose(); setTimeout(row.onPress!, 150); }}
+                                style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}
+                            >
+                                {inner}
+                            </Pressable>
+                        );
+                    }
+                    return <View key={`${row.label}-${i}`}>{inner}</View>;
+                })}
             </ScrollView>
         </View>
     );
@@ -977,9 +1112,6 @@ const detailModalStyles = StyleSheet.create(() => ({
     container: {
         borderRadius: 16,
         overflow: "hidden",
-        width: "100%",
-        maxWidth: 720,
-        // maxHeight applied inline via screenHeight * 0.8
     },
     header: {
         flexDirection: "row",
@@ -993,6 +1125,9 @@ const detailModalStyles = StyleSheet.create(() => ({
         flex: 1,
         fontSize: 15,
         fontWeight: "600",
+    },
+    backBtn: {
+        padding: 4,
     },
     closeBtn: {
         padding: 4,
