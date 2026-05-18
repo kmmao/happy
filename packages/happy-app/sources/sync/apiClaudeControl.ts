@@ -48,6 +48,16 @@ import type {
     ToggleMcpServerResponse,
     ApplySettingsRequest,
     ApplySettingsResponse,
+    ListSessionsRequest,
+    ListSessionsResponse,
+    GetSessionInfoRequest,
+    GetSessionInfoResponse,
+    DeleteSessionRequest,
+    DeleteSessionResponse,
+    RenameSessionRequest,
+    RenameSessionResponse,
+    GetSessionMessagesRequest,
+    GetSessionMessagesResponse,
     ClaudeControlMethod,
 } from '@kmmao/happy-wire';
 import { CLAUDE_CONTROL_SCOPE } from '@kmmao/happy-wire';
@@ -300,6 +310,92 @@ export async function applySettings(
         sessionId,
         methodName('apply_settings'),
         { settings },
+    );
+}
+
+// ─── Session Management (SDK 0.3.143+) ────────────────────────────────────
+
+/**
+ * List Claude Code sessions on the remote machine. These are the SDK's local
+ * JSONL session files — not Happy sessions. Useful for session picker UI,
+ * history browsing, or cleanup.
+ *
+ * @param dir - Optional project directory to scope results to.
+ */
+export async function listRemoteSessions(
+    sessionId: string,
+    options?: { dir?: string; limit?: number; offset?: number },
+): Promise<ListSessionsResponse> {
+    return apiSocket.sessionRPC<ListSessionsResponse, ListSessionsRequest>(
+        sessionId,
+        methodName('list_sessions'),
+        options ?? {},
+    );
+}
+
+/**
+ * Get info about a specific Claude Code session on the remote machine.
+ *
+ * @param targetSessionId - The SDK session ID to look up (NOT the Happy session ID).
+ */
+export async function getRemoteSessionInfo(
+    sessionId: string,
+    targetSessionId: string,
+    dir?: string,
+): Promise<GetSessionInfoResponse> {
+    return apiSocket.sessionRPC<GetSessionInfoResponse, GetSessionInfoRequest>(
+        sessionId,
+        methodName('get_session_info'),
+        { targetSessionId, dir },
+    );
+}
+
+/**
+ * Delete a Claude Code session's JSONL file on the remote machine.
+ * **Destructive** — the session data is permanently removed from the CLI's
+ * local storage.
+ */
+export async function deleteRemoteSession(
+    sessionId: string,
+    targetSessionId: string,
+    dir?: string,
+): Promise<DeleteSessionResponse> {
+    return apiSocket.sessionRPC<DeleteSessionResponse, DeleteSessionRequest>(
+        sessionId,
+        methodName('delete_session'),
+        { targetSessionId, dir },
+    );
+}
+
+/**
+ * Rename a Claude Code session on the remote machine (sets customTitle).
+ */
+export async function renameRemoteSession(
+    sessionId: string,
+    targetSessionId: string,
+    title: string,
+    dir?: string,
+): Promise<RenameSessionResponse> {
+    return apiSocket.sessionRPC<RenameSessionResponse, RenameSessionRequest>(
+        sessionId,
+        methodName('rename_session'),
+        { targetSessionId, title, dir },
+    );
+}
+
+/**
+ * Read messages from a Claude Code session on the remote machine.
+ * Returns parsed JSONL records (user/assistant/system messages).
+ */
+export async function getRemoteSessionMessages(
+    sessionId: string,
+    targetSessionId: string,
+    options?: { dir?: string; limit?: number; offset?: number; includeSystemMessages?: boolean },
+): Promise<GetSessionMessagesResponse> {
+    return apiSocket.sessionRPC<GetSessionMessagesResponse, GetSessionMessagesRequest>(
+        sessionId,
+        methodName('get_session_messages'),
+        { targetSessionId, ...options },
     );
 }
 

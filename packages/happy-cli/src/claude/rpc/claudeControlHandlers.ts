@@ -33,6 +33,13 @@ import type {
   SDKResultMessage,
   McpServerConfig,
 } from "@anthropic-ai/claude-agent-sdk";
+import {
+  listSessions as sdkListSessions,
+  getSessionInfo as sdkGetSessionInfo,
+  deleteSession as sdkDeleteSession,
+  renameSession as sdkRenameSession,
+  getSessionMessages as sdkGetSessionMessages,
+} from "@anthropic-ai/claude-agent-sdk";
 import type { RpcHandlerManager } from "@/api/rpc/RpcHandlerManager";
 import { logger } from "@/ui/logger";
 import {
@@ -59,6 +66,16 @@ import {
   type ToggleMcpServerResponse,
   type ApplySettingsRequest,
   type ApplySettingsResponse,
+  type ListSessionsRequest,
+  type ListSessionsResponse,
+  type GetSessionInfoRequest,
+  type GetSessionInfoResponse,
+  type DeleteSessionRequest,
+  type DeleteSessionResponse,
+  type RenameSessionRequest,
+  type RenameSessionResponse,
+  type GetSessionMessagesRequest,
+  type GetSessionMessagesResponse,
 } from "@kmmao/happy-wire";
 
 // ─── Constants ──────────────────────────────────────────────────────────────
@@ -599,5 +616,117 @@ export function registerClaudeControlHandlers(
     },
   );
 
-  logger.debug("[claudeControl] Registered 12 claude-control:* RPC handlers");
+  // ─── Session Management (SDK 0.3.143+ standalone exports) ─────────────────
+  // These do NOT require an active Query — they operate on the local session
+  // JSONL storage directly via SDK standalone functions.
+
+  // list_sessions — enumerate sessions on the remote machine
+  rpcHandlerManager.registerHandler<ListSessionsRequest, ListSessionsResponse>(
+    `${scope}:list_sessions`,
+    async (req) => {
+      try {
+        const sessions = await sdkListSessions({
+          dir: req.dir,
+          limit: req.limit,
+          offset: req.offset,
+        });
+        return {
+          sessions: sessions.map((s) => ({
+            sessionId: s.sessionId,
+            summary: s.summary,
+            lastModified: s.lastModified,
+            fileSize: s.fileSize,
+            customTitle: s.customTitle,
+            firstPrompt: s.firstPrompt,
+            gitBranch: s.gitBranch,
+            cwd: s.cwd,
+            tag: s.tag,
+            createdAt: s.createdAt,
+          })),
+        };
+      } catch (e) {
+        logger.debug("[claudeControl] list_sessions failed", e);
+        return { sessions: [] };
+      }
+    },
+  );
+
+  // get_session_info — get info about a specific session
+  rpcHandlerManager.registerHandler<GetSessionInfoRequest, GetSessionInfoResponse>(
+    `${scope}:get_session_info`,
+    async (req) => {
+      try {
+        const info = await sdkGetSessionInfo(req.targetSessionId, {
+          dir: req.dir,
+        });
+        if (!info) return { session: null };
+        return {
+          session: {
+            sessionId: info.sessionId,
+            summary: info.summary,
+            lastModified: info.lastModified,
+            fileSize: info.fileSize,
+            customTitle: info.customTitle,
+            firstPrompt: info.firstPrompt,
+            gitBranch: info.gitBranch,
+            cwd: info.cwd,
+            tag: info.tag,
+            createdAt: info.createdAt,
+          },
+        };
+      } catch (e) {
+        logger.debug("[claudeControl] get_session_info failed", e);
+        return { session: null };
+      }
+    },
+  );
+
+  // delete_session — remove a session's JSONL file
+  rpcHandlerManager.registerHandler<DeleteSessionRequest, DeleteSessionResponse>(
+    `${scope}:delete_session`,
+    async (req) => {
+      logger.debug(`[claudeControl] delete_session id=${req.targetSessionId}`);
+      await sdkDeleteSession(req.targetSessionId, { dir: req.dir });
+      return { success: true };
+    },
+  );
+
+  // rename_session — set a custom title on a session
+  rpcHandlerManager.registerHandler<RenameSessionRequest, RenameSessionResponse>(
+    `${scope}:rename_session`,
+    async (req) => {
+      logger.debug(`[claudeControl] rename_session id=${req.targetSessionId} title=${req.title}`);
+      await sdkRenameSession(req.targetSessionId, req.title, { dir: req.dir });
+      return { success: true };
+    },
+  );
+
+  // get_session_messages — read messages from a session's JSONL
+  rpcHandlerManager.registerHandler<GetSessionMessagesRequest, GetSessionMessagesResponse>(
+    `${scope}:get_session_messages`,
+    async (req) => {
+      try {
+        const msgs = await sdkGetSessionMessages(req.targetSessionId, {
+          dir: req.dir,
+          limit: req.limit,
+          offset: req.offset,
+          includeSystemMessages: req.includeSystemMessages,
+        });
+        return {
+          messages: msgs.map((m) => ({
+            type: m.type,
+            uuid: m.uuid,
+            sessionId: m.session_id,
+            content: m.message,
+          })),
+          totalCount: msgs.length,
+        };
+      } catch (e) {
+        logger.debug("[claudeControl] get_session_messages failed", e);
+        return { messages: [], totalCount: 0 };
+      }
+    },
+  );
+
+  logger.debug("[claudeControl] Registered 17 claude-control:* RPC handlers");
 }
