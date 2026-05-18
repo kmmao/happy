@@ -1,5 +1,30 @@
 # Changelog
 
+## 2.28.0 - 2026-05-18
+
+Major stability and performance improvements for web, plus full session message loading across all platforms.
+
+### Full Message Loading
+- Added full session message loading — all messages are now fetched at once instead of being limited to the latest page, with support for sessions of any size
+- Added loading percentage indicator — displays "Loading X% (loaded/total)" while session messages are being fetched and decrypted
+- Improved fetch batch size from 300/500 to 2000 messages per request, reducing server round-trips
+
+### Web Stability
+- Fixed white screen crash caused by infinite retry loops — backoff now caps at 100 retries before stopping
+- Added global Error Boundary for web — catches render errors and shows a recovery UI instead of a blank page
+- Fixed terminal component not cleaning up on initialization failure
+- Added tab visibility protection — activity updates are paused while the tab is hidden and flushed on return, preventing background CPU bursts
+
+### Performance
+- Added parse caching for plan and diff preview parsing — prevents redundant string parsing on every render cycle
+- Improved session messages LRU cache capacity from 3 to 5 sessions
+- Increased display message cap from 300 to 10,000 and native cache from 350 to 5,000
+
+### Context Usage & Tools
+- Added knowledge lifecycle trends visualization
+- Added task description display in progress panel
+- Improved tool UI with new tool view components
+
 ## 2.27.0 - 2026-05-12
 
 This release adds Turn separators, message metadata badges, smart auto-send improvements, and fixes message queue reliability across sessions and clients.
