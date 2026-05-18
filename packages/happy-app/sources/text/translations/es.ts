@@ -301,6 +301,9 @@ export const es: TranslationStructure = {
     compactSessionView: "Vista compacta de sesiones",
     compactSessionViewDescription:
       "Mostrar sesiones activas en un diseño más compacto",
+    showAgentsDashboard: "Panel de sesiones de agentes",
+    showAgentsDashboardDescription:
+      "Mostrar la vista horizontal de sesiones de agentes en la parte superior de la lista",
     collapsibleInput: "Entrada plegable",
     collapsibleInputDescription:
       "Colapsar automáticamente el cuadro de entrada cuando una sesión tiene mensajes",
@@ -4328,6 +4331,14 @@ export const es: TranslationStructure = {
       toolsCount: "{n} herramientas",
       invokerEntry: "Invocar herramienta MCP",
       invokerSubtitle: "Ejecutar una herramienta directamente en la sesión remota",
+      addServer: "Añadir servidor MCP",
+      reconnect: "Reconectar",
+      serverName: "Nombre del servidor",
+      transportType: "Transporte",
+      command: "Comando",
+      args: "Argumentos",
+      argsPlaceholder: "Separados por espacios (opcional)",
+      adding: "Añadiendo…",
     },
   },
   world: {

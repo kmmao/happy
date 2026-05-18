@@ -1,6 +1,6 @@
 /**
- * Claude Control RPC client — App-side wrapper for the 6 sidebar APIs
- * exposed by happy-cli (SDK 0.2.119+).
+ * Claude Control RPC client — App-side wrapper for the sidebar APIs
+ * exposed by happy-cli (SDK 0.2.119+, extended in 0.3.142+).
  *
  * All calls go through `apiSocket.sessionRPC` which applies the existing
  * per-session E2E encryption (AES-256-GCM via Session.dataEncryptionKey). No
@@ -40,6 +40,12 @@ import type {
     GetMcpServersResponse,
     GetContextDetailRequest,
     GetContextDetailResponse,
+    SetMcpServersRequest,
+    SetMcpServersResponse,
+    ReconnectMcpServerRequest,
+    ReconnectMcpServerResponse,
+    ToggleMcpServerRequest,
+    ToggleMcpServerResponse,
     ClaudeControlMethod,
 } from '@kmmao/happy-wire';
 import { CLAUDE_CONTROL_SCOPE } from '@kmmao/happy-wire';
@@ -207,6 +213,66 @@ export async function fetchMcpServers(sessionId: string): Promise<GetMcpServersR
         {},
     );
 }
+
+// ─── set_mcp_servers (SDK 0.3.142+) ────────────────────────────────────────
+
+/**
+ * Hot-swap the full set of MCP servers on a running session. The SDK diffs
+ * against the current config: newly added servers are connected, removed ones
+ * are disconnected, unchanged ones keep their connection.
+ *
+ * @param servers - Full MCP server config map (keys = server names).
+ * @returns Which servers were added, removed, and any per-server errors.
+ */
+export async function setMcpServers(
+    sessionId: string,
+    servers: SetMcpServersRequest['servers'],
+): Promise<SetMcpServersResponse> {
+    return apiSocket.sessionRPC<SetMcpServersResponse, SetMcpServersRequest>(
+        sessionId,
+        methodName('set_mcp_servers'),
+        { servers },
+    );
+}
+
+// ─── reconnect_mcp_server (SDK 0.3.142+) ───────────────────────────────────
+
+/**
+ * Reconnect a single MCP server by name. Useful when a server has a transient
+ * failure (status = 'failed') and the user wants to retry without restarting
+ * the entire session.
+ */
+export async function reconnectMcpServer(
+    sessionId: string,
+    serverName: string,
+): Promise<ReconnectMcpServerResponse> {
+    return apiSocket.sessionRPC<ReconnectMcpServerResponse, ReconnectMcpServerRequest>(
+        sessionId,
+        methodName('reconnect_mcp_server'),
+        { serverName },
+    );
+}
+
+// ─── toggle_mcp_server (SDK 0.3.142+) ──────────────────────────────────────
+
+/**
+ * Enable or disable a single MCP server without removing its config. When
+ * disabled, the server's tools are excluded from the Claude context; when
+ * re-enabled, the server reconnects automatically.
+ */
+export async function toggleMcpServer(
+    sessionId: string,
+    serverName: string,
+    enabled: boolean,
+): Promise<ToggleMcpServerResponse> {
+    return apiSocket.sessionRPC<ToggleMcpServerResponse, ToggleMcpServerRequest>(
+        sessionId,
+        methodName('toggle_mcp_server'),
+        { serverName, enabled },
+    );
+}
+
+// ─── Helpers ────────────────────────────────────────────────────────────────
 
 /**
  * Helper: generate a client-side confirm token for mcp_call. Runs on both

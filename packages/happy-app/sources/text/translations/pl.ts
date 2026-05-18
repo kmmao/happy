@@ -311,6 +311,9 @@ export const pl: TranslationStructure = {
     compactSessionView: "Kompaktowy widok sesji",
     compactSessionViewDescription:
       "Pokazuj aktywne sesje w bardziej zwartym układzie",
+    showAgentsDashboard: "Panel sesji agentów",
+    showAgentsDashboardDescription:
+      "Pokaż poziomy przegląd sesji agentów na górze listy sesji",
     collapsibleInput: "Zwijane pole wprowadzania",
     collapsibleInputDescription:
       "Automatycznie zwijaj pole wprowadzania, gdy sesja ma wiadomości",
@@ -4349,6 +4352,14 @@ export const pl: TranslationStructure = {
       toolsCount: "{n} narzędzi",
       invokerEntry: "Wywołaj narzędzie MCP",
       invokerSubtitle: "Uruchom narzędzie bezpośrednio w zdalnej sesji",
+      addServer: "Dodaj serwer MCP",
+      reconnect: "Połącz ponownie",
+      serverName: "Nazwa serwera",
+      transportType: "Transport",
+      command: "Polecenie",
+      args: "Argumenty",
+      argsPlaceholder: "Rozdzielone spacjami (opcjonalnie)",
+      adding: "Dodawanie…",
     },
   },
   world: {
