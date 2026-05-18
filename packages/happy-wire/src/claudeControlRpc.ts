@@ -349,6 +349,91 @@ export const ApplySettingsResponseSchema = z.object({
 export type ApplySettingsRequest = z.infer<typeof ApplySettingsRequestSchema>;
 export type ApplySettingsResponse = z.infer<typeof ApplySettingsResponseSchema>;
 
+// ── Session Management (SDK 0.3.143+ standalone exports) ───────────────────
+
+/** Session info shape returned by SDK's listSessions / getSessionInfo. */
+export const SdkSessionInfoSchema = z.object({
+    sessionId: z.string(),
+    summary: z.string(),
+    lastModified: z.number(),
+    fileSize: z.number().optional(),
+    customTitle: z.string().optional(),
+    firstPrompt: z.string().optional(),
+    gitBranch: z.string().optional(),
+    cwd: z.string().optional(),
+    tag: z.string().optional(),
+    createdAt: z.number().optional(),
+});
+export type SdkSessionInfo = z.infer<typeof SdkSessionInfoSchema>;
+
+// ── list_sessions ──────────────────────────────────────────────────────────
+export const ListSessionsRequestSchema = z.object({
+    /** Directory to scope results to. Omit for all projects. */
+    dir: z.string().optional(),
+    limit: z.number().int().positive().max(500).optional(),
+    offset: z.number().int().nonnegative().optional(),
+}).strict();
+export const ListSessionsResponseSchema = z.object({
+    sessions: z.array(SdkSessionInfoSchema),
+}).strict();
+export type ListSessionsRequest = z.infer<typeof ListSessionsRequestSchema>;
+export type ListSessionsResponse = z.infer<typeof ListSessionsResponseSchema>;
+
+// ── get_session_info ───────────────────────────────────────────────────────
+export const GetSessionInfoRequestSchema = z.object({
+    /** Session ID to look up. */
+    targetSessionId: z.string().min(1),
+    dir: z.string().optional(),
+}).strict();
+export const GetSessionInfoResponseSchema = z.object({
+    session: SdkSessionInfoSchema.nullable(),
+}).strict();
+export type GetSessionInfoRequest = z.infer<typeof GetSessionInfoRequestSchema>;
+export type GetSessionInfoResponse = z.infer<typeof GetSessionInfoResponseSchema>;
+
+// ── delete_session ─────────────────────────────────────────────────────────
+export const DeleteSessionRequestSchema = z.object({
+    targetSessionId: z.string().min(1),
+    dir: z.string().optional(),
+}).strict();
+export const DeleteSessionResponseSchema = z.object({
+    success: z.literal(true),
+}).strict();
+export type DeleteSessionRequest = z.infer<typeof DeleteSessionRequestSchema>;
+export type DeleteSessionResponse = z.infer<typeof DeleteSessionResponseSchema>;
+
+// ── rename_session ─────────────────────────────────────────────────────────
+export const RenameSessionRequestSchema = z.object({
+    targetSessionId: z.string().min(1),
+    title: z.string().min(1).max(500),
+    dir: z.string().optional(),
+}).strict();
+export const RenameSessionResponseSchema = z.object({
+    success: z.literal(true),
+}).strict();
+export type RenameSessionRequest = z.infer<typeof RenameSessionRequestSchema>;
+export type RenameSessionResponse = z.infer<typeof RenameSessionResponseSchema>;
+
+// ── get_session_messages ───────────────────────────────────────────────────
+export const GetSessionMessagesRequestSchema = z.object({
+    targetSessionId: z.string().min(1),
+    dir: z.string().optional(),
+    limit: z.number().int().positive().max(1000).optional(),
+    offset: z.number().int().nonnegative().optional(),
+    includeSystemMessages: z.boolean().optional(),
+}).strict();
+export const GetSessionMessagesResponseSchema = z.object({
+    messages: z.array(z.object({
+        type: z.enum(['user', 'assistant', 'system']),
+        uuid: z.string(),
+        sessionId: z.string(),
+        content: z.unknown(),
+    })),
+    totalCount: z.number().int().nonnegative(),
+}).strict();
+export type GetSessionMessagesRequest = z.infer<typeof GetSessionMessagesRequestSchema>;
+export type GetSessionMessagesResponse = z.infer<typeof GetSessionMessagesResponseSchema>;
+
 /**
  * Method name enum — consumers should derive typed handlers from this.
  * When adding a new method, update the CLI handler registration too.
@@ -366,6 +451,11 @@ export const CLAUDE_CONTROL_METHODS = [
     'reconnect_mcp_server',
     'toggle_mcp_server',
     'apply_settings',
+    'list_sessions',
+    'get_session_info',
+    'delete_session',
+    'rename_session',
+    'get_session_messages',
 ] as const;
 
 export type ClaudeControlMethod = typeof CLAUDE_CONTROL_METHODS[number];

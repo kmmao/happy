@@ -15,6 +15,10 @@ This document describes which features from the official `@anthropic-ai/claude-a
 | **initializationResult()** (model list + capabilities) | Yes | No | No |
 | **interrupt()** | Yes | No | No |
 | **stopTask()** | Yes | No | No |
+| **applyFlagSettings()** hot-swap | Yes | No | No |
+| **listSessions()** / **getSessionInfo()** | Yes | No | No |
+| **deleteSession()** / **renameSession()** | Yes | No | No |
+| **getSessionMessages()** | Yes | No | No |
 | Basic session protocol (messages, tool calls) | Yes | Yes | Yes |
 | Permission mode (default/acceptEdits/bypassPermissions/plan) | Yes | Mapped (read-only/safe-yolo/yolo) | Yes |
 
@@ -86,6 +90,27 @@ The hot-swap is triggered in `claudeRemote.ts` when a new turn arrives with diff
 | `packages/happy-cli/src/claude/rpc/claudeControlHandlers.ts` | RPC handlers including `apply_settings` → `applyFlagSettings()` |
 | `packages/happy-app/sources/sync/apiClaudeControl.ts` | App-side RPC client for claude-control methods |
 | `packages/happy-wire/src/sessionProtocol.ts` | Protocol schema (prompt-suggestion event, etc.) |
+
+## Session Management (SDK 0.3.143+)
+
+The SDK exports standalone functions for managing session JSONL files on the local filesystem. These are exposed via `claude-control:` RPC so the App can browse, rename, and delete CLI-side sessions remotely.
+
+| RPC Method | SDK Function | Needs Query? | Notes |
+|-----------|-------------|:------------:|-------|
+| `list_sessions` | `listSessions()` | No | Paginated, optional dir filter |
+| `get_session_info` | `getSessionInfo()` | No | Returns null if not found |
+| `delete_session` | `deleteSession()` | No | **Destructive** — permanent |
+| `rename_session` | `renameSession()` | No | Sets `customTitle` in JSONL |
+| `get_session_messages` | `getSessionMessages()` | No | Paginated, optional system messages |
+
+**Important:** These operate on the SDK's local JSONL session files, NOT on Happy server sessions. The `targetSessionId` parameter refers to the Claude Code session UUID, which is separate from the Happy session ID used for transport.
+
+App-side client functions are in `apiClaudeControl.ts`:
+- `listRemoteSessions(sessionId, options?)` — list all CLI sessions
+- `getRemoteSessionInfo(sessionId, targetSessionId)` — get one session's info
+- `deleteRemoteSession(sessionId, targetSessionId)` — delete a session
+- `renameRemoteSession(sessionId, targetSessionId, title)` — rename a session
+- `getRemoteSessionMessages(sessionId, targetSessionId, options?)` — read messages
 
 ## SDK Version
 
