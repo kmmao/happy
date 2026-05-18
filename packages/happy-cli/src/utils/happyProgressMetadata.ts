@@ -43,9 +43,7 @@ export function applyHappyProgressUpdate<T extends Metadata>(
   const implicitBoundary =
     !input.listId &&
     !!currentList &&
-    shouldStartNewProgressList(currentList.todos, input.todos, {
-      requirePriorCompleted: true,
-    });
+    shouldStartNewProgressList(currentList.todos, input.todos);
 
   let nextLists = lists;
   let targetId: string;

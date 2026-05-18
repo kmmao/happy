@@ -949,14 +949,7 @@ export const knownTools = {
     },
     icon: ICON_TODO,
     noStatus: true,
-    minimal: (opts: { metadata: Metadata | null; tool: ToolCall }) => {
-      const input = opts.tool.input;
-      if (!input) return true;
-      if (typeof input.subject === "string" || typeof input.description === "string") {
-        return false;
-      }
-      return true;
-    },
+    minimal: false,
     flat: true,
     input: z
       .object({
