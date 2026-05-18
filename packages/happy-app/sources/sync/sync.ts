@@ -543,7 +543,7 @@ class Sync {
     if (!encryption) return;
 
     const response = await apiSocket.request(
-      `/v3/sessions/${sessionId}/messages?before_seq=${oldestSeq}&limit=300`,
+      `/v3/sessions/${sessionId}/messages?before_seq=${oldestSeq}&limit=2000`,
     );
     if (!response.ok) return;
 
@@ -2170,7 +2170,6 @@ class Sync {
 
       const initialAfterSeq = this.sessionLastSeq.get(sessionId) ?? 0;
       const fetchStrategy = resolveMessageHistoryFetchStrategy({
-        platformOS: Platform.OS,
         initialAfterSeq,
       });
       const shouldApplyImmediately = shouldApplyMessagesImmediately(fetchStrategy);
@@ -2201,7 +2200,7 @@ class Sync {
 
       if (shouldFetchNewestPageFirst(fetchStrategy)) {
         const newestResponse = await apiSocket.request(
-          `/v3/sessions/${sessionId}/messages?before_seq=2147483647&limit=300`,
+          `/v3/sessions/${sessionId}/messages?before_seq=2147483647&limit=2000`,
         );
         if (!newestResponse.ok && newestResponse.status === 404) {
           log.log(
@@ -2260,7 +2259,7 @@ class Sync {
 
       while (hasMore) {
         const response = await apiSocket.request(
-          `/v3/sessions/${sessionId}/messages?after_seq=${afterSeq}&limit=500`,
+          `/v3/sessions/${sessionId}/messages?after_seq=${afterSeq}&limit=2000`,
         );
         if (!response.ok) {
           if (response.status === 404) {

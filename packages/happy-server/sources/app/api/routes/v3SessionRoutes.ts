@@ -41,7 +41,7 @@ function cacheNotFound(key: string): void {
 const getMessagesQuerySchema = z.object({
   after_seq: z.coerce.number().int().min(0).default(0),
   before_seq: z.coerce.number().int().min(0).max(2147483647).optional(),
-  limit: z.coerce.number().int().min(1).max(500).default(100),
+  limit: z.coerce.number().int().min(1).max(5000).default(100),
 });
 
 const sendMessagesBodySchema = z.object({

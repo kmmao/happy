@@ -4,18 +4,16 @@ export type MessageHistoryFetchStrategy =
   | "webLatestOnly";
 
 interface ResolveMessageHistoryFetchStrategyInput {
-  platformOS: string;
   initialAfterSeq: number;
 }
 
 export function resolveMessageHistoryFetchStrategy({
-  platformOS,
   initialAfterSeq,
 }: ResolveMessageHistoryFetchStrategyInput): MessageHistoryFetchStrategy {
   if (initialAfterSeq > 0) {
     return "incremental";
   }
-  return platformOS === "web" ? "webLatestOnly" : "nativeFullHistory";
+  return "nativeFullHistory";
 }
 
 export function shouldFetchNewestPageFirst(

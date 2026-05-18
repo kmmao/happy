@@ -176,7 +176,7 @@ export function sessionRoutes(app: Fastify) {
       schema: {
         querystring: z
           .object({
-            limit: z.coerce.number().int().min(1).max(500).default(150),
+            limit: z.coerce.number().int().min(1).max(5000).default(150),
           })
           .optional(),
       },

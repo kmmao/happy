@@ -354,7 +354,7 @@ describe("v3SessionRoutes", () => {
 
         const tooLargeLimit = await app.inject({
             method: "GET",
-            url: "/v3/sessions/session-1/messages?limit=501",
+            url: "/v3/sessions/session-1/messages?limit=5001",
             headers: { "x-user-id": "owner-user" }
         });
         expect(tooLargeLimit.statusCode).toBe(400);

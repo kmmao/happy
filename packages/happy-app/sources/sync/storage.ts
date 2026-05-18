@@ -432,7 +432,7 @@ function resolveLatestUserRequestPreview(
 
 // Maximum number of sessions whose full message history is kept in memory at once.
 // Older sessions are evicted when this limit is exceeded; they reload on demand.
-const MAX_LOADED_SESSIONS = 3;
+const MAX_LOADED_SESSIONS = 5;
 
 /**
  * Updates the LRU access order and evicts the oldest session messages when the
@@ -2406,7 +2406,7 @@ export function useHasUnreadMessages(sessionId: string): boolean {
 
 // Cap displayed messages to bound all downstream O(n) computations in ChatList.
 // Full history is still in messagesMap; this only limits the rendered slice.
-export const MAX_DISPLAY_MESSAGES = 300;
+export const MAX_DISPLAY_MESSAGES = 10000;
 
 export function useSessionMessages(
   sessionId: string,

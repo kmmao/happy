@@ -7,20 +7,8 @@ import {
 } from "./messageFetchStrategy";
 
 describe("messageFetchStrategy", () => {
-  it("uses latest-only history fetch on web when no cursor exists", () => {
+  it("uses full history fetch when no cursor exists", () => {
     const strategy = resolveMessageHistoryFetchStrategy({
-      platformOS: "web",
-      initialAfterSeq: 0,
-    });
-
-    expect(strategy).toBe("webLatestOnly");
-    expect(shouldFetchNewestPageFirst(strategy)).toBe(true);
-    expect(shouldApplyMessagesImmediately(strategy)).toBe(true);
-  });
-
-  it("uses full native history fetch when no cursor exists", () => {
-    const strategy = resolveMessageHistoryFetchStrategy({
-      platformOS: "ios",
       initialAfterSeq: 0,
     });
 
@@ -29,17 +17,15 @@ describe("messageFetchStrategy", () => {
     expect(shouldApplyMessagesImmediately(strategy)).toBe(false);
   });
 
-  it("uses incremental fetch once a cursor exists on any platform", () => {
+  it("uses incremental fetch once a cursor exists", () => {
     expect(
       resolveMessageHistoryFetchStrategy({
-        platformOS: "web",
         initialAfterSeq: 42,
       }),
     ).toBe("incremental");
     expect(
       resolveMessageHistoryFetchStrategy({
-        platformOS: "android",
-        initialAfterSeq: 42,
+        initialAfterSeq: 1,
       }),
     ).toBe("incremental");
   });
