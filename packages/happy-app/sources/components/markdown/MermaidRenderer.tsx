@@ -73,6 +73,10 @@ export const MermaidRenderer = React.memo((props: { content: string }) => {
     React.useEffect(() => {
       let isMounted = true;
       setHasError(false);
+      // Track the temporary DOM element created by mermaid.render() so we can
+      // remove it on cleanup. Without this, each render call leaves an orphaned
+      // <div id="d..."> in the document body, causing unbounded DOM growth.
+      let renderId: string | null = null;
 
       const renderMermaid = async () => {
         try {
@@ -88,10 +92,17 @@ export const MermaidRenderer = React.memo((props: { content: string }) => {
           }
 
           if (mermaid.render) {
+            renderId = `mermaid-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
             const { svg } = await mermaid.render(
-              `mermaid-${Date.now()}`,
+              renderId,
               props.content,
             );
+
+            // Clean up the temporary container element that mermaid.render() inserts
+            // into the document body (identified by "d" + renderId).
+            try {
+              document.getElementById("d" + renderId)?.remove();
+            } catch { /* best-effort */ }
 
             const dompurifyModule: any = await import("dompurify");
             const DOMPurify = dompurifyModule.default || dompurifyModule;
@@ -117,6 +128,12 @@ export const MermaidRenderer = React.memo((props: { content: string }) => {
 
       return () => {
         isMounted = false;
+        // Also clean up on unmount in case render completed after effect cleanup
+        if (renderId) {
+          try {
+            document.getElementById("d" + renderId)?.remove();
+          } catch { /* best-effort */ }
+        }
       };
     }, [props.content]);
 

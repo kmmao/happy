@@ -18,6 +18,8 @@
  *       read_file
  *   - Permission-gated (destructive side effects):
  *       mcp_call
+ *   - MCP management tier (runtime server lifecycle, SDK 0.3.142+):
+ *       set_mcp_servers, reconnect_mcp_server, toggle_mcp_server
  */
 
 import { z } from 'zod';
@@ -266,6 +268,62 @@ export const GetMcpServersResponseSchema = z.object({
 export type GetMcpServersRequest = z.infer<typeof GetMcpServersRequestSchema>;
 export type GetMcpServersResponse = z.infer<typeof GetMcpServersResponseSchema>;
 
+// ── set_mcp_servers (SDK 0.3.142+) ──────────────────────────────────────────
+/**
+ * Hot-swap the full set of MCP servers on a running session. The SDK diffs
+ * against the current set, connects newly added servers, and disconnects
+ * removed ones. Existing servers whose config hasn't changed keep their
+ * connection alive.
+ */
+export const SetMcpServersRequestSchema = z.object({
+    /** Full MCP server config map — keys are server names, values are McpServerConfig. */
+    servers: z.record(z.string(), z.object({
+        /** Transport type: 'stdio', 'sse', 'streamable-http', or 'url'. */
+        type: z.string().optional(),
+        /** Command for stdio transport. */
+        command: z.string().optional(),
+        /** Args for stdio transport. */
+        args: z.array(z.string()).optional(),
+        /** Environment variables for stdio transport. */
+        env: z.record(z.string(), z.string()).optional(),
+        /** URL for sse / streamable-http / url transports. */
+        url: z.string().optional(),
+    })),
+}).strict();
+export const SetMcpServersResponseSchema = z.object({
+    /** Server names that were newly connected. */
+    added: z.array(z.string()),
+    /** Server names that were disconnected. */
+    removed: z.array(z.string()),
+    /** Per-server errors keyed by server name. Empty when all succeeded. */
+    errors: z.record(z.string(), z.string()),
+}).strict();
+export type SetMcpServersRequest = z.infer<typeof SetMcpServersRequestSchema>;
+export type SetMcpServersResponse = z.infer<typeof SetMcpServersResponseSchema>;
+
+// ── reconnect_mcp_server (SDK 0.3.142+) ─────────────────────────────────────
+/** Reconnect a single MCP server by name (e.g. after a transient failure). */
+export const ReconnectMcpServerRequestSchema = z.object({
+    serverName: z.string().min(1).max(256),
+}).strict();
+export const ReconnectMcpServerResponseSchema = z.object({
+    success: z.literal(true),
+}).strict();
+export type ReconnectMcpServerRequest = z.infer<typeof ReconnectMcpServerRequestSchema>;
+export type ReconnectMcpServerResponse = z.infer<typeof ReconnectMcpServerResponseSchema>;
+
+// ── toggle_mcp_server (SDK 0.3.142+) ────────────────────────────────────────
+/** Enable or disable a single MCP server without removing its config. */
+export const ToggleMcpServerRequestSchema = z.object({
+    serverName: z.string().min(1).max(256),
+    enabled: z.boolean(),
+}).strict();
+export const ToggleMcpServerResponseSchema = z.object({
+    success: z.literal(true),
+}).strict();
+export type ToggleMcpServerRequest = z.infer<typeof ToggleMcpServerRequestSchema>;
+export type ToggleMcpServerResponse = z.infer<typeof ToggleMcpServerResponseSchema>;
+
 /**
  * Method name enum — consumers should derive typed handlers from this.
  * When adding a new method, update the CLI handler registration too.
@@ -279,6 +337,9 @@ export const CLAUDE_CONTROL_METHODS = [
     'get_context_usage',
     'get_mcp_servers',
     'get_context_detail',
+    'set_mcp_servers',
+    'reconnect_mcp_server',
+    'toggle_mcp_server',
 ] as const;
 
 export type ClaudeControlMethod = typeof CLAUDE_CONTROL_METHODS[number];

@@ -301,6 +301,9 @@ export const ca: TranslationStructure = {
     compactSessionView: "Vista compacta de sessions",
     compactSessionViewDescription:
       "Mostra les sessions actives en un disseny més compacte",
+    showAgentsDashboard: "Panell de sessions d'agents",
+    showAgentsDashboardDescription:
+      "Mostra la vista horitzontal de sessions d'agents a la part superior de la llista",
     collapsibleInput: "Entrada plegable",
     collapsibleInputDescription:
       "Plegar automàticament el quadre d'entrada quan una sessió té missatges",
@@ -4333,6 +4336,14 @@ export const ca: TranslationStructure = {
       toolsCount: "{n} eines",
       invokerEntry: "Invocar eina MCP",
       invokerSubtitle: "Executar una eina directament a la sessió remota",
+      addServer: "Afegir servidor MCP",
+      reconnect: "Reconnectar",
+      serverName: "Nom del servidor",
+      transportType: "Transport",
+      command: "Comanda",
+      args: "Arguments",
+      argsPlaceholder: "Separats per espais (opcional)",
+      adding: "Afegint…",
     },
   },
   world: {

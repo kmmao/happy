@@ -266,6 +266,9 @@ export const ru: TranslationStructure = {
     compactSessionView: "Компактный вид сессий",
     compactSessionViewDescription:
       "Отображать активные сессии в более компактном виде",
+    showAgentsDashboard: "Панель сессий агентов",
+    showAgentsDashboardDescription:
+      "Показывать горизонтальную панель обзора сессий агентов в верхней части списка",
     collapsibleInput: "Сворачиваемый ввод",
     collapsibleInputDescription:
       "Автоматически сворачивать поле ввода при наличии сообщений",
@@ -4347,6 +4350,14 @@ export const ru: TranslationStructure = {
       toolsCount: "{n} инструментов",
       invokerEntry: "Вызов MCP инструмента",
       invokerSubtitle: "Запустить инструмент напрямую в удалённой сессии",
+      addServer: "Добавить MCP сервер",
+      reconnect: "Переподключить",
+      serverName: "Имя сервера",
+      transportType: "Транспорт",
+      command: "Команда",
+      args: "Аргументы",
+      argsPlaceholder: "Через пробел (необязательно)",
+      adding: "Добавление…",
     },
   },
   world: {

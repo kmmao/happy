@@ -754,4 +754,31 @@ export class ApiClient {
       return null;
     }
   }
+
+  /**
+   * Fetch a single value from the UserKVStore by key.
+   * Returns null if the key doesn't exist or on network error.
+   * Used by the MCP registry to load persistent server configs on session start.
+   */
+  async fetchKvValue(key: string): Promise<{ key: string; value: string; version: number } | null> {
+    try {
+      const response = await axios.get<{ key: string; value: string; version: number }>(
+        `${configuration.serverUrl}/v1/kv/${encodeURIComponent(key)}`,
+        {
+          headers: {
+            Authorization: `Bearer ${this.credential.token}`,
+            "Content-Type": "application/json",
+          },
+          timeout: 5000,
+        },
+      );
+      return response.data;
+    } catch (error: any) {
+      if (error.response?.status === 404) {
+        return null;
+      }
+      logger.debug(`[API] fetchKvValue(${key}) failed:`, error);
+      return null;
+    }
+  }
 }

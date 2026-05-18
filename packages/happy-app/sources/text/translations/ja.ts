@@ -430,6 +430,9 @@ export const ja: TranslationStructure = {
     compactSessionView: "コンパクトセッション表示",
     compactSessionViewDescription:
       "アクティブなセッションをコンパクトなレイアウトで表示",
+    showAgentsDashboard: "エージェントセッションダッシュボード",
+    showAgentsDashboardDescription:
+      "セッション一覧の上部に横向きのエージェントセッション概要を表示",
     collapsibleInput: "入力ボックスの折りたたみ",
     collapsibleInputDescription:
       "メッセージがあるセッションで入力ボックスを自動的に折りたたむ",
@@ -4301,6 +4304,14 @@ export const ja: TranslationStructure = {
       toolsCount: "{n} ツール",
       invokerEntry: "MCPツールを実行",
       invokerSubtitle: "リモートセッションで直接ツールを実行する",
+      addServer: "MCPサーバーを追加",
+      reconnect: "再接続",
+      serverName: "サーバー名",
+      transportType: "トランスポート",
+      command: "コマンド",
+      args: "引数",
+      argsPlaceholder: "スペース区切り（任意）",
+      adding: "追加中…",
     },
   },
 

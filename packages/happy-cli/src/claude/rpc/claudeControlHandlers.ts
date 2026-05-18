@@ -1,6 +1,6 @@
 /**
- * Claude Control RPC handlers — CLI-side implementations for the 6 sidebar
- * APIs exposed to Happy App (SDK 0.2.119+).
+ * Claude Control RPC handlers — CLI-side implementations for the sidebar
+ * APIs exposed to Happy App (SDK 0.2.119+, extended in 0.3.142+).
  *
  * Schemas are defined in @kmmao/happy-wire/claudeControlRpc.ts. This file
  * implements each method on top of the Claude SDK (`Query`) and host
@@ -31,6 +31,7 @@ import { homedir } from "node:os";
 import type {
   Query as OfficialQuery,
   SDKResultMessage,
+  McpServerConfig,
 } from "@anthropic-ai/claude-agent-sdk";
 import type { RpcHandlerManager } from "@/api/rpc/RpcHandlerManager";
 import { logger } from "@/ui/logger";
@@ -50,6 +51,12 @@ import {
   type GetContextUsageResponse,
   type GetMcpServersRequest,
   type GetMcpServersResponse,
+  type SetMcpServersRequest,
+  type SetMcpServersResponse,
+  type ReconnectMcpServerRequest,
+  type ReconnectMcpServerResponse,
+  type ToggleMcpServerRequest,
+  type ToggleMcpServerResponse,
 } from "@kmmao/happy-wire";
 
 // ─── Constants ──────────────────────────────────────────────────────────────
@@ -518,5 +525,61 @@ export function registerClaudeControlHandlers(
     },
   );
 
-  logger.debug("[claudeControl] Registered 8 claude-control:* RPC handlers");
+  // set_mcp_servers — hot-swap MCP server config on a running session (SDK 0.3.142+)
+  rpcHandlerManager.registerHandler<SetMcpServersRequest, SetMcpServersResponse>(
+    `${scope}:set_mcp_servers`,
+    async (req) => {
+      const q = getCurrentQuery();
+      if (!q) {
+        return { added: [], removed: [], errors: { _: "No active query" } };
+      }
+      try {
+        // Cast through unknown — wire schema uses loose string types for transport
+        // flexibility; SDK expects discriminated union McpServerConfig.
+        const result = await q.setMcpServers(req.servers as unknown as Record<string, McpServerConfig>);
+        logger.debug(
+          `[claudeControl] set_mcp_servers added=${result.added.join(",")} removed=${result.removed.join(",")} errors=${JSON.stringify(result.errors)}`,
+        );
+        return {
+          added: result.added,
+          removed: result.removed,
+          errors: result.errors,
+        };
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        logger.debug("[claudeControl] set_mcp_servers failed", e);
+        return { added: [], removed: [], errors: { _: msg } };
+      }
+    },
+  );
+
+  // reconnect_mcp_server — reconnect a single server by name (SDK 0.3.142+)
+  rpcHandlerManager.registerHandler<ReconnectMcpServerRequest, ReconnectMcpServerResponse>(
+    `${scope}:reconnect_mcp_server`,
+    async (req) => {
+      const q = getCurrentQuery();
+      if (!q) {
+        throw new Error("No active query — cannot reconnect MCP server");
+      }
+      await q.reconnectMcpServer(req.serverName);
+      logger.debug(`[claudeControl] reconnect_mcp_server server=${req.serverName}`);
+      return { success: true };
+    },
+  );
+
+  // toggle_mcp_server — enable/disable a server without removing config (SDK 0.3.142+)
+  rpcHandlerManager.registerHandler<ToggleMcpServerRequest, ToggleMcpServerResponse>(
+    `${scope}:toggle_mcp_server`,
+    async (req) => {
+      const q = getCurrentQuery();
+      if (!q) {
+        throw new Error("No active query — cannot toggle MCP server");
+      }
+      await q.toggleMcpServer(req.serverName, req.enabled);
+      logger.debug(`[claudeControl] toggle_mcp_server server=${req.serverName} enabled=${req.enabled}`);
+      return { success: true };
+    },
+  );
+
+  logger.debug("[claudeControl] Registered 11 claude-control:* RPC handlers");
 }

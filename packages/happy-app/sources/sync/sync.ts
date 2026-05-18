@@ -5,7 +5,7 @@ import { hasCredentialSecret } from "@/auth/authCredentials";
 import { Encryption } from "@/sync/encryption/encryption";
 import { SessionEncryption } from "@/sync/encryption/sessionEncryption";
 import { decodeBase64 } from "@/encryption/base64";
-import { storage, registerPreferencesSyncCallback } from "./storage";
+import { storage, registerPreferencesSyncCallback, registerSessionEvictionCallback } from "./storage";
 import { isSessionRunning } from "@/utils/sessionUtils";
 import {
   ApiEphemeralUpdateSchema,
@@ -420,6 +420,14 @@ class Sync {
       this.syncSessionPreferences(sessionId);
     });
 
+    // Register LRU eviction callback to release per-session resources when
+    // storage evicts session messages. Without this, messagesSync / sendSync /
+    // locks / queues grow unboundedly as the user visits more sessions,
+    // eventually causing the web tab to lag and crash.
+    registerSessionEvictionCallback((sessionIds) => {
+      this.releaseSessionResources(sessionIds);
+    });
+
     // Subscribe to updates
     this.subscribeToUpdates();
 
@@ -647,6 +655,51 @@ class Sync {
     this.sessionQueueProcessing.delete(sessionId);
     if (this.lastVisibleSessionId === sessionId) {
       this.lastVisibleSessionId = null;
+    }
+  }
+
+  /**
+   * Release per-session resources when LRU evicts session messages from storage.
+   * Unlike cleanupSessionLocally (which handles 404 deletions), this is a soft
+   * eviction: the session still exists on the server, so we keep sessionLastSeq
+   * (for incremental fetch when the user returns) but release heavy objects
+   * (InvalidateSync with closures, locks, queues) that accumulate over time.
+   */
+  private releaseSessionResources(sessionIds: string[]) {
+    for (const sessionId of sessionIds) {
+      // Stop and remove message sync (will be re-created lazily on next visit)
+      const msgSync = this.messagesSync.get(sessionId);
+      if (msgSync) {
+        msgSync.stop();
+        this.messagesSync.delete(sessionId);
+      }
+      // Stop and remove send sync
+      const sndSync = this.sendSync.get(sessionId);
+      if (sndSync) {
+        sndSync.stop();
+        this.sendSync.delete(sessionId);
+      }
+      // Abort in-flight send requests
+      this.sendAbortControllers.get(sessionId)?.abort();
+      this.sendAbortControllers.delete(sessionId);
+      // Release locks and queues
+      this.sessionMessageLocks.delete(sessionId);
+      this.sessionMessageQueue.delete(sessionId);
+      this.sessionQueueProcessing.delete(sessionId);
+      // Release WebSocket dedup set
+      this.processedWebSocketMessageIds.delete(sessionId);
+      // Cancel any pending cache-write timer
+      const cacheTimer = this.cacheWriteTimers.get(sessionId);
+      if (cacheTimer) {
+        clearTimeout(cacheTimer);
+        this.cacheWriteTimers.delete(sessionId);
+      }
+      // Release backfill tracking (will re-backfill on next visit)
+      this.backfilledSessions.delete(sessionId);
+      this.sessionOldestSeq.delete(sessionId);
+    }
+    if (sessionIds.length > 0) {
+      log.log(`♻️ Released resources for ${sessionIds.length} evicted session(s)`);
     }
   }
 

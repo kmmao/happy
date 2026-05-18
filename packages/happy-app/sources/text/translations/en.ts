@@ -308,6 +308,9 @@ export const en: TranslationStructure = {
     compactSessionView: "Compact Session View",
     compactSessionViewDescription:
       "Show active sessions in a more compact layout",
+    showAgentsDashboard: "Agent Sessions Dashboard",
+    showAgentsDashboardDescription:
+      "Show the horizontal agent sessions overview at the top of the session list",
     collapsibleInput: "Collapsible Input",
     collapsibleInputDescription:
       "Auto-collapse the input box when a session has messages",
@@ -4326,6 +4329,14 @@ export const en: TranslationStructure = {
       toolsCount: "{n} tools",
       invokerEntry: "Invoke MCP Tool",
       invokerSubtitle: "Run a tool directly on the remote session",
+      addServer: "Add MCP Server",
+      reconnect: "Reconnect",
+      serverName: "Server name",
+      transportType: "Transport",
+      command: "Command",
+      args: "Arguments",
+      argsPlaceholder: "Space-separated (optional)",
+      adding: "Adding…",
     },
   },
 

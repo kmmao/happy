@@ -436,6 +436,9 @@ export const it: TranslationStructure = {
     compactSessionView: "Vista sessioni compatta",
     compactSessionViewDescription:
       "Mostra le sessioni attive in un layout più compatto",
+    showAgentsDashboard: "Pannello sessioni agenti",
+    showAgentsDashboardDescription:
+      "Mostra la panoramica orizzontale delle sessioni agenti in cima alla lista",
     collapsibleInput: "Input comprimibile",
     collapsibleInputDescription:
       "Comprimi automaticamente la casella di input quando una sessione ha messaggi",
@@ -4327,6 +4330,14 @@ export const it: TranslationStructure = {
       toolsCount: "{n} strumenti",
       invokerEntry: "Esegui strumento MCP",
       invokerSubtitle: "Esegui uno strumento direttamente sulla sessione remota",
+      addServer: "Aggiungi server MCP",
+      reconnect: "Riconnetti",
+      serverName: "Nome del server",
+      transportType: "Trasporto",
+      command: "Comando",
+      args: "Argomenti",
+      argsPlaceholder: "Separati da spazi (opzionale)",
+      adding: "Aggiunta…",
     },
   },
   world: {
