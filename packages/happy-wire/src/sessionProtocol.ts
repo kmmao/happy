@@ -153,6 +153,26 @@ export const sessionTaskEndEventSchema = z.object({
     .optional(),
 });
 
+export const sessionTaskUpdatedEventSchema = z.object({
+  t: z.literal("task-updated"),
+  taskId: z.string(),
+  patch: z.object({
+    status: z.enum(["pending", "running", "completed", "failed", "killed", "paused"]).optional(),
+    description: z.string().optional(),
+    endTime: z.number().optional(),
+    error: z.string().optional(),
+    isBackgrounded: z.boolean().optional(),
+  }),
+});
+
+export const sessionRateLimitEventSchema = z.object({
+  t: z.literal("rate-limit"),
+  status: z.enum(["allowed", "allowed_warning", "rejected"]),
+  resetsAt: z.number().optional(),
+  rateLimitType: z.string().optional(),
+  utilization: z.number().optional(),
+});
+
 export const sessionToolProgressEventSchema = z.object({
   t: z.literal("tool-progress"),
   toolUseId: z.string(),
@@ -228,6 +248,8 @@ export const sessionEventSchema = z.discriminatedUnion("t", [
   sessionTaskStartEventSchema,
   sessionTaskProgressEventSchema,
   sessionTaskEndEventSchema,
+  sessionTaskUpdatedEventSchema,
+  sessionRateLimitEventSchema,
   sessionToolProgressEventSchema,
   sessionPromptSuggestionEventSchema,
   sessionNeedsContinueEventSchema,
@@ -267,6 +289,8 @@ export const sessionEnvelopeSchema = z
         envelope.ev.t === "task-start" ||
         envelope.ev.t === "task-progress" ||
         envelope.ev.t === "task-end" ||
+        envelope.ev.t === "task-updated" ||
+        envelope.ev.t === "rate-limit" ||
         envelope.ev.t === "tool-progress" ||
         envelope.ev.t === "prompt-suggestion" ||
         envelope.ev.t === "needs-continue" ||
