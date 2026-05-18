@@ -311,24 +311,6 @@ export async function claudeRemote(opts: {
     ? systemPrompt + "\n\n" + localeInstruction
     : systemPrompt;
 
-  // System-reminder injection strategy (token optimization):
-  // - First user message: full injection as <system-reminder> text block
-  //   (guarantees the model sees all instructions even if SDK append fails)
-  // - Follow-up messages: NO injection (instructions already in conversation
-  //   history; SDK appendSystemPrompt provides system-level reinforcement)
-  //
-  // This saves ~1,500 tokens per follow-up message. In a 10-turn conversation
-  // that's ~13,500 tokens of input saved (~90% reduction in reminder overhead).
-  let isFirstUserMessage = true;
-  const buildSystemReminderPrefix = (mode: EnhancedMode): string => {
-    if (!isFirstUserMessage) return "";
-    isFirstUserMessage = false;
-    const appPrompt = mode.appendSystemPrompt;
-    const parts = [appPrompt, effectiveSystemPrompt].filter(Boolean);
-    if (parts.length === 0) return "";
-    return `<system-reminder>\n${parts.join("\n\n")}\n</system-reminder>\n\n`;
-  };
-
   const sdkOptions: QueryOptions = {
     cwd: opts.path,
     resume: startFrom ?? undefined,
@@ -427,7 +409,7 @@ export async function claudeRemote(opts: {
       type: "user",
       message: {
         role: "user",
-        content: buildSystemReminderPrefix(initial.mode) + initial.message,
+        content: initial.message,
       },
       parent_tool_use_id: null,
       session_id: undefined,
@@ -698,7 +680,7 @@ export async function claudeRemote(opts: {
         }
         messages.push({
           type: "user",
-          message: { role: "user", content: buildSystemReminderPrefix(next.mode) + next.message },
+          message: { role: "user", content: next.message },
           parent_tool_use_id: null,
           session_id: undefined,
           ...(next.mode.shouldQuery === false && { shouldQuery: false }),
