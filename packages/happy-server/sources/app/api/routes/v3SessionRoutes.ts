@@ -177,15 +177,12 @@ export function v3SessionRoutes(app: Fastify) {
       const hasMore = messages.length > limit;
       const page = hasMore ? messages.slice(0, limit) : messages;
 
-      // Include totalCount on the last page so clients can verify completeness
-      const totalCount = !hasMore
-        ? await db.sessionMessage.count({ where: { sessionId } })
-        : undefined;
+      const totalCount = await db.sessionMessage.count({ where: { sessionId } });
 
       return reply.send({
         messages: page.map(toResponseMessage),
         hasMore,
-        ...(totalCount !== undefined ? { totalCount } : {}),
+        totalCount,
       });
     },
   );
