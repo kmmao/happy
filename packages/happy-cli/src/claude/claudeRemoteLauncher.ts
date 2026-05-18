@@ -15,12 +15,14 @@ import type {
   SDKCompactBoundaryMessage as SDKCompactMsg,
   SDKTaskStartedMessage,
   SDKTaskProgressMessage,
+  SDKTaskUpdatedMessage,
   SDKTaskNotificationMessage,
   SDKAPIRetryMessage,
   SDKToolProgressMessage,
   SDKPromptSuggestionMessage,
   SDKSessionStateChangedMessage,
   SDKMemoryRecallMessage,
+  SDKRateLimitEvent,
 } from "@anthropic-ai/claude-agent-sdk";
 import { createSdkMcpServer } from "@anthropic-ai/claude-agent-sdk";
 import { z } from "zod";
@@ -1498,6 +1500,39 @@ export async function claudeRemoteLauncher(
               durationMs: m.usage.duration_ms,
             }
           : undefined,
+      });
+      session.client.sendSessionProtocolMessage(envelope);
+    }
+
+    // Forward Task updated (patch) to session protocol (SDK 0.3.142+)
+    if (
+      message.type === "system" &&
+      (message as SDKTaskUpdatedMessage).subtype === "task_updated"
+    ) {
+      const m = message as SDKTaskUpdatedMessage;
+      const envelope = createEnvelope("agent", {
+        t: "task-updated",
+        taskId: m.task_id,
+        patch: {
+          status: m.patch.status,
+          description: m.patch.description,
+          endTime: m.patch.end_time,
+          error: m.patch.error,
+          isBackgrounded: m.patch.is_backgrounded,
+        },
+      });
+      session.client.sendSessionProtocolMessage(envelope);
+    }
+
+    // Forward rate limit events to App (SDK 0.3.142+)
+    if (message.type === "rate_limit_event") {
+      const m = message as SDKRateLimitEvent;
+      const envelope = createEnvelope("agent", {
+        t: "rate-limit",
+        status: m.rate_limit_info.status,
+        resetsAt: m.rate_limit_info.resetsAt,
+        rateLimitType: m.rate_limit_info.rateLimitType,
+        utilization: m.rate_limit_info.utilization,
       });
       session.client.sendSessionProtocolMessage(envelope);
     }
