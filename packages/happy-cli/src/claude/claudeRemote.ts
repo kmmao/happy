@@ -11,6 +11,7 @@ import {
 import type { OnElicitation } from "@/claude/sdk/types";
 import type { SdkBeta } from "@anthropic-ai/claude-agent-sdk";
 import { mapToClaudeMode } from "./utils/permissionMode";
+import { buildFlagSettingsPatch } from "./utils/flagSettingsPatch";
 import { claudeCheckSession } from "./utils/claudeCheckSession";
 import { join, resolve } from "node:path";
 import { projectPath } from "@/projectPath";
@@ -648,9 +649,8 @@ export async function claudeRemote(opts: {
           model = newModel;
         }
 
-        // Snapshot current tools before mode is reassigned (used for applyFlagSettings diff below).
-        const prevAllowedTools = mode.allowedTools;
-        const prevDisallowedTools = mode.disallowedTools;
+        // Snapshot prev mode before reassignment (used for applyFlagSettings diff below).
+        const prevMode = mode;
 
         // Hot-swap permissionMode via setPermissionMode() if changed (non-plan, non-bypass ↔ non-plan, non-bypass)
         // Plan and bypass transitions require cold restart (handled by coldModeHash in launcher).
@@ -683,24 +683,14 @@ export async function claudeRemote(opts: {
           mode = next.mode;
         }
 
-        // Hot-swap allowedTools / disallowedTools via applyFlagSettings (SDK 0.3.142+)
-        // Maps EnhancedMode.allowedTools → Settings.permissions.allow,
-        //       EnhancedMode.disallowedTools → Settings.permissions.deny.
-        const prevAllow = JSON.stringify(prevAllowedTools ?? []);
-        const prevDeny = JSON.stringify(prevDisallowedTools ?? []);
-        const nextAllow = JSON.stringify(next.mode.allowedTools ?? []);
-        const nextDeny = JSON.stringify(next.mode.disallowedTools ?? []);
-        if (prevAllow !== nextAllow || prevDeny !== nextDeny) {
-          const permPatch: Record<string, unknown> = {};
-          if (prevAllow !== nextAllow) permPatch.allow = next.mode.allowedTools ?? [];
-          if (prevDeny !== nextDeny) permPatch.deny = next.mode.disallowedTools ?? [];
-          logger.debug(
-            `[claudeRemote] Hot-swapping permissions via applyFlagSettings: ${Object.keys(permPatch).join(", ")}`,
-          );
+        // Hot-swap Settings-level fields via applyFlagSettings (SDK 0.3.142+)
+        // Compares prevMode → next.mode and builds a minimal Settings patch.
+        const settingsPatch = buildFlagSettingsPatch(prevMode, next.mode);
+        if (settingsPatch) {
           try {
-            await (response as AdaptedQuery)._officialQuery.applyFlagSettings({
-              permissions: permPatch,
-            });
+            await (response as AdaptedQuery)._officialQuery.applyFlagSettings(
+              settingsPatch as Record<string, unknown>,
+            );
           } catch (err) {
             logger.debug(
               `[claudeRemote] applyFlagSettings failed (non-fatal): ${err}`,
