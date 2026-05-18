@@ -389,6 +389,10 @@ export async function claudeRemote(opts: {
     // Enable markdown preview content in AskUserQuestion option objects.
     // The model emits a `preview` field (markdown text) per option when set.
     toolConfig: { askUserQuestion: { previewFormat: "markdown" } },
+    // Stream partial assistant messages (SDK 0.3.143+). Emits
+    // SDKPartialAssistantMessage (type: 'stream_event') for each API SSE
+    // chunk, enabling real-time text-delta forwarding to the App.
+    includePartialMessages: true,
   };
 
   // Track thinking state
