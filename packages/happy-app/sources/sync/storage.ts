@@ -474,6 +474,10 @@ function applySessionMessagesLRU(
                 delete evictedMessages[id];
             }
             evictedLRU = toCheck.filter((id) => toKeep.has(id));
+            // Notify sync.ts to release per-session resources (InvalidateSync, locks, queues)
+            // for evicted sessions. Deferred via queueMicrotask to avoid side-effects
+            // inside a Zustand set() call.
+            queueMicrotask(() => onSessionMessagesEvicted?.(evicted));
         }
     }
 
@@ -486,6 +490,15 @@ export function registerPreferencesSyncCallback(
   callback: (sessionId: string) => void,
 ) {
   onPreferencesChanged = callback;
+}
+
+// Callback for cleaning up per-session resources when LRU evicts session messages.
+// Registered by sync.ts to avoid circular dependency.
+let onSessionMessagesEvicted: ((sessionIds: string[]) => void) | null = null;
+export function registerSessionEvictionCallback(
+  callback: (sessionIds: string[]) => void,
+) {
+  onSessionMessagesEvicted = callback;
 }
 
 export const storage = create<StorageState>()((set, get) => {

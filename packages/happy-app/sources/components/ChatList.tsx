@@ -585,9 +585,9 @@ const ChatListInternal = React.memo(
         viewabilityConfigCallbackPairs={viewabilityPairs.current}
         onEndReached={props.hasOlderMessages ? props.onLoadMore : undefined}
         onEndReachedThreshold={0.3}
-        windowSize={7}
-        maxToRenderPerBatch={8}
-        initialNumToRender={15}
+        windowSize={Platform.OS === "web" ? 5 : 7}
+        maxToRenderPerBatch={Platform.OS === "web" ? 5 : 8}
+        initialNumToRender={Platform.OS === "web" ? 10 : 15}
         removeClippedSubviews={Platform.OS !== "web"}
         ListHeaderComponent={<ListFooter sessionId={props.sessionId} contentMaxWidth={props.contentMaxWidth} />}
         ListFooterComponent={
