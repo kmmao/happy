@@ -31,6 +31,7 @@ import { logger } from "@/ui/logger";
 import { SDKToLogConverter } from "./utils/sdkToLogConverter";
 import { PLAN_FAKE_REJECT } from "./sdk/prompts";
 import { readClaudeMcpServers } from "@/claude/utils/claudeSettings";
+import { fetchMcpRegistryServers } from "@/claude/utils/mcpRegistryReader";
 import { EnhancedMode } from "./loop";
 import { RawJSONLines } from "@/claude/types";
 import { OutgoingMessageQueue } from "./utils/OutgoingMessageQueue";
@@ -2191,14 +2192,18 @@ export async function claudeRemoteLauncher(
         ],
       });
 
+      // Fetch persistent MCP registry from server KV (non-blocking — falls back to {} on error)
+      const registryServers = await fetchMcpRegistryServers(session.api);
+
       try {
         const remoteResult = await claudeRemote({
           sessionId: session.sessionId,
           path: session.path,
           allowedTools: session.allowedTools ?? [],
           mcpServers: {
-            ...readClaudeMcpServers(),       // User's ~/.claude/settings.json MCPs (lower priority)
-            happy: happyMcpServer,
+            ...readClaudeMcpServers(),       // User's ~/.claude/settings.json MCPs (lowest priority)
+            ...registryServers,              // Account-level MCP registry (medium priority)
+            happy: happyMcpServer,           // Happy-owned MCPs (highest priority)
             ...(knowledgeMcpServer ? { "happy-knowledge": knowledgeMcpServer } : {}),
           },
           hookSettingsPath: session.hookSettingsPath,
