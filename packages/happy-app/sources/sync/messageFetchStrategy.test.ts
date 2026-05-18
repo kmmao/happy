@@ -12,9 +12,9 @@ describe("messageFetchStrategy", () => {
       initialAfterSeq: 0,
     });
 
-    expect(strategy).toBe("nativeFullHistory");
+    expect(strategy).toBe("fullHistory");
     expect(shouldFetchNewestPageFirst(strategy)).toBe(false);
-    expect(shouldApplyMessagesImmediately(strategy)).toBe(false);
+    expect(shouldApplyMessagesImmediately(strategy)).toBe(true);
   });
 
   it("uses incremental fetch once a cursor exists", () => {

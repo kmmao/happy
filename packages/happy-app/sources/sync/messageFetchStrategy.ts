@@ -1,7 +1,6 @@
 export type MessageHistoryFetchStrategy =
   | "incremental"
-  | "nativeFullHistory"
-  | "webLatestOnly";
+  | "fullHistory";
 
 interface ResolveMessageHistoryFetchStrategyInput {
   initialAfterSeq: number;
@@ -13,17 +12,17 @@ export function resolveMessageHistoryFetchStrategy({
   if (initialAfterSeq > 0) {
     return "incremental";
   }
-  return "nativeFullHistory";
+  return "fullHistory";
 }
 
 export function shouldFetchNewestPageFirst(
-  strategy: MessageHistoryFetchStrategy,
+  _strategy: MessageHistoryFetchStrategy,
 ): boolean {
-  return strategy === "webLatestOnly";
+  return false;
 }
 
 export function shouldApplyMessagesImmediately(
-  strategy: MessageHistoryFetchStrategy,
+  _strategy: MessageHistoryFetchStrategy,
 ): boolean {
-  return strategy !== "nativeFullHistory";
+  return true;
 }
