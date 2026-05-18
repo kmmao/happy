@@ -742,8 +742,6 @@ export const pt: TranslationStructure = {
       `Restam ${turns}/${max} turnos. Referenciada ${hits}× nesta sessão. Acerto +1 (limite ${max}), falha −1, ao chegar a 0 é removida da injeção.`,
     knowledgeBadgeTooltipEvicted:
       "A contagem regressiva chegou a zero — esta entrada não é mais injetada na sessão atual. Uma nova referência ou turno relevante irá reativá-la.",
-    recommendationsTitle: "Sugerido para esta sessão",
-    recommendationsTapHint: "Toque para adicionar ao campo de entrada",
     autoOptionSendLabel: "Auto",
     autoOptionSendActiveLabel: "Auto · ON",
     autoOptionSendCountdown: ({ seconds }: { seconds: number }) => `Auto ${seconds}s`,

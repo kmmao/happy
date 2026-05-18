@@ -746,8 +746,6 @@ export const es: TranslationStructure = {
       `Quedan ${turns}/${max} turnos. Referenciada ${hits}× en esta sesión. Acierto +1 (tope ${max}), fallo −1, al llegar a 0 se excluye de la inyección.`,
     knowledgeBadgeTooltipEvicted:
       "La cuenta atrás llegó a cero — esta entrada ya no se inyecta en la sesión actual. Una nueva referencia o un turno relevante la reactivará.",
-    recommendationsTitle: "Sugerido para esta sesión",
-    recommendationsTapHint: "Toca para añadir al input",
     autoOptionSendLabel: "Auto",
     autoOptionSendActiveLabel: "Auto · ON",
     autoOptionSendCountdown: ({ seconds }: { seconds: number }) => `Auto ${seconds}s`,

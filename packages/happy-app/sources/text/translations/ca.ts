@@ -744,8 +744,6 @@ export const ca: TranslationStructure = {
       `Queden ${turns}/${max} torns. Referenciada ${hits}× en aquesta sessió. Encert +1 (topall ${max}), fallada −1, en arribar a 0 s'exclou de la injecció.`,
     knowledgeBadgeTooltipEvicted:
       "El compte enrere ha arribat a zero — aquesta entrada ja no s'injecta en la sessió actual. Una nova referència o un torn rellevant la reactivarà.",
-    recommendationsTitle: "Suggerit per a aquesta sessió",
-    recommendationsTapHint: "Toca per afegir a l'entrada",
     autoOptionSendLabel: "Auto",
     autoOptionSendActiveLabel: "Auto · ON",
     autoOptionSendCountdown: ({ seconds }: { seconds: number }) => `Auto ${seconds}s`,

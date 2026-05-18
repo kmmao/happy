@@ -754,8 +754,6 @@ export const pl: TranslationStructure = {
       `Pozostało ${turns}/${max} tur. Przywołana ${hits}× w tej sesji. Trafienie +1 (limit ${max}), chybienie −1, po dojściu do 0 zostaje usunięta z iniekcji.`,
     knowledgeBadgeTooltipEvicted:
       "Licznik doszedł do zera — ten wpis nie jest już wstrzykiwany w bieżącej sesji. Ponowne odwołanie lub istotna tura go reaktywuje.",
-    recommendationsTitle: "Sugerowane dla tej sesji",
-    recommendationsTapHint: "Dotknij, aby dodać do pola tekstowego",
     autoOptionSendLabel: "Auto",
     autoOptionSendActiveLabel: "Auto · WŁ",
     autoOptionSendCountdown: ({ seconds }: { seconds: number }) => `Auto ${seconds}s`,

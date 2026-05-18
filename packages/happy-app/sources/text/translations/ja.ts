@@ -866,8 +866,6 @@ export const ja: TranslationStructure = {
       `残り ${turns}/${max} ターン。このセッションで ${hits} 回参照。命中で +1（上限 ${max}）、不命中で −1、0 になると注入から除外。`,
     knowledgeBadgeTooltipEvicted:
       "カウントダウンがゼロに到達しました。この項目は現セッションの注入から外れています。再参照または新たな関連ターンで再有効化されます。",
-    recommendationsTitle: "このセッションで提案された課題",
-    recommendationsTapHint: "タップして入力欄に追加",
     autoOptionSendLabel: "自動",
     autoOptionSendActiveLabel: "自動 · ON",
     autoOptionSendCountdown: ({ seconds }: { seconds: number }) => `自動 ${seconds}秒`,

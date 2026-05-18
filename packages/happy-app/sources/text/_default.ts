@@ -734,8 +734,6 @@ export const en = {
       `${turns}/${max} turns remaining. Referenced ${hits}× this session. Each turn: hit → +1 (cap ${max}), miss → −1, reaches 0 → evicted from injection.`,
     knowledgeBadgeTooltipEvicted:
       "Countdown reached zero — this entry is no longer injected in the current session. Re-reference or a new relevant turn will re-activate it.",
-    recommendationsTitle: "Suggested for This Session",
-    recommendationsTapHint: "Tap to add to input",
     autoOptionSendLabel: "Auto",
     autoOptionSendActiveLabel: "Auto · ON",
     autoOptionSendCountdown: ({ seconds }: { seconds: number }) => `Auto ${seconds}s`,

@@ -712,8 +712,6 @@ export const zhHans: TranslationStructure = {
       `剩余 ${turns}/${max} 回合，本会话共引用 ${hits} 次。命中 +1（上限 ${max}），未命中 −1，归零即迁出注入。`,
     knowledgeBadgeTooltipEvicted:
       "倒计时归零 — 该条目已从本会话注入中移出。再次命中或新的相关话题会重新激活它。",
-    recommendationsTitle: "本次会话建议处理",
-    recommendationsTapHint: "点击填入输入框",
     autoOptionSendLabel: "自动",
     autoOptionSendActiveLabel: "自动 · 开",
     autoOptionSendCountdown: ({ seconds }: { seconds: number }) => `自动 ${seconds}秒`,

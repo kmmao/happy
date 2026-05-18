@@ -880,8 +880,6 @@ export const it: TranslationStructure = {
       `Restano ${turns}/${max} turni. Referenziata ${hits}× in questa sessione. Hit +1 (cap ${max}), miss −1, a 0 viene espulsa dall'iniezione.`,
     knowledgeBadgeTooltipEvicted:
       "Il conto alla rovescia è arrivato a zero — questa voce non viene più iniettata nella sessione corrente. Un nuovo riferimento o un turno pertinente la riattiverà.",
-    recommendationsTitle: "Suggerito per questa sessione",
-    recommendationsTapHint: "Tocca per aggiungere all'input",
     autoOptionSendLabel: "Auto",
     autoOptionSendActiveLabel: "Auto · ON",
     autoOptionSendCountdown: ({ seconds }: { seconds: number }) => `Auto ${seconds}s`,

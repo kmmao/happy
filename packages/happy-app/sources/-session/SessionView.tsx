@@ -28,9 +28,6 @@ import { ScrollToBottomButton } from "@/components/ScrollToBottomButton";
 import { OptionsPopover, type OptionItem } from "@/components/OptionsPopover";
 import { SessionKnowledgeSheet } from "@/components/knowledge/SessionKnowledgeSheet";
 import { EmptyMessages } from "@/components/EmptyMessages";
-import { SharedStateView } from "@/components/SharedStateView";
-import { SessionRecommendationsCard } from "@/components/SessionRecommendationsCard";
-import { useProjectActionItems } from "@/hooks/useProjectActionItems";
 import { VoiceAssistantStatusBar } from "@/components/VoiceAssistantStatusBar";
 import { useDraft } from "@/hooks/useDraft";
 import { useLatestOptions } from "@/hooks/useLatestOptions";
@@ -663,12 +660,6 @@ function SessionViewInner({
       }),
     [autoOptionFeedbackProjectId],
   );
-  const {
-    actionItems,
-    error: actionItemsError,
-    state: actionItemsState,
-    refresh: refreshActionItems,
-  } = useProjectActionItems(sessionProjectInner?.serverId ?? undefined);
   const backgroundTaskEntries = useBackgroundTaskEntries(sessionId);
   const { tasks: backgroundTasks, dismissTask: dismissBackgroundTask } = useBackgroundTasks(backgroundTaskEntries, isConnected);
   const [viewingTask, setViewingTask] = React.useState<BackgroundTask | null>(null);
@@ -1593,23 +1584,7 @@ function SessionViewInner({
     messages.length === 0 ? (
       <>
         {isLoaded ? (
-          actionItemsState.kind === "error" ? (
-            <SharedStateView
-              kind="error"
-              title={t("common.error")}
-              description={actionItemsError ?? undefined}
-              onAction={() => {
-                void refreshActionItems();
-              }}
-            />
-          ) : actionItems.length > 0 ? (
-            <SessionRecommendationsCard
-              actionItems={actionItems}
-              onSelect={setMessage}
-            />
-          ) : (
-            <EmptyMessages session={session} />
-          )
+          <EmptyMessages session={session} />
         ) : (
           <>
             <ActivityIndicator size="small" color={theme.colors.textSecondary} />

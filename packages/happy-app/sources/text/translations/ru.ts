@@ -971,8 +971,6 @@ export const ru: TranslationStructure = {
       `Осталось ${turns}/${max} ходов. В сессии использовано ${hits} раз. Попадание +1 (предел ${max}), промах −1, 0 → исключение из инъекции.`,
     knowledgeBadgeTooltipEvicted:
       "Счётчик обнулился — запись больше не инжектируется в текущую сессию. Повторное упоминание или новый релевантный ход снова её активируют.",
-    recommendationsTitle: "Рекомендовано для этой сессии",
-    recommendationsTapHint: "Нажмите, чтобы добавить в поле ввода",
     autoOptionSendLabel: "Авто",
     autoOptionSendActiveLabel: "Авто · ВКЛ",
     autoOptionSendCountdown: ({ seconds }: { seconds: number }) => `Авто ${seconds}с`,
