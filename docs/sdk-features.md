@@ -69,9 +69,10 @@ Cold restart detection uses `coldModeHash()` in `claudeRemoteLauncher.ts` to com
 
 ## SDK Version
 
-Current: `@anthropic-ai/claude-agent-sdk@0.2.139`
+Current: `@anthropic-ai/claude-agent-sdk@0.3.143`
 
 ### Version History
-- **0.2.139**: `SDKPermissionDeniedMessage` (auto-denied tool calls), `Query.backgroundTasks()`, `resolveSettings()`, hook `args`/`continueOnBlock`, `defaultView` setting
+- **0.3.143**: Major version bump (0.2→0.3). New exports: `deleteSession()`, `getSessionInfo()`, `getSessionMessages()`, `listSessions()`, `renameSession()`, `tagSession()`, `resolveSettings()`, `startup()`. New `Query` methods: `applyFlagSettings()`, `setMcpServers()`, `reconnectMcpServer()`, `toggleMcpServer()`, `mcpServerStatus()`, `reloadPlugins()`, `seedReadState()`. New Options: `toolAliases`, `tools`, `hooks`, `includePartialMessages`, `sessionId`, `resumeSessionAt`, `skills`, `sandbox`, `sessionStoreFlush`. New message types: `SDKTaskUpdatedMessage`, `SDKRateLimitEvent`, `SDKToolUseSummaryMessage`, `SDKPartialAssistantMessage`, `SDKNotificationMessage`. `EffortLevel` adds `'xhigh'`. New sub-modules: `bridge`, `assistant`, `browser` (not used by happy).
+- **0.2.140**: `SDKPermissionDeniedMessage` (auto-denied tool calls), `Query.backgroundTasks()`, hook `args`/`continueOnBlock`, `defaultView` setting
 - **0.2.133**: `forwardSubagentText` option for complete subagent conversation flows
 - **0.2.119**: `title`, `planModeInstructions`, `sessionStore`, `toolConfig`, model capabilities (`supportsEffort`, `supportedEffortLevels`, `supportsAdaptiveThinking`)

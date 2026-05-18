@@ -38,6 +38,27 @@ export type {
   SDKMirrorErrorMessage,
   // SDK 0.2.139+ additions
   SDKPermissionDeniedMessage,
+  // SDK 0.3.142+ additions
+  SDKTaskUpdatedMessage,
+  SDKRateLimitEvent,
+  SDKToolUseSummaryMessage,
+  SDKNotificationMessage,
+  SDKPartialAssistantMessage,
+  HookCallback,
+  HookCallbackMatcher,
+  HookEvent,
+  HookInput,
+  ToolConfig,
+  SessionStore,
+  SessionStoreEntry,
+  SessionKey,
+  SDKSessionInfo,
+  SessionMessage,
+  McpServerConfig,
+  McpServerStatus,
+  SlashCommand,
+  ModelInfo,
+  AccountInfo,
 } from "@anthropic-ai/claude-agent-sdk";
 
 export {
@@ -45,6 +66,14 @@ export {
   forkSession,
   getSubagentMessages,
   listSubagents,
+  // SDK 0.3.142+ additions
+  deleteSession,
+  getSessionInfo,
+  getSessionMessages,
+  listSessions,
+  renameSession,
+  tagSession,
+  resolveSettings,
 } from "@anthropic-ai/claude-agent-sdk";
 
 // ── Adapter-specific types (our API, not the official SDK's) ──
