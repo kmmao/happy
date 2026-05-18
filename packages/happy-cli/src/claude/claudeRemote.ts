@@ -648,6 +648,10 @@ export async function claudeRemote(opts: {
           model = newModel;
         }
 
+        // Snapshot current tools before mode is reassigned (used for applyFlagSettings diff below).
+        const prevAllowedTools = mode.allowedTools;
+        const prevDisallowedTools = mode.disallowedTools;
+
         // Hot-swap permissionMode via setPermissionMode() if changed (non-plan, non-bypass ↔ non-plan, non-bypass)
         // Plan and bypass transitions require cold restart (handled by coldModeHash in launcher).
         const newPermissionMode = mapToClaudeMode(next.mode.permissionMode);
@@ -678,6 +682,32 @@ export async function claudeRemote(opts: {
         } else {
           mode = next.mode;
         }
+
+        // Hot-swap allowedTools / disallowedTools via applyFlagSettings (SDK 0.3.142+)
+        // Maps EnhancedMode.allowedTools → Settings.permissions.allow,
+        //       EnhancedMode.disallowedTools → Settings.permissions.deny.
+        const prevAllow = JSON.stringify(prevAllowedTools ?? []);
+        const prevDeny = JSON.stringify(prevDisallowedTools ?? []);
+        const nextAllow = JSON.stringify(next.mode.allowedTools ?? []);
+        const nextDeny = JSON.stringify(next.mode.disallowedTools ?? []);
+        if (prevAllow !== nextAllow || prevDeny !== nextDeny) {
+          const permPatch: Record<string, unknown> = {};
+          if (prevAllow !== nextAllow) permPatch.allow = next.mode.allowedTools ?? [];
+          if (prevDeny !== nextDeny) permPatch.deny = next.mode.disallowedTools ?? [];
+          logger.debug(
+            `[claudeRemote] Hot-swapping permissions via applyFlagSettings: ${Object.keys(permPatch).join(", ")}`,
+          );
+          try {
+            await (response as AdaptedQuery)._officialQuery.applyFlagSettings({
+              permissions: permPatch,
+            });
+          } catch (err) {
+            logger.debug(
+              `[claudeRemote] applyFlagSettings failed (non-fatal): ${err}`,
+            );
+          }
+        }
+
         messages.push({
           type: "user",
           message: { role: "user", content: next.message },

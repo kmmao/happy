@@ -52,10 +52,28 @@ Set once at query start via `mapOptions()` in `queryAdapter.ts`. Cannot be hot-s
 | Model change | Hot-swap via `setModel()` — no restart |
 | Permission mode (default ↔ acceptEdits) | Hot-swap via `setPermissionMode()` |
 | Permission mode (to/from plan or bypassPermissions) | Cold restart required |
+| allowedTools / disallowedTools | Hot-swap via `applyFlagSettings({ permissions })` (SDK 0.3.142+) |
 | effort / thinking / maxBudgetUsd | Cold restart required |
-| fallbackModel / systemPrompt / allowedTools / disallowedTools | Cold restart required |
+| fallbackModel / systemPrompt | Cold restart required |
 
 Cold restart detection uses `coldModeHash()` in `claudeRemoteLauncher.ts` to compare the hash of non-hot-swappable fields between turns.
+
+### applyFlagSettings()
+
+The `Query.applyFlagSettings()` method (SDK 0.3.142+) merges partial `Settings` into the running session's flag settings layer. Flag settings sit above user/project/local settings and below managed policy settings.
+
+**Integrated hot-swap fields:**
+
+| EnhancedMode field | Settings path | Notes |
+|-------------------|---------------|-------|
+| `allowedTools` | `permissions.allow` | Permission allow rules |
+| `disallowedTools` | `permissions.deny` | Permission deny rules |
+
+**Not hot-swappable** (require cold restart): `thinking`, `effort`, `maxBudgetUsd`, `taskBudget` — these are `Options`-level fields, not `Settings`-level.
+
+The hot-swap is triggered in `claudeRemote.ts` when a new turn arrives with different `allowedTools`/`disallowedTools`. The launcher's `coldModeHash` excludes these fields so they don't trigger a process restart.
+
+**App-side RPC:** The App can also push settings changes directly via `applySettings()` → `claude-control:apply_settings` RPC, which delegates to the same `Query.applyFlagSettings()`. This is used for ad-hoc Settings updates from the sidebar UI.
 
 ## Key Files
 
@@ -65,6 +83,8 @@ Cold restart detection uses `coldModeHash()` in `claudeRemoteLauncher.ts` to com
 | `packages/happy-cli/src/claude/sdk/types.ts` | Adapter type definitions (QueryOptions, etc.) |
 | `packages/happy-cli/src/claude/claudeRemote.ts` | SDK session loop with hot-swap and init result handling |
 | `packages/happy-cli/src/claude/claudeRemoteLauncher.ts` | Outer loop with cold restart and message forwarding |
+| `packages/happy-cli/src/claude/rpc/claudeControlHandlers.ts` | RPC handlers including `apply_settings` → `applyFlagSettings()` |
+| `packages/happy-app/sources/sync/apiClaudeControl.ts` | App-side RPC client for claude-control methods |
 | `packages/happy-wire/src/sessionProtocol.ts` | Protocol schema (prompt-suggestion event, etc.) |
 
 ## SDK Version

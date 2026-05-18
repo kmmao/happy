@@ -324,6 +324,31 @@ export const ToggleMcpServerResponseSchema = z.object({
 export type ToggleMcpServerRequest = z.infer<typeof ToggleMcpServerRequestSchema>;
 export type ToggleMcpServerResponse = z.infer<typeof ToggleMcpServerResponseSchema>;
 
+// ── apply_settings (SDK 0.3.142+) ───────────────────────────────────────────
+/**
+ * Dynamically merge partial settings into the flag settings layer of a running
+ * session via `Query.applyFlagSettings()`. Flag settings sit above
+ * user/project/local settings and below managed policy settings.
+ *
+ * Typical use cases:
+ *   - Update permission rules (allow/deny) without cold restart
+ *   - Change hooks configuration
+ *   - Toggle MCP server approval settings
+ *   - Override model at the settings level
+ *
+ * Pass `null` for a top-level key to clear it from the flag layer (falls back
+ * to lower-precedence sources). Successive calls shallow-merge top-level keys.
+ */
+export const ApplySettingsRequestSchema = z.object({
+    /** Partial Settings object — only supplied keys are merged. */
+    settings: z.record(z.string(), z.unknown()),
+}).strict();
+export const ApplySettingsResponseSchema = z.object({
+    success: z.literal(true),
+}).strict();
+export type ApplySettingsRequest = z.infer<typeof ApplySettingsRequestSchema>;
+export type ApplySettingsResponse = z.infer<typeof ApplySettingsResponseSchema>;
+
 /**
  * Method name enum — consumers should derive typed handlers from this.
  * When adding a new method, update the CLI handler registration too.
@@ -340,6 +365,7 @@ export const CLAUDE_CONTROL_METHODS = [
     'set_mcp_servers',
     'reconnect_mcp_server',
     'toggle_mcp_server',
+    'apply_settings',
 ] as const;
 
 export type ClaudeControlMethod = typeof CLAUDE_CONTROL_METHODS[number];
