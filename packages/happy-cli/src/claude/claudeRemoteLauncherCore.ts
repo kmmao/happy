@@ -603,13 +603,6 @@ export async function claudeRemoteLauncher(
   // Perf tracking: end-to-end timing from socket to first assistant response
   let _perfTurnSocketReceivedAt: number | undefined;
   let _perfTurnFirstResponseLogged = false;
-  // Throttle the SDK 'requesting' status to one event per user turn.
-  // SDK 0.2.108+ emits it before every API call (incl. tool-result follow-ups),
-  // which would otherwise spam the App with a "Requesting..." chip on every
-  // retry/tool-use iteration. Reset alongside _perfTurnFirstResponseLogged at
-  // turn boundaries below.
-  let _requestingEventSentThisTurn = false;
-
   // Tracks TaskCreate/TaskUpdate tool calls from Claude Code runtime
   // (Opus 4.6+) and converts them to TodoWrite-compatible progress mirror.
   const taskMirrorState = new TaskMirrorState();
@@ -1178,20 +1171,11 @@ export async function claudeRemoteLauncher(
             type: "message",
             message: "Compacting context...",
           });
-        } else if (statusMsg.status === "requesting") {
-          // SDK 0.2.108+ fires this before every API call — including each
-          // tool-result follow-up and retry. Show only the first occurrence
-          // per turn so the App gets a single "Requesting..." signal instead
-          // of a flood during long tool-chained turns. Use SDKAPIRetryMessage
-          // if you need explicit retry visibility.
-          if (!_requestingEventSentThisTurn) {
-            _requestingEventSentThisTurn = true;
-            session.client.sendSessionEvent({
-              type: "message",
-              message: "Requesting...",
-            });
-          }
         }
+        // SDK "requesting" status is no longer forwarded as a session event.
+        // The App's thinking state indicator (useSessionStatus) already covers
+        // the "API call in progress" signal, so the persistent "Requesting..."
+        // chat chip was redundant noise.
       } else if ((message as SDKCompactMsg).subtype === "compact_boundary") {
         session.client.sendSessionEvent({
           type: "message",
@@ -2034,7 +2018,7 @@ export async function claudeRemoteLauncher(
               // Reset E2E perf tracking for new turn
               _perfTurnSocketReceivedAt = p.mode._perfSocketReceivedAt;
               _perfTurnFirstResponseLogged = false;
-              _requestingEventSentThisTurn = false;
+
               streamEventState = createStreamEventMapperState();
               permissionHandler.handleModeChange(p.mode.permissionMode);
               startMidTurnDrain();
@@ -2096,7 +2080,7 @@ export async function claudeRemoteLauncher(
                   // Reset E2E perf tracking for hot-swap turn
                   _perfTurnSocketReceivedAt = msg.mode._perfSocketReceivedAt;
                   _perfTurnFirstResponseLogged = false;
-                  _requestingEventSentThisTurn = false;
+    
                   streamEventState = createStreamEventMapperState();
                   permissionHandler.handleModeChange(mode.permissionMode);
                   startMidTurnDrain();
@@ -2132,7 +2116,7 @@ export async function claudeRemoteLauncher(
               // Reset E2E perf tracking for new turn
               _perfTurnSocketReceivedAt = msg.mode._perfSocketReceivedAt;
               _perfTurnFirstResponseLogged = false;
-              _requestingEventSentThisTurn = false;
+
               streamEventState = createStreamEventMapperState();
               permissionHandler.handleModeChange(mode.permissionMode);
               startMidTurnDrain();
