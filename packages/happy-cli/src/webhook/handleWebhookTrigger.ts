@@ -21,6 +21,11 @@ import type {
 } from "@/modules/common/registerCommonHandlers";
 import { normalizeResolvedRuntimeProfile } from "@kmmao/happy-wire";
 import { resolveAgentFromRuntimeProfile } from "@/supervisor/resolveAgentFromRuntimeProfile";
+import {
+  acquireSlot,
+  releaseSlot,
+  getPoolStatus,
+} from "@/supervisor/concurrencyLimiter";
 
 export interface WebhookHandlerDeps {
   readonly spawnSession: (
@@ -54,8 +59,21 @@ export async function handleWebhookTrigger(
   processingEvents.add(webhookEventId);
 
   let createdWorktreeBranch: string | undefined;
+  let slotAcquired = false;
 
   try {
+    // Acquire a webhook concurrency slot to prevent resource exhaustion
+    const poolBefore = getPoolStatus("webhook");
+    logger.info(
+      `[WEBHOOK-CONCURRENCY] BEFORE acquireSlot: event=${webhookEventId} active=${poolBefore.active}/${poolBefore.max} queued=${poolBefore.queued}`,
+    );
+    await acquireSlot("webhook");
+    slotAcquired = true;
+    const poolAfter = getPoolStatus("webhook");
+    logger.info(
+      `[WEBHOOK-CONCURRENCY] AFTER acquireSlot: event=${webhookEventId} active=${poolAfter.active}/${poolAfter.max} queued=${poolAfter.queued}`,
+    );
+
     logger.debug(
       `[WEBHOOK] Processing webhook event ${webhookEventId} for issue #${issueNumber}`,
     );
@@ -215,6 +233,13 @@ export async function handleWebhookTrigger(
     }
     return { success: false, errorMessage };
   } finally {
+    if (slotAcquired) {
+      releaseSlot("webhook");
+      const poolFinal = getPoolStatus("webhook");
+      logger.info(
+        `[WEBHOOK-CONCURRENCY] RELEASED: event=${webhookEventId} active=${poolFinal.active}/${poolFinal.max} queued=${poolFinal.queued}`,
+      );
+    }
     processingEvents.delete(webhookEventId);
   }
 }

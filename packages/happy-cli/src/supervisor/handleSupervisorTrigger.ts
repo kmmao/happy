@@ -27,6 +27,11 @@ import {
   type SlotType,
 } from "./concurrencyLimiter";
 import {
+  acquireMergeLock,
+  releaseMergeLock,
+  getMergeQueueStatus,
+} from "./mergeQueue";
+import {
   createWorktreeLocal,
   removeWorktreeForced,
   resolveParentBranch,
@@ -85,6 +90,7 @@ const fixWorktrees = new Map<
     readonly actionId: string;
     readonly projectId: string;
     readonly fixMode: "fix" | "analyze-first";
+    readonly fixStrategy: "direct" | "pr";
   }
 >();
 
@@ -131,6 +137,15 @@ export async function cleanupFixWorktree(
   logger.info(
     `[SUPERVISOR-CONCURRENCY] RELEASED (session exit): type=fix sessionId=${sessionId} active=${pool.active}/${pool.max} queued=${pool.queued}`,
   );
+
+  // Release merge lock so the next queued direct-mode fix for the same branch can proceed
+  if (info.fixStrategy === "direct") {
+    releaseMergeLock(info.parentBranch);
+    const mq = getMergeQueueStatus(info.parentBranch);
+    logger.info(
+      `[MERGE-QUEUE] RELEASED (session exit): branch=${info.parentBranch} sessionId=${sessionId} nextHolder=${mq.holder ?? "none"} queued=${mq.queued}`,
+    );
+  }
   try {
     await removeWorktreeForced(info.repoPath, info.branchName);
     logger.debug(
@@ -729,6 +744,23 @@ async function handleFixTrigger(
     `[SUPERVISOR] Worktree created: ${worktreeResult.worktreePath} (branch: ${worktreeResult.branchName})`,
   );
 
+  // Direct-mode fixes: serialize pushes to the same parent branch via merge queue.
+  // PR-mode fixes bypass the queue (conflicts handled by the git host).
+  if (fixStrategy === "direct") {
+    const mq = getMergeQueueStatus(parentBranch);
+    if (mq.holder !== null) {
+      logger.info(
+        `[MERGE-QUEUE] Fix ${actionId} waiting for merge lock on ${parentBranch} (holder: ${mq.holder}, queued: ${mq.queued})`,
+      );
+      deps.emitSupervisorFixStatus({
+        actionId,
+        projectId,
+        fixStatus: "queued",
+      });
+    }
+    await acquireMergeLock(parentBranch, actionId);
+  }
+
   deps.emitSupervisorFixStatus({
     actionId,
     projectId,
@@ -798,6 +830,7 @@ async function handleFixTrigger(
       projectId,
       fixStatus: "failed",
     });
+    if (fixStrategy === "direct") releaseMergeLock(parentBranch);
     try { await unlink(promptFilePath); } catch { /* best-effort */ }
     try { await removeWorktreeForced(repoPath, worktreeResult.branchName); } catch { /* best-effort */ }
     return undefined;
@@ -810,6 +843,7 @@ async function handleFixTrigger(
     actionId,
     projectId,
     fixMode,
+    fixStrategy,
   });
 
   const parentSessionId = deps.resolveGuardianSessionId?.(data) ?? undefined;

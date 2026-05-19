@@ -1,9 +1,10 @@
 /**
- * Machine-level concurrency limiter for supervisor sessions.
+ * Machine-level concurrency limiter for supervisor and webhook sessions.
  *
- * Two independent pools:
+ * Three independent pools:
  * - "analysis" pool: shared by analysis + research sessions (default max: 3)
- * - "fix" pool: for fix worktree sessions (default max: 2)
+ * - "fix" pool: for fix worktree sessions (default max: 5)
+ * - "webhook" pool: for webhook-triggered issue sessions (default max: 3)
  *
  * When a pool is full, callers queue and wait (no timeout).
  * Queued entries can be cancelled via AbortSignal.
@@ -11,7 +12,7 @@
 
 import { logger } from "@/ui/logger";
 
-export type SlotType = "analysis" | "fix";
+export type SlotType = "analysis" | "fix" | "webhook";
 
 interface QueueEntry {
   readonly resolve: () => void;
@@ -29,6 +30,7 @@ interface Pool {
 const pools: Record<SlotType, Pool> = {
   analysis: { active: 0, max: 3, queue: [] },
   fix: { active: 0, max: 5, queue: [] },
+  webhook: { active: 0, max: 3, queue: [] },
 };
 
 /**
