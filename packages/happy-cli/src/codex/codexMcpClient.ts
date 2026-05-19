@@ -514,7 +514,9 @@ export class CodexMcpClient {
         logger.debug("[CodexMCP] transport.close begin");
         await this.transport?.close?.();
         logger.debug("[CodexMCP] transport.close done");
-      } catch {}
+      } catch {
+        /* best-effort last-resort transport close — already in error path */
+      }
     }
 
     // As a last resort, if child still exists, send SIGKILL
@@ -524,7 +526,9 @@ export class CodexMcpClient {
         logger.debug("[CodexMCP] Child still alive, sending SIGKILL");
         try {
           process.kill(pid, "SIGKILL");
-        } catch {}
+        } catch {
+          /* best-effort SIGKILL — process may have exited between the liveness check and kill */
+        }
       } catch {
         /* not running */
       }

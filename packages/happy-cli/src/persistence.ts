@@ -286,7 +286,9 @@ export async function updateSettings(
               logger.warn(`[PERSISTENCE] Failed to remove stale lock file ${lockFile}: ${unlinkErr.message}`);
             });
           }
-        } catch {}
+        } catch {
+          /* lock file may have been deleted between EEXIST check and stat — ignore */
+        }
       } else {
         throw err;
       }
@@ -553,13 +555,17 @@ export async function acquireDaemonLock(
 export async function releaseDaemonLock(lockHandle: FileHandle): Promise<void> {
   try {
     await lockHandle.close();
-  } catch {}
+  } catch {
+    /* best-effort close — handle may already be invalid on shutdown */
+  }
 
   try {
     if (existsSync(configuration.daemonLockFile)) {
       unlinkSync(configuration.daemonLockFile);
     }
-  } catch {}
+  } catch {
+    /* best-effort cleanup — lock file may have been removed by another process */
+  }
 }
 
 //

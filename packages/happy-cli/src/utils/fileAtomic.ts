@@ -19,7 +19,9 @@ export async function atomicFileWrite(filePath: string, content: string): Promis
     // Clean up temp file on error
     try {
       await unlink(tmpFile);
-    } catch {}
+    } catch {
+      /* best-effort temp file cleanup — original error is re-thrown below */
+    }
     throw error;
   }
 }

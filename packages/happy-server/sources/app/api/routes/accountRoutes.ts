@@ -64,7 +64,8 @@ export function accountRoutes(app: Fastify) {
                 settings: user.settings,
                 settingsVersion: user.settingsVersion,
             });
-        } catch {
+        } catch (e) {
+            request.log.error(e, 'Failed to get account settings');
             return reply.code(500).send({ error: 'Failed to get account settings' });
         }
     });

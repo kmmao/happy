@@ -626,7 +626,9 @@ export async function runCodex(opts: {
         h && h.constructor ? h.constructor.name : typeof h,
       );
       logger.debug(`[codex][handles] kinds=${JSON.stringify(kinds)}`);
-    } catch {}
+    } catch {
+      /* best-effort debug logging — ignore serialisation errors */
+    }
   }
 
   //
@@ -2093,14 +2095,18 @@ export async function runCodex(opts: {
       logger.debug("[codex]: setRawMode(false)");
       try {
         process.stdin.setRawMode(false);
-      } catch {}
+      } catch {
+        /* best-effort TTY cleanup — may fail if stdin is already closed */
+      }
     }
     // Stop reading from stdin so the process can exit
     if (hasTTY) {
       logger.debug("[codex]: stdin.pause()");
       try {
         process.stdin.pause();
-      } catch {}
+      } catch {
+        /* best-effort stdin cleanup — may fail during shutdown */
+      }
     }
     // Clear periodic keep-alive to avoid keeping event loop alive
     logger.debug("[codex]: clearInterval(keepAlive)");

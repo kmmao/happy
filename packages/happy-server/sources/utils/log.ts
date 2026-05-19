@@ -40,7 +40,9 @@ const DEFAULT_LOG_LEVEL = process.env.LOG_LEVEL ?? 'info';
 let pinoPrettyTarget: string = 'pino-pretty';
 try {
     pinoPrettyTarget = require.resolve('pino-pretty');
-} catch {}
+} catch {
+    /* pino-pretty not found on disk — fall back to the bare module name and let pino handle it */
+}
 
 transports.push({
     target: pinoPrettyTarget,

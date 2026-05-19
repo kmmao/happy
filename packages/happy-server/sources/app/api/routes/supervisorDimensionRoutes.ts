@@ -396,6 +396,7 @@ async function callAnthropic(
         };
         return data.content?.[0]?.text?.trim() ?? null;
     } catch {
+        /* best-effort AI call — network errors or malformed responses return null */
         return null;
     }
 }
@@ -438,6 +439,7 @@ async function callOpenAI(
         };
         return data.choices?.[0]?.message?.content?.trim() ?? null;
     } catch {
+        /* best-effort AI call — network errors or malformed responses return null */
         return null;
     }
 }
