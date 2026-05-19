@@ -21,6 +21,14 @@ export function startTimeout() {
                     },
                     take: TIMEOUT_BATCH_SIZE
                 });
+                // Batch-fetch all access keys for sessions in this batch to avoid N+1 queries
+                const sessionIds = sessionBatch.map(s => s.id);
+                const accessKeys = await db.accessKey.findMany({
+                    where: { sessionId: { in: sessionIds } },
+                    select: { sessionId: true, machineId: true, accountId: true }
+                });
+                const accessKeyBySessionId = new Map(accessKeys.map(k => [k.sessionId, k]));
+
                 for (const session of sessionBatch) {
                     const updated = await db.session.updateManyAndReturn({
                         where: { id: session.id, active: true },
@@ -35,10 +43,7 @@ export function startTimeout() {
                         recipientFilter: { type: 'user-scoped-only' }
                     });
                     // Notify the CLI daemon to terminate the process for this session
-                    const accessKey = await db.accessKey.findFirst({
-                        where: { sessionId: session.id, accountId: session.accountId },
-                        select: { machineId: true }
-                    });
+                    const accessKey = accessKeyBySessionId.get(session.id);
                     if (accessKey) {
                         eventRouter.emitEphemeral({
                             userId: session.accountId,
