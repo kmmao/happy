@@ -66,6 +66,8 @@ export type TaskStatusMessage = {
 export type AgentTextMessage = {
   kind: "agent-text";
   id: string;
+  /** Server DB message ID — used for dedup on cache restore */
+  realID?: string | null;
   localId: string | null;
   createdAt: number;
   text: string;
@@ -77,6 +79,8 @@ export type AgentTextMessage = {
 export type ToolCallMessage = {
   kind: "tool-call";
   id: string;
+  /** Server DB message ID — used for dedup on cache restore */
+  realID?: string | null;
   localId: string | null;
   createdAt: number;
   tool: ToolCall;

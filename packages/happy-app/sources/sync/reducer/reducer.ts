@@ -1594,6 +1594,7 @@ function convertReducerMessageToMessage(
   } else if (reducerMsg.role === "agent" && reducerMsg.text !== null) {
     return {
       id: reducerMsg.id,
+      realID: reducerMsg.realID,
       localId: null,
       createdAt: reducerMsg.createdAt,
       kind: "agent-text",
@@ -1617,6 +1618,7 @@ function convertReducerMessageToMessage(
 
     return {
       id: reducerMsg.id,
+      realID: reducerMsg.realID,
       localId: null,
       createdAt: reducerMsg.createdAt,
       kind: "tool-call",

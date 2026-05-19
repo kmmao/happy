@@ -1434,10 +1434,10 @@ export const storage = create<StorageState>()((set, get) => {
         const reducerState = createReducer();
         for (const msg of cached.messages) {
           // Prefer server DB ID as key so the reducer can dedup fetched messages.
-          // UserTextMessage exposes realId; ModeSwitchMessage and others expose realID.
+          // UserTextMessage exposes realId; all other message kinds expose realID.
           const serverDbId =
             msg.kind === "user-text" ? msg.realId :
-            msg.kind === "agent-event" ? (msg.realID ?? null) :
+            "realID" in msg ? (msg.realID ?? null) :
             null;
           if (serverDbId) {
             reducerState.messageIds.set(serverDbId, msg.id);
