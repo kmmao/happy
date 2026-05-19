@@ -13,13 +13,19 @@ import {
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { Typography } from "@/constants/Typography";
 import { useSettingMutable } from "@/sync/storage";
-import { getAllCommands, CommandItem } from "@/sync/suggestionCommands";
+import {
+  getAllCommands,
+  CommandItem,
+  getCommandInsertionText,
+  getCommandItemKey,
+  normalizeFavoriteShortcut,
+} from "@/sync/suggestionCommands";
 import { t } from "@/text";
 import { screenLayoutMaxWidth } from "./layout";
 interface CommandListPopoverProps {
   visible: boolean;
   sessionId: string;
-  onCommandSelect: (command: string) => void;
+  onCommandSelect: (text: string) => void;
   onClose: () => void;
   /** When true, renders inline content only (no overlay/backdrop). Parent controls positioning. */
   inline?: boolean;
@@ -38,8 +44,10 @@ export const CommandListPopover = React.memo(
     const [shouldRender, setShouldRender] = React.useState(false);
     const [allCommands, setAllCommands] = React.useState<CommandItem[]>([]);
     const [query, setQuery] = React.useState("");
-    const [favorites, setFavorites] =
+    const [legacyFavoriteSlashCommands] =
       useSettingMutable("favoriteSlashCommands");
+    const [favoriteShortcuts, setFavoriteShortcuts] =
+      useSettingMutable("favoriteShortcuts");
     const inputRef = React.useRef<TextInput>(null);
 
     React.useEffect(() => {
@@ -78,13 +86,21 @@ export const CommandListPopover = React.memo(
       return fuse.search(query).map((r) => r.item);
     }, [allCommands, query]);
 
+    const normalizedFavorites = React.useMemo(() => {
+      if (favoriteShortcuts.length > 0) {
+        return favoriteShortcuts.map(normalizeFavoriteShortcut);
+      }
+      return legacyFavoriteSlashCommands.map(normalizeFavoriteShortcut);
+    }, [favoriteShortcuts, legacyFavoriteSlashCommands]);
+
     const { favoriteItems, otherItems } = React.useMemo(() => {
-      const favSet = new Set(favorites);
+      const favKeys = normalizedFavorites.map(getCommandItemKey);
+      const favSet = new Set(favKeys);
       const commandMap = new Map(
-        filteredCommands.map((cmd) => [cmd.command, cmd]),
+        filteredCommands.map((cmd) => [getCommandItemKey(cmd), cmd]),
       );
-      // Only show favorites that exist in the current session's command list
-      const favItems: CommandItem[] = favorites
+      // Only show favorites that exist in the current session's shortcut list
+      const favItems: CommandItem[] = favKeys
         .filter((fav) => commandMap.has(fav))
         .map((fav) => commandMap.get(fav)!)
         .filter((cmd) =>
@@ -92,33 +108,35 @@ export const CommandListPopover = React.memo(
             ? cmd.command.toLowerCase().includes(query.trim().toLowerCase())
             : true,
         );
-      const others = filteredCommands.filter((cmd) => !favSet.has(cmd.command));
+      const others = filteredCommands.filter((cmd) => !favSet.has(getCommandItemKey(cmd)));
       return { favoriteItems: favItems, otherItems: others };
-    }, [filteredCommands, favorites, query]);
+    }, [filteredCommands, normalizedFavorites, query]);
 
     const toggleFavorite = React.useCallback(
-      (command: string) => {
-        const isFav = favorites.includes(command);
+      (item: CommandItem) => {
+        const key = getCommandItemKey(item);
+        const isFav = normalizedFavorites.some((favorite) => getCommandItemKey(favorite) === key);
         const next = isFav
-          ? favorites.filter((c) => c !== command)
-          : [...favorites, command];
-        setFavorites(next);
+          ? normalizedFavorites.filter((favorite) => getCommandItemKey(favorite) !== key)
+          : [...normalizedFavorites, { kind: item.kind, command: item.command }];
+        setFavoriteShortcuts(next);
       },
-      [favorites, setFavorites],
+      [normalizedFavorites, setFavoriteShortcuts],
     );
 
     const moveFavorite = React.useCallback(
-      (command: string, direction: "up" | "down") => {
-        const idx = favorites.indexOf(command);
+      (item: CommandItem, direction: "up" | "down") => {
+        const key = getCommandItemKey(item);
+        const idx = normalizedFavorites.findIndex((favorite) => getCommandItemKey(favorite) === key);
         if (idx < 0) return;
         const targetIdx = direction === "up" ? idx - 1 : idx + 1;
-        if (targetIdx < 0 || targetIdx >= favorites.length) return;
-        const next = [...favorites];
-        next[idx] = favorites[targetIdx];
-        next[targetIdx] = favorites[idx];
-        setFavorites(next);
+        if (targetIdx < 0 || targetIdx >= normalizedFavorites.length) return;
+        const next = [...normalizedFavorites];
+        next[idx] = normalizedFavorites[targetIdx];
+        next[targetIdx] = normalizedFavorites[idx];
+        setFavoriteShortcuts(next);
       },
-      [favorites, setFavorites],
+      [normalizedFavorites, setFavoriteShortcuts],
     );
 
     if (!shouldRender) return null;
@@ -129,15 +147,18 @@ export const CommandListPopover = React.memo(
       favIndex?: number,
       favTotal?: number,
     ) => (
-      <View key={cmd.command} style={styles.commandRow}>
+      <View key={getCommandItemKey(cmd)} style={styles.commandRow}>
         <Pressable
           style={({ pressed }) => [
             styles.commandItem,
             pressed && styles.commandItemPressed,
           ]}
-          onPress={() => onCommandSelect(cmd.command)}
+          onPress={() => onCommandSelect(getCommandInsertionText(cmd))}
         >
-          <Text style={styles.commandName}>/{cmd.command}</Text>
+          <Text style={styles.commandName}>{cmd.kind === "skill" ? `$${cmd.command}` : `/${cmd.command}`}</Text>
+          <Text style={[styles.commandKind, { color: theme.colors.textSecondary }]}>
+            {cmd.kind === "skill" ? "skill" : "cmd"}
+          </Text>
           {cmd.description ? (
             <Text
               style={[
@@ -153,7 +174,7 @@ export const CommandListPopover = React.memo(
         {isFav && favIndex !== undefined && favTotal !== undefined && (
           <View style={styles.reorderButtons}>
             <Pressable
-              onPress={() => moveFavorite(cmd.command, "up")}
+              onPress={() => moveFavorite(cmd, "up")}
               hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
               style={[
                 styles.reorderButton,
@@ -172,7 +193,7 @@ export const CommandListPopover = React.memo(
               />
             </Pressable>
             <Pressable
-              onPress={() => moveFavorite(cmd.command, "down")}
+              onPress={() => moveFavorite(cmd, "down")}
               hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
               style={[
                 styles.reorderButton,
@@ -193,7 +214,7 @@ export const CommandListPopover = React.memo(
           </View>
         )}
         <Pressable
-          onPress={() => toggleFavorite(cmd.command)}
+          onPress={() => toggleFavorite(cmd)}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           style={styles.starButton}
         >
@@ -406,6 +427,13 @@ const styles = StyleSheet.create((theme, rt) => ({
     ...Typography.default("semiBold"),
     fontSize: 14,
     color: theme.colors.text,
+    flexShrink: 0,
+  },
+  commandKind: {
+    ...Typography.default("semiBold"),
+    fontSize: 10,
+    textTransform: "uppercase",
+    letterSpacing: 0.4,
     flexShrink: 0,
   },
   commandDesc: {

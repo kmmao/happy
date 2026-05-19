@@ -399,10 +399,11 @@ function NewSessionWizard() {
 
   // Slash command popover
   const [showCommandList, setShowCommandList] = React.useState(false);
-  const handleCommandSelect = React.useCallback((command: string) => {
+  const handleCommandSelect = React.useCallback((text: string) => {
     setSessionPrompt((prev) => {
       const trimmed = prev.trimEnd();
-      return trimmed ? `${trimmed} /${command}` : `/${command}`;
+      const insertion = text.trim();
+      return trimmed ? `${trimmed} ${insertion}` : insertion;
     });
     setShowCommandList(false);
   }, []);

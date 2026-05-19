@@ -324,6 +324,57 @@ export const ToggleMcpServerResponseSchema = z.object({
 export type ToggleMcpServerRequest = z.infer<typeof ToggleMcpServerRequestSchema>;
 export type ToggleMcpServerResponse = z.infer<typeof ToggleMcpServerResponseSchema>;
 
+// ── add_mcp_server (dynamic single-server registration) ────────────────────
+/**
+ * Register a single MCP server on a running session. The server is validated,
+ * merged with existing user servers, and connected via `setMcpServers()`.
+ * Protected server names (`happy`, `happy-knowledge`) are rejected.
+ */
+export const AddMcpServerRequestSchema = z.object({
+    /** Unique server name. Must not collide with protected names. */
+    name: z.string().min(1).max(256),
+    /** Server transport config — same shape as SetMcpServersRequest entries. */
+    config: z.object({
+        type: z.string().optional(),
+        command: z.string().optional(),
+        args: z.array(z.string()).optional(),
+        env: z.record(z.string(), z.string()).optional(),
+        url: z.string().optional(),
+    }),
+}).strict();
+export const AddMcpServerResponseSchema = z.object({
+    /** Whether the server was successfully added and connected. */
+    success: z.boolean(),
+    /** Server names that were newly connected (typically just the one added). */
+    added: z.array(z.string()),
+    /** Per-server errors. Empty on success. */
+    errors: z.record(z.string(), z.string()),
+    /** Error message when success is false. */
+    errorMessage: z.string().optional(),
+}).strict();
+export type AddMcpServerRequest = z.infer<typeof AddMcpServerRequestSchema>;
+export type AddMcpServerResponse = z.infer<typeof AddMcpServerResponseSchema>;
+
+// ── remove_mcp_server (dynamic single-server unregistration) ───────────────
+/**
+ * Unregister and disconnect a single MCP server from a running session.
+ * Protected server names are rejected. Removing a non-existent server is
+ * idempotent (returns success).
+ */
+export const RemoveMcpServerRequestSchema = z.object({
+    /** Server name to remove. */
+    name: z.string().min(1).max(256),
+}).strict();
+export const RemoveMcpServerResponseSchema = z.object({
+    success: z.boolean(),
+    /** Server names that were disconnected (typically just the one removed). */
+    removed: z.array(z.string()),
+    /** Error message when success is false. */
+    errorMessage: z.string().optional(),
+}).strict();
+export type RemoveMcpServerRequest = z.infer<typeof RemoveMcpServerRequestSchema>;
+export type RemoveMcpServerResponse = z.infer<typeof RemoveMcpServerResponseSchema>;
+
 // ── apply_settings (SDK 0.3.142+) ───────────────────────────────────────────
 /**
  * Dynamically merge partial settings into the flag settings layer of a running
@@ -450,6 +501,8 @@ export const CLAUDE_CONTROL_METHODS = [
     'set_mcp_servers',
     'reconnect_mcp_server',
     'toggle_mcp_server',
+    'add_mcp_server',
+    'remove_mcp_server',
     'apply_settings',
     'list_sessions',
     'get_session_info',

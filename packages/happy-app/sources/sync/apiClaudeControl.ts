@@ -46,6 +46,10 @@ import type {
     ReconnectMcpServerResponse,
     ToggleMcpServerRequest,
     ToggleMcpServerResponse,
+    AddMcpServerRequest,
+    AddMcpServerResponse,
+    RemoveMcpServerRequest,
+    RemoveMcpServerResponse,
     ApplySettingsRequest,
     ApplySettingsResponse,
     ListSessionsRequest,
@@ -281,6 +285,43 @@ export async function toggleMcpServer(
         sessionId,
         methodName('toggle_mcp_server'),
         { serverName, enabled },
+    );
+}
+
+// ─── add_mcp_server ────────────────────────────────────────────────────────
+
+/**
+ * Dynamically register a single MCP server on a running session.
+ * The server is validated, merged with existing servers, and connected.
+ * Protected server names (`happy`, `happy-knowledge`) are rejected.
+ */
+export async function addRemoteMcpServer(
+    sessionId: string,
+    name: string,
+    config: AddMcpServerRequest['config'],
+): Promise<AddMcpServerResponse> {
+    return apiSocket.sessionRPC<AddMcpServerResponse, AddMcpServerRequest>(
+        sessionId,
+        methodName('add_mcp_server'),
+        { name, config },
+    );
+}
+
+// ─── remove_mcp_server ─────────────────────────────────────────────────────
+
+/**
+ * Dynamically unregister and disconnect a single MCP server from a running
+ * session. Protected server names are rejected. Removing a non-existent
+ * server is idempotent (returns success).
+ */
+export async function removeRemoteMcpServer(
+    sessionId: string,
+    name: string,
+): Promise<RemoveMcpServerResponse> {
+    return apiSocket.sessionRPC<RemoveMcpServerResponse, RemoveMcpServerRequest>(
+        sessionId,
+        methodName('remove_mcp_server'),
+        { name },
     );
 }
 

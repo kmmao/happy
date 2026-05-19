@@ -1091,9 +1091,9 @@ function SessionViewInner({
 
   // Slash command popover
   const [showCommandList, setShowCommandList] = React.useState(false);
-  const handleCommandSelect = React.useCallback((command: string) => {
+  const handleCommandSelect = React.useCallback((text: string) => {
     setShowCommandList(false);
-    setMessage(`/${command} `);
+    setMessage(text);
   }, []);
 
   const handleLargeTextPaste = React.useCallback((text: string) => {

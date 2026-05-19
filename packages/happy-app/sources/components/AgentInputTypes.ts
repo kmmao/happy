@@ -36,7 +36,7 @@ export interface ImageProps {
 export interface CommandProps {
     onSlashCommandPress?: () => void;
     showCommandList?: boolean;
-    onCommandSelect?: (command: string) => void;
+    onCommandSelect?: (text: string) => void;
     onCommandListClose?: () => void;
 }
 

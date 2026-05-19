@@ -13,8 +13,9 @@
 
 ## 当前基线
 
-- SDK 版本：`packages/happy-cli/package.json` 中为 `@anthropic-ai/claude-agent-sdk@^0.2.91`
-- 当前目标：确认 `0.2.91` 新增或变化的能力已经被 Happy 正确吸收，而不是只完成版本号升级
+- SDK 版本：`packages/happy-cli/package.json` 中为 `@anthropic-ai/claude-agent-sdk@0.3.143`
+- 升级路径：`0.2.86 → 0.2.112 → 0.2.119 → 0.2.140 → 0.2.141 → 0.3.142 → 0.3.143`
+- 0.2→0.3 主版本跳跃要点：`Query` 从 type 变为 interface（`import type` 兼容），`SDKMessage` 联合类型新增成员，SDK 内部使用 `zod/v4`
 
 ## 升级时要看的集成面
 
@@ -29,8 +30,6 @@
 - `fallbackModel`
 - `customSystemPrompt`
 - `appendSystemPrompt`
-- `allowedTools`
-- `disallowedTools`
 - `maxBudgetUsd`
 - `thinking`
 - `effort`
@@ -42,6 +41,12 @@
 - `outputFormat`
 - `plugins`
 - `additionalDirectories`
+- `hooks`
+- `toolAliases`
+- `sessionId`
+- `persistSession`
+
+注意：`allowedTools` / `disallowedTools` 已从冷重启哈希移除，改为通过 `applyFlagSettings()` 热切换。
 
 关键代码：
 
@@ -61,6 +66,8 @@
 
 - mid-turn `setModel()`
 - mid-turn `setPermissionMode()`
+- mid-turn `applyFlagSettings()` — 热切换 `allowedTools` / `disallowedTools` 等 Settings 字段
+- mid-turn `setMcpServers()` — 热切换 MCP 服务器配置（add / remove / toggle）
 
 其中 `permissionMode` 当前策略是：
 
@@ -141,34 +148,40 @@ SDK 升级经常会扩展 Agent 定义、Agent tool 行为或多 agent 配置能
 
 ## 当前版本的重点核对项
 
-针对 `0.2.91`，当前应把验证重点收敛到下面几项，而不是泛泛全扫：
+针对 `0.3.143`，当前应把验证重点收敛到下面几项：
 
-### A. permission mode 热切换
+### A. 热切换能力
 
-- [ ] `default -> acceptEdits` 不重启会话
-- [ ] `acceptEdits -> default` 不重启会话
-- [ ] `plan <-> 非 plan` 仍触发冷重启
-- [ ] `bypassPermissions <-> 其他` 仍触发冷重启
-- [ ] Codex 模式到 Claude SDK 模式的映射无回归
+- [x] `default -> acceptEdits` 不重启会话
+- [x] `acceptEdits -> default` 不重启会话
+- [x] `plan <-> 非 plan` 仍触发冷重启
+- [x] `bypassPermissions <-> 其他` 仍触发冷重启
+- [x] `applyFlagSettings()` 热切换 permissions 不重启会话
+- [x] `setMcpServers()` 热切换 MCP 配置不重启会话
+- [ ] MCP add/remove 通过 App RPC 端到端验证
 
-### B. `terminal_reason` 透传
+### B. MCP Server 管理
 
-- [ ] 正常完成时拿到 `terminalReason`
-- [ ] 中断/取消/max-turns 时 `terminalReason` 不丢失
-- [ ] 上层结果消费方兼容该字段
+- [x] 注册/注销 MCP 服务器持久化到 KV 注册表
+- [x] 受保护服务器 (`happy`, `happy-knowledge`) 不可被覆盖或删除
+- [ ] App → RPC → CLI 端到端 MCP 服务器热加载
+- [ ] App → REST API → KV 注册表 CRUD 操作
+- [ ] 注册表跨设备同步正常
 
-### C. continue / requires_action 语义闭环
+### C. 新 Options 字段
 
-- [ ] `error_max_turns` 能稳定进入 continue 流程
-- [ ] `needs-continue` 在增量流和全量回放中一致
-- [ ] `sdkSessionState` 在历史恢复中不丢失
-- [ ] UI 提示与真实可继续动作语义一致
+- [x] `hooks` — 透传到 SDK，不影响现有 RPC 机制
+- [x] `toolAliases` — 透传到 SDK
+- [x] `sessionId` / `resumeSessionAt` — 透传到 SDK
+- [x] `sessionStoreFlush` / `persistSession` — 透传到 SDK
+- [ ] `hooks` + `PostToolUse` 回调实际生效验证
 
-### D. Agent 配置兼容性
+### D. Session Management
 
-- [ ] `agent` / `agents` 变更时行为符合预期
-- [ ] Agent 相关配置未出现“参数传了但实际没生效”
-- [ ] 新字段不会在 Happy 的 schema/normalize/storage 路径上被截断
+- [x] `listSessions` / `getSessionInfo` RPC 正常
+- [x] `deleteSession` / `renameSession` RPC 正常
+- [x] `getSessionMessages` RPC 正常
+- [ ] App 端会话浏览 UI 使用这些 RPC 的端到端验证
 
 ## 最小回归矩阵
 

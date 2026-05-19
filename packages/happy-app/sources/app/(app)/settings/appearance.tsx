@@ -43,6 +43,8 @@ function AppearanceSettingsScreen() {
     useSettingMutable("showFlavorIcons");
   const [compactSessionView, setCompactSessionView] =
     useSettingMutable("compactSessionView");
+  const [showAgentsDashboard, setShowAgentsDashboard] =
+    useSettingMutable("showAgentsDashboard");
   const [collapsibleInput, setCollapsibleInput] =
     useSettingMutable("collapsibleInput");
   const [expandThinkingByDefault, setExpandThinkingByDefault] =
@@ -175,6 +177,17 @@ function AppearanceSettingsScreen() {
             <Switch
               value={compactSessionView}
               onValueChange={setCompactSessionView}
+            />
+          }
+        />
+        <Item
+          title={t("settingsAppearance.showAgentsDashboard")}
+          subtitle={t("settingsAppearance.showAgentsDashboardDescription")}
+          icon={<Ionicons name="grid-outline" size={29} color={theme.colors.accentPurple} />}
+          rightElement={
+            <Switch
+              value={showAgentsDashboard}
+              onValueChange={setShowAgentsDashboard}
             />
           }
         />

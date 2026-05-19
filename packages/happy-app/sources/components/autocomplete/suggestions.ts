@@ -13,11 +13,14 @@ export async function getCommandSuggestions(sessionId: string, query: string): P
     
     try {
         // Use the command search cache with fuzzy matching
-        const commands = await searchCommands(sessionId, searchTerm, { limit: 5 });
+        const commands = await searchCommands(sessionId, searchTerm, {
+            limit: 5,
+            kinds: ['slash'],
+        });
         
         // Convert CommandItem to suggestion format
         return commands.map((cmd: CommandItem) => ({
-            key: `cmd-${cmd.command}`,
+            key: `cmd-${cmd.kind}-${cmd.command}`,
             text: `/${cmd.command}`,
             component: () => React.createElement(CommandSuggestion, {
                 command: cmd.command,

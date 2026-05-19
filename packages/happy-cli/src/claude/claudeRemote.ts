@@ -11,7 +11,10 @@ import {
 import type { OnElicitation } from "@/claude/sdk/types";
 import type { SdkBeta } from "@anthropic-ai/claude-agent-sdk";
 import { mapToClaudeMode } from "./utils/permissionMode";
-import { buildFlagSettingsPatch } from "./utils/flagSettingsPatch";
+import {
+  applyFlagSettingsFromModeDiff,
+  createAppliedSettingsState,
+} from "./utils/applyFlagSettings";
 import { claudeCheckSession } from "./utils/claudeCheckSession";
 import { join, resolve } from "node:path";
 import { projectPath } from "@/projectPath";
@@ -299,6 +302,7 @@ export async function claudeRemote(opts: {
 
   // Prepare SDK options
   let mode = initial.mode;
+  const appliedSettingsState = createAppliedSettingsState();
   // Translate App-level virtual model keys (e.g. "sonnet", "opus")
   // to real Anthropic model IDs, then fall back to env-configured model.
   let model =
@@ -689,18 +693,12 @@ export async function claudeRemote(opts: {
 
         // Hot-swap Settings-level fields via applyFlagSettings (SDK 0.3.142+)
         // Compares prevMode → next.mode and builds a minimal Settings patch.
-        const settingsPatch = buildFlagSettingsPatch(prevMode, next.mode);
-        if (settingsPatch) {
-          try {
-            await (response as AdaptedQuery)._officialQuery.applyFlagSettings(
-              settingsPatch as Record<string, unknown>,
-            );
-          } catch (err) {
-            logger.debug(
-              `[claudeRemote] applyFlagSettings failed (non-fatal): ${err}`,
-            );
-          }
-        }
+        await applyFlagSettingsFromModeDiff(
+          (response as AdaptedQuery)._officialQuery,
+          prevMode,
+          next.mode,
+          appliedSettingsState,
+        );
 
         messages.push({
           type: "user",

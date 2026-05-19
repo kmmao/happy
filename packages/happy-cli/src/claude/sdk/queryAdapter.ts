@@ -139,6 +139,18 @@ export function mapOptions(opts: QueryOptions): OfficialOptions {
   // ── Partial/streaming messages (SDK 0.3.143+) ──
   if (opts.includePartialMessages) result.includePartialMessages = opts.includePartialMessages;
 
+  // ── Tool name redirection (SDK 0.3.142+) ──
+  if (opts.toolAliases) result.toolAliases = opts.toolAliases;
+
+  // ── Hooks (SDK 0.3.142+) ──
+  if (opts.hooks) result.hooks = opts.hooks;
+
+  // ── Session control (SDK 0.3.142+) ──
+  if (opts.sessionId) result.sessionId = opts.sessionId;
+  if (opts.resumeSessionAt) result.resumeSessionAt = opts.resumeSessionAt;
+  if (opts.sessionStoreFlush) result.sessionStoreFlush = opts.sessionStoreFlush;
+  if (opts.persistSession !== undefined) result.persistSession = opts.persistSession;
+
   // ── System prompt mapping ──
   if (opts.customSystemPrompt) {
     result.systemPrompt = opts.customSystemPrompt;

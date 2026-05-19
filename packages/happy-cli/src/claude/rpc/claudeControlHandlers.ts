@@ -31,7 +31,6 @@ import { homedir } from "node:os";
 import type {
   Query as OfficialQuery,
   SDKResultMessage,
-  McpServerConfig,
 } from "@anthropic-ai/claude-agent-sdk";
 import {
   listSessions as sdkListSessions,
@@ -42,6 +41,16 @@ import {
 } from "@anthropic-ai/claude-agent-sdk";
 import type { RpcHandlerManager } from "@/api/rpc/RpcHandlerManager";
 import { logger } from "@/ui/logger";
+import {
+  applyFlagSettings as applyFlagSettingsCore,
+  type AppliedSettingsState,
+} from "@/claude/utils/applyFlagSettings";
+import {
+  applyMcpServers,
+  addMcpServer,
+  removeMcpServer,
+  type McpServerState,
+} from "@/claude/utils/mcpServerManager";
 import {
   CLAUDE_CONTROL_SCOPE,
   type GetSessionCostRequest,
@@ -64,6 +73,10 @@ import {
   type ReconnectMcpServerResponse,
   type ToggleMcpServerRequest,
   type ToggleMcpServerResponse,
+  type AddMcpServerRequest,
+  type AddMcpServerResponse,
+  type RemoveMcpServerRequest,
+  type RemoveMcpServerResponse,
   type ApplySettingsRequest,
   type ApplySettingsResponse,
   type ListSessionsRequest,
@@ -258,6 +271,10 @@ export interface RegisterClaudeControlHandlersOptions {
   costTracker?: SessionCostTracker | null;
   /** happy-cli package version; surfaced by get_binary_version. */
   happyCliVersion?: string;
+  /** Shared applied-settings state tracker for applyFlagSettings introspection. */
+  appliedSettingsState?: AppliedSettingsState | null;
+  /** Shared MCP server state tracker for dynamic load/unload. */
+  mcpServerState?: McpServerState | null;
 }
 
 /**
@@ -267,7 +284,7 @@ export interface RegisterClaudeControlHandlersOptions {
 export function registerClaudeControlHandlers(
   opts: RegisterClaudeControlHandlersOptions,
 ): void {
-  const { rpcHandlerManager, getCurrentQuery, cwd, costTracker, happyCliVersion } = opts;
+  const { rpcHandlerManager, getCurrentQuery, cwd, costTracker, happyCliVersion, appliedSettingsState, mcpServerState } = opts;
   const scope = CLAUDE_CONTROL_SCOPE;
 
   // get_session_cost
@@ -552,23 +569,22 @@ export function registerClaudeControlHandlers(
       if (!q) {
         return { added: [], removed: [], errors: { _: "No active query" } };
       }
-      try {
-        // Cast through unknown — wire schema uses loose string types for transport
-        // flexibility; SDK expects discriminated union McpServerConfig.
-        const result = await q.setMcpServers(req.servers as unknown as Record<string, McpServerConfig>);
-        logger.debug(
-          `[claudeControl] set_mcp_servers added=${result.added.join(",")} removed=${result.removed.join(",")} errors=${JSON.stringify(result.errors)}`,
-        );
-        return {
-          added: result.added,
-          removed: result.removed,
-          errors: result.errors,
-        };
-      } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        logger.debug("[claudeControl] set_mcp_servers failed", e);
-        return { added: [], removed: [], errors: { _: msg } };
+      if (!mcpServerState) {
+        return { added: [], removed: [], errors: { _: "No MCP server state — launcher did not wire one" } };
       }
+      const result = await applyMcpServers(
+        q,
+        req.servers as Record<string, Record<string, unknown>>,
+        mcpServerState,
+      );
+      if (!result.ok) {
+        return { added: [], removed: [], errors: { _: result.error } };
+      }
+      return {
+        added: result.added,
+        removed: result.removed,
+        errors: result.errors,
+      };
     },
   );
 
@@ -600,6 +616,56 @@ export function registerClaudeControlHandlers(
     },
   );
 
+  // add_mcp_server — dynamically register a single MCP server on a running session
+  rpcHandlerManager.registerHandler<AddMcpServerRequest, AddMcpServerResponse>(
+    `${scope}:add_mcp_server`,
+    async (req) => {
+      const q = getCurrentQuery();
+      if (!q) {
+        return { success: false, added: [], errors: {}, errorMessage: "No active query" };
+      }
+      if (!mcpServerState) {
+        return { success: false, added: [], errors: {}, errorMessage: "No MCP server state" };
+      }
+      const result = await addMcpServer(
+        q,
+        req.name,
+        req.config as Record<string, unknown>,
+        mcpServerState,
+      );
+      if (!result.ok) {
+        return { success: false, added: [], errors: {}, errorMessage: result.error };
+      }
+      return {
+        success: true,
+        added: result.added,
+        errors: result.errors,
+      };
+    },
+  );
+
+  // remove_mcp_server — dynamically unregister a single MCP server from a running session
+  rpcHandlerManager.registerHandler<RemoveMcpServerRequest, RemoveMcpServerResponse>(
+    `${scope}:remove_mcp_server`,
+    async (req) => {
+      const q = getCurrentQuery();
+      if (!q) {
+        return { success: false, removed: [], errorMessage: "No active query" };
+      }
+      if (!mcpServerState) {
+        return { success: false, removed: [], errorMessage: "No MCP server state" };
+      }
+      const result = await removeMcpServer(q, req.name, mcpServerState);
+      if (!result.ok) {
+        return { success: false, removed: [], errorMessage: result.error };
+      }
+      return {
+        success: true,
+        removed: result.removed,
+      };
+    },
+  );
+
   // apply_settings — hot-swap Settings-layer fields via applyFlagSettings() (SDK 0.3.142+)
   rpcHandlerManager.registerHandler<ApplySettingsRequest, ApplySettingsResponse>(
     `${scope}:apply_settings`,
@@ -608,10 +674,20 @@ export function registerClaudeControlHandlers(
       if (!q) {
         throw new Error("No active query — cannot apply settings");
       }
-      await q.applyFlagSettings(req.settings as Record<string, unknown>);
-      logger.debug(
-        `[claudeControl] apply_settings keys=${Object.keys(req.settings).join(",")}`,
+      if (!appliedSettingsState) {
+        throw new Error("No applied-settings state — launcher did not wire one");
+      }
+      const result = await applyFlagSettingsCore(
+        q,
+        req.settings as Record<string, unknown>,
+        appliedSettingsState,
       );
+      if (!result.applied && result.reason === "validation_error") {
+        throw new Error(`apply_settings validation failed: ${result.error}`);
+      }
+      if (!result.applied && result.reason === "sdk_error") {
+        throw new Error(`apply_settings SDK error: ${result.error}`);
+      }
       return { success: true };
     },
   );
@@ -728,5 +804,5 @@ export function registerClaudeControlHandlers(
     },
   );
 
-  logger.debug("[claudeControl] Registered 17 claude-control:* RPC handlers");
+  logger.debug("[claudeControl] Registered 19 claude-control:* RPC handlers");
 }

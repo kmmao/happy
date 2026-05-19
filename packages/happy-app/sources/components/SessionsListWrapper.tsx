@@ -7,7 +7,7 @@ import { SharedStateView } from './SharedStateView';
 import { AgentsDashboard } from './AgentsDashboard';
 import { UpdateBanner } from './UpdateBanner';
 import { useVisibleSessionListViewData } from '@/hooks/useVisibleSessionListViewData';
-import { useSessions } from '@/sync/storage';
+import { useSessions, useSetting } from '@/sync/storage';
 import { Session } from '@/sync/storageTypes';
 import { t } from '@/text';
 
@@ -47,6 +47,8 @@ export const SessionsListWrapper = React.memo(() => {
     const allSessions = useSessions();
     const styles = stylesheet;
 
+    const showAgentsDashboard = useSetting('showAgentsDashboard');
+
     const activeSessions = React.useMemo(() => {
         if (!allSessions) return [] as Session[];
         return (allSessions as Session[]).filter((item): item is Session =>
@@ -76,13 +78,13 @@ export const SessionsListWrapper = React.memo(() => {
         );
     }
 
-    const showAgentsDashboard = activeSessions.length >= 2;
+    const shouldShowDashboard = showAgentsDashboard && activeSessions.length >= 2;
 
     return (
         <View style={styles.container}>
-            {showAgentsDashboard && <UpdateBanner />}
-            <AgentsDashboard sessions={activeSessions} />
-            <SessionsList hideUpdateBanner={showAgentsDashboard} />
+            {shouldShowDashboard && <UpdateBanner />}
+            {shouldShowDashboard && <AgentsDashboard sessions={activeSessions} />}
+            <SessionsList hideUpdateBanner={shouldShowDashboard} />
         </View>
     );
 });

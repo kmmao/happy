@@ -53,6 +53,7 @@ import { optionScoreRoutes } from "./routes/optionScoreRoutes";
 import { optionGenerateRoutes } from "./routes/optionGenerateRoutes";
 import { supervisorDimensionRoutes } from "./routes/supervisorDimensionRoutes";
 import { agentLoopSuggestRoutes } from "./routes/agentLoopSuggestRoutes";
+import { mcpServerRoutes } from "./routes/mcpServerRoutes";
 import { isLocalStorage, getLocalFilesDir } from "@/storage/files";
 import { startKnowledgeLifecycleScheduler, stopKnowledgeLifecycleScheduler } from "@/modules/knowledgeLifecycleScheduler";
 import { startTaskStaleReaper, stopTaskStaleReaper } from "@/modules/taskStaleReaper";
@@ -179,6 +180,7 @@ export async function startApi() {
   optionGenerateRoutes(typed);
   supervisorDimensionRoutes(typed);
   agentLoopSuggestRoutes(typed);
+  mcpServerRoutes(typed);
 
   // Start HTTP
   const port = process.env.PORT ? parseInt(process.env.PORT, 10) : 3005;

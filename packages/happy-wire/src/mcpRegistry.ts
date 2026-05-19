@@ -77,6 +77,29 @@ export const McpRegistryEntrySchema = z.object({
   createdAt: z.string().optional(),
   /** ISO timestamp of the last update. */
   updatedAt: z.string().optional(),
+
+  // ── Extended metadata (optional, backward-compatible) ──
+
+  /** Categorize the server for UI grouping (e.g. 'search', 'data', 'code', 'infra'). */
+  category: z.string().max(64).optional(),
+  /** Icon identifier for display (e.g. emoji or icon-pack name). */
+  icon: z.string().max(64).optional(),
+  /** Free-form tags for filtering and search. */
+  tags: z.array(z.string().max(64)).max(20).optional(),
+  /** npm package name or GitHub repo (e.g. '@anthropic-ai/mcp-server-filesystem'). */
+  packageName: z.string().max(256).optional(),
+  /** Semantic version of the server binary/package. */
+  version: z.string().max(64).optional(),
+  /** Author or organization name. */
+  author: z.string().max(128).optional(),
+  /** Homepage / documentation URL. */
+  homepage: z.string().max(512).optional(),
+  /** Cached tool names discovered from the server on last connect. */
+  toolInventory: z.array(z.string().max(128)).max(200).optional(),
+  /** ISO timestamp of the last successful connection. */
+  lastConnectedAt: z.string().optional(),
+  /** Total number of times this server has been connected. */
+  connectionCount: z.number().int().nonnegative().optional(),
 });
 
 export type McpRegistryEntry = z.infer<typeof McpRegistryEntrySchema>;

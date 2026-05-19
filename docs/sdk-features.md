@@ -16,10 +16,17 @@ This document describes which features from the official `@anthropic-ai/claude-a
 | **interrupt()** | Yes | No | No |
 | **stopTask()** | Yes | No | No |
 | **applyFlagSettings()** hot-swap | Yes | No | No |
+| **setMcpServers()** hot-swap | Yes | No | No |
 | **listSessions()** / **getSessionInfo()** | Yes | No | No |
 | **deleteSession()** / **renameSession()** | Yes | No | No |
 | **getSessionMessages()** | Yes | No | No |
 | **includePartialMessages** (streaming) | Yes | N/A (native) | N/A (native) |
+| **hooks** (lifecycle callbacks) | Yes | No | No |
+| **toolAliases** (tool name redirection) | Yes | No | No |
+| **sessionId** (explicit session UUID) | Yes | No | No |
+| **resumeSessionAt** (positional resume) | Yes | No | No |
+| **sessionStoreFlush** (eager/batched) | Yes | No | No |
+| **persistSession** (disable persistence) | Yes | No | No |
 | Basic session protocol (messages, tool calls) | Yes | Yes | Yes |
 | Permission mode (default/acceptEdits/bypassPermissions/plan) | Yes | Mapped (read-only/safe-yolo/yolo) | Yes |
 
@@ -70,8 +77,11 @@ Set once at query start via `mapOptions()` in `queryAdapter.ts`. Cannot be hot-s
 | Permission mode (default ↔ acceptEdits) | Hot-swap via `setPermissionMode()` |
 | Permission mode (to/from plan or bypassPermissions) | Cold restart required |
 | allowedTools / disallowedTools | Hot-swap via `applyFlagSettings({ permissions })` (SDK 0.3.142+) |
+| MCP servers add/remove/toggle | Hot-swap via `setMcpServers()` (SDK 0.3.142+) |
 | effort / thinking / maxBudgetUsd | Cold restart required |
 | fallbackModel / systemPrompt | Cold restart required |
+| hooks / toolAliases | Cold restart required (Options-level, set at query start) |
+| sessionId / resumeSessionAt | Cold restart required (session construction) |
 
 Cold restart detection uses `coldModeHash()` in `claudeRemoteLauncher.ts` to compare the hash of non-hot-swappable fields between turns.
 
@@ -92,6 +102,33 @@ The hot-swap is triggered in `claudeRemote.ts` when a new turn arrives with diff
 
 **App-side RPC:** The App can also push settings changes directly via `applySettings()` → `claude-control:apply_settings` RPC, which delegates to the same `Query.applyFlagSettings()`. This is used for ad-hoc Settings updates from the sidebar UI.
 
+## MCP Server Management (SDK 0.3.142+)
+
+The SDK provides `Query.setMcpServers()` for hot-swapping MCP server configurations at runtime. Happy wraps this with a dual-write architecture:
+
+1. **Persistent Registry** — KV store via `/v1/mcp/servers` REST API (server-side), accessed through `mcpRegistry` (App-side)
+2. **Runtime Hot-load** — RPC via `claude-control:add_mcp_server` / `remove_mcp_server` → `mcpServerManager.ts` → `Query.setMcpServers()`
+
+Protected servers (`happy`, `happy-knowledge`) cannot be added/removed/overwritten by App RPCs.
+
+| RPC Method | Action | Notes |
+|-----------|--------|-------|
+| `set_mcp_servers` | Replace all user MCP servers | Full sync from registry |
+| `add_mcp_server` | Add single server | Validates transport, merges with existing |
+| `remove_mcp_server` | Remove single server | Rejects protected names |
+
+App-side orchestration (`mcpServerOps.ts`) implements persist-then-load: registry write is authoritative, runtime loading is best-effort.
+
+## Hooks (SDK 0.3.142+)
+
+The SDK `Options.hooks` field allows in-process TypeScript callbacks at agent lifecycle points. Happy exposes this through `QueryOptions.hooks` as a transparent pass-through.
+
+**Relationship to RPC:** Hooks and RPC are complementary:
+- **Hooks** — in-process, low-latency, synchronous interception (tool auditing, custom stop logic)
+- **RPC** — cross-device, network-based, async (App remote control, permission approval)
+
+Currently no built-in hooks are registered by default. The field is available for future extensions (e.g. PostToolUse audit logging, TaskCompleted notifications).
+
 ## Key Files
 
 | File | Role |
@@ -103,8 +140,15 @@ The hot-swap is triggered in `claudeRemote.ts` when a new turn arrives with diff
 | `packages/happy-cli/src/claude/rpc/claudeControlHandlers.ts` | RPC handlers including `apply_settings` → `applyFlagSettings()` |
 | `packages/happy-app/sources/sync/apiClaudeControl.ts` | App-side RPC client for claude-control methods |
 | `packages/happy-cli/src/claude/utils/streamEventMapper.ts` | SDK stream_event → text-delta session protocol mapping |
-| `packages/happy-cli/src/claude/utils/flagSettingsPatch.ts` | EnhancedMode diff → applyFlagSettings patch builder |
+| `packages/happy-cli/src/claude/utils/applyFlagSettings.ts` | Unified entry for `applyFlagSettings()` with state tracking |
+| `packages/happy-cli/src/claude/utils/settingsParser.ts` | Whitelist-based settings validator for App RPC |
+| `packages/happy-cli/src/claude/utils/mcpServerManager.ts` | MCP server lifecycle (validate, add, remove, sync) |
+| `packages/happy-wire/src/mcpRegistry.ts` | MCP registry schemas and helpers |
 | `packages/happy-wire/src/sessionProtocol.ts` | Protocol schema (prompt-suggestion event, etc.) |
+| `packages/happy-server/sources/app/api/routes/mcpServerRoutes.ts` | Server REST API for MCP server registry CRUD |
+| `packages/happy-app/sources/sync/mcpRegistry.ts` | App-side MCP registry manager (cache + REST API) |
+| `packages/happy-app/sources/sync/mcpServerOps.ts` | App-side dual-write orchestration (persist + hot-load) |
+| `packages/happy-app/sources/sync/apiMcpServers.ts` | App-side REST client for `/v1/mcp/servers` |
 
 ## Session Management (SDK 0.3.143+)
 

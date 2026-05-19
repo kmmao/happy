@@ -10,14 +10,40 @@ import {
 } from "./codexSurface";
 import { storage } from "./storage";
 
+export type CommandItemKind = "slash" | "skill";
+
 export interface CommandItem {
-  command: string; // The command without slash (e.g., "compact")
+  command: string; // The command without slash/sigil (e.g., "compact" or "tdd")
   description?: string; // Optional description of what the command does
+  kind: CommandItemKind;
+}
+
+export interface FavoriteShortcut {
+  kind: CommandItemKind;
+  command: string;
+}
+
+export function getCommandItemKey(item: Pick<CommandItem, "kind" | "command">): string {
+  return `${item.kind}:${item.command}`;
+}
+
+export function getCommandInsertionText(item: Pick<CommandItem, "kind" | "command">): string {
+  return item.kind === "skill" ? `$${item.command} ` : `/${item.command} `;
+}
+
+export function normalizeFavoriteShortcut(
+  shortcut: FavoriteShortcut | string,
+): FavoriteShortcut {
+  if (typeof shortcut === "string") {
+    return { kind: "slash", command: shortcut };
+  }
+  return shortcut;
 }
 
 interface SearchOptions {
   limit?: number;
   threshold?: number;
+  kinds?: CommandItemKind[];
 }
 
 // Commands to ignore/filter out
@@ -58,8 +84,8 @@ export const IGNORED_COMMANDS = [
 
 // Default commands always available
 const DEFAULT_COMMANDS: CommandItem[] = [
-  { command: "compact", description: "Compact the conversation history" },
-  { command: "clear", description: "Clear the conversation" },
+  { command: "compact", description: "Compact the conversation history", kind: "slash" },
+  { command: "clear", description: "Clear the conversation", kind: "slash" },
 ];
 
 // Command descriptions for known tools/commands
@@ -89,10 +115,11 @@ function mergeSlashCommands(
 ): void {
   for (const cmd of slashCommands) {
     if (IGNORED_COMMANDS.includes(cmd)) continue;
-    if (!commands.find((c) => c.command === cmd)) {
+    if (!commands.find((c) => c.kind === "slash" && c.command === cmd)) {
       commands.push({
         command: cmd,
         description: descriptions?.[cmd] ?? COMMAND_DESCRIPTIONS[cmd],
+        kind: "slash",
       });
     }
   }
@@ -100,14 +127,31 @@ function mergeSlashCommands(
 
 function mergeCodexPromptCommands(
   commands: CommandItem[],
-  promptCommands: readonly CommandItem[],
+  promptCommands: readonly Omit<CommandItem, "kind">[],
 ): void {
   for (const prompt of promptCommands) {
     if (IGNORED_COMMANDS.includes(prompt.command)) continue;
-    if (!commands.find((command) => command.command === prompt.command)) {
+    if (!commands.find((command) => command.kind === "slash" && command.command === prompt.command)) {
       commands.push({
         command: prompt.command,
         description: prompt.description,
+        kind: "slash",
+      });
+    }
+  }
+}
+
+function mergeCodexSkills(
+  commands: CommandItem[],
+  skills: readonly { name: string; description?: string | null }[] | undefined,
+): void {
+  for (const skill of skills ?? []) {
+    if (!skill.name) continue;
+    if (!commands.find((command) => command.kind === "skill" && command.command === skill.name)) {
+      commands.push({
+        command: skill.name,
+        description: skill.description ?? undefined,
+        kind: "skill",
       });
     }
   }
@@ -132,6 +176,7 @@ function getCommandsFromSession(sessionId: string): CommandItem[] {
           commands,
           resolveCodexPromptCommands(session.metadata),
         );
+        mergeCodexSkills(commands, session.metadata.codex?.skills);
       }
     }
     return commands;
@@ -154,6 +199,7 @@ function getCommandsFromSession(sessionId: string): CommandItem[] {
     commands,
     resolveCodexPromptCommands(session.metadata),
   );
+  mergeCodexSkills(commands, session.metadata.codex?.skills);
 
   return commands;
 }
@@ -164,10 +210,12 @@ export async function searchCommands(
   query: string,
   options: SearchOptions = {},
 ): Promise<CommandItem[]> {
-  const { limit = 10, threshold = 0.3 } = options;
+  const { limit = 10, threshold = 0.3, kinds } = options;
 
   // Get commands from session metadata (no caching)
-  const commands = getCommandsFromSession(sessionId);
+  const commands = kinds && kinds.length > 0
+    ? getCommandsFromSession(sessionId).filter((command) => kinds.includes(command.kind))
+    : getCommandsFromSession(sessionId);
 
   // If query is empty, return all commands
   if (!query || query.trim().length === 0) {

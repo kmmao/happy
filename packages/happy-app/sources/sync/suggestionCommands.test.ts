@@ -38,11 +38,12 @@ describe("getAllCommands", () => {
     };
 
     expect(getAllCommands("codex-session")).toEqual([
-      { command: "compact", description: "Compact the conversation history" },
-      { command: "clear", description: "Clear the conversation" },
+      { command: "compact", description: "Compact the conversation history", kind: "slash" },
+      { command: "clear", description: "Clear the conversation", kind: "slash" },
       {
         command: "ecc-plan",
         description: "Run the ECC planning workflow.",
+        kind: "slash",
       },
     ]);
   });
@@ -81,6 +82,7 @@ describe("getAllCommands", () => {
       {
         command: "ecc-plan",
         description: "Prompt metadata description",
+        kind: "slash",
       },
     ]);
   });
@@ -112,16 +114,49 @@ describe("getAllCommands", () => {
     };
 
     expect(getAllCommands("codex-session")).toEqual([
-      { command: "compact", description: "Compact the conversation history" },
-      { command: "clear", description: "Clear the conversation" },
+      { command: "compact", description: "Compact the conversation history", kind: "slash" },
+      { command: "clear", description: "Clear the conversation", kind: "slash" },
       {
         command: "plan",
         description: "Generic planner command",
+        kind: "slash",
       },
       {
         command: "ecc-plan",
         description: "Prompt metadata description",
+        kind: "slash",
       },
     ]);
   });
+
+  it("includes Codex skills as skill shortcuts", () => {
+    mockState = {
+      sessions: {
+        "codex-session": {
+          metadata: {
+            path: "/tmp/project",
+            host: "test-host",
+            flavor: "codex",
+            codex: {
+              skills: [
+                {
+                  name: "tdd",
+                  path: "/Users/test/.agents/skills/tdd/SKILL.md",
+                  description: "Test-driven development workflow",
+                  enabled: true,
+                },
+              ],
+            },
+          },
+        },
+      },
+    };
+
+    expect(getAllCommands("codex-session")).toContainEqual({
+      command: "tdd",
+      description: "Test-driven development workflow",
+      kind: "skill",
+    });
+  });
+
 });

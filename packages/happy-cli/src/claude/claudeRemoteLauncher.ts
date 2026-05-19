@@ -69,6 +69,8 @@ import {
   registerClaudeControlHandlers,
   SessionCostTracker,
 } from "./rpc/claudeControlHandlers";
+import { createAppliedSettingsState } from "./utils/applyFlagSettings";
+import { createMcpServerState } from "./utils/mcpServerManager";
 import packageJson from "../../package.json";
 
 interface PermissionsField {
@@ -356,12 +358,16 @@ export async function claudeRemoteLauncher(
 
   // Claude Control sidebar RPCs (SDK 0.2.119+ — see claudeControlRpc.ts wire schemas)
   const sessionCostTracker = new SessionCostTracker();
+  const appliedSettingsState = createAppliedSettingsState();
+  const mcpServerState = createMcpServerState();
   registerClaudeControlHandlers({
     rpcHandlerManager: session.client.rpcHandlerManager,
     getCurrentQuery: () => currentQuery,
     cwd: session.path,
     costTracker: sessionCostTracker,
     happyCliVersion: (packageJson as { version?: string }).version,
+    appliedSettingsState,
+    mcpServerState,
   });
   // Removed catch-all stdin handler - now handled by RemoteModeDisplay keyboard handlers
 
@@ -2218,6 +2224,17 @@ export async function claudeRemoteLauncher(
 
       // Fetch persistent MCP registry from server KV (non-blocking — falls back to {} on error)
       const registryServers = await fetchMcpRegistryServers(session.api);
+
+      // Seed MCP server state: protected servers (cannot be removed/overwritten by App),
+      // and user servers from local settings + registry for diffing.
+      mcpServerState.protectedServers = {
+        happy: { type: "sdk", name: "happy" },
+        ...(knowledgeMcpServer ? { "happy-knowledge": { type: "sdk", name: "happy-knowledge" } } : {}),
+      };
+      mcpServerState.userServers = {
+        ...readClaudeMcpServers() as Record<string, Record<string, unknown>>,
+        ...registryServers,
+      };
 
       try {
         const remoteResult = await claudeRemote({

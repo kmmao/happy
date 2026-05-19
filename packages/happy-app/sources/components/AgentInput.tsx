@@ -38,7 +38,12 @@ import {
   useSettingMutable,
 } from "@/sync/storage";
 import { hackMode, hackModes } from "@/sync/modeHacks";
-import { getAllCommands } from "@/sync/suggestionCommands";
+import {
+  getAllCommands,
+  getCommandInsertionText,
+  getCommandItemKey,
+  normalizeFavoriteShortcut,
+} from "@/sync/suggestionCommands";
 import { t } from "@/text";
 import { getBuiltInProfile } from "@/sync/profileUtils";
 import { useAnimatedTokensCostValue } from "./AnimatedTokensCost";
@@ -309,16 +314,27 @@ export const AgentInput = React.memo(
       [favoriteCommands, setFavoriteCommands],
     );
 
-    // Favorite slash commands (synced Settings — for quick chips above input)
-    // Only show favorites that exist in the current session's available commands
-    const [rawFavoriteSlashCommands] = useSettingMutable("favoriteSlashCommands");
-    const favoriteSlashCommands = React.useMemo(() => {
-      if (rawFavoriteSlashCommands.length === 0) return rawFavoriteSlashCommands;
-      const available = new Set(
-        getAllCommands(props.sessionId ?? "").map((c) => c.command),
+    // Favorite shortcuts (synced Settings — for quick chips above input).
+    // Supports legacy slash-command favorites plus typed slash/skill shortcuts.
+    // Only show favorites that exist in the current session's available shortcuts.
+    const [legacyFavoriteSlashCommands] = useSettingMutable("favoriteSlashCommands");
+    const [favoriteShortcuts] = useSettingMutable("favoriteShortcuts");
+    const favoriteShortcutItems = React.useMemo(() => {
+      const normalized = favoriteShortcuts.length > 0
+        ? favoriteShortcuts.map(normalizeFavoriteShortcut)
+        : legacyFavoriteSlashCommands.map(normalizeFavoriteShortcut);
+      if (normalized.length === 0) return [];
+
+      const available = new Map(
+        getAllCommands(props.sessionId ?? "").map((item) => [
+          getCommandItemKey(item),
+          item,
+        ]),
       );
-      return rawFavoriteSlashCommands.filter((cmd) => available.has(cmd));
-    }, [rawFavoriteSlashCommands, props.sessionId]);
+      return normalized
+        .map((shortcut) => available.get(getCommandItemKey(shortcut)))
+        .filter((item): item is NonNullable<typeof item> => Boolean(item));
+    }, [favoriteShortcuts, legacyFavoriteSlashCommands, props.sessionId]);
 
     // Handle settings button press
     const handleSettingsPress = React.useCallback(() => {
@@ -1541,7 +1557,7 @@ export const AgentInput = React.memo(
             </RNModal>
 
             {/* Favorite slash command chips */}
-            {favoriteSlashCommands.length > 0 && (
+            {favoriteShortcutItems.length > 0 && (
               <ScrollView
                 horizontal
                 showsHorizontalScrollIndicator={false}
@@ -1553,7 +1569,7 @@ export const AgentInput = React.memo(
                   gap: 6,
                 }}
               >
-                {favoriteSlashCommands.map((cmd, index) => {
+                {favoriteShortcutItems.map((item, index) => {
                   const glassStyle = getFavoriteSlashChipGlassStyle();
                   const gradient = FAVORITE_CHIP_GRADIENTS[
                     index % FAVORITE_CHIP_GRADIENTS.length
@@ -1561,10 +1577,10 @@ export const AgentInput = React.memo(
                   const accentColor = gradient[0];
                   return (
                     <Pressable
-                      key={cmd}
+                      key={getCommandItemKey(item)}
                       onPress={() => {
                         hapticsLight();
-                        props.commands?.onCommandSelect?.(cmd);
+                        props.commands?.onCommandSelect?.(getCommandInsertionText(item));
                       }}
                       style={({ pressed }) => ({
                         ...glassStyle.container,
@@ -1632,7 +1648,7 @@ export const AgentInput = React.memo(
                             }}
                             numberOfLines={1}
                           >
-                            {cmd.includes(":") ? cmd.split(":").pop() : cmd}
+                            {item.kind === "skill" ? `$${item.command}` : item.command}
                           </Text>
                         </LinearGradient>
                       </BlurView>

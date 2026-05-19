@@ -78,6 +78,11 @@ export const SettingsSchema = z.object({
     .describe(
       "Show real-time agent activity details in chat (thinking state, subagent info, tool descriptions)",
     ),
+  showAgentsDashboard: z
+    .boolean()
+    .describe(
+      "Show the horizontal agent sessions dashboard at the top of the session list when 2+ sessions are active",
+    ),
   knowledgeBase: z
     .boolean()
     .describe("Enable project knowledge base (experimental). Controls Tab visibility and CLI kill-switch; per-project mode/sensitivity/track options live on Project.knowledgeConfig."),
@@ -234,9 +239,19 @@ export const SettingsSchema = z.object({
     .array(z.string())
     .describe("User-defined favorite shell commands for quick access"),
   // Favorite slash commands for quick access in command list popover
+  // Deprecated for new writes; retained for backward compatibility/migration.
   favoriteSlashCommands: z
     .array(z.string())
     .describe("User-defined favorite slash commands for quick access"),
+  // Favorite shortcuts for quick access in command list popover. Supports slash commands and Codex skills.
+  favoriteShortcuts: z
+    .array(
+      z.object({
+        kind: z.enum(["slash", "skill"]),
+        command: z.string(),
+      }),
+    )
+    .describe("User-defined favorite shortcuts for quick access"),
   // Claude Code plugins configuration
   plugins: z
     .array(
@@ -408,6 +423,7 @@ export const settingsDefaults: Settings = {
   analyticsOptOut: false,
   experiments: false,
   showAgentActivity: true,
+  showAgentsDashboard: false,
   knowledgeBase: false,
   enablePreviewTab: false,
   useEnhancedSessionWizard: false,
@@ -450,6 +466,8 @@ export const settingsDefaults: Settings = {
   favoriteCommands: [],
   // Favorite slash commands (empty by default)
   favoriteSlashCommands: [],
+  // Favorite shortcuts (empty by default)
+  favoriteShortcuts: [],
   // Plugins (empty by default, populated via discovery or manual add)
   plugins: [],
   // Git host provider mappings (empty by default, uses built-in detection as fallback)

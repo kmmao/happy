@@ -1,9 +1,12 @@
 /**
- * MCP Registry Manager — persistent MCP server configuration via KV store.
+ * MCP Registry Manager — persistent MCP server configuration via REST API.
  *
- * Stores the full MCP server registry as a single encrypted KV entry under
- * `mcp:servers`. Provides CRUD operations and syncs changes to running
- * sessions via the `set_mcp_servers` RPC when a session ID is provided.
+ * Wraps the `/v1/mcp/servers` REST endpoints for CRUD operations on the
+ * MCP server registry. The server handles KV storage, encoding, and
+ * optimistic concurrency internally.
+ *
+ * Maintains an in-memory cache to avoid redundant API calls within the
+ * same app lifecycle. Invalidated on every write and on explicit refresh().
  *
  * Usage:
  *   import { mcpRegistry } from '@/sync/mcpRegistry';
@@ -13,22 +16,23 @@
  */
 
 import {
-    MCP_REGISTRY_KV_KEY,
-    McpRegistrySchema,
-    parseMcpRegistry,
     createEmptyMcpRegistry,
     type McpRegistry,
     type McpRegistryEntry,
 } from '@kmmao/happy-wire';
-import { kvGet } from '@/sync/apiKv';
-import { kvSetWithRetry } from '@/sync/kvConflictRetry';
+import {
+    registerMcpServer,
+    listMcpServers,
+    deleteMcpServer,
+    toggleMcpServerEnabled,
+} from '@/sync/apiMcpServers';
 import type { AuthCredentials } from '@/auth/tokenStorage';
 import { log } from '@/log';
 
 // ── In-memory cache ─────────────────────────────────────────────────────────
 
 /**
- * Cached registry state to avoid redundant KV reads within the same app
+ * Cached registry state to avoid redundant API calls within the same app
  * lifecycle. Invalidated on every write and on explicit refresh().
  */
 let cachedRegistry: McpRegistry | null = null;
@@ -37,7 +41,7 @@ let cachedVersion: number = -1;
 // ── Core operations ─────────────────────────────────────────────────────────
 
 /**
- * Load the MCP registry from KV store. Returns cached data if available.
+ * Load the MCP registry from the server. Returns cached data if available.
  * Call refresh() to force a fresh read.
  */
 async function load(credentials: AuthCredentials): Promise<{ registry: McpRegistry; version: number }> {
@@ -48,40 +52,25 @@ async function load(credentials: AuthCredentials): Promise<{ registry: McpRegist
 }
 
 /**
- * Force-refresh the registry from KV store, bypassing cache.
+ * Force-refresh the registry from the server, bypassing cache.
  */
 async function refresh(credentials: AuthCredentials): Promise<{ registry: McpRegistry; version: number }> {
     try {
-        const item = await kvGet(credentials, MCP_REGISTRY_KV_KEY);
-        if (!item) {
-            cachedRegistry = createEmptyMcpRegistry();
-            cachedVersion = -1;
-            return { registry: cachedRegistry, version: cachedVersion };
-        }
-        cachedRegistry = parseMcpRegistry(item.value);
-        cachedVersion = item.version;
+        const result = await listMcpServers(credentials);
+        const registry: McpRegistry = {
+            version: 1,
+            servers: Object.fromEntries(
+                result.servers.map((s) => [s.name, s]),
+            ),
+        };
+        cachedRegistry = registry;
+        cachedVersion = result.registryVersion;
         return { registry: cachedRegistry, version: cachedVersion };
     } catch (e) {
         log.log('[mcpRegistry] refresh failed', e);
         const empty = createEmptyMcpRegistry();
         return { registry: empty, version: -1 };
     }
-}
-
-/**
- * Save the full registry to KV store with optimistic concurrency.
- * Uses kvConflictRetry to handle version conflicts.
- */
-async function save(
-    credentials: AuthCredentials,
-    registry: McpRegistry,
-    version: number,
-): Promise<number> {
-    const value = JSON.stringify(McpRegistrySchema.parse(registry));
-    const { version: newVersion } = await kvSetWithRetry(credentials, MCP_REGISTRY_KV_KEY, value, version);
-    cachedRegistry = registry;
-    cachedVersion = newVersion;
-    return newVersion;
 }
 
 // ── CRUD operations ─────────────────────────────────────────────────────────
@@ -94,21 +83,34 @@ async function addServer(
     credentials: AuthCredentials,
     entry: McpRegistryEntry,
 ): Promise<McpRegistry> {
-    const { registry, version } = await load(credentials);
-    const now = new Date().toISOString();
-    const existing = registry.servers[entry.name];
+    const result = await registerMcpServer(credentials, {
+        name: entry.name,
+        transport: entry.transport,
+        enabled: entry.enabled,
+        machineId: entry.machineId,
+        description: entry.description,
+        category: entry.category,
+        icon: entry.icon,
+        tags: entry.tags,
+        packageName: entry.packageName,
+        version: entry.version,
+        author: entry.author,
+        homepage: entry.homepage,
+    });
+
+    // Invalidate cache — next load() will fetch fresh data
+    invalidateCache();
+
+    // Return a synthetic registry with the updated server for immediate use
+    const { registry } = await load(credentials);
     const updated: McpRegistry = {
         ...registry,
-        servers: {
-            ...registry.servers,
-            [entry.name]: {
-                ...entry,
-                createdAt: existing?.createdAt ?? now,
-                updatedAt: now,
-            },
-        },
+        servers: { ...registry.servers, [entry.name]: result.server },
     };
-    await save(credentials, updated, version);
+    cachedRegistry = updated;
+    if (result.registryVersion !== undefined) {
+        cachedVersion = result.registryVersion;
+    }
     return updated;
 }
 
@@ -120,14 +122,15 @@ async function removeServer(
     credentials: AuthCredentials,
     serverName: string,
 ): Promise<McpRegistry> {
-    const { registry, version } = await load(credentials);
-    if (!(serverName in registry.servers)) {
-        return registry;
+    await deleteMcpServer(credentials, serverName);
+
+    // Update cache
+    if (cachedRegistry) {
+        const { [serverName]: _, ...remaining } = cachedRegistry.servers;
+        cachedRegistry = { ...cachedRegistry, servers: remaining };
     }
-    const { [serverName]: _, ...remaining } = registry.servers;
-    const updated: McpRegistry = { ...registry, servers: remaining };
-    await save(credentials, updated, version);
-    return updated;
+
+    return cachedRegistry ?? createEmptyMcpRegistry();
 }
 
 /**
@@ -138,24 +141,25 @@ async function toggleServer(
     serverName: string,
     enabled: boolean,
 ): Promise<McpRegistry> {
-    const { registry, version } = await load(credentials);
-    const entry = registry.servers[serverName];
-    if (!entry) {
-        throw new Error(`MCP server '${serverName}' not found in registry`);
-    }
-    const updated: McpRegistry = {
-        ...registry,
-        servers: {
-            ...registry.servers,
-            [serverName]: {
-                ...entry,
-                enabled,
-                updatedAt: new Date().toISOString(),
+    const result = await toggleMcpServerEnabled(credentials, serverName, enabled);
+
+    // Update cache
+    if (cachedRegistry && cachedRegistry.servers[serverName]) {
+        cachedRegistry = {
+            ...cachedRegistry,
+            servers: {
+                ...cachedRegistry.servers,
+                [serverName]: result.server,
             },
-        },
-    };
-    await save(credentials, updated, version);
-    return updated;
+        };
+        if (result.registryVersion !== undefined) {
+            cachedVersion = result.registryVersion;
+        }
+    } else {
+        invalidateCache();
+    }
+
+    return cachedRegistry ?? createEmptyMcpRegistry();
 }
 
 /**
@@ -184,7 +188,6 @@ function invalidateCache(): void {
 export const mcpRegistry = {
     load,
     refresh,
-    save,
     addServer,
     removeServer,
     toggleServer,

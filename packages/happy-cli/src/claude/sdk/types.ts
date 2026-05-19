@@ -48,6 +48,7 @@ export type {
   HookCallbackMatcher,
   HookEvent,
   HookInput,
+  HookJSONOutput,
   ToolConfig,
   SessionStore,
   SessionStoreEntry,
@@ -231,6 +232,77 @@ export interface QueryOptions {
    * Maps to the official SDK's `Options.includePartialMessages` (0.3.143+).
    */
   includePartialMessages?: boolean;
+  /**
+   * Hook callbacks for responding to events during agent execution.
+   * Hooks can modify behavior, add context, or implement custom logic
+   * at key lifecycle points (tool use, session start/end, compaction, etc.).
+   *
+   * Complementary to the existing RPC mechanism — hooks run in-process
+   * within the SDK, while RPC handlers communicate over the network.
+   * Use hooks for low-latency, synchronous interception; use RPC for
+   * cross-device orchestration from the App.
+   *
+   * @example
+   * ```typescript
+   * hooks: {
+   *   PostToolUse: [{
+   *     hooks: [async (input) => ({ continue: true })]
+   *   }],
+   *   Stop: [{
+   *     hooks: [async (input) => ({ continue: true })]
+   *   }]
+   * }
+   * ```
+   *
+   * Maps to the official SDK's `Options.hooks` (0.3.142+).
+   */
+  hooks?: Partial<Record<import("@anthropic-ai/claude-agent-sdk").HookEvent, import("@anthropic-ai/claude-agent-sdk").HookCallbackMatcher[]>>;
+  /**
+   * Use a specific session ID instead of an auto-generated UUID.
+   * Must be a valid UUID. Cannot be used with `continue` or `resume` unless
+   * `forkSession` is also set.
+   *
+   * Maps to the official SDK's `Options.sessionId` (0.3.142+).
+   */
+  sessionId?: string;
+  /**
+   * When resuming, only resume messages up to and including the message
+   * with this UUID. Use with `resume`. The message ID should be from
+   * `SDKAssistantMessage.uuid`.
+   *
+   * Maps to the official SDK's `Options.resumeSessionAt` (0.3.142+).
+   */
+  resumeSessionAt?: string;
+  /**
+   * Controls how aggressively transcript entries are flushed to the
+   * sessionStore. `'eager'` gives near-real-time sync; `'batched'`
+   * (default) groups writes for efficiency. Ignored when sessionStore
+   * is not set.
+   *
+   * Maps to the official SDK's `Options.sessionStoreFlush` (0.3.142+).
+   * @alpha
+   */
+  sessionStoreFlush?: 'batched' | 'eager';
+  /**
+   * When false, disables session persistence to disk. Sessions will not be
+   * saved to ~/.claude/projects/ and cannot be resumed later. Useful for
+   * ephemeral or automated workflows.
+   *
+   * Maps to the official SDK's `Options.persistSession` (0.3.142+).
+   * @default true
+   */
+  persistSession?: boolean;
+  /**
+   * Map model-emitted tool names to alternative tool implementations.
+   * When the model calls tool `A` and `toolAliases` contains `{ A: 'B' }`,
+   * the SDK routes the call to tool `B` instead.
+   *
+   * Use case: redirect `Bash` to a remote sandbox MCP tool without changing
+   * model behavior. Example: `{ Bash: 'mcp__workspace__bash' }`.
+   *
+   * Maps to the official SDK's `Options.toolAliases` (0.3.142+).
+   */
+  toolAliases?: Record<string, string>;
 }
 
 /** Query prompt — string or async stream of user messages */
