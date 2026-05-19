@@ -17,6 +17,10 @@ export async function kvBulkGet(
     ctx: { uid: string },
     keys: string[]
 ): Promise<KVBulkGetResult> {
+    if (keys.length > 500) {
+        throw new Error(`kvBulkGet: keys array exceeds maximum allowed size of 500 (got ${keys.length})`);
+    }
+
     const results = await db.userKVStore.findMany({
         where: {
             accountId: ctx.uid,
@@ -26,7 +30,8 @@ export async function kvBulkGet(
             value: {
                 not: null  // Exclude deleted entries
             }
-        }
+        },
+        take: Math.min(keys.length, 500)
     });
 
     return {
