@@ -4,6 +4,7 @@ import { z } from "zod";
 import { detectProviderFromEnv } from "@/modules/optionScorer";
 import { decryptAiBackendProfile } from "@/modules/aiBackendProfileCrypto";
 import { getAiBackendProfileEnvironmentVariables } from "@/modules/aiBackendProfileEnv";
+import { log } from "@/utils/log";
 
 const BUILT_IN_DIMENSION_KEYS = new Set([
     "security",
@@ -395,8 +396,8 @@ async function callAnthropic(
             content?: Array<{ type: string; text?: string }>;
         };
         return data.content?.[0]?.text?.trim() ?? null;
-    } catch {
-        /* best-effort AI call — network errors or malformed responses return null */
+    } catch (err) {
+        log({ module: 'supervisor', level: 'warn' }, `Anthropic dimension prompt generation failed: ${String(err)}`);
         return null;
     }
 }
@@ -438,8 +439,8 @@ async function callOpenAI(
             }>;
         };
         return data.choices?.[0]?.message?.content?.trim() ?? null;
-    } catch {
-        /* best-effort AI call — network errors or malformed responses return null */
+    } catch (err) {
+        log({ module: 'supervisor', level: 'warn' }, `OpenAI dimension prompt generation failed: ${String(err)}`);
         return null;
     }
 }

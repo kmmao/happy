@@ -190,8 +190,8 @@ export function accountRoutes(app: Fastify) {
             try {
                 Intl.DateTimeFormat(undefined, { timeZone: timezone });
                 validTz = timezone;
-            } catch {
-                // Invalid timezone — fall back to UTC
+            } catch (err) {
+                log({ module: 'api', level: 'warn' }, `Invalid timezone "${timezone}", falling back to UTC: ${String(err)}`);
             }
         }
 

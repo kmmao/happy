@@ -372,7 +372,11 @@ function decryptRouteApiToken(
       ["webhook-route-token", `${route.accountId}:${route.repoUrl}`],
       route.apiToken as unknown as Uint8Array<ArrayBuffer>,
     );
-  } catch {
+  } catch (err) {
+    log(
+      { module: "webhook", level: "warn" },
+      `Failed to decrypt API token for route ${route.accountId}:${route.repoUrl}: ${String(err)}`,
+    );
     return undefined;
   }
 }

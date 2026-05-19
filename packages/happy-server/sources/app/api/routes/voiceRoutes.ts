@@ -47,7 +47,8 @@ function normalizeLiveKitCloudUrl(url: string): string | null {
     let parsed: URL;
     try {
         parsed = new URL(url);
-    } catch {
+    } catch (err) {
+        log({ module: 'voice', level: 'warn' }, `Invalid LiveKit URL "${url}": ${String(err)}`);
         return null;
     }
 
@@ -477,7 +478,8 @@ export function voiceRoutes(app: Fastify) {
                 totalParticipants,
                 cloudDashboardUrl: `https://cloud.livekit.io/projects/${projectSlug}`,
             });
-        } catch {
+        } catch (err) {
+            log({ module: 'voice', level: 'warn' }, `LiveKit credential verification failed: ${String(err)}`);
             return reply.send({ valid: false, error: 'Invalid LiveKit credentials' });
         }
     });
