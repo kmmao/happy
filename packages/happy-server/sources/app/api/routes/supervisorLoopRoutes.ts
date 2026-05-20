@@ -150,11 +150,17 @@ export function supervisorLoopRoutes(app: Fastify) {
                     id: z.string(),
                     loopId: z.string(),
                 }),
+                querystring: z.object({
+                    runsLimit: z.coerce.number().int().min(1).max(200).default(50),
+                    runsOffset: z.coerce.number().int().min(0).default(0),
+                }).optional(),
             },
         },
         async (request, reply) => {
             const userId = request.userId;
             const { id, loopId } = request.params;
+            const runsLimit = request.query?.runsLimit ?? 50;
+            const runsOffset = request.query?.runsOffset ?? 0;
 
             const loop = await db.supervisorLoop.findFirst({
                 where: {
@@ -168,17 +174,21 @@ export function supervisorLoopRoutes(app: Fastify) {
                 return reply.code(404).send({ error: "Loop not found" });
             }
 
+            const runsWhere = {
+                loopId,
+                projectId: id,
+                accountId: userId,
+            };
+
             // Fetch runs and actions in parallel (no data dependency between them)
-            const [runs, actions] = await Promise.all([
+            const [runs, runsTotal, actions] = await Promise.all([
                 db.supervisorRun.findMany({
-                    where: {
-                        loopId,
-                        projectId: id,
-                        accountId: userId,
-                    },
+                    where: runsWhere,
                     orderBy: { createdAt: "asc" },
-                    take: 1000,
+                    take: runsLimit,
+                    skip: runsOffset,
                 }),
+                db.supervisorRun.count({ where: runsWhere }),
                 db.supervisorAction.findMany({
                     where: {
                         projectId: id,
@@ -193,6 +203,7 @@ export function supervisorLoopRoutes(app: Fastify) {
 
             return reply.send({
                 loop: serializeLoop(loop),
+                runsTotal,
                 runs: runs.map((r) => ({
                     id: r.id,
                     trigger: r.trigger,
