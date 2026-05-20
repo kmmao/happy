@@ -1478,6 +1478,11 @@ export async function claudeRemoteLauncher(
 
       // When text/thinking was already sent as real-time text-delta stream
       // events, suppress the duplicate full-text envelopes from the log message.
+      // IMPORTANT: reset textStreamed after consuming so each assistant message
+      // independently determines whether its text was streamed. Without this
+      // reset, a second assistant message within the same query (e.g. after a
+      // tool call like AskUserQuestion) would be incorrectly suppressed even
+      // if its stream events never arrived.
       if (logMessage.type === "assistant") {
         const contentBlocks = Array.isArray((logMessage as any).message?.content)
           ? (logMessage as any).message.content
@@ -1487,6 +1492,9 @@ export async function claudeRemoteLauncher(
         if (streamEventState.textStreamed) {
           session.client.suppressAssistantTextEnvelopes();
         }
+        // Reset per-response: the next assistant message must independently
+        // prove its text was streamed before we suppress its full-text envelopes.
+        streamEventState.textStreamed = false;
       }
 
       // Queue message with optional delay for tool calls
