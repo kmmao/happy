@@ -50,7 +50,7 @@ export class GeminiPermissionHandler extends BasePermissionHandler {
     /**
      * Check if a tool should be auto-approved based on permission mode
      */
-    private shouldAutoApprove(toolName: string, toolCallId: string, input: unknown): boolean {
+    private shouldAutoApprove(toolName: string, toolCallId: string, _input: unknown): boolean {
         // Always auto-approve these tools regardless of permission mode:
         // - change_title: Changing chat title is safe and should be automatic
         // - GeminiReasoning: Reasoning is just display of thinking process, not an action

@@ -9,7 +9,6 @@ type ProgressCarrier = {
   progress?: ProgressState;
 };
 
-type ProgressList = NonNullable<NonNullable<ProgressState>["lists"]>[number];
 
 type AppendArgs = {
   toolCallId: string;

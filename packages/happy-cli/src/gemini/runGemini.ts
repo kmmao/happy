@@ -9,11 +9,7 @@
 import { render } from "ink";
 import React from "react";
 import { randomUUID } from "node:crypto";
-import os from "node:os";
-import { join, resolve } from "node:path";
-
 import { ApiClient } from "@/api/api";
-import { logger } from "@/ui/logger";
 import { Credentials, readSettings, writeSessionKey } from "@/persistence";
 import {
   createSessionMetadata,
@@ -24,11 +20,9 @@ import {
   type WorktreeCleanupInput,
 } from "@/utils/worktreeCleanup";
 import { initialMachineMetadata } from "@/daemon/run";
-import { configuration } from "@/configuration";
-import packageJson from "../../package.json";
-import { MessageQueue2 } from "@/utils/MessageQueue2";
+import { _configuration } from "@/_configuration";
+import _packageJson from "../../package.json";
 import { hashObject } from "@/utils/deterministicJson";
-import { projectPath } from "@/projectPath";
 import { startHappyServer } from "@/claude/utils/startHappyServer";
 import { MessageBuffer } from "@/ui/ink/messageBuffer";
 import { notifyDaemonSessionStarted } from "@/daemon/controlClient";
@@ -49,11 +43,10 @@ import type { GeminiMode, CodexMessagePayload } from "@/gemini/types";
 import type { PermissionMode } from "@/api/types";
 import {
   GEMINI_MODEL_ENV,
-  DEFAULT_GEMINI_MODEL,
+  _DEFAULT_GEMINI_MODEL,
   CHANGE_TITLE_INSTRUCTION,
 } from "@/gemini/constants";
 import {
-  readGeminiLocalConfig,
   saveGeminiModelToConfig,
   getInitialGeminiModel,
 } from "@/gemini/utils/config";
@@ -631,10 +624,6 @@ export async function runGemini(opts: {
   // Accumulate Gemini response text for sending complete message to mobile
   let accumulatedResponse = "";
   let isResponseInProgress = false;
-  let currentResponseMessageId: string | null = null; // Track the message ID for current response
-  let hadToolCallInTurn = false; // Track if any tool calls happened in this turn (for task_complete)
-  let pendingChangeTitle = false; // Track if we're waiting for change_title to complete
-  let changeTitleCompleted = false; // Track if change_title was completed in this turn
   let taskStartedSent = false; // Track if task_started was sent this turn (prevent duplicates)
 
   /**
@@ -960,8 +949,8 @@ export async function runGemini(opts: {
           const patchCallId =
             patchBeginMsg.call_id || patchBeginMsg.callId || randomUUID();
           const {
-            call_id: patchCallIdVar,
-            type: patchType,
+            call_id: _patchCallIdVar,
+            type: _patchType,
             auto_approved,
             changes,
           } = patchBeginMsg;
@@ -993,8 +982,8 @@ export async function runGemini(opts: {
           const patchEndCallId =
             patchEndMsg.call_id || patchEndMsg.callId || randomUUID();
           const {
-            call_id: patchEndCallIdVar,
-            type: patchEndType,
+            call_id: _patchEndCallIdVar,
+            type: _patchEndType,
             stdout,
             stderr,
             success,

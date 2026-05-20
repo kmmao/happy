@@ -33,10 +33,6 @@ interface AgentLoopBootstrapStoreFile {
   profiles: AgentLoopBootstrapProfile[];
 }
 
-const EMPTY_STORE: AgentLoopBootstrapStoreFile = {
-  version: 1,
-  profiles: [],
-};
 
 function normalizeStatus(profile: Partial<AgentLoopBootstrapProfile>): AgentLoopBootstrapStatus {
   if (profile.status) {

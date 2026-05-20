@@ -5,7 +5,6 @@ import type {
   SessionSummaryRefreshState,
   SessionSummaryState,
   Update,
-  UpdateMachineBody,
 } from "@kmmao/happy-wire";
 import { UsageSchema } from "@/claude/types";
 import type { SandboxConfig } from "@/persistence";

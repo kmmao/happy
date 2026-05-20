@@ -1,5 +1,3 @@
-import { readdirSync, statSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
 import { getProjectPath } from './path';
 import { claudeCheckSession } from './claudeCheckSession';
 import { logger } from '@/ui/logger';

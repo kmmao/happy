@@ -4,7 +4,7 @@ import { createInterface } from "node:readline";
 import { mkdirSync, existsSync } from "node:fs";
 import { randomUUID } from "node:crypto";
 import { logger } from "@/ui/logger";
-import { claudeCheckSession } from "./utils/claudeCheckSession";
+
 import { claudeFindLastSession } from "./utils/claudeFindLastSession";
 import { getProjectPath } from "./utils/path";
 import { projectPath } from "@/projectPath";
@@ -335,7 +335,7 @@ export async function claudeLocal(opts: {
               logger.info(
                 `[ClaudeLocal] Sandbox enabled: workspace=${opts.sandboxConfig.workspaceRoot ?? opts.path}, network=${opts.sandboxConfig.networkMode}`,
               );
-            } catch (error) {
+            } catch {
               logger.warn(
                 "[ClaudeLocal] Failed to initialize sandbox; continuing without sandbox.",
                 error,
@@ -401,14 +401,14 @@ export async function claudeLocal(opts: {
             logger.debug("[ClaudeLocal] Error reading from fd 3:", err);
           });
         }
-        child.on("error", (error) => {
+        child.on("error", (_error) => {
           // Ignore
         });
         child.on("exit", async (code, signal) => {
           if (cleanupSandbox) {
             try {
               await cleanupSandbox();
-            } catch (error) {
+            } catch {
               logger.warn(
                 "[ClaudeLocal] Failed to reset sandbox after session exit.",
                 error,

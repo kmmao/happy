@@ -258,7 +258,7 @@ describe("SDKToLogConverter", () => {
 
     it("should reset parent chain when requested", () => {
       const msg1 = userMsg("First");
-      const log1 = converter.convert(msg1);
+      converter.convert(msg1);
 
       converter.resetParentChain();
 

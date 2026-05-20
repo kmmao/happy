@@ -34,13 +34,11 @@ import {
   writeSessionKey,
 } from "@/persistence";
 import { initialMachineMetadata } from "@/daemon/run";
-import { configuration } from "@/configuration";
-import packageJson from "../../package.json";
-import os from "node:os";
+import _packageJson from "../../package.json";
 import { randomUUID } from "node:crypto";
 import { MessageQueue2 } from "@/utils/MessageQueue2";
 import { projectPath } from "@/projectPath";
-import { resolve, join } from "node:path";
+import { _resolve, join } from "node:path";
 import {
   createSessionMetadata,
   enrichMetadataWithWorktree,
@@ -59,9 +57,8 @@ import { CHANGE_TITLE_INSTRUCTION } from "@/gemini/constants";
 import { notifyDaemonSessionStarted } from "@/daemon/controlClient";
 import { startSessionHeartbeat } from "@/daemon/sessionHeartbeat";
 import { registerKillSessionHandler } from "@/claude/registerKillSessionHandler";
-import { delay } from "@/utils/time";
+import { _delay } from "@/utils/time";
 import { stopCaffeinate } from "@/utils/caffeinate";
-import { connectionState } from "@/utils/serverConnectionErrors";
 import { setupOfflineReconnection } from "@/utils/setupOfflineReconnection";
 import type { ApiSessionClient } from "@/api/apiSession";
 import { resolveCodexExecutionPolicy } from "./executionPolicy";

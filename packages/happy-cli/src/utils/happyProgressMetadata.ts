@@ -9,7 +9,6 @@ import {
 } from "@/utils/progressState";
 
 type ProgressState = NonNullable<Metadata["progress"]>;
-type ProgressList = NonNullable<ProgressState["lists"]>[number];
 export type HappyProgressTodo = NonNullable<ProgressState["todos"]>[number];
 
 export interface ApplyHappyProgressUpdateInput {

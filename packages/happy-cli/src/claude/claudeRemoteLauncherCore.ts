@@ -38,13 +38,9 @@ import { PLAN_FAKE_REJECT } from "./sdk/prompts";
 import { readClaudeMcpServers } from "@/claude/utils/claudeSettings";
 import { fetchMcpRegistryServers } from "@/claude/utils/mcpRegistryReader";
 import { EnhancedMode } from "./loop";
-import { RawJSONLines } from "@/claude/types";
-import { OutgoingMessageQueue } from "./utils/OutgoingMessageQueue";
 import { createSessionEventReporter } from "./sessionEventReporter";
-import { getToolName } from "./utils/getToolName";
-import { createEnvelope } from "@kmmao/happy-wire";
+import { _getToolName } from "./utils/_getToolName";
 import { hashObject } from "@/utils/deterministicJson";
-import type { Query as OfficialQuery } from "@anthropic-ai/claude-agent-sdk";
 import { getProjectPath } from "./utils/path";
 import { readFile, writeFile, mkdir, stat } from "node:fs/promises";
 import { join } from "node:path";
@@ -1992,7 +1988,7 @@ export async function claudeRemoteLauncher(
       };
 
       try {
-        const remoteResult = await claudeRemote({
+        await claudeRemote({
           sessionId: session.sessionId,
           path: session.path,
           allowedTools: session.allowedTools ?? [],
@@ -2586,7 +2582,7 @@ export async function claudeRemoteLauncher(
     }
   } finally {
     // Drain any pending elicitations to prevent Promise/listener leaks
-    for (const [id, { reject }] of pendingElicitations) {
+    for (const [_id, { reject }] of pendingElicitations) {
       reject(new Error("Session ended"));
     }
     pendingElicitations.clear();

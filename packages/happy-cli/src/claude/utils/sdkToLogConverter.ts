@@ -10,7 +10,6 @@ import type {
   SDKUserMessage,
   SDKAssistantMessage,
   SDKSystemMessage,
-  SDKResultMessage,
 } from "@/claude/sdk";
 import type { RawJSONLines } from "@/claude/types";
 

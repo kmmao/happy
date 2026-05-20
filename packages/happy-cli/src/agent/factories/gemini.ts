@@ -17,7 +17,6 @@ import {
   GEMINI_API_KEY_ENV, 
   GOOGLE_API_KEY_ENV, 
   GEMINI_MODEL_ENV, 
-  DEFAULT_GEMINI_MODEL 
 } from '@/gemini/constants';
 import { 
   readGeminiLocalConfig, 

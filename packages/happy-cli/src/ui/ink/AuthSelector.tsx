@@ -1,5 +1,3 @@
-import React, { useState, useEffect } from 'react';
-import { Text, useInput, Box } from 'ink';
 
 export type AuthMethod = 'mobile' | 'web';
 

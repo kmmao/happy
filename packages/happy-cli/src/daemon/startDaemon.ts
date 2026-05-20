@@ -38,8 +38,8 @@ import { projectPath } from "@/projectPath";
 import {
   getTmuxUtilities,
   isTmuxAvailable,
-  parseTmuxSessionIdentifier,
-  formatTmuxSessionIdentifier,
+  _parseTmuxSessionIdentifier,
+  _formatTmuxSessionIdentifier,
 } from "@/utils/tmux";
 import { expandEnvironmentVariables } from "@/utils/expandEnvVars";
 import { cleanupFixWorktree, getFixWorktreeInfo, getResearchRunInfo, forgetResearchRun } from "@/supervisor/handleSupervisorTrigger";
@@ -64,7 +64,7 @@ import { buildLoopEventsFromWebhook, selectLoopsForWebhookBridge } from "@/autom
 import { suggestAgentLoops as generateAgentLoopSuggestions } from "@/automation/AgentLoopSuggestion";
 import { suggestAgentLoopsWithAI as generateAgentLoopSuggestionsWithAI } from "@/automation/AgentLoopSuggestionAI";
 import { TrackedSessionRegistry } from "./TrackedSessionRegistry";
-import type { AutomationAuditEvent, AutomationJob } from "@/automation/types";
+import type { AutomationAuditEvent, _AutomationJob } from "@/automation/types";
 import { diagnoseAndReportFixStatus } from "@/supervisor/diagnoseFixStatus";
 import { detectTailscale, detectTailscaleServe } from "@/utils/tailscale";
 import { TunnelManager, TailscaleProvider, UpnpProvider, CaddyProvider } from "@/tunnel";
@@ -748,7 +748,7 @@ export async function startDaemon(): Promise<void> {
       const {
         directory,
         sessionId,
-        machineId,
+
         approvedNewDirectoryCreation = true,
         happySessionId,
         forkSourceId,

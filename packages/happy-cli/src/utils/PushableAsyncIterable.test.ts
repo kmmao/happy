@@ -136,7 +136,7 @@ describe('PushableAsyncIterable', () => {
         const iterable = new PushableAsyncIterable<number>()
         
         // First iteration is fine
-        const iterator1 = iterable[Symbol.asyncIterator]()
+        iterable[Symbol.asyncIterator]()
         
         // Second iteration should throw
         expect(() => iterable[Symbol.asyncIterator]()).toThrow('PushableAsyncIterable can only be iterated once')

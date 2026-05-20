@@ -168,7 +168,7 @@ export class PermissionHandler {
   handleToolCall = async (
     toolName: string,
     input: unknown,
-    mode: EnhancedMode,
+    _mode: EnhancedMode,
     options: { signal: AbortSignal },
   ): Promise<PermissionResult> => {
     // Calculate descriptor early - needed for ExitPlanMode check

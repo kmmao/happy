@@ -748,7 +748,7 @@ describe('ApiSessionClient v3 messages API migration', () => {
     });
 
     it('invalidates receive sync on first message when lastSeq is 0', async () => {
-        const client = new ApiSessionClient('fake-token', session);
+        void new ApiSessionClient('fake-token', session);
 
         mockAxiosGet.mockResolvedValueOnce({
             data: {

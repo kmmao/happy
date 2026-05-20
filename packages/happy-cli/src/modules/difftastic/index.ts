@@ -4,7 +4,7 @@
 
 import { spawn } from 'child_process';
 import { join, resolve } from 'path';
-import { platform, arch } from 'os';
+import { platform } from 'os';
 import { projectPath } from '@/projectPath';
 
 export interface DifftasticResult {

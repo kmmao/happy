@@ -20,8 +20,6 @@
  */
 
 import { spawn, SpawnOptions } from 'child_process';
-import { promisify } from 'util';
-import { logger } from '@/ui/logger';
 
 export enum TmuxControlState {
     /** Normal text processing mode */

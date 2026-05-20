@@ -10,7 +10,7 @@ export function startFileWatcher(file: string, onFileChange: (file: string) => v
             try {
                 logger.debug(`[FILE_WATCHER] Starting watcher for ${file}`);
                 const watcher = watch(file, { persistent: true, signal: abortController.signal });
-                for await (const event of watcher) {
+                for await (const _event of watcher) {
                     if (abortController.signal.aborted) {
                         return;
                     }

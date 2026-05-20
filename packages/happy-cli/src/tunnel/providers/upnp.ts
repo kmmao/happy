@@ -85,7 +85,7 @@ export class UpnpProvider implements TunnelProvider {
     const localIp = getLocalIp();
     if (!localIp) return { success: false, error: "Cannot determine local IP" };
 
-    const description = `${DESCRIPTION_PREFIX}-${proto.toLowerCase()}-${externalPort}`;
+    `${DESCRIPTION_PREFIX}-${proto.toLowerCase()}-${externalPort}`;
     // upnpc -a <localIp> <localPort> <externalPort> <protocol> <lease>
     const result = await this.execUpnpc([
       "-a", localIp,

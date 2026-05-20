@@ -144,7 +144,7 @@ export async function claudeLocalLauncher(
     // When to abort
     session.client.rpcHandlerManager.registerHandler("abort", doAbort); // Abort current process, clean queue and switch to remote mode
     session.client.rpcHandlerManager.registerHandler("switch", doSwitch); // When user wants to switch to remote mode
-    session.queue.setOnMessage((message: string, mode) => {
+    session.queue.setOnMessage(() => {
       // Switch to remote mode when message received
       doSwitch();
     }); // When any message is received, abort current process, clean queue and switch to remote mode

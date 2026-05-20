@@ -133,7 +133,7 @@ function setupCleanupHandlers(): void {
         logger.debug('[caffeinate] Uncaught exception, cleaning up:', error)
         cleanup()
     })
-    process.on('unhandledRejection', (reason, promise) => {
+    process.on("unhandledRejection", (reason, _promise) => {
         logger.debug('[caffeinate] Unhandled rejection, cleaning up:', reason)
         cleanup()
     })

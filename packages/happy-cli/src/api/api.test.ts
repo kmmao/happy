@@ -1,7 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { ApiClient } from './api';
-import axios from 'axios';
-import { connectionState } from '@/utils/serverConnectionErrors';
 import { logger } from '@/ui/logger';
 
 // Use vi.hoisted to ensure mock functions are available when vi.mock factory runs
@@ -42,7 +39,7 @@ vi.mock('./configuration', () => ({
 
 // Mock libsodium encryption
 vi.mock('./libsodiumEncryption', () => ({
-    libsodiumEncryptForPublicKey: vi.fn((data: any) => new Uint8Array(32))
+    libsodiumEncryptForPublicKey: vi.fn((_data: any) => new Uint8Array(32))
 }));
 
 // Global test metadata

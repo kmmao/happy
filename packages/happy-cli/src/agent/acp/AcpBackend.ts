@@ -97,9 +97,7 @@ import {
 import {
   type SessionUpdate,
   type HandlerContext,
-  DEFAULT_IDLE_TIMEOUT_MS,
-  DEFAULT_TOOL_CALL_TIMEOUT_MS,
-  handleAgentMessageChunk,
+  _DEFAULT_TOOL_CALL_TIMEOUT_MS,
   handleAgentThoughtChunk,
   handleToolCallUpdate,
   handleToolCall,
@@ -329,7 +327,6 @@ export class AcpBackend implements AgentBackend {
   private pendingPermissions = new Map<string, (response: RequestPermissionResponse) => void>();
 
   /** Map from permission request ID to real tool call ID for tracking */
-  private permissionToToolCallMap = new Map<string, string>();
 
   /** Map from real tool call ID to tool name for auto-approval */
   private toolCallIdToNameMap = new Map<string, string>();
@@ -707,7 +704,7 @@ export class AcpBackend implements AgentBackend {
 
       // Create ClientSideConnection
       this.connection = new ClientSideConnection(
-        (agent: Agent) => client,
+        (_agent: Agent) => client,
         stream
       );
 
@@ -1037,7 +1034,7 @@ export class AcpBackend implements AgentBackend {
   private idleResolver: (() => void) | null = null;
   private waitingForResponse = false;
 
-  async sendPrompt(sessionId: SessionId, prompt: string): Promise<void> {
+  async sendPrompt(_sessionId: SessionId, prompt: string): Promise<void> {
     // Check if prompt contains change_title instruction (via optional callback)
     const promptHasChangeTitle = this.options.hasChangeTitleInstruction?.(prompt) ?? false;
 
@@ -1237,7 +1234,7 @@ export class AcpBackend implements AgentBackend {
     }
   }
 
-  async cancel(sessionId: SessionId): Promise<void> {
+  async cancel(_sessionId: SessionId): Promise<void> {
     if (!this.connection || !this.acpSessionId) {
       return;
     }

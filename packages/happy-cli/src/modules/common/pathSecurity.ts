@@ -1,6 +1,4 @@
 import { resolve } from 'path';
-import { realpathSync, lstatSync } from 'fs';
-
 export interface PathValidationResult {
     valid: boolean;
     error?: string;

@@ -49,8 +49,6 @@
  */
 
 import axios from 'axios';
-import chalk from 'chalk';
-import { exponentialBackoffDelay } from '@/utils/time';
 import { logger } from '@/ui/logger';
 
 /**
@@ -282,7 +280,6 @@ export type OfflineFailure = {
 class OfflineState {
     private state: 'online' | 'offline' = 'online';
     private failures = new Map<string, OfflineFailure>(); // Dedupe by operation
-    private backend = 'Claude';
 
     /** Report failure - accumulates context, prints once on first offline transition */
     fail(failure: OfflineFailure): void {

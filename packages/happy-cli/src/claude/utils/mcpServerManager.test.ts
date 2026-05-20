@@ -1,14 +1,11 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
 import {
   validateMcpServerConfig,
-  createMcpServerState,
   applyMcpServers,
   addMcpServer,
   removeMcpServer,
   syncMcpServersFromRegistry,
-  type McpServerState,
+  type _McpServerState,
 } from "./mcpServerManager";
-
 // ─── Mock SDK Query ───────────────────────────────────────────────────────────
 
 function makeMockQuery(opts?: {

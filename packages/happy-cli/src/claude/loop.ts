@@ -2,8 +2,6 @@ import { ApiSessionClient } from "@/api/apiSession";
 import { MessageQueue2 } from "@/utils/MessageQueue2";
 import { logger } from "@/ui/logger";
 import { Session } from "./session";
-import { claudeLocalLauncher, LauncherResult } from "./claudeLocalLauncher";
-import { claudeRemoteLauncher } from "./claudeRemoteLauncher";
 import { ApiClient } from "@/lib";
 import type { JsRuntime } from "./runClaude";
 import type { SandboxConfig } from "@/persistence";
@@ -124,7 +122,7 @@ export async function loop(opts: LoopOptions): Promise<number> {
           case "exit":
             return result.code;
           default:
-            const _: never = result satisfies never;
+            void (result satisfies never);
         }
         break;
       }
@@ -139,13 +137,13 @@ export async function loop(opts: LoopOptions): Promise<number> {
             opts.onModeChange?.(mode);
             break;
           default:
-            const _: never = reason satisfies never;
+            void (reason satisfies never);
         }
         break;
       }
 
       default: {
-        const _: never = mode satisfies never;
+        void (mode satisfies never);
       }
     }
   }
