@@ -1,6 +1,6 @@
 import { AuthCredentials } from "@/auth/tokenStorage";
 import { backoff } from "@/utils/time";
-import { NonRetryableError } from "@/utils/time";
+import { throwIfNotOk } from "@/utils/http";
 import type { AIBackendProfile } from "./settings";
 import { getServerUrl } from "./serverConfig";
 
@@ -27,11 +27,7 @@ export async function fetchAccountProfiles(
             headers: authHeaders(credentials),
         });
 
-        if (!response.ok) {
-            throw new NonRetryableError(
-                `Failed to fetch account profiles: ${response.status}`,
-            );
-        }
+        throwIfNotOk(response, 'Failed to fetch account profiles');
 
         const data = (await response.json()) as {
             profiles: ServerAiBackendProfile[];
@@ -53,11 +49,7 @@ export async function createAccountProfile(
             body: JSON.stringify({ profile }),
         });
 
-        if (!response.ok) {
-            throw new NonRetryableError(
-                `Failed to create account profile: ${response.status}`,
-            );
-        }
+        throwIfNotOk(response, 'Failed to create account profile');
 
         return (await response.json()) as ServerAiBackendProfile;
     });
@@ -81,11 +73,7 @@ export async function updateAccountProfile(
             body: JSON.stringify({ profile, expectedRevision }),
         });
 
-        if (!response.ok) {
-            throw new NonRetryableError(
-                `Failed to update account profile: ${response.status}`,
-            );
-        }
+        throwIfNotOk(response, 'Failed to update account profile');
 
         return (await response.json()) as
             | { success: true; profile: AIBackendProfile; revision: number; archivedAt: number | null }
@@ -105,10 +93,6 @@ export async function deleteAccountProfile(
             headers: authHeaders(credentials),
         });
 
-        if (!response.ok) {
-            throw new NonRetryableError(
-                `Failed to delete account profile: ${response.status}`,
-            );
-        }
+        throwIfNotOk(response, 'Failed to delete account profile');
     });
 }

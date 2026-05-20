@@ -2,6 +2,7 @@ import { AuthCredentials } from "@/auth/tokenStorage";
 import { type ResolvedRuntimeProfile } from "@kmmao/happy-wire";
 import { backoff } from "@/utils/time";
 import { NonRetryableError } from "@/utils/time";
+import { throwIfNotOk } from "@/utils/http";
 import { getServerUrl } from "./serverConfig";
 
 /**
@@ -94,12 +95,7 @@ export async function triggerSupervisorRun(
             throw new NonRetryableError(data.error);
         }
 
-        if (!response.ok) {
-            const text = await response.text().catch(() => "");
-            throw new NonRetryableError(
-                text || `Failed to trigger supervisor run: ${response.status}`,
-            );
-        }
+        throwIfNotOk(response, 'Failed to trigger supervisor run');
 
         const data = (await response.json()) as RunResponse;
         return data.run;
@@ -128,11 +124,7 @@ export async function fetchSupervisorRuns(
             { headers: authHeaders(credentials) },
         );
 
-        if (!response.ok) {
-            throw new NonRetryableError(
-                `Failed to fetch supervisor runs: ${response.status}`,
-            );
-        }
+        throwIfNotOk(response, 'Failed to fetch supervisor runs');
 
         return (await response.json()) as RunsListResponse;
     });
@@ -154,11 +146,7 @@ export async function fetchSupervisorRun(
             { headers: authHeaders(credentials) },
         );
 
-        if (!response.ok) {
-            throw new NonRetryableError(
-                `Failed to fetch supervisor run: ${response.status}`,
-            );
-        }
+        throwIfNotOk(response, 'Failed to fetch supervisor run');
 
         const data = (await response.json()) as RunResponse;
         return data.run;
@@ -184,11 +172,7 @@ export async function cancelSupervisorRun(
             },
         );
 
-        if (!response.ok) {
-            throw new NonRetryableError(
-                `Failed to cancel supervisor run: ${response.status}`,
-            );
-        }
+        throwIfNotOk(response, 'Failed to cancel supervisor run');
 
         const data = (await response.json()) as RunResponse;
         return data.run;
@@ -228,11 +212,7 @@ export async function updateSupervisorConfig(
             },
         );
 
-        if (!response.ok) {
-            throw new NonRetryableError(
-                `Failed to update supervisor config: ${response.status}`,
-            );
-        }
+        throwIfNotOk(response, 'Failed to update supervisor config');
 
         return (await response.json()) as SupervisorConfigResponse;
     });
@@ -318,12 +298,7 @@ export async function startSupervisorLoop(
             throw new NonRetryableError(data.error);
         }
 
-        if (!response.ok) {
-            const text = await response.text().catch(() => "");
-            throw new NonRetryableError(
-                text || `Failed to start supervisor loop: ${response.status}`,
-            );
-        }
+        throwIfNotOk(response, 'Failed to start supervisor loop');
 
         const data = (await response.json()) as { loop: SupervisorLoop };
         return data.loop;
@@ -342,11 +317,7 @@ export async function fetchActiveLoop(
             { headers: authHeaders(credentials) },
         );
 
-        if (!response.ok) {
-            throw new NonRetryableError(
-                `Failed to fetch active loop: ${response.status}`,
-            );
-        }
+        throwIfNotOk(response, 'Failed to fetch active loop');
 
         const data = (await response.json()) as { loop: SupervisorLoop | null };
         return data.loop;
@@ -370,11 +341,7 @@ export async function fetchLoopHistory(
             { headers: authHeaders(credentials) },
         );
 
-        if (!response.ok) {
-            throw new NonRetryableError(
-                `Failed to fetch loop history: ${response.status}`,
-            );
-        }
+        throwIfNotOk(response, 'Failed to fetch loop history');
 
         return (await response.json()) as { loops: SupervisorLoop[]; total: number };
     });
@@ -426,11 +393,7 @@ export async function fetchLoopDetail(
             { headers: authHeaders(credentials) },
         );
 
-        if (!response.ok) {
-            throw new NonRetryableError(
-                `Failed to fetch loop detail: ${response.status}`,
-            );
-        }
+        throwIfNotOk(response, 'Failed to fetch loop detail');
 
         return (await response.json()) as LoopDetail;
     });
@@ -452,11 +415,7 @@ export async function pauseSupervisorLoop(
             },
         );
 
-        if (!response.ok) {
-            throw new NonRetryableError(
-                `Failed to pause loop: ${response.status}`,
-            );
-        }
+        throwIfNotOk(response, 'Failed to pause loop');
 
         const data = (await response.json()) as { loop: SupervisorLoop };
         return data.loop;
@@ -479,11 +438,7 @@ export async function resumeSupervisorLoop(
             },
         );
 
-        if (!response.ok) {
-            throw new NonRetryableError(
-                `Failed to resume loop: ${response.status}`,
-            );
-        }
+        throwIfNotOk(response, 'Failed to resume loop');
 
         const data = (await response.json()) as { loop: SupervisorLoop };
         return data.loop;
@@ -506,11 +461,7 @@ export async function stopSupervisorLoop(
             },
         );
 
-        if (!response.ok) {
-            throw new NonRetryableError(
-                `Failed to stop loop: ${response.status}`,
-            );
-        }
+        throwIfNotOk(response, 'Failed to stop loop');
 
         const data = (await response.json()) as { loop: SupervisorLoop };
         return data.loop;
@@ -560,11 +511,7 @@ export async function fetchSupervisorCost(
             { headers: authHeaders(credentials) },
         );
 
-        if (!response.ok) {
-            throw new NonRetryableError(
-                `Failed to fetch supervisor cost: ${response.status}`,
-            );
-        }
+        throwIfNotOk(response, 'Failed to fetch supervisor cost');
 
         return (await response.json()) as SupervisorCostSummary;
     });
@@ -587,11 +534,7 @@ export async function fetchSupervisorTrend(
             { headers: authHeaders(credentials) },
         );
 
-        if (!response.ok) {
-            throw new NonRetryableError(
-                `Failed to fetch supervisor trend: ${response.status}`,
-            );
-        }
+        throwIfNotOk(response, 'Failed to fetch supervisor trend');
 
         return (await response.json()) as SupervisorTrendData;
     });
@@ -656,11 +599,7 @@ export async function fetchSupervisorActions(
             { headers: authHeaders(credentials) },
         );
 
-        if (!response.ok) {
-            throw new NonRetryableError(
-                `Failed to fetch supervisor actions: ${response.status}`,
-            );
-        }
+        throwIfNotOk(response, 'Failed to fetch supervisor actions');
 
         return (await response.json()) as ActionsListResponse;
     });
@@ -687,12 +626,7 @@ export async function updateActionApproval(
             },
         );
 
-        if (!response.ok) {
-            const text = await response.text().catch(() => "");
-            throw new NonRetryableError(
-                text || `Failed to update action approval: ${response.status}`,
-            );
-        }
+        throwIfNotOk(response, 'Failed to update action approval');
 
         const data = (await response.json()) as { action: SupervisorAction };
         return data.action;
@@ -720,12 +654,7 @@ export async function triggerActionFix(
             },
         );
 
-        if (!response.ok) {
-            const text = await response.text().catch(() => "");
-            throw new NonRetryableError(
-                text || `Failed to trigger action fix: ${response.status}`,
-            );
-        }
+        throwIfNotOk(response, 'Failed to trigger action fix');
 
         const data = (await response.json()) as { action: SupervisorAction };
         return data.action;
@@ -753,12 +682,7 @@ export async function forceResolveAction(
             },
         );
 
-        if (!response.ok) {
-            const text = await response.text().catch(() => "");
-            throw new NonRetryableError(
-                text || `Failed to force-resolve action: ${response.status}`,
-            );
-        }
+        throwIfNotOk(response, 'Failed to force-resolve action');
 
         const data = (await response.json()) as { action: SupervisorAction };
         return data.action;
@@ -796,11 +720,7 @@ export async function fetchSupervisorSummary(
             { headers: authHeaders(credentials) },
         );
 
-        if (!response.ok) {
-            throw new NonRetryableError(
-                `Failed to fetch supervisor summary: ${response.status}`,
-            );
-        }
+        throwIfNotOk(response, 'Failed to fetch supervisor summary');
 
         return (await response.json()) as SupervisorSummary;
     });
@@ -847,9 +767,7 @@ export async function batchUpdateActionApproval(
                 body: JSON.stringify({ actionIds, approval }),
             },
         );
-        if (!response.ok) {
-            throw new NonRetryableError(`Failed to batch update actions: ${response.status}`);
-        }
+        throwIfNotOk(response, 'Failed to batch update actions');
         return (await response.json()) as { updatedCount: number };
     });
 }
@@ -870,9 +788,7 @@ export async function clearAllActions(
                 headers: authHeaders(credentials),
             },
         );
-        if (!response.ok) {
-            throw new NonRetryableError(`Failed to clear actions: ${response.status}`);
-        }
+        throwIfNotOk(response, 'Failed to clear actions');
         return (await response.json()) as { deletedCount: number };
     });
 }
@@ -893,9 +809,7 @@ export async function clearAllRuns(
                 headers: authHeaders(credentials),
             },
         );
-        if (!response.ok) {
-            throw new NonRetryableError(`Failed to clear runs: ${response.status}`);
-        }
+        throwIfNotOk(response, 'Failed to clear runs');
         return (await response.json()) as { deletedCount: number };
     });
 }
@@ -916,9 +830,7 @@ export async function clearAllLoops(
                 headers: authHeaders(credentials),
             },
         );
-        if (!response.ok) {
-            throw new NonRetryableError(`Failed to clear loops: ${response.status}`);
-        }
+        throwIfNotOk(response, 'Failed to clear loops');
         return (await response.json()) as { deletedCount: number };
     });
 }
@@ -940,9 +852,7 @@ export async function deleteAction(
                 headers: authHeaders(credentials),
             },
         );
-        if (!response.ok) {
-            throw new NonRetryableError(`Failed to delete action: ${response.status}`);
-        }
+        throwIfNotOk(response, 'Failed to delete action');
         return (await response.json()) as { deleted: boolean };
     });
 }
@@ -964,9 +874,7 @@ export async function deleteSupervisorRun(
                 headers: authHeaders(credentials),
             },
         );
-        if (!response.ok) {
-            throw new NonRetryableError(`Failed to delete run: ${response.status}`);
-        }
+        throwIfNotOk(response, 'Failed to delete run');
         return (await response.json()) as { deleted: boolean };
     });
 }
@@ -988,9 +896,7 @@ export async function deleteSupervisorLoop(
                 headers: authHeaders(credentials),
             },
         );
-        if (!response.ok) {
-            throw new NonRetryableError(`Failed to delete loop: ${response.status}`);
-        }
+        throwIfNotOk(response, 'Failed to delete loop');
         return (await response.json()) as { deleted: boolean };
     });
 }
@@ -1008,9 +914,7 @@ export async function fetchActionStats(
             `${API_ENDPOINT}/v1/projects/${projectId}/supervisor/actions/stats`,
             { headers: authHeaders(credentials) },
         );
-        if (!response.ok) {
-            throw new NonRetryableError(`Failed to fetch action stats: ${response.status}`);
-        }
+        throwIfNotOk(response, 'Failed to fetch action stats');
         return (await response.json()) as SupervisorActionStats;
     });
 }
@@ -1030,9 +934,7 @@ export async function exportRunReport(
             `${API_ENDPOINT}/v1/projects/${projectId}/supervisor/runs/${runId}/export?format=${format}`,
             { headers: authHeaders(credentials) },
         );
-        if (!response.ok) {
-            throw new NonRetryableError(`Failed to export run report: ${response.status}`);
-        }
+        throwIfNotOk(response, 'Failed to export run report');
         return (await response.json()) as RunExport;
     });
 }
@@ -1069,12 +971,7 @@ export async function reprocessPendingActions(
             throw new NonRetryableError(data.error);
         }
 
-        if (!response.ok) {
-            const text = await response.text().catch(() => "");
-            throw new NonRetryableError(
-                text || `Failed to reprocess actions: ${response.status}`,
-            );
-        }
+        throwIfNotOk(response, 'Failed to reprocess actions');
 
         return (await response.json()) as ReprocessResult;
     });
@@ -1138,7 +1035,7 @@ export async function fetchCustomDimensions(
         `${API_ENDPOINT}/v1/projects/${projectId}/supervisor/dimensions`,
         { headers: authHeaders(credentials) },
     );
-    if (!response.ok) throw new Error(`Failed to fetch dimensions: ${response.status}`);
+    throwIfNotOk(response, 'Failed to fetch dimensions');
     const data = (await response.json()) as { dimensions: SupervisorDimension[] };
     return data.dimensions;
 }
@@ -1157,10 +1054,7 @@ export async function createCustomDimension(
             body: JSON.stringify(payload),
         },
     );
-    if (!response.ok) {
-        const err = (await response.json().catch(() => ({}))) as { error?: string };
-        throw new Error(err.error ?? `Failed to create dimension: ${response.status}`);
-    }
+    throwIfNotOk(response, 'Failed to create dimension');
     const data = (await response.json()) as { dimension: SupervisorDimension };
     return data.dimension;
 }

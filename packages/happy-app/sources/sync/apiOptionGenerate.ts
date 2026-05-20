@@ -1,4 +1,5 @@
 import { AuthCredentials } from "@/auth/tokenStorage";
+import { throwIfNotOk } from "@/utils/http";
 import { getServerUrl } from "./serverConfig";
 
 export interface OptionGenerateResponse {
@@ -27,9 +28,7 @@ export async function generateOptionsRemote(
         signal: signal ?? AbortSignal.timeout(25000),
     });
 
-    if (!response.ok) {
-        throw new Error(`Option generation failed: ${response.status}`);
-    }
+    throwIfNotOk(response, 'Option generation failed');
 
     return (await response.json()) as OptionGenerateResponse;
 }

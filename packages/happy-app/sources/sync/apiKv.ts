@@ -1,6 +1,6 @@
 import { AuthCredentials } from '@/auth/tokenStorage';
 import { backoff } from '@/utils/time';
-import { NonRetryableError } from '@/utils/time';
+import { throwIfNotOk } from '@/utils/http';
 import { getServerUrl } from './serverConfig';
 
 //
@@ -86,10 +86,7 @@ export async function kvGet(
             return null;
         }
 
-        if (!response.ok) {
-            const ErrorClass = response.status >= 400 && response.status < 500 ? NonRetryableError : Error;
-            throw new ErrorClass(`Failed to get KV value: ${response.status}`);
-        }
+        throwIfNotOk(response, 'Failed to get KV value');
 
         const data = await response.json() as KvItem;
         return data;
@@ -127,10 +124,7 @@ export async function kvList(
             }
         });
 
-        if (!response.ok) {
-            const ErrorClass = response.status >= 400 && response.status < 500 ? NonRetryableError : Error;
-            throw new ErrorClass(`Failed to list KV items: ${response.status}`);
-        }
+        throwIfNotOk(response, 'Failed to list KV items');
 
         const data = await response.json() as KvListResponse;
         return data;
@@ -164,10 +158,7 @@ export async function kvBulkGet(
             body: JSON.stringify({ keys })
         });
 
-        if (!response.ok) {
-            const ErrorClass = response.status >= 400 && response.status < 500 ? NonRetryableError : Error;
-            throw new ErrorClass(`Failed to bulk get KV values: ${response.status}`);
-        }
+        throwIfNotOk(response, 'Failed to bulk get KV values');
 
         const data = await response.json() as KvBulkGetResponse;
         return data;
@@ -208,10 +199,7 @@ export async function kvMutate(
             return data;
         }
 
-        if (!response.ok) {
-            const ErrorClass = response.status >= 400 && response.status < 500 ? NonRetryableError : Error;
-            throw new ErrorClass(`Failed to mutate KV values: ${response.status}`);
-        }
+        throwIfNotOk(response, 'Failed to mutate KV values');
 
         const data = await response.json() as KvMutateSuccessResponse;
         return data;

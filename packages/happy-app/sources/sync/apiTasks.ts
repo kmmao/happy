@@ -1,5 +1,6 @@
 import { AuthCredentials } from "@/auth/tokenStorage";
 import { backoff } from "@/utils/time";
+import { throwIfNotOk } from "@/utils/http";
 import { getServerUrl } from "./serverConfig";
 
 export interface ServerTask {
@@ -67,9 +68,7 @@ export async function fetchTasks(
             `${API_ENDPOINT}/v1/tasks${qs ? `?${qs}` : ""}`,
             { headers: authHeaders(credentials) },
         );
-        if (!response.ok) {
-            throw new Error(`Failed to fetch tasks: ${response.status}`);
-        }
+        throwIfNotOk(response, 'Failed to fetch tasks');
         return (await response.json()) as TaskListResponse;
     });
 }
@@ -98,10 +97,7 @@ export async function createTask(
             headers: authHeaders(credentials),
             body: JSON.stringify(body),
         });
-        if (!response.ok) {
-            const data = await response.json().catch(() => ({}));
-            throw new Error((data as Record<string, string>).error ?? `Failed to create task: ${response.status}`);
-        }
+        throwIfNotOk(response, 'Failed to create task');
         const data = (await response.json()) as TaskResponse;
         return data.task;
     });
@@ -117,10 +113,7 @@ export async function fetchTask(
         const response = await fetch(`${API_ENDPOINT}/v1/tasks/${taskId}`, {
             headers: authHeaders(credentials),
         });
-        if (!response.ok) {
-            const data = await response.json().catch(() => ({}));
-            throw new Error((data as Record<string, string>).error ?? `Failed to fetch task: ${response.status}`);
-        }
+        throwIfNotOk(response, 'Failed to fetch task');
         const data = (await response.json()) as TaskResponse;
         return data.task;
     });
@@ -136,10 +129,7 @@ export async function cancelTask(
         method: "POST",
         headers: authHeaders(credentials),
     });
-    if (!response.ok) {
-        const data = await response.json().catch(() => ({}));
-        throw new Error((data as Record<string, string>).error ?? `Failed to cancel task: ${response.status}`);
-    }
+    throwIfNotOk(response, 'Failed to cancel task');
     const data = (await response.json()) as TaskResponse;
     return data.task;
 }
@@ -154,10 +144,7 @@ export async function retryTask(
         method: "POST",
         headers: authHeaders(credentials),
     });
-    if (!response.ok) {
-        const data = await response.json().catch(() => ({}));
-        throw new Error((data as Record<string, string>).error ?? `Failed to retry task: ${response.status}`);
-    }
+    throwIfNotOk(response, 'Failed to retry task');
     const data = (await response.json()) as TaskResponse;
     return data.task;
 }
@@ -172,10 +159,7 @@ export async function deleteTask(
         method: "DELETE",
         headers: authHeaders(credentials),
     });
-    if (!response.ok) {
-        const data = await response.json().catch(() => ({}));
-        throw new Error((data as Record<string, string>).error ?? `Failed to delete task: ${response.status}`);
-    }
+    throwIfNotOk(response, 'Failed to delete task');
 }
 
 export async function updateTask(
@@ -190,10 +174,7 @@ export async function updateTask(
         headers: authHeaders(credentials),
         body: JSON.stringify(body),
     });
-    if (!response.ok) {
-        const data = await response.json().catch(() => ({}));
-        throw new Error((data as Record<string, string>).error ?? `Failed to update task: ${response.status}`);
-    }
+    throwIfNotOk(response, 'Failed to update task');
     const data = (await response.json()) as TaskResponse;
     return data.task;
 }
@@ -209,10 +190,7 @@ export async function dispatchSwarm(
         headers: authHeaders(credentials),
         body: JSON.stringify(body),
     });
-    if (!response.ok) {
-        const data = await response.json().catch(() => ({}));
-        throw new Error((data as Record<string, string>).error ?? `Failed to dispatch swarm: ${response.status}`);
-    }
+    throwIfNotOk(response, 'Failed to dispatch swarm');
     return (await response.json()) as { dispatched: number; taskIds: string[] };
 }
 
@@ -226,10 +204,7 @@ export async function restoreTask(
         method: "POST",
         headers: authHeaders(credentials),
     });
-    if (!response.ok) {
-        const data = await response.json().catch(() => ({}));
-        throw new Error((data as Record<string, string>).error ?? `Failed to restore task: ${response.status}`);
-    }
+    throwIfNotOk(response, 'Failed to restore task');
     const data = (await response.json()) as TaskResponse;
     return data.task;
 }

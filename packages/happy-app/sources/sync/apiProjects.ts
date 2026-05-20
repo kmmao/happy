@@ -1,5 +1,6 @@
 import { AuthCredentials } from "@/auth/tokenStorage";
 import { backoff } from "@/utils/time";
+import { throwIfNotOk } from "@/utils/http";
 import { getServerUrl } from "./serverConfig";
 import * as z from "zod";
 
@@ -96,9 +97,7 @@ export async function fetchProjects(
                 { headers: authHeaders(credentials) },
             );
 
-            if (!response.ok) {
-                throw new Error(`Failed to fetch projects: ${response.status}`);
-            }
+            throwIfNotOk(response, 'Failed to fetch projects');
 
             const json = await response.json();
             const parsed = ProjectListResponseSchema.safeParse(json);
@@ -136,9 +135,7 @@ export async function createProject(
             body: JSON.stringify(params),
         });
 
-        if (!response.ok) {
-            throw new Error(`Failed to create project: ${response.status}`);
-        }
+        throwIfNotOk(response, 'Failed to create project');
 
         return (await response.json()) as ProjectResponse;
     });
@@ -168,9 +165,7 @@ export async function resolveProject(
             },
         );
 
-        if (!response.ok) {
-            throw new Error(`Failed to resolve project: ${response.status}`);
-        }
+        throwIfNotOk(response, 'Failed to resolve project');
 
         return (await response.json()) as ProjectResponse;
     });
@@ -200,9 +195,7 @@ export async function updateProject(
             },
         );
 
-        if (!response.ok) {
-            throw new Error(`Failed to update project: ${response.status}`);
-        }
+        throwIfNotOk(response, 'Failed to update project');
 
         const data = (await response.json()) as ProjectSingleResponse;
         return data.project;
@@ -228,8 +221,8 @@ export async function deleteProject(
         );
 
         // 404 = already deleted, treat as success
-        if (!response.ok && response.status !== 404) {
-            throw new Error(`Failed to delete project: ${response.status}`);
+        if (response.status !== 404) {
+            throwIfNotOk(response, 'Failed to delete project');
         }
     });
 }
@@ -254,11 +247,7 @@ export async function linkSessionsToProject(
             },
         );
 
-        if (!response.ok) {
-            throw new Error(
-                `Failed to link sessions: ${response.status}`,
-            );
-        }
+        throwIfNotOk(response, 'Failed to link sessions');
 
         const data = (await response.json()) as LinkSessionsResponse;
         return data.linked;
@@ -280,11 +269,7 @@ export async function fetchRelatedProjects(
             { headers: authHeaders(credentials) },
         );
 
-        if (!response.ok) {
-            throw new Error(
-                `Failed to fetch related projects: ${response.status}`,
-            );
-        }
+        throwIfNotOk(response, 'Failed to fetch related projects');
 
         const data = (await response.json()) as RelatedProjectsResponse;
         return data.related;

@@ -1,5 +1,6 @@
 import { AuthCredentials } from '@/auth/tokenStorage';
 import { backoff } from '@/utils/time';
+import { throwIfNotOk } from '@/utils/http';
 import { getServerUrl } from './serverConfig';
 
 /**
@@ -22,9 +23,7 @@ export async function connectService(
             body: JSON.stringify({ token: JSON.stringify(token) })
         });
 
-        if (!response.ok) {
-            throw new Error(`Failed to connect ${service}: ${response.status}`);
-        }
+        throwIfNotOk(response, `Failed to connect ${service}`);
 
         const data = await response.json() as { success: true };
         if (!data.success) {
@@ -47,13 +46,11 @@ export async function disconnectService(credentials: AuthCredentials, service: s
             }
         });
 
-        if (!response.ok) {
-            if (response.status === 404) {
-                const error = await response.json();
-                throw new Error(error.error || `${service} account not connected`);
-            }
-            throw new Error(`Failed to disconnect ${service}: ${response.status}`);
+        if (response.status === 404) {
+            const error = await response.json();
+            throw new Error(error.error || `${service} account not connected`);
         }
+        throwIfNotOk(response, `Failed to disconnect ${service}`);
 
         const data = await response.json() as { success: true };
         if (!data.success) {

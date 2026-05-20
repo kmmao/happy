@@ -1,4 +1,5 @@
 import { AuthCredentials } from "@/auth/tokenStorage";
+import { throwIfNotOk } from "@/utils/http";
 import { getServerUrl } from "./serverConfig";
 
 export interface OptionScoreResponse {
@@ -29,9 +30,7 @@ export async function scoreOptionsRemote(
         signal: signal ?? AbortSignal.timeout(18000),
     });
 
-    if (!response.ok) {
-        throw new Error(`Option scoring failed: ${response.status}`);
-    }
+    throwIfNotOk(response, 'Option scoring failed');
 
     return (await response.json()) as OptionScoreResponse;
 }

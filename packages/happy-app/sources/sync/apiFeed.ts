@@ -1,5 +1,6 @@
 import { AuthCredentials } from '@/auth/tokenStorage';
 import { backoff } from '@/utils/time';
+import { throwIfNotOk } from '@/utils/http';
 import { getServerUrl } from './serverConfig';
 import { FeedResponse, FeedResponseSchema, FeedItem } from './feedTypes';
 import { log } from '@/log';
@@ -33,9 +34,7 @@ export async function fetchFeed(
             }
         });
 
-        if (!response.ok) {
-            throw new Error(`Failed to fetch feed: ${response.status}`);
-        }
+        throwIfNotOk(response, 'Failed to fetch feed');
 
         const data = await response.json();
         const parsed = FeedResponseSchema.safeParse(data);

@@ -1,5 +1,6 @@
 import { AuthCredentials } from "@/auth/tokenStorage";
 import { backoff } from "@/utils/time";
+import { throwIfNotOk } from "@/utils/http";
 import { getServerUrl } from "./serverConfig";
 
 export interface ServerSessionEvent {
@@ -45,9 +46,7 @@ export async function fetchSessionEvents(
             `${API_ENDPOINT}/v1/sessions/${sessionId}/events${qs ? `?${qs}` : ""}`,
             { headers: authHeaders(credentials) },
         );
-        if (!response.ok) {
-            throw new Error(`Failed to fetch session events: ${response.status}`);
-        }
+        throwIfNotOk(response, 'Failed to fetch session events');
         return (await response.json()) as SessionEventsListResponse;
     });
 }

@@ -9,6 +9,7 @@
 import type { AuthCredentials } from '@/auth/tokenStorage';
 import type { McpRegistryEntry, McpTransportConfig } from '@kmmao/happy-wire';
 import { backoff } from '@/utils/time';
+import { throwIfNotOk } from '@/utils/http';
 import { getServerUrl } from './serverConfig';
 
 // ── Request/Response types ─────────────────────────────────────────────────
@@ -87,9 +88,7 @@ export async function registerMcpServer(
             throw new Error('version-conflict');
         }
 
-        if (!response.ok) {
-            throw new Error(`Failed to register MCP server: ${response.status}`);
-        }
+        throwIfNotOk(response, 'Failed to register MCP server');
 
         return await response.json() as ServerResponse;
     });
@@ -119,9 +118,7 @@ export async function listMcpServers(
             },
         });
 
-        if (!response.ok) {
-            throw new Error(`Failed to list MCP servers: ${response.status}`);
-        }
+        throwIfNotOk(response, 'Failed to list MCP servers');
 
         return await response.json() as ListServersResponse;
     });
@@ -150,9 +147,7 @@ export async function getMcpServer(
             return null;
         }
 
-        if (!response.ok) {
-            throw new Error(`Failed to get MCP server: ${response.status}`);
-        }
+        throwIfNotOk(response, 'Failed to get MCP server');
 
         const data = await response.json() as ServerResponse;
         return data.server;
@@ -190,9 +185,7 @@ export async function updateMcpServer(
             throw new Error('version-conflict');
         }
 
-        if (!response.ok) {
-            throw new Error(`Failed to update MCP server: ${response.status}`);
-        }
+        throwIfNotOk(response, 'Failed to update MCP server');
 
         return await response.json() as ServerResponse;
     });
@@ -222,9 +215,7 @@ export async function deleteMcpServer(
             throw new Error('version-conflict');
         }
 
-        if (!response.ok) {
-            throw new Error(`Failed to delete MCP server: ${response.status}`);
-        }
+        throwIfNotOk(response, 'Failed to delete MCP server');
     });
 }
 
@@ -259,9 +250,7 @@ export async function toggleMcpServerEnabled(
             throw new Error('version-conflict');
         }
 
-        if (!response.ok) {
-            throw new Error(`Failed to toggle MCP server: ${response.status}`);
-        }
+        throwIfNotOk(response, 'Failed to toggle MCP server');
 
         return await response.json() as ServerResponse;
     });

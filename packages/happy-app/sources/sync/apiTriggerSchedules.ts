@@ -1,5 +1,6 @@
 import { AuthCredentials } from "@/auth/tokenStorage";
 import { backoff } from "@/utils/time";
+import { throwIfNotOk } from "@/utils/http";
 import { getServerUrl } from "./serverConfig";
 
 export interface ServerTriggerSchedule {
@@ -62,9 +63,7 @@ export async function fetchTriggerSchedules(
             `${API_ENDPOINT}/v1/trigger-schedules${qs ? `?${qs}` : ""}`,
             { headers: authHeaders(credentials) },
         );
-        if (!response.ok) {
-            throw new Error(`Failed to fetch trigger schedules: ${response.status}`);
-        }
+        throwIfNotOk(response, 'Failed to fetch trigger schedules');
         return (await response.json()) as TriggerScheduleListResponse;
     });
 }
@@ -90,10 +89,7 @@ export async function createTriggerSchedule(
             headers: authHeaders(credentials),
             body: JSON.stringify(body),
         });
-        if (!response.ok) {
-            const data = await response.json().catch(() => ({}));
-            throw new Error((data as Record<string, string>).error ?? `Failed to create trigger schedule: ${response.status}`);
-        }
+        throwIfNotOk(response, 'Failed to create trigger schedule');
         const data = (await response.json()) as TriggerScheduleResponse;
         return data.triggerSchedule;
     });
@@ -119,10 +115,7 @@ export async function updateTriggerSchedule(
             headers: authHeaders(credentials),
             body: JSON.stringify(body),
         });
-        if (!response.ok) {
-            const data = await response.json().catch(() => ({}));
-            throw new Error((data as Record<string, string>).error ?? `Failed to update trigger schedule: ${response.status}`);
-        }
+        throwIfNotOk(response, 'Failed to update trigger schedule');
         const data = (await response.json()) as TriggerScheduleResponse;
         return data.triggerSchedule;
     });
@@ -139,10 +132,7 @@ export async function toggleTriggerSchedule(
             method: "POST",
             headers: authHeaders(credentials),
         });
-        if (!response.ok) {
-            const data = await response.json().catch(() => ({}));
-            throw new Error((data as Record<string, string>).error ?? `Failed to toggle trigger schedule: ${response.status}`);
-        }
+        throwIfNotOk(response, 'Failed to toggle trigger schedule');
         const data = (await response.json()) as TriggerScheduleResponse;
         return data.triggerSchedule;
     });
@@ -159,9 +149,6 @@ export async function deleteTriggerSchedule(
             method: "DELETE",
             headers: authHeaders(credentials),
         });
-        if (!response.ok) {
-            const data = await response.json().catch(() => ({}));
-            throw new Error((data as Record<string, string>).error ?? `Failed to delete trigger schedule: ${response.status}`);
-        }
+        throwIfNotOk(response, 'Failed to delete trigger schedule');
     });
 }

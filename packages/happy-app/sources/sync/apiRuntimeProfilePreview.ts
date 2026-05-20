@@ -1,5 +1,6 @@
 import { AuthCredentials } from "@/auth/tokenStorage";
-import { backoff, NonRetryableError } from "@/utils/time";
+import { backoff } from "@/utils/time";
+import { throwIfNotOk } from "@/utils/http";
 import { getServerUrl } from "./serverConfig";
 
 export type RuntimeProfilePreviewPurpose =
@@ -59,11 +60,7 @@ export async function fetchRuntimeProfilePreview(
                 },
             },
         );
-        if (!response.ok) {
-            throw new NonRetryableError(
-                `Failed to fetch runtime profile preview: ${response.status}`,
-            );
-        }
+        throwIfNotOk(response, 'Failed to fetch runtime profile preview');
         return (await response.json()) as RuntimeProfilePreviewResult;
     });
 }

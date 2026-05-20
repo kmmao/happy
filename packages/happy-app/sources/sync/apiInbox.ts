@@ -1,5 +1,6 @@
 import { AuthCredentials } from "@/auth/tokenStorage";
 import { backoff } from "@/utils/time";
+import { throwIfNotOk } from "@/utils/http";
 import { getServerUrl } from "./serverConfig";
 import * as z from "zod";
 
@@ -67,9 +68,7 @@ export async function fetchInboxItems(
             `${API_ENDPOINT}/v1/inbox${qs ? `?${qs}` : ""}`,
             { headers: authHeaders(credentials) },
         );
-        if (!response.ok) {
-            throw new Error(`Failed to fetch inbox: ${response.status}`);
-        }
+        throwIfNotOk(response, 'Failed to fetch inbox');
         const json = await response.json();
         const parsed = InboxListResponseSchema.safeParse(json);
         if (!parsed.success) {
@@ -89,9 +88,7 @@ export async function fetchInboxUnreadCount(
             `${API_ENDPOINT}/v1/inbox/count`,
             { headers: authHeaders(credentials) },
         );
-        if (!response.ok) {
-            throw new Error(`Failed to fetch inbox count: ${response.status}`);
-        }
+        throwIfNotOk(response, 'Failed to fetch inbox count');
         const json = await response.json();
         const parsed = InboxCountResponseSchema.safeParse(json);
         if (!parsed.success) {

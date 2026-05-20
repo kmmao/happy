@@ -1,5 +1,6 @@
 import { AuthCredentials } from '@/auth/tokenStorage';
 import { backoff } from '@/utils/time';
+import { throwIfNotOk } from '@/utils/http';
 import { getServerUrl } from './serverConfig';
 
 //
@@ -50,9 +51,7 @@ export async function provisionCreate(
             }),
         });
 
-        if (!response.ok) {
-            throw new Error(`Failed to create provision token: ${response.status}`);
-        }
+        throwIfNotOk(response, 'Failed to create provision token');
 
         return await response.json() as ProvisionCreateResponse;
     });
@@ -73,9 +72,7 @@ export async function provisionList(
             },
         });
 
-        if (!response.ok) {
-            throw new Error(`Failed to list provision tokens: ${response.status}`);
-        }
+        throwIfNotOk(response, 'Failed to list provision tokens');
 
         return await response.json() as ProvisionTokenItem[];
     });

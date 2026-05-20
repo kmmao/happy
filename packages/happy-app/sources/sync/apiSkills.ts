@@ -1,5 +1,6 @@
 import { AuthCredentials } from "@/auth/tokenStorage";
 import { backoff } from "@/utils/time";
+import { throwIfNotOk } from "@/utils/http";
 import { getServerUrl } from "./serverConfig";
 
 export interface ServerSkill {
@@ -55,9 +56,7 @@ export async function fetchSkills(
             `${API_ENDPOINT}/v1/skills${qs ? `?${qs}` : ""}`,
             { headers: authHeaders(credentials) },
         );
-        if (!response.ok) {
-            throw new Error(`Failed to fetch skills: ${response.status}`);
-        }
+        throwIfNotOk(response, 'Failed to fetch skills');
         return (await response.json()) as SkillListResponse;
     });
 }
@@ -73,9 +72,7 @@ export async function fetchSkill(
             `${API_ENDPOINT}/v1/skills/${skillId}`,
             { headers: authHeaders(credentials) },
         );
-        if (!response.ok) {
-            throw new Error(`Failed to fetch skill: ${response.status}`);
-        }
+        throwIfNotOk(response, 'Failed to fetch skill');
         const data = (await response.json()) as SkillResponse;
         return data.skill;
     });

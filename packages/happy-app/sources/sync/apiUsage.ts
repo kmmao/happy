@@ -1,5 +1,6 @@
 import { AuthCredentials } from "@/auth/tokenStorage";
-import { backoff, NonRetryableError } from "@/utils/time";
+import { backoff } from "@/utils/time";
+import { throwIfNotOk } from "@/utils/http";
 import { getServerUrl } from "./serverConfig";
 
 export interface UsageDataPoint {
@@ -41,9 +42,7 @@ export async function queryUsage(
       body: JSON.stringify(params),
     });
 
-    if (!response.ok) {
-      throw new NonRetryableError(`Failed to query usage: ${response.status}`);
-    }
+    throwIfNotOk(response, 'Failed to query usage');
 
     const data = (await response.json()) as UsageResponse;
     return data;
@@ -220,24 +219,20 @@ export async function getSessionUsageSummary(
       },
     );
 
-    if (!response.ok) {
-      if (response.status === 404) {
-        return {
-          totalInputTokens: 0,
-          totalOutputTokens: 0,
-          totalCacheCreationTokens: 0,
-          totalCacheReadTokens: 0,
-          lastInputTokens: 0,
-          lastOutputTokens: 0,
-          lastCacheCreation: 0,
-          lastCacheRead: 0,
-          reportCount: 0,
-        };
-      }
-      throw new NonRetryableError(
-        `Failed to get session usage summary: ${response.status}`,
-      );
+    if (response.status === 404) {
+      return {
+        totalInputTokens: 0,
+        totalOutputTokens: 0,
+        totalCacheCreationTokens: 0,
+        totalCacheReadTokens: 0,
+        lastInputTokens: 0,
+        lastOutputTokens: 0,
+        lastCacheCreation: 0,
+        lastCacheRead: 0,
+        reportCount: 0,
+      };
     }
+    throwIfNotOk(response, 'Failed to get session usage summary');
 
     return (await response.json()) as SessionUsageSummary;
   });

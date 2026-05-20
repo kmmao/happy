@@ -1,4 +1,5 @@
 import type { AuthCredentials } from '@/auth/tokenStorage';
+import { throwIfNotOk } from '@/utils/http';
 import { getServerUrl } from './serverConfig';
 import { config } from '@/config';
 import { storage } from './storage';
@@ -35,9 +36,7 @@ export async function fetchVoiceToken(
         })
     });
 
-    if (!response.ok) {
-        throw new Error(`Voice token request failed: ${response.status}`);
-    }
+    throwIfNotOk(response, 'Voice token request failed');
 
     return await response.json();
 }
@@ -66,9 +65,7 @@ export async function fetchLiveKitToken(
         })
     });
 
-    if (!response.ok) {
-        throw new Error(`LiveKit token request failed: ${response.status}`);
-    }
+    throwIfNotOk(response, 'LiveKit token request failed');
 
     return await response.json();
 }
@@ -93,9 +90,7 @@ export async function verifyLiveKitCredentials(
         })
     });
 
-    if (!response.ok) {
-        throw new Error(`LiveKit verify request failed: ${response.status}`);
-    }
+    throwIfNotOk(response, 'LiveKit verify request failed');
 
     return await response.json();
 }

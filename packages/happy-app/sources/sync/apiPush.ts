@@ -1,5 +1,6 @@
 import { AuthCredentials } from '@/auth/tokenStorage';
 import { backoff } from '@/utils/time';
+import { throwIfNotOk } from '@/utils/http';
 import { getServerUrl } from './serverConfig';
 
 export async function registerPushToken(credentials: AuthCredentials, token: string): Promise<void> {
@@ -14,9 +15,7 @@ export async function registerPushToken(credentials: AuthCredentials, token: str
             body: JSON.stringify({ token })
         });
 
-        if (!response.ok) {
-            throw new Error(`Failed to register push token: ${response.status}`);
-        }
+        throwIfNotOk(response, 'Failed to register push token');
 
         const data = await response.json();
         if (!data.success) {

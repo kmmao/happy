@@ -1,5 +1,6 @@
 import { AuthCredentials } from "@/auth/tokenStorage";
 import { backoff } from "@/utils/time";
+import { throwIfNotOk } from "@/utils/http";
 import { getServerUrl } from "./serverConfig";
 
 export interface ServerWebhookTrigger {
@@ -65,9 +66,7 @@ export async function fetchWebhookTriggers(
             `${API_ENDPOINT}/v1/webhook-triggers${qs ? `?${qs}` : ""}`,
             { headers: authHeaders(credentials) },
         );
-        if (!response.ok) {
-            throw new Error(`Failed to fetch webhook triggers: ${response.status}`);
-        }
+        throwIfNotOk(response, 'Failed to fetch webhook triggers');
         return (await response.json()) as WebhookTriggerListResponse;
     });
 }
@@ -93,10 +92,7 @@ export async function createWebhookTrigger(
             headers: authHeaders(credentials),
             body: JSON.stringify(body),
         });
-        if (!response.ok) {
-            const data = await response.json().catch(() => ({}));
-            throw new Error((data as Record<string, string>).error ?? `Failed to create webhook trigger: ${response.status}`);
-        }
+        throwIfNotOk(response, 'Failed to create webhook trigger');
         return (await response.json()) as CreateWebhookTriggerResponse;
     });
 }
@@ -121,10 +117,7 @@ export async function updateWebhookTrigger(
             headers: authHeaders(credentials),
             body: JSON.stringify(body),
         });
-        if (!response.ok) {
-            const data = await response.json().catch(() => ({}));
-            throw new Error((data as Record<string, string>).error ?? `Failed to update webhook trigger: ${response.status}`);
-        }
+        throwIfNotOk(response, 'Failed to update webhook trigger');
         const data = (await response.json()) as WebhookTriggerResponse;
         return data.webhookTrigger;
     });
@@ -141,10 +134,7 @@ export async function regenerateWebhookSecret(
             method: "POST",
             headers: authHeaders(credentials),
         });
-        if (!response.ok) {
-            const data = await response.json().catch(() => ({}));
-            throw new Error((data as Record<string, string>).error ?? `Failed to regenerate secret: ${response.status}`);
-        }
+        throwIfNotOk(response, 'Failed to regenerate secret');
         const data = (await response.json()) as { secret: string };
         return data.secret;
     });
@@ -161,9 +151,6 @@ export async function deleteWebhookTrigger(
             method: "DELETE",
             headers: authHeaders(credentials),
         });
-        if (!response.ok) {
-            const data = await response.json().catch(() => ({}));
-            throw new Error((data as Record<string, string>).error ?? `Failed to delete webhook trigger: ${response.status}`);
-        }
+        throwIfNotOk(response, 'Failed to delete webhook trigger');
     });
 }

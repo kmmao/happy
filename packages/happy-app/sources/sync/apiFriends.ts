@@ -1,5 +1,6 @@
 import { AuthCredentials } from '@/auth/tokenStorage';
 import { backoff } from '@/utils/time';
+import { throwIfNotOk } from '@/utils/http';
 import { getServerUrl } from './serverConfig';
 import {
     UserProfile,
@@ -32,12 +33,10 @@ export async function searchUsersByUsername(
             }
         );
 
-        if (!response.ok) {
-            if (response.status === 404) {
-                return [];
-            }
-            throw new Error(`Failed to search users: ${response.status}`);
+        if (response.status === 404) {
+            return [];
         }
+        throwIfNotOk(response, 'Failed to search users');
 
         const data = await response.json();
         const parsed = UsersSearchResponseSchema.safeParse(data);
@@ -70,12 +69,10 @@ export async function getUserProfile(
             }
         );
 
-        if (!response.ok) {
-            if (response.status === 404) {
-                return null;
-            }
-            throw new Error(`Failed to get user profile: ${response.status}`);
+        if (response.status === 404) {
+            return null;
         }
+        throwIfNotOk(response, 'Failed to get user profile');
 
         const data = await response.json();
         const parsed = UserResponseSchema.safeParse(data);

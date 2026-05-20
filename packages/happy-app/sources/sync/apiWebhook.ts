@@ -1,5 +1,6 @@
 import { AuthCredentials } from "@/auth/tokenStorage";
 import { backoff } from "@/utils/time";
+import { throwIfNotOk } from "@/utils/http";
 import { getServerUrl } from "./serverConfig";
 
 export interface CiRun {
@@ -44,9 +45,7 @@ export async function fetchCiRuns(
                 "Content-Type": "application/json",
             },
         });
-        if (!response.ok) {
-            throw new Error(`Failed to fetch CI runs: ${response.status}`);
-        }
+        throwIfNotOk(response, 'Failed to fetch CI runs');
         return (await response.json()) as { runs: CiRun[] };
     });
 }
@@ -72,9 +71,7 @@ export async function fetchWebhookEvents(
                 },
             },
         );
-        if (!response.ok) {
-            throw new Error(`Failed to fetch webhook events: ${response.status}`);
-        }
+        throwIfNotOk(response, 'Failed to fetch webhook events');
         return (await response.json()) as { events: WebhookEvent[]; total: number };
     });
 }
