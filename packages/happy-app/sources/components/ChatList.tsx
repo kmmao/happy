@@ -213,6 +213,9 @@ const ChatListInternal = React.memo(
         log.warn(
           `[ChatList] ${label} took ${durationMs.toFixed(1)}ms for ${props.messages.length} messages`,
         );
+        if (__DEV__) {
+          console.log(`[stream-perf] ChatList.${label}: ${durationMs.toFixed(1)}ms, msgs=${props.messages.length}`);
+        }
       },
       [props.messages.length],
     );

@@ -33,6 +33,7 @@ import { parseLegacyCodexPlanPreview } from "./tools/codexPlanCompat";
 import { parseCodexServicePreview } from "./tools/codexServiceCompat";
 import { CodexDiffView } from "./tools/views/CodexDiffView";
 import type { MessageMeta } from "@/sync/typesMessageMeta";
+import { StreamingTextView } from "./StreamingTextView";
 
 function buildUserMetaBadgeText(meta: MessageMeta | undefined): string | null {
   if (!meta) return null;
@@ -346,6 +347,11 @@ function AgentTextBlock(props: {
     (optionText: string) => getAutoOptionFeedbackStats(optionStatsProjectId, optionText),
     [optionStatsProjectId],
   );
+
+  // True when this is the latest agent message AND the session is actively streaming.
+  // We use a lightweight StreamingTextView during streaming to avoid re-parsing the
+  // full Markdown on every delta. Once streaming stops, we switch back to MarkdownView.
+  const isStreaming = props.isLatestAgent === true && session != null && isSessionRunning(session);
 
   // Hide thinking messages unless experiments is enabled
   if (props.message.isThinking && !experiments) {
@@ -685,6 +691,10 @@ function AgentTextBlock(props: {
               ) : null}
             </View>
           )
+        ) : isStreaming ? (
+          // During active streaming: skip Markdown parsing (100% cache-miss, O(n²))
+          // and render raw text. Switches back to MarkdownView once streaming ends.
+          <StreamingTextView text={props.message.text} />
         ) : (
           <MarkdownView
             markdown={props.message.text}

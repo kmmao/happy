@@ -84,6 +84,11 @@ export type UpdateHandlerContext = {
     processedWebSocketMessageIds: Map<string, Set<string>>;
 };
 
+// [stream-perf] delta arrival interval tracking
+let _perfLastDeltaAt = 0;
+let _perfDeltaCount = 0;
+let _perfDeltaLogAt = 0;
+
 // ---------------------------------------------------------------------------
 // new-message
 // ---------------------------------------------------------------------------
@@ -140,6 +145,28 @@ export async function handleNewMessageUpdate(
                 decrypted.createdAt,
                 decrypted.content,
             );
+
+            // [stream-perf] Track text-delta arrival intervals
+            if (__DEV__ && lastMessage?.role === "agent" && lastMessage.content[0]?.type === "text-delta") {
+                const now = Date.now();
+                _perfDeltaCount++;
+                if (_perfLastDeltaAt > 0) {
+                    const interval = now - _perfLastDeltaAt;
+                    // Log every 20 deltas or if interval is unusually large
+                    if (interval > 200 || (_perfDeltaCount % 20 === 0 && now - _perfDeltaLogAt > 1000)) {
+                        console.log(`[stream-perf] delta-arrival: interval=${interval}ms, total=${_perfDeltaCount}`);
+                        _perfDeltaLogAt = now;
+                    }
+                }
+                _perfLastDeltaAt = now;
+            } else if (lastMessage?.role !== "agent" || lastMessage?.content[0]?.type !== "text-delta") {
+                // Reset on non-delta messages
+                if (_perfDeltaCount > 0 && __DEV__) {
+                    console.log(`[stream-perf] delta-stream ended: total=${_perfDeltaCount} deltas`);
+                }
+                _perfDeltaCount = 0;
+                _perfLastDeltaAt = 0;
+            }
 
             // Check for task lifecycle events to update thinking state
             const rawContent = decrypted.content as {

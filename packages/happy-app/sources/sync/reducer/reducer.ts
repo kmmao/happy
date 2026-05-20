@@ -280,6 +280,9 @@ export function reducer(
   messages: NormalizedMessage[],
   agentState?: AgentState | null,
 ): ReducerResult {
+  const _perfT0 = typeof performance !== "undefined" ? performance.now() : 0;
+  let _perfDeltaCount = 0;
+
   let newMessages: Message[] = [];
   let changed: Set<string> = new Set();
   let hasReadyEvent = false;
@@ -753,6 +756,7 @@ export function reducer(
       // Process text and thinking content (tool calls handled in Phase 2)
       for (let c of msg.content) {
         if (c.type === "text-delta") {
+          _perfDeltaCount++;
           const existingMessageId = state.textStreamIdToMessageId.get(c.streamId);
           const existingMessage =
             existingMessageId ? state.messages.get(existingMessageId) : null;
@@ -1470,6 +1474,12 @@ export function reducer(
     if (message) {
       newMessages.push(message);
     }
+  }
+
+  // [stream-perf] Reducer timing
+  if (__DEV__ && _perfDeltaCount > 0 && _perfT0 > 0) {
+    const _perfMs = performance.now() - _perfT0;
+    console.log(`[stream-perf] reducer: ${_perfMs.toFixed(1)}ms, msgs=${messages.length}, deltas=${_perfDeltaCount}, changed=${changed.size}`);
   }
 
   return {

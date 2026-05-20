@@ -195,6 +195,11 @@ class Sync {
   private machineDataKeys = new Map<string, Uint8Array>(); // Store machine data encryption keys internally
   private artifactDataKeys = new Map<string, Uint8Array>(); // Store artifact data encryption keys internally
   private cacheWriteTimers = new Map<string, ReturnType<typeof setTimeout>>();
+  // Pending rAF handles for text-delta batching — one per session.
+  // Using requestAnimationFrame instead of a fixed setTimeout aligns delta flushes
+  // with the display refresh rate (~16ms @60Hz, ~8ms @120Hz ProMotion), producing
+  // smooth character-by-character streaming instead of 60ms chunks.
+  private deltaRafHandles = new Map<string, number>();
   private settingsSync: InvalidateSync;
   private profileSync: InvalidateSync;
   private accountProfilesSync: InvalidateSync;
@@ -597,6 +602,18 @@ class Sync {
     return sync;
   }
 
+  /**
+   * Returns true when every message in the batch is a pure text-delta (streaming chunk).
+   * Used to decide whether to throttle the queue flush.
+   */
+  private static isAllTextDeltas(messages: NormalizedMessage[]): boolean {
+    return messages.length > 0 && messages.every(
+      (m) => m.role === "agent" &&
+        m.content.length === 1 &&
+        m.content[0]?.type === "text-delta",
+    );
+  }
+
   private enqueueMessages(sessionId: string, messages: NormalizedMessage[]) {
     if (messages.length === 0) {
       return;
@@ -609,7 +626,29 @@ class Sync {
     }
     queue.push(...messages);
 
-    this.scheduleQueuedMessagesProcessing(sessionId);
+    // Batch text-deltas to the next animation frame so updates align with the
+    // display refresh rate (~16ms @60Hz, ~8ms @120Hz).  Multiple deltas arriving
+    // within the same frame are merged into a single Zustand set().
+    // Non-delta messages (tool calls, events, user messages) bypass the batch
+    // and flush immediately — they must never be delayed.
+    if (Sync.isAllTextDeltas(messages)) {
+      if (!this.deltaRafHandles.has(sessionId)) {
+        const handle = requestAnimationFrame(() => {
+          this.deltaRafHandles.delete(sessionId);
+          this.scheduleQueuedMessagesProcessing(sessionId);
+        });
+        this.deltaRafHandles.set(sessionId, handle);
+      }
+      // rAF already scheduled — delta will be picked up when it fires.
+    } else {
+      // Non-delta message: cancel any pending rAF and process immediately.
+      const existing = this.deltaRafHandles.get(sessionId);
+      if (existing != null) {
+        cancelAnimationFrame(existing);
+        this.deltaRafHandles.delete(sessionId);
+      }
+      this.scheduleQueuedMessagesProcessing(sessionId);
+    }
   }
 
   private getSessionMessageLock(sessionId: string): AsyncLock {
@@ -627,6 +666,12 @@ class Sync {
    * lastVisibleSessionId which is specific to the Sync class.
    */
   private cleanupSessionLocally(sessionId: string) {
+    // Cancel any pending delta rAF before wiping the session
+    const deltaRaf = this.deltaRafHandles.get(sessionId);
+    if (deltaRaf != null) {
+      cancelAnimationFrame(deltaRaf);
+      this.deltaRafHandles.delete(sessionId);
+    }
     cleanupSessionLocallyCore(
       {
         deleted404Sessions: this.deleted404Sessions,
@@ -675,6 +720,12 @@ class Sync {
       this.sessionQueueProcessing.delete(sessionId);
       // Release WebSocket dedup set
       this.processedWebSocketMessageIds.delete(sessionId);
+      // Cancel any pending delta rAF
+      const deltaRaf = this.deltaRafHandles.get(sessionId);
+      if (deltaRaf != null) {
+        cancelAnimationFrame(deltaRaf);
+        this.deltaRafHandles.delete(sessionId);
+      }
       // Cancel any pending cache-write timer
       const cacheTimer = this.cacheWriteTimers.get(sessionId);
       if (cacheTimer) {

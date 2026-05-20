@@ -1068,6 +1068,9 @@ export const storage = create<StorageState>()((set, get) => {
         isDataReady: true,
       })),
     applyMessages: (sessionId: string, messages: NormalizedMessage[]) => {
+      const _perfT0 = __DEV__ && typeof performance !== "undefined" ? performance.now() : 0;
+      let _perfReducerMs = 0;
+      let _perfMergeMs = 0;
       let changed = new Set<string>();
       let hasReadyEvent = false;
       let pinnedModelIdChanged = false;
@@ -1090,11 +1093,13 @@ export const storage = create<StorageState>()((set, get) => {
         const normalizedMessages = messages;
 
         // Run reducer with agentState
+        const _perfReducerT0 = _perfT0 > 0 ? performance.now() : 0;
         const reducerResult = reducer(
           existingSession.reducerState,
           normalizedMessages,
           agentState,
         );
+        if (_perfReducerT0 > 0) _perfReducerMs = performance.now() - _perfReducerT0;
         const processedMessages = reducerResult.messages;
         for (let message of processedMessages) {
           changed.add(message.id);
@@ -1103,6 +1108,7 @@ export const storage = create<StorageState>()((set, get) => {
           hasReadyEvent = true;
         }
 
+        const _perfMergeT0 = _perfT0 > 0 ? performance.now() : 0;
         // Optimized sort: avoid O(n log n) full re-sort on every streaming update.
         // existingSession.messages is already sorted newest-first (descending createdAt).
         const newMessages = processedMessages.filter(
@@ -1232,6 +1238,8 @@ export const storage = create<StorageState>()((set, get) => {
             updatedSessions,
           );
 
+        if (_perfMergeT0 > 0) _perfMergeMs = performance.now() - _perfMergeT0;
+
         return {
           ...state,
           sessions: updatedSessions,
@@ -1240,6 +1248,14 @@ export const storage = create<StorageState>()((set, get) => {
           sessionMessagesLRU,
         };
       });
+
+      // [stream-perf] applyMessages timing
+      if (_perfT0 > 0 && changed.size > 0) {
+        const _perfTotalMs = performance.now() - _perfT0;
+        if (_perfTotalMs > 1) {
+          console.log(`[stream-perf] applyMessages: ${_perfTotalMs.toFixed(1)}ms (reducer=${_perfReducerMs.toFixed(1)}, merge=${_perfMergeMs.toFixed(1)}), changed=${changed.size}, msgs=${messages.length}`);
+        }
+      }
 
       if (pinnedModelIdChanged) {
         stagePendingSessionPreferences(sessionId);
