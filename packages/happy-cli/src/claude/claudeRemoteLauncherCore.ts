@@ -2307,6 +2307,15 @@ export async function claudeRemoteLauncher(
           },
           onMessagesReady: (pushFn) => {
             midTurnPushFn = pushFn;
+            // The first nextMessage() call happens BEFORE onMessagesReady fires
+            // (claudeRemote.ts fetches the initial message before exposing
+            // the push function). That means the startMidTurnDrain() call
+            // inside nextMessage() silently returns (midTurnPushFn is still
+            // null at that point). We must start it here once the push
+            // function becomes available, otherwise user messages sent
+            // during the first turn are queued but never forwarded to the
+            // SDK until the turn finishes.
+            startMidTurnDrain();
           },
           onInitialized: (info) => {
             logger.debug(
