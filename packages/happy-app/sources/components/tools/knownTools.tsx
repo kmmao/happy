@@ -54,6 +54,18 @@ const ICON_QUESTION = (size: number = 24, color: string = "#000") => (
 const ICON_PUZZLE = (size: number = 24, color: string = "#000") => (
   <Ionicons name="extension-puzzle-outline" size={size} color={color} />
 );
+const ICON_GIT = (size: number = 24, color: string = "#000") => (
+  <Octicons name="git-branch" size={size} color={color} />
+);
+const ICON_CLOCK = (size: number = 24, color: string = "#000") => (
+  <Ionicons name="timer-outline" size={size} color={color} />
+);
+const ICON_CODE = (size: number = 24, color: string = "#000") => (
+  <Octicons name="code" size={size} color={color} />
+);
+const ICON_PLAN = (size: number = 24, color: string = "#000") => (
+  <Ionicons name="map-outline" size={size} color={color} />
+);
 
 /**
  * Extract a short display name from a file path.
@@ -2013,6 +2025,240 @@ export const knownTools = {
         });
       }
       return null;
+    },
+  },
+  EnterPlanMode: {
+    title: t("tools.names.planProposal"),
+    icon: ICON_PLAN,
+    minimal: true,
+    input: z.object({}).partial().passthrough(),
+  },
+  EnterWorktree: {
+    title: (opts: { metadata: Metadata | null; tool: ToolCall }) => {
+      if (typeof opts.tool.input?.name === "string" && opts.tool.input.name) {
+        return opts.tool.input.name;
+      }
+      return "Worktree";
+    },
+    icon: ICON_GIT,
+    minimal: true,
+    input: z
+      .object({
+        name: z.string().optional().describe("Worktree name"),
+        path: z.string().optional().describe("Existing worktree path"),
+      })
+      .partial()
+      .passthrough(),
+  },
+  ExitWorktree: {
+    title: (opts: { metadata: Metadata | null; tool: ToolCall }) => {
+      const action = opts.tool.input?.action;
+      if (action === "remove") return "Remove Worktree";
+      if (action === "keep") return "Keep Worktree";
+      return "Exit Worktree";
+    },
+    icon: ICON_GIT,
+    minimal: true,
+    input: z
+      .object({
+        action: z.string().optional().describe("keep or remove"),
+      })
+      .partial()
+      .passthrough(),
+  },
+  LSP: {
+    title: (opts: { metadata: Metadata | null; tool: ToolCall }) => {
+      const op = opts.tool.input?.operation;
+      if (typeof op === "string") return `LSP · ${op}`;
+      return "LSP";
+    },
+    icon: ICON_CODE,
+    minimal: true,
+    input: z
+      .object({
+        operation: z.string().optional().describe("LSP operation"),
+        filePath: z.string().optional().describe("File path"),
+        line: z.number().optional().describe("Line number"),
+        character: z.number().optional().describe("Character offset"),
+      })
+      .partial()
+      .passthrough(),
+    extractDescription: (opts: { metadata: Metadata | null; tool: ToolCall }) => {
+      if (typeof opts.tool.input?.filePath === "string") {
+        const basename = opts.tool.input.filePath.split("/").pop() || opts.tool.input.filePath;
+        const line = opts.tool.input?.line;
+        if (typeof line === "number") return `${basename}:${line}`;
+        return basename;
+      }
+      return null;
+    },
+  },
+  CronCreate: {
+    title: (opts: { metadata: Metadata | null; tool: ToolCall }) => {
+      if (typeof opts.tool.input?.cron === "string") {
+        return `Cron · ${opts.tool.input.cron}`;
+      }
+      return "Create Cron";
+    },
+    icon: ICON_CLOCK,
+    minimal: true,
+    noStatus: true,
+    input: z
+      .object({
+        cron: z.string().optional().describe("Cron expression"),
+        prompt: z.string().optional().describe("Prompt to run"),
+        recurring: z.boolean().optional().describe("Whether recurring"),
+      })
+      .partial()
+      .passthrough(),
+  },
+  CronDelete: {
+    title: "Delete Cron",
+    icon: ICON_CLOCK,
+    minimal: true,
+    noStatus: true,
+    input: z
+      .object({
+        id: z.string().optional().describe("Job ID"),
+      })
+      .partial()
+      .passthrough(),
+  },
+  CronList: {
+    title: "List Crons",
+    icon: ICON_CLOCK,
+    minimal: true,
+    noStatus: true,
+    input: z.object({}).partial().passthrough(),
+  },
+  ScheduleWakeup: {
+    title: (opts: { metadata: Metadata | null; tool: ToolCall }) => {
+      if (typeof opts.tool.input?.reason === "string" && opts.tool.input.reason) {
+        return opts.tool.input.reason;
+      }
+      const delay = opts.tool.input?.delaySeconds;
+      if (typeof delay === "number") {
+        return `Wakeup · ${delay}s`;
+      }
+      return "Schedule Wakeup";
+    },
+    icon: ICON_CLOCK,
+    minimal: true,
+    noStatus: true,
+    input: z
+      .object({
+        delaySeconds: z.number().optional().describe("Delay in seconds"),
+        reason: z.string().optional().describe("Reason for wakeup"),
+        prompt: z.string().optional().describe("Prompt to run"),
+      })
+      .partial()
+      .passthrough(),
+  },
+  TaskStop: {
+    title: (opts: { metadata: Metadata | null; tool: ToolCall }) => {
+      const taskId = opts.tool.input?.task_id;
+      if (typeof taskId === "string") {
+        return `Stop Task #${taskId}`;
+      }
+      return "Stop Task";
+    },
+    icon: ICON_TODO,
+    minimal: true,
+    noStatus: true,
+    input: z
+      .object({
+        task_id: z.string().optional().describe("Task ID to stop"),
+      })
+      .partial()
+      .passthrough(),
+  },
+  TaskOutput: {
+    title: (opts: { metadata: Metadata | null; tool: ToolCall }) => {
+      const taskId = opts.tool.input?.task_id;
+      if (typeof taskId === "string") {
+        return `Task Output #${taskId}`;
+      }
+      return "Task Output";
+    },
+    icon: ICON_TODO,
+    minimal: true,
+    noStatus: true,
+    input: z
+      .object({
+        task_id: z.string().optional().describe("Task ID"),
+        block: z.boolean().optional().describe("Wait for completion"),
+      })
+      .partial()
+      .passthrough(),
+  },
+  SendMessage: {
+    title: (opts: { metadata: Metadata | null; tool: ToolCall }) => {
+      const desc =
+        typeof opts.tool.input?.description === "string"
+          ? opts.tool.input.description
+          : null;
+      if (desc) return desc;
+      const agentId =
+        typeof opts.tool.input?.id === "string"
+          ? opts.tool.input.id
+          : typeof opts.tool.input?.name === "string"
+            ? opts.tool.input.name
+            : null;
+      if (agentId) return `→ ${agentId}`;
+      return t("tools.names.task");
+    },
+    icon: (size: number = 24, color: string = "#000") => (
+      <Octicons name="copilot" size={size} color={color} />
+    ),
+    minimal: true,
+    input: z
+      .object({
+        id: z.string().optional().describe("Agent ID to send message to"),
+        name: z.string().optional().describe("Agent name to send message to"),
+        message: z.string().optional().describe("The message to send"),
+        description: z.string().optional().describe("Short description"),
+      })
+      .partial()
+      .passthrough(),
+    extractDescription: (opts: { metadata: Metadata | null; tool: ToolCall }) => {
+      if (typeof opts.tool.input?.description === "string" && opts.tool.input.description) {
+        return opts.tool.input.description;
+      }
+      return null;
+    },
+  },
+  Skill: {
+    title: (opts: { metadata: Metadata | null; tool: ToolCall }) => {
+      if (typeof opts.tool.input?.skill === "string" && opts.tool.input.skill) {
+        return opts.tool.input.skill;
+      }
+      return "Skill";
+    },
+    icon: ICON_PUZZLE,
+    noStatus: true,
+    minimal: (opts: { metadata: Metadata | null; tool: ToolCall }) => {
+      // If input only has "skill" (no args or args is empty), render minimal
+      if (!opts.tool.input) return true;
+      const { skill, args, ...rest } = opts.tool.input as Record<string, any>;
+      const hasArgs = typeof args === "string" && args.trim().length > 0;
+      const hasOtherKeys = Object.keys(rest).length > 0;
+      return !hasArgs && !hasOtherKeys;
+    },
+    input: z
+      .object({
+        skill: z.string().optional().describe("The skill name to invoke"),
+        args: z.string().optional().describe("Optional arguments for the skill"),
+      })
+      .partial()
+      .passthrough(),
+    extractDescription: (opts: { metadata: Metadata | null; tool: ToolCall }) => {
+      if (typeof opts.tool.input?.args === "string" && opts.tool.input.args.trim()) {
+        return opts.tool.input.args;
+      }
+      if (typeof opts.tool.input?.skill === "string" && opts.tool.input.skill) {
+        return opts.tool.input.skill;
+      }
+      return "Skill";
     },
   },
   // Internal Claude Code tool for loading deferred tools - no user-visible output
