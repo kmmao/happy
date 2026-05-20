@@ -1069,14 +1069,14 @@ function SessionViewInner({
         reason: "manual-send",
       });
       setShowOptionsPopover(false);
-      if (sessionStatus.state === "thinking") {
+      if (isRunning) {
         storage.getState().appendToPendingQueue(sessionId, { localId: randomUUID(), message: option });
       } else {
         sync.sendMessage(sessionId, option);
       }
       trackMessageSent();
     },
-    [sessionId, latestOptionsHash, sessionStatus.state],
+    [sessionId, latestOptionsHash, isRunning],
   );
 
   const { bookmarks, toggleBookmark } = useBookmarks();
@@ -1085,14 +1085,14 @@ function SessionViewInner({
   const handleBookmarkOptionPress = React.useCallback(
     (option: string) => {
       setShowBookmarksPopover(false);
-      if (sessionStatus.state === "thinking") {
+      if (isRunning) {
         storage.getState().appendToPendingQueue(sessionId, { localId: randomUUID(), message: option });
       } else {
         sync.sendMessage(sessionId, option);
       }
       trackMessageSent();
     },
-    [sessionId, sessionStatus.state],
+    [sessionId, isRunning],
   );
 
   // Slash command popover
@@ -1731,7 +1731,7 @@ function SessionViewInner({
                   ? t("session.sentImage")
                   : t("session.sentImages", { count: imageCount }))
               : visibleText || pasteBlocks[0]?.summary;
-          if (sessionStatus.state === "thinking") {
+          if (isRunning) {
             storage.getState().appendToPendingQueue(sessionId, { localId: localIdForSend, message: finalMessage, displayText });
           } else {
             sync.sendMessage(sessionId, finalMessage, displayText, {
