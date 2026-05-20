@@ -155,16 +155,22 @@ export async function userRoutes(app: Fastify) {
 
     app.get('/v1/friends', {
         schema: {
+            querystring: z.object({
+                limit: z.coerce.number().int().min(1).max(100).default(100),
+                cursor: z.string().optional()
+            }),
             response: {
                 200: z.object({
-                    friends: z.array(UserProfileSchema)
+                    friends: z.array(UserProfileSchema),
+                    nextCursor: z.string().optional()
                 })
             }
         },
         preHandler: app.authenticate
     }, async (request, reply) => {
-        const friends = await friendList(Context.create(request.userId));
-        return reply.send({ friends });
+        const { limit, cursor } = request.query as { limit: number; cursor?: string };
+        const result = await friendList(Context.create(request.userId), { limit, cursor });
+        return reply.send({ friends: result.items, nextCursor: result.nextCursor });
     });
 };
 

@@ -46,13 +46,14 @@ export function kvRoutes(app: Fastify) {
         }
     });
 
-    // GET /v1/kv - List key-value pairs with optional prefix filter
+    // GET /v1/kv - List key-value pairs with optional prefix filter and cursor-based pagination
     app.get('/v1/kv', {
         preHandler: app.authenticate,
         schema: {
             querystring: z.object({
                 prefix: z.string().optional(),
-                limit: z.coerce.number().int().min(1).max(1000).default(100)
+                limit: z.coerce.number().int().min(1).max(100).default(100),
+                cursor: z.string().optional()
             }),
             response: {
                 200: z.object({
@@ -60,7 +61,8 @@ export function kvRoutes(app: Fastify) {
                         key: z.string(),
                         value: z.string(),
                         version: z.number()
-                    }))
+                    })),
+                    nextCursor: z.string().optional()
                 }),
                 500: z.object({
                     error: z.literal('Failed to list items')
@@ -69,10 +71,10 @@ export function kvRoutes(app: Fastify) {
         }
     }, async (request, reply) => {
         const userId = request.userId;
-        const { prefix, limit } = request.query;
+        const { prefix, limit, cursor } = request.query;
 
         try {
-            const result = await kvList({ uid: userId }, { prefix, limit });
+            const result = await kvList({ uid: userId }, { prefix, limit, cursor });
             return reply.send(result);
         } catch (error) {
             log({ module: 'api', level: 'error' }, `Failed to list KV items: ${error}`);

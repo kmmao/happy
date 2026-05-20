@@ -144,6 +144,13 @@ export async function dispatchWebhook(
     take: 1000,
   });
 
+  if (routes.length >= 1000) {
+    log(
+      { module: "webhook", level: "warn" },
+      `webhookRoute query hit the 1000-row limit for repoUrl=${normalizedUrl} — some routes may be missing`,
+    );
+  }
+
   if (routes.length === 0) {
     return { dispatched: false, reason: "no_matching_routes" };
   }
@@ -559,6 +566,13 @@ async function processRoutePRMerge(
     take: 1000,
   });
 
+  if (webhookEvents.length >= 1000) {
+    log(
+      { module: "webhook", level: "warn" },
+      `webhookEvent query hit the 1000-row limit for PR #${prMerge.prNumber} in route ${route.id} — some sessions may be missing`,
+    );
+  }
+
   if (webhookEvents.length === 0) {
     log(
       { module: "webhook" },
@@ -677,6 +691,13 @@ async function handlePushSupervisorTrigger(
     },
     take: 1000,
   });
+
+  if (projects.length >= 1000) {
+    log(
+      { module: "webhook", level: "warn" },
+      `project push-trigger query hit the 1000-row limit for repoUrl=${normalizedRepoUrl} — some projects may be missing`,
+    );
+  }
 
   if (projects.length === 0) {
     return { dispatched: false, reason: "no_push_trigger_projects" };
@@ -834,6 +855,13 @@ async function handlePROpenSupervisorTrigger(
     },
     take: 1000,
   });
+
+  if (projects.length >= 1000) {
+    log(
+      { module: "webhook", level: "warn" },
+      `project pr-open trigger query hit the 1000-row limit for repoUrl=${normalizedRepoUrl} — some projects may be missing`,
+    );
+  }
 
   // Only process projects that have prReview dimension enabled
   const prReviewProjects = projects.filter((p) =>
