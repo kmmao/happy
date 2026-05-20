@@ -1,3 +1,4 @@
+import type { FastifyReply, FastifyRequest } from "fastify";
 import { Fastify } from "../types";
 import { log } from "@/utils/log";
 import { auth } from "@/app/auth/auth";
@@ -7,7 +8,7 @@ import { apiError } from "./apiError";
 const MACHINE_ID_HEADER = "x-happy-machine-id";
 
 export function enableAuthentication(app: Fastify) {
-    app.decorate("authenticate", async function (request: any, reply: any) {
+    app.decorate("authenticate", async function (request: FastifyRequest, reply: FastifyReply) {
         try {
             const verified = await verifyBearerRequest(request);
             if (!verified) {
@@ -21,7 +22,7 @@ export function enableAuthentication(app: Fastify) {
         }
     });
 
-    app.decorate("authenticateMachineScopedCallback", async function (request: any, reply: any) {
+    app.decorate("authenticateMachineScopedCallback", async function (request: FastifyRequest, reply: FastifyReply) {
         try {
             const authHeader = request.headers.authorization;
             if (!authHeader || !authHeader.startsWith("Bearer ")) {
@@ -62,7 +63,7 @@ export function enableAuthentication(app: Fastify) {
     });
 }
 
-async function verifyBearerRequest(request: any): Promise<{ userId: string; extras?: any } | null> {
+async function verifyBearerRequest(request: FastifyRequest): Promise<{ userId: string; uuid?: string; extras?: any } | null> {
     const authHeader = request.headers.authorization;
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
         log({ module: "auth-decorator" }, `Auth failed - missing or invalid header for ${request.url}`);

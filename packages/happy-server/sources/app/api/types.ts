@@ -63,12 +63,12 @@ declare module 'fastify' {
             runId?: string;
             actionId?: string;
             expiresAt: number;
-            jti: string;
+            jti?: string;
         };
         startTime?: number;
     }
     interface FastifyInstance {
-        authenticate: any;
-        authenticateMachineScopedCallback: any;
+        authenticate: (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
+        authenticateMachineScopedCallback: (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
     }
 }
