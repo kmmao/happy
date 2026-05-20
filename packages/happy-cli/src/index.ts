@@ -534,7 +534,7 @@ function filterAutomationAudit<T extends { kind: string; status?: string; projec
     if (geminiSubcommand === "project" && args[2] === "get") {
       try {
         const { readGeminiLocalConfig } = await import("@/gemini/utils/config");
-        const config = readGeminiLocalConfig();
+        const config = await readGeminiLocalConfig();
 
         if (config.googleCloudProject) {
           logger.print(

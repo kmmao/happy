@@ -71,16 +71,16 @@ export interface GeminiBackendResult {
  * @param options - Configuration options
  * @returns GeminiBackendResult with backend and resolved model (single source of truth)
  */
-export function createGeminiBackend(options: GeminiBackendOptions): GeminiBackendResult {
+export async function createGeminiBackend(options: GeminiBackendOptions): Promise<GeminiBackendResult> {
 
   // Resolve API key from multiple sources (in priority order):
   // 1. Happy cloud OAuth token (via 'happy connect gemini') - highest priority
   // 2. Local Gemini CLI config files (~/.gemini/)
   // 3. GEMINI_API_KEY environment variable
   // 4. GOOGLE_API_KEY environment variable - lowest priority
-  
+
   // Try reading from local Gemini CLI config (token and model)
-  const localConfig = readGeminiLocalConfig();
+  const localConfig = await readGeminiLocalConfig();
   
   let apiKey = options.cloudToken       // 1. Happy cloud token (passed from runGemini)
     || localConfig.token                // 2. Local config (~/.gemini/)
@@ -181,7 +181,20 @@ export function createGeminiBackend(options: GeminiBackendOptions): GeminiBacken
  * to make the Gemini agent available for use.
  */
 export function registerGeminiAgent(): void {
-  agentRegistry.register('gemini', (opts) => createGeminiBackend(opts).backend);
+  // Note: createGeminiBackend is async; prefer calling it directly for full functionality.
+  // This sync registry stub omits the async gcloud ADC fallback.
+  agentRegistry.register('gemini', (opts) => new AcpBackend({
+    agentName: 'gemini',
+    cwd: opts.cwd,
+    command: 'gemini',
+    args: ['--experimental-acp'],
+    env: {
+      ...opts.env,
+      NODE_ENV: 'production',
+      DEBUG: '',
+    },
+    transportHandler: geminiTransport,
+  }));
   logger.debug('[Gemini] Registered with agent registry');
 }
 

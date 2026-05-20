@@ -509,10 +509,10 @@ export async function runGemini(opts: {
 
   // Track current model for UI display
   // Initialize with env var or default to show correct model from start
-  let displayedModel: string | undefined = getInitialGeminiModel();
+  let displayedModel: string | undefined = await getInitialGeminiModel();
 
   // Log initial values
-  const localConfig = readGeminiLocalConfig();
+  const localConfig = await readGeminiLocalConfig();
   logger.debug(
     `[gemini] Initial model setup: env[GEMINI_MODEL_ENV]=${process.env[GEMINI_MODEL_ENV] || "not set"}, localConfig=${localConfig.model || "not set"}, displayedModel=${displayedModel}`,
   );
@@ -1170,7 +1170,7 @@ export async function runGemini(opts: {
           message.mode?.model === undefined
             ? undefined
             : message.mode.model || null;
-        const backendResult = createGeminiBackend({
+        const backendResult = await createGeminiBackend({
           cwd: process.cwd(),
           mcpServers,
           permissionHandler,
@@ -1234,7 +1234,7 @@ export async function runGemini(opts: {
               message.mode?.model === undefined
                 ? undefined
                 : message.mode.model || null;
-            const backendResult = createGeminiBackend({
+            const backendResult = await createGeminiBackend({
               cwd: process.cwd(),
               mcpServers,
               permissionHandler,

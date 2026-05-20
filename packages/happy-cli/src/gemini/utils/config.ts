@@ -8,7 +8,8 @@
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
-import { execSync } from 'child_process';
+import { exec } from 'child_process';
+import { promisify } from 'util';
 import { logger } from '@/ui/logger';
 import { GEMINI_MODEL_ENV, DEFAULT_GEMINI_MODEL } from '../constants';
 
@@ -27,7 +28,7 @@ export interface GeminiLocalConfig {
  * Try to read Gemini config (auth token and model) from local Gemini CLI config
  * Gemini CLI stores tokens in ~/.gemini/ or uses gcloud Application Default Credentials
  */
-export function readGeminiLocalConfig(): GeminiLocalConfig {
+export async function readGeminiLocalConfig(): Promise<GeminiLocalConfig> {
   let token: string | null = null;
   let model: string | null = null;
   let googleCloudProject: string | null = null;
@@ -89,11 +90,11 @@ export function readGeminiLocalConfig(): GeminiLocalConfig {
   // Gemini CLI might use gcloud auth application-default print-access-token
   if (!token) {
     try {
-      const gcloudToken = execSync('gcloud auth application-default print-access-token', { 
-        encoding: 'utf8',
-        stdio: ['ignore', 'pipe', 'ignore'],
-        timeout: 5000
-      }).trim();
+      const execAsync = promisify(exec);
+      const { stdout } = await execAsync('gcloud auth application-default print-access-token', {
+        timeout: 5000,
+      });
+      const gcloudToken = stdout.trim();
       if (gcloudToken && gcloudToken.length > 0) {
         token = gcloudToken;
         logger.debug('[Gemini] Found token via gcloud Application Default Credentials');
@@ -238,8 +239,8 @@ export function saveGoogleCloudProjectToConfig(projectId: string, email?: string
  * 
  * @returns The initial model string
  */
-export function getInitialGeminiModel(): string {
-  const localConfig = readGeminiLocalConfig();
+export async function getInitialGeminiModel(): Promise<string> {
+  const localConfig = await readGeminiLocalConfig();
   return process.env[GEMINI_MODEL_ENV] || localConfig.model || DEFAULT_GEMINI_MODEL;
 }
 
