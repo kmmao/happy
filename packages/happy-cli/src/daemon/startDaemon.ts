@@ -1,7 +1,5 @@
 import fs from "fs/promises";
 import os from "os";
-import { execFile as execFileCb } from "node:child_process";
-import { promisify } from "node:util";
 import { randomUUID } from "node:crypto";
 
 import { ApiClient } from "@/api/api";
@@ -35,12 +33,7 @@ import {
 import { startDaemonControlServer } from "./controlServer";
 import { join } from "path";
 import { projectPath } from "@/projectPath";
-import {
-  getTmuxUtilities,
-  isTmuxAvailable,
-  _parseTmuxSessionIdentifier,
-  _formatTmuxSessionIdentifier,
-} from "@/utils/tmux";
+import { getTmuxUtilities, isTmuxAvailable } from "@/utils/tmux";
 import { expandEnvironmentVariables } from "@/utils/expandEnvVars";
 import { cleanupFixWorktree, getFixWorktreeInfo, getResearchRunInfo, forgetResearchRun } from "@/supervisor/handleSupervisorTrigger";
 import { AutomationStore } from "@/automation/AutomationStore";
@@ -64,7 +57,7 @@ import { buildLoopEventsFromWebhook, selectLoopsForWebhookBridge } from "@/autom
 import { suggestAgentLoops as generateAgentLoopSuggestions } from "@/automation/AgentLoopSuggestion";
 import { suggestAgentLoopsWithAI as generateAgentLoopSuggestionsWithAI } from "@/automation/AgentLoopSuggestionAI";
 import { TrackedSessionRegistry } from "./TrackedSessionRegistry";
-import type { AutomationAuditEvent, _AutomationJob } from "@/automation/types";
+import type { AutomationAuditEvent } from "@/automation/types";
 import { diagnoseAndReportFixStatus } from "@/supervisor/diagnoseFixStatus";
 import { detectTailscale, detectTailscaleServe } from "@/utils/tailscale";
 import { TunnelManager, TailscaleProvider, UpnpProvider, CaddyProvider } from "@/tunnel";
@@ -86,8 +79,11 @@ import {
   SESSION_WEBHOOK_TIMEOUT_MS,
   shellescape,
 } from "./startDaemonHelpers";
-
-const execFileAsync = promisify(execFileCb);
+import { recoverTrackedSessionsFromIndex as recoverTrackedSessionsFromIndexAction } from "./startDaemonSessionRecovery";
+import {
+  onHappySessionWebhook as onHappySessionWebhookAction,
+  onSessionHeartbeat as onSessionHeartbeatAction,
+} from "./startDaemonSessionWebhook";
 
 export { initialMachineMetadata };
 
@@ -429,22 +425,7 @@ export async function startDaemon(): Promise<void> {
       }
     };
 
-    // Helper functions
     const getCurrentChildren = () => Array.from(pidToTrackedSession.values());
-
-    const rememberTrackedSession = (session: TrackedSession) => {
-      // Schema v2 allows persisting spawn-only pending entries (daemon has
-      // spawned a child and knows its spawnId, but the child has not yet
-      // posted /session-started with its happySessionId). Require at least
-      // one stable identity.
-      if (!session.happySessionId && !session.spawnId) {
-        return;
-      }
-      void trackedSessionRegistry.rememberTrackedSession(session).catch((error) => {
-        const identity = session.happySessionId ?? `spawn:${session.spawnId}`;
-        logger.debug(`[DAEMON RUN] Failed to persist tracked session ${identity}: ${error}`);
-      });
-    };
 
     const forgetTrackedSession = (sessionId?: string) => {
       if (!sessionId) {
@@ -455,282 +436,37 @@ export async function startDaemon(): Promise<void> {
       });
     };
 
-    const resolveLikelyRecoverableHappyPid = async (persisted: { pid: number; startedAt?: number; tmuxSessionId?: string }): Promise<number | null> => {
-      if (process.platform === "win32") {
-        return null;
-      }
+    const recoverTrackedSessionsFromIndex = (): Promise<Set<string>> =>
+      recoverTrackedSessionsFromIndexAction({
+        pidToTrackedSession,
+        trackedSessionRegistry,
+        recordAutomationAuditEvent,
+      });
 
-      const candidatePids: number[] = [];
-      const pushCandidate = (pid?: number | null) => {
-        if (!pid || !Number.isFinite(pid) || pid <= 0 || candidatePids.includes(pid)) {
-          return;
-        }
-        candidatePids.push(pid);
-      };
-
-      pushCandidate(persisted.pid);
-
-      if (persisted.tmuxSessionId) {
-        const tmuxInfo = await getTmuxUtilities().getSessionInfoFromString(persisted.tmuxSessionId).catch(() => null);
-        if (!tmuxInfo) {
-          return null;
-        }
-
-        const panePid = await getTmuxUtilities().getPanePidFromSessionIdentifier(persisted.tmuxSessionId).catch(() => null);
-        pushCandidate(panePid);
-      }
-
-      for (const candidatePid of candidatePids) {
-        try {
-          process.kill(candidatePid, 0);
-        } catch {
-          continue;
-        }
-
-        try {
-          const { stdout } = await execFileAsync("ps", ["-p", String(candidatePid), "-o", "etimes=,command="]);
-          const line = stdout.trim();
-          const match = line.match(/^(\d+)\s+(.*)$/);
-          const elapsedSeconds = match ? Number(match[1]) : 0;
-          const command = match ? match[2].trim() : line;
-          if (!/(\bhappy\b|index\.mjs|dist_next\/index\.mjs|dist\/index\.mjs)/i.test(command)) {
-            continue;
-          }
-          if (persisted.startedAt) {
-            const minimumExpectedAgeSeconds = Math.max(0, Math.floor((Date.now() - persisted.startedAt) / 1000) - 300);
-            if (elapsedSeconds < minimumExpectedAgeSeconds) {
-              logger.debug(`[DAEMON RUN] PID ${candidatePid} looks newer than persisted session record; refusing reattach`);
-              continue;
-            }
-          }
-          return candidatePid;
-        } catch (error) {
-          logger.debug(`[DAEMON RUN] Failed to inspect PID ${candidatePid} for recovery: ${error}`);
-        }
-      }
-
-      return null;
-    };
-
-    const recoverTrackedSessionsFromIndex = async (): Promise<Set<string>> => {
-      const recoveredSessionIds = new Set<string>();
-      for (const persisted of trackedSessionRegistry.getAll()) {
-        const persistedSessionId = persisted.happySessionId;
-        if (pidToTrackedSession.has(persisted.pid)) {
-          if (persistedSessionId) {
-            recoveredSessionIds.add(persistedSessionId);
-          }
-          continue;
-        }
-
-        const recoveredPid = await resolveLikelyRecoverableHappyPid(persisted);
-        if (!recoveredPid) {
-          // For task sessions, do not force a terminal status during daemon restart.
-          // Scheduler recovery will requeue non-terminal jobs when possible, which
-          // avoids spurious "failed" caused only by CLI process restarts/upgrades.
-          if (persistedSessionId) {
-            await trackedSessionRegistry.forgetSession(persistedSessionId).catch(() => {});
-          } else if (persisted.spawnId) {
-            await trackedSessionRegistry.forgetSpawn(persisted.spawnId).catch(() => {});
-          }
-          continue;
-        }
-
-        // Pending entries (spawnId only, no session id yet) cannot be re-keyed
-        // into pidToTrackedSession with meaningful state — the child still
-        // owns the source of truth and will re-register via /session-started.
-        // Leave the persisted pending entry alone.
-        if (!persistedSessionId) {
-          continue;
-        }
-
-        const existingRecoveredSession = pidToTrackedSession.get(recoveredPid);
-        if (existingRecoveredSession?.happySessionId === persistedSessionId) {
-          recoveredSessionIds.add(persistedSessionId);
-          continue;
-        }
-
-        const recoveredAt = Date.now();
-        const trackedSession: TrackedSession = {
-          startedBy: persisted.startedBy,
-          pid: recoveredPid,
-          spawnId: persisted.spawnId,
-          happySessionId: persistedSessionId,
-          startedAt: persisted.startedAt,
-          lastActivityAt: persisted.lastActivityAt,
-          lastOutputAt: persisted.lastOutputAt,
-          lastHeartbeatAt: persisted.lastHeartbeatAt,
-          activity: persisted.activity,
-          automationContext: persisted.automationContext,
-          tmuxSessionId: persisted.tmuxSessionId,
-          directoryCreated: persisted.directoryCreated,
-          message: persisted.message,
-          recoveredFromIndex: true,
-          recoveredAt,
-        };
-        pidToTrackedSession.set(recoveredPid, trackedSession);
-        await trackedSessionRegistry.rememberTrackedSession(trackedSession).catch((error) => {
-          logger.debug(`[DAEMON RUN] Failed to refresh persisted tracked session ${persistedSessionId}: ${error}`);
-        });
-        recoveredSessionIds.add(persistedSessionId);
-        void recordAutomationAuditEvent({
-          kind: "session_reattached",
-          sessionId: persisted.happySessionId,
-          projectId: persisted.automationContext?.projectId,
-          runId: persisted.automationContext?.runId,
-          loopId: persisted.automationContext?.loopId,
-          trigger: persisted.automationContext?.trigger,
-          dedupeKey: persisted.automationContext?.dedupeKey,
-          status: "running",
-          message: `Reattached live session on PID ${recoveredPid}${persisted.pid !== recoveredPid ? ` (previous PID ${persisted.pid})` : ""}${persisted.tmuxSessionId ? ` (${persisted.tmuxSessionId})` : ""}`,
-        });
-        logger.debug(
-          `[DAEMON RUN] Reattached persisted session ${persisted.happySessionId} on PID ${recoveredPid}${persisted.pid !== recoveredPid ? ` (previous PID ${persisted.pid})` : ""}`,
-        );
-      }
-      return recoveredSessionIds;
-    };
-
-    // Handle webhook from happy session reporting itself
+    // Handle webhook from happy session reporting itself — delegates to extracted module.
     const onHappySessionWebhook = (
       sessionId: string,
       sessionMetadata: Metadata,
       reportedSpawnId?: string,
-    ) => {
-      logger.debugLargeJson(`[DAEMON RUN] Session reported`, sessionMetadata);
-
-      const pid = sessionMetadata.hostPid;
-      if (!pid) {
-        logger.debug(
-          `[DAEMON RUN] Session webhook missing hostPid for sessionId: ${sessionId}`,
-        );
-        return;
-      }
-
-      logger.debug(
-        `[DAEMON RUN] Session webhook: ${sessionId}, PID: ${pid}, started by: ${sessionMetadata.startedBy || "unknown"}${reportedSpawnId ? `, spawnId: ${reportedSpawnId}` : ""}`,
-      );
-      logger.debug(
-        `[DAEMON RUN] Current tracked sessions before webhook: ${Array.from(pidToTrackedSession.keys()).join(", ")}`,
+    ) =>
+      onHappySessionWebhookAction(
+        { pidToTrackedSession, pidToAwaiter, trackedSessionRegistry },
+        sessionId,
+        sessionMetadata,
+        reportedSpawnId,
       );
 
-      // Primary match: in-memory pid map (normal daemon-spawn → webhook path).
-      let existingSession = pidToTrackedSession.get(pid);
-
-      // Fallback match: daemon crashed between spawn and /session-started, so
-      // the in-memory map is empty but the pending entry persisted in
-      // tracked-sessions.json keyed by spawnId. Reconstruct the TrackedSession
-      // so automationContext / startedAt / directoryCreated survive the
-      // crash-and-restart, and this child isn't mislabeled as externally-started.
-      if (!existingSession && reportedSpawnId) {
-        const persisted = trackedSessionRegistry.getBySpawnId(reportedSpawnId);
-        if (persisted) {
-          existingSession = {
-            startedBy: persisted.startedBy,
-            pid,
-            spawnId: persisted.spawnId,
-            startedAt: persisted.startedAt,
-            lastActivityAt: persisted.lastActivityAt,
-            lastOutputAt: persisted.lastOutputAt,
-            automationContext: persisted.automationContext,
-            tmuxSessionId: persisted.tmuxSessionId,
-            directoryCreated: persisted.directoryCreated,
-            message: persisted.message,
-            recoveredFromIndex: true,
-            recoveredAt: Date.now(),
-          };
-          pidToTrackedSession.set(pid, existingSession);
-          logger.debug(
-            `[DAEMON RUN] Recovered pending spawn ${reportedSpawnId} from registry on webhook (pid ${pid})`,
-          );
-        }
-      }
-
-      if (existingSession && existingSession.startedBy === "daemon") {
-        // Defensive: child should echo back the exact spawnId we injected via
-        // HAPPY_SPAWN_ID env var. Mismatch suggests env propagation broke
-        // (shell wrapper clobbered env, process re-exec'd with fresh env, etc.).
-        // Keep daemon's authoritative spawnId and warn — do not trust the child.
-        if (
-          reportedSpawnId &&
-          existingSession.spawnId &&
-          reportedSpawnId !== existingSession.spawnId
-        ) {
-          logger.debug(
-            `[DAEMON RUN] Spawn id mismatch for PID ${pid}: daemon=${existingSession.spawnId}, child reported=${reportedSpawnId}. Keeping daemon's spawnId.`,
-          );
-        } else if (reportedSpawnId && !existingSession.spawnId) {
-          // Old daemon restart + new child — backfill spawnId from webhook.
-          existingSession.spawnId = reportedSpawnId;
-        }
-
-        // Update daemon-spawned session with reported data
-        existingSession.happySessionId = sessionId;
-        existingSession.happySessionMetadataFromLocalWebhook = sessionMetadata;
-        existingSession.lastActivityAt = Date.now();
-        existingSession.recoveredFromIndex = false;
-        existingSession.recoveredAt = undefined;
-        logger.debug(
-          `[DAEMON RUN] Updated daemon-spawned session ${sessionId} with metadata`,
-        );
-
-        // Resolve any awaiter for this PID
-        const awaiter = pidToAwaiter.get(pid);
-        if (awaiter) {
-          pidToAwaiter.delete(pid);
-          awaiter(existingSession);
-          logger.debug(`[DAEMON RUN] Resolved session awaiter for PID ${pid}`);
-        }
-        rememberTrackedSession(existingSession);
-      } else if (!existingSession) {
-        // New session started externally. Rare to get a spawnId here — would
-        // only happen if HAPPY_SPAWN_ID was set outside the daemon's own spawn
-        // path (e.g. user-set manually). Record it anyway for consistency.
-        const trackedSession: TrackedSession = {
-          startedBy: "happy directly - likely by user from terminal",
-          spawnId: reportedSpawnId,
-          happySessionId: sessionId,
-          happySessionMetadataFromLocalWebhook: sessionMetadata,
-          pid,
-          startedAt: Date.now(),
-          lastActivityAt: Date.now(),
-        };
-        pidToTrackedSession.set(pid, trackedSession);
-        logger.debug(
-          `[DAEMON RUN] Registered externally-started session ${sessionId}`,
-        );
-        rememberTrackedSession(trackedSession);
-      }
-    };
-
-    // Periodic liveness + activity signal from child — stronger than
-    // kill(pid, 0) because a wedged event loop cannot post.
+    // Periodic liveness + activity signal from child — delegates to extracted module.
     const onSessionHeartbeat = (params: {
       pid: number;
       happySessionId?: string;
       spawnId?: string;
       activity?: "idle" | "thinking" | "executing" | "blocked";
-    }): { known: boolean; keepAlive: boolean } => {
-      const existing = pidToTrackedSession.get(params.pid);
-      if (!existing) {
-        logger.debug(
-          `[DAEMON RUN] Heartbeat from unknown PID ${params.pid}${params.spawnId ? ` (spawnId=${params.spawnId})` : ""}`,
-        );
-        return { known: false, keepAlive: true };
-      }
-      const now = Date.now();
-      existing.lastHeartbeatAt = now;
-      existing.lastActivityAt = now;
-      if (params.activity) {
-        existing.activity = params.activity;
-      }
-      // Daemon asked for termination via diagnostics kill; signal the child to
-      // exit gracefully. kill(pid, SIGTERM) still runs independently, this is
-      // just a cooperative nudge.
-      const keepAlive = !existing.terminationRequestedAt;
-      void rememberTrackedSession(existing);
-      return { known: true, keepAlive };
-    };
+    }): { known: boolean; keepAlive: boolean } =>
+      onSessionHeartbeatAction(
+        { pidToTrackedSession, trackedSessionRegistry },
+        params,
+      );
 
     // Control port forwarded to spawned child sessions as HAPPY_INTER_AGENT_URL.
     // Set after the control server starts; captured by the spawnSession closure.
@@ -748,7 +484,6 @@ export async function startDaemon(): Promise<void> {
       const {
         directory,
         sessionId,
-
         approvedNewDirectoryCreation = true,
         happySessionId,
         forkSourceId,
@@ -2056,7 +1791,7 @@ export async function startDaemon(): Promise<void> {
     // Detect all tunnel providers
     const tunnelManager = new TunnelManager([new TailscaleProvider(), new UpnpProvider(), new CaddyProvider()]);
     const tunnelState = await tunnelManager.detectAll();
-    logger.debug(`[DAEMON RUN] Tunnels: ${tunnelState.providers.length} providers, ${tunnelState.providers.reduce((n, p) => n + p.entries.length, 0)} entries`);
+    logger.debug(`[DAEMON RUN] Tunnels: ${tunnelState.providers.length} providers, ${tunnelState.providers.reduce((n: number, p: { entries: unknown[] }) => n + p.entries.length, 0)} entries`);
     const cliInstall = await detectCliInstallInfo();
     logger.debug(`[DAEMON RUN] CLI install source: ${cliInstall.source}, self-upgrade: ${cliInstall.canSelfUpgrade}`);
 

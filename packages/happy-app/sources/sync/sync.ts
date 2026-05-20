@@ -9,15 +9,13 @@ import { storage, registerPreferencesSyncCallback, registerSessionEvictionCallba
 import { isSessionRunning } from "@/utils/sessionUtils";
 import { throwIfNotOk } from "@/utils/http";
 import {
-  ApiEphemeralUpdateSchema,
   ApiMessage,
   ApiUpdateContainerSchema,
 } from "./apiTypes";
 import type { ApiEphemeralActivityUpdate } from "./apiTypes";
-import { Session, Machine } from "./storageTypes";
+import { Session } from "./storageTypes";
 import { InvalidateSync } from "@/utils/sync";
 import { ActivityUpdateAccumulator } from "./reducer/activityUpdateAccumulator";
-import { resolveActivityThinking } from "./reducer/resolveActivityThinking";
 import { randomUUID } from "expo-crypto";
 import * as Notifications from "expo-notifications";
 import { registerPushToken } from "./apiPush";
@@ -26,7 +24,6 @@ import { isRunningOnMac } from "@/utils/platform";
 import {
   NormalizedMessage,
   normalizeRawMessage,
-  collectSequencedHistorySignals,
   RawRecord,
 } from "./typesRaw";
 import {
@@ -66,8 +63,6 @@ import {
 import { getCurrentLanguage, t } from "@/text";
 import { issueSessionStore } from "./issueSessionStore";
 import {
-  handleWebhookIssueLinked as issueHandleWebhookIssueLinked,
-  handleWebhookPRMerged as issueHandleWebhookPRMerged,
   markFailedIssueSessionsForEndedSessions as issueMarkFailed,
   checkProcessingPRs as issueCheckProcessingPRs,
   recoverMissingPRUrls as issueRecoverMissingPRUrls,
@@ -107,10 +102,8 @@ import { log } from "@/log";
 import { gitStatusSync } from "./gitStatusSync";
 import { projectManager } from "./projectManager";
 import { AsyncLock } from "@/utils/lock";
-import { NonRetryableError } from "@/utils/time";
 import { voiceHooks } from "@/realtime/hooks/voiceHooks";
 import { autoOptionSendService } from "@/sync/autoOptionSendService";
-import { Message } from "./typesMessage";
 import { EncryptionCache } from "./encryption/encryptionCache";
 import { systemPrompt } from "./prompt/systemPrompt";
 import type { DecryptedArtifact } from "./artifactTypes";
@@ -119,14 +112,9 @@ import { fetchFeed } from "./apiFeed";
 import type { FeedItem } from "./feedTypes";
 import { UserProfile } from "./friendTypes";
 import { resolveMessageModeMeta } from "./messageMeta";
-import { getSessionUsageSummary } from "./apiUsage";
-import { getLatestUserRequestPreview } from "@/utils/sessionUtils";
 import {
   initMessageCache,
   loadMessageCache,
-  saveMessageCache,
-  deleteMessageCache,
-  deleteHistoryComplete,
 } from "./messageCache";
 import { fetchAccountProfiles } from "./apiAccountProfiles";
 import { mergeAccountProfiles } from "@/utils/mergeAccountProfiles";
@@ -138,12 +126,22 @@ import {
 } from "./apiProjects";
 import { resolveFetchedSessionRpcReady } from "./fetchSessionRpcReady";
 import { recoverSessionMetadataAfterDecrypt } from "./sessionMetadataRecovery";
-import { resolveMessageCursorAdvance } from "./messageCursor";
+import { fetchMachinesAction } from "./syncMachines";
 import {
-  resolveMessageHistoryFetchStrategy,
-  shouldApplyMessagesImmediately,
-  shouldFetchNewestPageFirst,
-} from "./messageFetchStrategy";
+  handleEphemeralUpdateAction,
+  flushActivityUpdatesAction,
+  type EphemeralHandlerContext,
+} from "./syncEphemeralHandlers";
+import {
+  fetchMessagesAction,
+  applyMessagesAction,
+  scheduleCacheWriteAction,
+  flushPendingCacheWritesAction,
+  cancelPendingCacheWritesAction,
+  decryptAndNormalizeBatchAction,
+  cleanupSessionLocallyCore,
+  type MessageFetchContext,
+} from "./syncMessageFetch";
 
 type V3GetSessionMessagesResponse = {
   messages: ApiMessage[];
@@ -625,35 +623,23 @@ class Sync {
 
   /**
    * Clean up all local state for a session that no longer exists on the server (404).
-   * Removes messagesSync from the map to prevent future invalidate() calls,
-   * but does NOT call stop() on messagesSync since we are inside its own execution.
-   * Does NOT delete the lock — we are still inside lock.inLock().
-   * Adds sessionId to deleted404Sessions to prevent lazy re-creation.
+   * Delegates to cleanupSessionLocallyCore for shared per-session state, then handles
+   * lastVisibleSessionId which is specific to the Sync class.
    */
   private cleanupSessionLocally(sessionId: string) {
-    this.deleted404Sessions.add(sessionId);
-    storage.getState().deleteSession(sessionId);
-    this.encryption.removeSessionEncryption(sessionId);
-    projectManager.removeSession(sessionId);
-    gitStatusSync.clearForSession(sessionId);
-    // Remove from map so future invalidate() calls are no-ops,
-    // but don't call stop() on messagesSync — we are inside this sync's callback.
-    this.messagesSync.delete(sessionId);
-    // sendSync is a separate object — safe to stop() from here.
-    const sndSync = this.sendSync.get(sessionId);
-    if (sndSync) {
-      sndSync.stop();
-      this.sendSync.delete(sessionId);
-    }
-    this.pendingOutbox.delete(sessionId);
-    this.sessionLastSeq.delete(sessionId);
-    deleteLastSeq(sessionId);
-    deleteBackfillBoundary(sessionId);
-    deleteMessageCache(sessionId);
-    deleteHistoryComplete(sessionId);
-    // Do NOT delete sessionMessageLocks — we are still inside lock.inLock().
-    this.sessionMessageQueue.delete(sessionId);
-    this.sessionQueueProcessing.delete(sessionId);
+    cleanupSessionLocallyCore(
+      {
+        deleted404Sessions: this.deleted404Sessions,
+        encryption: this.encryption,
+        messagesSync: this.messagesSync,
+        sendSync: this.sendSync,
+        pendingOutbox: this.pendingOutbox,
+        sessionLastSeq: this.sessionLastSeq,
+        sessionMessageQueue: this.sessionMessageQueue,
+        sessionQueueProcessing: this.sessionQueueProcessing,
+      },
+      sessionId,
+    );
     if (this.lastVisibleSessionId === sessionId) {
       this.lastVisibleSessionId = null;
     }
@@ -1577,154 +1563,11 @@ class Sync {
 
   private fetchMachines = async () => {
     if (!this.credentials) return;
-
-    log.log("📊 Sync: Fetching machines...");
-    const API_ENDPOINT = getServerUrl();
-
-    type MachineItem = {
-      id: string;
-      metadata: string;
-      metadataVersion: number;
-      daemonState?: string | null;
-      daemonStateVersion?: number;
-      dataEncryptionKey?: string | null;
-      seq: number;
-      active: boolean;
-      activeAt: number;
-      createdAt: number;
-      updatedAt: number;
-    };
-
-    const allMachines: MachineItem[] = [];
-    let cursor: string | undefined;
-
-    do {
-      const params = new URLSearchParams({ limit: '100' });
-      if (cursor) params.set('cursor', cursor);
-
-      const response = await fetch(`${API_ENDPOINT}/v1/machines?${params}`, {
-        headers: {
-          Authorization: `Bearer ${this.credentials.token}`,
-          "Content-Type": "application/json",
-        },
-      });
-
-      if (!response.ok) {
-        log.error(`Failed to fetch machines: ${response.status}`);
-        return;
-      }
-
-      const data = await response.json() as { machines: MachineItem[]; nextCursor: string | null };
-      allMachines.push(...data.machines);
-      cursor = data.nextCursor ?? undefined;
-    } while (cursor);
-
-    log.log(`📊 Sync: Fetched ${allMachines.length} machines from server`);
-    const machines = allMachines as Array<{
-      id: string;
-      metadata: string;
-      metadataVersion: number;
-      daemonState?: string | null;
-      daemonStateVersion?: number;
-      dataEncryptionKey?: string | null;
-      seq: number;
-      active: boolean;
-      activeAt: number;
-      createdAt: number;
-      updatedAt: number;
-    }>;
-
-    // First, collect and decrypt encryption keys for all machines
-    const machineKeysMap = new Map<string, Uint8Array | null>();
-    for (const machine of machines) {
-      if (machine.dataEncryptionKey) {
-        const decryptedKey = await this.encryption.decryptEncryptionKey(
-          machine.dataEncryptionKey,
-        );
-        if (!decryptedKey) {
-          log.error(
-            `Failed to decrypt data encryption key for machine ${machine.id}`,
-          );
-          continue;
-        }
-        machineKeysMap.set(machine.id, decryptedKey);
-        this.machineDataKeys.set(machine.id, decryptedKey);
-      } else {
-        machineKeysMap.set(machine.id, null);
-      }
-    }
-
-    // Initialize machine encryptions
-    await this.encryption.initializeMachines(machineKeysMap);
-
-    // Process all machines first, then update state once
-    const decryptedMachines: Machine[] = [];
-
-    for (const machine of machines) {
-      // Get machine-specific encryption (might exist from previous initialization)
-      const machineEncryption = this.encryption.getMachineEncryption(
-        machine.id,
-      );
-      if (!machineEncryption) {
-        log.error(
-          `Machine encryption not found for ${machine.id} - this should never happen`,
-        );
-        continue;
-      }
-
-      try {
-        // Use machine-specific encryption (which handles fallback internally)
-        const metadata = machine.metadata
-          ? await machineEncryption.decryptMetadata(
-              machine.metadataVersion,
-              machine.metadata,
-            )
-          : null;
-
-        const daemonState = machine.daemonState
-          ? await machineEncryption.decryptDaemonState(
-              machine.daemonStateVersion || 0,
-              machine.daemonState,
-            )
-          : null;
-
-        decryptedMachines.push({
-          id: machine.id,
-          seq: machine.seq,
-          createdAt: machine.createdAt,
-          updatedAt: machine.updatedAt,
-          active: machine.active,
-          activeAt: machine.activeAt,
-          rpcReady: false,
-          metadata,
-          metadataVersion: machine.metadataVersion,
-          daemonState,
-          daemonStateVersion: machine.daemonStateVersion || 0,
-        });
-      } catch (error) {
-        log.error(`Failed to decrypt machine ${machine.id}:`, error);
-        // Still add the machine with null metadata
-        decryptedMachines.push({
-          id: machine.id,
-          seq: machine.seq,
-          createdAt: machine.createdAt,
-          updatedAt: machine.updatedAt,
-          active: machine.active,
-          activeAt: machine.activeAt,
-          rpcReady: false,
-          metadata: null,
-          metadataVersion: machine.metadataVersion,
-          daemonState: null,
-          daemonStateVersion: 0,
-        });
-      }
-    }
-
-    // Replace entire machine state with fetched machines
-    storage.getState().applyMachines(decryptedMachines, true);
-    log.log(
-      `🖥️ fetchMachines completed - processed ${decryptedMachines.length} machines`,
-    );
+    await fetchMachinesAction({
+      credentials: this.credentials,
+      encryption: this.encryption,
+      machineDataKeys: this.machineDataKeys,
+    });
   };
 
   private fetchFriends = async () => {
@@ -2202,245 +2045,32 @@ class Sync {
     }
   };
 
+  private get messageFetchCtx(): MessageFetchContext {
+    return {
+      encryption: this.encryption,
+      sessionLastSeq: this.sessionLastSeq,
+      sessionMessageLocks: this.sessionMessageLocks,
+      processedWebSocketMessageIds: this.processedWebSocketMessageIds,
+      sessionOldestSeq: this.sessionOldestSeq,
+      backfilledSessions: this.backfilledSessions,
+      cacheWriteTimers: this.cacheWriteTimers,
+      credentials: this.credentials,
+      deleted404Sessions: this.deleted404Sessions,
+      messagesSync: this.messagesSync,
+      sendSync: this.sendSync,
+      pendingOutbox: this.pendingOutbox,
+      sessionMessageQueue: this.sessionMessageQueue,
+      sessionQueueProcessing: this.sessionQueueProcessing,
+      cleanupSession: this.cleanupSessionLocally.bind(this),
+      applySessions: (sessions) =>
+        this.applySessions(
+          sessions as Parameters<typeof this.applySessions>[0],
+        ),
+    };
+  }
+
   private fetchMessages = async (sessionId: string) => {
-    log.log(
-      `💬 fetchMessages starting for session ${sessionId} - acquiring lock`,
-    );
-    const lock = this.getSessionMessageLock(sessionId);
-    await lock.inLock(async () => {
-      const encryption = this.encryption.getSessionEncryption(sessionId);
-      if (!encryption) {
-        log.log(
-          `💬 fetchMessages: Session encryption not ready for ${sessionId}, will retry`,
-        );
-        throw new Error(`Session encryption not ready for ${sessionId}`);
-      }
-
-      const initialAfterSeq = this.sessionLastSeq.get(sessionId) ?? 0;
-      const fetchStrategy = resolveMessageHistoryFetchStrategy({
-        initialAfterSeq,
-      });
-      const shouldApplyImmediately = shouldApplyMessagesImmediately(fetchStrategy);
-      let afterSeq = initialAfterSeq;
-      let hasMore = true;
-      let totalNormalized = 0;
-      let totalProcessedMessages = 0;
-      let isFirstBatch = true;
-      let serverTotalCount: number | undefined;
-      let blockedByUnprocessedMessage = false;
-      let pendingCursorSeq: number | null = null;
-
-      const historySignalEntries: Array<{
-        seq: number;
-        content: RawRecord | null | undefined;
-      }> = [];
-      const pendingNormalizedMessages: NormalizedMessage[] = [];
-      const applyBatch = (messages: NormalizedMessage[]) => {
-        if (messages.length === 0) {
-          return;
-        }
-        if (shouldApplyImmediately) {
-          this.applyMessages(sessionId, messages);
-        } else {
-          pendingNormalizedMessages.push(...messages);
-        }
-      };
-
-      if (shouldFetchNewestPageFirst(fetchStrategy)) {
-        const newestResponse = await apiSocket.request(
-          `/v3/sessions/${sessionId}/messages?before_seq=2147483647&limit=2000`,
-        );
-        if (!newestResponse.ok && newestResponse.status === 404) {
-          log.log(
-            `💬 fetchMessages: session ${sessionId} not found (404), cleaning up`,
-          );
-          this.cleanupSessionLocally(sessionId);
-          throw new NonRetryableError(`Session ${sessionId} not found`);
-        }
-        if (!newestResponse.ok) {
-          throw new Error(
-            `Failed to fetch messages for ${sessionId}: ${newestResponse.status}`,
-          );
-        }
-        const newestData =
-          (await newestResponse.json()) as V3GetSessionMessagesResponse;
-        const newestMessages = Array.isArray(newestData.messages)
-          ? newestData.messages
-          : [];
-        if (newestMessages.length > 0) {
-          const decryptResult = await this.decryptAndNormalizeBatch(
-            encryption,
-            newestMessages,
-            sessionId,
-          );
-          historySignalEntries.push(...decryptResult.sequencedContents);
-          totalNormalized += decryptResult.normalized.length;
-          totalProcessedMessages += decryptResult.processedSeqs.length;
-          applyBatch(decryptResult.normalized);
-
-          const cursorAdvance = resolveMessageCursorAdvance({
-            afterSeq,
-            rawSeqs: newestMessages.map((message) => message.seq),
-            processedSeqs: decryptResult.processedSeqs,
-          });
-          if (cursorAdvance.cursorSeq !== null) {
-            if (shouldApplyImmediately) {
-              this.sessionLastSeq.set(sessionId, cursorAdvance.cursorSeq);
-              saveLastSeq(sessionId, cursorAdvance.cursorSeq);
-            } else {
-              pendingCursorSeq = cursorAdvance.cursorSeq;
-            }
-          }
-          if (cursorAdvance.blockedByUnprocessedSeq) {
-            blockedByUnprocessedMessage = true;
-          }
-
-          const minSeq = Math.min(...newestMessages.map((m) => m.seq));
-          this.sessionOldestSeq.set(sessionId, minSeq);
-          storage.getState().setHasServerOlderMessages(sessionId, newestData.hasMore);
-        } else {
-          storage.getState().setHasServerOlderMessages(sessionId, false);
-        }
-        hasMore = false;
-        isFirstBatch = false;
-      }
-
-      while (hasMore) {
-        const response = await apiSocket.request(
-          `/v3/sessions/${sessionId}/messages?after_seq=${afterSeq}&limit=2000`,
-        );
-        if (!response.ok) {
-          if (response.status === 404) {
-            log.log(
-              `💬 fetchMessages: session ${sessionId} not found (404), cleaning up`,
-            );
-            this.cleanupSessionLocally(sessionId);
-            throw new NonRetryableError(`Session ${sessionId} not found`);
-          }
-          throw new Error(
-            `Failed to fetch messages for ${sessionId}: ${response.status}`,
-          );
-        }
-        const data = (await response.json()) as V3GetSessionMessagesResponse;
-        const messages = Array.isArray(data.messages) ? data.messages : [];
-        const decryptResult = await this.decryptAndNormalizeBatch(
-          encryption,
-          messages,
-          sessionId,
-        );
-        historySignalEntries.push(...decryptResult.sequencedContents);
-        totalNormalized += decryptResult.normalized.length;
-        totalProcessedMessages += decryptResult.processedSeqs.length;
-        applyBatch(decryptResult.normalized);
-        if (isFirstBatch && shouldApplyImmediately) {
-          storage.getState().applyMessagesLoaded(sessionId);
-          isFirstBatch = false;
-        }
-
-        const cursorAdvance = resolveMessageCursorAdvance({
-          afterSeq,
-          rawSeqs: messages.map((message) => message.seq),
-          processedSeqs: decryptResult.processedSeqs,
-        });
-        if (cursorAdvance.cursorSeq !== null) {
-          this.sessionLastSeq.set(sessionId, cursorAdvance.cursorSeq);
-          saveLastSeq(sessionId, cursorAdvance.cursorSeq);
-        }
-
-        hasMore = !!data.hasMore;
-        if (data.totalCount !== undefined) {
-          serverTotalCount = data.totalCount;
-        }
-        if (serverTotalCount !== undefined && serverTotalCount > 0) {
-          storage.getState().setSessionLoadingProgress(sessionId, {
-            loaded: totalProcessedMessages,
-            total: serverTotalCount,
-          });
-        }
-        if (cursorAdvance.blockedByUnprocessedSeq) {
-          blockedByUnprocessedMessage = true;
-          log.warn(
-            `⚠️ fetchMessages: stopped at seq ${cursorAdvance.nextAfterSeq} for ${sessionId} because a message could not be processed`,
-          );
-          hasMore = false;
-        } else if (hasMore && cursorAdvance.stalled) {
-          log.log(
-            `💬 fetchMessages: pagination stalled at seq ${afterSeq} for ${sessionId}, advancing by 1`,
-          );
-        }
-        afterSeq = cursorAdvance.nextAfterSeq;
-      }
-
-      if (!shouldApplyImmediately && pendingNormalizedMessages.length > 0) {
-        this.applyMessages(sessionId, pendingNormalizedMessages);
-      }
-      if (!shouldApplyImmediately && pendingCursorSeq !== null) {
-        this.sessionLastSeq.set(sessionId, pendingCursorSeq);
-        saveLastSeq(sessionId, pendingCursorSeq);
-      }
-
-      // Surface side-channel session signals after all messages are merged in seq order.
-      const finalHistorySignals = collectSequencedHistorySignals(historySignalEntries);
-      storage.getState().setPromptSuggestion(sessionId, finalHistorySignals.promptSuggestion);
-      storage.getState().setNeedsContinue(sessionId, finalHistorySignals.needsContinue);
-      if (finalHistorySignals.sdkSessionState !== null) {
-        const currentSession = storage.getState().sessions[sessionId];
-        if (currentSession) {
-          this.applySessions([
-            {
-              ...currentSession,
-              sdkSessionState: finalHistorySignals.sdkSessionState,
-            },
-          ]);
-        }
-      }
-
-      storage.getState().applyMessagesLoaded(sessionId);
-      // If this was a full history fetch (afterSeq started at 0), mark the
-      // session as backfilled so subsequent opens within this app session use
-      // incremental sync only (avoids redundant re-backfill within same session).
-      if (initialAfterSeq === 0 && !blockedByUnprocessedMessage) {
-        this.backfilledSessions.add(sessionId);
-      }
-      log.log(
-        `💬 fetchMessages completed for session ${sessionId} - processed ${totalNormalized} messages`,
-      );
-
-      if (
-        initialAfterSeq === 0 &&
-        serverTotalCount !== undefined &&
-        totalProcessedMessages < serverTotalCount
-      ) {
-        log.warn(
-          `⚠️ fetchMessages: incomplete history for ${sessionId} — processed ${totalProcessedMessages}/${serverTotalCount} messages (${serverTotalCount - totalProcessedMessages} missing, likely decrypt failures)`,
-        );
-      }
-
-      // Fetch cumulative usage baseline from server (non-blocking)
-      if (this.credentials) {
-        getSessionUsageSummary(this.credentials, sessionId)
-          .then((summary) => {
-            if (summary.reportCount > 0) {
-              storage.getState().applySessionUsageBaseline(sessionId, {
-                totalInputTokens: summary.totalInputTokens,
-                totalOutputTokens: summary.totalOutputTokens,
-                lastInputTokens: summary.lastInputTokens,
-                lastOutputTokens: summary.lastOutputTokens,
-                lastCacheCreation: summary.lastCacheCreation,
-                lastCacheRead: summary.lastCacheRead,
-              });
-              log.log(
-                `💬 Applied usage baseline for ${sessionId}: ${summary.totalInputTokens} in / ${summary.totalOutputTokens} out`,
-              );
-            }
-          })
-          .catch((error) => {
-            log.log(
-              `💬 Failed to fetch usage baseline for ${sessionId}: ${error}`,
-            );
-          });
-      }
-    });
+    await fetchMessagesAction(this.messageFetchCtx, sessionId);
   };
 
   private registerPushToken = async () => {
@@ -2617,411 +2247,54 @@ class Sync {
   private flushActivityUpdates = (
     updates: Map<string, ApiEphemeralActivityUpdate>,
   ) => {
-    // log.log(`🔄 Flushing activity updates for ${updates.size} sessions - acquiring lock`);
-
-    const sessions: Session[] = [];
-
-    for (const [sessionId, update] of updates) {
-      const session = storage.getState().sessions[sessionId];
-      if (session) {
-        // Ephemeral activity updates carry the CLI's real-time thinking state.
-        // Lifecycle events (turn-end via result messages) provide authoritative
-        // turn boundaries and are applied separately via applySessions in handleUpdate.
-        //
-        // Guard: if a lifecycle event set thinkingAt more recently than this
-        // ephemeral heartbeat's activeAt, keep the lifecycle thinking state
-        // to avoid a stale heartbeat flashing the status back to "online".
-        const resolved = resolveActivityThinking(
-          { thinking: session.thinking, thinkingAt: session.thinkingAt },
-          { active: update.active, activeAt: update.activeAt, thinking: update.thinking },
-        );
-        sessions.push({
-          ...session,
-          active: update.active,
-          activeAt: update.activeAt,
-          thinking: resolved.thinking,
-          thinkingAt: resolved.thinkingAt,
-          apiRetry: update.apiRetry
-            ? {
-                attempt: update.apiRetry.attempt,
-                maxRetries: update.apiRetry.maxRetries,
-                retryDelayMs: update.apiRetry.retryDelayMs,
-                errorStatus: update.apiRetry.errorStatus,
-                timestamp: Date.now(),
-              }
-            : null,
-        });
-      }
-    }
-
-    if (sessions.length > 0) {
-      this.applySessions(sessions);
-    }
+    flushActivityUpdatesAction(this.applySessions.bind(this), updates);
   };
+
+  private get ephemeralHandlerCtx(): EphemeralHandlerContext {
+    return {
+      activityAccumulator: this.activityAccumulator,
+      applySessions: this.applySessions.bind(this),
+      supervisorStatusListeners: this.supervisorStatusListeners,
+      researchConfigListeners: this.researchConfigListeners,
+      taskLogListeners: this.taskLogListeners,
+      taskStatusListeners: this.taskStatusListeners,
+      supervisorLoopStatusListeners: this.supervisorLoopStatusListeners,
+      inboxNewItemListeners: this.inboxNewItemListeners,
+      inboxUnreadCountListeners: this.inboxUnreadCountListeners,
+      sessionEventCreatedListeners: this.sessionEventCreatedListeners,
+      interAgentMessageListeners: this.interAgentMessageListeners,
+    };
+  }
 
   private handleEphemeralUpdate = (update: unknown) => {
-    const validatedUpdate = ApiEphemeralUpdateSchema.safeParse(update);
-    if (!validatedUpdate.success) {
-      log.log(`Invalid ephemeral update received: ${validatedUpdate.error}`);
-      return;
-    }
-    const updateData = validatedUpdate.data;
-
-    // Process activity updates through smart debounce accumulator
-    if (updateData.type === "activity") {
-      this.activityAccumulator.addUpdate(updateData);
-    }
-
-    // Handle machine activity updates
-    if (updateData.type === "machine-activity") {
-      // Update machine's active status and lastActiveAt
-      const machine = storage.getState().machines[updateData.id];
-      if (machine) {
-        const updatedMachine: Machine = {
-          ...machine,
-          active: updateData.active,
-          activeAt: updateData.activeAt,
-        };
-        storage.getState().applyMachines([updatedMachine]);
-      }
-    }
-
-    // Handle RPC ready status updates
-    if (updateData.type === "rpc-ready") {
-      if (updateData.scope === "machine") {
-        const machine = storage.getState().machines[updateData.id];
-        if (machine) {
-          storage.getState().applyMachines([{
-            ...machine,
-            rpcReady: updateData.ready,
-          }]);
-        }
-      } else if (updateData.scope === "session") {
-        const session = storage.getState().sessions[updateData.id];
-        if (session) {
-          this.applySessions([{
-            ...session,
-            rpcReady: updateData.ready,
-          }]);
-        }
-      }
-    }
-
-    // Handle usage updates
-    if (updateData.type === "usage") {
-      const session = storage.getState().sessions[updateData.id];
-      if (session) {
-        const prevUsage = session.latestUsage;
-        const updatedSession: Session = {
-          ...session,
-          latestUsage: {
-            inputTokens: updateData.tokens.input,
-            outputTokens: updateData.tokens.output,
-            cacheCreation: updateData.tokens.cache_creation,
-            cacheRead: updateData.tokens.cache_read,
-            contextSize:
-              updateData.tokens.input +
-              updateData.tokens.cache_creation +
-              updateData.tokens.cache_read,
-            totalInputTokens:
-              (prevUsage?.totalInputTokens ?? 0) +
-              updateData.tokens.input +
-              updateData.tokens.cache_creation +
-              updateData.tokens.cache_read,
-            totalOutputTokens:
-              (prevUsage?.totalOutputTokens ?? 0) + updateData.tokens.output,
-            timestamp: updateData.timestamp,
-          },
-        };
-        this.applySessions([updatedSession]);
-      }
-    }
-
-    // daemon-status ephemeral updates are deprecated, machine status is handled via machine-activity
-
-    // Handle webhook-issue-linked: create IssueSessionLink so the session list
-    // shows issue info for webhook-triggered sessions (same as app-initiated ones).
-    if (updateData.type === "webhook-issue-linked") {
-      void this.handleWebhookIssueLinked(updateData);
-    }
-
-    // Handle webhook-pr-merged: archive session and mark IssueSessionLink as completed.
-    if (updateData.type === "webhook-pr-merged") {
-      void this.handleWebhookPRMerged(updateData);
-    }
-
-    // Handle supervisor-status: notify listeners for real-time Health Tab updates.
-    if (updateData.type === "supervisor-status") {
-      const event = {
-        projectId: updateData.projectId,
-        status: updateData.status,
-        runId: updateData.runId,
-        currentDimension: updateData.currentDimension,
-        dimensionIndex: updateData.dimensionIndex,
-        totalDimensions: updateData.totalDimensions,
-      };
-      for (const listener of this.supervisorStatusListeners) {
-        listener(event);
-      }
-    }
-
-    // Handle knowledge-count: update session knowledge badge in header
-    // and bump changesRevision so useSessionKnowledge always re-fetches.
-    if (updateData.type === "knowledge-count") {
-      storage.setState((prev) => ({
-        sessionKnowledgeCount: {
-          ...prev.sessionKnowledgeCount,
-          [updateData.id]: updateData.count,
-        },
-        sessionKnowledgeChangesRevision: {
-          ...prev.sessionKnowledgeChangesRevision,
-          [updateData.id]: (prev.sessionKnowledgeChangesRevision[updateData.id] ?? 0) + 1,
-        },
-      }));
-    }
-
-    // Handle knowledge-access-update: bump per-session revision so hooks
-    // (useSessionKnowledge, useSessionKnowledgeAccesses) refetch and show
-    // fresh turnsRemaining / hitCount / references.
-    if (updateData.type === "knowledge-access-update") {
-      storage.setState((prev) => ({
-        sessionKnowledgeAccessRevision: {
-          ...prev.sessionKnowledgeAccessRevision,
-          [updateData.sessionId]:
-            (prev.sessionKnowledgeAccessRevision[updateData.sessionId] ?? 0) + 1,
-        },
-      }));
-    }
-
-    // Handle task-log: forward log chunks to task-log listeners
-    if (updateData.type === "task-log") {
-      for (const listener of this.taskLogListeners) {
-        listener(updateData.sessionId, updateData.taskId, updateData.chunk);
-      }
-    }
-
-    // Handle task-status-changed: notify listeners for real-time task status updates
-    if (updateData.type === "task-status-changed") {
-      for (const listener of this.taskStatusListeners) {
-        listener({
-          taskId: updateData.taskId,
-          machineId: updateData.machineId,
-          status: updateData.status,
-          sessionId: updateData.sessionId,
-          errorMessage: updateData.errorMessage,
-          completedAt: updateData.completedAt,
-          triggerType: updateData.triggerType,
-        });
-      }
-    }
-
-    // Handle inbox-new-item: notify listeners for real-time inbox updates
-    if (updateData.type === "inbox-new-item" && updateData.item) {
-      for (const listener of this.inboxNewItemListeners) {
-        listener(updateData.item);
-      }
-    }
-
-    // Handle inbox-unread-count: notify listeners for badge updates
-    if (updateData.type === "inbox-unread-count" && typeof updateData.count === "number") {
-      for (const listener of this.inboxUnreadCountListeners) {
-        listener(updateData.count);
-      }
-    }
-
-    // Handle session-event-created: notify listeners for real-time timeline updates
-    if (updateData.type === "session-event-created" && updateData.event) {
-      for (const listener of this.sessionEventCreatedListeners) {
-        listener(updateData.event);
-      }
-    }
-
-    // Handle inter-agent-message: notify listeners for Swarm coordination display
-    if (updateData.type === "inter-agent-message") {
-      const msg = {
-        fromSessionId: updateData.fromSessionId,
-        toSessionId: updateData.toSessionId,
-        message: updateData.message,
-        sentAt: updateData.sentAt,
-      };
-      for (const listener of this.interAgentMessageListeners) {
-        listener(msg);
-      }
-    }
-
-    // Handle supervisor-loop-status: notify listeners for real-time Loop status updates.
-    if (updateData.type === "supervisor-loop-status") {
-      const loopEvent = {
-        loopId: updateData.loopId,
-        projectId: updateData.projectId,
-        status: updateData.status,
-        currentIteration: updateData.currentIteration,
-        maxIterations: updateData.maxIterations,
-        currentPhase: updateData.currentPhase,
-        totalCostUsd: updateData.totalCostUsd,
-        totalActionsFound: updateData.totalActionsFound,
-        totalActionsFixed: updateData.totalActionsFixed,
-        currentHealthScore: updateData.currentHealthScore,
-        initialHealthScore: updateData.initialHealthScore,
-        exitReason: updateData.exitReason,
-        consecutiveFailures: updateData.consecutiveFailures,
-      };
-      for (const listener of this.supervisorLoopStatusListeners) {
-        listener(loopEvent);
-      }
-    }
-
-  };
-
-  /**
-   * Create an IssueSessionLink when a webhook-triggered session completes.
-   * Delegates to syncIssueHandlers module.
-   */
-  private handleWebhookIssueLinked = async (data: {
-    readonly issueNumber: number;
-    readonly issueTitle: string;
-    readonly issueBody: string;
-    readonly issueAuthor: string;
-    readonly issueLabels: string[];
-    readonly issueUrl: string;
-    readonly repoUrl: string;
-    readonly repoPath: string;
-    readonly machineId: string;
-    readonly sessionId: string;
-  }): Promise<void> => {
-    await issueHandleWebhookIssueLinked(data);
-  };
-
-  private handleWebhookPRMerged = async (data: {
-    readonly prNumber: number;
-    readonly prUrl: string;
-    readonly issueNumber: number;
-    readonly sessionId: string;
-    readonly machineId: string;
-    readonly repoPath: string;
-  }): Promise<void> => {
-    await issueHandleWebhookPRMerged(data);
+    handleEphemeralUpdateAction(this.ephemeralHandlerCtx, update);
   };
 
   //
   // Apply store
   //
 
-  private scheduleCacheWrite(sessionId: string): void {
-    const existing = this.cacheWriteTimers.get(sessionId);
-    if (existing) {
-      clearTimeout(existing);
-    }
-
-    this.cacheWriteTimers.set(
-      sessionId,
-      setTimeout(() => {
-        this.cacheWriteTimers.delete(sessionId);
-        const session = storage.getState().sessionMessages[sessionId];
-        const lastSeq = this.sessionLastSeq.get(sessionId) ?? 0;
-        if (session?.isLoaded && session.messages.length > 0) {
-          const latestRequestPreview =
-            storage.getState().sessions[sessionId]?.latestUserRequestPreview ??
-            getLatestUserRequestPreview(session.messages);
-          saveMessageCache(sessionId, session.messages, lastSeq, latestRequestPreview);
-        }
-      }, 2000),
-    );
-  }
-
   private flushPendingCacheWrites(): void {
-    for (const [sessionId, timer] of this.cacheWriteTimers) {
-      clearTimeout(timer);
-      const session = storage.getState().sessionMessages[sessionId];
-      const lastSeq = this.sessionLastSeq.get(sessionId) ?? 0;
-        const latestRequestPreview =
-          storage.getState().sessions[sessionId]?.latestUserRequestPreview ??
-          (session?.messages.length > 0
-            ? getLatestUserRequestPreview(session.messages)
-            : null);
-        if (session?.isLoaded && session.messages.length > 0) {
-          saveMessageCache(sessionId, session.messages, lastSeq, latestRequestPreview);
-        }
-    }
-    this.cacheWriteTimers.clear();
+    flushPendingCacheWritesAction(this.messageFetchCtx);
   }
 
   private cancelPendingCacheWrites(): void {
-    for (const timer of this.cacheWriteTimers.values()) {
-      clearTimeout(timer);
-    }
-    this.cacheWriteTimers.clear();
+    cancelPendingCacheWritesAction(this.messageFetchCtx);
   }
 
-  /**
-   * Decrypt and normalize a batch of raw messages.
-   * Extracted to share between reverse-pagination (newest-first) and forward pagination paths.
-   */
   private async decryptAndNormalizeBatch(
     encryption: SessionEncryption,
     rawMessages: ApiMessage[],
     sessionId?: string,
-  ): Promise<{
-    normalized: NormalizedMessage[];
-    sequencedContents: Array<{ seq: number; content: RawRecord | null | undefined }>;
-    processedSeqs: number[];
-  }> {
-    const decryptedMessages = await encryption.decryptMessages(rawMessages);
-    const normalized: NormalizedMessage[] = [];
-    const sequencedContents: Array<{ seq: number; content: RawRecord | null | undefined }> = [];
-    let decryptFailCount = 0;
-    const processedSeqs: number[] = [];
-    const failedSeqs: number[] = [];
-    for (let i = 0; i < decryptedMessages.length; i++) {
-      const decrypted = decryptedMessages[i];
-      const rawMessage = rawMessages[i];
-      if (!decrypted || decrypted.content === null) {
-        decryptFailCount++;
-        failedSeqs.push(rawMessage.seq);
-        continue;
-      }
-      processedSeqs.push(rawMessage.seq);
-      sequencedContents.push({ seq: rawMessage.seq, content: decrypted.content });
-      const msg = normalizeRawMessage(
-        decrypted.id,
-        decrypted.localId,
-        decrypted.createdAt,
-        decrypted.content,
-      );
-      if (msg) normalized.push(msg);
-    }
-    if (decryptFailCount > 0) {
-      log.warn(
-        `⚠️ ${decryptFailCount}/${rawMessages.length} messages failed to decrypt for session ${sessionId ?? "unknown"} seqs=[${failedSeqs.join(",")}] (possible encryption key mismatch after session reconnect)`,
-      );
-    }
-    return { normalized, sequencedContents, processedSeqs };
+  ) {
+    return decryptAndNormalizeBatchAction(encryption, rawMessages, sessionId);
   }
 
   private applyMessages = (
     sessionId: string,
     messages: NormalizedMessage[],
   ) => {
-    const result = storage.getState().applyMessages(sessionId, messages);
-    let m: Message[] = [];
-    for (let messageId of result.changed) {
-      const message =
-        storage.getState().sessionMessages[sessionId].messagesMap[messageId];
-      if (message) {
-        m.push(message);
-      }
-    }
-    if (m.length > 0) {
-      voiceHooks.onMessages(sessionId, m);
-      autoOptionSendService.onMessages(sessionId);
-    }
-    if (result.hasReadyEvent) {
-      voiceHooks.onReady(sessionId);
-      autoOptionSendService.onReady(sessionId);
-    }
-
-    // Schedule debounced cache write
-    this.scheduleCacheWrite(sessionId);
+    applyMessagesAction(this.messageFetchCtx, sessionId, messages);
   };
 
   private applySessions = (
