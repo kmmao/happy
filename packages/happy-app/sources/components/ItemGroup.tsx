@@ -129,7 +129,10 @@ export const ItemGroup = React.memo<ItemGroupProps>((props) => {
                                 showDivider: !isLast && childProps.showDivider !== false
                             });
                         }
-                        return child;
+                        // Drop non-element children (strings/numbers) — they
+                        // would create bare text nodes inside <View>, which
+                        // React Native forbids.
+                        return null;
                     })}
                 </View>
 

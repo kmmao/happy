@@ -375,7 +375,7 @@ function PluginsSettingsScreen() {
                             autoCorrect={false}
                         />
                     </View>
-                    {searchQuery && filteredAvailable.length === 0 && (
+                    {!!searchQuery && filteredAvailable.length === 0 && (
                         <View>
                             <Text style={styles.emptyText}>
                                 {t("settingsPlugins.noResults")}
