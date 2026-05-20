@@ -283,7 +283,16 @@ export async function runClaude(
           workingDirectory,
           onMessage: (msg) => session.sendClaudeSessionMessage(msg),
         });
-        if (offlineSessionId) scanner.onNewSession(offlineSessionId);
+        // In remote mode every user prompt arrives via the SDK or the
+        // app channel — both of which already deliver their messages
+        // to the server before they hit disk. Anything the scanner
+        // finds in the JSONL at the moment it learns the session id
+        // is therefore already on the server; treating it as fresh
+        // (the previous behavior) replayed the whole history back to
+        // the chat on reconnect. The scanner's real job is forwarding
+        // *future* JSONL writes from a parallel `claude --resume`
+        // terminal, which the file watcher will pick up.
+        if (offlineSessionId) scanner.onNewSession(offlineSessionId, { treatExistingAsProcessed: true });
         return { session, scanner };
       },
       onNotify: (msg: string) => logger.debug(`[claude:notify] ${msg}`),

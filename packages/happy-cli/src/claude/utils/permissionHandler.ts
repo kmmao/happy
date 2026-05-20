@@ -524,7 +524,7 @@ export class PermissionHandler {
   /**
    * Resets all state for new sessions
    */
-  reset(): void {
+  reset(reason: string = 'Session switched to local mode'): void {
     this.toolCalls = [];
     this.responses.clear();
     this.allowedTools.clear();
@@ -548,7 +548,7 @@ export class PermissionHandler {
           ...request,
           completedAt: Date.now(),
           status: "canceled",
-          reason: "Session switched to local mode",
+          reason,
         };
       }
 

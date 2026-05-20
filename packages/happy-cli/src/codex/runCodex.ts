@@ -837,6 +837,10 @@ export async function runCodex(opts: {
     }
   }
   permissionHandler = new CodexPermissionHandler(session);
+  // Drop any permission requests left in agent state from a previous CLI
+  // process that died while a tool prompt was open — see the matching
+  // call in claudeRemoteLauncherCore for the full rationale.
+  permissionHandler.reset('Previous CLI process exited before responding');
   permissionHandler.setPermissionMode(currentPermissionMode ?? "default");
   const pendingElicitations = new Map<
     string,
