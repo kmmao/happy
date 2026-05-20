@@ -339,7 +339,9 @@ export function sessionUpdateHandler(userId: string, socket: Socket, connection:
                     eventType: "task.completed",
                     severity: "info",
                     title: `${branchPrefix}${taskLabel}: completed`,
-                    referenceUrl: updated.sessionId ? `/session/${updated.sessionId}` : undefined,
+                    referenceUrl: updated.sessionId
+                        ? `/session/${updated.sessionId}`
+                        : `/machine/${task.machineId}/tasks`,
                     refType: "task",
                     refId: task.id,
                     groupKey: `task:${task.id}:completed`,

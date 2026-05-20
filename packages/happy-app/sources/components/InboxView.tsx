@@ -19,6 +19,7 @@ import { VoiceAssistantStatusBar } from './VoiceAssistantStatusBar';
 import { useInboxData } from '@/hooks/useInboxData';
 import { ServerInboxItem } from '@/sync/apiInbox';
 import { SharedStateView } from '@/components/SharedStateView';
+import { Modal } from '@/modal';
 
 // --- Inbox item card ---
 
@@ -59,9 +60,10 @@ const InboxItemCard = React.memo(({ item, onPress }: {
 
     return (
         <Pressable
-            style={[
+            style={({ pressed }) => [
                 styles.inboxItem,
                 !item.read && { backgroundColor: theme.colors.surface },
+                pressed && { opacity: 0.6 },
             ]}
             onPress={onPress}
         >
@@ -174,6 +176,8 @@ export const InboxView = React.memo(({}: InboxViewProps) => {
         }
         if (item.referenceUrl) {
             router.push(item.referenceUrl as any);
+        } else if (item.body) {
+            Modal.alert(item.title, item.body);
         }
     }, [inbox.markRead, router]);
 

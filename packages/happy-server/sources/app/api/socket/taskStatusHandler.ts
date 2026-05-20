@@ -93,7 +93,9 @@ export function taskStatusHandler(socket: Socket, userId: string): void {
                             ? `${taskLabel}: failed`
                             : `${taskLabel}: cancelled`,
                     body: resolvedStatus === "failed" ? data.errorMessage : undefined,
-                    referenceUrl: updated.sessionId ? `/session/${updated.sessionId}` : undefined,
+                    referenceUrl: updated.sessionId
+                        ? `/session/${updated.sessionId}`
+                        : `/machine/${task.machineId}/tasks`,
                     refType: "task",
                     refId: data.taskId,
                     groupKey: `task:${data.taskId}:${resolvedStatus}`,

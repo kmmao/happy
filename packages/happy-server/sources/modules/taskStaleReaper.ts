@@ -85,6 +85,7 @@ async function reapStaleTasks(): Promise<void> {
                 severity: "error",
                 title: `${taskLabel}: timed out`,
                 body: errorMessage,
+                referenceUrl: `/machine/${task.machineId}/tasks`,
                 refType: "task",
                 refId: task.id,
                 groupKey: `task:${task.id}:failed`,

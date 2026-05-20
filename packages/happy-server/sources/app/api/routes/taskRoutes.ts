@@ -200,6 +200,8 @@ export function taskRoutes(app: Fastify) {
                         purpose: "task-manual",
                         failure: taskRuntimeProfile,
                         referenceUrl: `/machine/${machineId}/tasks`,
+                        refType: "machine",
+                        refId: machineId,
                     });
                     return reply.code(400).send({
                         error: "profile_unavailable",
