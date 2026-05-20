@@ -29,7 +29,7 @@ yarn workspace @kmmao/happy-coder build        # CLI: build (rm dist → tsc →
 yarn workspace @kmmao/happy-coder test         # CLI: build then vitest run
 yarn workspace @kmmao/happy-coder dev          # CLI: dev mode via tsx
 
-yarn workspace happy-server build       # Server: tsc --noEmit
+yarn workspace happy-server typecheck   # Server: tsc --noEmit
 yarn workspace happy-server test        # Server: vitest run
 yarn workspace happy-server dev         # Server: start with .env files
 yarn workspace happy-server generate    # Server: prisma generate

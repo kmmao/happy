@@ -1,0 +1,42 @@
+name: Server TypeScript Typecheck
+
+on:
+    pull_request:
+        paths:
+            - 'packages/happy-server/**'
+            - 'packages/happy-wire/**'
+            - '.github/workflows/server-typecheck.yml'
+    push:
+        branches:
+            - main
+        paths:
+            - 'packages/happy-server/**'
+            - 'packages/happy-wire/**'
+            - '.github/workflows/server-typecheck.yml'
+
+concurrency:
+    group: server-typecheck-${{ github.ref }}
+    cancel-in-progress: true
+
+jobs:
+    typecheck:
+        runs-on: ubuntu-latest
+        timeout-minutes: 15
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v4
+
+            - name: Setup Node
+              uses: actions/setup-node@v4
+              with:
+                  node-version: 20
+                  cache: yarn
+
+            - name: Install dependencies
+              run: yarn install --frozen-lockfile
+
+            - name: Build happy-wire (shared types)
+              run: yarn workspace @kmmao/happy-wire build
+
+            - name: TypeScript typecheck
+              run: yarn workspace happy-server typecheck

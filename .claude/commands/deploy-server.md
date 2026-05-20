@@ -32,7 +32,7 @@ done
 
 1. 更新 `packages/happy-server/package.json` 的版本约束到最新（保留 `^` 前缀）
 2. 运行 `yarn install` 刷新 `yarn.lock`
-3. 运行 `yarn workspace happy-server build` 验证 typecheck 通过
+3. 运行 `yarn workspace happy-server typecheck` 验证 typecheck 通过
 4. 提交：`chore(server): bump @kmmao/happy-wire to ^X.Y.Z`
 5. 再进入步骤 2 重建镜像
 

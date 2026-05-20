@@ -34,7 +34,7 @@ COPY packages/happy-wire ./packages/happy-wire
 COPY packages/happy-server ./packages/happy-server
 
 RUN yarn workspace @kmmao/happy-wire build
-RUN yarn workspace happy-server build
+RUN yarn workspace happy-server typecheck
 
 # Stage 3: runtime
 FROM node:22-slim AS runner

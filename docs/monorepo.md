@@ -115,7 +115,7 @@ yarn workspace @kmmao/happy-coder test
 yarn workspace @kmmao/happy-coder dev
 
 # Server 相关
-yarn workspace happy-server build
+yarn workspace happy-server typecheck
 yarn workspace happy-server test
 yarn workspace happy-server dev
 

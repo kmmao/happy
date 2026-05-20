@@ -193,7 +193,7 @@ eas build:list
 
 - [ ] 合并上游代码并解决所有冲突
 - [ ] 在本地 `yarn install`（安装新依赖，如 `happy-wire`）
-- [ ] 确认 TypeScript 编译通过：`yarn workspace happy-server build`
+- [ ] 确认 TypeScript 编译通过：`yarn workspace happy-server typecheck`
 - [ ] 确认 CLI 构建通过：`yarn workspace @kmmao/happy-coder build`
 - [ ] 确认 App 类型检查通过：`yarn workspace happy-app typecheck`
 
