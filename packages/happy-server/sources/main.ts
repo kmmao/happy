@@ -71,11 +71,10 @@ process.on('uncaughtException', (error) => {
         name: error.name
     }, `Uncaught Exception: ${error.message}`);
 
-    console.error('Uncaught Exception:', error);
     process.exit(1);
 });
 
-process.on('unhandledRejection', (reason, promise) => {
+process.on('unhandledRejection', (reason, _promise) => {
     const errorMsg = reason instanceof Error ? reason.message : String(reason);
     const errorStack = reason instanceof Error ? reason.stack : undefined;
 
@@ -86,7 +85,6 @@ process.on('unhandledRejection', (reason, promise) => {
         reason: String(reason)
     }, `Unhandled Rejection: ${errorMsg}`);
 
-    console.error('Unhandled Rejection at:', promise, 'reason:', reason);
     process.exit(1);
 });
 
@@ -117,7 +115,7 @@ process.on('exit', (code) => {
 });
 
 main().catch((e) => {
-    console.error(e);
+    log({ module: 'startup', level: 'fatal' }, 'Startup failed', e instanceof Error ? e.message : String(e));
     process.exit(1);
 }).then(() => {
     process.exit(0);
