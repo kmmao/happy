@@ -17,7 +17,6 @@ function TerminalScreen() {
     const searchParams = useLocalSearchParams();
     const { theme } = useUnistyles();
 
-    // const [urlProcessed, setUrlProcessed] = useState(false);
     const publicKey = React.useMemo(() => {
         const keys = Object.keys(searchParams);
         if (keys.length > 0) {
