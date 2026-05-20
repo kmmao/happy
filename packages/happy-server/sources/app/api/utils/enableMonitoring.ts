@@ -1,4 +1,6 @@
 import { db } from "@/storage/db";
+import { redis } from "@/storage/redis";
+import { s3client, s3bucket, isLocalStorage } from "@/storage/files";
 import { Fastify } from "../types";
 import { httpRequestsCounter, httpRequestDurationHistogram } from "@/app/monitoring/metrics2";
 import { log } from "@/utils/log";
@@ -24,21 +26,46 @@ export function enableMonitoring(app: Fastify) {
     });
 
     app.get('/health', async (request, reply) => {
+        const failures: string[] = [];
+
+        // Test database connectivity
         try {
-            // Test database connectivity
             await db.$queryRaw`SELECT 1`;
-            reply.send({
-                status: 'ok',
-                timestamp: new Date().toISOString(),
-                service: 'happy-server'
-            });
         } catch (error) {
-            log({ module: 'health', level: 'error' }, `Health check failed: ${error}`);
+            log({ module: 'health', level: 'error' }, `Health check: database failed: ${error}`);
+            failures.push('database');
+        }
+
+        // Test Redis connectivity
+        try {
+            await redis.ping();
+        } catch (error) {
+            log({ module: 'health', level: 'error' }, `Health check: redis failed: ${error}`);
+            failures.push('redis');
+        }
+
+        // Test S3 connectivity (only when S3 is configured, not local storage)
+        if (!isLocalStorage()) {
+            try {
+                await s3client.bucketExists(s3bucket);
+            } catch (error) {
+                log({ module: 'health', level: 'error' }, `Health check: s3 failed: ${error}`);
+                failures.push('s3');
+            }
+        }
+
+        if (failures.length > 0) {
             reply.code(503).send({
                 status: 'error',
                 timestamp: new Date().toISOString(),
                 service: 'happy-server',
-                error: 'Database connectivity failed'
+                failures,
+            });
+        } else {
+            reply.send({
+                status: 'ok',
+                timestamp: new Date().toISOString(),
+                service: 'happy-server'
             });
         }
     });
