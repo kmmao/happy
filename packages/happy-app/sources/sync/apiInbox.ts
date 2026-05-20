@@ -108,9 +108,7 @@ export async function markInboxItemRead(
         method: "POST",
         headers: authHeaders(credentials),
     });
-    if (!response.ok) {
-        throw new Error(`Failed to mark inbox item read: ${response.status}`);
-    }
+    throwIfNotOk(response, "Failed to mark inbox item read");
 }
 
 export async function markAllInboxRead(
@@ -122,9 +120,7 @@ export async function markAllInboxRead(
         method: "POST",
         headers: authHeaders(credentials),
     });
-    if (!response.ok) {
-        throw new Error(`Failed to mark all inbox read: ${response.status}`);
-    }
+    throwIfNotOk(response, "Failed to mark all inbox read");
 }
 
 export async function deleteInboxItem(
@@ -137,7 +133,5 @@ export async function deleteInboxItem(
         method: "DELETE",
         headers: authHeaders(credentials),
     });
-    if (!response.ok) {
-        throw new Error(`Failed to delete inbox item: ${response.status}`);
-    }
+    throwIfNotOk(response, "Failed to delete inbox item");
 }

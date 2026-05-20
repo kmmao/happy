@@ -117,7 +117,7 @@ export async function updateArtifact(
                 const data = await response.json() as ArtifactUpdateResponse;
                 return data;
             }
-            throw new Error(`Failed to update artifact: ${response.status}`);
+            throwIfNotOk(response, "Failed to update artifact");
         }
 
         const data = await response.json() as ArtifactUpdateResponse;
@@ -146,7 +146,7 @@ export async function deleteArtifact(
             if (response.status === 404) {
                 throw new Error('Artifact not found');
             }
-            throw new Error(`Failed to delete artifact: ${response.status}`);
+            throwIfNotOk(response, "Failed to delete artifact");
         }
     });
 }

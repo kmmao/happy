@@ -98,9 +98,7 @@ export async function provisionUpdateUrls(
             body: JSON.stringify(urls),
         });
 
-        if (!response.ok) {
-            throw new Error(`Failed to update provision token: ${response.status}`);
-        }
+        throwIfNotOk(response, "Failed to update provision token");
     });
 }
 
@@ -121,9 +119,7 @@ export async function provisionRestore(
             },
         });
 
-        if (!response.ok) {
-            throw new Error(`Failed to restore provision token: ${response.status}`);
-        }
+        throwIfNotOk(response, "Failed to restore provision token");
     });
 }
 
@@ -144,8 +140,6 @@ export async function provisionRevoke(
             },
         });
 
-        if (!response.ok) {
-            throw new Error(`Failed to revoke provision token: ${response.status}`);
-        }
+        throwIfNotOk(response, "Failed to revoke provision token");
     });
 }

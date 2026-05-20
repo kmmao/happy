@@ -125,7 +125,7 @@ export async function sendFriendRequest(
             if (response.status === 404) {
                 return null;
             }
-            throw new Error(`Failed to add friend: ${response.status}`);
+            throwIfNotOk(response, "Failed to add friend");
         }
 
         const data = await response.json();
@@ -161,9 +161,7 @@ export async function getFriendsList(
             }
         });
 
-        if (!response.ok) {
-            throw new Error(`Failed to get friends list: ${response.status}`);
-        }
+        throwIfNotOk(response, "Failed to get friends list");
 
         const data = await response.json();
         const parsed = FriendsResponseSchema.safeParse(data);
@@ -199,7 +197,7 @@ export async function removeFriend(
             if (response.status === 404) {
                 return null;
             }
-            throw new Error(`Failed to remove friend: ${response.status}`);
+            throwIfNotOk(response, "Failed to remove friend");
         }
 
         const data = await response.json();

@@ -1074,7 +1074,7 @@ export async function updateCustomDimension(
             body: JSON.stringify(patch),
         },
     );
-    if (!response.ok) throw new Error(`Failed to update dimension: ${response.status}`);
+    throwIfNotOk(response, "Failed to update dimension");
     const data = (await response.json()) as { dimension: SupervisorDimension };
     return data.dimension;
 }
@@ -1089,7 +1089,7 @@ export async function deleteCustomDimension(
         `${API_ENDPOINT}/v1/projects/${projectId}/supervisor/dimensions/${dimId}`,
         { method: "DELETE", headers: authHeaders(credentials) },
     );
-    if (!response.ok) throw new Error(`Failed to delete dimension: ${response.status}`);
+    throwIfNotOk(response, "Failed to delete dimension");
 }
 
 export async function generateDimensionPrompt(

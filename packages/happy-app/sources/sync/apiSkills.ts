@@ -145,9 +145,7 @@ export async function archiveSkill(
         method: "POST",
         headers: authHeaders(credentials),
     });
-    if (!response.ok) {
-        throw new Error(`Failed to archive skill: ${response.status}`);
-    }
+    throwIfNotOk(response, "Failed to archive skill");
     const data = (await response.json()) as SkillResponse;
     return data.skill;
 }

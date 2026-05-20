@@ -10,6 +10,7 @@
 import { getServerUrl } from "./serverConfig";
 import type { AuthCredentials } from "@/auth/tokenStorage";
 import type { GitHostMapping, WebhookRepoConfig } from "./issueTypes";
+import { throwIfNotOk } from "@/utils/http";
 
 interface WebhookRouteResponse {
   readonly id: string;
@@ -81,7 +82,7 @@ export async function deleteWebhookRoute(
   );
 
   if (!response.ok && response.status !== 404) {
-    throw new Error(`Failed to delete webhook route: ${response.status}`);
+    throwIfNotOk(response, "Failed to delete webhook route");
   }
 }
 

@@ -7,6 +7,7 @@ import { SessionEncryption } from "@/sync/encryption/sessionEncryption";
 import { decodeBase64 } from "@/encryption/base64";
 import { storage, registerPreferencesSyncCallback, registerSessionEvictionCallback } from "./storage";
 import { isSessionRunning } from "@/utils/sessionUtils";
+import { throwIfNotOk } from "@/utils/http";
 import {
   ApiEphemeralUpdateSchema,
   ApiMessage,
@@ -1128,9 +1129,7 @@ class Sync {
       },
     });
 
-    if (!response.ok) {
-      throw new Error(`Failed to fetch sessions: ${response.status}`);
-    }
+    throwIfNotOk(response, "Failed to fetch sessions");
 
     const data = await response.json();
     const sessions = data.sessions as Array<{
@@ -1943,9 +1942,7 @@ class Sync {
         "Content-Type": "application/json",
       },
     });
-    if (!response.ok) {
-      throw new Error(`Failed to fetch settings: ${response.status}`);
-    }
+    throwIfNotOk(response, "Failed to fetch settings");
     const data = (await response.json()) as {
       settings: string | null;
       settingsVersion: number;
@@ -2010,9 +2007,7 @@ class Sync {
       },
     });
 
-    if (!response.ok) {
-      throw new Error(`Failed to fetch profile: ${response.status}`);
-    }
+    throwIfNotOk(response, "Failed to fetch profile");
 
     const data = await response.json();
     const parsedProfile = profileParse(data);
