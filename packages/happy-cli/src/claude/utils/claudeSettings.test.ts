@@ -6,6 +6,8 @@
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { mkdirSync, existsSync, rmSync, writeFileSync } from 'node:fs';
 import { readClaudeSettings, shouldIncludeCoAuthoredBy } from './claudeSettings';
 
 describe('Claude Settings', () => {

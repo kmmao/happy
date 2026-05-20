@@ -1,5 +1,7 @@
+import { describe, it, beforeEach, expect, vi } from 'vitest';
 import { ApiClient } from './api';
 import { logger } from '@/ui/logger';
+import { connectionState } from '@/utils/serverConnectionErrors';
 
 // Use vi.hoisted to ensure mock functions are available when vi.mock factory runs
 const { mockPost, mockIsAxiosError } = vi.hoisted(() => ({

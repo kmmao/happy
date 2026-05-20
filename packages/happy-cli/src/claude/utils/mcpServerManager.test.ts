@@ -1,10 +1,11 @@
+import { describe, it, expect, vi } from 'vitest';
 import {
   validateMcpServerConfig,
   applyMcpServers,
   addMcpServer,
   removeMcpServer,
   syncMcpServersFromRegistry,
-  type _McpServerState,
+  createMcpServerState,
 } from "./mcpServerManager";
 // ─── Mock SDK Query ───────────────────────────────────────────────────────────
 

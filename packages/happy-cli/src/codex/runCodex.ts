@@ -34,11 +34,11 @@ import {
   writeSessionKey,
 } from "@/persistence";
 import { initialMachineMetadata } from "@/daemon/run";
-import _packageJson from "../../package.json";
 import { randomUUID } from "node:crypto";
 import { MessageQueue2 } from "@/utils/MessageQueue2";
 import { projectPath } from "@/projectPath";
-import { _resolve, join } from "node:path";
+import { join } from "node:path";
+import { homedir } from "node:os";
 import {
   createSessionMetadata,
   enrichMetadataWithWorktree,
@@ -57,8 +57,9 @@ import { CHANGE_TITLE_INSTRUCTION } from "@/gemini/constants";
 import { notifyDaemonSessionStarted } from "@/daemon/controlClient";
 import { startSessionHeartbeat } from "@/daemon/sessionHeartbeat";
 import { registerKillSessionHandler } from "@/claude/registerKillSessionHandler";
-import { _delay } from "@/utils/time";
+import { delay as _delay } from "@/utils/time";
 import { stopCaffeinate } from "@/utils/caffeinate";
+import { connectionState } from "@/utils/serverConnectionErrors";
 import { setupOfflineReconnection } from "@/utils/setupOfflineReconnection";
 import type { ApiSessionClient } from "@/api/apiSession";
 import { resolveCodexExecutionPolicy } from "./executionPolicy";
@@ -792,7 +793,7 @@ export async function runCodex(opts: {
     if (!sessionId) return null;
     try {
       const codexHomeDir =
-        process.env.CODEX_HOME || join(os.homedir(), ".codex");
+        process.env.CODEX_HOME || join(homedir(), ".codex");
       const rootDir = join(codexHomeDir, "sessions");
 
       // Recursively collect all files under the sessions directory

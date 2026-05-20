@@ -1,6 +1,8 @@
 import { getProjectPath } from './path';
 import { claudeCheckSession } from './claudeCheckSession';
 import { logger } from '@/ui/logger';
+import { readdirSync, statSync } from 'node:fs';
+import { join } from 'node:path';
 
 /**
  * Finds the most recently modified VALID session in the project directory.

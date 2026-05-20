@@ -16,6 +16,9 @@
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { execSync, spawn } from 'child_process';
+import { existsSync, readFileSync, writeFileSync, unlinkSync } from 'node:fs';
+import { join } from 'node:path';
+import path from 'node:path';
 import { configuration } from '@/configuration';
 import { 
   listDaemonSessions, 

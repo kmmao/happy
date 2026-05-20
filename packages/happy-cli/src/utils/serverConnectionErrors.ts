@@ -50,6 +50,7 @@
 
 import axios from 'axios';
 import { logger } from '@/ui/logger';
+import { exponentialBackoffDelay } from '@/utils/time';
 
 /**
  * Configuration for offline reconnection behavior.
@@ -280,6 +281,7 @@ export type OfflineFailure = {
 class OfflineState {
     private state: 'online' | 'offline' = 'online';
     private failures = new Map<string, OfflineFailure>(); // Dedupe by operation
+    private backend = 'Claude';
 
     /** Report failure - accumulates context, prints once on first offline transition */
     fail(failure: OfflineFailure): void {
@@ -319,7 +321,7 @@ class OfflineState {
                 return `${f.operation} failed: ${desc}${url}`;
             })
             .join('; ');
-        logger.warn(`⚠️  Happy server unreachable, offline mode with auto-reconnect enabled - error details: ${summary}`);
+        logger.warn(`⚠️  ${this.backend} server unreachable, offline mode with auto-reconnect enabled - error details: ${summary}`);
 
         // Print detail lines if present - consistent 3-space indent with arrow
         const allDetails = [...this.failures.values()]

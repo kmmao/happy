@@ -6,6 +6,8 @@ import { ApiClient } from "@/lib";
 import type { JsRuntime } from "./runClaude";
 import type { SandboxConfig } from "@/persistence";
 import type { ThinkingConfig, AgentDefinition, OutputFormat, SdkBeta, SdkPluginConfig } from "./sdk/types";
+import { claudeLocalLauncher } from "./claudeLocalLauncher";
+import { claudeRemoteLauncher } from "./claudeRemoteLauncher";
 
 // Re-export permission mode type from api/types
 // Single unified type with 7 modes - Codex modes mapped at SDK boundary

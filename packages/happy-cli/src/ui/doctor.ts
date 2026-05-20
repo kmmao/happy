@@ -7,13 +7,16 @@
 
 import chalk from 'chalk'
 import { configuration } from '@/configuration'
-import { readSettings, readCredentials } from '@/persistence'
+import { readSettings, readCredentials, readDaemonState } from '@/persistence'
 import { checkDaemonStatus, getDaemonAutomationStatus } from '@/daemon/controlClient'
+import { findAllHappyProcesses } from '@/daemon/doctor'
 import { existsSync, readdirSync, statSync } from 'node:fs'
+import { join } from 'node:path'
 import { projectPath } from '@/projectPath'
 import packageJson from '../../package.json'
 import type { AutomationJob } from '@/automation/types'
 import { sanitizeProcessArgv } from '@/utils/securityRedaction'
+import { logger } from '@/ui/logger'
 
 /**
  * Get relevant environment information for debugging
@@ -191,14 +194,14 @@ export async function runDoctorCommand(filter?: 'all' | 'daemon'): Promise<void>
             logger.print(chalk.bold('\n🔍 All Happy CLI Processes'));
 
             // Group by type
-            const grouped = allProcesses.reduce((groups, process) => {
+            const grouped = allProcesses.reduce((groups: Record<string, typeof allProcesses>, process) => {
                 if (!groups[process.type]) groups[process.type] = [];
                 groups[process.type].push(process);
                 return groups;
-            }, {} as Record<string, typeof allProcesses>);
+            }, {});
 
             // Display each group
-            Object.entries(grouped).forEach(([type, processes]) => {
+            Object.entries(grouped).forEach(([type, processes]: [string, typeof allProcesses]) => {
                 const typeLabels: Record<string, string> = {
                     'current': '📍 Current Process',
                     'daemon': '🤖 Daemon',
@@ -215,7 +218,7 @@ export async function runDoctorCommand(filter?: 'all' | 'daemon'): Promise<void>
                 };
 
                 logger.print(chalk.blue(`\n${typeLabels[type] || type}:`));
-                processes.forEach(({ pid, command }) => {
+                (processes as Array<{ pid: number; command: string; type: string }>).forEach(({ pid, command }) => {
                     const color = type === 'current' ? chalk.green :
                         type.startsWith('dev') ? chalk.cyan :
                             type.includes('daemon') ? chalk.blue : chalk.gray;

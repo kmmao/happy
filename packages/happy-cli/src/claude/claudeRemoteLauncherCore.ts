@@ -23,6 +23,7 @@ import type {
   SDKSessionStateChangedMessage,
   SDKMemoryRecallMessage,
   SDKRateLimitEvent,
+  Query as OfficialQuery,
 } from "@anthropic-ai/claude-agent-sdk";
 import { createSdkMcpServer } from "@anthropic-ai/claude-agent-sdk";
 import { z } from "zod";
@@ -39,7 +40,6 @@ import { readClaudeMcpServers } from "@/claude/utils/claudeSettings";
 import { fetchMcpRegistryServers } from "@/claude/utils/mcpRegistryReader";
 import { EnhancedMode } from "./loop";
 import { createSessionEventReporter } from "./sessionEventReporter";
-import { _getToolName } from "./utils/_getToolName";
 import { hashObject } from "@/utils/deterministicJson";
 import { getProjectPath } from "./utils/path";
 import { readFile, writeFile, mkdir, stat } from "node:fs/promises";
@@ -76,12 +76,23 @@ import {
   formatKnowledgeForInjection,
   inferEntryType,
 } from "./remoteKnowledgeHelpers";
+import { OutgoingMessageQueue } from "./utils/OutgoingMessageQueue";
 
 interface PermissionsField {
   date: number;
   result: "approved" | "denied";
   mode?: "default" | "acceptEdits" | "bypassPermissions" | "plan" | "dontAsk" | "auto";
   allowedTools?: string[];
+}
+
+/**
+ * Helper function to create a session protocol message envelope
+ */
+function createEnvelope(type: string, payload: Record<string, unknown>): Record<string, unknown> {
+  return {
+    type,
+    ...payload,
+  };
 }
 
 export async function claudeRemoteLauncher(
@@ -338,7 +349,7 @@ export async function claudeRemoteLauncher(
       status: "stopped" as const,
       summary: "Task stopped by user",
     });
-    session.client.sendSessionProtocolMessage(envelope);
+    session.client.sendSessionProtocolMessage(envelope as any);
   }
 
   async function doBackgroundTasks(args: { toolUseId?: string }) {
@@ -619,7 +630,7 @@ export async function claudeRemoteLauncher(
         turnId,
       );
       if (envelope) {
-        session.client.sendSessionProtocolMessage(envelope);
+        session.client.sendSessionProtocolMessage(envelope as any);
       }
       return; // Don't pass stream events through the rest of the pipeline
     }
@@ -1209,7 +1220,7 @@ export async function claudeRemoteLauncher(
         taskType: m.task_type,
         workflowName: (m as any).workflow_name,
       });
-      session.client.sendSessionProtocolMessage(envelope);
+      session.client.sendSessionProtocolMessage(envelope as any);
     }
 
     // Forward Task progress to session protocol
@@ -1232,7 +1243,7 @@ export async function claudeRemoteLauncher(
         lastToolName: m.last_tool_name,
         summary: m.summary,
       });
-      session.client.sendSessionProtocolMessage(envelope);
+      session.client.sendSessionProtocolMessage(envelope as any);
     }
 
     // Forward memory recall to App as a session event (SDK 0.2.105+).
@@ -1278,7 +1289,7 @@ export async function claudeRemoteLauncher(
             }
           : undefined,
       });
-      session.client.sendSessionProtocolMessage(envelope);
+      session.client.sendSessionProtocolMessage(envelope as any);
     }
 
     // Forward Task updated (patch) to session protocol (SDK 0.3.142+)
@@ -1298,7 +1309,7 @@ export async function claudeRemoteLauncher(
           isBackgrounded: m.patch.is_backgrounded,
         },
       });
-      session.client.sendSessionProtocolMessage(envelope);
+      session.client.sendSessionProtocolMessage(envelope as any);
     }
 
     // Forward rate limit events to App (SDK 0.3.142+)
@@ -1311,7 +1322,7 @@ export async function claudeRemoteLauncher(
         rateLimitType: m.rate_limit_info.rateLimitType,
         utilization: m.rate_limit_info.utilization,
       });
-      session.client.sendSessionProtocolMessage(envelope);
+      session.client.sendSessionProtocolMessage(envelope as any);
     }
 
     // Forward API retry status via keep-alive ephemeral channel
@@ -1338,7 +1349,7 @@ export async function claudeRemoteLauncher(
         elapsedSeconds: m.elapsed_time_seconds,
         taskId: m.task_id,
       });
-      session.client.sendSessionProtocolMessage(envelope);
+      session.client.sendSessionProtocolMessage(envelope as any);
     }
 
     // Forward prompt suggestion to session protocol
@@ -1349,7 +1360,7 @@ export async function claudeRemoteLauncher(
           t: "prompt-suggestion",
           suggestion,
         });
-        session.client.sendSessionProtocolMessage(envelope);
+        session.client.sendSessionProtocolMessage(envelope as any);
       }
     }
 
@@ -1363,7 +1374,7 @@ export async function claudeRemoteLauncher(
         t: "session-state-changed",
         state: m.state,
       });
-      session.client.sendSessionProtocolMessage(envelope);
+      session.client.sendSessionProtocolMessage(envelope as any);
     }
 
     // Convert SDK message to log format and send to client
@@ -2298,7 +2309,7 @@ export async function claudeRemoteLauncher(
               autoCompactThreshold: ctx.autoCompactThreshold,
               messageBreakdown: ctx.messageBreakdown,
             });
-            session.client.sendSessionProtocolMessage(envelope);
+            session.client.sendSessionProtocolMessage(envelope as any);
           },
           onMaxTurnsReached: () => {
             logger.debug(
@@ -2307,7 +2318,7 @@ export async function claudeRemoteLauncher(
             const envelope = createEnvelope("agent", {
               t: "needs-continue",
             });
-            session.client.sendSessionProtocolMessage(envelope);
+            session.client.sendSessionProtocolMessage(envelope as any);
           },
           onReady: async () => {
             // Stop mid-turn drain before flushing — prevents race with nextMessage()

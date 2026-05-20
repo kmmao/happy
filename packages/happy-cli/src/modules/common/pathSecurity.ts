@@ -1,4 +1,5 @@
-import { resolve } from 'path';
+import { resolve } from 'node:path';
+import { realpathSync } from 'node:fs';
 export interface PathValidationResult {
     valid: boolean;
     error?: string;

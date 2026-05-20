@@ -1,3 +1,5 @@
+import { logger } from '@/ui/logger';
+import type { SDKUserMessage } from '@/claude/sdk';
 
 /**
  * An async iterable message queue that allows pushing messages and consuming them asynchronously

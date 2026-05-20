@@ -335,7 +335,7 @@ export async function claudeLocal(opts: {
               logger.info(
                 `[ClaudeLocal] Sandbox enabled: workspace=${opts.sandboxConfig.workspaceRoot ?? opts.path}, network=${opts.sandboxConfig.networkMode}`,
               );
-            } catch {
+            } catch (error) {
               logger.warn(
                 "[ClaudeLocal] Failed to initialize sandbox; continuing without sandbox.",
                 error,
@@ -408,7 +408,7 @@ export async function claudeLocal(opts: {
           if (cleanupSandbox) {
             try {
               await cleanupSandbox();
-            } catch {
+            } catch (error) {
               logger.warn(
                 "[ClaudeLocal] Failed to reset sandbox after session exit.",
                 error,

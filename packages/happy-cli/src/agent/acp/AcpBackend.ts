@@ -97,7 +97,7 @@ import {
 import {
   type SessionUpdate,
   type HandlerContext,
-  _DEFAULT_TOOL_CALL_TIMEOUT_MS,
+  handleAgentMessageChunk,
   handleAgentThoughtChunk,
   handleToolCallUpdate,
   handleToolCall,

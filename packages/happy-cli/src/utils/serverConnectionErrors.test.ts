@@ -361,7 +361,7 @@ describe('startOfflineReconnection', () => {
                 if (attemptCount < 2) throw createAxiosError(403);
             };
 
-            const { handle } = createTestHandle({ healthCheck });
+            const { handle, onNotify } = createTestHandle({ healthCheck });
 
             await waitForReconnection(handle);
 

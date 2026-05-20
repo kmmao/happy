@@ -1,7 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
   parseAndValidateSettings,
-  type _SettingsParseResult,
 } from "./settingsParser";
 
 describe("parseAndValidateSettings", () => {

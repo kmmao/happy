@@ -20,8 +20,9 @@ import {
   type WorktreeCleanupInput,
 } from "@/utils/worktreeCleanup";
 import { initialMachineMetadata } from "@/daemon/run";
-import { _configuration } from "@/_configuration";
-import _packageJson from "../../package.json";
+import { configuration as _configuration } from "@/configuration";
+import { default as _packageJson } from "../../package.json";
+import { logger } from "@/ui/logger";
 import { hashObject } from "@/utils/deterministicJson";
 import { startHappyServer } from "@/claude/utils/startHappyServer";
 import { MessageBuffer } from "@/ui/ink/messageBuffer";
@@ -32,6 +33,9 @@ import { stopCaffeinate } from "@/utils/caffeinate";
 import { connectionState } from "@/utils/serverConnectionErrors";
 import { setupOfflineReconnection } from "@/utils/setupOfflineReconnection";
 import type { ApiSessionClient } from "@/api/apiSession";
+import { MessageQueue2 } from "@/utils/MessageQueue2";
+import { join } from "node:path";
+import { projectPath } from "@/projectPath";
 
 import { createGeminiBackend } from "@/agent/factories/gemini";
 import type { AgentBackend, AgentMessage } from "@/agent";
@@ -43,12 +47,12 @@ import type { GeminiMode, CodexMessagePayload } from "@/gemini/types";
 import type { PermissionMode } from "@/api/types";
 import {
   GEMINI_MODEL_ENV,
-  _DEFAULT_GEMINI_MODEL,
   CHANGE_TITLE_INSTRUCTION,
 } from "@/gemini/constants";
 import {
   saveGeminiModelToConfig,
   getInitialGeminiModel,
+  readGeminiLocalConfig,
 } from "@/gemini/utils/config";
 import {
   parseOptionsFromText,
@@ -718,7 +722,6 @@ export async function runGemini(opts: {
             session.keepAlive(thinking, "remote");
             accumulatedResponse = "";
             isResponseInProgress = false;
-            currentResponseMessageId = null;
 
             // Show error in CLI UI - handle object errors properly
             let errorMessage = "Unknown error";
@@ -755,9 +758,6 @@ export async function runGemini(opts: {
           break;
 
         case "tool-call":
-          // Track that we had tool calls in this turn (for task_complete)
-          hadToolCallInTurn = true;
-
           // Show tool call in UI like Codex does
           const toolArgs = msg.args
             ? JSON.stringify(msg.args).substring(0, 100)
@@ -801,7 +801,6 @@ export async function runGemini(opts: {
             msg.callId?.includes("change_title") ||
             msg.toolName === "happy__change_title"
           ) {
-            changeTitleCompleted = true;
             logger.debug("[gemini] change_title completed");
           }
 
@@ -1279,15 +1278,7 @@ export async function runGemini(opts: {
         // This ensures a new assistant message will be created (not updating previous one)
         accumulatedResponse = "";
         isResponseInProgress = false;
-        hadToolCallInTurn = false;
         taskStartedSent = false; // Reset so new turn can send task_started
-
-        // Track if this prompt contains change_title instruction
-        // If so, don't send task_complete until change_title is completed
-        pendingChangeTitle =
-          message.message.includes("change_title") ||
-          message.message.includes("happy__change_title");
-        changeTitleCompleted = false;
 
         if (!geminiBackend || !acpSessionId) {
           throw new Error("Gemini backend or session not initialized");
@@ -1561,9 +1552,6 @@ export async function runGemini(opts: {
         });
 
         // Reset tracking flags
-        hadToolCallInTurn = false;
-        pendingChangeTitle = false;
-        changeTitleCompleted = false;
         taskStartedSent = false;
 
         thinking = false;

@@ -3,7 +3,6 @@ import {
   applyFlagSettings,
   applyFlagSettingsFromModeDiff,
   createAppliedSettingsState,
-  type _AppliedSettingsState,
 } from "./applyFlagSettings";
 import type { EnhancedMode } from "@/claude/loop";
 
