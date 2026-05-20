@@ -1,5 +1,6 @@
 import { AuthCredentials } from '@/auth/tokenStorage';
 import { backoff } from '@/utils/time';
+import { NonRetryableError } from '@/utils/time';
 import { getServerUrl } from './serverConfig';
 
 //
@@ -15,10 +16,12 @@ export interface KvItem {
 export interface KvListParams {
     prefix?: string;
     limit?: number;
+    cursor?: string;
 }
 
 export interface KvListResponse {
     items: KvItem[];
+    nextCursor?: string;
 }
 
 export interface KvBulkGetRequest {
@@ -84,7 +87,8 @@ export async function kvGet(
         }
 
         if (!response.ok) {
-            throw new Error(`Failed to get KV value: ${response.status}`);
+            const ErrorClass = response.status >= 400 && response.status < 500 ? NonRetryableError : Error;
+            throw new ErrorClass(`Failed to get KV value: ${response.status}`);
         }
 
         const data = await response.json() as KvItem;
@@ -106,7 +110,10 @@ export async function kvList(
         queryParams.append('prefix', params.prefix);
     }
     if (params.limit !== undefined) {
-        queryParams.append('limit', params.limit.toString());
+        queryParams.append('limit', Math.min(params.limit, 1000).toString());
+    }
+    if (params.cursor) {
+        queryParams.append('cursor', params.cursor);
     }
 
     const url = queryParams.toString()
@@ -121,7 +128,8 @@ export async function kvList(
         });
 
         if (!response.ok) {
-            throw new Error(`Failed to list KV items: ${response.status}`);
+            const ErrorClass = response.status >= 400 && response.status < 500 ? NonRetryableError : Error;
+            throw new ErrorClass(`Failed to list KV items: ${response.status}`);
         }
 
         const data = await response.json() as KvListResponse;
@@ -157,7 +165,8 @@ export async function kvBulkGet(
         });
 
         if (!response.ok) {
-            throw new Error(`Failed to bulk get KV values: ${response.status}`);
+            const ErrorClass = response.status >= 400 && response.status < 500 ? NonRetryableError : Error;
+            throw new ErrorClass(`Failed to bulk get KV values: ${response.status}`);
         }
 
         const data = await response.json() as KvBulkGetResponse;
@@ -200,7 +209,8 @@ export async function kvMutate(
         }
 
         if (!response.ok) {
-            throw new Error(`Failed to mutate KV values: ${response.status}`);
+            const ErrorClass = response.status >= 400 && response.status < 500 ? NonRetryableError : Error;
+            throw new ErrorClass(`Failed to mutate KV values: ${response.status}`);
         }
 
         const data = await response.json() as KvMutateSuccessResponse;
@@ -257,6 +267,31 @@ export async function kvDelete(
 }
 
 /**
+ * List all key-value pairs matching params, auto-paginating with cursor.
+ * Use this when you need more than 1000 items.
+ */
+export async function kvListAll(
+    credentials: AuthCredentials,
+    params: Omit<KvListParams, 'cursor' | 'limit'> & { pageSize?: number }
+): Promise<KvItem[]> {
+    const pageSize = params.pageSize ?? 1000;
+    const allItems: KvItem[] = [];
+    let cursor: string | undefined;
+
+    do {
+        const response = await kvList(credentials, {
+            prefix: params.prefix,
+            limit: pageSize,
+            cursor,
+        });
+        allItems.push(...response.items);
+        cursor = response.nextCursor;
+    } while (cursor);
+
+    return allItems;
+}
+
+/**
  * Get keys with a specific prefix
  */
 export async function kvGetByPrefix(
@@ -264,6 +299,6 @@ export async function kvGetByPrefix(
     prefix: string,
     limit: number = 100
 ): Promise<KvItem[]> {
-    const response = await kvList(credentials, { prefix, limit });
+    const response = await kvList(credentials, { prefix, limit: Math.min(limit, 1000) });
     return response.items;
 }

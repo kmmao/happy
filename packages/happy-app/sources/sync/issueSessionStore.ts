@@ -9,7 +9,7 @@ import { create } from "zustand";
 import { AsyncLock } from "@/utils/lock";
 import { useShallow } from "zustand/react/shallow";
 import { sync } from "./sync";
-import { kvList, kvMutate, type KvMutation, type KvItem } from "./apiKv";
+import { kvListAll, kvMutate, type KvItem } from "./apiKv";
 import {
   type IssueSessionLink,
   type IssueSessionLinkData,
@@ -122,12 +122,11 @@ export const issueSessionStore = create<IssueSessionStore>()((set, get) => ({
           return;
         }
 
-        const response = await kvList(credentials, {
+        const items = await kvListAll(credentials, {
           prefix: "issueSession/",
-          limit: 500,
         });
 
-        const decrypted = await Promise.all(response.items.map(decryptKvItem));
+        const decrypted = await Promise.all(items.map(decryptKvItem));
 
         const loaded: Record<string, IssueSessionLink> = {};
         for (const link of decrypted) {

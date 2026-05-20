@@ -52,7 +52,7 @@ export function kvRoutes(app: Fastify) {
         schema: {
             querystring: z.object({
                 prefix: z.string().optional(),
-                limit: z.coerce.number().int().min(1).max(100).default(100),
+                limit: z.coerce.number().int().min(1).max(1000).default(100),
                 cursor: z.string().optional()
             }),
             response: {
