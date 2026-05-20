@@ -29,6 +29,8 @@ export const TailscaleServeEntrySchema = z.object({
 
 export type TailscaleServeEntry = z.infer<typeof TailscaleServeEntrySchema>;
 
+export type TailscaleStatus = "connected" | "disconnected" | "not-installed";
+
 export const TailscaleInfoSchema = z.object({
   status: z.enum(["connected", "disconnected", "not-installed"]),
   ipv4: z.string().optional(),
