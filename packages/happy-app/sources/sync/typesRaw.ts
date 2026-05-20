@@ -43,6 +43,7 @@ const agentEventSchema = z.discriminatedUnion("type", [
   }),
   z.object({
     type: z.literal("ready"),
+    source: z.enum(["turn-end"]).optional(),
     model: z.string().optional(),
     usage: z
       .object({
@@ -1014,6 +1015,7 @@ function normalizeSessionEnvelope(
       ...(isSidechain ? { parentRef: parentUUID } : {}),
       content: {
         type: "ready",
+        source: "turn-end",
         ...(envelope.ev.model !== undefined
           ? { model: envelope.ev.model }
           : {}),

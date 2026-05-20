@@ -327,6 +327,13 @@ export function reducer(
       state.messageIds.set(msg.id, msg.id);
       hasReadyEvent = true;
 
+      // Legacy ready events are lifecycle-only (idle/notifications). Codex also
+      // emits a session-protocol turn-end for the visible turn summary; rendering
+      // both shows duplicate cumulative token badges for the same turn.
+      if (isLegacyLifecycleOnlyReadyEvent(msg.content)) {
+        continue;
+      }
+
       // Store actual model ID reported by CLI (e.g. "claude-opus-4-6")
       if (msg.content.model) {
         state.resolvedModelId = msg.content.model;
@@ -1572,6 +1579,20 @@ function processUsageData(
       currentTurnStartedAt: state.latestUsage?.currentTurnStartedAt,
     };
   }
+}
+
+function isLegacyLifecycleOnlyReadyEvent(
+  event: Extract<AgentEvent, { type: "ready" }>,
+): boolean {
+  return (
+    event.source !== "turn-end" &&
+    event.model === undefined &&
+    event.usage === undefined &&
+    event.durationMs === undefined &&
+    event.totalCostUsd === undefined &&
+    event.numTurns === undefined &&
+    event.modelUsage === undefined
+  );
 }
 
 function convertReducerMessageToMessage(

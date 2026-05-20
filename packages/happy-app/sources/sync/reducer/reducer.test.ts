@@ -2849,6 +2849,50 @@ describe('reducer', () => {
             expect(result.hasReadyEvent).toBe(true);
         });
 
+        it('renders session-protocol turn-end ready but hides duplicate legacy ready', () => {
+            const state = createReducer();
+            const result = reducer(state, [
+                {
+                    id: 'usage-1',
+                    localId: null,
+                    createdAt: 1000,
+                    role: 'event',
+                    content: {
+                        type: 'usage-stats',
+                        usage: {
+                            input_tokens: 100,
+                            output_tokens: 25,
+                        },
+                    },
+                    isSidechain: false,
+                },
+                {
+                    id: 'turn-end-1',
+                    localId: null,
+                    createdAt: 1001,
+                    role: 'event',
+                    content: { type: 'ready', source: 'turn-end' },
+                    isSidechain: false,
+                },
+                {
+                    id: 'ready-legacy-1',
+                    localId: null,
+                    createdAt: 1002,
+                    role: 'event',
+                    content: { type: 'ready' },
+                    isSidechain: false,
+                },
+            ]);
+
+            const readyMessages = result.messages.filter(
+                (message) =>
+                    message.kind === 'agent-event' &&
+                    message.event.type === 'ready',
+            );
+            expect(readyMessages).toHaveLength(1);
+            expect(result.hasReadyEvent).toBe(true);
+        });
+
         it('hides turn-start lifecycle messages', () => {
             const state = createReducer();
             const result = reducer(state, [{
