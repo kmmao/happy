@@ -21,12 +21,26 @@ let mergeTimer: ReturnType<typeof setInterval> | null = null;
  * Projects with decay/merge disabled are skipped at runtime.
  */
 export function startKnowledgeLifecycleScheduler(): void {
-    decayTimer = setInterval(() => {
-        void runGlobalDecayArchive();
+    decayTimer = setInterval(async () => {
+        const start = Date.now();
+        log({ module: "knowledge-lifecycle" }, "decay job started");
+        try {
+            await runGlobalDecayArchive();
+            log({ module: "knowledge-lifecycle" }, `decay job completed in ${Date.now() - start}ms`);
+        } catch (err) {
+            log({ module: "knowledge-lifecycle" }, `decay job failed after ${Date.now() - start}ms`, err);
+        }
     }, DECAY_INTERVAL_MS);
 
-    mergeTimer = setInterval(() => {
-        void runGlobalMergeJob();
+    mergeTimer = setInterval(async () => {
+        const start = Date.now();
+        log({ module: "knowledge-lifecycle" }, "merge job started");
+        try {
+            await runGlobalMergeJob();
+            log({ module: "knowledge-lifecycle" }, `merge job completed in ${Date.now() - start}ms`);
+        } catch (err) {
+            log({ module: "knowledge-lifecycle" }, `merge job failed after ${Date.now() - start}ms`, err);
+        }
     }, MERGE_INTERVAL_MS);
 
     log({ module: "knowledge-lifecycle" }, "Lifecycle scheduler started (decay: 1h, merge: 6h — project config controls per-project execution)");
