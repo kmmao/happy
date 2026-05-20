@@ -1798,6 +1798,23 @@ export async function claudeRemoteLauncher(
             break;
           }
 
+          // `continue` requires a fresh SDK query with sdkOptions.continue=true.
+          // It cannot be mid-turn pushed — put it back and let nextMessage()
+          // handle it after the current turn finishes.
+          if (item.mode.continue) {
+            logger.debug(
+              "[remote]: mid-turn drain — continue flag detected, deferring to nextMessage",
+            );
+            session.queue.push(
+              item.message,
+              item.mode,
+              undefined,
+              { priority: item.priority, kind: "continue", source: "user" },
+            );
+            executionGuard.requestRestart("continue");
+            break;
+          }
+
           // Handle shell commands directly without sending to Claude
           const specialCmd = parseSpecialCommand(item.message);
           if (specialCmd.type === "shell" && specialCmd.shellCommand) {
