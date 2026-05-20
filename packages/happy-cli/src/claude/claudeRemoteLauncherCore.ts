@@ -1451,6 +1451,12 @@ export async function claudeRemoteLauncher(
         }
       }
 
+      // When text/thinking was already sent as real-time text-delta stream
+      // events, suppress the duplicate full-text envelopes from the log message.
+      if (logMessage.type === "assistant" && streamEventState.textStreamed) {
+        session.client.suppressAssistantTextEnvelopes();
+      }
+
       // Queue message with optional delay for tool calls
       if (logMessage.type === "assistant" && message.type === "assistant") {
         const assistantMsg = message as SDKAssistantMessage;

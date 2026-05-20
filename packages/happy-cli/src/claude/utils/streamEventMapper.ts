@@ -46,6 +46,8 @@ export interface StreamEventMapperState {
   streamCounter: number;
   /** Whether TTFT has been logged for this turn. */
   ttftLogged: boolean;
+  /** Whether any text/thinking deltas were streamed in this query cycle. */
+  textStreamed: boolean;
 }
 
 export function createStreamEventMapperState(): StreamEventMapperState {
@@ -53,6 +55,7 @@ export function createStreamEventMapperState(): StreamEventMapperState {
     activeStreams: new Map(),
     streamCounter: 0,
     ttftLogged: false,
+    textStreamed: false,
   };
 }
 
@@ -93,6 +96,7 @@ export function mapStreamEventToEnvelope(
   const streamId = state.activeStreams.get(evt.index ?? 0) ?? `cb-${evt.index ?? 0}`;
 
   if (delta.type === "text_delta" && delta.text) {
+    state.textStreamed = true;
     return createEnvelope(
       "agent",
       {
@@ -105,6 +109,7 @@ export function mapStreamEventToEnvelope(
   }
 
   if (delta.type === "thinking_delta" && delta.thinking) {
+    state.textStreamed = true;
     return createEnvelope(
       "agent",
       {

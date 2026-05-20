@@ -218,6 +218,11 @@ export class ApiSessionClient extends EventEmitter {
   private accumulatedTurnUsage: Usage | null = null;
   private modelModeKey: string | undefined;
   private subagentFlushTimer: ReturnType<typeof setTimeout> | null = null;
+  /**
+   * When true, the next assistant message's text/thinking envelopes are suppressed
+   * because they were already sent as real-time text-delta stream events.
+   */
+  private _suppressAssistantTextEnvelopes = false;
   private readonly sendSync: InvalidateSync;
   private readonly receiveSync: InvalidateSync;
   // Track last reported cumulative cost to compute deltas.
@@ -228,6 +233,14 @@ export class ApiSessionClient extends EventEmitter {
   /** Current session protocol turn ID, or null if no turn is open. */
   get currentTurnId(): string | null {
     return this.claudeSessionProtocolState.currentTurnId;
+  }
+
+  /**
+   * Mark that text/thinking content was already streamed as text-delta envelopes.
+   * The next assistant message's text envelopes will be suppressed to avoid duplicates.
+   */
+  suppressAssistantTextEnvelopes() {
+    this._suppressAssistantTextEnvelopes = true;
   }
 
   constructor(token: string, session: Session) {
@@ -631,7 +644,18 @@ export class ApiSessionClient extends EventEmitter {
     // Extract subagent from mapped envelopes for usage-update attribution
     const mappedSubagent = mapped.envelopes.find((e) => e.subagent)?.subagent;
 
+    // When text was already streamed as text-delta envelopes, suppress the
+    // duplicate full-text envelopes from the complete assistant message.
+    const suppressText =
+      this._suppressAssistantTextEnvelopes && body.type === "assistant";
+    if (suppressText) {
+      this._suppressAssistantTextEnvelopes = false;
+    }
+
     for (const envelope of mapped.envelopes) {
+      if (suppressText && envelope.ev.t === "text") {
+        continue;
+      }
       this.sendSessionProtocolMessage(envelope);
     }
 
