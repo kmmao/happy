@@ -907,6 +907,12 @@ function SessionViewInner({
   pendingQueueRef.current = pendingQueue;
 
   // Drain one message from the pending queue each time the AI becomes idle.
+  // Also watch `pendingQueue.length` — the onSend handler uses the debounced
+  // `sessionStatus.state === "thinking"` to decide whether to queue, while
+  // `isRunning` is computed from the raw (un-debounced) session state. During
+  // the THINKING_EXIT_DELAY_MS window these diverge: isRunning is already
+  // false but sessionStatus still shows "thinking". A message queued during
+  // that window would be stuck because isRunning never transitions again.
   React.useEffect(() => {
     if (!isRunning && pendingQueueRef.current.length > 0) {
       const next = storage.getState().shiftPendingQueue(sessionId);
@@ -916,7 +922,7 @@ function SessionViewInner({
         });
       }
     }
-  }, [isRunning, sessionId]);
+  }, [isRunning, sessionId, pendingQueue.length]);
 
   // Auto-close preview when the previewed item is removed from the queue.
   React.useEffect(() => {
