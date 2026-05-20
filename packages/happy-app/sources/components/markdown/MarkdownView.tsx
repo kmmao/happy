@@ -36,6 +36,13 @@ export type Option = {
   title: string;
 };
 
+// Inline spans inside table cells must inherit the cell's font metrics —
+// otherwise inline code (which hardcodes fontSize/lineHeight in the `code`
+// span style) inflates rows in one column but not another, and the
+// column-first layout has no row-sync mechanism to compensate. Keep these
+// numbers in sync with `tableHeaderText` / `tableCellText` styles below.
+const TABLE_TEXT_SIZE = { fontSize: 13, lineHeight: 18 } as const;
+
 export const MarkdownView = React.memo(
   (props: { markdown: string; onOptionPress?: (option: Option) => void; optionStatsResolver?: AutoOptionStatsResolver; optionScoringMeta?: { modelUsed: string; provider: string } }) => {
     const blocks = React.useMemo(
@@ -638,7 +645,14 @@ function RenderOptionsBlock(props: {
   );
 }
 
-function RenderSpans(props: { spans: MarkdownSpan[]; baseStyle?: any }) {
+// `sizeOverride` is applied last so it wins over span styles (notably `code`,
+// which hardcodes fontSize/lineHeight). Used inside table cells to keep inline
+// code from inflating row height and breaking column-first row alignment.
+function RenderSpans(props: {
+  spans: MarkdownSpan[];
+  baseStyle?: any;
+  sizeOverride?: { fontSize: number; lineHeight: number };
+}) {
   return (
     <>
       {props.spans.map((span, index) => {
@@ -652,7 +666,7 @@ function RenderSpans(props: { spans: MarkdownSpan[]; baseStyle?: any }) {
               href={span.url as any}
               target="_blank"
               rel="noopener noreferrer"
-              style={[style.link, span.styles.map((s) => style[s])]}
+              style={[style.link, span.styles.map((s) => style[s]), props.sizeOverride]}
             >
               {span.text}
             </Link>
@@ -662,7 +676,7 @@ function RenderSpans(props: { spans: MarkdownSpan[]; baseStyle?: any }) {
             <Text
               key={index}
               selectable
-              style={[props.baseStyle, span.styles.map((s) => style[s])]}
+              style={[props.baseStyle, span.styles.map((s) => style[s]), props.sizeOverride]}
             >
               {span.text}
             </Text>
@@ -721,7 +735,11 @@ function RenderTableBlock(props: {
                   ]}
                 >
                   <Text style={style.tableHeaderText}>
-                    <RenderSpans spans={parseMarkdownSpans(header || '#', false)} baseStyle={style.tableHeaderText} />
+                    <RenderSpans
+                      spans={parseMarkdownSpans(header || '#', false)}
+                      baseStyle={style.tableHeaderText}
+                      sizeOverride={TABLE_TEXT_SIZE}
+                    />
                   </Text>
                 </View>
                 {/* Data cells for this column */}
@@ -743,7 +761,11 @@ function RenderTableBlock(props: {
                           !cellValue && style.tableCellEmpty,
                         ]}
                       >
-                        <RenderSpans spans={parseMarkdownSpans(cellValue || '—', false)} baseStyle={style.tableCellText} />
+                        <RenderSpans
+                          spans={parseMarkdownSpans(cellValue || '—', false)}
+                          baseStyle={style.tableCellText}
+                          sizeOverride={TABLE_TEXT_SIZE}
+                        />
                       </Text>
                     </View>
                   );
