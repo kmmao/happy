@@ -98,6 +98,7 @@ describe("Codex app-server notification schema contract subset", () => {
     );
     const ajv = new Ajv({
       allErrors: true,
+      formats: { int32: true, int64: true, uint: true, uint16: true, uint32: true },
     });
 
     const fixtureNames = [

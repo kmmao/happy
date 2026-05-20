@@ -524,7 +524,7 @@ describe('printOfflineWarning', () => {
 
         // New unified format via connectionState.fail() → logger.warn
         expect(logger.warn).toHaveBeenCalledWith(
-            expect.stringContaining('⚠️  Happy server unreachable, offline mode with auto-reconnect enabled')
+            expect.stringContaining('⚠️  Claude server unreachable, offline mode with auto-reconnect enabled')
         );
         expect(logger.warn).toHaveBeenCalledWith(
             expect.stringContaining('Server connection failed')

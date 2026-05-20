@@ -97,7 +97,7 @@ describe('Api server error handling', () => {
 
             expect(result).toBeNull();
             expect(logger.warn).toHaveBeenCalledWith(
-                expect.stringContaining('⚠️  Happy server unreachable')
+                expect.stringContaining('⚠️  Claude server unreachable')
             );
         });
 
@@ -116,7 +116,7 @@ describe('Api server error handling', () => {
 
             expect(result).toBeNull();
             expect(logger.warn).toHaveBeenCalledWith(
-                expect.stringContaining('⚠️  Happy server unreachable')
+                expect.stringContaining('⚠️  Claude server unreachable')
             );
         });
 
@@ -135,7 +135,7 @@ describe('Api server error handling', () => {
 
             expect(result).toBeNull();
             expect(logger.warn).toHaveBeenCalledWith(
-                expect.stringContaining('⚠️  Happy server unreachable')
+                expect.stringContaining('⚠️  Claude server unreachable')
             );
         });
 
@@ -158,7 +158,7 @@ describe('Api server error handling', () => {
             expect(result).toBeNull();
             // New unified format via connectionState.fail() → logger.warn
             expect(logger.warn).toHaveBeenCalledWith(
-                expect.stringContaining('⚠️  Happy server unreachable')
+                expect.stringContaining('⚠️  Claude server unreachable')
             );
             expect(logger.warn).toHaveBeenCalledWith(
                 expect.stringContaining('Session creation failed: 404')
@@ -183,7 +183,7 @@ describe('Api server error handling', () => {
 
             expect(result).toBeNull();
             expect(logger.warn).toHaveBeenCalledWith(
-                expect.stringContaining('⚠️  Happy server unreachable')
+                expect.stringContaining('⚠️  Claude server unreachable')
             );
         });
 
@@ -205,7 +205,7 @@ describe('Api server error handling', () => {
 
             expect(result).toBeNull();
             expect(logger.warn).toHaveBeenCalledWith(
-                expect.stringContaining('⚠️  Happy server unreachable')
+                expect.stringContaining('⚠️  Claude server unreachable')
             );
         });
 
@@ -223,7 +223,7 @@ describe('Api server error handling', () => {
 
             // Should not show the offline mode message
             expect(logger.warn).not.toHaveBeenCalledWith(
-                expect.stringContaining('⚠️  Happy server unreachable')
+                expect.stringContaining('⚠️  Claude server unreachable')
             );
         });
     });
@@ -259,7 +259,7 @@ describe('Api server error handling', () => {
             });
 
             expect(logger.warn).toHaveBeenCalledWith(
-                expect.stringContaining('⚠️  Happy server unreachable')
+                expect.stringContaining('⚠️  Claude server unreachable')
             );
         });
 
@@ -290,7 +290,7 @@ describe('Api server error handling', () => {
 
             // New unified format via connectionState.fail() → logger.warn
             expect(logger.warn).toHaveBeenCalledWith(
-                expect.stringContaining('⚠️  Happy server unreachable')
+                expect.stringContaining('⚠️  Claude server unreachable')
             );
             expect(logger.warn).toHaveBeenCalledWith(
                 expect.stringContaining('Machine registration failed: 404')
