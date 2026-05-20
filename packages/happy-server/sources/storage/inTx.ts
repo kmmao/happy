@@ -1,6 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { delay } from "@/utils/delay";
 import { db } from "@/storage/db";
+import { log } from "@/utils/log";
 
 export type Tx = Prisma.TransactionClient;
 
@@ -26,7 +27,7 @@ export async function inTx<T>(fn: (tx: Tx) => Promise<T>): Promise<T> {
                 try {
                     callback();
                 } catch (e) { // Ignore errors in callbacks because they are used mostly for notifications
-                    console.error(e);
+                    log({ module: 'inTx', level: 'error' }, 'afterTx callback error', e instanceof Error ? e.message : String(e));
                 }
             }
             return result.result;
