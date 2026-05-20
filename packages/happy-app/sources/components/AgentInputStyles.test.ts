@@ -1,4 +1,16 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
+vi.mock("react-native", () => ({
+    Platform: {
+        OS: "ios",
+        select: (options: Record<string, any>) => options.ios ?? options.default,
+    },
+    StyleSheet: {
+        create: (styles: any) => styles,
+        hairlineWidth: 1,
+    },
+}));
+
 import {
     getFavoriteSlashChipGlassStyle,
     getFloatingGlassChipStyle,

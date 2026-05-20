@@ -65,6 +65,35 @@ vi.mock("./sync", () => ({
     },
 }));
 
+vi.mock("react-native-mmkv", () => ({
+    MMKV: class {
+        getString() { return undefined; }
+        set() {}
+        delete() {}
+        clearAll() {}
+    },
+}));
+
+vi.mock("react-native", () => ({
+    Platform: { OS: "web" },
+}));
+
+vi.mock("./serverConfig", () => ({
+    getServerUrl: () => "http://localhost:3000",
+}));
+
+vi.mock("./apiOptionGenerate", () => ({
+    generateOptionsRemote: vi.fn(),
+}));
+
+vi.mock("@/log", () => ({
+    log: {
+        log: vi.fn(),
+        warn: vi.fn(),
+        error: vi.fn(),
+    },
+}));
+
 describe("shouldPublishCountdownRemaining", () => {
     it("does not publish sub-second countdown changes", () => {
         expect(shouldPublishCountdownRemaining(15_000, 14_750)).toBe(false);

@@ -77,19 +77,19 @@ describe("messageCache session preview", () => {
   });
 
   it("keeps latest user request preview even when cached messages are trimmed", () => {
-    const messages = Array.from({ length: 351 }, (_, index) =>
+    const messages = Array.from({ length: 5001 }, (_, index) =>
       userMessage(`message-${index}`, `message ${index}`, index),
     );
 
     saveMessageCache(
       "session-1",
       messages,
-      351,
+      5001,
       { text: "oldest important request", isAutoOptionSend: true },
     );
 
     const cached = loadMessageCache("session-1");
-    expect(cached?.messages).toHaveLength(350);
+    expect(cached?.messages).toHaveLength(5000);
     expect(cached?.isTrimmed).toBe(true);
     expect(cached?.latestUserRequestPreview).toEqual({
       text: "oldest important request",

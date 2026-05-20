@@ -27,6 +27,19 @@ vi.mock("react-native", () => ({
   },
 }));
 
+vi.mock("react-native-mmkv", () => ({
+  MMKV: class {
+    getString() { return undefined; }
+    set() {}
+    delete() {}
+    clearAll() {}
+  },
+}));
+
+vi.mock("./serverConfig", () => ({
+  getServerUrl: () => "http://localhost:3000",
+}));
+
 vi.mock("./storage", () => ({
   storage: {
     getState: mocks.getStateMock,
