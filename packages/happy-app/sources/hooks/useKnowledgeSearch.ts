@@ -11,6 +11,7 @@
 import * as React from "react";
 import { TokenStorage } from "@/auth/tokenStorage";
 import { getServerUrl } from "@/sync/serverConfig";
+import { throwIfNotOk } from "@/utils/http";
 
 export interface KnowledgeSearchResult {
     id: string;
@@ -79,9 +80,7 @@ export function useKnowledgeSearch() {
             // Discard stale responses
             if (requestIdRef.current !== currentRequestId) return;
 
-            if (!response.ok) {
-                throw new Error(`Search failed: ${response.status}`);
-            }
+            throwIfNotOk(response, 'Search failed');
 
             const data = (await response.json()) as SearchResponse;
 

@@ -10,6 +10,7 @@ import { TokenStorage } from "@/auth/tokenStorage";
 import { getServerUrl } from "@/sync/serverConfig";
 import { useSessionKnowledgeAccessRevision } from "@/sync/storage";
 import { backoff } from "@/utils/time";
+import { throwIfNotOk } from "@/utils/http";
 import {
     deriveCollectionViewState,
     type CollectionViewState,
@@ -111,9 +112,7 @@ export function useSessionKnowledgeAccesses(
                         },
                     },
                 );
-                if (!response.ok) {
-                    throw new Error(`Failed to fetch knowledge accesses: ${response.status}`);
-                }
+                throwIfNotOk(response, 'Failed to fetch knowledge accesses');
                 return (await response.json()) as AccessesResponse;
             });
 

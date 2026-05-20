@@ -13,6 +13,7 @@ import * as React from "react";
 import { TokenStorage } from "@/auth/tokenStorage";
 import { getServerUrl } from "@/sync/serverConfig";
 import { backoff } from "@/utils/time";
+import { throwIfNotOk } from "@/utils/http";
 
 interface KnowledgeEntry {
     id: string;
@@ -111,7 +112,7 @@ export function useProjectKnowledge(projectServerId: string | undefined) {
                 `${apiEndpoint}/v1/projects/${projectServerId}/knowledge?${params}`,
                 { headers },
             );
-            if (!response.ok) throw new Error(`Failed to fetch knowledge: ${response.status}`);
+            throwIfNotOk(response, 'Failed to fetch knowledge');
             return (await response.json()) as KnowledgeListResponse;
         }).catch(() => null);
     }, [projectServerId]);
@@ -135,7 +136,7 @@ export function useProjectKnowledge(projectServerId: string | undefined) {
                         `${API_ENDPOINT}/v1/projects/${projectServerId}/profile`,
                         { headers },
                     );
-                    if (!response.ok) throw new Error(`Failed to fetch profile: ${response.status}`);
+                    throwIfNotOk(response, 'Failed to fetch profile');
                     return (await response.json()) as ProfileResponse;
                 }).catch(() => null),
             ]);

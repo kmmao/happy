@@ -13,6 +13,7 @@ import {
     useSessionKnowledgeChangesRevision,
 } from "@/sync/storage";
 import { backoff } from "@/utils/time";
+import { throwIfNotOk } from "@/utils/http";
 import {
     deriveCollectionViewState,
     type CollectionViewState,
@@ -104,9 +105,7 @@ export function useSessionKnowledge(
                         },
                     },
                 );
-                if (!response.ok) {
-                    throw new Error(`Failed to fetch session knowledge: ${response.status}`);
-                }
+                throwIfNotOk(response, 'Failed to fetch session knowledge');
                 return (await response.json()) as KnowledgeListResponse;
             });
 

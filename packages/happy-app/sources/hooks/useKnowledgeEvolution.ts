@@ -9,6 +9,7 @@ import * as React from "react";
 import { TokenStorage } from "@/auth/tokenStorage";
 import { getServerUrl } from "@/sync/serverConfig";
 import { backoff } from "@/utils/time";
+import { throwIfNotOk } from "@/utils/http";
 import {
     deriveCollectionViewState,
     type CollectionViewState,
@@ -84,9 +85,7 @@ export function useKnowledgeEvolution(
                         },
                     },
                 );
-                if (!response.ok) {
-                    throw new Error(`Failed to fetch chain: ${response.status}`);
-                }
+                throwIfNotOk(response, 'Failed to fetch chain');
                 return (await response.json()) as ChainResponse;
             });
 
