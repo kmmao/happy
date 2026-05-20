@@ -17,6 +17,7 @@ import { backoff, delay } from "@/utils/time";
 import { configuration } from "@/configuration";
 import { RawJSONLines } from "@/claude/types";
 import { randomUUID } from "node:crypto";
+import { createId } from "@paralleldrive/cuid2";
 import { AsyncLock } from "@/utils/lock";
 import { RpcHandlerManager } from "./rpc/RpcHandlerManager";
 import { registerCommonHandlers } from "../modules/common/registerCommonHandlers";
@@ -233,6 +234,29 @@ export class ApiSessionClient extends EventEmitter {
   /** Current session protocol turn ID, or null if no turn is open. */
   get currentTurnId(): string | null {
     return this.claudeSessionProtocolState.currentTurnId;
+  }
+
+  /**
+   * Ensure a turn exists for the current query cycle. If no turn is open,
+   * creates one and sends the `turn-start` envelope so the App can associate
+   * subsequent stream events (text-delta) with a valid turn.
+   *
+   * Returns the current (possibly freshly-created) turn ID.
+   */
+  ensureCurrentTurn(): string {
+    if (this.claudeSessionProtocolState.currentTurnId) {
+      return this.claudeSessionProtocolState.currentTurnId;
+    }
+    const turnId = createId();
+    const envelope = createEnvelope(
+      "agent",
+      { t: "turn-start" as const },
+      { turn: turnId },
+    );
+    this.claudeSessionProtocolState.currentTurnId = turnId;
+    this.currentTurnStartTime = Date.now();
+    this.sendSessionProtocolMessage(envelope);
+    return turnId;
   }
 
   /**

@@ -623,14 +623,22 @@ export async function claudeRemoteLauncher(
     // carry raw API SSE chunks (text_delta, thinking_delta) that are
     // too granular for the JSONL log but perfect for real-time App UI.
     if (message.type === "stream_event") {
-      const turnId = session.client.currentTurnId;
+      // Ensure a turn exists before sending text-delta envelopes.
+      // Stream events can arrive before the full assistant message that
+      // normally creates the turn via ensureTurn(). Without a turn the App
+      // drops agent envelopes (typesRaw.ts guard), causing empty responses.
+      const turnId = session.client.ensureCurrentTurn();
       const envelope = mapStreamEventToEnvelope(
         message as unknown as Parameters<typeof mapStreamEventToEnvelope>[0],
         streamEventState,
         turnId,
       );
       if (envelope) {
+        logger.debug(`[stream] text-delta envelope → turn=${turnId}, delta=${JSON.stringify(envelope).slice(0, 200)}`);
         session.client.sendSessionProtocolMessage(envelope as any);
+      } else {
+        const evt = (message as any).event;
+        logger.debug(`[stream] no envelope for event type=${evt?.type}, delta.type=${evt?.delta?.type}`);
       }
       return; // Don't pass stream events through the rest of the pipeline
     }
@@ -1460,8 +1468,15 @@ export async function claudeRemoteLauncher(
 
       // When text/thinking was already sent as real-time text-delta stream
       // events, suppress the duplicate full-text envelopes from the log message.
-      if (logMessage.type === "assistant" && streamEventState.textStreamed) {
-        session.client.suppressAssistantTextEnvelopes();
+      if (logMessage.type === "assistant") {
+        const contentBlocks = Array.isArray((logMessage as any).message?.content)
+          ? (logMessage as any).message.content
+          : [];
+        const blockTypes = contentBlocks.map((b: any) => b.type);
+        logger.debug(`[assistant] blocks=${JSON.stringify(blockTypes)}, textStreamed=${streamEventState.textStreamed}, turnId=${session.client.currentTurnId}`);
+        if (streamEventState.textStreamed) {
+          session.client.suppressAssistantTextEnvelopes();
+        }
       }
 
       // Queue message with optional delay for tool calls
