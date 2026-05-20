@@ -351,7 +351,16 @@ function AgentTextBlock(props: {
   // True when this is the latest agent message AND the session is actively streaming.
   // We use a lightweight StreamingTextView during streaming to avoid re-parsing the
   // full Markdown on every delta. Once streaming stops, we switch back to MarkdownView.
-  const isStreaming = props.isLatestAgent === true && session != null && isSessionRunning(session);
+  //
+  // Once a message has been rendered as MarkdownView (streaming finished), it must
+  // never switch back to StreamingTextView — otherwise sending a new message would
+  // replay the typing animation on the previous reply and lose <options> styling.
+  const sessionRunning = session != null && isSessionRunning(session);
+  const wasRenderedAsMarkdown = React.useRef(false);
+  if (!(props.isLatestAgent === true && sessionRunning)) {
+    wasRenderedAsMarkdown.current = true;
+  }
+  const isStreaming = props.isLatestAgent === true && sessionRunning && !wasRenderedAsMarkdown.current;
 
   // Hide thinking messages unless experiments is enabled
   if (props.message.isThinking && !experiments) {
