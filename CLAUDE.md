@@ -8,7 +8,7 @@ Happy Coder is a mobile/web client system for remotely controlling Claude Code a
 
 ## Monorepo Structure
 
-Yarn v1.22.22 workspaces with 5 packages:
+Yarn v1.22.22 workspaces with 6 packages:
 
 | Package | Path | Purpose | Published As |
 |---------|------|---------|-------------|
@@ -17,6 +17,7 @@ Yarn v1.22.22 workspaces with 5 packages:
 | **happy-app** | `packages/happy-app` | React Native + Expo mobile/web client | App stores |
 | **happy-agent** | `packages/happy-agent` | Remote-only CLI for controlling agents | `@kmmao/happy-agent` on npm |
 | **happy-wire** | `packages/happy-wire` | Shared message wire types and Zod schemas | `@kmmao/happy-wire` on npm |
+| **happy-codium** | `packages/happy-codium` | Electron + Vite + React desktop IDE client (mirrors Codex Desktop) | Private |
 
 ## Common Commands
 
@@ -42,6 +43,12 @@ yarn workspace happy-app android        # App: Android emulator
 
 yarn workspace happy-agent build        # Agent: build (rm dist → tsc → pkgroll)
 yarn workspace happy-agent test         # Agent: build then vitest run
+
+yarn codium                                       # Codium: Electron dev (shortcut)
+yarn workspace @kmmao/happy-codium build          # Codium: electron-vite build
+yarn workspace @kmmao/happy-codium typecheck      # Codium: tsc node + web tsconfigs
+yarn workspace @kmmao/happy-codium test           # Codium: vitest run
+yarn workspace @kmmao/happy-codium rebuild        # Codium: rebuild native modules (better-sqlite3, node-pty)
 ```
 
 **Important**: happy-cli and happy-agent tests require a build first (`$npm_execpath run build && vitest run`). The daemon spawns the built binary directly.

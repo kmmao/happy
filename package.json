@@ -3,6 +3,7 @@
   "private": true,
   "scripts": {
     "cli": "yarn workspace happy-coder cli",
+    "codium": "yarn workspace @kmmao/happy-codium dev",
     "release": "node ./scripts/release.cjs",
     "web": "yarn workspace happy-app web",
     "postinstall": "node ./scripts/postinstall.cjs"
@@ -12,6 +13,7 @@
       "packages/happy-app",
       "packages/happy-agent",
       "packages/happy-cli",
+      "packages/happy-codium",
       "packages/happy-server",
       "packages/happy-wire"
     ],
@@ -22,7 +24,9 @@
       "**/react-native",
       "**/react-native/**",
       "**/react-native-edge-to-edge/**",
-      "**/react-native-incall-manager/**"
+      "**/react-native-incall-manager/**",
+      "@kmmao/happy-codium/**",
+      "@kmmao/happy-codium/**/**"
     ]
   },
   "packageManager": "yarn@1.22.22",
