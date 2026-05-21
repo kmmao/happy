@@ -1892,7 +1892,7 @@ export const AgentInput = React.memo(
                 editable={!isInputDisabled}
                 onKeyPress={handleKeyPress}
                 onStateChange={handleInputStateChange}
-                maxHeight={120}
+                maxHeight={Platform.OS === "web" ? 480 : 120}
                 onImagePaste={props.images?.onImagePaste}
                 onFilePaste={props.images?.onFilePaste}
                 onLargeTextPaste={props.onLargeTextPaste}
