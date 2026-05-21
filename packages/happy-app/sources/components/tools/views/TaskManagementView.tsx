@@ -32,7 +32,11 @@ function extractResultText(result: any): string {
 function buildTaskSubjectMap(messages: readonly Message[]): TaskSubjectMap {
     const map = new Map<string, string>();
     let nextAutoId = 1;
-    for (const msg of messages) {
+    // Messages are stored newest-first (compareMessagesDesc). Iterate in
+    // reverse so TaskCreate calls are visited in chronological order and
+    // auto-assigned IDs match the runtime's sequential numbering.
+    for (let i = messages.length - 1; i >= 0; i--) {
+        const msg = messages[i]!;
         if (msg.kind !== "tool-call") continue;
         if (msg.tool.name === "TaskCreate") {
             const subject = typeof msg.tool.input?.subject === "string" ? msg.tool.input.subject : null;
