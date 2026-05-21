@@ -112,6 +112,7 @@ import { fetchFeed } from "./apiFeed";
 import type { FeedItem } from "./feedTypes";
 import { UserProfile } from "./friendTypes";
 import { resolveMessageModeMeta } from "./messageMeta";
+import { newTraceId } from "./outboundTracer";
 import {
   initMessageCache,
   loadMessageCache,
@@ -162,6 +163,9 @@ type V3PostSessionMessagesResponse = {
 type OutboxMessage = {
   localId: string;
   content: string;
+  /** Trace ID assigned when the message was queued via sendMessage(). Threaded
+   *  through to the HTTP POST so all log lines for one send share the same ID. */
+  sendTraceId: string;
 };
 
 class Sync {
@@ -890,6 +894,9 @@ class Sync {
 
     // Generate local ID (or use provided one)
     const localId = options?.localId ?? randomUUID();
+    // Trace ID ties the "queued" log line to the HTTP POST that actually sends it.
+    const sendTraceId = newTraceId();
+    log.log(`[OUT] [${sendTraceId}] [send]  POST /v3/sessions/${sessionId}/messages  →  queued  localId=${localId}`);
 
     // Determine sentFrom based on platform
     let sentFrom: string;
@@ -955,6 +962,7 @@ class Sync {
     pending.push({
       localId,
       content: encryptedRawRecord,
+      sendTraceId,
     });
 
     this.getSendSync(sessionId)?.invalidate();
@@ -2041,6 +2049,10 @@ class Sync {
     const batch = pending.slice();
     const controller = new AbortController();
     this.sendAbortControllers.set(sessionId, controller);
+    // Use the first message's sendTraceId as the batch trace ID so all log
+    // lines for one send cycle (queued → HTTP start → HTTP result) share one ID.
+    const batchTraceId = batch[0]?.sendTraceId;
+    const batchExtra = `batch=${batch.length} localIds=${batch.map((m) => m.localId).join(",")}`;
     try {
       const response = await apiSocket.request(
         `/v3/sessions/${sessionId}/messages`,
@@ -2056,6 +2068,8 @@ class Sync {
             "Content-Type": "application/json",
           },
           signal: controller.signal,
+          traceId: batchTraceId,
+          extra: batchExtra,
         },
       );
       if (!response.ok) {
