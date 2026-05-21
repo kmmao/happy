@@ -1,5 +1,18 @@
 # Changelog
 
+## 2.30.0 - 2026-05-22
+
+Internal robustness pass on the background-task pipeline. No new features in this release — the change makes race conditions and out-of-order SDK events in the floating task bar fail loudly during development instead of silently leaving a task showing the wrong status.
+
+### Background-Task Stability
+- Added an explicit BackgroundTaskStatus state machine (`running` → `completed` / `failed` / `stopped`, all three terminals absorbing) — defines the lifecycle in one place instead of leaving it implicit in scattered string comparisons
+- Improved task-end handling — status transitions in the task registry are now validated against the state machine, so an out-of-order second `task-end` event can no longer silently flip a finished task into a different terminal status
+- Improved offline cleanup of running tasks — when a session goes offline, the "mark stale tasks as stopped" path is now double-guarded by the same state machine behind the existing running-only filter
+- Documented the one reducer path that intentionally bypasses validation (a `task-start` arriving after `task-end` for the same task is a legitimate wire-level out-of-order SDK event, not a reducer bug)
+
+### Code Health
+- Removed the unused state-machine API from the sub-agent status helper — sub-agent lifecycle is derived purely from the underlying tool call and has no mutable storage, so the parallel container/transition API was dead code outside of tests; the asymmetry with background tasks is now documented in source for future contributors
+
 ## 2.29.0 - 2026-05-22
 
 Surfaces running sub-agents in the floating task bar and fixes a misleading "Successfully completed" status when a sub-agent finishes with no output.
