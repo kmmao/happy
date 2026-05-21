@@ -21,6 +21,7 @@ import { t } from "@/text";
 import { useHeaderHeight } from "@/utils/responsive";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { MessageView } from "./MessageView";
+import { ToolGroupView } from "./ToolGroupView";
 import { Metadata, Session } from "@/sync/storageTypes";
 import { ChatFooter } from "./ChatFooter";
 import { Message } from "@/sync/typesMessage";
@@ -32,6 +33,7 @@ import {
   isTurnStartSeparator,
   type ChatDisplayItem,
 } from "./chatTimelineDisplay";
+import { type ToolGroupItem } from "@/hooks/useGroupedMessages";
 import { TurnTimelineMessageView } from "./TurnTimelineMessageView";
 import { shouldLogChatListTiming } from "./chatListPerformanceTiming";
 import { log } from "@/log";
@@ -279,6 +281,7 @@ const ChatListInternal = React.memo(
     // Filter tool-call messages based on viewInline setting.
     // When viewInline is off, hide main agent tool calls (except special ones).
     const viewInline = useSetting("viewInline");
+    const groupToolCalls = useSetting("groupToolCalls");
     const displayItems: ChatDisplayItem[] = React.useMemo(() => {
       const startedAt = now();
       const visibleMessages = viewInline
@@ -347,24 +350,114 @@ const ChatListInternal = React.memo(
       return items;
     }, [props.messages, viewInline, experiments, logTiming]);
 
+    // Group consecutive tool calls between text messages into collapsible
+    // containers — unless the user disabled it in settings.
+    type FinalDisplayItem = ChatDisplayItem | ToolGroupItem;
+    const finalDisplayItems: FinalDisplayItem[] = React.useMemo(() => {
+      if (!groupToolCalls) return displayItems;
+
+      const result: FinalDisplayItem[] = [];
+      let toolBuffer: Message[] = [];
+
+      const flushBuffer = () => {
+        if (toolBuffer.length === 0) return;
+        const hasRunning = toolBuffer.some(
+          (m) => m.kind === "tool-call" && m.tool.state === "running",
+        );
+        result.push({
+          type: "tool-group",
+          id: `group-${toolBuffer[toolBuffer.length - 1].id}`,
+          messages: [...toolBuffer],
+          hasRunning,
+        });
+        toolBuffer = [];
+      };
+
+      for (const item of displayItems) {
+        // Turn timeline and separator items pass through as-is
+        if (isTurnTimelineDisplayItem(item) || isTurnStartSeparator(item)) {
+          flushBuffer();
+          result.push(item);
+          continue;
+        }
+        // item is a Message
+        const msg = item as Message;
+        const isStandalone =
+          msg.kind === "user-text" ||
+          msg.kind === "agent-event" ||
+          (msg.kind === "agent-text" && !msg.isThinking && msg.text.trim().length > 0);
+        const isFileAttachment = msg.kind === "tool-call" && msg.tool.name === "file";
+
+        if (isStandalone || isFileAttachment) {
+          flushBuffer();
+          result.push(item);
+        } else {
+          toolBuffer.push(msg);
+        }
+      }
+      flushBuffer();
+      return result;
+    }, [displayItems, groupToolCalls]);
+
+    // Track which groups the user has manually toggled (flips their default state)
+    const [toggledGroups, setToggledGroups] = React.useState<Set<string>>(new Set());
+
+    // Auto-collapse groups when they finish running: clear toggle state so
+    // they return to the default (collapsed for completed groups)
+    React.useEffect(() => {
+      if (!groupToolCalls) return;
+      setToggledGroups((prev) => {
+        let changed = false;
+        const next = new Set(prev);
+        for (const item of finalDisplayItems) {
+          if (
+            "type" in item &&
+            (item as ToolGroupItem).type === "tool-group" &&
+            !(item as ToolGroupItem).hasRunning &&
+            prev.has(item.id)
+          ) {
+            next.delete(item.id);
+            changed = true;
+          }
+        }
+        return changed ? next : prev;
+      });
+    }, [finalDisplayItems, groupToolCalls]);
+
+    const handleToggleGroup = React.useCallback((groupId: string) => {
+      setToggledGroups((prev) => {
+        const next = new Set(prev);
+        if (next.has(groupId)) {
+          next.delete(groupId);
+        } else {
+          next.add(groupId);
+        }
+        return next;
+      });
+    }, []);
+
     // Collect user-text message indices in displayItems (not props.messages)
     // since the FlatList now uses displayItems as data.
     const userMessageIndices = React.useMemo(
       () =>
-        displayItems
-          .map((item, i) => (item.kind === "user-text" ? i : -1))
+        finalDisplayItems
+          .map((item, i) => ("kind" in item && item.kind === "user-text" ? i : -1))
           .filter((i) => i !== -1),
-      [displayItems],
+      [finalDisplayItems],
     );
 
-    // Map displayItems index → original messages index.
+    // Map finalDisplayItems index → original messages index.
     // When viewInline is off, some messages are filtered out, so indices diverge.
     const displayToMsgIndex = React.useMemo(() => {
       const map = new Map<number, number>();
       let messageIndex = 0;
-      for (let displayIndex = 0; displayIndex < displayItems.length; displayIndex += 1) {
-        const item = displayItems[displayIndex]!;
-        if (isTurnTimelineDisplayItem(item) || isTurnStartSeparator(item)) {
+      for (let displayIndex = 0; displayIndex < finalDisplayItems.length; displayIndex += 1) {
+        const item = finalDisplayItems[displayIndex]!;
+        if (
+          ("type" in item && (item as ToolGroupItem).type === "tool-group") ||
+          isTurnTimelineDisplayItem(item as ChatDisplayItem) ||
+          isTurnStartSeparator(item as ChatDisplayItem)
+        ) {
           continue;
         }
         while (
@@ -379,7 +472,7 @@ const ChatListInternal = React.memo(
         }
       }
       return map;
-    }, [displayItems, props.messages, viewInline]);
+    }, [finalDisplayItems, props.messages, viewInline]);
 
     React.useImperativeHandle(ref, () => ({
       scrollToBottom: () => {
@@ -412,7 +505,7 @@ const ChatListInternal = React.memo(
         }
 
         const targetIndex = currentUserMsgIndexRef.current;
-        if (targetIndex >= 0 && targetIndex < displayItems.length) {
+        if (targetIndex >= 0 && targetIndex < finalDisplayItems.length) {
           flatListRef.current?.scrollToIndex({
             index: targetIndex,
             animated: true,
@@ -433,7 +526,7 @@ const ChatListInternal = React.memo(
           animated: true,
         });
         setTimeout(() => {
-          if (info.index >= 0 && info.index < displayItems.length) {
+          if (info.index >= 0 && info.index < finalDisplayItems.length) {
             flatListRef.current?.scrollToIndex({
               index: info.index,
               animated: true,
@@ -442,7 +535,7 @@ const ChatListInternal = React.memo(
           }
         }, 200);
       },
-      [displayItems.length],
+      [finalDisplayItems.length],
     );
 
     const handleScroll = useCallback(
@@ -464,8 +557,8 @@ const ChatListInternal = React.memo(
     onVisibleUserMsgRef.current = props.onVisibleUserMessageChange;
     const displayToMsgIndexRef = React.useRef(displayToMsgIndex);
     displayToMsgIndexRef.current = displayToMsgIndex;
-    const displayItemsRef = React.useRef(displayItems);
-    displayItemsRef.current = displayItems;
+    const displayItemsRef = React.useRef(finalDisplayItems);
+    displayItemsRef.current = finalDisplayItems;
 
     const viewabilityPairs = React.useRef([
       {
@@ -483,7 +576,7 @@ const ChatListInternal = React.memo(
           for (const vt of viewableItems) {
             if (vt.index == null) continue;
             const item = items[vt.index];
-            if (item?.kind === "user-text") {
+            if (item && "kind" in item && item.kind === "user-text") {
               const msgIdx = map.get(vt.index);
               if (msgIdx !== undefined) {
                 cb(msgIdx);
@@ -496,10 +589,28 @@ const ChatListInternal = React.memo(
       },
     ]);
 
-    const keyExtractor = useCallback((item: ChatDisplayItem) => item.id, []);
+    const keyExtractor = useCallback((item: FinalDisplayItem) => item.id, []);
     const renderItem = useCallback(
-      ({ item }: { item: ChatDisplayItem }) => {
-        if (isTurnStartSeparator(item)) {
+      ({ item }: { item: FinalDisplayItem }) => {
+        // Tool group (only when groupToolCalls is on)
+        if ("type" in item && (item as ToolGroupItem).type === "tool-group") {
+          const group = item as ToolGroupItem;
+          const defaultExpanded = group.hasRunning;
+          const expanded = toggledGroups.has(group.id) ? !defaultExpanded : defaultExpanded;
+          return (
+            <ToolGroupView
+              group={group}
+              metadata={props.metadata}
+              sessionId={props.sessionId}
+              expanded={expanded}
+              onToggle={() => handleToggleGroup(group.id)}
+              permissionModeKey={props.permissionModeKey}
+              contentMaxWidth={props.contentMaxWidth}
+            />
+          );
+        }
+
+        if (isTurnStartSeparator(item as ChatDisplayItem)) {
           return (
             <View style={{ paddingHorizontal: 16, paddingTop: 4, paddingBottom: 2 }}>
               <View
@@ -521,18 +632,19 @@ const ChatListInternal = React.memo(
           );
         }
 
-        if (isTurnTimelineDisplayItem(item)) {
-          const timelineHasAvatar = item.steps.some(
+        if (isTurnTimelineDisplayItem(item as ChatDisplayItem)) {
+          const timelineItem = item as import("./chatTimelineDisplay").TurnTimelineDisplayItem;
+          const timelineHasAvatar = timelineItem.steps.some(
             (step) =>
               step.kind === "thinking" &&
               (showAvatarMapRef.current.get(step.message.id) ?? false),
           );
-          const timelineIsLatest = item.steps.some(
+          const timelineIsLatest = timelineItem.steps.some(
             (step) => step.kind === "thinking" && step.message.id === latestAgentIdRef.current,
           );
           return (
             <TurnTimelineMessageView
-              item={item}
+              item={timelineItem}
               metadata={props.metadata}
               sessionId={props.sessionId}
               showAvatar={timelineHasAvatar}
@@ -542,19 +654,21 @@ const ChatListInternal = React.memo(
           );
         }
 
+        // Remaining items are regular Messages
+        const msg = item as Message;
         const isReadyWithThinking =
-          item.kind === "agent-event" &&
-          item.event.type === "ready" &&
-          thinkingTurnIdsRef.current.has(item.id);
+          msg.kind === "agent-event" &&
+          msg.event.type === "ready" &&
+          thinkingTurnIdsRef.current.has(msg.id);
         return (
           <MessageView
-            message={item}
+            message={msg}
             metadata={props.metadata}
             sessionId={props.sessionId}
-            showAvatar={showAvatarMapRef.current.get(item.id) ?? false}
-            isLatestAgent={item.id === latestAgentIdRef.current}
+            showAvatar={showAvatarMapRef.current.get(msg.id) ?? false}
+            isLatestAgent={msg.id === latestAgentIdRef.current}
             hasTurnsWithThinking={isReadyWithThinking}
-            thinkingMode={isReadyWithThinking ? (thinkingTurnIdsRef.current.get(item.id) ?? null) : null}
+            thinkingMode={isReadyWithThinking ? (thinkingTurnIdsRef.current.get(msg.id) ?? null) : null}
             permissionModeKey={props.permissionModeKey}
             contentMaxWidth={props.contentMaxWidth}
           />
@@ -566,12 +680,14 @@ const ChatListInternal = React.memo(
         props.permissionModeKey,
         props.contentMaxWidth,
         theme,
+        toggledGroups,
+        handleToggleGroup,
       ],
     );
     return (
       <FlatList
         ref={flatListRef}
-        data={displayItems}
+        data={finalDisplayItems}
         inverted={true}
         keyExtractor={keyExtractor}
         maintainVisibleContentPosition={{

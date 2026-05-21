@@ -352,6 +352,18 @@ export const zhHans: TranslationStructure = {
     openClawDisabled: "OpenClaw 已隐藏",
     sub2ApiEnabled: "Sub2API 监控在设置中可见",
     sub2ApiDisabled: "Sub2API 监控已隐藏",
+    groupToolCalls: "工具调用分组",
+    groupToolCallsSubtitle: "将连续的工具调用折叠为一个容器",
+  },
+
+  toolGroup: {
+    editedFiles: ({ count }: { count: number }) => count === 1 ? "编辑了 1 个文件" : `编辑了 ${count} 个文件`,
+    readFiles: ({ count }: { count: number }) => count === 1 ? "读取了 1 个文件" : `读取了 ${count} 个文件`,
+    ranCommands: ({ count }: { count: number }) => count === 1 ? "执行了 1 个命令" : `执行了 ${count} 个命令`,
+    searched: ({ count }: { count: number }) => count === 1 ? "搜索了 1 次" : `搜索了 ${count} 次`,
+    fetchedUrls: ({ count }: { count: number }) => count === 1 ? "获取了 1 个 URL" : `获取了 ${count} 个 URL`,
+    ranTasks: ({ count }: { count: number }) => count === 1 ? "运行了 1 个任务" : `运行了 ${count} 个任务`,
+    usedTools: ({ count }: { count: number }) => count === 1 ? "使用了 1 个工具" : `使用了 ${count} 个工具`,
   },
 
   errors: {

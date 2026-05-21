@@ -352,6 +352,18 @@ export const zhHant: TranslationStructure = {
     openClawDisabled: "OpenClaw 已隱藏",
     sub2ApiEnabled: "Sub2API 監控在設定中可見",
     sub2ApiDisabled: "Sub2API 監控已隱藏",
+    groupToolCalls: "工具呼叫分組",
+    groupToolCallsSubtitle: "將連續的工具呼叫摺疊為一個容器",
+  },
+
+  toolGroup: {
+    editedFiles: ({ count }: { count: number }) => count === 1 ? "編輯了 1 個檔案" : `編輯了 ${count} 個檔案`,
+    readFiles: ({ count }: { count: number }) => count === 1 ? "讀取了 1 個檔案" : `讀取了 ${count} 個檔案`,
+    ranCommands: ({ count }: { count: number }) => count === 1 ? "執行了 1 個命令" : `執行了 ${count} 個命令`,
+    searched: ({ count }: { count: number }) => count === 1 ? "搜尋了 1 次" : `搜尋了 ${count} 次`,
+    fetchedUrls: ({ count }: { count: number }) => count === 1 ? "取得了 1 個 URL" : `取得了 ${count} 個 URL`,
+    ranTasks: ({ count }: { count: number }) => count === 1 ? "執行了 1 個任務" : `執行了 ${count} 個任務`,
+    usedTools: ({ count }: { count: number }) => count === 1 ? "使用了 1 個工具" : `使用了 ${count} 個工具`,
   },
 
   errors: {

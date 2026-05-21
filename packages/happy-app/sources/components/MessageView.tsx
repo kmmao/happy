@@ -34,6 +34,7 @@ import { parseCodexServicePreview } from "./tools/codexServiceCompat";
 import { CodexDiffView } from "./tools/views/CodexDiffView";
 import type { MessageMeta } from "@/sync/typesMessageMeta";
 import { StreamingTextView } from "./StreamingTextView";
+import { parseLocalCommandMessage, isUserSlashCommandEcho } from "./parseLocalCommandMessage";
 
 function buildUserMetaBadgeText(meta: MessageMeta | undefined): string | null {
   if (!meta) return null;
@@ -130,7 +131,7 @@ function RenderBlock(props: {
   switch (props.message.kind) {
     case "user-text":
       return (
-        <UserTextBlock message={props.message} sessionId={props.sessionId} />
+        <UserTextBlock message={props.message} metadata={props.metadata} sessionId={props.sessionId} />
       );
 
     case "agent-text":
@@ -173,12 +174,40 @@ function RenderBlock(props: {
   }
 }
 
-function UserTextBlock(props: { message: UserTextMessage; sessionId: string }) {
+function UserTextBlock(props: { message: UserTextMessage; metadata: Metadata | null; sessionId: string }) {
   const { toggleBookmark, isBookmarked } = useBookmarks();
   const appendToInput = useAppendToInput();
   const { theme } = useUnistyles();
   const router = useRouter();
   const session = useSession(props.sessionId);
+
+  // The user's own slash-command input is shown optimistically (carries a
+  // localId); the SDK then injects the canonical wrapper chip. Hide the raw
+  // echo so we don't render the command twice. Gated to Claude flavor only:
+  // Codex/Gemini don't reliably emit the <command-*> wrapper, so hiding the
+  // echo there would drop the command with nothing to replace it.
+  const isClaudeFlavor = !props.metadata?.flavor || props.metadata.flavor === 'claude';
+  if (isClaudeFlavor && isUserSlashCommandEcho(props.message.text, props.message.localId != null)) {
+    return null;
+  }
+
+  // Parse local command messages (slash commands wrapped by the SDK)
+  const parsedCommand = parseLocalCommandMessage(props.message.displayText || props.message.text);
+  if (parsedCommand.kind === 'caveat') {
+    return null;
+  }
+  if (parsedCommand.kind === 'command-run') {
+    return (
+      <View style={styles.chipContainer}>
+        <View style={[styles.commandChip, { backgroundColor: theme.colors.surfaceHigh }]}>
+          <Ionicons name="terminal-outline" size={14} color={theme.colors.textSecondary} />
+          <Text style={[styles.commandChipText, { color: theme.colors.textSecondary }]}>
+            /{parsedCommand.commandName}
+          </Text>
+        </View>
+      </View>
+    );
+  }
 
   const handleOptionPress = React.useCallback(
     (option: Option) => {
@@ -1342,5 +1371,23 @@ const styles = StyleSheet.create((theme) => ({
   debugText: {
     color: theme.colors.agentEventText,
     fontSize: 12,
+  },
+  chipContainer: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    paddingHorizontal: 16,
+    paddingVertical: 4,
+  },
+  commandChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  commandChipText: {
+    fontSize: 13,
+    ...Typography.mono(),
   },
 }));

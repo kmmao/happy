@@ -27,11 +27,11 @@ describe("resolveProjectDetailInitialTab", () => {
 describe("resolveProjectDetailTabs", () => {
     it("returns project operation tabs by default", () => {
         const tabs = resolveProjectDetailTabs({ knowledgeBaseEnabled: false });
-        expect(tabs).toEqual(["sessions", "health", "research"]);
+        expect(tabs).toEqual(["sessions", "git", "supervisor", "health", "events", "research", "traces", "config"]);
     });
 
     it("includes knowledge when enabled", () => {
         const tabs = resolveProjectDetailTabs({ knowledgeBaseEnabled: true });
-        expect(tabs).toEqual(["sessions", "health", "research", "knowledge"]);
+        expect(tabs).toEqual(["sessions", "git", "supervisor", "health", "events", "research", "traces", "config", "knowledge"]);
     });
 });

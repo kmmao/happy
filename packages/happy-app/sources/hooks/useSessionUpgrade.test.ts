@@ -62,7 +62,7 @@ describe("buildSessionRespawnProfile", () => {
         expect(result.profileId).toBe("openai");
         expect(result.environmentVariables).toMatchObject({
             OPENAI_BASE_URL: "https://api.openai.com/v1",
-            OPENAI_MODEL: "gpt-5.4",
+            OPENAI_MODEL: "gpt-5.5",
         });
         expect(result.runtimeProfile).toEqual(
             createResolvedRuntimeProfile(builtInProfile!, {

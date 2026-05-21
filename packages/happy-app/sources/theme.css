@@ -1,3 +1,13 @@
+/* Global font rendering — macOS Safari's default subpixel AA aliases badly
+   under body zoom ("chopped" bold, faint regular text); Chrome re-rasterizes
+   and is unaffected. Force grayscale AA, and stop Safari faux-bolding the
+   already-bold IBMPlexSans-SemiBold family. All three inherit. */
+html, body {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    font-synthesis: none;
+}
+
 /* Theme-aware scrollbar styles using Unistyles CSS variables */
 
 /* Webkit Scrollbars (Chrome, Safari, Edge) */

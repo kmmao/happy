@@ -14,6 +14,10 @@ const { machineRPCMock, sessionRPCMock, requestMock, storageState } = vi.hoisted
   }),
 );
 
+vi.mock("./serverConfig", () => ({
+  getServerUrl: () => "http://localhost:3000",
+}));
+
 vi.mock("./apiSocket", () => ({
   apiSocket: {
     sessionRPC: sessionRPCMock,
