@@ -56,72 +56,14 @@ export function getSubagentStatus(tool: ToolCall): SubagentStatus | null {
     return "exited";
 }
 
-// ---------------------------------------------------------------------------
-// State machine — explicit transitions with validation
-// ---------------------------------------------------------------------------
-//
-// Derivation from a ToolCall (above) is one half of the story — it answers
-// "what state is the SDK reporting right now?". For ad-hoc tracking
-// (tests, future runtime accounting, anywhere we want to walk the lifecycle
-// without an SDK ToolCall in hand) we also expose the state machine itself:
-//
-//                         ┌──────┐
-//                  ┌──────┤ exited
-//                  │      └──────┘ (absorbing)
-//   ┌─────────┐ ──┤
-//   │ running │   │      ┌──────┐
-//   └─────────┘ ──┴──────┤ zombie
-//                        └──────┘ (absorbing)
-//
-// `running` is the only state with outgoing transitions. Once the sub-agent
-// has terminated — whether cleanly (`exited`) or as the no-output crash case
-// (`zombie`) — there's nowhere left to go; resurrecting a finished sub-agent
-// is not a thing the SDK models, so neither do we.
-
-/** Immutable container that pairs a status with the timestamp it was entered. */
-export interface SubagentStateContainer {
-    readonly status: SubagentStatus;
-    /** Epoch milliseconds when `status` was entered. Useful for elapsed-time UI. */
-    readonly enteredAt: number;
-}
-
-/** Pure predicate over the transition table. `false` is the safe answer. */
-export function canTransitionSubagentStatus(
-    from: SubagentStatus,
-    to: SubagentStatus,
-): boolean {
-    if (from === "running") {
-        return to === "exited" || to === "zombie";
-    }
-    // Terminal states have no outgoing edges, including no self-loop.
-    return false;
-}
-
-/** Read the current status out of a container. Counterpart of `setSubagentState`. */
-export function getSubagentState(container: SubagentStateContainer): SubagentStatus {
-    return container.status;
-}
-
-/**
- * Transition to `next`, returning a fresh container. Throws on an illegal
- * transition rather than silently no-op'ing — silent illegal transitions
- * tend to mask reducer bugs.
- *
- * The original `container` is never mutated; callers should treat the
- * return value as canonical.
- *
- * @param now Epoch milliseconds for `enteredAt`. Optional so tests can pin
- *            the clock; defaults to `Date.now()`.
- */
-export function setSubagentState(
-    container: SubagentStateContainer,
-    next: SubagentStatus,
-    now: number = Date.now(),
-): SubagentStateContainer {
-    if (!canTransitionSubagentStatus(container.status, next)) {
-        throw new Error(
-            `Illegal SubagentStatus transition: ${container.status} → ${next}`,
-        );
-    }
-    return { status: next, enteredAt: now };
-}
+// Note: there is no explicit state-machine API (container + set/get
+// transition helpers) here, intentionally. Sub-agent status is purely
+// derived from the underlying ToolCall on every read — we never store
+// `SubagentStatus` as a mutable field anywhere. The parallel
+// `BackgroundTaskEntry` *does* store its status (because BackgroundTask
+// lifecycle is tracked in the reducer's own registry, separate from the
+// tool-call message), which is why `backgroundTaskStatus.ts` exposes a
+// container + transition adapter. If a future reducer change starts
+// tracking sub-agents in their own Map<sidechainKey, SubagentEntry>
+// registry, mirror the BackgroundTaskStatus shape at that point — not
+// before. YAGNI.
