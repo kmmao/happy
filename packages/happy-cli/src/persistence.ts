@@ -102,6 +102,8 @@ interface Settings {
   activeProfileId?: string;
   profiles: AIBackendProfile[];
   sandboxConfig?: SandboxConfig;
+  serverUrl?: string;
+  webappUrl?: string;
   // Claude Code plugins (synced with happy app)
   plugins?: Array<{
     id: string;
