@@ -498,6 +498,18 @@ export const ja: TranslationStructure = {
     openClawDisabled: "OpenClawが非表示",
     sub2ApiEnabled: "Sub2APIモニターが設定に表示されています",
     sub2ApiDisabled: "Sub2APIモニターが非表示",
+    groupToolCalls: "ツールコールのグループ化",
+    groupToolCallsSubtitle: "連続するツールコールを1つのコンテナにまとめる",
+  },
+
+  toolGroup: {
+    editedFiles: ({ count }: { count: number }) => count === 1 ? "1ファイルを編集" : `${count}ファイルを編集`,
+    readFiles: ({ count }: { count: number }) => count === 1 ? "1ファイルを読取" : `${count}ファイルを読取`,
+    ranCommands: ({ count }: { count: number }) => count === 1 ? "1コマンドを実行" : `${count}コマンドを実行`,
+    searched: ({ count }: { count: number }) => count === 1 ? "1回検索" : `${count}回検索`,
+    fetchedUrls: ({ count }: { count: number }) => count === 1 ? "1 URLを取得" : `${count} URLを取得`,
+    ranTasks: ({ count }: { count: number }) => count === 1 ? "1タスクを実行" : `${count}タスクを実行`,
+    usedTools: ({ count }: { count: number }) => count === 1 ? "1ツールを使用" : `${count}ツールを使用`,
   },
 
   errors: {

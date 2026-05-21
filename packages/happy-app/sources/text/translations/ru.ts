@@ -339,6 +339,18 @@ export const ru: TranslationStructure = {
     openClawDisabled: "OpenClaw скрыт",
     sub2ApiEnabled: "Монитор Sub2API отображается в настройках",
     sub2ApiDisabled: "Монитор Sub2API скрыт",
+    groupToolCalls: "Группировка вызовов",
+    groupToolCallsSubtitle: "Сворачивать последовательные вызовы инструментов в один контейнер",
+  },
+
+  toolGroup: {
+    editedFiles: ({ count }: { count: number }) => count === 1 ? "Изменён 1 файл" : `Изменено ${count} файлов`,
+    readFiles: ({ count }: { count: number }) => count === 1 ? "Прочитан 1 файл" : `Прочитано ${count} файлов`,
+    ranCommands: ({ count }: { count: number }) => count === 1 ? "Выполнена 1 команда" : `Выполнено ${count} команд`,
+    searched: ({ count }: { count: number }) => count === 1 ? "Поиск 1 раз" : `Поиск ${count} раз`,
+    fetchedUrls: ({ count }: { count: number }) => count === 1 ? "Загружен 1 URL" : `Загружено ${count} URL`,
+    ranTasks: ({ count }: { count: number }) => count === 1 ? "Выполнена 1 задача" : `Выполнено ${count} задач`,
+    usedTools: ({ count }: { count: number }) => count === 1 ? "Использован 1 инструмент" : `Использовано ${count} инструментов`,
   },
 
   errors: {

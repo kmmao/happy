@@ -27,6 +27,9 @@ function FeaturesSettingsScreen() {
   const [hideInactiveSessions, setHideInactiveSessions] = useSettingMutable(
     "hideInactiveSessions",
   );
+  const [groupToolCalls, setGroupToolCalls] = useSettingMutable(
+    "groupToolCalls",
+  );
   const [enablePreviewTab, setEnablePreviewTab] = useSettingMutable(
     "enablePreviewTab",
   );
@@ -86,6 +89,18 @@ function FeaturesSettingsScreen() {
             <Switch
               value={hideInactiveSessions}
               onValueChange={setHideInactiveSessions}
+            />
+          }
+          showChevron={false}
+        />
+        <Item
+          title={t("settingsFeatures.groupToolCalls")}
+          subtitle={t("settingsFeatures.groupToolCallsSubtitle")}
+          icon={<Ionicons name="layers-outline" size={29} color={theme.colors.accentPurple} />}
+          rightElement={
+            <Switch
+              value={groupToolCalls}
+              onValueChange={setGroupToolCalls}
             />
           }
           showChevron={false}

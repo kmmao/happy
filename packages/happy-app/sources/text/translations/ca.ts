@@ -374,6 +374,18 @@ export const ca: TranslationStructure = {
     openClawDisabled: "OpenClaw amagat",
     sub2ApiEnabled: "Monitor Sub2API visible als ajustos",
     sub2ApiDisabled: "Monitor Sub2API amagat",
+    groupToolCalls: "Agrupar crides",
+    groupToolCallsSubtitle: "Col·lapsar crides consecutives d'eines en un contenidor",
+  },
+
+  toolGroup: {
+    editedFiles: ({ count }: { count: number }) => count === 1 ? "Editat 1 fitxer" : `Editats ${count} fitxers`,
+    readFiles: ({ count }: { count: number }) => count === 1 ? "Llegit 1 fitxer" : `Llegits ${count} fitxers`,
+    ranCommands: ({ count }: { count: number }) => count === 1 ? "Executada 1 ordre" : `Executades ${count} ordres`,
+    searched: ({ count }: { count: number }) => count === 1 ? "Cercat 1 cop" : `Cercat ${count} cops`,
+    fetchedUrls: ({ count }: { count: number }) => count === 1 ? "Obtinguda 1 URL" : `Obtingudes ${count} URLs`,
+    ranTasks: ({ count }: { count: number }) => count === 1 ? "Executada 1 tasca" : `Executades ${count} tasques`,
+    usedTools: ({ count }: { count: number }) => count === 1 ? "Usat 1 eina" : `Usades ${count} eines`,
   },
 
   errors: {

@@ -375,6 +375,18 @@ export const es: TranslationStructure = {
     openClawDisabled: "OpenClaw oculto",
     sub2ApiEnabled: "Monitor Sub2API visible en ajustes",
     sub2ApiDisabled: "Monitor Sub2API oculto",
+    groupToolCalls: "Agrupar llamadas",
+    groupToolCallsSubtitle: "Colapsar llamadas consecutivas de herramientas en un contenedor",
+  },
+
+  toolGroup: {
+    editedFiles: ({ count }: { count: number }) => count === 1 ? "Editado 1 archivo" : `Editados ${count} archivos`,
+    readFiles: ({ count }: { count: number }) => count === 1 ? "Leído 1 archivo" : `Leídos ${count} archivos`,
+    ranCommands: ({ count }: { count: number }) => count === 1 ? "Ejecutado 1 comando" : `Ejecutados ${count} comandos`,
+    searched: ({ count }: { count: number }) => count === 1 ? "Buscado 1 vez" : `Buscado ${count} veces`,
+    fetchedUrls: ({ count }: { count: number }) => count === 1 ? "Obtenida 1 URL" : `Obtenidas ${count} URLs`,
+    ranTasks: ({ count }: { count: number }) => count === 1 ? "Ejecutada 1 tarea" : `Ejecutadas ${count} tareas`,
+    usedTools: ({ count }: { count: number }) => count === 1 ? "Usado 1 herramienta" : `Usadas ${count} herramientas`,
   },
 
   errors: {

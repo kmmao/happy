@@ -389,6 +389,11 @@ export const SettingsSchema = z.object({
     .describe(
       "Keep browser notifications visible until manually dismissed (web only)",
     ),
+  groupToolCalls: z
+    .boolean()
+    .describe(
+      "Collapse consecutive tool calls into grouped containers in chat",
+    ),
 });
 
 //
@@ -479,6 +484,7 @@ export const settingsDefaults: Settings = {
   // Browser notifications (web only, off by default)
   webNotifications: false,
   webNotificationsPersistent: false,
+  groupToolCalls: false,
 };
 Object.freeze(settingsDefaults);
 
