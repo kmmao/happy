@@ -1,6 +1,7 @@
 import { io, Socket } from "socket.io-client";
 import { TokenStorage } from "@/auth/tokenStorage";
 import { Encryption } from "./encryption/encryption";
+import { traceCall } from "./outboundTracer";
 
 //
 // Types
@@ -189,38 +190,44 @@ class ApiSocket {
     method: string,
     params: A,
   ): Promise<R> {
-    return this.rpcCallWithRetry(async () => {
-      const sessionEncryption = this.encryption!.getSessionEncryption(sessionId);
-      if (!sessionEncryption) {
-        throw new Error(`Session encryption not found for ${sessionId}`);
-      }
+    return traceCall(
+      "rpc-session",
+      method,
+      (_traceId) =>
+        this.rpcCallWithRetry(async () => {
+          const sessionEncryption = this.encryption!.getSessionEncryption(sessionId);
+          if (!sessionEncryption) {
+            throw new Error(`Session encryption not found for ${sessionId}`);
+          }
 
-      if (!this.socket || !this.socket.connected) {
-        throw new Error("RPC method not available");
-      }
+          if (!this.socket || !this.socket.connected) {
+            throw new Error("RPC method not available");
+          }
 
-      let result: { ok: boolean; result?: string; error?: string };
-      try {
-        result = await this.socket.timeout(
-          this.getRpcTimeout(method),
-        ).emitWithAck("rpc-call", {
-          method: `${sessionId}:${method}`,
-          params: await sessionEncryption.encryptRaw(params),
-        });
-      } catch (e) {
-        if (e instanceof Error && e.message === "operation has timed out") {
-          throw new Error(`RPC call '${method}' timed out`);
-        }
-        throw new Error(
-          `RPC call '${method}' failed: ${e instanceof Error ? e.message : String(e)}`,
-        );
-      }
+          let result: { ok: boolean; result?: string; error?: string };
+          try {
+            result = await this.socket.timeout(
+              this.getRpcTimeout(method),
+            ).emitWithAck("rpc-call", {
+              method: `${sessionId}:${method}`,
+              params: await sessionEncryption.encryptRaw(params),
+            });
+          } catch (e) {
+            if (e instanceof Error && e.message === "operation has timed out") {
+              throw new Error(`RPC call '${method}' timed out`);
+            }
+            throw new Error(
+              `RPC call '${method}' failed: ${e instanceof Error ? e.message : String(e)}`,
+            );
+          }
 
-      if (result.ok) {
-        return (await sessionEncryption.decryptRaw(result.result!)) as R;
-      }
-      throw new Error(result.error || `RPC call '${method}' failed`);
-    }, method);
+          if (result.ok) {
+            return (await sessionEncryption.decryptRaw(result.result!)) as R;
+          }
+          throw new Error(result.error || `RPC call '${method}' failed`);
+        }, method),
+      { extra: `sid=${sessionId}` },
+    );
   }
 
   /**
@@ -231,38 +238,44 @@ class ApiSocket {
     method: string,
     params: A,
   ): Promise<R> {
-    return this.rpcCallWithRetry(async () => {
-      const machineEncryption = this.encryption!.getMachineEncryption(machineId);
-      if (!machineEncryption) {
-        throw new Error(`Machine encryption not found for ${machineId}`);
-      }
+    return traceCall(
+      "rpc-machine",
+      method,
+      (_traceId) =>
+        this.rpcCallWithRetry(async () => {
+          const machineEncryption = this.encryption!.getMachineEncryption(machineId);
+          if (!machineEncryption) {
+            throw new Error(`Machine encryption not found for ${machineId}`);
+          }
 
-      if (!this.socket || !this.socket.connected) {
-        throw new Error("RPC method not available");
-      }
+          if (!this.socket || !this.socket.connected) {
+            throw new Error("RPC method not available");
+          }
 
-      let result: { ok: boolean; result?: string; error?: string };
-      try {
-        result = await this.socket.timeout(
-          this.getRpcTimeout(method),
-        ).emitWithAck("rpc-call", {
-          method: `${machineId}:${method}`,
-          params: await machineEncryption.encryptRaw(params),
-        });
-      } catch (e) {
-        if (e instanceof Error && e.message === "operation has timed out") {
-          throw new Error(`RPC call '${method}' timed out`);
-        }
-        throw new Error(
-          `RPC call '${method}' failed: ${e instanceof Error ? e.message : String(e)}`,
-        );
-      }
+          let result: { ok: boolean; result?: string; error?: string };
+          try {
+            result = await this.socket.timeout(
+              this.getRpcTimeout(method),
+            ).emitWithAck("rpc-call", {
+              method: `${machineId}:${method}`,
+              params: await machineEncryption.encryptRaw(params),
+            });
+          } catch (e) {
+            if (e instanceof Error && e.message === "operation has timed out") {
+              throw new Error(`RPC call '${method}' timed out`);
+            }
+            throw new Error(
+              `RPC call '${method}' failed: ${e instanceof Error ? e.message : String(e)}`,
+            );
+          }
 
-      if (result.ok) {
-        return (await machineEncryption.decryptRaw(result.result!)) as R;
-      }
-      throw new Error(result.error || `RPC call '${method}' failed`);
-    }, method);
+          if (result.ok) {
+            return (await machineEncryption.decryptRaw(result.result!)) as R;
+          }
+          throw new Error(result.error || `RPC call '${method}' failed`);
+        }, method),
+      { extra: `mid=${machineId}` },
+    );
   }
 
   send(event: string, data: any) {
@@ -274,14 +287,32 @@ class ApiSocket {
     if (!this.socket) {
       throw new Error("Socket not connected");
     }
-    return await this.socket.emitWithAck(event, data);
+    return traceCall("ack", event, async () => {
+      return await this.socket!.emitWithAck(event, data);
+    });
   }
 
   //
   // HTTP Requests
   //
 
-  async request(path: string, options?: RequestInit): Promise<Response> {
+  /**
+   * Make an authenticated HTTP request through the socket's configured endpoint.
+   *
+   * Accepts optional diagnostic fields alongside the standard RequestInit:
+   *   `traceId` — reuse an upstream trace ID (e.g. sendMessage → flushOutbox chain)
+   *               so all log lines for one send share the same short identifier.
+   *   `extra`   — freeform string appended to the "start" log line (e.g. batch size,
+   *               localIds).
+   *
+   * `traceId` is also injected as `X-Trace-Id` request header — ignored by the
+   * server today, but ready for server-side correlation when a monitoring platform
+   * is added. Both fields are stripped from the fetch RequestInit before calling.
+   */
+  async request(
+    path: string,
+    options?: RequestInit & { traceId?: string; extra?: string },
+  ): Promise<Response> {
     if (!this.config) {
       throw new Error("SyncSocket not initialized");
     }
@@ -291,16 +322,28 @@ class ApiSocket {
       throw new Error("No authentication credentials");
     }
 
-    const url = `${this.config.endpoint}${path}`;
-    const headers = {
-      Authorization: `Bearer ${credentials.token}`,
-      ...options?.headers,
-    };
+    const { traceId: callerTraceId, extra: callerExtra, ...fetchInit } = options ?? {};
+    const method = fetchInit.method ?? "GET";
+    const label = `${method} ${path}`;
 
-    return fetch(url, {
-      ...options,
-      headers,
-    });
+    return traceCall(
+      "http",
+      label,
+      async (traceId) => {
+        const url = `${this.config!.endpoint}${path}`;
+        const headers = {
+          Authorization: `Bearer ${credentials.token}`,
+          "X-Trace-Id": traceId,
+          ...fetchInit.headers,
+        };
+        return fetch(url, { ...fetchInit, headers });
+      },
+      {
+        traceId: callerTraceId,
+        extra: callerExtra,
+        onResult: (response) => `status=${response.status}`,
+      },
+    );
   }
 
   //
