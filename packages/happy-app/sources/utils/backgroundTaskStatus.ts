@@ -97,3 +97,27 @@ export function setBackgroundTaskState(
     }
     return { status: next, enteredAt: now };
 }
+
+/**
+ * Validate-and-transition adapter for callers that store the lifecycle status
+ * directly on a richer record (e.g. the reducer's `BackgroundTaskEntry`, which
+ * pairs the status with a `startedAt` rather than an `enteredAt`).
+ *
+ * Returns a fresh object with `status` overwritten; the input is never mutated.
+ * Throws on illegal transitions — same loud-failure contract as
+ * `setBackgroundTaskState`. Use this when adopting the state machine onto an
+ * existing record shape would otherwise require restructuring storage just to
+ * thread a container through.
+ *
+ * Generic over `E` so the returned object stays typed as the caller's record.
+ */
+export function transitionBackgroundTaskEntry<
+    E extends { readonly status: BackgroundTaskStatus },
+>(entry: E, next: BackgroundTaskStatus): E {
+    if (!canTransitionBackgroundTaskStatus(entry.status, next)) {
+        throw new Error(
+            `Illegal BackgroundTaskStatus transition: ${entry.status} → ${next}`,
+        );
+    }
+    return { ...entry, status: next };
+}

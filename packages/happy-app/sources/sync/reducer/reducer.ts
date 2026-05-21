@@ -125,6 +125,7 @@ import {
     processSidechainToolResult,
     extractSdkResultData,
 } from "./reducerHelpers";
+import { transitionBackgroundTaskEntry } from "@/utils/backgroundTaskStatus";
 
 /** SDK event-driven background task entry, maintained by task-start/progress/end events */
 export type BackgroundTaskEntry = {
@@ -1063,7 +1064,14 @@ export function reducer(
       const { taskId, toolUseId, description } = msg.taskStartInfo;
       const existing = state.backgroundTasks.get(taskId);
       if (existing) {
-        // task-start activates the entry — override provisional "completed" status
+        // task-start activates the entry. Deliberately NOT routed through
+        // `transitionBackgroundTaskEntry`: the wire can deliver task-end
+        // before task-start for the same task (the events are independent
+        // SDK messages, not strictly ordered), in which case `existing` is
+        // already in a terminal state. That's a legitimate out-of-order
+        // event, not a reducer bug, so we override with a raw spread rather
+        // than let the state machine throw on the (under our model) illegal
+        // terminal → running edge.
         state.backgroundTasks.set(taskId, {
           ...existing,
           toolUseId: toolUseId ?? existing.toolUseId,
@@ -1121,10 +1129,13 @@ export function reducer(
       const { taskId, status } = msg.taskEndInfo;
       const entry = state.backgroundTasks.get(taskId);
       if (entry) {
-        state.backgroundTasks.set(taskId, {
-          ...entry,
-          status,
-        });
+        // Route through the state machine so an out-of-order second task-end
+        // (e.g. terminal-to-terminal flip) surfaces as a thrown error during
+        // development rather than silently overwriting the prior status.
+        state.backgroundTasks.set(
+          taskId,
+          transitionBackgroundTaskEntry(entry, status),
+        );
         bgTasksDirty = true;
       }
       // Also update the tool-call message for tool bubble UI when the tool is still active.
@@ -1519,11 +1530,15 @@ export function completeStaleBackgroundTasks(
   const now = Date.now();
   const affected: string[] = [];
 
-  // Update backgroundTasks registry — mark as stopped (not completed, since they were interrupted)
+  // Update backgroundTasks registry — mark as stopped (not completed, since they were interrupted).
+  // The `entry.status === "running"` guard above is the primary safety net; routing the
+  // assignment through `transitionBackgroundTaskEntry` is belt-and-suspenders so a future
+  // edit that removes the guard still gets caught by the state machine instead of silently
+  // resetting a terminal entry's status back into the absorbing-state set.
   let bgDirty = false;
   for (const [taskId, entry] of state.backgroundTasks) {
     if (entry.status === "running") {
-      state.backgroundTasks.set(taskId, { ...entry, status: "stopped" });
+      state.backgroundTasks.set(taskId, transitionBackgroundTaskEntry(entry, "stopped"));
       bgDirty = true;
     }
   }
