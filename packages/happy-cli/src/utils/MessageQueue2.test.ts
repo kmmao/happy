@@ -1,6 +1,7 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { MessageQueue2 } from "./MessageQueue2";
 import { hashObject } from "./deterministicJson";
+import { logger } from "@/ui/logger";
 
 describe("MessageQueue2", () => {
   it("should create a queue", () => {
@@ -714,5 +715,150 @@ describe("MessageQueue2", () => {
       expect(r1).toBe(true);
       expect(r2).toBe(true);
     });
+  });
+});
+
+describe("MessageQueue2 — stall watchdog", () => {
+  let loggerDebugSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    loggerDebugSpy = vi.spyOn(logger, "debug");
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    loggerDebugSpy.mockRestore();
+  });
+
+  // Return the first logged line whose first argument contains `[STALLED]`,
+  // or undefined if no such line was emitted. Lets each test express its
+  // expectations as a single boolean while still allowing message inspection.
+  function findStallLog(): string | undefined {
+    for (const call of loggerDebugSpy.mock.calls) {
+      const first = call[0];
+      if (typeof first === "string" && first.includes("[STALLED]")) {
+        return first;
+      }
+    }
+    return undefined;
+  }
+
+  it("never fires while the queue stays empty", () => {
+    const queue = new MessageQueue2<string>((mode) => mode, null, {
+      stallThresholdMs: 10_000,
+      watchdogIntervalMs: 1_000,
+    });
+
+    vi.advanceTimersByTime(60_000); // 6× threshold of nothingness
+
+    expect(findStallLog()).toBeUndefined();
+    queue.close();
+  });
+
+  it("does not fire when a consumer drains messages within threshold", async () => {
+    const queue = new MessageQueue2<string>((mode) => mode, null, {
+      stallThresholdMs: 10_000,
+      watchdogIntervalMs: 1_000,
+    });
+
+    queue.push("a", "local");
+    const result = await queue.waitForMessagesAndGetAsString();
+    expect(result?.message).toBe("a");
+
+    // After a successful collectBatch, lastConsumedAt is fresh. Even after a
+    // long idle period the watchdog stays quiet because the queue is empty.
+    vi.advanceTimersByTime(60_000);
+    expect(findStallLog()).toBeUndefined();
+
+    queue.close();
+  });
+
+  it("fires once when work waits in queue past the stall threshold", () => {
+    const queue = new MessageQueue2<string>((mode) => mode, null, {
+      stallThresholdMs: 10_000,
+      watchdogIntervalMs: 1_000,
+    });
+
+    queue.push("a", "local", "lk-1");
+    queue.push("b", "local", "lk-2");
+
+    // Just under threshold: alarm not yet armed.
+    vi.advanceTimersByTime(9_000);
+    expect(findStallLog()).toBeUndefined();
+
+    // Cross the threshold on the next interval tick.
+    vi.advanceTimersByTime(2_000);
+    const stallLog = findStallLog();
+    expect(stallLog).toBeDefined();
+    expect(stallLog).toContain("Queue has 2 message(s)");
+    expect(stallLog).toContain("lk-1");
+    expect(stallLog).toContain("lk-2");
+
+    // Latch behavior: subsequent ticks past threshold don't produce a second
+    // log line — same stall episode, single report.
+    loggerDebugSpy.mockClear();
+    vi.advanceTimersByTime(60_000);
+    expect(findStallLog()).toBeUndefined();
+
+    queue.close();
+  });
+
+  it("re-arms after a successful consume so a fresh stall logs again", async () => {
+    const queue = new MessageQueue2<string>((mode) => mode, null, {
+      stallThresholdMs: 10_000,
+      watchdogIntervalMs: 1_000,
+    });
+
+    queue.push("a", "local");
+    vi.advanceTimersByTime(11_000);
+    expect(findStallLog()).toBeDefined();
+
+    // Consumer wakes up, drains the queue. markConsumed() resets the latch.
+    await queue.waitForMessagesAndGetAsString();
+    loggerDebugSpy.mockClear();
+
+    // New message stalls again — must produce a fresh [STALLED] entry.
+    queue.push("b", "local");
+    vi.advanceTimersByTime(11_000);
+    expect(findStallLog()).toBeDefined();
+
+    queue.close();
+  });
+
+  it("stops checking after close()", () => {
+    const queue = new MessageQueue2<string>((mode) => mode, null, {
+      stallThresholdMs: 10_000,
+      watchdogIntervalMs: 1_000,
+    });
+
+    queue.push("a", "local");
+    queue.close();
+
+    // close() clears the interval; even a long advance produces no [STALLED].
+    vi.advanceTimersByTime(60_000);
+    expect(findStallLog()).toBeUndefined();
+  });
+
+  it("revives the watchdog after reset() so a reopened queue keeps protection", () => {
+    const queue = new MessageQueue2<string>((mode) => mode, null, {
+      stallThresholdMs: 10_000,
+      watchdogIntervalMs: 1_000,
+    });
+
+    // Close kills the timer.
+    queue.close();
+    vi.advanceTimersByTime(60_000); // nothing happens, queue is closed
+
+    // reset() reopens (closed=false) and must restart the watchdog.
+    queue.reset();
+    queue.push("a", "local", "after-reset");
+    vi.advanceTimersByTime(11_000);
+
+    const stallLog = findStallLog();
+    expect(stallLog).toBeDefined();
+    expect(stallLog).toContain("after-reset");
+
+    queue.close();
   });
 });

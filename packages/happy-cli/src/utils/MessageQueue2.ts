@@ -38,7 +38,26 @@ const PRIORITY_ORDER: Record<QueuePriority, number> = {
 /**
  * A mode-aware message queue that stores messages with their modes.
  * Returns consistent batches of messages with the same mode.
+ *
+ * Stall watchdog:
+ *   The queue self-monitors for a stuck consumer. If messages sit unread for
+ *   `stallThresholdMs` (queue non-empty + no successful collectBatch in that
+ *   window), a `[STALLED]` line is emitted to the logger. This covers the
+ *   偶发 "Web sent message, Claude/Codex never responds" symptom whose two
+ *   most likely upstream causes — child process died, or the consumer loop
+ *   is wedged inside an SDK call that never returns — both manifest the same
+ *   way at this layer: the queue has work, nobody collects it.
+ *
+ *   The threshold (default 5 min) is intentionally generous: a long Claude
+ *   turn legitimately pins the consumer in `await claudeRemote(...)` for
+ *   several minutes, during which `collectBatch` is not called. We only
+ *   complain after that window AND if the queue actually contains work.
+ *   Each stall fires exactly one log line; the next successful consume
+ *   re-arms the alarm. Empty queue never triggers — that's just idle.
  */
+const DEFAULT_STALL_THRESHOLD_MS = 5 * 60_000;
+const DEFAULT_WATCHDOG_INTERVAL_MS = 60_000;
+
 export class MessageQueue2<T> {
   public queue: QueueItem<T>[] = [];
   private waiter: ((hasMessages: boolean) => void) | null = null;
@@ -47,12 +66,27 @@ export class MessageQueue2<T> {
   private onMessageHandler: ((message: string, mode: T) => void) | null = null;
   modeHasher: (mode: T) => string;
 
+  // Stall watchdog state. lastConsumedAt is the wall-clock time of the most
+  // recent successful collectBatch / tryTakeForMidTurn; stallReported is the
+  // single-shot latch that prevents log spam — cleared on every consume.
+  private lastConsumedAt: number = Date.now();
+  private stallReported = false;
+  private readonly stallThresholdMs: number;
+  private readonly watchdogIntervalMs: number;
+  private watchdogTimer: ReturnType<typeof setInterval> | null = null;
+
   constructor(
     modeHasher: (mode: T) => string,
     onMessageHandler: ((message: string, mode: T) => void) | null = null,
+    options?: { stallThresholdMs?: number; watchdogIntervalMs?: number },
   ) {
     this.modeHasher = modeHasher;
     this.onMessageHandler = onMessageHandler;
+    this.stallThresholdMs =
+      options?.stallThresholdMs ?? DEFAULT_STALL_THRESHOLD_MS;
+    this.watchdogIntervalMs =
+      options?.watchdogIntervalMs ?? DEFAULT_WATCHDOG_INTERVAL_MS;
+    this.ensureWatchdogRunning();
     logger.debug(`[MessageQueue2] Initialized`);
   }
 
@@ -188,6 +222,12 @@ export class MessageQueue2<T> {
     this.queue = [];
     this.closed = false;
     this.waiter = null;
+    // Fresh slate for the watchdog too: any prior stall report no longer
+    // applies, and if a previous close() killed the timer, revive it so a
+    // reopened queue keeps its diagnostic.
+    this.lastConsumedAt = Date.now();
+    this.stallReported = false;
+    this.ensureWatchdogRunning();
   }
 
   cancelByLocalKey(localKey: string): boolean {
@@ -208,6 +248,11 @@ export class MessageQueue2<T> {
   close(): void {
     logger.debug(`[MessageQueue2] close() called`);
     this.closed = true;
+
+    if (this.watchdogTimer) {
+      clearInterval(this.watchdogTimer);
+      this.watchdogTimer = null;
+    }
 
     if (this.waiter) {
       const waiter = this.waiter;
@@ -356,6 +401,10 @@ export class MessageQueue2<T> {
       ? Date.now() - earliestPushTime
       : undefined;
 
+    // Consumer is alive — refresh the stall watchdog. The next push won't
+    // arm an alarm until this timestamp goes stale again.
+    this.markConsumed();
+
     return {
       message: sameModeMessages.join("\n"),
       mode,
@@ -488,6 +537,8 @@ export class MessageQueue2<T> {
     logger.debug(
       `[MessageQueue2] tryTakeForMidTurn: took message, remaining: ${this.queue.length}`,
     );
+    // Mid-turn pickup counts as the consumer being alive — refresh watchdog.
+    this.markConsumed();
     return {
       message: item!.message,
       mode: item!.mode,
@@ -535,5 +586,88 @@ export class MessageQueue2<T> {
       }
     }
     return bestIdx;
+  }
+
+  /**
+   * Mark a successful consume event. Updates the watchdog reference timestamp
+   * and clears any latched stall report so the next legitimate stall can fire.
+   * Cheap enough to call on every batch/mid-turn pickup without measurement.
+   */
+  private markConsumed(): void {
+    this.lastConsumedAt = Date.now();
+    this.stallReported = false;
+  }
+
+  /**
+   * Idempotent watchdog starter. Safe to call from constructor and from
+   * `reset()` (which may resurrect a previously-closed queue). The interval
+   * is `.unref()`d so a forgotten queue never blocks Node from exiting —
+   * this is diagnostic infrastructure, not a load-bearing schedule.
+   */
+  private ensureWatchdogRunning(): void {
+    if (this.watchdogTimer) {
+      return;
+    }
+    const timer = setInterval(
+      () => this.watchdogCheck(),
+      this.watchdogIntervalMs,
+    );
+    // `unref` is present on Node's Timeout but not in all fake-timer shims;
+    // guard so tests using vitest fake timers don't crash.
+    const maybeUnref = (timer as unknown as { unref?: () => void }).unref;
+    if (typeof maybeUnref === "function") {
+      maybeUnref.call(timer);
+    }
+    this.watchdogTimer = timer;
+  }
+
+  /**
+   * One scan of the queue/consumer state. Emits exactly one `[STALLED]` log
+   * per stall episode (latch cleared on next `markConsumed`).
+   *
+   * Trigger conditions, ALL required:
+   *   1. queue not closed (a closed queue is intentionally drained)
+   *   2. queue.length > 0 (empty queue = idle, not stalled)
+   *   3. now - lastConsumedAt > stallThresholdMs (long enough since any consume)
+   *   4. !stallReported (don't spam — wait for re-arm)
+   *
+   * The log line carries enough breadcrumbs (queue depth, idle duration,
+   * oldest message age, up to 5 sample localKeys) to correlate with the
+   * server-side message audit when triaging.
+   */
+  private watchdogCheck(): void {
+    if (this.closed) {
+      return;
+    }
+    if (this.queue.length === 0) {
+      return;
+    }
+    const now = Date.now();
+    const idleMs = now - this.lastConsumedAt;
+    if (idleMs < this.stallThresholdMs) {
+      return;
+    }
+    if (this.stallReported) {
+      return;
+    }
+    this.stallReported = true;
+
+    const oldest = this.queue[0];
+    const oldestAgeMs = oldest?._perfPushTime
+      ? now - oldest._perfPushTime
+      : undefined;
+    const sampleLocalKeys = this.queue
+      .map((item) => item.localKey)
+      .filter((k): k is string => !!k)
+      .slice(0, 5);
+
+    logger.debug(
+      `[STALLED] [MessageQueue2] Queue has ${this.queue.length} message(s) waiting, ` +
+        `no successful collectBatch for ${Math.round(idleMs / 1000)}s ` +
+        `(threshold: ${Math.round(this.stallThresholdMs / 1000)}s). ` +
+        `Oldest message age: ${oldestAgeMs !== undefined ? Math.round(oldestAgeMs / 1000) + "s" : "unknown"}. ` +
+        `Sample localKeys: ${sampleLocalKeys.length > 0 ? sampleLocalKeys.join(", ") : "(none)"}. ` +
+        `Likely causes: consumer loop wedged in an SDK call, child agent process died, or onUserMessage callback never dispatched.`,
+    );
   }
 }
