@@ -181,6 +181,21 @@ export const InboxView = React.memo(({}: InboxViewProps) => {
         }
     }, [inbox.markRead, router]);
 
+    const handleClearAll = React.useCallback(async () => {
+        const confirmed = await Modal.confirm(
+            t('inbox.confirmClearAllTitle'),
+            t('inbox.confirmClearAllMessage'),
+            {
+                confirmText: t('inbox.clearAll'),
+                cancelText: t('common.cancel'),
+                destructive: true,
+            },
+        );
+        if (confirmed) {
+            await inbox.clearAll();
+        }
+    }, [inbox.clearAll]);
+
     const tabletHeader = isTablet ? (
         <View style={{ backgroundColor: theme.colors.groupped.background }}>
             <Header
@@ -246,13 +261,20 @@ export const InboxView = React.memo(({}: InboxViewProps) => {
                                 <Text style={[styles.notificationTitle, { color: theme.colors.groupped.sectionTitle }]}>
                                     {t('inbox.notifications')}
                                 </Text>
-                                {inbox.unreadCount > 0 && (
-                                    <Pressable onPress={() => void inbox.markAllRead()} hitSlop={8}>
-                                        <Text style={[styles.markAllRead, { color: theme.colors.header.tint }]}>
-                                            {t('inbox.markAllRead')}
+                                <View style={styles.notificationActions}>
+                                    {inbox.unreadCount > 0 && (
+                                        <Pressable onPress={() => void inbox.markAllRead()} hitSlop={8}>
+                                            <Text style={[styles.markAllRead, { color: theme.colors.header.tint }]}>
+                                                {t('inbox.markAllRead')}
+                                            </Text>
+                                        </Pressable>
+                                    )}
+                                    <Pressable onPress={() => void handleClearAll()} hitSlop={8}>
+                                        <Text style={[styles.clearAll, { color: SEVERITY_COLORS.error }]}>
+                                            {t('inbox.clearAll')}
                                         </Text>
                                     </Pressable>
-                                )}
+                                </View>
                             </View>
                         }
                     >
@@ -365,6 +387,15 @@ const styles = StyleSheet.create((theme) => ({
     markAllRead: {
         fontSize: 13,
         ...Typography.default(),
+    },
+    clearAll: {
+        fontSize: 13,
+        ...Typography.default(),
+    },
+    notificationActions: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 16,
     },
     // Inbox item styles
     inboxItem: {

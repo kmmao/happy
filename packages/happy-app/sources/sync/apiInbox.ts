@@ -135,3 +135,15 @@ export async function deleteInboxItem(
     });
     throwIfNotOk(response, "Failed to delete inbox item");
 }
+
+export async function clearAllInbox(
+    credentials: AuthCredentials,
+): Promise<void> {
+    const API_ENDPOINT = getServerUrl();
+
+    const response = await fetch(`${API_ENDPOINT}/v1/inbox`, {
+        method: "DELETE",
+        headers: authHeaders(credentials),
+    });
+    throwIfNotOk(response, "Failed to clear inbox");
+}
