@@ -5,6 +5,7 @@ import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { ToolCall } from "@/sync/typesMessage";
 import { Metadata } from "@/sync/storageTypes";
 import { resolvePath } from "@/utils/pathUtils";
+import { getSubagentStatus } from "@/utils/subagentStatus";
 import { t } from "@/text";
 import {
   getCodexCommandPreview,
@@ -70,8 +71,22 @@ function generateSimpleContent(
   };
 
   // Common: add status
+  //
+  // Sub-agents (Agent / Task) go through a dedicated three-state lifecycle —
+  // running / exited / zombie — defined in utils/subagentStatus. The zombie
+  // case (`completed` but no payload, e.g. the 40 ms Explore crash) used to
+  // render as "succeeded" with a green checkmark, misleading the user; we now
+  // route it through the error color with a dedicated label.
   const addStatus = () => {
-    if (tool.state === "completed") {
+    const subagentStatus = getSubagentStatus(tool);
+
+    if (subagentStatus === "zombie") {
+      rows.push({
+        label: t("tools.fullView.simple.status"),
+        value: t("tools.fullView.simple.noResult"),
+        color: statusColors.errorColor,
+      });
+    } else if (tool.state === "completed") {
       rows.push({
         label: t("tools.fullView.simple.status"),
         value: t("tools.fullView.simple.succeeded"),

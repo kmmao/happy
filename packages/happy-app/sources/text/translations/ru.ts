@@ -51,6 +51,9 @@ export const ru: TranslationStructure = {
     updates: "Обновления",
     notifications: "Уведомления",
     markAllRead: "Прочитать все",
+    clearAll: "Очистить всё",
+    confirmClearAllTitle: "Очистить все уведомления?",
+    confirmClearAllMessage: "Все уведомления будут удалены без возможности восстановления.",
     noNotifications: "Нет уведомлений",
     justNow: "Только что",
     minutesAgo: (n: number) => `${n} мин. назад`,
@@ -1225,6 +1228,7 @@ export const ru: TranslationStructure = {
         filesMatched: ({ count }: { count: number }) =>
           `${count} files matched`,
         succeeded: "Completed successfully",
+        noResult: "Нет вывода (вероятно, не удалось запустить)",
         failed: "Failed",
         running: "Running...",
       },

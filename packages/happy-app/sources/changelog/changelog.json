@@ -2,10 +2,15 @@
   "entries": {
     "en": [
       {
-        "version": "2.28.0",
-        "date": "2026-05-18",
-        "summary": "Major stability and performance improvements for web, plus full session message loading across all platforms.",
+        "version": "2.29.0",
+        "date": "2026-05-22",
+        "summary": "Surfaces running sub-agents in the floating task bar and fixes a misleading \"Successfully completed\" status when a sub-agent finishes with no output.",
         "changes": [
+          "Added a sub-agent chip in the BackgroundTaskBar above the input — Agent/Task tool calls that are still running now show alongside Bash background tasks with an \"AGENT\" tag, elapsed time, and the sub-agent type/description, so a sidechain investigation in flight stays visible even after the timeline has scrolled away",
+          "Added click-to-scroll on the sub-agent chip — tapping a running sub-agent now scrolls the chat to its tool-call card so its progress is one tap away",
+          "Added a `scrollToMessage` API on ChatList to support jumping to a specific message in either the inline list or a tool group",
+          "Fixed sub-agent tool cards showing \"Successfully completed\" with a green checkmark when the run ended with `result: null` — these now display \"No output (likely failed to start)\" in the error color, so a sub-agent that crashed at startup is no longer disguised as a success",
+          "Introduced an explicit `SubagentStatus` enum (`running` / `exited` / `zombie`) modeled on Unix process states — used by both the BackgroundTaskBar derivation and the tool-card status row, so \"what counts as still in flight\" and \"what counts as a zombie completion\" are defined in exactly one place",
           "Added full session message loading — all messages are now fetched at once instead of being limited to the latest page, with support for sessions of any size",
           "Added loading percentage indicator — displays \"Loading X% (loaded/total)\" while session messages are being fetched and decrypted",
           "Improved fetch batch size from 300/500 to 2000 messages per request, reducing server round-trips",
@@ -20,7 +25,7 @@
           "Added task description display in progress panel",
           "Improved tool UI with new tool view components"
         ],
-        "rawMarkdown": "## 2.28.0 - 2026-05-18\n\n\nMajor stability and performance improvements for web, plus full session message loading across all platforms.\n\n### Full Message Loading\n- Added full session message loading — all messages are now fetched at once instead of being limited to the latest page, with support for sessions of any size\n- Added loading percentage indicator — displays \"Loading X% (loaded/total)\" while session messages are being fetched and decrypted\n- Improved fetch batch size from 300/500 to 2000 messages per request, reducing server round-trips\n\n### Web Stability\n- Fixed white screen crash caused by infinite retry loops — backoff now caps at 100 retries before stopping\n- Added global Error Boundary for web — catches render errors and shows a recovery UI instead of a blank page\n- Fixed terminal component not cleaning up on initialization failure\n- Added tab visibility protection — activity updates are paused while the tab is hidden and flushed on return, preventing background CPU bursts\n\n### Performance\n- Added parse caching for plan and diff preview parsing — prevents redundant string parsing on every render cycle\n- Improved session messages LRU cache capacity from 3 to 5 sessions\n- Increased display message cap from 300 to 10,000 and native cache from 350 to 5,000\n\n### Context Usage & Tools\n- Added knowledge lifecycle trends visualization\n- Added task description display in progress panel\n- Improved tool UI with new tool view components"
+        "rawMarkdown": "## 2.29.0 - 2026-05-22\n\n\nSurfaces running sub-agents in the floating task bar and fixes a misleading \"Successfully completed\" status when a sub-agent finishes with no output.\n\n### Sub-Agent Visibility\n- Added a sub-agent chip in the BackgroundTaskBar above the input — Agent/Task tool calls that are still running now show alongside Bash background tasks with an \"AGENT\" tag, elapsed time, and the sub-agent type/description, so a sidechain investigation in flight stays visible even after the timeline has scrolled away\n- Added click-to-scroll on the sub-agent chip — tapping a running sub-agent now scrolls the chat to its tool-call card so its progress is one tap away\n- Added a `scrollToMessage` API on ChatList to support jumping to a specific message in either the inline list or a tool group\n\n### Sub-Agent Status\n- Fixed sub-agent tool cards showing \"Successfully completed\" with a green checkmark when the run ended with `result: null` — these now display \"No output (likely failed to start)\" in the error color, so a sub-agent that crashed at startup is no longer disguised as a success\n- Introduced an explicit `SubagentStatus` enum (`running` / `exited` / `zombie`) modeled on Unix process states — used by both the BackgroundTaskBar derivation and the tool-card status row, so \"what counts as still in flight\" and \"what counts as a zombie completion\" are defined in exactly one place\n\n\nMajor stability and performance improvements for web, plus full session message loading across all platforms.\n\n### Full Message Loading\n- Added full session message loading — all messages are now fetched at once instead of being limited to the latest page, with support for sessions of any size\n- Added loading percentage indicator — displays \"Loading X% (loaded/total)\" while session messages are being fetched and decrypted\n- Improved fetch batch size from 300/500 to 2000 messages per request, reducing server round-trips\n\n### Web Stability\n- Fixed white screen crash caused by infinite retry loops — backoff now caps at 100 retries before stopping\n- Added global Error Boundary for web — catches render errors and shows a recovery UI instead of a blank page\n- Fixed terminal component not cleaning up on initialization failure\n- Added tab visibility protection — activity updates are paused while the tab is hidden and flushed on return, preventing background CPU bursts\n\n### Performance\n- Added parse caching for plan and diff preview parsing — prevents redundant string parsing on every render cycle\n- Improved session messages LRU cache capacity from 3 to 5 sessions\n- Increased display message cap from 300 to 10,000 and native cache from 350 to 5,000\n\n### Context Usage & Tools\n- Added knowledge lifecycle trends visualization\n- Added task description display in progress panel\n- Improved tool UI with new tool view components"
       },
       {
         "version": "2.27.0",
@@ -773,10 +778,15 @@
     ],
     "zh-Hans": [
       {
-        "version": "2.28.0",
-        "date": "2026-05-18",
-        "summary": "Web 端重大稳定性和性能改进，同时实现全平台会话消息全量加载。",
+        "version": "2.29.0",
+        "date": "2026-05-22",
+        "summary": "将正在运行的子智能体（sub-agent）展示到输入框上方的悬浮任务条中，并修复了子智能体无输出退出时被错误显示为\"已成功完成\"的问题。",
         "changes": [
+          "新增子智能体 chip 显示——正在运行的 Agent/Task 工具调用现在会与 Bash 后台任务一起出现在 BackgroundTaskBar 中,带 \"AGENT\" 标签、运行时长、子智能体类型与描述,即使时间线已滚走也能持续看到正在进行的旁路调研",
+          "新增点击 chip 跳转——点击运行中的子智能体 chip 可滚动聊天到对应的工具调用卡片,一键查看进度",
+          "新增 ChatList 的 `scrollToMessage` API,支持跳转到内联列表或工具分组中的指定消息",
+          "修复子智能体卡片在 `result: null` 时仍显示为\"已成功完成\"+ 绿色对勾的问题——现在会以错误色显示\"无产出（可能启动失败）\",启动崩溃的子智能体不再被伪装成成功",
+          "新增显式的 `SubagentStatus` 枚举（`running` / `exited` / `zombie`,类比 Unix 进程状态）——BackgroundTaskBar 派生与工具卡片状态行都统一走这个枚举,\"什么算还在跑\"和\"什么算僵尸完成\"由一处真理源决定",
           "新增会话消息全量加载——所有消息一次性获取，不再限制为最新一页，支持任意规模的会话",
           "新增加载百分比指示器——在消息获取和解密过程中显示\"加载中 X%（已加载/总计）\"",
           "改进每批请求从 300/500 条提升至 2000 条，减少服务端往返次数",
@@ -791,7 +801,7 @@
           "新增进度面板中显示任务描述",
           "改进工具 UI，新增工具视图组件"
         ],
-        "rawMarkdown": "## 2.28.0 - 2026-05-18\n\n\nWeb 端重大稳定性和性能改进，同时实现全平台会话消息全量加载。\n\n### 消息全量加载\n- 新增会话消息全量加载——所有消息一次性获取，不再限制为最新一页，支持任意规模的会话\n- 新增加载百分比指示器——在消息获取和解密过程中显示\"加载中 X%（已加载/总计）\"\n- 改进每批请求从 300/500 条提升至 2000 条，减少服务端往返次数\n\n### Web 稳定性\n- 修复无限重试导致的白屏崩溃——backoff 机制现在在 100 次重试后停止\n- 新增 Web 全局 Error Boundary——捕获渲染错误并显示恢复界面，而非白屏\n- 修复终端组件初始化失败时未正确清理的问题\n- 新增标签页可见性防护——后台标签暂停活动更新，切回前台时统一刷新，防止后台 CPU 突增\n\n### 性能优化\n- 新增计划和 Diff 预览解析缓存——避免每次渲染周期重复解析字符串\n- 改进会话消息 LRU 缓存容量从 3 个提升至 5 个会话\n- 提升显示消息上限从 300 至 10,000 条，Native 缓存从 350 至 5,000 条\n\n### 上下文用量与工具\n- 新增知识生命周期趋势可视化\n- 新增进度面板中显示任务描述\n- 改进工具 UI，新增工具视图组件"
+        "rawMarkdown": "## 2.29.0 - 2026-05-22\n\n\n将正在运行的子智能体（sub-agent）展示到输入框上方的悬浮任务条中，并修复了子智能体无输出退出时被错误显示为\"已成功完成\"的问题。\n\n### 子智能体可见性\n- 新增子智能体 chip 显示——正在运行的 Agent/Task 工具调用现在会与 Bash 后台任务一起出现在 BackgroundTaskBar 中,带 \"AGENT\" 标签、运行时长、子智能体类型与描述,即使时间线已滚走也能持续看到正在进行的旁路调研\n- 新增点击 chip 跳转——点击运行中的子智能体 chip 可滚动聊天到对应的工具调用卡片,一键查看进度\n- 新增 ChatList 的 `scrollToMessage` API,支持跳转到内联列表或工具分组中的指定消息\n\n### 子智能体状态\n- 修复子智能体卡片在 `result: null` 时仍显示为\"已成功完成\"+ 绿色对勾的问题——现在会以错误色显示\"无产出（可能启动失败）\",启动崩溃的子智能体不再被伪装成成功\n- 新增显式的 `SubagentStatus` 枚举（`running` / `exited` / `zombie`,类比 Unix 进程状态）——BackgroundTaskBar 派生与工具卡片状态行都统一走这个枚举,\"什么算还在跑\"和\"什么算僵尸完成\"由一处真理源决定\n\n\nWeb 端重大稳定性和性能改进，同时实现全平台会话消息全量加载。\n\n### 消息全量加载\n- 新增会话消息全量加载——所有消息一次性获取，不再限制为最新一页，支持任意规模的会话\n- 新增加载百分比指示器——在消息获取和解密过程中显示\"加载中 X%（已加载/总计）\"\n- 改进每批请求从 300/500 条提升至 2000 条，减少服务端往返次数\n\n### Web 稳定性\n- 修复无限重试导致的白屏崩溃——backoff 机制现在在 100 次重试后停止\n- 新增 Web 全局 Error Boundary——捕获渲染错误并显示恢复界面，而非白屏\n- 修复终端组件初始化失败时未正确清理的问题\n- 新增标签页可见性防护——后台标签暂停活动更新，切回前台时统一刷新，防止后台 CPU 突增\n\n### 性能优化\n- 新增计划和 Diff 预览解析缓存——避免每次渲染周期重复解析字符串\n- 改进会话消息 LRU 缓存容量从 3 个提升至 5 个会话\n- 提升显示消息上限从 300 至 10,000 条，Native 缓存从 350 至 5,000 条\n\n### 上下文用量与工具\n- 新增知识生命周期趋势可视化\n- 新增进度面板中显示任务描述\n- 改进工具 UI，新增工具视图组件"
       },
       {
         "version": "2.27.0",
@@ -1521,7 +1531,7 @@
       }
     ]
   },
-  "latestVersion": "2.28.0",
+  "latestVersion": "2.29.0",
   "availableLocales": [
     "en",
     "zh-Hans"

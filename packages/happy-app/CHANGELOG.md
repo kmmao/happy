@@ -1,6 +1,18 @@
 # Changelog
 
-## 2.28.0 - 2026-05-18
+## 2.29.0 - 2026-05-22
+
+Surfaces running sub-agents in the floating task bar and fixes a misleading "Successfully completed" status when a sub-agent finishes with no output.
+
+### Sub-Agent Visibility
+- Added a sub-agent chip in the BackgroundTaskBar above the input — Agent/Task tool calls that are still running now show alongside Bash background tasks with an "AGENT" tag, elapsed time, and the sub-agent type/description, so a sidechain investigation in flight stays visible even after the timeline has scrolled away
+- Added click-to-scroll on the sub-agent chip — tapping a running sub-agent now scrolls the chat to its tool-call card so its progress is one tap away
+- Added a `scrollToMessage` API on ChatList to support jumping to a specific message in either the inline list or a tool group
+
+### Sub-Agent Status
+- Fixed sub-agent tool cards showing "Successfully completed" with a green checkmark when the run ended with `result: null` — these now display "No output (likely failed to start)" in the error color, so a sub-agent that crashed at startup is no longer disguised as a success
+- Introduced an explicit `SubagentStatus` enum (`running` / `exited` / `zombie`) modeled on Unix process states — used by both the BackgroundTaskBar derivation and the tool-card status row, so "what counts as still in flight" and "what counts as a zombie completion" are defined in exactly one place
+
 
 Major stability and performance improvements for web, plus full session message loading across all platforms.
 

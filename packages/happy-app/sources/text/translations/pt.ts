@@ -38,6 +38,9 @@ export const pt: TranslationStructure = {
     updates: "Atualizações",
     notifications: "Notificações",
     markAllRead: "Marcar tudo como lido",
+    clearAll: "Limpar tudo",
+    confirmClearAllTitle: "Limpar todas as notificações?",
+    confirmClearAllMessage: "Todas as notificações serão excluídas permanentemente. Esta ação não pode ser desfeita.",
     noNotifications: "Sem notificações",
     justNow: "Agora mesmo",
     minutesAgo: (n: number) => `há ${n}m`,
@@ -1213,6 +1216,7 @@ export const pt: TranslationStructure = {
         filesMatched: ({ count }: { count: number }) =>
           `${count} files matched`,
         succeeded: "Completed successfully",
+        noResult: "Sem saída (provavelmente falhou ao iniciar)",
         failed: "Failed",
         running: "Running...",
       },

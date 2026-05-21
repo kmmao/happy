@@ -40,6 +40,9 @@ export const zhHans: TranslationStructure = {
     updates: "动态",
     notifications: "通知",
     markAllRead: "全部已读",
+    clearAll: "清空全部",
+    confirmClearAllTitle: "清空所有通知？",
+    confirmClearAllMessage: "将永久删除所有通知，此操作无法撤销。",
     noNotifications: "暂无通知",
     justNow: "刚刚",
     minutesAgo: (n: number) => `${n}分钟前`,
@@ -1172,6 +1175,7 @@ export const zhHans: TranslationStructure = {
         filesMatched: ({ count }: { count: number }) =>
           `匹配了 ${count} 个文件`,
         succeeded: "已成功完成",
+        noResult: "无产出（可能启动失败）",
         failed: "失败",
         running: "运行中...",
       },

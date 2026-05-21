@@ -42,6 +42,10 @@ export interface ChatListHandle {
   scrollToBottom: () => void;
   scrollToUserMessage: (direction: "prev" | "next") => number;
   getUserMessageCount: () => number;
+  /** Scrolls the chat to the (inverted) display row that contains a message
+   *  with the given id. Returns true when a match was found. Used by the
+   *  BackgroundTaskBar sub-agent chips to jump to the launched-agent card. */
+  scrollToMessage: (messageId: string) => boolean;
 }
 
 export const LOAD_MORE_INCREMENT = 100;
@@ -516,6 +520,44 @@ const ChatListInternal = React.memo(
         return displayToMsgIndex.get(targetIndex) ?? -1;
       },
       getUserMessageCount: () => userMessageIndices.length,
+      scrollToMessage: (messageId: string): boolean => {
+        for (let i = 0; i < finalDisplayItems.length; i += 1) {
+          const item = finalDisplayItems[i];
+          if (!item) continue;
+          // Raw message row — most sub-agent (Agent/Task) tool-calls land here
+          // because the reducer explicitly skips them when forming tool groups.
+          if (
+            typeof item === "object" &&
+            "id" in item &&
+            (item as { id?: unknown }).id === messageId
+          ) {
+            flatListRef.current?.scrollToIndex({
+              index: i,
+              animated: true,
+              viewPosition: 0.5,
+            });
+            return true;
+          }
+          // ToolGroupItem — defensive path in case grouping ever covers Agent.
+          if (
+            typeof item === "object" &&
+            "type" in item &&
+            (item as ToolGroupItem).type === "tool-group"
+          ) {
+            const group = item as ToolGroupItem;
+            const groupItems = (group as unknown as { items?: ReadonlyArray<{ id?: string }> }).items;
+            if (groupItems?.some((m) => m?.id === messageId)) {
+              flatListRef.current?.scrollToIndex({
+                index: i,
+                animated: true,
+                viewPosition: 0.5,
+              });
+              return true;
+            }
+          }
+        }
+        return false;
+      },
     }));
 
     const handleScrollToIndexFailed = useCallback(

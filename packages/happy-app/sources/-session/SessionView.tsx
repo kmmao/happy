@@ -35,6 +35,7 @@ import { BookmarkProvider, useBookmarks } from "@/hooks/useBookmarks";
 import { InputContext } from "@/hooks/useInputContext";
 import { useSessionIssueInfo } from "@/hooks/useSessionIssueInfo";
 import { useBackgroundTasks, BackgroundTask } from "@/hooks/useBackgroundTasks";
+import { useRunningSubagents, RunningSubagent } from "@/hooks/useRunningSubagents";
 import { BackgroundTaskBar } from "@/components/BackgroundTaskBar";
 import { BackgroundTaskLogSheet } from "@/components/BackgroundTaskLogSheet";
 import { useDevConfig } from "@/hooks/useDevConfig";
@@ -664,6 +665,13 @@ function SessionViewInner({
   const { tasks: backgroundTasks, dismissTask: dismissBackgroundTask } = useBackgroundTasks(backgroundTaskEntries, isConnected);
   const [viewingTask, setViewingTask] = React.useState<BackgroundTask | null>(null);
 
+  // Sub-agents (Agent/Task tool calls) that are still running. Derived from
+  // the rendered message tree because the reducer only flags them via
+  // `tool.state === "running"` — there's no separate background-task entry.
+  // Surfaced in BackgroundTaskBar so a sidechain investigation in flight is
+  // visible above the input bar, even when the main timeline has scrolled away.
+  const runningSubagents = useRunningSubagents(messages, isConnected);
+
   // Close the log sheet when the viewed task is no longer running (e.g. session went offline)
   React.useEffect(() => {
     if (!viewingTask) return;
@@ -964,6 +972,13 @@ function SessionViewInner({
   // Scroll-to-bottom state
   const chatListRef = React.useRef<ChatListHandle>(null);
   const [showScrollToBottom, setShowScrollToBottom] = React.useState(false);
+
+  // Tapping a running sub-agent chip in BackgroundTaskBar should scroll the
+  // timeline to that sub-agent's tool-call card. Stable callback so the chip
+  // doesn't re-render every tick of its elapsed-time counter.
+  const handleSubagentPress = React.useCallback((subagent: RunningSubagent) => {
+    chatListRef.current?.scrollToMessage(subagent.messageId);
+  }, []);
 
   // Anchor for options detection — updated by both scroll and nav buttons
   const [scrollAnchor, setScrollAnchor] = React.useState(-1);
@@ -1617,6 +1632,8 @@ function SessionViewInner({
         onClose={handleCloseTask}
         onDismiss={dismissBackgroundTask}
         onPreview={handlePreview}
+        subagents={runningSubagents}
+        onSubagentPress={handleSubagentPress}
       />
       <BackgroundTaskLogSheet
         sessionId={sessionId}

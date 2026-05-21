@@ -38,6 +38,9 @@ export const ca: TranslationStructure = {
     updates: "Actualitzacions",
     notifications: "Notificacions",
     markAllRead: "Marcar tot llegit",
+    clearAll: "Buidar-ho tot",
+    confirmClearAllTitle: "Voleu buidar totes les notificacions?",
+    confirmClearAllMessage: "Això eliminarà permanentment totes les notificacions. Aquesta acció no es pot desfer.",
     noNotifications: "Sense notificacions",
     justNow: "Ara mateix",
     minutesAgo: (n: number) => `fa ${n}m`,
@@ -1215,6 +1218,7 @@ export const ca: TranslationStructure = {
         filesMatched: ({ count }: { count: number }) =>
           `${count} files matched`,
         succeeded: "Completed successfully",
+        noResult: "Sense sortida (probablement no s'ha pogut iniciar)",
         failed: "Failed",
         running: "Running...",
       },

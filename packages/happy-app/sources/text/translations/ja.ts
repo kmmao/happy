@@ -41,6 +41,9 @@ export const ja: TranslationStructure = {
     updates: "更新",
     notifications: "通知",
     markAllRead: "すべて既読にする",
+    clearAll: "すべて削除",
+    confirmClearAllTitle: "すべての通知を削除しますか？",
+    confirmClearAllMessage: "すべての通知が完全に削除されます。この操作は取り消せません。",
     noNotifications: "通知なし",
     justNow: "たった今",
     minutesAgo: (n: number) => `${n}分前`,
@@ -1342,6 +1345,7 @@ export const ja: TranslationStructure = {
         filesMatched: ({ count }: { count: number }) =>
           `${count} ファイルが一致`,
         succeeded: "正常に完了しました",
+        noResult: "出力なし（起動に失敗した可能性）",
         failed: "失敗",
         running: "実行中...",
       },

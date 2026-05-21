@@ -51,6 +51,9 @@ export const pl: TranslationStructure = {
     updates: "Aktualizacje",
     notifications: "Powiadomienia",
     markAllRead: "Oznacz wszystko przeczytane",
+    clearAll: "Wyczyść wszystko",
+    confirmClearAllTitle: "Wyczyścić wszystkie powiadomienia?",
+    confirmClearAllMessage: "Wszystkie powiadomienia zostaną trwale usunięte. Tej operacji nie można cofnąć.",
     noNotifications: "Brak powiadomień",
     justNow: "Właśnie teraz",
     minutesAgo: (n: number) => `${n} min. temu`,
@@ -1224,6 +1227,7 @@ export const pl: TranslationStructure = {
         filesMatched: ({ count }: { count: number }) =>
           `${count} files matched`,
         succeeded: "Completed successfully",
+        noResult: "Brak wyjścia (prawdopodobnie nie udało się uruchomić)",
         failed: "Failed",
         running: "Running...",
       },

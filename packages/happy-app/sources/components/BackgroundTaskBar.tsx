@@ -1,9 +1,12 @@
 /**
  * Floating bar above the input area showing active tasks.
  *
- * Shows two kinds of tasks:
+ * Shows three kinds of tasks:
  * 1. Background tasks (run_in_background) — with log polling, preview, and close button
  * 2. Foreground commands (regular Bash, running state only) — lightweight display
+ * 3. Sub-agents (Agent/Task tool calls that are still running) — read-only chip
+ *    so the user can tell a sidechain investigation is in flight from the main
+ *    timeline. See useRunningSubagents.ts for derivation.
  *
  * Each task shows a type icon, tool tag, smart label (with port if detected),
  * elapsed time, and optionally the latest log line.
@@ -18,6 +21,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { t } from "@/text";
 import { BackgroundTask } from "@/hooks/useBackgroundTasks";
 import { useBackgroundTaskLastLine } from "@/hooks/useBackgroundTaskLastLine";
+import { RunningSubagent } from "@/hooks/useRunningSubagents";
 import {
     detectCategory,
     categoryIcon,
@@ -34,6 +38,11 @@ type Props = {
     readonly onClose: (task: BackgroundTask) => void;
     readonly onDismiss: (taskId: string) => void;
     readonly onPreview?: (url: string) => void;
+    /** Sub-agents currently running in this session (Agent/Task tool calls). */
+    readonly subagents?: readonly RunningSubagent[];
+    /** Invoked when the user taps a sub-agent chip; typically scrolls to the
+     *  corresponding tool-call message in the timeline. */
+    readonly onSubagentPress?: (subagent: RunningSubagent) => void;
 };
 
 // ---------------------------------------------------------------------------
@@ -253,12 +262,22 @@ function TaskItem({
     );
 }
 
-function BackgroundTaskBarInner({ sessionId, tasks, onViewLog, onClose, onDismiss, onPreview }: Props) {
+function BackgroundTaskBarInner({
+    sessionId,
+    tasks,
+    onViewLog,
+    onClose,
+    onDismiss,
+    onPreview,
+    subagents,
+    onSubagentPress,
+}: Props) {
     const layout = useLayout();
     const { width: windowWidth } = useWindowDimensions();
     const containerWidth = Math.min(windowWidth, layout.maxWidth);
 
-    if (tasks.length === 0) return null;
+    const subagentList = subagents ?? EMPTY_SUBAGENTS;
+    if (tasks.length === 0 && subagentList.length === 0) return null;
 
     return (
         <View style={[styles.container, { maxWidth: containerWidth, alignSelf: "center", width: "100%" }]}>
@@ -286,8 +305,80 @@ function BackgroundTaskBarInner({ sessionId, tasks, onViewLog, onClose, onDismis
                         />
                     );
                 })}
+                {subagentList.map((sa) => (
+                    <SubagentChip
+                        key={sa.toolUseId}
+                        subagent={sa}
+                        onPress={onSubagentPress ? () => onSubagentPress(sa) : undefined}
+                    />
+                ))}
             </ScrollView>
         </View>
+    );
+}
+
+const EMPTY_SUBAGENTS: readonly RunningSubagent[] = [];
+
+/**
+ * Compact chip representing a sub-agent that is still running. Kept visually
+ * sibling to Bash background TaskItem so the user perceives them as one
+ * "what's running" panel.
+ */
+function SubagentChip({
+    subagent,
+    onPress,
+}: {
+    readonly subagent: RunningSubagent;
+    readonly onPress?: () => void;
+}) {
+    const { theme } = useUnistyles();
+    const [elapsed, setElapsed] = React.useState(() => formatElapsed(subagent.startedAt));
+
+    React.useEffect(() => {
+        const interval = setInterval(() => {
+            setElapsed(formatElapsed(subagent.startedAt));
+        }, 1000);
+        return () => clearInterval(interval);
+    }, [subagent.startedAt]);
+
+    const tint = (theme.colors as any).accentPurple ?? theme.colors.textLink;
+    const label = subagent.description
+        ? `${subagent.subagentType}: ${subagent.description}`
+        : subagent.subagentType;
+    const runningLabel = t("backgroundTasks.running");
+
+    return (
+        <Pressable
+            onPress={onPress}
+            disabled={!onPress}
+            style={({ pressed }) => [
+                styles.taskItem,
+                { backgroundColor: `${tint}15`, opacity: pressed && onPress ? 0.7 : 1 },
+            ]}
+            accessibilityRole={onPress ? "button" : undefined}
+            accessibilityLabel={`${subagent.subagentType} agent · ${runningLabel}`}
+        >
+            <View style={styles.taskTopRow}>
+                <Ionicons name="people-outline" size={14} color={tint} />
+                <View style={[styles.toolTagBadge, { backgroundColor: `${tint}20` }]}>
+                    <Text style={[styles.toolTagText, { color: tint }]}>
+                        AGENT
+                    </Text>
+                </View>
+                <Text
+                    style={[styles.taskLabel, { color: theme.colors.text }]}
+                    numberOfLines={1}
+                >
+                    {label}
+                </Text>
+                <Text style={[styles.statusLabel, { color: theme.colors.success }]}>
+                    {runningLabel}
+                </Text>
+                <Text style={[styles.taskElapsed, { color: theme.colors.textSecondary }]}>
+                    {elapsed}
+                </Text>
+            </View>
+        </Pressable>
     );
 }
 
