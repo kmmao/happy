@@ -453,8 +453,41 @@ export class ApiSessionClient extends EventEmitter {
 
   onUserMessage(callback: (data: UserMessage) => void) {
     this.pendingMessageCallback = callback;
+    // Drain the backlog through the guarded dispatcher so a throw on one buffered
+    // message cannot interrupt the while-loop and strand the rest of the queue.
     while (this.pendingMessages.length > 0) {
-      callback(this.pendingMessages.shift()!);
+      this.dispatchUserMessage(this.pendingMessages.shift()!);
+    }
+  }
+
+  /**
+   * Invoke the registered `onUserMessage` callback with a hard try/catch.
+   *
+   * Without this guard, any throw inside the Claude/Codex handlers (runClaude.ts
+   * / runCodex.ts — large callbacks with meta resolution, special-command
+   * parsing, queue pushes) is swallowed silently: the message looks "delivered"
+   * on the wire (Web/App UI shows it in the conversation) but the agent never
+   * sees it, producing the偶发 "sent on Web, no response" symptom.
+   *
+   * We deliberately do NOT rethrow — losing a single message is preferable to
+   * tearing down the socket pipeline; the [FATAL] log line is the contract for
+   * post-mortem grepping.
+   */
+  private dispatchUserMessage(message: UserMessage) {
+    if (!this.pendingMessageCallback) {
+      return;
+    }
+    try {
+      this.pendingMessageCallback(message);
+    } catch (error) {
+      const err = error instanceof Error ? error : new Error(String(error));
+      logger.debug(
+        `[FATAL] [onUserMessage] callback threw — message NOT delivered to agent. sessionId=${this.sessionId} localKey=${message.localKey ?? "none"} err=${err.message}\n${err.stack ?? "(no stack)"}`,
+      );
+      logger.debugLargeJson(
+        "[FATAL] [onUserMessage] offending message payload:",
+        message,
+      );
     }
   }
 
@@ -502,7 +535,7 @@ export class ApiSessionClient extends EventEmitter {
     if (userResult.success) {
       this.lastPerfSocketReceivedAt = perfTs;
       if (this.pendingMessageCallback) {
-        this.pendingMessageCallback(userResult.data);
+        this.dispatchUserMessage(userResult.data);
       } else {
         this.pendingMessages.push(userResult.data);
       }
