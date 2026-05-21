@@ -5,7 +5,7 @@
 
 import * as React from "react";
 import { TokenStorage } from "@/auth/tokenStorage";
-import { ServerInboxItem, fetchInboxItems, fetchInboxUnreadCount, markInboxItemRead, markAllInboxRead, deleteInboxItem } from "@/sync/apiInbox";
+import { ServerInboxItem, fetchInboxItems, fetchInboxUnreadCount, markInboxItemRead, markAllInboxRead, deleteInboxItem, clearAllInbox } from "@/sync/apiInbox";
 import { sync } from "@/sync/sync";
 
 interface InboxState {
@@ -21,6 +21,7 @@ export interface InboxActions {
     markRead: (itemId: string) => Promise<void>;
     markAllRead: () => Promise<void>;
     deleteItem: (itemId: string) => Promise<void>;
+    clearAll: () => Promise<void>;
 }
 
 export function useInboxData(): InboxState & InboxActions {
@@ -130,12 +131,28 @@ export function useInboxData(): InboxState & InboxActions {
         await deleteInboxItem(credentials, itemId);
     }, [state.items]);
 
+    const doClearAll = React.useCallback(async () => {
+        const credentials = await TokenStorage.getCredentials();
+        if (!credentials) return;
+
+        // Optimistic update
+        setState((prev) => ({
+            ...prev,
+            items: [],
+            total: 0,
+            unreadCount: 0,
+        }));
+
+        await clearAllInbox(credentials);
+    }, []);
+
     return {
         ...state,
         refresh,
         markRead,
         markAllRead: doMarkAllRead,
         deleteItem: doDeleteItem,
+        clearAll: doClearAll,
     };
 }
 

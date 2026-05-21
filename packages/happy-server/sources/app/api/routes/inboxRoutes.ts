@@ -159,4 +159,19 @@ export function inboxRoutes(app: Fastify) {
             return reply.send({ ok: true });
         },
     );
+
+    // DELETE /v1/inbox — Delete all items for current account (idempotent)
+    app.delete(
+        "/v1/inbox",
+        { preHandler: app.authenticate },
+        async (request, reply) => {
+            const userId = request.userId;
+
+            const result = await db.inboxItem.deleteMany({
+                where: { accountId: userId },
+            });
+
+            return reply.send({ ok: true, deleted: result.count });
+        },
+    );
 }
