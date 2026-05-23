@@ -45,6 +45,7 @@ import {
   connectionState,
 } from "@/utils/serverConnectionErrors";
 import { claudeLocal } from "@/claude/claudeLocal";
+import { collectClaudeLocalCommands } from "@/claude/utils/claudeLocalCommands";
 import { createSessionScanner } from "@/claude/utils/sessionScanner";
 import { Session } from "./session";
 import {
@@ -197,6 +198,23 @@ export async function runClaude(
 
   // Project path for server-side auto-resolve (worktree → parent repo)
   const projectPath_ = metadata.worktree?.parentRepoPath || metadata.path;
+
+  // Slash-command discovery. PTY mode lost the SDK's `available_commands`
+  // event, and `claude` TUI does not write its slash-command catalog into
+  // the on-disk JSONL we tail — so the App's `/` autocomplete falls back to
+  // just `[compact, clear]`. Re-create the SDK-era behaviour by scanning the
+  // same `.claude/commands/` hierarchy the TUI itself reads. See
+  // `claudeLocalCommands.ts` for the directory layout and precedence rules.
+  const localCommands = await collectClaudeLocalCommands({ cwd: workingDirectory });
+  if (localCommands.slashCommands.length > 0) {
+    metadata = {
+      ...metadata,
+      slashCommands: localCommands.slashCommands,
+      ...(Object.keys(localCommands.slashCommandDescriptions).length > 0
+        ? { slashCommandDescriptions: localCommands.slashCommandDescriptions }
+        : {}),
+    };
+  }
 
   // Session creation: reconnect to existing or create new
   let response;
@@ -387,11 +405,16 @@ export async function runClaude(
   // Set initial model mode key for usage tracking (e.g., "sonnet-1m")
   session.setModelModeKey(options.model);
 
-  // Tools / slash-commands metadata is now populated via the JSONL `system/init`
-  // record once the PTY-launched `claude` TUI emits it. Pre-PTY we eagerly
-  // spawned a throwaway SDK `query()` here to capture the init message early —
-  // post-PTY that no longer applies. `sessionScanner` -> `sessionEventReporter`
-  // updates the session metadata in-band, so no upfront extraction is needed.
+  // Slash-commands metadata is populated above via `collectClaudeLocalCommands`
+  // (filesystem scan of `.claude/commands/` + plugin commands). Pre-PTY we
+  // eagerly spawned a throwaway SDK `query()` here to capture the init
+  // message — but inspection of real on-disk JSONL files shows `claude` TUI
+  // never persists a `system/init` record, so JSONL tailing cannot recover
+  // the catalog. The on-startup filesystem scan replaces that path.
+  //
+  // Tool catalog (`metadata.tools`) is intentionally NOT populated post-PTY:
+  // it's only used in `/get_session_cost` RPC responses and the App's
+  // session-info panel, neither of which is reachable in current UI flows.
 
   // Start Happy MCP server
   const happyServer = await startHappyServer(session);
