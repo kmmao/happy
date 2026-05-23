@@ -1,12 +1,12 @@
 import { logger } from '@/ui/logger';
-import type { SDKUserMessage } from '@/claude/sdk';
+import type { ClaudeJsonlUserMessage } from '@/claude/jsonl';
 
 /**
  * An async iterable message queue that allows pushing messages and consuming them asynchronously
  */
-export class MessageQueue implements AsyncIterable<SDKUserMessage> {
-  private queue: SDKUserMessage[] = [];
-  private waiters: Array<(value: SDKUserMessage) => void> = [];
+export class MessageQueue implements AsyncIterable<ClaudeJsonlUserMessage> {
+  private queue: ClaudeJsonlUserMessage[] = [];
+  private waiters: Array<(value: ClaudeJsonlUserMessage) => void> = [];
   private closed = false;
   private closePromise?: Promise<void>;
   private closeResolve?: () => void;
@@ -91,7 +91,7 @@ export class MessageQueue implements AsyncIterable<SDKUserMessage> {
   /**
    * Async iterator implementation
    */
-  async *[Symbol.asyncIterator](): AsyncIterator<SDKUserMessage> {
+  async *[Symbol.asyncIterator](): AsyncIterator<ClaudeJsonlUserMessage> {
     logger.debug(`[MessageQueue] Iterator started`);
     while (true) {
       const message = this.queue.shift();
@@ -121,7 +121,7 @@ export class MessageQueue implements AsyncIterable<SDKUserMessage> {
   /**
    * Wait for the next message or queue closure
    */
-  private waitForNext(): Promise<SDKUserMessage | undefined> {
+  private waitForNext(): Promise<ClaudeJsonlUserMessage | undefined> {
     return new Promise((resolve) => {
       if (this.closed) {
         logger.debug(`[MessageQueue] waitForNext() called but queue is closed`);
@@ -129,7 +129,7 @@ export class MessageQueue implements AsyncIterable<SDKUserMessage> {
         return;
       }
 
-      const waiter = (value: SDKUserMessage) => resolve(value);
+      const waiter = (value: ClaudeJsonlUserMessage) => resolve(value);
       this.waiters.push(waiter);
       logger.debug(
         `[MessageQueue] waitForNext() adding waiter. Total waiters: ${this.waiters.length}`,

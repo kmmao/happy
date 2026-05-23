@@ -200,7 +200,7 @@ export async function applyMcpServers(
     };
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    logger.debug(`[mcpServerManager] SDK setMcpServers failed: ${msg}`);
+    logger.debug(`[mcpServerManager] claude setMcpServers failed: ${msg}`);
     return { ok: false, error: msg };
   }
 }

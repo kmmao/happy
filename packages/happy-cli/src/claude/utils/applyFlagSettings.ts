@@ -113,7 +113,7 @@ export async function applyFlagSettings(
     await query.applyFlagSettings(settings);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    logger.debug(`[applyFlagSettings] SDK call failed: ${msg}`);
+    logger.debug(`[applyFlagSettings] claude call failed: ${msg}`);
     return { applied: false, reason: "sdk_error", error: msg };
   }
 
@@ -165,7 +165,7 @@ export async function applyFlagSettingsFromModeDiff(
     await query.applyFlagSettings(settings);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    logger.debug(`[applyFlagSettings] SDK call failed (mode diff): ${msg}`);
+    logger.debug(`[applyFlagSettings] claude call failed (mode diff): ${msg}`);
     return { applied: false, reason: "sdk_error", error: msg };
   }
 

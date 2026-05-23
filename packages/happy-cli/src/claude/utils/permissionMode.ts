@@ -1,4 +1,4 @@
-import type { QueryOptions } from "@/claude/sdk";
+import type { QueryOptions } from "@/claude/jsonl";
 import type { PermissionMode } from "@/api/types";
 
 /** Derived from SDK's QueryOptions - the modes Claude actually supports */

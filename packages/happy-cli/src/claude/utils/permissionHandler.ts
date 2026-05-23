@@ -7,9 +7,9 @@
 
 import { isDeepStrictEqual } from "node:util";
 import { logger } from "@/lib";
-import { SDKAssistantMessage, SDKMessage, SDKUserMessage } from "../sdk";
-import type { PermissionResult, PermissionDecisionClassification } from "../sdk/types";
-import { PLAN_FAKE_REJECT, PLAN_FAKE_RESTART } from "../sdk/prompts";
+import { ClaudeJsonlAssistantMessage, ClaudeJsonlMessage, ClaudeJsonlUserMessage } from "../jsonl";
+import type { PermissionResult, PermissionDecisionClassification } from "../jsonl/types";
+import { PLAN_FAKE_REJECT, PLAN_FAKE_RESTART } from "../jsonl/prompts";
 import { Session } from "../session";
 import { getToolName } from "./getToolName";
 import { EnhancedMode, PermissionMode } from "../loop";
@@ -462,9 +462,9 @@ export class PermissionHandler {
   /**
    * Handles messages to track tool calls
    */
-  onMessage(message: SDKMessage): void {
+  onMessage(message: ClaudeJsonlMessage): void {
     if (message.type === "assistant") {
-      const assistantMsg = message as SDKAssistantMessage;
+      const assistantMsg = message as ClaudeJsonlAssistantMessage;
       if (assistantMsg.message && assistantMsg.message.content) {
         for (const block of assistantMsg.message.content) {
           if (block.type === "tool_use") {
@@ -479,7 +479,7 @@ export class PermissionHandler {
       }
     }
     if (message.type === "user") {
-      const userMsg = message as SDKUserMessage;
+      const userMsg = message as ClaudeJsonlUserMessage;
       if (
         userMsg.message &&
         userMsg.message.content &&
