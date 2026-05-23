@@ -1429,13 +1429,19 @@ export const knownTools = {
       .partial()
       .passthrough(),
     extractSubtitle: (opts: { metadata: Metadata | null; tool: ToolCall }) => {
+      // AskUserQuestionView already renders `question.question` inside the
+      // picker (see views/AskUserQuestionView.tsx:487), so for a single-question
+      // call we deliberately suppress the subtitle to avoid the same sentence
+      // appearing twice in the ToolView card. Multi-question calls still get a
+      // useful preview (joined headers / count) since the picker only shows the
+      // currently-active step.
       if (
         opts.tool.input?.questions &&
         Array.isArray(opts.tool.input.questions)
       ) {
         const qs = opts.tool.input.questions;
-        if (qs.length === 1) {
-          return qs[0].question;
+        if (qs.length <= 1) {
+          return null;
         }
         const headers = qs
           .map((q: { header?: string }) => q.header)

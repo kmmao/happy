@@ -45,6 +45,21 @@ import {
 import { getCodexBashIconName } from "./codexBashPresentation";
 import { shouldHideToolCall } from "./shouldHideToolCall";
 
+/**
+ * Tools whose specific view contains its own submit UI (the answer-picker /
+ * confirmation buttons live inside the tool view itself). For these tools we
+ * MUST NOT render the generic PermissionFooter — its "approve / deny / approve
+ * forever" buttons would appear underneath the picker and call the wrong RPC
+ * (`permission` instead of the tool-specific submission path), confusing the
+ * user and silently dropping their answers. The view component is responsible
+ * for resolving the pending permission via its own call (e.g. sessionAllow with
+ * answers, or sessionAskUserResponse for the MCP variant).
+ */
+const TOOLS_WITH_BUILTIN_SUBMIT_UI = new Set([
+  "AskUserQuestion",
+  "mcp__happy__ask_user",
+]);
+
 interface ToolViewProps {
   metadata: Metadata | null;
   tool: ToolCall;
@@ -493,7 +508,7 @@ export const ToolView = React.memo<ToolViewProps>((props) => {
         {sessionId &&
           tool.permission &&
           tool.permission.status === "pending" &&
-          tool.name !== "AskUserQuestion" &&
+          !TOOLS_WITH_BUILTIN_SUBMIT_UI.has(tool.name) &&
           (!willAutoApprove || autoApproveFailed) && (
             <PermissionFooter
               permission={tool.permission}
@@ -714,12 +729,14 @@ export const ToolView = React.memo<ToolViewProps>((props) => {
       })()}
 
       {/* Permission footer — shown when manual review is needed or auto-approve failed.
-         AskUserQuestion has its own submit UI (AskUserQuestionView) that sends answers
-         via sessionAllow, so it should never show the generic permission footer. */}
+         AskUserQuestion / mcp__happy__ask_user have their own submit UI inside
+         AskUserQuestionView; that view resolves the permission via sessionAllow
+         (native) or sessionAskUserResponse (MCP) when the user submits answers,
+         so the generic footer must be suppressed. */}
       {sessionId &&
         tool.permission &&
         tool.permission.status === "pending" &&
-        tool.name !== "AskUserQuestion" &&
+        !TOOLS_WITH_BUILTIN_SUBMIT_UI.has(tool.name) &&
         (!willAutoApprove || autoApproveFailed) && (
         <PermissionFooter
           permission={tool.permission}
