@@ -13,6 +13,7 @@ import { PermissionFooter } from "./PermissionFooter";
 import { formatPermissionParams } from "@/utils/formatPermissionParams";
 import { t } from "@/text";
 import { getToolViewComponent } from "./views/_all";
+import { TOOLS_WITH_BUILTIN_SUBMIT_UI } from "./toolsWithBuiltinSubmitUI";
 import type { ToolCall } from "@/sync/typesMessage";
 import type { Metadata } from "@/sync/storageTypes";
 import { Typography } from "@/constants/Typography";
@@ -41,7 +42,12 @@ export const PermissionSheet = React.memo(
             description: null,
             permission,
         }), [permission, toolInput, toolName]);
-        const useSpecificToolView = toolName === "AskUserQuestion" && SpecificToolView != null;
+        // Picker tools (AskUserQuestion + mcp__happy__ask_user) render their
+        // own submit UI; the generic PermissionFooter would call the wrong RPC
+        // and drop the user's answers — see TOOLS_WITH_BUILTIN_SUBMIT_UI for
+        // the rationale.
+        const useSpecificToolView =
+            TOOLS_WITH_BUILTIN_SUBMIT_UI.has(toolName) && SpecificToolView != null;
 
         // Auto-close once the permission is no longer pending
         React.useEffect(() => {

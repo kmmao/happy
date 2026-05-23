@@ -44,21 +44,7 @@ import {
 } from "./codexCommandUtils";
 import { getCodexBashIconName } from "./codexBashPresentation";
 import { shouldHideToolCall } from "./shouldHideToolCall";
-
-/**
- * Tools whose specific view contains its own submit UI (the answer-picker /
- * confirmation buttons live inside the tool view itself). For these tools we
- * MUST NOT render the generic PermissionFooter — its "approve / deny / approve
- * forever" buttons would appear underneath the picker and call the wrong RPC
- * (`permission` instead of the tool-specific submission path), confusing the
- * user and silently dropping their answers. The view component is responsible
- * for resolving the pending permission via its own call (e.g. sessionAllow with
- * answers, or sessionAskUserResponse for the MCP variant).
- */
-const TOOLS_WITH_BUILTIN_SUBMIT_UI = new Set([
-  "AskUserQuestion",
-  "mcp__happy__ask_user",
-]);
+import { TOOLS_WITH_BUILTIN_SUBMIT_UI } from "./toolsWithBuiltinSubmitUI";
 
 interface ToolViewProps {
   metadata: Metadata | null;
