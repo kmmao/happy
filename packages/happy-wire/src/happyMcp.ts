@@ -5,6 +5,7 @@ export const HAPPY_MCP_TOOL_NAMES = [
   "query_project_knowledge",
   "update_progress",
   "update_session_summary",
+  "ask_user",
 ] as const;
 
 export type HappyMcpCanonicalToolName = (typeof HAPPY_MCP_TOOL_NAMES)[number];
@@ -103,6 +104,47 @@ export const HAPPY_MCP_TOOL_SPECS: Record<
     dynamicAction: "Updating progress",
     fallbackAction: "Update progress",
     reasonPhrases: ["progress update", "progress updates", "update_progress"],
+  },
+  ask_user: {
+    title: "Ask User",
+    description:
+      "Ask the user one or more questions via the App's native picker UI. " +
+      "Use this whenever AskUserQuestion is unavailable (the host has disabled it — " +
+      "common when running under happy-cli's PTY-mode Claude TUI). The input schema " +
+      "is identical to AskUserQuestion's. The tool blocks until the user submits " +
+      "answers in the App, then returns them as a JSON string keyed by question text.",
+    failureLabel: "Failed to get user answer",
+    inputSchema: {
+      questions: z
+        .array(
+          z.object({
+            question: z.string().describe("The question to ask the user"),
+            header: z.string().describe("Short label/chip for the question (max ~12 chars)"),
+            options: z
+              .array(
+                z.object({
+                  label: z.string().describe("Option label"),
+                  description: z.string().describe("Option description"),
+                  preview: z
+                    .string()
+                    .optional()
+                    .describe("Optional preview content shown when the option is focused"),
+                }),
+              )
+              .describe("Available choices for this question (2-4 options)"),
+            multiSelect: z
+              .boolean()
+              .describe("Allow multiple selections instead of single-select"),
+          }),
+        )
+        .describe("Questions to ask the user (1-4 questions)"),
+    },
+    hideSuccessfulCall: false,
+    autoApproveByDefault: false,
+    permissionAction: "Waiting for user to answer",
+    dynamicAction: "Waiting for user to answer",
+    fallbackAction: "Ask user",
+    reasonPhrases: ["ask user", "user input", "ask_user"],
   },
   update_session_summary: {
     title: "Update Session Summary",
@@ -250,6 +292,31 @@ export function shouldAutoApproveHappyMcpToolName(
     ? HAPPY_MCP_TOOL_SPECS[canonical].autoApproveByDefault
     : false;
 }
+
+/**
+ * Wire schema for the `ask_user_response` session-level RPC.
+ *
+ * The App calls this when the user submits answers to a `mcp__happy__ask_user`
+ * prompt. The handler in happy-cli (PTY mode) resolves the corresponding
+ * pending MCP tool invocation so its `await` returns and Claude TUI receives
+ * the user's answers as the tool result. Lives next to the tool spec rather
+ * than in `claudeControlRpc.ts` because it's a Happy-MCP companion call, not a
+ * Claude runtime sidebar API.
+ */
+export const AskUserResponseRequestSchema = z
+  .object({
+    askId: z.string(),
+    answers: z.record(z.string(), z.string()),
+  })
+  .strict();
+export type AskUserResponseRequest = z.infer<typeof AskUserResponseRequestSchema>;
+
+export const AskUserResponseResultSchema = z
+  .object({
+    ok: z.literal(true),
+  })
+  .strict();
+export type AskUserResponseResult = z.infer<typeof AskUserResponseResultSchema>;
 
 export function shouldAutoApproveHappyMcpReason(
   reason: string | null | undefined,
