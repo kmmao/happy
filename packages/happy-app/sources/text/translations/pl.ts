@@ -929,6 +929,8 @@ export const pl: TranslationStructure = {
     quickActions: "Szybkie akcje",
     viewMachine: "Zobacz maszynę",
     viewMachineSubtitle: "Zobacz szczegóły maszyny i sesje",
+    openRawTerminal: "Otwórz surowy terminal",
+    openRawTerminalSubtitle: "Zobacz surowe bajty Claude TUI w terminalu webowym",
     killSessionSubtitle: "Natychmiastowo zakończ sesję",
     archiveSessionSubtitle: "Zarchiwizuj tę sesję i zatrzymaj ją",
     metadata: "Metadane",

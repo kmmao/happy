@@ -232,7 +232,7 @@ export class SDKToLogConverter {
           model: systemMsg.model,
           tools: systemMsg.tools,
           // Include all other fields from the system message
-          ...(systemMsg as Record<string, unknown>),
+          ...(systemMsg as unknown as Record<string, unknown>),
         };
         break;
       }
@@ -251,7 +251,7 @@ export class SDKToLogConverter {
         // Unknown message type - pass through with all fields
         logMessage = {
           ...baseFields,
-          ...(sdkMessage as Record<string, unknown>),
+          ...(sdkMessage as unknown as Record<string, unknown>),
           type: (sdkMessage as SDKMessage & { type: string }).type,
         } as RawJSONLines;
     }

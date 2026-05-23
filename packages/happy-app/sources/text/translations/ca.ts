@@ -920,6 +920,8 @@ export const ca: TranslationStructure = {
     quickActions: "Accions ràpides",
     viewMachine: "Veure la màquina",
     viewMachineSubtitle: "Veure detalls de la màquina i sessions",
+    openRawTerminal: "Obrir terminal en cru",
+    openRawTerminalSubtitle: "Veure els bytes en cru de Claude TUI al terminal web",
     killSessionSubtitle: "Finalitzar immediatament la sessió",
     archiveSessionSubtitle: "Arxiva aquesta sessió i atura-la",
     metadata: "Metadades",

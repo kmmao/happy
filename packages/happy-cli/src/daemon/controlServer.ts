@@ -475,6 +475,10 @@ export function startDaemonControlServer({
   emitCiTrigger,
   emitGitHubActionsWebhook,
   sendInterAgentMessage,
+  attachClaudePty,
+  detachClaudePty,
+  forwardClaudePtyData,
+  forwardClaudePtyExit,
 }: {
   getChildren: () => TrackedSession[];
   stopSession: (sessionId: string) => boolean;
@@ -596,6 +600,26 @@ export function startDaemonControlServer({
   runAutoDreamProfileNow: (profileIdValue: string) => Promise<AutoDreamMutationResult>;
   removeAutoDreamProfile: (profileIdValue: string) => Promise<AutoDreamMutationResult>;
   sendInterAgentMessage: (fromSessionId: string, toSessionId: string, message: string) => void;
+  /**
+   * Claude PTY lifecycle bridges — session children spawn the Claude TUI under
+   * `node-pty` and call these to surface the PTY through the daemon's
+   * existing TerminalManager wire (so App's `terminal-spawn`/`terminal-output`
+   * RPC paths see the Claude PTY uniformly alongside shell PTYs).
+   *
+   * `attach` is called once when the PTY starts; `detach` once at exit.
+   * `data` forwards each PTY output chunk so the daemon's machine socket can
+   * emit `terminal-output`. `exit` mirrors PTY exit semantics.
+   */
+  attachClaudePty: (input: {
+    terminalId: string;
+    sessionId: string;
+    cols: number;
+    rows: number;
+    cwd: string;
+  }) => void;
+  detachClaudePty: (terminalId: string) => void;
+  forwardClaudePtyData: (terminalId: string, data: string) => void;
+  forwardClaudePtyExit: (terminalId: string, exitCode: number) => void;
 }): Promise<{ port: number; stop: () => Promise<void> }> {
   return new Promise((resolve) => {
     const app = fastify({ logger: false });
@@ -1307,6 +1331,89 @@ export function startDaemonControlServer({
         const { fromSessionId, toSessionId, message } = body;
         logger.debug(`[CONTROL SERVER] Inter-agent message: ${fromSessionId} → ${toSessionId}`);
         sendInterAgentMessage(fromSessionId, toSessionId, message);
+        return { status: "ok" as const };
+      },
+    );
+
+    // ─── Claude PTY bridge endpoints ──────────────────────────────────────
+    // The daemon owns the App-facing TerminalManager (machine socket emits
+    // `terminal-output`), but the Claude PTY lives in the per-session child
+    // process. These endpoints relay the PTY's lifecycle + bytes through HTTP
+    // so the App can subscribe via the existing terminal wire.
+    typed.post(
+      "/claude-pty/attach",
+      {
+        schema: {
+          body: z.object({
+            terminalId: z.string().min(1),
+            sessionId: z.string().min(1),
+            cols: z.number().int().positive(),
+            rows: z.number().int().positive(),
+            cwd: z.string(),
+          }),
+          response: {
+            200: z.object({ status: z.literal("ok") }),
+          },
+        },
+      },
+      async (request) => {
+        attachClaudePty(request.body);
+        return { status: "ok" as const };
+      },
+    );
+
+    typed.post(
+      "/claude-pty/detach",
+      {
+        schema: {
+          body: z.object({ terminalId: z.string().min(1) }),
+          response: {
+            200: z.object({ status: z.literal("ok") }),
+          },
+        },
+      },
+      async (request) => {
+        detachClaudePty(request.body.terminalId);
+        return { status: "ok" as const };
+      },
+    );
+
+    typed.post(
+      "/claude-pty/data",
+      {
+        schema: {
+          body: z.object({
+            terminalId: z.string().min(1),
+            // 64KB upper bound matches MAX_OUTPUT_BUFFER in TerminalManager; the
+            // session-side router already chunks at 8KB but we leave headroom.
+            data: z.string().max(64 * 1024),
+          }),
+          response: {
+            200: z.object({ status: z.literal("ok") }),
+          },
+        },
+      },
+      async (request) => {
+        forwardClaudePtyData(request.body.terminalId, request.body.data);
+        return { status: "ok" as const };
+      },
+    );
+
+    typed.post(
+      "/claude-pty/exit",
+      {
+        schema: {
+          body: z.object({
+            terminalId: z.string().min(1),
+            exitCode: z.number().int(),
+          }),
+          response: {
+            200: z.object({ status: z.literal("ok") }),
+          },
+        },
+      },
+      async (request) => {
+        forwardClaudePtyExit(request.body.terminalId, request.body.exitCode);
         return { status: "ok" as const };
       },
     );

@@ -919,6 +919,8 @@ export const en: TranslationStructure = {
     quickActions: "Quick Actions",
     viewMachine: "View Machine",
     viewMachineSubtitle: "View machine details and sessions",
+    openRawTerminal: "Open Raw Terminal",
+    openRawTerminalSubtitle: "View the raw Claude TUI bytes in the web terminal",
     killSessionSubtitle: "Immediately terminate the session",
     archiveSessionSubtitle: "Archive this session and stop it",
     metadata: "Metadata",

@@ -882,6 +882,8 @@ export const zhHans: TranslationStructure = {
     quickActions: "快速操作",
     viewMachine: "查看设备",
     viewMachineSubtitle: "查看设备详情和会话",
+    openRawTerminal: "打开原始终端",
+    openRawTerminalSubtitle: "在网页终端中查看 Claude TUI 原始字节流",
     killSessionSubtitle: "立即终止会话",
     archiveSessionSubtitle: "归档此会话并停止它",
     metadata: "元数据",

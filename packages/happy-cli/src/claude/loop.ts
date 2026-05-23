@@ -5,7 +5,7 @@ import { Session } from "./session";
 import { ApiClient } from "@/lib";
 import type { JsRuntime } from "./runClaude";
 import type { SandboxConfig } from "@/persistence";
-import type { ThinkingConfig, AgentDefinition, OutputFormat, SdkBeta, SdkPluginConfig } from "./sdk/types";
+import type { ThinkingConfig, AgentDefinition, OutputFormat, SdkBeta, SdkPluginConfig, EffortLevel } from "./sdk/types";
 import { claudeLocalLauncher } from "./claudeLocalLauncher";
 import { claudeRemoteLauncher } from "./claudeRemoteLauncher";
 
@@ -27,7 +27,7 @@ export interface EnhancedMode {
   /** Controls thinking/reasoning behavior (adaptive, enabled, disabled) */
   thinking?: ThinkingConfig;
   /** Controls how much effort Claude puts into its response */
-  effort?: import("@anthropic-ai/claude-agent-sdk").EffortLevel;
+  effort?: EffortLevel;
   /**
    * API-side task budget in tokens — model self-paces tool use within the limit.
    * @alpha

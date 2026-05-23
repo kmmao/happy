@@ -862,6 +862,8 @@ export const zhHant: TranslationStructure = {
     quickActions: "快速操作",
     viewMachine: "查看裝置",
     viewMachineSubtitle: "查看裝置詳情和工作階段",
+    openRawTerminal: "開啟原始終端機",
+    openRawTerminalSubtitle: "在網頁終端機中檢視 Claude TUI 原始位元組流",
     killSessionSubtitle: "立即終止工作階段",
     archiveSessionSubtitle: "封存此工作階段並停止它",
     metadata: "中繼資料",

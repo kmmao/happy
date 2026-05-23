@@ -14,7 +14,6 @@ import { MessageQueue2 } from "@/utils/MessageQueue2";
 import { hashObject } from "@/utils/deterministicJson";
 import { startCaffeinate, stopCaffeinate } from "@/utils/caffeinate";
 import { readClaudeMcpServers } from "@/claude/utils/claudeSettings";
-import { extractSDKMetadataAsync } from "@/claude/sdk/metadataExtractor";
 import { parseSpecialCommand } from "@/parsers/specialCommands";
 import { executeShellCommand } from "@/utils/shellCommand";
 import { getEnvironmentInfo } from "@/ui/doctor";
@@ -377,25 +376,11 @@ export async function runClaude(
   // Set initial model mode key for usage tracking (e.g., "sonnet-1m")
   session.setModelModeKey(options.model);
 
-  // Extract SDK metadata in background and update session when ready
-  extractSDKMetadataAsync(async (sdkMetadata) => {
-    logger.debug(
-      "[start] SDK metadata extracted, updating session:",
-      sdkMetadata,
-    );
-    try {
-      // Update session metadata with tools and slash commands
-      session.updateMetadata((currentMetadata) => ({
-        ...currentMetadata,
-        tools: sdkMetadata.tools,
-        slashCommands: sdkMetadata.slashCommands,
-        slashCommandDescriptions: sdkMetadata.slashCommandDescriptions,
-      }));
-      logger.debug("[start] Session metadata updated with SDK capabilities");
-    } catch (error) {
-      logger.debug("[start] Failed to update session metadata:", error);
-    }
-  });
+  // Tools / slash-commands metadata is now populated via the JSONL `system/init`
+  // record once the PTY-launched `claude` TUI emits it. Pre-PTY we eagerly
+  // spawned a throwaway SDK `query()` here to capture the init message early —
+  // post-PTY that no longer applies. `sessionScanner` -> `sessionEventReporter`
+  // updates the session metadata in-band, so no upfront extraction is needed.
 
   // Start Happy MCP server
   const happyServer = await startHappyServer(session);

@@ -1,35 +1,82 @@
+/**
+ * claudeRemote — drive a single `claude` TUI process under a PTY for the
+ * remote/web client.
+ *
+ * Phase 5 of the PTY migration (`docs/.../plan`):
+ *
+ * Pre-migration this module called `@anthropic-ai/claude-agent-sdk`'s
+ * `query()` and iterated its async stream. Post-migration it spawns the
+ * user's `claude` TUI binary directly under `node-pty`, watches the JSONL
+ * session file written by claude under `~/.claude/projects/<…>/`, and
+ * converts each record into the same `SDKMessage`-shaped object the rest
+ * of the pipeline expects.
+ *
+ * Lifecycle
+ * ---------
+ *   1. Build CLI flags from the initial `EnhancedMode` via `buildClaudeCliFlags`.
+ *   2. Spawn the PTY (`startClaudePty`) + wrap with a `ClaudePtyController`
+ *      stub so existing call sites that called `setModel` / `setPermissionMode`
+ *      / `interrupt` keep compiling and degrade gracefully.
+ *   3. Install a `sessionScanner` watching the project JSONL — every record
+ *      is converted via `rawToSdkMessage` and forwarded to `opts.onMessage`.
+ *   4. Write the initial user prompt to PTY stdin.
+ *   5. On each `result` record, run the legacy hot-swap dance (now no-op
+ *      via Controller) and write the next prompt — until `nextMessage()`
+ *      yields null, at which point we kill the PTY and resolve.
+ *
+ * Visibility losses (logged, never silently swallowed):
+ *   • `setModel` / `setPermissionMode` are now no-ops — the SDK exposed
+ *     hot-swap; the TUI does not. Cold restart via launcher's coldModeHash
+ *     covers the cases that matter (plan/bypass transitions).
+ *   • `getContextUsage` returns null — no programmatic introspection.
+ *   • `initializationResult` returns `{ models: [] }` — the App renders an
+ *     empty model list (it can fall back to a hard-coded list).
+ *   • `applyFlagSettings` parses + tracks state but the SDK call itself is
+ *     a no-op (settings.json is read at spawn time only).
+ */
+
 import { EnhancedMode } from "./loop";
-import {
-  query,
-  type QueryOptions,
-  type SDKMessage,
-  type SDKSystemMessage,
-  type AdaptedQuery,
-  AbortError,
+import type {
+  SDKMessage,
   SDKUserMessage,
+  SdkBeta,
 } from "@/claude/sdk";
+import { AbortError } from "@/claude/sdk";
 import type { OnElicitation } from "@/claude/sdk/types";
-import type { SdkBeta } from "@anthropic-ai/claude-agent-sdk";
 import { mapToClaudeMode } from "./utils/permissionMode";
 import {
   applyFlagSettingsFromModeDiff,
   createAppliedSettingsState,
 } from "./utils/applyFlagSettings";
 import { claudeCheckSession } from "./utils/claudeCheckSession";
-import { join, resolve } from "node:path";
-import { projectPath } from "@/projectPath";
+import { resolve as resolvePath } from "node:path";
 import { parseSpecialCommand } from "@/parsers/specialCommands";
 import { executeShellCommand } from "@/utils/shellCommand";
 import { logger } from "@/lib";
-import { PushableAsyncIterable } from "@/utils/PushableAsyncIterable";
-import { getProjectPath } from "./utils/path";
-import { awaitFileExist } from "@/modules/watcher/awaitFileExist";
 import { systemPrompt } from "./utils/systemPrompt";
 import { buildLocaleInstruction } from "./utils/localeInstruction";
 import { PermissionResult } from "./sdk/types";
-import { HAPPY_PLAN_MODE_INSTRUCTIONS } from "./sdk/prompts";
-import { createSessionStoreAdapter } from "./sdk/sessionStoreAdapter";
 import type { JsRuntime } from "./runClaude";
+import { startClaudePty, type ClaudePtyHandle } from "@/claude/pty/claudePtyRuntime";
+import {
+  createClaudePtyController,
+  type ClaudePtyController,
+} from "@/claude/pty/claudePtyController";
+import { buildClaudeCliFlags } from "@/claude/pty/claudeCliFlags";
+import { rawToSdkMessage } from "@/claude/pty/rawToSdkMessage";
+import { attachClaudePtyRouter } from "@/claude/pty/claudePtyRouter";
+import {
+  bridgeAttach,
+  bridgeData,
+  bridgeDetach,
+  bridgeExit,
+  bridgeAvailable,
+  buildClaudeTerminalId,
+} from "@/claude/pty/claudePtyDaemonBridge";
+import { createSessionScanner } from "./utils/sessionScanner";
+
+void resolvePath; // path resolution kept available for future flag builders
+
 /**
  * Map App-level virtual model mode keys to real Anthropic model IDs.
  * Returns undefined for "use default" modes so the system default takes effect.
@@ -43,8 +90,7 @@ export function resolveModelKey(
   switch (modelKey) {
     // Sonnet/Opus default to 1M context — map short keys to explicit model IDs.
     // The [1m] suffix is a Happy-internal tracking convention; actual 1M context
-    // is enabled via the `context-1m-2025-08-07` SDK beta (see build1MBetas).
-    // Old `-1m` keys are preserved for backward compatibility with pinned sessions.
+    // is enabled via the `context-1m-2025-08-07` SDK beta (see buildBetasForModel).
     case "sonnet":
     case "sonnet-1m":
       return "claude-sonnet-4-6[1m]";
@@ -54,9 +100,7 @@ export function resolveModelKey(
     case "opus-4-7":
     case "opus-4-7-1m":
       return "claude-opus-4-7[1m]";
-    // Remaining keys (haiku, opusplan, etc.) pass through to the SDK which
-    // resolves them via ANTHROPIC_DEFAULT_*_MODEL env vars — enabling
-    // third-party provider model mapping.
+    // Remaining keys (haiku, opusplan, etc.) pass through unchanged.
     default:
       return modelKey;
   }
@@ -67,8 +111,6 @@ const BETA_1M: SdkBeta = "context-1m-2025-08-07";
 
 /**
  * Returns true when the given App model key should use the 1M context window.
- * Covers both the new short keys ("sonnet", "opus") and the legacy "-1m" suffixed
- * variants kept for backward compatibility.
  */
 export function is1MModelKey(modelKey: string | undefined): boolean {
   if (!modelKey) return false;
@@ -87,8 +129,8 @@ export function is1MModelKey(modelKey: string | undefined): boolean {
 
 /**
  * Build the betas array for a session, automatically prepending the 1M context
- * beta when the model key indicates a 1M-capable model. Caller-supplied betas
- * (e.g. experimental features from the App) are preserved and de-duplicated.
+ * beta when the model key indicates a 1M-capable model. Preserved for callers
+ * that build claude CLI `--betas` flags from EnhancedMode.
  */
 export function buildBetasForModel(
   modelKey: string | undefined,
@@ -97,12 +139,30 @@ export function buildBetasForModel(
   const needs1M = is1MModelKey(modelKey);
   const base: SdkBeta[] = needs1M ? [BETA_1M] : [];
   if (!extraBetas?.length) return base.length ? base : undefined;
-  // De-duplicate: keep order, avoid adding BETA_1M twice if caller already included it
   const merged = [...base];
   for (const b of extraBetas) {
     if (!merged.includes(b)) merged.push(b);
   }
   return merged.length ? merged : undefined;
+}
+
+// ─── User-input helpers ──────────────────────────────────────────────────────
+
+/**
+ * Flatten an SDK user-message content blob into a single newline-joined
+ * string for PTY stdin. The TUI consumes plain text; structured content
+ * (tool_result, image, etc.) cannot be re-injected mid-turn anyway.
+ */
+function flattenUserContent(msg: SDKUserMessage): string {
+  const content = msg.message?.content;
+  if (typeof content === "string") return content;
+  if (!Array.isArray(content)) return "";
+  const parts: string[] = [];
+  for (const block of content) {
+    const text = (block as { text?: string }).text;
+    if (typeof text === "string" && text.length > 0) parts.push(text);
+  }
+  return parts.join("\n");
 }
 
 export async function claudeRemote(opts: {
@@ -114,24 +174,25 @@ export async function claudeRemote(opts: {
   claudeArgs?: string[];
   allowedTools: string[];
   signal?: AbortSignal;
+  /**
+   * Canonical permission callback. Retained for API symmetry — the TUI now
+   * handles permission prompts itself, so this is never invoked in PTY mode.
+   * Kept on the options bag so caller code (claudeRemoteLauncherCore) does
+   * not need a conditional cast.
+   */
   canCallTool: (
     toolName: string,
     input: unknown,
     mode: EnhancedMode,
     options: { signal: AbortSignal },
   ) => Promise<PermissionResult>;
-  /** Path to temporary settings file with SessionStart hook (required for session tracking) */
+  /** Path to temporary settings file with SessionStart hook (becomes --settings). */
   hookSettingsPath: string;
-  /** JavaScript runtime to use for spawning Claude Code (default: 'node') */
+  /** JavaScript runtime — accepted for source compatibility, ignored by the TUI. */
   jsRuntime?: JsRuntime;
-  /** Callback for handling MCP elicitation requests (forwarded to App) */
+  /** MCP elicitation callback — TUI surfaces elicitation directly; accepted but unused. */
   onElicitation?: OnElicitation;
-  /**
-   * Happy session ID — forwarded to the SDK as `Options.title` (0.2.119+) so
-   * Claude Code's persisted JSONL metadata carries a stable link back to the
-   * originating Happy session. Only used on fresh SDK sessions; resume/continue
-   * will keep whatever title the prior session persisted.
-   */
+  /** Happy session id — forwarded to the launcher's tagging hooks if any. */
   happySessionId?: string;
 
   // Dynamic parameters
@@ -139,9 +200,9 @@ export async function claudeRemote(opts: {
   onReady: () => void | Promise<void>;
   isAborted: (toolCallId: string) => boolean;
 
-  /** Called after each turn to feed usage data back to the adaptive router */
+  /** Called after each turn to feed usage data back to the adaptive router. */
   onTurnComplete?: () => void;
-  /** Called when SDK returns error_max_turns — triggers "Continue" button in App */
+  /** Called when the TUI emits an `error_max_turns` result. */
   onMaxTurnsReached?: () => void;
 
   // Callbacks
@@ -151,7 +212,7 @@ export async function claudeRemote(opts: {
   onCompletionEvent?: (message: string) => void;
   onShellResult?: (output: string) => void;
   onSessionReset?: () => void;
-  /** Called with SDK result data (cost, usage breakdown) when a query completes */
+  /** Called when a result record is observed in the JSONL stream. */
   onResult?: (result: {
     totalCostUsd: number;
     numTurns: number;
@@ -169,13 +230,15 @@ export async function claudeRemote(opts: {
       }
     >;
   }) => void;
-  /** Called when the SDK Query object is ready, exposing it for runtime control (interrupt, stopTask, etc.) */
-  onQueryReady?: (
-    query: import("@anthropic-ai/claude-agent-sdk").Query,
-  ) => void;
-  /** Called when the messages PushableAsyncIterable is ready, exposing mid-turn push capability */
+  /**
+   * Exposes the PTY-backed controller for runtime control (interrupt,
+   * stopTask, etc). Most methods are no-op stubs in PTY mode — see
+   * `ClaudePtyController` doc comment.
+   */
+  onQueryReady?: (query: ClaudePtyController) => void;
+  /** Exposes mid-turn user-input push (writes to PTY stdin). */
   onMessagesReady?: (push: (msg: SDKUserMessage) => void) => void;
-  /** Called with context window usage breakdown after each turn completes */
+  /** Called with context-window usage breakdown after each turn — null in PTY mode. */
   onContextUsage?: (usage: {
     totalTokens: number;
     maxTokens: number;
@@ -192,7 +255,7 @@ export async function claudeRemote(opts: {
       userMessageTokens: number;
     };
   }) => void;
-  /** Called with initialization info (supported models) after system init */
+  /** Called with initialization info (supported models) — empty in PTY mode. */
   onInitialized?: (info: {
     models?: Array<{
       code: string;
@@ -203,76 +266,56 @@ export async function claudeRemote(opts: {
       supportsAdaptiveThinking?: boolean | null;
     }>;
   }) => void;
-}) {
-  // Check if session is valid
+}): Promise<void> {
+  // Check whether the requested session id is still resumable on disk.
   let startFrom = opts.sessionId;
   if (opts.sessionId && !claudeCheckSession(opts.sessionId, opts.path)) {
     startFrom = null;
   }
 
-  // Extract --resume from claudeArgs if present (for first spawn)
+  // Honour `--resume <id>` if present in claudeArgs (first-spawn convention).
   if (!startFrom && opts.claudeArgs) {
     for (let i = 0; i < opts.claudeArgs.length; i++) {
-      if (opts.claudeArgs[i] === "--resume") {
-        // Check if next arg exists and looks like a session ID
-        if (i + 1 < opts.claudeArgs.length) {
-          const nextArg = opts.claudeArgs[i + 1];
-          // If next arg doesn't start with dash and contains dashes, it's likely a UUID
-          if (!nextArg.startsWith("-") && nextArg.includes("-")) {
-            startFrom = nextArg;
-            logger.debug(
-              `[claudeRemote] Found --resume with session ID: ${startFrom}`,
-            );
-            break;
-          } else {
-            // Just --resume without UUID - SDK doesn't support this
-            logger.debug(
-              "[claudeRemote] Found --resume without session ID - not supported in remote mode",
-            );
-            break;
-          }
-        } else {
-          // --resume at end of args - SDK doesn't support this
-          logger.debug(
-            "[claudeRemote] Found --resume without session ID - not supported in remote mode",
-          );
-          break;
-        }
+      if (opts.claudeArgs[i] !== "--resume") continue;
+      const nextArg = opts.claudeArgs[i + 1];
+      if (
+        nextArg !== undefined &&
+        !nextArg.startsWith("-") &&
+        nextArg.includes("-")
+      ) {
+        startFrom = nextArg;
+        logger.debug(
+          `[claudeRemote] Found --resume with session ID: ${startFrom}`,
+        );
+        break;
       }
+      logger.debug(
+        "[claudeRemote] Found --resume without session ID — not supported in remote mode",
+      );
+      break;
     }
   }
 
-  // Set environment variables for Claude Code SDK (pre-init)
-  // NOTE: These may be overridden when SDK reads ~/.claude/settings.json
-  // We re-apply them after query() initialization to ensure profile takes priority
+  // Pre-apply env vars before the PTY spawn so the child inherits them.
   if (opts.claudeEnvVars) {
     Object.entries(opts.claudeEnvVars).forEach(([key, value]) => {
       process.env[key] = value;
     });
   }
 
-  // Get initial message
+  // Get the initial message; nothing to do without one.
   const initial = await opts.nextMessage();
-  if (!initial) {
-    // No initial message - exit
-    return;
-  }
+  if (!initial) return;
 
-  // Handle special commands
+  // Special-command short-circuits.
   const specialCommand = parseSpecialCommand(initial.message);
 
-  // Handle /clear command
   if (specialCommand.type === "clear") {
-    if (opts.onCompletionEvent) {
-      opts.onCompletionEvent("Context was reset");
-    }
-    if (opts.onSessionReset) {
-      opts.onSessionReset();
-    }
+    opts.onCompletionEvent?.("Context was reset");
+    opts.onSessionReset?.();
     return;
   }
 
-  // Handle shell command ($ or ! prefix) - execute directly without Claude
   if (specialCommand.type === "shell" && specialCommand.shellCommand) {
     logger.debug(
       "[claudeRemote] Detected $ shell command:",
@@ -282,458 +325,485 @@ export async function claudeRemote(opts: {
       specialCommand.shellCommand,
       opts.path,
     );
-    if (opts.onShellResult) {
-      opts.onShellResult(output);
-    }
+    opts.onShellResult?.(output);
     return;
   }
 
-  // Handle /compact command
   let isCompactCommand = false;
   if (specialCommand.type === "compact") {
     logger.debug(
-      "[claudeRemote] /compact command detected - will process as normal but with compaction behavior",
+      "[claudeRemote] /compact command detected — will process as normal but with compaction behavior",
     );
     isCompactCommand = true;
-    if (opts.onCompletionEvent) {
-      opts.onCompletionEvent("Compaction started");
-    }
+    opts.onCompletionEvent?.("Compaction started");
   }
 
-  // Prepare SDK options
-  let mode = initial.mode;
-  const appliedSettingsState = createAppliedSettingsState();
-  // Translate App-level virtual model keys (e.g. "sonnet", "opus")
-  // to real Anthropic model IDs, then fall back to env-configured model.
+  // Per-turn state.
+  let mode: EnhancedMode = initial.mode;
   let model =
     resolveModelKey(initial.mode.model) ??
     opts.claudeEnvVars?.ANTHROPIC_MODEL ??
     process.env.ANTHROPIC_MODEL;
+  const appliedSettingsState = createAppliedSettingsState();
 
-  // Build effective system prompt with optional locale instruction
+  // Compose the effective system prompt (locale + append). The TUI takes the
+  // combined string via `--append-system-prompt` instead of separate fields.
   const localeInstruction = buildLocaleInstruction(initial.mode.locale);
   const effectiveSystemPrompt = localeInstruction
     ? systemPrompt + "\n\n" + localeInstruction
     : systemPrompt;
+  const appendParts = [initial.mode.appendSystemPrompt, effectiveSystemPrompt].filter(
+    Boolean,
+  );
+  const mergedAppendSystemPrompt =
+    appendParts.length > 0 ? appendParts.join("\n\n") : undefined;
 
-  const sdkOptions: QueryOptions = {
-    cwd: opts.path,
-    resume: startFrom ?? undefined,
-    continue: initial.mode.continue || undefined,
-    mcpServers: opts.mcpServers,
-    // Never pass bypassPermissions to SDK — it causes Claude Code to skip
-    // permission requests entirely, so canUseTool is never called and
-    // AskUserQuestion cannot block. PermissionHandler handles auto-approval
-    // for bypass mode via canCallTool instead.
-    permissionMode: mapToClaudeMode(initial.mode.permissionMode) === "bypassPermissions"
-      ? "default"
-      : mapToClaudeMode(initial.mode.permissionMode),
-    // Pass through so Claude Code knows bypass is intended (enables
-    // --allow-dangerously-skip-permissions flag on the spawned process).
-    allowDangerouslySkipPermissions: mapToClaudeMode(initial.mode.permissionMode) === "bypassPermissions",
-    model: model || undefined,
-    fallbackModel: initial.mode.fallbackModel,
-    customSystemPrompt: initial.mode.customSystemPrompt
-      ? initial.mode.customSystemPrompt + "\n\n" + effectiveSystemPrompt
-      : undefined,
-    // System-level reinforcement via SDK (does NOT enter conversation history).
-    appendSystemPrompt: (() => {
-      const parts = [initial.mode.appendSystemPrompt, effectiveSystemPrompt].filter(Boolean);
-      return parts.length > 0 ? parts.join("\n\n") : undefined;
-    })(),
-    allowedTools: initial.mode.allowedTools
-      ? initial.mode.allowedTools.concat(opts.allowedTools)
-      : opts.allowedTools,
-    disallowedTools: initial.mode.disallowedTools,
-    canCallTool: (
-      toolName: string,
-      input: unknown,
-      options: { signal: AbortSignal },
-    ) => opts.canCallTool(toolName, input, mode, options),
-    executable: opts.jsRuntime ?? "node",
-    abort: opts.signal,
-    pathToClaudeCodeExecutable: (() => {
-      return resolve(
-        join(projectPath(), "scripts", "claude_remote_launcher.js"),
-      );
-    })(),
+  // The mode passed to buildClaudeCliFlags carries the merged append-prompt
+  // and the resolved model so the CLI builder does not need to know about
+  // the locale dance.
+  const flagMode: EnhancedMode = {
+    ...initial.mode,
+    model: model ?? initial.mode.model,
+    appendSystemPrompt: mergedAppendSystemPrompt,
+  };
+
+  const flagsResult = buildClaudeCliFlags({
+    mode: flagMode,
     settingsPath: opts.hookSettingsPath,
-    maxBudgetUsd: initial.mode.maxBudgetUsd,
-    thinking: initial.mode.thinking,
-    effort: initial.mode.effort,
-    taskBudget: initial.mode.taskBudget,
-    promptSuggestions: true,
-    onElicitation: opts.onElicitation,
-    // ── New SDK capabilities ──
-    agentProgressSummaries: true,
-    enableFileCheckpointing: true,
-    // Forward subagent text/thinking blocks as assistant/user messages so the
-    // App can render complete nested subagent conversation flows (SDK 0.2.133+).
-    forwardSubagentText: true,
-    // Let the SDK decide 1M-context eligibility per model (avoids forcing the
-    // beta on subagents that use haiku/other non-1M models).
-    // betas: buildBetasForModel(initial.mode.model, initial.mode.betas),
-    agent: initial.mode.agent,
-    agents: initial.mode.agents,
-    outputFormat: initial.mode.outputFormat,
-    plugins: initial.mode.plugins,
-    additionalDirectories: initial.mode.additionalDirectories,
-    // Happy-flavored plan-mode workflow body (SDK 0.2.119+). SDK only applies
-    // this when `permissionMode === 'plan'`; passing it unconditionally is a
-    // no-op outside plan mode.
-    planModeInstructions: HAPPY_PLAN_MODE_INSTRUCTIONS,
-    // Stable link from the Claude Code JSONL back to the Happy session (SDK 0.2.119+).
-    // Only applied to new sessions — resume/continue keeps whatever title was persisted.
-    title: opts.happySessionId,
-    // SessionStore @alpha adapter — undefined unless HAPPY_USE_SESSION_STORE=1.
-    // When enabled the SDK dual-writes transcript entries to our observer
-    // adapter (in-memory) in addition to the usual on-disk JSONL, so we can
-    // study real call cadence before building a production backend.
-    sessionStore: createSessionStoreAdapter(),
-    // Enable markdown preview content in AskUserQuestion option objects.
-    // The model emits a `preview` field (markdown text) per option when set.
-    toolConfig: { askUserQuestion: { previewFormat: "markdown" } },
-    // Stream partial assistant messages (SDK 0.3.143+). Emits
-    // SDKPartialAssistantMessage (type: 'stream_event') for each API SSE
-    // chunk, enabling real-time text-delta forwarding to the App.
-    includePartialMessages: true,
-  };
-
-  // Track thinking state
-  let thinking = false;
-  const updateThinking = (newThinking: boolean) => {
-    if (thinking !== newThinking) {
-      thinking = newThinking;
-      logger.debug(`[claudeRemote] Thinking state changed to: ${thinking}`);
-      if (opts.onThinkingChange) {
-        opts.onThinkingChange(thinking);
-      }
-    }
-  };
-
-  // Push initial message (skip when continuing — SDK resumes without a prompt)
-  let messages = new PushableAsyncIterable<SDKUserMessage>();
-  if (!initial.mode.continue) {
-    messages.push({
-      type: "user",
-      message: {
-        role: "user",
-        content: initial.message,
-      },
-      parent_tool_use_id: null,
-      session_id: undefined,
-    });
+    mcpServers: opts.mcpServers,
+    resumeSessionId: startFrom ?? undefined,
+    extraArgs: opts.claudeArgs,
+  });
+  for (const warning of flagsResult.warnings) {
+    logger.debug(`[claudeRemote] CLI flag warning: ${warning}`);
   }
 
-  // Expose mid-turn push capability to caller
-  opts.onMessagesReady?.((msg) => messages.push(msg));
+  // Build the child env. We let the PTY runtime sanitize (strip CLAUDECODE
+  // etc) — caller-supplied overrides take precedence over process.env.
+  const childEnv: NodeJS.ProcessEnv = {
+    ...process.env,
+    ...(opts.claudeEnvVars ?? {}),
+  };
 
-  // Start the loop.
-  // Forward all messages for sync immediately as they arrive from stdout,
-  // regardless of whether the for-await loop is blocked (e.g., at nextMessage).
-  // This ensures messages from YOLO-mode auto-continuations are synced even
-  // when the loop is waiting for user input after a result message.
+  // Spawn the PTY and surface the controller stub.
   const sdkCallAt = Date.now();
-  let firstResponseLogged = false;
-  const response = query({
-    prompt: messages,
-    options: sdkOptions,
-    onMessageReceived: (message) => {
-      if (!firstResponseLogged) {
-        firstResponseLogged = true;
-        logger.debug(`[perf] sdk_call → first_response: ${Date.now() - sdkCallAt}ms (type=${message.type})`);
-      }
-      logger.debugLargeJson(
-        `[claudeRemote] onMessageReceived ${message.type}`,
-        message,
-      );
-      opts.onMessage(message);
-    },
-  });
-  logger.debug(`[perf] sdk query() call completed (sync part): ${Date.now() - sdkCallAt}ms`);
+  let pty: ClaudePtyHandle;
+  try {
+    pty = startClaudePty({
+      args: flagsResult.args,
+      cwd: opts.path,
+      env: childEnv,
+    });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    logger.debug(`[claudeRemote] Failed to spawn claude PTY: ${msg}`);
+    throw e;
+  }
+  const controller = createClaudePtyController(pty);
+  opts.onQueryReady?.(controller);
+  logger.debug(
+    `[perf] sdk query() call completed (sync part): ${Date.now() - sdkCallAt}ms`,
+  );
 
-  // Expose the underlying SDK Query for runtime control (interrupt, stopTask, etc.)
-  opts.onQueryReady?.((response as AdaptedQuery)._officialQuery);
+  // Bridge the PTY to the daemon's TerminalManager so the App's "Open Raw
+  // Terminal" view can subscribe to the byte stream over the existing
+  // `terminal-output` socket event. Only meaningful when this CLI was spawned
+  // by a daemon (HAPPY_DAEMON_CONTROL_URL injected); standalone runs skip it.
+  let teardownPtyBridge: (() => void) | undefined;
+  if (opts.happySessionId && bridgeAvailable()) {
+    const happySessionId = opts.happySessionId;
+    const terminalId = buildClaudeTerminalId(happySessionId);
+    // Best-effort attach — we do not await so a slow daemon never blocks the
+    // PTY's first byte.
+    void bridgeAttach({
+      terminalId,
+      sessionId: happySessionId,
+      cols: 80,
+      rows: 24,
+      cwd: opts.path,
+    });
 
-  // Re-apply profile env vars AFTER SDK initialization.
-  // The SDK reads ~/.claude/settings.json during query() and may overwrite
-  // process.env values set by the daemon profile (e.g., ANTHROPIC_BASE_URL,
-  // ANTHROPIC_DEFAULT_*_MODEL). Profile config must take priority.
+    const router = attachClaudePtyRouter({
+      sessionId: happySessionId,
+      pty,
+      onOutput: ({ data }) => {
+        void bridgeData(terminalId, data);
+      },
+      onExit: ({ exitCode }) => {
+        void bridgeExit(terminalId, exitCode);
+      },
+    });
+
+    teardownPtyBridge = () => {
+      router.dispose();
+      void bridgeDetach(terminalId);
+    };
+  }
+
+  // Re-apply profile env vars AFTER spawn (matches pre-migration behaviour
+  // where settings.json could overwrite process.env). The PTY child has
+  // already inherited the env above; this only fixes our own process.env so
+  // downstream code in the same process sees the profile values.
   if (opts.claudeEnvVars) {
     Object.entries(opts.claudeEnvVars).forEach(([key, value]) => {
       process.env[key] = value;
     });
     logger.debug(
-      `[claudeRemote] Re-applied ${Object.keys(opts.claudeEnvVars).length} profile env vars after SDK init`,
+      `[claudeRemote] Re-applied ${Object.keys(opts.claudeEnvVars).length} profile env vars after spawn`,
     );
   }
 
+  // Thinking state — mirrors the SDK era's per-turn updateThinking calls.
+  let thinking = false;
+  const updateThinking = (next: boolean) => {
+    if (thinking === next) return;
+    thinking = next;
+    logger.debug(`[claudeRemote] Thinking state changed to: ${thinking}`);
+    opts.onThinkingChange?.(thinking);
+  };
   updateThinking(true);
-  try {
-    logger.debug(`[claudeRemote] Starting to iterate over response`);
 
-    for await (const message of response) {
-      // NOTE: opts.onMessage is already called via onMessageReceived above.
-      // This loop handles only control flow decisions (result, init, abort).
+  // Models broadcast (Controller returns an empty list under PTY).
+  if (opts.onInitialized) {
+    controller
+      .initializationResult()
+      .then((init) => {
+        if (opts.signal?.aborted) return;
+        opts.onInitialized?.({
+          models: init.models?.map((m) => ({
+            code: m.value,
+            value: m.displayName ?? m.value,
+            description: m.description ?? null,
+            supportsEffort: m.supportsEffort ?? null,
+            supportedEffortLevels: m.supportedEffortLevels ?? null,
+            supportsAdaptiveThinking: m.supportsAdaptiveThinking ?? null,
+          })),
+        });
+      })
+      .catch((e) => {
+        logger.debug("[claudeRemote] initializationResult failed:", e);
+      });
+  }
 
-      // Handle special system messages
-      if (message.type === "system" && message.subtype === "init") {
-        // Start thinking when session initializes
-        updateThinking(true);
+  // Lifecycle coordination — we resolve when the PTY exits or the caller
+  // aborts. nextMessage()===null path kills the PTY explicitly.
+  const seenSessionIds = new Set<string>();
+  let firstResponseLogged = false;
+  let aborted = false;
+  let exitResolved = false;
+  let exitResolve: () => void;
+  const exitPromise = new Promise<void>((resolve) => {
+    exitResolve = resolve;
+  });
 
-        const systemInit = message as SDKSystemMessage;
+  const finishOnce = () => {
+    if (exitResolved) return;
+    exitResolved = true;
+    teardownPtyBridge?.();
+    teardownPtyBridge = undefined;
+    exitResolve();
+  };
 
-        // Session id is still in memory, wait until session file is written to disk
-        // Start a watcher for to detect the session id
-        if (systemInit.session_id) {
-          logger.debug(
-            `[claudeRemote] Waiting for session file to be written to disk: ${systemInit.session_id}`,
-          );
-          const projectDir = getProjectPath(opts.path);
-          const found = await awaitFileExist(
-            join(projectDir, `${systemInit.session_id}.jsonl`),
-          );
-          logger.debug(
-            `[claudeRemote] Session file found: ${systemInit.session_id} ${found}`,
-          );
-          opts.onSessionFound(systemInit.session_id);
-        }
+  pty.onExit(({ exitCode, signal }) => {
+    logger.debug(
+      `[claudeRemote] PTY exited code=${exitCode} signal=${signal ?? "(none)"}`,
+    );
+    finishOnce();
+  });
 
-        // Fetch initialization result (supported models) asynchronously
-        if (opts.onInitialized) {
-          const officialQuery = (response as AdaptedQuery)._officialQuery;
-          const signal = opts.signal;
-          officialQuery
-            .initializationResult()
-            .then((initResult) => {
-              if (signal?.aborted) return; // session already torn down
-              opts.onInitialized?.({
-                models: initResult.models?.map((m) => ({
-                  code: m.value,
-                  value: m.displayName ?? m.value,
-                  description: m.description ?? null,
-                  supportsEffort: m.supportsEffort ?? null,
-                  supportedEffortLevels: m.supportedEffortLevels ?? null,
-                  supportsAdaptiveThinking: m.supportsAdaptiveThinking ?? null,
-                })),
-              });
-            })
-            .catch((e) => {
-              logger.debug(
-                "[claudeRemote] Failed to get initializationResult:",
-                e,
-              );
-            });
-        }
+  if (opts.signal) {
+    const signal = opts.signal;
+    const abortHandler = () => {
+      if (aborted) return;
+      aborted = true;
+      logger.debug("[claudeRemote] caller signal aborted — killing PTY");
+      pty.kill("SIGTERM");
+    };
+    if (signal.aborted) abortHandler();
+    else signal.addEventListener("abort", abortHandler, { once: true });
+  }
+
+  // Handle a single `result` record — drives the turn loop.
+  let resultInFlight = false;
+  const handleResult = async (raw: { type: "result" } & Record<string, unknown>) => {
+    if (aborted || resultInFlight) return;
+    resultInFlight = true;
+    try {
+      updateThinking(false);
+      logger.debug("[claudeRemote] Result received");
+
+      const result = raw as {
+        result?: string;
+        num_turns?: number;
+        subtype?: string;
+        total_cost_usd?: number;
+        terminal_reason?: string;
+        modelUsage?: Record<string, {
+          inputTokens: number;
+          outputTokens: number;
+          cacheReadInputTokens: number;
+          cacheCreationInputTokens: number;
+          costUSD: number;
+          contextWindow: number;
+          maxOutputTokens: number;
+        }>;
+      };
+
+      // Surface zero-turn local-command results (slash commands handled by
+      // claude without an API call — e.g. "Unknown skill: …").
+      if (
+        result.num_turns === 0 &&
+        result.result &&
+        result.result.trim().length > 0
+      ) {
+        logger.debug(
+          "[claudeRemote] Forwarding local command result:",
+          result.result,
+        );
+        opts.onCompletionEvent?.(result.result);
       }
 
-      // Handle result messages
-      if (message.type === "result") {
-        updateThinking(false);
-        logger.debug("[claudeRemote] Result received");
-
-        // Surface local command results (e.g., "Unknown skill: ...") that
-        // were handled by the SDK without calling the API (num_turns === 0).
-        // These would otherwise be silently dropped since result messages
-        // are not converted to log messages by sdkToLogConverter.
-        const resultData = message as { result?: string; num_turns?: number };
-        if (
-          resultData.num_turns === 0 &&
-          resultData.result &&
-          resultData.result.trim().length > 0
-        ) {
-          logger.debug(
-            "[claudeRemote] Forwarding local command result:",
-            resultData.result,
-          );
-          opts.onCompletionEvent?.(resultData.result);
-        }
-
-        // Detect error_max_turns for continue support
-        const resultSubtype = (message as any).subtype;
-        if (resultSubtype === "error_max_turns") {
-          logger.debug(
-            "[claudeRemote] Max turns reached — signaling needsContinue",
-          );
-          opts.onMaxTurnsReached?.();
-        }
-
-        // Extract SDK result data (cost, usage breakdown, terminal reason) before signaling ready
-        const resultMsg = message as {
-          total_cost_usd?: number;
-          num_turns?: number;
-          terminal_reason?: string;
-          modelUsage?: Record<
-            string,
-            {
-              inputTokens: number;
-              outputTokens: number;
-              cacheReadInputTokens: number;
-              cacheCreationInputTokens: number;
-              costUSD: number;
-              contextWindow: number;
-              maxOutputTokens: number;
-            }
-          >;
-        };
-        if (resultMsg.total_cost_usd !== undefined || resultMsg.modelUsage) {
-          opts.onResult?.({
-            totalCostUsd: resultMsg.total_cost_usd ?? 0,
-            numTurns: resultMsg.num_turns ?? 0,
-            terminalReason: resultMsg.terminal_reason,
-            modelUsage: resultMsg.modelUsage ?? {},
-          });
-        }
-
-        // Fetch context window usage breakdown (fire-and-forget, never blocks turn flow)
-        if (opts.onContextUsage) {
-          const officialQuery = (response as AdaptedQuery)._officialQuery;
-          officialQuery.getContextUsage?.()
-            .then((ctx) => {
-              if (ctx && !opts.signal?.aborted) {
-                opts.onContextUsage?.(ctx);
-              }
-            })
-            .catch((e) => {
-              logger.debug("[claudeRemote] Failed to get context usage:", e);
-            });
-        }
-
-        // Feed turn usage data back to adaptive router BEFORE onReady resets it
-        opts.onTurnComplete?.();
-
-        // Send completion messages
-        if (isCompactCommand) {
-          logger.debug("[claudeRemote] Compaction completed");
-          if (opts.onCompletionEvent) {
-            opts.onCompletionEvent("Compaction completed");
-          }
-          isCompactCommand = false;
-        }
-
-        // Send ready event (flush queued messages before signaling turn end)
-        await opts.onReady();
-
-        // Push next message
-        const next = await opts.nextMessage();
-        if (!next) {
-          messages.end();
-          return;
-        }
-
-        // Check for shell command in follow-up messages
-        const nextSpecialCommand = parseSpecialCommand(next.message);
-        if (
-          nextSpecialCommand.type === "shell" &&
-          nextSpecialCommand.shellCommand
-        ) {
-          logger.debug(
-            "[claudeRemote] Detected $ shell command in follow-up:",
-            nextSpecialCommand.shellCommand,
-          );
-          const output = await executeShellCommand(
-            nextSpecialCommand.shellCommand,
-            opts.path,
-          );
-          if (opts.onShellResult) {
-            // onShellResult already closes the turn, so skip onReady()
-            // to avoid double-closing the turn which corrupts protocol state
-            opts.onShellResult(output);
-          }
-          // Don't push to Claude, wait for next user message
-          continue;
-        }
-
-        // Hot-swap model via setModel() if model changed (avoids process restart)
-        const newModel =
-          resolveModelKey(next.mode.model) ??
-          opts.claudeEnvVars?.ANTHROPIC_MODEL ??
-          process.env.ANTHROPIC_MODEL;
-        if (newModel && newModel !== model) {
-          logger.debug(
-            `[claudeRemote] Hot-swapping model: ${model} → ${newModel}`,
-          );
-          await (response as AdaptedQuery)._officialQuery.setModel(newModel);
-          model = newModel;
-        }
-
-        // Snapshot prev mode before reassignment (used for applyFlagSettings diff below).
-        const prevMode = mode;
-
-        // Hot-swap permissionMode via setPermissionMode() if changed (non-plan, non-bypass ↔ non-plan, non-bypass)
-        // Plan and bypass transitions require cold restart (handled by coldModeHash in launcher).
-        const newPermissionMode = mapToClaudeMode(next.mode.permissionMode);
-        const currentPermissionMode = mapToClaudeMode(mode.permissionMode);
-        if (newPermissionMode !== currentPermissionMode) {
-          if (
-            newPermissionMode === "plan" ||
-            currentPermissionMode === "plan" ||
-            newPermissionMode === "bypassPermissions" ||
-            currentPermissionMode === "bypassPermissions"
-          ) {
-            // Should never reach here: plan/bypass transitions are caught by coldModeHash.
-            // Freeze only permissionMode to avoid SDK state desync;
-            // other fields (model, thinking, etc.) still update normally.
-            logger.debug(
-              `[claudeRemote] BUG: plan/bypass transition reached setPermissionMode — preserving SDK state (${currentPermissionMode} → ${newPermissionMode})`,
-            );
-            mode = { ...next.mode, permissionMode: mode.permissionMode };
-          } else {
-            logger.debug(
-              `[claudeRemote] Hot-swapping permissionMode: ${currentPermissionMode} → ${newPermissionMode}`,
-            );
-            await (response as AdaptedQuery)._officialQuery.setPermissionMode(
-              newPermissionMode,
-            );
-            mode = next.mode;
-          }
-        } else {
-          mode = next.mode;
-        }
-
-        // Hot-swap Settings-level fields via applyFlagSettings (SDK 0.3.142+)
-        // Compares prevMode → next.mode and builds a minimal Settings patch.
-        await applyFlagSettingsFromModeDiff(
-          (response as AdaptedQuery)._officialQuery,
-          prevMode,
-          next.mode,
-          appliedSettingsState,
+      if (result.subtype === "error_max_turns") {
+        logger.debug(
+          "[claudeRemote] Max turns reached — signaling needsContinue",
         );
+        opts.onMaxTurnsReached?.();
+      }
 
-        messages.push({
-          type: "user",
-          message: { role: "user", content: next.message },
-          parent_tool_use_id: null,
-          session_id: undefined,
-          ...(next.mode.shouldQuery === false && { shouldQuery: false }),
+      if (result.total_cost_usd !== undefined || result.modelUsage) {
+        opts.onResult?.({
+          totalCostUsd: result.total_cost_usd ?? 0,
+          numTurns: result.num_turns ?? 0,
+          terminalReason: result.terminal_reason,
+          modelUsage: result.modelUsage ?? {},
         });
       }
 
-      // Handle tool result
-      if (message.type === "user") {
-        const msg = message as SDKUserMessage;
-        if (msg.message.role === "user" && Array.isArray(msg.message.content)) {
-          for (let c of msg.message.content) {
-            if (
-              c.type === "tool_result" &&
-              c.tool_use_id &&
-              opts.isAborted(c.tool_use_id)
-            ) {
-              logger.debug("[claudeRemote] Tool aborted, exiting claudeRemote");
-              return;
-            }
+      // Context-window usage — PTY mode returns null; controller logs it.
+      if (opts.onContextUsage) {
+        controller
+          .getContextUsage()
+          .then((ctx) => {
+            if (!ctx || opts.signal?.aborted) return;
+            opts.onContextUsage?.({
+              totalTokens: ctx.totalTokens,
+              maxTokens: ctx.maxTokens,
+              percentage: ctx.percentage,
+              model: ctx.model,
+              categories: ctx.categories,
+              isAutoCompactEnabled: false,
+              messageBreakdown: ctx.messageBreakdown
+                ? {
+                    toolCallTokens: ctx.messageBreakdown.toolCallTokens,
+                    toolResultTokens: ctx.messageBreakdown.toolResultTokens,
+                    attachmentTokens: ctx.messageBreakdown.attachmentTokens,
+                    assistantMessageTokens:
+                      ctx.messageBreakdown.assistantMessageTokens,
+                    userMessageTokens: ctx.messageBreakdown.userMessageTokens,
+                  }
+                : undefined,
+            });
+          })
+          .catch((e) => {
+            logger.debug("[claudeRemote] getContextUsage failed:", e);
+          });
+      }
+
+      opts.onTurnComplete?.();
+
+      if (isCompactCommand) {
+        logger.debug("[claudeRemote] Compaction completed");
+        opts.onCompletionEvent?.("Compaction completed");
+        isCompactCommand = false;
+      }
+
+      await opts.onReady();
+
+      const next = await opts.nextMessage();
+      if (!next) {
+        logger.debug("[claudeRemote] nextMessage returned null — terminating PTY");
+        pty.kill("SIGTERM");
+        return;
+      }
+
+      const nextSpecialCommand = parseSpecialCommand(next.message);
+      if (
+        nextSpecialCommand.type === "shell" &&
+        nextSpecialCommand.shellCommand
+      ) {
+        logger.debug(
+          "[claudeRemote] Detected $ shell command in follow-up:",
+          nextSpecialCommand.shellCommand,
+        );
+        const output = await executeShellCommand(
+          nextSpecialCommand.shellCommand,
+          opts.path,
+        );
+        // onShellResult already closes the turn; don't double-close via onReady.
+        opts.onShellResult?.(output);
+        return;
+      }
+
+      // Hot-swap branches — Controller stubs log + no-op in PTY mode. The
+      // launcher's coldModeHash catches cases that genuinely need a fresh
+      // process (plan/bypass transitions, model swap).
+      const newModel =
+        resolveModelKey(next.mode.model) ??
+        opts.claudeEnvVars?.ANTHROPIC_MODEL ??
+        process.env.ANTHROPIC_MODEL;
+      if (newModel && newModel !== model) {
+        logger.debug(
+          `[claudeRemote] Hot-swap model requested ${model} → ${newModel} (no-op under PTY; cold restart handles this)`,
+        );
+        await controller.setModel(newModel);
+        model = newModel;
+      }
+
+      const prevMode = mode;
+      const newPermissionMode = mapToClaudeMode(next.mode.permissionMode);
+      const currentPermissionMode = mapToClaudeMode(mode.permissionMode);
+      if (newPermissionMode !== currentPermissionMode) {
+        const requiresColdRestart =
+          newPermissionMode === "plan" ||
+          currentPermissionMode === "plan" ||
+          newPermissionMode === "bypassPermissions" ||
+          currentPermissionMode === "bypassPermissions";
+        if (requiresColdRestart) {
+          // Launcher should have already cold-restarted via coldModeHash.
+          // Preserve our local permissionMode so subsequent diffs are sane.
+          logger.debug(
+            `[claudeRemote] permission-mode transition reached the hot path (${currentPermissionMode} → ${newPermissionMode}) — preserving PTY state`,
+          );
+          mode = { ...next.mode, permissionMode: mode.permissionMode };
+        } else {
+          await controller.setPermissionMode(newPermissionMode);
+          mode = next.mode;
+        }
+      } else {
+        mode = next.mode;
+      }
+
+      // Run the settings-diff for state tracking even though the controller
+      // call is a no-op — `AppliedSettingsState` still accumulates for the
+      // `get_context_usage` / `apply_settings` RPCs.
+      await applyFlagSettingsFromModeDiff(
+        controller,
+        prevMode,
+        next.mode,
+        appliedSettingsState,
+      );
+
+      // Push the prompt to the PTY. `shouldQuery: false` (system-only
+      // appends, e.g. progress sync) is not representable in TUI mode —
+      // drop silently with a debug log, matching the plan's accepted loss.
+      if (next.mode.shouldQuery === false) {
+        logger.debug(
+          "[claudeRemote] shouldQuery:false message dropped — TUI has no append-without-query semantics",
+        );
+        return;
+      }
+      pty.write(next.message + "\n");
+    } finally {
+      resultInFlight = false;
+    }
+  };
+
+  // Set up the JSONL session scanner. Every raw record becomes an
+  // SDKMessage-shaped object and is forwarded to opts.onMessage; result
+  // records additionally drive the turn loop.
+  const scanner = await createSessionScanner({
+    sessionId: startFrom,
+    workingDirectory: opts.path,
+    onMessage: (raw) => {
+      if (!firstResponseLogged) {
+        firstResponseLogged = true;
+        logger.debug(
+          `[perf] sdk_call → first_response: ${Date.now() - sdkCallAt}ms (type=${raw.type})`,
+        );
+      }
+
+      const sdkMsg = rawToSdkMessage(raw);
+      if (sdkMsg) {
+        logger.debugLargeJson(`[claudeRemote] onMessageReceived ${raw.type}`, sdkMsg);
+        opts.onMessage(sdkMsg);
+      }
+
+      // Surface new session ids as the JSONL records show up.
+      const rawRecord = raw as Record<string, unknown>;
+      const sid = typeof rawRecord.sessionId === "string"
+        ? rawRecord.sessionId
+        : typeof rawRecord.session_id === "string"
+          ? (rawRecord.session_id as string)
+          : undefined;
+      if (sid && !seenSessionIds.has(sid)) {
+        seenSessionIds.add(sid);
+        opts.onSessionFound(sid);
+        // Make sure the scanner also follows future writes to this id.
+        scanner.onNewSession(sid).catch(() => undefined);
+      }
+
+      // Tool-result abort detection — matches the SDK-era behaviour where
+      // a tool that the caller marked aborted should tear the turn down.
+      if (raw.type === "user") {
+        const blocks = Array.isArray((raw as { message?: { content?: unknown } })
+          .message?.content)
+          ? ((raw as { message: { content: Array<Record<string, unknown>> } })
+              .message.content)
+          : [];
+        for (const block of blocks) {
+          const useId = (block as { tool_use_id?: unknown }).tool_use_id;
+          if (
+            (block as { type?: unknown }).type === "tool_result" &&
+            typeof useId === "string" &&
+            opts.isAborted(useId)
+          ) {
+            logger.debug("[claudeRemote] Tool aborted, tearing down PTY");
+            aborted = true;
+            pty.kill("SIGTERM");
+            return;
           }
         }
       }
-    }
+
+      if (raw.type === "system") {
+        // The TUI's system:init equivalent re-asserts thinking=true so the
+        // App spinner stays consistent across mid-turn restarts.
+        updateThinking(true);
+      }
+
+      if (raw.type === "result") {
+        void handleResult(raw as { type: "result" } & Record<string, unknown>);
+      }
+    },
+  });
+
+  // Mid-turn user input from the App composer — writes straight to PTY.
+  opts.onMessagesReady?.((msg) => {
+    const text = flattenUserContent(msg);
+    if (!text) return;
+    pty.write(text + "\n");
+  });
+
+  // Initial prompt — skip when `continue` so the TUI resumes its own state.
+  if (!initial.mode.continue) {
+    pty.write(initial.message + "\n");
+  }
+
+  try {
+    await exitPromise;
   } catch (e) {
     if (e instanceof AbortError) {
-      logger.debug(`[claudeRemote] Aborted`);
-      // Ignore
+      logger.debug("[claudeRemote] Aborted via AbortError");
     } else {
       throw e;
     }
   } finally {
     updateThinking(false);
+    try {
+      await scanner.cleanup();
+    } catch (e) {
+      logger.debug("[claudeRemote] scanner cleanup failed:", e);
+    }
+    if (!pty.exited) pty.kill("SIGTERM");
   }
 }

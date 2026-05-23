@@ -1,10 +1,12 @@
 /**
- * Claude Code SDK integration for Happy CLI
+ * Claude SDK type-compat barrel for Happy CLI.
  *
- * Uses official @anthropic-ai/claude-agent-sdk via adapter layer.
+ * Post-PTY-migration (Phase 6+) this module no longer wraps the official
+ * `@anthropic-ai/claude-agent-sdk` runtime — it only re-exports the type
+ * surface that downstream code is still typed against. The runtime
+ * `query()` driver was replaced by `claudePtyRuntime` + `sessionScanner`.
  */
 
-export { query } from "./queryAdapter"
 export { AbortError } from "./types"
 export type {
   QueryOptions,
@@ -18,6 +20,17 @@ export type {
   SDKResultError,
   CanCallToolCallback,
   PermissionResult,
+  SdkBeta,
+  SDKStatusMessage,
+  SDKCompactBoundaryMessage,
+  SDKTaskStartedMessage,
+  SDKTaskProgressMessage,
+  SDKTaskUpdatedMessage,
+  SDKTaskNotificationMessage,
+  SDKAPIRetryMessage,
+  SDKToolProgressMessage,
+  SDKPromptSuggestionMessage,
+  SDKSessionStateChangedMessage,
+  SDKMemoryRecallMessage,
+  SDKRateLimitEvent,
 } from "./types"
-
-export type { AdaptedQuery } from "./queryAdapter"

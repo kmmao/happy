@@ -1165,6 +1165,80 @@ export class ApiMachineClient {
     this.socket.emit("session:message", { fromSessionId, toSessionId, message });
   }
 
+  /**
+   * Claude PTY bridge — session child processes own the Claude TUI PTY, but
+   * the daemon owns the App-facing TerminalManager + machine socket. These
+   * methods let the control-server callbacks plug per-session PTYs into the
+   * existing terminal wire without exposing the manager itself.
+   *
+   * `attachClaudePty` registers an external attachment so `terminal-spawn` /
+   * `terminal-list` RPCs see the Claude PTY alongside shell PTYs. The
+   * attachment buffers the most recent bytes for reconnect replay.
+   */
+  attachClaudePty(input: {
+    terminalId: string;
+    sessionId: string;
+    cols: number;
+    rows: number;
+    cwd: string;
+  }): void {
+    const MAX_BUFFER = 64 * 1024;
+    let buffer = "";
+    this.terminalManager.attachExternal({
+      terminalId: input.terminalId,
+      sessionId: input.sessionId,
+      cols: input.cols,
+      rows: input.rows,
+      cwd: input.cwd,
+      createdAt: Date.now(),
+      snapshot: () => buffer,
+      // For v1 the App's WebTerminal is observation-only — input from xterm.js
+      // and resizes are logged but dropped. The user types through the chat
+      // composer; the PTY's geometry is fixed at spawn. close requests are
+      // ignored since the session child owns the PTY lifecycle.
+      write: (data) => {
+        logger.debug(
+          `[apiMachine] Claude PTY write ignored (${data.length}B) for ${input.terminalId}`,
+        );
+      },
+      resize: (cols, rows) => {
+        logger.debug(
+          `[apiMachine] Claude PTY resize ignored (${cols}x${rows}) for ${input.terminalId}`,
+        );
+      },
+      requestClose: () => {
+        logger.debug(
+          `[apiMachine] Claude PTY close requested but ignored for ${input.terminalId}`,
+        );
+      },
+    });
+    // Bind the buffer maintainer so forwardClaudePtyData below can update it
+    // even though TerminalManager has no direct hook for buffer maintenance.
+    this.claudePtyBuffers.set(input.terminalId, (chunk: string) => {
+      buffer += chunk;
+      if (buffer.length > MAX_BUFFER) {
+        buffer = buffer.slice(buffer.length - MAX_BUFFER);
+      }
+    });
+  }
+
+  detachClaudePty(terminalId: string): void {
+    this.terminalManager.detachExternal(terminalId);
+    this.claudePtyBuffers.delete(terminalId);
+  }
+
+  forwardClaudePtyData(terminalId: string, data: string): void {
+    this.claudePtyBuffers.get(terminalId)?.(data);
+    this.terminalManager.emitExternalOutput(terminalId, data);
+  }
+
+  forwardClaudePtyExit(terminalId: string, exitCode: number): void {
+    this.terminalManager.emitExternalExit(terminalId, exitCode);
+    this.claudePtyBuffers.delete(terminalId);
+  }
+
+  private claudePtyBuffers = new Map<string, (chunk: string) => void>();
+
   private flushPendingFixStatuses() {
     const pending = [...this.pendingFixStatuses];
     this.pendingFixStatuses = [];
