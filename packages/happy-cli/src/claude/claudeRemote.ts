@@ -574,6 +574,19 @@ export async function claudeRemote(opts: {
   };
   updateThinking(true);
 
+  // Single chokepoint for writing a user prompt to the PTY. Marking thinking
+  // here (rather than waiting for the JSONL stream to emit a non-result
+  // system record) is what keeps the App's status indicator in lockstep with
+  // the TUI: in PTY mode the only deterministic "this turn just started"
+  // signal we control is the prompt write itself. Without this, the App
+  // would stay on "ready" through every turn after the first — `updateThinking
+  // (true)` would only fire opportunistically when an extra system record
+  // (e.g. stop_hook_summary) happened to land mid-turn.
+  const writePromptAndMarkThinking = (msg: string): void => {
+    writePromptToPty(pty, msg);
+    updateThinking(true);
+  };
+
   // Models broadcast (Controller returns an empty list under PTY).
   if (opts.onInitialized) {
     controller
@@ -842,7 +855,7 @@ export async function claudeRemote(opts: {
       // ptyReady is almost certainly resolved by now (we just consumed a
       // result), but await it anyway as cheap insurance against races.
       await ptyReady;
-      writePromptToPty(pty, next.message);
+      writePromptAndMarkThinking(next.message);
     } finally {
       resultInFlight = false;
     }
@@ -1018,13 +1031,16 @@ export async function claudeRemote(opts: {
   opts.onMessagesReady?.((msg) => {
     const text = flattenUserContent(msg);
     if (!text) return;
-    void ptyReady.then(() => writePromptToPty(pty, text));
+    void ptyReady.then(() => writePromptAndMarkThinking(text));
   });
 
   // Initial prompt — skip when `continue` so the TUI resumes its own state.
+  // `updateThinking(true)` is a no-op here (already true from the init at
+  // the top of this function), but using the helper keeps every prompt write
+  // funnelled through one chokepoint.
   if (!initial.mode.continue) {
     await ptyReady;
-    writePromptToPty(pty, initial.message);
+    writePromptAndMarkThinking(initial.message);
   }
 
   try {
