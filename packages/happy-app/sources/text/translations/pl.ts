@@ -1324,6 +1324,9 @@ export const pl: TranslationStructure = {
       otherDescription: "Wpisz własną odpowiedź",
       otherPlaceholder: "Wpisz swoją odpowiedź...",
       recommended: "Zalecane",
+      cancelStuckHint:
+        "Nie udało się wysłać odpowiedzi — ta sesja może nie obsługiwać selektora. Zamknij go, aby Claude kontynuował zwykłym tekstem.",
+      cancelStuckAction: "Anuluj i kontynuuj",
     },
     planFile: {
       refreshFromFile: "Odśwież z pliku",

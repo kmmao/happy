@@ -1280,6 +1280,9 @@ export const en: TranslationStructure = {
       otherDescription: "Type your own answer",
       otherPlaceholder: "Type your answer...",
       recommended: "Recommended",
+      cancelStuckHint:
+        "Couldn't deliver the answer — this session may not accept the picker. Dismiss it so Claude can continue with plain text.",
+      cancelStuckAction: "Cancel and continue",
     },
     planFile: {
       refreshFromFile: "Refresh from file",

@@ -1324,6 +1324,9 @@ export const ru: TranslationStructure = {
       otherDescription: "Введите свой ответ",
       otherPlaceholder: "Введите ваш ответ...",
       recommended: "Рекомендуется",
+      cancelStuckHint:
+        "Не удалось отправить ответ — эта сессия может не поддерживать пикер. Закройте его, чтобы Claude продолжил обычным текстом.",
+      cancelStuckAction: "Отменить и продолжить",
     },
     planFile: {
       refreshFromFile: "Обновить из файла",

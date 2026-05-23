@@ -5,8 +5,9 @@ export const PLAN_FAKE_RESTART = `PlEaZe Continue with plan.`
  * Happy-flavored replacement for the SDK 0.2.119+ plan-mode workflow body.
  * The SDK still wraps this with its read-only enforcement preamble and the
  * ExitPlanMode protocol footer, so we only restate the workflow itself —
- * adding Happy-specific surfaces the default does not know about (the
- * step-based AskUserQuestion UI, ExitPlanMode as the sole approval point).
+ * adding Happy-specific surfaces the default does not know about (ExitPlanMode
+ * as the sole approval point, plus a plain-text fallback for clarification
+ * questions when the interactive Q&A tool is unavailable in PTY mode).
  *
  * Keep this tight: the SDK already injects enough preamble/footer, and long
  * system reminders cost tokens on every plan-mode turn.
@@ -19,7 +20,9 @@ Research protocol:
 - Prefer verifying claims against the code over restating memory.
 
 Clarification protocol:
-- If the request has ambiguous tradeoffs (API shape, approach A vs B, scope boundaries), call the AskUserQuestion tool to resolve them BEFORE drafting. The user has a step-based Q&A UI — they can answer in one tap.
+- If the request has ambiguous tradeoffs (API shape, approach A vs B, scope boundaries), resolve them BEFORE drafting.
+- If an interactive question tool (AskUserQuestion / request_user_input) is available, use it — the user gets a one-tap picker UI.
+- If no interactive question tool is available (happy-cli's PTY mode disables AskUserQuestion because the Q&A UI has no return channel), ask in plain text with numbered options so the user can answer with a digit.
 - Only ask when a clarification would materially change the plan. Do not ask about trivia.
 
 Plan composition:

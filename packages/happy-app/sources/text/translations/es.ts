@@ -1314,6 +1314,9 @@ export const es: TranslationStructure = {
       otherDescription: "Escribe tu propia respuesta",
       otherPlaceholder: "Escribe tu respuesta...",
       recommended: "Recomendado",
+      cancelStuckHint:
+        "No se pudo enviar la respuesta — esta sesión puede no admitir el selector. Ciérralo para que Claude continúe en texto plano.",
+      cancelStuckAction: "Cancelar y continuar",
     },
     planFile: {
       refreshFromFile: "Actualizar desde archivo",

@@ -1238,6 +1238,9 @@ export const zhHant: TranslationStructure = {
       otherDescription: "輸入您自己的答案",
       otherPlaceholder: "輸入您的答案...",
       recommended: "推薦",
+      cancelStuckHint:
+        "提交未送達 —— 此會話可能不支援選項面板。點這裡跳過,讓 Claude 以純文字繼續。",
+      cancelStuckAction: "取消並跳過",
     },
     planFile: {
       refreshFromFile: "從檔案重新整理",

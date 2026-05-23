@@ -1269,6 +1269,9 @@ export const zhHans: TranslationStructure = {
       otherDescription: "输入您自己的答案",
       otherPlaceholder: "输入您的答案...",
       recommended: "推荐",
+      cancelStuckHint:
+        "提交未送达 —— 此会话可能不支持选项面板。点这里跳过,让 Claude 以纯文本继续。",
+      cancelStuckAction: "取消并跳过",
     },
     planFile: {
       refreshFromFile: "从文件刷新",
