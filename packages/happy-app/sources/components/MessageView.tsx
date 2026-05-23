@@ -377,19 +377,33 @@ function AgentTextBlock(props: {
     [optionStatsProjectId],
   );
 
-  // True when this is the latest agent message AND the session is actively streaming.
-  // We use a lightweight StreamingTextView during streaming to avoid re-parsing the
-  // full Markdown on every delta. Once streaming stops, we switch back to MarkdownView.
+  // True when this is the latest agent message AND the session is actively
+  // streaming AND the message belongs to the *current* thinking segment.
+  // StreamingTextView is lightweight (avoids re-parsing Markdown on every
+  // delta); MarkdownView formats the final result. Once streaming stops we
+  // switch to MarkdownView.
   //
-  // Once a message has been rendered as MarkdownView (streaming finished), it must
-  // never switch back to StreamingTextView — otherwise sending a new message would
-  // replay the typing animation on the previous reply and lose <options> styling.
+  // The "belongs to current turn" check uses `message.createdAt` vs the
+  // session's `thinkingAt` (stamped each time thinking flips false → true).
+  // Messages created *before* the current thinking segment started belong to
+  // a prior turn and must never re-enter the typewriter animation.
+  //
+  // History note: this used to be a `React.useRef<boolean>` "wasRenderedAs
+  // Markdown" latch. The latch reset whenever FlatList windowed the cell
+  // out and back in (common when a new user prompt arrives and the assistant
+  // row shifts position in the inverted list). Combined with the PTY-mode
+  // thinking fix in @kmmao/happy-coder@0.85.5 — which correctly re-asserts
+  // thinking=true at the start of every new turn — the latch reset caused
+  // the previous turn's reply to replay its typing animation on every new
+  // prompt. Deriving the state from `message.createdAt < session.thinkingAt`
+  // is mount-stable: it doesn't depend on component lifecycle.
   const sessionRunning = session != null && isSessionRunning(session);
-  const wasRenderedAsMarkdown = React.useRef(false);
-  if (!(props.isLatestAgent === true && sessionRunning)) {
-    wasRenderedAsMarkdown.current = true;
-  }
-  const isStreaming = props.isLatestAgent === true && sessionRunning && !wasRenderedAsMarkdown.current;
+  const isFromPriorTurn =
+    session != null &&
+    session.thinkingAt > 0 &&
+    props.message.createdAt < session.thinkingAt;
+  const isStreaming =
+    props.isLatestAgent === true && sessionRunning && !isFromPriorTurn;
 
   // Hide thinking messages unless experiments is enabled
   if (props.message.isThinking && !experiments) {

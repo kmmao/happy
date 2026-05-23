@@ -136,6 +136,36 @@ describe("buildClaudeCliFlags", () => {
     });
   });
 
+  it("mcpServers strips entries flagged `disabled: true` before serialising", () => {
+    const { args } = buildClaudeCliFlags({
+      mcpServers: {
+        "chrome-devtools": {
+          type: "stdio",
+          command: "npx",
+          args: ["-y", "chrome-devtools-mcp"],
+          disabled: true,
+        },
+        figma: { type: "http", url: "https://figma.example" },
+      },
+    });
+    expect(args.length).toBe(2);
+    expect(args[0]).toBe("--mcp-config");
+    expect(JSON.parse(args[1])).toEqual({
+      // chrome-devtools is filtered out; figma survives with no `disabled` field
+      mcpServers: { figma: { type: "http", url: "https://figma.example" } },
+    });
+  });
+
+  it("mcpServers omits --mcp-config entirely when every entry is disabled", () => {
+    const { args } = buildClaudeCliFlags({
+      mcpServers: {
+        a: { type: "stdio", command: "x", disabled: true },
+        b: { type: "http", url: "u", disabled: true },
+      },
+    });
+    expect(args).toEqual([]);
+  });
+
   it("settingsPath → --settings", () => {
     const { args } = buildClaudeCliFlags({ settingsPath: "/tmp/x.json" });
     expect(args).toEqual(["--settings", "/tmp/x.json"]);

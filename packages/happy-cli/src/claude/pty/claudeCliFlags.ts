@@ -177,11 +177,29 @@ export function buildClaudeCliFlags(
   }
 
   // ── MCP servers via --mcp-config ──
+  // Strip entries flagged `disabled: true` — that field is a Happy-internal
+  // annotation (set by markDisabledMcpServers so the PTY controller can
+  // report them as `status: 'disabled'` in the App). The Claude CLI's SDK
+  // schema does not include `disabled`, so leaking it into the JSON we
+  // serialise would either be rejected or, worse, get launched anyway.
+  // Claude already honours `~/.claude.json`'s per-project disabled list
+  // natively, so omission here matches its expected behaviour.
   if (input.mcpServers && Object.keys(input.mcpServers).length > 0) {
-    args.push(
-      "--mcp-config",
-      JSON.stringify({ mcpServers: input.mcpServers }),
-    );
+    const filtered: Record<string, unknown> = {};
+    for (const [name, config] of Object.entries(input.mcpServers)) {
+      if (
+        config &&
+        typeof config === "object" &&
+        !Array.isArray(config) &&
+        (config as { disabled?: unknown }).disabled === true
+      ) {
+        continue;
+      }
+      filtered[name] = config;
+    }
+    if (Object.keys(filtered).length > 0) {
+      args.push("--mcp-config", JSON.stringify({ mcpServers: filtered }));
+    }
   }
 
   // ── Settings file (hook settings + happy MCP HTTP injection) ──

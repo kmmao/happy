@@ -13,7 +13,12 @@ import { EnhancedMode, PermissionMode } from "./loop";
 import { MessageQueue2 } from "@/utils/MessageQueue2";
 import { hashObject } from "@/utils/deterministicJson";
 import { startCaffeinate, stopCaffeinate } from "@/utils/caffeinate";
-import { readClaudeMcpServers } from "@/claude/utils/claudeSettings";
+import {
+  markDisabledMcpServers,
+  readClaudeDisabledMcpServers,
+  readClaudeMcpServers,
+  readClaudePluginMcpServers,
+} from "@/claude/utils/claudeSettings";
 import { parseSpecialCommand } from "@/parsers/specialCommands";
 import { executeShellCommand } from "@/utils/shellCommand";
 import { getEnvironmentInfo } from "@/ui/doctor";
@@ -310,7 +315,13 @@ export async function runClaude(
         abort: new AbortController().signal,
         claudeEnvVars: options.claudeEnvVars,
         claudeArgs: options.claudeArgs,
-        mcpServers: { ...readClaudeMcpServers() },
+        mcpServers: markDisabledMcpServers(
+          {
+            ...readClaudeMcpServers(),
+            ...readClaudePluginMcpServers(),
+          },
+          readClaudeDisabledMcpServers(workingDirectory),
+        ),
         allowedTools: [],
         sandboxConfig,
       });
@@ -936,8 +947,19 @@ export async function runClaude(
     },
     // Happy MCP tools (change_title, update_progress, update_session_summary) are
     // registered as SDK-native in-process servers in claudeRemoteLauncher.ts.
-    // Merge user's ~/.claude/settings.json mcpServers so they are available in the session.
-    mcpServers: { ...readClaudeMcpServers() },
+    // Merge user's Claude Code MCP servers (from ~/.claude.json, with
+    // ~/.claude/settings.json as a fallback) plus plugin-marketplace MCPs
+    // (e.g. plugin:context7:context7) so they are available in the session.
+    // Per-project `disabledMcpServers` entries are tagged with `disabled: true`
+    // so the App's MCP panel can show them as disabled; --mcp-config strips
+    // them out at serialization time (see buildClaudeCliFlags).
+    mcpServers: markDisabledMcpServers(
+      {
+        ...readClaudeMcpServers(),
+        ...readClaudePluginMcpServers(),
+      },
+      readClaudeDisabledMcpServers(workingDirectory),
+    ),
     session,
     claudeEnvVars: options.claudeEnvVars,
     claudeArgs: options.claudeArgs,

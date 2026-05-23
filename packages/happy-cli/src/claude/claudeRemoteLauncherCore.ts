@@ -35,7 +35,12 @@ import {
   type StreamEventMapperState,
 } from "./utils/streamEventMapper";
 import { PLAN_FAKE_REJECT } from "./sdk/prompts";
-import { readClaudeMcpServers } from "@/claude/utils/claudeSettings";
+import {
+  markDisabledMcpServers,
+  readClaudeDisabledMcpServers,
+  readClaudeMcpServers,
+  readClaudePluginMcpServers,
+} from "@/claude/utils/claudeSettings";
 import { fetchMcpRegistryServers } from "@/claude/utils/mcpRegistryReader";
 import { EnhancedMode } from "./loop";
 import { createSessionEventReporter } from "./sessionEventReporter";
@@ -1932,8 +1937,26 @@ export async function claudeRemoteLauncher(
         happy: happyMcpServer as unknown as Record<string, unknown>,
         ...(knowledgeMcpServer ? { "happy-knowledge": knowledgeMcpServer as unknown as Record<string, unknown> } : {}),
       };
+      // Tag any MCP the user disabled (via `/mcp disable` in Claude Code,
+      // persisted to `~/.claude.json` → projects[cwd].disabledMcpServers) so
+      // the App's MCP panel can render them as `status: 'disabled'`. The
+      // `--mcp-config` serialiser drops these entries before they reach
+      // Claude CLI; Claude itself still respects its own native list.
+      //
+      // Plugin-marketplace MCPs (keyed `plugin:<plugin>:<server>`) are folded
+      // in here too — `disabledMcpServers` stores them under the same
+      // prefixed name, so a single `markDisabledMcpServers` pass handles both.
+      const disabledMcpNames = readClaudeDisabledMcpServers(session.path);
+      const userMcpServers = markDisabledMcpServers(
+        {
+          ...readClaudeMcpServers(),
+          ...readClaudePluginMcpServers(),
+        },
+        disabledMcpNames,
+      );
+
       mcpServerState.userServers = {
-        ...readClaudeMcpServers() as Record<string, Record<string, unknown>>,
+        ...userMcpServers as Record<string, Record<string, unknown>>,
         ...registryServers,
       };
 
@@ -1943,7 +1966,7 @@ export async function claudeRemoteLauncher(
           path: session.path,
           allowedTools: session.allowedTools ?? [],
           mcpServers: {
-            ...readClaudeMcpServers(),       // User's ~/.claude/settings.json MCPs (lowest priority)
+            ...userMcpServers,               // User's Claude Code MCPs from ~/.claude.json (+settings.json fallback) — lowest priority
             ...registryServers,              // Account-level MCP registry (medium priority)
             happy: happyMcpServer,           // Happy-owned MCPs (highest priority)
             ...(knowledgeMcpServer ? { "happy-knowledge": knowledgeMcpServer } : {}),
