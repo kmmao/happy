@@ -7,7 +7,7 @@
  * Post-PTY-migration (Phase 6) Happy CLI no longer depends on the SDK at
  * runtime — `claudePtyRuntime` spawns `claude` TUI directly and parses
  * JSONL output. We still keep typed shapes for the messages flowing
- * through `sessionScanner` → `rawToSdkMessage` → `messageFormatter` /
+ * through `sessionScanner` → `rawToJsonlMessage` → `messageFormatter` /
  * `sessionEventReporter`, because removing those types would force a
  * cascade of edits across 30+ consumer files.
  *
@@ -43,7 +43,7 @@ export class AbortError extends Error {
 
 // ─── Enum-like literal types ──────────────────────────────────────────────
 
-export type SdkBeta = "context-1m-2025-08-07";
+export type ClaudeJsonlBeta = "context-1m-2025-08-07";
 export type EffortLevel = "low" | "medium" | "high" | "xhigh" | "max";
 export type PermissionMode =
   | "default"
@@ -52,7 +52,7 @@ export type PermissionMode =
   | "plan"
   | "dontAsk"
   | "auto";
-export type SdkPermissionMode = PermissionMode;
+export type ClaudeJsonlPermissionMode = PermissionMode;
 export type HookPermissionDecision = "allow" | "deny" | "ask" | "defer";
 export type PermissionDecisionClassification =
   | "user_temporary"
@@ -110,7 +110,7 @@ export type ThinkingConfig = Record<string, unknown>;
 export type Settings = Record<string, unknown>;
 export type AgentDefinition = Record<string, unknown>;
 export type OutputFormat = Record<string, unknown>;
-export type SdkPluginConfig = { type: "local"; path: string };
+export type ClaudeJsonlPluginConfig = { type: "local"; path: string };
 export type GetSubagentMessagesOptions = Record<string, unknown>;
 export type ListSubagentsOptions = Record<string, unknown>;
 export type HookCallback = (...args: unknown[]) => unknown;
@@ -128,7 +128,7 @@ export interface SessionKey {
   sessionId: string;
   subpath?: string;
 }
-export interface SDKSessionInfo {
+export interface ClaudeJsonlSessionInfo {
   sessionId: string;
   summary: string;
   lastModified: number;
@@ -222,17 +222,17 @@ export interface ModelUsage {
   cacheReadInputTokens?: number;
   costUSD?: number;
 }
-export interface SDKDeferredToolUse {
+export interface ClaudeJsonlDeferredToolUse {
   id: string;
   name: string;
   input: Record<string, unknown>;
 }
-export interface SDKPermissionDenial {
+export interface ClaudeJsonlPermissionDenial {
   tool_name: string;
   tool_use_id: string;
   tool_input: Record<string, unknown>;
 }
-export type SDKMessageOrigin =
+export type ClaudeJsonlMessageOrigin =
   | { kind: "human" }
   | { kind: "channel"; server: string }
   | { kind: "peer"; from: string; name?: string }
@@ -240,7 +240,7 @@ export type SDKMessageOrigin =
   | { kind: "coordinator" };
 export type FastModeState = Record<string, unknown>;
 
-export type SDKAssistantMessageError =
+export type ClaudeJsonlAssistantMessageError =
   | "authentication_failed"
   | "oauth_org_not_allowed"
   | "billing_error"
@@ -253,11 +253,11 @@ export type SDKAssistantMessageError =
 
 // ─── SDK message types — STRUCTURAL (consumers introspect every field) ────
 
-export interface SDKAssistantMessage {
+export interface ClaudeJsonlAssistantMessage {
   type: "assistant";
   message: BetaMessage;
   parent_tool_use_id: string | null;
-  error?: SDKAssistantMessageError;
+  error?: ClaudeJsonlAssistantMessageError;
   uuid: UUID;
   session_id: string;
   request_id?: string;
@@ -265,14 +265,14 @@ export interface SDKAssistantMessage {
   task_description?: string;
 }
 
-export interface SDKUserMessage {
+export interface ClaudeJsonlUserMessage {
   type: "user";
   message: MessageParam;
   parent_tool_use_id: string | null;
   isSynthetic?: boolean;
   tool_use_result?: unknown;
   priority?: "now" | "next" | "later";
-  origin?: SDKMessageOrigin;
+  origin?: ClaudeJsonlMessageOrigin;
   shouldQuery?: boolean;
   timestamp?: string;
   uuid?: UUID;
@@ -281,7 +281,7 @@ export interface SDKUserMessage {
   task_description?: string;
 }
 
-export interface SDKSystemMessage {
+export interface ClaudeJsonlSystemMessage {
   type: "system";
   subtype: "init";
   agents?: string[];
@@ -302,7 +302,7 @@ export interface SDKSystemMessage {
   session_id: string;
 }
 
-export interface SDKStatusMessage {
+export interface ClaudeJsonlStatusMessage {
   type: "system";
   subtype: "status";
   status: "compacting" | "requesting" | null;
@@ -313,7 +313,7 @@ export interface SDKStatusMessage {
   session_id: string;
 }
 
-export interface SDKCompactBoundaryMessage {
+export interface ClaudeJsonlCompactBoundaryMessage {
   type: "system";
   subtype: "compact_boundary";
   compact_metadata: {
@@ -335,7 +335,7 @@ export interface SDKCompactBoundaryMessage {
   session_id: string;
 }
 
-export interface SDKMirrorErrorMessage {
+export interface ClaudeJsonlMirrorErrorMessage {
   type: "system";
   subtype: "mirror_error";
   error: string;
@@ -344,7 +344,7 @@ export interface SDKMirrorErrorMessage {
   session_id: string;
 }
 
-export interface SDKNotificationMessage {
+export interface ClaudeJsonlNotificationMessage {
   type: "system";
   subtype: "notification";
   key: string;
@@ -356,7 +356,7 @@ export interface SDKNotificationMessage {
   session_id: string;
 }
 
-export interface SDKPartialAssistantMessage {
+export interface ClaudeJsonlPartialAssistantMessage {
   type: "stream_event";
   event: BetaRawMessageStreamEvent;
   parent_tool_use_id: string | null;
@@ -365,7 +365,7 @@ export interface SDKPartialAssistantMessage {
   ttft_ms?: number;
 }
 
-export interface SDKPermissionDeniedMessage {
+export interface ClaudeJsonlPermissionDeniedMessage {
   type: "system";
   subtype: "permission_denied";
   tool_name: string;
@@ -378,14 +378,14 @@ export interface SDKPermissionDeniedMessage {
   session_id: string;
 }
 
-export interface SDKPromptSuggestionMessage {
+export interface ClaudeJsonlPromptSuggestionMessage {
   type: "prompt_suggestion";
   suggestion: string;
   uuid: UUID;
   session_id: string;
 }
 
-export interface SDKRateLimitInfo {
+export interface ClaudeJsonlRateLimitInfo {
   status: "allowed" | "allowed_warning" | "rejected";
   resetsAt?: number;
   rateLimitType?: "five_hour" | "seven_day" | "seven_day_opus" | "seven_day_sonnet" | "overage";
@@ -397,26 +397,26 @@ export interface SDKRateLimitInfo {
   surpassedThreshold?: number;
 }
 
-export interface SDKRateLimitEvent {
+export interface ClaudeJsonlRateLimitEvent {
   type: "rate_limit_event";
-  rate_limit_info: SDKRateLimitInfo;
+  rate_limit_info: ClaudeJsonlRateLimitInfo;
   uuid: UUID;
   session_id: string;
 }
 
-export interface SDKAPIRetryMessage {
+export interface ClaudeJsonlAPIRetryMessage {
   type: "system";
   subtype: "api_retry";
   attempt: number;
   max_retries: number;
   retry_delay_ms: number;
   error_status: number | null;
-  error: SDKAssistantMessageError;
+  error: ClaudeJsonlAssistantMessageError;
   uuid: UUID;
   session_id: string;
 }
 
-export interface SDKSessionStateChangedMessage {
+export interface ClaudeJsonlSessionStateChangedMessage {
   type: "system";
   subtype: "session_state_changed";
   state: "idle" | "running" | "requires_action";
@@ -424,7 +424,7 @@ export interface SDKSessionStateChangedMessage {
   session_id: string;
 }
 
-export interface SDKMemoryRecallMessage {
+export interface ClaudeJsonlMemoryRecallMessage {
   type: "system";
   subtype: "memory_recall";
   mode: "select" | "synthesize";
@@ -437,7 +437,7 @@ export interface SDKMemoryRecallMessage {
   session_id: string;
 }
 
-export interface SDKTaskNotificationMessage {
+export interface ClaudeJsonlTaskNotificationMessage {
   type: "system";
   subtype: "task_notification";
   task_id: string;
@@ -451,7 +451,7 @@ export interface SDKTaskNotificationMessage {
   session_id: string;
 }
 
-export interface SDKTaskProgressMessage {
+export interface ClaudeJsonlTaskProgressMessage {
   type: "system";
   subtype: "task_progress";
   task_id: string;
@@ -465,7 +465,7 @@ export interface SDKTaskProgressMessage {
   session_id: string;
 }
 
-export interface SDKTaskStartedMessage {
+export interface ClaudeJsonlTaskStartedMessage {
   type: "system";
   subtype: "task_started";
   task_id: string;
@@ -480,7 +480,7 @@ export interface SDKTaskStartedMessage {
   session_id: string;
 }
 
-export interface SDKTaskUpdatedMessage {
+export interface ClaudeJsonlTaskUpdatedMessage {
   type: "system";
   subtype: "task_updated";
   task_id: string;
@@ -496,7 +496,7 @@ export interface SDKTaskUpdatedMessage {
   session_id: string;
 }
 
-export interface SDKToolProgressMessage {
+export interface ClaudeJsonlToolProgressMessage {
   type: "tool_progress";
   tool_use_id: string;
   tool_name: string;
@@ -507,7 +507,7 @@ export interface SDKToolProgressMessage {
   session_id: string;
 }
 
-export interface SDKToolUseSummaryMessage {
+export interface ClaudeJsonlToolUseSummaryMessage {
   type: "tool_use_summary";
   summary: string;
   preceding_tool_use_ids: string[];
@@ -515,7 +515,7 @@ export interface SDKToolUseSummaryMessage {
   session_id: string;
 }
 
-export interface SDKResultSuccess {
+export interface ClaudeJsonlResultSuccess {
   type: "result";
   subtype: "success";
   duration_ms: number;
@@ -529,17 +529,17 @@ export interface SDKResultSuccess {
   total_cost_usd: number;
   usage: NonNullableUsage;
   modelUsage: Record<string, ModelUsage>;
-  permission_denials: SDKPermissionDenial[];
+  permission_denials: ClaudeJsonlPermissionDenial[];
   structured_output?: unknown;
-  deferred_tool_use?: SDKDeferredToolUse;
+  deferred_tool_use?: ClaudeJsonlDeferredToolUse;
   terminal_reason?: TerminalReason;
   fast_mode_state?: FastModeState;
-  origin?: SDKMessageOrigin;
+  origin?: ClaudeJsonlMessageOrigin;
   uuid: UUID;
   session_id: string;
 }
 
-export interface SDKResultError {
+export interface ClaudeJsonlResultError {
   type: "result";
   subtype:
     | "error_during_execution"
@@ -554,36 +554,36 @@ export interface SDKResultError {
   total_cost_usd: number;
   usage: NonNullableUsage;
   modelUsage: Record<string, ModelUsage>;
-  permission_denials: SDKPermissionDenial[];
+  permission_denials: ClaudeJsonlPermissionDenial[];
   errors: string[];
   terminal_reason?: TerminalReason;
   fast_mode_state?: FastModeState;
-  origin?: SDKMessageOrigin;
+  origin?: ClaudeJsonlMessageOrigin;
   uuid: UUID;
   session_id: string;
 }
 
-export type SDKResultMessage = SDKResultSuccess | SDKResultError;
+export type ClaudeJsonlResultMessage = ClaudeJsonlResultSuccess | ClaudeJsonlResultError;
 
-export type SDKMessage =
-  | SDKAssistantMessage
-  | SDKUserMessage
-  | SDKResultMessage
-  | SDKSystemMessage
-  | SDKPartialAssistantMessage
-  | SDKCompactBoundaryMessage
-  | SDKStatusMessage
-  | SDKAPIRetryMessage
-  | SDKToolProgressMessage
-  | SDKTaskNotificationMessage
-  | SDKTaskStartedMessage
-  | SDKTaskUpdatedMessage
-  | SDKTaskProgressMessage
-  | SDKSessionStateChangedMessage
-  | SDKNotificationMessage
-  | SDKToolUseSummaryMessage
-  | SDKMemoryRecallMessage
-  | SDKRateLimitEvent
-  | SDKPermissionDeniedMessage
-  | SDKPromptSuggestionMessage
-  | SDKMirrorErrorMessage;
+export type ClaudeJsonlMessage =
+  | ClaudeJsonlAssistantMessage
+  | ClaudeJsonlUserMessage
+  | ClaudeJsonlResultMessage
+  | ClaudeJsonlSystemMessage
+  | ClaudeJsonlPartialAssistantMessage
+  | ClaudeJsonlCompactBoundaryMessage
+  | ClaudeJsonlStatusMessage
+  | ClaudeJsonlAPIRetryMessage
+  | ClaudeJsonlToolProgressMessage
+  | ClaudeJsonlTaskNotificationMessage
+  | ClaudeJsonlTaskStartedMessage
+  | ClaudeJsonlTaskUpdatedMessage
+  | ClaudeJsonlTaskProgressMessage
+  | ClaudeJsonlSessionStateChangedMessage
+  | ClaudeJsonlNotificationMessage
+  | ClaudeJsonlToolUseSummaryMessage
+  | ClaudeJsonlMemoryRecallMessage
+  | ClaudeJsonlRateLimitEvent
+  | ClaudeJsonlPermissionDeniedMessage
+  | ClaudeJsonlPromptSuggestionMessage
+  | ClaudeJsonlMirrorErrorMessage;
