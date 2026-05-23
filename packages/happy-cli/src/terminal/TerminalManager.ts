@@ -25,6 +25,33 @@ export interface TerminalSession {
 export type TerminalOutputHandler = (terminalId: string, data: string) => void;
 export type TerminalExitHandler = (terminalId: string, exitCode: number) => void;
 
+/**
+ * External PTY adapter — used by Remote-mode Claude PTY runtime to inject its
+ * already-running PTY (terminalId = "claude:<sessionId>") into the same
+ * web-terminal wire surface. The App then reattaches to it through the existing
+ * `terminal-spawn` RPC by passing the matching `sessionId` or `terminalId`.
+ *
+ * Lifecycle: register on Claude PTY spawn, deregister on PTY exit. The adapter
+ * does NOT own the PTY process — that lives in `claudePtyRuntime`. TerminalManager
+ * only proxies write/resize/close.
+ */
+export interface ExternalPtyAttachment {
+  /** Stable id of the form `claude:<sessionId>`. */
+  readonly terminalId: string;
+  /** Owning Happy session id; used for `listBySession` and reattach by sessionId. */
+  readonly sessionId: string;
+  readonly cols: number;
+  readonly rows: number;
+  readonly cwd: string;
+  readonly createdAt: number;
+  /** Rolling-buffer replay for reconnect, sourced from `claudePtyRouter`. */
+  snapshot(): string;
+  write(data: string): void;
+  resize(cols: number, rows: number): void;
+  /** Best-effort close from the App side; PTY owner may ignore or honor it. */
+  requestClose(): void;
+}
+
 const MAX_TERMINALS_PER_SESSION = 5;
 const MAX_TERMINALS_GLOBAL = 20;
 const MAX_OUTPUT_CHUNK = 8 * 1024;  // 8KB per chunk
@@ -33,6 +60,12 @@ const MAX_OUTPUT_BUFFER = 64 * 1024; // 64KB replay buffer per terminal
 export class TerminalManager {
   private terminals = new Map<string, TerminalSession>();
   private sessionIndex = new Map<string, string[]>(); // sessionId → terminalId[]
+  // External attachments are keyed by terminalId; sessionLookup mirrors the
+  // sessionId→terminalId mapping so `spawn({ sessionId })` can find them
+  // without scanning. We keep these maps separate from `terminals` so the
+  // shell-PTY lifecycle code paths stay untouched.
+  private externalAttachments = new Map<string, ExternalPtyAttachment>();
+  private externalSessionLookup = new Map<string, string>(); // sessionId → terminalId
   private onOutput: TerminalOutputHandler | null = null;
   private onExit: TerminalExitHandler | null = null;
 
@@ -44,6 +77,54 @@ export class TerminalManager {
     this.onExit = handler;
   }
 
+  /**
+   * Register an externally-managed PTY (e.g. Claude TUI) under the wire's
+   * terminal protocol. The App can then reattach via `terminal-spawn`
+   * by passing either the matching `terminalId` or `sessionId`. Returns
+   * a disposer for symmetric teardown.
+   */
+  attachExternal(attachment: ExternalPtyAttachment): () => void {
+    if (this.externalAttachments.has(attachment.terminalId)) {
+      logger.debug(
+        `[TERMINAL] attachExternal called twice for ${attachment.terminalId} — replacing`,
+      );
+    }
+    this.externalAttachments.set(attachment.terminalId, attachment);
+    this.externalSessionLookup.set(attachment.sessionId, attachment.terminalId);
+    logger.debug(
+      `[TERMINAL] External PTY attached: ${attachment.terminalId} (session ${attachment.sessionId})`,
+    );
+    return () => this.detachExternal(attachment.terminalId);
+  }
+
+  detachExternal(terminalId: string): void {
+    const att = this.externalAttachments.get(terminalId);
+    if (!att) return;
+    this.externalAttachments.delete(terminalId);
+    if (this.externalSessionLookup.get(att.sessionId) === terminalId) {
+      this.externalSessionLookup.delete(att.sessionId);
+    }
+    logger.debug(`[TERMINAL] External PTY detached: ${terminalId}`);
+  }
+
+  /**
+   * Broadcast a chunk of output from an external PTY through the shared
+   * `terminal-output` socket event. Used by `claudePtyRouter` so consumers
+   * downstream (xterm.js in the App) don't need a separate wire path.
+   */
+  emitExternalOutput(terminalId: string, data: string): void {
+    if (!this.onOutput) return;
+    for (let i = 0; i < data.length; i += MAX_OUTPUT_CHUNK) {
+      this.onOutput(terminalId, data.slice(i, i + MAX_OUTPUT_CHUNK));
+    }
+  }
+
+  /** Mirror exit semantics for external PTYs over the existing wire. */
+  emitExternalExit(terminalId: string, exitCode: number): void {
+    this.detachExternal(terminalId);
+    this.onExit?.(terminalId, exitCode);
+  }
+
   spawn(options: {
     shell?: string;
     cwd?: string;
@@ -52,7 +133,31 @@ export class TerminalManager {
     sessionId?: string;
     terminalId?: string; // if provided, reattach to this specific PTY
   }): { success: boolean; terminalId?: string; recentOutput?: string; isExisting?: boolean; error?: string } {
-    // Reattach to a specific terminal by ID
+    // External attachment reattach — Claude TUI PTYs live in `claudePtyRuntime`
+    // and only surface here as a thin adapter. Resolve them via terminalId
+    // ("claude:<sessionId>") OR sessionId for the App's button entry.
+    const externalById = options.terminalId
+      ? this.externalAttachments.get(options.terminalId)
+      : undefined;
+    const externalBySession = !externalById && options.sessionId
+      ? this.externalAttachments.get(
+          this.externalSessionLookup.get(options.sessionId) ?? "",
+        )
+      : undefined;
+    const external = externalById ?? externalBySession;
+    if (external) {
+      if (options.cols && options.rows) {
+        external.resize(options.cols, options.rows);
+      }
+      return {
+        success: true,
+        terminalId: external.terminalId,
+        recentOutput: external.snapshot(),
+        isExisting: true,
+      };
+    }
+
+    // Reattach to a specific shell terminal by ID
     if (options.terminalId) {
       const existing = this.terminals.get(options.terminalId);
       if (existing) {
@@ -284,6 +389,11 @@ except Exception:
   }
 
   write(terminalId: string, data: string): boolean {
+    const external = this.externalAttachments.get(terminalId);
+    if (external) {
+      external.write(data);
+      return true;
+    }
     const session = this.terminals.get(terminalId);
     if (!session || !session.process.stdin?.writable) {
       return false;
@@ -293,6 +403,11 @@ except Exception:
   }
 
   resize(terminalId: string, cols: number, rows: number): boolean {
+    const external = this.externalAttachments.get(terminalId);
+    if (external) {
+      external.resize(cols, rows);
+      return true;
+    }
     const session = this.terminals.get(terminalId);
     if (!session) {
       return false;
@@ -324,6 +439,14 @@ except Exception:
   }
 
   close(terminalId: string): boolean {
+    const external = this.externalAttachments.get(terminalId);
+    if (external) {
+      // Don't tear down the underlying Claude PTY here — its lifecycle is owned
+      // by claudePtyRuntime. We just signal a close request; the runtime can
+      // forward it to the TUI (e.g. by writing Ctrl-C) if that's appropriate.
+      external.requestClose();
+      return true;
+    }
     const session = this.terminals.get(terminalId);
     if (!session) {
       return false;
@@ -344,10 +467,28 @@ except Exception:
 
   listBySession(sessionId: string): Array<{ id: string; createdAt: number; cols: number; rows: number; cwd: string }> {
     const ids = this.sessionIndex.get(sessionId) ?? [];
-    return ids
+    const shellTerminals = ids
       .map((id) => this.terminals.get(id))
       .filter((s): s is TerminalSession => s !== undefined)
       .map((s) => ({ id: s.id, createdAt: s.createdAt, cols: s.cols, rows: s.rows, cwd: s.cwd }));
+
+    // Include the external Claude PTY attachment for this session (if any)
+    // so the App's session-aware terminal list surfaces the raw TUI alongside
+    // shell terminals.
+    const externalTerminalId = this.externalSessionLookup.get(sessionId);
+    const external = externalTerminalId
+      ? this.externalAttachments.get(externalTerminalId)
+      : undefined;
+    if (external) {
+      shellTerminals.push({
+        id: external.terminalId,
+        createdAt: external.createdAt,
+        cols: external.cols,
+        rows: external.rows,
+        cwd: external.cwd,
+      });
+    }
+    return shellTerminals;
   }
 
   closeAll(): void {

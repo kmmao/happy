@@ -11,7 +11,14 @@ import { t } from "@/text";
 import { WebTerminal } from "@/components/terminal/WebTerminal";
 
 function TerminalPage() {
-    const { id: machineId } = useLocalSearchParams<{ id: string }>();
+    // `sessionId` (optional) — when present, the WebTerminal attaches to the
+    // Claude PTY broadcast under `terminalId = "claude:<sessionId>"` (see
+    // packages/happy-cli/src/claude/pty/claudePtyRouter.ts). Without it the
+    // terminal spawns a fresh generic shell PTY.
+    const { id: machineId, sessionId } = useLocalSearchParams<{
+        id: string;
+        sessionId?: string;
+    }>();
     const machine = useMachine(machineId);
     const { theme } = useUnistyles();
     const isOnline = machine ? isMachineOnline(machine) : false;
@@ -78,7 +85,7 @@ function TerminalPage() {
         <>
             <Stack.Screen options={{ title: t("webTerminal.title") }} />
             <View style={styles.container}>
-                <WebTerminal machineId={machineId} />
+                <WebTerminal machineId={machineId} sessionId={sessionId} />
             </View>
         </>
     );

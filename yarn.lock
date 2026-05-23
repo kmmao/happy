@@ -53,99 +53,45 @@
     package-manager-detector "^1.3.0"
     tinyexec "^1.0.1"
 
-"@anthropic-ai/claude-agent-sdk-darwin-arm64@0.3.145":
-  version "0.3.145"
-  resolved "https://registry.yarnpkg.com/@anthropic-ai/claude-agent-sdk-darwin-arm64/-/claude-agent-sdk-darwin-arm64-0.3.145.tgz#eeb80c5399cdcf749611b2e48c70016e705d062d"
-  integrity sha512-gNI0BG7LAU8alX+9EmhBYRwsot4QdHL+w9uYIw92ptBFJur1nmPAuO5/x3/hzqX28DomDcOM7/svd5j+U1808Q==
-
 "@anthropic-ai/claude-agent-sdk-darwin-arm64@0.3.147":
   version "0.3.147"
   resolved "https://registry.yarnpkg.com/@anthropic-ai/claude-agent-sdk-darwin-arm64/-/claude-agent-sdk-darwin-arm64-0.3.147.tgz#1a89a0669519f8fc620c0a81a85f0c1857143999"
   integrity sha512-znnkx53xxLnDbC7hqpx6CnA/5Pr3OYg/0AG75P/qzztd4RaXA2J1QjSwgccFP2Itv+Ucv1qbHsFErcrT0AUZ1Q==
-
-"@anthropic-ai/claude-agent-sdk-darwin-x64@0.3.145":
-  version "0.3.145"
-  resolved "https://registry.yarnpkg.com/@anthropic-ai/claude-agent-sdk-darwin-x64/-/claude-agent-sdk-darwin-x64-0.3.145.tgz#73225b8c3ee4e79d56fb827b21099856b0bfd94f"
-  integrity sha512-a3a19o9Ong3coMAVdKdIyLsgfKEreKbJtx2NJOnvXq9dPRoExuk2VxRnCO8Z17ulFQ/HREZdf3U3SBZF0QmVvA==
 
 "@anthropic-ai/claude-agent-sdk-darwin-x64@0.3.147":
   version "0.3.147"
   resolved "https://registry.yarnpkg.com/@anthropic-ai/claude-agent-sdk-darwin-x64/-/claude-agent-sdk-darwin-x64-0.3.147.tgz#ce053797d87358c460ea443a95736c107ec805a4"
   integrity sha512-o+KIQE0kqoxvYFJlCFBui4fQ3GlaEMUf1ISvTCgTiLFEZge7cEvcou7dFMGbotJ6F3M+dXPhaoMVCbwvSY5TQg==
 
-"@anthropic-ai/claude-agent-sdk-linux-arm64-musl@0.3.145":
-  version "0.3.145"
-  resolved "https://registry.yarnpkg.com/@anthropic-ai/claude-agent-sdk-linux-arm64-musl/-/claude-agent-sdk-linux-arm64-musl-0.3.145.tgz#cdd9f23d1407ff554dcb4cc760cd8515d724f7e5"
-  integrity sha512-oABzRm/JuMNp+E0yl4f07Gdzy8nJv8fbti8u+tVkT8tyZKOSrAUkiWRN9ZS4ju2vcV3FZ5iKZ70MVfkcXL+6Kg==
-
 "@anthropic-ai/claude-agent-sdk-linux-arm64-musl@0.3.147":
   version "0.3.147"
   resolved "https://registry.yarnpkg.com/@anthropic-ai/claude-agent-sdk-linux-arm64-musl/-/claude-agent-sdk-linux-arm64-musl-0.3.147.tgz#54196d172addd7329d67430c827c807f9944f90d"
   integrity sha512-9X0ai5uDtiHwaPyhp41wgwKcxTu9SkYhkMt9Xaoxwo59m8dAKzR4AhEPh5e1gwlP3RI/fSKGYBju20DRNKgg2Q==
-
-"@anthropic-ai/claude-agent-sdk-linux-arm64@0.3.145":
-  version "0.3.145"
-  resolved "https://registry.yarnpkg.com/@anthropic-ai/claude-agent-sdk-linux-arm64/-/claude-agent-sdk-linux-arm64-0.3.145.tgz#6ed89e4355a8e72eb6d5ac32ca30d6596bdf402d"
-  integrity sha512-oOT9RhOyBgNt2/vEzj8hp9tbksRhy3t/xu+IjWInoyInOY75DR16wXVcTQZWEUJBqkB0Cvv09Bo8E6Pr/nCA2Q==
 
 "@anthropic-ai/claude-agent-sdk-linux-arm64@0.3.147":
   version "0.3.147"
   resolved "https://registry.yarnpkg.com/@anthropic-ai/claude-agent-sdk-linux-arm64/-/claude-agent-sdk-linux-arm64-0.3.147.tgz#151dff55743d25dc770605842c53bc6d097cfe63"
   integrity sha512-Kbt5fLZth/HMoMwhh9oEV07IMAbHLsxALjPTe1vDOPz2lz/lqtjQ0+/TY3I688WrR6LNUKhft+dQW+z3epwk4g==
 
-"@anthropic-ai/claude-agent-sdk-linux-x64-musl@0.3.145":
-  version "0.3.145"
-  resolved "https://registry.yarnpkg.com/@anthropic-ai/claude-agent-sdk-linux-x64-musl/-/claude-agent-sdk-linux-x64-musl-0.3.145.tgz#7eb9fb70e4adf07722d1198b4d72e4cdbed635b8"
-  integrity sha512-TLrEg5j4GR6Jh3coSZdSfsLzXEUe1WyONjbmf7Ddzh5RPbafrf+MDA9aeIyYjLvJazIAmpLncf0bXVQ68bWU+g==
-
 "@anthropic-ai/claude-agent-sdk-linux-x64-musl@0.3.147":
   version "0.3.147"
   resolved "https://registry.yarnpkg.com/@anthropic-ai/claude-agent-sdk-linux-x64-musl/-/claude-agent-sdk-linux-x64-musl-0.3.147.tgz#27c8c71e6adedd72b7a80dcd2641963e1dd8755e"
   integrity sha512-q/+mXhoPXWj6S0KAKPfI1FeoswN/Hh2Ra8+FoRKRd546YvMPN1OB18+XUfiLI2se2iW6JCI7LHBhoJ3aHhO6qA==
-
-"@anthropic-ai/claude-agent-sdk-linux-x64@0.3.145":
-  version "0.3.145"
-  resolved "https://registry.yarnpkg.com/@anthropic-ai/claude-agent-sdk-linux-x64/-/claude-agent-sdk-linux-x64-0.3.145.tgz#2a14f6891009313309d31be40a7a993f3db3f512"
-  integrity sha512-Nmoqa2oRLOOFaU4KBplpyx3nKvVfBYUadJgefZ7wEHU9qkrsLjgnp3PSdGyu8BcfUXaR9r6K3hdUH00RYEqE+g==
 
 "@anthropic-ai/claude-agent-sdk-linux-x64@0.3.147":
   version "0.3.147"
   resolved "https://registry.yarnpkg.com/@anthropic-ai/claude-agent-sdk-linux-x64/-/claude-agent-sdk-linux-x64-0.3.147.tgz#739c8ae258f3c8c6d405ca822d9328b1cebd7b40"
   integrity sha512-VJF6OXNGQEHrwNt4C5t/VS2ffk3SUR8EL25J7oFB8yr8+i/z1hDi7nrTNdD7Mi03c9gY/2qmTTv9JG+1By2vdA==
 
-"@anthropic-ai/claude-agent-sdk-win32-arm64@0.3.145":
-  version "0.3.145"
-  resolved "https://registry.yarnpkg.com/@anthropic-ai/claude-agent-sdk-win32-arm64/-/claude-agent-sdk-win32-arm64-0.3.145.tgz#ce39e3eb58068da05b009e3b8f17929858199f44"
-  integrity sha512-9TJlExyy0c9DVoG4iE6nLv5AN/WVUAjxgQUugHHUp+jA50NX+31WBoUwT5V/YxB6Xly9mVWnu74EKwtCJ9uMpg==
-
 "@anthropic-ai/claude-agent-sdk-win32-arm64@0.3.147":
   version "0.3.147"
   resolved "https://registry.yarnpkg.com/@anthropic-ai/claude-agent-sdk-win32-arm64/-/claude-agent-sdk-win32-arm64-0.3.147.tgz#ad246042246294a5dda2ec8bcd098eb5c01d3ffe"
   integrity sha512-92F9YWo43C6gPpS6PdWUT3r+EM6xnjPkxDGP+yrXejCpPHsIrTPaqUj5x+NYYarHVk/rMexSa7+xuhIXY5vfOA==
 
-"@anthropic-ai/claude-agent-sdk-win32-x64@0.3.145":
-  version "0.3.145"
-  resolved "https://registry.yarnpkg.com/@anthropic-ai/claude-agent-sdk-win32-x64/-/claude-agent-sdk-win32-x64-0.3.145.tgz#785a6eb2dc9fd05f3b44da4f5a8626c4462c9bf6"
-  integrity sha512-he1MwHnkZDxNUqqHst0QPvmOnPf/8xJuP+12s+SBAAgx8WW2EmFGsd9t3TcRxrrrQKMCmdwwa2av+86gBhZ5Og==
-
 "@anthropic-ai/claude-agent-sdk-win32-x64@0.3.147":
   version "0.3.147"
   resolved "https://registry.yarnpkg.com/@anthropic-ai/claude-agent-sdk-win32-x64/-/claude-agent-sdk-win32-x64-0.3.147.tgz#fcaccd647d643b6bae07ea7676c88c1779b7fb3e"
   integrity sha512-Km8K8VnZN920Rlnt+pBCqnkk1p6x0G/nepAapBlo2cx7YIMSKdbiSCehVb0JO9m9WdL5gHIFGsu5RFC61JOqeg==
-
-"@anthropic-ai/claude-agent-sdk@0.3.145":
-  version "0.3.145"
-  resolved "https://registry.yarnpkg.com/@anthropic-ai/claude-agent-sdk/-/claude-agent-sdk-0.3.145.tgz#6a9af9c8a0aabf2bb46fad365ae7fbb526fcd525"
-  integrity sha512-IurOFBGswj/aPCHc5Q9EGTWej5eSGXzhvaQviEgxdSzyzHzrauFJwGkPg9AgcXdy6FC3NaoEBThy5HX1wHRYnw==
-  optionalDependencies:
-    "@anthropic-ai/claude-agent-sdk-darwin-arm64" "0.3.145"
-    "@anthropic-ai/claude-agent-sdk-darwin-x64" "0.3.145"
-    "@anthropic-ai/claude-agent-sdk-linux-arm64" "0.3.145"
-    "@anthropic-ai/claude-agent-sdk-linux-arm64-musl" "0.3.145"
-    "@anthropic-ai/claude-agent-sdk-linux-x64" "0.3.145"
-    "@anthropic-ai/claude-agent-sdk-linux-x64-musl" "0.3.145"
-    "@anthropic-ai/claude-agent-sdk-win32-arm64" "0.3.145"
-    "@anthropic-ai/claude-agent-sdk-win32-x64" "0.3.145"
 
 "@anthropic-ai/claude-agent-sdk@^0.3.143":
   version "0.3.147"

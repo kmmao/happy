@@ -8,7 +8,7 @@ import { mapToClaudeMode } from "./utils/permissionMode";
 import { PermissionHandler } from "./utils/permissionHandler";
 import { Future } from "@/utils/future";
 import { SDKAssistantMessage, SDKMessage, SDKUserMessage } from "./sdk";
-import { forkSession } from "./sdk/types";
+import { forkSession } from "@/claude/rpc/sessionStoreRpc";
 import type { ElicitationRequest, ElicitationResult } from "./sdk/types";
 import type {
   SDKStatusMessage as SDKStatusMsg,
@@ -23,10 +23,9 @@ import type {
   SDKSessionStateChangedMessage,
   SDKMemoryRecallMessage,
   SDKRateLimitEvent,
-  Query as OfficialQuery,
-} from "@anthropic-ai/claude-agent-sdk";
-import { createSdkMcpServer } from "@anthropic-ai/claude-agent-sdk";
-import { z } from "zod";
+} from "@/claude/sdk";
+import type { ClaudePtyController } from "@/claude/pty/claudePtyController";
+import { startHappyServer } from "@/claude/utils/startHappyServer";
 import { formatClaudeMessageForInk } from "@/ui/messageFormatterInk";
 import { logger } from "@/ui/logger";
 import { SDKToLogConverter } from "./utils/sdkToLogConverter";
@@ -51,7 +50,6 @@ import { TurnCollector, generateRepoMap } from "@/knowledge";
 import type { TurnCollectorConfig } from "@/knowledge";
 import { applyHappyProgressUpdate } from "@/utils/happyProgressMetadata";
 import { TaskMirrorState } from "@/utils/taskMirrorState";
-import { applySessionSummaryUpdate } from "@/utils/sessionSummaryMetadata";
 import {
   buildAutoSummarySyntheticPrompt,
   HAPPY_AUTO_SUMMARY_SOURCE,
@@ -205,8 +203,9 @@ export async function claudeRemoteLauncher(
     await abort();
   }
 
-  // Track current SDK Query for runtime control (interrupt, stopTask)
-  let currentQuery: OfficialQuery | null = null;
+  // Track current PTY controller for runtime control (interrupt, stopTask).
+  // Most methods are stub no-ops (TUI has no equivalent) — see ClaudePtyController.
+  let currentQuery: ClaudePtyController | null = null;
   // Knowledge base: turn-level data collection + injection
   // Default ON — collection runs silently in background (minimal overhead).
   // App setting `knowledgeBase` controls Tab visibility; env HAPPY_KNOWLEDGE_BASE=false to fully disable.
@@ -1597,7 +1596,7 @@ export async function claudeRemoteLauncher(
     options: { signal: AbortSignal },
   ): Promise<ElicitationResult> => {
     const id = `elicit-${++elicitationCounter}`;
-    logger.debug(`[remote]: MCP elicitation request from ${request.serverName}: ${id}`);
+    logger.debug(`[remote]: MCP elicitation request from ${request.mcpServerName}: ${id}`);
 
     return new Promise<ElicitationResult>((resolve, reject) => {
       const abortHandler = () => {
@@ -1624,7 +1623,7 @@ export async function claudeRemoteLauncher(
         ...currentState,
         elicitation: {
           id,
-          serverName: request.serverName,
+          serverName: request.mcpServerName,
           message: request.message,
           mode: request.mode ?? "form",
           url: request.url,
@@ -1637,7 +1636,7 @@ export async function claudeRemoteLauncher(
         .push()
         .sendToAllDevices(
           "MCP Input Required",
-          `${request.serverName}: ${request.message}`,
+          `${request.mcpServerName}: ${request.message}`,
           {
             sessionId: session.client.sessionId,
             type: "elicitation_request",
@@ -1900,139 +1899,29 @@ export async function claudeRemoteLauncher(
         turnDrainController = null;
       }
 
-      const knowledgeMcpServer = knowledgeEnabled ? createSdkMcpServer({
-        name: "happy-knowledge",
-        tools: [
-          {
-            name: "query_project_knowledge",
-            description: "Search the project knowledge base for relevant context, past decisions, known pitfalls, and conventions. Use this when you need to understand project-specific patterns or recall past work.",
-            inputSchema: { query: z.string().describe("Search query describing what you want to know") },
-            handler: async (args: { [x: string]: unknown }) => {
-              const query = typeof args["query"] === "string" ? args["query"] : "";
-              try {
-                const result = await session.client.fetchKnowledge("auto", [query]);
-                syncKnowledgeConfig(result?.knowledgeConfig);
-                if (!result || result.entries.length === 0) {
-                  return { content: [{ type: "text" as const, text: "No relevant knowledge found." }] };
-                }
-                const lines = result.entries.map((e: { entryType: string; title: string; content: string; confidence: string }) =>
-                  `[${e.entryType}] ${e.title} (${e.confidence})\n${e.content.slice(0, 500)}`
-                );
-                return { content: [{ type: "text" as const, text: lines.join("\n\n") }] };
-              } catch (err) {
-                logger.debug(`[knowledge] MCP tool query_project_knowledge failed: ${err}`);
-                return { content: [{ type: "text" as const, text: "Knowledge query failed." }] };
-              }
-            },
-          },
-        ],
-      }) : null;
+      // PTY migration: in-process SDK MCP servers were replaced by an HTTP MCP
+      // server hosted on the CLI side (see startHappyServer). Claude TUI is
+      // wired to this server via `--mcp-config` (see claudePtyRuntime), which
+      // exposes the `happy` namespace with all four tools (change_title,
+      // update_progress, update_session_summary, query_project_knowledge).
+      // We retain the in-process closures only to handle one extra side effect
+      // (`syncKnowledgeConfig` after each knowledge query) — but that fires
+      // inside the HTTP handler via its own client reference, so nothing here
+      // needs to be wired into Claude. Subscribe knowledge tracking through
+      // session.client.fetchKnowledge directly.
+      const happyHttp = await startHappyServer(session.client);
+      const happyHttpUrl = `${happyHttp.url.replace(/\/$/, "")}/mcp`;
+      logger.debug(`[happyMCP] HTTP url=${happyHttpUrl}`);
 
-      // SDK 0.2.119+ native binary: type:"http" MCP servers are not reliably
-      // forwarded to the spawned Claude Code process. Use in-process SDK MCP
-      // servers (same approach as knowledgeMcpServer) so tools are always
-      // visible to Claude regardless of external HTTP connectivity.
-      const happyMcpServer = createSdkMcpServer({
-        name: "happy",
-        tools: [
-          {
-            name: "change_title",
-            description: 'Set or update the chat session title. Titles should be short (under 50 chars) and action-oriented, e.g. "Fix auth token refresh".',
-            inputSchema: { title: z.string().describe("New chat session title") },
-            handler: async (args: { [x: string]: unknown }) => {
-              const title = typeof args["title"] === "string" ? args["title"] : "";
-              try {
-                session.client.sendClaudeSessionMessage({
-                  type: "summary",
-                  summary: title,
-                  leafUuid: randomUUID(),
-                });
-                logger.debug(`[happyMCP] change_title: "${title}"`);
-                return { content: [{ type: "text" as const, text: `Successfully changed chat title to: "${title}"` }] };
-              } catch (err) {
-                return { content: [{ type: "text" as const, text: `Failed to change title: ${err}` }] };
-              }
-            },
-          },
-          {
-            name: "update_progress",
-            description: "Optional override for the App's Progress tab. In most cases your TodoWrite calls are auto-mirrored, so you do NOT need to call this. Use it only when you want to set extra fields the CLI hook does not capture (currentStage, blockers) or to force a new list boundary with `listId: \"new\"`.",
-            inputSchema: {
-              todos: z.array(z.object({
-                content: z.string(),
-                status: z.enum(["pending", "in_progress", "completed"]),
-                activeForm: z.string().optional(),
-                stage: z.string().optional(),
-              })).describe("The full checklist — always send every item, not a delta"),
-              currentStage: z.string().optional().describe("Optional overall stage name for the checklist"),
-              blockers: z.array(z.string()).optional().describe("Optional list of things blocking progress"),
-              listId: z.string().optional().describe("Target list id. Use 'new' to force a fresh list"),
-              label: z.string().optional().describe("Short human-readable name for this task list"),
-            },
-            handler: async (args: { [x: string]: unknown }) => {
-              try {
-                const sanitizedTodos = (Array.isArray(args["todos"]) ? args["todos"] : []).map((t: { content?: unknown; status?: unknown; activeForm?: unknown; stage?: unknown }) => ({
-                  content: typeof t.content === "string" ? t.content : "",
-                  status: (t.status as "pending" | "in_progress" | "completed") ?? "pending",
-                  activeForm: typeof t.activeForm === "string" ? t.activeForm : undefined,
-                  stage: typeof t.stage === "string" ? t.stage : undefined,
-                }));
-                let shouldTriggerAutoSummary = false;
-                session.client.updateMetadata((metadata) => {
-                  const result = applyHappyProgressUpdate(metadata, {
-                    todos: sanitizedTodos,
-                    currentStage: typeof args["currentStage"] === "string" ? args["currentStage"] : undefined,
-                    blockers: Array.isArray(args["blockers"]) ? (args["blockers"] as string[]) : undefined,
-                    listId: typeof args["listId"] === "string" ? args["listId"] : undefined,
-                    label: typeof args["label"] === "string" ? args["label"] : undefined,
-                    createId: randomUUID,
-                  });
-                  shouldTriggerAutoSummary = result.shouldTriggerAutoSummary;
-                  return result.metadata;
-                });
-                if (shouldTriggerAutoSummary) {
-                  session.client.sendSyntheticUserMessage(buildAutoSummarySyntheticPrompt(), {
-                    displayText: "",
-                    sentFrom: HAPPY_AUTO_SUMMARY_SOURCE,
-                  });
-                }
-                return { content: [{ type: "text" as const, text: `Progress updated (${sanitizedTodos.length} items).` }] };
-              } catch (err) {
-                return { content: [{ type: "text" as const, text: `Failed to update progress: ${err}` }] };
-              }
-            },
-          },
-          {
-            name: "update_session_summary",
-            description: "Write a narrative session summary the App shows above the progress checklist. Call at milestones, not per task.",
-            inputSchema: {
-              goal: z.string().describe("What the user ultimately wants to accomplish"),
-              currentFocus: z.string().optional().describe("Brief description of the active task or phase"),
-              keyDecisions: z.array(z.string()).optional().describe("Important choices already made this session"),
-              openQuestions: z.array(z.string()).optional().describe("Unresolved questions or pending decisions"),
-              impactScope: z.array(z.string()).optional().describe("Modules/files/areas affected by this session's work"),
-              requestId: z.string().optional().describe("Optional request identifier"),
-            },
-            handler: async (args: { [x: string]: unknown }) => {
-              try {
-                session.client.updateMetadata((metadata) =>
-                  applySessionSummaryUpdate(metadata, {
-                    goal: typeof args["goal"] === "string" ? args["goal"] : "",
-                    currentFocus: typeof args["currentFocus"] === "string" ? args["currentFocus"] : undefined,
-                    keyDecisions: Array.isArray(args["keyDecisions"]) ? (args["keyDecisions"] as string[]) : undefined,
-                    openQuestions: Array.isArray(args["openQuestions"]) ? (args["openQuestions"] as string[]) : undefined,
-                    impactScope: Array.isArray(args["impactScope"]) ? (args["impactScope"] as string[]) : undefined,
-                    requestId: typeof args["requestId"] === "string" ? args["requestId"] : undefined,
-                  })
-                );
-                return { content: [{ type: "text" as const, text: "Session summary updated." }] };
-              } catch (err) {
-                return { content: [{ type: "text" as const, text: `Failed to update session summary: ${err}` }] };
-              }
-            },
-          },
-        ],
-      });
+      // Stop the HTTP server when the session closes.
+      const stopHappyHttp = happyHttp.stop;
+      void stopHappyHttp; // ensure the var is retained; cleanup happens in finally
+
+      const happyMcpEntry = { type: "http" as const, url: happyHttpUrl };
+      const knowledgeMcpEntry = knowledgeEnabled ? happyMcpEntry : null;
+
+      const knowledgeMcpServer: { type: "http"; url: string } | null = knowledgeMcpEntry;
+      const happyMcpServer: { type: "http"; url: string } = happyMcpEntry;
 
       // Fetch persistent MCP registry from server KV (non-blocking — falls back to {} on error)
       const registryServers = await fetchMcpRegistryServers(session.api);
@@ -2040,8 +1929,8 @@ export async function claudeRemoteLauncher(
       // Seed MCP server state: protected servers (cannot be removed/overwritten by App),
       // and user servers from local settings + registry for diffing.
       mcpServerState.protectedServers = {
-        happy: { type: "sdk", name: "happy" },
-        ...(knowledgeMcpServer ? { "happy-knowledge": { type: "sdk", name: "happy-knowledge" } } : {}),
+        happy: happyMcpServer as unknown as Record<string, unknown>,
+        ...(knowledgeMcpServer ? { "happy-knowledge": knowledgeMcpServer as unknown as Record<string, unknown> } : {}),
       };
       mcpServerState.userServers = {
         ...readClaudeMcpServers() as Record<string, Record<string, unknown>>,
@@ -2548,6 +2437,13 @@ export async function claudeRemoteLauncher(
 
         // Clear query reference immediately to prevent stale interrupt/stopTask calls
         currentQuery = null;
+
+        // Stop the per-session HTTP MCP server bound to this launch iteration.
+        try {
+          stopHappyHttp();
+        } catch (err) {
+          logger.debug(`[happyMCP] stop error: ${err}`);
+        }
 
         // Terminate all ongoing tool calls
         for (let [toolCallId, { parentToolCallId }] of ongoingToolCalls) {

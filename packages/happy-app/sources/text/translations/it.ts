@@ -1054,6 +1054,8 @@ export const it: TranslationStructure = {
     quickActions: "Azioni rapide",
     viewMachine: "Visualizza macchina",
     viewMachineSubtitle: "Visualizza dettagli e sessioni della macchina",
+    openRawTerminal: "Apri terminale grezzo",
+    openRawTerminalSubtitle: "Visualizza i byte grezzi del TUI di Claude nel terminale web",
     killSessionSubtitle: "Termina immediatamente la sessione",
     archiveSessionSubtitle: "Archivia questa sessione e fermala",
     metadata: "Metadati",

@@ -28,11 +28,26 @@
  * restart (launcher creates a fresh state per process).
  */
 
-import type { Query as OfficialQuery } from "@anthropic-ai/claude-agent-sdk";
+import type { ClaudePtyController } from "@/claude/pty/claudePtyController";
 import type { EnhancedMode } from "@/claude/loop";
 import { buildFlagSettingsPatch, describePatch } from "./flagSettingsPatch";
 import { parseAndValidateSettings } from "./settingsParser";
 import { logger } from "@/lib";
+
+/**
+ * PTY migration note (Phase 5)
+ * ----------------------------
+ * Pre-migration this module pushed Settings-layer patches to the live SDK
+ * Query via `query.applyFlagSettings(...)`. After the PTY migration the
+ * underlying `claude` TUI binary exposes no programmatic Settings-apply
+ * surface — settings are read from `--settings <path>` at spawn time only.
+ *
+ * Rather than ripping out every caller, we keep the parsing / validation /
+ * state-tracking path and turn the SDK call itself into a debug-logged
+ * no-op (via `ClaudePtyController.applyFlagSettings`). The caller still
+ * gets a typed `ApplyResult` and `AppliedSettingsState` keeps accumulating
+ * the patch history for introspection (`get_context_usage` RPC, etc).
+ */
 
 // ─── State tracking ───────────────────────────────────────────────────────────
 
@@ -73,7 +88,7 @@ export type ApplyResult =
  * @param state - Mutable state tracker (accumulated per process lifetime)
  */
 export async function applyFlagSettings(
-  query: OfficialQuery,
+  query: ClaudePtyController,
   rawSettings: Record<string, unknown>,
   state: AppliedSettingsState,
 ): Promise<ApplyResult> {
@@ -127,7 +142,7 @@ export async function applyFlagSettings(
  * Settings-level diff.
  */
 export async function applyFlagSettingsFromModeDiff(
-  query: OfficialQuery,
+  query: ClaudePtyController,
   prev: EnhancedMode,
   next: EnhancedMode,
   state: AppliedSettingsState,

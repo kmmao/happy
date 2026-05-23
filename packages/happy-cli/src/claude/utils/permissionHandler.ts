@@ -142,7 +142,7 @@ export class PermissionHandler {
       const result: PermissionResult = response.approved
         ? {
             behavior: "allow",
-            decisionClassification: classification,
+            classification,
             updatedInput: {
               ...((pending.input as Record<string, unknown>) || {}),
               // For AskUserQuestion: merge user answers into updatedInput
@@ -152,7 +152,7 @@ export class PermissionHandler {
           }
         : {
             behavior: "deny",
-            decisionClassification: classification,
+            classification,
             message:
               response.reason ||
               `The user doesn't want to proceed with this tool use. The tool use was rejected (eg. if it was a file edit, the new_string was NOT written to the file). STOP what you are doing and wait for the user to tell you how to proceed.`,

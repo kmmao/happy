@@ -475,6 +475,16 @@ export async function startDaemon(): Promise<void> {
     // Forwarding function wired up after apiMachine is available.
     let interAgentSend: ((from: string, to: string, msg: string) => void) | undefined;
 
+    // Claude PTY bridge handlers — set once apiMachine exists. Session children
+    // call these via the control HTTP server to surface their Claude TUI PTY
+    // through the daemon's TerminalManager (App-facing).
+    let claudePtyAttach:
+      | ((input: { terminalId: string; sessionId: string; cols: number; rows: number; cwd: string }) => void)
+      | undefined;
+    let claudePtyDetach: ((terminalId: string) => void) | undefined;
+    let claudePtyForwardData: ((terminalId: string, data: string) => void) | undefined;
+    let claudePtyForwardExit: ((terminalId: string, exitCode: number) => void) | undefined;
+
     // Spawn a new session (sessionId reserved for future --resume functionality)
     const spawnSession = async (
       options: SpawnSessionOptions,
@@ -789,7 +799,12 @@ export async function startDaemon(): Promise<void> {
           HAPPY_SPAWN_ID: spawnId,
           ...(happySessionId ? { HAPPY_SESSION_ID: happySessionId } : {}),
           ...(daemonControlPort > 0
-            ? { HAPPY_INTER_AGENT_URL: `http://127.0.0.1:${daemonControlPort}/inter-agent-message` }
+            ? {
+                HAPPY_INTER_AGENT_URL: `http://127.0.0.1:${daemonControlPort}/inter-agent-message`,
+                // Base URL for daemon control HTTP — children build other
+                // endpoints (e.g. /claude-pty/attach) by appending paths.
+                HAPPY_DAEMON_CONTROL_URL: `http://127.0.0.1:${daemonControlPort}`,
+              }
             : {}),
         };
 
@@ -1765,6 +1780,12 @@ export async function startDaemon(): Promise<void> {
           return result;
         },
         sendInterAgentMessage: (from, to, msg) => interAgentSend?.(from, to, msg),
+        attachClaudePty: (input) => claudePtyAttach?.(input),
+        detachClaudePty: (terminalId) => claudePtyDetach?.(terminalId),
+        forwardClaudePtyData: (terminalId, data) =>
+          claudePtyForwardData?.(terminalId, data),
+        forwardClaudePtyExit: (terminalId, exitCode) =>
+          claudePtyForwardExit?.(terminalId, exitCode),
       });
 
     daemonControlPort = controlPort;
@@ -2191,6 +2212,18 @@ export async function startDaemon(): Promise<void> {
 
     // Wire inter-agent forwarding now that the machine socket is live.
     interAgentSend = (from, to, msg) => apiMachine.sendInterAgentMessage(from, to, msg);
+
+    // Wire Claude PTY bridge handlers — session children invoke these via the
+    // control HTTP server to push the Claude TUI's bytes through the daemon's
+    // TerminalManager + machine socket. Until this point the forwarder
+    // callbacks above no-op (HAPPY_DAEMON_CONTROL_URL is set per-spawn so the
+    // child cannot beat the daemon to first contact in practice).
+    claudePtyAttach = (input) => apiMachine.attachClaudePty(input);
+    claudePtyDetach = (terminalId) => apiMachine.detachClaudePty(terminalId);
+    claudePtyForwardData = (terminalId, data) =>
+      apiMachine.forwardClaudePtyData(terminalId, data);
+    claudePtyForwardExit = (terminalId, exitCode) =>
+      apiMachine.forwardClaudePtyExit(terminalId, exitCode);
 
     // Brief ring buffer — keeps last 20 briefs for DaemonState push
     const MAX_RECENT_BRIEFS = 20;

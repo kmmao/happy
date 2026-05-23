@@ -1042,6 +1042,8 @@ export const ja: TranslationStructure = {
     quickActions: "クイックアクション",
     viewMachine: "マシンを表示",
     viewMachineSubtitle: "マシンの詳細とセッションを表示",
+    openRawTerminal: "生ターミナルを開く",
+    openRawTerminalSubtitle: "Web ターミナルで Claude TUI の生バイトを表示",
     killSessionSubtitle: "セッションを即座に終了",
     archiveSessionSubtitle: "このセッションをアーカイブして停止",
     metadata: "メタデータ",

@@ -686,6 +686,8 @@ export const ru: TranslationStructure = {
     quickActions: "Быстрые действия",
     viewMachine: "Посмотреть машину",
     viewMachineSubtitle: "Посмотреть детали машины и сессии",
+    openRawTerminal: "Открыть необработанный терминал",
+    openRawTerminalSubtitle: "Просмотреть необработанные байты Claude TUI в веб-терминале",
     killSessionSubtitle: "Немедленно завершить сессию",
     archiveSessionSubtitle: "Архивировать эту сессию и остановить её",
     metadata: "Метаданные",

@@ -28,17 +28,17 @@
 
 import { join, isAbsolute, resolve as resolvePath } from "node:path";
 import { homedir } from "node:os";
-import type {
-  Query as OfficialQuery,
-  SDKResultMessage,
-} from "@anthropic-ai/claude-agent-sdk";
+import type { ClaudePtyController } from "@/claude/pty/claudePtyController";
+import type { SDKResultMessage } from "@/claude/sdk";
+// Session store: filesystem-backed (replaces SDK 0.3.143+ standalone exports).
+// See sessionStoreRpc.ts for the JSONL on-disk format and rationale.
 import {
   listSessions as sdkListSessions,
   getSessionInfo as sdkGetSessionInfo,
   deleteSession as sdkDeleteSession,
   renameSession as sdkRenameSession,
   getSessionMessages as sdkGetSessionMessages,
-} from "@anthropic-ai/claude-agent-sdk";
+} from "@/claude/rpc/sessionStoreRpc";
 import type { RpcHandlerManager } from "@/api/rpc/RpcHandlerManager";
 import { logger } from "@/ui/logger";
 import {
@@ -263,8 +263,8 @@ export class SessionCostTracker {
 
 export interface RegisterClaudeControlHandlersOptions {
   rpcHandlerManager: RpcHandlerManager;
-  /** Returns the currently-active Claude Query, or null when idle. */
-  getCurrentQuery: () => OfficialQuery | null;
+  /** Returns the currently-active Claude controller, or null when idle. */
+  getCurrentQuery: () => ClaudePtyController | null;
   /** Session working directory used for resolving read_file relative paths. */
   cwd: string;
   /** Session-scoped cost tracker; null when the launcher does not wire one. */
@@ -312,9 +312,7 @@ export function registerClaudeControlHandlers(
       try {
         const init = await q.initializationResult();
         return {
-          version:
-            (init as unknown as { claude_code_version?: string })
-              .claude_code_version ?? "unknown",
+          version: init.claude_code_version ?? "unknown",
           happyCliVersion,
         };
       } catch (e) {
@@ -443,6 +441,20 @@ export function registerClaudeControlHandlers(
       }
       try {
         const raw = await q.getContextUsage();
+        if (!raw) {
+          // PTY mode (or any other transport without programmatic context
+          // introspection) — surface an empty payload rather than failing
+          // the RPC so the App can render a "unavailable" state.
+          return {
+            categories: [],
+            totalTokens: 0,
+            maxTokens: 1000000,
+            percentage: 0,
+            model: "unknown",
+            memoryFiles: [],
+            mcpTools: [],
+          };
+        }
         logger.debug("[claudeControl] get_context_usage raw", JSON.stringify({
           categoryNames: raw.categories.map((c) => `${c.name}:${c.tokens}`),
           totalTokens: raw.totalTokens,

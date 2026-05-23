@@ -1,9 +1,20 @@
 /**
- * SDK types — re-exports from official @anthropic-ai/claude-agent-sdk
- * with adapter-specific types for Happy CLI.
+ * SDK types — adapter surface consumed by Happy CLI.
+ *
+ * Phase 0 status (PTY migration plan)
+ * ----------------------------------
+ * SDK types are now imported through `compatTypes.ts` (the single seam
+ * point between Happy CLI and `@anthropic-ai/claude-agent-sdk`).
+ * Consumers should keep importing from `@/claude/sdk` (barrel) — the
+ * imports in this file will swap to local definitions in Phase 6
+ * without changing any consumer.
+ *
+ * Adapter-specific types (`QueryOptions`, `CanCallToolCallback`,
+ * `QueryPrompt`) remain defined here because they have no SDK
+ * counterpart — they describe Happy's wrapper API.
  */
 
-// ── Official SDK re-exports ──
+// ── Re-export every SDK type and runtime symbol via compatTypes ──
 export type {
   SDKMessage,
   SDKUserMessage,
@@ -15,10 +26,25 @@ export type {
   SDKAPIRetryMessage,
   SDKSessionStateChangedMessage,
   SDKDeferredToolUse,
+  SDKMirrorErrorMessage,
+  SDKPermissionDeniedMessage,
+  SDKTaskUpdatedMessage,
+  SDKRateLimitEvent,
+  SDKToolUseSummaryMessage,
+  SDKNotificationMessage,
+  SDKPartialAssistantMessage,
+  SDKStatusMessage,
+  SDKCompactBoundaryMessage,
+  SDKTaskStartedMessage,
+  SDKTaskProgressMessage,
+  SDKTaskNotificationMessage,
+  SDKToolProgressMessage,
+  SDKPromptSuggestionMessage,
+  SDKMemoryRecallMessage,
   PermissionResult,
   PermissionDecisionClassification,
   HookPermissionDecision,
-  PermissionMode as SdkPermissionMode,
+  SdkPermissionMode,
   TerminalReason,
   ThinkingConfig,
   EffortLevel,
@@ -34,16 +60,6 @@ export type {
   SdkPluginConfig,
   GetSubagentMessagesOptions,
   ListSubagentsOptions,
-  // SDK 0.2.119+ additions
-  SDKMirrorErrorMessage,
-  // SDK 0.2.139+ additions
-  SDKPermissionDeniedMessage,
-  // SDK 0.3.142+ additions
-  SDKTaskUpdatedMessage,
-  SDKRateLimitEvent,
-  SDKToolUseSummaryMessage,
-  SDKNotificationMessage,
-  SDKPartialAssistantMessage,
   HookCallback,
   HookCallbackMatcher,
   HookEvent,
@@ -60,24 +76,33 @@ export type {
   SlashCommand,
   ModelInfo,
   AccountInfo,
-} from "@anthropic-ai/claude-agent-sdk";
+} from "./compatTypes";
 
-export {
-  AbortError,
-  forkSession,
-  getSubagentMessages,
-  listSubagents,
-  // SDK 0.3.142+ additions
-  deleteSession,
-  getSessionInfo,
-  getSessionMessages,
-  listSessions,
-  renameSession,
-  tagSession,
-  resolveSettings,
-} from "@anthropic-ai/claude-agent-sdk";
+// Post-PTY-migration the SDK runtime functions (`forkSession`, `listSessions`,
+// `deleteSession`, `renameSession`, `getSessionInfo`, `getSessionMessages`,
+// `tagSession`, `getSubagentMessages`, `listSubagents`, `resolveSettings`) are
+// implemented locally in `@/claude/rpc/sessionStoreRpc`. Consumers should import
+// those directly — the SDK re-export surface is intentionally narrow now.
+export { AbortError } from "./compatTypes";
 
-// ── Adapter-specific types (our API, not the official SDK's) ──
+// ── Adapter-specific types (Happy CLI's wrapper API, not SDK shape) ──
+
+import type {
+  PermissionResult,
+  Settings,
+  ThinkingConfig,
+  EffortLevel,
+  OnElicitation,
+  SdkBeta,
+  AgentDefinition,
+  OutputFormat,
+  SdkPluginConfig,
+  ToolConfig,
+  SessionStore,
+  HookEvent,
+  HookCallbackMatcher,
+  SDKUserMessage,
+} from "./compatTypes";
 
 /** Callback for tool permission checks (adapter signature) */
 export interface CanCallToolCallback {
@@ -85,7 +110,7 @@ export interface CanCallToolCallback {
     toolName: string,
     input: unknown,
     options: { signal: AbortSignal },
-  ): Promise<import("@anthropic-ai/claude-agent-sdk").PermissionResult>;
+  ): Promise<PermissionResult>;
 }
 
 /** Adapter query options — maps to official Options internally via queryAdapter */
@@ -119,15 +144,15 @@ export interface QueryOptions {
    * Maps to the SDK's `settings` option (highest-priority flag settings layer).
    * Prefer this over `settingsPath`.
    */
-  settings?: string | import("@anthropic-ai/claude-agent-sdk").Settings;
+  settings?: string | Settings;
   /** @deprecated Use `settings` instead. Path to a settings JSON file. */
   settingsPath?: string;
   /** Maximum USD budget for this query — SDK returns error_max_budget_usd when exceeded */
   maxBudgetUsd?: number;
   /** Controls Claude's thinking/reasoning behavior */
-  thinking?: import("@anthropic-ai/claude-agent-sdk").ThinkingConfig;
+  thinking?: ThinkingConfig;
   /** Controls how much effort Claude puts into its response */
-  effort?: import("@anthropic-ai/claude-agent-sdk").EffortLevel;
+  effort?: EffortLevel;
   /**
    * API-side task budget in tokens. When set, the model is made aware of
    * its remaining token budget so it can pace tool use and wrap up before
@@ -138,7 +163,7 @@ export interface QueryOptions {
   /** Enable prompt suggestions — agent emits a prompt_suggestion after each turn */
   promptSuggestions?: boolean;
   /** Callback for handling MCP elicitation requests (user input from MCP servers) */
-  onElicitation?: import("@anthropic-ai/claude-agent-sdk").OnElicitation;
+  onElicitation?: OnElicitation;
   /**
    * Which setting sources to load. Defaults to ['user', 'project', 'local']
    * so that ~/.claude/commands/ and project commands are discovered.
@@ -149,7 +174,7 @@ export interface QueryOptions {
    * Enable beta features (e.g. 1M context window).
    * @see https://docs.anthropic.com/en/api/beta-headers
    */
-  betas?: import("@anthropic-ai/claude-agent-sdk").SdkBeta[];
+  betas?: SdkBeta[];
   /**
    * Enable periodic AI-generated progress summaries for running subagents.
    * Emitted on task_progress events via the summary field (~30s interval).
@@ -167,15 +192,15 @@ export interface QueryOptions {
   /**
    * Programmatically define custom subagents that can be invoked via the Agent tool.
    */
-  agents?: Record<string, import("@anthropic-ai/claude-agent-sdk").AgentDefinition>;
+  agents?: Record<string, AgentDefinition>;
   /**
    * Output format configuration for structured JSON responses.
    */
-  outputFormat?: import("@anthropic-ai/claude-agent-sdk").OutputFormat;
+  outputFormat?: OutputFormat;
   /**
    * Load plugins for this session. Plugins provide custom commands, agents, skills, and hooks.
    */
-  plugins?: import("@anthropic-ai/claude-agent-sdk").SdkPluginConfig[];
+  plugins?: SdkPluginConfig[];
   /**
    * Additional directories Claude can access beyond the current working directory.
    */
@@ -207,7 +232,7 @@ export interface QueryOptions {
    *
    * Maps to the official SDK's `Options.sessionStore` (@alpha, 0.2.119+).
    */
-  sessionStore?: import("@anthropic-ai/claude-agent-sdk").SessionStore;
+  sessionStore?: SessionStore;
   /**
    * Per-tool configuration for built-in tools.
    * Used to configure AskUserQuestion's previewFormat so the model emits
@@ -215,7 +240,7 @@ export interface QueryOptions {
    *
    * Maps to the official SDK's `Options.toolConfig` (0.2.119+).
    */
-  toolConfig?: import("@anthropic-ai/claude-agent-sdk").ToolConfig;
+  toolConfig?: ToolConfig;
   /**
    * Forward subagent text and thinking blocks as assistant/user messages so
    * consumers can render complete nested subagent conversation flows.
@@ -242,21 +267,9 @@ export interface QueryOptions {
    * Use hooks for low-latency, synchronous interception; use RPC for
    * cross-device orchestration from the App.
    *
-   * @example
-   * ```typescript
-   * hooks: {
-   *   PostToolUse: [{
-   *     hooks: [async (input) => ({ continue: true })]
-   *   }],
-   *   Stop: [{
-   *     hooks: [async (input) => ({ continue: true })]
-   *   }]
-   * }
-   * ```
-   *
    * Maps to the official SDK's `Options.hooks` (0.3.142+).
    */
-  hooks?: Partial<Record<import("@anthropic-ai/claude-agent-sdk").HookEvent, import("@anthropic-ai/claude-agent-sdk").HookCallbackMatcher[]>>;
+  hooks?: Partial<Record<HookEvent, HookCallbackMatcher[]>>;
   /**
    * Use a specific session ID instead of an auto-generated UUID.
    * Must be a valid UUID. Cannot be used with `continue` or `resume` unless
@@ -306,6 +319,4 @@ export interface QueryOptions {
 }
 
 /** Query prompt — string or async stream of user messages */
-export type QueryPrompt =
-  | string
-  | AsyncIterable<import("@anthropic-ai/claude-agent-sdk").SDKUserMessage>;
+export type QueryPrompt = string | AsyncIterable<SDKUserMessage>;

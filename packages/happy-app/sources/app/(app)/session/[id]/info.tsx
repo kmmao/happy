@@ -581,6 +581,26 @@ function SessionInfoContent({ session }: { session: Session }) {
               }
             />
           )}
+          {/*
+           * Raw PTY view — surfaces the original Claude TUI bytes
+           * (ANSI colors, in-progress streaming, native input loop).
+           * Wired to the WebTerminal via `terminalId = "claude:<sessionId>"`
+           * — see packages/happy-cli/src/claude/pty/claudePtyRouter.ts.
+           */}
+          {session.metadata?.machineId && session.metadata?.claudeSessionId && (
+            <Item
+              title={t("sessionInfo.openRawTerminal")}
+              subtitle={t("sessionInfo.openRawTerminalSubtitle")}
+              icon={
+                <Ionicons name="terminal-outline" size={29} color="#34C759" />
+              }
+              onPress={() =>
+                router.push(
+                  `/machine/${session.metadata?.machineId}/terminal?sessionId=${session.metadata?.claudeSessionId}`,
+                )
+              }
+            />
+          )}
           {needsUpgrade && (
             <Item
               title={`${t("sessionInfo.upgradeRestart")} → ${machineCliVersion}`}

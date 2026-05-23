@@ -917,6 +917,8 @@ export const pt: TranslationStructure = {
     quickActions: "Ações rápidas",
     viewMachine: "Ver máquina",
     viewMachineSubtitle: "Ver detalhes da máquina e sessões",
+    openRawTerminal: "Abrir terminal bruto",
+    openRawTerminalSubtitle: "Visualizar os bytes brutos do Claude TUI no terminal web",
     killSessionSubtitle: "Encerrar imediatamente a sessão",
     archiveSessionSubtitle: "Arquivar esta sessão e pará-la",
     metadata: "Metadados",

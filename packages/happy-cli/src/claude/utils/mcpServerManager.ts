@@ -26,7 +26,7 @@
  * each `setMcpServers()` call.
  */
 
-import type { Query as OfficialQuery } from "@anthropic-ai/claude-agent-sdk";
+import type { ClaudePtyController } from "@/claude/pty/claudePtyController";
 import { logger } from "@/lib";
 
 // ─── Protected server names ───────────────────────────────────────────────────
@@ -158,7 +158,7 @@ export type McpApplyResult =
  * @param state - Mutable state tracker
  */
 export async function applyMcpServers(
-  query: OfficialQuery,
+  query: ClaudePtyController,
   servers: Record<string, Record<string, unknown>>,
   state: McpServerState,
 ): Promise<McpApplyResult> {
@@ -208,7 +208,7 @@ export async function applyMcpServers(
  * user servers and re-applies the full set.
  */
 export async function addMcpServer(
-  query: OfficialQuery,
+  query: ClaudePtyController,
   name: string,
   config: Record<string, unknown>,
   state: McpServerState,
@@ -233,7 +233,7 @@ export async function addMcpServer(
  * without the named server and re-applies.
  */
 export async function removeMcpServer(
-  query: OfficialQuery,
+  query: ClaudePtyController,
   name: string,
   state: McpServerState,
 ): Promise<McpApplyResult> {
@@ -258,7 +258,7 @@ export async function removeMcpServer(
  * @param state - Mutable state tracker
  */
 export async function syncMcpServersFromRegistry(
-  query: OfficialQuery,
+  query: ClaudePtyController,
   registryServers: Record<string, Record<string, unknown>>,
   state: McpServerState,
 ): Promise<McpApplyResult> {
