@@ -129,7 +129,12 @@ async function readCommandsDir(
 
   const results: CommandEntry[] = [];
   for (const entry of entries) {
-    if (!entry.isFile()) continue;
+    // Accept files and symlinks (which may resolve to files). Claude users
+    // routinely manage commands via dotfile repos that symlink individual
+    // .md files into ~/.claude/commands — Dirent.isFile() is false for the
+    // symlink itself, so we'd lose those without this branch. readFile
+    // follows symlinks, so a dangling link simply errors out below.
+    if (!entry.isFile() && !entry.isSymbolicLink()) continue;
     if (!entry.name.endsWith(".md")) continue;
 
     const base = entry.name.replace(/\.md$/i, "");
@@ -180,7 +185,14 @@ async function readSkillsDir(
 
   const results: CommandEntry[] = [];
   for (const entry of entries) {
-    if (!entry.isDirectory()) continue;
+    // Accept directories AND symlinks. Many users (e.g. Matt Pocock's
+    // setup) install skills by symlinking each `<name>/` from a shared
+    // dotfile repo into `~/.claude/skills/`; `Dirent.isDirectory()` is
+    // `false` for those symlinks even though the target is a directory.
+    // The `pathExists(SKILL.md)` probe below uses `access()`, which
+    // follows symlinks, so dangling / non-skill links are filtered out
+    // naturally without an extra stat round-trip.
+    if (!entry.isDirectory() && !entry.isSymbolicLink()) continue;
     if (entry.name.startsWith(".")) continue;
 
     const skillFile = join(dir, entry.name, "SKILL.md");

@@ -9,7 +9,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 
 import { collectClaudeLocalCommands } from "./claudeLocalCommands";
 
@@ -229,6 +229,41 @@ describe("collectClaudeLocalCommands", () => {
 
     const result = await collectClaudeLocalCommands({ cwd, userHome });
     expect(result.slashCommands).toEqual([]);
+  });
+
+  it("follows symlinked skill directories (dotfile-repo install pattern)", async () => {
+    // Real skill lives outside ~/.claude/skills/ — mirrors what
+    // setup-matt-pocock-skills and similar dotfile-managed setups do.
+    const realSkill = join(testRoot, "dotfiles", "skills", "diagnose");
+    mkdirSync(realSkill, { recursive: true });
+    writeFileSync(
+      join(realSkill, "SKILL.md"),
+      `---\nname: diagnose\ndescription: Diagnose a runtime issue\n---\n`,
+    );
+
+    const linkParent = join(userHome, ".claude", "skills");
+    mkdirSync(linkParent, { recursive: true });
+    symlinkSync(realSkill, join(linkParent, "diagnose"), "dir");
+
+    const result = await collectClaudeLocalCommands({ cwd, userHome });
+    expect(result.slashCommands).toEqual(["diagnose"]);
+    expect(result.slashCommandDescriptions.diagnose).toBe(
+      "Diagnose a runtime issue",
+    );
+  });
+
+  it("follows symlinked command .md files", async () => {
+    const realFile = join(testRoot, "dotfiles", "commands", "deploy.md");
+    mkdirSync(join(testRoot, "dotfiles", "commands"), { recursive: true });
+    writeFileSync(realFile, `---\ndescription: Deploy\n---\n`);
+
+    const linkParent = join(userHome, ".claude", "commands");
+    mkdirSync(linkParent, { recursive: true });
+    symlinkSync(realFile, join(linkParent, "deploy.md"), "file");
+
+    const result = await collectClaudeLocalCommands({ cwd, userHome });
+    expect(result.slashCommands).toEqual(["deploy"]);
+    expect(result.slashCommandDescriptions.deploy).toBe("Deploy");
   });
 
   it("merges commands and skills into the same namespace", async () => {
