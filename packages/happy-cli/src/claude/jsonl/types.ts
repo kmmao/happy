@@ -5,7 +5,7 @@
  * ----------------------------------
  * SDK types are now imported through `compatTypes.ts` (the single seam
  * point between Happy CLI and `@anthropic-ai/claude-agent-sdk`).
- * Consumers should keep importing from `@/claude/sdk` (barrel) — the
+ * Consumers should keep importing from `@/claude/jsonl` (barrel) — the
  * imports in this file will swap to local definitions in Phase 6
  * without changing any consumer.
  *
@@ -16,35 +16,35 @@
 
 // ── Re-export every SDK type and runtime symbol via compatTypes ──
 export type {
-  SDKMessage,
-  SDKUserMessage,
-  SDKAssistantMessage,
-  SDKSystemMessage,
-  SDKResultMessage,
-  SDKResultSuccess,
-  SDKResultError,
-  SDKAPIRetryMessage,
-  SDKSessionStateChangedMessage,
-  SDKDeferredToolUse,
-  SDKMirrorErrorMessage,
-  SDKPermissionDeniedMessage,
-  SDKTaskUpdatedMessage,
-  SDKRateLimitEvent,
-  SDKToolUseSummaryMessage,
-  SDKNotificationMessage,
-  SDKPartialAssistantMessage,
-  SDKStatusMessage,
-  SDKCompactBoundaryMessage,
-  SDKTaskStartedMessage,
-  SDKTaskProgressMessage,
-  SDKTaskNotificationMessage,
-  SDKToolProgressMessage,
-  SDKPromptSuggestionMessage,
-  SDKMemoryRecallMessage,
+  ClaudeJsonlMessage,
+  ClaudeJsonlUserMessage,
+  ClaudeJsonlAssistantMessage,
+  ClaudeJsonlSystemMessage,
+  ClaudeJsonlResultMessage,
+  ClaudeJsonlResultSuccess,
+  ClaudeJsonlResultError,
+  ClaudeJsonlAPIRetryMessage,
+  ClaudeJsonlSessionStateChangedMessage,
+  ClaudeJsonlDeferredToolUse,
+  ClaudeJsonlMirrorErrorMessage,
+  ClaudeJsonlPermissionDeniedMessage,
+  ClaudeJsonlTaskUpdatedMessage,
+  ClaudeJsonlRateLimitEvent,
+  ClaudeJsonlToolUseSummaryMessage,
+  ClaudeJsonlNotificationMessage,
+  ClaudeJsonlPartialAssistantMessage,
+  ClaudeJsonlStatusMessage,
+  ClaudeJsonlCompactBoundaryMessage,
+  ClaudeJsonlTaskStartedMessage,
+  ClaudeJsonlTaskProgressMessage,
+  ClaudeJsonlTaskNotificationMessage,
+  ClaudeJsonlToolProgressMessage,
+  ClaudeJsonlPromptSuggestionMessage,
+  ClaudeJsonlMemoryRecallMessage,
   PermissionResult,
   PermissionDecisionClassification,
   HookPermissionDecision,
-  SdkPermissionMode,
+  ClaudeJsonlPermissionMode,
   TerminalReason,
   ThinkingConfig,
   EffortLevel,
@@ -56,8 +56,8 @@ export type {
   ForkSessionResult,
   AgentDefinition,
   OutputFormat,
-  SdkBeta,
-  SdkPluginConfig,
+  ClaudeJsonlBeta,
+  ClaudeJsonlPluginConfig,
   GetSubagentMessagesOptions,
   ListSubagentsOptions,
   HookCallback,
@@ -69,21 +69,21 @@ export type {
   SessionStore,
   SessionStoreEntry,
   SessionKey,
-  SDKSessionInfo,
+  ClaudeJsonlSessionInfo,
   SessionMessage,
   McpServerConfig,
   McpServerStatus,
   SlashCommand,
   ModelInfo,
   AccountInfo,
-} from "./compatTypes";
+} from "./jsonlMessageTypes";
 
 // Post-PTY-migration the SDK runtime functions (`forkSession`, `listSessions`,
 // `deleteSession`, `renameSession`, `getSessionInfo`, `getSessionMessages`,
 // `tagSession`, `getSubagentMessages`, `listSubagents`, `resolveSettings`) are
 // implemented locally in `@/claude/rpc/sessionStoreRpc`. Consumers should import
 // those directly — the SDK re-export surface is intentionally narrow now.
-export { AbortError } from "./compatTypes";
+export { AbortError } from "./jsonlMessageTypes";
 
 // ── Adapter-specific types (Happy CLI's wrapper API, not SDK shape) ──
 
@@ -93,16 +93,16 @@ import type {
   ThinkingConfig,
   EffortLevel,
   OnElicitation,
-  SdkBeta,
+  ClaudeJsonlBeta,
   AgentDefinition,
   OutputFormat,
-  SdkPluginConfig,
+  ClaudeJsonlPluginConfig,
   ToolConfig,
   SessionStore,
   HookEvent,
   HookCallbackMatcher,
-  SDKUserMessage,
-} from "./compatTypes";
+  ClaudeJsonlUserMessage,
+} from "./jsonlMessageTypes";
 
 /** Callback for tool permission checks (adapter signature) */
 export interface CanCallToolCallback {
@@ -174,7 +174,7 @@ export interface QueryOptions {
    * Enable beta features (e.g. 1M context window).
    * @see https://docs.anthropic.com/en/api/beta-headers
    */
-  betas?: SdkBeta[];
+  betas?: ClaudeJsonlBeta[];
   /**
    * Enable periodic AI-generated progress summaries for running subagents.
    * Emitted on task_progress events via the summary field (~30s interval).
@@ -200,7 +200,7 @@ export interface QueryOptions {
   /**
    * Load plugins for this session. Plugins provide custom commands, agents, skills, and hooks.
    */
-  plugins?: SdkPluginConfig[];
+  plugins?: ClaudeJsonlPluginConfig[];
   /**
    * Additional directories Claude can access beyond the current working directory.
    */
@@ -250,7 +250,7 @@ export interface QueryOptions {
    */
   forwardSubagentText?: boolean;
   /**
-   * Include partial/streaming message events (SDKPartialAssistantMessage)
+   * Include partial/streaming message events (ClaudeJsonlPartialAssistantMessage)
    * in the query output. When true, the SDK emits `type: 'stream_event'`
    * for each API SSE chunk, enabling real-time text-delta forwarding.
    *
@@ -281,7 +281,7 @@ export interface QueryOptions {
   /**
    * When resuming, only resume messages up to and including the message
    * with this UUID. Use with `resume`. The message ID should be from
-   * `SDKAssistantMessage.uuid`.
+   * `ClaudeJsonlAssistantMessage.uuid`.
    *
    * Maps to the official SDK's `Options.resumeSessionAt` (0.3.142+).
    */
@@ -319,4 +319,4 @@ export interface QueryOptions {
 }
 
 /** Query prompt — string or async stream of user messages */
-export type QueryPrompt = string | AsyncIterable<SDKUserMessage>;
+export type QueryPrompt = string | AsyncIterable<ClaudeJsonlUserMessage>;

@@ -1,5 +1,5 @@
 /**
- * streamEventMapper — converts SDK `stream_event` (SDKPartialAssistantMessage)
+ * streamEventMapper — converts SDK `stream_event` (ClaudeJsonlPartialAssistantMessage)
  * into session protocol `text-delta` envelopes for real-time streaming to App.
  *
  * The SDK's `includePartialMessages: true` option causes the Query iterator to

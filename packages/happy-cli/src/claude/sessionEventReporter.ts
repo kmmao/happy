@@ -6,7 +6,7 @@
  * Events: file_edit, bash_command, tool_call, git_operation, error
  */
 
-import type { SDKMessage, SDKAssistantMessage } from "./sdk";
+import type { ClaudeJsonlMessage, ClaudeJsonlAssistantMessage } from "./jsonl";
 import { logger } from "@/ui/logger";
 
 export interface SessionEventSink {
@@ -37,13 +37,13 @@ export function createSessionEventReporter(
   sink: SessionEventSink,
   getSessionId: () => string | null | undefined,
 ) {
-  return function reportMessage(message: SDKMessage): void {
+  return function reportMessage(message: ClaudeJsonlMessage): void {
     const sessionId = getSessionId();
     if (!sessionId) return;
     try {
       if (message.type !== "assistant") return;
 
-      const aMsg = message as SDKAssistantMessage;
+      const aMsg = message as ClaudeJsonlAssistantMessage;
       const content = aMsg.message?.content;
       if (!Array.isArray(content)) return;
 

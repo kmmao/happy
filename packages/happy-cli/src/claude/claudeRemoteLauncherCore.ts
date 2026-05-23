@@ -3,38 +3,38 @@ import { Session } from "./session";
 import { MessageBuffer } from "@/ui/ink/messageBuffer";
 import { RemoteModeDisplay } from "@/ui/ink/RemoteModeDisplay";
 import React from "react";
-import { claudeRemote, resolveModelKey, is1MModelKey } from "./claudeRemote";
+import { claudeRemote, is1MModelKey } from "./claudeRemote";
 import { mapToClaudeMode } from "./utils/permissionMode";
 import { PermissionHandler } from "./utils/permissionHandler";
 import { Future } from "@/utils/future";
-import { SDKAssistantMessage, SDKMessage, SDKUserMessage } from "./sdk";
+import { ClaudeJsonlAssistantMessage, ClaudeJsonlMessage, ClaudeJsonlUserMessage } from "./jsonl";
 import { forkSession } from "@/claude/rpc/sessionStoreRpc";
-import type { ElicitationRequest, ElicitationResult } from "./sdk/types";
+import type { ElicitationRequest, ElicitationResult } from "./jsonl/types";
 import type {
-  SDKStatusMessage as SDKStatusMsg,
-  SDKCompactBoundaryMessage as SDKCompactMsg,
-  SDKTaskStartedMessage,
-  SDKTaskProgressMessage,
-  SDKTaskUpdatedMessage,
-  SDKTaskNotificationMessage,
-  SDKAPIRetryMessage,
-  SDKToolProgressMessage,
-  SDKPromptSuggestionMessage,
-  SDKSessionStateChangedMessage,
-  SDKMemoryRecallMessage,
-  SDKRateLimitEvent,
-} from "@/claude/sdk";
+  ClaudeJsonlStatusMessage as ClaudeJsonlStatusMsg,
+  ClaudeJsonlCompactBoundaryMessage as ClaudeJsonlCompactMsg,
+  ClaudeJsonlTaskStartedMessage,
+  ClaudeJsonlTaskProgressMessage,
+  ClaudeJsonlTaskUpdatedMessage,
+  ClaudeJsonlTaskNotificationMessage,
+  ClaudeJsonlAPIRetryMessage,
+  ClaudeJsonlToolProgressMessage,
+  ClaudeJsonlPromptSuggestionMessage,
+  ClaudeJsonlSessionStateChangedMessage,
+  ClaudeJsonlMemoryRecallMessage,
+  ClaudeJsonlRateLimitEvent,
+} from "@/claude/jsonl";
 import type { ClaudePtyController } from "@/claude/pty/claudePtyController";
 import { startHappyServer } from "@/claude/utils/startHappyServer";
 import { formatClaudeMessageForInk } from "@/ui/messageFormatterInk";
 import { logger } from "@/ui/logger";
-import { SDKToLogConverter } from "./utils/sdkToLogConverter";
+import { ClaudeJsonlToLogConverter } from "./utils/jsonlToLogConverter";
 import {
   mapStreamEventToEnvelope,
   createStreamEventMapperState,
   type StreamEventMapperState,
 } from "./utils/streamEventMapper";
-import { PLAN_FAKE_REJECT } from "./sdk/prompts";
+import { PLAN_FAKE_REJECT } from "./jsonl/prompts";
 import {
   markDisabledMcpServers,
   readClaudeDisabledMcpServers,
@@ -46,7 +46,7 @@ import { EnhancedMode } from "./loop";
 import { createSessionEventReporter } from "./sessionEventReporter";
 import { hashObject } from "@/utils/deterministicJson";
 import { getProjectPath } from "./utils/path";
-import { readFile, writeFile, mkdir, stat } from "node:fs/promises";
+import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 import { parseSpecialCommand } from "@/parsers/specialCommands";
@@ -318,7 +318,7 @@ export async function claudeRemoteLauncher(
   });
 
   async function doInterrupt() {
-    logger.debug("[remote]: doInterrupt — graceful interrupt via SDK");
+    logger.debug("[remote]: doInterrupt — graceful interrupt via PTY");
     if (currentQuery) {
       try {
         await currentQuery.interrupt();
@@ -336,17 +336,9 @@ export async function claudeRemoteLauncher(
     logger.debug(`[remote]: doStopTask — taskId=${args.taskId}`);
     if (!args.taskId) return;
 
-    if (currentQuery) {
-      try {
-        await currentQuery.stopTask(args.taskId);
-        return; // SDK will emit task_notification(stopped) which gets persisted
-      } catch (e) {
-        logger.debug("[remote]: stopTask() failed, falling back to manual task-end", e);
-      }
-    }
-
-    // Fallback: when agent is idle (currentQuery is null) or stopTask failed,
-    // manually emit a task-end envelope so the status is persisted to the server.
+    // PTY mode has no programmatic stopTask — Claude TUI manages subagent
+    // lifetime internally. We can only ack the App-visible state by emitting
+    // a task-end envelope so the App's task list clears.
     const envelope = createEnvelope("agent", {
       t: "task-end",
       taskId: args.taskId,
@@ -357,15 +349,10 @@ export async function claudeRemoteLauncher(
   }
 
   async function doBackgroundTasks(args: { toolUseId?: string }) {
-    logger.debug(`[remote]: doBackgroundTasks — toolUseId=${args.toolUseId ?? "all"}`);
-    if (!currentQuery) return { success: false };
-    try {
-      const result = await currentQuery.backgroundTasks(args.toolUseId);
-      return { success: result };
-    } catch (e) {
-      logger.debug("[remote]: backgroundTasks() failed", e);
-      return { success: false };
-    }
+    // PTY mode has no programmatic background-task inspection. Return false
+    // so the App treats the move-to-background request as not-implemented.
+    logger.debug(`[remote]: doBackgroundTasks — toolUseId=${args.toolUseId ?? "all"} (no PTY equivalent)`);
+    return { success: false };
   }
 
   // When to abort
@@ -537,25 +524,14 @@ export async function claudeRemoteLauncher(
     },
   );
 
-  // Register RPC handler for seeding read state after compact/snip
+  // seedReadState had no PTY equivalent — the SDK-only read-cache pre-warm
+  // was retired with the SDK runtime. Kept as an ack-only handler so older
+  // App builds that still send the RPC don't see an "unknown handler" error.
   session.client.rpcHandlerManager.registerHandler(
     "seedReadState",
     async (args: { path: string; mtime: number }) => {
-      if (!currentQuery) {
-        return { error: "No active query" };
-      }
-      if (!args.path || args.mtime == null) {
-        return { error: "Missing path or mtime" };
-      }
-      try {
-        await currentQuery.seedReadState(args.path, args.mtime);
-        return { success: true };
-      } catch (err) {
-        logger.debug(`[remote]: seedReadState failed: ${err}`);
-        return {
-          error: err instanceof Error ? err.message : "seedReadState failed",
-        };
-      }
+      logger.debug(`[remote]: seedReadState(${args.path}, ${args.mtime}) — no PTY equivalent`);
+      return { success: true };
     },
   );
 
@@ -583,7 +559,7 @@ export async function claudeRemoteLauncher(
   });
 
   // Create SDK to Log converter (pass responses from permissions)
-  const sdkToLogConverter = new SDKToLogConverter(
+  const jsonlToLogConverter = new ClaudeJsonlToLogConverter(
     {
       sessionId: session.sessionId || "unknown",
       cwd: session.path,
@@ -591,9 +567,6 @@ export async function claudeRemoteLauncher(
     },
     permissionHandler.getResponses(),
   );
-
-  // Track files that have been Read by the SDK (for seedReadState after compact)
-  const readFilePaths = new Set<string>();
 
   // Session timeline event reporter (fire-and-forget to server).
   // getSessionId is called lazily so new sessions work even before Claude
@@ -637,7 +610,7 @@ export async function claudeRemoteLauncher(
   // Stream event mapper state — reset per query cycle.
   let streamEventState: StreamEventMapperState = createStreamEventMapperState();
 
-  function onMessage(message: SDKMessage) {
+  function onMessage(message: ClaudeJsonlMessage) {
     // ── Stream events (partial messages) → text-delta envelopes ────────
     // Intercept before the rest of the pipeline. stream_event messages
     // carry raw API SSE chunks (text_delta, thinking_delta) that are
@@ -683,27 +656,12 @@ export async function claudeRemoteLauncher(
     // Write to permission handler for tool id resolving
     permissionHandler.onMessage(message);
 
-    // Track Read tool calls for seedReadState after compact
-    if (message.type === "assistant") {
-      const aMsg = message as SDKAssistantMessage;
-      if (aMsg.message.content && Array.isArray(aMsg.message.content)) {
-        for (const c of aMsg.message.content) {
-          if (c.type === "tool_use" && c.name === "Read") {
-            const filePath = (c.input as Record<string, unknown>)?.file_path;
-            if (typeof filePath === "string") {
-              readFilePaths.add(filePath);
-            }
-          }
-        }
-      }
-    }
-
     // Knowledge base: collect turn data from SDK messages
     // Wrapped in try-catch to never interfere with message processing
     try {
       if (turnCollector) {
         if (message.type === "user") {
-          const uMsg = message as SDKUserMessage;
+          const uMsg = message as ClaudeJsonlUserMessage;
           const content = uMsg.message?.content;
           let text = "";
           if (typeof content === "string") {
@@ -719,7 +677,7 @@ export async function claudeRemoteLauncher(
           }
         }
         if (message.type === "assistant") {
-          const aMsg = message as SDKAssistantMessage;
+          const aMsg = message as ClaudeJsonlAssistantMessage;
           if (aMsg.message.content && Array.isArray(aMsg.message.content)) {
             for (const c of aMsg.message.content) {
               if (c.type === "text") {
@@ -749,7 +707,7 @@ export async function claudeRemoteLauncher(
     // shaped tool_use_result, so we track state from assistant tool_use blocks.
     if (message.type === "assistant") {
       try {
-        const aMsg = message as SDKAssistantMessage;
+        const aMsg = message as ClaudeJsonlAssistantMessage;
         if (aMsg.message.content && Array.isArray(aMsg.message.content)) {
           let taskMirrorChanged = false;
           for (const c of aMsg.message.content) {
@@ -798,7 +756,7 @@ export async function claudeRemoteLauncher(
     // silently overwrote).
     if (message.type === "user") {
       try {
-        const uMsg = message as SDKUserMessage;
+        const uMsg = message as ClaudeJsonlUserMessage;
         const rawResult = uMsg.tool_use_result;
         if (rawResult && typeof rawResult === "object") {
           const r = rawResult as Record<string, unknown>;
@@ -1013,7 +971,7 @@ export async function claudeRemoteLauncher(
     // TaskCreate results and reconcile full state from TaskList results.
     if (message.type === "user" && taskMirrorState.hasTasks()) {
       try {
-        const uMsg = message as SDKUserMessage;
+        const uMsg = message as ClaudeJsonlUserMessage;
         const content = uMsg.message?.content;
         if (Array.isArray(content)) {
           let reconciled = false;
@@ -1052,7 +1010,7 @@ export async function claudeRemoteLauncher(
     // the consumer side.
     if (message.type === "assistant") {
       try {
-        const aMsg = message as SDKAssistantMessage;
+        const aMsg = message as ClaudeJsonlAssistantMessage;
         const blocks = Array.isArray(aMsg.message.content)
           ? aMsg.message.content
           : [];
@@ -1118,7 +1076,7 @@ export async function claudeRemoteLauncher(
 
     // Detect plan mode tool calls
     if (message.type === "assistant") {
-      let umessage = message as SDKAssistantMessage;
+      let umessage = message as ClaudeJsonlAssistantMessage;
       if (umessage.message.content && Array.isArray(umessage.message.content)) {
         for (let c of umessage.message.content) {
           if (c.type === "tool_use") {
@@ -1166,7 +1124,7 @@ export async function claudeRemoteLauncher(
 
     // Track active tool calls
     if (message.type === "assistant") {
-      let umessage = message as SDKAssistantMessage;
+      let umessage = message as ClaudeJsonlAssistantMessage;
       if (umessage.message.content && Array.isArray(umessage.message.content)) {
         for (let c of umessage.message.content) {
           if (c.type === "tool_use") {
@@ -1186,7 +1144,7 @@ export async function claudeRemoteLauncher(
     // Collect tool call IDs to release atomically with the next enqueue
     let releaseIds: string[] = [];
     if (message.type === "user") {
-      let umessage = message as SDKUserMessage;
+      let umessage = message as ClaudeJsonlUserMessage;
       if (umessage.message.content && Array.isArray(umessage.message.content)) {
         for (let c of umessage.message.content) {
           if (c.type === "tool_result" && c.tool_use_id) {
@@ -1199,7 +1157,7 @@ export async function claudeRemoteLauncher(
 
     // Forward status events to App (compacting, requesting, compact_boundary, etc.)
     if (message.type === "system") {
-      const statusMsg = message as SDKStatusMsg;
+      const statusMsg = message as ClaudeJsonlStatusMsg;
       if (statusMsg.subtype === "status") {
         if (statusMsg.status === "compacting") {
           session.client.sendSessionEvent({
@@ -1211,35 +1169,23 @@ export async function claudeRemoteLauncher(
         // The App's thinking state indicator (useSessionStatus) already covers
         // the "API call in progress" signal, so the persistent "Requesting..."
         // chat chip was redundant noise.
-      } else if ((message as SDKCompactMsg).subtype === "compact_boundary") {
+      } else if ((message as ClaudeJsonlCompactMsg).subtype === "compact_boundary") {
         session.client.sendSessionEvent({
           type: "message",
           message: "Context compacted",
         });
-        // After compaction, seed read state for all tracked files so Edit doesn't fail
-        if (currentQuery && readFilePaths.size > 0) {
-          logger.debug(
-            `[remote]: seeding read state for ${readFilePaths.size} files after compact`,
-          );
-          for (const filePath of readFilePaths) {
-            stat(filePath)
-              .then((s) =>
-                currentQuery!.seedReadState(filePath, Math.floor(s.mtimeMs)),
-              )
-              .catch((e) =>
-                logger.debug(`[remote]: seedReadState skipped for ${filePath}: ${e}`),
-              );
-          }
-        }
+        // SDK-era seedReadState() pre-warmed the read cache here so the
+        // post-compact assistant could Edit tracked files. PTY mode has no
+        // such cache — Claude TUI re-reads files itself when needed.
       }
     }
 
     // Forward Task messages to session protocol
     if (
       message.type === "system" &&
-      (message as SDKTaskStartedMessage).subtype === "task_started"
+      (message as ClaudeJsonlTaskStartedMessage).subtype === "task_started"
     ) {
-      const m = message as SDKTaskStartedMessage;
+      const m = message as ClaudeJsonlTaskStartedMessage;
       const envelope = createEnvelope("agent", {
         t: "task-start",
         taskId: m.task_id,
@@ -1254,9 +1200,9 @@ export async function claudeRemoteLauncher(
     // Forward Task progress to session protocol
     if (
       message.type === "system" &&
-      (message as SDKTaskProgressMessage).subtype === "task_progress"
+      (message as ClaudeJsonlTaskProgressMessage).subtype === "task_progress"
     ) {
-      const m = message as SDKTaskProgressMessage;
+      const m = message as ClaudeJsonlTaskProgressMessage;
       const envelope = createEnvelope("agent", {
         t: "task-progress",
         taskId: m.task_id,
@@ -1279,9 +1225,9 @@ export async function claudeRemoteLauncher(
     // which memories were recalled so users can see "what I looked up".
     if (
       message.type === "system" &&
-      (message as SDKMemoryRecallMessage).subtype === "memory_recall"
+      (message as ClaudeJsonlMemoryRecallMessage).subtype === "memory_recall"
     ) {
-      const m = message as SDKMemoryRecallMessage;
+      const m = message as ClaudeJsonlMemoryRecallMessage;
       const count = m.memories?.length ?? 0;
       if (count > 0) {
         const summary =
@@ -1301,9 +1247,9 @@ export async function claudeRemoteLauncher(
     // Forward Task notification to session protocol
     if (
       message.type === "system" &&
-      (message as SDKTaskNotificationMessage).subtype === "task_notification"
+      (message as ClaudeJsonlTaskNotificationMessage).subtype === "task_notification"
     ) {
-      const m = message as SDKTaskNotificationMessage;
+      const m = message as ClaudeJsonlTaskNotificationMessage;
       const envelope = createEnvelope("agent", {
         t: "task-end",
         taskId: m.task_id,
@@ -1323,9 +1269,9 @@ export async function claudeRemoteLauncher(
     // Forward Task updated (patch) to session protocol (SDK 0.3.142+)
     if (
       message.type === "system" &&
-      (message as SDKTaskUpdatedMessage).subtype === "task_updated"
+      (message as ClaudeJsonlTaskUpdatedMessage).subtype === "task_updated"
     ) {
-      const m = message as SDKTaskUpdatedMessage;
+      const m = message as ClaudeJsonlTaskUpdatedMessage;
       const envelope = createEnvelope("agent", {
         t: "task-updated",
         taskId: m.task_id,
@@ -1342,7 +1288,7 @@ export async function claudeRemoteLauncher(
 
     // Forward rate limit events to App (SDK 0.3.142+)
     if (message.type === "rate_limit_event") {
-      const m = message as SDKRateLimitEvent;
+      const m = message as ClaudeJsonlRateLimitEvent;
       const envelope = createEnvelope("agent", {
         t: "rate-limit",
         status: m.rate_limit_info.status,
@@ -1356,9 +1302,9 @@ export async function claudeRemoteLauncher(
     // Forward API retry status via keep-alive ephemeral channel
     if (
       message.type === "system" &&
-      (message as SDKAPIRetryMessage).subtype === "api_retry"
+      (message as ClaudeJsonlAPIRetryMessage).subtype === "api_retry"
     ) {
-      const m = message as SDKAPIRetryMessage;
+      const m = message as ClaudeJsonlAPIRetryMessage;
       session.client.keepAlive(true, "remote", true, {
         attempt: m.attempt,
         maxRetries: m.max_retries,
@@ -1369,7 +1315,7 @@ export async function claudeRemoteLauncher(
 
     // Forward Tool progress to session protocol
     if (message.type === "tool_progress") {
-      const m = message as SDKToolProgressMessage;
+      const m = message as ClaudeJsonlToolProgressMessage;
       const envelope = createEnvelope("agent", {
         t: "tool-progress",
         toolUseId: m.tool_use_id,
@@ -1382,7 +1328,7 @@ export async function claudeRemoteLauncher(
 
     // Forward prompt suggestion to session protocol
     if (message.type === "prompt_suggestion") {
-      const suggestion = (message as SDKPromptSuggestionMessage).suggestion;
+      const suggestion = (message as ClaudeJsonlPromptSuggestionMessage).suggestion;
       if (suggestion) {
         const envelope = createEnvelope("agent", {
           t: "prompt-suggestion",
@@ -1395,9 +1341,9 @@ export async function claudeRemoteLauncher(
     // Forward session state changes (idle/running/requires_action) to App
     if (
       message.type === "system" &&
-      (message as SDKSessionStateChangedMessage).subtype === "session_state_changed"
+      (message as ClaudeJsonlSessionStateChangedMessage).subtype === "session_state_changed"
     ) {
-      const m = message as SDKSessionStateChangedMessage;
+      const m = message as ClaudeJsonlSessionStateChangedMessage;
       const envelope = createEnvelope("agent", {
         t: "session-state-changed",
         state: m.state,
@@ -1414,7 +1360,7 @@ export async function claudeRemoteLauncher(
     // stream and rewrite it to "Plan approved" — so the client sees the correct status
     // instead of a confusing denial message.
     if (message.type === "user") {
-      let umessage = message as SDKUserMessage;
+      let umessage = message as ClaudeJsonlUserMessage;
       if (umessage.message.content && Array.isArray(umessage.message.content)) {
         msg = {
           ...umessage,
@@ -1446,7 +1392,7 @@ export async function claudeRemoteLauncher(
       }
     }
 
-    const logMessage = sdkToLogConverter.convert(msg);
+    const logMessage = jsonlToLogConverter.convert(msg);
     if (logMessage) {
       // Add permissions field to tool result content
       if (logMessage.type === "user" && logMessage.message?.content) {
@@ -1509,7 +1455,7 @@ export async function claudeRemoteLauncher(
 
       // Queue message with optional delay for tool calls
       if (logMessage.type === "assistant" && message.type === "assistant") {
-        const assistantMsg = message as SDKAssistantMessage;
+        const assistantMsg = message as ClaudeJsonlAssistantMessage;
         const toolCallIds: string[] = [];
 
         if (
@@ -1549,7 +1495,7 @@ export async function claudeRemoteLauncher(
 
     // Insert a fake message to start the sidechain
     if (message.type === "assistant") {
-      let umessage = message as SDKAssistantMessage;
+      let umessage = message as ClaudeJsonlAssistantMessage;
       if (umessage.message.content && Array.isArray(umessage.message.content)) {
         for (let c of umessage.message.content) {
           if (
@@ -1558,7 +1504,7 @@ export async function claudeRemoteLauncher(
             c.input &&
             typeof (c.input as Record<string, unknown>).prompt === "string"
           ) {
-            const logMessage2 = sdkToLogConverter.convertSidechainUserMessage(
+            const logMessage2 = jsonlToLogConverter.convertSidechainUserMessage(
               c.id!,
               (c.input as Record<string, unknown>).prompt as string,
             );
@@ -1686,7 +1632,7 @@ export async function claudeRemoteLauncher(
       if (isNewSession) {
         messageBuffer.addMessage("Starting new Claude session...", "status");
         permissionHandler.reset(); // Reset permissions before starting new session
-        sdkToLogConverter.resetParentChain(); // Reset parent chain for new conversation
+        jsonlToLogConverter.resetParentChain(); // Reset parent chain for new conversation
         logger.debug(
           `[remote]: New session detected (previous: ${previousSessionId}, current: ${session.sessionId})`,
         );
@@ -1768,7 +1714,7 @@ export async function claudeRemoteLauncher(
         });
       };
       let currentColdHash: string | null = null;
-      let midTurnPushFn: ((msg: SDKUserMessage) => void) | null = null;
+      let midTurnPushFn: ((msg: ClaudeJsonlUserMessage) => void) | null = null;
       let turnDrainController: AbortController | null = null;
 
       // Drain mid-turn messages from the queue and push them directly to the SDK.
@@ -1778,7 +1724,7 @@ export async function claudeRemoteLauncher(
       async function drainMidTurnMessages(
         signal: AbortSignal,
         currentHash: string,
-        pushFn: (msg: SDKUserMessage) => void,
+        pushFn: (msg: ClaudeJsonlUserMessage) => void,
       ) {
         logger.debug("[remote]: mid-turn drain started");
         while (!signal.aborted) {
@@ -1808,7 +1754,7 @@ export async function claudeRemoteLauncher(
             break;
           }
 
-          // `continue` requires a fresh SDK query with sdkOptions.continue=true.
+          // `continue` requires a fresh PTY spawn with options.continue=true.
           // It cannot be mid-turn pushed — put it back and let nextMessage()
           // handle it after the current turn finishes.
           if (item.mode.continue) {
@@ -1837,24 +1783,11 @@ export async function claudeRemoteLauncher(
             continue;
           }
 
-          // Hot-swap model if changed
-          if (mode && item.mode.model !== mode.model && currentQuery) {
-            const resolvedModel = resolveModelKey(item.mode.model);
-            if (resolvedModel) {
-              logger.debug(
-                `[remote]: mid-turn hot-swap model: ${mode.model} → ${resolvedModel}`,
-              );
-              try {
-                await currentQuery.setModel(resolvedModel);
-              } catch (e) {
-                logger.debug("[remote]: mid-turn setModel failed", e);
-              }
-            }
-          }
-
-          // Hot-swap permissionMode if changed (non-plan, non-bypass only)
-          // Use mapToClaudeMode to convert Codex modes (yolo/safe-yolo/read-only)
-          // to SDK-compatible modes before comparison and SDK call.
+          // Mid-turn model + permission-mode changes have no PTY equivalent —
+          // Claude TUI binds these flags at spawn time. coldModeHash handles
+          // anything that genuinely needs a fresh process; here we only sync
+          // the permission handler's local copy so prompts go to the right
+          // mapped mode for the rest of this turn.
           if (mode && currentQuery) {
             const newMapped = mapToClaudeMode(item.mode.permissionMode);
             const currentMapped = mapToClaudeMode(mode.permissionMode);
@@ -1864,13 +1797,8 @@ export async function claudeRemoteLauncher(
               newMapped !== "bypassPermissions" && currentMapped !== "bypassPermissions"
             ) {
               logger.debug(
-                `[remote]: mid-turn hot-swap permissionMode: ${currentMapped} → ${newMapped}`,
+                `[remote]: mid-turn permission-mode change observed: ${currentMapped} → ${newMapped} (no PTY hot-swap; updating handler only)`,
               );
-              try {
-                await currentQuery.setPermissionMode(newMapped);
-              } catch (e) {
-                logger.debug("[remote]: mid-turn setPermissionMode failed", e);
-              }
               permissionHandler.handleModeChange(item.mode.permissionMode);
             }
           }
@@ -2034,7 +1962,7 @@ export async function claudeRemoteLauncher(
                 return null;
               }
 
-              // continue requires a fresh query with sdkOptions.continue=true
+              // continue requires a fresh PTY spawn with options.continue=true
               if (msg.mode.continue) {
                 logger.debug(
                   "[remote]: continue flag detected, forcing restart for new query",
@@ -2226,7 +2154,7 @@ export async function claudeRemoteLauncher(
           },
           onSessionFound: (sessionId) => {
             // Update converter's session ID when new session is found
-            sdkToLogConverter.updateSessionId(sessionId);
+            jsonlToLogConverter.updateSessionId(sessionId);
             session.onSessionFound(sessionId);
           },
           // Wire the hookServer-driven session-id channel into claudeRemote so
@@ -2273,7 +2201,7 @@ export async function claudeRemoteLauncher(
           },
           onInitialized: (info) => {
             logger.debug(
-              `[remote]: SDK initialized — ${info.models?.length ?? 0} models`,
+              `[remote]: claude initialized — ${info.models?.length ?? 0} models`,
             );
             if (info.models && info.models.length > 0) {
               session.client.updateMetadata((m) => ({
@@ -2495,7 +2423,7 @@ export async function claudeRemoteLauncher(
 
         // Terminate all ongoing tool calls
         for (let [toolCallId, { parentToolCallId }] of ongoingToolCalls) {
-          const converted = sdkToLogConverter.generateInterruptedToolResult(
+          const converted = jsonlToLogConverter.generateInterruptedToolResult(
             toolCallId,
             parentToolCallId,
           );

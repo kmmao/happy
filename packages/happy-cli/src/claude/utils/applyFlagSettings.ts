@@ -35,18 +35,18 @@ import { parseAndValidateSettings } from "./settingsParser";
 import { logger } from "@/lib";
 
 /**
- * PTY migration note (Phase 5)
- * ----------------------------
+ * PTY migration note
+ * ------------------
  * Pre-migration this module pushed Settings-layer patches to the live SDK
  * Query via `query.applyFlagSettings(...)`. After the PTY migration the
  * underlying `claude` TUI binary exposes no programmatic Settings-apply
  * surface — settings are read from `--settings <path>` at spawn time only.
  *
- * Rather than ripping out every caller, we keep the parsing / validation /
- * state-tracking path and turn the SDK call itself into a debug-logged
- * no-op (via `ClaudePtyController.applyFlagSettings`). The caller still
- * gets a typed `ApplyResult` and `AppliedSettingsState` keeps accumulating
- * the patch history for introspection (`get_context_usage` RPC, etc).
+ * The shim on `ClaudePtyController` was removed once it had no callers
+ * outside this file; we now keep the parsing / validation / state-tracking
+ * path here without calling out to the controller. `AppliedSettingsState`
+ * still accumulates the patch history for introspection (`get_context_usage`
+ * RPC, etc).
  */
 
 // ─── State tracking ───────────────────────────────────────────────────────────
@@ -78,12 +78,14 @@ export type ApplyResult =
 // ─── Core function ────────────────────────────────────────────────────────────
 
 /**
- * Apply a raw settings patch to a running SDK Query.
+ * Apply a raw settings patch.
  *
- * Validates input → skips empty → calls SDK → tracks state → returns result.
- * Never throws — all errors are captured in the result.
+ * Validates input → skips empty → tracks state → returns result. Never
+ * throws — all errors are captured in the result. In PTY mode the patch
+ * is only recorded into `AppliedSettingsState`; the active TUI cannot be
+ * mutated mid-session, so cold restart owns any real behaviour change.
  *
- * @param query - The active SDK Query instance
+ * @param query - The active PTY controller (kept for signature parity)
  * @param rawSettings - Raw settings object (from RPC or buildFlagSettingsPatch)
  * @param state - Mutable state tracker (accumulated per process lifetime)
  */
@@ -92,6 +94,8 @@ export async function applyFlagSettings(
   rawSettings: Record<string, unknown>,
   state: AppliedSettingsState,
 ): Promise<ApplyResult> {
+  void query; // Reserved for future PTY hot-swap if Claude TUI grows one.
+
   // ── Validate ──
   const parsed = parseAndValidateSettings(rawSettings);
   if (!parsed.ok) {
@@ -108,15 +112,6 @@ export async function applyFlagSettings(
     return { applied: false, reason: "empty" };
   }
 
-  // ── Apply to SDK ──
-  try {
-    await query.applyFlagSettings(settings);
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    logger.debug(`[applyFlagSettings] SDK call failed: ${msg}`);
-    return { applied: false, reason: "sdk_error", error: msg };
-  }
-
   // ── Track state ──
   for (const key of keys) {
     if (settings[key] === null) {
@@ -129,7 +124,7 @@ export async function applyFlagSettings(
   state.lastAppliedAt = Date.now();
 
   logger.debug(
-    `[applyFlagSettings] Applied: ${keys.join(",")} (total applies: ${state.applyCount})`,
+    `[applyFlagSettings] Tracked: ${keys.join(",")} (total applies: ${state.applyCount})`,
   );
   return { applied: true, keys };
 }
@@ -147,6 +142,8 @@ export async function applyFlagSettingsFromModeDiff(
   next: EnhancedMode,
   state: AppliedSettingsState,
 ): Promise<ApplyResult> {
+  void query; // Reserved for future PTY hot-swap if Claude TUI grows one.
+
   const patch = buildFlagSettingsPatch(prev, next);
   if (!patch) {
     return { applied: false, reason: "empty" };
@@ -160,14 +157,6 @@ export async function applyFlagSettingsFromModeDiff(
   // of Settings — skip re-validation (it's already structurally correct).
   const settings = patch as Record<string, unknown>;
   const keys = Object.keys(settings);
-
-  try {
-    await query.applyFlagSettings(settings);
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    logger.debug(`[applyFlagSettings] SDK call failed (mode diff): ${msg}`);
-    return { applied: false, reason: "sdk_error", error: msg };
-  }
 
   // Track state
   for (const key of keys) {

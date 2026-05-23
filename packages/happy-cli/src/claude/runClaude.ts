@@ -111,8 +111,8 @@ export async function runClaude(
   let machineId = settings?.machineId;
   const sandboxConfig = options.noSandbox ? undefined : settings?.sandboxConfig;
 
-  // Build SDK plugin configs from enabled plugins in settings
-  const sdkPlugins = (settings?.plugins ?? [])
+  // Build claude plugin configs from enabled plugins in settings
+  const claudePlugins = (settings?.plugins ?? [])
     .filter((p) => p.enabled)
     .map((p) => ({ type: "local" as const, path: p.path }));
   const sandboxEnabled = Boolean(sandboxConfig?.enabled);
@@ -418,7 +418,7 @@ export async function runClaude(
       }
     },
     onStopFailure: (data) => {
-      // SDK always sends error as SDKAssistantMessageError string (e.g. 'billing_error')
+      // SDK always sends error as ClaudeJsonlAssistantMessageError string (e.g. 'billing_error')
       const errorType = data.error !== "unknown" ? (data.error ?? undefined) : undefined;
       const errorMsg = data.error_details
         ?? data.last_assistant_message
@@ -810,7 +810,7 @@ export async function runClaude(
       locale: messageLocale,
       ...(messageContinue && { continue: true }),
       ...(messageShouldQuery === false && { shouldQuery: false }),
-      ...(sdkPlugins.length > 0 && { plugins: sdkPlugins }),
+      ...(claudePlugins.length > 0 && { plugins: claudePlugins }),
       ...(perfSocketReceivedAt && { _perfSocketReceivedAt: perfSocketReceivedAt }),
     };
     messageQueue.push(

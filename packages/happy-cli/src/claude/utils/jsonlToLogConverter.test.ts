@@ -3,37 +3,37 @@
  */
 
 import { describe, it, expect, beforeEach } from "vitest";
-import { SDKToLogConverter, convertSDKToLog } from "./sdkToLogConverter";
+import { ClaudeJsonlToLogConverter, convertSDKToLog } from "./jsonlToLogConverter";
 import type {
-  SDKMessage,
-  SDKUserMessage,
-  SDKAssistantMessage,
-  SDKSystemMessage,
-  SDKResultMessage,
-} from "@/claude/sdk";
+  ClaudeJsonlMessage,
+  ClaudeJsonlUserMessage,
+  ClaudeJsonlAssistantMessage,
+  ClaudeJsonlSystemMessage,
+  ClaudeJsonlResultMessage,
+} from "@/claude/jsonl";
 
 // Helper to create test SDK messages with minimal required fields
 const userMsg = (
   content: string | Array<Record<string, unknown>>,
-): SDKUserMessage =>
+): ClaudeJsonlUserMessage =>
   ({
     type: "user",
     message: { role: "user", content },
     parent_tool_use_id: null,
     session_id: "test",
-  }) as unknown as SDKUserMessage;
+  }) as unknown as ClaudeJsonlUserMessage;
 
 const assistantMsg = (
   content: Array<Record<string, unknown>>,
-): SDKAssistantMessage =>
+): ClaudeJsonlAssistantMessage =>
   ({
     type: "assistant",
     message: { role: "assistant", content },
     parent_tool_use_id: null,
     session_id: "test",
-  }) as unknown as SDKAssistantMessage;
+  }) as unknown as ClaudeJsonlAssistantMessage;
 
-const systemMsg = (overrides: Record<string, unknown> = {}): SDKSystemMessage =>
+const systemMsg = (overrides: Record<string, unknown> = {}): ClaudeJsonlSystemMessage =>
   ({
     type: "system",
     subtype: "init",
@@ -51,9 +51,9 @@ const systemMsg = (overrides: Record<string, unknown> = {}): SDKSystemMessage =>
     plugins: [],
     uuid: "00000000-0000-0000-0000-000000000000" as `${string}-${string}-${string}-${string}-${string}`,
     ...overrides,
-  }) as unknown as SDKSystemMessage;
+  }) as unknown as ClaudeJsonlSystemMessage;
 
-const resultMsg = (overrides: Record<string, unknown> = {}): SDKResultMessage =>
+const resultMsg = (overrides: Record<string, unknown> = {}): ClaudeJsonlResultMessage =>
   ({
     type: "result",
     subtype: "success",
@@ -75,10 +75,10 @@ const resultMsg = (overrides: Record<string, unknown> = {}): SDKResultMessage =>
     permission_denials: [],
     uuid: "00000000-0000-0000-0000-000000000000" as `${string}-${string}-${string}-${string}-${string}`,
     ...overrides,
-  }) as unknown as SDKResultMessage;
+  }) as unknown as ClaudeJsonlResultMessage;
 
-describe("SDKToLogConverter", () => {
-  let converter: SDKToLogConverter;
+describe("ClaudeJsonlToLogConverter", () => {
+  let converter: ClaudeJsonlToLogConverter;
   const context = {
     sessionId: "test-session-123",
     cwd: "/test/project",
@@ -87,14 +87,14 @@ describe("SDKToLogConverter", () => {
   };
 
   beforeEach(() => {
-    converter = new SDKToLogConverter(context);
+    converter = new ClaudeJsonlToLogConverter(context);
   });
 
   describe("User messages", () => {
-    it("should convert SDK user message to log format", () => {
-      const sdkMessage = userMsg("Hello Claude");
+    it("should convert JSONL user message to log format", () => {
+      const jsonlMessage = userMsg("Hello Claude");
 
-      const logMessage = converter.convert(sdkMessage);
+      const logMessage = converter.convert(jsonlMessage);
 
       expect(logMessage).toBeTruthy();
       expect(logMessage?.type).toBe("user");
@@ -117,12 +117,12 @@ describe("SDKToLogConverter", () => {
     });
 
     it("should handle user message with complex content", () => {
-      const sdkMessage = userMsg([
+      const jsonlMessage = userMsg([
         { type: "text", text: "Check this out" },
         { type: "tool_result", tool_use_id: "tool123", content: "Result data" },
       ]);
 
-      const logMessage = converter.convert(sdkMessage);
+      const logMessage = converter.convert(jsonlMessage);
 
       expect(logMessage?.type).toBe("user");
       expect((logMessage as any).message.content).toHaveLength(2);
@@ -130,12 +130,12 @@ describe("SDKToLogConverter", () => {
   });
 
   describe("Assistant messages", () => {
-    it("should convert SDK assistant message to log format", () => {
-      const sdkMessage = assistantMsg([
+    it("should convert JSONL assistant message to log format", () => {
+      const jsonlMessage = assistantMsg([
         { type: "text", text: "Hello! How can I help?" },
       ]);
 
-      const logMessage = converter.convert(sdkMessage);
+      const logMessage = converter.convert(jsonlMessage);
 
       expect(logMessage).toBeTruthy();
       expect(logMessage?.type).toBe("assistant");
@@ -150,7 +150,7 @@ describe("SDKToLogConverter", () => {
     });
 
     it("should include requestId if present", () => {
-      const sdkMessage: any = {
+      const jsonlMessage: any = {
         type: "assistant",
         message: {
           role: "assistant",
@@ -159,22 +159,22 @@ describe("SDKToLogConverter", () => {
         requestId: "req_123",
       };
 
-      const logMessage = converter.convert(sdkMessage);
+      const logMessage = converter.convert(jsonlMessage);
 
       expect((logMessage as any).requestId).toBe("req_123");
     });
   });
 
   describe("System messages", () => {
-    it("should convert SDK system message to log format", () => {
-      const sdkMessage = systemMsg({
+    it("should convert JSONL system message to log format", () => {
+      const jsonlMessage = systemMsg({
         session_id: "new-session-456",
         model: "claude-opus-4",
         cwd: "/project",
         tools: ["bash", "edit"],
       });
 
-      const logMessage = converter.convert(sdkMessage);
+      const logMessage = converter.convert(jsonlMessage);
 
       expect(logMessage).toBeTruthy();
       expect(logMessage?.type).toBe("system");
@@ -187,9 +187,9 @@ describe("SDKToLogConverter", () => {
     });
 
     it("should update session ID on init system message", () => {
-      const sdkMessage = systemMsg({ session_id: "updated-session-789" });
+      const jsonlMessage = systemMsg({ session_id: "updated-session-789" });
 
-      converter.convert(sdkMessage);
+      converter.convert(jsonlMessage);
 
       // Next message should have updated session ID
       const nextMsg = userMsg("Test");
@@ -201,7 +201,7 @@ describe("SDKToLogConverter", () => {
 
   describe("Result messages", () => {
     it("should not convert result messages", () => {
-      const sdkMessage = resultMsg({
+      const jsonlMessage = resultMsg({
         result: "Task completed",
         num_turns: 5,
         usage: {
@@ -217,13 +217,13 @@ describe("SDKToLogConverter", () => {
         session_id: "result-session",
       });
 
-      const logMessage = converter.convert(sdkMessage);
+      const logMessage = converter.convert(jsonlMessage);
 
       expect(logMessage).toBeNull();
     });
 
     it("should not convert error results", () => {
-      const sdkMessage = resultMsg({
+      const jsonlMessage = resultMsg({
         subtype: "error_max_turns",
         num_turns: 10,
         total_cost_usd: 0.1,
@@ -234,7 +234,7 @@ describe("SDKToLogConverter", () => {
         errors: ["Max turns reached"],
       });
 
-      const logMessage = converter.convert(sdkMessage);
+      const logMessage = converter.convert(jsonlMessage);
 
       // Error results are not converted to summaries
       expect(logMessage).toBeFalsy();
@@ -271,7 +271,7 @@ describe("SDKToLogConverter", () => {
 
   describe("Batch conversion", () => {
     it("should convert multiple messages maintaining relationships", () => {
-      const messages: SDKMessage[] = [
+      const messages: ClaudeJsonlMessage[] = [
         userMsg("Hello"),
         assistantMsg([{ type: "text", text: "Hi there!" }]),
         userMsg("How are you?"),
@@ -288,9 +288,9 @@ describe("SDKToLogConverter", () => {
 
   describe("Convenience function", () => {
     it("should convert single message without state", () => {
-      const sdkMessage = userMsg("Test message");
+      const jsonlMessage = userMsg("Test message");
 
-      const logMessage = convertSDKToLog(sdkMessage, context);
+      const logMessage = convertSDKToLog(jsonlMessage, context);
 
       expect(logMessage).toBeTruthy();
       expect(logMessage?.type).toBe("user");
@@ -310,9 +310,9 @@ describe("SDKToLogConverter", () => {
       >();
       responses.set("tool_123", { approved: true, mode: "acceptEdits" });
 
-      const converterWithResponses = new SDKToLogConverter(context, responses);
+      const converterWithResponses = new ClaudeJsonlToLogConverter(context, responses);
 
-      const sdkMessage = userMsg([
+      const jsonlMessage = userMsg([
         {
           type: "tool_result",
           tool_use_id: "tool_123",
@@ -320,7 +320,7 @@ describe("SDKToLogConverter", () => {
         },
       ]);
 
-      const logMessage = converterWithResponses.convert(sdkMessage);
+      const logMessage = converterWithResponses.convert(jsonlMessage);
 
       expect(logMessage).toBeTruthy();
       expect((logMessage as any).mode).toBe("acceptEdits");
@@ -337,9 +337,9 @@ describe("SDKToLogConverter", () => {
         }
       >();
 
-      const converterWithResponses = new SDKToLogConverter(context, responses);
+      const converterWithResponses = new ClaudeJsonlToLogConverter(context, responses);
 
-      const sdkMessage = userMsg([
+      const jsonlMessage = userMsg([
         {
           type: "tool_result",
           tool_use_id: "tool_456",
@@ -347,7 +347,7 @@ describe("SDKToLogConverter", () => {
         },
       ]);
 
-      const logMessage = converterWithResponses.convert(sdkMessage);
+      const logMessage = converterWithResponses.convert(jsonlMessage);
 
       expect(logMessage).toBeTruthy();
       expect((logMessage as any).mode).toBeUndefined();
@@ -365,9 +365,9 @@ describe("SDKToLogConverter", () => {
       >();
       responses.set("tool_789", { approved: true, mode: "bypassPermissions" });
 
-      const converterWithResponses = new SDKToLogConverter(context, responses);
+      const converterWithResponses = new ClaudeJsonlToLogConverter(context, responses);
 
-      const sdkMessage = userMsg([
+      const jsonlMessage = userMsg([
         { type: "text", text: "Here is the result:" },
         {
           type: "tool_result",
@@ -376,7 +376,7 @@ describe("SDKToLogConverter", () => {
         },
       ]);
 
-      const logMessage = converterWithResponses.convert(sdkMessage);
+      const logMessage = converterWithResponses.convert(jsonlMessage);
 
       expect(logMessage).toBeTruthy();
       expect((logMessage as any).mode).toBe("bypassPermissions");
@@ -398,7 +398,7 @@ describe("SDKToLogConverter", () => {
         reason: "User rejected",
       });
 
-      const sdkMessage = userMsg([
+      const jsonlMessage = userMsg([
         {
           type: "tool_result",
           tool_use_id: "tool_abc",
@@ -406,7 +406,7 @@ describe("SDKToLogConverter", () => {
         },
       ]);
 
-      const logMessage = convertSDKToLog(sdkMessage, context, responses);
+      const logMessage = convertSDKToLog(jsonlMessage, context, responses);
 
       expect(logMessage).toBeTruthy();
       expect((logMessage as any).mode).toBe("plan");

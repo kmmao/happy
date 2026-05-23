@@ -11,7 +11,7 @@
  * applies E2E encryption — we do not add another encryption layer here.
  *
  * Stage 3A (plaintext-content tier):
- *   - get_session_cost: aggregates cost from `result` JSONL records
+ *   - get_session_cost: aggregates cost from ClaudeJsonlResultMessage stream
  *   - get_binary_version: reads `claude --version` via initializationResult()
  *     (empty in PTY mode — see ClaudePtyController for the contract)
  *   - set_color: stores session accent color in local session state (App also
@@ -33,15 +33,15 @@
 import { join, isAbsolute, resolve as resolvePath } from "node:path";
 import { homedir } from "node:os";
 import type { ClaudePtyController } from "@/claude/pty/claudePtyController";
-import type { SDKResultMessage } from "@/claude/sdk";
+import type { ClaudeJsonlResultMessage } from "@/claude/jsonl";
 // Session store: filesystem-backed (replaces SDK 0.3.143+ standalone exports).
 // See sessionStoreRpc.ts for the JSONL on-disk format and rationale.
 import {
-  listSessions as sdkListSessions,
-  getSessionInfo as sdkGetSessionInfo,
-  deleteSession as sdkDeleteSession,
-  renameSession as sdkRenameSession,
-  getSessionMessages as sdkGetSessionMessages,
+  listSessions,
+  getSessionInfo,
+  deleteSession,
+  renameSession,
+  getSessionMessages,
 } from "@/claude/rpc/sessionStoreRpc";
 import type { RpcHandlerManager } from "@/api/rpc/RpcHandlerManager";
 import { logger } from "@/ui/logger";
@@ -174,7 +174,7 @@ export class SessionCostTracker {
   >();
 
   /**
-   * Fold an SDKResultMessage-shaped record into the running tally. Callers
+   * Fold an ClaudeJsonlResultMessage-shaped record into the running tally. Callers
    * should invoke this on every SDK result turn; unknown shapes are ignored
    * and never throw.
    */
@@ -213,7 +213,7 @@ export class SessionCostTracker {
   }
 
   /**
-   * Fold an `SDKResultMessage` (either success or error subtype) into the
+   * Fold an `ClaudeJsonlResultMessage` (either success or error subtype) into the
    * running tally. Prefers the per-model `modelUsage` breakdown when
    * present, falling back to the aggregate `usage` + `total_cost_usd` pair
    * when the SDK did not report per-model data.
@@ -221,7 +221,7 @@ export class SessionCostTracker {
    * Both branches accumulate additively; never subtract. Call once per
    * result message the launcher sees.
    */
-  recordResult(msg: SDKResultMessage): void {
+  recordResult(msg: ClaudeJsonlResultMessage): void {
     try {
       const modelUsage = msg.modelUsage;
       const perModelKeys = modelUsage ? Object.keys(modelUsage) : [];
@@ -365,17 +365,17 @@ export function registerClaudeControlHandlers(
         return { result: null, deniedReason: "error" };
       }
       try {
-        const sdkResult = await q.readFile(req.path, {
+        const jsonlResult = await q.readFile(req.path, {
           maxBytes: req.maxBytes ?? 1024 * 1024,
         });
-        if (!sdkResult) {
+        if (!jsonlResult) {
           return { result: null, deniedReason: "permission_denied" };
         }
         return {
           result: {
-            contents: sdkResult.contents,
-            absPath: sdkResult.absPath,
-            truncated: sdkResult.truncated,
+            contents: jsonlResult.contents,
+            absPath: jsonlResult.absPath,
+            truncated: jsonlResult.truncated,
           },
         };
       } catch (e) {
@@ -423,9 +423,9 @@ export function registerClaudeControlHandlers(
       // TUI subprocess connects to MCP servers itself (via --mcp-config) and
       // exposes no IPC for happy-cli to call a single MCP tool out-of-band.
       // The historical SDK era was equally stuck — `@anthropic-ai/claude-
-      // agent-sdk@0.2.119` shipped the `SDKControlMcpCallRequest` protocol
-      // type in sdk.d.ts but never exposed a runtime `callMcpTool()` on
-      // `Query`. The `sdk_not_implemented` error code (kept for wire
+      // agent-sdk@0.2.119` shipped the `ClaudeJsonlControlMcpCallRequest`
+      // protocol type in sdk.d.ts but never exposed a runtime `callMcpTool()`
+      // on `Query`. The `sdk_not_implemented` error code (kept for wire
       // compatibility) signals exactly this: whitelist and confirm token
       // were accepted, but the underlying agent runtime has no entry point
       // to invoke.
@@ -622,7 +622,10 @@ export function registerClaudeControlHandlers(
     },
   );
 
-  // reconnect_mcp_server — reconnect a single server by name (SDK 0.3.142+)
+  // reconnect_mcp_server — no programmatic reconnect in PTY mode (Claude TUI
+  // owns the MCP lifecycle). We still respond `success: true` so the App's
+  // refresh action completes; the next `mcp_server_status` poll re-reads the
+  // live map and the user sees the current state.
   rpcHandlerManager.registerHandler<ReconnectMcpServerRequest, ReconnectMcpServerResponse>(
     `${scope}:reconnect_mcp_server`,
     async (req) => {
@@ -630,13 +633,12 @@ export function registerClaudeControlHandlers(
       if (!q) {
         throw new Error("No active query — cannot reconnect MCP server");
       }
-      await q.reconnectMcpServer(req.serverName);
-      logger.debug(`[claudeControl] reconnect_mcp_server server=${req.serverName}`);
+      logger.debug(`[claudeControl] reconnect_mcp_server server=${req.serverName} (no-op under PTY)`);
       return { success: true };
     },
   );
 
-  // toggle_mcp_server — enable/disable a server without removing config (SDK 0.3.142+)
+  // toggle_mcp_server — enable/disable a server without removing config.
   //
   // PTY mode has no programmatic toggle API in the Claude TUI, so we
   // implement the behaviour ourselves:
@@ -646,10 +648,6 @@ export function registerClaudeControlHandlers(
   //      Claude Code reads it natively.
   //   3. Mutate the live in-memory MCP map in place so the App's MCP panel
   //      reflects the new `disabled` flag on its next poll (no restart).
-  //
-  // We still call q.toggleMcpServer afterwards: in SDK mode it does the
-  // real SDK toggle; in PTY mode it is a no-op debug log. Either way the
-  // disk + in-memory state already match.
   rpcHandlerManager.registerHandler<ToggleMcpServerRequest, ToggleMcpServerResponse>(
     `${scope}:toggle_mcp_server`,
     async (req) => {
@@ -694,7 +692,6 @@ export function registerClaudeControlHandlers(
         }
       }
 
-      await q.toggleMcpServer(req.serverName, req.enabled);
       logger.debug(
         `[claudeControl] toggle_mcp_server server=${req.serverName} enabled=${req.enabled} disabledList=[${nextDisabled.join(",")}]`,
       );
@@ -787,7 +784,7 @@ export function registerClaudeControlHandlers(
     `${scope}:list_sessions`,
     async (req) => {
       try {
-        const sessions = await sdkListSessions({
+        const sessions = await listSessions({
           dir: req.dir,
           limit: req.limit,
           offset: req.offset,
@@ -818,7 +815,7 @@ export function registerClaudeControlHandlers(
     `${scope}:get_session_info`,
     async (req) => {
       try {
-        const info = await sdkGetSessionInfo(req.targetSessionId, {
+        const info = await getSessionInfo(req.targetSessionId, {
           dir: req.dir,
         });
         if (!info) return { session: null };
@@ -848,7 +845,7 @@ export function registerClaudeControlHandlers(
     `${scope}:delete_session`,
     async (req) => {
       logger.debug(`[claudeControl] delete_session id=${req.targetSessionId}`);
-      await sdkDeleteSession(req.targetSessionId, { dir: req.dir });
+      await deleteSession(req.targetSessionId, { dir: req.dir });
       return { success: true };
     },
   );
@@ -858,7 +855,7 @@ export function registerClaudeControlHandlers(
     `${scope}:rename_session`,
     async (req) => {
       logger.debug(`[claudeControl] rename_session id=${req.targetSessionId} title=${req.title}`);
-      await sdkRenameSession(req.targetSessionId, req.title, { dir: req.dir });
+      await renameSession(req.targetSessionId, req.title, { dir: req.dir });
       return { success: true };
     },
   );
@@ -868,7 +865,7 @@ export function registerClaudeControlHandlers(
     `${scope}:get_session_messages`,
     async (req) => {
       try {
-        const msgs = await sdkGetSessionMessages(req.targetSessionId, {
+        const msgs = await getSessionMessages(req.targetSessionId, {
           dir: req.dir,
           limit: req.limit,
           offset: req.offset,
