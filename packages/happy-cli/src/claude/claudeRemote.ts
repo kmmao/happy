@@ -339,6 +339,17 @@ export async function claudeRemote(opts: {
       supportsAdaptiveThinking?: boolean | null;
     }>;
   }) => void;
+  /**
+   * Lets the caller subscribe us to its external session-id discovery channel
+   * (typically `Session.addSessionFoundCallback`, fed by the SessionStart
+   * hook). Without this, a fresh PTY-mode session never tells its scanner
+   * what JSONL file to watch — `opts.sessionId` is null on first start and
+   * the scanner only learns ids through records it has already produced
+   * (chicken-and-egg). Caller returns an unsubscribe fn we invoke at exit.
+   */
+  registerSessionFoundCallback?: (
+    cb: (sessionId: string) => void,
+  ) => (() => void) | void;
 }): Promise<void> {
   // Check whether the requested session id is still resumable on disk.
   let startFrom = opts.sessionId;
@@ -857,6 +868,20 @@ export async function claudeRemote(opts: {
     },
   });
 
+  // Subscribe to the caller's external session-id channel (typically fed by
+  // the SessionStart hook in runClaude.ts). This is the only way a fresh
+  // PTY-mode session learns which JSONL file the TUI is writing to before
+  // the scanner has anything to read. Idempotent on the scanner side, so
+  // a later in-band discovery via onMessage will no-op.
+  const unsubscribeSessionFound = opts.registerSessionFoundCallback?.((sid) => {
+    if (seenSessionIds.has(sid)) return;
+    seenSessionIds.add(sid);
+    logger.debug(
+      `[claudeRemote] external session-id notification: ${sid} — handing to scanner`,
+    );
+    scanner.onNewSession(sid).catch(() => undefined);
+  });
+
   // Mid-turn user input from the App composer — writes straight to PTY.
   // Callback is sync, so we fire-and-forget the readiness wait; in practice
   // the user can't compose a message faster than ~800ms after spawn anyway.
@@ -882,6 +907,9 @@ export async function claudeRemote(opts: {
     }
   } finally {
     updateThinking(false);
+    if (typeof unsubscribeSessionFound === "function") {
+      try { unsubscribeSessionFound(); } catch { /* best-effort */ }
+    }
     try {
       await scanner.cleanup();
     } catch (e) {

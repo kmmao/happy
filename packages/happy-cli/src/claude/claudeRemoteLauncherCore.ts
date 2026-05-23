@@ -2190,6 +2190,15 @@ export async function claudeRemoteLauncher(
             sdkToLogConverter.updateSessionId(sessionId);
             session.onSessionFound(sessionId);
           },
+          // Wire the hookServer-driven session-id channel into claudeRemote so
+          // its internal scanner learns which JSONL file to watch as soon as
+          // Claude's SessionStart hook fires. Without this, fresh PTY-mode
+          // sessions silently sit watching nothing while the TUI happily
+          // writes user/assistant records into a file no one is reading.
+          registerSessionFoundCallback: (cb) => {
+            session.addSessionFoundCallback(cb);
+            return () => session.removeSessionFoundCallback(cb);
+          },
           onThinkingChange: session.onThinkingChange,
           claudeEnvVars: session.claudeEnvVars,
           claudeArgs: session.claudeArgs,
