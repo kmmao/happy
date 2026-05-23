@@ -1,5 +1,17 @@
 # Changelog
 
+## 2.31.0 - 2026-05-24
+
+Removes the obsolete "move to background" button from the Claude session input bar. The button was a holdover from the SDK era when Happy CLI ran Claude through a programmatic SDK and could relocate foreground Bash/sub-agent calls to the background on demand. After the move to PTY mode, the CLI no longer has a programmatic hook for that action and the button became a silent no-op.
+
+### Cleanup
+- Removed the background-tasks button from the input bar — it has had no effect since the PTY migration
+- Removed the related `onBackgroundTasks` prop on `AgentInput` and the `sessionBackgroundTasks` op so dead code paths don't quietly drift
+- Kept the CLI's `backgroundTasks` RPC handler as a no-op stub so older app builds still get a clean response instead of an unknown-RPC error
+
+### Background-Task Bar (unchanged)
+- Preserved the separate floating Background Task Bar above the input — which surfaces running Bash background processes and sub-agents — untouched; only the SDK-era "send to background" button is gone
+
 ## 2.30.0 - 2026-05-22
 
 Internal robustness pass on the background-task pipeline. No new features in this release — the change makes race conditions and out-of-order SDK events in the floating task bar fail loudly during development instead of silently leaving a task showing the wrong status.

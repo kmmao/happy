@@ -351,6 +351,11 @@ export async function claudeRemoteLauncher(
   async function doBackgroundTasks(args: { toolUseId?: string }) {
     // PTY mode has no programmatic background-task inspection. Return false
     // so the App treats the move-to-background request as not-implemented.
+    //
+    // Note: the corresponding UI button was removed from happy-app in 2.31.0
+    // (commit removing AgentInput Background Tasks button). This handler is
+    // retained as a no-op stub so older App builds calling the RPC still get
+    // a clean { success: false } response instead of an "unknown RPC" error.
     logger.debug(`[remote]: doBackgroundTasks — toolUseId=${args.toolUseId ?? "all"} (no PTY equivalent)`);
     return { success: false };
   }
