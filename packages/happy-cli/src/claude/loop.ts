@@ -5,7 +5,7 @@ import { Session } from "./session";
 import { ApiClient } from "@/lib";
 import type { JsRuntime } from "./runClaude";
 import type { SandboxConfig } from "@/persistence";
-import type { ThinkingConfig, AgentDefinition, OutputFormat, SdkBeta, SdkPluginConfig, EffortLevel } from "./sdk/types";
+import type { ThinkingConfig, AgentDefinition, OutputFormat, ClaudeJsonlBeta, ClaudeJsonlPluginConfig, EffortLevel } from "./jsonl/types";
 import { claudeLocalLauncher } from "./claudeLocalLauncher";
 import { claudeRemoteLauncher } from "./claudeRemoteLauncher";
 
@@ -43,7 +43,7 @@ export interface EnhancedMode {
    */
   shouldQuery?: boolean;
   /** Enable beta features (e.g. 1M context window) */
-  betas?: SdkBeta[];
+  betas?: ClaudeJsonlBeta[];
   /** Agent name for the main thread */
   agent?: string;
   /** Custom subagent definitions */
@@ -51,7 +51,7 @@ export interface EnhancedMode {
   /** Structured output format (JSON schema) */
   outputFormat?: OutputFormat;
   /** Plugins to load for this session */
-  plugins?: SdkPluginConfig[];
+  plugins?: ClaudeJsonlPluginConfig[];
   /** Additional directories Claude can access */
   additionalDirectories?: string[];
   /** Perf tracking: timestamp when socket first received this message */

@@ -6,11 +6,11 @@
 import { randomUUID } from "node:crypto";
 import { execSync } from "node:child_process";
 import type {
-  SDKMessage,
-  SDKUserMessage,
-  SDKAssistantMessage,
-  SDKSystemMessage,
-} from "@/claude/sdk";
+  ClaudeJsonlMessage,
+  ClaudeJsonlUserMessage,
+  ClaudeJsonlAssistantMessage,
+  ClaudeJsonlSystemMessage,
+} from "@/claude/jsonl";
 import type { RawJSONLines } from "@/claude/types";
 
 /**
@@ -18,8 +18,8 @@ import type { RawJSONLines } from "@/claude/types";
  * Many SDK message subtypes carry this field, but not all union members.
  */
 function hasParentToolUseId(
-  msg: SDKMessage,
-): msg is SDKMessage & { parent_tool_use_id: string | null } {
+  msg: ClaudeJsonlMessage,
+): msg is ClaudeJsonlMessage & { parent_tool_use_id: string | null } {
   return "parent_tool_use_id" in msg;
 }
 
@@ -27,7 +27,7 @@ function hasParentToolUseId(
  * Extended assistant message with runtime-only `requestId` field
  * that the SDK type doesn't declare but Claude Code emits at runtime.
  */
-type ExtendedSDKAssistantMessage = SDKAssistantMessage & {
+type ExtendedSDKAssistantMessage = ClaudeJsonlAssistantMessage & {
   requestId?: string;
 };
 
@@ -62,7 +62,7 @@ function getGitBranch(cwd: string): string | undefined {
  * SDK to Log converter class
  * Maintains state for parent-child relationships between messages
  */
-export class SDKToLogConverter {
+export class ClaudeJsonlToLogConverter {
   private lastUuid: string | null = null;
   private context: ConversionContext;
   private responses?: Map<
@@ -125,16 +125,16 @@ export class SDKToLogConverter {
   /**
    * Convert SDK message to log format
    */
-  convert(sdkMessage: SDKMessage): RawJSONLines | null {
+  convert(jsonlMessage: ClaudeJsonlMessage): RawJSONLines | null {
     const uuid = randomUUID();
     const timestamp = new Date().toISOString();
     let parentUuid = this.lastUuid;
     let isSidechain = false;
-    if (hasParentToolUseId(sdkMessage) && sdkMessage.parent_tool_use_id) {
+    if (hasParentToolUseId(jsonlMessage) && jsonlMessage.parent_tool_use_id) {
       isSidechain = true;
       parentUuid =
-        this.sidechainLastUUID.get(sdkMessage.parent_tool_use_id) ?? null;
-      this.sidechainLastUUID.set(sdkMessage.parent_tool_use_id, uuid);
+        this.sidechainLastUUID.get(jsonlMessage.parent_tool_use_id) ?? null;
+      this.sidechainLastUUID.set(jsonlMessage.parent_tool_use_id, uuid);
     }
     const baseFields = {
       parentUuid: parentUuid,
@@ -150,9 +150,9 @@ export class SDKToLogConverter {
 
     let logMessage: RawJSONLines | null = null;
 
-    switch (sdkMessage.type) {
+    switch (jsonlMessage.type) {
       case "user": {
-        const userMsg = sdkMessage as SDKUserMessage;
+        const userMsg = jsonlMessage as ClaudeJsonlUserMessage;
         // The SDK marks context-only injections (e.g. Skill tool
         // feeding the skill body back into the conversation) as
         // `isSynthetic: true` in memory; on disk claude writes the
@@ -194,7 +194,7 @@ export class SDKToLogConverter {
       }
 
       case "assistant": {
-        const assistantMsg = sdkMessage as ExtendedSDKAssistantMessage;
+        const assistantMsg = jsonlMessage as ExtendedSDKAssistantMessage;
         logMessage = {
           ...baseFields,
           type: "assistant",
@@ -216,7 +216,7 @@ export class SDKToLogConverter {
       }
 
       case "system": {
-        const systemMsg = sdkMessage as SDKSystemMessage;
+        const systemMsg = jsonlMessage as ClaudeJsonlSystemMessage;
 
         // System messages with subtype 'init' might update session ID
         if (systemMsg.subtype === "init" && systemMsg.session_id) {
@@ -244,15 +244,15 @@ export class SDKToLogConverter {
         break;
       }
 
-      // Note: "tool_result" is not a standalone SDKMessage type in the SDK;
+      // Note: "tool_result" is not a standalone ClaudeJsonlMessage type in the SDK;
       // tool results arrive as content inside "user" messages (handled above).
 
       default:
         // Unknown message type - pass through with all fields
         logMessage = {
           ...baseFields,
-          ...(sdkMessage as unknown as Record<string, unknown>),
-          type: (sdkMessage as SDKMessage & { type: string }).type,
+          ...(jsonlMessage as unknown as Record<string, unknown>),
+          type: (jsonlMessage as ClaudeJsonlMessage & { type: string }).type,
         } as RawJSONLines;
     }
 
@@ -267,8 +267,8 @@ export class SDKToLogConverter {
   /**
    * Convert multiple SDK messages to log format
    */
-  convertMany(sdkMessages: SDKMessage[]): RawJSONLines[] {
-    return sdkMessages
+  convertMany(jsonlMessages: ClaudeJsonlMessage[]): RawJSONLines[] {
+    return jsonlMessages
       .map((msg) => this.convert(msg))
       .filter((msg): msg is RawJSONLines => msg !== null);
   }
@@ -366,7 +366,7 @@ export class SDKToLogConverter {
  * Convenience function for one-off conversions
  */
 export function convertSDKToLog(
-  sdkMessage: SDKMessage,
+  jsonlMessage: ClaudeJsonlMessage,
   context: Omit<ConversionContext, "parentUuid">,
   responses?: Map<
     string,
@@ -383,6 +383,6 @@ export function convertSDKToLog(
     }
   >,
 ): RawJSONLines | null {
-  const converter = new SDKToLogConverter(context, responses);
-  return converter.convert(sdkMessage);
+  const converter = new ClaudeJsonlToLogConverter(context, responses);
+  return converter.convert(jsonlMessage);
 }

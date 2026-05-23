@@ -1,21 +1,21 @@
 import chalk from 'chalk';
-import type { SDKMessage, SDKAssistantMessage, SDKResultMessage, SDKSystemMessage, SDKUserMessage } from '@/claude/sdk';
+import type { ClaudeJsonlMessage, ClaudeJsonlAssistantMessage, ClaudeJsonlResultMessage, ClaudeJsonlSystemMessage, ClaudeJsonlUserMessage } from '@/claude/jsonl';
 import { logger } from './logger';
 
-export type OnAssistantResultCallback = (result: SDKResultMessage) => void | Promise<void>;
+export type OnAssistantResultCallback = (result: ClaudeJsonlResultMessage) => void | Promise<void>;
 
 /**
  * Formats Claude SDK messages for terminal display
  */
 export function formatClaudeMessage(
-    message: SDKMessage,
+    message: ClaudeJsonlMessage,
     onAssistantResult?: OnAssistantResultCallback
 ): void {
     logger.debugLargeJson('[CLAUDE] Message from non interactive & remote mode:', message)
 
     switch (message.type) {
         case 'system': {
-            const sysMsg = message as SDKSystemMessage;
+            const sysMsg = message as ClaudeJsonlSystemMessage;
             if (sysMsg.subtype === 'init') {
                 logger.print(chalk.gray('─'.repeat(60)));
                 logger.print(chalk.blue.bold('🚀 Session initialized:'), chalk.cyan(sysMsg.session_id ?? 'pending'));
@@ -30,7 +30,7 @@ export function formatClaudeMessage(
         }
 
         case 'user': {
-            const userMsg = message as SDKUserMessage;
+            const userMsg = message as ClaudeJsonlUserMessage;
             // Handle different types of user message content
             if (userMsg.message && typeof userMsg.message === 'object' && 'content' in userMsg.message) {
                 const content = userMsg.message.content;
@@ -69,7 +69,7 @@ export function formatClaudeMessage(
         }
 
         case 'assistant': {
-            const assistantMsg = message as SDKAssistantMessage;
+            const assistantMsg = message as ClaudeJsonlAssistantMessage;
             if (assistantMsg.message && assistantMsg.message.content) {
                 logger.print(chalk.cyan.bold('\n🤖 Assistant:'));
                 
@@ -95,7 +95,7 @@ export function formatClaudeMessage(
         }
 
         case 'result': {
-            const resultMsg = message as SDKResultMessage;
+            const resultMsg = message as ClaudeJsonlResultMessage;
             if (resultMsg.subtype === 'success') {
                 if ('result' in resultMsg && resultMsg.result) {
                     logger.print(chalk.green.bold('\n✨ Summary:'));

@@ -76,7 +76,7 @@ export interface SessionHookData {
 export interface StopFailureHookData {
     hook_event_name: 'StopFailure';
     session_id?: string;
-    /** SDKAssistantMessageError string (e.g. 'billing_error', 'rate_limit'). Optional for forward compat. */
+    /** ClaudeJsonlAssistantMessageError string (e.g. 'billing_error', 'rate_limit'). Optional for forward compat. */
     error?: string;
     error_details?: string;
     last_assistant_message?: string;

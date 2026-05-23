@@ -8,7 +8,7 @@
  * `query()` and iterated its async stream. Post-migration it spawns the
  * user's `claude` TUI binary directly under `node-pty`, watches the JSONL
  * session file written by claude under `~/.claude/projects/<…>/`, and
- * converts each record into the same `SDKMessage`-shaped object the rest
+ * converts each record into the same `ClaudeJsonlMessage`-shaped object the rest
  * of the pipeline expects.
  *
  * Lifecycle
@@ -17,7 +17,7 @@
  *   2. Spawn the PTY (`startClaudePty`) + wrap with a `ClaudePtyController`
  *      that exposes the small surface PTY mode actually supports.
  *   3. Install a `sessionScanner` watching the project JSONL — every record
- *      is converted via `rawToSdkMessage` and forwarded to `opts.onMessage`.
+ *      is converted via `rawToJsonlMessage` and forwarded to `opts.onMessage`.
  *   4. Write the initial user prompt to PTY stdin.
  *   5. On each `result` record, observe the mode diff (no live hot-swap
  *      possible in PTY mode — the launcher's coldModeHash drives any real
@@ -38,12 +38,12 @@
 
 import { EnhancedMode } from "./loop";
 import type {
-  SDKMessage,
-  SDKUserMessage,
-  SdkBeta,
-} from "@/claude/sdk";
-import { AbortError } from "@/claude/sdk";
-import type { OnElicitation } from "@/claude/sdk/types";
+  ClaudeJsonlMessage,
+  ClaudeJsonlUserMessage,
+  ClaudeJsonlBeta,
+} from "@/claude/jsonl";
+import { AbortError } from "@/claude/jsonl";
+import type { OnElicitation } from "@/claude/jsonl/types";
 import { mapToClaudeMode } from "./utils/permissionMode";
 import {
   applyFlagSettingsFromModeDiff,
@@ -56,7 +56,7 @@ import { executeShellCommand } from "@/utils/shellCommand";
 import { logger } from "@/lib";
 import { systemPrompt } from "./utils/systemPrompt";
 import { buildLocaleInstruction } from "./utils/localeInstruction";
-import { PermissionResult } from "./sdk/types";
+import { PermissionResult } from "./jsonl/types";
 import type { JsRuntime } from "./runClaude";
 import { startClaudePty, type ClaudePtyHandle } from "@/claude/pty/claudePtyRuntime";
 import {
@@ -65,7 +65,7 @@ import {
   type UsageSnapshot,
 } from "@/claude/pty/claudePtyController";
 import { buildClaudeCliFlags } from "@/claude/pty/claudeCliFlags";
-import { rawToSdkMessage } from "@/claude/pty/rawToSdkMessage";
+import { rawToJsonlMessage } from "@/claude/pty/rawToJsonlMessage";
 import { attachClaudePtyRouter } from "@/claude/pty/claudePtyRouter";
 import {
   bridgeAttach,
@@ -109,7 +109,7 @@ export function resolveModelKey(
 }
 
 /** Beta tag required to enable 1M-token context window. */
-const BETA_1M: SdkBeta = "context-1m-2025-08-07";
+const BETA_1M: ClaudeJsonlBeta = "context-1m-2025-08-07";
 
 /**
  * Returns true when the given App model key should use the 1M context window.
@@ -136,10 +136,10 @@ export function is1MModelKey(modelKey: string | undefined): boolean {
  */
 export function buildBetasForModel(
   modelKey: string | undefined,
-  extraBetas?: SdkBeta[],
-): SdkBeta[] | undefined {
+  extraBetas?: ClaudeJsonlBeta[],
+): ClaudeJsonlBeta[] | undefined {
   const needs1M = is1MModelKey(modelKey);
-  const base: SdkBeta[] = needs1M ? [BETA_1M] : [];
+  const base: ClaudeJsonlBeta[] = needs1M ? [BETA_1M] : [];
   if (!extraBetas?.length) return base.length ? base : undefined;
   const merged = [...base];
   for (const b of extraBetas) {
@@ -155,7 +155,7 @@ export function buildBetasForModel(
  * string for PTY stdin. The TUI consumes plain text; structured content
  * (tool_result, image, etc.) cannot be re-injected mid-turn anyway.
  */
-function flattenUserContent(msg: SDKUserMessage): string {
+function flattenUserContent(msg: ClaudeJsonlUserMessage): string {
   const content = msg.message?.content;
   if (typeof content === "string") return content;
   if (!Array.isArray(content)) return "";
@@ -295,7 +295,7 @@ export async function claudeRemote(opts: {
   // Callbacks
   onSessionFound: (id: string) => void;
   onThinkingChange?: (thinking: boolean) => void;
-  onMessage: (message: SDKMessage) => void;
+  onMessage: (message: ClaudeJsonlMessage) => void;
   onCompletionEvent?: (message: string) => void;
   onShellResult?: (output: string) => void;
   onSessionReset?: () => void;
@@ -324,7 +324,7 @@ export async function claudeRemote(opts: {
    */
   onQueryReady?: (query: ClaudePtyController) => void;
   /** Exposes mid-turn user-input push (writes to PTY stdin). */
-  onMessagesReady?: (push: (msg: SDKUserMessage) => void) => void;
+  onMessagesReady?: (push: (msg: ClaudeJsonlUserMessage) => void) => void;
   /** Called with context-window usage breakdown after each turn — null in PTY mode. */
   onContextUsage?: (usage: {
     totalTokens: number;
@@ -484,7 +484,7 @@ export async function claudeRemote(opts: {
   };
 
   // Spawn the PTY and surface the controller stub.
-  const sdkCallAt = Date.now();
+  const ptyCallAt = Date.now();
   let pty: ClaudePtyHandle;
   try {
     pty = startClaudePty({
@@ -510,7 +510,7 @@ export async function claudeRemote(opts: {
   );
   opts.onQueryReady?.(controller);
   logger.debug(
-    `[perf] sdk query() call completed (sync part): ${Date.now() - sdkCallAt}ms`,
+    `[perf] PTY spawn completed (sync part): ${Date.now() - ptyCallAt}ms`,
   );
 
   // Gate every prompt write on the TUI being ready to receive keystrokes.
@@ -863,7 +863,7 @@ export async function claudeRemote(opts: {
   };
 
   // Set up the JSONL session scanner. Every raw record becomes an
-  // SDKMessage-shaped object and is forwarded to opts.onMessage; result
+  // ClaudeJsonlMessage-shaped object and is forwarded to opts.onMessage; result
   // records additionally drive the turn loop.
   const scanner = await createSessionScanner({
     sessionId: startFrom,
@@ -872,14 +872,14 @@ export async function claudeRemote(opts: {
       if (!firstResponseLogged) {
         firstResponseLogged = true;
         logger.debug(
-          `[perf] sdk_call → first_response: ${Date.now() - sdkCallAt}ms (type=${raw.type})`,
+          `[perf] sdk_call → first_response: ${Date.now() - ptyCallAt}ms (type=${raw.type})`,
         );
       }
 
-      const sdkMsg = rawToSdkMessage(raw);
-      if (sdkMsg) {
-        logger.debugLargeJson(`[claudeRemote] onMessageReceived ${raw.type}`, sdkMsg);
-        opts.onMessage(sdkMsg);
+      const jsonlMsg = rawToJsonlMessage(raw);
+      if (jsonlMsg) {
+        logger.debugLargeJson(`[claudeRemote] onMessageReceived ${raw.type}`, jsonlMsg);
+        opts.onMessage(jsonlMsg);
       }
 
       // Update the shared usage snapshot so controller.getContextUsage()

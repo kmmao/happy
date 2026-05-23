@@ -1,14 +1,14 @@
-import type { SDKMessage, SDKAssistantMessage, SDKResultMessage, SDKSystemMessage, SDKUserMessage } from '@/claude/sdk'
+import type { ClaudeJsonlMessage, ClaudeJsonlAssistantMessage, ClaudeJsonlResultMessage, ClaudeJsonlSystemMessage, ClaudeJsonlUserMessage } from '@/claude/jsonl'
 import type { MessageBuffer } from './ink/messageBuffer'
 import { logger } from './logger'
 
-export type OnAssistantResultInkCallback = (result: SDKResultMessage, messageBuffer: MessageBuffer) => void | Promise<void>
+export type OnAssistantResultInkCallback = (result: ClaudeJsonlResultMessage, messageBuffer: MessageBuffer) => void | Promise<void>
 
 /**
  * Formats Claude SDK messages for Ink display
  */
 export function formatClaudeMessageForInk(
-    message: SDKMessage,
+    message: ClaudeJsonlMessage,
     messageBuffer: MessageBuffer,
     onAssistantResult?: OnAssistantResultInkCallback
 ): void {
@@ -16,7 +16,7 @@ export function formatClaudeMessageForInk(
 
     switch (message.type) {
         case 'system': {
-            const sysMsg = message as SDKSystemMessage
+            const sysMsg = message as ClaudeJsonlSystemMessage
             if (sysMsg.subtype === 'init') {
                 messageBuffer.addMessage('─'.repeat(40), 'status')
                 messageBuffer.addMessage(`🚀 Session initialized: ${sysMsg.session_id ?? 'pending'}`, 'system')
@@ -31,7 +31,7 @@ export function formatClaudeMessageForInk(
         }
 
         case 'user': {
-            const userMsg = message as SDKUserMessage
+            const userMsg = message as ClaudeJsonlUserMessage
             if (userMsg.message && typeof userMsg.message === 'object' && 'content' in userMsg.message) {
                 const content = userMsg.message.content
                 
@@ -66,7 +66,7 @@ export function formatClaudeMessageForInk(
         }
 
         case 'assistant': {
-            const assistantMsg = message as SDKAssistantMessage
+            const assistantMsg = message as ClaudeJsonlAssistantMessage
             if (assistantMsg.message && assistantMsg.message.content) {
                 messageBuffer.addMessage('🤖 Assistant:', 'assistant')
                 
@@ -91,7 +91,7 @@ export function formatClaudeMessageForInk(
         }
 
         case 'result': {
-            const resultMsg = message as SDKResultMessage
+            const resultMsg = message as ClaudeJsonlResultMessage
             if (resultMsg.subtype === 'success') {
                 if ('result' in resultMsg && resultMsg.result) {
                     messageBuffer.addMessage('✨ Summary:', 'result')

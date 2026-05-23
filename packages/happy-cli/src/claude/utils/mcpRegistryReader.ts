@@ -36,12 +36,12 @@ export async function fetchMcpRegistryServers(
     }
 
     const registry = parseMcpRegistry(kvItem.value);
-    const sdkConfig = registryToSdkConfig(registry, machineId);
-    const serverNames = Object.keys(sdkConfig);
+    const mcpConfig = registryToSdkConfig(registry, machineId);
+    const serverNames = Object.keys(mcpConfig);
     logger.debug(
       `[mcpRegistry] Loaded ${serverNames.length} servers from registry: ${serverNames.join(", ")}`,
     );
-    return sdkConfig;
+    return mcpConfig;
   } catch (e) {
     logger.debug("[mcpRegistry] Failed to fetch MCP registry, using local config only", e);
     return {};
