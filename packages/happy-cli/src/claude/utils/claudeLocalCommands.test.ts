@@ -159,4 +159,97 @@ describe("collectClaudeLocalCommands", () => {
     expect(result.slashCommands).toEqual(["bare"]);
     expect(result.slashCommandDescriptions).toEqual({});
   });
+
+  it("picks up project-level skills via SKILL.md", async () => {
+    const skillDir = join(cwd, ".claude", "skills", "release-cli");
+    mkdirSync(skillDir, { recursive: true });
+    writeFileSync(
+      join(skillDir, "SKILL.md"),
+      `---\nname: release-cli\ndescription: Publish CLI to npm\n---\n\n# Release CLI\n`,
+    );
+
+    const result = await collectClaudeLocalCommands({ cwd, userHome });
+    expect(result.slashCommands).toEqual(["release-cli"]);
+    expect(result.slashCommandDescriptions).toEqual({
+      "release-cli": "Publish CLI to npm",
+    });
+  });
+
+  it("picks up user-level skills", async () => {
+    const skillDir = join(userHome, ".claude", "skills", "debug-issue");
+    mkdirSync(skillDir, { recursive: true });
+    writeFileSync(
+      join(skillDir, "SKILL.md"),
+      `---\nname: debug-issue\ndescription: Diagnose a runtime issue\n---\n`,
+    );
+
+    const result = await collectClaudeLocalCommands({ cwd, userHome });
+    expect(result.slashCommands).toEqual(["debug-issue"]);
+    expect(result.slashCommandDescriptions["debug-issue"]).toBe(
+      "Diagnose a runtime issue",
+    );
+  });
+
+  it("namespaces plugin skills with the plugin name", async () => {
+    const pluginDir = join(testRoot, "plugins", "codex");
+    const pluginSkillDir = join(pluginDir, "skills", "codex-cli-runtime");
+    mkdirSync(pluginSkillDir, { recursive: true });
+    writeFileSync(
+      join(pluginSkillDir, "SKILL.md"),
+      `---\nname: codex-cli-runtime\ndescription: Run codex CLI tasks\n---\n`,
+    );
+
+    const manifestDir = join(userHome, ".claude", "plugins");
+    mkdirSync(manifestDir, { recursive: true });
+    writeFileSync(
+      join(manifestDir, "installed_plugins.json"),
+      JSON.stringify({
+        version: 2,
+        plugins: {
+          "codex@claude-plugins-official": [{ installPath: pluginDir }],
+        },
+      }),
+    );
+
+    const result = await collectClaudeLocalCommands({ cwd, userHome });
+    expect(result.slashCommands).toEqual(["codex:codex-cli-runtime"]);
+    expect(result.slashCommandDescriptions).toEqual({
+      "codex:codex-cli-runtime": "Run codex CLI tasks",
+    });
+  });
+
+  it("ignores flat .md skill files (only directory form is recognised)", async () => {
+    const dir = join(cwd, ".claude", "skills");
+    mkdirSync(dir, { recursive: true });
+    // Flat file — Claude TUI does not register these as user-invocable.
+    writeFileSync(
+      join(dir, "flat-skill.md"),
+      `---\ndescription: This should not be picked up\n---\n`,
+    );
+
+    const result = await collectClaudeLocalCommands({ cwd, userHome });
+    expect(result.slashCommands).toEqual([]);
+  });
+
+  it("merges commands and skills into the same namespace", async () => {
+    mkdirSync(join(cwd, ".claude", "commands"), { recursive: true });
+    writeFileSync(
+      join(cwd, ".claude", "commands", "deploy.md"),
+      `Deploy command`,
+    );
+
+    const skillDir = join(cwd, ".claude", "skills", "release-cli");
+    mkdirSync(skillDir, { recursive: true });
+    writeFileSync(
+      join(skillDir, "SKILL.md"),
+      `---\ndescription: Publish CLI\n---\n`,
+    );
+
+    const result = await collectClaudeLocalCommands({ cwd, userHome });
+    expect(result.slashCommands).toEqual(["deploy", "release-cli"]);
+    expect(result.slashCommandDescriptions).toEqual({
+      deploy: "Deploy command",
+      "release-cli": "Publish CLI",
+    });
+  });
 });

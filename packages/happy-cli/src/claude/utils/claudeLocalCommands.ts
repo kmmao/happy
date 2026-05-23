@@ -1,6 +1,7 @@
 /**
  * claudeLocalCommands — discover Claude Code slash commands by scanning the
- * on-disk command directories that `claude` TUI itself reads at launch.
+ * on-disk command + skill directories that `claude` TUI itself reads at
+ * launch.
  *
  * Background
  * ----------
@@ -19,14 +20,26 @@
  *
  * What this module does
  * ---------------------
- * Mirrors the Codex side's `localSurface.ts` pattern: scan the same three
+ * Mirrors the Codex side's `localSurface.ts` pattern: scan the same
  * directory trees Claude itself consults and emit a `{ slashCommands,
  * slashCommandDescriptions }` pair that can be stuffed straight into the
  * session metadata at startup.
  *
+ * Slash commands (`<dir>/<name>.md`):
  *   <cwd>/.claude/commands/<name>.md           → "<name>"
  *   ~/.claude/commands/<name>.md               → "<name>"
  *   <pluginInstallPath>/commands/<name>.md     → "<plugin>:<name>"
+ *
+ * Skills (`<dir>/<name>/SKILL.md`):
+ *   <cwd>/.claude/skills/<name>/SKILL.md       → "<name>"
+ *   ~/.claude/skills/<name>/SKILL.md           → "<name>"
+ *   <pluginInstallPath>/skills/<name>/SKILL.md → "<plugin>:<name>"
+ *
+ * Both surfaces are merged into the same `slashCommands` array — in
+ * Claude Code typing `/<name>` resolves to either source uniformly (see
+ * the Skill tool's "When users reference a 'slash command' or '/<something>',
+ * they are referring to a skill" note in the Claude prompt). The App can
+ * therefore present the union under one popup.
  *
  * Description extraction prefers a `description:` frontmatter key, falling
  * back to the first non-empty body line that is not a heading or HR. We
@@ -140,15 +153,65 @@ async function readCommandsDir(
 }
 
 /**
+ * Scan a skills directory: `<dir>/<name>/SKILL.md` is the canonical layout
+ * Claude TUI recognises. Flat single-file skills (`<dir>/<name>.md`) are
+ * NOT included because empirically Claude Code TUI does not register them
+ * as user-invocable.
+ *
+ * Each SKILL.md carries YAML frontmatter with at least `name:` and
+ * `description:` keys. We use the directory name as the canonical
+ * identifier (matching how Claude TUI itself surfaces the skill in its
+ * `/` autocomplete), and only fall back to scanning frontmatter for the
+ * description.
+ */
+async function readSkillsDir(
+  dir: string,
+  prefix: string,
+): Promise<CommandEntry[]> {
+  if (!(await pathExists(dir))) return [];
+
+  let entries;
+  try {
+    entries = await readdir(dir, { withFileTypes: true });
+  } catch (err) {
+    logger.debug(`[claudeLocalCommands] Failed to read ${dir}: ${err}`);
+    return [];
+  }
+
+  const results: CommandEntry[] = [];
+  for (const entry of entries) {
+    if (!entry.isDirectory()) continue;
+    if (entry.name.startsWith(".")) continue;
+
+    const skillFile = join(dir, entry.name, "SKILL.md");
+    if (!(await pathExists(skillFile))) continue;
+
+    let content: string;
+    try {
+      content = await readFile(skillFile, "utf8");
+    } catch (err) {
+      logger.debug(`[claudeLocalCommands] Failed to read ${skillFile}: ${err}`);
+      continue;
+    }
+
+    results.push({
+      name: prefix ? `${prefix}:${entry.name}` : entry.name,
+      description: extractDescription(content),
+    });
+  }
+  return results;
+}
+
+/**
  * Walk `~/.claude/plugins/installed_plugins.json` and surface every plugin's
- * `commands/` dir.
+ * `commands/` and `skills/` dirs.
  *
  * The manifest format mirrors what `readClaudePluginMcpServers` already
  * parses for MCP servers — see `claudeSettings.ts` for the full schema
  * notes. Keys look like `"<plugin>@<marketplace>"`; we drop the marketplace
  * suffix and use the plain plugin name as the slash-command namespace
- * (e.g. `commit-commands:commit-push-pr`). This matches how Claude TUI
- * itself presents plugin-contributed commands.
+ * (e.g. `commit-commands:commit-push-pr`, `codex:codex-cli-runtime`). This
+ * matches how Claude TUI itself presents plugin-contributed surfaces.
  */
 async function readPluginCommands(claudeHome: string): Promise<CommandEntry[]> {
   const manifestPath = join(claudeHome, "plugins", "installed_plugins.json");
@@ -186,11 +249,11 @@ async function readPluginCommands(claudeHome: string): Promise<CommandEntry[]> {
     const install = installs[0] as { installPath?: unknown };
     if (typeof install?.installPath !== "string") continue;
 
-    const cmds = await readCommandsDir(
-      join(install.installPath, "commands"),
-      pluginName,
-    );
-    all.push(...cmds);
+    const [cmds, skills] = await Promise.all([
+      readCommandsDir(join(install.installPath, "commands"), pluginName),
+      readSkillsDir(join(install.installPath, "skills"), pluginName),
+    ]);
+    all.push(...cmds, ...skills);
   }
   return all;
 }
@@ -213,16 +276,28 @@ export async function collectClaudeLocalCommands(
   const userHome = options.userHome ?? homedir();
   const claudeHome = join(userHome, ".claude");
 
-  const [pluginCmds, userCmds, projectCmds] = await Promise.all([
-    readPluginCommands(claudeHome),
-    readCommandsDir(join(claudeHome, "commands"), ""),
-    readCommandsDir(join(cwd, ".claude", "commands"), ""),
-  ]);
+  const [pluginEntries, userCmds, projectCmds, userSkills, projectSkills] =
+    await Promise.all([
+      readPluginCommands(claudeHome),
+      readCommandsDir(join(claudeHome, "commands"), ""),
+      readCommandsDir(join(cwd, ".claude", "commands"), ""),
+      readSkillsDir(join(claudeHome, "skills"), ""),
+      readSkillsDir(join(cwd, ".claude", "skills"), ""),
+    ]);
 
   // De-dupe by name. Iterate in low → high precedence order so later
-  // writes overwrite earlier ones: plugin < user < project.
+  // writes overwrite earlier ones: plugin < user < project. Skills and
+  // commands share the same namespace (Claude TUI resolves `/<name>`
+  // uniformly across both), so a project-level command can shadow a
+  // user-level skill of the same name, etc.
   const byName = new Map<string, CommandEntry>();
-  for (const list of [pluginCmds, userCmds, projectCmds]) {
+  for (const list of [
+    pluginEntries,
+    userCmds,
+    userSkills,
+    projectCmds,
+    projectSkills,
+  ]) {
     for (const entry of list) {
       byName.set(entry.name, entry);
     }
@@ -241,7 +316,9 @@ export async function collectClaudeLocalCommands(
 
   logger.debug(
     `[claudeLocalCommands] Discovered ${slashCommands.length} slash commands ` +
-      `(${projectCmds.length} project, ${userCmds.length} user, ${pluginCmds.length} plugin)`,
+      `(${projectCmds.length} project cmds, ${userCmds.length} user cmds, ` +
+      `${projectSkills.length} project skills, ${userSkills.length} user skills, ` +
+      `${pluginEntries.length} plugin entries)`,
   );
 
   return { slashCommands, slashCommandDescriptions };
