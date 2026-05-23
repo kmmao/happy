@@ -307,6 +307,12 @@ export const AskUserResponseRequestSchema = z
   .object({
     askId: z.string(),
     answers: z.record(z.string(), z.string()),
+    // When true the user explicitly declined to answer (tapped the "取消选择"
+    // / "Decline" button in the App's picker). The happy-cli handler treats
+    // this as an error so the MCP tool returns isError to Claude TUI — letting
+    // the model know it did not get an answer and should pick a fallback path
+    // (e.g. proceed with assumptions or ask differently).
+    canceled: z.boolean().optional(),
   })
   .strict();
 export type AskUserResponseRequest = z.infer<typeof AskUserResponseRequestSchema>;
