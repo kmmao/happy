@@ -1233,6 +1233,7 @@ export const zhHant: TranslationStructure = {
     askUserQuestion: {
       submit: "提交答案",
       submitRetry: "重試",
+      decline: "取消選擇",
       multipleQuestions: ({ count }: { count: number }) => `${count} 個問題`,
       other: "其他",
       otherDescription: "輸入您自己的答案",

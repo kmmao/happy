@@ -1275,6 +1275,7 @@ export const en: TranslationStructure = {
     askUserQuestion: {
       submit: "Submit Answer",
       submitRetry: "Retry",
+      decline: "Decline",
       multipleQuestions: ({ count }: { count: number }) => `${count} questions`,
       other: "Other",
       otherDescription: "Type your own answer",

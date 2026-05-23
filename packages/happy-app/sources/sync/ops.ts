@@ -2063,6 +2063,7 @@ export async function sessionAskUserResponse(
   sessionId: string,
   askId: string,
   answers: Record<string, string>,
+  options?: { canceled?: boolean },
 ): Promise<void> {
   // Mirror sessionAllow: dismiss needs-attention dot as soon as the user
   // engages, so the App's session-list badge clears even before the RPC
@@ -2076,6 +2077,11 @@ export async function sessionAskUserResponse(
     await apiSocket.sessionRPC(sessionId, "ask_user_response", {
       askId,
       answers,
+      // Only include the flag when explicitly set so older CLI builds — whose
+      // wire schema is .strict() and rejects unknown fields — keep accepting
+      // the call. Once everyone is on @kmmao/happy-wire >= 0.22.4 this guard
+      // can go away.
+      ...(options?.canceled ? { canceled: true } : {}),
     });
   } catch (error) {
     console.error(

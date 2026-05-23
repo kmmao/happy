@@ -448,6 +448,38 @@ export const AskUserQuestionView = React.memo<ToolViewProps>(
       }
     }, [sessionId, isCancelling]);
 
+    // "Decline to answer" path for `mcp__happy__ask_user`. Unlike the stuck
+    // escape hatch above, this is a normal user choice — surfaced whenever
+    // the picker is interactive. We POST `canceled: true` so happy-cli's
+    // RPC handler rejects the pending MCP promise, which surfaces to Claude
+    // TUI as isError and the model picks a fallback path. Native
+    // AskUserQuestion (SDK mode) has no equivalent decline channel today, so
+    // the button is gated to the MCP variant.
+    const isMcpAskUser = tool.name === "mcp__happy__ask_user";
+    const [isDeclining, setIsDeclining] = React.useState(false);
+    const handleDecline = React.useCallback(async () => {
+      if (!sessionId || isDeclining || isSubmitting) return;
+      const permissionId = tool.permission?.id ?? tool.id;
+      if (!permissionId) return;
+      setIsDeclining(true);
+      setSubmitError(false);
+      try {
+        await sessionAskUserResponse(sessionId, permissionId, {}, {
+          canceled: true,
+        });
+      } catch {
+        setSubmitError(true);
+      } finally {
+        setIsDeclining(false);
+      }
+    }, [
+      sessionId,
+      isDeclining,
+      isSubmitting,
+      tool.permission?.id,
+      tool.id,
+    ]);
+
     // Show submitted/completed state
     if (isAnswered || tool.state === "completed") {
       return (
@@ -646,39 +678,71 @@ export const AskUserQuestionView = React.memo<ToolViewProps>(
                   />
                 </TouchableOpacity>
               ) : (
-                <TouchableOpacity
-                  style={[
-                    styles.submitButton,
-                    (!allQuestionsAnswered || isSubmitting) &&
-                      styles.submitButtonDisabled,
-                    submitError && styles.submitButtonError,
-                  ]}
-                  onPress={handleSubmit}
-                  disabled={!allQuestionsAnswered || isSubmitting}
-                  activeOpacity={0.7}
-                >
-                  {isSubmitting ? (
-                    <ActivityIndicator
-                      size="small"
-                      color={theme.colors.button.primary.tint}
-                    />
-                  ) : submitError ? (
-                    <>
-                      <Ionicons
-                        name="refresh"
-                        size={14}
+                <>
+                  {/* Decline button — gated to the MCP variant because native
+                      AskUserQuestion (SDK mode) has no equivalent decline RPC.
+                      Sits to the left of Submit as a secondary text button so
+                      it's visible but doesn't compete with the primary
+                      action. */}
+                  {isMcpAskUser && (
+                    <TouchableOpacity
+                      style={[
+                        styles.declineButton,
+                        (isSubmitting || isDeclining) &&
+                          styles.declineButtonDisabled,
+                      ]}
+                      onPress={handleDecline}
+                      disabled={isSubmitting || isDeclining}
+                      activeOpacity={0.7}
+                    >
+                      {isDeclining ? (
+                        <ActivityIndicator
+                          size="small"
+                          color={theme.colors.textSecondary}
+                        />
+                      ) : (
+                        <Text style={styles.declineButtonText}>
+                          {t("tools.askUserQuestion.decline")}
+                        </Text>
+                      )}
+                    </TouchableOpacity>
+                  )}
+                  <TouchableOpacity
+                    style={[
+                      styles.submitButton,
+                      (!allQuestionsAnswered || isSubmitting || isDeclining) &&
+                        styles.submitButtonDisabled,
+                      submitError && styles.submitButtonError,
+                    ]}
+                    onPress={handleSubmit}
+                    disabled={
+                      !allQuestionsAnswered || isSubmitting || isDeclining
+                    }
+                    activeOpacity={0.7}
+                  >
+                    {isSubmitting ? (
+                      <ActivityIndicator
+                        size="small"
                         color={theme.colors.button.primary.tint}
                       />
+                    ) : submitError ? (
+                      <>
+                        <Ionicons
+                          name="refresh"
+                          size={14}
+                          color={theme.colors.button.primary.tint}
+                        />
+                        <Text style={styles.submitButtonText}>
+                          {t("tools.askUserQuestion.submitRetry")}
+                        </Text>
+                      </>
+                    ) : (
                       <Text style={styles.submitButtonText}>
-                        {t("tools.askUserQuestion.submitRetry")}
+                        {t("tools.askUserQuestion.submit")}
                       </Text>
-                    </>
-                  ) : (
-                    <Text style={styles.submitButtonText}>
-                      {t("tools.askUserQuestion.submit")}
-                    </Text>
-                  )}
-                </TouchableOpacity>
+                    )}
+                  </TouchableOpacity>
+                </>
               )}
             </View>
           )}
@@ -919,6 +983,28 @@ const styles = StyleSheet.create((theme) => ({
     color: theme.colors.button.primary.tint,
     fontSize: 14,
     fontWeight: "600",
+  },
+  // Secondary "decline to answer" button — sits left of submit for the MCP
+  // ask_user variant. Lower visual weight than submit on purpose.
+  declineButton: {
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 8,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    minHeight: 40,
+    borderWidth: 1,
+    borderColor: theme.colors.divider,
+    backgroundColor: "transparent",
+  },
+  declineButtonDisabled: {
+    opacity: 0.5,
+  },
+  declineButtonText: {
+    color: theme.colors.textSecondary,
+    fontSize: 13,
+    fontWeight: "500",
   },
 
   // PTY-mode escape hatch (rendered only when submit fails)
