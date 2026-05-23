@@ -248,9 +248,25 @@ export async function startHappyServer(client: ApiSessionClient) {
       version: "1.0.0",
     });
 
+    // MCP SDK passes a `RequestHandlerExtra` as the second arg to tool handlers.
+    // We expose only the pieces we currently consume — the cancellation signal,
+    // the per-request progressToken (optional, sent by clients that opted into
+    // progress notifications), and `sendNotification` for emitting heartbeats.
+    type HappyToolExtra = {
+      signal: AbortSignal;
+      sendNotification: (notification: {
+        method: "notifications/progress";
+        params: { progressToken: string | number; progress: number; total?: number };
+      }) => Promise<void>;
+      _meta?: { progressToken?: string | number };
+    };
+
     const registerHappyTool = (
       name: HappyMcpCanonicalToolName,
-      handler: (args: any) => Promise<{ content: Array<{ type: "text"; text: string }>; isError: boolean }>,
+      handler: (
+        args: any,
+        extra: HappyToolExtra,
+      ) => Promise<{ content: Array<{ type: "text"; text: string }>; isError: boolean }>,
     ) => {
       const spec = HAPPY_MCP_TOOL_SPECS[name];
       mcp.registerTool(
@@ -260,7 +276,7 @@ export async function startHappyServer(client: ApiSessionClient) {
           title: spec.title,
           inputSchema: spec.inputSchema as Record<string, any>,
         },
-        handler,
+        handler as any,
       );
     };
 
@@ -318,7 +334,7 @@ export async function startHappyServer(client: ApiSessionClient) {
         };
       });
 
-    registerHappyTool("ask_user", async (args: any) => {
+    registerHappyTool("ask_user", async (args: any, extra) => {
       const questions = args?.questions;
       if (!Array.isArray(questions) || questions.length === 0) {
         return {
@@ -384,6 +400,55 @@ export async function startHappyServer(client: ApiSessionClient) {
         });
       };
 
+      // MCP clients (notably Claude Code TUI) enforce their own per-request
+      // timeout — DEFAULT_REQUEST_TIMEOUT_MSEC is 60s in the official SDK and
+      // is not configurable from the server side. Two complementary defences:
+      //
+      // 1. Heartbeat: emit `notifications/progress` every 30s. Clients that
+      //    opted into `resetTimeoutOnProgress` (Claude Code does, when a
+      //    progressToken is present on the request) reset their timer on each
+      //    one, letting the user take as long as they need. We only beat when
+      //    we actually got a progressToken — sending without one is a protocol
+      //    error.
+      //
+      // 2. Abort signal: when the client decides the request is dead anyway
+      //    (network drop, user-side cancel, or its own ceiling), the SDK fires
+      //    `extra.signal`. Reject the pending entry so the App's picker UI
+      //    leaves pending state (reducer turns it into a `canceled` completed
+      //    request, AskUserQuestionView flips to SubmittedView) instead of
+      //    sitting on a phantom prompt for a tool result that will never be
+      //    accepted.
+      const progressToken = extra._meta?.progressToken;
+      const startMs = Date.now();
+      let heartbeat: NodeJS.Timeout | null = null;
+      if (progressToken !== undefined) {
+        heartbeat = setInterval(() => {
+          extra
+            .sendNotification({
+              method: "notifications/progress",
+              params: { progressToken, progress: Date.now() - startMs },
+            })
+            .catch((err) => {
+              logger.debug(
+                `[happyMCP] ask_user progress send failed askId=${askId}: ${err}`,
+              );
+            });
+        }, 30_000);
+      }
+
+      const onAbort = () => {
+        const pending = pendingAskUser.get(askId);
+        if (!pending) return;
+        pendingAskUser.delete(askId);
+        clearTimeout(pending.timer);
+        pending.reject(
+          new Error(
+            "MCP client aborted the request (likely TUI-side timeout or cancel)",
+          ),
+        );
+      };
+      extra.signal.addEventListener("abort", onAbort);
+
       try {
         const answers = await new Promise<Record<string, string>>(
           (resolve, reject) => {
@@ -416,6 +481,9 @@ export async function startHappyServer(client: ApiSessionClient) {
           content: [{ type: "text", text: `ask_user failed: ${reason}` }],
           isError: true,
         };
+      } finally {
+        if (heartbeat) clearInterval(heartbeat);
+        extra.signal.removeEventListener("abort", onAbort);
       }
     });
 
