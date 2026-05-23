@@ -180,11 +180,62 @@ function flattenUserContent(msg: SDKUserMessage): string {
  * TUI input handler. The trailing `\r` is the explicit submit keystroke.
  */
 function writePromptToPty(pty: ClaudePtyHandle, message: string): void {
+  const preview = message.length > 60 ? `${message.slice(0, 60)}…` : message;
+  logger.debug(
+    `[claudeRemote] writePromptToPty len=${message.length} multiline=${message.includes("\n")} preview=${JSON.stringify(preview)}`,
+  );
   if (message.includes("\n")) {
     pty.write(`\x1b[200~${message}\x1b[201~\r`);
   } else {
     pty.write(`${message}\r`);
   }
+}
+
+/**
+ * Resolve once the Claude TUI is ready to accept keystrokes.
+ *
+ * Why this exists: `pty.write` calls issued immediately after `startClaudePty`
+ * (T+a few ms) land before Ink switches the terminal to raw mode and registers
+ * its keyboard handler. Those bytes are silently dropped — the TUI's stdin
+ * reader consumes them but discards them because the input loop isn't wired
+ * yet. Symptom: SessionStart hook fires, but no `result` event ever appears
+ * because the user prompt was never seen by the TUI.
+ *
+ * Heuristic: wait for the first PTY data chunk (proves the child is alive
+ * and producing output) + a small grace window (gives Ink time to finish
+ * initial render and enable raw mode). Bounded by `timeoutMs` so a broken
+ * binary that produces no output still unblocks the caller and we degrade
+ * to the pre-fix behaviour rather than hanging.
+ */
+function waitForPtyReady(
+  pty: ClaudePtyHandle,
+  graceMs = 800,
+  timeoutMs = 8000,
+): Promise<void> {
+  return new Promise((resolve) => {
+    let settled = false;
+    let firstChunkSeen = false;
+    const startedAt = Date.now();
+
+    const finish = (reason: string) => {
+      if (settled) return;
+      settled = true;
+      unsubscribe();
+      clearTimeout(timeoutTimer);
+      logger.debug(
+        `[claudeRemote] PTY ready (${reason}) after ${Date.now() - startedAt}ms`,
+      );
+      resolve();
+    };
+
+    const timeoutTimer = setTimeout(() => finish("timeout"), timeoutMs);
+
+    const unsubscribe = pty.onData(() => {
+      if (firstChunkSeen) return;
+      firstChunkSeen = true;
+      setTimeout(() => finish("first-chunk+grace"), graceMs);
+    });
+  });
 }
 
 export async function claudeRemote(opts: {
@@ -426,6 +477,10 @@ export async function claudeRemote(opts: {
   logger.debug(
     `[perf] sdk query() call completed (sync part): ${Date.now() - sdkCallAt}ms`,
   );
+
+  // Gate every prompt write on the TUI being ready to receive keystrokes.
+  // Shared promise → first writer pays the wait, the rest see it resolved.
+  const ptyReady = waitForPtyReady(pty);
 
   // Bridge the PTY to the daemon's TerminalManager so the App's "Open Raw
   // Terminal" view can subscribe to the byte stream over the existing
@@ -724,6 +779,9 @@ export async function claudeRemote(opts: {
         );
         return;
       }
+      // ptyReady is almost certainly resolved by now (we just consumed a
+      // result), but await it anyway as cheap insurance against races.
+      await ptyReady;
       writePromptToPty(pty, next.message);
     } finally {
       resultInFlight = false;
@@ -800,14 +858,17 @@ export async function claudeRemote(opts: {
   });
 
   // Mid-turn user input from the App composer — writes straight to PTY.
+  // Callback is sync, so we fire-and-forget the readiness wait; in practice
+  // the user can't compose a message faster than ~800ms after spawn anyway.
   opts.onMessagesReady?.((msg) => {
     const text = flattenUserContent(msg);
     if (!text) return;
-    writePromptToPty(pty, text);
+    void ptyReady.then(() => writePromptToPty(pty, text));
   });
 
   // Initial prompt — skip when `continue` so the TUI resumes its own state.
   if (!initial.mode.continue) {
+    await ptyReady;
     writePromptToPty(pty, initial.message);
   }
 
