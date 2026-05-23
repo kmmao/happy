@@ -29,7 +29,16 @@
  * ------------------------
  *   1. Adds `session_id` (snake_case) alongside the original `sessionId`
  *      — consumers reading either key work.
- *   2. Promotes `parentUuid` → `parent_tool_use_id` for tool-call lineage.
+ *   2. Forwards `parent_tool_use_id` when the JSONL record carries it
+ *      explicitly (records produced inside a Task subagent's run carry
+ *      this in some Claude TUI versions). We DO NOT promote `parentUuid`
+ *      here — `parentUuid` is the conversation-record chain link (every
+ *      record's predecessor) and is set on every non-root record. Treating
+ *      it as a subagent id would make the sessionProtocolMapper classify
+ *      every message as a sidechain reply via `pickProviderSubagent`,
+ *      causing it to buffer (rather than emit) every envelope. Symptom
+ *      pre-fix: App ChatList stays empty even though `sendClaudeSession-
+ *      Message` is invoked for every record.
  *   3. Otherwise passes through every field (camelCase + extras are
  *      preserved on the returned object — TypeScript view is narrower
  *      than the runtime view, on purpose).
@@ -57,11 +66,13 @@ export function rawToSdkMessage(raw: RawJSONLines): SDKMessage | null {
   // care (e.g. the local launcher) pick it up directly from the scanner.
   if (raw.type === "summary") return null;
 
-  // Common field promotion: sessionId → session_id, parentUuid → parent_tool_use_id.
+  // Field rename: sessionId → session_id (consumers read both).
+  // parent_tool_use_id is forwarded only when the JSONL record carries it
+  // explicitly — see the doc-comment above for why we do NOT promote
+  // parentUuid.
   const anyRaw = raw as Record<string, unknown>;
   const sessionId = pickString(anyRaw, "sessionId") ?? pickString(anyRaw, "session_id");
-  const parentToolUseId =
-    pickString(anyRaw, "parent_tool_use_id") ?? pickString(anyRaw, "parentUuid") ?? null;
+  const parentToolUseId = pickString(anyRaw, "parent_tool_use_id") ?? null;
 
   // Build the result by spreading the original record and overlaying
   // the renamed keys. TypeScript erases the extras, but at runtime they

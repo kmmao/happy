@@ -584,6 +584,32 @@ export async function claudeRemote(opts: {
     exitResolve = resolve;
   });
 
+  // Per-turn aggregation for synthesizing the `result` record.
+  // Claude TUI's JSONL stream does NOT emit a `type: "result"` record
+  // (the SDK's `query()` stream did). It instead writes a
+  // `type: "system", subtype: "turn_duration"` marker as the last record
+  // of every turn. We accumulate usage / model / stop_reason from each
+  // assistant message and convert that marker into a synthetic result so
+  // `handleResult` — and therefore `onReady` → `closeClaudeSessionTurn`
+  // → `nextMessage()` → next prompt write — actually fires.
+  let turnAssistantCount = 0;
+  let turnLastStopReason: string | undefined;
+  type TurnModelUsageEntry = {
+    inputTokens: number;
+    outputTokens: number;
+    cacheReadInputTokens: number;
+    cacheCreationInputTokens: number;
+    costUSD: number;
+    contextWindow: number;
+    maxOutputTokens: number;
+  };
+  const turnModelUsage = new Map<string, TurnModelUsageEntry>();
+  const resetTurnAggregates = () => {
+    turnAssistantCount = 0;
+    turnLastStopReason = undefined;
+    turnModelUsage.clear();
+  };
+
   const finishOnce = () => {
     if (exitResolved) return;
     exitResolved = true;
@@ -856,9 +882,77 @@ export async function claudeRemote(opts: {
         }
       }
 
+      // Aggregate per-turn data so we can synthesize a `result` record
+      // when the TUI signals turn end. See `turnModelUsage` declaration.
+      if (raw.type === "assistant") {
+        turnAssistantCount += 1;
+        const assistantRaw = raw as {
+          message?: {
+            model?: string;
+            stop_reason?: string;
+            usage?: {
+              input_tokens?: number;
+              output_tokens?: number;
+              cache_creation_input_tokens?: number;
+              cache_read_input_tokens?: number;
+            };
+          };
+        };
+        if (typeof assistantRaw.message?.stop_reason === "string") {
+          turnLastStopReason = assistantRaw.message.stop_reason;
+        }
+        const usage = assistantRaw.message?.usage;
+        const model = assistantRaw.message?.model;
+        if (usage && model) {
+          const existing = turnModelUsage.get(model) ?? {
+            inputTokens: 0,
+            outputTokens: 0,
+            cacheReadInputTokens: 0,
+            cacheCreationInputTokens: 0,
+            costUSD: 0,
+            contextWindow: 0,
+            maxOutputTokens: 0,
+          };
+          existing.inputTokens += usage.input_tokens ?? 0;
+          existing.outputTokens += usage.output_tokens ?? 0;
+          existing.cacheReadInputTokens += usage.cache_read_input_tokens ?? 0;
+          existing.cacheCreationInputTokens +=
+            usage.cache_creation_input_tokens ?? 0;
+          turnModelUsage.set(model, existing);
+        }
+      }
+
       if (raw.type === "system") {
-        // The TUI's system:init equivalent re-asserts thinking=true so the
-        // App spinner stays consistent across mid-turn restarts.
+        const systemRaw = raw as { subtype?: unknown };
+        // TUI turn-end marker — the only "this turn is done" signal the
+        // JSONL stream emits. Synthesize a `result` record so the
+        // existing handleResult → onReady → nextMessage loop advances.
+        // Without this, the first turn never closes: the App spinner
+        // would spin forever AND no second user prompt would ever be
+        // written to the PTY (nextMessage() is only consumed inside
+        // handleResult).
+        if (systemRaw.subtype === "turn_duration") {
+          const modelUsageObj: Record<string, TurnModelUsageEntry> = {};
+          for (const [k, v] of turnModelUsage) modelUsageObj[k] = v;
+          const synthetic = {
+            type: "result" as const,
+            uuid: `synthetic-result-${Date.now()}`,
+            subtype: "success",
+            total_cost_usd: 0,
+            num_turns: turnAssistantCount,
+            terminal_reason: turnLastStopReason,
+            modelUsage: modelUsageObj,
+          };
+          logger.debug(
+            `[claudeRemote] synthesized result from turn_duration: num_turns=${synthetic.num_turns} stop_reason=${synthetic.terminal_reason ?? "(none)"} models=${Object.keys(modelUsageObj).length}`,
+          );
+          resetTurnAggregates();
+          void handleResult(synthetic);
+          return;
+        }
+        // Other system records (e.g. stop_hook_summary) re-assert
+        // thinking=true so the App spinner stays consistent across
+        // mid-turn restarts.
         updateThinking(true);
       }
 
