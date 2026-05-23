@@ -160,7 +160,19 @@ export function updateMessageWithCompletedPermission(
 
     // Update tool state based on permission status
     if (completed.status === "approved") {
-        if (
+        if (tool.name === "mcp__happy__ask_user") {
+            // mcp__happy__ask_user has no separate tool-result envelope
+            // (the matching tool_use envelope is skipped in reducer Phase 2
+            // to avoid a duplicate card), so its completion has to be
+            // driven entirely by the approved permission. Mark the synthetic
+            // ToolCall completed here — otherwise the picker card would stay
+            // in the "running" state forever after the user submits answers.
+            tool.state = "completed";
+            tool.completedAt = completed.completedAt || Date.now();
+            if (tool.result === undefined && completed.answers) {
+                tool.result = completed.answers;
+            }
+        } else if (
             tool.state !== "completed" &&
             tool.state !== "error" &&
             tool.state !== "running"

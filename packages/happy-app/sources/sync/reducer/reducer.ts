@@ -857,6 +857,19 @@ export function reducer(
     if (msg.role === "agent") {
       for (let c of msg.content) {
         if (c.type === "tool-call") {
+          // mcp__happy__ask_user lives entirely on the agentState.requests /
+          // completedRequests channel (created as a synthetic ToolCall in
+          // Phase 0). Its MCP tool_use also flows through Claude TUI's jsonl
+          // → tool-call envelope path with a different id (Claude-assigned
+          // toolUseId, not our askId), which would produce a second
+          // duplicate card with another picker UI. Skip the envelope tool
+          // call here so the synthetic message remains the single source of
+          // truth. The matching tool-result envelope is also naturally
+          // ignored in Phase 3 because nothing registers its toolUseId in
+          // toolIdToMessageId.
+          if (c.name === "mcp__happy__ask_user") {
+            continue;
+          }
           // Direct lookup by tool ID (since permission ID = tool ID now)
           const existingMessageId = state.toolIdToMessageId.get(c.id);
 
