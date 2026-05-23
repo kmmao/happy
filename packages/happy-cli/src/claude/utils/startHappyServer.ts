@@ -215,7 +215,21 @@ export async function startHappyServer(client: ApiSessionClient) {
       }
       pendingAskUser.delete(req.askId);
       clearTimeout(pending.timer);
-      pending.resolve(req.answers ?? {});
+      if (req.canceled) {
+        // User tapped the picker's "取消选择" button. Reject the pending MCP
+        // promise so the tool handler's catch path runs — that records a
+        // canceled entry in completedRequests and returns isError to Claude
+        // TUI, letting the model know it did not get an answer and should
+        // proceed differently (e.g. ask in plain text or pick defaults).
+        logger.debug(
+          `[happyMCP] ask_user_response: user declined askId=${req.askId}`,
+        );
+        pending.reject(
+          new Error("User declined to answer this question"),
+        );
+      } else {
+        pending.resolve(req.answers ?? {});
+      }
       return { ok: true };
     },
   );
