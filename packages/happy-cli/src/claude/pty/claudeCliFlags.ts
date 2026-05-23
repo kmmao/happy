@@ -15,6 +15,8 @@
  *   permissionMode        → --permission-mode <mode>    (boot-only; runtime swap = cold restart)
  *   model                 → --model <model>             (boot-only; runtime swap = `/model …` slash command)
  *   fallbackModel         → --fallback-model <model>
+ *   effort                → --effort <level>            (low | medium | high | xhigh | max; boot-only,
+ *                                                       runtime swap = cold restart via coldModeHash)
  *   appendSystemPrompt    → --append-system-prompt <text>   (also exposed as env HAPPY_APPEND_SYSTEM_PROMPT)
  *   allowedTools          → --allowedTools a,b,c
  *   disallowedTools       → --disallowedTools a,b,c
@@ -29,7 +31,12 @@
  *   allowDangerouslySkipPermissions
  *                         → --dangerously-skip-permissions
  *
- *   thinking / effort / taskBudget / outputFormat / shouldQuery / hooks /
+ *   thinking              → ⚠️ no CLI flag — caller is expected to merge
+ *                              `alwaysThinkingEnabled` / env into the temporary
+ *                              settings.json (see mergeThinkingIntoSettings).
+ *                              We emit a debug-level note here but no warning.
+ *
+ *   taskBudget / outputFormat / shouldQuery / hooks /
  *   plugins / customSystemPrompt / agents
  *                         → ⚠️ no equivalent claude CLI flag — emitted as a
  *                              `logger.warn` so we surface visibility loss
@@ -102,6 +109,13 @@ export function buildClaudeCliFlags(
     if (mode.fallbackModel) {
       args.push("--fallback-model", mode.fallbackModel);
     }
+    // Claude TUI accepts low|medium|high|xhigh|max. If the active model does
+    // not support the requested level, Claude itself falls back to the highest
+    // supported level at or below it (per https://code.claude.com/docs/en/model-config),
+    // so we pass the user's choice through unchanged.
+    if (mode.effort) {
+      args.push("--effort", mode.effort);
+    }
     if (mode.appendSystemPrompt) {
       args.push("--append-system-prompt", mode.appendSystemPrompt);
     }
@@ -124,16 +138,12 @@ export function buildClaudeCliFlags(
     }
 
     // ── Capability-loss warnings ──
-    if (mode.thinking) {
-      warnings.push(
-        "EnhancedMode.thinking has no claude CLI flag — config is dropped (set in settings.json if Claude TUI supports it)",
-      );
-    }
-    if (mode.effort != null) {
-      warnings.push(
-        "EnhancedMode.effort has no claude CLI flag — config is dropped",
-      );
-    }
+    // thinking is intentionally not a warning: it is honoured via the
+    // temporary settings.json (alwaysThinkingEnabled + env), composed
+    // by mergeThinkingIntoSettings() and consumed via --settings <path>
+    // below. If callers forget to merge, Claude silently falls back to
+    // adaptive thinking — that's the same as `undefined`, so dropping
+    // the warning avoids log noise without hiding a real bug.
     if (mode.taskBudget) {
       warnings.push(
         "EnhancedMode.taskBudget has no claude CLI flag — config is dropped",

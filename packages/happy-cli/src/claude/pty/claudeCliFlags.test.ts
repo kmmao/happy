@@ -179,18 +179,23 @@ describe("buildClaudeCliFlags", () => {
     expect(args).toEqual(["--session-id", "uuid", "--debug", "--no-banner"]);
   });
 
-  it("thinking emits a capability-loss warning", () => {
-    const { warnings } = buildClaudeCliFlags({
+  it("thinking is honoured via settings.json — no warning, no CLI flag", () => {
+    const { args, warnings } = buildClaudeCliFlags({
       mode: modeFrom({ thinking: { type: "enabled", budgetTokens: 5000 } }),
     });
-    expect(warnings.some((w) => /thinking/i.test(w))).toBe(true);
+    // thinking has no CLI flag; mergeThinkingIntoSettings patches --settings.
+    expect(args).toEqual([]);
+    expect(warnings.some((w) => /thinking/i.test(w))).toBe(false);
   });
 
-  it("effort emits a capability-loss warning", () => {
-    const { warnings } = buildClaudeCliFlags({
-      mode: modeFrom({ effort: "high" }),
-    });
-    expect(warnings.some((w) => /effort/i.test(w))).toBe(true);
+  it("effort emits --effort <level> for each supported value", () => {
+    for (const level of ["low", "medium", "high", "xhigh", "max"] as const) {
+      const { args, warnings } = buildClaudeCliFlags({
+        mode: modeFrom({ effort: level }),
+      });
+      expect(args).toEqual(["--effort", level]);
+      expect(warnings.some((w) => /effort/i.test(w))).toBe(false);
+    }
   });
 
   it("outputFormat emits a capability-loss warning", () => {

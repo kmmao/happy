@@ -65,6 +65,7 @@ import {
   type UsageSnapshot,
 } from "@/claude/pty/claudePtyController";
 import { buildClaudeCliFlags } from "@/claude/pty/claudeCliFlags";
+import { mergeThinkingIntoSettings } from "@/claude/utils/mergeThinkingIntoSettings";
 import { rawToJsonlMessage } from "@/claude/pty/rawToJsonlMessage";
 import { attachClaudePtyRouter } from "@/claude/pty/claudePtyRouter";
 import {
@@ -493,6 +494,12 @@ export async function claudeRemote(opts: {
   for (const warning of flagsResult.warnings) {
     logger.debug(`[claudeRemote] CLI flag warning: ${warning}`);
   }
+
+  // Patch the hook settings file in place to honour the user's thinking-mode
+  // choice — Claude TUI exposes this via `alwaysThinkingEnabled` + an env var
+  // (no CLI flag). Idempotent across cold restarts; a no-op when thinking is
+  // adaptive/undefined. See packages/happy-cli/src/claude/utils/mergeThinkingIntoSettings.ts.
+  mergeThinkingIntoSettings(opts.hookSettingsPath, flagMode.thinking);
 
   // Build the child env. We let the PTY runtime sanitize (strip CLAUDECODE
   // etc) — caller-supplied overrides take precedence over process.env.

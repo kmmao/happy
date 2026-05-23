@@ -33,10 +33,13 @@ export async function createSessionScanner(opts: {
     let currentSessionId: string | null = null;
     let watchers = new Map<string, (() => void)>();
     let processedMessageKeys = new Set<string>();
-    // Tracks which subagent jsonl files have already been associated to a
-    // Task/Agent tool_use. Persisted across polls so we don't re-associate
-    // the same agent-XXX.jsonl when the main file grows.
-    let consumedAgentIds = new Set<string>();
+    // Tool_use.id → agentId binding. Persisted across polls so the same
+    // tool_use always re-reads its associated agent-XXX.jsonl from disk
+    // (Claude writes that file INCREMENTALLY: initial prompt first, then
+    // tool_use/tool_result blocks, then the final assistant reply seconds
+    // later). Using a Set<consumedAgentIds> here would freeze the subagent
+    // file at its first-seen state and miss every incremental update.
+    let toolUseToAgentBinding = new Map<string, string>();
 
     // Mark existing messages as processed and start watching the initial session
     if (opts.sessionId) {
@@ -78,7 +81,7 @@ export async function createSessionScanner(opts: {
                 projectDir,
                 session,
                 rawMessages,
-                consumedAgentIds,
+                toolUseToAgentBinding,
             );
             let skipped = 0;
             let sent = 0;
@@ -204,7 +207,7 @@ async function interleaveSubagentMessages(
     projectDir: string,
     sessionId: string,
     mainMessages: RawJSONLines[],
-    consumedAgentIds: Set<string>,
+    binding: Map<string, string>,
 ): Promise<RawJSONLines[]> {
     const subagentsDir = join(projectDir, sessionId, 'subagents');
     const out: RawJSONLines[] = [];
@@ -221,8 +224,9 @@ async function interleaveSubagentMessages(
 
             const associated = await readAssociatedSubagent(
                 subagentsDir,
+                block.id,
                 block.input as SubagentInput,
-                consumedAgentIds,
+                binding,
             );
             if (!associated) {
                 logger.debug(

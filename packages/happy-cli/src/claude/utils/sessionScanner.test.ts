@@ -323,6 +323,116 @@ describe('sessionScanner', () => {
       expect(subCountAfterSecondSync).toBe(2)
     })
 
+    it('re-reads subagent jsonl on subsequent polls when file grows incrementally', async () => {
+      // Regression for the bug found in production: subagents/agent-XXX.jsonl
+      // is written incrementally by Claude (just like the main jsonl). On the
+      // first sync the file may only contain the initial user prompt; the
+      // Bash/Grep/Read tool_use + tool_result lines + final assistant reply
+      // arrive seconds later. We must NOT mark the agent file as
+      // "fully consumed" on first hit — we have to re-read on every poll and
+      // let processedMessageKeys (uuid-level) handle dedup downstream.
+      const sessionId = 'sess-grow-1'
+      const sessionFile = join(projectDir, `${sessionId}.jsonl`)
+      const subagentsDir = join(projectDir, sessionId, 'subagents')
+      await mkdir(subagentsDir, { recursive: true })
+
+      const mainUser = {
+        type: 'user',
+        uuid: 'g-u-1',
+        message: { role: 'user', content: 'spawn an agent' },
+      }
+      const mainAssistantWithTask = {
+        type: 'assistant',
+        uuid: 'g-a-1',
+        message: {
+          role: 'assistant',
+          id: 'msg_grow',
+          content: [
+            {
+              type: 'tool_use',
+              id: 'tu_grow',
+              name: 'Task',
+              input: {
+                subagent_type: 'Explore',
+                description: 'Grow test',
+                prompt: 'list files',
+              },
+            },
+          ],
+        },
+      }
+      await writeFile(sessionFile, ln(mainUser) + ln(mainAssistantWithTask))
+
+      // First sync: subagent file has ONLY the initial user prompt line.
+      await writeFile(
+        join(subagentsDir, 'agent-G.meta.json'),
+        JSON.stringify({ agentType: 'Explore', description: 'Grow test' }),
+      )
+      const subUserOnly = {
+        type: 'user',
+        uuid: 'sub-g-u',
+        isSidechain: true,
+        message: { role: 'user', content: 'list files' },
+      }
+      const subagentJsonlPath = join(subagentsDir, 'agent-G.jsonl')
+      await writeFile(subagentJsonlPath, ln(subUserOnly))
+
+      scanner = await createSessionScanner({
+        sessionId: null,
+        workingDirectory: testDir,
+        onMessage: (msg) => collectedMessages.push(msg),
+      })
+      scanner.onNewSession(sessionId)
+      await new Promise((r) => setTimeout(r, 200))
+
+      expect(
+        collectedMessages.some(
+          (m) => m.type === 'user' && m.uuid === 'sub-g-u',
+        ),
+      ).toBe(true)
+      const firstPollSubCount = collectedMessages.filter(
+        (m) => (m as any).parent_tool_use_id === 'tu_grow',
+      ).length
+      expect(firstPollSubCount).toBe(1)
+
+      // Second poll: subagent jsonl grows with the assistant tool_use+text.
+      const subAssistant = {
+        type: 'assistant',
+        uuid: 'sub-g-a',
+        isSidechain: true,
+        message: {
+          role: 'assistant',
+          id: 'msg_sub_g',
+          content: [{ type: 'text', text: 'here are the files' }],
+        },
+      }
+      await new Promise((r) => setTimeout(r, 50))
+      await appendFile(subagentJsonlPath, ln(subAssistant))
+      // Bump main file mtime so the watcher schedules a sync — appending to
+      // the subagent file alone is enough in production because the periodic
+      // 3s tick triggers sync.invalidate(), but in tests we want determinism.
+      const mainUser2 = {
+        type: 'user',
+        uuid: 'g-u-2',
+        message: { role: 'user', content: 'thanks' },
+      }
+      await appendFile(sessionFile, ln(mainUser2))
+      await new Promise((r) => setTimeout(r, 300))
+
+      // The new subagent assistant message MUST appear, still tagged with
+      // parent_tool_use_id === 'tu_grow'.
+      const subAssistantOut = collectedMessages.find(
+        (m) => m.type === 'assistant' && m.uuid === 'sub-g-a',
+      )
+      expect(subAssistantOut).toBeDefined()
+      expect((subAssistantOut as any).parent_tool_use_id).toBe('tu_grow')
+
+      const secondPollSubCount = collectedMessages.filter(
+        (m) => (m as any).parent_tool_use_id === 'tu_grow',
+      ).length
+      expect(secondPollSubCount).toBe(2)
+    })
+
     it('routes multiple Agent tool calls to their own subagents without crosstalk', async () => {
       // Cycle 2: two Task tool_use blocks in main jsonl, two subagent files.
       // Each subagent's messages must carry its OWN tool_use.id as parent —

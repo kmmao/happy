@@ -46,24 +46,26 @@ describe('subagentJsonlReader', () => {
       userMsg + '\n' + assistantMsg + '\n',
     )
 
-    const consumedAgentIds = new Set<string>()
+    const binding = new Map<string, string>()
     const result = await readAssociatedSubagent(
       subagentsDir,
+      'tu-1',
       { subagent_type: 'Explore', description: 'D', prompt: 'P' },
-      consumedAgentIds,
+      binding,
     )
 
     expect(result).not.toBeNull()
     expect(result!.agentId).toBe('agent-abc')
     expect(result!.messages).toHaveLength(2)
-    expect(consumedAgentIds.has('agent-abc')).toBe(true)
+    expect(binding.get('tu-1')).toBe('agent-abc')
   })
 
-  it('does not re-match a subagent that is already in consumedAgentIds', async () => {
+  it('does not re-bind a subagent that another tool_use already owns', async () => {
     // Two subagent files share the same agentType + description + prompt.
-    // First call should pick one of them; second call with the same input
-    // must skip the consumed one and return the OTHER (proves the guard works
-    // even when the matcher would otherwise pick the same file again).
+    // First call (tool_use=tu-1) binds one of them; second call from a
+    // DIFFERENT tool_use (tu-2) with the same input must pick the OTHER
+    // file, because the first one is already bound. Proves the one-to-one
+    // tool_use ↔ agent file constraint.
     const writeAgent = async (id: string) => {
       await writeFile(
         join(subagentsDir, `${id}.meta.json`),
@@ -81,16 +83,64 @@ describe('subagentJsonlReader', () => {
     await writeAgent('agent-1')
     await writeAgent('agent-2')
 
-    const consumed = new Set<string>()
+    const binding = new Map<string, string>()
     const input = { subagent_type: 'Explore', description: 'D', prompt: 'P' }
 
-    const first = await readAssociatedSubagent(subagentsDir, input, consumed)
-    const second = await readAssociatedSubagent(subagentsDir, input, consumed)
+    const first = await readAssociatedSubagent(subagentsDir, 'tu-1', input, binding)
+    const second = await readAssociatedSubagent(subagentsDir, 'tu-2', input, binding)
 
     expect(first).not.toBeNull()
     expect(second).not.toBeNull()
     expect(second!.agentId).not.toBe(first!.agentId)
-    expect(consumed.size).toBe(2)
+    expect(binding.size).toBe(2)
+  })
+
+  it('re-reads the same agent file when called again with the same tool_use id', async () => {
+    // Regression for prod bug: subagent jsonl grows incrementally. After the
+    // first poll binds tu-1 → agent-G, a second poll for tu-1 must skip
+    // matching entirely and re-parse the file (now larger), so newly
+    // appended lines flow through to the caller.
+    const agentId = 'agent-grow'
+    await writeFile(
+      join(subagentsDir, `${agentId}.meta.json`),
+      JSON.stringify({ agentType: 'Explore', description: 'D' }),
+    )
+    const userLine = JSON.stringify({
+      type: 'user', uuid: 'u-1', isSidechain: true,
+      message: { role: 'user', content: 'P' },
+    })
+    await writeFile(join(subagentsDir, `${agentId}.jsonl`), userLine + '\n')
+
+    const binding = new Map<string, string>()
+    const first = await readAssociatedSubagent(
+      subagentsDir,
+      'tu-1',
+      { subagent_type: 'Explore', description: 'D', prompt: 'P' },
+      binding,
+    )
+    expect(first!.messages).toHaveLength(1)
+    expect(binding.get('tu-1')).toBe(agentId)
+
+    // Append a new line — simulates Claude streaming the assistant reply.
+    const assistantLine = JSON.stringify({
+      type: 'assistant', uuid: 'a-1', isSidechain: true,
+      message: { role: 'assistant', id: 'msg', content: [{ type: 'text', text: 'hi' }] },
+    })
+    await writeFile(
+      join(subagentsDir, `${agentId}.jsonl`),
+      userLine + '\n' + assistantLine + '\n',
+    )
+
+    const second = await readAssociatedSubagent(
+      subagentsDir,
+      'tu-1',
+      { subagent_type: 'Explore', description: 'D', prompt: 'P' },
+      binding,
+    )
+    expect(second!.agentId).toBe(agentId)
+    expect(second!.messages).toHaveLength(2)
+    // Still only one binding (no duplicate registration).
+    expect(binding.size).toBe(1)
   })
 
   it('returns null when no subagent file matches the input', async () => {
@@ -103,26 +153,28 @@ describe('subagentJsonlReader', () => {
       JSON.stringify({ type: 'user', uuid: 'u', message: { role: 'user', content: 'P' } }) + '\n',
     )
 
-    const consumed = new Set<string>()
+    const binding = new Map<string, string>()
     const result = await readAssociatedSubagent(
       subagentsDir,
+      'tu-miss',
       { subagent_type: 'Explore', description: 'D', prompt: 'P' },
-      consumed,
+      binding,
     )
 
     expect(result).toBeNull()
-    expect(consumed.size).toBe(0)
+    expect(binding.size).toBe(0)
   })
 
   it('returns null when subagents directory does not exist', async () => {
-    const consumed = new Set<string>()
+    const binding = new Map<string, string>()
     const result = await readAssociatedSubagent(
       join(subagentsDir, 'nonexistent'),
+      'tu-none',
       { subagent_type: 'Explore', description: 'D', prompt: 'P' },
-      consumed,
+      binding,
     )
     expect(result).toBeNull()
-    expect(consumed.size).toBe(0)
+    expect(binding.size).toBe(0)
   })
 
   it('skips a subagent whose meta.json is not valid JSON and falls through to the next candidate', async () => {
@@ -140,11 +192,12 @@ describe('subagentJsonlReader', () => {
       JSON.stringify({ type: 'user', uuid: 'u', message: { role: 'user', content: 'P' } }) + '\n',
     )
 
-    const consumed = new Set<string>()
+    const binding = new Map<string, string>()
     const result = await readAssociatedSubagent(
       subagentsDir,
+      'tu-bad',
       { subagent_type: 'Explore', description: 'D', prompt: 'P' },
-      consumed,
+      binding,
     )
 
     expect(result).not.toBeNull()
@@ -176,17 +229,17 @@ describe('subagentJsonlReader', () => {
     await utimes(join(subagentsDir, 'agent-early.jsonl'), earlyTime, earlyTime)
     await utimes(join(subagentsDir, 'agent-late.jsonl'), lateTime, lateTime)
 
-    const consumed = new Set<string>()
+    const binding = new Map<string, string>()
     const result = await readAssociatedSubagent(
       subagentsDir,
+      'tu-fb',
       { subagent_type: 'Explore', description: 'D', prompt: 'PROMPT_THAT_NOBODY_HAS' },
-      consumed,
+      binding,
     )
 
     expect(result).not.toBeNull()
     expect(result!.agentId).toBe('agent-early')
-    expect(consumed.has('agent-early')).toBe(true)
-    expect(consumed.has('agent-late')).toBe(false)
+    expect(binding.get('tu-fb')).toBe('agent-early')
   })
 
   it('prefers a Layer-1 triple match over a Layer-2 (earlier mtime) candidate', async () => {
@@ -212,15 +265,16 @@ describe('subagentJsonlReader', () => {
     await utimes(join(subagentsDir, 'agent-old.jsonl'), new Date('2024-01-01'), new Date('2024-01-01'))
     await utimes(join(subagentsDir, 'agent-match.jsonl'), new Date('2024-06-01'), new Date('2024-06-01'))
 
-    const consumed = new Set<string>()
+    const binding = new Map<string, string>()
     const result = await readAssociatedSubagent(
       subagentsDir,
+      'tu-strict',
       { subagent_type: 'Explore', description: 'D', prompt: 'P' },
-      consumed,
+      binding,
     )
 
     expect(result).not.toBeNull()
     expect(result!.agentId).toBe('agent-match')
-    expect(consumed.has('agent-old')).toBe(false)
+    expect(Array.from(binding.values())).not.toContain('agent-old')
   })
 })
