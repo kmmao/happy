@@ -20,6 +20,7 @@ import {
   HAPPY_MCP_TOOL_NAMES,
   HAPPY_MCP_TOOL_SPECS,
   type HappyMcpCanonicalToolName,
+  type AskUserResponseRequest,
 } from "@kmmao/happy-wire";
 
 type McpTextResponse = {
@@ -57,8 +58,42 @@ export async function queryProjectKnowledge(
   }
 }
 
+/**
+ * 30 minutes — bound on how long an `ask_user` MCP handler will block waiting
+ * for the user to answer in the App. The MCP SDK has no native timeout, so we
+ * roll our own to keep Claude TUI from sitting on a tool_use forever if the
+ * user closes the App without answering. Pick a window long enough that a user
+ * who walks away mid-conversation can still come back and reply.
+ */
+const ASK_USER_TIMEOUT_MS = 30 * 60 * 1000;
+
+type PendingAskUser = {
+  resolve: (answers: Record<string, string>) => void;
+  reject: (err: Error) => void;
+  timer: NodeJS.Timeout;
+};
+
 export async function startHappyServer(client: ApiSessionClient) {
   logger.debug(`[happyMCP] server:start sessionId=${client.sessionId}`);
+
+  // Pending `mcp__happy__ask_user` invocations, keyed by askId. The MCP tool
+  // handler inserts an entry then awaits its resolver; the App posts the user's
+  // answers via the `ask_user_response` RPC which looks the entry up and
+  // resolves it. On session teardown all surviving entries are rejected so the
+  // MCP handler returns isError instead of hanging the next turn.
+  const pendingAskUser = new Map<string, PendingAskUser>();
+
+  const rejectAllPendingAskUser = (reason: string) => {
+    if (pendingAskUser.size === 0) return;
+    logger.debug(
+      `[happyMCP] ask_user: rejecting ${pendingAskUser.size} pending entries (${reason})`,
+    );
+    for (const [, pending] of pendingAskUser) {
+      clearTimeout(pending.timer);
+      pending.reject(new Error(reason));
+    }
+    pendingAskUser.clear();
+  };
 
   // Handler that sends title updates via the client
   const handler = async (title: string) => {
@@ -159,6 +194,32 @@ export async function startHappyServer(client: ApiSessionClient) {
     }
   };
 
+  // The App's AskUserQuestionView calls `ask_user_response` when the user
+  // submits answers for an `mcp__happy__ask_user` prompt. We resolve the
+  // matching pendingAskUser entry so the MCP handler's await returns and
+  // Claude TUI receives the user's answers as the tool result.
+  //
+  // Registered unconditionally (both SDK and PTY modes) — the handler is a
+  // no-op for any askId we don't recognise. Conversely the `permission` RPC
+  // (SDK-mode only) is left untouched: native AskUserQuestion still rides
+  // its own path so the two channels cannot interfere.
+  client.rpcHandlerManager.registerHandler<AskUserResponseRequest, { ok: true }>(
+    "ask_user_response",
+    async (req) => {
+      const pending = pendingAskUser.get(req.askId);
+      if (!pending) {
+        logger.debug(
+          `[happyMCP] ask_user_response: no pending entry for askId=${req.askId} (likely already resolved or expired)`,
+        );
+        return { ok: true };
+      }
+      pendingAskUser.delete(req.askId);
+      clearTimeout(pending.timer);
+      pending.resolve(req.answers ?? {});
+      return { ok: true };
+    },
+  );
+
   //
   // Create a per-request MCP server factory
   // @modelcontextprotocol/sdk >= 1.26.0 forbids reusing a stateless
@@ -243,6 +304,107 @@ export async function startHappyServer(client: ApiSessionClient) {
         };
       });
 
+    registerHappyTool("ask_user", async (args: any) => {
+      const questions = args?.questions;
+      if (!Array.isArray(questions) || questions.length === 0) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: "ask_user requires a non-empty `questions` array.",
+            },
+          ],
+          isError: true,
+        };
+      }
+
+      const askId = randomUUID();
+      logger.debug(
+        `[happyMCP] ask_user start askId=${askId} questions=${questions.length}`,
+      );
+
+      // Surface as a pending agentState.requests entry. The App reducer
+      // (Phase 0) auto-creates a tool message from this and routes it through
+      // the mcp__happy__ask_user knownTools entry, which mirrors AskUserQuestion's
+      // picker UI. The App distinguishes ours from native AskUserQuestion by the
+      // tool name so its submit handler calls `ask_user_response` instead of the
+      // SDK-only `permission` RPC.
+      client.updateAgentState((state) => ({
+        ...state,
+        requests: {
+          ...(state.requests ?? {}),
+          [askId]: {
+            tool: "mcp__happy__ask_user",
+            arguments: { questions },
+            createdAt: Date.now(),
+          },
+        },
+      }));
+
+      const cleanupRequestEntry = (
+        outcome: { status: "approved" | "canceled" | "denied"; answers?: Record<string, string>; reason?: string },
+      ) => {
+        client.updateAgentState((state) => {
+          const requests = { ...(state.requests ?? {}) };
+          const pendingEntry = requests[askId];
+          delete requests[askId];
+          const completedBase = pendingEntry ?? {
+            tool: "mcp__happy__ask_user",
+            arguments: { questions },
+            createdAt: Date.now(),
+          };
+          return {
+            ...state,
+            requests,
+            completedRequests: {
+              ...(state.completedRequests ?? {}),
+              [askId]: {
+                ...completedBase,
+                completedAt: Date.now(),
+                status: outcome.status,
+                ...(outcome.reason ? { reason: outcome.reason } : {}),
+                ...(outcome.answers ? { answers: outcome.answers } : {}),
+              },
+            },
+          };
+        });
+      };
+
+      try {
+        const answers = await new Promise<Record<string, string>>(
+          (resolve, reject) => {
+            const timer = setTimeout(() => {
+              if (!pendingAskUser.delete(askId)) return;
+              reject(
+                new Error(
+                  `ask_user timed out after ${Math.round(ASK_USER_TIMEOUT_MS / 60000)} minutes with no response from user`,
+                ),
+              );
+            }, ASK_USER_TIMEOUT_MS);
+            pendingAskUser.set(askId, { resolve, reject, timer });
+          },
+        );
+
+        cleanupRequestEntry({ status: "approved", answers });
+        logger.debug(
+          `[happyMCP] ask_user resolved askId=${askId} answerKeys=${Object.keys(answers).length}`,
+        );
+
+        return {
+          content: [{ type: "text", text: JSON.stringify(answers) }],
+          isError: false,
+        };
+      } catch (err) {
+        const reason = (err as Error).message;
+        cleanupRequestEntry({ status: "canceled", reason });
+        logger.debug(`[happyMCP] ask_user failed askId=${askId}: ${reason}`);
+        return {
+          content: [{ type: "text", text: `ask_user failed: ${reason}` }],
+          isError: true,
+        };
+      }
+    });
+
     registerHappyTool("update_session_summary", async (args: any) => {
         const response = await summaryHandler(args);
         if (response.success) {
@@ -305,6 +467,7 @@ export async function startHappyServer(client: ApiSessionClient) {
     toolNames: [...HAPPY_MCP_TOOL_NAMES],
     stop: () => {
       logger.debug(`[happyMCP] server:stop sessionId=${client.sessionId}`);
+      rejectAllPendingAskUser("Happy MCP server stopped");
       server.close();
     },
   };

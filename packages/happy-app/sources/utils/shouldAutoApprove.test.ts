@@ -30,6 +30,25 @@ describe("shouldAutoApprove", () => {
         });
     });
 
+    // mcp__happy__ask_user: same Q&A guarantee as AskUserQuestion, but routed
+    // through happy-cli's MCP server. Auto-approving would silently call the
+    // wrong RPC and drop the user's answers.
+    describe("mcp__happy__ask_user", () => {
+        it.each([
+            "default",
+            "bypassPermissions",
+            "yolo",
+            "plan",
+            "acceptEdits",
+            "auto",
+            "dontAsk",
+            null,
+            undefined,
+        ] as const)("returns false in %s mode", (mode) => {
+            expect(shouldAutoApprove(mode, "mcp__happy__ask_user")).toBe(false);
+        });
+    });
+
     // ExitPlanMode: auto-approve in bypassPermissions and yolo
     describe("ExitPlanMode", () => {
         it.each(["bypassPermissions", "yolo"] as const)(

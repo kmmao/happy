@@ -13,9 +13,18 @@ const EDIT_TOOLS = new Set([
     "NotebookEdit",
 ]);
 
-/** Tools that always require manual interaction regardless of mode */
+/**
+ * Tools that always require manual interaction regardless of mode.
+ *
+ * Both entries are Q&A channels — auto-approving them would silently call the
+ * permission RPC with no answers, dropping the user's input and freezing the
+ * model on a never-resolving tool_use. `mcp__happy__ask_user` additionally
+ * uses a different RPC (`ask_user_response`), so auto-approving it would hit
+ * the wrong handler entirely.
+ */
 const ALWAYS_MANUAL_TOOLS = new Set([
     "AskUserQuestion",
+    "mcp__happy__ask_user",
 ]);
 
 /** ExitPlanMode tool names (Claude SDK uses both conventions) */

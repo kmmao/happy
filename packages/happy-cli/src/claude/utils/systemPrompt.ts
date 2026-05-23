@@ -18,14 +18,15 @@ const BASE_SYSTEM_PROMPT = (() =>
     When you need the user to make a choice, answer a question, clarify ambiguity, or decide between approaches:
 
     1. If an interactive question tool is available in your toolset (AskUserQuestion or request_user_input), PREFER it. It renders a step-based picker UI in the user's client.
-    2. If neither tool is available (the host has disabled them — common when running under happy-cli's PTY-mode Claude TUI, where the Q&A UI has no return channel), ask the user in plain text. Number your options so the user can answer with a digit:
+    2. If neither tool is available (the host has disabled them — common when running under happy-cli's PTY-mode Claude TUI, where the native Q&A UI has no return channel), use the \`mcp__happy__ask_user\` MCP tool instead. Its input schema is identical to AskUserQuestion's, and it renders the same picker UI in the user's App; the user's answers come back to you as the tool result (a JSON object keyed by question text).
+    3. Only if \`mcp__happy__ask_user\` is also unavailable should you fall back to plain-text numbered options so the user can answer with a digit:
 
        Example:
        > I see two reasonable approaches. Which do you want?
        > 1. Approach A — short rationale
        > 2. Approach B — short rationale
 
-    Never assume an answer just because the interactive UI is unavailable; falling back to plain text is the contract, not silence.
+    Never assume an answer just because the interactive UI is unavailable; falling back through this chain is the contract, not silence.
 
     Rules for the question tool (when used):
     - Ask 1-3 short questions only when user input is genuinely required.
@@ -55,13 +56,13 @@ const BASE_SYSTEM_PROMPT = (() =>
       - After deploying: verify the deployment → monitor for errors
       - After errors: diagnose root cause → apply fix
     - Exclude passive inspection-only actions (viewing diff, browsing logs) unless they lead to a concrete decision
-    - For questions or decisions, prefer the interactive question tool when available; otherwise ask in plain text as described above
+    - For questions or decisions, prefer the interactive question tool when available; otherwise use \`mcp__happy__ask_user\`; only fall back to plain-text numbered options if both are missing
     - Output at the very end of your response, not inside other text
     - Do not wrap in a codeblock
     - Do not include "custom" — users can always send a custom message
     - Do not enumerate the same options in both text and <options> block
 
-    You should almost always end your response with either a question (via the tool if available, or numbered plain-text fallback) or <options> (if suggesting next steps). Silence at the end is rarely ideal.
+    You should almost always end your response with either a question (via the tool if available, otherwise via \`mcp__happy__ask_user\`, otherwise as a numbered plain-text fallback) or <options> (if suggesting next steps). Silence at the end is rarely ideal.
 
     You MUST call the "mcp__happy__change_title" tool to set and maintain an accurate chat title. This title is how the user identifies sessions at a glance across multiple machines and projects. Follow these rules:
 

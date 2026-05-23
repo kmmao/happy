@@ -10,7 +10,11 @@ import {
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { ToolViewProps } from "./_all";
 import { ToolSectionView } from "../ToolSectionView";
-import { sessionAllow, sessionInterrupt } from "@/sync/ops";
+import {
+  sessionAllow,
+  sessionAskUserResponse,
+  sessionInterrupt,
+} from "@/sync/ops";
 import { t } from "@/text";
 import { Ionicons } from "@expo/vector-icons";
 
@@ -388,15 +392,25 @@ export const AskUserQuestionView = React.memo<ToolViewProps>(
         return;
       }
 
+      // Native AskUserQuestion (SDK mode) rides the standard permission RPC.
+      // `mcp__happy__ask_user` (PTY mode, registered by happy-cli's Happy MCP
+      // server) uses a dedicated `ask_user_response` RPC instead — see
+      // sessionAskUserResponse for the rationale.
+      const isMcpAskUser = tool.name === "mcp__happy__ask_user";
+
       try {
-        await sessionAllow(
-          sessionId,
-          permissionId,
-          undefined,
-          undefined,
-          undefined,
-          answers,
-        );
+        if (isMcpAskUser) {
+          await sessionAskUserResponse(sessionId, permissionId, answers);
+        } else {
+          await sessionAllow(
+            sessionId,
+            permissionId,
+            undefined,
+            undefined,
+            undefined,
+            answers,
+          );
+        }
       } catch {
         setSubmitError(true);
       } finally {
@@ -407,6 +421,7 @@ export const AskUserQuestionView = React.memo<ToolViewProps>(
       questions,
       otherTexts,
       isSubmitting,
+      tool.name,
       tool.permission?.id,
       tool.id,
     ]);

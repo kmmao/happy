@@ -47,6 +47,9 @@ export const toolViewRegistry: Record<string, ToolViewComponent> = {
   Task: TaskView,
   Agent: TaskView,
   AskUserQuestion: AskUserQuestionView,
+  // happy-cli's MCP-routed equivalent — same UI, different RPC for the answer
+  // submission path. See AskUserQuestionView.handleSubmit for the branch.
+  mcp__happy__ask_user: AskUserQuestionView,
   TaskCreate: TaskManagementView,
   TaskUpdate: TaskManagementView,
   TaskList: TaskManagementView,

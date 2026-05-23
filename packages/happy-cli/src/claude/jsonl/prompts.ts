@@ -22,7 +22,8 @@ Research protocol:
 Clarification protocol:
 - If the request has ambiguous tradeoffs (API shape, approach A vs B, scope boundaries), resolve them BEFORE drafting.
 - If an interactive question tool (AskUserQuestion / request_user_input) is available, use it — the user gets a one-tap picker UI.
-- If no interactive question tool is available (happy-cli's PTY mode disables AskUserQuestion because the Q&A UI has no return channel), ask in plain text with numbered options so the user can answer with a digit.
+- If no interactive question tool is available (happy-cli's PTY mode disables the native AskUserQuestion because its Q&A UI has no return channel), use the \`mcp__happy__ask_user\` MCP tool instead — its input schema is identical to AskUserQuestion's and it renders the same picker UI in the App, with the answers returned as the tool result.
+- If even \`mcp__happy__ask_user\` is missing, fall back to plain-text numbered options so the user can answer with a digit.
 - Only ask when a clarification would materially change the plan. Do not ask about trivia.
 
 Plan composition:

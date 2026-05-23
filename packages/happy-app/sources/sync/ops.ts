@@ -2051,6 +2051,42 @@ export async function sessionAllow(
 }
 
 /**
+ * Submit answers for an `mcp__happy__ask_user` MCP tool invocation.
+ *
+ * Separate from `sessionAllow` because the underlying RPC handler is
+ * registered by happy-cli's Happy MCP server (not the SDK permission flow),
+ * so it speaks a leaner schema with just `{ askId, answers }`. Keeping the
+ * two RPC paths apart means native AskUserQuestion (SDK mode) and the MCP
+ * variant (PTY mode) can coexist without one tripping over the other.
+ */
+export async function sessionAskUserResponse(
+  sessionId: string,
+  askId: string,
+  answers: Record<string, string>,
+): Promise<void> {
+  // Mirror sessionAllow: dismiss needs-attention dot as soon as the user
+  // engages, so the App's session-list badge clears even before the RPC
+  // completes (which can be slow on flaky links).
+  const session = storage.getState().sessions[sessionId];
+  if (session?.needsAttention) {
+    storage.getState().applySessions([{ ...session, needsAttention: false }]);
+  }
+
+  try {
+    await apiSocket.sessionRPC(sessionId, "ask_user_response", {
+      askId,
+      answers,
+    });
+  } catch (error) {
+    console.error(
+      `[sessionAskUserResponse] RPC failed (sessionId=${sessionId}, askId=${askId}):`,
+      error,
+    );
+    throw error;
+  }
+}
+
+/**
  * Deny a permission request
  */
 export async function sessionDeny(

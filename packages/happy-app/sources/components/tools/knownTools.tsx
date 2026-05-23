@@ -1377,6 +1377,79 @@ export const knownTools = {
       );
     },
   },
+  // happy-cli's in-process MCP tool for asking the user questions from PTY mode,
+  // where the SDK's native AskUserQuestion has no return channel. The input
+  // schema mirrors AskUserQuestion's exactly. The same AskUserQuestionView is
+  // mapped to this tool name via toolViewRegistry in ./views/_all.tsx — the
+  // view itself branches on tool.name to call `ask_user_response` (this tool)
+  // vs `sessionAllow` (native AskUserQuestion) when the user submits answers.
+  mcp__happy__ask_user: {
+    title: (opts: { metadata: Metadata | null; tool: ToolCall }) => {
+      if (
+        opts.tool.input?.questions &&
+        Array.isArray(opts.tool.input.questions) &&
+        opts.tool.input.questions.length > 0
+      ) {
+        const qs = opts.tool.input.questions;
+        if (qs.length > 1) {
+          return t("tools.askUserQuestion.multipleQuestions", {
+            count: qs.length,
+          });
+        }
+        if (qs[0].header) {
+          return qs[0].header;
+        }
+      }
+      return t("tools.names.question");
+    },
+    icon: ICON_QUESTION,
+    minimal: false,
+    noStatus: true,
+    input: z
+      .object({
+        questions: z
+          .array(
+            z.object({
+              question: z.string().describe("The question to ask"),
+              header: z.string().describe("Short label for the question"),
+              options: z
+                .array(
+                  z.object({
+                    label: z.string().describe("Option label"),
+                    description: z.string().describe("Option description"),
+                    preview: z.string().optional().describe("Optional markdown preview content for this option"),
+                  }),
+                )
+                .describe("Available choices"),
+              multiSelect: z.boolean().describe("Allow multiple selections"),
+            }),
+          )
+          .describe("Questions to ask the user"),
+      })
+      .partial()
+      .passthrough(),
+    extractSubtitle: (opts: { metadata: Metadata | null; tool: ToolCall }) => {
+      if (
+        opts.tool.input?.questions &&
+        Array.isArray(opts.tool.input.questions)
+      ) {
+        const qs = opts.tool.input.questions;
+        if (qs.length === 1) {
+          return qs[0].question;
+        }
+        const headers = qs
+          .map((q: { header?: string }) => q.header)
+          .filter(Boolean);
+        if (headers.length > 0) {
+          return headers.join(" · ");
+        }
+        return t("tools.askUserQuestion.multipleQuestions", {
+          count: qs.length,
+        });
+      }
+      return null;
+    },
+  },
   mcp__happy__save_memory: {
     title: "Save Memory",
     icon: ICON_TODO,
