@@ -18,6 +18,7 @@
  * behaviour in PTY mode:
  *
  *   • interrupt()             → write Ctrl-C (0x03) to PTY stdin
+ *   • approveExitPlan()       → write "1\r" to confirm TUI plan-mode dialog
  *   • mcpServerStatus()       → snapshot the launcher-side MCP config map
  *   • getContextUsage()       → reconstruct usage from JSONL snapshot
  *   • initializationResult()  → returns empty models[] (App still polls)
@@ -110,6 +111,21 @@ function maxTokensForModel(model: string): number {
 export interface ClaudePtyController {
   /** Send SIGINT-equivalent to the PTY (Ctrl-C). */
   interrupt(): Promise<void>;
+  /**
+   * Approve the Claude TUI's ExitPlanMode confirmation dialog by writing
+   * the "1\r" keystroke to PTY stdin — selecting the first option
+   * ("Yes, and auto-accept edits going forward"). Required because PTY
+   * mode bypasses `canCallTool`: when Claude emits an ExitPlanMode tool_use
+   * the TUI renders an in-terminal Yes/No picker that no App button can
+   * reach. In Yolo/bypassPermissions mode the launcher invokes this
+   * automatically so plan-mode sessions don't hang indefinitely.
+   *
+   * NOTE: TUI's exit-plan picker has no "bypassPermissions" option — it
+   * only offers auto-accept-edits (option 1) or manual approval (option 2).
+   * We pick option 1 because it preserves the closest equivalent of the
+   * user's intent (no further per-tool prompts) for the rest of the turn.
+   */
+  approveExitPlan(): Promise<void>;
   /** Initialization result — returns empty model list in PTY mode. */
   initializationResult(): Promise<{
     claude_code_version?: string;
@@ -193,7 +209,8 @@ export interface ClaudePtyController {
 /**
  * Create a PTY-backed controller stub.
  *
- * @param pty            Live PTY handle — only `interrupt()` uses it.
+ * @param pty            Live PTY handle — used by `interrupt()` and
+ *                       `approveExitPlan()` to write control bytes / keys.
  * @param getLatestUsage Optional getter for the latest assistant-message usage
  *                       snapshot. Provided by `claudeRemote.ts` which updates
  *                       a shared reference as the session scanner emits
@@ -213,6 +230,14 @@ export function createClaudePtyController(
     async interrupt() {
       logger.debug("[ptyController] interrupt → Ctrl-C");
       pty.interrupt();
+    },
+
+    async approveExitPlan() {
+      // "1" + CR selects the first option ("Yes, and auto-accept edits")
+      // in the TUI's plan-mode confirmation dialog. CR (\r) matches the
+      // submit convention used elsewhere in the PTY layer.
+      logger.debug("[ptyController] approveExitPlan → write '1\\r'");
+      pty.write("1\r");
     },
 
     async initializationResult() {

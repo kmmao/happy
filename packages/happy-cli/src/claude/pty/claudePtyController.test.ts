@@ -34,6 +34,27 @@ function makeStubPty(): ClaudePtyHandle {
   };
 }
 
+/**
+ * Stub PTY that records every `write()` call. Used to assert that
+ * `approveExitPlan()` actually pushes the expected bytes to PTY stdin.
+ */
+function makeRecordingPty(): ClaudePtyHandle & { writes: string[] } {
+  const writes: string[] = [];
+  return {
+    get pid() { return 1234; },
+    get cols() { return 80; },
+    get rows() { return 24; },
+    get exited() { return false; },
+    write(data: string) { writes.push(data); },
+    resize() {},
+    interrupt() {},
+    kill() {},
+    onData() { return () => undefined; },
+    onExit() { return () => undefined; },
+    writes,
+  };
+}
+
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
 describe("createClaudePtyController — getContextUsage", () => {
@@ -189,5 +210,28 @@ describe("createClaudePtyController — mcpServerStatus", () => {
     expect(result).toHaveLength(1);
     expect(result[0].name).toBe("new-server");
     expect(result[0].status).toBe("connected");
+  });
+});
+
+// ── approveExitPlan tests ─────────────────────────────────────────────────────
+
+describe("createClaudePtyController — approveExitPlan", () => {
+  it("writes '1\\r' to PTY stdin to confirm the plan-mode dialog", async () => {
+    const pty = makeRecordingPty();
+    const controller = createClaudePtyController(pty);
+
+    await controller.approveExitPlan();
+
+    expect(pty.writes).toEqual(["1\r"]);
+  });
+
+  it("is idempotent across multiple calls — each emits one keystroke", async () => {
+    const pty = makeRecordingPty();
+    const controller = createClaudePtyController(pty);
+
+    await controller.approveExitPlan();
+    await controller.approveExitPlan();
+
+    expect(pty.writes).toEqual(["1\r", "1\r"]);
   });
 });
