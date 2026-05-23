@@ -61,6 +61,7 @@ import { startClaudePty, type ClaudePtyHandle } from "@/claude/pty/claudePtyRunt
 import {
   createClaudePtyController,
   type ClaudePtyController,
+  type UsageSnapshot,
 } from "@/claude/pty/claudePtyController";
 import { buildClaudeCliFlags } from "@/claude/pty/claudeCliFlags";
 import { rawToSdkMessage } from "@/claude/pty/rawToSdkMessage";
@@ -174,21 +175,33 @@ function flattenUserContent(msg: SDKUserMessage): string {
  * unsubmitted in the input buffer and the message would never reach the
  * agent. (Symptom pre-fix: spinner stuck, jsonl file never written.)
  *
- * Multi-line text is wrapped in bracketed-paste markers (`ESC[200~ … ESC[201~`)
- * so embedded newlines are preserved as a single paste rather than each one
- * being interpreted as a submit. Bracketed paste is supported by Claude's
- * TUI input handler. The trailing `\r` is the explicit submit keystroke.
+ * Why we ALWAYS wrap in bracketed paste (`ESC[200~ … ESC[201~`) — even for
+ * single-line input
+ * --------------------------------------------------------------------------
+ * Pre-fix the single-line fast path was `${message}\r` without paste markers.
+ * Observed in the wild (`~/.happy/logs/2026-05-23-21-13-01-pid-99100.log`,
+ * 21:14:10): a 73-char Chinese prompt was written to the PTY, but the TUI
+ * sat with the body in the composer for ~2m40s with nothing in the JSONL —
+ * until the user typed `1` + Enter, which "unstuck" the buffer and
+ * submitted both prompts back-to-back.
+ *
+ * Root cause: when CJK / multibyte / longer text lands as one PTY chunk,
+ * Ink's input handler treats the burst as an implicit paste and folds the
+ * trailing `\r` into the paste body rather than processing it as a discrete
+ * Enter keystroke. The submit never fires.
+ *
+ * The fix is to make the intent explicit: `\x1b[200~ … \x1b[201~` tells the
+ * TUI exactly when the paste body ends. After `\x1b[201~` the input handler
+ * exits paste mode, and the subsequent `\r` is processed as a normal Enter.
+ * This costs ~6 extra bytes per write and matches what every modern terminal
+ * does when the user actually pastes.
  */
 function writePromptToPty(pty: ClaudePtyHandle, message: string): void {
   const preview = message.length > 60 ? `${message.slice(0, 60)}…` : message;
   logger.debug(
     `[claudeRemote] writePromptToPty len=${message.length} multiline=${message.includes("\n")} preview=${JSON.stringify(preview)}`,
   );
-  if (message.includes("\n")) {
-    pty.write(`\x1b[200~${message}\x1b[201~\r`);
-  } else {
-    pty.write(`${message}\r`);
-  }
+  pty.write(`\x1b[200~${message}\x1b[201~\r`);
 }
 
 /**
@@ -483,7 +496,17 @@ export async function claudeRemote(opts: {
     logger.debug(`[claudeRemote] Failed to spawn claude PTY: ${msg}`);
     throw e;
   }
-  const controller = createClaudePtyController(pty);
+  // Shared usage snapshot — updated by the session scanner's onMessage as
+  // each assistant message arrives; read by controller.getContextUsage() so
+  // the App's context-window panel shows real token counts in PTY mode.
+  let latestUsage: UsageSnapshot | null = null;
+  const controller = createClaudePtyController(
+    pty,
+    () => latestUsage,
+    // Expose the launch-time MCP server map so mcpServerStatus() can list
+    // configured servers even without a live SDK connection.
+    () => (opts.mcpServers ?? {}),
+  );
   opts.onQueryReady?.(controller);
   logger.debug(
     `[perf] sdk query() call completed (sync part): ${Date.now() - sdkCallAt}ms`,
@@ -843,6 +866,19 @@ export async function claudeRemote(opts: {
       if (sdkMsg) {
         logger.debugLargeJson(`[claudeRemote] onMessageReceived ${raw.type}`, sdkMsg);
         opts.onMessage(sdkMsg);
+      }
+
+      // Update the shared usage snapshot so controller.getContextUsage()
+      // can return real token counts for the context-window panel (PTY mode).
+      if (raw.type === "assistant" && raw.message?.usage && raw.message.model) {
+        const u = raw.message.usage;
+        latestUsage = {
+          model: raw.message.model,
+          inputTokens: u.input_tokens,
+          cacheReadInputTokens: u.cache_read_input_tokens ?? 0,
+          cacheCreationInputTokens: u.cache_creation_input_tokens ?? 0,
+          outputTokens: u.output_tokens,
+        };
       }
 
       // Surface new session ids as the JSONL records show up.
