@@ -10,7 +10,7 @@ import {
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { ToolViewProps } from "./_all";
 import { ToolSectionView } from "../ToolSectionView";
-import { sessionAllow } from "@/sync/ops";
+import { sessionAllow, sessionInterrupt } from "@/sync/ops";
 import { t } from "@/text";
 import { Ionicons } from "@expo/vector-icons";
 
@@ -411,6 +411,28 @@ export const AskUserQuestionView = React.memo<ToolViewProps>(
       tool.id,
     ]);
 
+    // Escape hatch for PTY-mode sessions: the CLI's PTY launcher disables
+    // AskUserQuestion (see packages/happy-cli/src/claude/claudeRemote.ts) but
+    // older CLI builds — or pre-Tier-A sessions already in flight — can still
+    // emit a tool_use that nothing on the CLI side will ever resolve. When
+    // submit fails or the permission record never arrives, this lets the user
+    // send Ctrl-C through the PTY (sessionInterrupt → controller.interrupt)
+    // so Claude TUI exits its in-terminal Q&A UI and the session unblocks.
+    // Surfaced only on the submit-error path so normal sessions never see it.
+    const [isCancelling, setIsCancelling] = React.useState(false);
+    const handleCancelStuck = React.useCallback(async () => {
+      if (!sessionId || isCancelling) return;
+      setIsCancelling(true);
+      try {
+        await sessionInterrupt(sessionId);
+      } catch {
+        // sessionInterrupt is a fire-and-forget; surfacing a retry would
+        // require its own UX and the user can simply tap again.
+      } finally {
+        setIsCancelling(false);
+      }
+    }, [sessionId, isCancelling]);
+
     // Show submitted/completed state
     if (isAnswered || tool.state === "completed") {
       return (
@@ -542,6 +564,33 @@ export const AskUserQuestionView = React.memo<ToolViewProps>(
               })()}
             </View>
           </View>
+
+          {/* Submit error escape hatch — only shown after a real submit
+              attempt failed. See handleCancelStuck for the rationale. */}
+          {canInteract && submitError && (
+            <View style={styles.cancelHintContainer}>
+              <Text style={styles.cancelHintText}>
+                {t("tools.askUserQuestion.cancelStuckHint")}
+              </Text>
+              <TouchableOpacity
+                onPress={handleCancelStuck}
+                disabled={isCancelling}
+                activeOpacity={0.7}
+                style={styles.cancelHintButton}
+              >
+                {isCancelling ? (
+                  <ActivityIndicator
+                    size="small"
+                    color={theme.colors.textSecondary}
+                  />
+                ) : (
+                  <Text style={styles.cancelHintButtonText}>
+                    {t("tools.askUserQuestion.cancelStuckAction")}
+                  </Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          )}
 
           {/* Navigation + Submit */}
           {canInteract && (
@@ -855,6 +904,35 @@ const styles = StyleSheet.create((theme) => ({
     color: theme.colors.button.primary.tint,
     fontSize: 14,
     fontWeight: "600",
+  },
+
+  // PTY-mode escape hatch (rendered only when submit fails)
+  cancelHintContainer: {
+    marginTop: 8,
+    padding: 12,
+    borderRadius: 8,
+    backgroundColor: theme.colors.surfaceHighest,
+    gap: 8,
+  },
+  cancelHintText: {
+    fontSize: 12,
+    color: theme.colors.textSecondary,
+    lineHeight: 16,
+  },
+  cancelHintButton: {
+    alignSelf: "flex-start",
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: theme.colors.divider,
+    minHeight: 32,
+    justifyContent: "center",
+  },
+  cancelHintButtonText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: theme.colors.text,
   },
 
   // Other input

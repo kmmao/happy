@@ -1377,6 +1377,9 @@ export const it: TranslationStructure = {
       otherDescription: "Scrivi la tua risposta",
       otherPlaceholder: "Scrivi la tua risposta...",
       recommended: "Consigliato",
+      cancelStuckHint:
+        "Impossibile inviare la risposta — questa sessione potrebbe non supportare il selettore. Chiudilo per consentire a Claude di proseguire in testo semplice.",
+      cancelStuckAction: "Annulla e continua",
     },
     planFile: {
       refreshFromFile: "Aggiorna dal file",

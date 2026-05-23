@@ -1367,6 +1367,9 @@ export const ja: TranslationStructure = {
       otherDescription: "自分の回答を入力",
       otherPlaceholder: "回答を入力...",
       recommended: "推奨",
+      cancelStuckHint:
+        "回答を送信できませんでした — このセッションはピッカーをサポートしていない可能性があります。閉じれば Claude はプレーンテキストで続行できます。",
+      cancelStuckAction: "キャンセルして続行",
     },
     planFile: {
       refreshFromFile: "ファイルから更新",

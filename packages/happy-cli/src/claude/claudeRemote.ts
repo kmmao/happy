@@ -459,10 +459,28 @@ export async function claudeRemote(opts: {
   // The mode passed to buildClaudeCliFlags carries the merged append-prompt
   // and the resolved model so the CLI builder does not need to know about
   // the locale dance.
+  //
+  // AskUserQuestion is also force-disabled here. In the legacy SDK path the
+  // App's interactive Q&A UI rode on `canCallTool` → `permissionHandler.
+  // handleToolCall`: when Claude emitted an AskUserQuestion tool_use the SDK
+  // paused the turn, fired our hook, we registered a pending request, the App
+  // rendered the picker, and the user's answer flowed back via `sessionAllow`
+  // and got merged into `updatedInput`. PTY mode has no `canCallTool` hook
+  // and no way to inject `updatedInput` mid-turn — Claude TUI renders its own
+  // in-terminal Q&A UI and waits for local keyboard input that the App can
+  // never deliver. Result: every AskUserQuestion tool_use hangs the session
+  // (the App's "submit" button silently no-ops because `tool.permission` is
+  // never set). Disabling the tool forces Claude to ask via plain text, which
+  // the App's message composer already handles. See
+  // packages/happy-cli/src/claude/utils/systemPrompt.ts for the matching
+  // prompt-side change.
   const flagMode: EnhancedMode = {
     ...initial.mode,
     model: model ?? initial.mode.model,
     appendSystemPrompt: mergedAppendSystemPrompt,
+    disallowedTools: Array.from(
+      new Set([...(initial.mode.disallowedTools ?? []), "AskUserQuestion"]),
+    ),
   };
 
   const flagsResult = buildClaudeCliFlags({

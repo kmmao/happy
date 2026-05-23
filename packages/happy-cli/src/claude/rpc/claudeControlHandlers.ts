@@ -1,9 +1,9 @@
 /**
  * Claude Control RPC handlers — CLI-side implementations for the sidebar
- * APIs exposed to Happy App (SDK 0.2.119+, extended in 0.3.142+).
+ * APIs exposed to Happy App.
  *
  * Schemas are defined in @kmmao/happy-wire/claudeControlRpc.ts. This file
- * implements each method on top of the Claude SDK (`Query`) and host
+ * implements each method on top of the `ClaudePtyController` and host
  * filesystem, with the tier-based security gating described in
  * docs/encryption.md.
  *
@@ -12,18 +12,22 @@
  *
  * Stage 3A (plaintext-content tier):
  *   - get_session_cost: aggregates cost from ClaudeJsonlResultMessage stream
- *   - get_binary_version: queries SDK initializationResult()
+ *   - get_binary_version: reads `claude --version` via initializationResult()
+ *     (empty in PTY mode — see ClaudePtyController for the contract)
  *   - set_color: stores session accent color in local session state (App also
  *     mirrors it; no long-term persistence here — App is the source of truth)
  *
  * Stage 3B (E2E content tier):
- *   - read_file: SDK's Query.readFile() with CLI-side path blacklist
+ *   - read_file: file-read with CLI-side path blacklist. Returns null in PTY
+ *     mode (no host-side allow-list to safely re-implement) → handler maps
+ *     to `permission_denied`.
  *
  * Stage 3C (permission-gated):
  *   - mcp_call: CLI-side MCP server whitelist gating. The App MUST display a
  *     2-step confirmation and echo the token back via clientConfirmToken.
  *     CLI logs each call for audit. Default deny until an explicit whitelist
- *     is provided.
+ *     is provided. Currently returns `sdk_not_implemented` — see the handler
+ *     for the historical reason and the PTY-mode equivalent.
  */
 
 import { join, isAbsolute, resolve as resolvePath } from "node:path";
@@ -415,31 +419,33 @@ export function registerClaudeControlHandlers(
       logger.debug(
         `[claudeControl] [AUDIT] mcp_call server=${parsed.server} tool=${parsed.toolName} confirmToken=${req.clientConfirmToken.slice(0, 8)}...`,
       );
-      // Upstream SDK gap: `@anthropic-ai/claude-agent-sdk@0.2.119` ships the
-      // `ClaudeJsonlControlMcpCallRequest` protocol type in sdk.d.ts but exposes no
-      // corresponding runtime method on the `Query` interface — the existing
-      // `mcpServerStatus()` / `setMcpServers()` / `reconnectMcpServer()` /
-      // `toggleMcpServer()` members only configure and report on servers,
-      // none invokes a tool. Until the SDK lands a public `callMcpTool()`
-      // (or equivalent), we return `sdk_not_implemented` so the App can
-      // surface an honest "waiting on SDK" state instead of masking the gap
-      // as a transient server error.
+      // No programmatic MCP-tool invocation surface in PTY mode: the Claude
+      // TUI subprocess connects to MCP servers itself (via --mcp-config) and
+      // exposes no IPC for happy-cli to call a single MCP tool out-of-band.
+      // The historical SDK era was equally stuck — `@anthropic-ai/claude-
+      // agent-sdk@0.2.119` shipped the `ClaudeJsonlControlMcpCallRequest`
+      // protocol type in sdk.d.ts but never exposed a runtime `callMcpTool()`
+      // on `Query`. The `sdk_not_implemented` error code (kept for wire
+      // compatibility) signals exactly this: whitelist and confirm token
+      // were accepted, but the underlying agent runtime has no entry point
+      // to invoke.
       //
-      // Rolling our own MCP client (spawning a parallel
-      // `@modelcontextprotocol/sdk` connection per whitelisted server) is
-      // possible but duplicates the SDK's managed lifecycle and cannot cover
-      // `type: 'sdk'` servers — not worth the maintenance cost for a gap
-      // that should be closed upstream.
+      // Rolling our own MCP client (spawning a parallel `@modelcontextprotocol/
+      // sdk` connection per whitelisted server) would duplicate the TUI's
+      // connection lifecycle and cannot cover stdio servers without forking
+      // them again — not worth the maintenance cost for a feature the App
+      // already gates behind an explicit confirm dialog.
       return {
         success: false,
         errorCode: "sdk_not_implemented",
         errorMessage:
-          "Claude Agent SDK 0.2.119 does not expose a public runtime method for mcp_call (protocol type is declared but unimplemented). Waiting on upstream; whitelist and confirm token were accepted.",
+          "mcp_call is not supported in PTY mode — the Claude TUI owns the MCP connections and exposes no programmatic invocation surface. Whitelist and confirm token were accepted.",
       };
     },
   );
 
-  // get_context_usage — context window breakdown via SDK getContextUsage()
+  // get_context_usage — context window breakdown reconstructed from the
+  // latest assistant JSONL record (see ClaudePtyController.getContextUsage)
   rpcHandlerManager.registerHandler<GetContextUsageRequest, GetContextUsageResponse>(
     `${scope}:get_context_usage`,
     async () => {

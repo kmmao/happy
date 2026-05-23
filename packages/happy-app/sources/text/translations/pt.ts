@@ -1311,6 +1311,9 @@ export const pt: TranslationStructure = {
       otherDescription: "Digite sua própria resposta",
       otherPlaceholder: "Digite sua resposta...",
       recommended: "Recomendado",
+      cancelStuckHint:
+        "Não foi possível enviar a resposta — esta sessão pode não suportar o seletor. Feche-o para que o Claude continue em texto puro.",
+      cancelStuckAction: "Cancelar e continuar",
     },
     planFile: {
       refreshFromFile: "Atualizar do arquivo",

@@ -1313,6 +1313,9 @@ export const ca: TranslationStructure = {
       otherDescription: "Escriu la teva pròpia resposta",
       otherPlaceholder: "Escriu la teva resposta...",
       recommended: "Recomanat",
+      cancelStuckHint:
+        "No s'ha pogut enviar la resposta — aquesta sessió pot no admetre el selector. Tanca'l perquè Claude continuï en text pla.",
+      cancelStuckAction: "Cancel·la i continua",
     },
     planFile: {
       refreshFromFile: "Actualitza des del fitxer",

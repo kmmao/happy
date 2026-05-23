@@ -115,11 +115,13 @@ export const McpCallResponseSchema = z.object({
         'invalid_arguments',
         'permission_denied',
         /**
-         * SDK 0.2.119 defines the `mcp_call` control protocol type but does
-         * not expose a public runtime method on the `Query` interface. Until
-         * upstream lands a `callMcpTool()` / equivalent, the CLI handler
-         * returns this code so the App can surface an honest "waiting on
-         * SDK" state instead of masking the gap as a server error.
+         * The agent runtime has no programmatic MCP-tool invocation surface.
+         * In PTY mode the Claude TUI owns the MCP connections itself; the
+         * historical Claude Agent SDK also never exposed a runtime
+         * `callMcpTool()` on `Query`. The CLI handler returns this code so
+         * the App can surface an honest "not supported" state instead of
+         * masking the gap as a server error. Code name preserved for wire
+         * compatibility across older CLI / App builds.
          */
         'sdk_not_implemented',
         'unknown',
