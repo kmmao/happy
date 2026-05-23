@@ -449,12 +449,19 @@ export const AskUserQuestionView = React.memo<ToolViewProps>(
     }, [sessionId, isCancelling]);
 
     // "Decline to answer" path for `mcp__happy__ask_user`. Unlike the stuck
-    // escape hatch above, this is a normal user choice — surfaced whenever
-    // the picker is interactive. We POST `canceled: true` so happy-cli's
-    // RPC handler rejects the pending MCP promise, which surfaces to Claude
-    // TUI as isError and the model picks a fallback path. Native
-    // AskUserQuestion (SDK mode) has no equivalent decline channel today, so
-    // the button is gated to the MCP variant.
+    // escape hatch above, this is a normal user choice — and it's a
+    // whole-prompt decision, not a per-step one, so the button is rendered
+    // alongside the back/next navigation on every step (not only the last).
+    // Used to sit inside the last-step branch which made it invisible in
+    // multi-step prompts until the user finished navigating to the end —
+    // confusing because "decline" is exactly what you'd want to do at any
+    // earlier step too.
+    //
+    // We POST `canceled: true` so happy-cli's RPC handler rejects the
+    // pending MCP promise, which surfaces to Claude TUI as isError and the
+    // model picks a fallback path. Native AskUserQuestion (SDK mode) has no
+    // equivalent decline channel today, so the button is gated to the MCP
+    // variant.
     const isMcpAskUser = tool.name === "mcp__happy__ask_user";
     const [isDeclining, setIsDeclining] = React.useState(false);
     const handleDecline = React.useCallback(async () => {
@@ -639,7 +646,11 @@ export const AskUserQuestionView = React.memo<ToolViewProps>(
             </View>
           )}
 
-          {/* Navigation + Submit */}
+          {/* Navigation + Decline + Submit
+              Layout: [← Back] [Decline]  ...spacer...  [Next →] or [Submit]
+              Decline sits on the left side because it's a global "abandon
+              this prompt" action — it must be reachable at every step, not
+              gated behind navigating to the last one. */}
           {canInteract && (
             <View style={styles.actionsContainer}>
               {questions.length > 1 && currentStep > 0 && (
@@ -653,6 +664,29 @@ export const AskUserQuestionView = React.memo<ToolViewProps>(
                     size={16}
                     color={theme.colors.text}
                   />
+                </TouchableOpacity>
+              )}
+              {isMcpAskUser && (
+                <TouchableOpacity
+                  style={[
+                    styles.declineButton,
+                    (isSubmitting || isDeclining) &&
+                      styles.declineButtonDisabled,
+                  ]}
+                  onPress={handleDecline}
+                  disabled={isSubmitting || isDeclining}
+                  activeOpacity={0.7}
+                >
+                  {isDeclining ? (
+                    <ActivityIndicator
+                      size="small"
+                      color={theme.colors.textSecondary}
+                    />
+                  ) : (
+                    <Text style={styles.declineButtonText}>
+                      {t("tools.askUserQuestion.decline")}
+                    </Text>
+                  )}
                 </TouchableOpacity>
               )}
               <View style={styles.actionsSpacer} />
@@ -678,71 +712,41 @@ export const AskUserQuestionView = React.memo<ToolViewProps>(
                   />
                 </TouchableOpacity>
               ) : (
-                <>
-                  {/* Decline button — gated to the MCP variant because native
-                      AskUserQuestion (SDK mode) has no equivalent decline RPC.
-                      Sits to the left of Submit as a secondary text button so
-                      it's visible but doesn't compete with the primary
-                      action. */}
-                  {isMcpAskUser && (
-                    <TouchableOpacity
-                      style={[
-                        styles.declineButton,
-                        (isSubmitting || isDeclining) &&
-                          styles.declineButtonDisabled,
-                      ]}
-                      onPress={handleDecline}
-                      disabled={isSubmitting || isDeclining}
-                      activeOpacity={0.7}
-                    >
-                      {isDeclining ? (
-                        <ActivityIndicator
-                          size="small"
-                          color={theme.colors.textSecondary}
-                        />
-                      ) : (
-                        <Text style={styles.declineButtonText}>
-                          {t("tools.askUserQuestion.decline")}
-                        </Text>
-                      )}
-                    </TouchableOpacity>
-                  )}
-                  <TouchableOpacity
-                    style={[
-                      styles.submitButton,
-                      (!allQuestionsAnswered || isSubmitting || isDeclining) &&
-                        styles.submitButtonDisabled,
-                      submitError && styles.submitButtonError,
-                    ]}
-                    onPress={handleSubmit}
-                    disabled={
-                      !allQuestionsAnswered || isSubmitting || isDeclining
-                    }
-                    activeOpacity={0.7}
-                  >
-                    {isSubmitting ? (
-                      <ActivityIndicator
-                        size="small"
+                <TouchableOpacity
+                  style={[
+                    styles.submitButton,
+                    (!allQuestionsAnswered || isSubmitting || isDeclining) &&
+                      styles.submitButtonDisabled,
+                    submitError && styles.submitButtonError,
+                  ]}
+                  onPress={handleSubmit}
+                  disabled={
+                    !allQuestionsAnswered || isSubmitting || isDeclining
+                  }
+                  activeOpacity={0.7}
+                >
+                  {isSubmitting ? (
+                    <ActivityIndicator
+                      size="small"
+                      color={theme.colors.button.primary.tint}
+                    />
+                  ) : submitError ? (
+                    <>
+                      <Ionicons
+                        name="refresh"
+                        size={14}
                         color={theme.colors.button.primary.tint}
                       />
-                    ) : submitError ? (
-                      <>
-                        <Ionicons
-                          name="refresh"
-                          size={14}
-                          color={theme.colors.button.primary.tint}
-                        />
-                        <Text style={styles.submitButtonText}>
-                          {t("tools.askUserQuestion.submitRetry")}
-                        </Text>
-                      </>
-                    ) : (
                       <Text style={styles.submitButtonText}>
-                        {t("tools.askUserQuestion.submit")}
+                        {t("tools.askUserQuestion.submitRetry")}
                       </Text>
-                    )}
-                  </TouchableOpacity>
-                </>
+                    </>
+                  ) : (
+                    <Text style={styles.submitButtonText}>
+                      {t("tools.askUserQuestion.submit")}
+                    </Text>
+                  )}
+                </TouchableOpacity>
               )}
             </View>
           )}
