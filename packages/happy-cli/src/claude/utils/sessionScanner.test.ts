@@ -7,6 +7,9 @@ import { tmpdir } from 'node:os'
 import { existsSync } from 'node:fs'
 import { getProjectPath } from './path'
 
+// Helper: encode one main-jsonl message line.
+const ln = (obj: unknown) => JSON.stringify(obj) + '\n'
+
 describe('sessionScanner', () => {
   let testDir: string
   let projectDir: string
@@ -207,5 +210,324 @@ describe('sessionScanner', () => {
     //   expect((lastAssistantMsg.message.content as any)[0].text).toBe('kekr')
     //   expect(lastAssistantMsg.message.id).toBe('msg_01KWeuP88pkzRtXmggJRnQmV')
     // }
+  })
+
+  describe('subagent interleave', () => {
+    it('injects subagent messages with parent_tool_use_id and dedups across polls', async () => {
+      // Cycle 1 tracer:
+      //   - Main jsonl contains: user → assistant w/ Task tool_use (id=tu_1).
+      //   - subagents/agent-X.{meta.json,jsonl} matches the tool_use via triple-key.
+      //   - First sync: onMessage receives the main pair AND the subagent's two
+      //     internal messages, each carrying parent_tool_use_id === 'tu_1'.
+      //   - Second sync (triggered by appending a new main message) must NOT
+      //     re-emit the subagent's messages (uuid dedup by processedMessageKeys).
+      const sessionId = 'sess-tracer-1'
+      const sessionFile = join(projectDir, `${sessionId}.jsonl`)
+      const subagentsDir = join(projectDir, sessionId, 'subagents')
+      await mkdir(subagentsDir, { recursive: true })
+
+      const mainUser = {
+        type: 'user',
+        uuid: 'main-u-1',
+        message: { role: 'user', content: 'spawn an agent' },
+      }
+      const mainAssistantWithTask = {
+        type: 'assistant',
+        uuid: 'main-a-1',
+        message: {
+          role: 'assistant',
+          id: 'msg_main',
+          content: [
+            {
+              type: 'tool_use',
+              id: 'tu_1',
+              name: 'Task',
+              input: {
+                subagent_type: 'Explore',
+                description: 'Find files',
+                prompt: 'List all the files in this repo',
+              },
+            },
+          ],
+        },
+      }
+      await writeFile(sessionFile, ln(mainUser) + ln(mainAssistantWithTask))
+
+      await writeFile(
+        join(subagentsDir, 'agent-X.meta.json'),
+        JSON.stringify({ agentType: 'Explore', description: 'Find files' }),
+      )
+      const subUser = {
+        type: 'user',
+        uuid: 'sub-u-1',
+        isSidechain: true,
+        message: { role: 'user', content: 'List all the files in this repo' },
+      }
+      const subAssistant = {
+        type: 'assistant',
+        uuid: 'sub-a-1',
+        isSidechain: true,
+        message: {
+          role: 'assistant',
+          id: 'msg_sub',
+          content: [{ type: 'text', text: 'Here are the files' }],
+        },
+      }
+      await writeFile(
+        join(subagentsDir, 'agent-X.jsonl'),
+        ln(subUser) + ln(subAssistant),
+      )
+
+      scanner = await createSessionScanner({
+        sessionId: null,
+        workingDirectory: testDir,
+        onMessage: (msg) => collectedMessages.push(msg),
+      })
+      scanner.onNewSession(sessionId)
+      await new Promise((r) => setTimeout(r, 200))
+
+      const subUserOut = collectedMessages.find(
+        (m) => m.type === 'user' && m.uuid === 'sub-u-1',
+      )
+      const subAssistantOut = collectedMessages.find(
+        (m) => m.type === 'assistant' && m.uuid === 'sub-a-1',
+      )
+      expect(subUserOut).toBeDefined()
+      expect(subAssistantOut).toBeDefined()
+      expect((subUserOut as any).parent_tool_use_id).toBe('tu_1')
+      expect((subAssistantOut as any).parent_tool_use_id).toBe('tu_1')
+
+      const subCountAfterFirstSync = collectedMessages.filter(
+        (m) => (m as any).parent_tool_use_id === 'tu_1',
+      ).length
+      expect(subCountAfterFirstSync).toBe(2)
+
+      // Trigger a second sync by appending a brand-new main message.
+      await new Promise((r) => setTimeout(r, 50))
+      const mainUser2 = {
+        type: 'user',
+        uuid: 'main-u-2',
+        message: { role: 'user', content: 'thanks' },
+      }
+      await appendFile(sessionFile, ln(mainUser2))
+      await new Promise((r) => setTimeout(r, 250))
+
+      expect(
+        collectedMessages.some(
+          (m) => m.type === 'user' && m.uuid === 'main-u-2',
+        ),
+      ).toBe(true)
+      const subCountAfterSecondSync = collectedMessages.filter(
+        (m) => (m as any).parent_tool_use_id === 'tu_1',
+      ).length
+      expect(subCountAfterSecondSync).toBe(2)
+    })
+
+    it('routes multiple Agent tool calls to their own subagents without crosstalk', async () => {
+      // Cycle 2: two Task tool_use blocks in main jsonl, two subagent files.
+      // Each subagent's messages must carry its OWN tool_use.id as parent —
+      // never the other one. Guards against off-by-one block.id capture in
+      // interleaveSubagentMessages.
+      const sessionId = 'sess-multi-1'
+      const sessionFile = join(projectDir, `${sessionId}.jsonl`)
+      const subagentsDir = join(projectDir, sessionId, 'subagents')
+      await mkdir(subagentsDir, { recursive: true })
+
+      const mainUser = {
+        type: 'user',
+        uuid: 'm-u-1',
+        message: { role: 'user', content: 'two tasks please' },
+      }
+      const makeAssistant = (uuid: string, toolId: string, desc: string, prompt: string) => ({
+        type: 'assistant',
+        uuid,
+        message: {
+          role: 'assistant',
+          id: `msg_${uuid}`,
+          content: [
+            {
+              type: 'tool_use',
+              id: toolId,
+              name: 'Task',
+              input: { subagent_type: 'Explore', description: desc, prompt },
+            },
+          ],
+        },
+      })
+      const mainAssistantA = makeAssistant('m-a-A', 'tu_A', 'DescA', 'promptA')
+      const mainAssistantB = makeAssistant('m-a-B', 'tu_B', 'DescB', 'promptB')
+      await writeFile(
+        sessionFile,
+        ln(mainUser) + ln(mainAssistantA) + ln(mainAssistantB),
+      )
+
+      // Subagent A
+      await writeFile(
+        join(subagentsDir, 'agent-A.meta.json'),
+        JSON.stringify({ agentType: 'Explore', description: 'DescA' }),
+      )
+      await writeFile(
+        join(subagentsDir, 'agent-A.jsonl'),
+        ln({
+          type: 'user',
+          uuid: 'sub-A-u',
+          isSidechain: true,
+          message: { role: 'user', content: 'promptA' },
+        }) +
+          ln({
+            type: 'assistant',
+            uuid: 'sub-A-a',
+            isSidechain: true,
+            message: {
+              role: 'assistant',
+              id: 'msg_subA',
+              content: [{ type: 'text', text: 'reply A' }],
+            },
+          }),
+      )
+
+      // Subagent B
+      await writeFile(
+        join(subagentsDir, 'agent-B.meta.json'),
+        JSON.stringify({ agentType: 'Explore', description: 'DescB' }),
+      )
+      await writeFile(
+        join(subagentsDir, 'agent-B.jsonl'),
+        ln({
+          type: 'user',
+          uuid: 'sub-B-u',
+          isSidechain: true,
+          message: { role: 'user', content: 'promptB' },
+        }) +
+          ln({
+            type: 'assistant',
+            uuid: 'sub-B-a',
+            isSidechain: true,
+            message: {
+              role: 'assistant',
+              id: 'msg_subB',
+              content: [{ type: 'text', text: 'reply B' }],
+            },
+          }),
+      )
+
+      scanner = await createSessionScanner({
+        sessionId: null,
+        workingDirectory: testDir,
+        onMessage: (msg) => collectedMessages.push(msg),
+      })
+      scanner.onNewSession(sessionId)
+      await new Promise((r) => setTimeout(r, 200))
+
+      // Subagent A messages must all point to tu_A; never to tu_B.
+      const subAUser = collectedMessages.find(
+        (m) => m.type === 'user' && m.uuid === 'sub-A-u',
+      )
+      const subAAssistant = collectedMessages.find(
+        (m) => m.type === 'assistant' && m.uuid === 'sub-A-a',
+      )
+      expect((subAUser as any)?.parent_tool_use_id).toBe('tu_A')
+      expect((subAAssistant as any)?.parent_tool_use_id).toBe('tu_A')
+
+      const subBUser = collectedMessages.find(
+        (m) => m.type === 'user' && m.uuid === 'sub-B-u',
+      )
+      const subBAssistant = collectedMessages.find(
+        (m) => m.type === 'assistant' && m.uuid === 'sub-B-a',
+      )
+      expect((subBUser as any)?.parent_tool_use_id).toBe('tu_B')
+      expect((subBAssistant as any)?.parent_tool_use_id).toBe('tu_B')
+
+      // No crosstalk: nothing tagged tu_A should belong to subagent B and vice-versa.
+      const taggedA = collectedMessages.filter(
+        (m) => (m as any).parent_tool_use_id === 'tu_A',
+      )
+      const taggedB = collectedMessages.filter(
+        (m) => (m as any).parent_tool_use_id === 'tu_B',
+      )
+      expect(taggedA.every((m) => m.type !== 'user' || m.uuid?.startsWith('sub-A-'))).toBe(true)
+      expect(taggedB.every((m) => m.type !== 'user' || m.uuid?.startsWith('sub-B-'))).toBe(true)
+      expect(taggedA).toHaveLength(2)
+      expect(taggedB).toHaveLength(2)
+    })
+
+    it('passes through unchanged when subagents directory absent or tool is not Task/Agent', async () => {
+      // Cycle 3: graceful degradation. Main jsonl has BOTH a Task tool_use
+      // (would normally trigger lookup) AND a Bash tool_use (must never
+      // trigger lookup). The subagents/ directory does NOT exist. Scanner
+      // must emit only the main messages with no parent_tool_use_id wiring
+      // and no thrown error.
+      const sessionId = 'sess-degrade-1'
+      const sessionFile = join(projectDir, `${sessionId}.jsonl`)
+      // Note: subagents/ deliberately NOT created.
+
+      const mainUser = {
+        type: 'user',
+        uuid: 'd-u-1',
+        message: { role: 'user', content: 'do things' },
+      }
+      const taskCall = {
+        type: 'assistant',
+        uuid: 'd-a-1',
+        message: {
+          role: 'assistant',
+          id: 'msg_d1',
+          content: [
+            {
+              type: 'tool_use',
+              id: 'tu_orphan',
+              name: 'Task',
+              input: {
+                subagent_type: 'Explore',
+                description: 'WillNotMatch',
+                prompt: 'orphan',
+              },
+            },
+          ],
+        },
+      }
+      const bashCall = {
+        type: 'assistant',
+        uuid: 'd-a-2',
+        message: {
+          role: 'assistant',
+          id: 'msg_d2',
+          content: [
+            {
+              type: 'tool_use',
+              id: 'tu_bash',
+              name: 'Bash',
+              input: { command: 'ls' },
+            },
+          ],
+        },
+      }
+      await writeFile(sessionFile, ln(mainUser) + ln(taskCall) + ln(bashCall))
+
+      scanner = await createSessionScanner({
+        sessionId: null,
+        workingDirectory: testDir,
+        onMessage: (msg) => collectedMessages.push(msg),
+      })
+      scanner.onNewSession(sessionId)
+      await new Promise((r) => setTimeout(r, 200))
+
+      // All three main messages flow through.
+      expect(
+        collectedMessages.some((m) => m.type === 'user' && m.uuid === 'd-u-1'),
+      ).toBe(true)
+      expect(
+        collectedMessages.some((m) => m.type === 'assistant' && m.uuid === 'd-a-1'),
+      ).toBe(true)
+      expect(
+        collectedMessages.some((m) => m.type === 'assistant' && m.uuid === 'd-a-2'),
+      ).toBe(true)
+
+      // No subagent messages, no parent_tool_use_id injection happened.
+      const tagged = collectedMessages.filter(
+        (m) => (m as any).parent_tool_use_id !== undefined,
+      )
+      expect(tagged).toHaveLength(0)
+    })
   })
 })

@@ -5,6 +5,7 @@ import { readFile } from "node:fs/promises";
 import { logger } from "@/ui/logger";
 import { startFileWatcher } from "@/modules/watcher/startFileWatcher";
 import { getProjectPath } from "./path";
+import { readAssociatedSubagent, SubagentInput } from "./subagentJsonlReader";
 
 /**
  * Known internal Claude Code event types that should be silently skipped.
@@ -32,6 +33,10 @@ export async function createSessionScanner(opts: {
     let currentSessionId: string | null = null;
     let watchers = new Map<string, (() => void)>();
     let processedMessageKeys = new Set<string>();
+    // Tracks which subagent jsonl files have already been associated to a
+    // Task/Agent tool_use. Persisted across polls so we don't re-associate
+    // the same agent-XXX.jsonl when the main file grows.
+    let consumedAgentIds = new Set<string>();
 
     // Mark existing messages as processed and start watching the initial session
     if (opts.sessionId) {
@@ -68,7 +73,13 @@ export async function createSessionScanner(opts: {
 
         // Process sessions
         for (let session of sessions) {
-            const sessionMessages = await readSessionLog(projectDir, session);
+            const rawMessages = await readSessionLog(projectDir, session);
+            const sessionMessages = await interleaveSubagentMessages(
+                projectDir,
+                session,
+                rawMessages,
+                consumedAgentIds,
+            );
             let skipped = 0;
             let sent = 0;
             for (let file of sessionMessages) {
@@ -177,6 +188,60 @@ function messageKey(message: RawJSONLines): string {
     } else {
         throw Error() // Impossible
     }
+}
+
+/**
+ * Walk the parsed main-jsonl messages, find Task/Agent tool_use blocks, and
+ * splice in the corresponding subagents/agent-XXX.jsonl messages immediately
+ * after each tool_use. Each spliced message receives a `parent_tool_use_id`
+ * pointing at the tool_use.id, which `sessionProtocolMapper` already uses to
+ * route messages into a sidechain session envelope.
+ *
+ * Non-Task/Agent tool_use blocks are ignored. Missing subagents/ directory or
+ * unmatched tool_use blocks fall through without touching the message stream.
+ */
+async function interleaveSubagentMessages(
+    projectDir: string,
+    sessionId: string,
+    mainMessages: RawJSONLines[],
+    consumedAgentIds: Set<string>,
+): Promise<RawJSONLines[]> {
+    const subagentsDir = join(projectDir, sessionId, 'subagents');
+    const out: RawJSONLines[] = [];
+
+    for (const msg of mainMessages) {
+        out.push(msg);
+        if (msg.type !== 'assistant') continue;
+        const content = (msg as any).message?.content;
+        if (!Array.isArray(content)) continue;
+
+        for (const block of content) {
+            if (block?.type !== 'tool_use') continue;
+            if (block.name !== 'Task' && block.name !== 'Agent') continue;
+
+            const associated = await readAssociatedSubagent(
+                subagentsDir,
+                block.input as SubagentInput,
+                consumedAgentIds,
+            );
+            if (!associated) {
+                logger.debug(
+                    `[SESSION_SCANNER] No subagent match for tool_use ${block.id} (${block.name})`,
+                );
+                continue;
+            }
+
+            for (const subMsg of associated.messages) {
+                // Inject the parent pointer; sessionProtocolMapper.pickProviderSubagent
+                // reads parent_tool_use_id to attach the message to the right
+                // sidechain envelope. Use a spread to avoid mutating the
+                // parsed value (which lives in the agent-XXX.jsonl cache).
+                out.push({ ...subMsg, parent_tool_use_id: block.id } as RawJSONLines);
+            }
+        }
+    }
+
+    return out;
 }
 
 /**

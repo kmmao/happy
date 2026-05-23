@@ -2204,7 +2204,40 @@ export async function claudeRemoteLauncher(
             session.addSessionFoundCallback(cb);
             return () => session.removeSessionFoundCallback(cb);
           },
-          onThinkingChange: session.onThinkingChange,
+          // PTY-mode bridge for the App's `sdkSessionState` path.
+          //
+          // The App's `isSessionRunning(session)` (sources/utils/sessionUtils.ts)
+          // short-circuits on `session.sdkSessionState != null` — only when
+          // sdkSessionState is null does it fall back to the legacy
+          // `session.thinking` flag we keep up to date via keepAlive heartbeats.
+          //
+          // The only producer of sdkSessionState updates is a
+          // `session-state-changed` envelope. SDK-era happy-cli relayed those
+          // from Claude SDK's `system.subtype=session_state_changed` JSONL
+          // records (see the forwarder at the top of `onMessage` below).
+          // Claude TUI in PTY mode does NOT emit those records, so under the
+          // current PTY launcher this envelope is never produced — App-side
+          // sdkSessionState stays at whatever last live/historical value it
+          // had (often "running" from an earlier SDK turn, or carried over
+          // from a different session). That makes the App think the session
+          // is forever "thinking" (e.g. the puttering... indicator never
+          // clears) regardless of the truthful keepAlive heartbeats.
+          //
+          // Fix: synthesize the envelope on every thinking transition so the
+          // modern path observes the same truth as the heartbeat path. PTY
+          // mode has no `requires_action` (no canCallTool synchronous pause
+          // — see permissionHandler doc), so we only emit running↔idle.
+          // updateThinking() inside claudeRemote.ts already dedupes
+          // (`if (thinking === next) return`), so this fires at most twice
+          // per turn (start + end), not on every tick.
+          onThinkingChange: (thinking: boolean) => {
+            session.onThinkingChange(thinking);
+            const stateEnvelope = createEnvelope("agent", {
+              t: "session-state-changed",
+              state: thinking ? "running" : "idle",
+            });
+            session.client.sendSessionProtocolMessage(stateEnvelope as any);
+          },
           claudeEnvVars: session.claudeEnvVars,
           claudeArgs: session.claudeArgs,
           onMessage,
