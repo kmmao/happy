@@ -34,8 +34,12 @@ import { logger } from "@/lib";
 /**
  * Server names that cannot be added/removed/overwritten by App RPCs.
  * These are Happy's own MCP servers created by the launcher.
+ *
+ * Exported so other modules (e.g. claudeControlHandlers.toggle_mcp_server)
+ * can reject mutations to these names with a consistent error message
+ * instead of redefining the set.
  */
-const PROTECTED_SERVER_NAMES = new Set(["happy", "happy-knowledge"]);
+export const PROTECTED_SERVER_NAMES = new Set(["happy", "happy-knowledge"]);
 
 // ─── Known transport types ────────────────────────────────────────────────────
 

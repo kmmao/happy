@@ -16,7 +16,14 @@
  * as its sibling (`dirname(CLAUDE_CONFIG_DIR)/.claude.json`).
  */
 
-import { existsSync, readFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  renameSync,
+  unlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { dirname, join } from 'node:path';
 import { homedir } from 'node:os';
 import { logger } from '@/ui/logger';
@@ -200,6 +207,98 @@ export function readClaudeDisabledMcpServers(cwd: string): string[] {
     );
   }
   return names;
+}
+
+/**
+ * Persist the per-project disabled MCP server list to `~/.claude.json`.
+ *
+ * Writes `projects[cwd].disabledMcpServers = names` atomically (temp file +
+ * `rename`) so a crash mid-write never leaves a half-written config Claude
+ * Code can't read. All other top-level keys and sibling project slots are
+ * preserved opaquely — we never lose untyped data we didn't touch.
+ *
+ * Empty list is written as `[]` (not omitted) so the next `readClaudeRoot`
+ * sees the explicit "no disabled servers" state rather than missing-field
+ * ambiguity; this matches what Claude Code itself persists after the user
+ * enables the last disabled server.
+ *
+ * Returns `true` on success, `false` if any filesystem step failed (logged).
+ */
+export function writeClaudeDisabledMcpServers(
+  cwd: string,
+  names: readonly string[],
+): boolean {
+  const rootPath = getClaudeRootConfigPath();
+
+  // Read the existing config so we can preserve everything outside our slot.
+  // Missing or unreadable file → start from a fresh object; we still want the
+  // write to succeed so the App's first toggle on a clean machine works.
+  let config: ClaudeRootConfig = {};
+  if (existsSync(rootPath)) {
+    try {
+      config = JSON.parse(readFileSync(rootPath, 'utf-8')) as ClaudeRootConfig;
+      if (!config || typeof config !== 'object' || Array.isArray(config)) {
+        // File present but unusable — refuse to clobber it. Surface the
+        // problem so the operator can repair it manually.
+        logger.debug(
+          `[ClaudeSettings] ${rootPath} is not a JSON object; refusing to overwrite`,
+        );
+        return false;
+      }
+    } catch (error) {
+      logger.debug(`[ClaudeSettings] ${rootPath} is malformed; refusing to overwrite: ${error}`);
+      return false;
+    }
+  }
+
+  const projects =
+    config.projects && typeof config.projects === 'object' && !Array.isArray(config.projects)
+      ? { ...(config.projects as Record<string, ClaudeProjectConfig>) }
+      : {};
+  const existingSlot =
+    projects[cwd] && typeof projects[cwd] === 'object' && !Array.isArray(projects[cwd])
+      ? (projects[cwd] as ClaudeProjectConfig)
+      : {};
+
+  const dedupedNames = Array.from(
+    new Set(names.filter((n): n is string => typeof n === 'string' && n.length > 0)),
+  );
+
+  projects[cwd] = {
+    ...existingSlot,
+    disabledMcpServers: dedupedNames,
+  };
+
+  const next: ClaudeRootConfig = { ...config, projects };
+
+  // Atomic write: stage to a sibling temp file, then rename over the target.
+  // Rename within the same dir is atomic on POSIX (and best-effort on Win).
+  const dir = dirname(rootPath);
+  try {
+    mkdirSync(dir, { recursive: true });
+  } catch (error) {
+    logger.debug(`[ClaudeSettings] Cannot create dir ${dir}: ${error}`);
+    return false;
+  }
+
+  const tmpPath = `${rootPath}.${process.pid}.${Date.now()}.tmp`;
+  try {
+    writeFileSync(tmpPath, JSON.stringify(next, null, 2), 'utf-8');
+    renameSync(tmpPath, rootPath);
+    logger.debug(
+      `[ClaudeSettings] Persisted disabledMcpServers(${dedupedNames.length}) for ${cwd}: ${dedupedNames.join(', ') || '(none)'}`,
+    );
+    return true;
+  } catch (error) {
+    logger.debug(`[ClaudeSettings] Failed to write ${rootPath}: ${error}`);
+    // Best-effort cleanup of the temp file if rename failed.
+    try {
+      if (existsSync(tmpPath)) unlinkSync(tmpPath);
+    } catch {
+      /* ignore */
+    }
+    return false;
+  }
 }
 
 /**

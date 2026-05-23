@@ -1,0 +1,223 @@
+/**
+ * toggle_mcp_server RPC handler tests.
+ *
+ * In PTY mode the Claude TUI has no programmatic toggle API, so happy-cli
+ * implements the behaviour itself:
+ *   1. Reject mutations to protected names (happy / happy-knowledge).
+ *   2. Persist the new `disabledMcpServers` list to ~/.claude.json.
+ *   3. Mutate the live in-memory map so the next mcpServerStatus() poll
+ *      reflects the new state without restarting the session.
+ *
+ * These tests pin all three contracts. The RpcHandlerManager is stubbed
+ * so the handler can be invoked directly; the ClaudePtyController is a
+ * minimal stub that records calls.
+ */
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { tmpdir } from 'node:os';
+import { dirname, join } from 'node:path';
+import { mkdirSync, existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+
+import { registerClaudeControlHandlers } from './claudeControlHandlers';
+import { createMcpServerState } from '@/claude/utils/mcpServerManager';
+import type { ClaudePtyController } from '@/claude/pty/claudePtyController';
+import { CLAUDE_CONTROL_SCOPE } from '@kmmao/happy-wire';
+
+// ── RpcHandlerManager stub ────────────────────────────────────────────────────
+
+/**
+ * Captures every handler the production code registers in a Map keyed by
+ * the fully-qualified method name (e.g. `claude-control:toggle_mcp_server`).
+ * Tests look up the toggle handler by name and invoke it directly.
+ */
+function makeRpcHandlerManagerStub() {
+  const handlers = new Map<string, (req: any) => Promise<any>>();
+  return {
+    handlers,
+    registerHandler<TReq, TRes>(method: string, fn: (req: TReq) => Promise<TRes>) {
+      handlers.set(method, fn as unknown as (req: any) => Promise<any>);
+    },
+  };
+}
+
+// ── ClaudePtyController stub ──────────────────────────────────────────────────
+
+function makeControllerStub(): {
+  controller: ClaudePtyController;
+  toggleCalls: Array<{ name: string; enabled: boolean }>;
+} {
+  const toggleCalls: Array<{ name: string; enabled: boolean }> = [];
+  const controller: Partial<ClaudePtyController> = {
+    async toggleMcpServer(name, enabled) {
+      toggleCalls.push({ name, enabled });
+    },
+    // Every other method on the interface is unused by toggle_mcp_server tests
+    // — supply no-ops only for the handlers we do not call.
+  };
+  return { controller: controller as ClaudePtyController, toggleCalls };
+}
+
+// ── Test scaffolding ─────────────────────────────────────────────────────────
+
+describe('registerClaudeControlHandlers — toggle_mcp_server', () => {
+  let testClaudeDir: string;
+  let testRootConfigPath: string;
+  let originalClaudeConfigDir: string | undefined;
+  const cwd = '/Users/test/project';
+
+  beforeEach(() => {
+    testClaudeDir = join(tmpdir(), `test-control-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+    mkdirSync(testClaudeDir, { recursive: true });
+    testRootConfigPath = join(dirname(testClaudeDir), '.claude.json');
+    originalClaudeConfigDir = process.env.CLAUDE_CONFIG_DIR;
+    process.env.CLAUDE_CONFIG_DIR = testClaudeDir;
+  });
+
+  afterEach(() => {
+    if (originalClaudeConfigDir !== undefined) {
+      process.env.CLAUDE_CONFIG_DIR = originalClaudeConfigDir;
+    } else {
+      delete process.env.CLAUDE_CONFIG_DIR;
+    }
+    if (existsSync(testClaudeDir)) rmSync(testClaudeDir, { recursive: true, force: true });
+    if (existsSync(testRootConfigPath)) rmSync(testRootConfigPath, { force: true });
+  });
+
+  function setup(opts: { liveMcpServers?: Record<string, unknown> } = {}) {
+    const rpc = makeRpcHandlerManagerStub();
+    const { controller, toggleCalls } = makeControllerStub();
+    const liveMcpServers = opts.liveMcpServers ?? {};
+    registerClaudeControlHandlers({
+      rpcHandlerManager: rpc as any,
+      getCurrentQuery: () => controller,
+      cwd,
+      mcpServerState: createMcpServerState(),
+      liveMcpServers,
+    });
+    const handler = rpc.handlers.get(`${CLAUDE_CONTROL_SCOPE}:toggle_mcp_server`)!;
+    return { handler, toggleCalls, liveMcpServers };
+  }
+
+  function readDisk(): any {
+    return JSON.parse(readFileSync(testRootConfigPath, 'utf-8'));
+  }
+
+  it('persists disable to ~/.claude.json and mutates liveMcpServers', async () => {
+    const liveMcpServers: Record<string, unknown> = {
+      'chrome-devtools': { type: 'stdio', command: 'npx' },
+      happy: { type: 'http', url: 'http://localhost' },
+    };
+    const { handler, toggleCalls } = setup({ liveMcpServers });
+
+    const result = await handler({ serverName: 'chrome-devtools', enabled: false });
+    expect(result).toEqual({ success: true });
+
+    // Disk: project slot now records the disabled name.
+    expect(readDisk().projects[cwd].disabledMcpServers).toEqual(['chrome-devtools']);
+
+    // Live map: entry stayed (config preserved), `disabled: true` annotated.
+    expect(liveMcpServers['chrome-devtools']).toEqual({
+      type: 'stdio',
+      command: 'npx',
+      disabled: true,
+    });
+
+    // Controller's no-op toggle is still invoked (SDK-mode parity).
+    expect(toggleCalls).toEqual([{ name: 'chrome-devtools', enabled: false }]);
+  });
+
+  it('persists enable by removing the name from the disabled list', async () => {
+    // Pre-existing disabled state on disk + live map.
+    writeFileSync(
+      testRootConfigPath,
+      JSON.stringify({
+        projects: { [cwd]: { disabledMcpServers: ['chrome-devtools', 'figma'] } },
+      }),
+    );
+    const liveMcpServers: Record<string, unknown> = {
+      'chrome-devtools': { type: 'stdio', command: 'npx', disabled: true },
+      figma: { type: 'http', url: 'https://figma', disabled: true },
+    };
+    const { handler } = setup({ liveMcpServers });
+
+    await handler({ serverName: 'chrome-devtools', enabled: true });
+
+    expect(readDisk().projects[cwd].disabledMcpServers).toEqual(['figma']);
+    expect(liveMcpServers['chrome-devtools']).toEqual({
+      type: 'stdio',
+      command: 'npx',
+    });
+    // The untouched server is left alone.
+    expect(liveMcpServers.figma).toEqual({
+      type: 'http',
+      url: 'https://figma',
+      disabled: true,
+    });
+  });
+
+  it('rejects toggling protected names (happy / happy-knowledge)', async () => {
+    const { handler } = setup({
+      liveMcpServers: { happy: { command: 'node' } },
+    });
+
+    await expect(handler({ serverName: 'happy', enabled: false })).rejects.toThrow(/protected/);
+    await expect(handler({ serverName: 'happy-knowledge', enabled: false })).rejects.toThrow(
+      /protected/,
+    );
+
+    // Disk never written.
+    expect(existsSync(testRootConfigPath)).toBe(false);
+  });
+
+  it('throws when no active query is available', async () => {
+    const rpc = makeRpcHandlerManagerStub();
+    registerClaudeControlHandlers({
+      rpcHandlerManager: rpc as any,
+      getCurrentQuery: () => null,
+      cwd,
+      mcpServerState: createMcpServerState(),
+      liveMcpServers: {},
+    });
+    const handler = rpc.handlers.get(`${CLAUDE_CONTROL_SCOPE}:toggle_mcp_server`)!;
+
+    await expect(handler({ serverName: 'x', enabled: false })).rejects.toThrow(/No active query/);
+  });
+
+  it('disables an entry even when liveMcpServers does not contain it (disk still wins)', async () => {
+    // The user might toggle a server that vanished from the live map (e.g.
+    // installed by Claude Code outside happy-cli). We still persist the
+    // disable so the next launch honours it.
+    const liveMcpServers: Record<string, unknown> = {};
+    const { handler } = setup({ liveMcpServers });
+
+    await handler({ serverName: 'ghost', enabled: false });
+
+    expect(readDisk().projects[cwd].disabledMcpServers).toEqual(['ghost']);
+    // No entry was conjured into the live map.
+    expect(liveMcpServers).toEqual({});
+  });
+
+  it('composes with concurrent edits — second toggle sees the first on disk', async () => {
+    const liveMcpServers: Record<string, unknown> = {
+      a: { command: 'a' },
+      b: { command: 'b' },
+    };
+    const { handler } = setup({ liveMcpServers });
+
+    await handler({ serverName: 'a', enabled: false });
+    await handler({ serverName: 'b', enabled: false });
+
+    expect(readDisk().projects[cwd].disabledMcpServers).toEqual(['a', 'b']);
+    expect(liveMcpServers.a).toMatchObject({ disabled: true });
+    expect(liveMcpServers.b).toMatchObject({ disabled: true });
+  });
+
+  it('deduplicates when the same name is disabled twice', async () => {
+    const liveMcpServers: Record<string, unknown> = { dup: { command: 'd' } };
+    const { handler } = setup({ liveMcpServers });
+
+    await handler({ serverName: 'dup', enabled: false });
+    await handler({ serverName: 'dup', enabled: false });
+
+    expect(readDisk().projects[cwd].disabledMcpServers).toEqual(['dup']);
+  });
+});

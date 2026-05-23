@@ -8,7 +8,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
-import { mkdirSync, existsSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, existsSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import {
   readClaudeSettings,
   readClaudeRootConfig,
@@ -17,6 +17,7 @@ import {
   readClaudePluginMcpServers,
   markDisabledMcpServers,
   shouldIncludeCoAuthoredBy,
+  writeClaudeDisabledMcpServers,
 } from './claudeSettings';
 
 describe('Claude Settings', () => {
@@ -338,6 +339,133 @@ describe('Claude Settings', () => {
         c: null,
         d: ['array'],
       });
+    });
+  });
+
+  describe('writeClaudeDisabledMcpServers', () => {
+    const cwd = '/Users/test/project';
+
+    function readBack(): any {
+      return JSON.parse(readFileSync(testRootConfigPath, 'utf-8'));
+    }
+
+    it('creates ~/.claude.json from scratch when it does not exist', () => {
+      expect(existsSync(testRootConfigPath)).toBe(false);
+
+      const ok = writeClaudeDisabledMcpServers(cwd, ['chrome-devtools']);
+      expect(ok).toBe(true);
+
+      const written = readBack();
+      expect(written).toEqual({
+        projects: {
+          [cwd]: { disabledMcpServers: ['chrome-devtools'] },
+        },
+      });
+    });
+
+    it('writes an empty array (not undefined) when names is empty', () => {
+      writeClaudeDisabledMcpServers(cwd, ['x']);
+      const ok = writeClaudeDisabledMcpServers(cwd, []);
+      expect(ok).toBe(true);
+      expect(readBack().projects[cwd].disabledMcpServers).toEqual([]);
+    });
+
+    it('preserves every untouched top-level field', () => {
+      writeFileSync(
+        testRootConfigPath,
+        JSON.stringify({
+          mcpServers: { keep: { type: 'stdio', command: 'keep' } },
+          customField: 'hi',
+          numericField: 42,
+          projects: {
+            '/some/other': { disabledMcpServers: ['leave-me'] },
+          },
+        }),
+      );
+
+      writeClaudeDisabledMcpServers(cwd, ['figma']);
+
+      const written = readBack();
+      expect(written.mcpServers).toEqual({
+        keep: { type: 'stdio', command: 'keep' },
+      });
+      expect(written.customField).toBe('hi');
+      expect(written.numericField).toBe(42);
+      expect(written.projects['/some/other']).toEqual({
+        disabledMcpServers: ['leave-me'],
+      });
+      expect(written.projects[cwd]).toEqual({
+        disabledMcpServers: ['figma'],
+      });
+    });
+
+    it('preserves untouched fields on the same project slot', () => {
+      writeFileSync(
+        testRootConfigPath,
+        JSON.stringify({
+          projects: {
+            [cwd]: {
+              disabledMcpServers: ['old'],
+              allowedTools: ['Bash'],
+              history: { lastPrompt: 'hi' },
+            },
+          },
+        }),
+      );
+
+      writeClaudeDisabledMcpServers(cwd, ['new']);
+
+      const written = readBack();
+      expect(written.projects[cwd]).toEqual({
+        disabledMcpServers: ['new'],
+        allowedTools: ['Bash'],
+        history: { lastPrompt: 'hi' },
+      });
+    });
+
+    it('deduplicates and drops empty / non-string entries before persisting', () => {
+      // Caller could pass garbage in pure-JS land; cast through unknown so the
+      // defensive filter is exercised without poisoning the rest of the file
+      // with @ts-expect-error directives.
+      const ok = writeClaudeDisabledMcpServers(
+        cwd,
+        (['a', 'a', '', 42, null, 'b'] as unknown) as readonly string[],
+      );
+      expect(ok).toBe(true);
+      expect(readBack().projects[cwd].disabledMcpServers).toEqual(['a', 'b']);
+    });
+
+    it('does not leave a stray temp file behind on success', () => {
+      writeClaudeDisabledMcpServers(cwd, ['x']);
+      // Temp files share the rootPath prefix + `.tmp` suffix.
+      const dir = dirname(testRootConfigPath);
+      const entries = readdirSync(dir);
+      const strays = entries.filter((e) => e.startsWith('.claude.json.') && e.endsWith('.tmp'));
+      expect(strays).toEqual([]);
+    });
+
+    it('refuses to overwrite when ~/.claude.json is unreadable JSON', () => {
+      writeFileSync(testRootConfigPath, '{ not json');
+      const before = readFileSync(testRootConfigPath, 'utf-8');
+
+      const ok = writeClaudeDisabledMcpServers(cwd, ['x']);
+      expect(ok).toBe(false);
+
+      // File untouched — operator can still repair it by hand.
+      const after = readFileSync(testRootConfigPath, 'utf-8');
+      expect(after).toBe(before);
+    });
+
+    it('refuses to overwrite when ~/.claude.json is a JSON array (not an object)', () => {
+      writeFileSync(testRootConfigPath, JSON.stringify(['nope']));
+      const ok = writeClaudeDisabledMcpServers(cwd, ['x']);
+      expect(ok).toBe(false);
+      expect(readBack()).toEqual(['nope']);
+    });
+
+    it('round-trips through readClaudeDisabledMcpServers', () => {
+      writeClaudeDisabledMcpServers(cwd, ['alpha', 'beta']);
+      expect(readClaudeDisabledMcpServers(cwd)).toEqual(['alpha', 'beta']);
     });
   });
 

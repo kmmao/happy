@@ -379,6 +379,11 @@ export async function claudeRemoteLauncher(
   const sessionCostTracker = new SessionCostTracker();
   const appliedSettingsState = createAppliedSettingsState();
   const mcpServerState = createMcpServerState();
+  // Mutable, shared MCP server map: filled in by runClaudeOnce just before
+  // claudeRemote() is called, then mutated in place by toggle_mcp_server so
+  // the PTY controller's live getter surfaces the new `disabled` flag on the
+  // App's next mcpServerStatus() poll without a session restart.
+  const liveMcpServers: Record<string, unknown> = {};
   registerClaudeControlHandlers({
     rpcHandlerManager: session.client.rpcHandlerManager,
     getCurrentQuery: () => currentQuery,
@@ -387,6 +392,7 @@ export async function claudeRemoteLauncher(
     happyCliVersion: (packageJson as { version?: string }).version,
     appliedSettingsState,
     mcpServerState,
+    liveMcpServers,
   });
   // Removed catch-all stdin handler - now handled by RemoteModeDisplay keyboard handlers
 
@@ -1960,17 +1966,27 @@ export async function claudeRemoteLauncher(
         ...registryServers,
       };
 
+      // Refill the shared liveMcpServers map in place. Clearing first guards
+      // against stale entries from a prior turn (e.g. a server the user
+      // removed). The RPC toggle handler mutates this same reference, so
+      // the PTY controller reads new states without a session restart.
+      for (const key of Object.keys(liveMcpServers)) delete liveMcpServers[key];
+      Object.assign(liveMcpServers, {
+        ...userMcpServers,               // User's Claude Code MCPs from ~/.claude.json (+settings.json fallback) — lowest priority
+        ...registryServers,              // Account-level MCP registry (medium priority)
+        happy: happyMcpServer,           // Happy-owned MCPs (highest priority)
+        ...(knowledgeMcpServer ? { "happy-knowledge": knowledgeMcpServer } : {}),
+      });
+
       try {
         await claudeRemote({
           sessionId: session.sessionId,
           path: session.path,
           allowedTools: session.allowedTools ?? [],
-          mcpServers: {
-            ...userMcpServers,               // User's Claude Code MCPs from ~/.claude.json (+settings.json fallback) — lowest priority
-            ...registryServers,              // Account-level MCP registry (medium priority)
-            happy: happyMcpServer,           // Happy-owned MCPs (highest priority)
-            ...(knowledgeMcpServer ? { "happy-knowledge": knowledgeMcpServer } : {}),
-          },
+          // Same reference the RPC handler mutates; the PTY controller's
+          // mcpServerStatus() reads it live on each poll, so toggles take
+          // effect without restarting the session.
+          mcpServers: liveMcpServers,
           hookSettingsPath: session.hookSettingsPath,
           jsRuntime: session.jsRuntime,
           happySessionId: session.client.sessionId,

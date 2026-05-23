@@ -6,7 +6,9 @@
  * is available (PTY mode before the first assistant turn).
  *
  * Also verifies that mcpServerStatus() maps the launch-time mcpServers config
- * to a status list (happy/happy-knowledge → connected, others → pending or disabled).
+ * to a status list. PTY mode has no live MCP connection feedback, so every
+ * non-disabled MCP is reported as "connected" optimistically; entries flagged
+ * `disabled: true` are reported as "disabled".
  *
  * We use a minimal stub PTY handle so these tests never spawn a real process.
  */
@@ -150,18 +152,21 @@ describe("createClaudePtyController — mcpServerStatus", () => {
     expect(result.find((s) => s.name === "happy-knowledge")?.status).toBe("connected");
   });
 
-  it("marks user servers as pending", async () => {
+  it("marks user / plugin servers as connected (PTY has no live status, so we report optimistically)", async () => {
     const servers = {
       "my-server": { command: "npx", args: ["-y", "@my/mcp"] },
+      "plugin:context7:context7": { command: "npx", args: ["-y", "@upstash/context7-mcp"] },
       happy: { command: "node", args: ["happy.js"] },
     };
     const controller = createClaudePtyController(makeStubPty(), () => null, () => servers);
     const result = await controller.mcpServerStatus();
 
-    expect(result.find((s) => s.name === "my-server")?.status).toBe("pending");
+    expect(result.find((s) => s.name === "my-server")?.status).toBe("connected");
+    expect(result.find((s) => s.name === "plugin:context7:context7")?.status).toBe("connected");
+    expect(result.find((s) => s.name === "happy")?.status).toBe("connected");
   });
 
-  it("marks servers with disabled:true as disabled", async () => {
+  it("marks servers with disabled:true as disabled (others stay connected)", async () => {
     const servers = {
       "off-server": { command: "npx", args: ["-y", "@off/mcp"], disabled: true },
       "on-server": { command: "npx", args: ["-y", "@on/mcp"] },
@@ -170,7 +175,7 @@ describe("createClaudePtyController — mcpServerStatus", () => {
     const result = await controller.mcpServerStatus();
 
     expect(result.find((s) => s.name === "off-server")?.status).toBe("disabled");
-    expect(result.find((s) => s.name === "on-server")?.status).toBe("pending");
+    expect(result.find((s) => s.name === "on-server")?.status).toBe("connected");
   });
 
   it("reflects updated server list when getter changes", async () => {
@@ -183,5 +188,6 @@ describe("createClaudePtyController — mcpServerStatus", () => {
     const result = await controller.mcpServerStatus();
     expect(result).toHaveLength(1);
     expect(result[0].name).toBe("new-server");
+    expect(result[0].status).toBe("connected");
   });
 });

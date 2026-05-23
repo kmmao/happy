@@ -77,15 +77,6 @@ export interface UsageSnapshot {
   outputTokens: number;
 }
 
-// ── Happy-managed MCP server names ───────────────────────────────────────────
-
-/**
- * Servers injected by the Happy launcher at spawn time. They are always
- * successfully connected (Happy controls their lifecycle), so we report
- * them as "connected" rather than "pending".
- */
-const HAPPY_MANAGED_SERVERS = new Set(["happy", "happy-knowledge"]);
-
 // ── Model context-window limits ───────────────────────────────────────────────
 
 /**
@@ -327,17 +318,23 @@ export function createClaudePtyController(
         return [];
       }
 
+      // PTY mode has no live MCP feedback (no SDK Query.mcpServerStatus()
+      // hook to listen to). The Claude TUI subprocess connects to MCPs at
+      // launch; by the time the App polls (every 30s), they are either
+      // connected or failed — and we have no signal to distinguish those.
+      // We therefore optimistically report "connected" for any configured,
+      // non-disabled MCP. The user still sees real connection errors
+      // because Claude prints them in the terminal, and MCP-prefixed tool
+      // calls will themselves fail loudly if a server is broken.
+      //
+      // Happy's own MCPs (happy / happy-knowledge) are guaranteed connected
+      // since the launcher owns their lifecycle; they share the same code
+      // path because "connected" is now the default for everything.
       const result = entries.map(([name, config]) => {
         const cfg = (config ?? {}) as Record<string, unknown>;
-        const isDisabled = cfg.disabled === true;
-        const isHappyManaged = HAPPY_MANAGED_SERVERS.has(name);
-
-        const status: "connected" | "pending" | "disabled" = isDisabled
+        const status: "connected" | "disabled" = cfg.disabled === true
           ? "disabled"
-          : isHappyManaged
-            ? "connected"
-            : "pending";
-
+          : "connected";
         logger.debug(`[ptyController] mcpServerStatus ${name}=${status}`);
         return { name, status };
       });

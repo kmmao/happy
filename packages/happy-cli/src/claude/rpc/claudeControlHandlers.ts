@@ -49,8 +49,13 @@ import {
   applyMcpServers,
   addMcpServer,
   removeMcpServer,
+  PROTECTED_SERVER_NAMES,
   type McpServerState,
 } from "@/claude/utils/mcpServerManager";
+import {
+  readClaudeDisabledMcpServers,
+  writeClaudeDisabledMcpServers,
+} from "@/claude/utils/claudeSettings";
 import {
   CLAUDE_CONTROL_SCOPE,
   type GetSessionCostRequest,
@@ -275,6 +280,17 @@ export interface RegisterClaudeControlHandlersOptions {
   appliedSettingsState?: AppliedSettingsState | null;
   /** Shared MCP server state tracker for dynamic load/unload. */
   mcpServerState?: McpServerState | null;
+  /**
+   * Shared, mutable MCP server map handed to claudeRemote at spawn time.
+   * The PTY controller reads from this same reference on every
+   * mcpServerStatus() poll, so RPC handlers that mutate it (toggle_mcp_server
+   * flipping `disabled`) produce immediate UI feedback without restarting
+   * the Claude session.
+   *
+   * Null when running without an active session (e.g. before the first
+   * claudeRemote call); handlers that need it should bail out gracefully.
+   */
+  liveMcpServers?: Record<string, unknown> | null;
 }
 
 /**
@@ -284,7 +300,7 @@ export interface RegisterClaudeControlHandlersOptions {
 export function registerClaudeControlHandlers(
   opts: RegisterClaudeControlHandlersOptions,
 ): void {
-  const { rpcHandlerManager, getCurrentQuery, cwd, costTracker, happyCliVersion, appliedSettingsState, mcpServerState } = opts;
+  const { rpcHandlerManager, getCurrentQuery, cwd, costTracker, happyCliVersion, appliedSettingsState, mcpServerState, liveMcpServers } = opts;
   const scope = CLAUDE_CONTROL_SCOPE;
 
   // get_session_cost
@@ -615,6 +631,19 @@ export function registerClaudeControlHandlers(
   );
 
   // toggle_mcp_server — enable/disable a server without removing config (SDK 0.3.142+)
+  //
+  // PTY mode has no programmatic toggle API in the Claude TUI, so we
+  // implement the behaviour ourselves:
+  //   1. Reject mutations to Happy's own MCPs (happy / happy-knowledge).
+  //   2. Persist the new disabled list to ~/.claude.json (the same file
+  //      Claude Code's `/mcp disable` writes to). On next session start,
+  //      Claude Code reads it natively.
+  //   3. Mutate the live in-memory MCP map in place so the App's MCP panel
+  //      reflects the new `disabled` flag on its next poll (no restart).
+  //
+  // We still call q.toggleMcpServer afterwards: in SDK mode it does the
+  // real SDK toggle; in PTY mode it is a no-op debug log. Either way the
+  // disk + in-memory state already match.
   rpcHandlerManager.registerHandler<ToggleMcpServerRequest, ToggleMcpServerResponse>(
     `${scope}:toggle_mcp_server`,
     async (req) => {
@@ -622,8 +651,47 @@ export function registerClaudeControlHandlers(
       if (!q) {
         throw new Error("No active query — cannot toggle MCP server");
       }
+      if (PROTECTED_SERVER_NAMES.has(req.serverName)) {
+        throw new Error(`server '${req.serverName}' is protected and cannot be toggled`);
+      }
+
+      // Compute the new disabled list from the current on-disk state so the
+      // toggle composes correctly with concurrent edits from `/mcp disable`.
+      const current = new Set(readClaudeDisabledMcpServers(cwd));
+      if (req.enabled) {
+        current.delete(req.serverName);
+      } else {
+        current.add(req.serverName);
+      }
+      const nextDisabled = [...current];
+
+      const persisted = writeClaudeDisabledMcpServers(cwd, nextDisabled);
+      if (!persisted) {
+        throw new Error(
+          `Failed to persist disabledMcpServers for ${cwd} (see CLI debug log)`,
+        );
+      }
+
+      // Update the in-memory map the PTY controller reads from so the next
+      // mcpServerStatus() poll returns the new state. We do NOT delete the
+      // entry — keeping the config lets the user re-enable it later.
+      if (liveMcpServers) {
+        const existing = liveMcpServers[req.serverName];
+        if (existing && typeof existing === "object" && !Array.isArray(existing)) {
+          const merged = { ...(existing as Record<string, unknown>) };
+          if (req.enabled) {
+            delete merged.disabled;
+          } else {
+            merged.disabled = true;
+          }
+          liveMcpServers[req.serverName] = merged;
+        }
+      }
+
       await q.toggleMcpServer(req.serverName, req.enabled);
-      logger.debug(`[claudeControl] toggle_mcp_server server=${req.serverName} enabled=${req.enabled}`);
+      logger.debug(
+        `[claudeControl] toggle_mcp_server server=${req.serverName} enabled=${req.enabled} disabledList=[${nextDisabled.join(",")}]`,
+      );
       return { success: true };
     },
   );
