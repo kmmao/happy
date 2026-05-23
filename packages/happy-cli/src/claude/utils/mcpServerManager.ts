@@ -18,12 +18,13 @@
  * 3. **State tracking** — `McpServerState` records the user-provided servers
  *    separately from protected servers, enabling accurate diff/sync.
  *
- * ## Relationship to SDK
+ * ## PTY-mode behaviour
  *
- * The SDK's `Query.setMcpServers()` does a full diff-and-apply: it connects
- * newly added servers and disconnects removed ones, keeping unchanged ones
- * alive. This module builds the full config map (user + protected) before
- * each `setMcpServers()` call.
+ * The SDK era had `Query.setMcpServers()` that diff-applied changes against a
+ * live runtime. The Claude TUI has no programmatic equivalent — MCP servers
+ * are bound at spawn time via `--mcp-config`. This module therefore validates
+ * + tracks state only; the in-memory map drives `mcpServerStatus` polls and
+ * any real connection change requires a cold restart.
  */
 
 import type { ClaudePtyController } from "@/claude/pty/claudePtyController";
@@ -155,9 +156,12 @@ export type McpApplyResult =
 
 /**
  * Replace the full set of user MCP servers. Protected servers are always
- * re-injected. Validates all configs before calling the SDK.
+ * re-injected. Validates all configs and updates the in-memory state map.
+ * No live SDK call: PTY mode requires a cold restart to actually connect
+ * new servers — this only ensures the App's MCP panel + status polls see
+ * the new config until the launcher cycles the PTY.
  *
- * @param query - Active SDK Query
+ * @param query - Active PTY controller (kept for signature parity)
  * @param servers - User-provided server configs (excluding protected names)
  * @param state - Mutable state tracker
  */
@@ -166,6 +170,8 @@ export async function applyMcpServers(
   servers: Record<string, Record<string, unknown>>,
   state: McpServerState,
 ): Promise<McpApplyResult> {
+  void query; // Reserved for future PTY MCP hot-swap if it lands.
+
   // Validate all configs
   for (const [name, config] of Object.entries(servers)) {
     const v = validateMcpServerConfig(name, config);
@@ -175,34 +181,21 @@ export async function applyMcpServers(
     }
   }
 
-  // Build full config: protected + user
-  const fullConfig = {
-    ...state.protectedServers,
-    ...servers,
-  };
+  // Compute added/removed against previous state for an honest result.
+  const prev = new Set(Object.keys(state.userServers));
+  const next = new Set(Object.keys(servers));
+  const added = [...next].filter((n) => !prev.has(n));
+  const removed = [...prev].filter((n) => !next.has(n));
 
-  try {
-    const result = await query.setMcpServers(fullConfig as any);
+  // Track state
+  state.userServers = { ...servers };
+  state.lastSyncAt = Date.now();
 
-    // Track state
-    state.userServers = { ...servers };
-    state.lastSyncAt = Date.now();
+  logger.debug(
+    `[mcpServerManager] Tracked: added=${added.join(",") || "none"} removed=${removed.join(",") || "none"} (cold restart required to take effect)`,
+  );
 
-    logger.debug(
-      `[mcpServerManager] Applied: added=${result.added.join(",") || "none"} removed=${result.removed.join(",") || "none"} errors=${JSON.stringify(result.errors)}`,
-    );
-
-    return {
-      ok: true,
-      added: result.added,
-      removed: result.removed,
-      errors: result.errors,
-    };
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    logger.debug(`[mcpServerManager] claude setMcpServers failed: ${msg}`);
-    return { ok: false, error: msg };
-  }
+  return { ok: true, added, removed, errors: {} };
 }
 
 // ─── Add single server ───────────────────────────────────────────────────────
@@ -255,9 +248,10 @@ export async function removeMcpServer(
 /**
  * Sync MCP servers from the account-level registry into the running session.
  * Registry servers are merged with any manually-added user servers (manual
- * additions take precedence for same-name conflicts).
+ * additions take precedence for same-name conflicts). State-only update; see
+ * `applyMcpServers` for the PTY-mode caveat.
  *
- * @param query - Active SDK Query
+ * @param query - Active PTY controller (kept for signature parity)
  * @param registryServers - SDK-format server configs from `registryToSdkConfig()`
  * @param state - Mutable state tracker
  */
@@ -266,6 +260,8 @@ export async function syncMcpServersFromRegistry(
   registryServers: Record<string, Record<string, unknown>>,
   state: McpServerState,
 ): Promise<McpApplyResult> {
+  void query; // Reserved for future PTY MCP hot-swap if it lands.
+
   // Registry is base, manual user additions override
   const merged = {
     ...registryServers,
@@ -283,31 +279,18 @@ export async function syncMcpServersFromRegistry(
     filtered[name] = config;
   }
 
-  // Build full config
-  const fullConfig = {
-    ...state.protectedServers,
-    ...filtered,
-  };
+  // Compute added/removed against previous state.
+  const prev = new Set(Object.keys(state.userServers));
+  const next = new Set(Object.keys(filtered));
+  const added = [...next].filter((n) => !prev.has(n));
+  const removed = [...prev].filter((n) => !next.has(n));
 
-  try {
-    const result = await query.setMcpServers(fullConfig as any);
+  state.userServers = filtered;
+  state.lastSyncAt = Date.now();
 
-    state.userServers = filtered;
-    state.lastSyncAt = Date.now();
+  logger.debug(
+    `[mcpServerManager] Registry sync tracked: added=${added.join(",") || "none"} removed=${removed.join(",") || "none"} (cold restart required to take effect)`,
+  );
 
-    logger.debug(
-      `[mcpServerManager] Registry sync: added=${result.added.join(",") || "none"} removed=${result.removed.join(",") || "none"}`,
-    );
-
-    return {
-      ok: true,
-      added: result.added,
-      removed: result.removed,
-      errors: result.errors,
-    };
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    logger.debug(`[mcpServerManager] Registry sync failed: ${msg}`);
-    return { ok: false, error: msg };
-  }
+  return { ok: true, added, removed, errors: {} };
 }

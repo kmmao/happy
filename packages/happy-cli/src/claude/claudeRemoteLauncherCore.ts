@@ -3,7 +3,7 @@ import { Session } from "./session";
 import { MessageBuffer } from "@/ui/ink/messageBuffer";
 import { RemoteModeDisplay } from "@/ui/ink/RemoteModeDisplay";
 import React from "react";
-import { claudeRemote, resolveModelKey, is1MModelKey } from "./claudeRemote";
+import { claudeRemote, is1MModelKey } from "./claudeRemote";
 import { mapToClaudeMode } from "./utils/permissionMode";
 import { PermissionHandler } from "./utils/permissionHandler";
 import { Future } from "@/utils/future";
@@ -46,7 +46,7 @@ import { EnhancedMode } from "./loop";
 import { createSessionEventReporter } from "./sessionEventReporter";
 import { hashObject } from "@/utils/deterministicJson";
 import { getProjectPath } from "./utils/path";
-import { readFile, writeFile, mkdir, stat } from "node:fs/promises";
+import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 import { parseSpecialCommand } from "@/parsers/specialCommands";
@@ -336,17 +336,9 @@ export async function claudeRemoteLauncher(
     logger.debug(`[remote]: doStopTask — taskId=${args.taskId}`);
     if (!args.taskId) return;
 
-    if (currentQuery) {
-      try {
-        await currentQuery.stopTask(args.taskId);
-        return; // SDK will emit task_notification(stopped) which gets persisted
-      } catch (e) {
-        logger.debug("[remote]: stopTask() failed, falling back to manual task-end", e);
-      }
-    }
-
-    // Fallback: when agent is idle (currentQuery is null) or stopTask failed,
-    // manually emit a task-end envelope so the status is persisted to the server.
+    // PTY mode has no programmatic stopTask — Claude TUI manages subagent
+    // lifetime internally. We can only ack the App-visible state by emitting
+    // a task-end envelope so the App's task list clears.
     const envelope = createEnvelope("agent", {
       t: "task-end",
       taskId: args.taskId,
@@ -357,15 +349,10 @@ export async function claudeRemoteLauncher(
   }
 
   async function doBackgroundTasks(args: { toolUseId?: string }) {
-    logger.debug(`[remote]: doBackgroundTasks — toolUseId=${args.toolUseId ?? "all"}`);
-    if (!currentQuery) return { success: false };
-    try {
-      const result = await currentQuery.backgroundTasks(args.toolUseId);
-      return { success: result };
-    } catch (e) {
-      logger.debug("[remote]: backgroundTasks() failed", e);
-      return { success: false };
-    }
+    // PTY mode has no programmatic background-task inspection. Return false
+    // so the App treats the move-to-background request as not-implemented.
+    logger.debug(`[remote]: doBackgroundTasks — toolUseId=${args.toolUseId ?? "all"} (no PTY equivalent)`);
+    return { success: false };
   }
 
   // When to abort
@@ -537,25 +524,14 @@ export async function claudeRemoteLauncher(
     },
   );
 
-  // Register RPC handler for seeding read state after compact/snip
+  // seedReadState had no PTY equivalent — the SDK-only read-cache pre-warm
+  // was retired with the SDK runtime. Kept as an ack-only handler so older
+  // App builds that still send the RPC don't see an "unknown handler" error.
   session.client.rpcHandlerManager.registerHandler(
     "seedReadState",
     async (args: { path: string; mtime: number }) => {
-      if (!currentQuery) {
-        return { error: "No active query" };
-      }
-      if (!args.path || args.mtime == null) {
-        return { error: "Missing path or mtime" };
-      }
-      try {
-        await currentQuery.seedReadState(args.path, args.mtime);
-        return { success: true };
-      } catch (err) {
-        logger.debug(`[remote]: seedReadState failed: ${err}`);
-        return {
-          error: err instanceof Error ? err.message : "seedReadState failed",
-        };
-      }
+      logger.debug(`[remote]: seedReadState(${args.path}, ${args.mtime}) — no PTY equivalent`);
+      return { success: true };
     },
   );
 
@@ -591,9 +567,6 @@ export async function claudeRemoteLauncher(
     },
     permissionHandler.getResponses(),
   );
-
-  // Track files that have been Read by the SDK (for seedReadState after compact)
-  const readFilePaths = new Set<string>();
 
   // Session timeline event reporter (fire-and-forget to server).
   // getSessionId is called lazily so new sessions work even before Claude
@@ -682,21 +655,6 @@ export async function claudeRemoteLauncher(
 
     // Write to permission handler for tool id resolving
     permissionHandler.onMessage(message);
-
-    // Track Read tool calls for seedReadState after compact
-    if (message.type === "assistant") {
-      const aMsg = message as ClaudeJsonlAssistantMessage;
-      if (aMsg.message.content && Array.isArray(aMsg.message.content)) {
-        for (const c of aMsg.message.content) {
-          if (c.type === "tool_use" && c.name === "Read") {
-            const filePath = (c.input as Record<string, unknown>)?.file_path;
-            if (typeof filePath === "string") {
-              readFilePaths.add(filePath);
-            }
-          }
-        }
-      }
-    }
 
     // Knowledge base: collect turn data from SDK messages
     // Wrapped in try-catch to never interfere with message processing
@@ -1216,21 +1174,9 @@ export async function claudeRemoteLauncher(
           type: "message",
           message: "Context compacted",
         });
-        // After compaction, seed read state for all tracked files so Edit doesn't fail
-        if (currentQuery && readFilePaths.size > 0) {
-          logger.debug(
-            `[remote]: seeding read state for ${readFilePaths.size} files after compact`,
-          );
-          for (const filePath of readFilePaths) {
-            stat(filePath)
-              .then((s) =>
-                currentQuery!.seedReadState(filePath, Math.floor(s.mtimeMs)),
-              )
-              .catch((e) =>
-                logger.debug(`[remote]: seedReadState skipped for ${filePath}: ${e}`),
-              );
-          }
-        }
+        // SDK-era seedReadState() pre-warmed the read cache here so the
+        // post-compact assistant could Edit tracked files. PTY mode has no
+        // such cache — Claude TUI re-reads files itself when needed.
       }
     }
 
@@ -1837,24 +1783,11 @@ export async function claudeRemoteLauncher(
             continue;
           }
 
-          // Hot-swap model if changed
-          if (mode && item.mode.model !== mode.model && currentQuery) {
-            const resolvedModel = resolveModelKey(item.mode.model);
-            if (resolvedModel) {
-              logger.debug(
-                `[remote]: mid-turn hot-swap model: ${mode.model} → ${resolvedModel}`,
-              );
-              try {
-                await currentQuery.setModel(resolvedModel);
-              } catch (e) {
-                logger.debug("[remote]: mid-turn setModel failed", e);
-              }
-            }
-          }
-
-          // Hot-swap permissionMode if changed (non-plan, non-bypass only)
-          // Use mapToClaudeMode to convert Codex modes (yolo/safe-yolo/read-only)
-          // to SDK-compatible modes before comparison and SDK call.
+          // Mid-turn model + permission-mode changes have no PTY equivalent —
+          // Claude TUI binds these flags at spawn time. coldModeHash handles
+          // anything that genuinely needs a fresh process; here we only sync
+          // the permission handler's local copy so prompts go to the right
+          // mapped mode for the rest of this turn.
           if (mode && currentQuery) {
             const newMapped = mapToClaudeMode(item.mode.permissionMode);
             const currentMapped = mapToClaudeMode(mode.permissionMode);
@@ -1864,13 +1797,8 @@ export async function claudeRemoteLauncher(
               newMapped !== "bypassPermissions" && currentMapped !== "bypassPermissions"
             ) {
               logger.debug(
-                `[remote]: mid-turn hot-swap permissionMode: ${currentMapped} → ${newMapped}`,
+                `[remote]: mid-turn permission-mode change observed: ${currentMapped} → ${newMapped} (no PTY hot-swap; updating handler only)`,
               );
-              try {
-                await currentQuery.setPermissionMode(newMapped);
-              } catch (e) {
-                logger.debug("[remote]: mid-turn setPermissionMode failed", e);
-              }
               permissionHandler.handleModeChange(item.mode.permissionMode);
             }
           }

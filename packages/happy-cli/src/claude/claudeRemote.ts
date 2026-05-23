@@ -15,24 +15,25 @@
  * ---------
  *   1. Build CLI flags from the initial `EnhancedMode` via `buildClaudeCliFlags`.
  *   2. Spawn the PTY (`startClaudePty`) + wrap with a `ClaudePtyController`
- *      stub so existing call sites that called `setModel` / `setPermissionMode`
- *      / `interrupt` keep compiling and degrade gracefully.
+ *      that exposes the small surface PTY mode actually supports.
  *   3. Install a `sessionScanner` watching the project JSONL — every record
  *      is converted via `rawToJsonlMessage` and forwarded to `opts.onMessage`.
  *   4. Write the initial user prompt to PTY stdin.
- *   5. On each `result` record, run the legacy hot-swap dance (now no-op
- *      via Controller) and write the next prompt — until `nextMessage()`
- *      yields null, at which point we kill the PTY and resolve.
+ *   5. On each `result` record, observe the mode diff (no live hot-swap
+ *      possible in PTY mode — the launcher's coldModeHash drives any real
+ *      restart) and write the next prompt — until `nextMessage()` yields
+ *      null, at which point we kill the PTY and resolve.
  *
  * Visibility losses (logged, never silently swallowed):
- *   • `setModel` / `setPermissionMode` are now no-ops — the SDK exposed
- *     hot-swap; the TUI does not. Cold restart via launcher's coldModeHash
- *     covers the cases that matter (plan/bypass transitions).
- *   • `getContextUsage` returns null — no programmatic introspection.
+ *   • Mid-session model / permission-mode changes cannot reach the live TUI;
+ *     cold restart via the launcher's coldModeHash covers transitions that
+ *     matter (plan/bypass, model swap).
+ *   • `getContextUsage` is reconstructed from JSONL — no SDK-level breakdown
+ *     (memoryFiles, mcpTools, systemPromptSections) is available.
  *   • `initializationResult` returns `{ models: [] }` — the App renders an
  *     empty model list (it can fall back to a hard-coded list).
- *   • `applyFlagSettings` parses + tracks state but the SDK call itself is
- *     a no-op (settings.json is read at spawn time only).
+ *   • `applyFlagSettings` parses + tracks state but does not push to the TUI
+ *     (settings.json is read at spawn time only).
  */
 
 import { EnhancedMode } from "./loop";
@@ -317,9 +318,9 @@ export async function claudeRemote(opts: {
     >;
   }) => void;
   /**
-   * Exposes the PTY-backed controller for runtime control (interrupt,
-   * stopTask, etc). Most methods are no-op stubs in PTY mode — see
-   * `ClaudePtyController` doc comment.
+   * Exposes the PTY-backed controller for runtime control — `interrupt`,
+   * `mcpServerStatus`, `getContextUsage`, etc. See `ClaudePtyController`
+   * for the supported surface.
    */
   onQueryReady?: (query: ClaudePtyController) => void;
   /** Exposes mid-turn user-input push (writes to PTY stdin). */
@@ -794,18 +795,17 @@ export async function claudeRemote(opts: {
         return;
       }
 
-      // Hot-swap branches — Controller stubs log + no-op in PTY mode. The
-      // launcher's coldModeHash catches cases that genuinely need a fresh
-      // process (plan/bypass transitions, model swap).
+      // Hot-swap is unavailable in PTY mode — the launcher's `coldModeHash`
+      // already triggered a fresh process for any change that requires it.
+      // Here we only refresh local state so subsequent diffs stay sane.
       const newModel =
         resolveModelKey(next.mode.model) ??
         opts.claudeEnvVars?.ANTHROPIC_MODEL ??
         process.env.ANTHROPIC_MODEL;
       if (newModel && newModel !== model) {
         logger.debug(
-          `[claudeRemote] Hot-swap model requested ${model} → ${newModel} (no-op under PTY; cold restart handles this)`,
+          `[claudeRemote] Model change observed ${model} → ${newModel} (cold restart handles this; updating local state)`,
         );
-        await controller.setModel(newModel);
         model = newModel;
       }
 
@@ -826,7 +826,8 @@ export async function claudeRemote(opts: {
           );
           mode = { ...next.mode, permissionMode: mode.permissionMode };
         } else {
-          await controller.setPermissionMode(newPermissionMode);
+          // Non-cold-restart transitions (e.g. default ↔ acceptEdits) cannot
+          // be pushed to a live TUI; absorb into local state only.
           mode = next.mode;
         }
       } else {
