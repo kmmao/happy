@@ -616,7 +616,10 @@ export function registerClaudeControlHandlers(
     },
   );
 
-  // reconnect_mcp_server — reconnect a single server by name (SDK 0.3.142+)
+  // reconnect_mcp_server — no programmatic reconnect in PTY mode (Claude TUI
+  // owns the MCP lifecycle). We still respond `success: true` so the App's
+  // refresh action completes; the next `mcp_server_status` poll re-reads the
+  // live map and the user sees the current state.
   rpcHandlerManager.registerHandler<ReconnectMcpServerRequest, ReconnectMcpServerResponse>(
     `${scope}:reconnect_mcp_server`,
     async (req) => {
@@ -624,13 +627,12 @@ export function registerClaudeControlHandlers(
       if (!q) {
         throw new Error("No active query — cannot reconnect MCP server");
       }
-      await q.reconnectMcpServer(req.serverName);
-      logger.debug(`[claudeControl] reconnect_mcp_server server=${req.serverName}`);
+      logger.debug(`[claudeControl] reconnect_mcp_server server=${req.serverName} (no-op under PTY)`);
       return { success: true };
     },
   );
 
-  // toggle_mcp_server — enable/disable a server without removing config (SDK 0.3.142+)
+  // toggle_mcp_server — enable/disable a server without removing config.
   //
   // PTY mode has no programmatic toggle API in the Claude TUI, so we
   // implement the behaviour ourselves:
@@ -640,10 +642,6 @@ export function registerClaudeControlHandlers(
   //      Claude Code reads it natively.
   //   3. Mutate the live in-memory MCP map in place so the App's MCP panel
   //      reflects the new `disabled` flag on its next poll (no restart).
-  //
-  // We still call q.toggleMcpServer afterwards: in SDK mode it does the
-  // real SDK toggle; in PTY mode it is a no-op debug log. Either way the
-  // disk + in-memory state already match.
   rpcHandlerManager.registerHandler<ToggleMcpServerRequest, ToggleMcpServerResponse>(
     `${scope}:toggle_mcp_server`,
     async (req) => {
@@ -688,7 +686,6 @@ export function registerClaudeControlHandlers(
         }
       }
 
-      await q.toggleMcpServer(req.serverName, req.enabled);
       logger.debug(
         `[claudeControl] toggle_mcp_server server=${req.serverName} enabled=${req.enabled} disabledList=[${nextDisabled.join(",")}]`,
       );

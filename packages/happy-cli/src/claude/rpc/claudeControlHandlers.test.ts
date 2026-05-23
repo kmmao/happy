@@ -41,19 +41,12 @@ function makeRpcHandlerManagerStub() {
 
 // ── ClaudePtyController stub ──────────────────────────────────────────────────
 
-function makeControllerStub(): {
-  controller: ClaudePtyController;
-  toggleCalls: Array<{ name: string; enabled: boolean }>;
-} {
-  const toggleCalls: Array<{ name: string; enabled: boolean }> = [];
-  const controller: Partial<ClaudePtyController> = {
-    async toggleMcpServer(name, enabled) {
-      toggleCalls.push({ name, enabled });
-    },
-    // Every other method on the interface is unused by toggle_mcp_server tests
-    // — supply no-ops only for the handlers we do not call.
-  };
-  return { controller: controller as ClaudePtyController, toggleCalls };
+function makeControllerStub(): { controller: ClaudePtyController } {
+  // toggle_mcp_server does not call into the controller in PTY mode — it
+  // only needs `getCurrentQuery()` to return a truthy value. Every other
+  // method on the interface is unused by these tests.
+  const controller: Partial<ClaudePtyController> = {};
+  return { controller: controller as ClaudePtyController };
 }
 
 // ── Test scaffolding ─────────────────────────────────────────────────────────
@@ -84,7 +77,7 @@ describe('registerClaudeControlHandlers — toggle_mcp_server', () => {
 
   function setup(opts: { liveMcpServers?: Record<string, unknown> } = {}) {
     const rpc = makeRpcHandlerManagerStub();
-    const { controller, toggleCalls } = makeControllerStub();
+    const { controller } = makeControllerStub();
     const liveMcpServers = opts.liveMcpServers ?? {};
     registerClaudeControlHandlers({
       rpcHandlerManager: rpc as any,
@@ -94,7 +87,7 @@ describe('registerClaudeControlHandlers — toggle_mcp_server', () => {
       liveMcpServers,
     });
     const handler = rpc.handlers.get(`${CLAUDE_CONTROL_SCOPE}:toggle_mcp_server`)!;
-    return { handler, toggleCalls, liveMcpServers };
+    return { handler, liveMcpServers };
   }
 
   function readDisk(): any {
@@ -106,7 +99,7 @@ describe('registerClaudeControlHandlers — toggle_mcp_server', () => {
       'chrome-devtools': { type: 'stdio', command: 'npx' },
       happy: { type: 'http', url: 'http://localhost' },
     };
-    const { handler, toggleCalls } = setup({ liveMcpServers });
+    const { handler } = setup({ liveMcpServers });
 
     const result = await handler({ serverName: 'chrome-devtools', enabled: false });
     expect(result).toEqual({ success: true });
@@ -120,9 +113,6 @@ describe('registerClaudeControlHandlers — toggle_mcp_server', () => {
       command: 'npx',
       disabled: true,
     });
-
-    // Controller's no-op toggle is still invoked (SDK-mode parity).
-    expect(toggleCalls).toEqual([{ name: 'chrome-devtools', enabled: false }]);
   });
 
   it('persists enable by removing the name from the disabled list', async () => {
