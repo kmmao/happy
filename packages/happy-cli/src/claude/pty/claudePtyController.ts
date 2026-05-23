@@ -36,10 +36,84 @@
  * the launcher actually calls. It is NOT a full implementation of the
  * SDK interface, and consumers must not rely on returned values from
  * the no-op methods.
+ *
+ * getContextUsage — PTY implementation
+ * -------------------------------------
+ * The SDK's `getContextUsage()` queries a live in-process runtime object.
+ * In PTY mode there is no such object. Instead, `claudeRemote.ts` tracks
+ * the latest `assistant` message usage fields (input_tokens,
+ * cache_read_input_tokens, cache_creation_input_tokens) from the session
+ * JSONL scanner and passes a `getLatestUsage` getter at construction time.
+ *
+ * What we can reconstruct from session data:
+ *   ✓ totalTokens  — sum of all three input buckets (the actual context window)
+ *   ✓ maxTokens    — derived from model name via a hardcoded lookup table
+ *   ✓ percentage   — totalTokens / maxTokens * 100
+ *   ✓ model        — from assistant message
+ *   ✓ apiUsage     — direct mapping of the four raw fields
+ *   ✓ categories   — single "Conversation" bucket (no SDK-level breakdown)
+ *
+ * What remains unavailable in PTY mode:
+ *   ✗ categories breakdown (system prompt / tools / memory / messages)
+ *   ✗ memoryFiles, mcpTools, systemPromptSections (not in session JSONL)
+ *   ✗ messageBreakdown per-category (would require parsing every message)
  */
 
 import type { ClaudePtyHandle } from "./claudePtyRuntime";
 import { logger } from "@/ui/logger";
+
+// ── UsageSnapshot ─────────────────────────────────────────────────────────────
+
+/**
+ * Raw token-usage extracted from the latest `assistant` JSONL message.
+ * Populated by `claudeRemote.ts` as the session scanner emits messages;
+ * consumed by `getContextUsage()` to synthesise a context-usage response.
+ */
+export interface UsageSnapshot {
+  model: string;
+  inputTokens: number;
+  cacheReadInputTokens: number;
+  cacheCreationInputTokens: number;
+  outputTokens: number;
+}
+
+// ── Happy-managed MCP server names ───────────────────────────────────────────
+
+/**
+ * Servers injected by the Happy launcher at spawn time. They are always
+ * successfully connected (Happy controls their lifecycle), so we report
+ * them as "connected" rather than "pending".
+ */
+const HAPPY_MANAGED_SERVERS = new Set(["happy", "happy-knowledge"]);
+
+// ── Model context-window limits ───────────────────────────────────────────────
+
+/**
+ * Known model → context window (input tokens) mapping.
+ * All current Claude models share a 200k context window.
+ * Prefix-matched so future minor versions (e.g. "claude-opus-4-8") resolve
+ * without a code change.
+ */
+const MODEL_CONTEXT_LIMITS: Array<[prefix: string, maxTokens: number]> = [
+  ["claude-opus-4", 200_000],
+  ["claude-sonnet-4", 200_000],
+  ["claude-haiku-4", 200_000],
+  ["claude-3-5-sonnet", 200_000],
+  ["claude-3-5-haiku", 200_000],
+  ["claude-3-opus", 200_000],
+  ["claude-3-sonnet", 200_000],
+  ["claude-3-haiku", 200_000],
+];
+
+function maxTokensForModel(model: string): number {
+  for (const [prefix, limit] of MODEL_CONTEXT_LIMITS) {
+    if (model.startsWith(prefix)) return limit;
+  }
+  // Conservative fallback — matches every deployed Claude model today.
+  return 200_000;
+}
+
+// ── Interface ─────────────────────────────────────────────────────────────────
 
 /**
  * Subset of OfficialQuery's API that the launcher and RPC handlers consume.
@@ -121,7 +195,13 @@ export interface ClaudePtyController {
   reconnectMcpServer(serverName: string): Promise<void>;
   /** Toggle a single MCP server — TUI has no equivalent; warn + no-op. */
   toggleMcpServer(serverName: string, enabled: boolean): Promise<void>;
-  /** Context usage — TUI has no equivalent; returns null. */
+  /**
+   * Context window usage breakdown.
+   *
+   * In PTY mode this is reconstructed from the latest `assistant` message's
+   * usage fields (see module doc comment). Returns null before the first
+   * assistant turn completes (no snapshot yet).
+   */
   getContextUsage(): Promise<{
     totalTokens: number;
     maxTokens: number;
@@ -156,8 +236,26 @@ export interface ClaudePtyController {
   } | null>;
 }
 
+// ── Factory ───────────────────────────────────────────────────────────────────
+
+/**
+ * Create a PTY-backed controller stub.
+ *
+ * @param pty            Live PTY handle — only `interrupt()` uses it.
+ * @param getLatestUsage Optional getter for the latest assistant-message usage
+ *                       snapshot. Provided by `claudeRemote.ts` which updates
+ *                       a shared reference as the session scanner emits
+ *                       assistant messages. Defaults to `() => null` (no data).
+ * @param getMcpServers  Optional getter for the MCP server config map that was
+ *                       passed to `claudeRemote()` at session start. Used by
+ *                       `mcpServerStatus()` to surface configured servers to the
+ *                       App even though the PTY has no programmatic status API.
+ *                       Defaults to `() => ({})` (empty — no servers reported).
+ */
 export function createClaudePtyController(
   pty: ClaudePtyHandle,
+  getLatestUsage: () => UsageSnapshot | null = () => null,
+  getMcpServers: () => Record<string, unknown> = () => ({}),
 ): ClaudePtyController {
   return {
     async interrupt() {
@@ -221,8 +319,30 @@ export function createClaudePtyController(
     },
 
     async mcpServerStatus() {
-      logger.debug("[ptyController] mcpServerStatus() — no TUI equivalent");
-      return [];
+      const servers = getMcpServers();
+      const entries = Object.entries(servers);
+
+      if (entries.length === 0) {
+        logger.debug("[ptyController] mcpServerStatus() — no servers configured");
+        return [];
+      }
+
+      const result = entries.map(([name, config]) => {
+        const cfg = (config ?? {}) as Record<string, unknown>;
+        const isDisabled = cfg.disabled === true;
+        const isHappyManaged = HAPPY_MANAGED_SERVERS.has(name);
+
+        const status: "connected" | "pending" | "disabled" = isDisabled
+          ? "disabled"
+          : isHappyManaged
+            ? "connected"
+            : "pending";
+
+        logger.debug(`[ptyController] mcpServerStatus ${name}=${status}`);
+        return { name, status };
+      });
+
+      return result;
     },
 
     async reconnectMcpServer(serverName: string) {
@@ -238,7 +358,47 @@ export function createClaudePtyController(
     },
 
     async getContextUsage() {
-      return null;
+      const snapshot = getLatestUsage();
+      if (!snapshot) return null;
+
+      const {
+        model,
+        inputTokens,
+        cacheReadInputTokens,
+        cacheCreationInputTokens,
+        outputTokens,
+      } = snapshot;
+
+      // Total input tokens = all three input buckets (never includes output).
+      const totalTokens = inputTokens + cacheReadInputTokens + cacheCreationInputTokens;
+      const maxTokens = maxTokensForModel(model);
+      const percentage = maxTokens > 0 ? (totalTokens / maxTokens) * 100 : 0;
+
+      logger.debug(
+        `[ptyController] getContextUsage: model=${model} total=${totalTokens}/${maxTokens} (${percentage.toFixed(1)}%)`,
+      );
+
+      return {
+        totalTokens,
+        maxTokens,
+        percentage,
+        model,
+        // Single bucket — no SDK-level breakdown available in PTY mode.
+        categories: [
+          {
+            name: "Conversation",
+            tokens: totalTokens,
+            color: "#007AFF",
+            isDeferred: false,
+          },
+        ],
+        apiUsage: {
+          input_tokens: inputTokens,
+          output_tokens: outputTokens,
+          cache_creation_input_tokens: cacheCreationInputTokens,
+          cache_read_input_tokens: cacheReadInputTokens,
+        },
+      };
     },
   };
 }
