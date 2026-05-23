@@ -165,6 +165,28 @@ function flattenUserContent(msg: SDKUserMessage): string {
   return parts.join("\n");
 }
 
+/**
+ * Submit a user prompt to the Claude TUI through the PTY.
+ *
+ * Claude's TUI runs in raw mode (Ink/React under the hood) where the
+ * line-discipline does *not* translate `\n` → `\r`. The TUI's keyboard
+ * handler only treats CR (`\r`, 0x0D) as "Enter pressed"; an LF would sit
+ * unsubmitted in the input buffer and the message would never reach the
+ * agent. (Symptom pre-fix: spinner stuck, jsonl file never written.)
+ *
+ * Multi-line text is wrapped in bracketed-paste markers (`ESC[200~ … ESC[201~`)
+ * so embedded newlines are preserved as a single paste rather than each one
+ * being interpreted as a submit. Bracketed paste is supported by Claude's
+ * TUI input handler. The trailing `\r` is the explicit submit keystroke.
+ */
+function writePromptToPty(pty: ClaudePtyHandle, message: string): void {
+  if (message.includes("\n")) {
+    pty.write(`\x1b[200~${message}\x1b[201~\r`);
+  } else {
+    pty.write(`${message}\r`);
+  }
+}
+
 export async function claudeRemote(opts: {
   // Fixed parameters
   sessionId: string | null;
@@ -702,7 +724,7 @@ export async function claudeRemote(opts: {
         );
         return;
       }
-      pty.write(next.message + "\n");
+      writePromptToPty(pty, next.message);
     } finally {
       resultInFlight = false;
     }
@@ -781,12 +803,12 @@ export async function claudeRemote(opts: {
   opts.onMessagesReady?.((msg) => {
     const text = flattenUserContent(msg);
     if (!text) return;
-    pty.write(text + "\n");
+    writePromptToPty(pty, text);
   });
 
   // Initial prompt — skip when `continue` so the TUI resumes its own state.
   if (!initial.mode.continue) {
-    pty.write(initial.message + "\n");
+    writePromptToPty(pty, initial.message);
   }
 
   try {
