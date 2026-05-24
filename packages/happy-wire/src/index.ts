@@ -18,3 +18,4 @@ export * from './codexBackendSelection';
 export * from './codexMetadata';
 export * from './claudeControlRpc';
 export * from './mcpRegistry';
+export * from './replayBuffer';
