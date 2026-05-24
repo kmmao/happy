@@ -157,11 +157,6 @@ describe("parseAndValidateSettings", () => {
     if (r.ok) expect(r.settings.attribution).toBe(false);
   });
 
-  it("validates includeCoAuthoredBy as boolean", () => {
-    const r = parseAndValidateSettings({ includeCoAuthoredBy: true });
-    expect(r.ok).toBe(true);
-  });
-
   it("validates respectGitignore as boolean", () => {
     const r = parseAndValidateSettings({ respectGitignore: false });
     expect(r.ok).toBe(true);

@@ -121,7 +121,6 @@ const ALLOWED_KEYS: Record<string, Validator> = {
   enabledMcpjsonServers: stringArrayOrNull,
   disabledMcpjsonServers: stringArrayOrNull,
   attribution: booleanOrNull,
-  includeCoAuthoredBy: booleanOrNull,
   includeGitInstructions: booleanOrNull,
   respectGitignore: booleanOrNull,
   availableModels: (v, key) => {
