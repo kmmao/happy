@@ -17,9 +17,11 @@
  * What remains on this controller is the subset that still has a real
  * behaviour in PTY mode:
  *
- *   • interrupt()             → write Ctrl-C (0x03) to PTY stdin
- *   • approveExitPlan()       → write "1\r" to confirm TUI plan-mode dialog
- *   • mcpServerStatus()       → snapshot the launcher-side MCP config map
+ *   • interrupt()                       → write Ctrl-C (0x03) to PTY stdin
+ *   • approveExitPlan()                 → write "1\r" to confirm TUI plan-mode dialog
+ *   • approveExitPlanWhenPickerReady()  → react to picker appearing in onData,
+ *                                          with 2 s blind fallback
+ *   • mcpServerStatus()                 → snapshot the launcher-side MCP config map
  *   • getContextUsage()       → reconstruct usage from JSONL snapshot
  *   • initializationResult()  → returns empty models[] (App still polls)
  *   • readFile()              → returns null (handler maps to permission_denied)
@@ -55,6 +57,7 @@
 
 import type { ClaudePtyHandle } from "./claudePtyRuntime";
 import { logger } from "@/ui/logger";
+import { probeMcpServer } from "@/claude/utils/mcpStatusProbe";
 
 // ── UsageSnapshot ─────────────────────────────────────────────────────────────
 
@@ -126,6 +129,33 @@ export interface ClaudePtyController {
    * user's intent (no further per-tool prompts) for the rest of the turn.
    */
   approveExitPlan(): Promise<void>;
+  /**
+   * Robust variant of `approveExitPlan()`: watches PTY output for the TUI
+   * plan-mode picker render and sends "1\r" the moment it appears. Falls
+   * back to a blind keystroke 2 s after the call if the picker pattern is
+   * never observed — covers the case where the picker was already drawn
+   * before the launcher's JSONL-driven detection ran (since `onData`
+   * only delivers future chunks).
+   *
+   * Why this exists alongside `approveExitPlan()`:
+   *   - `approveExitPlan()` is a primitive used by tests and any future
+   *     RPC-triggered manual override. It writes "1\r" unconditionally.
+   *   - `approveExitPlanWhenPickerReady()` is the production path used by
+   *     the launcher in Yolo/bypass mode. The split keeps the primitive
+   *     observable without the detection wiring.
+   *
+   * The fallback timeout exists because Subagent-emitted ExitPlanMode
+   * tool_use events historically stalled the session for thousands of
+   * seconds in Yolo mode (see commit 41aba1263 for the JSONL-detection
+   * origin). A blind 600 ms send fixed the common case; 2 s with reactive
+   * detection covers the slow/wrapped-output edge cases that motivated
+   * this routine.
+   *
+   * Resolves once the keystroke is written (either reactively or via the
+   * fallback). Never rejects — failures are logged and swallowed because
+   * the alternative is silently hanging the session.
+   */
+  approveExitPlanWhenPickerReady(): Promise<void>;
   /** Initialization result — returns empty model list in PTY mode. */
   initializationResult(): Promise<{
     claude_code_version?: string;
@@ -240,6 +270,71 @@ export function createClaudePtyController(
       pty.write("1\r");
     },
 
+    approveExitPlanWhenPickerReady() {
+      return new Promise<void>((resolve) => {
+        let done = false;
+        let unsubscribe: (() => void) | null = null;
+        let timeoutId: ReturnType<typeof setTimeout> | null = null;
+
+        // Sliding window: picker text may arrive split across multiple
+        // onData chunks (especially over a slow PTY pipe with small
+        // framing). 1 KB is far more than any single picker render.
+        let window = "";
+        const WINDOW_MAX = 1024;
+
+        // Match Claude TUI's plan-mode picker. The `❯` cursor glyph
+        // precedes the first option; we allow up to 80 chars between it
+        // and `1.` to absorb ANSI colour/bold escape sequences the TUI
+        // interleaves with the visible glyphs. After `1.` we explicitly
+        // skip zero-or-more CSI sequences (e.g. `\x1b[0m` colour resets)
+        // and then require whitespace — this rejects prose like
+        // `1.5kg` (no whitespace after the dot) without missing
+        // ANSI-styled options like `\x1b[1m1.\x1b[0m Yes` where the
+        // whitespace sits past a colour reset. The `\b` word boundary
+        // is deliberately omitted because the byte before `1` is `m`
+        // (the trailing char of a CSI sequence), which is a word char.
+        const PICKER_PATTERN = /❯[\s\S]{0,80}?1\.(?:\x1b\[[\d;]*m)*\s/;
+
+        const send = (reason: string) => {
+          if (done) return;
+          done = true;
+          if (timeoutId !== null) clearTimeout(timeoutId);
+          unsubscribe?.();
+          logger.debug(
+            `[ptyController] approveExitPlanWhenPickerReady (${reason}) → write '1\\r'`,
+          );
+          try {
+            pty.write("1\r");
+          } catch (err) {
+            // Match the "swallow + log" promise contract documented on the
+            // interface — propagating here would deadlock the launcher
+            // because the caller treats this as fire-and-forget.
+            logger.debug(
+              `[ptyController] approveExitPlanWhenPickerReady write failed: ${err instanceof Error ? err.message : String(err)}`,
+            );
+          }
+          resolve();
+        };
+
+        unsubscribe = pty.onData((data: string) => {
+          if (done) return;
+          window += data;
+          if (window.length > WINDOW_MAX) {
+            window = window.slice(window.length - WINDOW_MAX);
+          }
+          if (PICKER_PATTERN.test(window)) {
+            send("picker detected");
+          }
+        });
+
+        // Fallback: 2 s is roughly 3× the original 41aba1263 hardcoded
+        // 600 ms and gives the TUI plenty of time on slow systems. It
+        // also covers the "picker already drawn before subscribe" case,
+        // since onData only delivers future chunks.
+        timeoutId = setTimeout(() => send("2s fallback timeout"), 2000);
+      });
+    },
+
     async initializationResult() {
       // No equivalent in TUI mode — return empty so the launcher emits
       // an empty models[] update instead of waiting forever.
@@ -263,27 +358,33 @@ export function createClaudePtyController(
       }
 
       // PTY mode has no live MCP feedback (no SDK Query.mcpServerStatus()
-      // hook to listen to). The Claude TUI subprocess connects to MCPs at
-      // launch; by the time the App polls (every 30s), they are either
-      // connected or failed — and we have no signal to distinguish those.
-      // We therefore optimistically report "connected" for any configured,
-      // non-disabled MCP. The user still sees real connection errors
-      // because Claude prints them in the terminal, and MCP-prefixed tool
-      // calls will themselves fail loudly if a server is broken.
+      // hook to listen to). Earlier revisions optimistically reported
+      // "connected" for every non-disabled server, which masked typos and
+      // unreachable upstreams until the user actually invoked a tool. We
+      // now run cached reachability probes per server (see
+      // `mcpStatusProbe.ts`):
       //
-      // Happy's own MCPs (happy / happy-knowledge) are guaranteed connected
-      // since the launcher owns their lifecycle; they share the same code
-      // path because "connected" is now the default for everything.
-      const result = entries.map(([name, config]) => {
-        const cfg = (config ?? {}) as Record<string, unknown>;
-        const status: "connected" | "disabled" = cfg.disabled === true
-          ? "disabled"
-          : "connected";
-        logger.debug(`[ptyController] mcpServerStatus ${name}=${status}`);
-        return { name, status };
-      });
+      //   stdio → PATH-resolve `command` (`command not found` → "failed")
+      //   url   → HEAD/GET ping with 2 s timeout (5xx / network err → "failed")
+      //
+      // Probe results are cached 60 s, so the App's 30 s poll cadence does
+      // at most one round-trip per server per minute. Probes still cannot
+      // detect a binary that exists but won't speak MCP — only the
+      // launcher / claude itself sees that — but they correctly catch the
+      // common misconfig cases that were previously invisible.
+      const results = await Promise.all(
+        entries.map(async ([name, config]) => {
+          const probe = await probeMcpServer(name, config);
+          logger.debug(
+            `[ptyController] mcpServerStatus ${name}=${probe.status}${probe.error ? ` (${probe.error})` : ""}`,
+          );
+          return probe.error
+            ? { name, status: probe.status, error: probe.error }
+            : { name, status: probe.status };
+        }),
+      );
 
-      return result;
+      return results;
     },
 
     async getContextUsage() {

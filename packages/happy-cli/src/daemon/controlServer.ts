@@ -19,6 +19,7 @@ import type { AgentLoopBootstrapCreateInput, AgentLoopBootstrapMutationResult, A
 import type { AgentLoopBootstrapProfile } from "@/automation/AgentLoopBootstrapStore";
 import type { AutoDreamCreateInput, AutoDreamMutationResult, AutoDreamUpdateInput } from "@/automation/AutoDreamCoordinator";
 import type { AutoDreamProfile } from "@/automation/AutoDreamStore";
+import { TERMINAL_REPLAY_BUFFER_BYTES } from "@kmmao/happy-wire";
 
 const automationJobSchema = z.object({
   id: z.string(),
@@ -616,6 +617,8 @@ export function startDaemonControlServer({
     cols: number;
     rows: number;
     cwd: string;
+    /** Optional session-local URL for App→PTY reverse traffic. */
+    reverseUrl?: string;
   }) => void;
   detachClaudePty: (terminalId: string) => void;
   forwardClaudePtyData: (terminalId: string, data: string) => void;
@@ -1350,6 +1353,11 @@ export function startDaemonControlServer({
             cols: z.number().int().positive(),
             rows: z.number().int().positive(),
             cwd: z.string(),
+            // Session-side loopback URL for App→PTY input/resize/close.
+            // Optional for backward compat with older session children that
+            // never run a reverse server — those attachments remain
+            // observation-only (legacy behavior).
+            reverseUrl: z.url().optional(),
           }),
           response: {
             200: z.object({ status: z.literal("ok") }),
@@ -1384,9 +1392,11 @@ export function startDaemonControlServer({
         schema: {
           body: z.object({
             terminalId: z.string().min(1),
-            // 64KB upper bound matches MAX_OUTPUT_BUFFER in TerminalManager; the
-            // session-side router already chunks at 8KB but we leave headroom.
-            data: z.string().max(64 * 1024),
+            // Upper bound mirrors TERMINAL_REPLAY_BUFFER_BYTES (shared with
+            // TerminalManager). The session-side router already chunks at
+            // TERMINAL_OUTPUT_CHUNK_BYTES (8KB) but we leave headroom for
+            // future producers that might batch larger payloads.
+            data: z.string().max(TERMINAL_REPLAY_BUFFER_BYTES),
           }),
           response: {
             200: z.object({ status: z.literal("ok") }),

@@ -44,14 +44,17 @@ function makeFakePty(): {
     },
     write(data) {
       writes.push(data);
+      return true;
     },
     resize(c, r) {
       cols = c;
       rows = r;
       resizes.push([c, r]);
+      return true;
     },
     interrupt() {
       writes.push("\x03");
+      return true;
     },
     kill() {
       exited = true;

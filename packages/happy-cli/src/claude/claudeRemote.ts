@@ -76,6 +76,10 @@ import {
   bridgeAvailable,
   buildClaudeTerminalId,
 } from "@/claude/pty/claudePtyDaemonBridge";
+import {
+  startClaudePtyReverseServer,
+  type ClaudePtyReverseServer,
+} from "@/claude/pty/claudePtyReverseServer";
 import { createSessionScanner } from "./utils/sessionScanner";
 
 void resolvePath; // path resolution kept available for future flag builders
@@ -198,12 +202,23 @@ function flattenUserContent(msg: ClaudeJsonlUserMessage): string {
  * This costs ~6 extra bytes per write and matches what every modern terminal
  * does when the user actually pastes.
  */
-function writePromptToPty(pty: ClaudePtyHandle, message: string): void {
+/**
+ * Returns true on successful write. Returning the boolean (instead of `void`)
+ * is what lets `writePromptAndMarkThinking` skip the "thinking=true" flip on
+ * failure — otherwise the App would spin forever waiting for a turn that
+ * never starts, because the PTY ate the prompt before it could be processed.
+ *
+ * `pty.write` itself returns false when the underlying child has exited or
+ * `child.write` threw (see `claudePtyRuntime.write`). Both are unrecoverable
+ * for the current prompt; the caller is responsible for surfacing the
+ * failure (currently via `opts.onCompletionEvent`).
+ */
+function writePromptToPty(pty: ClaudePtyHandle, message: string): boolean {
   const preview = message.length > 60 ? `${message.slice(0, 60)}…` : message;
   logger.debug(
     `[claudeRemote] writePromptToPty len=${message.length} multiline=${message.includes("\n")} preview=${JSON.stringify(preview)}`,
   );
-  pty.write(`\x1b[200~${message}\x1b[201~\r`);
+  return pty.write(`\x1b[200~${message}\x1b[201~\r`);
 }
 
 /**
@@ -216,27 +231,51 @@ function writePromptToPty(pty: ClaudePtyHandle, message: string): void {
  * yet. Symptom: SessionStart hook fires, but no `result` event ever appears
  * because the user prompt was never seen by the TUI.
  *
- * Heuristic: wait for the first PTY data chunk (proves the child is alive
- * and producing output) + a small grace window (gives Ink time to finish
- * initial render and enable raw mode). Bounded by `timeoutMs` so a broken
- * binary that produces no output still unblocks the caller and we degrade
- * to the pre-fix behaviour rather than hanging.
+ * Strategy: layered detection, fastest-positive-wins.
+ *
+ *   1. **Alt-screen enter (`\x1b[?1049h`)** — Ink emits this CSI when it
+ *      switches to the alternate screen buffer at startup. At that point
+ *      Ink's stdin reader has registered its raw-mode handler, so keystrokes
+ *      are guaranteed to be routed. A short `altScreenGraceMs` (100 ms) after
+ *      the sequence covers the rare ordering where Ink calls
+ *      `process.stdout.write('\x1b[?1049h')` a tick before `process.stdin.on`
+ *      attaches. This is the fast path — typical resolve time ~150-250 ms.
+ *
+ *   2. **First-chunk + long grace (800 ms)** — fallback when the user runs
+ *      Claude with `NO_ALT_SCREEN=1`, pipes its output, or uses a wrapper
+ *      that strips the 1049 sequence. The original behaviour, kept verbatim.
+ *
+ *   3. **Hard timeout (`timeoutMs`)** — broken binary produces no output;
+ *      degrade to "send anyway" rather than hanging the launcher forever.
+ *
+ * The alt-screen check is a substring search in a 64-byte sliding window
+ * (the sequence is 8 bytes, but Ink may emit it interleaved with cursor /
+ * colour CSIs in the same chunk so a small buffer absorbs split boundaries).
  */
 function waitForPtyReady(
   pty: ClaudePtyHandle,
-  graceMs = 800,
+  firstChunkGraceMs = 800,
+  altScreenGraceMs = 100,
   timeoutMs = 8000,
 ): Promise<void> {
   return new Promise((resolve) => {
     let settled = false;
-    let firstChunkSeen = false;
+    let firstChunkTimer: ReturnType<typeof setTimeout> | null = null;
+    let altScreenTimer: ReturnType<typeof setTimeout> | null = null;
     const startedAt = Date.now();
+
+    // Sliding window for alt-screen detection — covers chunk-boundary splits.
+    let window = "";
+    const WINDOW_MAX = 64;
+    const ALT_SCREEN_ENTER = "\x1b[?1049h";
 
     const finish = (reason: string) => {
       if (settled) return;
       settled = true;
       unsubscribe();
       clearTimeout(timeoutTimer);
+      if (firstChunkTimer !== null) clearTimeout(firstChunkTimer);
+      if (altScreenTimer !== null) clearTimeout(altScreenTimer);
       logger.debug(
         `[claudeRemote] PTY ready (${reason}) after ${Date.now() - startedAt}ms`,
       );
@@ -245,10 +284,28 @@ function waitForPtyReady(
 
     const timeoutTimer = setTimeout(() => finish("timeout"), timeoutMs);
 
-    const unsubscribe = pty.onData(() => {
-      if (firstChunkSeen) return;
-      firstChunkSeen = true;
-      setTimeout(() => finish("first-chunk+grace"), graceMs);
+    const unsubscribe = pty.onData((data: string) => {
+      // Fast path: alt-screen enter sighted → tiny grace then ready.
+      if (altScreenTimer === null) {
+        window += data;
+        if (window.length > WINDOW_MAX) {
+          window = window.slice(window.length - WINDOW_MAX);
+        }
+        if (window.includes(ALT_SCREEN_ENTER)) {
+          altScreenTimer = setTimeout(
+            () => finish("alt-screen+grace"),
+            altScreenGraceMs,
+          );
+          return;
+        }
+      }
+      // Fallback: arm first-chunk grace on the very first byte received.
+      if (firstChunkTimer === null) {
+        firstChunkTimer = setTimeout(
+          () => finish("first-chunk+grace"),
+          firstChunkGraceMs,
+        );
+      }
     });
   });
 }
@@ -550,15 +607,6 @@ export async function claudeRemote(opts: {
   if (opts.happySessionId && bridgeAvailable()) {
     const happySessionId = opts.happySessionId;
     const terminalId = buildClaudeTerminalId(happySessionId);
-    // Best-effort attach — we do not await so a slow daemon never blocks the
-    // PTY's first byte.
-    void bridgeAttach({
-      terminalId,
-      sessionId: happySessionId,
-      cols: 80,
-      rows: 24,
-      cwd: opts.path,
-    });
 
     const router = attachClaudePtyRouter({
       sessionId: happySessionId,
@@ -571,9 +619,46 @@ export async function claudeRemote(opts: {
       },
     });
 
+    // Reverse-channel server: lets the daemon POST App keystrokes/resizes
+    // back into the PTY. Failure to start is non-fatal — observation
+    // still works without it (legacy behavior).
+    let reverseServer: ClaudePtyReverseServer | undefined;
+    try {
+      reverseServer = await startClaudePtyReverseServer({
+        input: (data) => router.acceptInput(data),
+        resize: (cols, rows) => router.acceptResize(cols, rows),
+        close: () => {
+          // Deliberately a no-op for now: closing the App's terminal tab
+          // should not tear down the Claude TUI the daemon is hosting.
+          // Future revisions may dispatch a graceful quit (Ctrl-C + 'q')
+          // gated on an explicit "stop session" affordance in the App.
+          logger.debug(
+            `[claudeRemote] reverse close requested for ${terminalId}; ignoring (no-op by design)`,
+          );
+        },
+      });
+    } catch (err) {
+      logger.debug(
+        `[claudeRemote] reverse PTY server failed to start: ${err instanceof Error ? err.message : String(err)} — observation-only mode`,
+      );
+    }
+
+    // Best-effort attach — we do not await so a slow daemon never blocks the
+    // PTY's first byte. Includes the reverse URL when available so the
+    // daemon's `apiMachine.attachClaudePty` can forward App input back here.
+    void bridgeAttach({
+      terminalId,
+      sessionId: happySessionId,
+      cols: 80,
+      rows: 24,
+      cwd: opts.path,
+      reverseUrl: reverseServer?.baseUrl,
+    });
+
     teardownPtyBridge = () => {
       router.dispose();
       void bridgeDetach(terminalId);
+      void reverseServer?.stop();
     };
   }
 
@@ -608,9 +693,26 @@ export async function claudeRemote(opts: {
   // would stay on "ready" through every turn after the first — `updateThinking
   // (true)` would only fire opportunistically when an extra system record
   // (e.g. stop_hook_summary) happened to land mid-turn.
+  //
+  // Failure handling: when `pty.write` returns false (PTY exited or write
+  // threw), we deliberately do NOT flip thinking=true — doing so would leave
+  // the App stuck on "thinking" indefinitely because the JSONL stream will
+  // never produce a result record for a prompt that was never delivered.
+  // Instead, surface a single user-visible diagnostic via the existing
+  // `onCompletionEvent` channel (same channel "Context was reset" /
+  // "Compaction completed" use) so the App's transcript shows that this
+  // particular send failed, and warn-log for the server-side debugger.
   const writePromptAndMarkThinking = (msg: string): void => {
-    writePromptToPty(pty, msg);
-    updateThinking(true);
+    if (writePromptToPty(pty, msg)) {
+      updateThinking(true);
+      return;
+    }
+    logger.warn(
+      `[claudeRemote] prompt write dropped — PTY exited=${pty.exited} pid=${pty.pid}; len=${msg.length}`,
+    );
+    opts.onCompletionEvent?.(
+      "Failed to deliver prompt to Claude — terminal exited",
+    );
   };
 
   // Models broadcast (Controller returns an empty list under PTY).

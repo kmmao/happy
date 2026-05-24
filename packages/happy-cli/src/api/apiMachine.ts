@@ -1181,9 +1181,19 @@ export class ApiMachineClient {
     cols: number;
     rows: number;
     cwd: string;
+    /**
+     * Loopback URL of the per-session reverse HTTP server. When present, App
+     * keystrokes / resizes / close-requests POST straight through to the
+     * Claude PTY — the App's "Open Raw Claude Terminal" view becomes
+     * interactive. When absent, the attachment is observation-only (legacy
+     * behavior; happens with older session children that don't run the
+     * reverse server).
+     */
+    reverseUrl?: string;
   }): void {
-    const MAX_BUFFER = 64 * 1024;
-    let buffer = "";
+    if (input.reverseUrl) {
+      this.claudePtyReverseUrls.set(input.terminalId, input.reverseUrl);
+    }
     this.terminalManager.attachExternal({
       terminalId: input.terminalId,
       sessionId: input.sessionId,
@@ -1191,53 +1201,78 @@ export class ApiMachineClient {
       rows: input.rows,
       cwd: input.cwd,
       createdAt: Date.now(),
-      snapshot: () => buffer,
-      // For v1 the App's WebTerminal is observation-only — input from xterm.js
-      // and resizes are logged but dropped. The user types through the chat
-      // composer; the PTY's geometry is fixed at spawn. close requests are
-      // ignored since the session child owns the PTY lifecycle.
+      // Empty initial snapshot — TerminalManager grows it via the
+      // appendOutput hook on each emitExternalOutput call.
+      snapshot: () => "",
       write: (data) => {
-        logger.debug(
-          `[apiMachine] Claude PTY write ignored (${data.length}B) for ${input.terminalId}`,
-        );
+        this.postClaudePtyReverse(input.terminalId, "/input", { data });
       },
       resize: (cols, rows) => {
-        logger.debug(
-          `[apiMachine] Claude PTY resize ignored (${cols}x${rows}) for ${input.terminalId}`,
-        );
+        this.postClaudePtyReverse(input.terminalId, "/resize", { cols, rows });
       },
       requestClose: () => {
-        logger.debug(
-          `[apiMachine] Claude PTY close requested but ignored for ${input.terminalId}`,
-        );
+        this.postClaudePtyReverse(input.terminalId, "/close", {});
       },
-    });
-    // Bind the buffer maintainer so forwardClaudePtyData below can update it
-    // even though TerminalManager has no direct hook for buffer maintenance.
-    this.claudePtyBuffers.set(input.terminalId, (chunk: string) => {
-      buffer += chunk;
-      if (buffer.length > MAX_BUFFER) {
-        buffer = buffer.slice(buffer.length - MAX_BUFFER);
-      }
     });
   }
 
   detachClaudePty(terminalId: string): void {
+    this.claudePtyReverseUrls.delete(terminalId);
     this.terminalManager.detachExternal(terminalId);
-    this.claudePtyBuffers.delete(terminalId);
   }
 
   forwardClaudePtyData(terminalId: string, data: string): void {
-    this.claudePtyBuffers.get(terminalId)?.(data);
+    // Replay buffer maintenance now lives inside the external attachment —
+    // a single call here both appends-to-buffer and fans-out the chunk.
     this.terminalManager.emitExternalOutput(terminalId, data);
   }
 
   forwardClaudePtyExit(terminalId: string, exitCode: number): void {
+    this.claudePtyReverseUrls.delete(terminalId);
     this.terminalManager.emitExternalExit(terminalId, exitCode);
-    this.claudePtyBuffers.delete(terminalId);
   }
 
-  private claudePtyBuffers = new Map<string, (chunk: string) => void>();
+  /**
+   * terminalId → session-local reverse-server base URL. Populated by
+   * `attachClaudePty` when the session child reports a URL; cleared on
+   * detach / exit. POSTs use this to route App→PTY traffic without
+   * threading another callback through `setRPCHandlers`.
+   */
+  private claudePtyReverseUrls = new Map<string, string>();
+
+  /**
+   * Fire-and-forget POST to the per-session reverse server. Failures are
+   * logged at debug — App "send" UX already treats these as best-effort
+   * (no ack today), and the alternative (retry / queue) would re-implement
+   * the daemon-side backpressure already living in `claudePtyDaemonBridge`
+   * for the opposite direction. If this becomes a real ordering issue we
+   * will switch to a per-terminalId FIFO mirror of the bridge.
+   */
+  private postClaudePtyReverse(
+    terminalId: string,
+    path: "/input" | "/resize" | "/close",
+    body: Record<string, unknown>,
+  ): void {
+    const base = this.claudePtyReverseUrls.get(terminalId);
+    if (!base) return; // session child didn't expose a reverse channel
+    void fetch(`${base}${path}`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
+    })
+      .then((res) => {
+        if (!res.ok) {
+          logger.debug(
+            `[API MACHINE] claude-pty reverse POST ${path} for ${terminalId} → ${res.status}`,
+          );
+        }
+      })
+      .catch((err) => {
+        logger.debug(
+          `[API MACHINE] claude-pty reverse POST ${path} for ${terminalId} failed: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      });
+  }
 
   private flushPendingFixStatuses() {
     const pending = [...this.pendingFixStatuses];

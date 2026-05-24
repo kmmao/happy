@@ -1,50 +1,83 @@
 /**
  * TerminalManager — manages PTY sessions for the web terminal feature.
  *
- * Each terminal is a child process with piped stdio.
- * node-pty would give a real PTY, but to avoid native dependencies
- * we use child_process.spawn with 'script' wrapper for pseudo-TTY support.
+ * Both "internal" shell PTYs (spawned on demand by the App's
+ * `terminal-spawn` RPC) and "external" PTYs (the Claude TUI owned by
+ * `claudePtyRuntime` in the session child) live in the same
+ * `Map<terminalId, ManagedPty>`. Every consumer code path (write / resize /
+ * close / listBySession) operates on the unified `ManagedPty` interface so
+ * there are no parallel `if (external) … else …` branches.
+ *
+ * Internal PTYs use `node-pty` directly — earlier revisions wrapped a small
+ * Python `pty.openpty()` script under `child_process.spawn` "to avoid native
+ * dependencies", but the Claude PTY path already pulls `node-pty` in as a
+ * dependency, so the workaround is gone and resize now uses real
+ * `TIOCSWINSZ` + SIGWINCH (the inline `stty cols X rows Y\n` write was
+ * fragile and visible in the user's shell).
  */
 
-import { spawn, ChildProcess } from "child_process";
+import { spawn as ptySpawn, type IPty } from "node-pty";
 import { createId } from "@paralleldrive/cuid2";
 import { logger } from "@/ui/logger";
-
-export interface TerminalSession {
-  id: string;
-  sessionId?: string; // owning Claude session — used for persistent reattach
-  process: ChildProcess;
-  cols: number;
-  rows: number;
-  shell: string;
-  cwd: string;
-  createdAt: number;
-  outputBuffer: string; // rolling buffer of recent output for reattach replay
-}
+import {
+  TERMINAL_OUTPUT_CHUNK_BYTES,
+  TERMINAL_REPLAY_BUFFER_BYTES,
+  chunkStringSafe,
+  createReplayBuffer,
+} from "@kmmao/happy-wire";
 
 export type TerminalOutputHandler = (terminalId: string, data: string) => void;
 export type TerminalExitHandler = (terminalId: string, exitCode: number) => void;
 
 /**
- * External PTY adapter — used by Remote-mode Claude PTY runtime to inject its
- * already-running PTY (terminalId = "claude:<sessionId>") into the same
- * web-terminal wire surface. The App then reattaches to it through the existing
- * `terminal-spawn` RPC by passing the matching `sessionId` or `terminalId`.
+ * Unified PTY surface. Both shell terminals and Claude TUI attachments
+ * implement this — `TerminalManager` only ever talks through it, so the
+ * write/resize/close paths have a single branch.
+ */
+interface ManagedPty {
+  readonly terminalId: string;
+  readonly sessionId?: string;
+  readonly kind: "internal" | "external";
+  readonly createdAt: number;
+  cols: number;
+  rows: number;
+  cwd: string;
+  /** Most recent bytes for reconnect replay. */
+  snapshot(): string;
+  /** Append a chunk to the replay buffer (external attachments only — internal PTYs append themselves on `onData`). */
+  appendOutput?(data: string): void;
+  /** Write input to the PTY. Returns true if accepted. */
+  write(data: string): boolean;
+  /** Resize the PTY. Returns true if accepted. */
+  resize(cols: number, rows: number): boolean;
+  /**
+   * Tear down the PTY. For internal terminals this kills the child
+   * (SIGTERM with SIGKILL fallback); for external attachments this signals
+   * a best-effort close to the upstream owner — the owner may ignore or
+   * honor it.
+   */
+  close(): void;
+}
+
+/**
+ * External PTY adapter — the Claude PTY runtime injects its already-running
+ * PTY (terminalId = "claude:<sessionId>") into the same web-terminal wire
+ * surface so the App can subscribe through the existing `terminal-spawn` RPC.
  *
- * Lifecycle: register on Claude PTY spawn, deregister on PTY exit. The adapter
- * does NOT own the PTY process — that lives in `claudePtyRuntime`. TerminalManager
- * only proxies write/resize/close.
+ * The adapter does NOT own the PTY process — that lives in `claudePtyRuntime`.
+ * TerminalManager only proxies write/resize/close.
+ *
+ * For backward compat with `attachExternal` callers we accept the legacy
+ * shape (snapshot/write/resize/requestClose) and adapt it into a `ManagedPty`
+ * internally.
  */
 export interface ExternalPtyAttachment {
-  /** Stable id of the form `claude:<sessionId>`. */
   readonly terminalId: string;
-  /** Owning Happy session id; used for `listBySession` and reattach by sessionId. */
   readonly sessionId: string;
   readonly cols: number;
   readonly rows: number;
   readonly cwd: string;
   readonly createdAt: number;
-  /** Rolling-buffer replay for reconnect, sourced from `claudePtyRouter`. */
   snapshot(): string;
   write(data: string): void;
   resize(cols: number, rows: number): void;
@@ -54,18 +87,12 @@ export interface ExternalPtyAttachment {
 
 const MAX_TERMINALS_PER_SESSION = 5;
 const MAX_TERMINALS_GLOBAL = 20;
-const MAX_OUTPUT_CHUNK = 8 * 1024;  // 8KB per chunk
-const MAX_OUTPUT_BUFFER = 64 * 1024; // 64KB replay buffer per terminal
+const MAX_OUTPUT_CHUNK = TERMINAL_OUTPUT_CHUNK_BYTES;
+const MAX_OUTPUT_BUFFER = TERMINAL_REPLAY_BUFFER_BYTES;
 
 export class TerminalManager {
-  private terminals = new Map<string, TerminalSession>();
-  private sessionIndex = new Map<string, string[]>(); // sessionId → terminalId[]
-  // External attachments are keyed by terminalId; sessionLookup mirrors the
-  // sessionId→terminalId mapping so `spawn({ sessionId })` can find them
-  // without scanning. We keep these maps separate from `terminals` so the
-  // shell-PTY lifecycle code paths stay untouched.
-  private externalAttachments = new Map<string, ExternalPtyAttachment>();
-  private externalSessionLookup = new Map<string, string>(); // sessionId → terminalId
+  private ptys = new Map<string, ManagedPty>();
+  private sessionIndex = new Map<string, Set<string>>(); // sessionId → terminalIds
   private onOutput: TerminalOutputHandler | null = null;
   private onExit: TerminalExitHandler | null = null;
 
@@ -77,20 +104,26 @@ export class TerminalManager {
     this.onExit = handler;
   }
 
+  // ── External attachments (Claude PTY) ──────────────────────────────────
+
   /**
-   * Register an externally-managed PTY (e.g. Claude TUI) under the wire's
-   * terminal protocol. The App can then reattach via `terminal-spawn`
-   * by passing either the matching `terminalId` or `sessionId`. Returns
-   * a disposer for symmetric teardown.
+   * Register an externally-managed PTY (currently only the Claude TUI). The
+   * App can reattach via `terminal-spawn` by passing either the matching
+   * `terminalId` or `sessionId`. Returns a disposer for symmetric teardown.
+   *
+   * The replay buffer is owned by the adapter — callers no longer need to
+   * thread a separate buffer-append callback through `forwardClaudePtyData`;
+   * they just call `emitExternalOutput`.
    */
   attachExternal(attachment: ExternalPtyAttachment): () => void {
-    if (this.externalAttachments.has(attachment.terminalId)) {
+    if (this.ptys.has(attachment.terminalId)) {
       logger.debug(
         `[TERMINAL] attachExternal called twice for ${attachment.terminalId} — replacing`,
       );
     }
-    this.externalAttachments.set(attachment.terminalId, attachment);
-    this.externalSessionLookup.set(attachment.sessionId, attachment.terminalId);
+    const managed = wrapExternalAttachment(attachment);
+    this.ptys.set(attachment.terminalId, managed);
+    this.indexSession(attachment.sessionId, attachment.terminalId);
     logger.debug(
       `[TERMINAL] External PTY attached: ${attachment.terminalId} (session ${attachment.sessionId})`,
     );
@@ -98,24 +131,25 @@ export class TerminalManager {
   }
 
   detachExternal(terminalId: string): void {
-    const att = this.externalAttachments.get(terminalId);
-    if (!att) return;
-    this.externalAttachments.delete(terminalId);
-    if (this.externalSessionLookup.get(att.sessionId) === terminalId) {
-      this.externalSessionLookup.delete(att.sessionId);
-    }
+    const pty = this.ptys.get(terminalId);
+    if (!pty || pty.kind !== "external") return;
+    this.ptys.delete(terminalId);
+    this.unindexSession(pty.sessionId, terminalId);
     logger.debug(`[TERMINAL] External PTY detached: ${terminalId}`);
   }
 
   /**
    * Broadcast a chunk of output from an external PTY through the shared
-   * `terminal-output` socket event. Used by `claudePtyRouter` so consumers
-   * downstream (xterm.js in the App) don't need a separate wire path.
+   * `terminal-output` socket event. Updates the attachment's replay buffer
+   * in passing so reconnects see the latest screen.
    */
   emitExternalOutput(terminalId: string, data: string): void {
+    const pty = this.ptys.get(terminalId);
+    if (!pty || pty.kind !== "external") return;
+    pty.appendOutput?.(data);
     if (!this.onOutput) return;
-    for (let i = 0; i < data.length; i += MAX_OUTPUT_CHUNK) {
-      this.onOutput(terminalId, data.slice(i, i + MAX_OUTPUT_CHUNK));
+    for (const chunk of chunkStringSafe(data, MAX_OUTPUT_CHUNK)) {
+      this.onOutput(terminalId, chunk);
     }
   }
 
@@ -125,66 +159,53 @@ export class TerminalManager {
     this.onExit?.(terminalId, exitCode);
   }
 
+  // ── Internal shell PTYs ────────────────────────────────────────────────
+
   spawn(options: {
     shell?: string;
     cwd?: string;
     cols?: number;
     rows?: number;
     sessionId?: string;
-    terminalId?: string; // if provided, reattach to this specific PTY
-  }): { success: boolean; terminalId?: string; recentOutput?: string; isExisting?: boolean; error?: string } {
-    // External attachment reattach — Claude TUI PTYs live in `claudePtyRuntime`
-    // and only surface here as a thin adapter. Resolve them via terminalId
-    // ("claude:<sessionId>") OR sessionId for the App's button entry.
-    const externalById = options.terminalId
-      ? this.externalAttachments.get(options.terminalId)
-      : undefined;
-    const externalBySession = !externalById && options.sessionId
-      ? this.externalAttachments.get(
-          this.externalSessionLookup.get(options.sessionId) ?? "",
-        )
-      : undefined;
-    const external = externalById ?? externalBySession;
-    if (external) {
+    /** If provided, reattach to this specific PTY (internal or external). */
+    terminalId?: string;
+  }): {
+    success: boolean;
+    terminalId?: string;
+    recentOutput?: string;
+    isExisting?: boolean;
+    error?: string;
+  } {
+    // Reattach path — works for both internal and external since they
+    // implement the same surface.
+    const existing = this.resolveExisting(options.terminalId, options.sessionId);
+    if (existing) {
       if (options.cols && options.rows) {
-        external.resize(options.cols, options.rows);
+        existing.resize(options.cols, options.rows);
       }
       return {
         success: true,
-        terminalId: external.terminalId,
-        recentOutput: external.snapshot(),
+        terminalId: existing.terminalId,
+        recentOutput: existing.snapshot(),
         isExisting: true,
       };
     }
 
-    // Reattach to a specific shell terminal by ID
-    if (options.terminalId) {
-      const existing = this.terminals.get(options.terminalId);
-      if (existing) {
-        if (options.cols && options.rows) {
-          this.resize(options.terminalId, options.cols, options.rows);
-        }
+    if (options.sessionId) {
+      const ids = this.sessionIndex.get(options.sessionId);
+      if (ids && ids.size >= MAX_TERMINALS_PER_SESSION) {
         return {
-          success: true,
-          terminalId: options.terminalId,
-          recentOutput: existing.outputBuffer,
-          isExisting: true,
+          success: false,
+          error: `Maximum ${MAX_TERMINALS_PER_SESSION} terminals per session reached`,
         };
       }
-      // Terminal not found — fall through to create new
     }
 
-    // Check per-session limit
-    if (options.sessionId) {
-      const sessionTerminals = this.sessionIndex.get(options.sessionId) ?? [];
-      if (sessionTerminals.length >= MAX_TERMINALS_PER_SESSION) {
-        return { success: false, error: `Maximum ${MAX_TERMINALS_PER_SESSION} terminals per session reached` };
-      }
-    }
-
-    // Check global limit
-    if (this.terminals.size >= MAX_TERMINALS_GLOBAL) {
-      return { success: false, error: `Maximum ${MAX_TERMINALS_GLOBAL} terminals reached` };
+    if (this.ptys.size >= MAX_TERMINALS_GLOBAL) {
+      return {
+        success: false,
+        error: `Maximum ${MAX_TERMINALS_GLOBAL} terminals reached`,
+      };
     }
 
     const id = createId();
@@ -194,192 +215,55 @@ export class TerminalManager {
     const rows = options.rows || 24;
 
     try {
-      const env = {
+      const env: NodeJS.ProcessEnv = {
         ...process.env,
         TERM: "xterm-256color",
+        COLORTERM: "truecolor",
         COLUMNS: String(cols),
         LINES: String(rows),
+        // Let user startup scripts skip self-wrapping with `script`/`tmux`.
+        HAPPY_TERMINAL: process.env.HAPPY_TERMINAL ?? "1",
       };
 
-      let child: ChildProcess;
+      const child: IPty = ptySpawn(shell, [], {
+        name: "xterm-256color",
+        cols,
+        rows,
+        cwd,
+        // node-pty's d.ts insists on string-valued env; we filter undefined
+        // upstream by virtue of spreading `process.env` which is already
+        // `string | undefined` — cast to satisfy the type.
+        env: env as { [key: string]: string },
+      });
 
-      {
-        // Both macOS and Linux: 'script' calls tcgetattr() on stdin to save terminal
-        // settings. When the daemon's stdin is a pipe/socket (not a TTY), this fails with
-        // "Operation not supported on socket". Use Python3's pty.openpty() on all platforms
-        // — it allocates a real PTY pair without requiring the parent to have a controlling
-        // terminal, and works identically on macOS and Linux.
-        const ptyScript = `
-import os, sys, pty, select, struct, termios, fcntl, signal, traceback
-
-def dbg(msg):
-    sys.stdout.write(f"[happy-pty] {msg}\\r\\n")
-    sys.stdout.flush()
-
-try:
-    shell = os.environ['PTY_SHELL']
-    cols  = int(os.environ.get('PTY_COLS', '80'))
-    rows  = int(os.environ.get('PTY_ROWS', '24'))
-
-    master_fd, slave_fd = pty.openpty()
-    dbg(f"openpty ok: master={master_fd} slave={slave_fd} shell={shell}")
-
-    try:
-        fcntl.ioctl(slave_fd, termios.TIOCSWINSZ, struct.pack('HHHH', rows, cols, 0, 0))
-    except Exception as e:
-        dbg(f"TIOCSWINSZ warn: {e}")
-
-    pid = os.fork()
-    # Install SIGTERM handler (parent only) so killing python3 also kills the shell child
-    def _sigterm(sig, frame):
-        try: os.kill(pid, signal.SIGTERM)
-        except OSError: pass
-        sys.exit(0)
-    signal.signal(signal.SIGTERM, _sigterm)
-    if pid == 0:
-        # Child: set up controlling terminal and exec shell
-        os.close(master_fd)
-        try:
-            os.setsid()
-            fcntl.ioctl(slave_fd, termios.TIOCSCTTY, 0)
-        except Exception as e:
-            pass  # non-fatal: PTY still usable without controlling terminal
-        for fd in (0, 1, 2):
-            os.dup2(slave_fd, fd)
-        if slave_fd > 2:
-            os.close(slave_fd)
-        env = dict(os.environ)
-        env.update({
-            'TERM': 'xterm-256color',
-            'COLORTERM': 'truecolor',
-            'COLUMNS': str(cols),
-            'LINES': str(rows),
-            'HAPPY_TERMINAL': '1',  # let startup scripts skip re-wrapping with script
-        })
-        os.execve(shell, [shell], env)
-        sys.exit(127)
-
-    # Parent: relay between PTY master and our stdin/stdout pipes
-    os.close(slave_fd)
-    fin  = sys.stdin.fileno()
-    fout = sys.stdout.fileno()
-
-    while True:
-        try:
-            r, _, _ = select.select([master_fd, fin], [], [], 1.0)
-        except (OSError, ValueError):
-            break
-        if master_fd in r:
-            try:
-                data = os.read(master_fd, 4096)
-                os.write(fout, data)
-            except OSError:
-                break
-        if fin in r:
-            try:
-                data = os.read(fin, 4096)
-                if not data:
-                    break
-                os.write(master_fd, data)
-            except OSError:
-                break
-        try:
-            wpid, wstatus = os.waitpid(pid, os.WNOHANG)
-            if wpid != 0:
-                break
-        except ChildProcessError:
-            break
-
-    try:
-        os.kill(pid, signal.SIGTERM)
-    except OSError:
-        pass
-
-except Exception:
-    sys.stdout.write("[happy-pty ERROR]\\r\\n")
-    sys.stdout.write(traceback.format_exc().replace("\\n", "\\r\\n"))
-    sys.stdout.flush()
-    sys.exit(1)
-`;
-
-        child = spawn("python3", ["-c", ptyScript], {
-          cwd,
-          env: {
-            ...env,
-            PTY_SHELL: shell,
-            PTY_COLS: String(cols),
-            PTY_ROWS: String(rows),
-          },
-          stdio: ["pipe", "pipe", "pipe"],
-        });
-      }
-
-      const session: TerminalSession = {
-        id,
+      const managed = createInternalPty({
+        terminalId: id,
         sessionId: options.sessionId,
-        process: child,
+        cwd,
         cols,
         rows,
         shell,
-        cwd,
-        createdAt: Date.now(),
-        outputBuffer: "",
-      };
-
-      this.terminals.set(id, session);
-      if (options.sessionId) {
-        const existing = this.sessionIndex.get(options.sessionId) ?? [];
-        this.sessionIndex.set(options.sessionId, [...existing, id]);
-      }
-
-      const appendToBuffer = (text: string) => {
-        session.outputBuffer += text;
-        if (session.outputBuffer.length > MAX_OUTPUT_BUFFER) {
-          session.outputBuffer = session.outputBuffer.slice(session.outputBuffer.length - MAX_OUTPUT_BUFFER);
-        }
-      };
-
-      // Stream stdout
-      child.stdout?.on("data", (data: Buffer) => {
-        const text = data.toString("utf-8");
-        appendToBuffer(text);
-        if (this.onOutput) {
-          for (let i = 0; i < text.length; i += MAX_OUTPUT_CHUNK) {
-            this.onOutput(id, text.slice(i, i + MAX_OUTPUT_CHUNK));
+        pty: child,
+        emitOutput: (chunk) => {
+          if (!this.onOutput) return;
+          for (const piece of chunkStringSafe(chunk, MAX_OUTPUT_CHUNK)) {
+            this.onOutput(id, piece);
           }
-        }
-      });
-
-      // Stream stderr (merge into output)
-      child.stderr?.on("data", (data: Buffer) => {
-        const text = data.toString("utf-8");
-        appendToBuffer(text);
-        if (this.onOutput) {
-          for (let i = 0; i < text.length; i += MAX_OUTPUT_CHUNK) {
-            this.onOutput(id, text.slice(i, i + MAX_OUTPUT_CHUNK));
+        },
+        emitExit: (code) => {
+          // Pull from map first so a re-entrant exit handler can't double-emit.
+          if (this.ptys.delete(id)) {
+            this.unindexSession(options.sessionId, id);
           }
-        }
+          this.onExit?.(id, code);
+        },
       });
 
-      child.on("exit", (code) => {
-        logger.debug(`[TERMINAL] Terminal ${id} exited with code ${code}`);
-        this.terminals.delete(id);
-        this.removeFromSessionIndex(session.sessionId, id);
-        if (this.onExit) {
-          this.onExit(id, code ?? -1);
-        }
-      });
-
-      child.on("error", (err) => {
-        logger.debug(`[TERMINAL] Terminal ${id} error: ${err.message}`);
-        this.terminals.delete(id);
-        this.removeFromSessionIndex(session.sessionId, id);
-        if (this.onExit) {
-          this.onExit(id, -1);
-        }
-      });
-
-      logger.debug(`[TERMINAL] Spawned terminal ${id} (shell=${shell}, cwd=${cwd}, ${cols}x${rows})`);
+      this.ptys.set(id, managed);
+      this.indexSession(options.sessionId, id);
+      logger.debug(
+        `[TERMINAL] Spawned terminal ${id} (shell=${shell}, cwd=${cwd}, ${cols}x${rows}, pid=${child.pid})`,
+      );
       return { success: true, terminalId: id };
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
@@ -388,120 +272,290 @@ except Exception:
     }
   }
 
+  // ── Unified write/resize/close ─────────────────────────────────────────
+
   write(terminalId: string, data: string): boolean {
-    const external = this.externalAttachments.get(terminalId);
-    if (external) {
-      external.write(data);
-      return true;
-    }
-    const session = this.terminals.get(terminalId);
-    if (!session || !session.process.stdin?.writable) {
-      return false;
-    }
-    session.process.stdin.write(data);
-    return true;
+    const pty = this.ptys.get(terminalId);
+    return pty ? pty.write(data) : false;
   }
 
   resize(terminalId: string, cols: number, rows: number): boolean {
-    const external = this.externalAttachments.get(terminalId);
-    if (external) {
-      external.resize(cols, rows);
-      return true;
-    }
-    const session = this.terminals.get(terminalId);
-    if (!session) {
-      return false;
-    }
-    session.cols = cols;
-    session.rows = rows;
-    // Send SIGWINCH to the child process to signal resize
-    // The 'script' wrapper should propagate this to the inner shell
-    try {
-      if (session.process.pid) {
-        // Set env vars for subsequent commands
-        this.write(terminalId, `stty cols ${cols} rows ${rows}\n`);
-      }
-    } catch {
-      // Best-effort resize
-    }
-    return true;
-  }
-
-  private removeFromSessionIndex(sessionId: string | undefined, terminalId: string): void {
-    if (!sessionId) return;
-    const ids = this.sessionIndex.get(sessionId) ?? [];
-    const updated = ids.filter((id) => id !== terminalId);
-    if (updated.length === 0) {
-      this.sessionIndex.delete(sessionId);
-    } else {
-      this.sessionIndex.set(sessionId, updated);
-    }
+    const pty = this.ptys.get(terminalId);
+    return pty ? pty.resize(cols, rows) : false;
   }
 
   close(terminalId: string): boolean {
-    const external = this.externalAttachments.get(terminalId);
-    if (external) {
-      // Don't tear down the underlying Claude PTY here — its lifecycle is owned
-      // by claudePtyRuntime. We just signal a close request; the runtime can
-      // forward it to the TUI (e.g. by writing Ctrl-C) if that's appropriate.
-      external.requestClose();
+    const pty = this.ptys.get(terminalId);
+    if (!pty) return false;
+    if (pty.kind === "external") {
+      // Don't tear down the upstream PTY — its lifecycle is owned elsewhere.
+      pty.close();
       return true;
     }
-    const session = this.terminals.get(terminalId);
-    if (!session) {
-      return false;
-    }
-    try {
-      session.process.kill("SIGTERM");
-      // Force kill after 3 seconds
-      setTimeout(() => {
-        try { session.process.kill("SIGKILL"); } catch { /* already dead */ }
-      }, 3000);
-    } catch {
-      // Already dead
-    }
-    this.terminals.delete(terminalId);
-    this.removeFromSessionIndex(session.sessionId, terminalId);
+    pty.close();
+    // Internal PTY's own exit handler will remove it from the map; nothing
+    // else to do here.
     return true;
   }
 
-  listBySession(sessionId: string): Array<{ id: string; createdAt: number; cols: number; rows: number; cwd: string }> {
-    const ids = this.sessionIndex.get(sessionId) ?? [];
-    const shellTerminals = ids
-      .map((id) => this.terminals.get(id))
-      .filter((s): s is TerminalSession => s !== undefined)
-      .map((s) => ({ id: s.id, createdAt: s.createdAt, cols: s.cols, rows: s.rows, cwd: s.cwd }));
-
-    // Include the external Claude PTY attachment for this session (if any)
-    // so the App's session-aware terminal list surfaces the raw TUI alongside
-    // shell terminals.
-    const externalTerminalId = this.externalSessionLookup.get(sessionId);
-    const external = externalTerminalId
-      ? this.externalAttachments.get(externalTerminalId)
-      : undefined;
-    if (external) {
-      shellTerminals.push({
-        id: external.terminalId,
-        createdAt: external.createdAt,
-        cols: external.cols,
-        rows: external.rows,
-        cwd: external.cwd,
+  listBySession(
+    sessionId: string,
+  ): Array<{ id: string; createdAt: number; cols: number; rows: number; cwd: string }> {
+    const ids = this.sessionIndex.get(sessionId);
+    if (!ids) return [];
+    const result: Array<{ id: string; createdAt: number; cols: number; rows: number; cwd: string }> = [];
+    for (const id of ids) {
+      const pty = this.ptys.get(id);
+      if (!pty) continue;
+      result.push({
+        id: pty.terminalId,
+        createdAt: pty.createdAt,
+        cols: pty.cols,
+        rows: pty.rows,
+        cwd: pty.cwd,
       });
     }
-    return shellTerminals;
+    return result;
   }
 
   closeAll(): void {
-    for (const [id] of this.terminals) {
+    // Snapshot to a list first because close() mutates the map.
+    for (const id of [...this.ptys.keys()]) {
       this.close(id);
     }
   }
 
   getActiveCount(): number {
-    return this.terminals.size;
+    // Only internal terminals count against quotas / "active shells" — the
+    // external Claude PTY is part of the session lifecycle, not a user shell.
+    let count = 0;
+    for (const pty of this.ptys.values()) {
+      if (pty.kind === "internal") count++;
+    }
+    return count;
   }
 
   hasTerminal(terminalId: string): boolean {
-    return this.terminals.has(terminalId);
+    return this.ptys.has(terminalId);
   }
+
+  // ── Internal helpers ───────────────────────────────────────────────────
+
+  private resolveExisting(
+    terminalId: string | undefined,
+    sessionId: string | undefined,
+  ): ManagedPty | undefined {
+    if (terminalId) {
+      const direct = this.ptys.get(terminalId);
+      if (direct) return direct;
+    }
+    if (sessionId) {
+      const ids = this.sessionIndex.get(sessionId);
+      if (ids) {
+        // Prefer external attachment if present — the App's "open raw
+        // Claude terminal" button passes sessionId and expects the TUI,
+        // not an ad-hoc shell that happened to be tagged with the same
+        // session id.
+        for (const id of ids) {
+          const pty = this.ptys.get(id);
+          if (pty?.kind === "external") return pty;
+        }
+      }
+    }
+    return undefined;
+  }
+
+  private indexSession(sessionId: string | undefined, terminalId: string): void {
+    if (!sessionId) return;
+    let ids = this.sessionIndex.get(sessionId);
+    if (!ids) {
+      ids = new Set();
+      this.sessionIndex.set(sessionId, ids);
+    }
+    ids.add(terminalId);
+  }
+
+  private unindexSession(sessionId: string | undefined, terminalId: string): void {
+    if (!sessionId) return;
+    const ids = this.sessionIndex.get(sessionId);
+    if (!ids) return;
+    ids.delete(terminalId);
+    if (ids.size === 0) this.sessionIndex.delete(sessionId);
+  }
+}
+
+// ── ManagedPty factories ────────────────────────────────────────────────
+
+function wrapExternalAttachment(att: ExternalPtyAttachment): ManagedPty {
+  // External attachments now own their own replay buffer — callers used to
+  // thread a buffer-append callback through `forwardClaudePtyData`; the
+  // adapter does it transparently via `appendOutput` instead. The ANSI-
+  // aware replay buffer drops history at clear-screen markers and never
+  // splits an escape sequence on trim.
+  const replay = createReplayBuffer({ limit: 4 * MAX_OUTPUT_BUFFER });
+  const initial = att.snapshot();
+  if (initial.length > 0) replay.append(initial);
+  let cols = att.cols;
+  let rows = att.rows;
+  return {
+    terminalId: att.terminalId,
+    sessionId: att.sessionId,
+    kind: "external",
+    createdAt: att.createdAt,
+    get cols() {
+      return cols;
+    },
+    set cols(v) {
+      cols = v;
+    },
+    get rows() {
+      return rows;
+    },
+    set rows(v) {
+      rows = v;
+    },
+    cwd: att.cwd,
+    snapshot() {
+      return replay.snapshot();
+    },
+    appendOutput(data) {
+      replay.append(data);
+    },
+    write(data) {
+      try {
+        att.write(data);
+        return true;
+      } catch (err) {
+        logger.debug(
+          `[TERMINAL] external write failed: ${err instanceof Error ? err.message : String(err)}`,
+        );
+        return false;
+      }
+    },
+    resize(newCols, newRows) {
+      cols = newCols;
+      rows = newRows;
+      try {
+        att.resize(newCols, newRows);
+        return true;
+      } catch (err) {
+        logger.debug(
+          `[TERMINAL] external resize failed: ${err instanceof Error ? err.message : String(err)}`,
+        );
+        return false;
+      }
+    },
+    close() {
+      try {
+        att.requestClose();
+      } catch (err) {
+        logger.debug(
+          `[TERMINAL] external close failed: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      }
+    },
+  };
+}
+
+function createInternalPty(opts: {
+  terminalId: string;
+  sessionId: string | undefined;
+  cwd: string;
+  cols: number;
+  rows: number;
+  shell: string;
+  pty: IPty;
+  emitOutput: (chunk: string) => void;
+  emitExit: (code: number) => void;
+}): ManagedPty {
+  const replay = createReplayBuffer({ limit: 4 * MAX_OUTPUT_BUFFER });
+  let cols = opts.cols;
+  let rows = opts.rows;
+  let exited = false;
+  const createdAt = Date.now();
+
+  opts.pty.onData((data: string) => {
+    replay.append(data);
+    opts.emitOutput(data);
+  });
+
+  opts.pty.onExit(({ exitCode, signal }) => {
+    if (exited) return;
+    exited = true;
+    logger.debug(
+      `[TERMINAL] Terminal ${opts.terminalId} exited code=${exitCode} signal=${signal ?? "?"}`,
+    );
+    opts.emitExit(exitCode ?? -1);
+  });
+
+  return {
+    terminalId: opts.terminalId,
+    sessionId: opts.sessionId,
+    kind: "internal",
+    createdAt,
+    get cols() {
+      return cols;
+    },
+    set cols(v) {
+      cols = v;
+    },
+    get rows() {
+      return rows;
+    },
+    set rows(v) {
+      rows = v;
+    },
+    cwd: opts.cwd,
+    snapshot() {
+      return replay.snapshot();
+    },
+    write(data) {
+      if (exited) return false;
+      try {
+        opts.pty.write(data);
+        return true;
+      } catch (err) {
+        logger.debug(
+          `[TERMINAL] internal write failed for ${opts.terminalId}: ${err instanceof Error ? err.message : String(err)}`,
+        );
+        return false;
+      }
+    },
+    resize(newCols, newRows) {
+      if (exited || newCols <= 0 || newRows <= 0) return false;
+      cols = newCols;
+      rows = newRows;
+      try {
+        // node-pty issues TIOCSWINSZ + SIGWINCH internally; far more reliable
+        // than the previous `stty cols X rows Y\n` write-to-stdin hack which
+        // depended on the shell behaving and was visible to the user.
+        opts.pty.resize(newCols, newRows);
+        return true;
+      } catch (err) {
+        logger.debug(
+          `[TERMINAL] internal resize failed for ${opts.terminalId}: ${err instanceof Error ? err.message : String(err)}`,
+        );
+        return false;
+      }
+    },
+    close() {
+      if (exited) return;
+      try {
+        opts.pty.kill("SIGTERM");
+      } catch {
+        // already dead
+      }
+      // Force-kill if it hangs. unref so the timer doesn't keep the daemon
+      // alive on its own.
+      const timer = setTimeout(() => {
+        if (exited) return;
+        try {
+          opts.pty.kill("SIGKILL");
+        } catch {
+          // already dead
+        }
+      }, 3000);
+      timer.unref?.();
+    },
+  };
 }

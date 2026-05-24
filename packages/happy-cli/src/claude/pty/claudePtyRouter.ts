@@ -33,14 +33,27 @@ import type {
   ClaudePtyHandle,
 } from "./claudePtyRuntime";
 import { logger } from "@/ui/logger";
+import {
+  TERMINAL_OUTPUT_CHUNK_BYTES,
+  TERMINAL_REPLAY_BUFFER_BYTES,
+  chunkStringSafe,
+  claudePtyTerminalId,
+  createReplayBuffer,
+} from "@kmmao/happy-wire";
 
-const MAX_OUTPUT_CHUNK = 8 * 1024; // 8KB per socket emit
-const DEFAULT_BUFFER_BYTES = 64 * 1024; // 64KB rolling buffer
+const MAX_OUTPUT_CHUNK = TERMINAL_OUTPUT_CHUNK_BYTES;
+// Default size is now controlled by createReplayBuffer (256 KB). The legacy
+// `TERMINAL_REPLAY_BUFFER_BYTES` constant still bounds the HTTP body size
+// per chunk on the daemon side; it does not have to match the local replay
+// buffer size.
+const DEFAULT_BUFFER_BYTES = 4 * TERMINAL_REPLAY_BUFFER_BYTES;
 
-/** Convention: the App subscribes to `terminal-output` for this id. */
-export function claudeTerminalIdFor(sessionId: string): string {
-  return `claude:${sessionId}`;
-}
+/**
+ * Convention: the App subscribes to `terminal-output` for this id. Re-exported
+ * from the wire package so both producer (CLI) and consumer (App, daemon)
+ * share a single source of truth.
+ */
+export const claudeTerminalIdFor = claudePtyTerminalId;
 
 export interface ClaudePtyRouterOptions {
   /** Stable Happy session id this PTY belongs to. */
@@ -72,21 +85,20 @@ export function attachClaudePtyRouter(
 ): ClaudePtyRouter {
   const terminalId = claudeTerminalIdFor(options.sessionId);
   const limit = options.ringBufferBytes ?? DEFAULT_BUFFER_BYTES;
-  let buffer = "";
-
-  const appendToBuffer = (text: string) => {
-    buffer += text;
-    if (buffer.length > limit) {
-      buffer = buffer.slice(buffer.length - limit);
-    }
-  };
+  // ANSI-aware replay buffer: drops history before the most recent clear-
+  // screen/alt-screen marker and never trims mid-escape-sequence, so
+  // reconnect replay starts from a clean renderer state. Same FIFO size
+  // semantics as the old `buffer.slice(buffer.length - limit)` cap.
+  const replay = createReplayBuffer({ limit });
 
   const handleData: ClaudePtyDataHandler = (data) => {
-    appendToBuffer(data);
-    // Chunked emit: prevents a single >MB burst from a noisy command
-    // from saturating a single socket packet.
-    for (let i = 0; i < data.length; i += MAX_OUTPUT_CHUNK) {
-      const chunk = data.slice(i, i + MAX_OUTPUT_CHUNK);
+    replay.append(data);
+    // Chunked emit: prevents a single >MB burst from a noisy command from
+    // saturating a single socket packet. chunkStringSafe avoids splitting
+    // surrogate pairs at chunk boundaries (otherwise an emoji landing on
+    // byte 8192 would render as two ` ` in xterm.js until the next
+    // chunk arrives).
+    for (const chunk of chunkStringSafe(data, MAX_OUTPUT_CHUNK)) {
       try {
         options.onOutput({ terminalId, data: chunk });
       } catch (err) {
@@ -113,7 +125,7 @@ export function attachClaudePtyRouter(
   return {
     terminalId,
     snapshot() {
-      return buffer;
+      return replay.snapshot();
     },
     acceptInput(data) {
       options.pty.write(data);

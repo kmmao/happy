@@ -29,6 +29,7 @@
 
 import type { ClaudePtyController } from "@/claude/pty/claudePtyController";
 import { logger } from "@/lib";
+import { resetMcpProbeCache } from "@/claude/utils/mcpStatusProbe";
 
 // ─── Protected server names ───────────────────────────────────────────────────
 
@@ -191,6 +192,11 @@ export async function applyMcpServers(
   state.userServers = { ...servers };
   state.lastSyncAt = Date.now();
 
+  // Drop any cached status probes — the next `mcpServerStatus()` poll should
+  // re-probe against the new config instead of returning stale results for up
+  // to 60 s (the probe TTL).
+  resetMcpProbeCache();
+
   logger.debug(
     `[mcpServerManager] Tracked: added=${added.join(",") || "none"} removed=${removed.join(",") || "none"} (cold restart required to take effect)`,
   );
@@ -287,6 +293,9 @@ export async function syncMcpServersFromRegistry(
 
   state.userServers = filtered;
   state.lastSyncAt = Date.now();
+
+  // Drop cached status probes (same reason as `applyMcpServers`).
+  resetMcpProbeCache();
 
   logger.debug(
     `[mcpServerManager] Registry sync tracked: added=${added.join(",") || "none"} removed=${removed.join(",") || "none"} (cold restart required to take effect)`,

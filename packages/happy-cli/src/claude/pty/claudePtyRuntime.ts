@@ -66,12 +66,18 @@ export interface ClaudePtyHandle {
   readonly rows: number;
   /** True after exit fires (or kill completes). */
   readonly exited: boolean;
-  /** Push bytes to PTY stdin. Silently dropped if exited. */
-  write(data: string): void;
-  /** Resize the PTY. Silently dropped if exited. */
-  resize(cols: number, rows: number): void;
+  /**
+   * Push bytes to PTY stdin. Returns true if the write was accepted by the
+   * underlying PTY, false if the process is already exited or node-pty threw
+   * (e.g. pipe was closed). Callers that route user prompts must inspect
+   * this so the App can surface a "send failed" instead of silently dropping
+   * the keystroke.
+   */
+  write(data: string): boolean;
+  /** Resize the PTY. Returns true on success. */
+  resize(cols: number, rows: number): boolean;
   /** Send SIGINT to the child (equivalent to Ctrl-C in the terminal). */
-  interrupt(): void;
+  interrupt(): boolean;
   /** Send signal and clean up. Falls back to SIGKILL after `graceMs`. */
   kill(signal?: NodeJS.Signals, graceMs?: number): void;
   /** Subscribe to PTY output bytes. Returns an unsubscribe fn. */
@@ -156,34 +162,40 @@ export function startClaudePty(opts: ClaudePtyRuntimeOptions = {}): ClaudePtyHan
       return state.exited;
     },
     write(data) {
-      if (state.exited) return;
+      if (state.exited) return false;
       try {
         child.write(data);
+        return true;
       } catch (err) {
         logger.debug(`[claudePty] write failed: ${err instanceof Error ? err.message : String(err)}`);
+        return false;
       }
     },
     resize(newCols, newRows) {
-      if (state.exited) return;
-      if (newCols <= 0 || newRows <= 0) return;
+      if (state.exited) return false;
+      if (newCols <= 0 || newRows <= 0) return false;
       state.cols = newCols;
       state.rows = newRows;
       try {
         child.resize(newCols, newRows);
+        return true;
       } catch (err) {
         logger.debug(`[claudePty] resize failed: ${err instanceof Error ? err.message : String(err)}`);
+        return false;
       }
     },
     interrupt() {
-      if (state.exited) return;
+      if (state.exited) return false;
       // Ctrl-C byte (0x03) — TUIs handle this as an interrupt at the line
       // discipline level, which is the right semantics for "stop current
       // task" in claude. We avoid SIGINT to the process group to keep the
       // session alive.
       try {
         child.write("\x03");
+        return true;
       } catch (err) {
         logger.debug(`[claudePty] interrupt write failed: ${err instanceof Error ? err.message : String(err)}`);
+        return false;
       }
     },
     kill(signal = "SIGTERM", graceMs = 3000) {

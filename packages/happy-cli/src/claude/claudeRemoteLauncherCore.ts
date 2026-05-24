@@ -1114,30 +1114,30 @@ export async function claudeRemoteLauncher(
               // the App lifting a finger. PTY mode bypasses `canCallTool`, so
               // the TUI renders an in-terminal "Yes/No" picker that no App
               // button can reach — the session hangs until the local terminal
-              // user keys it themselves. For Yolo / bypassPermissions users
-              // (who explicitly opted into "no prompts"), we synthesise the
-              // keystroke ourselves so the plan continues without local
+              // user keys it themselves (4047 s stalls observed in Yolo mode
+              // before this bridge existed). For Yolo / bypassPermissions
+              // users (who explicitly opted into "no prompts"), we synthesise
+              // the keystroke so the plan continues without local
               // intervention.
               //
-              // The 600ms delay matches the TUI's typical render latency
-              // between tool_use landing in JSONL and the picker becoming
-              // input-ready — pressing too early can lose the keystroke to a
-              // non-focused widget. We DO NOT loop / retry: if it misses, the
-              // user can still press 1 locally, and we don't want to spam
-              // keystrokes into a possibly different prompt.
+              // We delegate timing to `approveExitPlanWhenPickerReady`,
+              // which watches PTY output for the picker render and sends
+              // the keystroke the instant it appears (with a 2 s blind
+              // fallback). This replaces the earlier hardcoded 600 ms
+              // setTimeout, which lost keystrokes when the TUI was slow to
+              // render — and the comment "if it misses, the user can press
+              // 1 locally" never matched mobile/web App users.
               if (permissionHandler.isInBypassMode()) {
                 const ptyController = currentQuery;
                 if (ptyController) {
                   logger.debug(
                     "[remote]: auto-approving ExitPlanMode via PTY keystroke (bypass mode)",
                   );
-                  setTimeout(() => {
-                    ptyController.approveExitPlan().catch((err) => {
-                      logger.debug(
-                        `[remote]: approveExitPlan failed: ${err instanceof Error ? err.message : String(err)}`,
-                      );
-                    });
-                  }, 600);
+                  ptyController.approveExitPlanWhenPickerReady().catch((err) => {
+                    logger.debug(
+                      `[remote]: approveExitPlanWhenPickerReady failed: ${err instanceof Error ? err.message : String(err)}`,
+                    );
+                  });
                 } else {
                   logger.debug(
                     "[remote]: ExitPlanMode detected in bypass mode but PTY controller not ready — user must approve locally",

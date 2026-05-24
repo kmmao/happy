@@ -119,8 +119,37 @@ export async function createSessionScanner(opts: {
     });
     await sync.invalidateAndAwait();
 
-    // Periodic sync
-    const intervalId = setInterval(() => { sync.invalidate(); }, 3000);
+    // Periodic sync — defense-in-depth for events the per-file `fs.watch`
+    // watcher misses. The watcher is the primary signal for the main session
+    // JSONL: every Claude write triggers `sync.invalidate()` within tens of
+    // milliseconds on macOS (fsevents) / Linux (inotify) / Windows
+    // (ReadDirectoryChangesW), so the poll never wins that race.
+    //
+    // What the poll actually covers:
+    //   1. **Subagent JSONL appends** — `interleaveSubagentMessages` re-reads
+    //      `subagents/agent-XXX.jsonl` on every sync cycle. When Claude writes
+    //      a late `tool_result` to a subagent file *after* the main JSONL has
+    //      already settled, no watcher event on the main file fires, so the
+    //      next tool_result is invisible until the next poll.
+    //   2. **Network filesystems** — fsevents/inotify do not propagate over
+    //      NFS/SMB, so on remote mounts the poll is the only signal.
+    //   3. **Watcher restart gaps** — `startFileWatcher` reconnects with a 1 s
+    //      backoff after `EBADF`/`ENOENT` (file rotated, dir replaced); events
+    //      during that window land on the next poll.
+    //
+    // 3 s was the pre-PTY default, picked when MCP sub-agent traces churned
+    // every couple of turns. With the PTY router + bridge in place an idle
+    // session triggers ~20 polls/minute that each `readFile` + Zod-parse the
+    // full JSONL — pure waste 99 % of the time. 15 s bounds the worst-case
+    // subagent-tail latency without burning CPU on stable sessions.
+    //
+    // Override with `HAPPY_SESSION_SCAN_INTERVAL_MS` for users who hit the
+    // edge cases above (e.g. NFS-hosted projects need a smaller value).
+    const intervalMs = Math.max(
+        1000,
+        Number(process.env.HAPPY_SESSION_SCAN_INTERVAL_MS) || 15_000,
+    );
+    const intervalId = setInterval(() => { sync.invalidate(); }, intervalMs);
 
     // Public interface
     return {
