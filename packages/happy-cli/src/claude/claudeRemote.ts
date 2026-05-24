@@ -66,6 +66,7 @@ import {
 } from "@/claude/pty/claudePtyController";
 import { buildClaudeCliFlags } from "@/claude/pty/claudeCliFlags";
 import { mergeThinkingIntoSettings } from "@/claude/utils/mergeThinkingIntoSettings";
+import { buildPtyDisallowedTools } from "@/claude/utils/disallowedTools";
 import { rawToJsonlMessage } from "@/claude/pty/rawToJsonlMessage";
 import { attachClaudePtyRouter } from "@/claude/pty/claudePtyRouter";
 import {
@@ -339,6 +340,21 @@ export async function claudeRemote(opts: {
   onElicitation?: OnElicitation;
   /** Happy session id — forwarded to the launcher's tagging hooks if any. */
   happySessionId?: string;
+  /**
+   * Plan-mode lockdown. Set by the launcher after it observes an
+   * `EnterPlanMode` tool_use while the active permission mode is
+   * `bypassPermissions` (yolo). Without this lockdown, `--dangerously-skip-
+   * permissions` lets Claude treat plan mode as advisory — it can write the
+   * plan straight to disk via the `Write` tool and never emit `ExitPlanMode`,
+   * which leaves the App's "review plan" UI stuck forever (session id
+   * 6a885a93-aebb-4782-822c-0a2be19d2c33 hung 11 min on exactly this).
+   *
+   * When true, `Write/Edit/MultiEdit/NotebookEdit/Bash` are pushed into
+   * `disallowedTools` so the model is forced down the proper ExitPlanMode
+   * path. The launcher clears the flag (and cold-restarts again) once the
+   * picker-driven approval keystroke has been delivered.
+   */
+  planModeLockdown?: boolean;
 
   // Dynamic parameters
   nextMessage: () => Promise<{ message: string; mode: EnhancedMode } | null>;
@@ -532,13 +548,18 @@ export async function claudeRemote(opts: {
   // the App's message composer already handles. See
   // packages/happy-cli/src/claude/utils/systemPrompt.ts for the matching
   // prompt-side change.
+  // Plan-mode lockdown set + invariant AskUserQuestion deny live together in
+  // `buildPtyDisallowedTools` (see that helper for the rationale of each
+  // entry). Keeps this constructor narrow and lets the tool-deny logic be
+  // unit-tested without standing up a real PTY.
   const flagMode: EnhancedMode = {
     ...initial.mode,
     model: model ?? initial.mode.model,
     appendSystemPrompt: mergedAppendSystemPrompt,
-    disallowedTools: Array.from(
-      new Set([...(initial.mode.disallowedTools ?? []), "AskUserQuestion"]),
-    ),
+    disallowedTools: buildPtyDisallowedTools({
+      base: initial.mode.disallowedTools,
+      planModeLockdown: opts.planModeLockdown,
+    }),
   };
 
   const flagsResult = buildClaudeCliFlags({

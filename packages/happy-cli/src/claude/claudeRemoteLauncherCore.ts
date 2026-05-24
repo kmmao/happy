@@ -615,6 +615,35 @@ export async function claudeRemoteLauncher(
   // Stream event mapper state — reset per query cycle.
   let streamEventState: StreamEventMapperState = createStreamEventMapperState();
 
+  /**
+   * Plan-mode lockdown flag for `yolo` (bypassPermissions) sessions.
+   *
+   * Bug it fixes: starting Claude TUI with `--dangerously-skip-permissions`
+   * short-circuits every permission check, so even after the assistant
+   * calls `EnterPlanMode` the plan-mode "read-only" contract is purely
+   * advisory. We've observed Opus 4.7 (session 6a885a93… and earlier)
+   * sidestep `ExitPlanMode` entirely by `Write`-ing the plan markdown
+   * straight to `~/.claude/plans/*.md` and then going idle, which leaves
+   * the App's review UI stuck on `honking…` forever — no picker, no
+   * approval keystroke, no progress.
+   *
+   * Mitigation: when EnterPlanMode is observed in bypass mode, set this
+   * flag and cold-restart Claude TUI. The next spawn runs `claudeRemote`
+   * with `planModeLockdown=true`, which appends `Write/Edit/MultiEdit/
+   * NotebookEdit/Bash` to `disallowedTools` — a hard deny that even
+   * `--dangerously-skip-permissions` cannot override. With those tools
+   * unavailable, the model has to use `ExitPlanMode` to deliver the
+   * plan, which goes through the picker-detection auto-approval path
+   * (`approveExitPlanWhenPickerReady`). After the approval keystroke is
+   * sent we clear the flag and cold-restart again so the rest of the
+   * session keeps the full Yolo toolset.
+   *
+   * Declared at launcher scope (outside the cold-restart `while` loop)
+   * so the value survives the cold restarts it drives. `onMessage` and
+   * `coldModeHash` both close over it.
+   */
+  let planModeLockdownActive = false;
+
   function onMessage(message: ClaudeJsonlMessage) {
     // ── Stream events (partial messages) → text-delta envelopes ────────
     // Intercept before the rest of the pipeline. stream_event messages
@@ -1133,11 +1162,28 @@ export async function claudeRemoteLauncher(
                   logger.debug(
                     "[remote]: auto-approving ExitPlanMode via PTY keystroke (bypass mode)",
                   );
-                  ptyController.approveExitPlanWhenPickerReady().catch((err) => {
-                    logger.debug(
-                      `[remote]: approveExitPlanWhenPickerReady failed: ${err instanceof Error ? err.message : String(err)}`,
-                    );
-                  });
+                  ptyController
+                    .approveExitPlanWhenPickerReady()
+                    .then(() => {
+                      // Clear the plan-mode lockdown ONLY after the keystroke
+                      // is delivered — clearing earlier would let the next
+                      // cold restart go through before the picker is gone,
+                      // and the relaunched TUI would render the picker again
+                      // with no listener attached. Cold-restart back to plain
+                      // Yolo so the rest of the session has the full toolset.
+                      if (planModeLockdownActive) {
+                        planModeLockdownActive = false;
+                        logger.debug(
+                          "[remote]: ExitPlanMode keystroke sent → disabling plan-mode lockdown + cold restart",
+                        );
+                        executionGuard.requestRestart("mode_change");
+                      }
+                    })
+                    .catch((err) => {
+                      logger.debug(
+                        `[remote]: approveExitPlanWhenPickerReady failed: ${err instanceof Error ? err.message : String(err)}`,
+                      );
+                    });
                 } else {
                   logger.debug(
                     "[remote]: ExitPlanMode detected in bypass mode but PTY controller not ready — user must approve locally",
@@ -1150,9 +1196,22 @@ export async function claudeRemoteLauncher(
             // Skip if already in bypass mode — ExitPlanMode should auto-approve in YOLO/bypass.
             if (c.name === "enter_plan_mode" || c.name === "EnterPlanMode") {
               if (permissionHandler.isInBypassMode()) {
-                logger.debug(
-                  "[remote]: detected EnterPlanMode in bypass mode — keeping bypass for auto-approve on ExitPlanMode",
-                );
+                // Yolo + plan mode is broken without `disallowedTools` for the
+                // write/exec tools — see `planModeLockdownActive` declaration
+                // for the full rationale. Flip the flag and trigger a cold
+                // restart so the relaunched PTY honours the hardened deny
+                // list. Re-entry is a no-op (already locked down).
+                if (!planModeLockdownActive) {
+                  planModeLockdownActive = true;
+                  logger.debug(
+                    "[remote]: EnterPlanMode in bypass mode → enabling plan-mode lockdown + cold restart",
+                  );
+                  executionGuard.requestRestart("mode_change");
+                } else {
+                  logger.debug(
+                    "[remote]: EnterPlanMode in bypass mode (lockdown already active — no-op)",
+                  );
+                }
               } else {
                 logger.debug(
                   "[remote]: detected EnterPlanMode — syncing permissionHandler to plan mode",
@@ -1739,6 +1798,10 @@ export async function claudeRemoteLauncher(
         return hashObject({
           isPlan: mapped === "plan",
           isBypass: mapped === "bypassPermissions",
+          // Toggling plan-mode lockdown changes the spawned process's
+          // `disallowedTools` set, which Claude TUI binds at boot only —
+          // hot-swap can't propagate it, so this MUST force a cold restart.
+          planLockdown: planModeLockdownActive,
           isExtendedContext: is1MModelKey(m.model),
           fallbackModel: m.fallbackModel,
           customSystemPrompt: m.customSystemPrompt,
@@ -1954,6 +2017,12 @@ export async function claudeRemoteLauncher(
           sessionId: session.sessionId,
           path: session.path,
           allowedTools: session.allowedTools ?? [],
+          // Persisted across cold restarts; flipped by the EnterPlanMode /
+          // ExitPlanMode blocks above. When true, claudeRemote will inject
+          // Write/Edit/MultiEdit/NotebookEdit/Bash into disallowedTools so the
+          // Yolo+plan-mode hang documented at `planModeLockdownActive` can't
+          // recur.
+          planModeLockdown: planModeLockdownActive,
           // Same reference the RPC handler mutates; the PTY controller's
           // mcpServerStatus() reads it live on each poll, so toggles take
           // effect without restarting the session.
