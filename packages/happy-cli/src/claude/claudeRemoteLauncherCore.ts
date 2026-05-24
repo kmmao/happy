@@ -644,6 +644,23 @@ export async function claudeRemoteLauncher(
    */
   let planModeLockdownActive = false;
 
+  /**
+   * Deferred cold-restart request. Some events (notably the ExitPlanMode
+   * picker auto-approval in Yolo mode) need to flip a cold-restart-driving
+   * field AND wait for the assistant's current turn to end before the new
+   * PTY spawns. Firing `executionGuard.requestRestart` directly from those
+   * sites races with Claude TUI's still-completing tool flow and surfaces
+   * as `[Request interrupted by user for tool use]` in the JSONL — the
+   * assistant sees its own turn being torn down.
+   *
+   * Set by `.then()` callbacks that want a clean turn-boundary restart;
+   * consumed by `onTurnComplete`. coldModeHash divergence on the next
+   * `nextMessage` iteration is the secondary safety net for the case
+   * where `onTurnComplete` never fires (e.g. user sends a new message
+   * mid-turn).
+   */
+  let pendingPostTurnRestart: "mode_change" | null = null;
+
   function onMessage(message: ClaudeJsonlMessage) {
     // ── Stream events (partial messages) → text-delta envelopes ────────
     // Intercept before the rest of the pipeline. stream_event messages
@@ -1169,14 +1186,26 @@ export async function claudeRemoteLauncher(
                       // is delivered — clearing earlier would let the next
                       // cold restart go through before the picker is gone,
                       // and the relaunched TUI would render the picker again
-                      // with no listener attached. Cold-restart back to plain
-                      // Yolo so the rest of the session has the full toolset.
+                      // with no listener attached.
+                      //
+                      // DO NOT call `executionGuard.requestRestart` here.
+                      // Picker keystroke delivery happens during the
+                      // assistant's still-completing ExitPlanMode turn:
+                      // firing a restart synchronously tore that turn down
+                      // and produced `[Request interrupted by user for tool
+                      // use]` in the JSONL (see commit history). Instead we
+                      // flip the flag (so coldModeHash now diverges from
+                      // currentColdHash) and stash a deferred restart that
+                      // `onTurnComplete` consumes on the natural turn
+                      // boundary. If the user sends a new message before the
+                      // turn ends, the divergent coldModeHash in
+                      // `nextMessage` is the secondary safety net.
                       if (planModeLockdownActive) {
                         planModeLockdownActive = false;
+                        pendingPostTurnRestart = "mode_change";
                         logger.debug(
-                          "[remote]: ExitPlanMode keystroke sent → disabling plan-mode lockdown + cold restart",
+                          "[remote]: ExitPlanMode keystroke sent → disabling plan-mode lockdown + scheduling post-turn cold restart",
                         );
-                        executionGuard.requestRestart("mode_change");
                       }
                     })
                     .catch((err) => {
@@ -2037,6 +2066,21 @@ export async function claudeRemoteLauncher(
           },
           onTurnComplete: () => {
             finishTurn();
+            // Consume any deferred cold-restart request that was scheduled
+            // mid-turn (e.g. ExitPlanMode picker auto-approval in Yolo
+            // mode — see `pendingPostTurnRestart` declaration for why this
+            // is deferred rather than fired inline). Firing on the natural
+            // turn boundary avoids the "[Request interrupted by user for
+            // tool use]" race that broke plan-mode flows when the restart
+            // was synchronous.
+            if (pendingPostTurnRestart) {
+              const reason = pendingPostTurnRestart;
+              pendingPostTurnRestart = null;
+              logger.debug(
+                `[remote]: post-turn restart consumed (reason=${reason})`,
+              );
+              executionGuard.requestRestart(reason);
+            }
           },
           nextMessage: async () => {
             // Stop any running mid-turn drain from the previous turn
