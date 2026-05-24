@@ -1,5 +1,46 @@
 # 更新日志
 
+## 2.32.0 - 2026-05-24
+
+PTY 迁移后对新的 `mcp__happy__ask_user` picker 管线进行端到端加固 —— 修复重复卡片、幽灵 approve/deny 页脚、缺失的 decline 通路，以及原生 `AskUserQuestion` 工具的死锁问题；同时新增 Inbox "Clear All" 操作和 Settings 页 build 元信息展示。
+
+### mcp__happy__ask_user — picker 体验加固
+- 修复重复 picker 卡片 —— 在 reducer 层去除 synthetic ToolCall 与 tool_use envelope 的重复，每次请求只渲染一张卡片
+- 修复"待授权"小标签打开的 PermissionSheet 把通用 approve/deny 弹层叠在 picker 之上 —— `AskUserQuestion` 与 `mcp__happy__ask_user` 现在共用同一份 `toolsWithBuiltinSubmitUI` 白名单
+- 移除单问题 picker 上方重复出现的问题副标题
+- 移除叠在 picker 下方多余的 `PermissionFooter` approve/deny 按钮行
+- 新增 picker 的 "Decline" 按钮（仅 mcp 变体）—— 点击会调用 `sessionAskUserResponse({ canceled: true })`，happy-cli ≥ 0.85.10 会拒绝挂起的 MCP 调用，让 Claude 回退到纯文本 Q&A，不再卡死
+- 将 decline 按钮从"最后一步"分支中挪出，多步 prompt 现在任意一步都能取消（左侧 back/decline，右侧 next/submit）
+- 为所有 10 种语言新增 `askUserQuestion.decline` i18n 键
+
+### PTY 模式下的 AskUserQuestion
+- 修复 PTY 模式下原生 `AskUserQuestion` 工具卡死整个 session 的问题 —— App 无法投递答案，因为 Claude TUI 自己接管了终端 Q&A 界面
+- happy-cli 在 PTY argv 中强制禁用 `AskUserQuestion`，让 Claude 回退到 App composer 内的纯文本编号选项
+- picker 在 submit 失败路径上新增"取消并继续"逃生通道 —— 通过 `sessionInterrupt` 向 PTY 发送 Ctrl-C，解除已卡住的 session
+- 更新 system 与 plan-mode prompt，把纯文本 fallback 协议教给 Claude
+- 为所有 10 种语言新增 `cancelStuckHint` / `cancelStuckAction` i18n 键
+
+### Inbox
+- 在 inbox 通知头部新增破坏性的 "Clear All" 操作 —— 通过确认对话框拦截，后端走 `DELETE /v1/inbox`（按已登录账户隔离、幂等）；UI 在网络往返前先做乐观清空
+
+### Settings
+- 在设置页展示 build 元信息（commit / 时间 / 分支），方便快速定位用户当前使用的构建版本
+
+### Bug 修复
+- 修复每次发送新 prompt 时上一轮 assistant 回复会重新走 typewriter 动画的问题 —— "已经渲染为 Markdown" 的标记现在从 `message.createdAt < session.thinkingAt` 推导，不再依赖在 FlatList 重挂载时丢失的 React ref
+
+## 2.31.0 - 2026-05-24
+
+移除 Claude session 输入栏上过时的"移至后台"按钮。这个按钮是 SDK 时代的遗留物 —— 当时 happy-cli 通过编程式 SDK 驱动 Claude，可以按需把前台的 Bash / 子 agent 调用挪到后台。迁移到 PTY 模式后，CLI 失去了这条编程入口，按钮变成了一个静默无效的占位。
+
+### 清理
+- 移除输入栏上的 background-tasks 按钮 —— 自 PTY 迁移以来它就毫无作用
+- 移除 `AgentInput` 上相关的 `onBackgroundTasks` prop 和 `sessionBackgroundTasks` op，避免死代码暗中漂移
+- 保留 CLI 端 `backgroundTasks` RPC handler 作为 no-op 桩，让老版本 App 收到干净响应而非 unknown-RPC 错误
+
+### Background Task Bar（未改动）
+- 输入栏上方独立的浮动 Background Task Bar（用于展示 Bash 后台进程和子 agent）保持不变 —— 本次只移除了 SDK 时代的"发送到后台"按钮
+
 ## 2.30.0 - 2026-05-22
 
 后台任务管线的内部健壮性重构。本次发布无新功能——目标是让悬浮任务条注册表中的竞态条件和乱序 SDK 事件在开发期以抛错形式暴露，而不是默默让某个任务停留在错误的状态显示上。

@@ -1,5 +1,34 @@
 # Changelog
 
+## 2.32.0 - 2026-05-24
+
+Hardens the new `mcp__happy__ask_user` picker pipeline end-to-end after the PTY migration — fixes duplicate cards, ghost approve/deny footers, missing decline path, and a deadlock on the native `AskUserQuestion` tool — and ships an Inbox "Clear All" action plus build metadata in Settings.
+
+### mcp__happy__ask_user — picker UX hardening
+- Fixed duplicate picker cards by deduping the synthetic ToolCall path against the tool_use envelope so the App only renders one card per request
+- Fixed the "needs permission" chip opening a generic approve/deny PermissionSheet on top of the picker — `AskUserQuestion` and `mcp__happy__ask_user` now share a single `toolsWithBuiltinSubmitUI` whitelist
+- Removed the duplicate question subtitle that appeared above the single-question picker
+- Removed the redundant `PermissionFooter` approve/deny row that overlaid the picker
+- Added a "Decline" button to the picker (mcp variant only) — taps call `sessionAskUserResponse({ canceled: true })`, and happy-cli ≥ 0.85.10 rejects the pending MCP invocation so Claude falls back to plain-text Q&A instead of hanging
+- Moved the decline button out of the last-step branch so multi-step prompts can be declined from any step (back/decline on the left, next/submit on the right)
+- Added `askUserQuestion.decline` i18n keys across all 10 languages
+
+### AskUserQuestion in PTY mode
+- Fixed the native `AskUserQuestion` tool deadlocking every PTY-mode session — the App can never deliver an answer because Claude TUI owns the in-terminal Q&A UI
+- happy-cli now force-disables `AskUserQuestion` in the PTY argv so Claude falls back to plain-text numbered options inside the App composer
+- Added a "Cancel and continue" escape hatch on the picker's submit-error path that fires `sessionInterrupt` (Ctrl-C through the PTY) to unstick sessions stuck on the pre-fix behaviour
+- Updated system + plan-mode prompts to teach Claude the plain-text fallback contract
+- Added `cancelStuckHint` / `cancelStuckAction` i18n keys across all 10 languages
+
+### Inbox
+- Added a destructive "Clear All" action in the inbox header, gated by a confirm dialog and backed by `DELETE /v1/inbox` (account-scoped, idempotent); UI updates optimistically before the network round-trip
+
+### Settings
+- Surfaced build metadata (commit, time, branch) on the Settings page to speed up "which build is the user on" triage
+
+### Bug Fixes
+- Fixed assistant replies from prior turns replaying with a typewriter animation every time the user sent a new prompt — the "already rendered as Markdown" check now derives from `message.createdAt < session.thinkingAt` instead of a remount-fragile React ref
+
 ## 2.31.0 - 2026-05-24
 
 Removes the obsolete "move to background" button from the Claude session input bar. The button was a holdover from the SDK era when Happy CLI ran Claude through a programmatic SDK and could relocate foreground Bash/sub-agent calls to the background on demand. After the move to PTY mode, the CLI no longer has a programmatic hook for that action and the button became a silent no-op.
