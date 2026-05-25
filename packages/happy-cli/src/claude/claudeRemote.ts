@@ -581,17 +581,28 @@ export async function claudeRemote(opts: {
   mergeThinkingIntoSettings(opts.hookSettingsPath, flagMode.thinking);
 
   // Inject (or strip) the ExitPlanMode auto-approve PreToolUse hook. Gated on
-  // the same `planModeLockdown` flag as the hardened deny list above: when plan
-  // mode is locked down the relaunched TUI is the one that will render the
-  // ExitPlanMode "Ready to code?" picker, and this hook bypasses it
-  // deterministically (allow + updatedInput) instead of the old "1\r" keystroke
-  // that landed in the picker's text field and rejected the plan. Idempotent
-  // across cold restarts; removed on the enable→disable transition. See
+  // bypass/Yolo mode — NOT on `planModeLockdown`. The hook only matches
+  // ExitPlanMode (which the model emits solely when leaving plan mode), so
+  // keeping it always-on for Yolo sessions is safe and is the desired UX:
+  // a user who opted into "no prompts" should never see the in-terminal
+  // "Ready to code?" picker. The hook bypasses it deterministically
+  // (permissionDecision:"allow" + updatedInput) instead of the old "1\r"
+  // keystroke that landed in the picker's text field and rejected the plan.
+  //
+  // Why not gate on `planModeLockdown`: that flag only flips true AFTER a
+  // cold restart triggered by EnterPlanMode, and that restart is deferred to
+  // the turn boundary. When the model runs EnterPlanMode → ExitPlanMode within
+  // a single turn (the common case — verified in PID 59981) no restart fires
+  // first, so a lockdown-gated hook is never present when ExitPlanMode is
+  // actually called. Gating on bypass mode makes the hook present from the
+  // first spawn, independent of restart timing.
+  //
+  // Idempotent across cold restarts; stripped if the session ever leaves
+  // bypass mode. See
   // packages/happy-cli/src/claude/utils/mergeExitPlanAutoApproveIntoSettings.ts.
-  mergeExitPlanAutoApproveIntoSettings(
-    opts.hookSettingsPath,
-    !!opts.planModeLockdown,
-  );
+  const isBypassMode =
+    mapToClaudeMode(flagMode.permissionMode) === "bypassPermissions";
+  mergeExitPlanAutoApproveIntoSettings(opts.hookSettingsPath, isBypassMode);
 
   // Build the child env. We let the PTY runtime sanitize (strip CLAUDECODE
   // etc) — caller-supplied overrides take precedence over process.env.

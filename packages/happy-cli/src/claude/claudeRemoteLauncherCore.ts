@@ -1158,10 +1158,17 @@ export async function claudeRemoteLauncher(
               // PTY-mode plan-approval is handled by a PreToolUse allow-hook
               // (see utils/mergeExitPlanAutoApproveIntoSettings.ts +
               // scripts/exit_plan_auto_approve.cjs), injected into the
-              // `--settings` file whenever plan-mode lockdown is active. The
-              // hook returns permissionDecision:"allow" + updatedInput, which
+              // `--settings` file for EVERY bypass/Yolo spawn (gated on bypass
+              // mode in claudeRemote, NOT on plan-mode lockdown). The hook
+              // returns permissionDecision:"allow" + updatedInput, which
               // deterministically bypasses the TUI "Ready to code?" picker —
               // no keystroke synthesis, independent of render timing.
+              //
+              // Always-on is required for correctness: the lockdown cold
+              // restart is deferred to the turn boundary, so when the model
+              // runs EnterPlanMode → ExitPlanMode within one turn (the common
+              // case, PID 59981) no restart fires first and a lockdown-gated
+              // hook would be absent exactly when ExitPlanMode is called.
               //
               // The earlier bridge blind-wrote "1\r" to the PTY once the picker
               // was assumed ready. With no reliable picker-ready signal the
@@ -1171,20 +1178,22 @@ export async function claudeRemoteLauncher(
               // "[Request interrupted by user for tool use]" (observed in PIDs
               // 67654 / 50704). The hook removes that race entirely.
               //
-              // We still tear down the plan-mode lockdown so the next turn runs
-              // with the normal deny list. DO NOT call
-              // `executionGuard.requestRestart` here: the ExitPlanMode turn is
-              // still completing and a synchronous restart tears it down (the
-              // very interruption we are fixing). Flip the flag (so coldModeHash
-              // diverges from currentColdHash) and stash a deferred restart that
-              // `onTurnComplete` consumes on the natural turn boundary. A new
-              // user message before the turn ends hits the divergent
-              // coldModeHash in `nextMessage` as the secondary safety net.
+              // The branch below is a SEPARATE concern: when plan-mode lockdown
+              // actually engaged (a cold restart did happen and hardened the
+              // deny list), tear it down so the next turn regains the full Yolo
+              // toolset. DO NOT call `executionGuard.requestRestart` here: the
+              // ExitPlanMode turn is still completing and a synchronous restart
+              // tears it down (the very interruption we are fixing). Flip the
+              // flag (so coldModeHash diverges from currentColdHash) and stash a
+              // deferred restart that `onTurnComplete` consumes on the natural
+              // turn boundary. A new user message before the turn ends hits the
+              // divergent coldModeHash in `nextMessage` as the secondary safety
+              // net.
               if (permissionHandler.isInBypassMode() && planModeLockdownActive) {
                 planModeLockdownActive = false;
                 pendingPostTurnRestart = "mode_change";
                 logger.debug(
-                  "[remote]: ExitPlanMode auto-approved via PreToolUse hook → disabling plan-mode lockdown + scheduling post-turn cold restart",
+                  "[remote]: ExitPlanMode observed → disabling plan-mode lockdown + scheduling post-turn cold restart (approval handled by always-on PreToolUse hook)",
                 );
               }
             }
