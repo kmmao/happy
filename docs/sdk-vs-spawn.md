@@ -1,7 +1,13 @@
 # SDK vs CLI Spawn：Claude Code 集成方式对比
 
-Happy 项目从 CLI spawn 演进到 Claude Agent SDK，Multica 目前仍采用 CLI spawn 方式。
+Happy 项目早期从 CLI spawn 演进到 Claude Agent SDK，Multica 目前仍采用 CLI spawn 方式。
 本文档对比两种集成方式的优劣势，供技术选型参考。
+
+> **当前状态（2026）**：Happy 的 Claude **Remote 模式已从 SDK `query()` 迁回到 spawn**——
+> 用 `node-pty` 包裹真实的 `claude` TUI，会话状态从 JSONL 文件增量扫描得到。这是一种
+> 带终端透传的 spawn 变体（见下文「Phase 4」与 `cli-architecture.md` 的「Claude PTY session」章节）。
+> 因此本文「SDK 优势」中的运行时动态控制（`setModel`/`setPermissionMode` 等）在当前 Remote
+> 模式下**不可用**，改由 `coldModeHash` 冷重启替代。下面的对比仍作为两种范式的选型参考保留。
 
 ## 架构对比
 
@@ -152,11 +158,18 @@ Phase 2: 直接 spawn (无 tmux)
   └─ execFile + 管道
   └─ 仍是文本解析
 
-Phase 3: Claude Agent SDK (当前)
+Phase 3: Claude Agent SDK
   └─ @anthropic-ai/claude-agent-sdk
   └─ 结构化消息流
   └─ 动态控制 (model/permission/effort)
   └─ queryAdapter.ts 适配层
+
+Phase 4: node-pty (当前, Remote 模式)
+  └─ startClaudePty 用 node-pty 包裹真实 claude TUI
+  └─ 终端字节经 router(ANSI 重放缓冲) → daemonBridge(FIFO+背压) → App
+  └─ 反向 App→PTY 走 claudePtyReverseServer (/input /resize /close)
+  └─ 消息来自 JSONL 文件增量扫描 (sessionScanner)，类型为 ClaudeJsonl*
+  └─ 运行时动态控制不可用，改由 coldModeHash 冷重启
 ```
 
 ## 选型建议
@@ -172,5 +185,5 @@ Phase 3: Claude Agent SDK (当前)
 
 ## 参考项目
 
-- **Happy**: SDK 方式，`packages/happy-cli/src/claude/sdk/` 适配层
+- **Happy**: Remote 模式现为 PTY spawn 方式，`packages/happy-cli/src/claude/pty/`（runtime/router/daemonBridge/reverseServer/controller）+ `claudeRemote.ts`；JSONL 解析层 `packages/happy-cli/src/claude/jsonl/`（原 `sdk/`，类型由 `SDK*` 改名为 `ClaudeJsonl*`，见 commit `b9a95e851`）
 - **Multica**: Spawn 方式，Go daemon 编排多种 Agent CLI

@@ -388,6 +388,55 @@ RPC is used to send commands over the Socket.IO connection:
 
 This mechanism allows the server and mobile clients to drive local actions without exposing a broad REST surface.
 
+## Claude PTY session (Remote mode)
+
+In **Remote mode**, the CLI no longer drives Claude through the Agent SDK's
+`query()`. It spawns the real `claude` TUI under a PTY (`node-pty`) and bridges
+that terminal to the App. See `docs/sdk-vs-spawn.md` for why the migration
+happened; the modules live under `src/claude/pty/`.
+
+```mermaid
+flowchart LR
+    subgraph "Session child process"
+        Runtime[claudePtyRuntime<br/><i>node-pty: spawn/write/resize/kill</i>]
+        Router[claudePtyRouter<br/><i>ANSI replay buffer + safe chunking</i>]
+        Bridge[claudePtyDaemonBridge<br/><i>FIFO + 4MB backpressure</i>]
+        Reverse[claudePtyReverseServer<br/><i>127.0.0.1: /input /resize /close</i>]
+    end
+
+    Claude[claude TUI] --> |onData| Runtime --> Router --> Bridge
+    Bridge --> |HTTP POST /claude-pty/*| Control[Daemon control server]
+    Control --> TM[daemon TerminalManager] --> |terminal-output| App[(App)]
+
+    App --> |terminal-input/-resize/-close| TM --> |HTTP POST| Reverse
+    Reverse --> Runtime --> |write/resize| Claude
+```
+
+**Output path** (`claude` → App): PTY bytes arrive on `Runtime.onData`; the
+**router** appends them to an ANSI-aware replay buffer (drops history before the
+most recent clear/alt-screen marker; never trims mid-escape-sequence) for
+reconnect replay, and emits them in `TERMINAL_OUTPUT_CHUNK_BYTES` (8 KB) chunks
+that never split surrogate pairs. The **daemon bridge** relays chunks to the
+daemon's control server over HTTP using a per-terminal FIFO that POSTs serially
+(preserving ANSI order); above a 4 MB queue it drops the *oldest* bytes to keep
+the most recent screen — what a reconnecting user actually sees.
+
+**Input path** (App → `claude`): the daemon owns the App-facing
+`terminal-input`/`-resize`/`-close` wire but the PTY lives in the session child,
+so each session opens a loopback **reverse server** (`startClaudePtyReverseServer`)
+whose URL is sent in the `claude-pty/attach` POST. The daemon forwards App input
+straight to `/input`, `/resize`, `/close`, which call back into the PTY.
+
+**Readiness & plan mode:** keystrokes written before Ink enters raw mode are
+silently dropped, so `waitForPtyReady` (in `claudeRemote.ts`) gates the first
+prompt behind a 3-layer detector (alt-screen enter → first-chunk grace → hard
+timeout). Because PTY mode bypasses the SDK's `canCallTool`, the launcher
+confirms the TUI's ExitPlanMode picker by writing `1\r` via
+`claudePtyController.approveExitPlanWhenPickerReady()` (snapshot + onData window
++ 2 s blind fallback). Runtime knobs the SDK exposed (hot-swap model / permission
+mode / MCP) have no TUI equivalent; behaviour changes are driven by a
+`coldModeHash` cold restart instead.
+
 ## Implementation references
 - CLI entry: `packages/happy-cli/src/index.ts`
 - Daemon: `packages/happy-cli/src/daemon`
@@ -395,3 +444,4 @@ This mechanism allows the server and mobile clients to drive local actions witho
 - API clients: `packages/happy-cli/src/api`
 - Persistence: `packages/happy-cli/src/persistence.ts`
 - Config: `packages/happy-cli/src/configuration.ts`
+- Claude PTY (Remote mode): `packages/happy-cli/src/claude/pty/` (runtime, router, daemonBridge, reverseServer, controller) and `packages/happy-cli/src/claude/claudeRemote.ts`

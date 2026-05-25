@@ -106,4 +106,50 @@ describe("claudePtyRuntime", () => {
     await delay(50);
     expect(fired).toBe(true);
   });
+
+  it("kill() escalates to SIGKILL when SIGTERM is ignored", async () => {
+    // A node process that swallows SIGTERM but stays alive — only the
+    // SIGKILL fallback in kill() can terminate it. Exercises the grace →
+    // SIGKILL escalation path that the basic `cat` cases never hit.
+    const pty = startClaudePty({
+      command: process.execPath,
+      args: ["-e", "process.on('SIGTERM', () => {}); setInterval(() => {}, 1000);"],
+    });
+    // Give node time to start and install the SIGTERM handler.
+    await delay(400);
+    expect(pty.exited).toBe(false);
+
+    pty.kill("SIGTERM", 200); // short grace so SIGKILL fires quickly
+    await delay(700);
+
+    expect(pty.exited).toBe(true);
+  });
+
+  it("repeated kill() calls are safe and terminate once", async () => {
+    const pty = startClaudePty({ command: "cat" });
+    // Stacked kill() calls must not throw or arm duplicate SIGKILL timers.
+    pty.kill();
+    pty.kill();
+    pty.kill();
+    await delay(WAIT_MS);
+    expect(pty.exited).toBe(true);
+
+    // A kill() after exit is a no-op and still doesn't throw.
+    pty.kill();
+    expect(pty.exited).toBe(true);
+  });
+
+  it("resize after exit returns false and leaves cols/rows unchanged", async () => {
+    const pty = startClaudePty({ command: "cat", cols: 80, rows: 24 });
+    pty.kill();
+    await delay(WAIT_MS);
+    expect(pty.exited).toBe(true);
+
+    // Rejected resize must not pollute the reported size (regression guard
+    // for assigning state.cols/rows only after a successful child.resize()).
+    const ok = pty.resize(132, 50);
+    expect(ok).toBe(false);
+    expect(pty.cols).toBe(80);
+    expect(pty.rows).toBe(24);
+  });
 });

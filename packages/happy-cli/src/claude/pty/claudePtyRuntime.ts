@@ -119,6 +119,10 @@ export function startClaudePty(opts: ClaudePtyRuntimeOptions = {}): ClaudePtyHan
     rows,
     exited: false,
   };
+  // SIGKILL fallback timer armed by `kill()`. Tracked so repeated `kill()`
+  // calls (e.g. caller abort + shutdown path) don't stack multiple timers,
+  // and so we can clear it once the child exits on its own.
+  let killTimer: ReturnType<typeof setTimeout> | null = null;
 
   // node-pty's onData fires once per chunk read from the PTY master.
   child.onData((data: string) => {
@@ -136,6 +140,10 @@ export function startClaudePty(opts: ClaudePtyRuntimeOptions = {}): ClaudePtyHan
   child.onExit(({ exitCode, signal }) => {
     state.exited = true;
     state.pid = -1;
+    if (killTimer !== null) {
+      clearTimeout(killTimer);
+      killTimer = null;
+    }
     logger.debug(`[claudePty] exited code=${exitCode} signal=${signal ?? ""}`);
     for (const handler of exitHandlers) {
       try {
@@ -174,10 +182,13 @@ export function startClaudePty(opts: ClaudePtyRuntimeOptions = {}): ClaudePtyHan
     resize(newCols, newRows) {
       if (state.exited) return false;
       if (newCols <= 0 || newRows <= 0) return false;
-      state.cols = newCols;
-      state.rows = newRows;
       try {
         child.resize(newCols, newRows);
+        // Only record the new size once node-pty accepted it, so the
+        // reported cols/rows never drift from the PTY's actual winsize
+        // when a resize throws.
+        state.cols = newCols;
+        state.rows = newRows;
         return true;
       } catch (err) {
         logger.debug(`[claudePty] resize failed: ${err instanceof Error ? err.message : String(err)}`);
@@ -205,8 +216,11 @@ export function startClaudePty(opts: ClaudePtyRuntimeOptions = {}): ClaudePtyHan
       } catch {
         // already dead
       }
-      // Force kill if it hangs.
-      const timer = setTimeout(() => {
+      // Force kill if it hangs. A SIGKILL fallback is already armed if kill()
+      // was called before — don't stack a second timer.
+      if (killTimer !== null) return;
+      killTimer = setTimeout(() => {
+        killTimer = null;
         if (state.exited) return;
         try {
           child.kill("SIGKILL");
@@ -215,7 +229,7 @@ export function startClaudePty(opts: ClaudePtyRuntimeOptions = {}): ClaudePtyHan
         }
       }, graceMs);
       // Unref so this timer doesn't keep the process alive on its own.
-      timer.unref?.();
+      killTimer.unref?.();
     },
     onData(handler) {
       if (state.exited) return () => undefined;
