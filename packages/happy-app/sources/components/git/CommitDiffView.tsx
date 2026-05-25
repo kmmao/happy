@@ -73,6 +73,13 @@ export const CommitDiffView = React.memo<CommitDiffViewProps>(
 
       (async () => {
         try {
+          // Without a repo cwd, `git show` would run in the daemon's default
+          // directory (wrong repo or not a repo at all). Bail with an error
+          // instead of issuing a command that can't produce the right diff.
+          if (!sessionPath) {
+            setError("Failed to read file at commit");
+            return;
+          }
           // `--pretty=format:` strips the commit header so stdout is the raw
           // patch for the requested file. Trailing `--` guards the path.
           // Single-quote both args and escape embedded quotes so unusual
