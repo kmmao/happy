@@ -71,3 +71,55 @@ describe("happyMcp", () => {
     );
   });
 });
+
+describe("happyMcp array-arg coercion (LLM stringified arrays)", () => {
+  const summary = HAPPY_MCP_TOOL_SPECS.update_session_summary.inputSchema;
+
+  it("coerces a JSON-encoded string array back to a real array", () => {
+    const r = summary.keyDecisions.safeParse('["a","b"]');
+    expect(r.success).toBe(true);
+    expect(r.success && r.data).toEqual(["a", "b"]);
+  });
+
+  it("passes a real string array through unchanged", () => {
+    const r = summary.impactScope.safeParse(["x", "y"]);
+    expect(r.success).toBe(true);
+    expect(r.success && r.data).toEqual(["x", "y"]);
+  });
+
+  it("leaves optional string arrays omittable", () => {
+    expect(summary.openQuestions.safeParse(undefined).success).toBe(true);
+  });
+
+  it("coerces a stringified object array and re-validates items", () => {
+    const todos = HAPPY_MCP_TOOL_SPECS.update_progress.inputSchema.todos;
+    const ok = todos.safeParse('[{"content":"do","status":"pending"}]');
+    expect(ok.success).toBe(true);
+    expect(ok.success && ok.data).toEqual([
+      { content: "do", status: "pending" },
+    ]);
+    // Malformed payload (bad status) is still rejected: we tolerate the
+    // encoding mistake, not invalid data.
+    const bad = todos.safeParse('[{"content":"do","status":"nope"}]');
+    expect(bad.success).toBe(false);
+  });
+
+  it("coerces stringified ask_user questions including nested options", () => {
+    const questions = HAPPY_MCP_TOOL_SPECS.ask_user.inputSchema.questions;
+    const payload = JSON.stringify([
+      {
+        question: "Pick one",
+        header: "Choice",
+        options: [
+          { label: "A", description: "first" },
+          { label: "B", description: "second" },
+        ],
+        multiSelect: false,
+      },
+    ]);
+    const r = questions.safeParse(payload);
+    expect(r.success).toBe(true);
+    const parsed = (r.success ? r.data : []) as Array<{ options: unknown[] }>;
+    expect(parsed[0].options).toHaveLength(2);
+  });
+});

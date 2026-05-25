@@ -24,6 +24,50 @@ type HappyMcpToolSpec = {
   reasonPhrases: string[];
 };
 
+/**
+ * Tool-input array coercion.
+ *
+ * LLMs frequently emit array-typed tool arguments as a JSON-encoded *string*
+ * (e.g. `"[\"a\",\"b\"]"` instead of `["a","b"]`). Against a strict
+ * `type: array` schema the Claude TUI rejects such a call ("The model's tool
+ * call could not be parsed (retry also failed)") and aborts the whole turn via
+ * StopFailure — confirmed in the wild for update_session_summary's
+ * keyDecisions/impactScope.
+ *
+ * These helpers widen the *advertised* JSON schema to `anyOf: [array, string]`
+ * (so the binary accepts the stringified form at parse time) and normalize the
+ * value back to a real array server-side. For object arrays the string branch
+ * is JSON-parsed and re-validated against the item schema via `.pipe`, so
+ * malformed payloads are still rejected — we tolerate the encoding mistake,
+ * not bad data.
+ */
+const parseIfJsonString = (v: unknown): unknown => {
+  if (typeof v !== "string") return v;
+  try {
+    return JSON.parse(v);
+  } catch {
+    return v;
+  }
+};
+
+/** `string[]` that also accepts a JSON-encoded array string. */
+const looseStringArray = () =>
+  z
+    .union([z.array(z.string()), z.string()])
+    .transform((v): string[] => {
+      if (Array.isArray(v)) return v;
+      const parsed = parseIfJsonString(v);
+      if (Array.isArray(parsed)) return parsed.map(String);
+      return v.length ? [v] : [];
+    });
+
+/** Array of `item` that also accepts a JSON-encoded array string (re-validated). */
+const looseObjectArray = <T extends z.ZodTypeAny>(item: T) =>
+  z.union([
+    z.array(item),
+    z.string().transform(parseIfJsonString).pipe(z.array(item)),
+  ]);
+
 export const HAPPY_MCP_TOOL_SPECS: Record<
   HappyMcpCanonicalToolName,
   HappyMcpToolSpec
@@ -64,29 +108,26 @@ export const HAPPY_MCP_TOOL_SPECS: Record<
       'Optional override for the App\'s Progress tab. In most cases your TodoWrite calls are auto-mirrored, so you do NOT need to call this. Use it only when you want to set extra fields the CLI hook does not capture (currentStage, blockers) or to force a new list boundary with `listId: "new"`.',
     failureLabel: "Failed to update progress",
     inputSchema: {
-      todos: z
-        .array(
-          z.object({
-            content: z.string().describe("Concise description of the task"),
-            status: z
-              .enum(["pending", "in_progress", "completed"])
-              .describe("Current status of the task"),
-            activeForm: z
-              .string()
-              .optional()
-              .describe(
-                "Imperative-present form shown when status is in_progress",
-              ),
-            stage: z.string().optional().describe("Optional phase/stage label"),
-          }),
-        )
-        .describe("The full checklist — always send every item, not a delta"),
+      todos: looseObjectArray(
+        z.object({
+          content: z.string().describe("Concise description of the task"),
+          status: z
+            .enum(["pending", "in_progress", "completed"])
+            .describe("Current status of the task"),
+          activeForm: z
+            .string()
+            .optional()
+            .describe(
+              "Imperative-present form shown when status is in_progress",
+            ),
+          stage: z.string().optional().describe("Optional phase/stage label"),
+        }),
+      ).describe("The full checklist — always send every item, not a delta"),
       currentStage: z
         .string()
         .optional()
         .describe("Optional overall stage name for the checklist"),
-      blockers: z
-        .array(z.string())
+      blockers: looseStringArray()
         .optional()
         .describe("Optional list of things blocking progress"),
       listId: z
@@ -115,29 +156,25 @@ export const HAPPY_MCP_TOOL_SPECS: Record<
       "answers in the App, then returns them as a JSON string keyed by question text.",
     failureLabel: "Failed to get user answer",
     inputSchema: {
-      questions: z
-        .array(
-          z.object({
-            question: z.string().describe("The question to ask the user"),
-            header: z.string().describe("Short label/chip for the question (max ~12 chars)"),
-            options: z
-              .array(
-                z.object({
-                  label: z.string().describe("Option label"),
-                  description: z.string().describe("Option description"),
-                  preview: z
-                    .string()
-                    .optional()
-                    .describe("Optional preview content shown when the option is focused"),
-                }),
-              )
-              .describe("Available choices for this question (2-4 options)"),
-            multiSelect: z
-              .boolean()
-              .describe("Allow multiple selections instead of single-select"),
-          }),
-        )
-        .describe("Questions to ask the user (1-4 questions)"),
+      questions: looseObjectArray(
+        z.object({
+          question: z.string().describe("The question to ask the user"),
+          header: z.string().describe("Short label/chip for the question (max ~12 chars)"),
+          options: looseObjectArray(
+            z.object({
+              label: z.string().describe("Option label"),
+              description: z.string().describe("Option description"),
+              preview: z
+                .string()
+                .optional()
+                .describe("Optional preview content shown when the option is focused"),
+            }),
+          ).describe("Available choices for this question (2-4 options)"),
+          multiSelect: z
+            .boolean()
+            .describe("Allow multiple selections instead of single-select"),
+        }),
+      ).describe("Questions to ask the user (1-4 questions)"),
     },
     hideSuccessfulCall: false,
     autoApproveByDefault: false,
@@ -157,16 +194,13 @@ export const HAPPY_MCP_TOOL_SPECS: Record<
         .string()
         .optional()
         .describe("Brief description of the active task or phase"),
-      keyDecisions: z
-        .array(z.string())
+      keyDecisions: looseStringArray()
         .optional()
         .describe("Important choices already made this session"),
-      openQuestions: z
-        .array(z.string())
+      openQuestions: looseStringArray()
         .optional()
         .describe("Unresolved questions or pending decisions"),
-      impactScope: z
-        .array(z.string())
+      impactScope: looseStringArray()
         .optional()
         .describe("Modules/files/areas affected by this session's work"),
       requestId: z
