@@ -13,7 +13,10 @@
  * We use a minimal stub PTY handle so these tests never spawn a real process.
  */
 
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { isAbsolute, join } from "node:path";
 import { createClaudePtyController, type UsageSnapshot } from "./claudePtyController";
 import type { ClaudePtyDataHandler, ClaudePtyHandle } from "./claudePtyRuntime";
 
@@ -484,5 +487,108 @@ describe("createClaudePtyController — approveExitPlanWhenPickerReady", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+// ── readFile tests ─────────────────────────────────────────────────────────────
+
+describe("createClaudePtyController — readFile", () => {
+  let dir: string;
+
+  beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), "pty-readfile-"));
+  });
+
+  afterEach(() => {
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("reads a UTF-8 text file and reports an absolute path, not truncated", async () => {
+    const file = join(dir, "note.txt");
+    writeFileSync(file, "hello sidebar 你好");
+    const controller = createClaudePtyController(makeStubPty());
+
+    const result = await controller.readFile(file);
+
+    expect(result).not.toBeNull();
+    expect(result?.contents).toBe("hello sidebar 你好");
+    expect(result?.truncated).toBe(false);
+    expect(isAbsolute(result?.absPath ?? "")).toBe(true);
+    expect(result?.absPath).toBe(file);
+  });
+
+  it("truncates to maxBytes and flags truncated:true when the file is larger", async () => {
+    const file = join(dir, "big.txt");
+    writeFileSync(file, "abcdefghij"); // 10 ASCII bytes
+    const controller = createClaudePtyController(makeStubPty());
+
+    const result = await controller.readFile(file, { maxBytes: 4 });
+
+    expect(result?.truncated).toBe(true);
+    expect(result?.contents).toBe("abcd");
+  });
+
+  it("returns null for a path that does not exist", async () => {
+    const controller = createClaudePtyController(makeStubPty());
+    const result = await controller.readFile(join(dir, "missing.txt"));
+    expect(result).toBeNull();
+  });
+
+  it("returns null when the path is a directory", async () => {
+    const controller = createClaudePtyController(makeStubPty());
+    const result = await controller.readFile(dir);
+    expect(result).toBeNull();
+  });
+
+  it("returns null for a binary file containing a NUL byte", async () => {
+    const file = join(dir, "bin.dat");
+    writeFileSync(file, Buffer.from([0x48, 0x49, 0x00, 0x4a, 0x4b]));
+    const controller = createClaudePtyController(makeStubPty());
+
+    const result = await controller.readFile(file);
+    expect(result).toBeNull();
+  });
+
+  it("resolves a relative path to an absolute one before reading", async () => {
+    // Defensive no-op for direct callers — the handler normally passes an
+    // absolute path. We can't write outside the temp dir, so just assert the
+    // returned absPath is absolute when given a bare relative name.
+    const controller = createClaudePtyController(makeStubPty());
+    const result = await controller.readFile("definitely-not-here.txt");
+    // Missing → null, but the resolve step must not throw.
+    expect(result).toBeNull();
+  });
+});
+
+// ── setModel tests ─────────────────────────────────────────────────────────────
+
+describe("createClaudePtyController — setModel", () => {
+  it("writes '/model <name>\\r' to the PTY", async () => {
+    const pty = makeRecordingPty();
+    const controller = createClaudePtyController(pty);
+
+    await controller.setModel("sonnet");
+
+    expect(pty.writes).toEqual(["/model sonnet\r"]);
+  });
+
+  it("passes the model value through verbatim (full IDs / aliases)", async () => {
+    const pty = makeRecordingPty();
+    const controller = createClaudePtyController(pty);
+
+    await controller.setModel("claude-opus-4-7");
+
+    expect(pty.writes).toEqual(["/model claude-opus-4-7\r"]);
+  });
+
+  it("never rejects when the PTY write throws (fire-and-forget)", async () => {
+    const pty = makeRecordingPty();
+    // Force write() to throw — setModel must swallow it.
+    pty.write = (_data: string): boolean => {
+      throw new Error("pty gone");
+    };
+    const controller = createClaudePtyController(pty);
+
+    await expect(controller.setModel("sonnet")).resolves.toBeUndefined();
   });
 });

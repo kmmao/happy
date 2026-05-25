@@ -21,10 +21,12 @@
  *   • approveExitPlan()                 → write "1\r" to confirm TUI plan-mode dialog
  *   • approveExitPlanWhenPickerReady()  → react to picker appearing in onData,
  *                                          with 2 s blind fallback
+ *   • setModel()                        → write "/model <name>\r" to hot-swap the
+ *                                          model within a session (no restart)
  *   • mcpServerStatus()                 → snapshot the launcher-side MCP config map
  *   • getContextUsage()       → reconstruct usage from JSONL snapshot
  *   • initializationResult()  → returns empty models[] (App still polls)
- *   • readFile()              → returns null (handler maps to permission_denied)
+ *   • readFile()              → read the file from disk (handler gates the path)
  *
  * Type compatibility
  * ------------------
@@ -57,6 +59,8 @@
  *   ✗ messageBreakdown per-category (would require parsing every message)
  */
 
+import { readFile as fsReadFile } from "node:fs/promises";
+import { isAbsolute, resolve as resolvePath } from "node:path";
 import type { ClaudePtyHandle } from "./claudePtyRuntime";
 import { logger } from "@/ui/logger";
 import { probeMcpServer } from "@/claude/utils/mcpStatusProbe";
@@ -160,6 +164,33 @@ export interface ClaudePtyController {
    * the alternative is silently hanging the session.
    */
   approveExitPlanWhenPickerReady(): Promise<void>;
+  /**
+   * Hot-swap the active model on a running session by writing the TUI's
+   * `/model <name>\r` slash command to PTY stdin.
+   *
+   * Why this exists: the SDK era had `Query.setModel()`. PTY mode dropped it,
+   * so the launcher's `coldModeHash` (which deliberately excludes model within
+   * the same context-window tier) classified a model change as "hot-swap, no
+   * restart" — but nothing actually re-applied the model, so the switch was
+   * silently lost until an unrelated cold restart. `claudeCliFlags.ts`
+   * documents `/model …` as the runtime-swap mechanism, and `mode.model` is the
+   * same value passed to `--model` at spawn, so it is accepted verbatim here.
+   *
+   * `claudeRemote.ts` calls this just before writing the next prompt whenever
+   * `mode.model` differs from the model last applied to the PTY, so the turn
+   * runs under the new model. Never rejects — failures are logged and
+   * swallowed (the caller treats it as fire-and-forget, like `approveExitPlan`).
+   *
+   * Verified against claude 2.1.150 (TUI probe): `/model <name>` with an
+   * explicit argument applies immediately and inline (`⎿ Set model to … for
+   * this session`) with NO selection picker — only bare `/model` (no argument)
+   * opens the picker, which we never send. So a single blind write suffices and
+   * the picker-navigation layer that `approveExitPlanWhenPickerReady` needs is
+   * unnecessary here. The TUI also parses the Happy `[1m]` suffix as a 1M-context
+   * request (rejected inline, no picker, on accounts without 1M access) — exactly
+   * as boot `--model` treats the same resolved string, so no new failure mode.
+   */
+  setModel(model: string): Promise<void>;
   /** Initialization result — returns empty model list in PTY mode. */
   initializationResult(): Promise<{
     claude_code_version?: string;
@@ -173,12 +204,17 @@ export interface ClaudePtyController {
     }>;
   }>;
   /**
-   * Read a file via the active query — sidebar uses this for the "view file"
-   * action. TUI has no equivalent and we deliberately do NOT shell out to
-   * `fs.readFile` here: the SDK applied an allow-list at the tool-permission
-   * layer that PTY mode cannot reproduce, and the path blacklist in
-   * claudeControlHandlers.ts is defense-in-depth, not a sandbox. Returning
-   * null causes the handler to surface `permission_denied` to the App.
+   * Read a file from disk — sidebar uses this for the "view file" action.
+   *
+   * The caller (`claudeControlHandlers.read_file`) resolves the request path
+   * against the session cwd and rejects blacklisted paths (`~/.ssh`, `~/.aws`,
+   * `/etc/shadow`, …) BEFORE invoking this, so it passes an already-absolute,
+   * already-vetted path. We read it with `node:fs/promises`, truncate to
+   * `maxBytes`, and reject binaries (NUL byte / heavy U+FFFD after UTF-8
+   * decode) to keep garbage out of the App's text viewer.
+   *
+   * Returns null on any failure (missing file, directory, permission error,
+   * binary content); the handler maps null to `permission_denied`.
    */
   readFile(
     path: string,
@@ -372,10 +408,65 @@ export function createClaudePtyController(
     },
 
     async readFile(path: string, opts?: { maxBytes?: number }) {
-      logger.debug(
-        `[ptyController] readFile(${path}, maxBytes=${opts?.maxBytes ?? "?"}) — no TUI equivalent`,
-      );
-      return null;
+      const maxBytes = opts?.maxBytes ?? 1024 * 1024;
+      // The handler already resolved the path against the session cwd and ran
+      // it through the blacklist; resolve again only as a defensive no-op for
+      // the rare direct caller (tests) that passes a relative path.
+      const absPath = isAbsolute(path) ? path : resolvePath(path);
+      try {
+        const buf = await fsReadFile(absPath);
+
+        // Binary guard 1 — a NUL byte in the first 8 KiB is the classic
+        // "this is not text" marker (executables, images, archives). Reject
+        // before decoding so the App never receives a wall of mojibake.
+        const scanLen = Math.min(buf.length, 8192);
+        for (let i = 0; i < scanLen; i++) {
+          if (buf[i] === 0) {
+            logger.debug(`[ptyController] readFile(${absPath}) — binary (NUL byte) → null`);
+            return null;
+          }
+        }
+
+        const truncated = buf.length > maxBytes;
+        const contents = (truncated ? buf.subarray(0, maxBytes) : buf).toString("utf-8");
+
+        // Binary guard 2 — non-UTF-8 binaries without an early NUL (e.g.
+        // Latin-1 blobs) decode to many U+FFFD replacement chars. A truncation
+        // boundary can split one multibyte char (≤1 replacement char), so we
+        // only bail when replacements are a meaningful fraction of the output.
+        const replacements = (contents.match(/�/g) ?? []).length;
+        if (contents.length > 0 && replacements / contents.length > 0.1) {
+          logger.debug(
+            `[ptyController] readFile(${absPath}) — binary (${replacements}/${contents.length} replacement chars) → null`,
+          );
+          return null;
+        }
+
+        logger.debug(
+          `[ptyController] readFile(${absPath}) ok bytes=${buf.length} truncated=${truncated}`,
+        );
+        return { contents, absPath, truncated };
+      } catch (err) {
+        logger.debug(
+          `[ptyController] readFile(${absPath}) failed: ${err instanceof Error ? err.message : String(err)}`,
+        );
+        return null;
+      }
+    },
+
+    async setModel(model: string) {
+      // Reuse mode.model verbatim — it is the same value passed to `--model`
+      // at spawn, and the TUI's `/model` accepts the same aliases / full IDs.
+      logger.debug(`[ptyController] setModel → write '/model ${model}\\r'`);
+      try {
+        pty.write(`/model ${model}\r`);
+      } catch (err) {
+        // Fire-and-forget contract (see interface doc): swallow + log rather
+        // than reject, so a transient write failure can't deadlock the caller.
+        logger.debug(
+          `[ptyController] setModel write failed: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      }
     },
 
     async mcpServerStatus() {

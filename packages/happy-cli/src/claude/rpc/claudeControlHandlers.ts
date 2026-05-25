@@ -18,9 +18,10 @@
  *     mirrors it; no long-term persistence here — App is the source of truth)
  *
  * Stage 3B (E2E content tier):
- *   - read_file: file-read with CLI-side path blacklist. Returns null in PTY
- *     mode (no host-side allow-list to safely re-implement) → handler maps
- *     to `permission_denied`.
+ *   - read_file: file-read with CLI-side path blacklist. The handler resolves
+ *     the path against the session cwd, rejects blacklisted paths, then reads
+ *     it from disk via ClaudePtyController.readFile (binary content / missing
+ *     files surface as `permission_denied`).
  *
  * Stage 3C (permission-gated):
  *   - mcp_call: CLI-side MCP server whitelist gating. The App MUST display a
@@ -365,7 +366,10 @@ export function registerClaudeControlHandlers(
         return { result: null, deniedReason: "error" };
       }
       try {
-        const jsonlResult = await q.readFile(req.path, {
+        // Pass the already-resolved, blacklist-vetted absolute path so the
+        // controller reads exactly what was checked (not a relative path
+        // re-resolved against the daemon's cwd, which differs from `cwd`).
+        const jsonlResult = await q.readFile(absPath, {
           maxBytes: req.maxBytes ?? 1024 * 1024,
         });
         if (!jsonlResult) {

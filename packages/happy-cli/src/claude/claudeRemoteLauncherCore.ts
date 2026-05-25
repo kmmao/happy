@@ -1822,21 +1822,24 @@ export async function claudeRemoteLauncher(
       let mode: EnhancedMode | null = null;
 
       // "Cold hash" detects changes that require a process restart.
-      // It intentionally excludes fields that can be hot-swapped:
-      //   - model: hot-swapped via setModel() (within same context window tier)
-      //   - permissionMode (between non-plan, non-bypass modes): via setPermissionMode()
-      //   - allowedTools / disallowedTools: via applyFlagSettings({ permissions }) (SDK 0.3.142+)
-      // Cold restart is required for:
-      //   - plan ↔ non-plan: different tool sets (ExitPlanMode etc.)
-      //   - bypassPermissions ↔ other: AskUserQuestion disallowedTools changes
-      //   - context window tier change (200K ↔ 1M): SDK bug — setModel() doesn't
-      //     update options.mainLoopModel, so auto-compact threshold stays stale
-      //   - thinking, effort, maxBudgetUsd: SDK has no runtime set methods
+      // It intentionally excludes the one field that DOES take effect on the
+      // live TUI:
+      //   - model (within the same context-window tier): hot-swapped by
+      //     claudeRemote.ts writing `/model <name>` to the PTY before the next
+      //     prompt. A tier change (200K ↔ 1M) still cold-restarts via
+      //     `isExtendedContext` below, since that re-binds the model flag set.
+      // Cold restart is required for everything the Claude TUI binds at boot:
+      //   - ANY permissionMode change: the TUI has no programmatic setter (mode
+      //     cycling is Shift+Tab only, which we can't reliably target), so
+      //     default ↔ acceptEdits ↔ plan ↔ bypass all restart to take effect.
+      //   - allowedTools / disallowedTools: bound at spawn (settings.json/flags).
+      //   - thinking, effort, maxBudgetUsd, etc.: no runtime knobs in PTY mode.
       const coldModeHash = (m: EnhancedMode) => {
         const mapped = mapToClaudeMode(m.permissionMode);
         return hashObject({
-          isPlan: mapped === "plan",
-          isBypass: mapped === "bypassPermissions",
+          // Full mapped permission mode — distinguishes default vs acceptEdits
+          // (not just plan/bypass) so every transition forces a restart.
+          permissionMode: mapped,
           // Toggling plan-mode lockdown changes the spawned process's
           // `disallowedTools` set, which Claude TUI binds at boot only —
           // hot-swap can't propagate it, so this MUST force a cold restart.
@@ -2127,13 +2130,14 @@ export async function claudeRemoteLauncher(
                 // Mode changed. Check if cold-restart fields are unchanged (hot-swappable).
                 const newColdHash = coldModeHash(msg.mode);
                 if (currentColdHash && newColdHash === currentColdHash) {
-                  // Only hot-swappable fields changed (model, permissionMode,
-                  // allowedTools, disallowedTools). Actual SDK calls happen in
-                  // claudeRemote.ts when the message is delivered to the query.
+                  // Only hot-swappable fields changed. The model swap (the one
+                  // field excluded from coldModeHash) is applied by
+                  // claudeRemote.ts writing `/model <name>` to the PTY just
+                  // before this message's prompt — no process restart needed.
+                  // permissionMode is NOT listed: any permissionMode change now
+                  // diverges coldModeHash and takes the cold-restart path below.
                   const changed = [
                     mode?.model !== msg.mode.model && "model",
-                    mode?.permissionMode !== msg.mode.permissionMode &&
-                      "permissionMode",
                     JSON.stringify(mode?.allowedTools) !== JSON.stringify(msg.mode.allowedTools) &&
                       "allowedTools",
                     JSON.stringify(mode?.disallowedTools) !== JSON.stringify(msg.mode.disallowedTools) &&

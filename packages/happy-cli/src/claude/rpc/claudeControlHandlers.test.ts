@@ -13,7 +13,7 @@
  * minimal stub that records calls.
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { tmpdir } from 'node:os';
+import { homedir, tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { mkdirSync, existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 
@@ -209,5 +209,75 @@ describe('registerClaudeControlHandlers — toggle_mcp_server', () => {
     await handler({ serverName: 'dup', enabled: false });
 
     expect(readDisk().projects[cwd].disabledMcpServers).toEqual(['dup']);
+  });
+});
+
+// ── read_file blacklist regression ─────────────────────────────────────────────
+
+/**
+ * read_file gates the path BEFORE touching the controller: blacklisted
+ * prefixes (~/.ssh, /etc/shadow, …) return `blacklisted_path` and the
+ * controller's readFile is never invoked. Now that the controller actually
+ * reads from disk (D), this regression pins that the gate still fires — the
+ * disk read must not become a back door around the blacklist.
+ */
+describe('registerClaudeControlHandlers — read_file blacklist', () => {
+  const cwd = '/Users/test/project';
+
+  function setupReadFile() {
+    const rpc = makeRpcHandlerManagerStub();
+    let readFileCalls = 0;
+    const controller: Partial<ClaudePtyController> = {
+      async readFile() {
+        readFileCalls++;
+        return { contents: 'leaked', absPath: '/x', truncated: false };
+      },
+    };
+    registerClaudeControlHandlers({
+      rpcHandlerManager: rpc as any,
+      getCurrentQuery: () => controller as ClaudePtyController,
+      cwd,
+      mcpServerState: createMcpServerState(),
+      liveMcpServers: {},
+    });
+    const handler = rpc.handlers.get(`${CLAUDE_CONTROL_SCOPE}:read_file`)!;
+    return { handler, readFileCalls: () => readFileCalls };
+  }
+
+  it('rejects ~/.ssh/id_rsa with blacklisted_path and never reads disk', async () => {
+    const { handler, readFileCalls } = setupReadFile();
+
+    const result = await handler({ path: join(homedir(), '.ssh', 'id_rsa') });
+
+    expect(result).toEqual({ result: null, deniedReason: 'blacklisted_path' });
+    expect(readFileCalls()).toBe(0);
+  });
+
+  it('rejects a relative path that resolves into a blacklisted dir', async () => {
+    const { handler, readFileCalls } = setupReadFile();
+    // Relative path is resolved against homedir-based blacklist only after
+    // joining cwd; craft one that climbs out of cwd into ~/.aws.
+    const result = await handler({ path: join(homedir(), '.aws', 'credentials') });
+
+    expect(result).toEqual({ result: null, deniedReason: 'blacklisted_path' });
+    expect(readFileCalls()).toBe(0);
+  });
+
+  it('rejects /etc/shadow with blacklisted_path', async () => {
+    const { handler, readFileCalls } = setupReadFile();
+
+    const result = await handler({ path: '/etc/shadow' });
+
+    expect(result).toEqual({ result: null, deniedReason: 'blacklisted_path' });
+    expect(readFileCalls()).toBe(0);
+  });
+
+  it('allows a non-blacklisted path through to the controller readFile', async () => {
+    const { handler, readFileCalls } = setupReadFile();
+
+    const result = await handler({ path: join(cwd, 'src', 'index.ts') });
+
+    expect(result).toEqual({ result: { contents: 'leaked', absPath: '/x', truncated: false } });
+    expect(readFileCalls()).toBe(1);
   });
 });

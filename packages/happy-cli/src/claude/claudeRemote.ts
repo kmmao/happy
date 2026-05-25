@@ -980,18 +980,24 @@ export async function claudeRemote(opts: {
         return;
       }
 
-      // Hot-swap is unavailable in PTY mode — the launcher's `coldModeHash`
-      // already triggered a fresh process for any change that requires it.
-      // Here we only refresh local state so subsequent diffs stay sane.
+      // Model change. A context-tier change (200K ↔ 1M) diverges the
+      // launcher's `coldModeHash` and cold-restarts, re-applying the model via
+      // `--model` at spawn (so `newModel === model` here — nothing to do). A
+      // same-tier swap is deliberately excluded from `coldModeHash`, so no
+      // restart fires and nothing else re-applies it. We hot-swap it ourselves
+      // via the TUI's `/model` slash command just before the prompt (see the
+      // setModel call below), using the resolved key — the same value `--model`
+      // received at spawn.
       const newModel =
         resolveModelKey(next.mode.model) ??
         opts.claudeEnvVars?.ANTHROPIC_MODEL ??
         process.env.ANTHROPIC_MODEL;
-      if (newModel && newModel !== model) {
+      const modelToApply = newModel && newModel !== model ? newModel : null;
+      if (modelToApply) {
         logger.debug(
-          `[claudeRemote] Model change observed ${model} → ${newModel} (cold restart handles this; updating local state)`,
+          `[claudeRemote] model change ${model} → ${modelToApply} — hot-swapping via /model before prompt`,
         );
-        model = newModel;
+        model = modelToApply;
       }
 
       const prevMode = mode;
@@ -1011,8 +1017,12 @@ export async function claudeRemote(opts: {
           );
           mode = { ...next.mode, permissionMode: mode.permissionMode };
         } else {
-          // Non-cold-restart transitions (e.g. default ↔ acceptEdits) cannot
-          // be pushed to a live TUI; absorb into local state only.
+          // default ↔ acceptEdits. As of the coldModeHash change these also
+          // cold-restart (the TUI has no live permission-mode setter), so the
+          // launcher normally relaunches before such a message reaches here.
+          // This branch survives only as defensive local-state tracking for a
+          // transition that slips through; the new mode takes effect on the
+          // relaunched PTY, not from here.
           mode = next.mode;
         }
       } else {
@@ -1041,6 +1051,16 @@ export async function claudeRemote(opts: {
       // ptyReady is almost certainly resolved by now (we just consumed a
       // result), but await it anyway as cheap insurance against races.
       await ptyReady;
+      // Apply a pending model hot-swap before the prompt so this turn runs
+      // under the new model. Write `/model <name>\r`, then settle briefly so
+      // the TUI processes the slash command before the prompt lands. (If a
+      // future TUI version makes `/model <name>` open a picker rather than set
+      // directly, this is where a picker-navigation layer would go — see
+      // ClaudePtyController.setModel and docs/verification notes.)
+      if (modelToApply) {
+        await controller.setModel(modelToApply);
+        await new Promise<void>((r) => setTimeout(r, 300));
+      }
       writePromptAndMarkThinking(next.message);
     } finally {
       resultInFlight = false;
