@@ -138,10 +138,22 @@ export class Session {
   };
 
   /**
-   * Register a callback to be notified when session ID is found/changed
+   * Register a callback to be notified when session ID is found/changed.
+   *
+   * Replays the last-known id to late subscribers (BehaviorSubject semantics):
+   * the SessionStart hook fires once per fresh id and `onSessionFound` is gated
+   * on the id actually changing, so a subscriber that registers *after* the hook
+   * has already fired would otherwise never learn the id. In PTY/Remote mode the
+   * claude process is live (and can fire SessionStart) from `startClaudePty`,
+   * while the scanner only subscribes a couple of awaits later — without this
+   * replay that race leaves the scanner watching nothing. All current
+   * subscribers are idempotent on a repeated id, so the replay is safe.
    */
   addSessionFoundCallback = (callback: (sessionId: string) => void): void => {
     this.sessionFoundCallbacks.push(callback);
+    if (this.sessionId !== null) {
+      callback(this.sessionId);
+    }
   };
 
   /**
