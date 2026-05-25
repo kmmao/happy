@@ -25,22 +25,7 @@ import { screenLayoutMaxWidth } from "@/components/layout";
 import { FileIcon } from "@/components/FileIcon";
 import { utf8ToBase64 } from "@/utils/stringUtils";
 import { getFavoriteItemActions } from "./gitBrowseTabFavorites";
-
-const BINARY_EXTENSIONS = new Set([
-    "png", "jpg", "jpeg", "gif", "bmp", "svg", "ico",
-    "mp4", "avi", "mov", "wmv", "flv", "webm",
-    "mp3", "wav", "flac", "aac", "ogg",
-    "pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx",
-    "zip", "tar", "gz", "rar", "7z",
-    "exe", "dmg", "deb", "rpm",
-    "woff", "woff2", "ttf", "otf",
-    "db", "sqlite", "sqlite3",
-]);
-
-function isBinaryExtension(name: string): boolean {
-    const ext = name.split(".").pop()?.toLowerCase();
-    return ext ? BINARY_EXTENSIONS.has(ext) : false;
-}
+import { isBinaryFilePath } from "@/components/diff/binaryFiles";
 
 function formatFileSize(bytes?: number): string {
     if (bytes === undefined || bytes === null) return "";
@@ -681,7 +666,7 @@ export const GitBrowseTab = React.memo<{
                                 size={16}
                                 color={theme.colors.textSecondary}
                             />
-                        ) : isBinaryExtension(entry.name) ? (
+                        ) : isBinaryFilePath(entry.name) ? (
                             <Text
                                 style={{
                                     fontSize: 11,

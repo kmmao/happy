@@ -7,7 +7,7 @@ import { knownTools } from "@/components/tools/knownTools";
 import { toolFullViewStyles } from "../ToolFullView";
 import { ToolDiffView } from "@/components/tools/ToolDiffView";
 import { trimIdent } from "@/utils/trimIdent";
-import { getLanguageFromPath } from "@/components/diff/syntaxTokenizer";
+import { getLanguageForPath } from "@/components/diff/fileLanguage";
 import {
   calculateUnifiedDiff,
   formatUnifiedDiffText,
@@ -40,7 +40,7 @@ export const EditViewFull = React.memo<EditViewFullProps>(
 
     const filePath =
       typeof input?.file_path === "string" ? input.file_path : null;
-    const language = filePath ? getLanguageFromPath(filePath) : null;
+    const language = filePath ? getLanguageForPath(filePath) : null;
 
     const handleCopyDiff = React.useCallback(() => {
       const contextLines = expandedContext ? 999999 : 3;

@@ -5,7 +5,7 @@ import { ToolDiffView } from "@/components/tools/ToolDiffView";
 import { knownTools } from "../../tools/knownTools";
 import { trimIdent } from "@/utils/trimIdent";
 import { useSetting } from "@/sync/storage";
-import { getLanguageFromPath } from "@/components/diff/syntaxTokenizer";
+import { getLanguageForPath } from "@/components/diff/fileLanguage";
 
 export const EditView = React.memo<ToolViewProps>(({ tool }) => {
   const showLineNumbersInToolViews = useSetting("showLineNumbersInToolViews");
@@ -21,7 +21,7 @@ export const EditView = React.memo<ToolViewProps>(({ tool }) => {
 
   const filePath =
     typeof tool.input?.file_path === "string" ? tool.input.file_path : null;
-  const language = filePath ? getLanguageFromPath(filePath) : null;
+  const language = filePath ? getLanguageForPath(filePath) : null;
 
   return (
     <>

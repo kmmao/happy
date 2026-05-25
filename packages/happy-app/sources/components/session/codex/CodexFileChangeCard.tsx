@@ -3,7 +3,7 @@ import { Pressable, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
-import { getLanguageFromPath } from "@/components/diff/syntaxTokenizer";
+import { getLanguageForPath } from "@/components/diff/fileLanguage";
 import { Text } from "@/components/StyledText";
 import { type FileChange } from "@/components/session/codeChangeTypes";
 import { CodexDiffStats } from "@/components/session/codex/CodexDiffStats";
@@ -41,7 +41,7 @@ export const CodexFileChangeCard = React.memo<CodexFileChangeCardProps>(
   function CodexFileChangeCard({ change, initiallyExpanded = false }) {
     const { theme } = useUnistyles();
     const [expanded, setExpanded] = React.useState(initiallyExpanded);
-    const language = getLanguageFromPath(change.filePath);
+    const language = getLanguageForPath(change.filePath);
     const kind = inferCodexFileChangeKind(change);
     const visuals = getKindVisuals(kind);
     const badgeColors = React.useMemo(() => {

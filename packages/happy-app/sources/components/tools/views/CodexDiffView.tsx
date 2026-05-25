@@ -11,7 +11,7 @@ import { CodexDiffStats } from '@/components/session/codex/CodexDiffStats';
 import { buildCodexDiffPalette } from '@/components/session/codex/codexDiffPalette';
 import { getCodexDiffStats, parseCodexUnifiedDiff } from '../codexDiffUtils';
 import { Metadata } from '@/sync/storageTypes';
-import { getLanguageFromPath } from '@/components/diff/syntaxTokenizer';
+import { getLanguageForPath } from "@/components/diff/fileLanguage";
 import { buildCodexToolViewTheme } from './codexToolViewTheme';
 
 interface CodexDiffViewProps {
@@ -58,7 +58,7 @@ export const CodexDiffView = React.memo<CodexDiffViewProps>(({ tool, scrollViewR
         oldText = parsed.oldText;
         newText = parsed.newText;
         fileName = parsed.fileName;
-        language = parsed.fileName ? getLanguageFromPath(parsed.fileName) : null;
+        language = parsed.fileName ? getLanguageForPath(parsed.fileName) : null;
     }
 
     const diffStats = React.useMemo(

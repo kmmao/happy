@@ -11,7 +11,7 @@ import { Text } from "@/components/StyledText";
 import { SimpleSyntaxHighlighter } from "@/components/SimpleSyntaxHighlighter";
 import { MarkdownView } from "@/components/markdown/MarkdownView";
 import { Typography } from "@/constants/Typography";
-import { sessionReadFile, sessionBash } from "@/sync/ops";
+import { sessionReadFile } from "@/sync/ops";
 import { storage } from "@/sync/storage";
 import { Modal } from "@/modal";
 import { useUnistyles, StyleSheet } from "react-native-unistyles";
@@ -20,6 +20,9 @@ import { t } from "@/text";
 import { FileIcon } from "@/components/FileIcon";
 import { base64ToUtf8 } from "@/utils/stringUtils";
 import { log } from '@/log';
+import { CommitDiffView } from "@/components/git/CommitDiffView";
+import { getLanguageForPath } from "@/components/diff/fileLanguage";
+import { isBinaryFilePath } from "@/components/diff/binaryFiles";
 
 interface FileContent {
   content: string;
@@ -48,6 +51,11 @@ function FileScreen() {
     }
   }
 
+  // Commit-scoped view delegates to CommitDiffView — it handles git show,
+  // binary detection, and diff rendering. Hooks below still run unconditionally
+  // for the non-commit branch; CommitDiffView is rendered after they settle.
+  const isCommitView = !!(commitHash && sessionId);
+
   const [fileContent, setFileContent] = React.useState<FileContent | null>(
     null,
   );
@@ -55,81 +63,14 @@ function FileScreen() {
   const [isLoading, setIsLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
 
-  // Determine file language from extension
-  const getFileLanguage = React.useCallback((path: string): string | null => {
-    const ext = path.split(".").pop()?.toLowerCase();
-    switch (ext) {
-      case "js":
-      case "jsx":
-        return "javascript";
-      case "ts":
-      case "tsx":
-        return "typescript";
-      case "py":
-        return "python";
-      case "html":
-      case "htm":
-        return "html";
-      case "css":
-        return "css";
-      case "json":
-        return "json";
-      case "md":
-        return "markdown";
-      case "xml":
-        return "xml";
-      case "yaml":
-      case "yml":
-        return "yaml";
-      case "sh":
-      case "bash":
-        return "bash";
-      case "sql":
-        return "sql";
-      case "go":
-        return "go";
-      case "rust":
-      case "rs":
-        return "rust";
-      case "java":
-        return "java";
-      case "c":
-        return "c";
-      case "cpp":
-      case "cc":
-      case "cxx":
-        return "cpp";
-      case "php":
-        return "php";
-      case "rb":
-        return "ruby";
-      case "swift":
-        return "swift";
-      case "kt":
-        return "kotlin";
-      default:
-        return null;
-    }
-  }, []);
-
-  // Check if file is likely binary based on extension
-  const isBinaryFile = React.useCallback((path: string): boolean => {
-    const ext = path.split(".").pop()?.toLowerCase();
-    const binaryExtensions = [
-      "png", "jpg", "jpeg", "gif", "bmp", "svg", "ico",
-      "mp4", "avi", "mov", "wmv", "flv", "webm",
-      "mp3", "wav", "flac", "aac", "ogg",
-      "pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx",
-      "zip", "tar", "gz", "rar", "7z",
-      "exe", "dmg", "deb", "rpm",
-      "woff", "woff2", "ttf", "otf",
-      "db", "sqlite", "sqlite3",
-    ];
-    return ext ? binaryExtensions.includes(ext) : false;
-  }, []);
-
   // Load file content
   React.useEffect(() => {
+    // Commit-scoped view is rendered by CommitDiffView (see early return
+    // below), so skip the working-tree load entirely in that mode.
+    if (isCommitView) {
+      setIsLoading(false);
+      return;
+    }
     let isCancelled = false;
 
     const loadFile = async () => {
@@ -137,12 +78,8 @@ function FileScreen() {
         setIsLoading(true);
         setError(null);
 
-        // Get session metadata for git commands
-        const session = storage.getState().sessions[sessionId!];
-        const sessionPath = session?.metadata?.path;
-
         // Check if file is likely binary before trying to read
-        if (isBinaryFile(filePath)) {
+        if (isBinaryFilePath(filePath)) {
           if (!isCancelled) {
             setFileContent({
               content: "",
@@ -154,40 +91,7 @@ function FileScreen() {
           return;
         }
 
-        // When viewing a historical commit, read the file at that commit
-        // Otherwise, read the current working tree version
-        if (commitHash && sessionPath && sessionId) {
-          try {
-            const showResponse = await sessionBash(sessionId, {
-              command: `git show ${commitHash}:"${filePath}"`,
-              cwd: sessionPath,
-              timeout: 10000,
-            });
-
-            if (!isCancelled) {
-              if (showResponse.success) {
-                const content = showResponse.stdout ?? "";
-                const hasNullBytes = content.includes("\0");
-                const isBinary = hasNullBytes;
-
-                setFileContent({
-                  content: isBinary ? "" : content,
-                  encoding: "utf8",
-                  isBinary,
-                });
-              } else {
-                setError(
-                  showResponse.stderr || "Failed to read file at commit",
-                );
-              }
-            }
-          } catch (showError) {
-            log.error("Failed to read file at commit:", showError);
-            if (!isCancelled) {
-              setError("Failed to read file at commit");
-            }
-          }
-        } else {
+        {
           const response = await sessionReadFile(sessionId, filePath);
 
           if (!isCancelled) {
@@ -286,7 +190,7 @@ function FileScreen() {
     return () => {
       isCancelled = true;
     };
-  }, [sessionId, filePath, commitHash, isBinaryFile]);
+  }, [sessionId, filePath, commitHash, isCommitView]);
 
   // Show error modal if there's an error
   React.useEffect(() => {
@@ -296,8 +200,25 @@ function FileScreen() {
   }, [error]);
 
   const fileName = filePath.split("/").pop() || filePath;
-  const language = getFileLanguage(filePath);
+  const language = getLanguageForPath(filePath);
   const isMarkdown = language === "markdown";
+
+  // Commit-scoped view: defer entirely to CommitDiffView so the diff renders
+  // with proper line wrapping and shares logic with SidePanelGitPanel.
+  if (isCommitView) {
+    const session = storage.getState().sessions[sessionId!];
+    const sessionPath = session?.metadata?.path ?? "";
+    return (
+      <View style={[styles.container, { backgroundColor: theme.colors.surface }]}>
+        <CommitDiffView
+          sessionId={sessionId!}
+          sessionPath={sessionPath}
+          fullPath={filePath}
+          commitHash={commitHash!}
+        />
+      </View>
+    );
+  }
 
   if (isLoading) {
     return (
@@ -531,7 +452,7 @@ function FileScreen() {
   );
 }
 
-const styles = StyleSheet.create((theme, rt) => ({
+const styles = StyleSheet.create((_theme, rt) => ({
   container: {
     flex: 1,
     maxWidth: screenLayoutMaxWidth(rt.screen.width, rt.screen.height),

@@ -24,6 +24,7 @@ import {
   type GitCommit,
   type GitCommitFile,
 } from "@/sync/gitHistory";
+import { utf8ToBase64 } from "@/utils/stringUtils";
 
 function formatRelativeTime(timestamp: number): string {
   const now = Math.floor(Date.now() / 1000);
@@ -41,6 +42,11 @@ interface CommitFileRowProps {
   readonly sessionId: string;
   readonly commitHash: string;
   readonly isLast: boolean;
+  /**
+   * When provided, intercepts the row tap instead of routing to the full-screen
+   * file viewer. Used by SidePanelGitPanel so the diff stays inside the panel.
+   */
+  readonly onPress?: (fullPath: string, commitHash: string) => void;
 }
 
 const CommitFileRow = React.memo<CommitFileRowProps>(function CommitFileRow({
@@ -48,16 +54,21 @@ const CommitFileRow = React.memo<CommitFileRowProps>(function CommitFileRow({
   sessionId,
   commitHash,
   isLast,
+  onPress,
 }) {
   const router = useRouter();
   const { theme } = useUnistyles();
 
   const handlePress = React.useCallback(() => {
-    const encodedPath = btoa(file.fullPath);
+    if (onPress) {
+      onPress(file.fullPath, commitHash);
+      return;
+    }
+    const encodedPath = utf8ToBase64(file.fullPath);
     router.push(
       `/session/${sessionId}/file?path=${encodedPath}&commit=${commitHash}`,
     );
-  }, [router, sessionId, file.fullPath, commitHash]);
+  }, [onPress, router, sessionId, file.fullPath, commitHash]);
 
   return (
     <Pressable
@@ -143,6 +154,7 @@ interface CommitItemProps {
   readonly repoPath?: string;
   readonly isExpanded: boolean;
   readonly onToggle: (hash: string) => void;
+  readonly onFilePress?: (fullPath: string, commitHash: string) => void;
 }
 
 const CommitItem = React.memo<CommitItemProps>(function CommitItem({
@@ -151,6 +163,7 @@ const CommitItem = React.memo<CommitItemProps>(function CommitItem({
   repoPath,
   isExpanded,
   onToggle,
+  onFilePress,
 }) {
   const { theme } = useUnistyles();
   const [files, setFiles] = React.useState<readonly GitCommitFile[]>([]);
@@ -320,6 +333,7 @@ const CommitItem = React.memo<CommitItemProps>(function CommitItem({
                   sessionId={sessionId}
                   commitHash={commit.hash}
                   isLast={index === files.length - 1}
+                  onPress={onFilePress}
                 />
               ))}
             </>
@@ -337,7 +351,18 @@ export const GitHistoryTab = React.memo<{
   repoPath?: string;
   onPullDown?: () => void;
   onScrollUp?: () => void;
-}>(function GitHistoryTab({ sessionId, repoPath, onPullDown, onScrollUp }) {
+  /**
+   * Intercept commit-file taps so an embedding panel can render the diff in
+   * its own scope instead of pushing the full-screen file route.
+   */
+  onCommitFilePress?: (fullPath: string, commitHash: string) => void;
+}>(function GitHistoryTab({
+  sessionId,
+  repoPath,
+  onPullDown,
+  onScrollUp,
+  onCommitFilePress,
+}) {
   const { theme } = useUnistyles();
   const [commits, setCommits] = React.useState<readonly GitCommit[]>([]);
   const [hasMore, setHasMore] = React.useState(false);
@@ -416,9 +441,16 @@ export const GitHistoryTab = React.memo<{
         repoPath={repoPath}
         isExpanded={expandedCommitHash === item.hash}
         onToggle={handleToggleExpand}
+        onFilePress={onCommitFilePress}
       />
     ),
-    [sessionId, repoPath, expandedCommitHash, handleToggleExpand],
+    [
+      sessionId,
+      repoPath,
+      expandedCommitHash,
+      handleToggleExpand,
+      onCommitFilePress,
+    ],
   );
 
   const renderFooter = React.useCallback(() => {

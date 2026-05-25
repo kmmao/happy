@@ -23,7 +23,7 @@ import { DiffToolbar } from "@/components/diff/DiffToolbar";
 import { t } from "@/text";
 import { useSetting } from "@/sync/storage";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
-import { getLanguageFromPath } from "@/components/diff/syntaxTokenizer";
+import { getLanguageForPath } from "@/components/diff/fileLanguage";
 
 interface MultiEditViewFullProps {
   tool: ToolCall;
@@ -61,7 +61,7 @@ export const MultiEditViewFull = React.memo<MultiEditViewFullProps>(
 
     const filePath =
       typeof input?.file_path === "string" ? input.file_path : null;
-    const language = filePath ? getLanguageFromPath(filePath) : null;
+    const language = filePath ? getLanguageForPath(filePath) : null;
 
     // Pre-compute tab items with stats
     const editItems: EditTabItem[] = React.useMemo(

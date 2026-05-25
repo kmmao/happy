@@ -15,6 +15,10 @@ import { GitIssuesTab } from "@/components/git/issues/GitIssuesTab";
 import { GitPRsTab } from "@/components/git/prs/GitPRsTab";
 import { GitRepoSelector } from "@/components/git/GitRepoSelector";
 import { GitBranchHeader } from "@/components/git/GitBranchHeader";
+import { CommitDiffView } from "@/components/git/CommitDiffView";
+import { Text } from "@/components/StyledText";
+import { Typography } from "@/constants/Typography";
+import { t } from "@/text";
 import {
     useSessionGitStatus,
     useSessionProjectGitStatus,
@@ -37,6 +41,13 @@ export const SidePanelGitPanel = React.memo<SidePanelGitPanelProps>(
         const [selectedRepoPath, setSelectedRepoPath] = React.useState<string | null>(null);
         const [isRepoSelectorExpanded, setIsRepoSelectorExpanded] = React.useState(false);
         const [isRefreshing, setIsRefreshing] = React.useState(false);
+        // Commit-file diff overlay inside this panel — when set, the panel
+        // replaces its tabs with an in-panel CommitDiffView.
+        const [viewedCommitFile, setViewedCommitFile] = React.useState<{
+            fullPath: string;
+            commitHash: string;
+            repoBasePath: string;
+        } | null>(null);
         const { theme } = useUnistyles();
 
         const [refreshTrigger, setRefreshTrigger] = React.useState(0);
@@ -144,6 +155,102 @@ export const SidePanelGitPanel = React.memo<SidePanelGitPanelProps>(
             setIsRepoSelectorExpanded(true);
         }, []);
 
+        // Resolve the active repo's working-tree path so `git show` runs in the
+        // correct cwd (submodule vs. root). `fullPath` from history is already
+        // repo-relative; we keep it as the path the diff header displays.
+        const handleHistoryFilePress = React.useCallback(
+            (fullPath: string, commitHash: string) => {
+                const repoBase = selectedRepoPath
+                    ? `${sessionPath}/${selectedRepoPath}`
+                    : sessionPath;
+                setViewedCommitFile({
+                    fullPath,
+                    commitHash,
+                    repoBasePath: repoBase,
+                });
+            },
+            [sessionPath, selectedRepoPath],
+        );
+
+        const handleCloseCommitDiff = React.useCallback(() => {
+            setViewedCommitFile(null);
+        }, []);
+
+        // Clear the diff overlay when the user switches repos so we never
+        // render a stale commit/file pair from a different repo.
+        React.useEffect(() => {
+            setViewedCommitFile(null);
+        }, [selectedRepoPath, sessionId]);
+
+        if (viewedCommitFile) {
+            const shortHash = viewedCommitFile.commitHash.slice(0, 7);
+            const fileName =
+                viewedCommitFile.fullPath.split("/").pop() ||
+                viewedCommitFile.fullPath;
+            return (
+                <View style={{ flex: 1, backgroundColor: theme.colors.surface }}>
+                    <View
+                        style={{
+                            flexDirection: "row",
+                            alignItems: "center",
+                            paddingHorizontal: 8,
+                            paddingVertical: 8,
+                            borderBottomWidth: 1,
+                            borderBottomColor: theme.colors.divider,
+                            backgroundColor: theme.colors.surface,
+                        }}
+                    >
+                        <Pressable
+                            onPress={handleCloseCommitDiff}
+                            style={(p) => ({
+                                paddingHorizontal: 6,
+                                paddingVertical: 4,
+                                opacity: p.pressed ? 0.5 : 1,
+                            })}
+                            accessibilityRole="button"
+                            accessibilityLabel={t("common.back")}
+                        >
+                            <Ionicons
+                                name="arrow-back"
+                                size={20}
+                                color={theme.colors.text}
+                            />
+                        </Pressable>
+                        <View style={{ flex: 1, marginLeft: 4 }}>
+                            <Text
+                                numberOfLines={1}
+                                style={{
+                                    fontSize: 13,
+                                    color: theme.colors.text,
+                                    fontWeight: "600",
+                                    ...Typography.default(),
+                                }}
+                            >
+                                {fileName}
+                            </Text>
+                            <Text
+                                numberOfLines={1}
+                                style={{
+                                    fontSize: 11,
+                                    color: theme.colors.textSecondary,
+                                    ...Typography.mono(),
+                                }}
+                            >
+                                {shortHash}
+                            </Text>
+                        </View>
+                    </View>
+                    <CommitDiffView
+                        sessionId={sessionId}
+                        sessionPath={viewedCommitFile.repoBasePath}
+                        fullPath={viewedCommitFile.fullPath}
+                        commitHash={viewedCommitFile.commitHash}
+                        showHeader={false}
+                    />
+                </View>
+            );
+        }
+
         return (
             <View style={{ flex: 1, backgroundColor: theme.colors.surface }}>
                 {hasSubmodules && (
@@ -221,6 +328,7 @@ export const SidePanelGitPanel = React.memo<SidePanelGitPanelProps>(
                         repoPath={selectedRepoPath ?? undefined}
                         onPullDown={hasSubmodules ? handlePullDown : undefined}
                         onScrollUp={hasSubmodules ? handleScrollUp : undefined}
+                        onCommitFilePress={handleHistoryFilePress}
                     />
                 </View>
                 <View

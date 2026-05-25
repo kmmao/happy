@@ -10,7 +10,7 @@ import { getDiffStatsLight } from "@/components/diff/calculateDiff";
 import { EditTabBar, EditTabItem } from "@/components/diff/EditTabBar";
 import { useSetting } from "@/sync/storage";
 import { t } from "@/text";
-import { getLanguageFromPath } from "@/components/diff/syntaxTokenizer";
+import { getLanguageForPath } from "@/components/diff/fileLanguage";
 
 export const MultiEditView = React.memo<ToolViewProps>(({ tool }) => {
   const showLineNumbersInToolViews = useSetting("showLineNumbersInToolViews");
@@ -30,7 +30,7 @@ export const MultiEditView = React.memo<ToolViewProps>(({ tool }) => {
 
   const filePath =
     typeof tool.input?.file_path === "string" ? tool.input.file_path : null;
-  const language = filePath ? getLanguageFromPath(filePath) : null;
+  const language = filePath ? getLanguageForPath(filePath) : null;
 
   // Pre-compute tab items with stats
   const editItems: EditTabItem[] = React.useMemo(

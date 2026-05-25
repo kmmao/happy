@@ -14,6 +14,7 @@ import { Text } from "@/components/StyledText";
 import { MarkdownView } from "@/components/markdown/MarkdownView";
 import { SimpleSyntaxHighlighter } from "@/components/SimpleSyntaxHighlighter";
 import { DiffView } from "@/components/diff/DiffView";
+import { getLanguageForPath } from "@/components/diff/fileLanguage";
 import { screenLayoutMaxWidth } from "@/components/layout";
 import { Typography } from "@/constants/Typography";
 import { Modal } from "@/modal";
@@ -23,31 +24,6 @@ import { base64ToUtf8 } from "@/utils/stringUtils";
 
 function shellEscape(value: string): string {
   return `'${value.replace(/'/g, "'\\''")}'`;
-}
-
-function detectLanguage(path: string): string | null {
-  const ext = path.split(".").pop()?.toLowerCase();
-  switch (ext) {
-    case "md":
-      return "markdown";
-    case "js":
-    case "jsx":
-      return "javascript";
-    case "ts":
-    case "tsx":
-      return "typescript";
-    case "py":
-      return "python";
-    case "json":
-      return "json";
-    case "sh":
-      return "bash";
-    case "yml":
-    case "yaml":
-      return "yaml";
-    default:
-      return null;
-  }
 }
 
 function escapeRegExp(value: string): string {
@@ -239,7 +215,7 @@ export default function MachineFileViewerScreen() {
     setMatchCursor(0);
   }, [query]);
 
-  const language = detectLanguage(filePath);
+  const language = getLanguageForPath(filePath);
   const isMarkdown = language === "markdown";
   const searchState = React.useMemo(
     () => buildSearchState(content, query, matchCursor),

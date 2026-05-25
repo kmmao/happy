@@ -8,7 +8,7 @@ import { Metadata } from "@/sync/storageTypes";
 import { resolvePath } from "@/utils/pathUtils";
 import { ToolDiffView } from "@/components/tools/ToolDiffView";
 import { useSetting } from "@/sync/storage";
-import { getLanguageFromPath } from "@/components/diff/syntaxTokenizer";
+import { getLanguageForPath } from "@/components/diff/fileLanguage";
 import { CodexDiffStats } from "@/components/session/codex/CodexDiffStats";
 import { buildCodexDiffPalette } from "@/components/session/codex/codexDiffPalette";
 import { getCodexPatchEntries } from "../codexPatchUtils";
@@ -54,7 +54,7 @@ export const CodexPatchView = React.memo<CodexPatchViewProps>(
             ...entry,
             index,
             resolvedPath,
-            language: getLanguageFromPath(resolvedPath),
+            language: getLanguageForPath(resolvedPath),
           };
         }),
       [tool.input?.changes, metadata],

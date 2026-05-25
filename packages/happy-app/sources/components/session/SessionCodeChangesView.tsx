@@ -4,7 +4,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
 import { DiffStatsBar } from "@/components/diff/DiffStatsBar";
-import { getLanguageFromPath } from "@/components/diff/syntaxTokenizer";
+import { getLanguageForPath } from "@/components/diff/fileLanguage";
 import { CodexCodeTab } from "@/components/session/codex/CodexCodeTab";
 import { Text } from "@/components/StyledText";
 import { ToolDiffView } from "@/components/tools/ToolDiffView";
@@ -25,7 +25,7 @@ const LegacyFileChangeItem = React.memo(function LegacyFileChangeItem({
 }) {
   const { theme } = useUnistyles();
   const [expanded, setExpanded] = React.useState(false);
-  const language = getLanguageFromPath(change.filePath);
+  const language = getLanguageForPath(change.filePath);
 
   return (
     <View style={{ borderBottomWidth: 1, borderBottomColor: theme.colors.divider }}>
