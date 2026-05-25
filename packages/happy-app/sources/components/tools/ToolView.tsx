@@ -11,7 +11,6 @@ import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { Ionicons, Octicons } from "@expo/vector-icons";
 import { getToolViewComponent } from "./views/_all";
 import { Message, ToolCall } from "@/sync/typesMessage";
-import { AgentEvent } from "@/sync/typesRaw";
 import { CodeView } from "../CodeView";
 import { ToolSectionView } from "./ToolSectionView";
 import { useElapsedTime } from "@/hooks/useElapsedTime";
@@ -69,24 +68,6 @@ export const ToolView = React.memo<ToolViewProps>((props) => {
         : 0,
     [tool.name, tool.input?.changes],
   );
-  const subAgentModel = React.useMemo(() => {
-    if (
-      (tool.name !== "Agent" && tool.name !== "Task") ||
-      !props.messages?.length
-    ) {
-      return null;
-    }
-    for (const m of props.messages) {
-      if (m.kind === "agent-event") {
-        const evt = m.event as AgentEvent;
-        if ("model" in evt && evt.model) {
-          return (evt.model as string).replace(/-\d{8}$/, "");
-        }
-      }
-    }
-    return null;
-  }, [tool.name, props.messages]);
-
   const useMergedInlineToolView =
     tool.name === "CodexDiff" ||
     (tool.name === "CodexPatch" && patchEntryCount === 1);
@@ -550,11 +531,6 @@ export const ToolView = React.memo<ToolViewProps>((props) => {
                 </Text>
               )}
             </View>
-            {subAgentModel ? (
-              <View style={styles.subAgentModelBadge}>
-                <Text style={styles.subAgentModelText}>{subAgentModel}</Text>
-              </View>
-            ) : null}
             {statsBar}
             {tool.state === "running" ? (
               <View style={styles.elapsedContainer}>
@@ -603,11 +579,6 @@ export const ToolView = React.memo<ToolViewProps>((props) => {
                 </Text>
               )}
             </View>
-            {subAgentModel ? (
-              <View style={styles.subAgentModelBadge}>
-                <Text style={styles.subAgentModelText}>{subAgentModel}</Text>
-              </View>
-            ) : null}
             {statsBar}
             {tool.state === "running" ? (
               <View style={styles.elapsedContainer}>
@@ -812,17 +783,5 @@ const styles = StyleSheet.create((_theme) => ({
     paddingHorizontal: 12,
     paddingTop: 0,
     overflow: "visible",
-  },
-  subAgentModelBadge: {
-    backgroundColor: _theme.colors.accentTeal + "15",
-    borderRadius: 4,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    marginLeft: 4,
-  },
-  subAgentModelText: {
-    fontSize: 10,
-    fontWeight: "500",
-    color: _theme.colors.accentTeal,
   },
 }));
