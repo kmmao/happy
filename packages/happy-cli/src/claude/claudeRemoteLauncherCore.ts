@@ -34,7 +34,7 @@ import {
   createStreamEventMapperState,
   type StreamEventMapperState,
 } from "./utils/streamEventMapper";
-import { PLAN_FAKE_REJECT } from "./jsonl/prompts";
+import { PLAN_FAKE_REJECT, PLAN_FAKE_RESTART } from "./jsonl/prompts";
 import {
   markDisabledMcpServers,
   readClaudeDisabledMcpServers,
@@ -645,39 +645,6 @@ export async function claudeRemoteLauncher(
    */
   let planModeLockdownActive = false;
 
-  /**
-   * Deferred cold-restart request. Some events (notably tearing down the
-   * plan-mode lockdown once ExitPlanMode is auto-approved in Yolo mode) need
-   * to flip a cold-restart-driving field AND wait for the assistant's current
-   * turn to end before the new PTY spawns. Firing
-   * `executionGuard.requestRestart` directly from those sites races with
-   * Claude TUI's still-completing tool flow and surfaces as
-   * `[Request interrupted by user for tool use]` in the JSONL — the assistant
-   * sees its own turn being torn down.
-   *
-   * Set at the ExitPlanMode detection site that wants a clean turn-boundary
-   * restart; consumed by `onTurnComplete`. coldModeHash divergence on the
-   * next `nextMessage` iteration is the secondary safety net for the case
-   * where `onTurnComplete` never fires (e.g. user sends a new message
-   * mid-turn).
-   */
-  let pendingPostTurnRestart: "mode_change" | null = null;
-
-  /**
-   * Set alongside `pendingPostTurnRestart` when the deferred restart is the
-   * plan-mode lockdown teardown (ExitPlanMode auto-approved in Yolo). That
-   * cold restart relaunches the PTY with the write/exec deny list lifted, but
-   * `--resume` alone strands the session: Claude TUI waits for a new message
-   * rather than acting on the "plan approved, start coding" tool_result that
-   * arrived just before the restart, so the run goes idle right after the plan
-   * renders (observed PID 4738). We inject a hidden synthetic continuation
-   * after the restart so the model actually implements the approved plan.
-   * The injected message round-trips through the server and lands in
-   * session.queue after the relaunch; the diverged coldModeHash (planLockdown
-   * flipped false) stops the dying process from consuming it mid-turn.
-   */
-  let pendingPlanApprovalContinue = false;
-
   function onMessage(message: ClaudeJsonlMessage) {
     // ── Stream events (partial messages) → text-delta envelopes ────────
     // Intercept before the rest of the pipeline. stream_event messages
@@ -1206,10 +1173,38 @@ export async function claudeRemoteLauncher(
               // net.
               if (permissionHandler.isInBypassMode() && planModeLockdownActive) {
                 planModeLockdownActive = false;
-                pendingPostTurnRestart = "mode_change";
-                pendingPlanApprovalContinue = true;
+
+                // Continuation after plan approval (the part that was missing).
+                //
+                // In PTY mode ExitPlanMode is approved by the PreToolUse
+                // allow-hook at the TUI level, so the SDK canCallTool path
+                // (permissionHandler.autoApproveExitPlan) NEVER runs — and that
+                // is the only place that normally queues PLAN_FAKE_RESTART to
+                // continue the session. Meanwhile permissionHandler.isAborted()
+                // unconditionally returns true for ExitPlanMode, so the moment
+                // its tool_result arrives claudeRemote tears the PTY down with
+                // SIGTERM. The outer loop relaunches with the deny list lifted
+                // (planModeLockdown=false, set just above), but with no queued
+                // message it blocks in nextMessage and the run idles right
+                // after the plan renders — confirmed PID 47534: "Tool aborted,
+                // tearing down PTY" with zero PLAN_FAKE_RESTART in the log.
+                //
+                // Queue the same PLAN_FAKE_RESTART continuation here, the one
+                // detection point that DOES fire in PTY mode, so the relaunched
+                // (lockdown-free) process resumes and implements the approved
+                // plan. `unshift` (urgent) makes it the first message the
+                // relaunch dispatches.
+                session.queue.unshift(
+                  PLAN_FAKE_RESTART,
+                  { permissionMode: permissionHandler.getPermissionMode() },
+                  {
+                    priority: "urgent",
+                    kind: "notification",
+                    source: "exit-plan-continue",
+                  },
+                );
                 logger.debug(
-                  "[remote]: ExitPlanMode observed → disabling plan-mode lockdown + scheduling post-turn cold restart + continuation (approval handled by always-on PreToolUse hook)",
+                  "[remote]: ExitPlanMode observed → disabling plan-mode lockdown + queued PLAN_FAKE_RESTART continuation (PTY hook approval; SDK autoApprove path skipped)",
                 );
               }
             }
@@ -2059,49 +2054,6 @@ export async function claudeRemoteLauncher(
           },
           onTurnComplete: () => {
             finishTurn();
-            // Consume any deferred cold-restart request that was scheduled
-            // mid-turn (e.g. ExitPlanMode picker auto-approval in Yolo
-            // mode — see `pendingPostTurnRestart` declaration for why this
-            // is deferred rather than fired inline). Firing on the natural
-            // turn boundary avoids the "[Request interrupted by user for
-            // tool use]" race that broke plan-mode flows when the restart
-            // was synchronous.
-            if (pendingPostTurnRestart) {
-              const reason = pendingPostTurnRestart;
-              pendingPostTurnRestart = null;
-              logger.debug(
-                `[remote]: post-turn restart consumed (reason=${reason})`,
-              );
-              executionGuard.requestRestart(reason);
-
-              // The plan-lockdown teardown relaunches with the deny list lifted
-              // but `--resume` leaves Claude TUI idle — it will not act on the
-              // "plan approved, start coding" tool_result on its own. Inject a
-              // hidden synthetic turn so the relaunched process implements the
-              // approved plan instead of stranding the session at "ready".
-              // Same proven path as the auto-summary trigger; the message
-              // arrives after the relaunch and the diverged coldModeHash keeps
-              // the dying process from grabbing it mid-turn.
-              if (pendingPlanApprovalContinue) {
-                pendingPlanApprovalContinue = false;
-                try {
-                  session.client.sendSyntheticUserMessage(
-                    "[Plan approved — Yolo mode] The plan was approved and the full toolset is now available. Proceed with implementing the approved plan now.",
-                    {
-                      displayText: "",
-                      sentFrom: "happy-cli-plan-continue",
-                    },
-                  );
-                  logger.debug(
-                    "[remote]: post-plan-approval continuation dispatched",
-                  );
-                } catch (continueErr) {
-                  logger.debug(
-                    `[remote]: post-plan-approval continuation failed: ${continueErr}`,
-                  );
-                }
-              }
-            }
           },
           nextMessage: async () => {
             // Stop any running mid-turn drain from the previous turn

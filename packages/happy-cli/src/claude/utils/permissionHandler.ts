@@ -74,6 +74,16 @@ export class PermissionHandler {
   }
 
   /**
+   * Current permission mode. The launcher reads this when queueing the
+   * ExitPlanMode continuation (PLAN_FAKE_RESTART) so the relaunched session
+   * keeps the user's exact bypass variant ("yolo" vs "bypassPermissions")
+   * instead of being silently rewritten.
+   */
+  getPermissionMode(): PermissionMode {
+    return this.permissionMode;
+  }
+
+  /**
    * Handler response
    */
   private handlePermissionResponse(
