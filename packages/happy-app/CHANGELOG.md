@@ -1,5 +1,15 @@
 # Changelog
 
+## 2.33.0 - 2026-05-25
+
+Brings the History tab's commit-file view in line with the Changes tab — the same diff/file layout with collapsible hunks, side-by-side line numbers, and inline syntax highlighting — and fixes opening commit files whose names contain non-ASCII characters.
+
+### Git history & diffs
+- Improved the commit-file diff to share the Changes-tab renderer: stats header, collapsible hunks, side-by-side line numbers, and inline syntax + diff highlighting
+- Added an in-panel commit-file diff in the side panel, with a back button instead of full-screen navigation
+- Fixed opening a commit file whose name contains non-ASCII characters (Chinese, accents, emoji) — tapping it no longer fails to open the diff
+- Fixed loading commit diffs for files whose names contain special characters
+
 ## 2.32.0 - 2026-05-24
 
 Hardens the new `mcp__happy__ask_user` picker pipeline end-to-end after the PTY migration — fixes duplicate cards, ghost approve/deny footers, missing decline path, and a deadlock on the native `AskUserQuestion` tool — and ships an Inbox "Clear All" action plus build metadata in Settings.

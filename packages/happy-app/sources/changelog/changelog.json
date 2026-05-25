@@ -2,6 +2,18 @@
   "entries": {
     "en": [
       {
+        "version": "2.33.0",
+        "date": "2026-05-25",
+        "summary": "Brings the History tab's commit-file view in line with the Changes tab — the same diff/file layout with collapsible hunks, side-by-side line numbers, and inline syntax highlighting — and fixes opening commit files whose names contain non-ASCII characters.",
+        "changes": [
+          "Improved the commit-file diff to share the Changes-tab renderer: stats header, collapsible hunks, side-by-side line numbers, and inline syntax + diff highlighting",
+          "Added an in-panel commit-file diff in the side panel, with a back button instead of full-screen navigation",
+          "Fixed opening a commit file whose name contains non-ASCII characters (Chinese, accents, emoji) — tapping it no longer fails to open the diff",
+          "Fixed loading commit diffs for files whose names contain special characters"
+        ],
+        "rawMarkdown": "## 2.33.0 - 2026-05-25\n\n\nBrings the History tab's commit-file view in line with the Changes tab — the same diff/file layout with collapsible hunks, side-by-side line numbers, and inline syntax highlighting — and fixes opening commit files whose names contain non-ASCII characters.\n\n### Git history & diffs\n- Improved the commit-file diff to share the Changes-tab renderer: stats header, collapsible hunks, side-by-side line numbers, and inline syntax + diff highlighting\n- Added an in-panel commit-file diff in the side panel, with a back button instead of full-screen navigation\n- Fixed opening a commit file whose name contains non-ASCII characters (Chinese, accents, emoji) — tapping it no longer fails to open the diff\n- Fixed loading commit diffs for files whose names contain special characters"
+      },
+      {
         "version": "2.32.0",
         "date": "2026-05-24",
         "summary": "Hardens the new `mcp__happy__ask_user` picker pipeline end-to-end after the PTY migration — fixes duplicate cards, ghost approve/deny footers, missing decline path, and a deadlock on the native `AskUserQuestion` tool — and ships an Inbox \"Clear All\" action plus build metadata in Settings.",
@@ -826,6 +838,18 @@
     ],
     "zh-Hans": [
       {
+        "version": "2.33.0",
+        "date": "2026-05-25",
+        "summary": "让 History（历史）标签的提交文件视图与 Changes（改动）标签保持一致 —— 相同的差异/文件布局，支持可折叠代码块、左右并排行号和内联语法高亮；同时修复打开文件名含非 ASCII 字符的提交文件时无法打开的问题。",
+        "changes": [
+          "改进提交文件差异，复用 Changes 标签的渲染器：统计头、可折叠代码块、并排行号，以及内联语法 + 差异高亮",
+          "在侧边面板内新增提交文件差异视图，使用返回按钮而非全屏跳转",
+          "修复打开文件名含非 ASCII 字符（中文、重音符号、emoji）的提交文件时点击无法打开差异的问题",
+          "修复文件名含特殊字符时加载提交差异失败的问题"
+        ],
+        "rawMarkdown": "## 2.33.0 - 2026-05-25\n\n\n让 History（历史）标签的提交文件视图与 Changes（改动）标签保持一致 —— 相同的差异/文件布局，支持可折叠代码块、左右并排行号和内联语法高亮；同时修复打开文件名含非 ASCII 字符的提交文件时无法打开的问题。\n\n### Git 历史与差异\n- 改进提交文件差异，复用 Changes 标签的渲染器：统计头、可折叠代码块、并排行号，以及内联语法 + 差异高亮\n- 在侧边面板内新增提交文件差异视图，使用返回按钮而非全屏跳转\n- 修复打开文件名含非 ASCII 字符（中文、重音符号、emoji）的提交文件时点击无法打开差异的问题\n- 修复文件名含特殊字符时加载提交差异失败的问题"
+      },
+      {
         "version": "2.32.0",
         "date": "2026-05-24",
         "summary": "PTY 迁移后对新的 `mcp__happy__ask_user` picker 管线进行端到端加固 —— 修复重复卡片、幽灵 approve/deny 页脚、缺失的 decline 通路，以及原生 `AskUserQuestion` 工具的死锁问题；同时新增 Inbox \"Clear All\" 操作和 Settings 页 build 元信息展示。",
@@ -1627,7 +1651,7 @@
       }
     ]
   },
-  "latestVersion": "2.32.0",
+  "latestVersion": "2.33.0",
   "availableLocales": [
     "en",
     "zh-Hans"
