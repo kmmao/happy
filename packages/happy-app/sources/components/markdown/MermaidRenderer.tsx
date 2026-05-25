@@ -1,29 +1,20 @@
 import * as React from "react";
 import { View, Platform, Text, Pressable } from "react-native";
 import { WebView } from "react-native-webview";
-import { StyleSheet, useUnistyles } from "react-native-unistyles";
+import { StyleSheet } from "react-native-unistyles";
 import { Typography } from "@/constants/Typography";
 import { t } from "@/text";
 import * as Clipboard from "expo-clipboard";
 import { Modal } from "@/modal";
 import { log } from '@/log';
 
-/**
- * Escape HTML special characters to prevent XSS when interpolating
- * user content into WebView HTML templates.
- */
-function escapeHtml(str: string): string {
-  return str
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
-}
-
-// Style for Web platform
+// Style for Web platform.
+// White background so the light "default" mermaid theme renders with readable
+// contrast: dark text + dark arrows need a light surface, and light pastel
+// classDef fills (pink/yellow/etc.) also stay legible. A dark card would hide
+// the dark arrows; a dark theme would hide text on those light classDef nodes.
 const webStyle: any = {
-  backgroundColor: "#1a1a1a",
+  backgroundColor: "#ffffff",
   borderRadius: 8,
   padding: 16,
   overflow: "auto",
@@ -31,7 +22,6 @@ const webStyle: any = {
 
 // Mermaid render component that works on all platforms
 export const MermaidRenderer = React.memo((props: { content: string }) => {
-  const { theme } = useUnistyles();
   const [dimensions, setDimensions] = React.useState({ width: 0, height: 200 });
   const [svgContent, setSvgContent] = React.useState<string | null>(null);
   const [isHovered, setIsHovered] = React.useState(false);
@@ -86,8 +76,17 @@ export const MermaidRenderer = React.memo((props: { content: string }) => {
           if (mermaid.initialize) {
             mermaid.initialize({
               startOnLoad: false,
-              theme: "dark",
+              // "default" (light) theme so dark text/arrows are readable on the
+              // white card and light classDef fills stay legible. The "dark" theme
+              // uses light-grey text that vanishes on light classDef-coloured nodes.
+              theme: "default",
               securityLevel: "strict",
+              // Render labels as SVG <text> instead of HTML inside <foreignObject>.
+              // DOMPurify (below) strips foreignObject HTML in the SVG namespace no
+              // matter which profile is enabled, which made all node text vanish while
+              // boxes/arrows remained. SVG <text> survives sanitization and renders fine.
+              htmlLabels: false,
+              flowchart: { htmlLabels: false },
             });
           }
 
@@ -106,6 +105,8 @@ export const MermaidRenderer = React.memo((props: { content: string }) => {
 
             const dompurifyModule: any = await import("dompurify");
             const DOMPurify = dompurifyModule.default || dompurifyModule;
+            // Labels are SVG <text> (htmlLabels disabled above), so the SVG profile is
+            // sufficient and keeps the sanitization surface tight.
             const sanitizedSvg = DOMPurify.sanitize(svg, {
               USE_PROFILES: { svg: true, svgFilters: true },
             });
@@ -188,7 +189,9 @@ export const MermaidRenderer = React.memo((props: { content: string }) => {
                 body {
                     margin: 0;
                     padding: 16px;
-                    background-color: ${theme.colors.surfaceHighest};
+                    /* White surface for the light "default" theme: keeps dark text,
+                       dark arrows, and light classDef fills all readable. */
+                    background-color: #ffffff;
                 }
                 #mermaid-container {
                     display: flex;
@@ -211,8 +214,14 @@ export const MermaidRenderer = React.memo((props: { content: string }) => {
             <script>
                 mermaid.initialize({
                     startOnLoad: false,
-                    theme: 'dark',
-                    securityLevel: 'strict'
+                    // Match the web path: light "default" theme on a white surface
+                    // so text, arrows, and light classDef fills stay readable.
+                    theme: 'default',
+                    securityLevel: 'strict',
+                    // Match the web path: render labels as SVG <text> so flowchart
+                    // text layout stays consistent across web and native platforms.
+                    htmlLabels: false,
+                    flowchart: { htmlLabels: false }
                 });
                 (async function() {
                     try {

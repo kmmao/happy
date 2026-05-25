@@ -10,6 +10,10 @@ Brings the History tab's commit-file view in line with the Changes tab — the s
 - Fixed opening a commit file whose name contains non-ASCII characters (Chinese, accents, emoji) — tapping it no longer fails to open the diff
 - Fixed loading commit diffs for files whose names contain special characters
 
+### Markdown
+- Fixed Mermaid diagram text being invisible — node labels now render as SVG `<text>` instead of HTML inside `<foreignObject>`, which the SVG sanitizer was stripping
+- Fixed Mermaid diagrams with poor contrast — switched to the light theme on a white card so node text, arrows, and custom `classDef` colors all stay legible
+
 ## 2.32.0 - 2026-05-24
 
 Hardens the new `mcp__happy__ask_user` picker pipeline end-to-end after the PTY migration — fixes duplicate cards, ghost approve/deny footers, missing decline path, and a deadlock on the native `AskUserQuestion` tool — and ships an Inbox "Clear All" action plus build metadata in Settings.

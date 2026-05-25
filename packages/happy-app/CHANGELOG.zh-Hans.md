@@ -10,6 +10,10 @@
 - 修复打开文件名含非 ASCII 字符（中文、重音符号、emoji）的提交文件时点击无法打开差异的问题
 - 修复文件名含特殊字符时加载提交差异失败的问题
 
+### Markdown
+- 修复 Mermaid 流程图文字不显示的问题 —— 节点标签改用 SVG `<text>` 渲染,不再放在会被 SVG 净化器删除的 `<foreignObject>` HTML 里
+- 修复 Mermaid 流程图对比度过低看不清的问题 —— 改用浅色主题 + 白色卡片背景,节点文字、箭头与自定义 `classDef` 配色都清晰可读
+
 ## 2.32.0 - 2026-05-24
 
 PTY 迁移后对新的 `mcp__happy__ask_user` picker 管线进行端到端加固 —— 修复重复卡片、幽灵 approve/deny 页脚、缺失的 decline 通路，以及原生 `AskUserQuestion` 工具的死锁问题；同时新增 Inbox "Clear All" 操作和 Settings 页 build 元信息展示。

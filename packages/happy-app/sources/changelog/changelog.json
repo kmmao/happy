@@ -9,9 +9,11 @@
           "Improved the commit-file diff to share the Changes-tab renderer: stats header, collapsible hunks, side-by-side line numbers, and inline syntax + diff highlighting",
           "Added an in-panel commit-file diff in the side panel, with a back button instead of full-screen navigation",
           "Fixed opening a commit file whose name contains non-ASCII characters (Chinese, accents, emoji) — tapping it no longer fails to open the diff",
-          "Fixed loading commit diffs for files whose names contain special characters"
+          "Fixed loading commit diffs for files whose names contain special characters",
+          "Fixed Mermaid diagram text being invisible — node labels now render as SVG `<text>` instead of HTML inside `<foreignObject>`, which the SVG sanitizer was stripping",
+          "Fixed Mermaid diagrams with poor contrast — switched to the light theme on a white card so node text, arrows, and custom `classDef` colors all stay legible"
         ],
-        "rawMarkdown": "## 2.33.0 - 2026-05-25\n\n\nBrings the History tab's commit-file view in line with the Changes tab — the same diff/file layout with collapsible hunks, side-by-side line numbers, and inline syntax highlighting — and fixes opening commit files whose names contain non-ASCII characters.\n\n### Git history & diffs\n- Improved the commit-file diff to share the Changes-tab renderer: stats header, collapsible hunks, side-by-side line numbers, and inline syntax + diff highlighting\n- Added an in-panel commit-file diff in the side panel, with a back button instead of full-screen navigation\n- Fixed opening a commit file whose name contains non-ASCII characters (Chinese, accents, emoji) — tapping it no longer fails to open the diff\n- Fixed loading commit diffs for files whose names contain special characters"
+        "rawMarkdown": "## 2.33.0 - 2026-05-25\n\n\nBrings the History tab's commit-file view in line with the Changes tab — the same diff/file layout with collapsible hunks, side-by-side line numbers, and inline syntax highlighting — and fixes opening commit files whose names contain non-ASCII characters.\n\n### Git history & diffs\n- Improved the commit-file diff to share the Changes-tab renderer: stats header, collapsible hunks, side-by-side line numbers, and inline syntax + diff highlighting\n- Added an in-panel commit-file diff in the side panel, with a back button instead of full-screen navigation\n- Fixed opening a commit file whose name contains non-ASCII characters (Chinese, accents, emoji) — tapping it no longer fails to open the diff\n- Fixed loading commit diffs for files whose names contain special characters\n\n### Markdown\n- Fixed Mermaid diagram text being invisible — node labels now render as SVG `<text>` instead of HTML inside `<foreignObject>`, which the SVG sanitizer was stripping\n- Fixed Mermaid diagrams with poor contrast — switched to the light theme on a white card so node text, arrows, and custom `classDef` colors all stay legible"
       },
       {
         "version": "2.32.0",
@@ -845,9 +847,11 @@
           "改进提交文件差异，复用 Changes 标签的渲染器：统计头、可折叠代码块、并排行号，以及内联语法 + 差异高亮",
           "在侧边面板内新增提交文件差异视图，使用返回按钮而非全屏跳转",
           "修复打开文件名含非 ASCII 字符（中文、重音符号、emoji）的提交文件时点击无法打开差异的问题",
-          "修复文件名含特殊字符时加载提交差异失败的问题"
+          "修复文件名含特殊字符时加载提交差异失败的问题",
+          "修复 Mermaid 流程图文字不显示的问题 —— 节点标签改用 SVG `<text>` 渲染,不再放在会被 SVG 净化器删除的 `<foreignObject>` HTML 里",
+          "修复 Mermaid 流程图对比度过低看不清的问题 —— 改用浅色主题 + 白色卡片背景,节点文字、箭头与自定义 `classDef` 配色都清晰可读"
         ],
-        "rawMarkdown": "## 2.33.0 - 2026-05-25\n\n\n让 History（历史）标签的提交文件视图与 Changes（改动）标签保持一致 —— 相同的差异/文件布局，支持可折叠代码块、左右并排行号和内联语法高亮；同时修复打开文件名含非 ASCII 字符的提交文件时无法打开的问题。\n\n### Git 历史与差异\n- 改进提交文件差异，复用 Changes 标签的渲染器：统计头、可折叠代码块、并排行号，以及内联语法 + 差异高亮\n- 在侧边面板内新增提交文件差异视图，使用返回按钮而非全屏跳转\n- 修复打开文件名含非 ASCII 字符（中文、重音符号、emoji）的提交文件时点击无法打开差异的问题\n- 修复文件名含特殊字符时加载提交差异失败的问题"
+        "rawMarkdown": "## 2.33.0 - 2026-05-25\n\n\n让 History（历史）标签的提交文件视图与 Changes（改动）标签保持一致 —— 相同的差异/文件布局，支持可折叠代码块、左右并排行号和内联语法高亮；同时修复打开文件名含非 ASCII 字符的提交文件时无法打开的问题。\n\n### Git 历史与差异\n- 改进提交文件差异，复用 Changes 标签的渲染器：统计头、可折叠代码块、并排行号，以及内联语法 + 差异高亮\n- 在侧边面板内新增提交文件差异视图，使用返回按钮而非全屏跳转\n- 修复打开文件名含非 ASCII 字符（中文、重音符号、emoji）的提交文件时点击无法打开差异的问题\n- 修复文件名含特殊字符时加载提交差异失败的问题\n\n### Markdown\n- 修复 Mermaid 流程图文字不显示的问题 —— 节点标签改用 SVG `<text>` 渲染,不再放在会被 SVG 净化器删除的 `<foreignObject>` HTML 里\n- 修复 Mermaid 流程图对比度过低看不清的问题 —— 改用浅色主题 + 白色卡片背景,节点文字、箭头与自定义 `classDef` 配色都清晰可读"
       },
       {
         "version": "2.32.0",
