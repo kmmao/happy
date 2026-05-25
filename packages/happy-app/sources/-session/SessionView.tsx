@@ -152,6 +152,15 @@ const EMPTY_PENDING_QUEUE: ReadonlyArray<{
   displayText?: string;
 }> = [];
 
+// On web the tab runs in a memory-limited renderer process. Seeding displayLimit
+// with the full MAX_DISPLAY_MESSAGES window means a multi-thousand-message session
+// feeds the *entire* history into ChatList, which rebuilds several O(n) arrays/maps
+// on every streaming token and (with RN-web's weak virtualization) lets the heap
+// creep toward Chrome's per-tab ceiling until the tab is killed (error code 5 =
+// SBOX_FATAL_MEMORY_EXCEEDED). Start with a small window on web; "load older" pages
+// the rest back in on demand. Native keeps the full window.
+const INITIAL_DISPLAY_LIMIT = Platform.OS === "web" ? 500 : MAX_DISPLAY_MESSAGES;
+
 function findPendingPermission(messages: readonly Message[]): PendingPermissionInfo | null {
   for (const msg of messages) {
     if (msg.kind !== "tool-call") continue;
@@ -626,7 +635,7 @@ function SessionViewInner({
     sessionColumnHeight > 0 && agentInputHeight > 0
       ? Math.max(80, sessionColumnHeight - agentInputHeight - 8)
       : undefined;
-  const [displayLimit, setDisplayLimit] = React.useState(MAX_DISPLAY_MESSAGES);
+  const [displayLimit, setDisplayLimit] = React.useState(INITIAL_DISPLAY_LIMIT);
   const handleLoadMore = React.useCallback(() => {
     setDisplayLimit((prev) => prev + LOAD_MORE_INCREMENT);
   }, []);
@@ -1229,13 +1238,15 @@ function SessionViewInner({
           : hasPendingAskUserQuestionVisible
             ? "ask-user-question"
             : "options-missing";
-    console.log('[autoSend.effect→invalidate]', {
-      reason,
-      status: autoOptionSend.status,
-      hasSnapshot: !!currentOptionsSnapshot,
-      hasServiceOpts: hasServiceOptions,
-      msgLen: message.trim().length,
-    });
+    if (__DEV__) {
+      console.log('[autoSend.effect→invalidate]', {
+        reason,
+        status: autoOptionSend.status,
+        hasSnapshot: !!currentOptionsSnapshot,
+        hasServiceOpts: hasServiceOptions,
+        msgLen: message.trim().length,
+      });
+    }
     autoOptionSendService.dispatch(sessionId, {
       type: "context-invalidated",
       reason,

@@ -32,6 +32,7 @@ import { useTrackScreens } from "@/track/useTrackScreens";
 import { RealtimeProvider } from "@/realtime/RealtimeProvider";
 import { FaviconPermissionIndicator } from "@/components/web/FaviconPermissionIndicator";
 import { WebErrorBoundary, setupWebErrorHandlers } from "@/components/web/WebErrorBoundary";
+import { startMemoryWatchdog } from "@/sync/memoryWatchdog";
 import { CommandPaletteProvider } from "@/components/CommandPalette/CommandPaletteProvider";
 import { StatusBarProvider } from "@/components/StatusBarProvider";
 // import * as SystemUI from 'expo-system-ui';
@@ -200,6 +201,9 @@ export default function RootLayout() {
   } | null>(null);
   React.useEffect(() => {
     setupWebErrorHandlers();
+    // Web-only heap watchdog: persists a localStorage trail so the run-up to a
+    // renderer-OOM crash (Chrome error code 5) can be inspected after reload.
+    startMemoryWatchdog();
   }, []);
 
   React.useEffect(() => {
