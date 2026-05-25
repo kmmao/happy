@@ -633,10 +633,11 @@ export async function claudeRemoteLauncher(
    * NotebookEdit/Bash` to `disallowedTools` — a hard deny that even
    * `--dangerously-skip-permissions` cannot override. With those tools
    * unavailable, the model has to use `ExitPlanMode` to deliver the
-   * plan, which goes through the picker-detection auto-approval path
-   * (`approveExitPlanWhenPickerReady`). After the approval keystroke is
-   * sent we clear the flag and cold-restart again so the rest of the
-   * session keeps the full Yolo toolset.
+   * plan, which is auto-approved by the PreToolUse allow-hook that
+   * `claudeRemote` injects while this flag is set (see
+   * mergeExitPlanAutoApproveIntoSettings). After the tool is approved we
+   * clear the flag and cold-restart again so the rest of the session
+   * keeps the full Yolo toolset.
    *
    * Declared at launcher scope (outside the cold-restart `while` loop)
    * so the value survives the cold restarts it drives. `onMessage` and
@@ -645,17 +646,18 @@ export async function claudeRemoteLauncher(
   let planModeLockdownActive = false;
 
   /**
-   * Deferred cold-restart request. Some events (notably the ExitPlanMode
-   * picker auto-approval in Yolo mode) need to flip a cold-restart-driving
-   * field AND wait for the assistant's current turn to end before the new
-   * PTY spawns. Firing `executionGuard.requestRestart` directly from those
-   * sites races with Claude TUI's still-completing tool flow and surfaces
-   * as `[Request interrupted by user for tool use]` in the JSONL — the
-   * assistant sees its own turn being torn down.
+   * Deferred cold-restart request. Some events (notably tearing down the
+   * plan-mode lockdown once ExitPlanMode is auto-approved in Yolo mode) need
+   * to flip a cold-restart-driving field AND wait for the assistant's current
+   * turn to end before the new PTY spawns. Firing
+   * `executionGuard.requestRestart` directly from those sites races with
+   * Claude TUI's still-completing tool flow and surfaces as
+   * `[Request interrupted by user for tool use]` in the JSONL — the assistant
+   * sees its own turn being torn down.
    *
-   * Set by `.then()` callbacks that want a clean turn-boundary restart;
-   * consumed by `onTurnComplete`. coldModeHash divergence on the next
-   * `nextMessage` iteration is the secondary safety net for the case
+   * Set at the ExitPlanMode detection site that wants a clean turn-boundary
+   * restart; consumed by `onTurnComplete`. coldModeHash divergence on the
+   * next `nextMessage` iteration is the secondary safety net for the case
    * where `onTurnComplete` never fires (e.g. user sends a new message
    * mid-turn).
    */
@@ -1153,71 +1155,37 @@ export async function claudeRemoteLauncher(
                   );
               }
 
-              // PTY-mode plan-approval bridge.
+              // PTY-mode plan-approval is handled by a PreToolUse allow-hook
+              // (see utils/mergeExitPlanAutoApproveIntoSettings.ts +
+              // scripts/exit_plan_auto_approve.cjs), injected into the
+              // `--settings` file whenever plan-mode lockdown is active. The
+              // hook returns permissionDecision:"allow" + updatedInput, which
+              // deterministically bypasses the TUI "Ready to code?" picker —
+              // no keystroke synthesis, independent of render timing.
               //
-              // In the legacy SDK pipeline `canCallTool` → `permissionHandler.
-              // handleToolCall` → `autoApproveExitPlan` resolved this without
-              // the App lifting a finger. PTY mode bypasses `canCallTool`, so
-              // the TUI renders an in-terminal "Yes/No" picker that no App
-              // button can reach — the session hangs until the local terminal
-              // user keys it themselves (4047 s stalls observed in Yolo mode
-              // before this bridge existed). For Yolo / bypassPermissions
-              // users (who explicitly opted into "no prompts"), we synthesise
-              // the keystroke so the plan continues without local
-              // intervention.
+              // The earlier bridge blind-wrote "1\r" to the PTY once the picker
+              // was assumed ready. With no reliable picker-ready signal the
+              // digit landed in the picker's free-text input and the trailing
+              // CR submitted "1" as plan feedback, which Claude read as "the
+              // user wants changes" and REJECTED the tool →
+              // "[Request interrupted by user for tool use]" (observed in PIDs
+              // 67654 / 50704). The hook removes that race entirely.
               //
-              // We delegate timing to `approveExitPlanWhenPickerReady`,
-              // which watches PTY output for the picker render and sends
-              // the keystroke the instant it appears (with a 2 s blind
-              // fallback). This replaces the earlier hardcoded 600 ms
-              // setTimeout, which lost keystrokes when the TUI was slow to
-              // render — and the comment "if it misses, the user can press
-              // 1 locally" never matched mobile/web App users.
-              if (permissionHandler.isInBypassMode()) {
-                const ptyController = currentQuery;
-                if (ptyController) {
-                  logger.debug(
-                    "[remote]: auto-approving ExitPlanMode via PTY keystroke (bypass mode)",
-                  );
-                  ptyController
-                    .approveExitPlanWhenPickerReady()
-                    .then(() => {
-                      // Clear the plan-mode lockdown ONLY after the keystroke
-                      // is delivered — clearing earlier would let the next
-                      // cold restart go through before the picker is gone,
-                      // and the relaunched TUI would render the picker again
-                      // with no listener attached.
-                      //
-                      // DO NOT call `executionGuard.requestRestart` here.
-                      // Picker keystroke delivery happens during the
-                      // assistant's still-completing ExitPlanMode turn:
-                      // firing a restart synchronously tore that turn down
-                      // and produced `[Request interrupted by user for tool
-                      // use]` in the JSONL (see commit history). Instead we
-                      // flip the flag (so coldModeHash now diverges from
-                      // currentColdHash) and stash a deferred restart that
-                      // `onTurnComplete` consumes on the natural turn
-                      // boundary. If the user sends a new message before the
-                      // turn ends, the divergent coldModeHash in
-                      // `nextMessage` is the secondary safety net.
-                      if (planModeLockdownActive) {
-                        planModeLockdownActive = false;
-                        pendingPostTurnRestart = "mode_change";
-                        logger.debug(
-                          "[remote]: ExitPlanMode keystroke sent → disabling plan-mode lockdown + scheduling post-turn cold restart",
-                        );
-                      }
-                    })
-                    .catch((err) => {
-                      logger.debug(
-                        `[remote]: approveExitPlanWhenPickerReady failed: ${err instanceof Error ? err.message : String(err)}`,
-                      );
-                    });
-                } else {
-                  logger.debug(
-                    "[remote]: ExitPlanMode detected in bypass mode but PTY controller not ready — user must approve locally",
-                  );
-                }
+              // We still tear down the plan-mode lockdown so the next turn runs
+              // with the normal deny list. DO NOT call
+              // `executionGuard.requestRestart` here: the ExitPlanMode turn is
+              // still completing and a synchronous restart tears it down (the
+              // very interruption we are fixing). Flip the flag (so coldModeHash
+              // diverges from currentColdHash) and stash a deferred restart that
+              // `onTurnComplete` consumes on the natural turn boundary. A new
+              // user message before the turn ends hits the divergent
+              // coldModeHash in `nextMessage` as the secondary safety net.
+              if (permissionHandler.isInBypassMode() && planModeLockdownActive) {
+                planModeLockdownActive = false;
+                pendingPostTurnRestart = "mode_change";
+                logger.debug(
+                  "[remote]: ExitPlanMode auto-approved via PreToolUse hook → disabling plan-mode lockdown + scheduling post-turn cold restart",
+                );
               }
             }
             // When SDK enters plan mode via EnterPlanMode tool, sync permissionHandler

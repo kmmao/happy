@@ -66,6 +66,7 @@ import {
 } from "@/claude/pty/claudePtyController";
 import { buildClaudeCliFlags } from "@/claude/pty/claudeCliFlags";
 import { mergeThinkingIntoSettings } from "@/claude/utils/mergeThinkingIntoSettings";
+import { mergeExitPlanAutoApproveIntoSettings } from "@/claude/utils/mergeExitPlanAutoApproveIntoSettings";
 import { buildPtyDisallowedTools } from "@/claude/utils/disallowedTools";
 import { rawToJsonlMessage } from "@/claude/pty/rawToJsonlMessage";
 import { attachClaudePtyRouter } from "@/claude/pty/claudePtyRouter";
@@ -578,6 +579,19 @@ export async function claudeRemote(opts: {
   // (no CLI flag). Idempotent across cold restarts; a no-op when thinking is
   // adaptive/undefined. See packages/happy-cli/src/claude/utils/mergeThinkingIntoSettings.ts.
   mergeThinkingIntoSettings(opts.hookSettingsPath, flagMode.thinking);
+
+  // Inject (or strip) the ExitPlanMode auto-approve PreToolUse hook. Gated on
+  // the same `planModeLockdown` flag as the hardened deny list above: when plan
+  // mode is locked down the relaunched TUI is the one that will render the
+  // ExitPlanMode "Ready to code?" picker, and this hook bypasses it
+  // deterministically (allow + updatedInput) instead of the old "1\r" keystroke
+  // that landed in the picker's text field and rejected the plan. Idempotent
+  // across cold restarts; removed on the enable→disable transition. See
+  // packages/happy-cli/src/claude/utils/mergeExitPlanAutoApproveIntoSettings.ts.
+  mergeExitPlanAutoApproveIntoSettings(
+    opts.hookSettingsPath,
+    !!opts.planModeLockdown,
+  );
 
   // Build the child env. We let the PTY runtime sanitize (strip CLAUDECODE
   // etc) — caller-supplied overrides take precedence over process.env.
