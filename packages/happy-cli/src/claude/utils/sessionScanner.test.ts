@@ -640,4 +640,147 @@ describe('sessionScanner', () => {
       expect(tagged).toHaveLength(0)
     })
   })
+
+  describe('incremental read (P2)', () => {
+    it('does not emit a half-written line until its newline arrives', async () => {
+      // readMainMessages parses only through the last newline; a line written
+      // without its trailing \n must stay buffered as `partial` and surface
+      // exactly once when completed — never as a parse error or a duplicate.
+      const sessionId = 'sess-partial-1'
+      const sessionFile = join(projectDir, `${sessionId}.jsonl`)
+
+      const u1 = { type: 'user', uuid: 'p-u-1', message: { role: 'user', content: 'one' } }
+      await writeFile(sessionFile, ln(u1))
+
+      scanner = await createSessionScanner({
+        sessionId: null,
+        workingDirectory: testDir,
+        onMessage: (m) => collectedMessages.push(m),
+      })
+      scanner.onNewSession(sessionId)
+      await new Promise((r) => setTimeout(r, 200))
+      expect(collectedMessages.filter((m) => m.type === 'user').length).toBe(1)
+
+      // Append a line WITHOUT its trailing newline (half-written).
+      const u2line = JSON.stringify({ type: 'user', uuid: 'p-u-2', message: { role: 'user', content: 'two' } })
+      await appendFile(sessionFile, u2line.slice(0, 12))
+      await new Promise((r) => setTimeout(r, 200))
+      expect(collectedMessages.some((m) => (m as any).uuid === 'p-u-2')).toBe(false)
+
+      // Complete the line + newline.
+      await appendFile(sessionFile, u2line.slice(12) + '\n')
+      await new Promise((r) => setTimeout(r, 200))
+      expect(collectedMessages.filter((m) => (m as any).uuid === 'p-u-2')).toHaveLength(1)
+    })
+
+    it('reassembles a multi-byte UTF-8 char split across two reads', async () => {
+      // The trailing `partial` is kept as raw bytes, so a 你/🌟 character whose
+      // UTF-8 bytes straddle the read boundary must decode intact once the
+      // rest arrives — not as a U+FFFD replacement char.
+      const sessionId = 'sess-utf8-1'
+      const sessionFile = join(projectDir, `${sessionId}.jsonl`)
+      const buf = Buffer.from(
+        ln({ type: 'user', uuid: 'utf-u-1', message: { role: 'user', content: '你好🌟世界' } }),
+        'utf-8',
+      )
+      const cut = buf.length - 6 // inside the trailing multi-byte chars, before the \n
+
+      await writeFile(sessionFile, buf.subarray(0, cut))
+      scanner = await createSessionScanner({
+        sessionId: null,
+        workingDirectory: testDir,
+        onMessage: (m) => collectedMessages.push(m),
+      })
+      scanner.onNewSession(sessionId)
+      await new Promise((r) => setTimeout(r, 200))
+      expect(collectedMessages.some((m) => (m as any).uuid === 'utf-u-1')).toBe(false)
+
+      await appendFile(sessionFile, buf.subarray(cut))
+      await new Promise((r) => setTimeout(r, 200))
+      const out = collectedMessages.find((m) => (m as any).uuid === 'utf-u-1')
+      expect(out).toBeDefined()
+      if (out && out.type === 'user') {
+        expect(out.message.content).toBe('你好🌟世界')
+      }
+    })
+
+    it('falls back to a full reparse when the file shrinks (truncation)', async () => {
+      // st.size < offset means the file was rewound/rewritten in place; the
+      // reader resets offset+cache and reparses so the new content surfaces.
+      const sessionId = 'sess-trunc-1'
+      const sessionFile = join(projectDir, `${sessionId}.jsonl`)
+      const a = { type: 'user', uuid: 't-u-1', message: { role: 'user', content: 'aaaaaaaaaa' } }
+      const b = { type: 'user', uuid: 't-u-2', message: { role: 'user', content: 'bbbbbbbbbb' } }
+      await writeFile(sessionFile, ln(a) + ln(b))
+
+      scanner = await createSessionScanner({
+        sessionId: null,
+        workingDirectory: testDir,
+        onMessage: (m) => collectedMessages.push(m),
+      })
+      scanner.onNewSession(sessionId)
+      await new Promise((r) => setTimeout(r, 200))
+      expect(collectedMessages.filter((m) => ['t-u-1', 't-u-2'].includes((m as any).uuid)).length).toBe(2)
+
+      // Rewrite shorter — size drops below the consumed offset.
+      await writeFile(sessionFile, ln({ type: 'user', uuid: 't-u-3', message: { role: 'user', content: 'c' } }))
+      await new Promise((r) => setTimeout(r, 200))
+      expect(collectedMessages.some((m) => (m as any).uuid === 't-u-3')).toBe(true)
+    })
+  })
+
+  describe('subagents watcher (P1)', () => {
+    it('surfaces a late subagent message after appending only the subagent jsonl', async () => {
+      // The whole point of P1: a tool_result written to the subagent file
+      // *after* the main jsonl has settled must surface promptly via the
+      // subagents/ dir watcher — well under the 15s poll. We assert it shows
+      // up within 500ms while never touching the main session file.
+      const sessionId = 'sess-watch-1'
+      const sessionFile = join(projectDir, `${sessionId}.jsonl`)
+      const subagentsDir = join(projectDir, sessionId, 'subagents')
+      await mkdir(subagentsDir, { recursive: true })
+
+      const mainUser = { type: 'user', uuid: 'w-u-1', message: { role: 'user', content: 'spawn' } }
+      const mainAssistantTask = {
+        type: 'assistant',
+        uuid: 'w-a-1',
+        message: {
+          role: 'assistant',
+          id: 'msg_w',
+          content: [
+            { type: 'tool_use', id: 'tu_w', name: 'Task', input: { subagent_type: 'Explore', description: 'WatchTest', prompt: 'go' } },
+          ],
+        },
+      }
+      await writeFile(sessionFile, ln(mainUser) + ln(mainAssistantTask))
+
+      await writeFile(
+        join(subagentsDir, 'agent-W.meta.json'),
+        JSON.stringify({ agentType: 'Explore', description: 'WatchTest' }),
+      )
+      const subagentJsonl = join(subagentsDir, 'agent-W.jsonl')
+      await writeFile(subagentJsonl, ln({ type: 'user', uuid: 'sub-w-u', isSidechain: true, message: { role: 'user', content: 'go' } }))
+
+      scanner = await createSessionScanner({
+        sessionId: null,
+        workingDirectory: testDir,
+        onMessage: (m) => collectedMessages.push(m),
+      })
+      scanner.onNewSession(sessionId)
+      await new Promise((r) => setTimeout(r, 250))
+      // First sync binds the subagent and attaches the dir watcher.
+      expect(collectedMessages.some((m) => (m as any).uuid === 'sub-w-u')).toBe(true)
+
+      // Append ONLY the subagent file — no main-file write, no poll wait.
+      await appendFile(
+        subagentJsonl,
+        ln({ type: 'assistant', uuid: 'sub-w-a', isSidechain: true, message: { role: 'assistant', id: 'msg_sub_w', content: [{ type: 'text', text: 'done' }] } }),
+      )
+      await new Promise((r) => setTimeout(r, 500))
+
+      const out = collectedMessages.find((m) => m.type === 'assistant' && (m as any).uuid === 'sub-w-a')
+      expect(out).toBeDefined()
+      expect((out as any).parent_tool_use_id).toBe('tu_w')
+    })
+  })
 })

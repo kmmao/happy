@@ -12,6 +12,10 @@ This monorepo contains multiple packages, each with its own changelog:
 
 ## Recent Highlights
 
+### 2026-05-26
+
+- **happy-cli 0.86.0** — PTY-mode reliability & performance: subagent (Task/Agent) results now appear in milliseconds via a per-session `subagents/` watcher, long sessions parse only newly appended log bytes, ExitPlanMode auto-approval detects the picker from the current screen snapshot, the context-usage panel splits into Cached context / Cache write / New input, and an optional deep MCP `initialize` handshake probe (`HAPPY_MCP_HANDSHAKE_PROBE=1`) verifies stdio servers really speak MCP.
+
 ### 2026-05-13
 
 - **happy-cli 0.78.0** — Upgraded Claude Agent SDK to 0.2.139, added "Move to background" button for converting foreground tasks to background via `Query.backgroundTasks()`.

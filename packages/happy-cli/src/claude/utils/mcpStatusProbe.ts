@@ -16,9 +16,21 @@
  *
  *   - stdio MCP → resolve `command` against the user's PATH (cached 60 s).
  *     A missing binary becomes `"failed"` with a `command not found` error.
- *     We cannot detect a binary that exists but won't speak MCP — that needs
- *     the launcher / claude itself — but a missing binary is the most common
- *     misconfiguration we can rule out cheaply.
+ *     A bare PATH-resolve cannot detect a binary that exists but won't speak
+ *     MCP, but a missing binary is the most common misconfiguration we can
+ *     rule out cheaply.
+ *
+ *     OPT-IN deep probe (HAPPY_MCP_HANDSHAKE_PROBE=1): once the command
+ *     resolves, actually spawn it and perform a real MCP `initialize`
+ *     JSON-RPC handshake over stdio (timeout HAPPY_MCP_HANDSHAKE_TIMEOUT_MS,
+ *     default 3 s). A successful handshake is the only thing that proves the
+ *     binary really speaks MCP, so it upgrades to a high-confidence
+ *     `"connected"` cached for 5 min (the spawn is expensive). A failed or
+ *     timed-out handshake degrades back to the PATH-resolve result rather
+ *     than reporting `"failed"` — MCP servers can be slow to start, need a
+ *     specific cwd/env, or require auth, so a probe miss is not proof the
+ *     server is broken. Off by default because it spawns the user's
+ *     configured command as a side effect of a status poll.
  *
  *   - http/sse/streamable-http/url MCP → HEAD/GET ping (2 s timeout, cached
  *     60 s). 2xx/3xx/4xx maps to `"connected"`; network errors / 5xx /
@@ -39,11 +51,15 @@
  */
 
 import { access, constants } from "node:fs/promises";
+import { spawn } from "node:child_process";
 import path from "node:path";
 import { logger } from "@/ui/logger";
 
 const PROBE_TTL_MS = 60_000;
 const HTTP_TIMEOUT_MS = 2000;
+// Successful MCP `initialize` handshakes are cached far longer than the cheap
+// PATH-resolve / HTTP probes because each one costs a full child-process spawn.
+const HANDSHAKE_TTL_MS = 5 * 60_000;
 
 export type McpProbeStatus = "connected" | "failed" | "disabled";
 
@@ -52,6 +68,12 @@ export interface McpProbeResult {
   error?: string;
   /** Wall-clock ms when the probe was performed. */
   checkedAt: number;
+  /**
+   * Override for how long this specific result stays warm in the cache.
+   * Defaults to {@link PROBE_TTL_MS} when unset; the stdio handshake sets the
+   * longer {@link HANDSHAKE_TTL_MS} on success since re-spawning is costly.
+   */
+  ttlMs?: number;
 }
 
 interface CacheEntry {
@@ -84,13 +106,24 @@ export async function probeMcpServer(
   }
 
   const type = typeof cfg.type === "string" ? cfg.type : "stdio";
-  // stdio MCP: PATH-resolve the configured command. Doesn't validate the
-  // binary actually speaks MCP — that's the launcher's job — but catches
-  // the most common misconfig (typo / missing dependency) for free.
+  // stdio MCP: PATH-resolve the configured command, then (opt-in) perform a
+  // real `initialize` handshake. PATH-resolve alone catches the most common
+  // misconfig (typo / missing dependency) for free; the handshake confirms
+  // the binary actually speaks MCP. See module doc + probeStdioCommand.
   if (type === "stdio") {
     const command = typeof cfg.command === "string" ? cfg.command : "";
     if (!command) return failed("stdio config missing 'command'");
-    return cached(`stdio:${command}`, () => probeStdioCommand(command, name));
+    const args = Array.isArray(cfg.args)
+      ? cfg.args.filter((a): a is string => typeof a === "string")
+      : [];
+    const env =
+      cfg.env && typeof cfg.env === "object" && !Array.isArray(cfg.env)
+        ? (cfg.env as Record<string, string>)
+        : {};
+    // Key on command + args: different args are different upstreams, and the
+    // handshake spawns exactly this argv, so they must not share a cache slot.
+    const key = `stdio:${command}\0${args.join("\0")}`;
+    return cached(key, () => probeStdioCommand(command, args, env, name));
   }
 
   // URL-based MCP transports: cheap HEAD/GET ping. We don't issue an MCP
@@ -128,8 +161,9 @@ async function cached(
 ): Promise<McpProbeResult> {
   const now = Date.now();
   const entry = cache.get(key);
-  // Reuse a cached result that's still warm.
-  if (entry && now - entry.result.checkedAt < PROBE_TTL_MS) {
+  // Reuse a cached result that's still warm. TTL is per-result so a
+  // handshake-confirmed "connected" can outlive a cheap PATH-resolve hit.
+  if (entry && now - entry.result.checkedAt < (entry.result.ttlMs ?? PROBE_TTL_MS)) {
     return entry.result;
   }
   // Coalesce: another caller's probe is in flight — share it instead of
@@ -158,7 +192,37 @@ async function cached(
   return promise;
 }
 
-async function probeStdioCommand(command: string, name: string): Promise<McpProbeResult> {
+async function probeStdioCommand(
+  command: string,
+  args: string[],
+  env: Record<string, string>,
+  name: string,
+): Promise<McpProbeResult> {
+  const resolved = await resolveStdioCommand(command, name);
+  // Command missing / not executable → definitively failed; spawning would
+  // just reproduce the same ENOENT, so skip the expensive handshake.
+  if (resolved.status !== "connected") return resolved;
+
+  // Opt-in deep probe. Off by default: spawning the user's configured MCP
+  // command as a side effect of a status poll can have real consequences
+  // (DB connections, file locks, telemetry) and costs a subprocess per
+  // server per cache cycle.
+  if (process.env.HAPPY_MCP_HANDSHAKE_PROBE !== "1") {
+    return resolved;
+  }
+
+  const handshake = await probeStdioHandshake(command, args, env, name);
+  // Only UPGRADE confidence on success. A failed/timed-out handshake degrades
+  // to the PATH-resolve result instead of "failed" (see module doc): a probe
+  // miss is not proof the server is broken.
+  if (handshake.status === "connected") return handshake;
+  logger.debug(
+    `[mcpStatusProbe] '${name}' handshake inconclusive (${handshake.error ?? "?"}); degrading to PATH-resolve`,
+  );
+  return resolved;
+}
+
+async function resolveStdioCommand(command: string, name: string): Promise<McpProbeResult> {
   // Absolute or relative path: stat directly. Relative path is resolved
   // against the daemon's cwd, which matches how `node-pty` would resolve
   // it when actually spawning the child.
@@ -187,6 +251,126 @@ async function probeStdioCommand(command: string, name: string): Promise<McpProb
   }
   logger.debug(`[mcpStatusProbe] '${name}' command '${command}' not found in PATH`);
   return failed(`command not found in PATH: ${command}`);
+}
+
+/**
+ * Spawn the stdio MCP server and perform a real MCP `initialize` JSON-RPC
+ * handshake over its stdin/stdout. Resolves `"connected"` (with the long
+ * {@link HANDSHAKE_TTL_MS}) only when the server returns a valid initialize
+ * result; every other outcome — spawn error, early exit, JSON-RPC error,
+ * timeout — resolves `"failed"` so the caller can degrade gracefully.
+ *
+ * The child is always killed once we have an answer: we only need the
+ * handshake, never a long-lived connection. Never throws — the Promise
+ * always resolves so `cached()` gets a deterministic result.
+ */
+function probeStdioHandshake(
+  command: string,
+  args: string[],
+  env: Record<string, string>,
+  name: string,
+): Promise<McpProbeResult> {
+  // stdio JSON-RPC transport frames each message as one line of JSON.
+  const INITIALIZE_ID = 1;
+  const request =
+    JSON.stringify({
+      jsonrpc: "2.0",
+      id: INITIALIZE_ID,
+      method: "initialize",
+      params: {
+        protocolVersion: "2024-11-05",
+        capabilities: {},
+        clientInfo: { name: "happy-cli-probe", version: "1.0.0" },
+      },
+    }) + "\n";
+
+  const timeoutMs = Math.max(
+    250,
+    Number(process.env.HAPPY_MCP_HANDSHAKE_TIMEOUT_MS) || 3000,
+  );
+
+  return new Promise<McpProbeResult>((resolve) => {
+    let settled = false;
+    let stdout = "";
+
+    let child: ReturnType<typeof spawn>;
+    try {
+      child = spawn(command, args, {
+        // Inherit the daemon env so the server finds node_modules / auth, plus
+        // any per-server overrides. stderr is ignored — servers log there.
+        env: { ...process.env, ...env },
+        stdio: ["pipe", "pipe", "ignore"],
+      });
+    } catch (err) {
+      resolve(failed(err instanceof Error ? err.message : String(err)));
+      return;
+    }
+
+    const finish = (result: McpProbeResult) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      child.stdout?.removeAllListeners();
+      // We only needed the handshake — reclaim the child immediately.
+      try {
+        child.kill("SIGKILL");
+      } catch {
+        /* already exited */
+      }
+      resolve(result);
+    };
+
+    const timer = setTimeout(() => {
+      finish(failed(`initialize handshake timed out after ${timeoutMs}ms`));
+    }, timeoutMs);
+
+    child.on("error", (err: Error) => {
+      finish(failed(err.message));
+    });
+
+    child.on("exit", (code) => {
+      finish(failed(`process exited (code ${code}) before initialize response`));
+    });
+
+    child.stdout?.on("data", (chunk: Buffer) => {
+      stdout += chunk.toString("utf-8");
+      let nl: number;
+      while ((nl = stdout.indexOf("\n")) !== -1) {
+        const line = stdout.slice(0, nl).trim();
+        stdout = stdout.slice(nl + 1);
+        if (!line) continue;
+        let msg: any;
+        try {
+          msg = JSON.parse(line);
+        } catch {
+          // Non-JSON banner / log line on stdout — skip, keep reading.
+          continue;
+        }
+        // Ignore notifications and unrelated ids; match our initialize reply.
+        if (!msg || msg.id !== INITIALIZE_ID) continue;
+        if (msg.error) {
+          finish(failed(`initialize error: ${msg.error?.message ?? "unknown"}`));
+        } else if (msg.result) {
+          finish({ status: "connected", checkedAt: Date.now(), ttlMs: HANDSHAKE_TTL_MS });
+        } else {
+          finish(failed("initialize response missing result"));
+        }
+        return;
+      }
+    });
+
+    // Swallow EPIPE: if the server exits before/while we write the request,
+    // the stdin pipe breaks and emits 'error'. The exit/timeout handlers
+    // already settle the probe, so this listener just prevents an unhandled
+    // stream error from crashing the process.
+    child.stdin?.on("error", () => {});
+    try {
+      child.stdin?.write(request);
+    } catch (err) {
+      finish(failed(err instanceof Error ? err.message : String(err)));
+    }
+    logger.debug(`[mcpStatusProbe] '${name}' initialize handshake → ${command} ${args.join(" ")}`);
+  });
 }
 
 async function canExecute(filePath: string): Promise<boolean> {

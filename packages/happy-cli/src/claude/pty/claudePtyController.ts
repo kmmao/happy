@@ -47,7 +47,9 @@
  *   ✓ percentage   — totalTokens / maxTokens * 100
  *   ✓ model        — from assistant message
  *   ✓ apiUsage     — direct mapping of the four raw fields
- *   ✓ categories   — single "Conversation" bucket (no SDK-level breakdown)
+ *   ✓ categories   — three input buckets (Cached context / Cache write /
+ *                    New input) derived from the API's own usage fields;
+ *                    NOT the SDK's system/tools/memory breakdown
  *
  * What remains unavailable in PTY mode:
  *   ✗ categories breakdown (system prompt / tools / memory / messages)
@@ -130,12 +132,14 @@ export interface ClaudePtyController {
    */
   approveExitPlan(): Promise<void>;
   /**
-   * Robust variant of `approveExitPlan()`: watches PTY output for the TUI
-   * plan-mode picker render and sends "1\r" the moment it appears. Falls
-   * back to a blind keystroke 2 s after the call if the picker pattern is
-   * never observed — covers the case where the picker was already drawn
-   * before the launcher's JSONL-driven detection ran (since `onData`
-   * only delivers future chunks).
+   * Robust variant of `approveExitPlan()`: sends "1\r" the moment the TUI
+   * plan-mode picker is detected. Detection has three layers, fastest wins:
+   *   1. the replay-buffer snapshot at call time — catches a picker already
+   *      on screen before we subscribed (`onData` only delivers future
+   *      chunks, so without this the case below fell to the blind timeout);
+   *   2. a sliding window over subsequent `onData` chunks — catches a picker
+   *      rendered after the call;
+   *   3. a blind 2 s fallback keystroke if neither matched.
    *
    * Why this exists alongside `approveExitPlan()`:
    *   - `approveExitPlan()` is a primitive used by tests and any future
@@ -250,11 +254,21 @@ export interface ClaudePtyController {
  *                       `mcpServerStatus()` to surface configured servers to the
  *                       App even though the PTY has no programmatic status API.
  *                       Defaults to `() => ({})` (empty — no servers reported).
+ * @param getReplaySnapshot Optional getter for the PTY router's current
+ *                       ANSI-aware screen snapshot. Used by
+ *                       `approveExitPlanWhenPickerReady()` as the first
+ *                       detection layer — it catches a plan-mode picker that
+ *                       was already drawn before we subscribed to `onData`
+ *                       (which only delivers future chunks). Provided by
+ *                       `claudeRemote.ts` after the router attaches; defaults
+ *                       to `() => ""` (no snapshot — falls through to the
+ *                       onData window + blind 2 s fallback).
  */
 export function createClaudePtyController(
   pty: ClaudePtyHandle,
   getLatestUsage: () => UsageSnapshot | null = () => null,
   getMcpServers: () => Record<string, unknown> = () => ({}),
+  getReplaySnapshot: () => string = () => "",
 ): ClaudePtyController {
   return {
     async interrupt() {
@@ -315,6 +329,22 @@ export function createClaudePtyController(
           }
           resolve();
         };
+
+        // Layer 1: the picker may already be on screen before we subscribe.
+        // onData only delivers FUTURE chunks, so without this snapshot check
+        // the "picker already drawn" case fell through to the blind 2 s
+        // fallback. Seed the sliding window with the current screen so a
+        // picker rendered moments before this call is detected immediately.
+        const snapshot = getReplaySnapshot();
+        if (snapshot && PICKER_PATTERN.test(snapshot)) {
+          send("picker already on screen");
+          return;
+        }
+        // Carry the snapshot into the window so a picker that is split across
+        // the snapshot boundary and the first onData chunk still matches.
+        window = snapshot.length > WINDOW_MAX
+          ? snapshot.slice(snapshot.length - WINDOW_MAX)
+          : snapshot;
 
         unsubscribe = pty.onData((data: string) => {
           if (done) return;
@@ -413,15 +443,25 @@ export function createClaudePtyController(
         maxTokens,
         percentage,
         model,
-        // Single bucket — no SDK-level breakdown available in PTY mode.
+        // PTY mode can't reproduce the SDK's system/tools/memory split (those
+        // counts aren't in the session JSONL). The one decomposition we CAN
+        // derive at zero extra cost is the three input buckets the API already
+        // reports, which together sum to totalTokens:
+        //   • Cached context — cache_read: context reused from the prompt
+        //     cache (cheap; the bulk of a long session)
+        //   • Cache write     — cache_creation: context written to the cache
+        //     this turn (full-priced now, reused cheaply next turn)
+        //   • New input       — input: genuinely uncached input this turn
+        // Zero-token buckets are dropped here: the App filters zeros for its
+        // breakdown list but iterates `categories` verbatim for the legend +
+        // ring donut, so an empty bucket would render as a "0" legend row.
         categories: [
-          {
-            name: "Conversation",
-            tokens: totalTokens,
-            color: "#007AFF",
-            isDeferred: false,
-          },
-        ],
+          { name: "Cached context", tokens: cacheReadInputTokens, color: "#34C759" },
+          { name: "Cache write", tokens: cacheCreationInputTokens, color: "#FF9500" },
+          { name: "New input", tokens: inputTokens, color: "#007AFF" },
+        ]
+          .filter((c) => c.tokens > 0)
+          .map((c) => ({ ...c, isDeferred: false })),
         apiUsage: {
           input_tokens: inputTokens,
           output_tokens: outputTokens,

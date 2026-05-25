@@ -128,7 +128,7 @@ describe("createClaudePtyController — getContextUsage", () => {
     });
   });
 
-  it("returns a single 'Conversation' category covering all input tokens", async () => {
+  it("splits input into three buckets (Cached context / Cache write / New input)", async () => {
     const snapshot: UsageSnapshot = {
       model: "claude-haiku-4-5",
       inputTokens: 50,
@@ -139,9 +139,35 @@ describe("createClaudePtyController — getContextUsage", () => {
     const controller = createClaudePtyController(makeStubPty(), () => snapshot);
     const result = await controller.getContextUsage();
 
+    expect(result?.categories).toHaveLength(3);
+    const byName = Object.fromEntries(
+      (result?.categories ?? []).map((c) => [c.name, c.tokens]),
+    );
+    expect(byName["Cached context"]).toBe(10_000);
+    expect(byName["Cache write"]).toBe(500);
+    expect(byName["New input"]).toBe(50);
+
+    // The three buckets must sum back to totalTokens (the context window).
+    const sum = (result?.categories ?? []).reduce((acc, c) => acc + c.tokens, 0);
+    expect(sum).toBe(result?.totalTokens);
+    expect(sum).toBe(10_550);
+  });
+
+  it("drops zero-token buckets so the App legend doesn't render empty rows", async () => {
+    // Fresh turn: everything is uncached new input, no cache read/write yet.
+    const snapshot: UsageSnapshot = {
+      model: "claude-opus-4-7",
+      inputTokens: 1_200,
+      cacheReadInputTokens: 0,
+      cacheCreationInputTokens: 0,
+      outputTokens: 300,
+    };
+    const controller = createClaudePtyController(makeStubPty(), () => snapshot);
+    const result = await controller.getContextUsage();
+
     expect(result?.categories).toHaveLength(1);
-    expect(result?.categories[0].name).toBe("Conversation");
-    expect(result?.categories[0].tokens).toBe(10_550); // 50 + 10000 + 500
+    expect(result?.categories[0].name).toBe("New input");
+    expect(result?.categories[0].tokens).toBe(1_200);
   });
 
   it("reflects the latest snapshot when the getter is updated after creation", async () => {
@@ -398,5 +424,65 @@ describe("createClaudePtyController — approveExitPlanWhenPickerReady", () => {
     // the same session) must not re-trigger a stale send.
     pty.emitData("❯ 1. Yes, and auto-accept edits\r\n");
     expect(pty.writes).toEqual(["1\r"]);
+  });
+
+  it("sends immediately when the picker is already on the replay snapshot (Layer 1)", async () => {
+    const pty = makeRecordingPty();
+    // Picker already drawn before we subscribe — onData would never deliver
+    // it (it only carries future chunks). The snapshot getter is the only
+    // source. No onData emission, no fake timers: the send must be synchronous.
+    const controller = createClaudePtyController(
+      pty,
+      () => null,
+      () => ({}),
+      () => "❯ 1. Yes, and auto-accept edits\r\n  2. No, keep planning\r\n",
+    );
+
+    await controller.approveExitPlanWhenPickerReady();
+
+    expect(pty.writes).toEqual(["1\r"]);
+  });
+
+  it("matches a picker split across the snapshot boundary and the first chunk", async () => {
+    const pty = makeRecordingPty();
+    // Snapshot ends mid-picker (cursor drawn, option not yet); the rest
+    // arrives on the next onData chunk. Seeding the window with the snapshot
+    // is what lets these two halves match.
+    const controller = createClaudePtyController(
+      pty,
+      () => null,
+      () => ({}),
+      () => "❯ ",
+    );
+
+    const approvePromise = controller.approveExitPlanWhenPickerReady();
+    // No write yet — snapshot alone doesn't complete the pattern.
+    expect(pty.writes).toEqual([]);
+
+    pty.emitData("1. Yes, and auto-accept edits\r\n");
+    await approvePromise;
+    expect(pty.writes).toEqual(["1\r"]);
+  });
+
+  it("ignores a snapshot without a picker and still falls back after 2 s", async () => {
+    vi.useFakeTimers();
+    try {
+      const pty = makeRecordingPty();
+      const controller = createClaudePtyController(
+        pty,
+        () => null,
+        () => ({}),
+        () => "just some scrollback text, no picker here\r\n",
+      );
+
+      const approvePromise = controller.approveExitPlanWhenPickerReady();
+      expect(pty.writes).toEqual([]);
+
+      await vi.advanceTimersByTimeAsync(2000);
+      await approvePromise;
+      expect(pty.writes).toEqual(["1\r"]);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

@@ -1,7 +1,8 @@
 import { InvalidateSync } from "@/utils/sync";
 import { RawJSONLines, RawJSONLinesSchema } from "../types";
 import { join } from "node:path";
-import { readFile } from "node:fs/promises";
+import { stat, open } from "node:fs/promises";
+import { existsSync, type Stats } from "node:fs";
 import { logger } from "@/ui/logger";
 import { startFileWatcher } from "@/modules/watcher/startFileWatcher";
 import { getProjectPath } from "./path";
@@ -41,9 +42,76 @@ export async function createSessionScanner(opts: {
     // file at its first-seen state and miss every incremental update.
     let toolUseToAgentBinding = new Map<string, string>();
 
+    // P2: per-session incremental-read bookkeeping. `fileReadState` tracks how
+    // many bytes of each session JSONL we've consumed plus any trailing
+    // half-written line (kept as raw bytes so a multi-byte UTF-8 char split
+    // across two reads survives). `mainMessageCache` holds the parsed result so
+    // each sync only JSON.parse + Zod-validates newly appended lines.
+    let fileReadState = new Map<string, { offset: number; partial: Buffer }>();
+    let mainMessageCache = new Map<string, RawJSONLines[]>();
+
+    // P1: per-session watcher on the `subagents/` directory. Subagent JSONL
+    // writes don't touch the main session file, so without this a late
+    // tool_result only surfaced on the next periodic poll (up to 15 s).
+    let subagentWatchers = new Map<string, () => void>();
+
+    // Incrementally read a session's main JSONL, returning the FULL parsed
+    // message list (cached prefix + freshly appended lines). Returning the
+    // whole list — not just the new tail — keeps interleaveSubagentMessages
+    // able to re-read every bound subagent file on each sync, which is how
+    // late subagent tool_results get picked up (see P1 watcher above).
+    const readMainMessages = async (sessionId: string): Promise<RawJSONLines[]> => {
+        const file = join(projectDir, `${sessionId}.jsonl`);
+        let st: Stats;
+        try {
+            st = await stat(file);
+        } catch {
+            logger.debug(`[SESSION_SCANNER] Session file not found: ${file}`);
+            return mainMessageCache.get(sessionId) ?? [];
+        }
+
+        let state = fileReadState.get(sessionId);
+        let cache = mainMessageCache.get(sessionId);
+        // First read, or the file shrank (truncated / rewritten in place).
+        // --resume writes a NEW sessionId file, so the common case never hits
+        // this; the guard just keeps us correct if a file is ever rewound.
+        if (!state || st.size < state.offset) {
+            state = { offset: 0, partial: Buffer.alloc(0) };
+            cache = [];
+        }
+        cache = cache ?? [];
+
+        if (st.size > state.offset) {
+            const fd = await open(file, "r");
+            try {
+                const len = st.size - state.offset;
+                const buf = Buffer.alloc(len);
+                await fd.read(buf, 0, len, state.offset);
+                const combined = Buffer.concat([state.partial, buf]);
+                // Parse only through the last newline; trailing bytes are a
+                // half-written line we re-prepend on the next read.
+                const lastNl = combined.lastIndexOf(0x0a);
+                if (lastNl === -1) {
+                    state.partial = combined;
+                } else {
+                    const complete = combined.subarray(0, lastNl + 1).toString("utf-8");
+                    state.partial = combined.subarray(lastNl + 1);
+                    cache.push(...parseJsonlText(complete));
+                }
+                state.offset = st.size;
+            } finally {
+                await fd.close();
+            }
+        }
+
+        fileReadState.set(sessionId, state);
+        mainMessageCache.set(sessionId, cache);
+        return cache;
+    };
+
     // Mark existing messages as processed and start watching the initial session
     if (opts.sessionId) {
-        let messages = await readSessionLog(projectDir, opts.sessionId);
+        let messages = await readMainMessages(opts.sessionId);
         logger.debug(`[SESSION_SCANNER] Marking ${messages.length} existing messages as processed from session ${opts.sessionId}`);
         for (let m of messages) {
             processedMessageKeys.add(messageKey(m));
@@ -76,7 +144,7 @@ export async function createSessionScanner(opts: {
 
         // Process sessions
         for (let session of sessions) {
-            const rawMessages = await readSessionLog(projectDir, session);
+            const rawMessages = await readMainMessages(session);
             const sessionMessages = await interleaveSubagentMessages(
                 projectDir,
                 session,
@@ -116,6 +184,20 @@ export async function createSessionScanner(opts: {
                 watchers.set(p, startFileWatcher(join(projectDir, `${p}.jsonl`), () => { sync.invalidate(); }));
             }
         }
+
+        // P1: once a session's subagents/ directory exists (created on the
+        // first Task/Agent tool_use) watch it, so incremental subagent JSONL
+        // appends invalidate immediately instead of waiting for the poll.
+        // Lazy + existence-gated to avoid per-second ENOENT watcher retries on
+        // sessions that never spawn a subagent.
+        for (let p of sessions) {
+            if (subagentWatchers.has(p)) continue;
+            const subagentsDir = join(projectDir, p, "subagents");
+            if (existsSync(subagentsDir)) {
+                logger.debug(`[SESSION_SCANNER] Starting subagents watcher for session: ${p}`);
+                subagentWatchers.set(p, startFileWatcher(subagentsDir, () => { sync.invalidate(); }));
+            }
+        }
     });
     await sync.invalidateAndAwait();
 
@@ -125,12 +207,16 @@ export async function createSessionScanner(opts: {
     // milliseconds on macOS (fsevents) / Linux (inotify) / Windows
     // (ReadDirectoryChangesW), so the poll never wins that race.
     //
-    // What the poll actually covers:
+    // What the poll actually covers (it is now a pure backstop — the main
+    // JSONL watcher and the per-session subagents/ watcher are the primary
+    // signals):
     //   1. **Subagent JSONL appends** — `interleaveSubagentMessages` re-reads
-    //      `subagents/agent-XXX.jsonl` on every sync cycle. When Claude writes
-    //      a late `tool_result` to a subagent file *after* the main JSONL has
-    //      already settled, no watcher event on the main file fires, so the
-    //      next tool_result is invisible until the next poll.
+    //      `subagents/agent-XXX.jsonl` on every sync cycle. The per-session
+    //      subagents/ watcher (created lazily once that dir first appears)
+    //      now fires `sync.invalidate()` on those appends, so a late
+    //      `tool_result` surfaces within tens of ms instead of waiting for
+    //      this poll. The poll only backstops the gap before that watcher
+    //      attaches and the network-fs case below.
     //   2. **Network filesystems** — fsevents/inotify do not propagate over
     //      NFS/SMB, so on remote mounts the poll is the only signal.
     //   3. **Watcher restart gaps** — `startFileWatcher` reconnects with a 1 s
@@ -138,10 +224,11 @@ export async function createSessionScanner(opts: {
     //      during that window land on the next poll.
     //
     // 3 s was the pre-PTY default, picked when MCP sub-agent traces churned
-    // every couple of turns. With the PTY router + bridge in place an idle
-    // session triggers ~20 polls/minute that each `readFile` + Zod-parse the
-    // full JSONL — pure waste 99 % of the time. 15 s bounds the worst-case
-    // subagent-tail latency without burning CPU on stable sessions.
+    // every couple of turns. Reads are now incremental (`readMainMessages`
+    // only parses bytes appended past the last offset), so a poll on a stable
+    // session is a cheap `stat` + no-op rather than a full readFile + Zod
+    // reparse. 15 s bounds the worst-case latency for the gaps above without
+    // burning CPU on stable sessions.
     //
     // Override with `HAPPY_SESSION_SCAN_INTERVAL_MS` for users who hit the
     // edge cases above (e.g. NFS-hosted projects need a smaller value).
@@ -159,8 +246,14 @@ export async function createSessionScanner(opts: {
                 w();
             }
             watchers.clear();
+            for (let w of subagentWatchers.values()) {
+                w();
+            }
+            subagentWatchers.clear();
             await sync.invalidateAndAwait();
             sync.stop();
+            fileReadState.clear();
+            mainMessageCache.clear();
         },
         onNewSession: async (sessionId: string, options?: { treatExistingAsProcessed?: boolean }) => {
             if (currentSessionId === sessionId) {
@@ -183,7 +276,7 @@ export async function createSessionScanner(opts: {
             // file as fresh user prompts. Without this, every previous
             // user message re-appears in the chat after reconnect.
             if (options?.treatExistingAsProcessed) {
-                const existing = await readSessionLog(projectDir, sessionId);
+                const existing = await readMainMessages(sessionId);
                 logger.debug(`[SESSION_SCANNER] Pre-marking ${existing.length} existing messages as processed for new session ${sessionId}`);
                 for (const m of existing) {
                     processedMessageKeys.add(messageKey(m));
@@ -278,45 +371,36 @@ async function interleaveSubagentMessages(
 }
 
 /**
- * Read and parse session log file
- * Returns only valid conversation messages, silently skipping internal events
+ * Parse a chunk of JSONL text into valid conversation messages. Skips blank
+ * lines, known-internal Claude events, and anything that fails the schema —
+ * the same per-line semantics the old full-file reader used, factored out so
+ * the incremental reader (readMainMessages) can reuse them on appended text.
  */
-async function readSessionLog(projectDir: string, sessionId: string): Promise<RawJSONLines[]> {
-    const expectedSessionFile = join(projectDir, `${sessionId}.jsonl`);
-    logger.debug(`[SESSION_SCANNER] Reading session file: ${expectedSessionFile}`);
-    let file: string;
-    try {
-        file = await readFile(expectedSessionFile, 'utf-8');
-    } catch (error) {
-        logger.debug(`[SESSION_SCANNER] Session file not found: ${expectedSessionFile}`);
-        return [];
-    }
-    let lines = file.split('\n');
-    let messages: RawJSONLines[] = [];
-    for (let l of lines) {
+function parseJsonlText(text: string): RawJSONLines[] {
+    const messages: RawJSONLines[] = [];
+    for (const l of text.split('\n')) {
+        if (l.trim() === '') {
+            continue;
+        }
+        let message: any;
         try {
-            if (l.trim() === '') {
-                continue;
-            }
-            let message = JSON.parse(l);
-            
-            // Silently skip known internal Claude Code events
-            // These are state/tracking events, not conversation messages
-            if (message.type && INTERNAL_CLAUDE_EVENT_TYPES.has(message.type)) {
-                continue;
-            }
-            
-            let parsed = RawJSONLinesSchema.safeParse(message);
-            if (!parsed.success) {
-                // Unknown message types are silently skipped
-                // They will be tracked by processedMessageKeys to avoid reprocessing
-                continue;
-            }
-            messages.push(parsed.data);
+            message = JSON.parse(l);
         } catch (e) {
             logger.debug(`[SESSION_SCANNER] Error processing message: ${e}`);
             continue;
         }
+        // Silently skip known internal Claude Code events — state/tracking
+        // events, not conversation messages.
+        if (message.type && INTERNAL_CLAUDE_EVENT_TYPES.has(message.type)) {
+            continue;
+        }
+        const parsed = RawJSONLinesSchema.safeParse(message);
+        if (!parsed.success) {
+            // Unknown message types are silently skipped; processedMessageKeys
+            // still tracks them so they aren't reprocessed.
+            continue;
+        }
+        messages.push(parsed.data);
     }
     return messages;
 }

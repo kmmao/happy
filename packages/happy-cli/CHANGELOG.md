@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.86.0 - 2026-05-26
+
+Reliability and performance improvements for PTY-mode (remote) Claude sessions, plus a richer context-usage panel and an optional deep MCP health check.
+
+- Subagent (Task/Agent) tool results now surface within tens of milliseconds instead of waiting up to 15s — each session's `subagents/` directory gets its own file watcher, so incremental subagent log writes no longer depend on the periodic poll.
+- More robust plan-mode auto-approval in Yolo/bypass mode: the ExitPlanMode picker is now detected from the terminal's current screen snapshot (not just future output), so a picker already on screen before detection starts is approved immediately rather than via the blind 2s fallback.
+- Reduced CPU/IO on long sessions: the session scanner now incrementally parses only newly appended log bytes (tracking a per-file byte offset and buffering any half-written trailing line) instead of re-reading and re-validating the whole file on every update.
+- Context-usage panel now breaks the conversation into three buckets — Cached context, Cache write, and New input — derived from the model's own token-usage fields, replacing the single "Conversation" bucket.
+- Added an optional deep MCP status probe: set `HAPPY_MCP_HANDSHAKE_PROBE=1` to verify stdio MCP servers with a real `initialize` JSON-RPC handshake (timeout via `HAPPY_MCP_HANDSHAKE_TIMEOUT_MS`, default 3s) instead of only PATH-resolving the command. A successful handshake is cached for 5 minutes; a failed or timed-out handshake degrades to the PATH-resolve result. Off by default.
+
 ## 0.78.0 - 2026-05-13
 
 Upgraded Claude Agent SDK and added background tasks support.

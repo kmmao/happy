@@ -629,12 +629,19 @@ export async function claudeRemote(opts: {
   // each assistant message arrives; read by controller.getContextUsage() so
   // the App's context-window panel shows real token counts in PTY mode.
   let latestUsage: UsageSnapshot | null = null;
+  // Replay-snapshot getter for approveExitPlanWhenPickerReady()'s first
+  // detection layer. The router (which owns the ANSI-aware replay buffer) is
+  // created further below, so we start with an empty-string default and
+  // reassign once it attaches. The controller captures this binding by
+  // reference via the `() => getReplaySnapshot()` indirection below.
+  let getReplaySnapshot: () => string = () => "";
   const controller = createClaudePtyController(
     pty,
     () => latestUsage,
     // Expose the launch-time MCP server map so mcpServerStatus() can list
     // configured servers even without a live SDK connection.
     () => (opts.mcpServers ?? {}),
+    () => getReplaySnapshot(),
   );
   opts.onQueryReady?.(controller);
   logger.debug(
@@ -664,6 +671,11 @@ export async function claudeRemote(opts: {
         void bridgeExit(terminalId, exitCode);
       },
     });
+
+    // Now that the router (and its replay buffer) exists, let the controller
+    // read the live screen snapshot. approveExitPlanWhenPickerReady() uses it
+    // to detect a plan-mode picker already drawn before it subscribed.
+    getReplaySnapshot = () => router.snapshot();
 
     // Reverse-channel server: lets the daemon POST App keystrokes/resizes
     // back into the PTY. Failure to start is non-fatal — observation
