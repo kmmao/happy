@@ -163,6 +163,21 @@ export async function claudeRemoteLauncher(
       logger.debug(
         `[remote]: execution guard reserve skipped (state=${snapshot.state}, gen=${snapshot.generation})`,
       );
+      // claudeRemote only asks for the next message after the previous turn
+      // has drained, so a lingering "running" state here means the prior
+      // turn's finishTurn() never fired — e.g. a PTY-mode interrupt, which
+      // stops the TUI but emits no turn-complete event. Left as-is, start()
+      // below returns null on a "running" guard, activeTurnGeneration keeps
+      // pointing at the dead generation, and the dequeued message still gets
+      // typed into the PTY with no turn lifecycle: it renders but never
+      // executes (the "sends content but doesn't run" hang). Reconcile the
+      // stale generation so start() can open a fresh turn. We only touch
+      // "running" — "restarting"/"interrupting" already let start() proceed
+      // and are relied on by the plan-mode continue path.
+      if (snapshot.state === "running" && activeTurnGeneration !== null) {
+        executionGuard.end(activeTurnGeneration);
+        activeTurnGeneration = null;
+      }
     }
     const generation = executionGuard.start();
     if (generation !== null) {
@@ -322,6 +337,13 @@ export async function claudeRemoteLauncher(
     if (currentQuery) {
       try {
         await currentQuery.interrupt();
+        // A PTY interrupt stops the TUI mid-turn but never emits a
+        // turn-complete event, so onTurnComplete()/finishTurn() would not
+        // fire on its own and the execution guard would stay "running" on the
+        // interrupted generation. Reconcile it here so the next message can
+        // reserve a fresh turn instead of being skipped (and silently typed
+        // into the PTY without ever executing).
+        finishTurn();
       } catch (e) {
         logger.debug("[remote]: interrupt() threw — falling back to abort", e);
         await abort();
