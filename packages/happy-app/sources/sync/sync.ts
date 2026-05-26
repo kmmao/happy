@@ -142,6 +142,10 @@ import {
   cleanupSessionLocallyCore,
   type MessageFetchContext,
 } from "./syncMessageFetch";
+import {
+  prefetchOlderMessagesInBackground,
+  type OlderMessagePrefetchDeps,
+} from "./messagePrefetch";
 
 type V3GetSessionMessagesResponse = {
   messages: ApiMessage[];
@@ -186,6 +190,8 @@ class Sync {
   // ensuring users can always access their full message history.
   private backfilledSessions = new Set<string>();
   private sessionOldestSeq = new Map<string, number>();
+  // Sessions with a running background older-message prefetch loop (re-entrancy guard).
+  private backgroundPrefetchSessions = new Set<string>();
   // Tracks recently processed WebSocket message server-IDs per session.
   // Prevents double-delivery of the same event (e.g. "Context was reset" appearing twice
   // when the same new-message WebSocket event is processed by both direct delivery and
@@ -685,6 +691,7 @@ class Sync {
       },
       sessionId,
     );
+    this.backgroundPrefetchSessions.delete(sessionId);
     if (this.lastVisibleSessionId === sessionId) {
       this.lastVisibleSessionId = null;
     }
@@ -735,6 +742,7 @@ class Sync {
       // Release backfill tracking (will re-backfill on next visit)
       this.backfilledSessions.delete(sessionId);
       this.sessionOldestSeq.delete(sessionId);
+      this.backgroundPrefetchSessions.delete(sessionId);
     }
     if (sessionIds.length > 0) {
       log.log(`♻️ Released resources for ${sessionIds.length} evicted session(s)`);
@@ -2120,8 +2128,27 @@ class Sync {
     };
   }
 
+  private get olderMessagePrefetchDeps(): OlderMessagePrefetchDeps {
+    return {
+      fetchOlderMessages: this.fetchOlderMessages,
+      hasServerOlderMessages: (sessionId) =>
+        storage.getState().sessionMessages[sessionId]?.hasServerOlderMessages ??
+        false,
+      hasSessionEncryption: (sessionId) =>
+        this.encryption.getSessionEncryption(sessionId) !== null,
+      getOldestSeq: (sessionId) => this.sessionOldestSeq.get(sessionId),
+      activePrefetches: this.backgroundPrefetchSessions,
+    };
+  }
+
   private fetchMessages = async (sessionId: string) => {
     await fetchMessagesAction(this.messageFetchCtx, sessionId);
+    // Once the initial page is in, fire-and-forget the background loop that
+    // pulls the remaining history so scrolling up never blocks on the network.
+    void prefetchOlderMessagesInBackground(
+      this.olderMessagePrefetchDeps,
+      sessionId,
+    );
   };
 
   private registerPushToken = async () => {
