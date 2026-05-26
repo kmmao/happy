@@ -19,6 +19,10 @@ import { RawJSONLines } from "@/claude/types";
 import { randomUUID } from "node:crypto";
 import { createId } from "@paralleldrive/cuid2";
 import { AsyncLock } from "@/utils/lock";
+import {
+  createSmartReconnect,
+  type SmartReconnectHandle,
+} from "@/utils/smartReconnect";
 import { RpcHandlerManager } from "./rpc/RpcHandlerManager";
 import { registerCommonHandlers } from "../modules/common/registerCommonHandlers";
 import {
@@ -189,6 +193,7 @@ export class ApiSessionClient extends EventEmitter {
   private agentState: AgentState | null;
   private agentStateVersion: number;
   private socket: Socket<ServerToClientEvents, ClientToServerEvents>;
+  private reconnect: SmartReconnectHandle;
   private pendingMessages: UserMessage[] = [];
   private pendingMessageCallback: ((message: UserMessage) => void) | null =
     null;
@@ -307,13 +312,18 @@ export class ApiSessionClient extends EventEmitter {
         sessionId: this.sessionId,
       },
       path: "/v1/updates",
-      reconnection: true,
-      reconnectionAttempts: Infinity,
-      reconnectionDelay: 1000,
-      reconnectionDelayMax: 5000,
+      // socket.io's built-in auto-reconnect latches onto Power-Nap WiFi blips
+      // and creates server-side zombie sessions; we self-manage reconnection
+      // through SmartReconnect (network + lid + external-display gated).
+      reconnection: false,
       transports: ["websocket"],
       withCredentials: true,
       autoConnect: false,
+    });
+
+    this.reconnect = createSmartReconnect({
+      connect: () => this.socket.connect(),
+      log: (message) => logger.debug(`[API] reconnect: ${message}`),
     });
 
     //
@@ -322,6 +332,7 @@ export class ApiSessionClient extends EventEmitter {
 
     this.socket.on("connect", () => {
       logger.debug("Socket connected successfully");
+      this.reconnect.cancel();
       this.rpcHandlerManager.onSocketConnect(this.socket);
       // Send initial heartbeat immediately so server knows session is alive.
       // Without this, lastActiveAt stays stale and the 10-minute timeout may fire.
@@ -343,11 +354,13 @@ export class ApiSessionClient extends EventEmitter {
     this.socket.on("disconnect", (reason) => {
       logger.debug("[API] Socket disconnected:", reason);
       this.rpcHandlerManager.onSocketDisconnect();
+      this.reconnect.schedule();
     });
 
     this.socket.on("connect_error", (error) => {
       logger.debug("[API] Socket connection error:", error);
       this.rpcHandlerManager.onSocketDisconnect();
+      this.reconnect.schedule();
     });
 
     // Server events
@@ -1458,6 +1471,7 @@ export class ApiSessionClient extends EventEmitter {
     }
     this.sendSync.stop();
     this.receiveSync.stop();
+    this.reconnect.shutdown();
     this.socket.close();
   }
 }

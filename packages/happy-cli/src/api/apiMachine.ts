@@ -7,6 +7,10 @@ import { io, Socket } from "socket.io-client";
 import { logger } from "@/ui/logger";
 import { configuration } from "@/configuration";
 import {
+  createSmartReconnect,
+  type SmartReconnectHandle,
+} from "@/utils/smartReconnect";
+import {
   MachineMetadata,
   DaemonState,
   Machine,
@@ -385,6 +389,7 @@ const TAILSCALE_REFRESH_MS = 5 * 60 * 1000; // 5 minutes
 
 export class ApiMachineClient {
   private socket!: Socket<ServerToDaemonEvents, DaemonToServerEvents>;
+  private reconnect: SmartReconnectHandle | null = null;
   private keepAliveInterval: NodeJS.Timeout | null = null;
   private tailscaleRefreshInterval: NodeJS.Timeout | null = null;
   private lastTailscaleInfo: TailscaleInfo | null = null;
@@ -1413,13 +1418,20 @@ export class ApiMachineClient {
         machineId: this.machine.id,
       },
       path: "/v1/updates",
-      reconnection: true,
-      reconnectionDelay: 1000,
-      reconnectionDelayMax: 5000,
+      // Self-managed reconnection (see SmartReconnect) replaces socket.io's
+      // built-in auto-reconnect, which otherwise revives zombie connections on
+      // Power-Nap WiFi blips after lid-close.
+      reconnection: false,
+    });
+
+    this.reconnect = createSmartReconnect({
+      connect: () => this.socket.connect(),
+      log: (message) => logger.debug(`[API MACHINE] reconnect: ${message}`),
     });
 
     this.socket.on("connect", () => {
       logger.debug("[API MACHINE] Connected to server; waiting for auth-ready");
+      this.reconnect?.cancel();
 
       // Cancel any pending disconnect cleanup timer as soon as transport is back.
       if (this.disconnectCleanupTimer) {
@@ -1488,6 +1500,7 @@ export class ApiMachineClient {
     this.socket.on("disconnect", () => {
       logger.debug("[API MACHINE] Disconnected from server");
       this.rpcHandlerManager.onSocketDisconnect();
+      this.reconnect?.schedule();
       this.stopKeepAlive();
       this.stopTailscaleRefresh();
       this.terminalManager.closeAll();
@@ -1620,6 +1633,7 @@ export class ApiMachineClient {
 
     this.socket.on("connect_error", (error) => {
       logger.debug(`[API MACHINE] Connection error: ${error.message}`);
+      this.reconnect?.schedule();
     });
 
     this.socket.io.on("error", (error: any) => {
@@ -1739,6 +1753,7 @@ export class ApiMachineClient {
 
   shutdown() {
     logger.debug("[API MACHINE] Shutting down");
+    this.reconnect?.shutdown();
     this.stopKeepAlive();
     this.stopTailscaleRefresh();
     if (this.socket) {

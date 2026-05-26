@@ -12,7 +12,7 @@ import {
 import { logger } from "@/ui/logger";
 import { authAndSetupMachineIfNeeded } from "@/ui/auth";
 import { configuration } from "@/configuration";
-import { startCaffeinate, stopCaffeinate } from "@/utils/caffeinate";
+import { cleanupOrphanCaffeinate, startCaffeinate, stopCaffeinate } from "@/utils/caffeinate";
 import packageJson from "../../package.json";
 import { getEnvironmentInfo } from "@/ui/doctor";
 import { spawnHappyCLI } from "@/utils/spawnHappyCLI";
@@ -197,7 +197,10 @@ export async function startDaemon(): Promise<void> {
   // 2. Should not have another daemon process running
 
   try {
-    // Start caffeinate
+    // Reap any caffeinate orphaned by a previous daemon crash, then start ours.
+    // caffeinate is owned solely by the daemon — sessions no longer spawn their
+    // own — so a single managed process keeps the machine awake.
+    cleanupOrphanCaffeinate();
     const caffeinateStarted = startCaffeinate();
     if (caffeinateStarted) {
       logger.debug("[DAEMON RUN] Sleep prevention enabled");

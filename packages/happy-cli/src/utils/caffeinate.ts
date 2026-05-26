@@ -3,11 +3,30 @@
  * Uses the built-in macOS caffeinate command to keep the system awake
  */
 
-import { spawn, ChildProcess } from 'child_process'
+import { spawn, ChildProcess, execFileSync } from 'child_process'
+import { existsSync, readFileSync, unlinkSync, writeFileSync } from 'fs'
+import { join } from 'path'
 import { logger } from '@/ui/logger'
 import { configuration } from '@/configuration'
 
 let caffeinateProcess: ChildProcess | null = null
+
+/**
+ * Path to the pidfile recording the daemon-owned caffeinate PID. Used to clean
+ * up an orphaned caffeinate left behind by a previous daemon that exited without
+ * a chance to stop it (e.g. a crash).
+ */
+function caffeinatePidFile(): string {
+    return join(configuration.happyHomeDir, 'caffeinate.pid')
+}
+
+function removeCaffeinatePidFile(): void {
+    try {
+        unlinkSync(caffeinatePidFile())
+    } catch {
+        // Pidfile may not exist; ignore.
+    }
+}
 
 /**
  * Start caffeinate to prevent system sleep
@@ -51,7 +70,18 @@ export function startCaffeinate(): boolean {
         caffeinateProcess.on('exit', (code, signal) => {
             logger.debug(`[caffeinate] Process exited with code ${code}, signal ${signal}`)
             caffeinateProcess = null
+            removeCaffeinatePidFile()
         })
+
+        // Record the PID so a future daemon can reap this process if we crash
+        // before stopCaffeinate() runs.
+        if (caffeinateProcess.pid) {
+            try {
+                writeFileSync(caffeinatePidFile(), String(caffeinateProcess.pid))
+            } catch (error) {
+                logger.debug('[caffeinate] Failed to write pidfile:', error)
+            }
+        }
 
         logger.debug(`[caffeinate] Started with PID ${caffeinateProcess.pid}`)
         
@@ -92,11 +122,60 @@ export async function stopCaffeinate(): Promise<void> {
                 caffeinateProcess.kill('SIGKILL')
             }
             caffeinateProcess = null
+            removeCaffeinatePidFile()
             isStopping = false
         } catch (error) {
             logger.debug('[caffeinate] Error stopping caffeinate:', error)
             isStopping = false
         }
+    }
+}
+
+/**
+ * Reap an orphaned caffeinate process recorded by a previous daemon run.
+ *
+ * caffeinate is owned solely by the daemon; sessions no longer spawn their own.
+ * If a daemon crashes without running stopCaffeinate(), its caffeinate is
+ * reparented to init and keeps the Mac awake forever. On startup the new daemon
+ * checks the recorded PID and — only if it is still a live `caffeinate` process
+ * (verified via `ps`, so a recycled PID is never killed) — terminates it.
+ * No-op on non-macOS platforms.
+ */
+export function cleanupOrphanCaffeinate(): void {
+    if (process.platform !== 'darwin') {
+        return
+    }
+    const pidFile = caffeinatePidFile()
+    if (!existsSync(pidFile)) {
+        return
+    }
+    try {
+        const pid = parseInt(readFileSync(pidFile, 'utf8').trim(), 10)
+        if (Number.isInteger(pid) && pid > 0 && isCaffeinateProcess(pid)) {
+            logger.debug(`[caffeinate] Reaping orphan caffeinate PID ${pid} from a previous run`)
+            try {
+                process.kill(pid, 'SIGTERM')
+            } catch (error) {
+                logger.debug('[caffeinate] Failed to kill orphan caffeinate:', error)
+            }
+        }
+    } catch (error) {
+        logger.debug('[caffeinate] Failed to clean orphan caffeinate:', error)
+    } finally {
+        removeCaffeinatePidFile()
+    }
+}
+
+/** True when `pid` is a currently running `caffeinate` process. */
+function isCaffeinateProcess(pid: number): boolean {
+    try {
+        const comm = execFileSync('ps', ['-p', String(pid), '-o', 'comm='], {
+            encoding: 'utf8',
+        }).trim()
+        return comm.includes('caffeinate')
+    } catch {
+        // `ps` exits non-zero when the PID is not running.
+        return false
     }
 }
 

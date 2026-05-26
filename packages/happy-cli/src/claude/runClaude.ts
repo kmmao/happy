@@ -12,7 +12,7 @@ import { Credentials, readSettings, readSessionKey, writeSessionKey } from "@/pe
 import { EnhancedMode, PermissionMode } from "./loop";
 import { MessageQueue2 } from "@/utils/MessageQueue2";
 import { hashObject } from "@/utils/deterministicJson";
-import { startCaffeinate, stopCaffeinate } from "@/utils/caffeinate";
+import { stopCaffeinate } from "@/utils/caffeinate";
 import {
   markDisabledMcpServers,
   readClaudeDisabledMcpServers,
@@ -480,12 +480,6 @@ export async function runClaude(
     ...currentState,
     controlledByUser: options.startingMode !== "remote",
   }));
-
-  // Start caffeinate to prevent sleep on macOS
-  const caffeinateStarted = startCaffeinate();
-  if (caffeinateStarted) {
-    logger.infoDeveloper("Sleep prevention enabled (macOS)");
-  }
 
   // Import MessageQueue2 and create message queue
   const messageQueue = new MessageQueue2<EnhancedMode>((mode) =>
