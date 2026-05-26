@@ -157,6 +157,53 @@ export async function claudeRemoteLauncher(
   });
   let activeTurnGeneration: number | null = null;
 
+  // ── Stranded-turn diagnostics (#122 PTY-migration hang) ──────────────
+  // When a turn ends abnormally without emitting onTurnComplete, the
+  // ExecutionGuard stays "running" forever: the next user message is typed
+  // into a dead PTY ("renders but never executes") and the App's thinking
+  // indicator never clears. These probes are LOG-ONLY — they capture the
+  // exact moment and state so the strand can be confirmed from the session
+  // log without changing behaviour. Grep `[remote][strand]` to find hits.
+  // The auto-recovery watchdog (interrupt + cold restart) is deferred until
+  // a captured occurrence confirms which path strands.
+  let lastClaudeOutputAt = Date.now();
+  let turnWatchdog: ReturnType<typeof setInterval> | null = null;
+  const WATCHDOG_TICK_MS = 20_000;
+  const WATCHDOG_IDLE_WARN_MS = 60_000;
+
+  const strandDiagState = (): string => {
+    const snap = executionGuard.getSnapshot();
+    return (
+      `guard=${snap.state} gen=${snap.generation} activeGen=${activeTurnGeneration} ` +
+      `idle=${Date.now() - lastClaudeOutputAt}ms ongoingTools=${ongoingToolCalls.size} ` +
+      `pendingElicit=${pendingElicitations.size}`
+    );
+  };
+
+  function startTurnWatchdog(): void {
+    stopTurnWatchdog();
+    turnWatchdog = setInterval(() => {
+      const snap = executionGuard.getSnapshot();
+      if (snap.state !== "running") return;
+      const idleMs = Date.now() - lastClaudeOutputAt;
+      if (idleMs < WATCHDOG_IDLE_WARN_MS) return;
+      // Skip legitimate long waits: an active tool (e.g. a slow Bash) or a
+      // pending MCP elicitation explains the silence without being a strand.
+      if (ongoingToolCalls.size > 0 || pendingElicitations.size > 0) return;
+      logger.debug(
+        `[remote][strand] turn appears stranded — PTY silent ${idleMs}ms while guard running. ${strandDiagState()}`,
+      );
+    }, WATCHDOG_TICK_MS);
+    if (typeof turnWatchdog.unref === "function") turnWatchdog.unref();
+  }
+
+  function stopTurnWatchdog(): void {
+    if (turnWatchdog) {
+      clearInterval(turnWatchdog);
+      turnWatchdog = null;
+    }
+  }
+
   const dispatchTurn = (reason: "user_message" | "continue" | "isolated_command" | "mode_change") => {
     if (!executionGuard.reserve(reason)) {
       const snapshot = executionGuard.getSnapshot();
@@ -175,6 +222,9 @@ export async function claudeRemoteLauncher(
       // "running" — "restarting"/"interrupting" already let start() proceed
       // and are relied on by the plan-mode continue path.
       if (snapshot.state === "running" && activeTurnGeneration !== null) {
+        logger.debug(
+          `[remote][strand] reconciling stranded turn — force-ending stale gen=${activeTurnGeneration} (no onTurnComplete before next message). ${strandDiagState()}`,
+        );
         executionGuard.end(activeTurnGeneration);
         activeTurnGeneration = null;
       }
@@ -182,10 +232,12 @@ export async function claudeRemoteLauncher(
     const generation = executionGuard.start();
     if (generation !== null) {
       activeTurnGeneration = generation;
+      startTurnWatchdog();
     }
   };
 
   const finishTurn = () => {
+    stopTurnWatchdog();
     if (activeTurnGeneration === null) {
       executionGuard.cancelReservation();
       return;
@@ -668,6 +720,9 @@ export async function claudeRemoteLauncher(
   let planModeLockdownActive = false;
 
   function onMessage(message: ClaudeJsonlMessage) {
+    // Any message from Claude's PTY counts as activity — refreshes the
+    // stranded-turn watchdog so legitimate long-running turns don't warn.
+    lastClaudeOutputAt = Date.now();
     // ── Stream events (partial messages) → text-delta envelopes ────────
     // Intercept before the rest of the pipeline. stream_event messages
     // carry raw API SSE chunks (text_delta, thinking_delta) that are
@@ -1955,9 +2010,12 @@ export async function claudeRemoteLauncher(
           modeHash = item.modeHash;
           mode = item.mode;
 
-          // Push the message to the SDK for mid-turn injection
+          // Push the message to the SDK for mid-turn injection.
+          // Strand probe: if the turn is dead (guard running, high idle, no
+          // active tools), this push types into a wedged PTY and won't run —
+          // the state captured here proves it from the log.
           logger.debug(
-            `[remote]: mid-turn push — ${item.message.length} chars`,
+            `[remote]: mid-turn push — ${item.message.length} chars. ${strandDiagState()}`,
           );
           pushFn({
             type: "user",
@@ -2599,6 +2657,10 @@ export async function claudeRemoteLauncher(
         stopMidTurnDrain();
         midTurnPushFn = null;
 
+        // The PTY process for this launch iteration is gone — stop the
+        // stranded-turn watchdog (a fresh turn re-arms it via dispatchTurn).
+        stopTurnWatchdog();
+
         // Clear query reference immediately to prevent stale interrupt/stopTask calls
         currentQuery = null;
 
@@ -2736,6 +2798,7 @@ export async function claudeRemoteLauncher(
       abortFuture.resolve(undefined);
     }
 
+    stopTurnWatchdog();
     executionGuard.close();
   }
 
