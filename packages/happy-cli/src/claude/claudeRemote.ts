@@ -743,6 +743,23 @@ export async function claudeRemote(opts: {
   };
   updateThinking(true);
 
+  // PTY-mode interrupt (Esc — see claudePtyRuntime.interrupt) stops the current
+  // turn, but the Claude TUI never writes a `turn_duration` marker for an
+  // interrupted turn — and `handleResult` (the only mid-run caller of
+  // `updateThinking(false)`) only fires off that marker. Left alone, the App's
+  // sdkSessionState stays "running" after an interrupt: the abort button never
+  // clears and, worse, the message queue's "Send now" action — which drains
+  // only once `isRunning` flips to false — silently no-ops, so users tap it
+  // repeatedly before a queued message happens to go out. Wrap the controller's
+  // interrupt so a successful Esc also marks the turn idle, handing the App a
+  // deterministic running→idle signal. `updateThinking` dedupes, so a real
+  // `turn_duration` arriving later (or a second interrupt) is a harmless no-op.
+  const writeInterrupt = controller.interrupt.bind(controller);
+  controller.interrupt = async () => {
+    await writeInterrupt();
+    updateThinking(false);
+  };
+
   // Single chokepoint for writing a user prompt to the PTY. Marking thinking
   // here (rather than waiting for the JSONL stream to emit a non-result
   // system record) is what keeps the App's status indicator in lockstep with

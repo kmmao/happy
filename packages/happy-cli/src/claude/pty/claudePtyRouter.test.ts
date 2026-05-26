@@ -53,7 +53,7 @@ function makeFakePty(): {
       return true;
     },
     interrupt() {
-      writes.push("\x03");
+      writes.push("\x1b");
       return true;
     },
     kill() {

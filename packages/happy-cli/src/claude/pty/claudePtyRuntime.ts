@@ -76,7 +76,12 @@ export interface ClaudePtyHandle {
   write(data: string): boolean;
   /** Resize the PTY. Returns true on success. */
   resize(cols: number, rows: number): boolean;
-  /** Send SIGINT to the child (equivalent to Ctrl-C in the terminal). */
+  /**
+   * Stop the current turn by writing the Esc key (0x1b) to PTY stdin — the
+   * Claude TUI's "esc to interrupt" key. NOT Ctrl-C: the TUI runs in raw mode
+   * where Ctrl-C means "press again to exit", so it never stopped generation.
+   * Returns true if the write was accepted.
+   */
   interrupt(): boolean;
   /** Send signal and clean up. Falls back to SIGKILL after `graceMs`. */
   kill(signal?: NodeJS.Signals, graceMs?: number): void;
@@ -197,12 +202,17 @@ export function startClaudePty(opts: ClaudePtyRuntimeOptions = {}): ClaudePtyHan
     },
     interrupt() {
       if (state.exited) return false;
-      // Ctrl-C byte (0x03) — TUIs handle this as an interrupt at the line
-      // discipline level, which is the right semantics for "stop current
-      // task" in claude. We avoid SIGINT to the process group to keep the
-      // session alive.
+      // Esc byte (0x1b) — NOT Ctrl-C. The Claude TUI runs its PTY in raw mode
+      // (ISIG off), so Ctrl-C (0x03) is delivered as a literal keystroke, and
+      // the TUI treats it as "press again to exit", not "stop generation" — so
+      // sending \x03 left the turn running (the "stop button does nothing /
+      // takes several taps" bug). Esc is the TUI's actual interrupt key (the
+      // "esc to interrupt" hint shown during a turn). A lone \x1b resolves to a
+      // bare Escape press once the TUI's escape-sequence timeout fires (nothing
+      // follows it), exactly as a human pressing Esc. We never send SIGINT to
+      // the process group, to keep the session alive.
       try {
-        child.write("\x03");
+        child.write("\x1b");
         return true;
       } catch (err) {
         logger.debug(`[claudePty] interrupt write failed: ${err instanceof Error ? err.message : String(err)}`);

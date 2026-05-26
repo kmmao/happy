@@ -17,7 +17,9 @@
  * What remains on this controller is the subset that still has a real
  * behaviour in PTY mode:
  *
- *   • interrupt()                       → write Ctrl-C (0x03) to PTY stdin
+ *   • interrupt()                       → write Esc (0x1b) to PTY stdin
+ *                                          (the TUI's "esc to interrupt" key —
+ *                                          NOT Ctrl-C, which is "press to exit")
  *   • approveExitPlan()                 → write "1\r" to confirm TUI plan-mode dialog
  *   • approveExitPlanWhenPickerReady()  → react to picker appearing in onData,
  *                                          with 2 s blind fallback
@@ -118,7 +120,12 @@ function maxTokensForModel(model: string): number {
  * proved to be dead paths; cold restart via `coldModeHash` replaces them.
  */
 export interface ClaudePtyController {
-  /** Send SIGINT-equivalent to the PTY (Ctrl-C). */
+  /**
+   * Stop the current turn by writing the TUI's Esc interrupt key (0x1b) to
+   * PTY stdin. NOT Ctrl-C: the Claude TUI runs in raw mode where Ctrl-C means
+   * "press again to exit" rather than "stop generation", so \x03 left the turn
+   * running. Esc is the "esc to interrupt" key the TUI hints during a turn.
+   */
   interrupt(): Promise<void>;
   /**
    * Approve the Claude TUI's ExitPlanMode confirmation dialog by writing
@@ -308,7 +315,7 @@ export function createClaudePtyController(
 ): ClaudePtyController {
   return {
     async interrupt() {
-      logger.debug("[ptyController] interrupt → Ctrl-C");
+      logger.debug("[ptyController] interrupt → Esc");
       pty.interrupt();
     },
 
