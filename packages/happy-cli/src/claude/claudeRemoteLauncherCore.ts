@@ -157,19 +157,30 @@ export async function claudeRemoteLauncher(
   });
   let activeTurnGeneration: number | null = null;
 
-  // ── Stranded-turn diagnostics (#122 PTY-migration hang) ──────────────
-  // When a turn ends abnormally without emitting onTurnComplete, the
-  // ExecutionGuard stays "running" forever: the next user message is typed
-  // into a dead PTY ("renders but never executes") and the App's thinking
-  // indicator never clears. These probes are LOG-ONLY — they capture the
-  // exact moment and state so the strand can be confirmed from the session
-  // log without changing behaviour. Grep `[remote][strand]` to find hits.
-  // The auto-recovery watchdog (interrupt + cold restart) is deferred until
-  // a captured occurrence confirms which path strands.
+  // ── Stranded-turn watchdog + auto-recovery (#122 PTY-migration hang) ──
+  // A turn can wedge so the Claude TUI neither writes its `turn_duration`
+  // marker (so handleResult → updateThinking(false) never fires) nor exits
+  // (so claudeRemote's exit `finally` — the other updateThinking(false) —
+  // never runs). claudeRemote stays parked on `await exitPromise`, the
+  // ExecutionGuard stays "running", and the 2s keep-alive heartbeat keeps
+  // broadcasting thinking=true: the App spinner spins forever and the next
+  // user message is held client-side ("running → queue, don't send"), so
+  // resending never helps and only a manual restart recovers.
+  //
+  // The watchdog detects this — PTY silent past a threshold while the guard
+  // is still "running" and no tool / elicitation explains the silence — and
+  // drives two-tier recovery (see recoverStrandedTurn). A live turn always
+  // streams tokens (refreshing lastClaudeOutputAt via onMessage), so a long
+  // legitimate turn never trips it. Grep `[remote][strand]` for activity.
   let lastClaudeOutputAt = Date.now();
   let turnWatchdog: ReturnType<typeof setInterval> | null = null;
+  let strandRecoveryInFlight = false;
+  let lastColdRestartAt = 0;
   const WATCHDOG_TICK_MS = 20_000;
-  const WATCHDOG_IDLE_WARN_MS = 60_000;
+  const WATCHDOG_IDLE_WARN_MS = 60_000; // log-only "looks stranded" warning
+  const WATCHDOG_IDLE_RECOVER_MS = 120_000; // trigger auto-recovery
+  const STRAND_TIER1_GRACE_MS = 10_000; // wait after interrupt before tier-2
+  const MIN_COLD_RESTART_INTERVAL_MS = 300_000; // rate-limit tier-2 restarts
 
   const strandDiagState = (): string => {
     const snap = executionGuard.getSnapshot();
@@ -190,6 +201,13 @@ export async function claudeRemoteLauncher(
       // Skip legitimate long waits: an active tool (e.g. a slow Bash) or a
       // pending MCP elicitation explains the silence without being a strand.
       if (ongoingToolCalls.size > 0 || pendingElicitations.size > 0) return;
+      if (idleMs >= WATCHDOG_IDLE_RECOVER_MS && !strandRecoveryInFlight) {
+        logger.debug(
+          `[remote][strand] PTY silent ${idleMs}ms while guard running — starting auto-recovery. ${strandDiagState()}`,
+        );
+        void recoverStrandedTurn(idleMs);
+        return;
+      }
       logger.debug(
         `[remote][strand] turn appears stranded — PTY silent ${idleMs}ms while guard running. ${strandDiagState()}`,
       );
@@ -201,6 +219,59 @@ export async function claudeRemoteLauncher(
     if (turnWatchdog) {
       clearInterval(turnWatchdog);
       turnWatchdog = null;
+    }
+  }
+
+  // Two-tier recovery for a confirmed strand (driven by the watchdog above).
+  //
+  // Tier 1 — graceful interrupt via doInterrupt(): currentQuery.interrupt()
+  //   writes Esc to the PTY (reaching the wrapped controller.interrupt in
+  //   claudeRemote.ts, which fires updateThinking(false)) and finishTurn()
+  //   reconciles the guard. The Esc write + updateThinking(false) do NOT
+  //   depend on the wedged TUI reacting, so this alone clears the App
+  //   spinner and unblocks client-side sending. If the TUI honours the Esc
+  //   it resumes printing — lastClaudeOutputAt advances past `interruptAt`.
+  //
+  // Tier 2 — if the PTY stays silent through the grace window the TUI is
+  //   truly wedged (the next message would strand too), so abort() the
+  //   controller and let `while (!exitReason)` cold-restart a fresh PTY.
+  //   claudeRemote's exit `finally` guarantees updateThinking(false) on the
+  //   way out. Rate-limited so a persistently broken session can't thrash.
+  async function recoverStrandedTurn(idleMs: number): Promise<void> {
+    if (strandRecoveryInFlight || exitReason) return;
+    strandRecoveryInFlight = true;
+    const interruptAt = Date.now();
+    try {
+      logger.debug(
+        `[remote][strand] auto-recovery tier-1 (graceful interrupt) after ${idleMs}ms PTY silence. ${strandDiagState()}`,
+      );
+      await doInterrupt();
+      await new Promise<void>((resolve) =>
+        setTimeout(resolve, STRAND_TIER1_GRACE_MS),
+      );
+      if (exitReason || lastClaudeOutputAt > interruptAt) {
+        logger.debug(
+          "[remote][strand] auto-recovery tier-1 succeeded — PTY responsive again.",
+        );
+        return;
+      }
+      if (Date.now() - lastColdRestartAt < MIN_COLD_RESTART_INTERVAL_MS) {
+        logger.debug(
+          "[remote][strand] tier-1 ineffective but tier-2 cold restart suppressed (rate limit) — spinner already cleared, will retry next window.",
+        );
+        return;
+      }
+      logger.debug(
+        `[remote][strand] tier-1 ineffective — escalating to tier-2 cold restart. ${strandDiagState()}`,
+      );
+      lastColdRestartAt = Date.now();
+      await abort();
+    } catch (e) {
+      logger.debug(
+        `[remote][strand] auto-recovery threw: ${e instanceof Error ? e.message : String(e)}`,
+      );
+    } finally {
+      strandRecoveryInFlight = false;
     }
   }
 
