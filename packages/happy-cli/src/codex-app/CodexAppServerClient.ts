@@ -1,6 +1,11 @@
-import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
-import { createInterface, type Interface as ReadLineInterface } from "node:readline";
 import { logger } from "@/ui/logger";
+import {
+  type CodexTransport,
+  type CodexTransportCloseInfo,
+  StdioSpawnTransport,
+  WebSocketTransport,
+  resolveCodexEndpoint,
+} from "./CodexTransport";
 import type { CodexSessionConfig, CodexToolResponse } from "@/codex/types";
 import type { CodexPermissionHandler } from "@/codex/utils/permissionHandler";
 import type { SandboxConfig } from "@/persistence";
@@ -454,8 +459,9 @@ function buildGrantedPermissions(
 }
 
 export class CodexAppServerClient {
-  private process: ChildProcessWithoutNullStreams | null = null;
-  private stdoutReader: ReadLineInterface | null = null;
+  private transport: CodexTransport | null = null;
+  private injectedTransport: CodexTransport | null = null;
+  private readonly endpoint?: string;
   private connected = false;
   private nextRequestId = 1;
   private pendingCalls = new Map<string, PendingCall>();
@@ -492,8 +498,13 @@ export class CodexAppServerClient {
   public readonly supportsModeHotSwap = true;
   public readonly backendKind = "codex-app-server" as const;
 
-  constructor(sandboxConfig?: SandboxConfig) {
+  constructor(
+    sandboxConfig?: SandboxConfig,
+    options?: { endpoint?: string; transport?: CodexTransport },
+  ) {
     this.sandboxConfig = sandboxConfig;
+    this.endpoint = options?.endpoint;
+    this.injectedTransport = options?.transport ?? null;
   }
 
   setHandler(handler: ((event: any) => void) | null): void {
@@ -540,6 +551,49 @@ export class CodexAppServerClient {
       return;
     }
 
+    let transport = this.injectedTransport;
+    if (!transport) {
+      const endpoint = this.endpoint ?? resolveCodexEndpoint();
+      if (endpoint) {
+        // Attach to an externally-managed Codex app-server over WebSocket
+        // instead of spawning (and owning) our own child process. Sandboxing
+        // only applies to processes we spawn, so it is off in this mode.
+        this.sandboxEnabled = false;
+        transport = new WebSocketTransport(endpoint);
+      } else {
+        transport = await this.buildStdioTransport();
+      }
+    }
+
+    transport.onMessage((line) => {
+      void this.handleStdoutLine(line);
+    });
+    transport.onClose((info) => {
+      this.handleTransportClose(info);
+    });
+
+    this.transport = transport;
+    await transport.open();
+
+    await this.sendRequest("initialize", {
+      clientInfo: {
+        name: "happy_codex_app_server",
+        title: "Happy Codex App Server",
+        version: "1.0.0",
+      },
+      capabilities: {
+        experimentalApi: true,
+      },
+    });
+    this.sendNotification("initialized");
+
+    this.capabilities = await this.loadCapabilities();
+    this.connected = true;
+  }
+
+  // Builds the default stdio transport: spawn `codex app-server` (optionally
+  // wrapped for the sandbox) with the same env preparation as before.
+  private async buildStdioTransport(): Promise<CodexTransport> {
     let command = "codex";
     let args = ["app-server"];
     this.sandboxEnabled = false;
@@ -592,53 +646,34 @@ export class CodexAppServerClient {
       env.CODEX_SANDBOX = "seatbelt";
     }
 
-    this.process = spawn(command, args, {
-      stdio: ["pipe", "pipe", "pipe"],
+    return new StdioSpawnTransport({
+      command,
+      args,
       env,
       cwd: process.cwd(),
     });
+  }
 
-    this.stdoutReader = createInterface({ input: this.process.stdout });
-    this.stdoutReader.on("line", (line) => {
-      void this.handleStdoutLine(line);
-    });
-
-    this.process.stderr.on("data", (data) => {
-      logger.debug(`[CodexAppServer][stderr] ${data.toString()}`);
-    });
-
-    this.process.on("exit", (code, signal) => {
-      const error = new Error(
-        `Codex app-server exited with code ${code ?? "unknown"}${
-          signal ? ` (signal ${signal})` : ""
+  // Mirrors the prior child-process "exit" handling: reject everything in
+  // flight and reset connection state when the transport terminates.
+  private handleTransportClose(info: CodexTransportCloseInfo): void {
+    const error =
+      info.error ??
+      new Error(
+        `Codex app-server exited with code ${info.code ?? "unknown"}${
+          info.signal ? ` (signal ${info.signal})` : ""
         }`,
       );
-      for (const pending of this.pendingCalls.values()) {
-        pending.reject(error);
-      }
-      this.pendingCalls.clear();
-      for (const waiter of this.turnWaiters.values()) {
-        waiter.reject(error);
-      }
-      this.turnWaiters.clear();
-      this.connected = false;
-      this.activeTurnId = null;
-    });
-
-    await this.sendRequest("initialize", {
-      clientInfo: {
-        name: "happy_codex_app_server",
-        title: "Happy Codex App Server",
-        version: "1.0.0",
-      },
-      capabilities: {
-        experimentalApi: true,
-      },
-    });
-    this.sendNotification("initialized");
-
-    this.capabilities = await this.loadCapabilities();
-    this.connected = true;
+    for (const pending of this.pendingCalls.values()) {
+      pending.reject(error);
+    }
+    this.pendingCalls.clear();
+    for (const waiter of this.turnWaiters.values()) {
+      waiter.reject(error);
+    }
+    this.turnWaiters.clear();
+    this.connected = false;
+    this.activeTurnId = null;
   }
 
   async loadCapabilities(): Promise<AppServerCapabilities> {
@@ -1128,13 +1163,8 @@ export class CodexAppServerClient {
   }
 
   async disconnect(): Promise<void> {
-    this.stdoutReader?.close();
-    this.stdoutReader = null;
-
-    if (this.process && !this.process.killed) {
-      this.process.kill("SIGKILL");
-    }
-    this.process = null;
+    await this.transport?.close();
+    this.transport = null;
     this.connected = false;
 
     if (this.sandboxCleanup) {
@@ -1902,22 +1932,22 @@ export class CodexAppServerClient {
   }
 
   private sendNotification(method: string): void {
-    this.process?.stdin.write(`${JSON.stringify({ method })}\n`);
+    this.transport?.send(JSON.stringify({ method }));
   }
 
   private sendResponse(id: string | number, result: unknown): void {
-    this.process?.stdin.write(`${JSON.stringify({ id, result })}\n`);
+    this.transport?.send(JSON.stringify({ id, result }));
   }
 
   private sendError(id: string | number, message: string): void {
-    this.process?.stdin.write(
-      `${JSON.stringify({ id, error: { message } })}\n`,
-    );
+    this.transport?.send(JSON.stringify({ id, error: { message } }));
   }
 
   private sendRequest(method: string, params: unknown): Promise<unknown> {
-    if (!this.process) {
-      return Promise.reject(new Error("Codex app-server process not started"));
+    if (!this.transport) {
+      return Promise.reject(
+        new Error("Codex app-server transport not connected"),
+      );
     }
 
     const id = this.nextRequestId++;
@@ -1926,12 +1956,7 @@ export class CodexAppServerClient {
 
     return new Promise((resolve, reject) => {
       this.pendingCalls.set(key, { resolve, reject });
-      this.process?.stdin.write(`${payload}\n`, (error) => {
-        if (error) {
-          this.pendingCalls.delete(key);
-          reject(error);
-        }
-      });
+      this.transport!.send(payload);
     });
   }
 }
