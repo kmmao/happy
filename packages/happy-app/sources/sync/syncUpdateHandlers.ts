@@ -79,7 +79,7 @@ export type UpdateHandlerContext = {
     friendRequestsSync: { invalidate: () => void };
     feedSync: { invalidate: () => void };
     projectsSync: { invalidate: () => void };
-    sessionsSync: { invalidate: () => void };
+    sessionsSync: { invalidate: () => void; awaitQueue: () => Promise<void> };
     assumeUsers: (userIds: string[]) => Promise<void>;
     processedWebSocketMessageIds: Map<string, Set<string>>;
 };
@@ -98,9 +98,17 @@ export async function handleNewMessageUpdate(
     ctx: UpdateHandlerContext,
 ): Promise<void> {
     // Get encryption
-    const encryption = ctx.encryption.getSessionEncryption(body.sid);
+    let encryption = ctx.encryption.getSessionEncryption(body.sid);
     if (!encryption) {
-        log.error(`Session ${body.sid} not found`);
+        // Startup race (#84): the new-message push can arrive before the
+        // sessions sync has finished initializing this session's encryption.
+        // Wait for the in-flight sessions sync to settle, then re-read before
+        // giving up and triggering a refetch.
+        await ctx.sessionsSync.awaitQueue();
+        encryption = ctx.encryption.getSessionEncryption(body.sid);
+    }
+    if (!encryption) {
+        log.error(`Session ${body.sid} not found after awaiting sessions sync`);
         ctx.fetchSessions();
         return;
     }
@@ -444,19 +452,27 @@ export async function handleUpdateSessionUpdate(
     body: Extract<UpdateData["body"], { t: "update-session" }>,
     ctx: UpdateHandlerContext,
 ): Promise<void> {
-    const session = storage.getState().sessions[body.id];
+    let session = storage.getState().sessions[body.id];
+    let sessionEncryption = ctx.encryption.getSessionEncryption(body.id);
+    if (!session || !sessionEncryption) {
+        // Startup race (#80): the update-session push can arrive before the
+        // sessions sync has loaded this session (and its encryption) into
+        // storage. Wait for the in-flight sessions sync to settle, then
+        // re-read before dropping the update.
+        await ctx.sessionsSync.awaitQueue();
+        session = storage.getState().sessions[body.id];
+        sessionEncryption = ctx.encryption.getSessionEncryption(body.id);
+    }
     if (!session) {
         log.warn(
-            `Session ${body.id} not found for update-session; refetching sessions`,
+            `Session ${body.id} not found for update-session after awaiting sessions sync; refetching sessions`,
         );
         ctx.fetchSessions();
         return;
     }
-
-    const sessionEncryption = ctx.encryption.getSessionEncryption(body.id);
     if (!sessionEncryption) {
         log.error(
-            `Session encryption not found for ${body.id} - this should never happen`,
+            `Session encryption not found for ${body.id} after awaiting sessions sync`,
         );
         ctx.fetchSessions();
         return;

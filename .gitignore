@@ -46,6 +46,8 @@ yarn-error.*
 .claude/worktrees/
 .claude/skills/
 .claude/todo.md
+.claude/scheduled_tasks.json
+.claude/scheduled_tasks.lock
 logs/
 !packages/happy-app/sources/text/translations/logs/
 !packages/happy-app/sources/text/translations/logs/untranslated/

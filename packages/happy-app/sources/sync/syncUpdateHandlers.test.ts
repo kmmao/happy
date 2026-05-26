@@ -142,6 +142,33 @@ vi.mock("@/log", () => ({
   },
 }));
 
+function makeBaselineSession() {
+  return {
+    id: "session-1",
+    seq: 1,
+    createdAt: 1,
+    updatedAt: 1,
+    active: true,
+    activeAt: 1,
+    rpcReady: true,
+    metadata: {
+      path: "/repo",
+      machineId: "machine-1",
+    },
+    metadataVersion: 1,
+    agentState: {},
+    agentStateVersion: 1,
+    preferencesVersion: 0,
+    thinking: false,
+    thinkingAt: 0,
+    presence: "online",
+    needsAttention: false,
+    permissionMode: "default",
+    modelMode: "default",
+    draft: null,
+  };
+}
+
 let handleUpdateSessionUpdate: typeof import("./syncUpdateHandlers").handleUpdateSessionUpdate;
 
 describe("handleUpdateSessionUpdate", () => {
@@ -151,30 +178,7 @@ describe("handleUpdateSessionUpdate", () => {
   handleUpdateSessionUpdate = (await import("./syncUpdateHandlers")).handleUpdateSessionUpdate;
 
   mocks.storageState.sessions = {
-      "session-1": {
-        id: "session-1",
-        seq: 1,
-        createdAt: 1,
-        updatedAt: 1,
-        active: true,
-        activeAt: 1,
-        rpcReady: true,
-        metadata: {
-          path: "/repo",
-          machineId: "machine-1",
-        },
-        metadataVersion: 1,
-        agentState: {},
-        agentStateVersion: 1,
-        preferencesVersion: 0,
-        thinking: false,
-        thinkingAt: 0,
-        presence: "online",
-        needsAttention: false,
-        permissionMode: "default",
-        modelMode: "default",
-        draft: null,
-      },
+      "session-1": makeBaselineSession(),
     };
 
     mocks.mergeUpdatedSessionMock.mockReturnValue({
@@ -224,5 +228,133 @@ describe("handleUpdateSessionUpdate", () => {
     expect(decryptAgentState).toHaveBeenCalledTimes(1);
     expect(mocks.invalidateGitStatusMock).not.toHaveBeenCalled();
     expect(mocks.onPermissionRequestedMock).not.toHaveBeenCalled();
+  });
+
+  it("启动竞态下先等待 sessions 同步再重试,而非直接丢弃 (#80)", async () => {
+    // 推送先于 sessions 同步到达:storage 里还没有该 session,encryption 也尚未就绪
+    delete mocks.storageState.sessions["session-1"];
+
+    const decryptAgentState = vi.fn().mockResolvedValue({});
+    const sessionEncryption = {
+      decryptAgentState,
+      decryptMetadata: vi.fn(),
+      decryptPreferences: vi.fn(),
+    };
+
+    // getSessionEncryption:第一次缺失,awaitQueue 之后才可用
+    const getSessionEncryption = vi
+      .fn()
+      .mockReturnValueOnce(undefined)
+      .mockReturnValue(sessionEncryption);
+
+    // awaitQueue:模拟正在进行的 sessions 同步落地,把 session 写回 storage
+    const awaitQueue = vi.fn(async () => {
+      mocks.storageState.sessions["session-1"] = makeBaselineSession();
+    });
+
+    await handleUpdateSessionUpdate(
+      { seq: 9, createdAt: 999 } as any,
+      {
+        t: "update-session",
+        id: "session-1",
+        agentState: { version: 2, value: "encrypted-agent-state" },
+      } as any,
+      {
+        encryption: { getSessionEncryption },
+        applySessions: mocks.applySessionsMock,
+        fetchSessions: mocks.fetchSessionsMock,
+        sessionsSync: { invalidate: vi.fn(), awaitQueue },
+      } as any,
+    );
+
+    expect(awaitQueue).toHaveBeenCalledTimes(1);
+    expect(getSessionEncryption).toHaveBeenCalledTimes(2);
+    expect(mocks.applySessionsMock).toHaveBeenCalledTimes(1);
+    expect(mocks.fetchSessionsMock).not.toHaveBeenCalled();
+  });
+
+  it("等待 sessions 同步后仍缺失时,优雅回退到 refetch (#80)", async () => {
+    // session 始终不存在,即使等待同步队列后也没有出现
+    delete mocks.storageState.sessions["session-1"];
+
+    const getSessionEncryption = vi.fn().mockReturnValue(undefined);
+    const awaitQueue = vi.fn(async () => {
+      // 同步未能补上该 session
+    });
+
+    await handleUpdateSessionUpdate(
+      { seq: 9, createdAt: 999 } as any,
+      {
+        t: "update-session",
+        id: "session-1",
+        agentState: { version: 2, value: "encrypted-agent-state" },
+      } as any,
+      {
+        encryption: { getSessionEncryption },
+        applySessions: mocks.applySessionsMock,
+        fetchSessions: mocks.fetchSessionsMock,
+        sessionsSync: { invalidate: vi.fn(), awaitQueue },
+      } as any,
+    );
+
+    expect(awaitQueue).toHaveBeenCalledTimes(1);
+    expect(mocks.fetchSessionsMock).toHaveBeenCalledTimes(1);
+    expect(mocks.applySessionsMock).not.toHaveBeenCalled();
+  });
+});
+
+let handleNewMessageUpdate: typeof import("./syncUpdateHandlers").handleNewMessageUpdate;
+
+describe("handleNewMessageUpdate", () => {
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    handleNewMessageUpdate = (await import("./syncUpdateHandlers")).handleNewMessageUpdate;
+    mocks.storageState.sessions = {};
+  });
+
+  it("启动竞态下先等待 sessions 同步再重试 encryption,而非直接丢弃 (#84)", async () => {
+    const encryption = { decryptMessage: vi.fn() };
+
+    // encryption 第一次缺失,awaitQueue 之后才就绪
+    const getSessionEncryption = vi
+      .fn()
+      .mockReturnValueOnce(undefined)
+      .mockReturnValue(encryption);
+    const awaitQueue = vi.fn(async () => {});
+
+    // body 不带 message:只验证 race 守卫路径,跳过解密管线
+    await handleNewMessageUpdate(
+      { seq: 9, createdAt: 999 } as any,
+      { t: "new-message", sid: "session-1" } as any,
+      {
+        encryption: { getSessionEncryption },
+        fetchSessions: mocks.fetchSessionsMock,
+        sessionsSync: { invalidate: vi.fn(), awaitQueue },
+      } as any,
+    );
+
+    expect(awaitQueue).toHaveBeenCalledTimes(1);
+    expect(getSessionEncryption).toHaveBeenCalledTimes(2);
+    expect(encryption.decryptMessage).not.toHaveBeenCalled();
+    expect(mocks.fetchSessionsMock).not.toHaveBeenCalled();
+  });
+
+  it("等待 sessions 同步后 encryption 仍缺失时,优雅回退到 refetch (#84)", async () => {
+    const getSessionEncryption = vi.fn().mockReturnValue(undefined);
+    const awaitQueue = vi.fn(async () => {});
+
+    await handleNewMessageUpdate(
+      { seq: 9, createdAt: 999 } as any,
+      { t: "new-message", sid: "session-1" } as any,
+      {
+        encryption: { getSessionEncryption },
+        fetchSessions: mocks.fetchSessionsMock,
+        sessionsSync: { invalidate: vi.fn(), awaitQueue },
+      } as any,
+    );
+
+    expect(awaitQueue).toHaveBeenCalledTimes(1);
+    expect(getSessionEncryption).toHaveBeenCalledTimes(2);
+    expect(mocks.fetchSessionsMock).toHaveBeenCalledTimes(1);
   });
 });
