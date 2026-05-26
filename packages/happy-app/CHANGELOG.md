@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.33.2 - 2026-05-26
+
+Fixes the AskUserQuestion option card rendering above the assistant text that introduced it. When a message's text and its tool call share the same timestamp, the prose now stays above the card, matching natural reading order.
+
+### Chat ordering
+- Fixed AskUserQuestion and permission option cards appearing above the assistant message text — the text and the card it spawns share a timestamp, and the tie-breaker now keeps the text on top in the inverted chat list
+- Improved message-ordering maintainability by extracting the stable comparator into a dedicated `messageOrdering` module covered by unit tests
+
 ## 2.33.1 - 2026-05-26
 
 Web crashes now survive a reload. The error boundary saves every crash to local storage and replays it into the in-app dev logs on the next launch, so render errors are no longer wiped the moment you tap Reload.

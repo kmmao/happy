@@ -62,25 +62,7 @@ import {
   buildSessionPreferencesSnapshot,
   overlayPendingSessionPreferences,
 } from "./sessionPreferencesState";
-
-// Stable descending comparator for messages.
-// When createdAt is identical, use kind priority so that in the newest-first
-// array user-text comes before ready events, which come before agent content.
-// Final tie-breaker is the id string to guarantee deterministic order.
-const MESSAGE_KIND_PRIORITY: Record<string, number> = {
-    "user-text": 0,
-    "agent-event": 1,
-    "agent-text": 2,
-    "tool-call": 3,
-};
-function compareMessagesDesc(a: Message, b: Message): number {
-    const dt = b.createdAt - a.createdAt;
-    if (dt !== 0) return dt;
-    const pa = MESSAGE_KIND_PRIORITY[a.kind] ?? 9;
-    const pb = MESSAGE_KIND_PRIORITY[b.kind] ?? 9;
-    if (pa !== pb) return pa - pb;
-    return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
-}
+import { compareMessagesDesc } from "./messageOrdering";
 
 // Debounce timer for realtimeMode changes
 let realtimeModeDebounceTimer: ReturnType<typeof setTimeout> | null = null;
