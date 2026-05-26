@@ -2,10 +2,11 @@
 
 ## 2.33.2 - 2026-05-26
 
-Fixes the AskUserQuestion option card rendering above the assistant text that introduced it. When a message's text and its tool call share the same timestamp, the prose now stays above the card, matching natural reading order.
+Fixes the question/permission option card rendering above the assistant text that introduced it. The conclusion now always comes first, with the choices below it, matching natural reading order — both when the text and its tool call share a timestamp and in PTY/Yolo mode where the picker request carried an earlier timestamp.
 
 ### Chat ordering
-- Fixed AskUserQuestion and permission option cards appearing above the assistant message text — the text and the card it spawns share a timestamp, and the tie-breaker now keeps the text on top in the inverted chat list
+- Fixed AskUserQuestion and permission option cards appearing above the assistant message text — when the text and the card it spawns share a timestamp, the tie-breaker now keeps the text on top in the inverted chat list
+- Fixed the `ask_user` picker in PTY/Yolo mode jumping above the assistant's analysis — its request timestamp could predate the surrounding prose, so the card is now anchored to render at or below the latest preceding text
 - Improved message-ordering maintainability by extracting the stable comparator into a dedicated `messageOrdering` module covered by unit tests
 
 ## 2.33.1 - 2026-05-26

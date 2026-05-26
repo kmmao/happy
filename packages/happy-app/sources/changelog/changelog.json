@@ -4,12 +4,13 @@
       {
         "version": "2.33.2",
         "date": "2026-05-26",
-        "summary": "Fixes the AskUserQuestion option card rendering above the assistant text that introduced it. When a message's text and its tool call share the same timestamp, the prose now stays above the card, matching natural reading order.",
+        "summary": "Fixes the question/permission option card rendering above the assistant text that introduced it. The conclusion now always comes first, with the choices below it, matching natural reading order — both when the text and its tool call share a timestamp and in PTY/Yolo mode where the picker request carried an earlier timestamp.",
         "changes": [
-          "Fixed AskUserQuestion and permission option cards appearing above the assistant message text — the text and the card it spawns share a timestamp, and the tie-breaker now keeps the text on top in the inverted chat list",
+          "Fixed AskUserQuestion and permission option cards appearing above the assistant message text — when the text and the card it spawns share a timestamp, the tie-breaker now keeps the text on top in the inverted chat list",
+          "Fixed the `ask_user` picker in PTY/Yolo mode jumping above the assistant's analysis — its request timestamp could predate the surrounding prose, so the card is now anchored to render at or below the latest preceding text",
           "Improved message-ordering maintainability by extracting the stable comparator into a dedicated `messageOrdering` module covered by unit tests"
         ],
-        "rawMarkdown": "## 2.33.2 - 2026-05-26\n\n\nFixes the AskUserQuestion option card rendering above the assistant text that introduced it. When a message's text and its tool call share the same timestamp, the prose now stays above the card, matching natural reading order.\n\n### Chat ordering\n- Fixed AskUserQuestion and permission option cards appearing above the assistant message text — the text and the card it spawns share a timestamp, and the tie-breaker now keeps the text on top in the inverted chat list\n- Improved message-ordering maintainability by extracting the stable comparator into a dedicated `messageOrdering` module covered by unit tests"
+        "rawMarkdown": "## 2.33.2 - 2026-05-26\n\n\nFixes the question/permission option card rendering above the assistant text that introduced it. The conclusion now always comes first, with the choices below it, matching natural reading order — both when the text and its tool call share a timestamp and in PTY/Yolo mode where the picker request carried an earlier timestamp.\n\n### Chat ordering\n- Fixed AskUserQuestion and permission option cards appearing above the assistant message text — when the text and the card it spawns share a timestamp, the tie-breaker now keeps the text on top in the inverted chat list\n- Fixed the `ask_user` picker in PTY/Yolo mode jumping above the assistant's analysis — its request timestamp could predate the surrounding prose, so the card is now anchored to render at or below the latest preceding text\n- Improved message-ordering maintainability by extracting the stable comparator into a dedicated `messageOrdering` module covered by unit tests"
       },
       {
         "version": "2.33.1",
@@ -863,12 +864,13 @@
       {
         "version": "2.33.2",
         "date": "2026-05-26",
-        "summary": "修复 AskUserQuestion 选项卡片显示在引出它的助手文本上方的问题。当一条消息的文本与其工具调用共享同一时间戳时，文本现在会正确显示在卡片上方，符合自然阅读顺序。",
+        "summary": "修复提问 / 权限选项卡片显示在引出它的助手文本上方的问题。现在始终是结论先出现、选项跟在下方，符合自然阅读顺序 —— 无论是文本与工具调用共享同一时间戳，还是 PTY / Yolo 模式下提问请求带着更早的时间戳。",
         "changes": [
-          "修复 AskUserQuestion 与权限选项卡片显示在助手消息文本上方的问题 —— 文本与它触发的卡片共享同一时间戳，排序的 tie-breaker 现在会在倒序聊天列表中让文本保持在上方",
+          "修复 AskUserQuestion 与权限选项卡片显示在助手消息文本上方的问题 —— 当文本与它触发的卡片共享同一时间戳时，排序的 tie-breaker 现在会在倒序聊天列表中让文本保持在上方",
+          "修复 PTY / Yolo 模式下 `ask_user` 选项卡片跳到助手分析文本上方的问题 —— 它的请求时间戳可能早于前面的文本，现在卡片会被锚定到不早于最近一段文本，从而显示在文本下方",
           "改进消息排序的可维护性：将稳定比较器抽取到独立的 `messageOrdering` 模块，并补充单元测试"
         ],
-        "rawMarkdown": "## 2.33.2 - 2026-05-26\n\n\n修复 AskUserQuestion 选项卡片显示在引出它的助手文本上方的问题。当一条消息的文本与其工具调用共享同一时间戳时，文本现在会正确显示在卡片上方，符合自然阅读顺序。\n\n### 聊天排序\n- 修复 AskUserQuestion 与权限选项卡片显示在助手消息文本上方的问题 —— 文本与它触发的卡片共享同一时间戳，排序的 tie-breaker 现在会在倒序聊天列表中让文本保持在上方\n- 改进消息排序的可维护性：将稳定比较器抽取到独立的 `messageOrdering` 模块，并补充单元测试"
+        "rawMarkdown": "## 2.33.2 - 2026-05-26\n\n\n修复提问 / 权限选项卡片显示在引出它的助手文本上方的问题。现在始终是结论先出现、选项跟在下方，符合自然阅读顺序 —— 无论是文本与工具调用共享同一时间戳，还是 PTY / Yolo 模式下提问请求带着更早的时间戳。\n\n### 聊天排序\n- 修复 AskUserQuestion 与权限选项卡片显示在助手消息文本上方的问题 —— 当文本与它触发的卡片共享同一时间戳时，排序的 tie-breaker 现在会在倒序聊天列表中让文本保持在上方\n- 修复 PTY / Yolo 模式下 `ask_user` 选项卡片跳到助手分析文本上方的问题 —— 它的请求时间戳可能早于前面的文本，现在卡片会被锚定到不早于最近一段文本，从而显示在文本下方\n- 改进消息排序的可维护性：将稳定比较器抽取到独立的 `messageOrdering` 模块，并补充单元测试"
       },
       {
         "version": "2.33.1",

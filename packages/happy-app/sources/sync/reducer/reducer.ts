@@ -557,6 +557,28 @@ export function reducer(
     }
   }
 
+  // A pending permission / question card must never render ABOVE the agent
+  // prose that introduces it. In PTY/Yolo mode the mcp__happy__ask_user request
+  // carries its own createdAt (Date.now() at tool-call time), which can predate
+  // the surrounding agent text's createdAt — pushing the picker card above the
+  // conclusion it belongs under. Anchor the card to the latest agent-text time
+  // so it sorts at-or-below the prose; when the times tie, the kind-priority
+  // tie-breaker in compareMessagesDesc keeps agent-text on top. Phase 0 runs
+  // before the text loop (Phase 1), so pre-scan this batch's agent text in
+  // addition to the running state.latestAgentTextTime.
+  let pendingCardAnchor = state.latestAgentTextTime;
+  for (const msg of nonSidechainMessages) {
+    if (msg.role !== "agent" || msg.createdAt <= pendingCardAnchor) {
+      continue;
+    }
+    const hasVisibleText = msg.content.some(
+      (c) => c.type === "text" || (c.type === "text-delta" && !c.thinking),
+    );
+    if (hasVisibleText) {
+      pendingCardAnchor = msg.createdAt;
+    }
+  }
+
   //
   // Phase 0: Process AgentState permissions
   //
@@ -607,7 +629,9 @@ export function reducer(
             id: mid,
             realID: null,
             role: "agent",
-            createdAt: request.createdAt || Date.now(),
+            // Anchor below preceding agent prose so the card never jumps above
+            // the conclusion that introduces it (see pendingCardAnchor above).
+            createdAt: Math.max(request.createdAt || Date.now(), pendingCardAnchor),
             text: null,
             tool: toolCall,
             event: null,
