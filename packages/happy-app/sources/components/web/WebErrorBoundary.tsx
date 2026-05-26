@@ -7,6 +7,70 @@ interface State {
     message: string | null;
 }
 
+const CRASH_KEY = "happy:crash:v1";
+const CRASH_CAP = 10; // keep the last N crashes; ring-buffered so storage can't grow unbounded
+const MESSAGE_CAP = 2_000; // char caps so one giant error can't blow the localStorage quota
+const STACK_CAP = 8_000;
+
+interface CrashRecord {
+    t: number; // epoch ms
+    kind: "render" | "error" | "unhandledrejection";
+    message: string;
+    stack?: string; // error stack and/or React component stack
+}
+
+// Persist a crash to localStorage so it survives the reload that wipes the
+// in-memory `log` buffer. Mirrors the memoryWatchdog trail, but for thrown
+// errors rather than heap pressure. Best-effort: storage may be full/disabled.
+function recordCrash(kind: CrashRecord["kind"], message: string, stack?: string): void {
+    if (typeof window === "undefined") return;
+    try {
+        const raw = window.localStorage.getItem(CRASH_KEY);
+        const list: CrashRecord[] = raw ? JSON.parse(raw) : [];
+        list.push({
+            t: Date.now(),
+            kind,
+            message: message.slice(0, MESSAGE_CAP),
+            stack: stack ? stack.slice(0, STACK_CAP) : undefined,
+        });
+        if (list.length > CRASH_CAP) list.splice(0, list.length - CRASH_CAP);
+        window.localStorage.setItem(CRASH_KEY, JSON.stringify(list));
+    } catch {
+        // quota exceeded or storage disabled — diagnostics are best-effort
+    }
+}
+
+// Replay persisted crashes from previous runs into the dev log so they show up
+// on /dev/logs after a reload. Records are kept (not cleared) so the history
+// stays inspectable; use window.__happyCrash.clear() to reset.
+export function surfaceCrashTrail(): void {
+    if (typeof window === "undefined") return;
+    try {
+        const raw = window.localStorage.getItem(CRASH_KEY);
+        if (!raw) return;
+        const list: CrashRecord[] = JSON.parse(raw);
+        if (!Array.isArray(list) || list.length === 0) return;
+        log.warn(`[crash] ===== ${list.length} persisted crash record(s) from previous runs =====`);
+        for (const c of list) {
+            const time = new Date(c.t).toLocaleString();
+            log.error(`[crash] ${time} (${c.kind}): ${c.message}`);
+            if (c.stack) log.error(`[crash] stack: ${c.stack}`);
+        }
+        log.warn("[crash] ===== end persisted crash trail (window.__happyCrash.clear() to reset) =====");
+    } catch {
+        // ignore malformed trail
+    }
+}
+
+function clearCrashTrail(): void {
+    if (typeof window === "undefined") return;
+    try {
+        window.localStorage.removeItem(CRASH_KEY);
+    } catch {
+        // ignore
+    }
+}
+
 export class WebErrorBoundary extends React.Component<{ children: React.ReactNode }, State> {
     state: State = { hasError: false, message: null };
 
@@ -18,6 +82,14 @@ export class WebErrorBoundary extends React.Component<{ children: React.ReactNod
     }
 
     componentDidCatch(error: unknown, info: React.ErrorInfo) {
+        const message = error instanceof Error ? error.message : String(error);
+        const stack = [
+            error instanceof Error ? error.stack : undefined,
+            info.componentStack ?? undefined,
+        ]
+            .filter(Boolean)
+            .join("\n");
+        recordCrash("render", message, stack || undefined);
         log.error("WebErrorBoundary caught render error:", error, info.componentStack);
     }
 
@@ -88,11 +160,23 @@ export class WebErrorBoundary extends React.Component<{ children: React.ReactNod
 export function setupWebErrorHandlers() {
     if (Platform.OS !== "web" || typeof window === "undefined") return;
 
+    // Replay any crashes persisted before the last reload into /dev/logs.
+    surfaceCrashTrail();
+    (window as unknown as { __happyCrash?: unknown }).__happyCrash = {
+        dump: surfaceCrashTrail,
+        clear: clearCrashTrail,
+    };
+
     window.addEventListener("error", (event) => {
+        recordCrash("error", event.message, event.filename ? `${event.filename}:${event.lineno}` : undefined);
         log.error("Uncaught error:", event.message, event.filename, event.lineno);
     });
 
     window.addEventListener("unhandledrejection", (event) => {
+        const reason = event.reason;
+        const message = reason instanceof Error ? reason.message : String(reason);
+        const stack = reason instanceof Error ? reason.stack : undefined;
+        recordCrash("unhandledrejection", message, stack);
         log.error("Unhandled promise rejection:", event.reason);
     });
 }

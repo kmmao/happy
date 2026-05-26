@@ -2,6 +2,17 @@
   "entries": {
     "en": [
       {
+        "version": "2.33.1",
+        "date": "2026-05-26",
+        "summary": "Web crashes now survive a reload. The error boundary saves every crash to local storage and replays it into the in-app dev logs on the next launch, so render errors are no longer wiped the moment you tap Reload.",
+        "changes": [
+          "Added crash persistence to the web error boundary — render errors, uncaught errors, and unhandled promise rejections are now saved to local storage (last 10, ring-buffered), not just an in-memory log that the reload cleared",
+          "Improved post-crash debugging: persisted crashes are automatically replayed into the dev logs page on the next launch, including the error message and the component/error stack",
+          "Added `window.__happyCrash.dump()` and `window.__happyCrash.clear()` console helpers to inspect or reset the saved crash trail"
+        ],
+        "rawMarkdown": "## 2.33.1 - 2026-05-26\n\n\nWeb crashes now survive a reload. The error boundary saves every crash to local storage and replays it into the in-app dev logs on the next launch, so render errors are no longer wiped the moment you tap Reload.\n\n### Crash diagnostics (web)\n- Added crash persistence to the web error boundary — render errors, uncaught errors, and unhandled promise rejections are now saved to local storage (last 10, ring-buffered), not just an in-memory log that the reload cleared\n- Improved post-crash debugging: persisted crashes are automatically replayed into the dev logs page on the next launch, including the error message and the component/error stack\n- Added `window.__happyCrash.dump()` and `window.__happyCrash.clear()` console helpers to inspect or reset the saved crash trail"
+      },
+      {
         "version": "2.33.0",
         "date": "2026-05-25",
         "summary": "Brings the History tab's commit-file view in line with the Changes tab — the same diff/file layout with collapsible hunks, side-by-side line numbers, and inline syntax highlighting — and fixes opening commit files whose names contain non-ASCII characters.",
@@ -840,6 +851,17 @@
     ],
     "zh-Hans": [
       {
+        "version": "2.33.1",
+        "date": "2026-05-26",
+        "summary": "网页端崩溃现在能在刷新后保留。错误边界会把每次崩溃保存到 localStorage，并在下次启动时重新呈现到应用内的 dev 日志页面，渲染错误不会再在你点击 Reload 的瞬间被清空。",
+        "changes": [
+          "新增网页错误边界的崩溃持久化 —— 渲染错误、未捕获错误和未处理的 promise rejection 现在会保存到 localStorage（环形缓冲保留最近 10 条），而非只存在刷新即清空的内存日志中",
+          "改进崩溃后排查：持久化的崩溃会在下次启动时自动重新呈现到 dev 日志页面，包含错误信息与组件/错误堆栈",
+          "新增 `window.__happyCrash.dump()` 与 `window.__happyCrash.clear()` 控制台辅助方法，用于查看或重置已保存的崩溃记录"
+        ],
+        "rawMarkdown": "## 2.33.1 - 2026-05-26\n\n\n网页端崩溃现在能在刷新后保留。错误边界会把每次崩溃保存到 localStorage，并在下次启动时重新呈现到应用内的 dev 日志页面，渲染错误不会再在你点击 Reload 的瞬间被清空。\n\n### 崩溃诊断（网页端）\n- 新增网页错误边界的崩溃持久化 —— 渲染错误、未捕获错误和未处理的 promise rejection 现在会保存到 localStorage（环形缓冲保留最近 10 条），而非只存在刷新即清空的内存日志中\n- 改进崩溃后排查：持久化的崩溃会在下次启动时自动重新呈现到 dev 日志页面，包含错误信息与组件/错误堆栈\n- 新增 `window.__happyCrash.dump()` 与 `window.__happyCrash.clear()` 控制台辅助方法，用于查看或重置已保存的崩溃记录"
+      },
+      {
         "version": "2.33.0",
         "date": "2026-05-25",
         "summary": "让 History（历史）标签的提交文件视图与 Changes（改动）标签保持一致 —— 相同的差异/文件布局，支持可折叠代码块、左右并排行号和内联语法高亮；同时修复打开文件名含非 ASCII 字符的提交文件时无法打开的问题。",
@@ -1655,7 +1677,7 @@
       }
     ]
   },
-  "latestVersion": "2.33.0",
+  "latestVersion": "2.33.1",
   "availableLocales": [
     "en",
     "zh-Hans"

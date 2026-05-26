@@ -1,5 +1,14 @@
 # Changelog
 
+## 2.33.1 - 2026-05-26
+
+Web crashes now survive a reload. The error boundary saves every crash to local storage and replays it into the in-app dev logs on the next launch, so render errors are no longer wiped the moment you tap Reload.
+
+### Crash diagnostics (web)
+- Added crash persistence to the web error boundary — render errors, uncaught errors, and unhandled promise rejections are now saved to local storage (last 10, ring-buffered), not just an in-memory log that the reload cleared
+- Improved post-crash debugging: persisted crashes are automatically replayed into the dev logs page on the next launch, including the error message and the component/error stack
+- Added `window.__happyCrash.dump()` and `window.__happyCrash.clear()` console helpers to inspect or reset the saved crash trail
+
 ## 2.33.0 - 2026-05-25
 
 Brings the History tab's commit-file view in line with the Changes tab — the same diff/file layout with collapsible hunks, side-by-side line numbers, and inline syntax highlighting — and fixes opening commit files whose names contain non-ASCII characters.
