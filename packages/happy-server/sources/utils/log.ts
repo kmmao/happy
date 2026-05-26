@@ -1,4 +1,5 @@
 import pino from 'pino';
+import pretty from 'pino-pretty';
 import { mkdirSync } from 'fs';
 import { join } from 'path';
 
@@ -33,45 +34,11 @@ function formatLocalTime(timestamp?: number) {
     return `${hours}:${mins}:${secs}.${ms}`;
 }
 
-const transports: any[] = [];
 const DEFAULT_LOG_LEVEL = process.env.LOG_LEVEL ?? 'info';
 
-// Resolve pino-pretty target - use absolute path for bundled binaries
-let pinoPrettyTarget: string = 'pino-pretty';
-try {
-    pinoPrettyTarget = require.resolve('pino-pretty');
-} catch {
-    /* pino-pretty not found on disk — fall back to the bare module name and let pino handle it */
-}
-
-transports.push({
-    target: pinoPrettyTarget,
-    options: {
-        colorize: true,
-        translateTime: 'HH:MM:ss.l',
-        ignore: 'pid,hostname',
-        messageFormat: '{msg} | [{time}]',
-        errorLikeObjectKeys: ['err', 'error'],
-    },
-});
-
-if (process.env.DANGEROUSLY_LOG_TO_SERVER_FOR_AI_AUTO_DEBUGGING && consolidatedLogFile) {
-    transports.push({
-        target: 'pino/file',
-        options: {
-            destination: consolidatedLogFile,
-            mkdir: true,
-            messageFormat: '{msg} | [server time: {time}]',
-        },
-    });
-}
-
-// Main server logger with local time formatting
-export const logger = pino({
+// Shared pino options: inject localTime into every entry + custom timestamp.
+const baseOptions: pino.LoggerOptions = {
     level: DEFAULT_LOG_LEVEL,
-    transport: {
-        targets: transports,
-    },
     formatters: {
         log: (object: any) => {
             // Add localTime to every log entry
@@ -79,36 +46,43 @@ export const logger = pino({
                 ...object,
                 localTime: formatLocalTime(typeof object.time === 'number' ? object.time : undefined),
             };
-        }
+        },
     },
     timestamp: () => `,"time":${Date.now()},"localTime":"${formatLocalTime()}"`,
+};
+
+// Pretty console output as a *synchronous, in-process* stream — not a pino
+// transport. pino's transport mechanism runs targets inside a worker thread
+// that require()s them by file path at runtime; that breaks inside a
+// `bun build --compile` single-file binary, where those modules live in the
+// bundle and not on disk, so the compiled server fails to start. Building the
+// pretty stream directly keeps everything in-process and lets the binary boot.
+const prettyStream = pretty({
+    colorize: true,
+    translateTime: 'HH:MM:ss.l',
+    ignore: 'pid,hostname',
+    messageFormat: '{msg} | [{time}]',
+    errorLikeObjectKeys: ['err', 'error'],
 });
 
+const fileEnabled = !!(process.env.DANGEROUSLY_LOG_TO_SERVER_FOR_AI_AUTO_DEBUGGING && consolidatedLogFile);
+
+// When remote debugging is on, tee raw-JSON logs to the consolidated file via
+// pino.destination (in-process SonicBoom, no worker thread either).
+const logStream: pino.DestinationStream = fileEnabled
+    ? pino.multistream([
+        { stream: prettyStream, level: DEFAULT_LOG_LEVEL as pino.Level },
+        { stream: pino.destination({ dest: consolidatedLogFile!, mkdir: true }), level: DEFAULT_LOG_LEVEL as pino.Level },
+    ])
+    : prettyStream;
+
+// Main server logger with local time formatting
+export const logger = pino(baseOptions, logStream);
+
 // Optional file-only logger for remote logs from CLI/mobile
-export const fileConsolidatedLogger = process.env.DANGEROUSLY_LOG_TO_SERVER_FOR_AI_AUTO_DEBUGGING && consolidatedLogFile ? 
-    pino({
-        level: DEFAULT_LOG_LEVEL,
-        transport: {
-            targets: [{
-                target: 'pino/file',
-                options: {
-                    destination: consolidatedLogFile,
-                    mkdir: true,
-                },
-            }],
-        },
-        formatters: {
-            log: (object: any) => {
-                // Add localTime to every log entry
-                // Note: source property already exists from CLI/mobile logs
-                return {
-                    ...object,
-                    localTime: formatLocalTime(typeof object.time === 'number' ? object.time : undefined),
-                };
-            }
-        },
-        timestamp: () => `,"time":${Date.now()},"localTime":"${formatLocalTime()}"`,
-    }) : undefined;
+export const fileConsolidatedLogger = fileEnabled
+    ? pino(baseOptions, pino.destination({ dest: consolidatedLogFile!, mkdir: true }))
+    : undefined;
 
 function resolveLogLevel(src: any): pino.LevelWithSilent | null {
     if (!src || typeof src !== 'object' || Array.isArray(src)) {
