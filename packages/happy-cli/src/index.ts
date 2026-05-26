@@ -20,7 +20,11 @@ import {
   stopDaemon,
 } from "./daemon/controlClient";
 import { getLatestDaemonLog } from "./ui/logger";
-import { killRunawayHappyProcesses } from "./daemon/doctor";
+import {
+  doctorCleanUsage,
+  hasHelpFlag,
+  killRunawayHappyProcesses,
+} from "./daemon/doctor";
 import { install } from "./daemon/install";
 import { uninstall } from "./daemon/uninstall";
 import { ApiClient } from "./api/api";
@@ -250,6 +254,12 @@ function filterAutomationAudit<T extends { kind: string; status?: string; projec
   if (subcommand === "doctor") {
     // Check for clean subcommand
     if (args[1] === "clean") {
+      // `clean` is destructive, so `--help`/`-h` must short-circuit to usage
+      // before any process is killed.
+      if (hasHelpFlag(args)) {
+        logger.print(doctorCleanUsage());
+        process.exit(0);
+      }
       const result = await killRunawayHappyProcesses();
       logger.print(`Cleaned up ${result.killed} runaway processes`);
       if (result.errors.length > 0) {

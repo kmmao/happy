@@ -16,9 +16,27 @@ vi.mock("cross-spawn", () => ({
 }));
 
 import {
+  doctorCleanUsage,
   findRunawayHappyProcesses,
+  hasHelpFlag,
   killRunawayHappyProcesses,
 } from "@/daemon/doctor";
+
+describe("doctor clean --help guard", () => {
+  it("把 --help / -h 识别为请求帮助(任意位置)", () => {
+    expect(hasHelpFlag(["doctor", "clean", "--help"])).toBe(true);
+    expect(hasHelpFlag(["doctor", "clean", "-h"])).toBe(true);
+    expect(hasHelpFlag(["doctor", "clean"])).toBe(false);
+    expect(hasHelpFlag(["doctor"])).toBe(false);
+  });
+
+  it("usage 文本明确说明该命令是破坏性的(会杀进程)", () => {
+    const usage = doctorCleanUsage();
+    expect(usage).toContain("happy doctor clean");
+    expect(usage.toLowerCase()).toContain("destructive");
+    expect(usage.toLowerCase()).toContain("kill");
+  });
+});
 
 describe("daemon doctor cleanup", () => {
   beforeEach(() => {

@@ -10,6 +10,29 @@ import spawn from 'cross-spawn';
 import { logger } from '@/ui/logger';
 
 /**
+ * Whether the args request help (`--help` or `-h`, in any position).
+ */
+export function hasHelpFlag(args: string[]): boolean {
+  return args.includes('--help') || args.includes('-h');
+}
+
+/**
+ * Usage text for `happy doctor clean`. Spells out that the command is
+ * destructive (it terminates running happy processes) so `--help` is a safe,
+ * read-only way to learn what it does.
+ */
+export function doctorCleanUsage(): string {
+  return [
+    'Usage: happy doctor clean',
+    '',
+    'Terminate runaway happy processes (orphaned daemons and daemon-spawned sessions).',
+    '',
+    'WARNING: This command is destructive — it kills running happy processes.',
+    'Run it only when you intend to stop those processes.',
+  ].join('\n');
+}
+
+/**
  * Find all Happy CLI processes (including current process)
  */
 export async function findAllHappyProcesses(): Promise<Array<{ pid: number, command: string, type: string }>> {
