@@ -4,6 +4,9 @@ import { regenerateProfile } from "./knowledgeProfileGenerator";
 // Mock db
 vi.mock("@/storage/db", () => ({
     db: {
+        project: {
+            findUnique: vi.fn(),
+        },
         projectKnowledge: {
             findMany: vi.fn(),
         },
@@ -36,6 +39,9 @@ const FAKE_ENTRIES = [
 describe("knowledgeProfileGenerator", () => {
     beforeEach(() => {
         mockFetch.mockReset();
+        // Knowledge base enabled by default — the disabled-path test overrides this.
+        vi.mocked(db.project.findUnique).mockReset();
+        vi.mocked(db.project.findUnique).mockResolvedValue({ knowledgeConfig: JSON.stringify({ enabled: true }) } as never);
         vi.mocked(db.projectKnowledge.findMany).mockReset();
         vi.mocked(db.projectProfile.upsert).mockReset();
     });
@@ -242,6 +248,21 @@ describe("knowledgeProfileGenerator", () => {
             const result = await regenerateProfile("test-project");
             expect(result.success).toBe(false);
             expect(result.error).toContain("No JSON object found");
+        });
+    });
+
+    describe("knowledge base switch", () => {
+        it("should skip and not call the LLM when the knowledge base is disabled", async () => {
+            vi.stubEnv("PROFILE_PROVIDER", "anthropic");
+            vi.stubEnv("ANTHROPIC_API_KEY", "test-key");
+            vi.mocked(db.project.findUnique).mockResolvedValue({ knowledgeConfig: JSON.stringify({ enabled: false }) } as never);
+
+            const result = await regenerateProfile("test-project");
+
+            expect(result.success).toBe(false);
+            expect(result.error).toContain("disabled");
+            expect(mockFetch).not.toHaveBeenCalled();
+            expect(db.projectKnowledge.findMany).not.toHaveBeenCalled();
         });
     });
 });

@@ -1,5 +1,6 @@
 import { db } from "@/storage/db";
 import { log } from "@/utils/log";
+import { resolveKnowledgeConfig } from "./knowledgeConfigResolver";
 import { z } from "zod";
 
 /**
@@ -148,6 +149,14 @@ export async function regenerateProfile(projectId: string): Promise<{
     version?: number;
     error?: string;
 }> {
+    // Total knowledge-base switch (project-level) gates everything: when the
+    // base is disabled, never spend an LLM call regenerating its profile —
+    // even when reached via the auto-trigger or the manual REST route.
+    const config = await resolveKnowledgeConfig(projectId);
+    if (!config.enabled) {
+        return { success: false, error: "Knowledge base disabled for this project" };
+    }
+
     const provider = detectProvider();
     if (provider === "none") {
         return { success: false, error: "No LLM provider configured (set ANTHROPIC_API_KEY or OLLAMA_URL)" };

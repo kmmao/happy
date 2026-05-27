@@ -247,6 +247,13 @@ export function knowledgeRoutes(app: Fastify) {
                 return reply.code(404).send({ error: "Project not found" });
             }
 
+            // Honor the project-level knowledge switch (same as the socket path):
+            // when disabled, drop the submission so nothing is written or refined.
+            const knowledgeConfig = await resolveKnowledgeConfig(id);
+            if (!knowledgeConfig.enabled) {
+                return reply.send({ action: "noop", reason: "knowledge-disabled" });
+            }
+
             // Mem0-style dedup: check for similar active entries
             const dedupAction = await consolidate(id, body);
 
@@ -438,6 +445,11 @@ export function knowledgeRoutes(app: Fastify) {
             });
             if (!project) {
                 return reply.code(404).send({ error: "Project not found" });
+            }
+
+            const knowledgeConfig = await resolveKnowledgeConfig(id);
+            if (!knowledgeConfig.enabled) {
+                return reply.code(409).send({ error: "Knowledge base is disabled for this project" });
             }
 
             const entry = await db.projectKnowledge.findFirst({
@@ -632,6 +644,11 @@ export function knowledgeRoutes(app: Fastify) {
             });
             if (!project) {
                 return reply.code(404).send({ error: "Project not found" });
+            }
+
+            const knowledgeConfig = await resolveKnowledgeConfig(id);
+            if (!knowledgeConfig.enabled) {
+                return reply.code(409).send({ error: "Knowledge base is disabled for this project" });
             }
 
             const result = await regenerateProfile(id);

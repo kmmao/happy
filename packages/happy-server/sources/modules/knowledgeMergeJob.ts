@@ -5,7 +5,7 @@ import { storeKnowledgeEmbedding, findSimilarByEmbedding } from "./knowledgeEmbe
 import { generateEmbedding, truncateForEmbedding } from "./embeddingService";
 import { addRelations } from "./knowledgeRelation";
 import { trackKnowledgeCreation } from "./knowledgeAutoProfile";
-import { parseKnowledgeConfig, mergeWithDefaults } from "./knowledgeConfigResolver";
+import { parseKnowledgeConfig, mergeWithDefaults, resolveKnowledgeConfig } from "./knowledgeConfigResolver";
 import { z } from "zod";
 
 // ─── Configuration ───
@@ -377,6 +377,13 @@ export async function runMergeJob(projectId: string): Promise<{
     let clustersProcessed = 0;
 
     try {
+        // Respect the total knowledge-base switch — skip merge work (and its
+        // LLM calls) entirely when the base is disabled for this project.
+        const config = await resolveKnowledgeConfig(projectId);
+        if (!config.enabled) {
+            return { merged: 0, clusters: 0 };
+        }
+
         const clusters = await findMergeClusters(projectId);
 
         if (clusters.length === 0) {

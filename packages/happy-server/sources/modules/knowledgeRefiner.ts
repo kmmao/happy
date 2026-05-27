@@ -250,6 +250,11 @@ export async function refineKnowledgeEntry(input: RefineInput): Promise<void> {
     // Check project-level config first, fall back to env var
     if (input.projectId) {
         const config = await resolveKnowledgeConfig(input.projectId);
+        // Total knowledge-base switch first, then the refine sub-toggle.
+        if (!config.enabled) {
+            log({ module: "knowledge-refine" }, `Knowledge base disabled for project ${input.projectId}`);
+            return;
+        }
         if (!config.refineEnabled) {
             log({ module: "knowledge-refine" }, `Refine disabled for project ${input.projectId}`);
             return;
