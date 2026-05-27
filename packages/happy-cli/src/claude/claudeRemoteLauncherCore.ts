@@ -150,6 +150,10 @@ export async function claudeRemoteLauncher(
   let exitReason: "switch" | "exit" | null = null;
   let abortController: AbortController | null = null;
   let abortFuture: Future<void> | null = null;
+  // Set just before the strand watchdog's tier-2 cold-restart abort() so the
+  // post-abort branch can report an auto-recovery instead of a user abort —
+  // the watchdog aborts the very same controller a manual stop does.
+  let strandColdRestart = false;
   const executionGuard = new ExecutionGuard(({ from, to }) => {
     logger.debug(
       `[remote]: execution guard ${from.state} -> ${to.state}${to.activeReason ? ` (${to.activeReason})` : ""} [gen=${to.generation}]`,
@@ -193,6 +197,15 @@ export async function claudeRemoteLauncher(
 
   function startTurnWatchdog(): void {
     stopTurnWatchdog();
+    // A fresh turn's silence clock starts when its watchdog (re)starts — it
+    // must NOT inherit lastClaudeOutputAt from the previous turn's last PTY
+    // output. Between turns the user can sit idle for minutes (lastClaudeOutputAt
+    // freezes since onMessage stops firing), so without this reset the watchdog
+    // counts that inter-turn idle as *this* turn's PTY silence. Combined with a
+    // slow first token (e.g. Opus high-reasoning on a large context), the strand
+    // detector then aborts the just-started turn — surfacing to the user as a
+    // spurious "Aborted by user" the moment the turn begins.
+    lastClaudeOutputAt = Date.now();
     turnWatchdog = setInterval(() => {
       const snap = executionGuard.getSnapshot();
       if (snap.state !== "running") return;
@@ -265,6 +278,7 @@ export async function claudeRemoteLauncher(
         `[remote][strand] tier-1 ineffective — escalating to tier-2 cold restart. ${strandDiagState()}`,
       );
       lastColdRestartAt = Date.now();
+      strandColdRestart = true;
       await abort();
     } catch (e) {
       logger.debug(
@@ -2703,9 +2717,12 @@ export async function claudeRemoteLauncher(
         if (!exitReason && abortController.signal.aborted) {
           session.client.closeClaudeSessionTurn("cancelled", lastResultData ?? undefined);
           lastResultData = null;
+          // The watchdog's tier-2 cold restart aborts the same controller a user
+          // stop does — distinguish them so an auto-recovery isn't mislabeled as
+          // a user action (the user never pressed anything; the turn was stuck).
           session.client.sendSessionEvent({
             type: "message",
-            message: "Aborted by user",
+            message: strandColdRestart ? "Recovered a stuck turn" : "Aborted by user",
           });
         }
       } catch (e: unknown) {
@@ -2723,6 +2740,8 @@ export async function claudeRemoteLauncher(
       } finally {
         logger.debug("[remote]: launch finally");
         lastResultData = null;
+        // Clear per-iteration so a later genuine user abort can't inherit it.
+        strandColdRestart = false;
 
         // Stop mid-turn drain and clear push function to prevent stale pushes
         stopMidTurnDrain();
