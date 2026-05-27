@@ -600,6 +600,12 @@ export function reducer(
         if (existingMessageId) {
           // Update existing tool message with permission info
           const message = state.messages.get(existingMessageId);
+          // [ask-order] DIAGNOSTIC (temporary): card already existed from a
+          // prior batch — if its createdAt predates the latest agent text,
+          // it is stuck above the prose (immutability forbids re-anchoring).
+          console.log(
+            `[ask-order] existing card tool=${message?.tool?.name} existing.createdAt=${message?.createdAt} latestText=${state.latestAgentTextTime} anchor=${pendingCardAnchor}`,
+          );
           if (message?.tool && !message.tool.permission) {
             message.tool.permission = {
               id: permId,
@@ -610,6 +616,10 @@ export function reducer(
         } else {
           // Create a new tool message for the permission request
           let mid = allocateId();
+          // [ask-order] DIAGNOSTIC (temporary): brand-new pending card.
+          console.log(
+            `[ask-order] new card tool=${request.tool} req.createdAt=${request.createdAt} anchor=${pendingCardAnchor} latestText=${state.latestAgentTextTime} -> createdAt=${Math.max(request.createdAt || Date.now(), pendingCardAnchor)}`,
+          );
           let toolCall: ToolCall = {
             name: request.tool,
             state: "running" as const,
