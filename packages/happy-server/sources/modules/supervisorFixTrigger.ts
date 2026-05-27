@@ -3,9 +3,7 @@ import {
     buildSupervisorTriggerEphemeral,
 } from "@/app/events/eventRouter";
 import { auth } from "@/app/auth/auth";
-import {
-    resolveConfiguredSupervisorProfile,
-} from "@/modules/supervisorConfiguredProfile";
+import { resolveConfiguredSupervisorProfile } from "@/modules/supervisorConfiguredProfile";
 
 interface SupervisorFixActionTriggerInput {
     title: string;
@@ -32,27 +30,17 @@ interface EmitConfiguredSupervisorFixTriggerInput {
     fixAction: SupervisorFixActionTriggerInput;
 }
 
-export async function resolveSupervisorProfileFromConfig(
-    userId: string,
-    supervisorConfig: string | null,
-) {
-    const result = await resolveConfiguredSupervisorProfile({
-        userId,
-        supervisorConfig,
-    });
-    if (!result.ok) {
-        throw new Error(result.error);
-    }
-    return result.resolvedProfile;
-}
-
 export async function emitConfiguredSupervisorFixTrigger(
     input: EmitConfiguredSupervisorFixTriggerInput,
 ): Promise<void> {
-    const resolvedProfile = await resolveSupervisorProfileFromConfig(
-        input.userId,
-        input.supervisorConfig,
-    );
+    const resolved = await resolveConfiguredSupervisorProfile({
+        userId: input.userId,
+        supervisorConfig: input.supervisorConfig,
+    });
+    if (!resolved.ok) {
+        throw new Error(resolved.error);
+    }
+    const resolvedProfile = resolved.resolvedProfile;
     const callbackToken = await auth.createSupervisorCallbackToken({
         userId: input.userId,
         projectId: input.projectId,

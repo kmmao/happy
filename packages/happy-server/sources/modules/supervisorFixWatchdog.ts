@@ -139,19 +139,8 @@ export async function cleanupStaleFixActions(
             body: `Auto-failed: ${action.title}`,
         });
 
-        // Trigger loop progression if applicable
-        try {
-            await loopOnFixCompleted(
-                userId,
-                action.id,
-                action.projectId,
-                "failed",
-            );
-        } catch (loopError) {
-            log(
-                { module: "supervisor", level: "error" },
-                `Fix watchdog loop progression error for action ${action.id}: ${loopError}`,
-            );
-        }
+        // Trigger loop progression if applicable — the engine absorbs its
+        // own errors.
+        await loopOnFixCompleted(userId, action.id, action.projectId, "failed");
     }
 }

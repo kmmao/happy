@@ -14,10 +14,8 @@ import { activityCache } from "@/app/presence/sessionCache";
 import { onRunCompleted as loopOnRunCompleted } from "@/modules/supervisorLoopEngine";
 import { log } from "@/utils/log";
 import { handleAutoApproval } from "@/app/api/socket/supervisorRunStatusHandler";
-import {
-    emitResolvedSupervisorRunTrigger,
-    resolveConfiguredSupervisorRunProfile,
-} from "@/modules/supervisorRunTrigger";
+import { emitResolvedSupervisorRunTrigger } from "@/modules/supervisorRunTrigger";
+import { resolveConfiguredSupervisorProfile } from "@/modules/supervisorConfiguredProfile";
 import { ResolvedRuntimeProfileSchema } from "@/types/aiBackendProfile";
 
 /**
@@ -63,7 +61,7 @@ export function supervisorRunRoutes(app: Fastify) {
                 return reply.code(404).send({ error: "Project not found" });
             }
 
-            const resolvedRunProfile = await resolveConfiguredSupervisorRunProfile({
+            const resolvedRunProfile = await resolveConfiguredSupervisorProfile({
                 userId,
                 supervisorConfig: project.supervisorConfig,
                 profileId: request.body?.profileId,
@@ -747,15 +745,10 @@ export function supervisorRunRoutes(app: Fastify) {
                     }
                 }
 
-                // Loop progression: if this run belongs to a loop, advance the state machine
-                try {
-                    await loopOnRunCompleted(userId, runId, id);
-                } catch (loopError) {
-                    log(
-                        { module: "supervisor", level: "error" },
-                        `Loop progression error for run ${runId}: ${loopError}`,
-                    );
-                }
+                // Loop progression: if this run belongs to a loop, advance the
+                // state machine. Errors are absorbed inside the engine so they
+                // never fail this status callback.
+                await loopOnRunCompleted(userId, runId, id);
             }
 
             return reply.send({

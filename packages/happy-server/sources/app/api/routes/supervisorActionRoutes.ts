@@ -7,7 +7,6 @@ import {
 } from "@/app/events/eventRouter";
 import { pushSupervisorNotification } from "@/modules/pushSend";
 import { onFixCompleted as loopOnFixCompleted } from "@/modules/supervisorLoopEngine";
-import { log } from "@/utils/log";
 import { emitConfiguredSupervisorFixTrigger } from "@/modules/supervisorFixTrigger";
 
 /**
@@ -671,16 +670,10 @@ export function supervisorActionRoutes(app: Fastify) {
                 });
             }
 
-            // Loop progression: if this fix belongs to a loop, check if all fixes are done
+            // Loop progression: if this fix belongs to a loop, check if all fixes
+            // are done. The engine absorbs its own errors.
             if (fixStatus === "completed" || fixStatus === "failed" || fixStatus === "analyzed") {
-                try {
-                    await loopOnFixCompleted(userId, actionId, id, fixStatus);
-                } catch (loopError) {
-                    log(
-                        { module: "supervisor", level: "error" },
-                        `Loop fix progression error for action ${actionId}: ${loopError}`,
-                    );
-                }
+                await loopOnFixCompleted(userId, actionId, id, fixStatus);
             }
 
             return reply.send({
@@ -790,15 +783,8 @@ export function supervisorActionRoutes(app: Fastify) {
                 body,
             });
 
-            // Loop progression
-            try {
-                await loopOnFixCompleted(userId, actionId, id, resolution);
-            } catch (loopError) {
-                log(
-                    { module: "supervisor", level: "error" },
-                    `Force-resolve loop progression error for action ${actionId}: ${loopError}`,
-                );
-            }
+            // Loop progression — the engine absorbs its own errors.
+            await loopOnFixCompleted(userId, actionId, id, resolution);
 
             const updated = await db.supervisorAction.findUnique({
                 where: { id: actionId },

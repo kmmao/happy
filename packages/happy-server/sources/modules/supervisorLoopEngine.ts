@@ -14,7 +14,6 @@ import {
     buildSupervisorTriggerEphemeral,
     buildSupervisorLoopStatusEphemeral,
 } from "@/app/events/eventRouter";
-import { computeHealthScore, countSeverities } from "@/modules/supervisorScoring";
 import { checkDailyRunLimit, incrementDailyRunCount } from "@/modules/supervisorLimits";
 import { auth } from "@/app/auth/auth";
 import {
@@ -264,7 +263,29 @@ export async function startLoop(
 
 // ── Run Completed → Decide Next Step ──
 
+/**
+ * Advance the loop after a Run reports completion.
+ *
+ * Loop progression must never fail the triggering operation (the HTTP status
+ * callback from Claude). This wrapper absorbs and logs any error so every
+ * caller stays a one-liner instead of repeating the same try/catch.
+ */
 export async function onRunCompleted(
+    userId: string,
+    runId: string,
+    projectId: string,
+): Promise<void> {
+    try {
+        await progressLoopAfterRun(userId, runId, projectId);
+    } catch (error) {
+        log(
+            { module: "supervisor", level: "error" },
+            `Loop progression failed after run ${runId}: ${error}`,
+        );
+    }
+}
+
+async function progressLoopAfterRun(
     userId: string,
     runId: string,
     projectId: string,
@@ -325,7 +346,30 @@ export async function onRunCompleted(
 
 // ── Fix Completed → Check if All Fixes Done ──
 
+/**
+ * Advance the loop after a fix Action reports completion.
+ *
+ * Like {@link onRunCompleted}, this absorbs and logs its own errors so the
+ * triggering callers (action status callback, force-resolve, fix watchdog)
+ * never have to guard the call themselves.
+ */
 export async function onFixCompleted(
+    userId: string,
+    actionId: string,
+    projectId: string,
+    fixStatus: "completed" | "failed" | "analyzed",
+): Promise<void> {
+    try {
+        await progressLoopAfterFix(userId, actionId, projectId, fixStatus);
+    } catch (error) {
+        log(
+            { module: "supervisor", level: "error" },
+            `Loop progression failed after fix action ${actionId}: ${error}`,
+        );
+    }
+}
+
+async function progressLoopAfterFix(
     userId: string,
     actionId: string,
     projectId: string,

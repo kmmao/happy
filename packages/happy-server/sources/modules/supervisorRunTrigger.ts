@@ -6,7 +6,6 @@ import { auth } from "@/app/auth/auth";
 import {
     resolveConfiguredSupervisorProfile,
     type ResolveConfiguredSupervisorProfileInput,
-    type ResolveConfiguredSupervisorProfileResult,
 } from "@/modules/supervisorConfiguredProfile";
 import { type ResolvedSupervisorProfile } from "@/modules/supervisorProfileResolver";
 
@@ -17,12 +16,6 @@ type ExistingActionSummary = {
     approval: string;
     fixStatus: string | null;
 };
-
-type ResolveConfiguredSupervisorRunProfileInput =
-    ResolveConfiguredSupervisorProfileInput;
-
-type ResolveConfiguredSupervisorRunProfileResult =
-    ResolveConfiguredSupervisorProfileResult;
 
 interface EmitResolvedSupervisorRunTriggerInput {
     userId: string;
@@ -58,13 +51,7 @@ interface EmitResolvedSupervisorRunTriggerInput {
 
 interface EmitConfiguredSupervisorRunTriggerInput
     extends Omit<EmitResolvedSupervisorRunTriggerInput, "resolvedProfile">,
-        ResolveConfiguredSupervisorRunProfileInput {}
-
-export async function resolveConfiguredSupervisorRunProfile(
-    input: ResolveConfiguredSupervisorRunProfileInput,
-): Promise<ResolveConfiguredSupervisorRunProfileResult> {
-    return resolveConfiguredSupervisorProfile(input);
-}
+        ResolveConfiguredSupervisorProfileInput {}
 
 export async function emitResolvedSupervisorRunTrigger(
     input: EmitResolvedSupervisorRunTriggerInput,
@@ -109,7 +96,7 @@ export async function emitResolvedSupervisorRunTrigger(
 export async function emitConfiguredSupervisorRunTrigger(
     input: EmitConfiguredSupervisorRunTriggerInput,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
-    const resolvedProfile = await resolveConfiguredSupervisorRunProfile(input);
+    const resolvedProfile = await resolveConfiguredSupervisorProfile(input);
     if (!resolvedProfile.ok) {
         return resolvedProfile;
     }
