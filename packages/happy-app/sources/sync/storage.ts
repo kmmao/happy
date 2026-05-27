@@ -943,13 +943,14 @@ export const storage = create<StorageState>()((set, get) => {
               const newMsgs = processedMessages.filter(
                 (m) => !existingSessionMessages.messagesMap[m.id],
               );
-              if (newMsgs.length === 0) {
+              if (newMsgs.length === 0 && !reducerResult.reordered) {
                 // Only updates — no sort needed
                 messagesArray = existingSessionMessages.messages.map(
                   (m) => messagesMap[m.id] ?? m,
                 );
               } else if (
                 existingSessionMessages.messages.length > 0 &&
+                !reducerResult.reordered &&
                 newMsgs.every(
                   (m) => m.createdAt >= (existingSessionMessages.messages[0]?.createdAt ?? 0),
                 )
@@ -1106,7 +1107,7 @@ export const storage = create<StorageState>()((set, get) => {
           // Nothing changed — reuse existing references entirely (zero GC)
           messagesArray = existingSession.messages;
           mergedMessagesMap = existingSession.messagesMap;
-        } else if (hasOnlyUpdates) {
+        } else if (hasOnlyUpdates && !reducerResult.reordered) {
           // Fast path: only in-place updates — replace references, no sort needed
           // Build a minimal map overlay instead of copying the entire map
           mergedMessagesMap = { ...existingSession.messagesMap };
@@ -1119,6 +1120,7 @@ export const storage = create<StorageState>()((set, get) => {
         } else if (
           newMessages.length > 0 &&
           existingSession.messages.length > 0 &&
+          !reducerResult.reordered &&
           newMessages.every(
             (m) => m.createdAt >= (existingSession.messages[0]?.createdAt ?? 0),
           )

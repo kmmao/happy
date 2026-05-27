@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.34.1 - 2026-05-28
+
+Fixes a remaining case where a question or permission option card could still appear above the assistant text that introduced it, when the card and the conclusion arrived in separate streaming batches (common in PTY/Yolo mode).
+
+### Chat ordering
+- Fixed AskUserQuestion and permission cards still rendering above the assistant's conclusion when the card was created in an earlier batch and the prose only arrived later — the card is now re-anchored to the latest preceding text instead of being anchored only once at creation time
+- Fixed the chat list not re-sorting after such a re-anchor — the reducer now signals storage to rebuild message order, because the incremental fast-path could not observe a timestamp change on an already-existing message
+
 ## 2.34.0 - 2026-05-28
 
 Adds App Lock — an optional PIN or biometric gate that keeps this device's app contents private. It's a local privacy deterrent: the PIN only controls access to the app's UI on this device and never touches your account's end-to-end encryption keys.

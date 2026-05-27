@@ -2,6 +2,16 @@
   "entries": {
     "en": [
       {
+        "version": "2.34.1",
+        "date": "2026-05-28",
+        "summary": "Fixes a remaining case where a question or permission option card could still appear above the assistant text that introduced it, when the card and the conclusion arrived in separate streaming batches (common in PTY/Yolo mode).",
+        "changes": [
+          "Fixed AskUserQuestion and permission cards still rendering above the assistant's conclusion when the card was created in an earlier batch and the prose only arrived later — the card is now re-anchored to the latest preceding text instead of being anchored only once at creation time",
+          "Fixed the chat list not re-sorting after such a re-anchor — the reducer now signals storage to rebuild message order, because the incremental fast-path could not observe a timestamp change on an already-existing message"
+        ],
+        "rawMarkdown": "## 2.34.1 - 2026-05-28\n\n\nFixes a remaining case where a question or permission option card could still appear above the assistant text that introduced it, when the card and the conclusion arrived in separate streaming batches (common in PTY/Yolo mode).\n\n### Chat ordering\n- Fixed AskUserQuestion and permission cards still rendering above the assistant's conclusion when the card was created in an earlier batch and the prose only arrived later — the card is now re-anchored to the latest preceding text instead of being anchored only once at creation time\n- Fixed the chat list not re-sorting after such a re-anchor — the reducer now signals storage to rebuild message order, because the incremental fast-path could not observe a timestamp change on an already-existing message"
+      },
+      {
         "version": "2.34.0",
         "date": "2026-05-28",
         "summary": "Adds App Lock — an optional PIN or biometric gate that keeps this device's app contents private. It's a local privacy deterrent: the PIN only controls access to the app's UI on this device and never touches your account's end-to-end encryption keys.",
@@ -877,6 +887,16 @@
     ],
     "zh-Hans": [
       {
+        "version": "2.34.1",
+        "date": "2026-05-28",
+        "summary": "修复了问答 / 权限选项卡片仍可能显示在引出它的助手文本上方的遗留情况 —— 当卡片与结论分别在不同的流式批次到达时（PTY / Yolo 模式下常见）。",
+        "changes": [
+          "修复 AskUserQuestion 与权限卡片在「卡片于较早批次创建、结论文本随后才到达」时仍排到助手结论上方的问题 —— 卡片现在会被重新锚定到最近一段前置文本的时间，而不再只在创建时锚定一次",
+          "修复此类重锚之后聊天列表不重新排序的问题 —— reducer 现在会通知 storage 重建消息顺序，因为增量快路径无法察觉已存在消息时间戳的变化"
+        ],
+        "rawMarkdown": "## 2.34.1 - 2026-05-28\n\n\n修复了问答 / 权限选项卡片仍可能显示在引出它的助手文本上方的遗留情况 —— 当卡片与结论分别在不同的流式批次到达时（PTY / Yolo 模式下常见）。\n\n### 聊天排序\n- 修复 AskUserQuestion 与权限卡片在「卡片于较早批次创建、结论文本随后才到达」时仍排到助手结论上方的问题 —— 卡片现在会被重新锚定到最近一段前置文本的时间，而不再只在创建时锚定一次\n- 修复此类重锚之后聊天列表不重新排序的问题 —— reducer 现在会通知 storage 重建消息顺序，因为增量快路径无法察觉已存在消息时间戳的变化"
+      },
+      {
         "version": "2.34.0",
         "date": "2026-05-28",
         "summary": "新增「应用锁」—— 可选的 PIN 码或生物识别门，让此设备上的应用内容保持私密。它是一个本地隐私防护：PIN 码仅控制此设备上对应用界面的访问，绝不触碰账户的端到端加密密钥。",
@@ -887,12 +907,20 @@
           "新增连续 5 次 PIN 码错误后的递增冷却（30 秒 → 1 分钟 → 5 分钟），不会擦除任何数据",
           "新增「忘记 PIN 码？」路径：通过登出再重新登录来重置锁，没有任何后门",
           "新增应用切换器遮罩：锁定时在最近应用预览中隐藏应用内容",
-          "改进隐私保护：仅在设备安全存储中保存 PIN 码的加盐 SHA-256 哈希；锁设置保留在设备本地，绝不同步",
+          "改进隐私保护：仅在设备安全存储中保存 PIN 码的加盐 SHA-256 哈希；锁设置保留在设备本地，绝不同步"
+        ],
+        "rawMarkdown": "## 2.34.0 - 2026-05-28\n\n\n新增「应用锁」—— 可选的 PIN 码或生物识别门，让此设备上的应用内容保持私密。它是一个本地隐私防护：PIN 码仅控制此设备上对应用界面的访问，绝不触碰账户的端到端加密密钥。\n\n### 应用锁\n- 新增应用锁，在「设置 → 应用锁」中启用（仅移动端）：需要 6 位数字 PIN 码，可选 Face ID / Touch ID / 指纹解锁\n- 新增可配置的重新锁定超时（立即 / 30 秒 / 1 分钟 / 5 分钟 / 从不）——「从不」表示应用在后台不会自动锁定，但冷启动仍需输入 PIN 码\n- 新增手动「立即锁定」操作，可随时锁定应用\n- 新增连续 5 次 PIN 码错误后的递增冷却（30 秒 → 1 分钟 → 5 分钟），不会擦除任何数据\n- 新增「忘记 PIN 码？」路径：通过登出再重新登录来重置锁，没有任何后门\n- 新增应用切换器遮罩：锁定时在最近应用预览中隐藏应用内容\n- 改进隐私保护：仅在设备安全存储中保存 PIN 码的加盐 SHA-256 哈希；锁设置保留在设备本地，绝不同步"
+      },
+      {
+        "version": "2.33.2",
+        "date": "2026-05-26",
+        "summary": "修复提问 / 权限选项卡片显示在引出它的助手文本上方的问题。现在始终是结论先出现、选项跟在下方，符合自然阅读顺序 —— 无论是文本与工具调用共享同一时间戳，还是 PTY / Yolo 模式下提问请求带着更早的时间戳。",
+        "changes": [
           "修复 AskUserQuestion 与权限选项卡片显示在助手消息文本上方的问题 —— 当文本与它触发的卡片共享同一时间戳时，排序的 tie-breaker 现在会在倒序聊天列表中让文本保持在上方",
           "修复 PTY / Yolo 模式下 `ask_user` 选项卡片跳到助手分析文本上方的问题 —— 它的请求时间戳可能早于前面的文本，现在卡片会被锚定到不早于最近一段文本，从而显示在文本下方",
           "改进消息排序的可维护性：将稳定比较器抽取到独立的 `messageOrdering` 模块，并补充单元测试"
         ],
-        "rawMarkdown": "## 2.34.0 - 2026-05-28\n\n\n新增「应用锁」—— 可选的 PIN 码或生物识别门，让此设备上的应用内容保持私密。它是一个本地隐私防护：PIN 码仅控制此设备上对应用界面的访问，绝不触碰账户的端到端加密密钥。\n\n### 应用锁\n- 新增应用锁，在「设置 → 应用锁」中启用（仅移动端）：需要 6 位数字 PIN 码，可选 Face ID / Touch ID / 指纹解锁\n- 新增可配置的重新锁定超时（立即 / 30 秒 / 1 分钟 / 5 分钟 / 从不）——「从不」表示应用在后台不会自动锁定，但冷启动仍需输入 PIN 码\n- 新增手动「立即锁定」操作，可随时锁定应用\n- 新增连续 5 次 PIN 码错误后的递增冷却（30 秒 → 1 分钟 → 5 分钟），不会擦除任何数据\n- 新增「忘记 PIN 码？」路径：通过登出再重新登录来重置锁，没有任何后门\n- 新增应用切换器遮罩：锁定时在最近应用预览中隐藏应用内容\n- 改进隐私保护：仅在设备安全存储中保存 PIN 码的加盐 SHA-256 哈希；锁设置保留在设备本地，绝不同步\n\n修复提问 / 权限选项卡片显示在引出它的助手文本上方的问题。现在始终是结论先出现、选项跟在下方，符合自然阅读顺序 —— 无论是文本与工具调用共享同一时间戳，还是 PTY / Yolo 模式下提问请求带着更早的时间戳。\n\n### 聊天排序\n- 修复 AskUserQuestion 与权限选项卡片显示在助手消息文本上方的问题 —— 当文本与它触发的卡片共享同一时间戳时，排序的 tie-breaker 现在会在倒序聊天列表中让文本保持在上方\n- 修复 PTY / Yolo 模式下 `ask_user` 选项卡片跳到助手分析文本上方的问题 —— 它的请求时间戳可能早于前面的文本，现在卡片会被锚定到不早于最近一段文本，从而显示在文本下方\n- 改进消息排序的可维护性：将稳定比较器抽取到独立的 `messageOrdering` 模块，并补充单元测试"
+        "rawMarkdown": "## 2.33.2 - 2026-05-26\n\n\n修复提问 / 权限选项卡片显示在引出它的助手文本上方的问题。现在始终是结论先出现、选项跟在下方，符合自然阅读顺序 —— 无论是文本与工具调用共享同一时间戳，还是 PTY / Yolo 模式下提问请求带着更早的时间戳。\n\n### 聊天排序\n- 修复 AskUserQuestion 与权限选项卡片显示在助手消息文本上方的问题 —— 当文本与它触发的卡片共享同一时间戳时，排序的 tie-breaker 现在会在倒序聊天列表中让文本保持在上方\n- 修复 PTY / Yolo 模式下 `ask_user` 选项卡片跳到助手分析文本上方的问题 —— 它的请求时间戳可能早于前面的文本，现在卡片会被锚定到不早于最近一段文本，从而显示在文本下方\n- 改进消息排序的可维护性：将稳定比较器抽取到独立的 `messageOrdering` 模块，并补充单元测试"
       },
       {
         "version": "2.33.1",
@@ -1721,7 +1749,7 @@
       }
     ]
   },
-  "latestVersion": "2.34.0",
+  "latestVersion": "2.34.1",
   "availableLocales": [
     "en",
     "zh-Hans"

@@ -80,6 +80,46 @@ describe('pending permission/question card ordering', () => {
         expect(picker!.createdAt).toBeGreaterThanOrEqual(5000);
     });
 
+    it('re-anchors an EXISTING picker when later-batch prose out-dates it', () => {
+        const state = createReducer();
+
+        const agentState: AgentState = {
+            requests: {
+                'ask1': {
+                    tool: 'mcp__happy__ask_user',
+                    arguments: { question: 'Pick one' },
+                    createdAt: 3000,
+                },
+            },
+        };
+
+        // Batch 1: the picker arrives first, before any prose, created with its
+        // own (earlier) request timestamp.
+        reducer(state, [], agentState);
+        const pickerBatch1 = Array.from(state.messages.values()).find(
+            (m) => m.tool?.name === 'mcp__happy__ask_user',
+        );
+        expect(pickerBatch1!.createdAt).toBe(3000);
+
+        // Batch 2: the conclusion prose arrives LATER (createdAt 5000) while the
+        // same request is still pending. This hits the existing-card branch,
+        // which previously never re-anchored — leaving the picker above the prose.
+        const result = reducer(
+            state,
+            [agentText('text1', 5000, 'Here is my analysis. Pick one:')],
+            agentState,
+        );
+
+        const picker = Array.from(state.messages.values()).find(
+            (m) => m.tool?.name === 'mcp__happy__ask_user',
+        );
+        // Card is bumped up to the prose time so it no longer sorts above it.
+        expect(picker!.createdAt).toBe(5000);
+        // The reducer must signal storage to rebuild order, because storage's
+        // incremental fast-path cannot observe an existing createdAt change.
+        expect(result.reordered).toBe(true);
+    });
+
     it('leaves a picker that is already newer than the prose untouched', () => {
         const state = createReducer();
 

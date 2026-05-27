@@ -266,6 +266,13 @@ export type ReducerResult = {
     >;
   };
   hasReadyEvent?: boolean;
+  /**
+   * True when the reducer changed the createdAt of an ALREADY-EXISTING message
+   * (e.g. re-anchoring a pending ask_user/permission card below later prose).
+   * storage's incremental ordering fast-paths assume an existing message's
+   * createdAt is immutable, so they must fall back to a full re-sort when set.
+   */
+  reordered?: boolean;
 };
 
 /** Lifecycle event messages that require content-based dedup within a 5s window */
@@ -287,6 +294,11 @@ export function reducer(
   let newMessages: Message[] = [];
   let changed: Set<string> = new Set();
   let hasReadyEvent = false;
+  // Set when we mutate the createdAt of an already-existing message (re-anchoring
+  // a pending card below later prose). storage's incremental ordering fast-paths
+  // assume existing createdAt never changes, so they must fall back to a full
+  // re-sort when this is true. See ReducerResult.reordered.
+  let reordered = false;
   // Track task status messages for Phase 3.7 sidechain redirection
   const taskStatusMsgIds = new Map<string, string>(); // reducerMsg mid → taskId
 
@@ -600,12 +612,18 @@ export function reducer(
         if (existingMessageId) {
           // Update existing tool message with permission info
           const message = state.messages.get(existingMessageId);
-          // [ask-order] DIAGNOSTIC (temporary): card already existed from a
-          // prior batch — if its createdAt predates the latest agent text,
-          // it is stuck above the prose (immutability forbids re-anchoring).
-          console.log(
-            `[ask-order] existing card tool=${message?.tool?.name} existing.createdAt=${message?.createdAt} latestText=${state.latestAgentTextTime} anchor=${pendingCardAnchor}`,
-          );
+          // A card created in an earlier batch keeps the createdAt it was
+          // anchored to back then. If the conclusion prose only arrives in a
+          // LATER batch, that prose now out-dates the card and the picker is
+          // stranded ABOVE it. Re-anchor the card to the latest agent-text time
+          // so it stays below the prose; flag a resort because storage's
+          // incremental fast-path assumes an existing message's createdAt never
+          // changes and would otherwise leave the card in its old position.
+          if (message && message.createdAt < pendingCardAnchor) {
+            message.createdAt = pendingCardAnchor;
+            reordered = true;
+            changed.add(existingMessageId);
+          }
           if (message?.tool && !message.tool.permission) {
             message.tool.permission = {
               id: permId,
@@ -616,10 +634,6 @@ export function reducer(
         } else {
           // Create a new tool message for the permission request
           let mid = allocateId();
-          // [ask-order] DIAGNOSTIC (temporary): brand-new pending card.
-          console.log(
-            `[ask-order] new card tool=${request.tool} req.createdAt=${request.createdAt} anchor=${pendingCardAnchor} latestText=${state.latestAgentTextTime} -> createdAt=${Math.max(request.createdAt || Date.now(), pendingCardAnchor)}`,
-          );
           let toolCall: ToolCall = {
             name: request.tool,
             state: "running" as const,
@@ -1561,6 +1575,7 @@ export function reducer(
         }
       : undefined,
     hasReadyEvent: hasReadyEvent || undefined,
+    reordered: reordered || undefined,
   };
 }
 
