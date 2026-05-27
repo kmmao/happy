@@ -59,6 +59,19 @@ export const LocalSettingsSchema = z.object({
   // Third-party integration visibility toggles (default off)
   openClawEnabled: z.boolean().describe("Show OpenClaw integration in settings and tab bar"),
   sub2ApiEnabled: z.boolean().describe("Show Sub2API usage monitor in settings"),
+  // App lock (PIN / biometric) — privacy deterrent gate, device-local only.
+  // The PIN itself is NOT stored here; only a salted hash lives in expo-secure-store.
+  appLockEnabled: z
+    .boolean()
+    .describe("Require a PIN/biometric to open the app on this device"),
+  appLockTimeout: z
+    .enum(["immediate", "30s", "1m", "5m", "never"])
+    .describe(
+      "How long the app can be backgrounded before it re-locks. 'never' = background never auto-locks, but a cold start still locks.",
+    ),
+  appLockBiometricEnabled: z
+    .boolean()
+    .describe("Allow Face ID / Touch ID / fingerprint to unlock instead of the PIN"),
 });
 
 //
@@ -90,6 +103,9 @@ export const localSettingsDefaults: LocalSettings = {
   scoringModelOverride: {},
   openClawEnabled: false,
   sub2ApiEnabled: false,
+  appLockEnabled: false,
+  appLockTimeout: "immediate",
+  appLockBiometricEnabled: false,
 };
 Object.freeze(localSettingsDefaults);
 

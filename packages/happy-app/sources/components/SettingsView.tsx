@@ -293,6 +293,14 @@ export const SettingsView = React.memo(function SettingsView() {
           icon={<Ionicons name="mic-outline" size={29} color={theme.colors.success} />}
           onPress={() => router.push("/settings/voice")}
         />
+        {Platform.OS !== "web" && (
+          <Item
+            title={t("settings.appLock")}
+            subtitle={t("settings.appLockSubtitle")}
+            icon={<Ionicons name="lock-closed-outline" size={29} color={theme.colors.accentBlue} />}
+            onPress={() => router.push("/settings/app-lock")}
+          />
+        )}
         <Item
           title={t("settings.featuresTitle")}
           subtitle={t("settings.featuresSubtitle")}

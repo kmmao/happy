@@ -149,6 +149,20 @@ export default function RootLayout() {
         }}
       />
       <Stack.Screen
+        name="settings/app-lock"
+        options={{
+          headerTitle: t("settingsAppLock.title"),
+          headerBackTitle: t("common.back"),
+        }}
+      />
+      <Stack.Screen
+        name="settings/app-lock-setup"
+        options={{
+          headerTitle: t("settingsAppLock.setupTitle"),
+          headerBackTitle: t("common.back"),
+        }}
+      />
+      <Stack.Screen
         name="settings/installation-guide"
         options={{
           headerTitle: t("settings.installGuide"),

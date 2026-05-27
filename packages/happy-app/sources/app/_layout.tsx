@@ -21,6 +21,7 @@ import {
 } from "react-native-safe-area-context";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SidebarNavigator } from "@/components/SidebarNavigator";
+import { AppLockGate } from "@/components/AppLockGate";
 import sodium from "@/encryption/libsodium.lib";
 import { View, Platform } from "react-native";
 import { ModalProvider } from "@/modal";
@@ -297,15 +298,17 @@ export default function RootLayout() {
           <AuthProvider initialCredentials={initState.credentials}>
             <ThemeProvider value={navigationTheme}>
               <StatusBarProvider />
-              <ModalProvider>
-                <CommandPaletteProvider>
-                  <RealtimeProvider>
-                    <HorizontalSafeAreaWrapper>
-                      <SidebarNavigator />
-                    </HorizontalSafeAreaWrapper>
-                  </RealtimeProvider>
-                </CommandPaletteProvider>
-              </ModalProvider>
+              <AppLockGate>
+                <ModalProvider>
+                  <CommandPaletteProvider>
+                    <RealtimeProvider>
+                      <HorizontalSafeAreaWrapper>
+                        <SidebarNavigator />
+                      </HorizontalSafeAreaWrapper>
+                    </RealtimeProvider>
+                  </CommandPaletteProvider>
+                </ModalProvider>
+              </AppLockGate>
             </ThemeProvider>
           </AuthProvider>
         </GestureHandlerRootView>
