@@ -589,7 +589,7 @@ describe("AgentLoopCoordinator", () => {
     expect(gated.loop?.iteration).toBe(1);
 
     vi.setSystemTime(new Date("2025-01-01T23:30:00"));
-    (scheduler as any).getJobsSnapshot = () => [];
+    (scheduler as any).getActiveJobByLoopId = () => undefined;
     const manual = await coordinator.runNow(created.loop!.id);
     expect(manual.success).toBe(true);
     expect(manual.loop?.iteration).toBe(2);

@@ -155,8 +155,6 @@ export interface AgentLoopCoordinatorOptions {
   onBriefGenerated?: (brief: AgentLoopBriefSnapshot) => void;
 }
 
-const TERMINAL_STATUSES = new Set(["completed", "failed", "cancelled"]);
-
 function normalizeOptionalString(value: string | null | undefined): string | undefined {
   if (value == null) {
     return undefined;
@@ -1095,7 +1093,9 @@ export class AgentLoopCoordinator {
   }
 
   private hasActiveJob(loopId: string): boolean {
-    return this.scheduler.getJobsSnapshot().some((job) => job.loopId === loopId && !TERMINAL_STATUSES.has(job.status));
+    // The scheduler owns the "active job per loop" invariant — delegate rather
+    // than re-derive it from a job snapshot here.
+    return this.scheduler.getActiveJobByLoopId(loopId) !== undefined;
   }
 
   private async ensureLoaded(): Promise<void> {

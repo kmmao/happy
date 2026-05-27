@@ -443,4 +443,41 @@ describe("AutomationScheduler", () => {
       await scheduler.stop();
     }
   });
+
+  it("owns the active-job-per-loop invariant via getActiveJobByLoopId", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "happy-automation-scheduler-"));
+    tempDirs.push(dir);
+    // maxConcurrentDispatches: 0 keeps the job parked at "queued" so we can
+    // observe a non-terminal job without it racing to completion.
+    const scheduler = createScheduler(dir, { maxConcurrentDispatches: 0 });
+
+    try {
+      await scheduler.start();
+
+      // No job yet for this loop.
+      expect(scheduler.getActiveJobByLoopId("loop-1")).toBeUndefined();
+
+      const { job } = await scheduler.enqueueAgentLoop({
+        type: "agent-loop-trigger",
+        loopId: "loop-1",
+        prompt: "do work",
+        directory: "/tmp/repo",
+        intervalMs: 600000,
+        trigger: "manual",
+        iteration: 1,
+        agent: "claude",
+      });
+
+      // A queued (non-terminal) job counts as active for its loop.
+      expect(scheduler.getActiveJobByLoopId("loop-1")?.id).toBe(job.id);
+      // A different loop id sees no active job.
+      expect(scheduler.getActiveJobByLoopId("loop-2")).toBeUndefined();
+
+      // Once the job reaches a terminal state, the loop is free again.
+      await scheduler.markJobTerminalByDedupeKey(job.dedupeKey, "completed");
+      expect(scheduler.getActiveJobByLoopId("loop-1")).toBeUndefined();
+    } finally {
+      await scheduler.stop();
+    }
+  });
 });

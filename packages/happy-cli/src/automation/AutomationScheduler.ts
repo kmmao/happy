@@ -221,6 +221,20 @@ export class AutomationScheduler {
     return this.store.getAll();
   }
 
+  /**
+   * The active (non-terminal) automation job for an agent loop, if any.
+   *
+   * The scheduler owns job lifecycle, so it owns the definition of "active" —
+   * this is the single authority for the "don't run a loop while one is already
+   * running" invariant. Callers must not re-derive it by scanning
+   * getJobsSnapshot(), which leaks the terminal-status semantics out of here.
+   */
+  getActiveJobByLoopId(loopId: string): AutomationJob | undefined {
+    return this.store
+      .getAll()
+      .find((job) => job.loopId === loopId && !TERMINAL_STATUSES.has(job.status));
+  }
+
   async cancelJob(jobId: string): Promise<AutomationMutationResult> {
     await this.ensureLoaded();
     const job = this.store.get(jobId);
