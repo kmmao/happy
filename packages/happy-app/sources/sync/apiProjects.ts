@@ -2,6 +2,7 @@ import { AuthCredentials } from "@/auth/tokenStorage";
 import { backoff } from "@/utils/time";
 import { throwIfNotOk } from "@/utils/http";
 import { getServerUrl } from "./serverConfig";
+import { apiRequest } from "./apiRequest";
 import * as z from "zod";
 
 /**
@@ -82,33 +83,25 @@ export async function fetchProjects(
     credentials: AuthCredentials,
     archived?: boolean,
 ): Promise<ServerProject[]> {
-    const API_ENDPOINT = getServerUrl();
     const all: ServerProject[] = [];
     let cursor: string | undefined;
 
     do {
-        const qs = new URLSearchParams({ limit: '100' });
-        if (archived !== undefined) qs.set('archived', String(archived));
-        if (cursor) qs.set('cursor', cursor);
-
-        const page = await backoff(async () => {
-            const response = await fetch(
-                `${API_ENDPOINT}/v1/projects?${qs}`,
-                { headers: authHeaders(credentials) },
-            );
-
-            throwIfNotOk(response, 'Failed to fetch projects');
-
-            const json = await response.json();
-            const parsed = ProjectListResponseSchema.safeParse(json);
-            if (!parsed.success) {
-                throw new Error(`Invalid projects response: ${parsed.error.issues[0]?.message}`);
-            }
-            return parsed.data;
+        const json = await apiRequest<unknown>(credentials, "/v1/projects", {
+            query: {
+                limit: 100,
+                archived: archived !== undefined ? archived : undefined,
+                cursor: cursor || undefined,
+            },
+            errorMessage: "Failed to fetch projects",
         });
+        const parsed = ProjectListResponseSchema.safeParse(json);
+        if (!parsed.success) {
+            throw new Error(`Invalid projects response: ${parsed.error.issues[0]?.message}`);
+        }
 
-        all.push(...(page.projects as unknown as ServerProject[]));
-        cursor = page.nextCursor ?? undefined;
+        all.push(...(parsed.data.projects as unknown as ServerProject[]));
+        cursor = parsed.data.nextCursor ?? undefined;
     } while (cursor);
 
     return all;
@@ -126,18 +119,10 @@ export async function createProject(
         metadata?: string | null;
     },
 ): Promise<{ project: ServerProject; created: boolean }> {
-    const API_ENDPOINT = getServerUrl();
-
-    return await backoff(async () => {
-        const response = await fetch(`${API_ENDPOINT}/v1/projects`, {
-            method: "POST",
-            headers: authHeaders(credentials),
-            body: JSON.stringify(params),
-        });
-
-        throwIfNotOk(response, 'Failed to create project');
-
-        return (await response.json()) as ProjectResponse;
+    return await apiRequest<ProjectResponse>(credentials, "/v1/projects", {
+        method: "POST",
+        body: params,
+        errorMessage: "Failed to create project",
     });
 }
 
@@ -153,21 +138,10 @@ export async function resolveProject(
         metadata?: string | null;
     },
 ): Promise<{ project: ServerProject; created: boolean }> {
-    const API_ENDPOINT = getServerUrl();
-
-    return await backoff(async () => {
-        const response = await fetch(
-            `${API_ENDPOINT}/v1/projects/resolve`,
-            {
-                method: "POST",
-                headers: authHeaders(credentials),
-                body: JSON.stringify(params),
-            },
-        );
-
-        throwIfNotOk(response, 'Failed to resolve project');
-
-        return (await response.json()) as ProjectResponse;
+    return await apiRequest<ProjectResponse>(credentials, "/v1/projects/resolve", {
+        method: "POST",
+        body: params,
+        errorMessage: "Failed to resolve project",
     });
 }
 
@@ -183,23 +157,12 @@ export async function updateProject(
         archived?: boolean;
     },
 ): Promise<ServerProject> {
-    const API_ENDPOINT = getServerUrl();
-
-    return await backoff(async () => {
-        const response = await fetch(
-            `${API_ENDPOINT}/v1/projects/${projectId}`,
-            {
-                method: "PATCH",
-                headers: authHeaders(credentials),
-                body: JSON.stringify(params),
-            },
-        );
-
-        throwIfNotOk(response, 'Failed to update project');
-
-        const data = (await response.json()) as ProjectSingleResponse;
-        return data.project;
+    const data = await apiRequest<ProjectSingleResponse>(credentials, `/v1/projects/${projectId}`, {
+        method: "PATCH",
+        body: params,
+        errorMessage: "Failed to update project",
     });
+    return data.project;
 }
 
 /**
@@ -235,23 +198,12 @@ export async function linkSessionsToProject(
     projectId: string,
     sessionIds: string[],
 ): Promise<number> {
-    const API_ENDPOINT = getServerUrl();
-
-    return await backoff(async () => {
-        const response = await fetch(
-            `${API_ENDPOINT}/v1/projects/${projectId}/link-sessions`,
-            {
-                method: "POST",
-                headers: authHeaders(credentials),
-                body: JSON.stringify({ sessionIds }),
-            },
-        );
-
-        throwIfNotOk(response, 'Failed to link sessions');
-
-        const data = (await response.json()) as LinkSessionsResponse;
-        return data.linked;
+    const data = await apiRequest<LinkSessionsResponse>(credentials, `/v1/projects/${projectId}/link-sessions`, {
+        method: "POST",
+        body: { sessionIds },
+        errorMessage: "Failed to link sessions",
     });
+    return data.linked;
 }
 
 /**
@@ -261,19 +213,10 @@ export async function fetchRelatedProjects(
     credentials: AuthCredentials,
     projectId: string,
 ): Promise<RelatedProject[]> {
-    const API_ENDPOINT = getServerUrl();
-
-    return await backoff(async () => {
-        const response = await fetch(
-            `${API_ENDPOINT}/v1/projects/${projectId}/related`,
-            { headers: authHeaders(credentials) },
-        );
-
-        throwIfNotOk(response, 'Failed to fetch related projects');
-
-        const data = (await response.json()) as RelatedProjectsResponse;
-        return data.related;
+    const data = await apiRequest<RelatedProjectsResponse>(credentials, `/v1/projects/${projectId}/related`, {
+        errorMessage: "Failed to fetch related projects",
     });
+    return data.related;
 }
 
 /**
@@ -292,4 +235,3 @@ export async function setSessionForkSource(
         body: JSON.stringify({ forkedFromSessionId }),
     });
 }
-

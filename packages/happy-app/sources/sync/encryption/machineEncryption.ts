@@ -1,7 +1,7 @@
-import { decodeBase64, encodeBase64 } from '@/encryption/base64';
 import { MachineMetadata, MachineMetadataSchema } from '../storageTypes';
 import { EncryptionCache } from './encryptionCache';
 import { Decryptor, Encryptor } from './encryptor';
+import { decryptValue, encryptValue } from './codec';
 import { log } from '@/log';
 
 export class MachineEncryption {
@@ -23,8 +23,7 @@ export class MachineEncryption {
      * Encrypt machine metadata
      */
     async encryptMetadata(metadata: MachineMetadata): Promise<string> {
-        const encrypted = await this.encryptor.encrypt([metadata]);
-        return encodeBase64(encrypted[0], 'base64');
+        return encryptValue(this.encryptor, metadata);
     }
 
     /**
@@ -39,13 +38,12 @@ export class MachineEncryption {
 
         // Decrypt if not cached
         try {
-            const encryptedData = decodeBase64(encrypted, 'base64');
-            const decrypted = await this.encryptor.decrypt([encryptedData]);
-            if (!decrypted[0]) {
+            const decrypted = await decryptValue(this.encryptor, encrypted);
+            if (decrypted === null) {
                 return null;
             }
-            
-            const parsed = MachineMetadataSchema.safeParse(decrypted[0]);
+
+            const parsed = MachineMetadataSchema.safeParse(decrypted);
             if (!parsed.success) {
                 log.error('Failed to parse machine metadata:', parsed.error);
                 return null;
@@ -64,8 +62,7 @@ export class MachineEncryption {
      * Encrypt daemon state
      */
     async encryptDaemonState(state: any): Promise<string> {
-        const encrypted = await this.encryptor.encrypt([state]);
-        return encodeBase64(encrypted[0], 'base64');
+        return encryptValue(this.encryptor, state);
     }
 
     /**
@@ -84,10 +81,8 @@ export class MachineEncryption {
 
         // Decrypt if not cached
         try {
-            const encryptedData = decodeBase64(encrypted, 'base64');
-            const decrypted = await this.encryptor.decrypt([encryptedData]);
-            const result = decrypted[0] || null;
-            
+            const result = await decryptValue(this.encryptor, encrypted);
+
             // Cache the result (including null values)
             this.cache.setCachedDaemonState(this.machineId, version, result);
             return result;
@@ -103,8 +98,7 @@ export class MachineEncryption {
      * Encrypt raw data using machine-specific encryption
      */
     async encryptRaw(data: any): Promise<string> {
-        const encrypted = await this.encryptor.encrypt([data]);
-        return encodeBase64(encrypted[0], 'base64');
+        return encryptValue(this.encryptor, data);
     }
 
     /**
@@ -112,9 +106,7 @@ export class MachineEncryption {
      */
     async decryptRaw(encrypted: string): Promise<any | null> {
         try {
-            const encryptedData = decodeBase64(encrypted, 'base64');
-            const decrypted = await this.encryptor.decrypt([encryptedData]);
-            return decrypted[0] || null;
+            return await decryptValue(this.encryptor, encrypted);
         } catch (error) {
             log.error('Failed to decrypt raw data:', error);
             return null;

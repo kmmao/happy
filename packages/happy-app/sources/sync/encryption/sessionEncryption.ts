@@ -1,4 +1,4 @@
-import { decodeBase64, encodeBase64 } from "@/encryption/base64";
+import { decodeBase64 } from "@/encryption/base64";
 import { RawRecord } from "../typesRaw";
 import { ApiMessage } from "../apiTypes";
 import {
@@ -12,6 +12,7 @@ import {
 } from "../storageTypes";
 import { EncryptionCache } from "./encryptionCache";
 import { Decryptor, Encryptor } from "./encryptor";
+import { decryptValue, decryptValueSafe, encryptValue } from "./codec";
 
 export class SessionEncryption {
   private sessionId: string;
@@ -120,37 +121,28 @@ export class SessionEncryption {
    * Encrypt a raw record
    */
   async encryptRawRecord(record: RawRecord): Promise<string> {
-    const encrypted = await this.encryptor.encrypt([record]);
-    return encodeBase64(encrypted[0], "base64");
+    return encryptValue(this.encryptor, record);
   }
 
   /**
    * Encrypt raw data using session-specific encryption
    */
   async encryptRaw(data: any): Promise<string> {
-    const encrypted = await this.encryptor.encrypt([data]);
-    return encodeBase64(encrypted[0], "base64");
+    return encryptValue(this.encryptor, data);
   }
 
   /**
    * Decrypt raw data using session-specific encryption
    */
   async decryptRaw(encrypted: string): Promise<any | null> {
-    try {
-      const encryptedData = decodeBase64(encrypted, "base64");
-      const decrypted = await this.encryptor.decrypt([encryptedData]);
-      return decrypted[0] || null;
-    } catch (error) {
-      return null;
-    }
+    return decryptValueSafe(this.encryptor, encrypted);
   }
 
   /**
    * Encrypt metadata using session-specific encryption
    */
   async encryptMetadata(metadata: Metadata): Promise<string> {
-    const encrypted = await this.encryptor.encrypt([metadata]);
-    return encodeBase64(encrypted[0], "base64");
+    return encryptValue(this.encryptor, metadata);
   }
 
   /**
@@ -167,12 +159,11 @@ export class SessionEncryption {
     }
 
     // Decrypt if not cached
-    const encryptedData = decodeBase64(encrypted, "base64");
-    const decrypted = await this.encryptor.decrypt([encryptedData]);
-    if (!decrypted[0]) {
+    const decrypted = await decryptValue(this.encryptor, encrypted);
+    if (decrypted === null) {
       return null;
     }
-    const parsed = MetadataSchema.safeParse(decrypted[0]);
+    const parsed = MetadataSchema.safeParse(decrypted);
     if (!parsed.success) {
       return null;
     }
@@ -186,8 +177,7 @@ export class SessionEncryption {
    * Encrypt agent state using session-specific encryption
    */
   async encryptAgentState(state: AgentState): Promise<string> {
-    const encrypted = await this.encryptor.encrypt([state]);
-    return encodeBase64(encrypted[0], "base64");
+    return encryptValue(this.encryptor, state);
   }
 
   /**
@@ -208,12 +198,11 @@ export class SessionEncryption {
     }
 
     // Decrypt if not cached
-    const encryptedData = decodeBase64(encrypted, "base64");
-    const decrypted = await this.encryptor.decrypt([encryptedData]);
-    if (!decrypted[0]) {
+    const decrypted = await decryptValue(this.encryptor, encrypted);
+    if (decrypted === null) {
       return {};
     }
-    const parsed = AgentStateSchema.safeParse(decrypted[0]);
+    const parsed = AgentStateSchema.safeParse(decrypted);
     if (!parsed.success) {
       return {};
     }
@@ -227,8 +216,7 @@ export class SessionEncryption {
    * Encrypt session preferences using session-specific encryption
    */
   async encryptPreferences(preferences: SessionPreferences): Promise<string> {
-    const encrypted = await this.encryptor.encrypt([preferences]);
-    return encodeBase64(encrypted[0], "base64");
+    return encryptValue(this.encryptor, preferences);
   }
 
   /**
@@ -242,12 +230,11 @@ export class SessionEncryption {
     }
 
     try {
-      const encryptedData = decodeBase64(encrypted, "base64");
-      const decrypted = await this.encryptor.decrypt([encryptedData]);
-      if (!decrypted[0]) {
+      const decrypted = await decryptValue(this.encryptor, encrypted);
+      if (decrypted === null) {
         return null;
       }
-      const parsed = SessionPreferencesSchema.safeParse(decrypted[0]);
+      const parsed = SessionPreferencesSchema.safeParse(decrypted);
       if (!parsed.success) {
         return null;
       }

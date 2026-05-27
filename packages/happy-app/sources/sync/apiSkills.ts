@@ -1,7 +1,6 @@
 import { AuthCredentials } from "@/auth/tokenStorage";
-import { backoff } from "@/utils/time";
-import { throwIfNotOk } from "@/utils/http";
 import { getServerUrl } from "./serverConfig";
+import { apiRequest } from "./apiRequest";
 
 export interface ServerSkill {
     id: string;
@@ -42,22 +41,14 @@ export async function fetchSkills(
         offset?: number;
     },
 ): Promise<{ skills: ServerSkill[]; total: number }> {
-    const API_ENDPOINT = getServerUrl();
-    const params = new URLSearchParams();
-    if (opts?.projectId) params.set("projectId", opts.projectId);
-    if (opts?.archived !== undefined) params.set("archived", String(opts.archived));
-    if (opts?.limit) params.set("limit", String(opts.limit));
-    if (opts?.offset) params.set("offset", String(opts.offset));
-
-    const qs = params.toString();
-
-    return await backoff(async () => {
-        const response = await fetch(
-            `${API_ENDPOINT}/v1/skills${qs ? `?${qs}` : ""}`,
-            { headers: authHeaders(credentials) },
-        );
-        throwIfNotOk(response, 'Failed to fetch skills');
-        return (await response.json()) as SkillListResponse;
+    return await apiRequest<SkillListResponse>(credentials, "/v1/skills", {
+        query: {
+            projectId: opts?.projectId || undefined,
+            archived: opts?.archived,
+            limit: opts?.limit || undefined,
+            offset: opts?.offset || undefined,
+        },
+        errorMessage: "Failed to fetch skills",
     });
 }
 
@@ -65,17 +56,10 @@ export async function fetchSkill(
     credentials: AuthCredentials,
     skillId: string,
 ): Promise<ServerSkill> {
-    const API_ENDPOINT = getServerUrl();
-
-    return await backoff(async () => {
-        const response = await fetch(
-            `${API_ENDPOINT}/v1/skills/${skillId}`,
-            { headers: authHeaders(credentials) },
-        );
-        throwIfNotOk(response, 'Failed to fetch skill');
-        const data = (await response.json()) as SkillResponse;
-        return data.skill;
+    const data = await apiRequest<SkillResponse>(credentials, `/v1/skills/${skillId}`, {
+        errorMessage: "Failed to fetch skill",
     });
+    return data.skill;
 }
 
 export async function createSkill(
@@ -139,14 +123,11 @@ export async function archiveSkill(
     credentials: AuthCredentials,
     skillId: string,
 ): Promise<ServerSkill> {
-    const API_ENDPOINT = getServerUrl();
-
-    const response = await fetch(`${API_ENDPOINT}/v1/skills/${skillId}/archive`, {
+    const data = await apiRequest<SkillResponse>(credentials, `/v1/skills/${skillId}/archive`, {
         method: "POST",
-        headers: authHeaders(credentials),
+        retry: false,
+        errorMessage: "Failed to archive skill",
     });
-    throwIfNotOk(response, "Failed to archive skill");
-    const data = (await response.json()) as SkillResponse;
     return data.skill;
 }
 

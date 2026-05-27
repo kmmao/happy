@@ -1,7 +1,5 @@
 import { AuthCredentials } from "@/auth/tokenStorage";
-import { backoff } from "@/utils/time";
-import { throwIfNotOk } from "@/utils/http";
-import { getServerUrl } from "./serverConfig";
+import { apiRequest, apiRequestVoid } from "./apiRequest";
 
 export interface ServerWebhookTrigger {
     id: string;
@@ -34,13 +32,6 @@ interface CreateWebhookTriggerResponse {
     secret: string;
 }
 
-function authHeaders(credentials: AuthCredentials) {
-    return {
-        Authorization: `Bearer ${credentials.token}`,
-        "Content-Type": "application/json",
-    };
-}
-
 export async function fetchWebhookTriggers(
     credentials: AuthCredentials,
     opts?: {
@@ -51,23 +42,15 @@ export async function fetchWebhookTriggers(
         offset?: number;
     },
 ): Promise<{ webhookTriggers: ServerWebhookTrigger[]; total: number }> {
-    const API_ENDPOINT = getServerUrl();
-    const params = new URLSearchParams();
-    if (opts?.machineId) params.set("machineId", opts.machineId);
-    if (opts?.projectId) params.set("projectId", opts.projectId);
-    if (opts?.enabled !== undefined) params.set("enabled", String(opts.enabled));
-    if (opts?.limit) params.set("limit", String(opts.limit));
-    if (opts?.offset) params.set("offset", String(opts.offset));
-
-    const qs = params.toString();
-
-    return await backoff(async () => {
-        const response = await fetch(
-            `${API_ENDPOINT}/v1/webhook-triggers${qs ? `?${qs}` : ""}`,
-            { headers: authHeaders(credentials) },
-        );
-        throwIfNotOk(response, 'Failed to fetch webhook triggers');
-        return (await response.json()) as WebhookTriggerListResponse;
+    return await apiRequest<WebhookTriggerListResponse>(credentials, "/v1/webhook-triggers", {
+        query: {
+            machineId: opts?.machineId || undefined,
+            projectId: opts?.projectId || undefined,
+            enabled: opts?.enabled,
+            limit: opts?.limit || undefined,
+            offset: opts?.offset || undefined,
+        },
+        errorMessage: "Failed to fetch webhook triggers",
     });
 }
 
@@ -84,16 +67,10 @@ export async function createWebhookTrigger(
         profileId?: string;
     },
 ): Promise<{ webhookTrigger: ServerWebhookTrigger; secret: string }> {
-    const API_ENDPOINT = getServerUrl();
-
-    return await backoff(async () => {
-        const response = await fetch(`${API_ENDPOINT}/v1/webhook-triggers`, {
-            method: "POST",
-            headers: authHeaders(credentials),
-            body: JSON.stringify(body),
-        });
-        throwIfNotOk(response, 'Failed to create webhook trigger');
-        return (await response.json()) as CreateWebhookTriggerResponse;
+    return await apiRequest<CreateWebhookTriggerResponse>(credentials, "/v1/webhook-triggers", {
+        method: "POST",
+        body,
+        errorMessage: "Failed to create webhook trigger",
     });
 }
 
@@ -109,48 +86,31 @@ export async function updateWebhookTrigger(
         profileId?: string | null;
     },
 ): Promise<ServerWebhookTrigger> {
-    const API_ENDPOINT = getServerUrl();
-
-    return await backoff(async () => {
-        const response = await fetch(`${API_ENDPOINT}/v1/webhook-triggers/${id}`, {
-            method: "PATCH",
-            headers: authHeaders(credentials),
-            body: JSON.stringify(body),
-        });
-        throwIfNotOk(response, 'Failed to update webhook trigger');
-        const data = (await response.json()) as WebhookTriggerResponse;
-        return data.webhookTrigger;
+    const data = await apiRequest<WebhookTriggerResponse>(credentials, `/v1/webhook-triggers/${id}`, {
+        method: "PATCH",
+        body,
+        errorMessage: "Failed to update webhook trigger",
     });
+    return data.webhookTrigger;
 }
 
 export async function regenerateWebhookSecret(
     credentials: AuthCredentials,
     id: string,
 ): Promise<string> {
-    const API_ENDPOINT = getServerUrl();
-
-    return await backoff(async () => {
-        const response = await fetch(`${API_ENDPOINT}/v1/webhook-triggers/${id}/regenerate-secret`, {
-            method: "POST",
-            headers: authHeaders(credentials),
-        });
-        throwIfNotOk(response, 'Failed to regenerate secret');
-        const data = (await response.json()) as { secret: string };
-        return data.secret;
+    const data = await apiRequest<{ secret: string }>(credentials, `/v1/webhook-triggers/${id}/regenerate-secret`, {
+        method: "POST",
+        errorMessage: "Failed to regenerate secret",
     });
+    return data.secret;
 }
 
 export async function deleteWebhookTrigger(
     credentials: AuthCredentials,
     id: string,
 ): Promise<void> {
-    const API_ENDPOINT = getServerUrl();
-
-    await backoff(async () => {
-        const response = await fetch(`${API_ENDPOINT}/v1/webhook-triggers/${id}`, {
-            method: "DELETE",
-            headers: authHeaders(credentials),
-        });
-        throwIfNotOk(response, 'Failed to delete webhook trigger');
+    await apiRequestVoid(credentials, `/v1/webhook-triggers/${id}`, {
+        method: "DELETE",
+        errorMessage: "Failed to delete webhook trigger",
     });
 }

@@ -1,7 +1,5 @@
 import { AuthCredentials } from "@/auth/tokenStorage";
-import { backoff } from "@/utils/time";
-import { throwIfNotOk } from "@/utils/http";
-import { getServerUrl } from "./serverConfig";
+import { apiRequest, apiRequestVoid } from "./apiRequest";
 
 export interface ServerTriggerSchedule {
     id: string;
@@ -31,13 +29,6 @@ interface TriggerScheduleResponse {
     triggerSchedule: ServerTriggerSchedule;
 }
 
-function authHeaders(credentials: AuthCredentials) {
-    return {
-        Authorization: `Bearer ${credentials.token}`,
-        "Content-Type": "application/json",
-    };
-}
-
 export async function fetchTriggerSchedules(
     credentials: AuthCredentials,
     opts?: {
@@ -48,23 +39,15 @@ export async function fetchTriggerSchedules(
         offset?: number;
     },
 ): Promise<{ triggerSchedules: ServerTriggerSchedule[]; total: number }> {
-    const API_ENDPOINT = getServerUrl();
-    const params = new URLSearchParams();
-    if (opts?.machineId) params.set("machineId", opts.machineId);
-    if (opts?.projectId) params.set("projectId", opts.projectId);
-    if (opts?.enabled !== undefined) params.set("enabled", String(opts.enabled));
-    if (opts?.limit) params.set("limit", String(opts.limit));
-    if (opts?.offset) params.set("offset", String(opts.offset));
-
-    const qs = params.toString();
-
-    return await backoff(async () => {
-        const response = await fetch(
-            `${API_ENDPOINT}/v1/trigger-schedules${qs ? `?${qs}` : ""}`,
-            { headers: authHeaders(credentials) },
-        );
-        throwIfNotOk(response, 'Failed to fetch trigger schedules');
-        return (await response.json()) as TriggerScheduleListResponse;
+    return await apiRequest<TriggerScheduleListResponse>(credentials, "/v1/trigger-schedules", {
+        query: {
+            machineId: opts?.machineId || undefined,
+            projectId: opts?.projectId || undefined,
+            enabled: opts?.enabled,
+            limit: opts?.limit || undefined,
+            offset: opts?.offset || undefined,
+        },
+        errorMessage: "Failed to fetch trigger schedules",
     });
 }
 
@@ -81,18 +64,12 @@ export async function createTriggerSchedule(
         profileId?: string;
     },
 ): Promise<ServerTriggerSchedule> {
-    const API_ENDPOINT = getServerUrl();
-
-    return await backoff(async () => {
-        const response = await fetch(`${API_ENDPOINT}/v1/trigger-schedules`, {
-            method: "POST",
-            headers: authHeaders(credentials),
-            body: JSON.stringify(body),
-        });
-        throwIfNotOk(response, 'Failed to create trigger schedule');
-        const data = (await response.json()) as TriggerScheduleResponse;
-        return data.triggerSchedule;
+    const data = await apiRequest<TriggerScheduleResponse>(credentials, "/v1/trigger-schedules", {
+        method: "POST",
+        body,
+        errorMessage: "Failed to create trigger schedule",
     });
+    return data.triggerSchedule;
 }
 
 export async function updateTriggerSchedule(
@@ -107,48 +84,31 @@ export async function updateTriggerSchedule(
         profileId?: string | null;
     },
 ): Promise<ServerTriggerSchedule> {
-    const API_ENDPOINT = getServerUrl();
-
-    return await backoff(async () => {
-        const response = await fetch(`${API_ENDPOINT}/v1/trigger-schedules/${id}`, {
-            method: "PATCH",
-            headers: authHeaders(credentials),
-            body: JSON.stringify(body),
-        });
-        throwIfNotOk(response, 'Failed to update trigger schedule');
-        const data = (await response.json()) as TriggerScheduleResponse;
-        return data.triggerSchedule;
+    const data = await apiRequest<TriggerScheduleResponse>(credentials, `/v1/trigger-schedules/${id}`, {
+        method: "PATCH",
+        body,
+        errorMessage: "Failed to update trigger schedule",
     });
+    return data.triggerSchedule;
 }
 
 export async function toggleTriggerSchedule(
     credentials: AuthCredentials,
     id: string,
 ): Promise<ServerTriggerSchedule> {
-    const API_ENDPOINT = getServerUrl();
-
-    return await backoff(async () => {
-        const response = await fetch(`${API_ENDPOINT}/v1/trigger-schedules/${id}/toggle`, {
-            method: "POST",
-            headers: authHeaders(credentials),
-        });
-        throwIfNotOk(response, 'Failed to toggle trigger schedule');
-        const data = (await response.json()) as TriggerScheduleResponse;
-        return data.triggerSchedule;
+    const data = await apiRequest<TriggerScheduleResponse>(credentials, `/v1/trigger-schedules/${id}/toggle`, {
+        method: "POST",
+        errorMessage: "Failed to toggle trigger schedule",
     });
+    return data.triggerSchedule;
 }
 
 export async function deleteTriggerSchedule(
     credentials: AuthCredentials,
     id: string,
 ): Promise<void> {
-    const API_ENDPOINT = getServerUrl();
-
-    await backoff(async () => {
-        const response = await fetch(`${API_ENDPOINT}/v1/trigger-schedules/${id}`, {
-            method: "DELETE",
-            headers: authHeaders(credentials),
-        });
-        throwIfNotOk(response, 'Failed to delete trigger schedule');
+    await apiRequestVoid(credentials, `/v1/trigger-schedules/${id}`, {
+        method: "DELETE",
+        errorMessage: "Failed to delete trigger schedule",
     });
 }

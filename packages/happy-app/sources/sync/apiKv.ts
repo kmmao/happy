@@ -2,6 +2,7 @@ import { AuthCredentials } from '@/auth/tokenStorage';
 import { backoff } from '@/utils/time';
 import { throwIfNotOk } from '@/utils/http';
 import { getServerUrl } from './serverConfig';
+import { apiRequest } from './apiRequest';
 
 //
 // Types
@@ -100,34 +101,13 @@ export async function kvList(
     credentials: AuthCredentials,
     params: KvListParams = {}
 ): Promise<KvListResponse> {
-    const API_ENDPOINT = getServerUrl();
-
-    const queryParams = new URLSearchParams();
-    if (params.prefix) {
-        queryParams.append('prefix', params.prefix);
-    }
-    if (params.limit !== undefined) {
-        queryParams.append('limit', Math.min(params.limit, 1000).toString());
-    }
-    if (params.cursor) {
-        queryParams.append('cursor', params.cursor);
-    }
-
-    const url = queryParams.toString()
-        ? `${API_ENDPOINT}/v1/kv?${queryParams.toString()}`
-        : `${API_ENDPOINT}/v1/kv`;
-
-    return await backoff(async () => {
-        const response = await fetch(url, {
-            headers: {
-                'Authorization': `Bearer ${credentials.token}`
-            }
-        });
-
-        throwIfNotOk(response, 'Failed to list KV items');
-
-        const data = await response.json() as KvListResponse;
-        return data;
+    return await apiRequest<KvListResponse>(credentials, '/v1/kv', {
+        query: {
+            prefix: params.prefix || undefined,
+            limit: params.limit !== undefined ? Math.min(params.limit, 1000) : undefined,
+            cursor: params.cursor || undefined,
+        },
+        errorMessage: 'Failed to list KV items',
     });
 }
 
@@ -146,22 +126,10 @@ export async function kvBulkGet(
         throw new Error('Cannot bulk get more than 100 keys at once');
     }
 
-    const API_ENDPOINT = getServerUrl();
-
-    return await backoff(async () => {
-        const response = await fetch(`${API_ENDPOINT}/v1/kv/bulk`, {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${credentials.token}`,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ keys })
-        });
-
-        throwIfNotOk(response, 'Failed to bulk get KV values');
-
-        const data = await response.json() as KvBulkGetResponse;
-        return data;
+    return await apiRequest<KvBulkGetResponse>(credentials, '/v1/kv/bulk', {
+        method: 'POST',
+        body: { keys },
+        errorMessage: 'Failed to bulk get KV values',
     });
 }
 

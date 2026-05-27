@@ -1,8 +1,6 @@
 import { AuthCredentials } from "@/auth/tokenStorage";
-import { backoff } from "@/utils/time";
-import { throwIfNotOk } from "@/utils/http";
-import { getServerUrl } from "./serverConfig";
 import * as z from "zod";
+import { apiRequest, apiRequestVoid } from "./apiRequest";
 
 export interface ServerInboxItem {
     id: string;
@@ -38,13 +36,6 @@ const InboxCountResponseSchema = z.object({
     count: z.number(),
 });
 
-function authHeaders(credentials: AuthCredentials) {
-    return {
-        Authorization: `Bearer ${credentials.token}`,
-        "Content-Type": "application/json",
-    };
-}
-
 export async function fetchInboxItems(
     credentials: AuthCredentials,
     opts?: {
@@ -54,96 +45,73 @@ export async function fetchInboxItems(
         offset?: number;
     },
 ): Promise<{ items: ServerInboxItem[]; total: number }> {
-    const API_ENDPOINT = getServerUrl();
-    const params = new URLSearchParams();
-    if (opts?.category) params.set("category", opts.category);
-    if (opts?.read !== undefined) params.set("read", String(opts.read));
-    if (opts?.limit) params.set("limit", String(opts.limit));
-    if (opts?.offset) params.set("offset", String(opts.offset));
-
-    const qs = params.toString();
-
-    return await backoff(async () => {
-        const response = await fetch(
-            `${API_ENDPOINT}/v1/inbox${qs ? `?${qs}` : ""}`,
-            { headers: authHeaders(credentials) },
-        );
-        throwIfNotOk(response, 'Failed to fetch inbox');
-        const json = await response.json();
-        const parsed = InboxListResponseSchema.safeParse(json);
-        if (!parsed.success) {
-            throw new Error(`Invalid inbox response: ${parsed.error.issues[0]?.message}`);
-        }
-        return parsed.data;
+    const json = await apiRequest<unknown>(credentials, "/v1/inbox", {
+        query: {
+            category: opts?.category || undefined,
+            read: opts?.read,
+            limit: opts?.limit || undefined,
+            offset: opts?.offset || undefined,
+        },
+        errorMessage: "Failed to fetch inbox",
     });
+    const parsed = InboxListResponseSchema.safeParse(json);
+    if (!parsed.success) {
+        throw new Error(`Invalid inbox response: ${parsed.error.issues[0]?.message}`);
+    }
+    return parsed.data;
 }
 
 export async function fetchInboxUnreadCount(
     credentials: AuthCredentials,
 ): Promise<number> {
-    const API_ENDPOINT = getServerUrl();
-
-    return await backoff(async () => {
-        const response = await fetch(
-            `${API_ENDPOINT}/v1/inbox/count`,
-            { headers: authHeaders(credentials) },
-        );
-        throwIfNotOk(response, 'Failed to fetch inbox count');
-        const json = await response.json();
-        const parsed = InboxCountResponseSchema.safeParse(json);
-        if (!parsed.success) {
-            throw new Error(`Invalid inbox count response: ${parsed.error.issues[0]?.message}`);
-        }
-        return parsed.data.count;
+    const json = await apiRequest<unknown>(credentials, "/v1/inbox/count", {
+        errorMessage: "Failed to fetch inbox count",
     });
+    const parsed = InboxCountResponseSchema.safeParse(json);
+    if (!parsed.success) {
+        throw new Error(`Invalid inbox count response: ${parsed.error.issues[0]?.message}`);
+    }
+    return parsed.data.count;
 }
 
 export async function markInboxItemRead(
     credentials: AuthCredentials,
     itemId: string,
 ): Promise<void> {
-    const API_ENDPOINT = getServerUrl();
-
-    const response = await fetch(`${API_ENDPOINT}/v1/inbox/${itemId}/read`, {
+    await apiRequestVoid(credentials, `/v1/inbox/${itemId}/read`, {
         method: "POST",
-        headers: authHeaders(credentials),
+        retry: false,
+        errorMessage: "Failed to mark inbox item read",
     });
-    throwIfNotOk(response, "Failed to mark inbox item read");
 }
 
 export async function markAllInboxRead(
     credentials: AuthCredentials,
 ): Promise<void> {
-    const API_ENDPOINT = getServerUrl();
-
-    const response = await fetch(`${API_ENDPOINT}/v1/inbox/read-all`, {
+    await apiRequestVoid(credentials, "/v1/inbox/read-all", {
         method: "POST",
-        headers: authHeaders(credentials),
+        retry: false,
+        errorMessage: "Failed to mark all inbox read",
     });
-    throwIfNotOk(response, "Failed to mark all inbox read");
 }
 
 export async function deleteInboxItem(
     credentials: AuthCredentials,
     itemId: string,
 ): Promise<void> {
-    const API_ENDPOINT = getServerUrl();
-
-    const response = await fetch(`${API_ENDPOINT}/v1/inbox/${itemId}`, {
+    await apiRequestVoid(credentials, `/v1/inbox/${itemId}`, {
         method: "DELETE",
-        headers: authHeaders(credentials),
+        retry: false,
+        errorMessage: "Failed to delete inbox item",
     });
-    throwIfNotOk(response, "Failed to delete inbox item");
 }
 
 export async function clearAllInbox(
     credentials: AuthCredentials,
 ): Promise<void> {
-    const API_ENDPOINT = getServerUrl();
-
-    const response = await fetch(`${API_ENDPOINT}/v1/inbox`, {
+    await apiRequestVoid(credentials, "/v1/inbox", {
         method: "DELETE",
-        headers: authHeaders(credentials),
+        retry: false,
+        errorMessage: "Failed to clear inbox",
     });
-    throwIfNotOk(response, "Failed to clear inbox");
 }

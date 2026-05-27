@@ -1,7 +1,5 @@
 import { AuthCredentials } from "@/auth/tokenStorage";
-import { backoff } from "@/utils/time";
-import { throwIfNotOk } from "@/utils/http";
-import { getServerUrl } from "./serverConfig";
+import { apiRequest } from "./apiRequest";
 
 export interface CiRun {
     runId: number;
@@ -32,21 +30,12 @@ export async function fetchCiRuns(
     credentials: AuthCredentials,
     params?: { projectId?: string; repoUrl?: string },
 ): Promise<{ runs: CiRun[] }> {
-    const API_ENDPOINT = getServerUrl();
-    const query = new URLSearchParams();
-    if (params?.projectId) query.set("projectId", params.projectId);
-    if (params?.repoUrl) query.set("repoUrl", params.repoUrl);
-    const qs = query.toString() ? `?${query.toString()}` : "";
-
-    return await backoff(async () => {
-        const response = await fetch(`${API_ENDPOINT}/v1/ci/runs${qs}`, {
-            headers: {
-                Authorization: `Bearer ${credentials.token}`,
-                "Content-Type": "application/json",
-            },
-        });
-        throwIfNotOk(response, 'Failed to fetch CI runs');
-        return (await response.json()) as { runs: CiRun[] };
+    return await apiRequest<{ runs: CiRun[] }>(credentials, "/v1/ci/runs", {
+        query: {
+            projectId: params?.projectId || undefined,
+            repoUrl: params?.repoUrl || undefined,
+        },
+        errorMessage: 'Failed to fetch CI runs',
     });
 }
 
@@ -54,24 +43,12 @@ export async function fetchWebhookEvents(
     credentials: AuthCredentials,
     params?: { projectId?: string; limit?: number; offset?: number },
 ): Promise<{ events: WebhookEvent[]; total: number }> {
-    const API_ENDPOINT = getServerUrl();
-    const query = new URLSearchParams();
-    if (params?.projectId) query.set("projectId", params.projectId);
-    if (params?.limit !== undefined) query.set("limit", String(params.limit));
-    if (params?.offset !== undefined) query.set("offset", String(params.offset));
-    const qs = query.toString() ? `?${query.toString()}` : "";
-
-    return await backoff(async () => {
-        const response = await fetch(
-            `${API_ENDPOINT}/v1/webhooks/events${qs}`,
-            {
-                headers: {
-                    Authorization: `Bearer ${credentials.token}`,
-                    "Content-Type": "application/json",
-                },
-            },
-        );
-        throwIfNotOk(response, 'Failed to fetch webhook events');
-        return (await response.json()) as { events: WebhookEvent[]; total: number };
+    return await apiRequest<{ events: WebhookEvent[]; total: number }>(credentials, "/v1/webhooks/events", {
+        query: {
+            projectId: params?.projectId || undefined,
+            limit: params?.limit,
+            offset: params?.offset,
+        },
+        errorMessage: 'Failed to fetch webhook events',
     });
 }

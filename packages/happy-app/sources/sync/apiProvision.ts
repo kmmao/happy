@@ -1,7 +1,5 @@
 import { AuthCredentials } from '@/auth/tokenStorage';
-import { backoff } from '@/utils/time';
-import { throwIfNotOk } from '@/utils/http';
-import { getServerUrl } from './serverConfig';
+import { apiRequest, apiRequestVoid } from './apiRequest';
 
 //
 // Types
@@ -34,26 +32,15 @@ export async function provisionCreate(
     credentials: AuthCredentials,
     params: { label?: string; ttlHours?: number; webappUrl?: string; ttydUrl?: string } = {}
 ): Promise<ProvisionCreateResponse> {
-    const API_ENDPOINT = getServerUrl();
-
-    return await backoff(async () => {
-        const response = await fetch(`${API_ENDPOINT}/v1/provision`, {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${credentials.token}`,
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                label: params.label ?? null,
-                ttlHours: params.ttlHours ?? 72,
-                webappUrl: params.webappUrl ?? null,
-                ttydUrl: params.ttydUrl ?? null,
-            }),
-        });
-
-        throwIfNotOk(response, 'Failed to create provision token');
-
-        return await response.json() as ProvisionCreateResponse;
+    return await apiRequest<ProvisionCreateResponse>(credentials, '/v1/provision', {
+        method: 'POST',
+        body: {
+            label: params.label ?? null,
+            ttlHours: params.ttlHours ?? 72,
+            webappUrl: params.webappUrl ?? null,
+            ttydUrl: params.ttydUrl ?? null,
+        },
+        errorMessage: 'Failed to create provision token',
     });
 }
 
@@ -63,18 +50,8 @@ export async function provisionCreate(
 export async function provisionList(
     credentials: AuthCredentials
 ): Promise<ProvisionTokenItem[]> {
-    const API_ENDPOINT = getServerUrl();
-
-    return await backoff(async () => {
-        const response = await fetch(`${API_ENDPOINT}/v1/provision`, {
-            headers: {
-                'Authorization': `Bearer ${credentials.token}`,
-            },
-        });
-
-        throwIfNotOk(response, 'Failed to list provision tokens');
-
-        return await response.json() as ProvisionTokenItem[];
+    return await apiRequest<ProvisionTokenItem[]>(credentials, '/v1/provision', {
+        errorMessage: 'Failed to list provision tokens',
     });
 }
 
@@ -86,19 +63,10 @@ export async function provisionUpdateUrls(
     tokenId: string,
     urls: { webappUrl?: string; ttydUrl?: string }
 ): Promise<void> {
-    const API_ENDPOINT = getServerUrl();
-
-    await backoff(async () => {
-        const response = await fetch(`${API_ENDPOINT}/v1/provision/${tokenId}`, {
-            method: 'PATCH',
-            headers: {
-                'Authorization': `Bearer ${credentials.token}`,
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(urls),
-        });
-
-        throwIfNotOk(response, "Failed to update provision token");
+    await apiRequestVoid(credentials, `/v1/provision/${tokenId}`, {
+        method: 'PATCH',
+        body: urls,
+        errorMessage: 'Failed to update provision token',
     });
 }
 
@@ -109,17 +77,9 @@ export async function provisionRestore(
     credentials: AuthCredentials,
     tokenId: string
 ): Promise<void> {
-    const API_ENDPOINT = getServerUrl();
-
-    await backoff(async () => {
-        const response = await fetch(`${API_ENDPOINT}/v1/provision/${tokenId}/restore`, {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${credentials.token}`,
-            },
-        });
-
-        throwIfNotOk(response, "Failed to restore provision token");
+    await apiRequestVoid(credentials, `/v1/provision/${tokenId}/restore`, {
+        method: 'POST',
+        errorMessage: 'Failed to restore provision token',
     });
 }
 
@@ -130,16 +90,8 @@ export async function provisionRevoke(
     credentials: AuthCredentials,
     tokenId: string
 ): Promise<void> {
-    const API_ENDPOINT = getServerUrl();
-
-    await backoff(async () => {
-        const response = await fetch(`${API_ENDPOINT}/v1/provision/${tokenId}`, {
-            method: 'DELETE',
-            headers: {
-                'Authorization': `Bearer ${credentials.token}`,
-            },
-        });
-
-        throwIfNotOk(response, "Failed to revoke provision token");
+    await apiRequestVoid(credentials, `/v1/provision/${tokenId}`, {
+        method: 'DELETE',
+        errorMessage: 'Failed to revoke provision token',
     });
 }

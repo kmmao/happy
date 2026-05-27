@@ -1,7 +1,6 @@
 import { deriveKey } from "@/encryption/deriveKey";
 import {
   AES256Encryption,
-  BoxEncryption,
   SecretBoxEncryption,
   Encryptor,
   Decryptor,
@@ -10,7 +9,8 @@ import { encodeHex } from "@/encryption/hex";
 import { EncryptionCache } from "./encryptionCache";
 import { SessionEncryption } from "./sessionEncryption";
 import { MachineEncryption } from "./machineEncryption";
-import { encodeBase64, decodeBase64 } from "@/encryption/base64";
+import { decryptValueSafe, encryptValue } from "./codec";
+import { decodeBase64 } from "@/encryption/base64";
 import sodium from "@/encryption/libsodium.lib";
 import { decryptBox, encryptBox } from "@/encryption/libsodium";
 import { log } from "@/log";
@@ -179,18 +179,11 @@ export class Encryption {
   //
 
   async encryptRaw(data: any): Promise<string> {
-    const encrypted = await this.legacyEncryption.encrypt([data]);
-    return encodeBase64(encrypted[0], "base64");
+    return encryptValue(this.legacyEncryption, data);
   }
 
   async decryptRaw(encrypted: string): Promise<any | null> {
-    try {
-      const encryptedData = decodeBase64(encrypted, "base64");
-      const decrypted = await this.legacyEncryption.decrypt([encryptedData]);
-      return decrypted[0] || null;
-    } catch (error) {
-      return null;
-    }
+    return decryptValueSafe(this.legacyEncryption, encrypted);
   }
 
   //
