@@ -195,6 +195,30 @@ export async function claudeRemoteLauncher(
   const STRAND_TIER1_GRACE_MS = 10_000; // wait after interrupt before tier-2
   const MIN_COLD_RESTART_INTERVAL_MS = 300_000; // rate-limit tier-2 restarts
 
+  // ── Stranded-turn auto-redelivery ──
+  // A turn can wedge the Claude TUI the instant the prompt is written: the
+  // prompt sits unsubmitted in the composer, the TUI emits zero bytes, and
+  // nothing ever runs (observed in 2026-05-27-23-53-39-pid-36115.log gen=5 —
+  // 0 PTY bytes, 0 JSONL records for the whole turn). The watchdog's tier-1
+  // Esc unwedges the PTY, but Esc CLEARS the Claude TUI composer — so the
+  // prompt the user sent is discarded and lost forever. Symptom: "I sent a
+  // message and got no reaction." (Distinct from the false-positive abort the
+  // PTY-byte liveness signal fixed: there the turn was alive; here it genuinely
+  // never started.)
+  //
+  // Fix: retain the in-flight prompt so a tier-1 recovery that finds the turn
+  // produced ZERO output can re-push it onto the queue. The still-running
+  // mid-turn drain (a tier-1-only recovery never stops it) takes the re-pushed
+  // message — its mode is identical so the cold-hash check passes — and writes
+  // it to the now-responsive PTY via midTurnPushFn. Bounded to ONE consecutive
+  // auto-retry (`strandRedeliverCount`, reset by any genuine output) so a
+  // persistently wedged session escalates to tier-2 instead of re-strand
+  // looping. Gating on zero output is what makes re-delivery double-execution
+  // safe: no JSONL record means nothing ran.
+  let inFlightPrompt: { message: string; mode: EnhancedMode } | null = null;
+  let turnProducedOutput = false;
+  let strandRedeliverCount = 0;
+
   const strandDiagState = (): string => {
     const snap = executionGuard.getSnapshot();
     return (
@@ -275,6 +299,7 @@ export async function claudeRemoteLauncher(
         logger.debug(
           "[remote][strand] auto-recovery tier-1 succeeded — PTY responsive again.",
         );
+        maybeRedeliverStrandedPrompt();
         return;
       }
       if (Date.now() - lastColdRestartAt < MIN_COLD_RESTART_INTERVAL_MS) {
@@ -298,7 +323,39 @@ export async function claudeRemoteLauncher(
     }
   }
 
+  // Re-deliver the in-flight prompt after a tier-1 recovery that unwedged a PTY
+  // whose turn produced nothing. The recovery Esc cleared the TUI composer, so
+  // the prompt is gone; re-pushing it lets the still-running mid-turn drain type
+  // it onto the now-responsive PTY. Skipped when the turn produced output (the
+  // prompt actually ran — re-delivering would double-execute), when nothing is
+  // in flight, or when the one-shot budget is already spent (the next strand
+  // escalates to tier-2 instead of re-strand looping). `urgent` priority jumps
+  // any backlog so the lost prompt runs before later sends.
+  function maybeRedeliverStrandedPrompt(): void {
+    if (exitReason || turnProducedOutput || !inFlightPrompt) return;
+    if (strandRedeliverCount >= 1) {
+      logger.debug(
+        "[remote][strand] stranded prompt already re-delivered once — not retrying (next strand escalates to tier-2).",
+      );
+      return;
+    }
+    strandRedeliverCount++;
+    const { message, mode } = inFlightPrompt;
+    logger.debug(
+      `[remote][strand] re-delivering stranded prompt (turn produced 0 output, attempt ${strandRedeliverCount}) — ${message.length} chars`,
+    );
+    session.queue.push(message, mode, undefined, {
+      priority: "urgent",
+      kind: "prompt",
+      source: "strand-redeliver",
+    });
+  }
+
   const dispatchTurn = (reason: "user_message" | "continue" | "isolated_command" | "mode_change") => {
+    // Fresh turn — its "did anything run?" flag starts false. The first JSONL
+    // record (onMessage) flips it true; a strand recovery reads it to decide
+    // whether the prompt was lost and must be re-delivered.
+    turnProducedOutput = false;
     if (!executionGuard.reserve(reason)) {
       const snapshot = executionGuard.getSnapshot();
       logger.debug(
@@ -818,6 +875,11 @@ export async function claudeRemoteLauncher(
     // watchdog (the load-bearing one is raw PTY byte activity — see
     // onPtyActivity and the watchdog block). Refresh the silence clock.
     lastClaudeOutputAt = Date.now();
+    // Any JSONL record proves the turn actually ran — so a strand recovery
+    // must NOT re-deliver its prompt (it wasn't lost), and the session is
+    // healthy enough to re-arm the one-shot auto-redelivery budget.
+    turnProducedOutput = true;
+    strandRedeliverCount = 0;
     // ── Stream events (partial messages) → text-delta envelopes ────────
     // Intercept before the rest of the pipeline. stream_event messages
     // carry raw API SSE chunks (text_delta, thinking_delta) that are
@@ -2241,6 +2303,17 @@ export async function claudeRemoteLauncher(
               let p = pending;
               pending = null;
               dispatchTurn(reasonForQueuedMessage(p));
+              // Re-establish tracked mode state for the post-cold-restart turn.
+              // The restart loop reset these to null, so without this the
+              // onPromptWritten capture would record mode=null and
+              // startMidTurnDrain() (called just below) would no-op on a null
+              // currentColdHash — leaving no drain alive to consume a strand
+              // re-delivery. The new PTY was spawned with p.mode's cold params,
+              // so coldModeHash(p.mode) is exactly right here. modeHash stays
+              // null (pending carries no full hash); the next turn re-derives it
+              // via the normal path, as it always has.
+              mode = p.mode;
+              currentColdHash = coldModeHash(p.mode);
               // Reset E2E perf tracking for new turn
               _perfTurnSocketReceivedAt = p.mode._perfSocketReceivedAt;
               _perfTurnFirstResponseLogged = false;
@@ -2519,6 +2592,18 @@ export async function claudeRemoteLauncher(
           // strands and aborted. See the watchdog block for the full rationale.
           onPtyActivity: () => {
             lastClaudeOutputAt = Date.now();
+          },
+          // Capture the EXACT text written to the composer (bracketed-paste
+          // payload, including any once-per-session prefixes the launcher
+          // prepended) as the in-flight prompt. If a tier-1 Esc recovery has
+          // to clear the composer before this turn ever ran, the watchdog
+          // re-delivers this verbatim — preserving CONTEXT.md/world-config/
+          // knowledge that raw msg.message would lose (their *Injected flags
+          // suppress re-injection). `mode` is the launcher's current turn mode,
+          // which matches currentColdHash at strand time so the re-pushed
+          // message is accepted by the still-alive mid-turn drain.
+          onPromptWritten: (text: string) => {
+            inFlightPrompt = { message: text, mode: mode! };
           },
           onCompletionEvent: (message: string) => {
             logger.debug(`[remote]: Completion event: ${message}`);

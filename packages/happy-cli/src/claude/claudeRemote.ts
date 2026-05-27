@@ -381,6 +381,18 @@ export async function claudeRemote(opts: {
    * token used to look identical to a strand and got falsely aborted.
    */
   onPtyActivity?: () => void;
+  /**
+   * Fires with the EXACT text written to the PTY composer for a turn —
+   * the bracketed-paste payload as Claude actually received it, including any
+   * once-per-session prefixes (CONTEXT.md / world-config / knowledge) the
+   * launcher prepended. The launcher captures this as the "in-flight prompt"
+   * so the stranded-turn watchdog can re-deliver verbatim if a tier-1 Esc
+   * recovery had to clear the composer before the prompt ever ran. Capturing
+   * the raw user message instead would drop those prefixes on re-delivery
+   * (their *Injected flags suppress re-injection), permanently losing
+   * once-per-session context on a first-turn strand.
+   */
+  onPromptWritten?: (text: string) => void;
   onCompletionEvent?: (message: string) => void;
   onShellResult?: (output: string) => void;
   onSessionReset?: () => void;
@@ -798,6 +810,7 @@ export async function claudeRemote(opts: {
   // particular send failed, and warn-log for the server-side debugger.
   const writePromptAndMarkThinking = (msg: string): void => {
     if (writePromptToPty(pty, msg)) {
+      opts.onPromptWritten?.(msg);
       updateThinking(true);
       return;
     }
