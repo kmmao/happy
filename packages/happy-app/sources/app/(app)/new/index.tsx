@@ -67,6 +67,7 @@ import {
 } from "@/utils/imageUpload";
 import { encodeBase64 } from "@/encryption/base64";
 import { uploadRawFile } from "@/utils/imageUpload.shared";
+import { waitForSessionRpcReady } from "@/sync/waitForSessionRpcReady";
 import { useCLIDetection } from "@/hooks/useCLIDetection";
 import {
   useEnvironmentVariables,
@@ -121,6 +122,56 @@ function filterSelectableModelsForNewSession(
       model.key as (typeof SUPPORTED_CODEX_MODELS)[number],
     ),
   );
+}
+
+// Deliver the initial prompt + any attached images to a freshly-created session.
+// Runs in the background after navigation: image upload uses the session's
+// getUploadDir/writeFile RPCs, which only work once the daemon has registered
+// the session's handlers (rpcReady). Uploading before then silently drops the
+// image, so we wait for rpcReady before attempting it.
+async function deliverInitialSessionMessage(
+  sessionId: string,
+  prompt: string,
+  images: { id: string; base64: string; fileName?: string }[],
+): Promise<void> {
+  let imageRefs = "";
+  if (images.length > 0) {
+    // Wait for the session's RPC handlers to register before uploading; falls
+    // through to a best-effort attempt if it never becomes ready in time.
+    await waitForSessionRpcReady(
+      () => storage.getState().sessions[sessionId]?.rpcReady ?? false,
+      30_000,
+    );
+    const uploadResults = await Promise.allSettled(
+      images.map(async (img) => {
+        if (img.fileName) {
+          // Non-image file: use uploadRawFile
+          const path = await uploadRawFile(sessionId, img.base64, img.fileName);
+          return { path, fileName: img.fileName };
+        }
+        // Image: use uploadBase64Image
+        const path = await uploadBase64Image(sessionId, img.base64);
+        return { path, fileName: undefined };
+      }),
+    );
+    const refs = uploadResults
+      .filter(
+        (r): r is PromiseFulfilledResult<{ path: string; fileName?: string }> =>
+          r.status === "fulfilled",
+      )
+      .map((r) =>
+        r.value.fileName
+          ? `[image: ${r.value.path} | ${r.value.fileName}]`
+          : `[image: ${r.value.path}]`,
+      );
+    if (refs.length > 0) {
+      imageRefs = refs.join("\n");
+    }
+  }
+  const finalMessage = [prompt, imageRefs].filter(Boolean).join("\n");
+  if (finalMessage) {
+    await sync.sendMessage(sessionId, finalMessage);
+  }
 }
 
 export const callbacks = {
@@ -1282,13 +1333,14 @@ function NewSessionWizard() {
       }
 
       if ("sessionId" in result && result.sessionId) {
+        const sessionId = result.sessionId;
         // Clear draft state on successful session creation
         clearNewSessionDraft();
 
         await sync.refreshSessions();
 
         applySessionStartPreferences(storage.getState(), {
-          sessionId: result.sessionId,
+          sessionId,
           permissionModeKey: permissionMode.key,
           modelModeKey: modelMode?.key ?? null,
           sdkSettings: {
@@ -1306,47 +1358,9 @@ function NewSessionWizard() {
               : null,
         });
 
-        // Send initial message (with any attached images) if provided
+        // Capture the initial prompt + attached images before navigating away.
         const currentImages = pendingImagesRef.current;
-        const hasText = effectivePrompt.trim().length > 0;
-        const hasImages = currentImages.length > 0;
-        if (hasText || hasImages) {
-          // Upload any pending images/files to the newly created session
-          let imageRefs = "";
-          if (hasImages) {
-            const uploadResults = await Promise.allSettled(
-              currentImages.map(async (img) => {
-                if (img.fileName) {
-                  // Non-image file: use uploadRawFile
-                  const path = await uploadRawFile(result.sessionId, img.base64, img.fileName);
-                  return { path, fileName: img.fileName };
-                }
-                // Image: use uploadBase64Image
-                const path = await uploadBase64Image(result.sessionId, img.base64);
-                return { path, fileName: undefined };
-              }),
-            );
-            const refs = uploadResults
-              .filter(
-                (r): r is PromiseFulfilledResult<{ path: string; fileName?: string }> =>
-                  r.status === "fulfilled",
-              )
-              .map((r) =>
-                r.value.fileName
-                  ? `[image: ${r.value.path} | ${r.value.fileName}]`
-                  : `[image: ${r.value.path}]`,
-              );
-            if (refs.length > 0) {
-              imageRefs = refs.join("\n");
-            }
-          }
-          const finalMessage = [effectivePrompt.trim(), imageRefs]
-            .filter(Boolean)
-            .join("\n");
-          if (finalMessage) {
-            await sync.sendMessage(result.sessionId, finalMessage);
-          }
-        }
+        const trimmedPrompt = effectivePrompt.trim();
 
         // Mark input as expanded for the new session so it doesn't collapse on entry
         const expandedSessions =
@@ -1354,15 +1368,29 @@ function NewSessionWizard() {
         storage.getState().applyLocalSettings({
           inputExpandedSessions: {
             ...expandedSessions,
-            [result.sessionId]: true,
+            [sessionId]: true,
           },
         });
 
-        router.replace(`/session/${result.sessionId}`, {
+        // Navigate into the session immediately so the user isn't blocked while
+        // images upload and the daemon registers the session's RPC handlers.
+        router.replace(`/session/${sessionId}`, {
           dangerouslySingular() {
             return "session";
           },
         });
+
+        // Deliver the initial message + images in the background. Image upload
+        // waits for the session to become rpcReady (see deliverInitialSessionMessage),
+        // which a freshly-spawned session is not yet — uploading too early
+        // silently drops the image.
+        void deliverInitialSessionMessage(
+          sessionId,
+          trimmedPrompt,
+          currentImages,
+        ).catch((err) =>
+          log.error("Failed to deliver initial session message", err),
+        );
       } else {
         throw new Error("Session spawning failed - no session ID returned.");
       }
