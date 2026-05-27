@@ -371,6 +371,16 @@ export async function claudeRemote(opts: {
   onSessionFound: (id: string) => void;
   onThinkingChange?: (thinking: boolean) => void;
   onMessage: (message: ClaudeJsonlMessage) => void;
+  /**
+   * Fires on every raw PTY byte chunk. The Claude TUI's animated spinner
+   * emits bytes at sub-second cadence whenever Claude is genuinely working
+   * (thinking — even pre-first-token, streaming, or running a tool) and falls
+   * silent only when the turn has ended or the PTY wedged. The launcher feeds
+   * this into its stranded-turn watchdog as the liveness signal: JSONL
+   * messages alone miss the pure-thinking and MCP-tool phases, so a slow first
+   * token used to look identical to a strand and got falsely aborted.
+   */
+  onPtyActivity?: () => void;
   onCompletionEvent?: (message: string) => void;
   onShellResult?: (output: string) => void;
   onSessionReset?: () => void;
@@ -625,6 +635,15 @@ export async function claudeRemote(opts: {
     logger.debug(`[claudeRemote] Failed to spawn claude PTY: ${msg}`);
     throw e;
   }
+  // Liveness probe for the launcher's stranded-turn watchdog. Every PTY byte
+  // — including the animated spinner the TUI redraws while Claude thinks,
+  // streams, or runs a tool — refreshes the watchdog's silence clock. A real
+  // strand (turn ended without onTurnComplete, PTY idle/wedged) emits no such
+  // bytes, so this cleanly separates a slow first token from a genuine hang.
+  // Disposed in finishOnce so the listener dies with this PTY on cold restart.
+  const disposePtyActivity = opts.onPtyActivity
+    ? pty.onData(() => opts.onPtyActivity!())
+    : undefined;
   // Shared usage snapshot — updated by the session scanner's onMessage as
   // each assistant message arrives; read by controller.getContextUsage() so
   // the App's context-window panel shows real token counts in PTY mode.
@@ -852,6 +871,7 @@ export async function claudeRemote(opts: {
   const finishOnce = () => {
     if (exitResolved) return;
     exitResolved = true;
+    disposePtyActivity?.();
     teardownPtyBridge?.();
     teardownPtyBridge = undefined;
     exitResolve();

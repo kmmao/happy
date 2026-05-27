@@ -173,9 +173,18 @@ export async function claudeRemoteLauncher(
   //
   // The watchdog detects this — PTY silent past a threshold while the guard
   // is still "running" and no tool / elicitation explains the silence — and
-  // drives two-tier recovery (see recoverStrandedTurn). A live turn always
-  // streams tokens (refreshing lastClaudeOutputAt via onMessage), so a long
-  // legitimate turn never trips it. Grep `[remote][strand]` for activity.
+  // drives two-tier recovery (see recoverStrandedTurn).
+  //
+  // Liveness is measured by lastClaudeOutputAt, refreshed by raw PTY byte
+  // activity (onPtyActivity) AND parsed JSONL messages (onMessage). The PTY
+  // signal is the load-bearing one: the TUI's animated spinner emits bytes at
+  // sub-second cadence the entire time Claude is genuinely working — including
+  // pure pre-first-token thinking (Opus xhigh on a large context) and MCP-tool
+  // phases that write no JSONL — and goes silent only once the turn has ended
+  // or the PTY wedged. Relying on onMessage alone (the original bug) made a
+  // slow first token indistinguishable from a strand, so the watchdog aborted
+  // legitimately-thinking turns — surfacing as a spurious "Aborted by user".
+  // Grep `[remote][strand]` for activity.
   let lastClaudeOutputAt = Date.now();
   let turnWatchdog: ReturnType<typeof setInterval> | null = null;
   let strandRecoveryInFlight = false;
@@ -805,8 +814,9 @@ export async function claudeRemoteLauncher(
   let planModeLockdownActive = false;
 
   function onMessage(message: ClaudeJsonlMessage) {
-    // Any message from Claude's PTY counts as activity — refreshes the
-    // stranded-turn watchdog so legitimate long-running turns don't warn.
+    // A parsed JSONL message is one liveness source for the stranded-turn
+    // watchdog (the load-bearing one is raw PTY byte activity — see
+    // onPtyActivity and the watchdog block). Refresh the silence clock.
     lastClaudeOutputAt = Date.now();
     // ── Stream events (partial messages) → text-delta envelopes ────────
     // Intercept before the rest of the pipeline. stream_event messages
@@ -2501,6 +2511,15 @@ export async function claudeRemoteLauncher(
           claudeEnvVars: session.claudeEnvVars,
           claudeArgs: session.claudeArgs,
           onMessage,
+          // Raw PTY byte activity is the watchdog's primary liveness signal:
+          // the animated spinner emits bytes the whole time Claude is working
+          // (thinking/streaming/tool-running), whereas a strand falls silent.
+          // JSONL messages (onMessage) alone miss the pure-thinking and
+          // MCP-tool phases, which is why slow first tokens were misread as
+          // strands and aborted. See the watchdog block for the full rationale.
+          onPtyActivity: () => {
+            lastClaudeOutputAt = Date.now();
+          },
           onCompletionEvent: (message: string) => {
             logger.debug(`[remote]: Completion event: ${message}`);
             session.client.sendSessionEvent({ type: "message", message });
