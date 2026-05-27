@@ -187,11 +187,28 @@ export async function claudeRemoteLauncher(
   // Grep `[remote][strand]` for activity.
   let lastClaudeOutputAt = Date.now();
   let turnWatchdog: ReturnType<typeof setInterval> | null = null;
+  let writeVerifyTimer: ReturnType<typeof setTimeout> | null = null;
   let strandRecoveryInFlight = false;
   let lastColdRestartAt = 0;
   const WATCHDOG_TICK_MS = 20_000;
   const WATCHDOG_IDLE_WARN_MS = 60_000; // log-only "looks stranded" warning
-  const WATCHDOG_IDLE_RECOVER_MS = 120_000; // trigger auto-recovery
+  const WATCHDOG_IDLE_RECOVER_MS = 120_000; // trigger auto-recovery (turn already produced output)
+  // Fast path for a submission wedge — a turn that has produced ZERO output and
+  // emitted ZERO PTY bytes since it began. That is the prompt-never-submitted
+  // strand (see the auto-redelivery block below), NOT slow thinking: a turn
+  // genuinely working refreshes lastClaudeOutputAt via the spinner's sub-second
+  // PTY bytes within ~300ms, so it never accumulates even this much idle. Re-
+  // delivery is double-execution safe here (zero output = nothing ran), so we
+  // recover in ~40s instead of paying the full 120s general threshold on every
+  // wedged turn — the user-visible "very slow / no response" on large sessions
+  // where the wedge recurred on every turn (~140s lost each).
+  const WATCHDOG_WEDGE_RECOVER_MS = 30_000;
+  // Post-write submission-wedge check (armed at the moment each prompt is
+  // written, see onPromptWritten). A normal submit echoes the pasted prompt
+  // back as raw PTY bytes within milliseconds; a wedge produces zero echo and
+  // zero output. This catches a wedge in ~2.5s — far faster than the 20s-tick
+  // watchdog above — by reusing the same proven Esc+re-deliver recovery.
+  const WRITE_VERIFY_MS = 2_500;
   const STRAND_TIER1_GRACE_MS = 10_000; // wait after interrupt before tier-2
   const MIN_COLD_RESTART_INTERVAL_MS = 300_000; // rate-limit tier-2 restarts
 
@@ -242,11 +259,26 @@ export async function claudeRemoteLauncher(
     turnWatchdog = setInterval(() => {
       const snap = executionGuard.getSnapshot();
       if (snap.state !== "running") return;
-      const idleMs = Date.now() - lastClaudeOutputAt;
-      if (idleMs < WATCHDOG_IDLE_WARN_MS) return;
       // Skip legitimate long waits: an active tool (e.g. a slow Bash) or a
       // pending MCP elicitation explains the silence without being a strand.
       if (ongoingToolCalls.size > 0 || pendingElicitations.size > 0) return;
+      const idleMs = Date.now() - lastClaudeOutputAt;
+      // Fast wedge recovery: turn produced no output AND the PTY has been silent
+      // since it started — the prompt never submitted. Recover well before the
+      // general threshold (a working turn's spinner bytes keep idleMs tiny, so
+      // this only ever trips on a real wedge; zero output makes redelivery safe).
+      if (
+        !turnProducedOutput &&
+        idleMs >= WATCHDOG_WEDGE_RECOVER_MS &&
+        !strandRecoveryInFlight
+      ) {
+        logger.debug(
+          `[remote][strand] zero-output submission wedge — PTY silent ${idleMs}ms since turn start, fast auto-recovery. ${strandDiagState()}`,
+        );
+        void recoverStrandedTurn(idleMs);
+        return;
+      }
+      if (idleMs < WATCHDOG_IDLE_WARN_MS) return;
       if (idleMs >= WATCHDOG_IDLE_RECOVER_MS && !strandRecoveryInFlight) {
         logger.debug(
           `[remote][strand] PTY silent ${idleMs}ms while guard running — starting auto-recovery. ${strandDiagState()}`,
@@ -265,6 +297,15 @@ export async function claudeRemoteLauncher(
     if (turnWatchdog) {
       clearInterval(turnWatchdog);
       turnWatchdog = null;
+    }
+  }
+
+  // Cancel a pending post-write wedge check — the turn has produced output, the
+  // turn ended, or recovery is taking over. Cheap and idempotent.
+  function clearWriteVerify(): void {
+    if (writeVerifyTimer) {
+      clearTimeout(writeVerifyTimer);
+      writeVerifyTimer = null;
     }
   }
 
@@ -389,6 +430,7 @@ export async function claudeRemoteLauncher(
 
   const finishTurn = () => {
     stopTurnWatchdog();
+    clearWriteVerify();
     if (activeTurnGeneration === null) {
       executionGuard.cancelReservation();
       return;
@@ -879,6 +921,7 @@ export async function claudeRemoteLauncher(
     // must NOT re-deliver its prompt (it wasn't lost), and the session is
     // healthy enough to re-arm the one-shot auto-redelivery budget.
     turnProducedOutput = true;
+    clearWriteVerify();
     strandRedeliverCount = 0;
     // ── Stream events (partial messages) → text-delta envelopes ────────
     // Intercept before the rest of the pipeline. stream_event messages
@@ -2604,6 +2647,33 @@ export async function claudeRemoteLauncher(
           // message is accepted by the still-alive mid-turn drain.
           onPromptWritten: (text: string) => {
             inFlightPrompt = { message: text, mode: mode! };
+            // Post-write submission-wedge check. A healthy submit makes the TUI
+            // echo the pasted prompt within milliseconds (raw PTY bytes →
+            // onPtyActivity → lastClaudeOutputAt advances past writtenAt); a
+            // wedge — the paste dropped/folded so the prompt never submits —
+            // produces zero echo and zero JSONL. If NEITHER has appeared shortly
+            // after the write, run the proven Esc+re-deliver recovery now rather
+            // than waiting the ~40s watchdog tick. writtenAt is captured before
+            // any echo (onPromptWritten fires synchronously after the write), so
+            // a working turn's echo/spinner reliably clears the check; only a
+            // genuine wedge trips it — and re-delivery is double-execution safe
+            // because zero output means nothing ran.
+            const writtenAt = Date.now();
+            clearWriteVerify();
+            writeVerifyTimer = setTimeout(() => {
+              writeVerifyTimer = null;
+              if (exitReason || strandRecoveryInFlight) return;
+              if (executionGuard.getSnapshot().state !== "running") return;
+              if (turnProducedOutput || lastClaudeOutputAt > writtenAt) return;
+              if (ongoingToolCalls.size > 0 || pendingElicitations.size > 0) return;
+              logger.debug(
+                `[remote][strand] post-write wedge — no PTY echo/output ${Date.now() - writtenAt}ms after prompt write, fast auto-recovery. ${strandDiagState()}`,
+              );
+              void recoverStrandedTurn(Date.now() - lastClaudeOutputAt);
+            }, WRITE_VERIFY_MS);
+            if (typeof writeVerifyTimer.unref === "function") {
+              writeVerifyTimer.unref();
+            }
           },
           onCompletionEvent: (message: string) => {
             logger.debug(`[remote]: Completion event: ${message}`);
