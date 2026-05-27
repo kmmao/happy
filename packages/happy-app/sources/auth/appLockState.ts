@@ -72,3 +72,35 @@ export function appLockTimeoutMs(timeout: LocalSettings["appLockTimeout"]): numb
       return 0;
   }
 }
+
+/**
+ * Cold-start lock decision. On launch the app locks once, but only if the lock was
+ * already enabled when the process started — enabling mid-session (right after
+ * setting a PIN) must not instantly lock the user out. Callers fire this at most
+ * once per process (guarded by a ref).
+ */
+export function shouldLockOnColdStart(params: {
+  guardActive: boolean;
+  enabledAtMount: boolean;
+}): boolean {
+  return params.guardActive && params.enabledAtMount;
+}
+
+/**
+ * Foreground re-lock decision. Returns true when, on returning to the foreground,
+ * the app has been backgrounded for at least the configured timeout. A `never`
+ * timeout (Infinity) never re-locks from the background; a missing `backgroundedAt`
+ * (no background event recorded) or an inactive guard never locks.
+ */
+export function shouldRelockOnForeground(params: {
+  guardActive: boolean;
+  backgroundedAt: number | null;
+  now: number;
+  timeout: LocalSettings["appLockTimeout"];
+}): boolean {
+  const { guardActive, backgroundedAt, now, timeout } = params;
+  if (!guardActive || backgroundedAt == null) return false;
+  const ms = appLockTimeoutMs(timeout);
+  if (ms === Infinity) return false;
+  return now - backgroundedAt >= ms;
+}

@@ -7,7 +7,8 @@ import { useAuth } from "@/auth/AuthContext";
 import { hasPin } from "@/auth/appLock";
 import {
   appLockController,
-  appLockTimeoutMs,
+  shouldLockOnColdStart,
+  shouldRelockOnForeground,
   useAppLocked,
 } from "@/auth/appLockState";
 import { AppLockScreen } from "@/components/AppLockScreen";
@@ -70,11 +71,15 @@ export function AppLockGate({ children }: { children: React.ReactNode }) {
 
   // Cold start: lock once per process, only if the lock was on at launch.
   React.useEffect(() => {
-    if (guardActive && !coldStartHandledRef.current) {
-      coldStartHandledRef.current = true;
-      if (enabledAtMountRef.current) {
-        appLockController.lock();
-      }
+    if (!guardActive || coldStartHandledRef.current) return;
+    coldStartHandledRef.current = true;
+    if (
+      shouldLockOnColdStart({
+        guardActive,
+        enabledAtMount: enabledAtMountRef.current,
+      })
+    ) {
+      appLockController.lock();
     }
   }, [guardActive]);
 
@@ -95,9 +100,14 @@ export function AppLockGate({ children }: { children: React.ReactNode }) {
       } else if (next === "active") {
         const bgAt = backgroundedAtRef.current;
         backgroundedAtRef.current = null;
-        if (bgAt == null || !guardActive) return;
-        const ms = appLockTimeoutMs(timeout);
-        if (ms !== Infinity && Date.now() - bgAt >= ms) {
+        if (
+          shouldRelockOnForeground({
+            guardActive,
+            backgroundedAt: bgAt,
+            now: Date.now(),
+            timeout,
+          })
+        ) {
           appLockController.lock();
         }
       }
