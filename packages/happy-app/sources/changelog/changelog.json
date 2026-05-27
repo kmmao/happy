@@ -2,6 +2,21 @@
   "entries": {
     "en": [
       {
+        "version": "2.34.0",
+        "date": "2026-05-28",
+        "summary": "Adds App Lock — an optional PIN or biometric gate that keeps this device's app contents private. It's a local privacy deterrent: the PIN only controls access to the app's UI on this device and never touches your account's end-to-end encryption keys.",
+        "changes": [
+          "Added App Lock, enabled from Settings → App Lock (mobile only): require a 6-digit PIN, with optional Face ID / Touch ID / fingerprint unlock",
+          "Added a configurable re-lock timeout (Immediately / 30s / 1m / 5m / Never) — \"Never\" keeps the app unlocked in the background, but a cold start still requires the PIN",
+          "Added a manual \"Lock now\" action to lock the app on demand",
+          "Added escalating cooldowns after 5 failed PIN attempts (30s → 1m → 5m) with no data wipe",
+          "Added a \"Forgot PIN?\" path that resets the lock by logging out and back in — there is no backdoor",
+          "Added an app-switcher mask so the app contents are hidden in the recent-apps preview while locked",
+          "Improved privacy by storing only a salted SHA-256 hash of the PIN in the device secure store; the lock settings stay device-local and are never synced"
+        ],
+        "rawMarkdown": "## 2.34.0 - 2026-05-28\n\n\nAdds App Lock — an optional PIN or biometric gate that keeps this device's app contents private. It's a local privacy deterrent: the PIN only controls access to the app's UI on this device and never touches your account's end-to-end encryption keys.\n\n### App Lock\n- Added App Lock, enabled from Settings → App Lock (mobile only): require a 6-digit PIN, with optional Face ID / Touch ID / fingerprint unlock\n- Added a configurable re-lock timeout (Immediately / 30s / 1m / 5m / Never) — \"Never\" keeps the app unlocked in the background, but a cold start still requires the PIN\n- Added a manual \"Lock now\" action to lock the app on demand\n- Added escalating cooldowns after 5 failed PIN attempts (30s → 1m → 5m) with no data wipe\n- Added a \"Forgot PIN?\" path that resets the lock by logging out and back in — there is no backdoor\n- Added an app-switcher mask so the app contents are hidden in the recent-apps preview while locked\n- Improved privacy by storing only a salted SHA-256 hash of the PIN in the device secure store; the lock settings stay device-local and are never synced"
+      },
+      {
         "version": "2.33.2",
         "date": "2026-05-26",
         "summary": "Fixes the question/permission option card rendering above the assistant text that introduced it. The conclusion now always comes first, with the choices below it, matching natural reading order — both when the text and its tool call share a timestamp and in PTY/Yolo mode where the picker request carried an earlier timestamp.",
@@ -862,15 +877,22 @@
     ],
     "zh-Hans": [
       {
-        "version": "2.33.2",
-        "date": "2026-05-26",
-        "summary": "修复提问 / 权限选项卡片显示在引出它的助手文本上方的问题。现在始终是结论先出现、选项跟在下方，符合自然阅读顺序 —— 无论是文本与工具调用共享同一时间戳，还是 PTY / Yolo 模式下提问请求带着更早的时间戳。",
+        "version": "2.34.0",
+        "date": "2026-05-28",
+        "summary": "新增「应用锁」—— 可选的 PIN 码或生物识别门，让此设备上的应用内容保持私密。它是一个本地隐私防护：PIN 码仅控制此设备上对应用界面的访问，绝不触碰账户的端到端加密密钥。",
         "changes": [
+          "新增应用锁，在「设置 → 应用锁」中启用（仅移动端）：需要 6 位数字 PIN 码，可选 Face ID / Touch ID / 指纹解锁",
+          "新增可配置的重新锁定超时（立即 / 30 秒 / 1 分钟 / 5 分钟 / 从不）——「从不」表示应用在后台不会自动锁定，但冷启动仍需输入 PIN 码",
+          "新增手动「立即锁定」操作，可随时锁定应用",
+          "新增连续 5 次 PIN 码错误后的递增冷却（30 秒 → 1 分钟 → 5 分钟），不会擦除任何数据",
+          "新增「忘记 PIN 码？」路径：通过登出再重新登录来重置锁，没有任何后门",
+          "新增应用切换器遮罩：锁定时在最近应用预览中隐藏应用内容",
+          "改进隐私保护：仅在设备安全存储中保存 PIN 码的加盐 SHA-256 哈希；锁设置保留在设备本地，绝不同步",
           "修复 AskUserQuestion 与权限选项卡片显示在助手消息文本上方的问题 —— 当文本与它触发的卡片共享同一时间戳时，排序的 tie-breaker 现在会在倒序聊天列表中让文本保持在上方",
           "修复 PTY / Yolo 模式下 `ask_user` 选项卡片跳到助手分析文本上方的问题 —— 它的请求时间戳可能早于前面的文本，现在卡片会被锚定到不早于最近一段文本，从而显示在文本下方",
           "改进消息排序的可维护性：将稳定比较器抽取到独立的 `messageOrdering` 模块，并补充单元测试"
         ],
-        "rawMarkdown": "## 2.33.2 - 2026-05-26\n\n\n修复提问 / 权限选项卡片显示在引出它的助手文本上方的问题。现在始终是结论先出现、选项跟在下方，符合自然阅读顺序 —— 无论是文本与工具调用共享同一时间戳，还是 PTY / Yolo 模式下提问请求带着更早的时间戳。\n\n### 聊天排序\n- 修复 AskUserQuestion 与权限选项卡片显示在助手消息文本上方的问题 —— 当文本与它触发的卡片共享同一时间戳时，排序的 tie-breaker 现在会在倒序聊天列表中让文本保持在上方\n- 修复 PTY / Yolo 模式下 `ask_user` 选项卡片跳到助手分析文本上方的问题 —— 它的请求时间戳可能早于前面的文本，现在卡片会被锚定到不早于最近一段文本，从而显示在文本下方\n- 改进消息排序的可维护性：将稳定比较器抽取到独立的 `messageOrdering` 模块，并补充单元测试"
+        "rawMarkdown": "## 2.34.0 - 2026-05-28\n\n\n新增「应用锁」—— 可选的 PIN 码或生物识别门，让此设备上的应用内容保持私密。它是一个本地隐私防护：PIN 码仅控制此设备上对应用界面的访问，绝不触碰账户的端到端加密密钥。\n\n### 应用锁\n- 新增应用锁，在「设置 → 应用锁」中启用（仅移动端）：需要 6 位数字 PIN 码，可选 Face ID / Touch ID / 指纹解锁\n- 新增可配置的重新锁定超时（立即 / 30 秒 / 1 分钟 / 5 分钟 / 从不）——「从不」表示应用在后台不会自动锁定，但冷启动仍需输入 PIN 码\n- 新增手动「立即锁定」操作，可随时锁定应用\n- 新增连续 5 次 PIN 码错误后的递增冷却（30 秒 → 1 分钟 → 5 分钟），不会擦除任何数据\n- 新增「忘记 PIN 码？」路径：通过登出再重新登录来重置锁，没有任何后门\n- 新增应用切换器遮罩：锁定时在最近应用预览中隐藏应用内容\n- 改进隐私保护：仅在设备安全存储中保存 PIN 码的加盐 SHA-256 哈希；锁设置保留在设备本地，绝不同步\n\n修复提问 / 权限选项卡片显示在引出它的助手文本上方的问题。现在始终是结论先出现、选项跟在下方，符合自然阅读顺序 —— 无论是文本与工具调用共享同一时间戳，还是 PTY / Yolo 模式下提问请求带着更早的时间戳。\n\n### 聊天排序\n- 修复 AskUserQuestion 与权限选项卡片显示在助手消息文本上方的问题 —— 当文本与它触发的卡片共享同一时间戳时，排序的 tie-breaker 现在会在倒序聊天列表中让文本保持在上方\n- 修复 PTY / Yolo 模式下 `ask_user` 选项卡片跳到助手分析文本上方的问题 —— 它的请求时间戳可能早于前面的文本，现在卡片会被锚定到不早于最近一段文本，从而显示在文本下方\n- 改进消息排序的可维护性：将稳定比较器抽取到独立的 `messageOrdering` 模块，并补充单元测试"
       },
       {
         "version": "2.33.1",
@@ -1699,7 +1721,7 @@
       }
     ]
   },
-  "latestVersion": "2.33.2",
+  "latestVersion": "2.34.0",
   "availableLocales": [
     "en",
     "zh-Hans"

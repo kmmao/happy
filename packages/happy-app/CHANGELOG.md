@@ -1,5 +1,18 @@
 # Changelog
 
+## 2.34.0 - 2026-05-28
+
+Adds App Lock — an optional PIN or biometric gate that keeps this device's app contents private. It's a local privacy deterrent: the PIN only controls access to the app's UI on this device and never touches your account's end-to-end encryption keys.
+
+### App Lock
+- Added App Lock, enabled from Settings → App Lock (mobile only): require a 6-digit PIN, with optional Face ID / Touch ID / fingerprint unlock
+- Added a configurable re-lock timeout (Immediately / 30s / 1m / 5m / Never) — "Never" keeps the app unlocked in the background, but a cold start still requires the PIN
+- Added a manual "Lock now" action to lock the app on demand
+- Added escalating cooldowns after 5 failed PIN attempts (30s → 1m → 5m) with no data wipe
+- Added a "Forgot PIN?" path that resets the lock by logging out and back in — there is no backdoor
+- Added an app-switcher mask so the app contents are hidden in the recent-apps preview while locked
+- Improved privacy by storing only a salted SHA-256 hash of the PIN in the device secure store; the lock settings stay device-local and are never synced
+
 ## 2.33.2 - 2026-05-26
 
 Fixes the question/permission option card rendering above the assistant text that introduced it. The conclusion now always comes first, with the choices below it, matching natural reading order — both when the text and its tool call share a timestamp and in PTY/Yolo mode where the picker request carried an earlier timestamp.
