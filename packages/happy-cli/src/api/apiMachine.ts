@@ -35,7 +35,7 @@ import {
   normalizeResolvedRuntimeProfile,
   type ResolvedRuntimeProfile,
 } from "@kmmao/happy-wire";
-import { encodeBase64, decodeBase64, encrypt, decrypt } from "./encryption";
+import { createCipher, type Cipher } from "./encryption";
 import { backoff } from "@/utils/time";
 import { RpcHandlerManager } from "./rpc/RpcHandlerManager";
 import { detectTailscale, detectTailscaleServe, type TailscaleInfo } from "@/utils/tailscale";
@@ -395,6 +395,7 @@ export class ApiMachineClient {
   private lastTailscaleInfo: TailscaleInfo | null = null;
   private tunnelManager: TunnelManager | null = null;
   private rpcHandlerManager: RpcHandlerManager;
+  private readonly cipher: Cipher;
   private webhookHandler: ((data: WebhookTriggerData) => void) | null = null;
   private ciHandler: ((data: CiTriggerData) => void) | null = null;
   private supervisorHandler:
@@ -439,11 +440,11 @@ export class ApiMachineClient {
     private token: string,
     private machine: Machine,
   ) {
-    // Initialize RPC handler manager
+    // Initialize cipher + RPC handler manager
+    this.cipher = createCipher(this.machine.encryptionKey, this.machine.encryptionVariant);
     this.rpcHandlerManager = new RpcHandlerManager({
       scopePrefix: this.machine.id,
-      encryptionKey: this.machine.encryptionKey,
-      encryptionVariant: this.machine.encryptionVariant,
+      cipher: this.cipher,
       logger: (msg, data) => logger.debug(msg, data),
     });
 
@@ -1301,32 +1302,20 @@ export class ApiMachineClient {
 
       const answer = await this.socket.emitWithAck("machine-update-metadata", {
         machineId: this.machine.id,
-        metadata: encodeBase64(
-          encrypt(
-            this.machine.encryptionKey,
-            this.machine.encryptionVariant,
-            updated,
-          ),
-        ),
+        metadata: this.cipher.encrypt(updated),
         expectedVersion: this.machine.metadataVersion,
       });
 
       if (answer.result === "success") {
-        this.machine.metadata = decrypt(
-          this.machine.encryptionKey,
-          this.machine.encryptionVariant,
-          decodeBase64(answer.metadata),
-        );
+        const decrypted = this.cipher.decrypt(answer.metadata);
+        this.machine.metadata = decrypted.ok ? decrypted.value : null;
         this.machine.metadataVersion = answer.version;
         logger.debug("[API MACHINE] Metadata updated successfully");
       } else if (answer.result === "version-mismatch") {
         if (answer.version > this.machine.metadataVersion) {
           this.machine.metadataVersion = answer.version;
-          this.machine.metadata = decrypt(
-            this.machine.encryptionKey,
-            this.machine.encryptionVariant,
-            decodeBase64(answer.metadata),
-          );
+          const decrypted = this.cipher.decrypt(answer.metadata);
+          this.machine.metadata = decrypted.ok ? decrypted.value : null;
         }
         throw new Error("Metadata version mismatch"); // Triggers retry
       }
@@ -1345,32 +1334,20 @@ export class ApiMachineClient {
 
       const answer = await this.socket.timeout(10_000).emitWithAck("machine-update-state", {
         machineId: this.machine.id,
-        daemonState: encodeBase64(
-          encrypt(
-            this.machine.encryptionKey,
-            this.machine.encryptionVariant,
-            updated,
-          ),
-        ),
+        daemonState: this.cipher.encrypt(updated),
         expectedVersion: this.machine.daemonStateVersion,
       });
 
       if (answer.result === "success") {
-        this.machine.daemonState = decrypt(
-          this.machine.encryptionKey,
-          this.machine.encryptionVariant,
-          decodeBase64(answer.daemonState),
-        );
+        const decrypted = this.cipher.decrypt(answer.daemonState);
+        this.machine.daemonState = decrypted.ok ? decrypted.value : null;
         this.machine.daemonStateVersion = answer.version;
         logger.debug("[API MACHINE] Daemon state updated successfully");
       } else if (answer.result === "version-mismatch") {
         if (answer.version > this.machine.daemonStateVersion) {
           this.machine.daemonStateVersion = answer.version;
-          this.machine.daemonState = decrypt(
-            this.machine.encryptionKey,
-            this.machine.encryptionVariant,
-            decodeBase64(answer.daemonState),
-          );
+          const decrypted = this.cipher.decrypt(answer.daemonState);
+          this.machine.daemonState = decrypted.ok ? decrypted.value : null;
         }
         throw new Error("Daemon state version mismatch"); // Triggers retry
       }
@@ -1545,21 +1522,15 @@ export class ApiMachineClient {
 
         if (update.metadata) {
           logger.debug("[API MACHINE] Received external metadata update");
-          this.machine.metadata = decrypt(
-            this.machine.encryptionKey,
-            this.machine.encryptionVariant,
-            decodeBase64(update.metadata.value),
-          );
+          const decrypted = this.cipher.decrypt(update.metadata.value);
+          this.machine.metadata = decrypted.ok ? decrypted.value : null;
           this.machine.metadataVersion = update.metadata.version;
         }
 
         if (update.daemonState) {
           logger.debug("[API MACHINE] Received external daemon state update");
-          this.machine.daemonState = decrypt(
-            this.machine.encryptionKey,
-            this.machine.encryptionVariant,
-            decodeBase64(update.daemonState.value),
-          );
+          const decrypted = this.cipher.decrypt(update.daemonState.value);
+          this.machine.daemonState = decrypted.ok ? decrypted.value : null;
           this.machine.daemonStateVersion = update.daemonState.version;
         }
       } else {

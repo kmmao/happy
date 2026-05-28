@@ -26,10 +26,13 @@ vi.mock('@/ui/logger', () => ({
 
 // Mock encryption utilities
 vi.mock('./encryption', () => ({
-    decodeBase64: vi.fn((data: string) => data),
     encodeBase64: vi.fn((data: any) => data),
-    decrypt: vi.fn((data: any) => data),
-    encrypt: vi.fn((data: any) => data)
+    getRandomBytes: vi.fn((size: number) => new Uint8Array(size)),
+    libsodiumEncryptForPublicKey: vi.fn((data: Uint8Array) => data),
+    createCipher: vi.fn(() => ({
+        encrypt: vi.fn((data: any) => data),
+        decrypt: vi.fn((data: any) => ({ ok: true, value: data })),
+    })),
 }));
 
 // Mock configuration

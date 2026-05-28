@@ -13,11 +13,9 @@ import { CreateSessionResponseSchema } from "@/api/types";
 import { ApiSessionClient } from "./apiSession";
 import { ApiMachineClient } from "./apiMachine";
 import {
-  decodeBase64,
   encodeBase64,
   getRandomBytes,
-  encrypt,
-  decrypt,
+  createCipher,
   libsodiumEncryptForPublicKey,
 } from "./encryption";
 import { PushNotificationClient } from "./pushNotifications";
@@ -100,6 +98,7 @@ export class ApiClient {
       encryptionKey = this.credential.encryption.secret;
       encryptionVariant = "legacy";
     }
+    const cipher = createCipher(encryptionKey, encryptionVariant);
 
     // Create session
     try {
@@ -107,14 +106,8 @@ export class ApiClient {
         `${configuration.serverUrl}/v1/sessions`,
         {
           tag: opts.tag,
-          metadata: encodeBase64(
-            encrypt(encryptionKey, encryptionVariant, opts.metadata),
-          ),
-          agentState: opts.state
-            ? encodeBase64(
-                encrypt(encryptionKey, encryptionVariant, opts.state),
-              )
-            : null,
+          metadata: cipher.encrypt(opts.metadata),
+          agentState: opts.state ? cipher.encrypt(opts.state) : null,
           dataEncryptionKey: dataEncryptionKey
             ? encodeBase64(dataEncryptionKey)
             : null,
@@ -141,22 +134,14 @@ export class ApiClient {
         `Session created/loaded: ${parsed.data.session.id} (tag: ${opts.tag})`,
       );
       let raw = parsed.data.session;
+      const metadataResult = cipher.decrypt(raw.metadata);
+      const agentStateResult = raw.agentState ? cipher.decrypt(raw.agentState) : null;
       let session: Session = {
         id: raw.id,
         seq: raw.seq,
-        metadata: decrypt(
-          encryptionKey,
-          encryptionVariant,
-          decodeBase64(raw.metadata),
-        ),
+        metadata: metadataResult.ok ? metadataResult.value : null,
         metadataVersion: raw.metadataVersion,
-        agentState: raw.agentState
-          ? decrypt(
-              encryptionKey,
-              encryptionVariant,
-              decodeBase64(raw.agentState),
-            )
-          : null,
+        agentState: agentStateResult?.ok ? agentStateResult.value : null,
         agentStateVersion: raw.agentStateVersion,
         encryptionKey: encryptionKey,
         encryptionVariant: encryptionVariant,
@@ -244,6 +229,7 @@ export class ApiClient {
       encryptionKey = this.credential.encryption.secret;
       encryptionVariant = "legacy";
     }
+    const cipher = createCipher(encryptionKey, encryptionVariant);
 
     // Helper to create minimal machine object for offline mode (DRY)
     const createMinimalMachine = (): Machine => ({
@@ -262,13 +248,9 @@ export class ApiClient {
         `${configuration.serverUrl}/v1/machines`,
         {
           id: opts.machineId,
-          metadata: encodeBase64(
-            encrypt(encryptionKey, encryptionVariant, opts.metadata),
-          ),
+          metadata: cipher.encrypt(opts.metadata),
           daemonState: opts.daemonState
-            ? encodeBase64(
-                encrypt(encryptionKey, encryptionVariant, opts.daemonState),
-              )
+            ? cipher.encrypt(opts.daemonState)
             : undefined,
           dataEncryptionKey: dataEncryptionKey
             ? encodeBase64(dataEncryptionKey)
@@ -289,25 +271,15 @@ export class ApiClient {
       );
 
       // Return decrypted machine like we do for sessions
+      const metadataResult = raw.metadata ? cipher.decrypt(raw.metadata) : null;
+      const daemonStateResult = raw.daemonState ? cipher.decrypt(raw.daemonState) : null;
       const machine: Machine = {
         id: raw.id,
         encryptionKey: encryptionKey,
         encryptionVariant: encryptionVariant,
-        metadata: raw.metadata
-          ? decrypt(
-              encryptionKey,
-              encryptionVariant,
-              decodeBase64(raw.metadata),
-            )
-          : null,
+        metadata: metadataResult?.ok ? metadataResult.value : null,
         metadataVersion: raw.metadataVersion || 0,
-        daemonState: raw.daemonState
-          ? decrypt(
-              encryptionKey,
-              encryptionVariant,
-              decodeBase64(raw.daemonState),
-            )
-          : null,
+        daemonState: daemonStateResult?.ok ? daemonStateResult.value : null,
         daemonStateVersion: raw.daemonStateVersion || 0,
       };
       return machine;
@@ -420,6 +392,7 @@ export class ApiClient {
       encryptionKey = this.credential.encryption.secret;
       encryptionVariant = "legacy";
     }
+    const cipher = createCipher(encryptionKey, encryptionVariant);
 
     try {
       const response = await axios.post<CreateSessionResponse>(
@@ -427,14 +400,8 @@ export class ApiClient {
         {
           tag: "reconnect",
           sessionId: opts.sessionId,
-          metadata: encodeBase64(
-            encrypt(encryptionKey, encryptionVariant, opts.metadata),
-          ),
-          agentState: opts.state
-            ? encodeBase64(
-                encrypt(encryptionKey, encryptionVariant, opts.state),
-              )
-            : null,
+          metadata: cipher.encrypt(opts.metadata),
+          agentState: opts.state ? cipher.encrypt(opts.state) : null,
           // Only send dataEncryptionKey when generating a new key.
           // When reusing, server keeps the existing key unchanged.
           dataEncryptionKey: dataEncryptionKey
@@ -461,22 +428,14 @@ export class ApiClient {
       }
       logger.debug(`[API] Reconnected to session: ${parsed.data.session.id}`);
       let raw = parsed.data.session;
+      const metadataResult = cipher.decrypt(raw.metadata);
+      const agentStateResult = raw.agentState ? cipher.decrypt(raw.agentState) : null;
       let session: Session = {
         id: raw.id,
         seq: raw.seq,
-        metadata: decrypt(
-          encryptionKey,
-          encryptionVariant,
-          decodeBase64(raw.metadata),
-        ),
+        metadata: metadataResult.ok ? metadataResult.value : null,
         metadataVersion: raw.metadataVersion,
-        agentState: raw.agentState
-          ? decrypt(
-              encryptionKey,
-              encryptionVariant,
-              decodeBase64(raw.agentState),
-            )
-          : null,
+        agentState: agentStateResult?.ok ? agentStateResult.value : null,
         agentStateVersion: raw.agentStateVersion,
         encryptionKey: encryptionKey,
         encryptionVariant: encryptionVariant,
@@ -576,23 +535,16 @@ export class ApiClient {
         encryptionKey = this.credential.encryption.secret;
         encryptionVariant = "legacy";
       }
+      const cipher = createCipher(encryptionKey, encryptionVariant);
 
+      const metadataResult = cipher.decrypt(raw.metadata);
+      const agentStateResult = raw.agentState ? cipher.decrypt(raw.agentState) : null;
       return {
         id: raw.id,
         seq: raw.seq,
-        metadata: decrypt(
-          encryptionKey,
-          encryptionVariant,
-          decodeBase64(raw.metadata),
-        ),
+        metadata: metadataResult.ok ? metadataResult.value : null,
         metadataVersion: raw.metadataVersion,
-        agentState: raw.agentState
-          ? decrypt(
-              encryptionKey,
-              encryptionVariant,
-              decodeBase64(raw.agentState),
-            )
-          : null,
+        agentState: agentStateResult?.ok ? agentStateResult.value : null,
         agentStateVersion: raw.agentStateVersion,
         encryptionKey,
         encryptionVariant,
