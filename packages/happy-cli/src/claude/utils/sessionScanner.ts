@@ -1,12 +1,12 @@
 import { InvalidateSync } from "@/utils/sync";
 import { RawJSONLines, RawJSONLinesSchema } from "../types";
 import { join } from "node:path";
-import { stat, open } from "node:fs/promises";
-import { existsSync, type Stats } from "node:fs";
+import { existsSync } from "node:fs";
 import { logger } from "@/ui/logger";
 import { startFileWatcher } from "@/modules/watcher/startFileWatcher";
 import { getProjectPath } from "./path";
 import { readAssociatedSubagent, SubagentInput } from "./subagentJsonlReader";
+import { createIncrementalJsonlReader, type IncrementalJsonlReader } from "./incrementalJsonlReader";
 
 /**
  * Known internal Claude Code event types that should be silently skipped.
@@ -42,71 +42,34 @@ export async function createSessionScanner(opts: {
     // file at its first-seen state and miss every incremental update.
     let toolUseToAgentBinding = new Map<string, string>();
 
-    // P2: per-session incremental-read bookkeeping. `fileReadState` tracks how
-    // many bytes of each session JSONL we've consumed plus any trailing
-    // half-written line (kept as raw bytes so a multi-byte UTF-8 char split
-    // across two reads survives). `mainMessageCache` holds the parsed result so
-    // each sync only JSON.parse + Zod-validates newly appended lines.
-    let fileReadState = new Map<string, { offset: number; partial: Buffer }>();
-    let mainMessageCache = new Map<string, RawJSONLines[]>();
+    // P2: per-session incremental reader. The byte-level tailing strategy
+    // (consume only appended bytes, buffer a trailing half-written line as raw
+    // bytes across reads, reset on truncation) lives behind
+    // createIncrementalJsonlReader; here we just keep one reader per session,
+    // created lazily on first read. parseJsonlText is the claude-specific
+    // parseChunk it calls on each newly-completed block of lines.
+    let mainReaders = new Map<string, IncrementalJsonlReader<RawJSONLines>>();
 
     // P1: per-session watcher on the `subagents/` directory. Subagent JSONL
     // writes don't touch the main session file, so without this a late
     // tool_result only surfaced on the next periodic poll (up to 15 s).
     let subagentWatchers = new Map<string, () => void>();
 
-    // Incrementally read a session's main JSONL, returning the FULL parsed
-    // message list (cached prefix + freshly appended lines). Returning the
-    // whole list — not just the new tail — keeps interleaveSubagentMessages
-    // able to re-read every bound subagent file on each sync, which is how
-    // late subagent tool_results get picked up (see P1 watcher above).
-    const readMainMessages = async (sessionId: string): Promise<RawJSONLines[]> => {
-        const file = join(projectDir, `${sessionId}.jsonl`);
-        let st: Stats;
-        try {
-            st = await stat(file);
-        } catch {
-            logger.debug(`[SESSION_SCANNER] Session file not found: ${file}`);
-            return mainMessageCache.get(sessionId) ?? [];
+    // Read a session's main JSONL, returning the FULL parsed message list
+    // (cached prefix + freshly appended lines). Returning the whole list — not
+    // just the new tail — keeps interleaveSubagentMessages able to re-read every
+    // bound subagent file on each sync, which is how late subagent tool_results
+    // get picked up (see P1 watcher above).
+    const readMainMessages = (sessionId: string): Promise<RawJSONLines[]> => {
+        let reader = mainReaders.get(sessionId);
+        if (!reader) {
+            reader = createIncrementalJsonlReader(
+                join(projectDir, `${sessionId}.jsonl`),
+                parseJsonlText,
+            );
+            mainReaders.set(sessionId, reader);
         }
-
-        let state = fileReadState.get(sessionId);
-        let cache = mainMessageCache.get(sessionId);
-        // First read, or the file shrank (truncated / rewritten in place).
-        // --resume writes a NEW sessionId file, so the common case never hits
-        // this; the guard just keeps us correct if a file is ever rewound.
-        if (!state || st.size < state.offset) {
-            state = { offset: 0, partial: Buffer.alloc(0) };
-            cache = [];
-        }
-        cache = cache ?? [];
-
-        if (st.size > state.offset) {
-            const fd = await open(file, "r");
-            try {
-                const len = st.size - state.offset;
-                const buf = Buffer.alloc(len);
-                await fd.read(buf, 0, len, state.offset);
-                const combined = Buffer.concat([state.partial, buf]);
-                // Parse only through the last newline; trailing bytes are a
-                // half-written line we re-prepend on the next read.
-                const lastNl = combined.lastIndexOf(0x0a);
-                if (lastNl === -1) {
-                    state.partial = combined;
-                } else {
-                    const complete = combined.subarray(0, lastNl + 1).toString("utf-8");
-                    state.partial = combined.subarray(lastNl + 1);
-                    cache.push(...parseJsonlText(complete));
-                }
-                state.offset = st.size;
-            } finally {
-                await fd.close();
-            }
-        }
-
-        fileReadState.set(sessionId, state);
-        mainMessageCache.set(sessionId, cache);
-        return cache;
+        return reader.read();
     };
 
     // Mark existing messages as processed and start watching the initial session
@@ -252,8 +215,7 @@ export async function createSessionScanner(opts: {
             subagentWatchers.clear();
             await sync.invalidateAndAwait();
             sync.stop();
-            fileReadState.clear();
-            mainMessageCache.clear();
+            mainReaders.clear();
         },
         onNewSession: async (sessionId: string, options?: { treatExistingAsProcessed?: boolean }) => {
             if (currentSessionId === sessionId) {

@@ -536,5 +536,139 @@ describe("closeClaudeTurnWithStatus", () => {
       t: "turn-end",
       status: "cancelled",
     });
+    expect(result.dropped).toEqual([]);
+  });
+});
+
+/**
+ * The mapper used to swallow whole classes of messages into an
+ * indistinguishable `envelopes: []`. The drop taxonomy makes each intentional
+ * non-emit an explicit, classified decision — so these tests assert *why* a
+ * message produced nothing, not merely that it did.
+ */
+describe("drop taxonomy", () => {
+  it("classifies a summary message as summary-message", () => {
+    const result = mapClaudeLogMessageToSessionEnvelopes(
+      { type: "summary", summary: "Done", leafUuid: "leaf-1" } as any,
+      { currentTurnId: "turn-1" },
+    );
+    expect(result.envelopes).toHaveLength(0);
+    expect(result.dropped).toEqual([
+      { type: "summary", reason: "summary-message" },
+    ]);
+  });
+
+  it("classifies a system message as system-message", () => {
+    const result = mapClaudeLogMessageToSessionEnvelopes(
+      { type: "system", uuid: "s-1" } as any,
+      { currentTurnId: "turn-1" },
+    );
+    expect(result.envelopes).toHaveLength(0);
+    expect(result.dropped).toEqual([
+      { type: "system", reason: "system-message" },
+    ]);
+  });
+
+  it("classifies an isMeta user message as meta-user-message", () => {
+    const result = mapClaudeLogMessageToSessionEnvelopes(
+      {
+        type: "user",
+        uuid: "u-meta-1",
+        isMeta: true,
+        message: { role: "user", content: "skill prompt body" },
+      } as any,
+      { currentTurnId: null },
+    );
+    expect(result.envelopes).toHaveLength(0);
+    expect(result.dropped).toEqual([
+      { type: "user", reason: "meta-user-message" },
+    ]);
+  });
+
+  it("classifies an empty-content user message as empty-user-content", () => {
+    const result = mapClaudeLogMessageToSessionEnvelopes(
+      {
+        type: "user",
+        uuid: "u-empty-1",
+        message: { role: "user", content: [] },
+      } as any,
+      { currentTurnId: null },
+    );
+    expect(result.envelopes).toHaveLength(0);
+    expect(result.dropped).toEqual([
+      { type: "user", reason: "empty-user-content" },
+    ]);
+  });
+
+  it("classifies an unhandled message type as unhandled-message-type", () => {
+    const result = mapClaudeLogMessageToSessionEnvelopes(
+      { type: "result", uuid: "r-1", subtype: "success" } as any,
+      { currentTurnId: "turn-1" },
+    );
+    expect(result.envelopes).toHaveLength(0);
+    expect(result.dropped).toEqual([
+      { type: "result", reason: "unhandled-message-type" },
+    ]);
+  });
+
+  it("classifies a pending-subagent message as a deferral, then clears it on replay", () => {
+    const state = { currentTurnId: null };
+
+    const buffered = mapClaudeLogMessageToSessionEnvelopes(
+      {
+        type: "assistant",
+        uuid: "a-defer-1",
+        parent_tool_use_id: "task-defer-1",
+        message: {
+          role: "assistant",
+          content: [{ type: "text", text: "deferred child" }],
+        },
+      } as any,
+      state,
+    );
+    expect(buffered.envelopes).toHaveLength(0);
+    expect(buffered.dropped).toEqual([
+      { type: "assistant", reason: "buffered-pending-subagent" },
+    ]);
+
+    // Once the parent Task registers, the buffered child is replayed and
+    // genuinely emitted — so the parent's result reports no drops.
+    const parent = mapClaudeLogMessageToSessionEnvelopes(
+      {
+        type: "assistant",
+        uuid: "a-defer-parent-1",
+        message: {
+          role: "assistant",
+          content: [
+            {
+              type: "tool_use",
+              id: "task-defer-1",
+              name: "Task",
+              input: { prompt: "run deferred task" },
+            },
+          ],
+        },
+      } as any,
+      state,
+    );
+    expect(parent.dropped).toEqual([]);
+    expect(
+      parent.envelopes.some(
+        (e) => e.ev.t === "text" && e.ev.text === "deferred child",
+      ),
+    ).toBe(true);
+  });
+
+  it("reports no drops for a normally-emitted user message", () => {
+    const result = mapClaudeLogMessageToSessionEnvelopes(
+      {
+        type: "user",
+        uuid: "u-ok-1",
+        message: { role: "user", content: "hello" },
+      } as any,
+      { currentTurnId: null },
+    );
+    expect(result.envelopes).toHaveLength(1);
+    expect(result.dropped).toEqual([]);
   });
 });

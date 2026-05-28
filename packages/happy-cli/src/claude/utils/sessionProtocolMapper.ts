@@ -42,9 +42,35 @@ export type TurnMeta = {
   modelUsage?: Record<string, TurnModelUsage>;
 };
 
+/**
+ * Why a Claude log message produced no Session envelopes. Each value names a
+ * distinct, intentional non-emit decision the mapper makes. Before this existed
+ * the six drop sites all returned an indistinguishable `envelopes: []`, so a
+ * caller (or a reader) could not tell "handled, deliberately silent, here's why"
+ * from "fell through unhandled". Surfacing the reason turns those look-alike
+ * returns into a typed, testable taxonomy — the same interface-as-test-surface
+ * move the Cipher/dispatch seams make elsewhere.
+ *
+ * Note `buffered-pending-subagent` is a *deferral*, not a discard: the message
+ * is queued and replayed once its parent tool-call appears.
+ */
+export type DropReason =
+  | "buffered-pending-subagent"
+  | "summary-message"
+  | "system-message"
+  | "meta-user-message"
+  | "empty-user-content"
+  | "unhandled-message-type";
+
+export type DroppedMessage = {
+  type: string;
+  reason: DropReason;
+};
+
 type ClaudeMapperResult = {
   currentTurnId: string | null;
   envelopes: SessionEnvelope[];
+  dropped: DroppedMessage[];
 };
 
 function pickProviderSubagent(message: RawJSONLines): string | undefined {
@@ -532,6 +558,7 @@ export function closeClaudeTurnWithStatus(
   return {
     currentTurnId: state.currentTurnId,
     envelopes,
+    dropped: [],
   };
 }
 
@@ -547,6 +574,7 @@ function mapClaudeLogMessageToSessionEnvelopesInternal(
   state: ClaudeSessionProtocolState,
 ): ClaudeMapperResult {
   const envelopes: SessionEnvelope[] = [];
+  const dropped: DroppedMessage[] = [];
   const providerSubagent = resolveProviderSubagent(message, state);
   const subagent = providerSubagent
     ? getSessionSubagentIdForProviderSubagent(state, providerSubagent)
@@ -557,7 +585,8 @@ function mapClaudeLogMessageToSessionEnvelopesInternal(
     bufferSubagentMessage(state, providerSubagent, message);
     return {
       currentTurnId: state.currentTurnId,
-      envelopes: [],
+      envelopes,
+      dropped: [{ type: message.type, reason: "buffered-pending-subagent" }],
     };
   }
 
@@ -565,6 +594,7 @@ function mapClaudeLogMessageToSessionEnvelopesInternal(
     return {
       currentTurnId: state.currentTurnId,
       envelopes,
+      dropped: [{ type: message.type, reason: "summary-message" }],
     };
   }
 
@@ -572,6 +602,7 @@ function mapClaudeLogMessageToSessionEnvelopesInternal(
     return {
       currentTurnId: state.currentTurnId,
       envelopes,
+      dropped: [{ type: message.type, reason: "system-message" }],
     };
   }
 
@@ -662,6 +693,7 @@ function mapClaudeLogMessageToSessionEnvelopesInternal(
             state,
           );
           envelopes.push(...replay.envelopes);
+          dropped.push(...replay.dropped);
         }
       }
     }
@@ -669,6 +701,7 @@ function mapClaudeLogMessageToSessionEnvelopesInternal(
     return {
       currentTurnId: state.currentTurnId,
       envelopes,
+      dropped,
     };
   }
 
@@ -683,6 +716,7 @@ function mapClaudeLogMessageToSessionEnvelopesInternal(
       return {
         currentTurnId: state.currentTurnId,
         envelopes,
+        dropped: [{ type: message.type, reason: "meta-user-message" }],
       };
     }
 
@@ -709,6 +743,7 @@ function mapClaudeLogMessageToSessionEnvelopesInternal(
       return {
         currentTurnId: state.currentTurnId,
         envelopes,
+        dropped,
       };
     }
 
@@ -719,6 +754,7 @@ function mapClaudeLogMessageToSessionEnvelopesInternal(
       return {
         currentTurnId: state.currentTurnId,
         envelopes,
+        dropped: [{ type: message.type, reason: "empty-user-content" }],
       };
     }
 
@@ -800,11 +836,13 @@ function mapClaudeLogMessageToSessionEnvelopesInternal(
     return {
       currentTurnId: state.currentTurnId,
       envelopes,
+      dropped,
     };
   }
 
   return {
     currentTurnId: state.currentTurnId,
     envelopes,
+    dropped: [{ type: message.type, reason: "unhandled-message-type" }],
   };
 }
