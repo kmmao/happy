@@ -14,7 +14,7 @@ import {
     eventRouter,
 } from "@/app/events/eventRouter";
 import { inTx } from "@/storage/inTx";
-import { addRelations, type KnowledgeRelationType } from "@/modules/knowledgeRelation";
+import { addRelations, supersedeEntry, type KnowledgeRelationType } from "@/modules/knowledgeRelation";
 import { resolveKnowledgeConfig } from "@/modules/knowledgeConfigResolver";
 import {
     applyTurnHit,
@@ -104,14 +104,7 @@ export function knowledgeHandler(userId: string, socket: Socket) {
             }
 
             const created = await inTx(async (tx) => {
-                if (action.type === "update" && action.existingId) {
-                    await tx.projectKnowledge.update({
-                        where: { id: action.existingId },
-                        data: { status: "superseded" },
-                    });
-                }
-
-                return tx.projectKnowledge.create({
+                const row = await tx.projectKnowledge.create({
                     data: {
                         projectId,
                         entryType: entry.entryType,
@@ -134,6 +127,10 @@ export function knowledgeHandler(userId: string, socket: Socket) {
                         supersedesId: action.type === "update" ? action.existingId : null,
                     },
                 });
+                if (action.type === "update" && action.existingId) {
+                    await supersedeEntry(tx, row.id, action.existingId);
+                }
+                return row;
             });
 
             // Fire-and-forget: generate embedding for semantic search
@@ -164,14 +161,6 @@ export function knowledgeHandler(userId: string, socket: Socket) {
                         relationType: "related" as KnowledgeRelationType,
                     })),
                 );
-            }
-            // If this is a supersede action, also create a "refines" relation
-            if (action.type === "update" && action.existingId) {
-                void addRelations([{
-                    fromId: created.id,
-                    toId: action.existingId,
-                    relationType: "refines" as KnowledgeRelationType,
-                }]);
             }
 
             // Push knowledge count to App (ephemeral, user-scoped only)

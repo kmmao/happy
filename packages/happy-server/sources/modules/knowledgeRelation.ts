@@ -1,4 +1,5 @@
 import { db } from "@/storage/db";
+import { type Tx } from "@/storage/inTx";
 import { log } from "@/utils/log";
 
 export type KnowledgeRelationType = "related" | "contradicts" | "refines" | "combines";
@@ -66,6 +67,42 @@ export async function addRelations(
     if (failures.length > 0) {
         log({ module: "knowledge-relation" }, `${failures.length} relation inserts failed`);
     }
+}
+
+/**
+ * Record that `newEntryId` supersedes `supersededEntryId`.
+ *
+ * Superseding a knowledge entry is one invariant with two stored parts that
+ * must move together: the old entry's status flips to "superseded", and a
+ * "refines" relation new→old is recorded so the chain/graph view can walk the
+ * lineage. (The new entry separately carries `supersedesId`, set on its own
+ * create by the caller.) These two writes were previously open-coded at every
+ * create path — the REST route, the socket handler, the supervisor
+ * contributor, the auto-dream transcript processor — and had already drifted:
+ * the auto-dream path flipped the status but never recorded the relation, so
+ * those lineages were invisible to the graph. This is the single owner of the
+ * pair, so callers cannot forget half of it.
+ *
+ * Runs on the caller's transaction (pass the `inTx` client) so the status flip
+ * and the relation commit atomically with the new entry's creation.
+ */
+export async function supersedeEntry(
+    tx: Tx,
+    newEntryId: string,
+    supersededEntryId: string,
+): Promise<void> {
+    await tx.projectKnowledge.update({
+        where: { id: supersededEntryId },
+        data: { status: "superseded" },
+    });
+    await tx.knowledgeRelation.create({
+        data: {
+            fromEntryId: newEntryId,
+            toEntryId: supersededEntryId,
+            relationType: "refines",
+            metadata: null,
+        },
+    });
 }
 
 /**

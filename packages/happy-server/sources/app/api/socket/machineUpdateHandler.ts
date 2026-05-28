@@ -12,6 +12,7 @@ import { checkAndTriggerSchedules } from "@/modules/triggerScheduleRunner";
 import { buildBriefPushBody, pushSend } from "@/modules/pushSend";
 import { consolidate } from "@/modules/knowledgeConsolidate";
 import { storeKnowledgeEmbedding } from "@/modules/knowledgeEmbedding";
+import { supersedeEntry } from "@/modules/knowledgeRelation";
 import { inTx } from "@/storage/inTx";
 
 // Track last seen brief timestamp per machine to detect new briefs
@@ -389,13 +390,7 @@ export function machineUpdateHandler(userId: string, socket: Socket) {
                 if (action.type === "noop") continue;
 
                 const created = await inTx(async (tx) => {
-                    if (action.type === "update" && action.existingId) {
-                        await tx.projectKnowledge.update({
-                            where: { id: action.existingId },
-                            data: { status: "superseded" },
-                        });
-                    }
-                    return tx.projectKnowledge.create({
+                    const row = await tx.projectKnowledge.create({
                         data: {
                             projectId,
                             entryType: turn.entryType ?? "discovery",
@@ -414,6 +409,10 @@ export function machineUpdateHandler(userId: string, socket: Socket) {
                             supersedesId: action.type === "update" ? action.existingId : null,
                         },
                     });
+                    if (action.type === "update" && action.existingId) {
+                        await supersedeEntry(tx, row.id, action.existingId);
+                    }
+                    return row;
                 });
 
                 void storeKnowledgeEmbedding(created.id, turn.title ?? "", turn.content ?? "");

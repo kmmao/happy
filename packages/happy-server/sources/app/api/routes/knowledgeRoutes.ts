@@ -10,7 +10,7 @@ import { generateEmbedding, truncateForEmbedding } from "@/modules/embeddingServ
 import { regenerateProfile } from "@/modules/knowledgeProfileGenerator";
 import { trackKnowledgeCreation } from "@/modules/knowledgeAutoProfile";
 import { refineKnowledgeEntry } from "@/modules/knowledgeRefiner";
-import { addRelations, type KnowledgeRelationType } from "@/modules/knowledgeRelation";
+import { addRelations, supersedeEntry, type KnowledgeRelationType } from "@/modules/knowledgeRelation";
 import { inboxCreate } from "@/modules/inboxCreate";
 import {
     getEvictedKnowledgeIds,
@@ -262,14 +262,7 @@ export function knowledgeRoutes(app: Fastify) {
             }
 
             const entry = await inTx(async (tx) => {
-                if (dedupAction.type === "update") {
-                    await tx.projectKnowledge.update({
-                        where: { id: dedupAction.existingId },
-                        data: { status: "superseded" },
-                    });
-                }
-
-                return tx.projectKnowledge.create({
+                const created = await tx.projectKnowledge.create({
                     data: {
                         projectId: id,
                         entryType: body.entryType,
@@ -296,6 +289,10 @@ export function knowledgeRoutes(app: Fastify) {
                         supersedesId: dedupAction.type === "update" ? dedupAction.existingId : body.supersedesId,
                     },
                 });
+                if (dedupAction.type === "update") {
+                    await supersedeEntry(tx, created.id, dedupAction.existingId);
+                }
+                return created;
             });
 
             // Fire-and-forget: generate embedding for semantic search
@@ -336,14 +333,6 @@ export function knowledgeRoutes(app: Fastify) {
                         relationType: "related" as KnowledgeRelationType,
                     })),
                 );
-            }
-            // If this is a supersede action, also create a "refines" relation
-            if (dedupAction.type === "update" && dedupAction.existingId) {
-                void addRelations([{
-                    fromId: entry.id,
-                    toId: dedupAction.existingId,
-                    relationType: "refines" as KnowledgeRelationType,
-                }]);
             }
 
             return reply.code(201).send({

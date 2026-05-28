@@ -2,7 +2,7 @@ import { log } from "@/utils/log";
 import { consolidate } from "./knowledgeConsolidate";
 import { inTx } from "@/storage/inTx";
 import { storeKnowledgeEmbedding } from "./knowledgeEmbedding";
-import { addRelations } from "./knowledgeRelation";
+import { supersedeEntry } from "./knowledgeRelation";
 
 const MAX_ENTRIES_PER_RUN = 5;
 const SEVERITY_ORDER: Record<string, number> = { critical: 0, high: 1, medium: 2, low: 3 };
@@ -63,14 +63,7 @@ export async function contributeSupervisorKnowledge(
             }
 
             const entry = await inTx(async (tx) => {
-                if (dedupResult.type === "update" && dedupResult.existingId) {
-                    await tx.projectKnowledge.update({
-                        where: { id: dedupResult.existingId },
-                        data: { status: "superseded" },
-                    });
-                }
-
-                return tx.projectKnowledge.create({
+                const row = await tx.projectKnowledge.create({
                     data: {
                         projectId,
                         entryType,
@@ -86,18 +79,13 @@ export async function contributeSupervisorKnowledge(
                         supersedesId: dedupResult.type === "update" ? dedupResult.existingId : null,
                     },
                 });
+                if (dedupResult.type === "update" && dedupResult.existingId) {
+                    await supersedeEntry(tx, row.id, dedupResult.existingId);
+                }
+                return row;
             });
 
             void storeKnowledgeEmbedding(entry.id, entry.title, entry.content);
-
-            // Dual-write: if supersede, create "refines" relation
-            if (dedupResult.type === "update" && dedupResult.existingId) {
-                void addRelations([{
-                    fromId: entry.id,
-                    toId: dedupResult.existingId,
-                    relationType: "refines",
-                }]);
-            }
 
             created++;
         }
