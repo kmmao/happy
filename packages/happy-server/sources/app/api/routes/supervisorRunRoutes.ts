@@ -1,22 +1,15 @@
 import {
     eventRouter,
     buildSupervisorStatusEphemeral,
-    buildSessionActivityEphemeral,
 } from "@/app/events/eventRouter";
 import { type Fastify } from "../types";
 import { db } from "@/storage/db";
 import { z } from "zod";
-import { Prisma } from "@prisma/client";
 import { checkDailyRunLimit, incrementDailyRunCount } from "@/modules/supervisorLimits";
-import { computeHealthScore, countSeverities } from "@/modules/supervisorScoring";
-import { aggregateSessionUsage, scheduleDelayedCostAggregation } from "@/modules/supervisorUsage";
-import { activityCache } from "@/app/presence/sessionCache";
-import { onRunCompleted as loopOnRunCompleted } from "@/modules/supervisorLoopEngine";
-import { log } from "@/utils/log";
-import { handleAutoApproval } from "@/app/api/socket/supervisorRunStatusHandler";
 import { emitResolvedSupervisorRunTrigger } from "@/modules/supervisorRunTrigger";
 import { resolveConfiguredSupervisorProfile } from "@/modules/supervisorConfiguredProfile";
 import { ResolvedRuntimeProfileSchema } from "@/types/aiBackendProfile";
+import { supervisorRunStatusApply } from "../supervisor/supervisorRunStatusApply";
 
 /**
  * Supervisor run routes: trigger, list, detail, cancel, and status updates.
@@ -467,292 +460,25 @@ export function supervisorRunRoutes(app: Fastify) {
                 return reply.code(403).send({ error: "Callback token mismatch" });
             }
 
-            const userId = callbackAuth.userId;
-            const machineId = callbackAuth.machineId;
-
-            const run = await db.supervisorRun.findFirst({
-                where: {
-                    id: runId,
-                    projectId: id,
-                    accountId: userId,
-                },
-                select: {
-                    id: true,
-                    sessionId: true,
-                    project: {
-                        select: {
-                            machineId: true,
-                        },
-                    },
-                },
+            // Thin adapter: authenticate (above), delegate the whole completion
+            // flow to the deep module, then map its structured outcome to HTTP.
+            const result = await supervisorRunStatusApply({
+                userId: callbackAuth.userId,
+                machineId: callbackAuth.machineId,
+                // Curl callback is authenticated only by the callback token, so
+                // prove the run's project belongs to that machine.
+                enforceMachineMatch: true,
+                projectId: id,
+                runId,
+                ...request.body,
             });
 
-            if (!run) {
-                return reply
-                    .code(404)
-                    .send({ error: "Supervisor run not found" });
-            }
-
-            if (!machineId || run.project.machineId !== machineId) {
-                return reply.code(403).send({ error: "Machine mismatch" });
-            }
-
-            const {
-                status,
-                artifactId,
-                sessionId,
-                actionsCount,
-                issuesCreated,
-                errorMessage,
-                currentDimension,
-                dimensionIndex,
-                totalDimensions,
-                reportTitle,
-                reportContent,
-                actions: reportedActions,
-            } = request.body;
-
-            if (sessionId) {
-                const matchedSession = await db.session.findFirst({
-                    where: {
-                        id: sessionId,
-                        accountId: userId,
-                        projectId: id,
-                    },
-                    select: { id: true },
-                });
-                if (!matchedSession) {
-                    return reply.code(403).send({ error: "Invalid session for machine" });
-                }
-            }
-
-            // Atomic: only update if status is still pending/running
-            const data: Prisma.SupervisorRunUpdateManyMutationInput = {
-                status,
-            };
-            if (artifactId !== undefined) data.artifactId = artifactId;
-            if (sessionId !== undefined) data.sessionId = sessionId;
-            if (actionsCount !== undefined) data.actionsCount = actionsCount;
-            if (issuesCreated !== undefined) data.issuesCreated = issuesCreated;
-            if (errorMessage !== undefined) data.errorMessage = errorMessage;
-            if (reportTitle !== undefined) data.reportTitle = reportTitle;
-            if (reportContent !== undefined) data.reportContent = reportContent;
-            if (status === "completed" || status === "failed") {
-                data.completedAt = new Date();
-            }
-
-            const result = await db.supervisorRun.updateMany({
-                where: {
-                    id: runId,
-                    projectId: id,
-                    accountId: userId,
-                    status: { in: ["pending", "running"] },
-                },
-                data,
-            });
-
-            if (result.count === 0) {
-                // Check if run exists but is already in a terminal state
-                const existing = await db.supervisorRun.findFirst({
-                    where: { id: runId, projectId: id, accountId: userId },
-                    select: { status: true },
-                });
-
-                if (!existing) {
-                    return reply
-                        .code(404)
-                        .send({ error: "Supervisor run not found" });
-                }
-
-                return reply.code(409).send({
-                    error: `Run is already ${existing.status}`,
-                });
-            }
-
-            // Compute and persist healthScore on completion
-            if (status === "completed") {
-                // Create SupervisorAction entries if provided — with deduplication
-                if (reportedActions && reportedActions.length > 0) {
-                    const existingPending = await db.supervisorAction.findMany({
-                        where: {
-                            projectId: id,
-                            accountId: userId,
-                            approval: "pending",
-                        },
-                        select: { id: true, category: true, title: true },
-                    });
-
-                    const existingKeys = new Map(
-                        existingPending.map((a) => [`${a.category}::${a.title}`, a.id]),
-                    );
-
-                    const newActions: typeof reportedActions = [];
-                    const batchOps: ReturnType<typeof db.supervisorAction.update>[] = [];
-
-                    for (const action of reportedActions) {
-                        const key = `${action.category}::${action.title}`;
-                        const existingId = existingKeys.get(key);
-                        if (existingId) {
-                            batchOps.push(
-                                db.supervisorAction.update({
-                                    where: { id: existingId },
-                                    data: {
-                                        lastSeenRunId: runId,
-                                        description: action.description,
-                                        suggestedFix: action.suggestedFix ?? null,
-                                        confidence: action.confidence ?? null,
-                                        severity: action.severity,
-                                    },
-                                }),
-                            );
-                        } else {
-                            newActions.push(action);
-                        }
-                    }
-
-                    if (batchOps.length > 0) {
-                        await db.$transaction(batchOps);
-                    }
-
-                    if (newActions.length > 0) {
-                        await db.supervisorAction.createMany({
-                            data: newActions.map((action) => ({
-                                runId,
-                                projectId: id,
-                                accountId: userId,
-                                severity: action.severity,
-                                category: action.category,
-                                title: action.title,
-                                description: action.description,
-                                suggestedFix: action.suggestedFix ?? null,
-                                confidence: action.confidence ?? null,
-                            })),
-                        });
-                    }
-
-                    await db.supervisorRun.update({
-                        where: { id: runId },
-                        data: { actionsCount: reportedActions.length },
-                    });
-                }
-
-                const allActions = await db.supervisorAction.findMany({
-                    where: { runId, projectId: id, accountId: userId },
-                    select: { severity: true },
-                });
-                const counts = countSeverities(allActions);
-                const healthScore = computeHealthScore(counts);
-
-                // Aggregate session usage (cost/tokens) from UsageReport
-                const runForSession = await db.supervisorRun.findUnique({
-                    where: { id: runId },
-                    select: { sessionId: true },
-                });
-                const resolvedSessionId = sessionId ?? runForSession?.sessionId;
-                const usage = await aggregateSessionUsage(resolvedSessionId);
-
-                await db.supervisorRun.update({
-                    where: { id: runId },
-                    data: {
-                        healthScore,
-                        ...(usage
-                            ? {
-                                  tokenCount: usage.totalTokens,
-                                  costUsd: usage.totalCostUsd,
-                              }
-                            : {}),
-                    },
-                });
-
-                // Delayed re-aggregation: the turn-end cost report arrives AFTER
-                // Claude's curl POST (which triggers this handler). Schedule
-                // multiple retry attempts at increasing intervals.
-                if (resolvedSessionId) {
-                    scheduleDelayedCostAggregation(runId, resolvedSessionId);
-                }
-
-                // Archive the supervisor session so it doesn't stay active
-                if (resolvedSessionId) {
-                    const now = Date.now();
-                    await db.session.updateMany({
-                        where: { id: resolvedSessionId, active: true },
-                        data: { lastActiveAt: new Date(now), active: false },
-                    });
-                    activityCache.invalidateSession(resolvedSessionId);
-                    eventRouter.emitEphemeral({
-                        userId,
-                        payload: buildSessionActivityEphemeral(resolvedSessionId, false, now, false),
-                        recipientFilter: { type: "user-scoped-only" },
-                    });
-                }
-            }
-
-            // Fetch the updated run for response
-            const updated = await db.supervisorRun.findUnique({
-                where: { id: runId },
-            });
-
-            // Notify App clients about status change
-            eventRouter.emitEphemeral({
-                userId,
-                payload: buildSupervisorStatusEphemeral(
-                    runId,
-                    id,
-                    status,
-                    artifactId,
-                    errorMessage,
-                    currentDimension,
-                    dimensionIndex,
-                    totalDimensions,
-                ),
-                recipientFilter: { type: "user-scoped-only" },
-            });
-
-            // Notify the daemon so it can finalise its local AutomationJob.
-            // The HTTP callback (Claude → Server) bypasses the daemon entirely,
-            // so without this the AutomationScheduler stays stuck at "running".
-            if ((status === "completed" || status === "failed") && machineId) {
-                eventRouter.emitEphemeral({
-                    userId,
-                    payload: { type: "supervisor-run-complete", runId, projectId: id, status },
-                    recipientFilter: { type: "machine-scoped-only", machineId },
-                });
-            }
-
-            if (status === "completed" || status === "failed") {
-                // Auto/semi-auto mode: automatically approve actions based on configured severities
-                // Skip if run belongs to a loop — Loop engine handles its own approval flow.
-                // Check DB for actions (not request body) because Claude may report
-                // actions in a separate request from the "completed" status.
-                if (status === "completed") {
-                    const runForAutoApprove = await db.supervisorRun.findUnique({
-                        where: { id: runId },
-                        select: { loopId: true, actionsCount: true },
-                    });
-                    log(
-                        { module: "supervisor" },
-                        `Auto-approval check: run ${runId}, loopId=${runForAutoApprove?.loopId ?? "null"}, actionsCount=${runForAutoApprove?.actionsCount ?? "null"}`,
-                    );
-                    if (!runForAutoApprove?.loopId && (runForAutoApprove?.actionsCount ?? 0) > 0) {
-                        try {
-                            await handleAutoApproval(userId, id, runId);
-                        } catch (autoApproveError) {
-                            log(
-                                { module: "supervisor", level: "error" },
-                                `Auto-approval error for run ${runId}: ${autoApproveError}`,
-                            );
-                        }
-                    }
-                }
-
-                // Loop progression: if this run belongs to a loop, advance the
-                // state machine. Errors are absorbed inside the engine so they
-                // never fail this status callback.
-                await loopOnRunCompleted(userId, runId, id);
+            if (!result.ok) {
+                return reply.code(result.status).send({ error: result.error });
             }
 
             return reply.send({
-                run: updated ? serializeSupervisorRun(updated) : { id: runId },
+                run: result.run ? serializeSupervisorRun(result.run) : { id: runId },
             });
         },
     );

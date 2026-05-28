@@ -8,6 +8,11 @@ import {
 import { pushSupervisorNotification } from "@/modules/pushSend";
 import { onFixCompleted as loopOnFixCompleted } from "@/modules/supervisorLoopEngine";
 import { emitConfiguredSupervisorFixTrigger } from "@/modules/supervisorFixTrigger";
+import {
+    decideApprovalTransition,
+    DISMISSED_APPROVALS,
+    ACTIVE_FIX_STATUSES,
+} from "@/modules/supervisorActionLogic";
 
 /**
  * Supervisor action routes for the approval workflow.
@@ -90,7 +95,7 @@ export function supervisorActionRoutes(app: Fastify) {
                 where.approval = "approved";
                 where.fixStatus = "failed";
             } else if (view === "dismissed") {
-                where.approval = { in: ["skipped", "ignored"] };
+                where.approval = { in: [...DISMISSED_APPROVALS] };
             } else if (approval) {
                 where.approval = approval;
             }
@@ -137,38 +142,26 @@ export function supervisorActionRoutes(app: Fastify) {
             const { id, actionId } = request.params;
             const { approval } = request.body;
 
-            // State transitions:
-            // - Restore: dismissed/approved → pending (approved only when not actively fixing)
-            // - Forward: pending → approved/skipped/ignored
-            // - Post-analysis: approved (with fixStatus=analyzed) → ignored/skipped
-            let fromApproval: string | { in: string[] };
-            if (approval === "pending") {
-                // Restore from dismissed or approved
-                fromApproval = { in: ["skipped", "ignored", "approved"] };
-            } else if (approval === "skipped" || approval === "ignored") {
-                // Allow from pending OR from approved (post-analysis dismiss)
-                fromApproval = { in: ["pending", "approved"] };
-            } else {
-                // approved: only from pending
-                fromApproval = "pending";
-            }
+            // The approval state machine and its interlock with the fix
+            // lifecycle live in decideApprovalTransition. The decision is applied
+            // as ONE atomic updateMany (compare-and-swap on allowedFrom) so the
+            // transition stays race-safe.
+            const transition = decideApprovalTransition(approval);
 
             const result = await db.supervisorAction.updateMany({
                 where: {
                     id: actionId,
                     projectId: id,
                     accountId: userId,
-                    approval: fromApproval,
-                    // Block restore to pending if fix is actively running
+                    approval: { in: transition.allowedFrom },
                     // Prisma: notIn does not match NULL, so explicitly allow null
-                    ...(approval === "pending"
-                        ? { OR: [{ fixStatus: null }, { fixStatus: { notIn: ["pending", "running"] } }] }
+                    ...(transition.blockWhileActivelyFixing
+                        ? { OR: [{ fixStatus: null }, { fixStatus: { notIn: [...ACTIVE_FIX_STATUSES] } }] }
                         : {}),
                 },
                 data: {
                     approval,
-                    // Reset fix status when restoring to pending or dismissing after analysis
-                    ...(approval === "pending" || approval === "skipped" || approval === "ignored"
+                    ...(transition.resetFix
                         ? { fixStatus: null, fixSessionId: null, fixMode: null }
                         : {}),
                 },
@@ -285,7 +278,7 @@ export function supervisorActionRoutes(app: Fastify) {
                     id: actionId,
                     projectId: id,
                     accountId: userId,
-                    approval: { in: ["skipped", "ignored"] },
+                    approval: { in: [...DISMISSED_APPROVALS] },
                 },
             });
 

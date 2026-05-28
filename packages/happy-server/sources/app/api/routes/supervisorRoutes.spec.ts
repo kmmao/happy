@@ -335,7 +335,7 @@ vi.mock("@/modules/pushSend", () => ({
 import { supervisorRoutes } from "./supervisorRoutes";
 import { supervisorRunRoutes } from "./supervisorRunRoutes";
 import { supervisorActionRoutes } from "./supervisorActionRoutes";
-import { handleAutoApproval } from "../socket/supervisorRunStatusHandler";
+import { handleAutoApproval } from "../supervisor/supervisorAutoApproval";
 
 async function createApp() {
     const app = fastify();
