@@ -14,6 +14,34 @@ import { EncryptionCache } from "./encryptionCache";
 import { Decryptor, Encryptor } from "./encryptor";
 import { decryptValue, decryptValueSafe, encryptValue } from "./codec";
 
+/**
+ * Why a message could not be surfaced as decrypted content. The per-session
+ * cipher knows which of these happened; collapsing them all to a `null` content
+ * forced every caller to re-guess. Naming them keeps that knowledge at the seam.
+ *
+ * In practice `decrypt-failed` is the live case (an encryption-key mismatch
+ * after a session reconnect). The wire only models encrypted message content,
+ * so `not-encrypted` is defensive against malformed/legacy records, and
+ * `missing` against an empty input slot.
+ */
+export type MessageDecryptFailureReason =
+  | "decrypt-failed"
+  | "not-encrypted"
+  | "missing";
+
+/**
+ * Result of decrypting a single message: either the decrypted message, or a
+ * typed reason it could not be produced.
+ */
+export type MessageDecryptOutcome =
+  | { ok: true; message: DecryptedMessage }
+  | {
+      ok: false;
+      reason: MessageDecryptFailureReason;
+      seq: number | null;
+      id: string | null;
+    };
+
 export class SessionEncryption {
   private sessionId: string;
   private encryptor: Encryptor & Decryptor;
@@ -30,38 +58,49 @@ export class SessionEncryption {
   }
 
   /**
-   * Batch-first API for decrypting messages
+   * Deep core: decrypt a batch of messages into typed outcomes, distinguishing
+   * a real decrypt failure from a not-encrypted record and a missing slot — the
+   * distinction the legacy `(DecryptedMessage | null)[]` shape threw away.
+   *
+   * Caching is unchanged: a negative result is still cached as a content-null
+   * placeholder so it is not re-attempted (and is cleared on key change via the
+   * cache). A cached content-null is therefore reported as `decrypt-failed`,
+   * the dominant case, since the cache does not retain which reason produced it.
    */
-  async decryptMessages(
+  async decryptMessageOutcomes(
     messages: ApiMessage[],
-  ): Promise<(DecryptedMessage | null)[]> {
-    // Check cache for all messages first
-    const results: (DecryptedMessage | null)[] = new Array(messages.length);
+  ): Promise<MessageDecryptOutcome[]> {
+    const results: MessageDecryptOutcome[] = new Array(messages.length);
     const toDecrypt: { index: number; message: ApiMessage }[] = [];
 
     for (let i = 0; i < messages.length; i++) {
       const message = messages[i];
       if (!message) {
-        results[i] = null;
+        results[i] = { ok: false, reason: "missing", seq: null, id: null };
         continue;
       }
 
-      // Check cache first
       const cached = this.cache.getCachedMessage(message.id);
       if (cached) {
-        results[i] = cached;
+        results[i] =
+          cached.content === null
+            ? {
+                ok: false,
+                reason: "decrypt-failed",
+                seq: message.seq,
+                id: message.id,
+              }
+            : { ok: true, message: cached };
       } else if (message.content.t === "encrypted") {
         toDecrypt.push({ index: i, message });
       } else {
-        // Not encrypted or invalid
+        this.cache.setCachedMessage(message.id, this.placeholderFor(message));
         results[i] = {
-          id: message.id,
+          ok: false,
+          reason: "not-encrypted",
           seq: message.seq,
-          localId: message.localId ?? null,
-          content: null,
-          createdAt: message.createdAt,
+          id: message.id,
         };
-        this.cache.setCachedMessage(message.id, results[i]!);
       }
     }
 
@@ -86,22 +125,51 @@ export class SessionEncryption {
             createdAt: message.createdAt,
           };
           this.cache.setCachedMessage(message.id, result);
-          results[index] = result;
+          results[index] = { ok: true, message: result };
         } else {
-          const result: DecryptedMessage = {
-            id: message.id,
+          this.cache.setCachedMessage(message.id, this.placeholderFor(message));
+          results[index] = {
+            ok: false,
+            reason: "decrypt-failed",
             seq: message.seq,
-            localId: message.localId ?? null,
-            content: null,
-            createdAt: message.createdAt,
+            id: message.id,
           };
-          this.cache.setCachedMessage(message.id, result);
-          results[index] = result;
         }
       }
     }
 
     return results;
+  }
+
+  /**
+   * Legacy batch view over {@link decryptMessageOutcomes}: maps each outcome
+   * back to the historical `(DecryptedMessage | null)[]` shape — a missing slot
+   * is `null`, any other failure is a content-null placeholder — so callers that
+   * have not adopted outcomes see byte-identical results.
+   */
+  async decryptMessages(
+    messages: ApiMessage[],
+  ): Promise<(DecryptedMessage | null)[]> {
+    const outcomes = await this.decryptMessageOutcomes(messages);
+    return outcomes.map((outcome, i) => {
+      if (outcome.ok) {
+        return outcome.message;
+      }
+      if (outcome.reason === "missing") {
+        return null;
+      }
+      return this.placeholderFor(messages[i]);
+    });
+  }
+
+  private placeholderFor(message: ApiMessage): DecryptedMessage {
+    return {
+      id: message.id,
+      seq: message.seq,
+      localId: message.localId ?? null,
+      content: null,
+      createdAt: message.createdAt,
+    };
   }
 
   /**
