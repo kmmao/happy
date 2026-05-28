@@ -79,6 +79,40 @@ export function toPersistedTrackedSession(session: TrackedSession): PersistedTra
   };
 }
 
+/**
+ * Inverse of toPersistedTrackedSession: rebuild a live TrackedSession from a
+ * persisted entry during crash-recovery. Restores every persisted field —
+ * including lastHeartbeatAt and activity — so a daemon-spawned session
+ * reattached after a restart keeps its full history rather than being
+ * mislabeled as externally-started.
+ *
+ * `pid` is supplied by the caller (the reporting child's current pid) because
+ * the persisted pid belongs to the process that died; the new child reports
+ * its own. recoveredFromIndex/recoveredAt mark the entry as disk-restored.
+ */
+export function fromPersistedTrackedSession(
+  persisted: PersistedTrackedSession,
+  pid: number,
+): TrackedSession {
+  return {
+    startedBy: persisted.startedBy,
+    spawnId: persisted.spawnId,
+    happySessionId: persisted.happySessionId,
+    pid,
+    startedAt: persisted.startedAt,
+    lastActivityAt: persisted.lastActivityAt,
+    lastOutputAt: persisted.lastOutputAt,
+    lastHeartbeatAt: persisted.lastHeartbeatAt,
+    activity: persisted.activity,
+    automationContext: persisted.automationContext,
+    tmuxSessionId: persisted.tmuxSessionId,
+    directoryCreated: persisted.directoryCreated,
+    message: persisted.message,
+    recoveredFromIndex: true,
+    recoveredAt: Date.now(),
+  };
+}
+
 export class TrackedSessionRegistry {
   private entries = new Map<string, PersistedTrackedSession>();
   private loaded = false;
@@ -144,6 +178,17 @@ export class TrackedSessionRegistry {
 
   getBySpawnId(spawnId: string): PersistedTrackedSession | undefined {
     return this.entries.get(`spawn:${spawnId}`);
+  }
+
+  /**
+   * Rebuild a live TrackedSession for a spawnId whose in-memory entry was lost
+   * (daemon crashed between spawn and /session-started) but whose pending
+   * record survived on disk. Returns undefined when no persisted entry matches.
+   */
+  recoverBySpawnId(spawnId: string, pid: number): TrackedSession | undefined {
+    const persisted = this.getBySpawnId(spawnId);
+    if (!persisted) return undefined;
+    return fromPersistedTrackedSession(persisted, pid);
   }
 
   async upsert(session: PersistedTrackedSession): Promise<void> {

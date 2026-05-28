@@ -82,22 +82,9 @@ export function onHappySessionWebhook(
   // so automationContext / startedAt / directoryCreated survive the
   // crash-and-restart, and this child isn't mislabeled as externally-started.
   if (!existingSession && reportedSpawnId) {
-    const persisted = trackedSessionRegistry.getBySpawnId(reportedSpawnId);
-    if (persisted) {
-      existingSession = {
-        startedBy: persisted.startedBy,
-        pid,
-        spawnId: persisted.spawnId,
-        startedAt: persisted.startedAt,
-        lastActivityAt: persisted.lastActivityAt,
-        lastOutputAt: persisted.lastOutputAt,
-        automationContext: persisted.automationContext,
-        tmuxSessionId: persisted.tmuxSessionId,
-        directoryCreated: persisted.directoryCreated,
-        message: persisted.message,
-        recoveredFromIndex: true,
-        recoveredAt: Date.now(),
-      };
+    const recovered = trackedSessionRegistry.recoverBySpawnId(reportedSpawnId, pid);
+    if (recovered) {
+      existingSession = recovered;
       pidToTrackedSession.set(pid, existingSession);
       logger.debug(
         `[DAEMON RUN] Recovered pending spawn ${reportedSpawnId} from registry on webhook (pid ${pid})`,
