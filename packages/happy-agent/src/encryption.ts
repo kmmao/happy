@@ -158,6 +158,62 @@ export function decrypt(key: Uint8Array, variant: 'legacy' | 'dataKey', data: Ui
     }
 }
 
+// --- Cipher adapter ---
+
+/**
+ * Outcome of a decrypt attempt.
+ *
+ * The low-level {@link decrypt} returns `unknown | null`, fusing "could not
+ * decrypt" (wrong key, tampered bytes, wrong variant, non-JSON plaintext)
+ * with a value that legitimately decrypted to something falsy.
+ * `DecryptResult` splits those apart: `{ ok: false }` is an authentication or
+ * parse failure, while `{ ok: true, value }` carries the recovered plaintext.
+ * Callers branch on `ok` instead of guessing from a collapsed `null`.
+ */
+export type DecryptResult =
+    | { ok: true; value: any }
+    | { ok: false };
+
+/**
+ * A Cipher binds one AccessKey + encryption variant into a small interface.
+ *
+ * It is the single seam every transport client encrypts/decrypts through:
+ * hand it a value and get a wire-ready base64 string, or hand it a base64
+ * wire string and get a {@link DecryptResult}. The variant choice (legacy
+ * NaCl secretbox vs AES-256-GCM dataKey) and the base64 framing live behind
+ * this interface, so call sites never thread `(key, variant)` or call
+ * `encode`/`decodeBase64` themselves — a wrong-variant or wrong-key bug can
+ * only originate at the one `createCipher` call, not at the dozens of places
+ * that used to repeat the pattern.
+ */
+export interface Cipher {
+    /** Encrypt a JSON-serializable value, returning a base64 wire string. */
+    encrypt(data: any): string;
+    /** Decode + decrypt a base64 wire string. Never throws. */
+    decrypt(data: string): DecryptResult;
+}
+
+/**
+ * Build a {@link Cipher} for one AccessKey. Construct it once where the key
+ * and variant are first resolved (session / machine setup) and pass the
+ * Cipher down; do not thread `(key, variant)` pairs through call sites.
+ */
+export function createCipher(key: Uint8Array, variant: 'legacy' | 'dataKey'): Cipher {
+    return {
+        encrypt(data: any): string {
+            return encodeBase64(encrypt(key, variant, data));
+        },
+        decrypt(data: string): DecryptResult {
+            try {
+                const value = decrypt(key, variant, decodeBase64(data));
+                return value === null ? { ok: false } : { ok: true, value };
+            } catch {
+                return { ok: false };
+            }
+        },
+    };
+}
+
 // --- Auth challenge (for token refresh) ---
 
 export function authChallenge(secret: Uint8Array): {

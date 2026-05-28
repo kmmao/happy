@@ -20,6 +20,8 @@ import {
     libsodiumEncryptForPublicKey,
     decryptBoxBundle,
     authChallenge,
+    createCipher,
+    type Cipher,
 } from './encryption';
 
 // Helper: hex encode for test vector comparison
@@ -356,5 +358,55 @@ describe('getRandomBytes', () => {
         const a = getRandomBytes(32);
         const b = getRandomBytes(32);
         expect(a).not.toEqual(b);
+    });
+});
+
+/**
+ * Real-crypto tests for the Cipher adapter — the single seam every transport
+ * client encrypts/decrypts through. They pin round-trip fidelity across both
+ * variants and a `decrypt` that is TOTAL (never throws) and discriminates a
+ * real failure from a legitimately-falsy recovered value.
+ */
+describe('Cipher adapter', () => {
+    const variants: Array<'legacy' | 'dataKey'> = ['legacy', 'dataKey'];
+
+    for (const variant of variants) {
+        describe(`variant=${variant}`, () => {
+            const newCipher = (): Cipher => createCipher(getRandomBytes(32), variant);
+
+            it('round-trips a structured value', () => {
+                const cipher = newCipher();
+                const value = { a: 1, b: 'two', c: [3, { d: true }], e: null };
+                expect(cipher.decrypt(cipher.encrypt(value))).toEqual({ ok: true, value });
+            });
+
+            it('discriminates legitimately-falsy values from failure (false / 0 / "")', () => {
+                const cipher = newCipher();
+                for (const value of [false, 0, '']) {
+                    expect(cipher.decrypt(cipher.encrypt(value))).toEqual({ ok: true, value });
+                }
+            });
+
+            it('returns { ok: false } on garbage input instead of throwing', () => {
+                const cipher = newCipher();
+                expect(cipher.decrypt('!!!not base64!!!')).toEqual({ ok: false });
+                expect(cipher.decrypt('')).toEqual({ ok: false });
+                expect(cipher.decrypt(encodeBase64(getRandomBytes(64)))).toEqual({ ok: false });
+            });
+
+            it('returns { ok: false } when decrypting with a different key', () => {
+                const sender = newCipher();
+                const wrong = newCipher();
+                expect(wrong.decrypt(sender.encrypt({ secret: 42 }))).toEqual({ ok: false });
+            });
+        });
+    }
+
+    it('does not cross-decrypt between variants (wrong variant => { ok: false })', () => {
+        const key = getRandomBytes(32);
+        const legacy = createCipher(key, 'legacy');
+        const dataKey = createCipher(key, 'dataKey');
+        expect(dataKey.decrypt(legacy.encrypt({ hi: 1 }))).toEqual({ ok: false });
+        expect(legacy.decrypt(dataKey.encrypt({ hi: 1 }))).toEqual({ ok: false });
     });
 });
