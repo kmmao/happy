@@ -2,6 +2,8 @@
  * Common RPC types and interfaces for both session and machine clients
  */
 
+import type { Cipher } from '@/api/encryption';
+
 /**
  * Generic RPC handler function type
  * @template TRequest - The request data type
@@ -34,8 +36,7 @@ export type RpcResponseCallback = (response: string) => void;
  */
 export interface RpcHandlerConfig {
     scopePrefix: string;
-    encryptionKey: Uint8Array;
-    encryptionVariant: 'legacy' | 'dataKey';
+    cipher: Cipher;
     logger?: (message: string, data?: any) => void;
 }
 
