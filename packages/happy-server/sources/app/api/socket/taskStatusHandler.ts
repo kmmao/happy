@@ -5,14 +5,10 @@
 
 import { Socket } from "socket.io";
 import { z } from "zod";
-import { db } from "@/storage/db";
 import { log } from "@/utils/log";
-import { eventRouter, buildTaskStatusChangedEphemeral } from "@/app/events/eventRouter";
 import { inboxCreate } from "@/modules/inboxCreate";
-import {
-    normalizeTaskStatusReport,
-    shouldApplyTaskStatus,
-} from "@/modules/taskStatusLogic";
+import { normalizeTaskStatusReport } from "@/modules/taskStatusLogic";
+import { taskStatusApply } from "@/app/api/task/taskStatusApply";
 
 const taskStatusSchema = z.object({
     taskId: z.string().min(1),
@@ -42,45 +38,33 @@ export function taskStatusHandler(socket: Socket, userId: string): void {
             });
             const resolvedStatus = normalized.status;
 
-            const task = await db.task.findFirst({
-                where: { id: data.taskId, accountId: userId },
+            const result = await taskStatusApply({
+                userId,
+                taskId: data.taskId,
+                resolvedStatus,
+                sessionId: data.sessionId,
+                errorMessage: data.errorMessage,
             });
 
-            if (!task) {
-                log(
-                    { module: "task", level: "warn" },
-                    `task-status: task ${data.taskId} not found for user ${userId}`,
-                );
+            if (!result.ok) {
+                if (result.reason === "not-found") {
+                    log(
+                        { module: "task", level: "warn" },
+                        `task-status: task ${data.taskId} not found for user ${userId}`,
+                    );
+                } else if (result.reason === "stale") {
+                    log(
+                        { module: "task", level: "warn" },
+                        `task-status: ignored stale transition for ${data.taskId}: ${result.task.status} -> ${resolvedStatus}`,
+                    );
+                }
                 return;
             }
 
-            if (task.status === resolvedStatus && ["completed", "failed", "cancelled"].includes(task.status)) {
-                return;
-            }
-
-            if (!shouldApplyTaskStatus(task.status, resolvedStatus)) {
-                log(
-                    { module: "task", level: "warn" },
-                    `task-status: ignored stale transition for ${data.taskId}: ${task.status} -> ${resolvedStatus}`,
-                );
-                return;
-            }
-
-            const isTerminal = ["completed", "failed", "cancelled"].includes(resolvedStatus);
-
-            const updated = await db.task.update({
-                where: { id: data.taskId },
-                data: {
-                    status: resolvedStatus,
-                    sessionId: data.sessionId ?? task.sessionId,
-                    errorMessage: data.errorMessage ?? task.errorMessage,
-                    dispatchedAt: resolvedStatus === "running" && !task.dispatchedAt ? new Date() : task.dispatchedAt,
-                    completedAt: isTerminal ? new Date() : task.completedAt,
-                },
-            });
+            const updated = result.task;
 
             // Create inbox item for terminal statuses
-            if (isTerminal) {
+            if (result.isTerminal) {
                 const taskLabel = updated.title ?? `Task ${data.taskId.slice(-6)}`;
                 void inboxCreate({
                     accountId: userId,
@@ -95,27 +79,12 @@ export function taskStatusHandler(socket: Socket, userId: string): void {
                     body: resolvedStatus === "failed" ? data.errorMessage : undefined,
                     referenceUrl: updated.sessionId
                         ? `/session/${updated.sessionId}`
-                        : `/machine/${task.machineId}/tasks`,
+                        : `/machine/${updated.machineId}/tasks`,
                     refType: "task",
                     refId: data.taskId,
                     groupKey: `task:${data.taskId}:${resolvedStatus}`,
                 });
             }
-
-            // Notify App
-            eventRouter.emitEphemeral({
-                userId,
-                payload: buildTaskStatusChangedEphemeral({
-                    taskId: data.taskId,
-                    machineId: task.machineId,
-                    status: resolvedStatus,
-                    sessionId: updated.sessionId ?? undefined,
-                    errorMessage: updated.errorMessage ?? undefined,
-                    completedAt: updated.completedAt?.getTime(),
-                    triggerType: task.triggerType,
-                }),
-                recipientFilter: { type: "user-scoped-only" },
-            });
 
             log({ module: "task" }, `task-status: task ${data.taskId} → ${resolvedStatus}`);
         } catch (error) {

@@ -215,6 +215,20 @@ vi.mock("@/modules/taskStatusLogic", () => ({
         if (["completed", "failed", "cancelled"].includes(current)) return false;
         return true;
     }),
+    decideTaskTransition: vi.fn(({ current, resolvedStatus, now }: any) => {
+        const terminal = ["completed", "failed", "cancelled"];
+        if (current.status === resolvedStatus && terminal.includes(current.status)) {
+            return { apply: false, reason: "duplicate-terminal" };
+        }
+        if (terminal.includes(current.status) && current.status !== resolvedStatus) {
+            return { apply: false, reason: "stale" };
+        }
+        const isTerminal = terminal.includes(resolvedStatus);
+        const timestamps: { dispatchedAt?: Date; completedAt?: Date } = {};
+        if (resolvedStatus === "running" && !current.dispatchedAt) timestamps.dispatchedAt = now;
+        if (isTerminal) timestamps.completedAt = now;
+        return { apply: true, isTerminal, timestamps };
+    }),
 }));
 
 import { taskRoutes } from "./taskRoutes";

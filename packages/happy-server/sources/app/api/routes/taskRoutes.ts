@@ -13,8 +13,9 @@ import { inTx } from "@/storage/inTx";
 import { claimRepeatKey } from "@/storage/repeatKey";
 import {
     normalizeTaskStatusReport,
-    shouldApplyTaskStatus,
+    decideTaskTransition,
 } from "@/modules/taskStatusLogic";
+import { taskStatusApply } from "@/app/api/task/taskStatusApply";
 import {
     isUnifiedRuntimeProfileResolverEnabled,
     notifyRuntimeProfileFailure,
@@ -868,15 +869,18 @@ export function taskRoutes(app: Fastify) {
                     }
                 }
 
-                if (task.status === resolvedStatus && ["completed", "failed", "cancelled"].includes(task.status)) {
-                    return { task, ignored: true } as const;
-                }
-
-                if (!shouldApplyTaskStatus(task.status, resolvedStatus)) {
-                    log(
-                        { module: "task", level: "warn" },
-                        `Ignored stale task result transition ${taskId}: ${task.status} -> ${resolvedStatus}`,
-                    );
+                const decision = decideTaskTransition({
+                    current: { status: task.status, dispatchedAt: task.dispatchedAt },
+                    resolvedStatus,
+                    now: new Date(),
+                });
+                if (!decision.apply) {
+                    if (decision.reason === "stale") {
+                        log(
+                            { module: "task", level: "warn" },
+                            `Ignored stale task result transition ${taskId}: ${task.status} -> ${resolvedStatus}`,
+                        );
+                    }
                     return { task, ignored: true } as const;
                 }
 
@@ -886,7 +890,7 @@ export function taskRoutes(app: Fastify) {
                         status: resolvedStatus,
                         sessionId: sessionId ?? task.sessionId,
                         errorMessage: payload.errorMessage ?? task.errorMessage,
-                        completedAt: new Date(),
+                        ...decision.timestamps,
                     },
                 });
 
@@ -1067,54 +1071,29 @@ export function taskRoutes(app: Fastify) {
             });
             const resolvedStatus = payload.status;
 
-            const task = await db.task.findFirst({
-                where: { id: taskId, accountId: request.userId },
-            });
-            if (!task) {
-                return reply.code(404).send({ error: "Task not found" });
-            }
-
-            if (task.status === resolvedStatus && ["completed", "failed", "cancelled"].includes(task.status)) {
-                return reply.send({ task: serializeTask(task), ignored: true });
-            }
-
-            if (!shouldApplyTaskStatus(task.status, resolvedStatus)) {
-                log(
-                    { module: "task", level: "warn" },
-                    `Ignored stale task status transition ${taskId}: ${task.status} -> ${resolvedStatus}`,
-                );
-                return reply.send({ task: serializeTask(task), ignored: true });
-            }
-
-            const isTerminal = ["completed", "failed", "cancelled"].includes(resolvedStatus);
-
-            const updated = await db.task.update({
-                where: { id: taskId },
-                data: {
-                    status: resolvedStatus,
-                    sessionId: sessionId ?? task.sessionId,
-                    errorMessage: errorMessage ?? task.errorMessage,
-                    dispatchedAt: resolvedStatus === "running" && !task.dispatchedAt ? new Date() : task.dispatchedAt,
-                    completedAt: isTerminal ? new Date() : task.completedAt,
-                },
-            });
-
-            eventRouter.emitEphemeral({
+            const result = await taskStatusApply({
                 userId: request.userId,
-                payload: buildTaskStatusChangedEphemeral({
-                    taskId,
-                    machineId: task.machineId,
-                    status: resolvedStatus,
-                    sessionId: updated.sessionId ?? undefined,
-                    errorMessage: updated.errorMessage ?? undefined,
-                    completedAt: updated.completedAt?.getTime(),
-                    triggerType: task.triggerType,
-                }),
-                recipientFilter: { type: "user-scoped-only" },
+                taskId,
+                resolvedStatus,
+                sessionId,
+                errorMessage,
             });
+
+            if (!result.ok) {
+                if (result.reason === "not-found") {
+                    return reply.code(404).send({ error: "Task not found" });
+                }
+                if (result.reason === "stale") {
+                    log(
+                        { module: "task", level: "warn" },
+                        `Ignored stale task status transition ${taskId}: ${result.task.status} -> ${resolvedStatus}`,
+                    );
+                }
+                return reply.send({ task: serializeTask(result.task), ignored: true });
+            }
 
             log({ module: "task" }, `Task ${taskId} status → ${resolvedStatus}`);
-            return reply.send({ task: serializeTask(updated) });
+            return reply.send({ task: serializeTask(result.task) });
         },
     );
 }
