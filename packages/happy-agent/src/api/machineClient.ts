@@ -17,7 +17,7 @@
 import { io, Socket } from "socket.io-client";
 import { logger } from "../logger";
 import { withBackoff } from "../utils/backoff";
-import { encodeBase64, decodeBase64, encrypt, decrypt } from "../encryption";
+import { encodeBase64, decodeBase64, encrypt, decrypt, createCipher } from "../encryption";
 import { RpcHandlerManager } from "./rpc/RpcHandlerManager";
 import { registerAgentHandlers } from "./rpc/registerHandlers";
 import type { Machine, MachineMetadata, DaemonState } from "./types";
@@ -138,8 +138,7 @@ export class MachineClient {
     // Initialize RPC handler manager scoped to this machine
     this.rpcHandlerManager = new RpcHandlerManager({
       scopePrefix: opts.machine.id,
-      encryptionKey: opts.machine.encryptionKey,
-      encryptionVariant: opts.machine.encryptionVariant,
+      cipher: createCipher(opts.machine.encryptionKey, opts.machine.encryptionVariant),
       logger: (msg, data) => logger.debug(msg, data),
     });
 

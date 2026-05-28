@@ -12,7 +12,7 @@
 
 import { EventEmitter } from "node:events";
 import { io, Socket } from "socket.io-client";
-import { decodeBase64, encodeBase64, encrypt, decrypt } from "../encryption";
+import { decodeBase64, encodeBase64, encrypt, decrypt, createCipher } from "../encryption";
 import { logger } from "../logger";
 import { withBackoff } from "../utils/backoff";
 import { RpcHandlerManager, createRpcHandlerManager } from "./rpc/RpcHandlerManager";
@@ -77,8 +77,7 @@ export class SessionClient extends EventEmitter {
     // Initialize RPC handler manager
     this.rpcHandlerManager = createRpcHandlerManager({
       scopePrefix: `session:${opts.sessionId}`,
-      encryptionKey: opts.encryptionKey,
-      encryptionVariant: opts.encryptionVariant,
+      cipher: createCipher(opts.encryptionKey, opts.encryptionVariant),
       logger: (msg, data) => logger.debug(msg, data),
     });
 
