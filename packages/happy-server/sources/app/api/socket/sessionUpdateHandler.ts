@@ -4,7 +4,6 @@ import {
     buildNewMessageUpdate,
     buildSessionActivityEphemeral,
     buildTaskStatusChangedEphemeral,
-    buildUpdateSessionUpdate,
     ClientConnection,
     eventRouter,
 } from "@/app/events/eventRouter";
@@ -15,6 +14,7 @@ import { AsyncLock } from "@/utils/lock";
 import { debug, log } from "@/utils/log";
 import { randomKeyNaked } from "@/utils/randomKeyNaked";
 import { Socket } from "socket.io";
+import { sessionVersionedFieldUpdate } from "./sessionVersionedFieldUpdate";
 
 /**
  * Look up the git branch for a session that was started in a worktree.
@@ -45,48 +45,7 @@ export function sessionUpdateHandler(userId: string, socket: Socket, connection:
                 return;
             }
 
-            // Resolve session
-            const session = await db.session.findUnique({
-                where: { id: sid, accountId: userId }
-            });
-            if (!session) {
-                return;
-            }
-
-            // Check version
-            if (session.metadataVersion !== expectedVersion) {
-                callback({ result: 'version-mismatch', version: session.metadataVersion, metadata: session.metadata });
-                return null;
-            }
-
-            // Update metadata
-            const { count } = await db.session.updateMany({
-                where: { id: sid, metadataVersion: expectedVersion },
-                data: {
-                    metadata: metadata,
-                    metadataVersion: expectedVersion + 1
-                }
-            });
-            if (count === 0) {
-                callback({ result: 'version-mismatch', version: session.metadataVersion, metadata: session.metadata });
-                return null;
-            }
-
-            // Generate session metadata update
-            const updSeq = await allocateUserSeq(userId);
-            const metadataUpdate = {
-                value: metadata,
-                version: expectedVersion + 1
-            };
-            const updatePayload = buildUpdateSessionUpdate(sid, updSeq, randomKeyNaked(12), metadataUpdate);
-            eventRouter.emitUpdate({
-                userId,
-                payload: updatePayload,
-                recipientFilter: { type: 'all-interested-in-session', sessionId: sid }
-            });
-
-            // Send success response with new version via callback
-            callback({ result: 'success', version: expectedVersion + 1, metadata: metadata });
+            await sessionVersionedFieldUpdate({ userId, sid, field: 'metadata', value: metadata, expectedVersion, callback });
         } catch (error) {
             log({ module: 'websocket', level: 'error' }, `Error in update-metadata: ${error}`);
             if (callback) {
@@ -107,52 +66,7 @@ export function sessionUpdateHandler(userId: string, socket: Socket, connection:
                 return;
             }
 
-            // Resolve session
-            const session = await db.session.findUnique({
-                where: {
-                    id: sid,
-                    accountId: userId
-                }
-            });
-            if (!session) {
-                callback({ result: 'error' });
-                return null;
-            }
-
-            // Check version
-            if (session.agentStateVersion !== expectedVersion) {
-                callback({ result: 'version-mismatch', version: session.agentStateVersion, agentState: session.agentState });
-                return null;
-            }
-
-            // Update agent state
-            const { count } = await db.session.updateMany({
-                where: { id: sid, agentStateVersion: expectedVersion },
-                data: {
-                    agentState: agentState,
-                    agentStateVersion: expectedVersion + 1
-                }
-            });
-            if (count === 0) {
-                callback({ result: 'version-mismatch', version: session.agentStateVersion, agentState: session.agentState });
-                return null;
-            }
-
-            // Generate session agent state update
-            const updSeq = await allocateUserSeq(userId);
-            const agentStateUpdate = {
-                value: agentState,
-                version: expectedVersion + 1
-            };
-            const updatePayload = buildUpdateSessionUpdate(sid, updSeq, randomKeyNaked(12), undefined, agentStateUpdate);
-            eventRouter.emitUpdate({
-                userId,
-                payload: updatePayload,
-                recipientFilter: { type: 'all-interested-in-session', sessionId: sid }
-            });
-
-            // Send success response with new version via callback
-            callback({ result: 'success', version: expectedVersion + 1, agentState: agentState });
+            await sessionVersionedFieldUpdate({ userId, sid, field: 'agentState', value: agentState, expectedVersion, callback });
         } catch (error) {
             log({ module: 'websocket', level: 'error' }, `Error in update-state: ${error}`);
             if (callback) {

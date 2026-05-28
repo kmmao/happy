@@ -6,6 +6,7 @@ import { log } from "@/utils/log";
 import { randomKeyNaked } from "@/utils/randomKeyNaked";
 import { Socket } from "socket.io";
 import * as privacyKit from "privacy-kit";
+import { artifactVersionedUpdate } from "@/app/api/artifact/artifactVersionedUpdate";
 
 export function artifactUpdateHandler(userId: string, socket: Socket) {
     // Read artifact with full body
@@ -111,114 +112,44 @@ export function artifactUpdateHandler(userId: string, socket: Socket) {
                 return;
             }
 
-            // Get current artifact
-            const currentArtifact = await db.artifact.findFirst({
-                where: {
-                    id: artifactId,
-                    accountId: userId
-                }
+            // Delegate the optimistic-concurrency CAS to the deep module; here
+            // we only shape the socket callback for each outcome.
+            const result = await artifactVersionedUpdate({
+                artifactId,
+                userId,
+                header,
+                body,
             });
 
-            if (!currentArtifact) {
-                if (callback) {
+            if (!result.applied) {
+                if (result.reason === 'not-found') {
                     callback({ result: 'error', message: 'Artifact not found' });
+                    return;
                 }
-                return;
-            }
-
-            // Check for version mismatches
-            const headerMismatch = header && currentArtifact.headerVersion !== header.expectedVersion;
-            const bodyMismatch = body && currentArtifact.bodyVersion !== body.expectedVersion;
-
-            if (headerMismatch || bodyMismatch) {
                 const response: any = { result: 'version-mismatch' };
-                
-                if (headerMismatch) {
+                if (result.header) {
                     response.header = {
-                        currentVersion: currentArtifact.headerVersion,
-                        currentData: privacyKit.encodeBase64(currentArtifact.header)
+                        currentVersion: result.header.currentVersion,
+                        currentData: result.header.currentData,
                     };
                 }
-                
-                if (bodyMismatch) {
+                if (result.body) {
                     response.body = {
-                        currentVersion: currentArtifact.bodyVersion,
-                        currentData: privacyKit.encodeBase64(currentArtifact.body)
+                        currentVersion: result.body.currentVersion,
+                        currentData: result.body.currentData,
                     };
                 }
-                
-                callback(response);
-                return;
-            }
-
-            // Build update data
-            const updateData: any = {
-                updatedAt: new Date(),
-                seq: currentArtifact.seq + 1
-            };
-
-            let headerUpdate: { value: string; version: number } | undefined;
-            let bodyUpdate: { value: string; version: number } | undefined;
-
-            if (header) {
-                updateData.header = privacyKit.decodeBase64(header.data);
-                updateData.headerVersion = header.expectedVersion + 1;
-                headerUpdate = {
-                    value: header.data,
-                    version: header.expectedVersion + 1
-                };
-            }
-
-            if (body) {
-                updateData.body = privacyKit.decodeBase64(body.data);
-                updateData.bodyVersion = body.expectedVersion + 1;
-                bodyUpdate = {
-                    value: body.data,
-                    version: body.expectedVersion + 1
-                };
-            }
-
-            // Perform atomic update with version check
-            const { count } = await db.artifact.updateMany({
-                where: {
-                    id: artifactId,
-                    accountId: userId,
-                    ...(header && { headerVersion: header.expectedVersion }),
-                    ...(body && { bodyVersion: body.expectedVersion })
-                },
-                data: updateData
-            });
-
-            if (count === 0) {
-                // Re-fetch current version
-                const current = await db.artifact.findFirst({
-                    where: {
-                        id: artifactId,
-                        accountId: userId
-                    }
-                });
-
-                const response: any = { result: 'version-mismatch' };
-                
-                if (header && current) {
-                    response.header = {
-                        currentVersion: current.headerVersion,
-                        currentData: privacyKit.encodeBase64(current.header)
-                    };
-                }
-                
-                if (body && current) {
-                    response.body = {
-                        currentVersion: current.bodyVersion,
-                        currentData: privacyKit.encodeBase64(current.body)
-                    };
-                }
-                
                 callback(response);
                 return;
             }
 
             // Emit update event
+            const headerUpdate = result.headerVersion !== undefined && header
+                ? { value: header.data, version: result.headerVersion }
+                : undefined;
+            const bodyUpdate = result.bodyVersion !== undefined && body
+                ? { value: body.data, version: result.bodyVersion }
+                : undefined;
             const updSeq = await allocateUserSeq(userId);
             const updatePayload = buildUpdateArtifactUpdate(artifactId, updSeq, randomKeyNaked(12), headerUpdate, bodyUpdate);
             eventRouter.emitUpdate({
@@ -229,21 +160,18 @@ export function artifactUpdateHandler(userId: string, socket: Socket) {
 
             // Send success response
             const response: any = { result: 'success' };
-            
             if (headerUpdate) {
                 response.header = {
                     version: headerUpdate.version,
                     data: header!.data
                 };
             }
-            
             if (bodyUpdate) {
                 response.body = {
                     version: bodyUpdate.version,
                     data: body!.data
                 };
             }
-            
             callback(response);
         } catch (error) {
             log({ module: 'websocket', level: 'error' }, `Error in artifact-update: ${error}`);

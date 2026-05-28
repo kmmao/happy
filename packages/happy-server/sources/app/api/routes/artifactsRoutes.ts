@@ -6,6 +6,7 @@ import { randomKeyNaked } from "@/utils/randomKeyNaked";
 import { allocateUserSeq } from "@/storage/seq";
 import { log } from "@/utils/log";
 import * as privacyKit from "privacy-kit";
+import { artifactVersionedUpdate } from "@/app/api/artifact/artifactVersionedUpdate";
 
 export function artifactsRoutes(app: Fastify) {
     // GET /v1/artifacts - List all artifacts for the account
@@ -283,75 +284,49 @@ export function artifactsRoutes(app: Fastify) {
         const { header, expectedHeaderVersion, body, expectedBodyVersion } = request.body;
 
         try {
-            // Get current artifact for version check
-            const currentArtifact = await db.artifact.findFirst({
-                where: {
-                    id,
-                    accountId: userId
-                }
+            // A field counts as "provided" only when both its data and its
+            // expected version are present; delegate the CAS to the deep module.
+            const headerArg =
+                header !== undefined && expectedHeaderVersion !== undefined
+                    ? { data: header, expectedVersion: expectedHeaderVersion }
+                    : undefined;
+            const bodyArg =
+                body !== undefined && expectedBodyVersion !== undefined
+                    ? { data: body, expectedVersion: expectedBodyVersion }
+                    : undefined;
+
+            const result = await artifactVersionedUpdate({
+                artifactId: id,
+                userId,
+                header: headerArg,
+                body: bodyArg,
             });
 
-            if (!currentArtifact) {
-                return reply.code(404).send({ error: 'Artifact not found' });
-            }
-
-            // Check version mismatches
-            const headerMismatch = header !== undefined && expectedHeaderVersion !== undefined && 
-                                   currentArtifact.headerVersion !== expectedHeaderVersion;
-            const bodyMismatch = body !== undefined && expectedBodyVersion !== undefined && 
-                                 currentArtifact.bodyVersion !== expectedBodyVersion;
-
-            if (headerMismatch || bodyMismatch) {
+            if (!result.applied) {
+                if (result.reason === 'not-found') {
+                    return reply.code(404).send({ error: 'Artifact not found' });
+                }
                 return reply.code(409).send({
                     success: false,
                     error: 'version-mismatch',
-                    ...(headerMismatch && {
-                        currentHeaderVersion: currentArtifact.headerVersion,
-                        currentHeader: privacyKit.encodeBase64(currentArtifact.header)
+                    ...(result.header && {
+                        currentHeaderVersion: result.header.currentVersion,
+                        currentHeader: result.header.currentData,
                     }),
-                    ...(bodyMismatch && {
-                        currentBodyVersion: currentArtifact.bodyVersion,
-                        currentBody: privacyKit.encodeBase64(currentArtifact.body)
-                    })
+                    ...(result.body && {
+                        currentBodyVersion: result.body.currentVersion,
+                        currentBody: result.body.currentData,
+                    }),
                 });
             }
 
-            // Build update data
-            const updateData: any = {
-                updatedAt: new Date()
-            };
-            
-            let headerUpdate: { value: string; version: number } | undefined;
-            let bodyUpdate: { value: string; version: number } | undefined;
-
-            if (header !== undefined && expectedHeaderVersion !== undefined) {
-                updateData.header = privacyKit.decodeBase64(header);
-                updateData.headerVersion = expectedHeaderVersion + 1;
-                headerUpdate = {
-                    value: header,
-                    version: expectedHeaderVersion + 1
-                };
-            }
-
-            if (body !== undefined && expectedBodyVersion !== undefined) {
-                updateData.body = privacyKit.decodeBase64(body);
-                updateData.bodyVersion = expectedBodyVersion + 1;
-                bodyUpdate = {
-                    value: body,
-                    version: expectedBodyVersion + 1
-                };
-            }
-
-            // Increment seq
-            updateData.seq = currentArtifact.seq + 1;
-
-            // Update artifact
-            await db.artifact.update({
-                where: { id },
-                data: updateData
-            });
-
             // Emit update-artifact event
+            const headerUpdate = result.headerVersion !== undefined && headerArg
+                ? { value: headerArg.data, version: result.headerVersion }
+                : undefined;
+            const bodyUpdate = result.bodyVersion !== undefined && bodyArg
+                ? { value: bodyArg.data, version: result.bodyVersion }
+                : undefined;
             const updSeq = await allocateUserSeq(userId);
             const updatePayload = buildUpdateArtifactUpdate(id, updSeq, randomKeyNaked(12), headerUpdate, bodyUpdate);
             eventRouter.emitUpdate({

@@ -2,6 +2,7 @@ import { Fastify } from "../types";
 import { z } from "zod";
 import { db } from "@/storage/db";
 import { log } from "@/utils/log";
+import { versionedUpdate } from "@/modules/versionedUpdate";
 
 export function accessKeysRoutes(app: Fastify) {
     // Get Access Key API
@@ -211,70 +212,42 @@ export function accessKeysRoutes(app: Fastify) {
         const { data, expectedVersion } = request.body;
 
         try {
-            // Get current access key for version check
-            const currentAccessKey = await db.accessKey.findUnique({
-                where: {
-                    accountId_machineId_sessionId: {
-                        accountId: userId,
-                        machineId,
-                        sessionId
-                    }
-                }
-            });
-
-            if (!currentAccessKey) {
-                return reply.code(404).send({ error: 'Access key not found' });
-            }
-
-            // Check version
-            if (currentAccessKey.dataVersion !== expectedVersion) {
-                return reply.code(409).send({
-                    success: false,
-                    error: 'version-mismatch',
-                    currentVersion: currentAccessKey.dataVersion,
-                    currentData: currentAccessKey.data
-                });
-            }
-
-            // Update with version check
-            const { count } = await db.accessKey.updateMany({
-                where: {
-                    accountId: userId,
-                    machineId,
-                    sessionId,
-                    dataVersion: expectedVersion
-                },
-                data: {
-                    data,
-                    dataVersion: expectedVersion + 1,
-                    updatedAt: new Date()
-                }
-            });
-
-            if (count === 0) {
-                // Re-fetch to get current version
-                const accessKey = await db.accessKey.findUnique({
-                    where: {
-                        accountId_machineId_sessionId: {
-                            accountId: userId,
-                            machineId,
-                            sessionId
+            const result = await versionedUpdate<string>({
+                expectedVersion,
+                read: async () => {
+                    const key = await db.accessKey.findUnique({
+                        where: {
+                            accountId_machineId_sessionId: { accountId: userId, machineId, sessionId }
                         }
-                    }
-                });
+                    });
+                    return key ? { version: key.dataVersion, value: key.data } : null;
+                },
+                write: async (expected) => {
+                    const { count } = await db.accessKey.updateMany({
+                        where: { accountId: userId, machineId, sessionId, dataVersion: expected },
+                        data: { data, dataVersion: expected + 1, updatedAt: new Date() }
+                    });
+                    return count;
+                }
+            });
+
+            if (!result.applied) {
+                if (result.reason === 'not-found') {
+                    return reply.code(404).send({ error: 'Access key not found' });
+                }
                 return reply.code(409).send({
                     success: false,
                     error: 'version-mismatch',
-                    currentVersion: accessKey?.dataVersion || 0,
-                    currentData: accessKey?.data || ''
+                    currentVersion: result.currentVersion,
+                    currentData: result.currentValue
                 });
             }
 
-            log({ module: 'access-keys', userId, sessionId, machineId }, `Updated access key to version ${expectedVersion + 1}`);
+            log({ module: 'access-keys', userId, sessionId, machineId }, `Updated access key to version ${result.newVersion}`);
 
             return reply.send({
                 success: true,
-                version: expectedVersion + 1
+                version: result.newVersion
             });
         } catch (error) {
             log({ module: 'api', level: 'error' }, `Failed to update access key: ${error}`);
