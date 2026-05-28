@@ -39,6 +39,7 @@ import { emitConfiguredSupervisorRunTrigger } from "@/modules/supervisorRunTrigg
 import {
   isUnifiedRuntimeProfileResolverEnabled,
   resolveRuntimeProfile,
+  notifyRuntimeProfileFailure,
 } from "@/modules/runtimeProfileResolver";
 
 /**
@@ -450,6 +451,26 @@ async function processRoute(
       explicitProfileId: route.profileId,
       purpose: "webhook",
     });
+    if (!resolvedRuntimeProfile.ok) {
+      // No silent fallback (per runtimeProfileResolver contract): surface the
+      // failure to the operator and skip dispatch, mirroring the cron
+      // (triggerScheduleRunner) and inbound-trigger (webhookTriggerRoutes)
+      // paths. Mark the event "failed" (not "skipped") so a later redelivery
+      // can retry once the profile binding is fixed.
+      notifyRuntimeProfileFailure({
+        accountId: route.accountId,
+        purpose: "webhook",
+        failure: resolvedRuntimeProfile,
+        referenceUrl: issue.issueUrl,
+        refType: "webhookRoute",
+        refId: route.id,
+      });
+      await db.webhookEvent.update({
+        where: { id: event.id },
+        data: { status: "failed", errorMessage: resolvedRuntimeProfile.message },
+      });
+      return false;
+    }
   }
 
   eventRouter.emitEphemeral({
