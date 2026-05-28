@@ -7,12 +7,7 @@
  */
 
 import { logger as defaultLogger } from "../../logger";
-import {
-  decodeBase64,
-  encodeBase64,
-  encrypt,
-  decrypt,
-} from "../../encryption";
+import type { Cipher } from "../../encryption";
 import type {
   RpcHandler,
   RpcHandlerMap,
@@ -24,8 +19,7 @@ import type { Socket } from "socket.io-client";
 export class RpcHandlerManager {
   private handlers: RpcHandlerMap = new Map();
   private readonly scopePrefix: string;
-  private readonly encryptionKey: Uint8Array;
-  private readonly encryptionVariant: "legacy" | "dataKey";
+  private readonly cipher: Cipher;
   private readonly logger: (message: string, data?: unknown) => void;
   private socket: Socket | null = null;
   private reregisterInterval: ReturnType<typeof setInterval> | null = null;
@@ -33,8 +27,7 @@ export class RpcHandlerManager {
 
   constructor(config: RpcHandlerConfig) {
     this.scopePrefix = config.scopePrefix;
-    this.encryptionKey = config.encryptionKey;
-    this.encryptionVariant = config.encryptionVariant;
+    this.cipher = config.cipher;
     this.logger =
       config.logger ?? ((msg, data) => defaultLogger.debug(msg, data));
   }
@@ -55,51 +48,45 @@ export class RpcHandlerManager {
   }
 
   /**
-   * Handle an incoming RPC request
+   * Route a decrypted RPC call to its handler. This is the plaintext core of
+   * the manager: it knows nothing about the wire (no base64, no cipher), so it
+   * is TOTAL — an unknown method or a throwing handler both resolve to an
+   * `{ error }` value rather than rejecting. That makes it the test surface for
+   * routing behaviour, exercised without any crypto setup.
    */
-  async handleRequest(request: RpcRequest): Promise<string> {
+  async dispatch(method: string, params: unknown): Promise<unknown> {
+    const handler = this.handlers.get(method);
+    if (!handler) {
+      this.logger("[RPC] [ERROR] Method not found", { method });
+      return { error: "Method not found" };
+    }
     try {
-      const handler = this.handlers.get(request.method);
-
-      if (!handler) {
-        this.logger("[RPC] [ERROR] Method not found", {
-          method: request.method,
-        });
-        const errorResponse = { error: "Method not found" };
-        return encodeBase64(
-          encrypt(this.encryptionKey, this.encryptionVariant, errorResponse),
-        );
-      }
-
-      // Decrypt the incoming params
-      const decryptedParams = decrypt(
-        this.encryptionKey,
-        this.encryptionVariant,
-        decodeBase64(request.params),
-      );
-
-      // Call the handler
-      this.logger("[RPC] Calling handler", { method: request.method });
-      const result = await handler(decryptedParams);
+      this.logger("[RPC] Calling handler", { method });
+      const result = await handler(params);
       this.logger("[RPC] Handler returned", {
-        method: request.method,
+        method,
         hasResult: result !== undefined,
       });
-
-      // Encrypt and return the response
-      const encryptedResponse = encodeBase64(
-        encrypt(this.encryptionKey, this.encryptionVariant, result),
-      );
-      return encryptedResponse;
+      return result;
     } catch (error) {
       this.logger("[RPC] [ERROR] Error handling request", { error });
-      const errorResponse = {
-        error: error instanceof Error ? error.message : "Unknown error",
-      };
-      return encodeBase64(
-        encrypt(this.encryptionKey, this.encryptionVariant, errorResponse),
-      );
+      return { error: error instanceof Error ? error.message : "Unknown error" };
     }
+  }
+
+  /**
+   * Handle an incoming wire RPC request: decrypt params, dispatch in plaintext,
+   * encrypt the result. The Cipher is the only encryption seam; on a decrypt
+   * failure the handler is still dispatched with `null` params (preserving the
+   * previous behaviour where a corrupt payload decrypted to `null`).
+   */
+  async handleRequest(request: RpcRequest): Promise<string> {
+    const decrypted = this.cipher.decrypt(request.params);
+    const result = await this.dispatch(
+      request.method,
+      decrypted.ok ? decrypted.value : null,
+    );
+    return this.cipher.encrypt(result);
   }
 
   onSocketConnect(socket: Socket): void {

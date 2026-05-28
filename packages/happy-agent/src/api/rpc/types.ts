@@ -3,6 +3,8 @@
  * Mirrors happy-cli/src/api/rpc/types.ts
  */
 
+import type { Cipher } from "../../encryption";
+
 /**
  * Generic RPC handler function type
  */
@@ -33,8 +35,7 @@ export type RpcResponseCallback = (response: string) => void;
  */
 export interface RpcHandlerConfig {
   scopePrefix: string;
-  encryptionKey: Uint8Array;
-  encryptionVariant: "legacy" | "dataKey";
+  cipher: Cipher;
   logger?: (message: string, data?: unknown) => void;
 }
 
