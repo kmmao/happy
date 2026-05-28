@@ -2,7 +2,8 @@ import { afterEach, describe, expect, it } from "vitest";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { TrackedSessionRegistry, toPersistedTrackedSession } from "./TrackedSessionRegistry";
+import { TrackedSessionRegistry, fromPersistedTrackedSession, toPersistedTrackedSession } from "./TrackedSessionRegistry";
+import type { PersistedTrackedSession } from "./TrackedSessionRegistry";
 
 let tempDirs: string[] = [];
 
@@ -296,5 +297,79 @@ describe("TrackedSessionRegistry", () => {
     await reloaded.load();
     expect(reloaded.getBySpawnId("sp-a")).toBeDefined();
     expect(reloaded.getBySpawnId("sp-b")).toBeDefined();
+  });
+});
+
+describe("fromPersistedTrackedSession", () => {
+  const persisted: PersistedTrackedSession = {
+    spawnId: "sp-recover",
+    pid: 1000,
+    startedBy: "daemon",
+    startedAt: 100,
+    lastActivityAt: 200,
+    lastOutputAt: 250,
+    lastHeartbeatAt: 300,
+    activity: "thinking",
+    automationContext: { kind: "agent_loop", loopId: "loop-9" },
+    tmuxSessionId: "session:9",
+    directoryCreated: true,
+    message: "pending",
+  };
+
+  it("restores lastHeartbeatAt and activity (the fields the old inline reconstruction dropped)", () => {
+    const session = fromPersistedTrackedSession(persisted, 2000);
+    expect(session.lastHeartbeatAt).toBe(300);
+    expect(session.activity).toBe("thinking");
+  });
+
+  it("uses the caller-supplied pid, not the stale persisted pid", () => {
+    const session = fromPersistedTrackedSession(persisted, 2000);
+    expect(session.pid).toBe(2000);
+  });
+
+  it("flags the result as recovered from the on-disk index", () => {
+    const before = Date.now();
+    const session = fromPersistedTrackedSession(persisted, 2000);
+    expect(session.recoveredFromIndex).toBe(true);
+    expect(session.recoveredAt).toBeGreaterThanOrEqual(before);
+  });
+
+  it("round-trips every persisted field through toPersistedTrackedSession (pid aside)", () => {
+    const reconstructed = fromPersistedTrackedSession(persisted, 2000);
+    const rePersisted = toPersistedTrackedSession(reconstructed);
+    expect(rePersisted).toEqual({ ...persisted, pid: 2000 });
+  });
+});
+
+describe("recoverBySpawnId", () => {
+  it("returns undefined when no persisted entry matches the spawnId", async () => {
+    const path = await makeTempRegistryPath();
+    const registry = new TrackedSessionRegistry(path);
+    await registry.load();
+    expect(registry.recoverBySpawnId("sp-missing", 2000)).toBeUndefined();
+  });
+
+  it("rebuilds a live TrackedSession from a persisted pending spawn", async () => {
+    const path = await makeTempRegistryPath();
+    const registry = new TrackedSessionRegistry(path);
+    await registry.load();
+    await registry.upsert({
+      spawnId: "sp-pending",
+      pid: 1000,
+      startedBy: "daemon",
+      startedAt: 100,
+      lastHeartbeatAt: 300,
+      activity: "executing",
+    });
+
+    const recovered = registry.recoverBySpawnId("sp-pending", 2000);
+    expect(recovered).toMatchObject({
+      spawnId: "sp-pending",
+      startedBy: "daemon",
+      pid: 2000,
+      lastHeartbeatAt: 300,
+      activity: "executing",
+      recoveredFromIndex: true,
+    });
   });
 });
