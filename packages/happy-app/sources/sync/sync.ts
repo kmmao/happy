@@ -101,7 +101,10 @@ import { config } from "@/config";
 import { log } from "@/log";
 import { gitStatusSync } from "./gitStatusSync";
 import { projectManager } from "./projectManager";
-import { AsyncLock } from "@/utils/lock";
+import {
+  createSessionMessageProcessor,
+  type SessionMessageProcessor,
+} from "./sessionMessageProcessor";
 import { voiceHooks } from "@/realtime/hooks/voiceHooks";
 import { autoOptionSendService } from "@/sync/autoOptionSendService";
 import { EncryptionCache } from "./encryption/encryptionCache";
@@ -181,9 +184,13 @@ class Sync {
   private sendAbortControllers = new Map<string, AbortController>();
   private sessionLastSeq = loadLastSeqs();
   private pendingOutbox = new Map<string, OutboxMessage[]>();
-  private sessionMessageQueue = new Map<string, NormalizedMessage[]>();
-  private sessionQueueProcessing = new Set<string>();
-  private sessionMessageLocks = new Map<string, AsyncLock>();
+  // Owns the per-session message queue, serialization lock, processing flag,
+  // and delta-batching frame. See sessionMessageProcessor.ts.
+  private messageProcessor: SessionMessageProcessor =
+    createSessionMessageProcessor({
+      applyMessages: (sessionId, messages) =>
+        this.applyMessages(sessionId, messages),
+    });
   private deleted404Sessions = new Set<string>(); // Guard against re-creating sync for 404'd sessions
   // Tracks sessions that have completed a full history backfill in this app session.
   // In-memory only (not persisted) so every app restart re-backfills trimmed sessions,
@@ -201,11 +208,6 @@ class Sync {
   private machineDataKeys = new Map<string, Uint8Array>(); // Store machine data encryption keys internally
   private artifactDataKeys = new Map<string, Uint8Array>(); // Store artifact data encryption keys internally
   private cacheWriteTimers = new Map<string, ReturnType<typeof setTimeout>>();
-  // Pending rAF handles for text-delta batching — one per session.
-  // Using requestAnimationFrame instead of a fixed setTimeout aligns delta flushes
-  // with the display refresh rate (~16ms @60Hz, ~8ms @120Hz ProMotion), producing
-  // smooth character-by-character streaming instead of 60ms chunks.
-  private deltaRafHandles = new Map<string, number>();
   private settingsSync: InvalidateSync;
   private profileSync: InvalidateSync;
   private accountProfilesSync: InvalidateSync;
@@ -608,62 +610,8 @@ class Sync {
     return sync;
   }
 
-  /**
-   * Returns true when every message in the batch is a pure text-delta (streaming chunk).
-   * Used to decide whether to throttle the queue flush.
-   */
-  private static isAllTextDeltas(messages: NormalizedMessage[]): boolean {
-    return messages.length > 0 && messages.every(
-      (m) => m.role === "agent" &&
-        m.content.length === 1 &&
-        m.content[0]?.type === "text-delta",
-    );
-  }
-
   private enqueueMessages(sessionId: string, messages: NormalizedMessage[]) {
-    if (messages.length === 0) {
-      return;
-    }
-
-    let queue = this.sessionMessageQueue.get(sessionId);
-    if (!queue) {
-      queue = [];
-      this.sessionMessageQueue.set(sessionId, queue);
-    }
-    queue.push(...messages);
-
-    // Batch text-deltas to the next animation frame so updates align with the
-    // display refresh rate (~16ms @60Hz, ~8ms @120Hz).  Multiple deltas arriving
-    // within the same frame are merged into a single Zustand set().
-    // Non-delta messages (tool calls, events, user messages) bypass the batch
-    // and flush immediately — they must never be delayed.
-    if (Sync.isAllTextDeltas(messages)) {
-      if (!this.deltaRafHandles.has(sessionId)) {
-        const handle = requestAnimationFrame(() => {
-          this.deltaRafHandles.delete(sessionId);
-          this.scheduleQueuedMessagesProcessing(sessionId);
-        });
-        this.deltaRafHandles.set(sessionId, handle);
-      }
-      // rAF already scheduled — delta will be picked up when it fires.
-    } else {
-      // Non-delta message: cancel any pending rAF and process immediately.
-      const existing = this.deltaRafHandles.get(sessionId);
-      if (existing != null) {
-        cancelAnimationFrame(existing);
-        this.deltaRafHandles.delete(sessionId);
-      }
-      this.scheduleQueuedMessagesProcessing(sessionId);
-    }
-  }
-
-  private getSessionMessageLock(sessionId: string): AsyncLock {
-    let lock = this.sessionMessageLocks.get(sessionId);
-    if (!lock) {
-      lock = new AsyncLock();
-      this.sessionMessageLocks.set(sessionId, lock);
-    }
-    return lock;
+    this.messageProcessor.enqueue(sessionId, messages);
   }
 
   /**
@@ -672,12 +620,9 @@ class Sync {
    * lastVisibleSessionId which is specific to the Sync class.
    */
   private cleanupSessionLocally(sessionId: string) {
-    // Cancel any pending delta rAF before wiping the session
-    const deltaRaf = this.deltaRafHandles.get(sessionId);
-    if (deltaRaf != null) {
-      cancelAnimationFrame(deltaRaf);
-      this.deltaRafHandles.delete(sessionId);
-    }
+    // Drop queued/in-flight processing + pending frame, but keep the lock — a
+    // 404 cleanup can fire while we are still inside lock.inLock().
+    this.messageProcessor.forget(sessionId);
     cleanupSessionLocallyCore(
       {
         deleted404Sessions: this.deleted404Sessions,
@@ -686,8 +631,6 @@ class Sync {
         sendSync: this.sendSync,
         pendingOutbox: this.pendingOutbox,
         sessionLastSeq: this.sessionLastSeq,
-        sessionMessageQueue: this.sessionMessageQueue,
-        sessionQueueProcessing: this.sessionQueueProcessing,
       },
       sessionId,
     );
@@ -721,18 +664,10 @@ class Sync {
       // Abort in-flight send requests
       this.sendAbortControllers.get(sessionId)?.abort();
       this.sendAbortControllers.delete(sessionId);
-      // Release locks and queues
-      this.sessionMessageLocks.delete(sessionId);
-      this.sessionMessageQueue.delete(sessionId);
-      this.sessionQueueProcessing.delete(sessionId);
+      // Release queue, lock, processing flag, and pending delta frame
+      this.messageProcessor.release(sessionId);
       // Release WebSocket dedup set
       this.processedWebSocketMessageIds.delete(sessionId);
-      // Cancel any pending delta rAF
-      const deltaRaf = this.deltaRafHandles.get(sessionId);
-      if (deltaRaf != null) {
-        cancelAnimationFrame(deltaRaf);
-        this.deltaRafHandles.delete(sessionId);
-      }
       // Cancel any pending cache-write timer
       const cacheTimer = this.cacheWriteTimers.get(sessionId);
       if (cacheTimer) {
@@ -747,38 +682,6 @@ class Sync {
     if (sessionIds.length > 0) {
       log.log(`♻️ Released resources for ${sessionIds.length} evicted session(s)`);
     }
-  }
-
-  private scheduleQueuedMessagesProcessing(sessionId: string) {
-    if (this.sessionQueueProcessing.has(sessionId)) {
-      return;
-    }
-
-    this.sessionQueueProcessing.add(sessionId);
-    const lock = this.getSessionMessageLock(sessionId);
-    void lock
-      .inLock(() => {
-        while (true) {
-          const pending = this.sessionMessageQueue.get(sessionId);
-          if (!pending || pending.length === 0) {
-            break;
-          }
-          const batch = pending.splice(0, pending.length);
-          this.applyMessages(sessionId, batch);
-        }
-      })
-      .finally(() => {
-        this.sessionQueueProcessing.delete(sessionId);
-        // Use queueMicrotask to check for new messages immediately after
-        // clearing the processing flag. This closes the race window where
-        // messages arrive between the while-loop exit and the delete above.
-        queueMicrotask(() => {
-          const pending = this.sessionMessageQueue.get(sessionId);
-          if (pending && pending.length > 0) {
-            this.scheduleQueuedMessagesProcessing(sessionId);
-          }
-        });
-      });
   }
 
   private get bgSendState(): BackgroundSendState {
@@ -2108,7 +2011,7 @@ class Sync {
     return {
       encryption: this.encryption,
       sessionLastSeq: this.sessionLastSeq,
-      sessionMessageLocks: this.sessionMessageLocks,
+      getMessageLock: (sessionId) => this.messageProcessor.getLock(sessionId),
       processedWebSocketMessageIds: this.processedWebSocketMessageIds,
       sessionOldestSeq: this.sessionOldestSeq,
       backfilledSessions: this.backfilledSessions,
@@ -2118,8 +2021,6 @@ class Sync {
       messagesSync: this.messagesSync,
       sendSync: this.sendSync,
       pendingOutbox: this.pendingOutbox,
-      sessionMessageQueue: this.sessionMessageQueue,
-      sessionQueueProcessing: this.sessionQueueProcessing,
       cleanupSession: this.cleanupSessionLocally.bind(this),
       applySessions: (sessions) =>
         this.applySessions(
@@ -2257,9 +2158,8 @@ class Sync {
       sendSync: this.sendSync as Map<string, { stop: () => void }>,
       pendingOutbox: this.pendingOutbox as Map<string, unknown[]>,
       deleteLastSeq: deleteLastSeq,
-      sessionMessageLocks: this.sessionMessageLocks as Map<string, unknown>,
-      sessionMessageQueue: this.sessionMessageQueue as Map<string, unknown[]>,
-      sessionQueueProcessing: this.sessionQueueProcessing,
+      releaseMessageProcessing: (sessionId) =>
+        this.messageProcessor.release(sessionId),
       artifactsSync: this.artifactsSync,
       friendsSync: this.friendsSync,
       friendRequestsSync: this.friendRequestsSync,

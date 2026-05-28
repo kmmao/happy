@@ -71,9 +71,8 @@ export type UpdateHandlerContext = {
     sendSync: Map<string, { stop: () => void }>;
     pendingOutbox: Map<string, unknown[]>;
     deleteLastSeq: (sessionId: string) => void;
-    sessionMessageLocks: Map<string, unknown>;
-    sessionMessageQueue: Map<string, unknown[]>;
-    sessionQueueProcessing: Set<string>;
+    /** Fully release the message processor's per-session queue, lock, and flags. */
+    releaseMessageProcessing: (sessionId: string) => void;
     artifactsSync: { invalidate: () => void };
     friendsSync: { invalidate: () => void };
     friendRequestsSync: { invalidate: () => void };
@@ -437,9 +436,7 @@ export function handleDeleteSessionUpdate(
     deleteBackfillBoundary(sessionId);
     deleteMessageCache(sessionId);
     deleteHistoryComplete(sessionId);
-    ctx.sessionMessageLocks.delete(sessionId);
-    ctx.sessionMessageQueue.delete(sessionId);
-    ctx.sessionQueueProcessing.delete(sessionId);
+    ctx.releaseMessageProcessing(sessionId);
 
     log.log(`🗑️ Session ${sessionId} deleted from local storage`);
 }

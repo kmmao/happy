@@ -9,6 +9,8 @@ import { storage } from "./storage";
 import type { MachineMetadata } from "./storageTypes";
 import { getErrorMessage } from "@/utils/errors";
 import { getServerUrl } from "./serverConfig";
+import type { SpawnSessionResult } from "@kmmao/happy-wire";
+export type { SpawnSessionResult };
 type ResolvedRuntimeProfile = {
   profileId?: string;
   profileName?: string;
@@ -135,12 +137,6 @@ interface SessionKillResponse {
   success: boolean;
   message: string;
 }
-
-// Response types for spawn session
-export type SpawnSessionResult =
-  | { type: "success"; sessionId: string }
-  | { type: "requestToApproveDirectoryCreation"; directory: string }
-  | { type: "error"; errorMessage: string };
 
 // Options for spawning a session
 export interface SpawnSessionOptions {

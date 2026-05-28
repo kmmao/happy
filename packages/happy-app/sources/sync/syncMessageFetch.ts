@@ -4,7 +4,10 @@
  */
 
 import { Encryption } from "./encryption/encryption";
-import { SessionEncryption } from "./encryption/sessionEncryption";
+import {
+  MessageDecryptFailureReason,
+  SessionEncryption,
+} from "./encryption/sessionEncryption";
 import { AuthCredentials } from "@/auth/tokenStorage";
 import { apiSocket } from "./apiSocket";
 import { storage } from "./storage";
@@ -50,7 +53,8 @@ import { InvalidateSync } from "@/utils/sync";
 export type MessageFetchContext = {
   encryption: Encryption;
   sessionLastSeq: Map<string, number>;
-  sessionMessageLocks: Map<string, AsyncLock>;
+  /** Get-or-create the per-session serialization lock owned by the message processor. */
+  getMessageLock: (sessionId: string) => AsyncLock;
   processedWebSocketMessageIds: Map<string, Set<string>>;
   sessionOldestSeq: Map<string, number>;
   backfilledSessions: Set<string>;
@@ -60,8 +64,6 @@ export type MessageFetchContext = {
   messagesSync: Map<string, InvalidateSync>;
   sendSync: Map<string, InvalidateSync>;
   pendingOutbox: Map<string, unknown[]>;
-  sessionMessageQueue: Map<string, NormalizedMessage[]>;
-  sessionQueueProcessing: Set<string>;
   /** Callback to fully clean up a 404'd session (all state, including lastVisibleSessionId). */
   cleanupSession: (sessionId: string) => void;
   applySessions: (
@@ -75,8 +77,9 @@ export type MessageFetchContext = {
 
 /**
  * Cleans per-session data structures that are safe to remove even while inside
- * lock.inLock() (does NOT touch sessionMessageLocks).
- * The Sync class wrapper additionally handles lastVisibleSessionId.
+ * lock.inLock(). Queue / processing-flag / lock state is owned by the message
+ * processor — the Sync wrapper drops that (via messageProcessor.forget) and
+ * lastVisibleSessionId separately before calling this.
  */
 export function cleanupSessionLocallyCore(
   ctx: Pick<
@@ -87,8 +90,6 @@ export function cleanupSessionLocallyCore(
     | "sendSync"
     | "pendingOutbox"
     | "sessionLastSeq"
-    | "sessionMessageQueue"
-    | "sessionQueueProcessing"
   >,
   sessionId: string,
 ): void {
@@ -112,9 +113,6 @@ export function cleanupSessionLocallyCore(
   deleteBackfillBoundary(sessionId);
   deleteMessageCache(sessionId);
   deleteHistoryComplete(sessionId);
-  // Do NOT delete sessionMessageLocks — caller may still be inside lock.inLock().
-  ctx.sessionMessageQueue.delete(sessionId);
-  ctx.sessionQueueProcessing.delete(sessionId);
 }
 
 // ---------------------------------------------------------------------------
@@ -130,7 +128,7 @@ export async function decryptAndNormalizeBatchAction(
   sequencedContents: Array<{ seq: number; content: RawRecord | null | undefined }>;
   processedSeqs: number[];
 }> {
-  const decryptedMessages = await encryption.decryptMessages(rawMessages);
+  const outcomes = await encryption.decryptMessageOutcomes(rawMessages);
   const normalized: NormalizedMessage[] = [];
   const sequencedContents: Array<{
     seq: number;
@@ -139,15 +137,22 @@ export async function decryptAndNormalizeBatchAction(
   let decryptFailCount = 0;
   const processedSeqs: number[] = [];
   const failedSeqs: number[] = [];
+  const failureBreakdown: Record<MessageDecryptFailureReason, number> = {
+    "decrypt-failed": 0,
+    "not-encrypted": 0,
+    missing: 0,
+  };
 
-  for (let i = 0; i < decryptedMessages.length; i++) {
-    const decrypted = decryptedMessages[i];
+  for (let i = 0; i < outcomes.length; i++) {
+    const outcome = outcomes[i];
     const rawMessage = rawMessages[i];
-    if (!decrypted || decrypted.content === null) {
+    if (!outcome.ok) {
       decryptFailCount++;
       failedSeqs.push(rawMessage.seq);
+      failureBreakdown[outcome.reason]++;
       continue;
     }
+    const decrypted = outcome.message;
     processedSeqs.push(rawMessage.seq);
     sequencedContents.push({ seq: rawMessage.seq, content: decrypted.content });
     const msg = normalizeRawMessage(
@@ -161,7 +166,7 @@ export async function decryptAndNormalizeBatchAction(
 
   if (decryptFailCount > 0) {
     log.warn(
-      `⚠️ ${decryptFailCount}/${rawMessages.length} messages failed to decrypt for session ${sessionId ?? "unknown"} seqs=[${failedSeqs.join(",")}] (possible encryption key mismatch after session reconnect)`,
+      `⚠️ ${decryptFailCount}/${rawMessages.length} messages not applied for session ${sessionId ?? "unknown"} seqs=[${failedSeqs.join(",")}] (decrypt-failed=${failureBreakdown["decrypt-failed"]}, not-encrypted=${failureBreakdown["not-encrypted"]}, missing=${failureBreakdown.missing}; decrypt failures usually indicate an encryption key mismatch after session reconnect)`,
     );
   }
 
@@ -272,11 +277,7 @@ export async function fetchMessagesAction(
 ): Promise<void> {
   log.log(`💬 fetchMessages starting for session ${sessionId} - acquiring lock`);
 
-  let lock = ctx.sessionMessageLocks.get(sessionId);
-  if (!lock) {
-    lock = new AsyncLock();
-    ctx.sessionMessageLocks.set(sessionId, lock);
-  }
+  const lock = ctx.getMessageLock(sessionId);
 
   await lock.inLock(async () => {
     const encryption = ctx.encryption.getSessionEncryption(sessionId);

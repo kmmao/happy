@@ -3,7 +3,7 @@ import { useShallow } from "zustand/react/shallow";
 import { Session, Machine, GitStatus, type SessionPreferences, type SessionLatestUserRequestPreview } from "./storageTypes";
 import { createReducer, reducer, ReducerState, BackgroundTaskEntry } from "./reducer/reducer";
 import { Message } from "./typesMessage";
-import { getLatestUserRequestPreview } from "@/utils/sessionUtils";
+import { foldReducerResultIntoSession } from "./sessionMessageFold";
 import { NormalizedMessage } from "./typesRaw";
 import { isMachineOnline } from "@/utils/machineUtils";
 import { applySettings, Settings } from "./settings";
@@ -62,7 +62,7 @@ import {
   buildSessionPreferencesSnapshot,
   overlayPendingSessionPreferences,
 } from "./sessionPreferencesState";
-import { compareMessagesDesc } from "./messageOrdering";
+import { compareMessagesDesc, mergeProcessedMessages } from "./messageOrdering";
 
 // Debounce timer for realtimeMode changes
 let realtimeModeDebounceTimer: ReturnType<typeof setTimeout> | null = null;
@@ -405,13 +405,6 @@ function buildSessionListViewData(
   }
 
   return listData;
-}
-
-function resolveLatestUserRequestPreview(
-  messages: readonly Message[],
-  fallback?: SessionLatestUserRequestPreview | null,
-): SessionLatestUserRequestPreview | null {
-  return getLatestUserRequestPreview(messages) ?? fallback ?? null;
 }
 
 // Maximum number of sessions whose full message history is kept in memory at once.
@@ -925,45 +918,18 @@ export const storage = create<StorageState>()((set, get) => {
             );
             const processedMessages = reducerResult.messages;
 
-            // Always update the session messages, even if no new messages were created
-            // This ensures the reducer state is updated with the new AgentState
-            let messagesMap: Record<string, Message>;
-            let messagesArray: Message[];
-
-            if (processedMessages.length === 0) {
-              // No messages produced — reuse existing references (zero allocation)
-              messagesMap = existingSessionMessages.messagesMap;
-              messagesArray = existingSessionMessages.messages;
-            } else {
-              // Apply same fast-path strategy as applyMessages
-              messagesMap = { ...existingSessionMessages.messagesMap };
-              for (const message of processedMessages) {
-                messagesMap[message.id] = message;
-              }
-              const newMsgs = processedMessages.filter(
-                (m) => !existingSessionMessages.messagesMap[m.id],
+            // Always update the session messages, even if no new messages were
+            // created — this keeps the reducer state in sync with the new
+            // AgentState. Same incremental-ordering strategy as applyMessages.
+            const { messages: messagesArray, messagesMap } =
+              mergeProcessedMessages(
+                {
+                  messages: existingSessionMessages.messages,
+                  messagesMap: existingSessionMessages.messagesMap,
+                },
+                processedMessages,
+                reducerResult.reordered === true,
               );
-              if (newMsgs.length === 0 && !reducerResult.reordered) {
-                // Only updates — no sort needed
-                messagesArray = existingSessionMessages.messages.map(
-                  (m) => messagesMap[m.id] ?? m,
-                );
-              } else if (
-                existingSessionMessages.messages.length > 0 &&
-                !reducerResult.reordered &&
-                newMsgs.every(
-                  (m) => m.createdAt >= (existingSessionMessages.messages[0]?.createdAt ?? 0),
-                )
-              ) {
-                // New messages are newest — prepend
-                const sortedNew = [...newMsgs].sort(compareMessagesDesc);
-                messagesArray = [...sortedNew, ...existingSessionMessages.messages.map(
-                  (m) => messagesMap[m.id] ?? m,
-                )];
-              } else {
-                messagesArray = Object.values(messagesMap).sort(compareMessagesDesc);
-              }
-            }
 
             updatedSessionMessages[session.id] = {
               messages: messagesArray,
@@ -1092,109 +1058,32 @@ export const storage = create<StorageState>()((set, get) => {
         }
 
         const _perfMergeT0 = _perfT0 > 0 ? performance.now() : 0;
-        // Optimized sort: avoid O(n log n) full re-sort on every streaming update.
-        // existingSession.messages is already sorted newest-first (descending createdAt).
-        const newMessages = processedMessages.filter(
-          (m) => !existingSession.messagesMap[m.id],
-        );
-        const hasOnlyUpdates =
-          newMessages.length === 0 && processedMessages.length > 0;
-
-        let messagesArray: Message[];
-        let mergedMessagesMap: Record<string, Message>;
-
-        if (processedMessages.length === 0) {
-          // Nothing changed — reuse existing references entirely (zero GC)
-          messagesArray = existingSession.messages;
-          mergedMessagesMap = existingSession.messagesMap;
-        } else if (hasOnlyUpdates && !reducerResult.reordered) {
-          // Fast path: only in-place updates — replace references, no sort needed
-          // Build a minimal map overlay instead of copying the entire map
-          mergedMessagesMap = { ...existingSession.messagesMap };
-          for (const message of processedMessages) {
-            mergedMessagesMap[message.id] = message;
-          }
-          messagesArray = existingSession.messages.map(
-            (m) => mergedMessagesMap[m.id] ?? m,
-          );
-        } else if (
-          newMessages.length > 0 &&
-          existingSession.messages.length > 0 &&
-          !reducerResult.reordered &&
-          newMessages.every(
-            (m) => m.createdAt >= (existingSession.messages[0]?.createdAt ?? 0),
-          )
-        ) {
-          // Fast path: all new messages are ≥ newest existing — prepend sorted batch
-          mergedMessagesMap = { ...existingSession.messagesMap };
-          for (const message of processedMessages) {
-            mergedMessagesMap[message.id] = message;
-          }
-          const sortedNew = [...newMessages].sort(compareMessagesDesc);
-          const existingMaybeUpdated = processedMessages.some(
-            (m) => existingSession.messagesMap[m.id],
-          )
-            ? existingSession.messages.map((m) => mergedMessagesMap[m.id] ?? m)
-            : existingSession.messages;
-          messagesArray = [...sortedNew, ...existingMaybeUpdated];
-        } else {
-          // Slow path: full re-sort (out-of-order timestamps or first load)
-          mergedMessagesMap = { ...existingSession.messagesMap };
-          for (const message of processedMessages) {
-            mergedMessagesMap[message.id] = message;
-          }
-          messagesArray = Object.values(mergedMessagesMap).sort(compareMessagesDesc);
-        }
-
-        const latestUserRequestPreview = session
-          ? resolveLatestUserRequestPreview(
-              messagesArray,
-              session.latestUserRequestPreview,
-            )
-          : null;
-
-        // Update session with todos and latestUsage
-        // IMPORTANT: We extract latestUsage from the mutable reducerState and copy it to the Session object
-        // This ensures latestUsage is available immediately on load, even before messages are fully loaded
-        let updatedSessions = state.sessions;
-        const needsUpdate =
-          (reducerResult.todos !== undefined ||
-            existingSession.reducerState.latestUsage ||
-            existingSession.reducerState.resolvedModelId ||
-            latestUserRequestPreview !== (session?.latestUserRequestPreview ?? null)) &&
-          session;
-
-        if (needsUpdate) {
-          const nextPinnedModelId =
-            session.pinnedModelId ??
-            existingSession.reducerState.resolvedModelId ??
-            null;
-          pinnedModelIdChanged =
-            nextPinnedModelId !== (session.pinnedModelId ?? null);
-          updatedSessions = {
-            ...state.sessions,
-            [sessionId]: {
-              ...session,
-              ...(reducerResult.todos !== undefined && {
-                todos: reducerResult.todos,
-              }),
-              latestUserRequestPreview,
-              // Copy latestUsage from reducerState to make it immediately available
-              latestUsage: existingSession.reducerState.latestUsage
-                ? {
-                    ...existingSession.reducerState.latestUsage,
-                  }
-                : session.latestUsage,
-              // Copy actual model ID from turn-end events
-              ...(existingSession.reducerState.resolvedModelId && {
-                resolvedModelId: existingSession.reducerState.resolvedModelId,
-              }),
-              ...(nextPinnedModelId && {
-                pinnedModelId: nextPinnedModelId,
-              }),
+        // Incremental ordering: avoid an O(n log n) full re-sort on every
+        // streaming update. existingSession.messages is already newest-first.
+        const { messages: messagesArray, messagesMap: mergedMessagesMap } =
+          mergeProcessedMessages(
+            {
+              messages: existingSession.messages,
+              messagesMap: existingSession.messagesMap,
             },
-          };
-        }
+            processedMessages,
+            reducerResult.reordered === true,
+          );
+
+        // Fold the reducer's side-products (todos, latestUsage, resolvedModelId,
+        // pinnedModelId, preview) back onto the Session. The fold returns the same
+        // session reference when nothing changed, so we can skip the list rebuild.
+        const folded = foldReducerResultIntoSession({
+          session,
+          reducerState: existingSession.reducerState,
+          messages: messagesArray,
+          todos: reducerResult.todos,
+        });
+        pinnedModelIdChanged = folded.pinnedModelIdChanged;
+        const updatedSessions =
+          session && folded.session !== session
+            ? { ...state.sessions, [sessionId]: folded.session! }
+            : state.sessions;
 
         const nextSessionListViewData =
           updatedSessions !== state.sessions
@@ -1277,25 +1166,20 @@ export const storage = create<StorageState>()((set, get) => {
             messages = Object.values(messagesMap).sort(compareMessagesDesc);
           }
 
-          // Extract latestUsage and resolvedModelId from reducerState if available and update session
-          let updatedSessions = state.sessions;
-          if (session && (reducerState.latestUsage || reducerState.resolvedModelId)) {
-            const nextPinnedModelId =
-              session.pinnedModelId ??
-              reducerState.resolvedModelId ??
-              null;
-            pinnedModelIdChanged =
-              nextPinnedModelId !== (session.pinnedModelId ?? null);
-            updatedSessions = {
-              ...state.sessions,
-              [sessionId]: {
-                ...session,
-                ...(reducerState.latestUsage && { latestUsage: { ...reducerState.latestUsage } }),
-                ...(reducerState.resolvedModelId && { resolvedModelId: reducerState.resolvedModelId }),
-                ...(nextPinnedModelId && { pinnedModelId: nextPinnedModelId }),
-              },
-            };
-          }
+          // Fold reducer side-products onto the session (same rule as applyMessages).
+          // On first load the freshly-reduced agentState carries no user-text, so the
+          // preview is a no-op; todos are intentionally not folded here (pass undefined).
+          const folded = foldReducerResultIntoSession({
+            session,
+            reducerState,
+            messages,
+            todos: undefined,
+          });
+          pinnedModelIdChanged = folded.pinnedModelIdChanged;
+          const updatedSessions =
+            session && folded.session !== session
+              ? { ...state.sessions, [sessionId]: folded.session! }
+              : state.sessions;
 
           result = {
             ...state,
@@ -1454,19 +1338,19 @@ export const storage = create<StorageState>()((set, get) => {
           }
         }
 
-        const latestUserRequestPreview = resolveLatestUserRequestPreview(
-          cached.messages,
-          cached.latestUserRequestPreview,
-        );
-        const updatedSessions = state.sessions[sessionId]
-          ? {
-              ...state.sessions,
-              [sessionId]: {
-                ...state.sessions[sessionId],
-                latestUserRequestPreview,
-              },
-            }
-          : state.sessions;
+        // Fold the cached preview onto the session. The cache-rebuilt reducerState
+        // carries no latestUsage/resolvedModelId, so only the preview participates.
+        const session = state.sessions[sessionId];
+        const folded = foldReducerResultIntoSession({
+          session,
+          reducerState,
+          messages: cached.messages,
+          todos: undefined,
+        });
+        const updatedSessions =
+          session && folded.session !== session
+            ? { ...state.sessions, [sessionId]: folded.session! }
+            : state.sessions;
 
         const updatedSessionMessagesRaw = {
           ...state.sessionMessages,

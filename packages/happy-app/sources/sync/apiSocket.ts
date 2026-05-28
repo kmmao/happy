@@ -1,10 +1,17 @@
 import { io, Socket } from "socket.io-client";
 import { TokenStorage } from "@/auth/tokenStorage";
 import { Encryption } from "./encryption/encryption";
+import { createListeners } from "@/utils/listeners";
 
 //
 // Types
 //
+
+export type ConnectionStatus =
+  | "disconnected"
+  | "connecting"
+  | "connected"
+  | "error";
 
 export interface SyncSocketConfig {
   endpoint: string;
@@ -13,7 +20,7 @@ export interface SyncSocketConfig {
 
 export interface SyncSocketState {
   isConnected: boolean;
-  connectionStatus: "disconnected" | "connecting" | "connected" | "error";
+  connectionStatus: ConnectionStatus;
   lastError: Error | null;
 }
 
@@ -29,13 +36,10 @@ class ApiSocket {
   private config: SyncSocketConfig | null = null;
   private encryption: Encryption | null = null;
   private messageHandlers: Map<string, (data: any) => void> = new Map();
-  private ephemeralListeners: Set<(data: any) => void> = new Set();
-  private reconnectedListeners: Set<() => void> = new Set();
-  private statusListeners: Set<
-    (status: "disconnected" | "connecting" | "connected" | "error") => void
-  > = new Set();
-  private currentStatus: "disconnected" | "connecting" | "connected" | "error" =
-    "disconnected";
+  private ephemeral = createListeners<any>();
+  private reconnected = createListeners();
+  private status = createListeners<ConnectionStatus>({ initial: "disconnected" });
+  private currentStatus: ConnectionStatus = "disconnected";
 
   //
   // Initialization
@@ -87,19 +91,12 @@ class ApiSocket {
   //
 
   onReconnected = (listener: () => void) => {
-    this.reconnectedListeners.add(listener);
-    return () => this.reconnectedListeners.delete(listener);
+    return this.reconnected.subscribe(listener);
   };
 
-  onStatusChange = (
-    listener: (
-      status: "disconnected" | "connecting" | "connected" | "error",
-    ) => void,
-  ) => {
-    this.statusListeners.add(listener);
-    // Immediately notify with current status
-    listener(this.currentStatus);
-    return () => this.statusListeners.delete(listener);
+  onStatusChange = (listener: (status: ConnectionStatus) => void) => {
+    // The registry replays the current status to a new subscriber immediately.
+    return this.status.subscribe(listener);
   };
 
   //
@@ -117,8 +114,7 @@ class ApiSocket {
 
   /** Register an additional ephemeral listener — supports multiple concurrent listeners. */
   addEphemeralListener(handler: (data: any) => void): () => void {
-    this.ephemeralListeners.add(handler);
-    return () => this.ephemeralListeners.delete(handler);
+    return this.ephemeral.subscribe(handler);
   }
 
   /**
@@ -182,19 +178,20 @@ class ApiSocket {
   }
 
   /**
-   * RPC call for sessions - uses session-specific encryption
+   * The minimal encryption surface an RPC scope must provide. Both
+   * SessionEncryption and MachineEncryption satisfy it, so the RPC pipeline
+   * below works against either without knowing which scope it's serving.
    */
-  async sessionRPC<R, A>(
-    sessionId: string,
+  private async encryptedRPC<R, A>(
+    encryption: {
+      encryptRaw(data: any): Promise<string>;
+      decryptRaw(encrypted: string): Promise<any | null>;
+    },
+    target: string,
     method: string,
     params: A,
   ): Promise<R> {
     return this.rpcCallWithRetry(async () => {
-      const sessionEncryption = this.encryption!.getSessionEncryption(sessionId);
-      if (!sessionEncryption) {
-        throw new Error(`Session encryption not found for ${sessionId}`);
-      }
-
       if (!this.socket || !this.socket.connected) {
         throw new Error("RPC method not available");
       }
@@ -204,8 +201,8 @@ class ApiSocket {
         result = await this.socket.timeout(
           this.getRpcTimeout(method),
         ).emitWithAck("rpc-call", {
-          method: `${sessionId}:${method}`,
-          params: await sessionEncryption.encryptRaw(params),
+          method: `${target}:${method}`,
+          params: await encryption.encryptRaw(params),
         });
       } catch (e) {
         if (e instanceof Error && e.message === "operation has timed out") {
@@ -217,10 +214,25 @@ class ApiSocket {
       }
 
       if (result.ok) {
-        return (await sessionEncryption.decryptRaw(result.result!)) as R;
+        return (await encryption.decryptRaw(result.result!)) as R;
       }
       throw new Error(result.error || `RPC call '${method}' failed`);
     }, method);
+  }
+
+  /**
+   * RPC call for sessions - uses session-specific encryption
+   */
+  async sessionRPC<R, A>(
+    sessionId: string,
+    method: string,
+    params: A,
+  ): Promise<R> {
+    const sessionEncryption = this.encryption!.getSessionEncryption(sessionId);
+    if (!sessionEncryption) {
+      throw new Error(`Session encryption not found for ${sessionId}`);
+    }
+    return this.encryptedRPC<R, A>(sessionEncryption, sessionId, method, params);
   }
 
   /**
@@ -231,38 +243,11 @@ class ApiSocket {
     method: string,
     params: A,
   ): Promise<R> {
-    return this.rpcCallWithRetry(async () => {
-      const machineEncryption = this.encryption!.getMachineEncryption(machineId);
-      if (!machineEncryption) {
-        throw new Error(`Machine encryption not found for ${machineId}`);
-      }
-
-      if (!this.socket || !this.socket.connected) {
-        throw new Error("RPC method not available");
-      }
-
-      let result: { ok: boolean; result?: string; error?: string };
-      try {
-        result = await this.socket.timeout(
-          this.getRpcTimeout(method),
-        ).emitWithAck("rpc-call", {
-          method: `${machineId}:${method}`,
-          params: await machineEncryption.encryptRaw(params),
-        });
-      } catch (e) {
-        if (e instanceof Error && e.message === "operation has timed out") {
-          throw new Error(`RPC call '${method}' timed out`);
-        }
-        throw new Error(
-          `RPC call '${method}' failed: ${e instanceof Error ? e.message : String(e)}`,
-        );
-      }
-
-      if (result.ok) {
-        return (await machineEncryption.decryptRaw(result.result!)) as R;
-      }
-      throw new Error(result.error || `RPC call '${method}' failed`);
-    }, method);
+    const machineEncryption = this.encryption!.getMachineEncryption(machineId);
+    if (!machineEncryption) {
+      throw new Error(`Machine encryption not found for ${machineId}`);
+    }
+    return this.encryptedRPC<R, A>(machineEncryption, machineId, method, params);
   }
 
   send(event: string, data: any) {
@@ -322,12 +307,10 @@ class ApiSocket {
   // Private Methods
   //
 
-  private updateStatus(
-    status: "disconnected" | "connecting" | "connected" | "error",
-  ) {
+  private updateStatus(status: ConnectionStatus) {
     if (this.currentStatus !== status) {
       this.currentStatus = status;
-      this.statusListeners.forEach((listener) => listener(status));
+      this.status.emit(status);
     }
   }
 
@@ -338,7 +321,7 @@ class ApiSocket {
     this.socket.on("connect", () => {
       this.updateStatus("connected");
       if (!this.socket?.recovered) {
-        this.reconnectedListeners.forEach((listener) => listener());
+        this.reconnected.emit();
       }
     });
 
@@ -362,9 +345,7 @@ class ApiSocket {
         handler(data);
       }
       if (event === "ephemeral") {
-        for (const listener of this.ephemeralListeners) {
-          listener(data);
-        }
+        this.ephemeral.emit(data);
       }
     });
   }
