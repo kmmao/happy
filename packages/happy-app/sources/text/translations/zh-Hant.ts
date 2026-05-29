@@ -4092,6 +4092,7 @@ export const zhHant: TranslationStructure = {
     submit: "提交",
   },
   stopFailure: {
+    restart: "重新啟動工作階段",
     title: "會話意外停止",
     lastMessage: "最後一條助手訊息",
     errorLabels: {

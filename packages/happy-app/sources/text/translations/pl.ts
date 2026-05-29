@@ -4213,6 +4213,7 @@ export const pl: TranslationStructure = {
     submit: "Wyślij",
   },
   stopFailure: {
+    restart: "Uruchom ponownie sesję",
     title: "Sesja niespodziewanie zatrzymana",
     lastMessage: "Ostatnia wiadomość asystenta",
     errorLabels: {

@@ -210,7 +210,7 @@ export const SessionView = React.memo((props: { id: string }) => {
     : null;
   const canReactivate = session?.presence !== "online" && reactivationContext !== null;
 
-  const [, performReactivation] = useHappyAction(async () => {
+  const [reactivating, performReactivation] = useHappyAction(async () => {
     if (!session || !reactivationContext) {
       throw new HappyError(t("machine.failedToStartSession"), false);
     }
@@ -542,6 +542,9 @@ export const SessionView = React.memo((props: { id: string }) => {
                   sessionId={sessionId}
                   session={session}
                   appendToInputRef={appendToInputRef}
+                  canReactivate={canReactivate}
+                  onReactivate={performReactivation}
+                  reactivating={reactivating}
                 />
               )}
             </View>
@@ -583,14 +586,27 @@ function SessionViewLoaded({
   sessionId,
   session,
   appendToInputRef,
+  canReactivate,
+  onReactivate,
+  reactivating,
 }: {
   sessionId: string;
   session: Session;
   appendToInputRef: { current: (text: string) => void };
+  canReactivate: boolean;
+  onReactivate: () => void;
+  reactivating: boolean;
 }) {
   return (
     <BookmarkProvider sessionId={sessionId}>
-      <SessionViewInner sessionId={sessionId} session={session} appendToInputRef={appendToInputRef} />
+      <SessionViewInner
+        sessionId={sessionId}
+        session={session}
+        appendToInputRef={appendToInputRef}
+        canReactivate={canReactivate}
+        onReactivate={onReactivate}
+        reactivating={reactivating}
+      />
     </BookmarkProvider>
   );
 }
@@ -599,10 +615,16 @@ function SessionViewInner({
   sessionId,
   session,
   appendToInputRef,
+  canReactivate,
+  onReactivate,
+  reactivating,
 }: {
   sessionId: string;
   session: Session;
   appendToInputRef: { current: (text: string) => void };
+  canReactivate: boolean;
+  onReactivate: () => void;
+  reactivating: boolean;
 }) {
   const layout = useLayout();
   const { theme } = useUnistyles();
@@ -1938,6 +1960,8 @@ function SessionViewInner({
         {session.agentState?.stopFailure && session.presence !== "online" && (
           <StopFailureBanner
             stopFailure={session.agentState.stopFailure}
+            onRestart={canReactivate ? onReactivate : undefined}
+            restarting={reactivating}
           />
         )}
         <AgentContentView

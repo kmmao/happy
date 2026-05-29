@@ -1,5 +1,5 @@
 import * as React from "react";
-import { View, Text, Pressable, ScrollView, Linking } from "react-native";
+import { View, Text, Pressable, ScrollView, Linking, ActivityIndicator } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { Ionicons } from "@expo/vector-icons";
 import { t } from "@/text";
@@ -13,6 +13,10 @@ interface StopFailureData {
 
 interface Props {
     stopFailure: StopFailureData;
+    /** When provided, renders a "Restart Session" button that re-spawns the session. */
+    onRestart?: () => void;
+    /** Whether a restart is currently in flight (disables the button + shows spinner). */
+    restarting?: boolean;
 }
 
 const BILLING_URL = "https://console.anthropic.com/settings/billing";
@@ -46,7 +50,7 @@ function getErrorLabel(errorType: string | null | undefined): string | null {
     return errorType;
 }
 
-export const StopFailureBanner = React.memo(({ stopFailure }: Props) => {
+export const StopFailureBanner = React.memo(({ stopFailure, onRestart, restarting }: Props) => {
     const { theme } = useUnistyles();
     const [expanded, setExpanded] = React.useState(false);
     const [dismissed, setDismissed] = React.useState(false);
@@ -89,6 +93,30 @@ export const StopFailureBanner = React.memo(({ stopFailure }: Props) => {
             <Text style={[styles.errorMessage, { color: theme.colors.text }]} numberOfLines={5}>
                 {stopFailure.error}
             </Text>
+
+            {onRestart && (
+                <Pressable
+                    onPress={onRestart}
+                    disabled={restarting}
+                    style={[
+                        styles.restartButton,
+                        {
+                            backgroundColor: theme.colors.surfaceHighest,
+                            borderColor: theme.colors.warningCritical,
+                            opacity: restarting ? 0.6 : 1,
+                        },
+                    ]}
+                >
+                    {restarting ? (
+                        <ActivityIndicator size="small" color={theme.colors.warningCritical} />
+                    ) : (
+                        <Ionicons name="refresh" size={15} color={theme.colors.warningCritical} />
+                    )}
+                    <Text style={[styles.restartText, { color: theme.colors.warningCritical }]}>
+                        {t("stopFailure.restart")}
+                    </Text>
+                </Pressable>
+            )}
 
             {isBillingError && (
                 <Pressable onPress={() => Linking.openURL(BILLING_URL)} style={styles.actionRow}>
@@ -173,6 +201,22 @@ const styles = StyleSheet.create((_, rt) => ({
         flexDirection: "row",
         alignItems: "center",
         gap: 4,
+    },
+    restartButton: {
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 6,
+        alignSelf: "flex-start",
+        paddingVertical: 8,
+        paddingHorizontal: 14,
+        borderRadius: 8,
+        borderWidth: 1,
+    },
+    restartText: {
+        fontSize: 13,
+        fontWeight: "600",
+        ...Typography.default(),
     },
     actionText: {
         fontSize: 13,

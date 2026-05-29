@@ -4190,6 +4190,7 @@ export const en: TranslationStructure = {
     submit: "Submit",
   },
   stopFailure: {
+    restart: "Restart Session",
     title: "Session Stopped Unexpectedly",
     lastMessage: "Last assistant message",
     errorLabels: {

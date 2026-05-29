@@ -4192,6 +4192,7 @@ export const es: TranslationStructure = {
     submit: "Enviar",
   },
   stopFailure: {
+    restart: "Reiniciar sesión",
     title: "La sesión se detuvo inesperadamente",
     lastMessage: "Último mensaje del asistente",
     errorLabels: {

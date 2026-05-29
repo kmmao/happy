@@ -4250,6 +4250,7 @@ export const en = {
   },
 
   stopFailure: {
+    restart: "Restart Session",
     title: "Session Stopped Unexpectedly",
     lastMessage: "Last assistant message",
     errorLabels: {

@@ -4211,6 +4211,7 @@ export const ru: TranslationStructure = {
     submit: "Отправить",
   },
   stopFailure: {
+    restart: "Перезапустить сессию",
     title: "Сессия неожиданно остановлена",
     lastMessage: "Последнее сообщение ассистента",
     errorLabels: {

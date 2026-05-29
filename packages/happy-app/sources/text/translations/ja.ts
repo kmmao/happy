@@ -4165,6 +4165,7 @@ export const ja: TranslationStructure = {
     submit: "送信",
   },
   stopFailure: {
+    restart: "セッションを再起動",
     title: "セッションが予期せず停止しました",
     lastMessage: "最後のアシスタントメッセージ",
     errorLabels: {

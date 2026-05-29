@@ -4086,6 +4086,7 @@ export const zhHans: TranslationStructure = {
     submit: "提交",
   },
   stopFailure: {
+    restart: "重启会话",
     title: "会话意外停止",
     lastMessage: "最后一条助手消息",
     errorLabels: {

@@ -4197,6 +4197,7 @@ export const ca: TranslationStructure = {
     submit: "Envia",
   },
   stopFailure: {
+    restart: "Reinicia la sessió",
     title: "La sessió s'ha aturat inesperadament",
     lastMessage: "Últim missatge de l'assistent",
     errorLabels: {
