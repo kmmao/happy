@@ -2152,6 +2152,7 @@ class Sync {
       enqueueMessages: this.enqueueMessages.bind(this),
       getMessagesSync: this.getMessagesSync.bind(this),
       fetchSessions: () => { this.fetchSessions(); },
+      fetchMachines: () => { this.fetchMachines(); },
       onSessionVisible: this.onSessionVisible.bind(this),
       getCursor: (sessionId) => this.cursors.get(sessionId),
       deleteCursor: (sessionId) => this.cursors.delete(sessionId),
@@ -2168,6 +2169,7 @@ class Sync {
       feedSync: this.feedSync,
       projectsSync: this.projectsSync,
       sessionsSync: this.sessionsSync,
+      machinesSync: this.machinesSync,
       assumeUsers: this.assumeUsers.bind(this),
     };
   }

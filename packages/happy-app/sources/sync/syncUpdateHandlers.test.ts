@@ -3,11 +3,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => {
   const storageState = {
     sessions: {} as Record<string, any>,
+    machines: {} as Record<string, any>,
     settings: {
       webNotifications: false,
       webNotificationsPersistent: false,
     },
     getPendingSessionPreferences: vi.fn(() => null),
+    applyMachines: vi.fn(),
   };
 
   return {
@@ -387,5 +389,185 @@ describe("handleNewMessageUpdate", () => {
     // The message must NOT be marked processed / enqueued — a recovered key
     // needs to re-decrypt it on refetch.
     expect(enqueueMessages).not.toHaveBeenCalled();
+  });
+});
+
+let resolveSessionEncryption: typeof import("./syncEncryptionScope").resolveSessionEncryption;
+let resolveMachineEncryption: typeof import("./syncEncryptionScope").resolveMachineEncryption;
+
+describe("syncEncryptionScope", () => {
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    const mod = await import("./syncEncryptionScope");
+    resolveSessionEncryption = mod.resolveSessionEncryption;
+    resolveMachineEncryption = mod.resolveMachineEncryption;
+  });
+
+  it("session:encryption 初次缺失则先 awaitQueue 再重读,而非直接丢弃 (#80/#84)", async () => {
+    const enc = {};
+    const getSessionEncryption = vi
+      .fn()
+      .mockReturnValueOnce(null)
+      .mockReturnValue(enc);
+    const awaitQueue = vi.fn(async () => {});
+    const fetchSessions = vi.fn();
+
+    const result = await resolveSessionEncryption("s1", {
+      encryption: { getSessionEncryption },
+      sessionsSync: { invalidate: vi.fn(), awaitQueue },
+      fetchSessions,
+    } as any);
+
+    expect(result).toBe(enc);
+    expect(awaitQueue).toHaveBeenCalledTimes(1);
+    expect(getSessionEncryption).toHaveBeenCalledTimes(2);
+    expect(fetchSessions).not.toHaveBeenCalled();
+  });
+
+  it("session:awaitQueue 后仍缺失则回退到 fetchSessions 并返回 null", async () => {
+    const getSessionEncryption = vi.fn().mockReturnValue(null);
+    const awaitQueue = vi.fn(async () => {});
+    const fetchSessions = vi.fn();
+
+    const result = await resolveSessionEncryption("s1", {
+      encryption: { getSessionEncryption },
+      sessionsSync: { invalidate: vi.fn(), awaitQueue },
+      fetchSessions,
+    } as any);
+
+    expect(result).toBeNull();
+    expect(awaitQueue).toHaveBeenCalledTimes(1);
+    expect(fetchSessions).toHaveBeenCalledTimes(1);
+  });
+
+  it("machine:encryption 初次缺失则先 awaitQueue(machinesSync) 再重读 —— 修复此前被静默丢弃的 race", async () => {
+    const enc = {};
+    const getMachineEncryption = vi
+      .fn()
+      .mockReturnValueOnce(null)
+      .mockReturnValue(enc);
+    const awaitQueue = vi.fn(async () => {});
+    const fetchMachines = vi.fn();
+
+    const result = await resolveMachineEncryption("m1", {
+      encryption: { getMachineEncryption },
+      machinesSync: { invalidate: vi.fn(), awaitQueue },
+      fetchMachines,
+    } as any);
+
+    expect(result).toBe(enc);
+    expect(awaitQueue).toHaveBeenCalledTimes(1);
+    expect(getMachineEncryption).toHaveBeenCalledTimes(2);
+    expect(fetchMachines).not.toHaveBeenCalled();
+  });
+
+  it("machine:awaitQueue 后仍缺失则回退到 fetchMachines 并返回 null", async () => {
+    const getMachineEncryption = vi.fn().mockReturnValue(null);
+    const awaitQueue = vi.fn(async () => {});
+    const fetchMachines = vi.fn();
+
+    const result = await resolveMachineEncryption("m1", {
+      encryption: { getMachineEncryption },
+      machinesSync: { invalidate: vi.fn(), awaitQueue },
+      fetchMachines,
+    } as any);
+
+    expect(result).toBeNull();
+    expect(awaitQueue).toHaveBeenCalledTimes(1);
+    expect(fetchMachines).toHaveBeenCalledTimes(1);
+  });
+
+  it("session:encryptor 已就绪但 extraReady(session row)初次未就绪时,仍 awaitQueue 而非丢弃 (#80 窗口)", async () => {
+    const enc = {};
+    // encryptor 一直在(initializeSessions 早于 applySessions 注册)
+    const getSessionEncryption = vi.fn().mockReturnValue(enc);
+    let sessionRowReady = false;
+    const awaitQueue = vi.fn(async () => {
+      sessionRowReady = true; // in-flight sync 落地后才写入 session row
+    });
+    const fetchSessions = vi.fn();
+
+    const result = await resolveSessionEncryption(
+      "s1",
+      {
+        encryption: { getSessionEncryption },
+        sessionsSync: { invalidate: vi.fn(), awaitQueue },
+        fetchSessions,
+      } as any,
+      () => sessionRowReady,
+    );
+
+    expect(result).toBe(enc);
+    expect(awaitQueue).toHaveBeenCalledTimes(1);
+    expect(fetchSessions).not.toHaveBeenCalled();
+  });
+});
+
+let handleUpdateMachineUpdate: typeof import("./syncUpdateHandlers").handleUpdateMachineUpdate;
+
+describe("handleUpdateMachineUpdate", () => {
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    handleUpdateMachineUpdate = (await import("./syncUpdateHandlers")).handleUpdateMachineUpdate;
+    mocks.storageState.machines = {};
+  });
+
+  it("启动竞态下先等待 machines 同步再重试 encryption,成功后正常 applyMachines(machine 版 #80,此前会被静默丢弃)", async () => {
+    const decryptMetadata = vi.fn().mockResolvedValue({ host: "h" });
+    const machineEncryption = {
+      decryptMetadata,
+      decryptDaemonState: vi.fn(),
+    };
+    // encryption 第一次缺失,awaitQueue(machinesSync) 之后才就绪
+    const getMachineEncryption = vi
+      .fn()
+      .mockReturnValueOnce(null)
+      .mockReturnValue(machineEncryption);
+    const awaitQueue = vi.fn(async () => {});
+    const fetchMachines = vi.fn();
+
+    await handleUpdateMachineUpdate(
+      { seq: 5, createdAt: 100 } as any,
+      {
+        t: "update-machine",
+        machineId: "machine-1",
+        metadata: { version: 2, value: "enc-metadata" },
+      } as any,
+      {
+        encryption: { getMachineEncryption },
+        machinesSync: { invalidate: vi.fn(), awaitQueue },
+        fetchMachines,
+      } as any,
+    );
+
+    expect(awaitQueue).toHaveBeenCalledTimes(1);
+    expect(getMachineEncryption).toHaveBeenCalledTimes(2);
+    expect(decryptMetadata).toHaveBeenCalledTimes(1);
+    expect(mocks.storageState.applyMachines).toHaveBeenCalledTimes(1);
+    expect(fetchMachines).not.toHaveBeenCalled();
+  });
+
+  it("awaitQueue 后 encryption 仍缺失则 fetchMachines 兜底,且不写 storage", async () => {
+    const getMachineEncryption = vi.fn().mockReturnValue(null);
+    const awaitQueue = vi.fn(async () => {});
+    const fetchMachines = vi.fn();
+
+    await handleUpdateMachineUpdate(
+      { seq: 5, createdAt: 100 } as any,
+      {
+        t: "update-machine",
+        machineId: "machine-1",
+        metadata: { version: 2, value: "enc-metadata" },
+      } as any,
+      {
+        encryption: { getMachineEncryption },
+        machinesSync: { invalidate: vi.fn(), awaitQueue },
+        fetchMachines,
+      } as any,
+    );
+
+    expect(awaitQueue).toHaveBeenCalledTimes(1);
+    expect(fetchMachines).toHaveBeenCalledTimes(1);
+    expect(mocks.storageState.applyMachines).not.toHaveBeenCalled();
   });
 });

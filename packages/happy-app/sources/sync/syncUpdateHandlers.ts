@@ -12,7 +12,6 @@ import {
 import type { Session, Machine } from "./storageTypes";
 import type { Encryption } from "./encryption/encryption";
 import type { SessionMessageCursor } from "./sessionMessageCursor";
-import type { SessionEncryption } from "./encryption/sessionEncryption";
 import { ArtifactEncryption } from "./encryption/artifactEncryption";
 import type { DecryptedArtifact } from "./artifactTypes";
 import type { FeedItem } from "./feedTypes";
@@ -36,6 +35,7 @@ import { deleteMessageCache, deleteHistoryComplete } from "./messageCache";
 import { deleteBackfillBoundary } from "./persistence";
 import { detectNeedsAttention } from "./syncHelpers";
 import { mergeUpdatedSession } from "./updateSessionMerge";
+import { resolveSessionEncryption, resolveMachineEncryption } from "./syncEncryptionScope";
 import { voiceHooks } from "@/realtime/hooks/voiceHooks";
 import { t } from "@/text";
 import { getSessionName } from "@/utils/sessionUtils";
@@ -64,6 +64,7 @@ export type UpdateHandlerContext = {
     enqueueMessages: (sessionId: string, messages: NormalizedMessage[]) => void;
     getMessagesSync: (sessionId: string) => { invalidate: () => void } | null;
     fetchSessions: () => void;
+    fetchMachines: () => void;
     onSessionVisible: (sessionId: string) => void;
     /** The single owner of per-session seq + live dedup. */
     getCursor: (sessionId: string) => SessionMessageCursor;
@@ -81,6 +82,7 @@ export type UpdateHandlerContext = {
     feedSync: { invalidate: () => void };
     projectsSync: { invalidate: () => void };
     sessionsSync: { invalidate: () => void; awaitQueue: () => Promise<void> };
+    machinesSync: { invalidate: () => void; awaitQueue: () => Promise<void> };
     assumeUsers: (userIds: string[]) => Promise<void>;
 };
 
@@ -97,19 +99,10 @@ export async function handleNewMessageUpdate(
     body: Extract<UpdateData["body"], { t: "new-message" }>,
     ctx: UpdateHandlerContext,
 ): Promise<void> {
-    // Get encryption
-    let encryption = ctx.encryption.getSessionEncryption(body.sid);
+    // resolveSessionEncryption owns the #84 startup-race + refetch-recovery
+    // invariant (shared with update-session and update-machine).
+    const encryption = await resolveSessionEncryption(body.sid, ctx);
     if (!encryption) {
-        // Startup race (#84): the new-message push can arrive before the
-        // sessions sync has finished initializing this session's encryption.
-        // Wait for the in-flight sessions sync to settle, then re-read before
-        // giving up and triggering a refetch.
-        await ctx.sessionsSync.awaitQueue();
-        encryption = ctx.encryption.getSessionEncryption(body.sid);
-    }
-    if (!encryption) {
-        log.error(`Session ${body.sid} not found after awaiting sessions sync`);
-        ctx.fetchSessions();
         return;
     }
 
@@ -444,46 +437,37 @@ export async function handleUpdateSessionUpdate(
     body: Extract<UpdateData["body"], { t: "update-session" }>,
     ctx: UpdateHandlerContext,
 ): Promise<void> {
-    let session = storage.getState().sessions[body.id];
-    let sessionEncryption = ctx.encryption.getSessionEncryption(body.id);
-    if (!session || !sessionEncryption) {
-        // Startup race (#80): the update-session push can arrive before the
-        // sessions sync has loaded this session (and its encryption) into
-        // storage. Wait for the in-flight sessions sync to settle, then
-        // re-read before dropping the update.
-        await ctx.sessionsSync.awaitQueue();
-        session = storage.getState().sessions[body.id];
-        sessionEncryption = ctx.encryption.getSessionEncryption(body.id);
-    }
-    if (!session) {
-        log.warn(
-            `Session ${body.id} not found for update-session after awaiting sessions sync; refetching sessions`,
-        );
-        ctx.fetchSessions();
+    // update-session needs the encryptor AND the session row. fetchSessions
+    // registers the encryptor (initializeSessions) BEFORE it writes the row
+    // (applySessions), so gating on encryption alone would drop a push that
+    // arrives mid-sync; resolving both together makes it await the sync (#80).
+    const sessionEncryption = await resolveSessionEncryption(
+        body.id,
+        ctx,
+        () => !!storage.getState().sessions[body.id],
+    );
+    if (!sessionEncryption) {
         return;
     }
-    if (!sessionEncryption) {
-        log.error(
-            `Session encryption not found for ${body.id} after awaiting sessions sync`,
-        );
+    const session = storage.getState().sessions[body.id];
+    if (!session) {
+        // Defensive: row removed between resolution and read (concurrent delete).
         ctx.fetchSessions();
         return;
     }
 
-    const agentState =
-        body.agentState && sessionEncryption
-            ? await sessionEncryption.decryptAgentState(
-                body.agentState.version,
-                body.agentState.value,
-            )
-            : session.agentState;
-    const metadata =
-        body.metadata && sessionEncryption
-            ? await sessionEncryption.decryptMetadata(
-                body.metadata.version,
-                body.metadata.value,
-            )
-            : session.metadata;
+    const agentState = body.agentState
+        ? await sessionEncryption.decryptAgentState(
+            body.agentState.version,
+            body.agentState.value,
+        )
+        : session.agentState;
+    const metadata = body.metadata
+        ? await sessionEncryption.decryptMetadata(
+            body.metadata.version,
+            body.metadata.value,
+        )
+        : session.metadata;
 
     // Decrypt preferences if included in the update
     const preferencesData = body.preferences;
@@ -651,11 +635,11 @@ export async function handleUpdateMachineUpdate(
         daemonStateVersion: machine?.daemonStateVersion ?? 0,
     };
 
-    const machineEncryption = ctx.encryption.getMachineEncryption(machineId);
+    // resolveMachineEncryption applies the same startup-race + refetch-recovery
+    // invariant the session handlers use. Previously update-machine had no
+    // awaitQueue/refetch and silently dropped a raced update.
+    const machineEncryption = await resolveMachineEncryption(machineId, ctx);
     if (!machineEncryption) {
-        log.error(
-            `Machine encryption not found for ${machineId} - cannot decrypt updates`,
-        );
         return;
     }
 
