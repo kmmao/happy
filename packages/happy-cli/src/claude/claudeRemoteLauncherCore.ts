@@ -91,7 +91,7 @@ interface PermissionsField {
 /**
  * Helper function to create a session protocol message envelope
  */
-function createEnvelope(type: string, payload: Record<string, unknown>): Record<string, unknown> {
+function buildProtocolMessage(type: string, payload: Record<string, unknown>): Record<string, unknown> {
   return {
     type,
     ...payload,
@@ -606,7 +606,7 @@ export async function claudeRemoteLauncher(
     // PTY mode has no programmatic stopTask — Claude TUI manages subagent
     // lifetime internally. We can only ack the App-visible state by emitting
     // a task-end envelope so the App's task list clears.
-    const envelope = createEnvelope("agent", {
+    const envelope = buildProtocolMessage("agent", {
       t: "task-end",
       taskId: args.taskId,
       status: "stopped" as const,
@@ -1582,7 +1582,7 @@ export async function claudeRemoteLauncher(
       (message as ClaudeJsonlTaskStartedMessage).subtype === "task_started"
     ) {
       const m = message as ClaudeJsonlTaskStartedMessage;
-      const envelope = createEnvelope("agent", {
+      const envelope = buildProtocolMessage("agent", {
         t: "task-start",
         taskId: m.task_id,
         toolUseId: m.tool_use_id,
@@ -1599,7 +1599,7 @@ export async function claudeRemoteLauncher(
       (message as ClaudeJsonlTaskProgressMessage).subtype === "task_progress"
     ) {
       const m = message as ClaudeJsonlTaskProgressMessage;
-      const envelope = createEnvelope("agent", {
+      const envelope = buildProtocolMessage("agent", {
         t: "task-progress",
         taskId: m.task_id,
         description: m.description,
@@ -1646,7 +1646,7 @@ export async function claudeRemoteLauncher(
       (message as ClaudeJsonlTaskNotificationMessage).subtype === "task_notification"
     ) {
       const m = message as ClaudeJsonlTaskNotificationMessage;
-      const envelope = createEnvelope("agent", {
+      const envelope = buildProtocolMessage("agent", {
         t: "task-end",
         taskId: m.task_id,
         status: m.status,
@@ -1668,7 +1668,7 @@ export async function claudeRemoteLauncher(
       (message as ClaudeJsonlTaskUpdatedMessage).subtype === "task_updated"
     ) {
       const m = message as ClaudeJsonlTaskUpdatedMessage;
-      const envelope = createEnvelope("agent", {
+      const envelope = buildProtocolMessage("agent", {
         t: "task-updated",
         taskId: m.task_id,
         patch: {
@@ -1685,7 +1685,7 @@ export async function claudeRemoteLauncher(
     // Forward rate limit events to App (SDK 0.3.142+)
     if (message.type === "rate_limit_event") {
       const m = message as ClaudeJsonlRateLimitEvent;
-      const envelope = createEnvelope("agent", {
+      const envelope = buildProtocolMessage("agent", {
         t: "rate-limit",
         status: m.rate_limit_info.status,
         resetsAt: m.rate_limit_info.resetsAt,
@@ -1712,7 +1712,7 @@ export async function claudeRemoteLauncher(
     // Forward Tool progress to session protocol
     if (message.type === "tool_progress") {
       const m = message as ClaudeJsonlToolProgressMessage;
-      const envelope = createEnvelope("agent", {
+      const envelope = buildProtocolMessage("agent", {
         t: "tool-progress",
         toolUseId: m.tool_use_id,
         toolName: m.tool_name,
@@ -1726,7 +1726,7 @@ export async function claudeRemoteLauncher(
     if (message.type === "prompt_suggestion") {
       const suggestion = (message as ClaudeJsonlPromptSuggestionMessage).suggestion;
       if (suggestion) {
-        const envelope = createEnvelope("agent", {
+        const envelope = buildProtocolMessage("agent", {
           t: "prompt-suggestion",
           suggestion,
         });
@@ -1740,7 +1740,7 @@ export async function claudeRemoteLauncher(
       (message as ClaudeJsonlSessionStateChangedMessage).subtype === "session_state_changed"
     ) {
       const m = message as ClaudeJsonlSessionStateChangedMessage;
-      const envelope = createEnvelope("agent", {
+      const envelope = buildProtocolMessage("agent", {
         t: "session-state-changed",
         state: m.state,
       });
@@ -2618,7 +2618,7 @@ export async function claudeRemoteLauncher(
           // per turn (start + end), not on every tick.
           onThinkingChange: (thinking: boolean) => {
             session.onThinkingChange(thinking);
-            const stateEnvelope = createEnvelope("agent", {
+            const stateEnvelope = buildProtocolMessage("agent", {
               t: "session-state-changed",
               state: thinking ? "running" : "idle",
             });
@@ -2723,7 +2723,7 @@ export async function claudeRemoteLauncher(
             lastResultData = data;
           },
           onContextUsage: (ctx) => {
-            const envelope = createEnvelope("agent", {
+            const envelope = buildProtocolMessage("agent", {
               t: "context-usage" as const,
               totalTokens: ctx.totalTokens,
               maxTokens: ctx.maxTokens,
@@ -2744,7 +2744,7 @@ export async function claudeRemoteLauncher(
             logger.debug(
               "[remote]: Max turns reached — sending needs-continue",
             );
-            const envelope = createEnvelope("agent", {
+            const envelope = buildProtocolMessage("agent", {
               t: "needs-continue",
             });
             session.client.sendSessionProtocolMessage(envelope as any);

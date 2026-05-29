@@ -3,8 +3,10 @@ import type { RawJSONLines } from "@/claude/types";
 import {
   createEnvelope,
   type SessionEnvelope,
+  type SessionEvent,
   type SessionTurnEndStatus,
 } from "@kmmao/happy-wire";
+import { reduce, type ProtocolIntent } from "@/session-protocol/turnReducer";
 
 export type ClaudeSessionProtocolState = {
   currentTurnId: string | null;
@@ -418,78 +420,65 @@ function setSubagentTitle(
   getSubagentTitles(state).set(subagent, title.trim());
 }
 
-function maybeEmitSubagentStart(
-  state: ClaudeSessionProtocolState,
-  turn: string,
-  subagent: string | undefined,
-  envelopes: SessionEnvelope[],
-): void {
-  if (!subagent) {
-    return;
-  }
-
-  const started = getStartedSubagents(state);
-  if (started.has(subagent)) {
-    return;
-  }
-
-  const title = getSubagentTitles(state).get(subagent);
-  envelopes.push(
-    createEnvelope(
-      "agent",
-      {
-        t: "start",
-        ...(title ? { title } : {}),
-      },
-      { turn, subagent },
-    ),
-  );
-  started.add(subagent);
-  getActiveSubagents(state).add(subagent);
-}
-
-function maybeEmitSubagentStop(
-  state: ClaudeSessionProtocolState,
-  turn: string,
-  subagent: string,
-  envelopes: SessionEnvelope[],
-): void {
-  const active = getActiveSubagents(state);
-  if (!active.has(subagent)) {
-    return;
-  }
-
-  envelopes.push(createEnvelope("agent", { t: "stop" }, { turn, subagent }));
-  active.delete(subagent);
-}
-
-function clearSubagentTracking(state: ClaudeSessionProtocolState): void {
+function clearResolutionMaps(state: ClaudeSessionProtocolState): void {
   getUuidToProviderSubagent(state).clear();
   getTaskPromptToSubagents(state).clear();
   getProviderSubagentToSessionSubagent(state).clear();
   getSubagentTitles(state).clear();
   getBufferedSubagentMessages(state).clear();
   getHiddenParentToolCalls(state).clear();
-  getStartedSubagents(state).clear();
-  getActiveSubagents(state).clear();
 }
 
-function ensureTurn(
+// Bridge to the shared Turn lifecycle reducer (see CONTEXT.md: Turn, Subagent).
+// The three lifecycle fields on ClaudeSessionProtocolState — currentTurnId,
+// startedSubagents, activeSubagents — ARE the reducer's ProtocolState, so we
+// lift them in, reduce, and write them back. This keeps the external state
+// shape (and apiSession's `.currentTurnId` reads) untouched while turn opening,
+// subagent start/stop dedup, and ordering live in one place instead of being
+// hand-rolled here. Claude-specific subagent *resolution* stays below.
+function applyIntent(
   state: ClaudeSessionProtocolState,
+  intent: ProtocolIntent,
   envelopes: SessionEnvelope[],
-): string {
-  if (state.currentTurnId) {
-    return state.currentTurnId;
-  }
-
-  const turnId = createId();
-  envelopes.push(
-    createEnvelope("agent", { t: "turn-start" }, { turn: turnId }),
+): void {
+  const { state: next, envelopes: emitted } = reduce(
+    {
+      currentTurnId: state.currentTurnId,
+      startedSubagents: getStartedSubagents(state),
+      activeSubagents: getActiveSubagents(state),
+    },
+    intent,
   );
-  state.currentTurnId = turnId;
-  return turnId;
+  state.currentTurnId = next.currentTurnId;
+  state.startedSubagents = new Set(next.startedSubagents);
+  state.activeSubagents = new Set(next.activeSubagents);
+  envelopes.push(...emitted);
 }
 
+// Emit one agent content event, lazily opening the Turn — and the Subagent's
+// `start` (titled from its Task registration) — as needed.
+function emitContent(
+  state: ClaudeSessionProtocolState,
+  ev: SessionEvent,
+  subagent: string | undefined,
+  envelopes: SessionEnvelope[],
+): void {
+  applyIntent(
+    state,
+    subagent
+      ? {
+          kind: "content",
+          ev,
+          subagent,
+          subagentTitle: getSubagentTitles(state).get(subagent),
+        }
+      : { kind: "content", ev },
+    envelopes,
+  );
+}
+
+// Close the open Turn (turn-end + auto-stop of any still-active Subagent) and
+// drop the Claude-specific resolution maps. No-op when no Turn is open.
 function closeTurn(
   state: ClaudeSessionProtocolState,
   status: SessionTurnEndStatus,
@@ -499,31 +488,8 @@ function closeTurn(
   if (!state.currentTurnId) {
     return;
   }
-
-  envelopes.push(
-    createEnvelope(
-      "agent",
-      {
-        t: "turn-end",
-        status,
-        ...(meta?.model !== undefined ? { model: meta.model } : {}),
-        ...(meta?.usage !== undefined ? { usage: meta.usage } : {}),
-        ...(meta?.durationMs !== undefined
-          ? { durationMs: meta.durationMs }
-          : {}),
-        ...(meta?.totalCostUsd !== undefined
-          ? { totalCostUsd: meta.totalCostUsd }
-          : {}),
-        ...(meta?.numTurns !== undefined ? { numTurns: meta.numTurns } : {}),
-        ...(meta?.modelUsage !== undefined
-          ? { modelUsage: meta.modelUsage }
-          : {}),
-      },
-      { turn: state.currentTurnId },
-    ),
-  );
-  state.currentTurnId = null;
-  clearSubagentTracking(state);
+  applyIntent(state, { kind: "turnEnd", status, meta }, envelopes);
+  clearResolutionMaps(state);
 }
 
 function toolTitle(name: string, input: unknown): string {
@@ -607,21 +573,13 @@ function mapClaudeLogMessageToSessionEnvelopesInternal(
   }
 
   if (message.type === "assistant") {
-    const turnId = ensureTurn(state, envelopes);
-    maybeEmitSubagentStart(state, turnId, subagent, envelopes);
     const blocks = Array.isArray(message.message?.content)
       ? message.message.content
       : [];
 
     for (const block of blocks) {
       if (block.type === "text" && typeof block.text === "string") {
-        envelopes.push(
-          createEnvelope(
-            "agent",
-            { t: "text", text: block.text },
-            { turn: turnId, subagent },
-          ),
-        );
+        emitContent(state, { t: "text", text: block.text }, subagent, envelopes);
         continue;
       }
 
@@ -632,12 +590,11 @@ function mapClaudeLogMessageToSessionEnvelopesInternal(
         if (block.thinking.length === 0) {
           continue;
         }
-        envelopes.push(
-          createEnvelope(
-            "agent",
-            { t: "text", text: block.thinking, thinking: true },
-            { turn: turnId, subagent },
-          ),
+        emitContent(
+          state,
+          { t: "text", text: block.thinking, thinking: true },
+          subagent,
+          envelopes,
         );
         continue;
       }
@@ -672,19 +629,18 @@ function mapClaudeLogMessageToSessionEnvelopesInternal(
           // Fall through to emit tool-call-start envelope like regular tools
         }
 
-        envelopes.push(
-          createEnvelope(
-            "agent",
-            {
-              t: "tool-call-start",
-              call,
-              name,
-              title,
-              description: title,
-              args,
-            },
-            { turn: turnId, subagent },
-          ),
+        emitContent(
+          state,
+          {
+            t: "tool-call-start",
+            call,
+            name,
+            title,
+            description: title,
+            args,
+          },
+          subagent,
+          envelopes,
         );
         const buffered = consumeBufferedSubagentMessages(state, call);
         for (const bufferedMessage of buffered) {
@@ -722,14 +678,11 @@ function mapClaudeLogMessageToSessionEnvelopesInternal(
 
     if (typeof message.message.content === "string") {
       if (message.isSidechain) {
-        const turnId = ensureTurn(state, envelopes);
-        maybeEmitSubagentStart(state, turnId, subagent, envelopes);
-        envelopes.push(
-          createEnvelope(
-            "agent",
-            { t: "text", text: message.message.content },
-            { turn: turnId, subagent },
-          ),
+        emitContent(
+          state,
+          { t: "text", text: message.message.content },
+          subagent,
+          envelopes,
         );
       } else {
         closeTurn(state, "completed", envelopes);
@@ -758,10 +711,6 @@ function mapClaudeLogMessageToSessionEnvelopesInternal(
       };
     }
 
-    const turnId = ensureTurn(state, envelopes);
-    if (message.isSidechain) {
-      maybeEmitSubagentStart(state, turnId, subagent, envelopes);
-    }
     for (const block of blocks) {
       if (
         block.type === "tool_result" &&
@@ -773,10 +722,9 @@ function mapClaudeLogMessageToSessionEnvelopesInternal(
         if (!message.isSidechain) {
           if (getHiddenParentToolCalls(state).has(block.tool_use_id)) {
             if (sessionSubagentForToolResult) {
-              maybeEmitSubagentStop(
+              applyIntent(
                 state,
-                turnId,
-                sessionSubagentForToolResult,
+                { kind: "subagentStop", subagent: sessionSubagentForToolResult },
                 envelopes,
               );
             }
@@ -784,10 +732,9 @@ function mapClaudeLogMessageToSessionEnvelopesInternal(
             continue;
           }
           if (sessionSubagentForToolResult) {
-            maybeEmitSubagentStop(
+            applyIntent(
               state,
-              turnId,
-              sessionSubagentForToolResult,
+              { kind: "subagentStop", subagent: sessionSubagentForToolResult },
               envelopes,
             );
           }
@@ -808,13 +755,7 @@ function mapClaudeLogMessageToSessionEnvelopesInternal(
           toolCallEnd.outputFile = bgMatch[2];
         }
 
-        envelopes.push(
-          createEnvelope(
-            "agent",
-            toolCallEnd as any,
-            { turn: turnId, subagent },
-          ),
-        );
+        emitContent(state, toolCallEnd as unknown as SessionEvent, subagent, envelopes);
         continue;
       }
 
@@ -823,13 +764,7 @@ function mapClaudeLogMessageToSessionEnvelopesInternal(
         typeof block.text === "string" &&
         block.text.trim().length > 0
       ) {
-        envelopes.push(
-          createEnvelope(
-            "agent",
-            { t: "text", text: block.text },
-            { turn: turnId, subagent },
-          ),
-        );
+        emitContent(state, { t: "text", text: block.text }, subagent, envelopes);
       }
     }
 

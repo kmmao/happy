@@ -7,7 +7,13 @@ import {
   createEnvelope,
   type CreateEnvelopeOptions,
   type SessionEnvelope,
+  type SessionEvent,
 } from "@kmmao/happy-wire";
+import {
+  reduce,
+  type ProtocolIntent,
+  type ProtocolState,
+} from "@/session-protocol/turnReducer";
 
 export type CodexTurnState = {
   currentTurnId: string | null;
@@ -54,40 +60,6 @@ function getProviderSubagentToSessionSubagent(
   state: CodexTurnState,
 ): Map<string, string> {
   return state.providerSubagentToSessionSubagent ?? new Map<string, string>();
-}
-
-function maybeEmitSubagentStart(
-  subagent: string | undefined,
-  opts: CreateEnvelopeOptions,
-  startedSubagents: Set<string>,
-  activeSubagents: Set<string>,
-  envelopes: SessionEnvelope[],
-): void {
-  if (!subagent || startedSubagents.has(subagent)) {
-    return;
-  }
-
-  envelopes.push(
-    createEnvelope("agent", { t: "start" }, { ...opts, subagent }),
-  );
-  startedSubagents.add(subagent);
-  activeSubagents.add(subagent);
-}
-
-function emitSubagentStops(
-  opts: CreateEnvelopeOptions,
-  startedSubagents: Set<string>,
-  activeSubagents: Set<string>,
-): SessionEnvelope[] {
-  const envelopes: SessionEnvelope[] = [];
-  for (const subagent of activeSubagents) {
-    envelopes.push(
-      createEnvelope("agent", { t: "stop" }, { ...opts, subagent }),
-    );
-  }
-  activeSubagents.clear();
-  startedSubagents.clear();
-  return envelopes;
 }
 
 function buildEnvelopeOptions(
@@ -391,109 +363,79 @@ export function mapCodexMcpMessageToSessionEnvelopes(
   state: CodexTurnState,
 ): CodexMapperResult {
   const type = message.type;
-  const startedSubagents = getStartedSubagents(state);
-  const activeSubagents = getActiveSubagents(state);
   const providerSubagentToSessionSubagent =
     getProviderSubagentToSessionSubagent(state);
 
+  // Lifecycle bridge: currentTurnId + started/activeSubagents ARE the reducer's
+  // ProtocolState (see CONTEXT.md: Turn, Subagent). We thread a snapshot through
+  // reduce; Codex-specific subagent resolution (providerSubagentToSessionSubagent)
+  // stays here. Codex opens Turns explicitly on `task_started` (turnBegin) — the
+  // reducer's lazy-open never triggers because content always has an open Turn.
+  let protocol: ProtocolState = {
+    currentTurnId: state.currentTurnId,
+    startedSubagents: getStartedSubagents(state),
+    activeSubagents: getActiveSubagents(state),
+  };
+  const lifecycleEnvelopes: SessionEnvelope[] = [];
+  const apply = (intent: ProtocolIntent): void => {
+    const r = reduce(protocol, intent);
+    protocol = r.state;
+    lifecycleEnvelopes.push(...r.envelopes);
+  };
+  const result = (): CodexMapperResult => ({
+    currentTurnId: protocol.currentTurnId,
+    startedSubagents: new Set(protocol.startedSubagents),
+    activeSubagents: new Set(protocol.activeSubagents),
+    providerSubagentToSessionSubagent,
+    envelopes: lifecycleEnvelopes,
+  });
+
   if (type === "task_started") {
-    const turnId = createId();
-    const turnStart = createEnvelope(
-      "agent",
-      { t: "turn-start" },
-      { turn: turnId },
-    );
-    startedSubagents.clear();
-    activeSubagents.clear();
     providerSubagentToSessionSubagent.clear();
-    return {
-      currentTurnId: turnId,
-      startedSubagents,
-      activeSubagents,
-      providerSubagentToSessionSubagent,
-      envelopes: [turnStart],
+    // Fresh Turn: drop any stale subagent tracking, then open a new Turn.
+    protocol = {
+      currentTurnId: null,
+      startedSubagents: new Set(),
+      activeSubagents: new Set(),
     };
+    apply({ kind: "turnBegin" });
+    return result();
   }
 
   if (type === "task_complete" || type === "turn_aborted") {
-    if (!state.currentTurnId) {
-      return {
-        currentTurnId: null,
-        startedSubagents,
-        activeSubagents,
-        providerSubagentToSessionSubagent,
-        envelopes: [],
-      };
+    if (!protocol.currentTurnId) {
+      return result();
     }
-
-    const lifecycleOpts = {
-      turn: state.currentTurnId,
-    } satisfies CreateEnvelopeOptions;
     providerSubagentToSessionSubagent.clear();
-    return {
-      currentTurnId: null,
-      startedSubagents,
-      activeSubagents,
-      providerSubagentToSessionSubagent,
-      envelopes: [
-        ...emitSubagentStops(lifecycleOpts, startedSubagents, activeSubagents),
-        createEnvelope(
-          "agent",
-          {
-            t: "turn-end",
-            status: pickTurnEndStatus(message, type),
-          },
-          lifecycleOpts,
-        ),
-      ],
-    };
+    apply({ kind: "turnEnd", status: pickTurnEndStatus(message, type) });
+    return result();
   }
 
   if (type === "token_count") {
-    return {
-      currentTurnId: state.currentTurnId,
-      startedSubagents,
-      activeSubagents,
-      providerSubagentToSessionSubagent,
-      envelopes: [],
-    };
+    return result();
   }
 
   const subagent = resolveSessionSubagent(
     message,
     providerSubagentToSessionSubagent,
   );
-  const opts = buildEnvelopeOptions(state.currentTurnId, subagent);
+  const emitContent = (ev: SessionEvent): CodexMapperResult => {
+    // Codex Turns open explicitly on task_started; content never opens one, so
+    // content outside a Turn (e.g. early app-server notifications) stays Turn-less.
+    apply({
+      kind: "content",
+      ev,
+      openTurn: false,
+      ...(subagent ? { subagent } : {}),
+    });
+    return result();
+  };
 
   if (type === "agent_message") {
     if (typeof message.message !== "string") {
-      return {
-        currentTurnId: state.currentTurnId,
-        startedSubagents,
-        activeSubagents,
-        providerSubagentToSessionSubagent,
-        envelopes: [],
-      };
+      return result();
     }
-
-    const envelopes: SessionEnvelope[] = [];
-    maybeEmitSubagentStart(
-      subagent,
-      opts,
-      startedSubagents,
-      activeSubagents,
-      envelopes,
-    );
-    envelopes.push(
-      createEnvelope("agent", { t: "text", text: message.message }, opts),
-    );
-    return {
-      currentTurnId: state.currentTurnId,
-      startedSubagents,
-      activeSubagents,
-      providerSubagentToSessionSubagent,
-      envelopes,
-    };
+    return emitContent({ t: "text", text: message.message });
   }
 
   if (type === "text_delta") {
@@ -503,73 +445,21 @@ export function mapCodexMcpMessageToSessionEnvelopes(
       typeof message.delta !== "string" ||
       message.delta.length === 0
     ) {
-      return {
-        currentTurnId: state.currentTurnId,
-        startedSubagents,
-        activeSubagents,
-        providerSubagentToSessionSubagent,
-        envelopes: [],
-      };
+      return result();
     }
-
-    const envelopes: SessionEnvelope[] = [];
-    maybeEmitSubagentStart(
-      subagent,
-      opts,
-      startedSubagents,
-      activeSubagents,
-      envelopes,
-    );
-    envelopes.push(
-      createEnvelope(
-        "agent",
-        {
-          t: "text-delta",
-          stream: message.stream,
-          delta: message.delta,
-          ...(message.thinking ? { thinking: true } : {}),
-        } as any,
-        opts,
-      ),
-    );
-    return {
-      currentTurnId: state.currentTurnId,
-      startedSubagents,
-      activeSubagents,
-      providerSubagentToSessionSubagent,
-      envelopes,
-    };
+    return emitContent({
+      t: "text-delta",
+      stream: message.stream,
+      delta: message.delta,
+      ...(message.thinking ? { thinking: true } : {}),
+    } as any);
   }
 
   if (type === "service_message") {
     if (typeof message.text !== "string" || message.text.length === 0) {
-      return {
-        currentTurnId: state.currentTurnId,
-        startedSubagents,
-        activeSubagents,
-        providerSubagentToSessionSubagent,
-        envelopes: [],
-      };
+      return result();
     }
-
-    const envelopes: SessionEnvelope[] = [];
-    maybeEmitSubagentStart(
-      subagent,
-      opts,
-      startedSubagents,
-      activeSubagents,
-      envelopes,
-    );
-    envelopes.push(
-      createEnvelope("agent", { t: "service", text: message.text }, opts),
-    );
-    return {
-      currentTurnId: state.currentTurnId,
-      startedSubagents,
-      activeSubagents,
-      providerSubagentToSessionSubagent,
-      envelopes,
-    };
+    return emitContent({ t: "service", text: message.text });
   }
 
   if (type === "agent_reasoning" || type === "agent_reasoning_delta") {
@@ -581,33 +471,9 @@ export function mapCodexMcpMessageToSessionEnvelopes(
           : null;
 
     if (!text) {
-      return {
-        currentTurnId: state.currentTurnId,
-        startedSubagents,
-        activeSubagents,
-        providerSubagentToSessionSubagent,
-        envelopes: [],
-      };
+      return result();
     }
-
-    const envelopes: SessionEnvelope[] = [];
-    maybeEmitSubagentStart(
-      subagent,
-      opts,
-      startedSubagents,
-      activeSubagents,
-      envelopes,
-    );
-    envelopes.push(
-      createEnvelope("agent", { t: "text", text, thinking: true }, opts),
-    );
-    return {
-      currentTurnId: state.currentTurnId,
-      startedSubagents,
-      activeSubagents,
-      providerSubagentToSessionSubagent,
-      envelopes,
-    };
+    return emitContent({ t: "text", text, thinking: true });
   }
 
   if (type === "exec_command_begin" || type === "exec_approval_request") {
@@ -619,124 +485,42 @@ export function mapCodexMcpMessageToSessionEnvelopes(
       ...args
     } = message;
     const payload = buildCodexExecToolPayload(args as Record<string, unknown>);
-
-    const envelopes: SessionEnvelope[] = [];
-    maybeEmitSubagentStart(
-      subagent,
-      opts,
-      startedSubagents,
-      activeSubagents,
-      envelopes,
-    );
-    envelopes.push(
-      createEnvelope(
-        "agent",
-        {
-          t: "tool-call-start",
-          call,
-          name: payload.name,
-          title: payload.title,
-          description: payload.description,
-          args: payload.args,
-        },
-        opts,
-      ),
-    );
-    return {
-      currentTurnId: state.currentTurnId,
-      startedSubagents,
-      activeSubagents,
-      providerSubagentToSessionSubagent,
-      envelopes,
-    };
+    return emitContent({
+      t: "tool-call-start",
+      call,
+      name: payload.name,
+      title: payload.title,
+      description: payload.description,
+      args: payload.args,
+    });
   }
 
   if (type === "exec_command_end") {
-    const call = pickCallId(message);
-    const envelopes: SessionEnvelope[] = [];
-    maybeEmitSubagentStart(
-      subagent,
-      opts,
-      startedSubagents,
-      activeSubagents,
-      envelopes,
-    );
-    envelopes.push(createEnvelope("agent", { t: "tool-call-end", call }, opts));
-    return {
-      currentTurnId: state.currentTurnId,
-      startedSubagents,
-      activeSubagents,
-      providerSubagentToSessionSubagent,
-      envelopes,
-    };
+    return emitContent({ t: "tool-call-end", call: pickCallId(message) });
   }
 
   if (type === "patch_apply_begin") {
     const call = pickCallId(message);
     const autoApproved = (message as { auto_approved?: unknown }).auto_approved;
     const changes = (message as { changes?: unknown }).changes;
-
-    const envelopes: SessionEnvelope[] = [];
-    maybeEmitSubagentStart(
-      subagent,
-      opts,
-      startedSubagents,
-      activeSubagents,
-      envelopes,
-    );
-    envelopes.push(
-      createEnvelope(
-        "agent",
-        {
-          t: "tool-call-start",
-          call,
-          name: "CodexPatch",
-          title: "Apply patch",
-          description: patchDescription(changes),
-          args: {
-            auto_approved: autoApproved,
-            changes,
-          },
-        },
-        opts,
-      ),
-    );
-    return {
-      currentTurnId: state.currentTurnId,
-      startedSubagents,
-      activeSubagents,
-      providerSubagentToSessionSubagent,
-      envelopes,
-    };
+    return emitContent({
+      t: "tool-call-start",
+      call,
+      name: "CodexPatch",
+      title: "Apply patch",
+      description: patchDescription(changes),
+      args: {
+        auto_approved: autoApproved,
+        changes,
+      },
+    });
   }
 
   if (type === "patch_apply_end") {
-    const call = pickCallId(message);
-    const envelopes: SessionEnvelope[] = [];
-    maybeEmitSubagentStart(
-      subagent,
-      opts,
-      startedSubagents,
-      activeSubagents,
-      envelopes,
-    );
-    envelopes.push(createEnvelope("agent", { t: "tool-call-end", call }, opts));
-    return {
-      currentTurnId: state.currentTurnId,
-      startedSubagents,
-      activeSubagents,
-      providerSubagentToSessionSubagent,
-      envelopes,
-    };
+    return emitContent({ t: "tool-call-end", call: pickCallId(message) });
   }
 
-  return {
-    currentTurnId: state.currentTurnId,
-    startedSubagents,
-    activeSubagents,
-    providerSubagentToSessionSubagent,
-    envelopes: [],
-  };
+  return result();
 }
 
 export function mapCodexProcessorMessageToSessionEnvelopes(
