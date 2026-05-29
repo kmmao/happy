@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.86.11 - 2026-05-30
+
+Consistent turn and subagent lifecycle across Claude and Codex sessions.
+
+- Unified the Turn/Subagent lifecycle that had silently drifted between the Claude and Codex session protocols into a single shared reducer, so both providers now open turns, start subagents exactly once, and close turns identically.
+- A turn that ends (or a session that aborts mid-stream) now always stops any still-active subagent first, so the App no longer shows a dangling subagent after the turn is over.
+
 ## 0.86.0 - 2026-05-26
 
 Reliability and performance improvements for PTY-mode (remote) Claude sessions, plus a richer context-usage panel and an optional deep MCP health check.
