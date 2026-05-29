@@ -16,6 +16,12 @@ import { t } from "@/text";
 interface CodexFileChangeCardProps {
   change: FileChange;
   initiallyExpanded?: boolean;
+  // Optional controlled-mode pair. CodexCodeTab hoists expansion into a
+  // FlatList parent so virtualization can drop off-screen rows without
+  // losing user-toggled state; independent callers (CodexPlanSection)
+  // omit these and the card keeps its original useState behaviour.
+  expanded?: boolean;
+  onToggle?: (filePath: string) => void;
 }
 
 function getKindVisuals(kind: ReturnType<typeof inferCodexFileChangeKind>) {
@@ -38,9 +44,23 @@ function getKindVisuals(kind: ReturnType<typeof inferCodexFileChangeKind>) {
 }
 
 export const CodexFileChangeCard = React.memo<CodexFileChangeCardProps>(
-  function CodexFileChangeCard({ change, initiallyExpanded = false }) {
+  function CodexFileChangeCard({
+    change,
+    initiallyExpanded = false,
+    expanded: expandedProp,
+    onToggle,
+  }) {
     const { theme } = useUnistyles();
-    const [expanded, setExpanded] = React.useState(initiallyExpanded);
+    const isControlled = expandedProp !== undefined;
+    const [internalExpanded, setInternalExpanded] = React.useState(initiallyExpanded);
+    const expanded = isControlled ? expandedProp : internalExpanded;
+    const setExpanded = React.useCallback(() => {
+      if (isControlled) {
+        onToggle?.(change.filePath);
+      } else {
+        setInternalExpanded((value) => !value);
+      }
+    }, [isControlled, onToggle, change.filePath]);
     const language = getLanguageForPath(change.filePath);
     const kind = inferCodexFileChangeKind(change);
     const visuals = getKindVisuals(kind);
@@ -78,7 +98,7 @@ export const CodexFileChangeCard = React.memo<CodexFileChangeCardProps>(
         ]}
       >
         <Pressable
-          onPress={() => setExpanded((value) => !value)}
+          onPress={setExpanded}
           style={({ pressed }) => [
             styles.header,
             {

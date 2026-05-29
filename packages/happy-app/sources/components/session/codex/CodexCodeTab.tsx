@@ -1,5 +1,5 @@
 import * as React from "react";
-import { ScrollView, View } from "react-native";
+import { FlatList, View, type ListRenderItem } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
 import { CodexEmptyState } from "@/components/session/codex/CodexEmptyState";
@@ -30,15 +30,21 @@ function sortFileChanges(changes: readonly FileChange[]): FileChange[] {
   });
 }
 
+const codexKeyExtractor = (item: FileChange) => item.filePath;
+
 export const CodexCodeTab = React.memo<CodexCodeTabProps>(
   function CodexCodeTab({ sessionId }) {
     const { theme } = useUnistyles();
     const { messages } = useSessionMessages(sessionId);
+    // Match LegacyCodeChangesView: defer the heavy messages → fileChanges
+    // derivation so streaming chunks don't re-run collectToolCalls + the
+    // codex tab data extractor on every render.
+    const deferredMessages = React.useDeferredValue(messages);
     const session = useSession(sessionId);
     const metadata = session?.metadata ?? null;
 
     const data = React.useMemo(() => {
-      const toolCalls = collectToolCalls(messages);
+      const toolCalls = collectToolCalls(deferredMessages);
       const codexData = extractCodexCodeTabData(toolCalls, metadata);
       if (codexData.fileChanges.length > 0) {
         return codexData;
@@ -48,7 +54,7 @@ export const CodexCodeTab = React.memo<CodexCodeTabProps>(
         ...codexData,
         fileChanges: extractFileChanges(toolCalls, metadata),
       };
-    }, [messages, metadata]);
+    }, [deferredMessages, metadata]);
 
     const fileChanges = React.useMemo(
       () => sortFileChanges(data.fileChanges),
@@ -62,6 +68,46 @@ export const CodexCodeTab = React.memo<CodexCodeTabProps>(
     const totalDeletions = fileChanges.reduce(
       (sum, change) => sum + change.totalDeletions,
       0,
+    );
+
+    // Expansion hoisted out of CodexFileChangeCard. Seeds the first file as
+    // expanded once on the first non-empty render — preserving the legacy
+    // `initiallyExpanded={index === 0}` UX without re-expanding it every
+    // time the sorted file list shuffles during streaming.
+    const [expandedKeys, setExpandedKeys] = React.useState<ReadonlySet<string>>(
+      () => new Set<string>(),
+    );
+    const seededRef = React.useRef(false);
+    if (!seededRef.current && fileChanges.length > 0) {
+      seededRef.current = true;
+      setExpandedKeys(new Set([fileChanges[0].filePath]));
+    }
+    const handleToggle = React.useCallback((filePath: string) => {
+      setExpandedKeys((prev) => {
+        const next = new Set(prev);
+        if (next.has(filePath)) next.delete(filePath);
+        else next.add(filePath);
+        return next;
+      });
+    }, []);
+
+    const renderItem = React.useCallback<ListRenderItem<FileChange>>(
+      ({ item }) => (
+        <CodexFileChangeCard
+          change={item}
+          expanded={expandedKeys.has(item.filePath)}
+          onToggle={handleToggle}
+        />
+      ),
+      [expandedKeys, handleToggle],
+    );
+
+    const flatListContentStyle = React.useMemo(
+      () => ({
+        padding: theme.codex.spacing.panelPadding,
+        gap: theme.codex.spacing.cardGap,
+      }),
+      [theme.codex.spacing.panelPadding, theme.codex.spacing.cardGap],
     );
 
     return (
@@ -81,24 +127,20 @@ export const CodexCodeTab = React.memo<CodexCodeTabProps>(
         {totalFiles === 0 ? (
           <CodexEmptyState />
         ) : (
-          <ScrollView
+          <FlatList
             style={styles.scrollView}
-            contentContainerStyle={[
-              styles.contentContainer,
-              {
-                padding: theme.codex.spacing.panelPadding,
-                gap: theme.codex.spacing.cardGap,
-              },
-            ]}
-          >
-            {fileChanges.map((change, index) => (
-              <CodexFileChangeCard
-                key={change.filePath}
-                change={change}
-                initiallyExpanded={index === 0}
-              />
-            ))}
-          </ScrollView>
+            contentContainerStyle={flatListContentStyle}
+            data={fileChanges}
+            renderItem={renderItem}
+            keyExtractor={codexKeyExtractor}
+            // Same virtualization tuning as LegacyCodeChangesView; codex
+            // cards each carry a CodexUnifiedDiffView which is expensive
+            // to keep mounted off-screen.
+            removeClippedSubviews
+            initialNumToRender={8}
+            maxToRenderPerBatch={6}
+            windowSize={5}
+          />
         )}
       </View>
     );

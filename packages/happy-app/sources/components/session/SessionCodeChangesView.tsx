@@ -1,5 +1,10 @@
 import * as React from "react";
-import { Pressable, ScrollView, View } from "react-native";
+import {
+  FlatList,
+  Pressable,
+  View,
+  type ListRenderItem,
+} from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
@@ -18,13 +23,33 @@ import {
   type FileChange,
 } from "./sidePanelCodeData";
 
+interface LegacyFileChangeItemProps {
+  change: FileChange;
+  // Optional controlled-mode pair. When `expanded` is provided the row stops
+  // managing its own state — used by LegacyCodeChangesView so that FlatList
+  // virtualization can unmount/remount a row without losing the expansion.
+  // Independent callers (SessionProgressPanel/CodexPlanSection equivalent)
+  // pass nothing and the row falls back to its original useState behavior.
+  expanded?: boolean;
+  onToggle?: (filePath: string) => void;
+}
+
 const LegacyFileChangeItem = React.memo(function LegacyFileChangeItem({
   change,
-}: {
-  change: FileChange;
-}) {
+  expanded: expandedProp,
+  onToggle,
+}: LegacyFileChangeItemProps) {
   const { theme } = useUnistyles();
-  const [expanded, setExpanded] = React.useState(false);
+  const isControlled = expandedProp !== undefined;
+  const [internalExpanded, setInternalExpanded] = React.useState(false);
+  const expanded = isControlled ? expandedProp : internalExpanded;
+  const handlePress = React.useCallback(() => {
+    if (isControlled) {
+      onToggle?.(change.filePath);
+    } else {
+      setInternalExpanded((value) => !value);
+    }
+  }, [isControlled, onToggle, change.filePath]);
   const language = getLanguageForPath(change.filePath);
 
   return (
@@ -38,7 +63,7 @@ const LegacyFileChangeItem = React.memo(function LegacyFileChangeItem({
           gap: 6,
           opacity: pressed ? 0.6 : 1,
         })}
-        onPress={() => setExpanded((value) => !value)}
+        onPress={handlePress}
       >
         <Ionicons
           name={expanded ? "chevron-down" : "chevron-forward"}
@@ -88,6 +113,8 @@ const LegacyFileChangeItem = React.memo(function LegacyFileChangeItem({
 
 export const FileChangeItem = LegacyFileChangeItem;
 
+const legacyKeyExtractor = (item: FileChange) => item.filePath;
+
 const LegacyCodeChangesView = React.memo(function LegacyCodeChangesView({
   sessionId,
 }: {
@@ -121,8 +148,34 @@ const LegacyCodeChangesView = React.memo(function LegacyCodeChangesView({
     0,
   );
 
-  return (
-    <View style={[styles.legacyContainer, { backgroundColor: theme.colors.surface }]}>
+  // Expansion is hoisted out of the row so FlatList virtualization can
+  // unmount/remount a row (when it leaves the window and returns) without
+  // losing the user's expanded view of its diff.
+  const [expandedKeys, setExpandedKeys] = React.useState<ReadonlySet<string>>(
+    () => new Set<string>(),
+  );
+  const handleToggle = React.useCallback((filePath: string) => {
+    setExpandedKeys((prev) => {
+      const next = new Set(prev);
+      if (next.has(filePath)) next.delete(filePath);
+      else next.add(filePath);
+      return next;
+    });
+  }, []);
+
+  const renderItem = React.useCallback<ListRenderItem<FileChange>>(
+    ({ item }) => (
+      <LegacyFileChangeItem
+        change={item}
+        expanded={expandedKeys.has(item.filePath)}
+        onToggle={handleToggle}
+      />
+    ),
+    [expandedKeys, handleToggle],
+  );
+
+  const SummaryHeader = React.useMemo(
+    () => (
       <View
         style={[
           styles.legacySummaryBar,
@@ -141,25 +194,48 @@ const LegacyCodeChangesView = React.memo(function LegacyCodeChangesView({
           <DiffStatsBar additions={totalAdditions} deletions={totalDeletions} />
         ) : null}
       </View>
-      {totalFiles === 0 ? (
-        <View style={styles.emptyContainer}>
-          <Ionicons
-            name="document-text-outline"
-            size={40}
-            color={theme.colors.textSecondary}
-          />
-          <Text style={{ fontSize: 14, color: theme.colors.textSecondary }}>
-            {t("changes.noChanges")}
-          </Text>
-        </View>
-      ) : (
-        <ScrollView style={styles.scrollView}>
-          {fileChanges.map((change) => (
-            <LegacyFileChangeItem key={change.filePath} change={change} />
-          ))}
-        </ScrollView>
-      )}
-    </View>
+    ),
+    [
+      theme.colors.divider,
+      theme.colors.text,
+      totalFiles,
+      totalAdditions,
+      totalDeletions,
+    ],
+  );
+
+  const EmptyView = React.useMemo(
+    () => (
+      <View style={styles.emptyContainer}>
+        <Ionicons
+          name="document-text-outline"
+          size={40}
+          color={theme.colors.textSecondary}
+        />
+        <Text style={{ fontSize: 14, color: theme.colors.textSecondary }}>
+          {t("changes.noChanges")}
+        </Text>
+      </View>
+    ),
+    [theme.colors.textSecondary],
+  );
+
+  return (
+    <FlatList
+      style={[styles.legacyContainer, { backgroundColor: theme.colors.surface }]}
+      contentContainerStyle={styles.legacyContentContainer}
+      data={fileChanges}
+      renderItem={renderItem}
+      keyExtractor={legacyKeyExtractor}
+      ListHeaderComponent={SummaryHeader}
+      ListEmptyComponent={EmptyView}
+      // Virtualize so off-screen rows release their ToolDiffView trees;
+      // critical for long sessions with 100+ changed files.
+      removeClippedSubviews
+      initialNumToRender={12}
+      maxToRenderPerBatch={8}
+      windowSize={5}
+    />
   );
 });
 
@@ -184,6 +260,11 @@ const styles = StyleSheet.create((_, rt) => ({
   legacyContainer: {
     flex: 1,
   },
+  // contentContainerStyle for the FlatList. flexGrow lets ListEmptyComponent
+  // fill the visible area so the "no changes" view stays vertically centered.
+  legacyContentContainer: {
+    flexGrow: 1,
+  },
   legacySummaryBar: {
     flexDirection: "row",
     alignItems: "center",
@@ -201,8 +282,5 @@ const styles = StyleSheet.create((_, rt) => ({
     justifyContent: "center",
     alignItems: "center",
     gap: 12,
-  },
-  scrollView: {
-    flex: 1,
   },
 }));
