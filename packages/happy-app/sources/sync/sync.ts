@@ -86,6 +86,7 @@ import {
   deleteLastSeq,
   deleteBackfillBoundary,
 } from "./persistence";
+import { SessionMessageCursorRegistry } from "./sessionMessageCursor";
 import { initializeTracking, tracking } from "@/track";
 import { parseToken } from "@/utils/parseToken";
 import { RevenueCat, LogLevel, PaywallResult } from "./revenueCat";
@@ -182,7 +183,12 @@ class Sync {
   private messagesSync = new Map<string, InvalidateSync>();
   private sendSync = new Map<string, InvalidateSync>();
   private sendAbortControllers = new Map<string, AbortController>();
-  private sessionLastSeq = loadLastSeqs();
+  /**
+   * Single owner of per-session read position (seq) + live dedup. Replaces the
+   * former parallel `sessionLastSeq` + `processedWebSocketMessageIds` maps; seq
+   * persistence is owned by the cursor's advanceTo (no ad-hoc saveLastSeq).
+   */
+  private cursors = new SessionMessageCursorRegistry(saveLastSeq, loadLastSeqs());
   private pendingOutbox = new Map<string, OutboxMessage[]>();
   // Owns the per-session message queue, serialization lock, processing flag,
   // and delta-batching frame. See sessionMessageProcessor.ts.
@@ -199,11 +205,7 @@ class Sync {
   private sessionOldestSeq = new Map<string, number>();
   // Sessions with a running background older-message prefetch loop (re-entrancy guard).
   private backgroundPrefetchSessions = new Set<string>();
-  // Tracks recently processed WebSocket message server-IDs per session.
-  // Prevents double-delivery of the same event (e.g. "Context was reset" appearing twice
-  // when the same new-message WebSocket event is processed by both direct delivery and
-  // a subsequent fetch). Capped at 200 entries per session to avoid unbounded growth.
-  private processedWebSocketMessageIds = new Map<string, Set<string>>();
+
   private sessionDataKeys = new Map<string, Uint8Array>(); // Store session data encryption keys internally
   private machineDataKeys = new Map<string, Uint8Array>(); // Store machine data encryption keys internally
   private artifactDataKeys = new Map<string, Uint8Array>(); // Store artifact data encryption keys internally
@@ -502,24 +504,24 @@ class Sync {
           // Always re-run full backfill for trimmed caches because only the
           // newest messages are persisted between app launches.
           if (!this.backfilledSessions.has(sessionId)) {
-            this.sessionLastSeq.delete(sessionId);
+            this.cursors.delete(sessionId);
             deleteLastSeq(sessionId);
-          } else if (!this.sessionLastSeq.has(sessionId)) {
-            this.sessionLastSeq.set(sessionId, cached.lastSeq);
+          } else if (!this.cursors.has(sessionId)) {
+            this.cursors.seed(sessionId, cached.lastSeq);
           }
-        } else if (!this.sessionLastSeq.has(sessionId)) {
+        } else if (!this.cursors.has(sessionId)) {
           // Cache is complete — use cached lastSeq for incremental fetch only
-          this.sessionLastSeq.set(sessionId, cached.lastSeq);
+          this.cursors.seed(sessionId, cached.lastSeq);
         }
         log.log(
           `💬 Restored ${cached.messages.length} cached messages for ${sessionId} (trimmed: ${cached.isTrimmed})`,
         );
-      } else if (this.sessionLastSeq.has(sessionId)) {
+      } else if (this.cursors.has(sessionId)) {
         // lastSeq exists but no cache (e.g. first launch after feature rollout)
         // Reset to 0 to force full re-fetch, otherwise history would be missing.
         // Clear any stale backfill boundary too — the tail range it claims to
         // cover is no longer guaranteed to be in storage.
-        this.sessionLastSeq.delete(sessionId);
+        this.cursors.delete(sessionId);
         deleteLastSeq(sessionId);
         deleteBackfillBoundary(sessionId);
         log.log(`💬 Reset lastSeq for ${sessionId} — no cache available`);
@@ -544,7 +546,7 @@ class Sync {
    * from the beginning, recovering any messages that went missing.
    */
   forceReloadMessages = (sessionId: string): void => {
-    this.sessionLastSeq.delete(sessionId);
+    this.cursors.delete(sessionId);
     deleteLastSeq(sessionId);
     deleteBackfillBoundary(sessionId);
     this.backfilledSessions.delete(sessionId);
@@ -630,7 +632,8 @@ class Sync {
         messagesSync: this.messagesSync,
         sendSync: this.sendSync,
         pendingOutbox: this.pendingOutbox,
-        sessionLastSeq: this.sessionLastSeq,
+        getCursor: (sid) => this.cursors.get(sid),
+        deleteCursor: (sid) => this.cursors.delete(sid),
       },
       sessionId,
     );
@@ -666,8 +669,11 @@ class Sync {
       this.sendAbortControllers.delete(sessionId);
       // Release queue, lock, processing flag, and pending delta frame
       this.messageProcessor.release(sessionId);
-      // Release WebSocket dedup set
-      this.processedWebSocketMessageIds.delete(sessionId);
+      // Release the live dedup set but keep the cursor's seq — the session still
+      // exists on the server and we need incremental fetch when the user returns.
+      if (this.cursors.has(sessionId)) {
+        this.cursors.get(sessionId).releaseDedup();
+      }
       // Cancel any pending cache-write timer
       const cacheTimer = this.cacheWriteTimers.get(sessionId);
       if (cacheTimer) {
@@ -1978,15 +1984,12 @@ class Sync {
       const data = (await response.json()) as V3PostSessionMessagesResponse;
       pending.splice(0, batch.length);
       if (Array.isArray(data.messages) && data.messages.length > 0) {
-        const currentLastSeq = this.sessionLastSeq.get(sessionId) ?? 0;
-        let maxSeq = currentLastSeq;
+        // Advance the cursor past every message the server echoed back.
+        // advanceTo only moves forward and persists, so the max wins.
+        const cursor = this.cursors.get(sessionId);
         for (const message of data.messages) {
-          if (message.seq > maxSeq) {
-            maxSeq = message.seq;
-          }
+          cursor.advanceTo(message.seq);
         }
-        this.sessionLastSeq.set(sessionId, maxSeq);
-        saveLastSeq(sessionId, maxSeq);
       }
     } catch (error) {
       this.maybeStartBackgroundSendWatchdog();
@@ -2010,9 +2013,8 @@ class Sync {
   private get messageFetchCtx(): MessageFetchContext {
     return {
       encryption: this.encryption,
-      sessionLastSeq: this.sessionLastSeq,
+      getCursor: (sessionId) => this.cursors.get(sessionId),
       getMessageLock: (sessionId) => this.messageProcessor.getLock(sessionId),
-      processedWebSocketMessageIds: this.processedWebSocketMessageIds,
       sessionOldestSeq: this.sessionOldestSeq,
       backfilledSessions: this.backfilledSessions,
       cacheWriteTimers: this.cacheWriteTimers,
@@ -2151,8 +2153,8 @@ class Sync {
       getMessagesSync: this.getMessagesSync.bind(this),
       fetchSessions: () => { this.fetchSessions(); },
       onSessionVisible: this.onSessionVisible.bind(this),
-      sessionLastSeq: this.sessionLastSeq,
-      saveLastSeq: saveLastSeq,
+      getCursor: (sessionId) => this.cursors.get(sessionId),
+      deleteCursor: (sessionId) => this.cursors.delete(sessionId),
       deleted404Sessions: this.deleted404Sessions,
       messagesSync: this.messagesSync as Map<string, { stop: () => void }>,
       sendSync: this.sendSync as Map<string, { stop: () => void }>,
@@ -2167,7 +2169,6 @@ class Sync {
       projectsSync: this.projectsSync,
       sessionsSync: this.sessionsSync,
       assumeUsers: this.assumeUsers.bind(this),
-      processedWebSocketMessageIds: this.processedWebSocketMessageIds,
     };
   }
 

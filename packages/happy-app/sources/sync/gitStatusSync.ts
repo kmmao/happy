@@ -27,6 +27,7 @@ import {
   SubmoduleInfo,
 } from "./projectManager";
 import { log } from '@/log';
+import { registerSessionScopedStore } from "./sessionScopedStore";
 
 const MAX_SUBMODULES = 20;
 const SUBMODULE_PATHS_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
@@ -204,6 +205,10 @@ export class GitStatusSync {
 
     // Clear git status from storage
     storage.getState().applyGitStatus(sessionId, null);
+  }
+
+  disposeSession(sessionId: string): void {
+    this.clearForSession(sessionId);
   }
 
   /**
@@ -679,3 +684,4 @@ export class GitStatusSync {
 
 // Global singleton instance
 export const gitStatusSync = new GitStatusSync();
+registerSessionScopedStore(gitStatusSync);

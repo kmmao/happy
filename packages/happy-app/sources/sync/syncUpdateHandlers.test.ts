@@ -313,7 +313,7 @@ describe("handleNewMessageUpdate", () => {
   });
 
   it("启动竞态下先等待 sessions 同步再重试 encryption,而非直接丢弃 (#84)", async () => {
-    const encryption = { decryptMessage: vi.fn() };
+    const encryption = { decryptMessageOutcomes: vi.fn() };
 
     // encryption 第一次缺失,awaitQueue 之后才就绪
     const getSessionEncryption = vi
@@ -335,7 +335,7 @@ describe("handleNewMessageUpdate", () => {
 
     expect(awaitQueue).toHaveBeenCalledTimes(1);
     expect(getSessionEncryption).toHaveBeenCalledTimes(2);
-    expect(encryption.decryptMessage).not.toHaveBeenCalled();
+    expect(encryption.decryptMessageOutcomes).not.toHaveBeenCalled();
     expect(mocks.fetchSessionsMock).not.toHaveBeenCalled();
   });
 
@@ -356,5 +356,36 @@ describe("handleNewMessageUpdate", () => {
     expect(awaitQueue).toHaveBeenCalledTimes(1);
     expect(getSessionEncryption).toHaveBeenCalledTimes(2);
     expect(mocks.fetchSessionsMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("decrypt-failed 的实时消息触发 refetch 以恢复密钥,且不入队 (#2)", async () => {
+    const decryptMessageOutcomes = vi.fn(async () => [
+      { ok: false, reason: "decrypt-failed", seq: 42, id: "m1" },
+    ]);
+    const getSessionEncryption = vi.fn().mockReturnValue({
+      decryptMessageOutcomes,
+    });
+    const enqueueMessages = vi.fn();
+
+    await handleNewMessageUpdate(
+      { seq: 42, createdAt: 999 } as any,
+      {
+        t: "new-message",
+        sid: "session-1",
+        message: { id: "m1", seq: 42, content: { t: "encrypted", c: "x" } },
+      } as any,
+      {
+        encryption: { getSessionEncryption },
+        fetchSessions: mocks.fetchSessionsMock,
+        enqueueMessages,
+        sessionsSync: { invalidate: vi.fn(), awaitQueue: vi.fn(async () => {}) },
+      } as any,
+    );
+
+    expect(decryptMessageOutcomes).toHaveBeenCalledTimes(1);
+    expect(mocks.fetchSessionsMock).toHaveBeenCalledTimes(1);
+    // The message must NOT be marked processed / enqueued — a recovered key
+    // needs to re-decrypt it on refetch.
+    expect(enqueueMessages).not.toHaveBeenCalled();
   });
 });

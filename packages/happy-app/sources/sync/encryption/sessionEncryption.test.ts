@@ -174,31 +174,3 @@ describe("SessionEncryption.decryptMessageOutcomes", () => {
     expect(spy).toHaveBeenCalledTimes(1);
   });
 });
-
-describe("SessionEncryption.decryptMessages (legacy view)", () => {
-  it("maps outcomes back to the historical (DecryptedMessage | null)[] shape", async () => {
-    const { enc } = makeSession();
-    const results = await enc.decryptMessages([
-      encryptedMessage("ok1", 1, { role: "user", text: "hi" }),
-      corruptMessage("bad1", 2),
-      undefined as unknown as ApiMessage,
-    ]);
-
-    // Success → message with content; decrypt failure → content-null
-    // placeholder (NOT null); missing slot → null.
-    expect(results[0]).toMatchObject({ id: "ok1", content: { role: "user", text: "hi" } });
-    expect(results[1]).toMatchObject({ id: "bad1", content: null });
-    expect(results[2]).toBeNull();
-  });
-
-  it("decryptMessage returns the message on success and null when absent", async () => {
-    const { enc } = makeSession();
-    const ok = await enc.decryptMessage(
-      encryptedMessage("ok1", 1, { role: "user" }),
-    );
-    expect(ok?.id).toBe("ok1");
-
-    const none = await enc.decryptMessage(null);
-    expect(none).toBeNull();
-  });
-});

@@ -8,6 +8,7 @@ import {
   MessageDecryptFailureReason,
   SessionEncryption,
 } from "./encryption/sessionEncryption";
+import type { SessionMessageCursor } from "./sessionMessageCursor";
 import { AuthCredentials } from "@/auth/tokenStorage";
 import { apiSocket } from "./apiSocket";
 import { storage } from "./storage";
@@ -30,7 +31,6 @@ import {
   deleteHistoryComplete,
 } from "./messageCache";
 import {
-  saveLastSeq,
   deleteLastSeq,
   deleteBackfillBoundary,
 } from "./persistence";
@@ -42,9 +42,8 @@ import {
   shouldApplyMessagesImmediately,
   shouldFetchNewestPageFirst,
 } from "./messageFetchStrategy";
-import { gitStatusSync } from "./gitStatusSync";
-import { projectManager } from "./projectManager";
 import { InvalidateSync } from "@/utils/sync";
+import { disposeSessionScopedState } from "./sessionScopedStore";
 
 // ---------------------------------------------------------------------------
 // Context type
@@ -52,10 +51,10 @@ import { InvalidateSync } from "@/utils/sync";
 
 export type MessageFetchContext = {
   encryption: Encryption;
-  sessionLastSeq: Map<string, number>;
+  /** The single owner of per-session seq (and live dedup). */
+  getCursor: (sessionId: string) => SessionMessageCursor;
   /** Get-or-create the per-session serialization lock owned by the message processor. */
   getMessageLock: (sessionId: string) => AsyncLock;
-  processedWebSocketMessageIds: Map<string, Set<string>>;
   sessionOldestSeq: Map<string, number>;
   backfilledSessions: Set<string>;
   cacheWriteTimers: Map<string, ReturnType<typeof setTimeout>>;
@@ -89,15 +88,14 @@ export function cleanupSessionLocallyCore(
     | "messagesSync"
     | "sendSync"
     | "pendingOutbox"
-    | "sessionLastSeq"
-  >,
+    | "getCursor"
+  > & { deleteCursor: (sessionId: string) => void },
   sessionId: string,
 ): void {
   ctx.deleted404Sessions.add(sessionId);
   storage.getState().deleteSession(sessionId);
   ctx.encryption.removeSessionEncryption(sessionId);
-  projectManager.removeSession(sessionId);
-  gitStatusSync.clearForSession(sessionId);
+  disposeSessionScopedState(sessionId);
   // Remove from map so future invalidate() calls are no-ops,
   // but don't call stop() on messagesSync — we are inside this sync's callback.
   ctx.messagesSync.delete(sessionId);
@@ -108,7 +106,7 @@ export function cleanupSessionLocallyCore(
     ctx.sendSync.delete(sessionId);
   }
   ctx.pendingOutbox.delete(sessionId);
-  ctx.sessionLastSeq.delete(sessionId);
+  ctx.deleteCursor(sessionId);
   deleteLastSeq(sessionId);
   deleteBackfillBoundary(sessionId);
   deleteMessageCache(sessionId);
@@ -178,7 +176,7 @@ export async function decryptAndNormalizeBatchAction(
 // ---------------------------------------------------------------------------
 
 export function applyMessagesAction(
-  ctx: Pick<MessageFetchContext, "cacheWriteTimers" | "sessionLastSeq">,
+  ctx: Pick<MessageFetchContext, "cacheWriteTimers" | "getCursor">,
   sessionId: string,
   messages: NormalizedMessage[],
 ): void {
@@ -209,7 +207,7 @@ export function applyMessagesAction(
 // ---------------------------------------------------------------------------
 
 export function scheduleCacheWriteAction(
-  ctx: Pick<MessageFetchContext, "cacheWriteTimers" | "sessionLastSeq">,
+  ctx: Pick<MessageFetchContext, "cacheWriteTimers" | "getCursor">,
   sessionId: string,
 ): void {
   const existing = ctx.cacheWriteTimers.get(sessionId);
@@ -222,7 +220,7 @@ export function scheduleCacheWriteAction(
     setTimeout(() => {
       ctx.cacheWriteTimers.delete(sessionId);
       const session = storage.getState().sessionMessages[sessionId];
-      const lastSeq = ctx.sessionLastSeq.get(sessionId) ?? 0;
+      const lastSeq = ctx.getCursor(sessionId).lastSeq();
       if (session?.isLoaded && session.messages.length > 0) {
         const latestRequestPreview =
           storage.getState().sessions[sessionId]?.latestUserRequestPreview ??
@@ -234,12 +232,12 @@ export function scheduleCacheWriteAction(
 }
 
 export function flushPendingCacheWritesAction(
-  ctx: Pick<MessageFetchContext, "cacheWriteTimers" | "sessionLastSeq">,
+  ctx: Pick<MessageFetchContext, "cacheWriteTimers" | "getCursor">,
 ): void {
   for (const [sessionId, timer] of ctx.cacheWriteTimers) {
     clearTimeout(timer);
     const session = storage.getState().sessionMessages[sessionId];
-    const lastSeq = ctx.sessionLastSeq.get(sessionId) ?? 0;
+    const lastSeq = ctx.getCursor(sessionId).lastSeq();
     const latestRequestPreview =
       storage.getState().sessions[sessionId]?.latestUserRequestPreview ??
       (session?.messages.length > 0
@@ -288,7 +286,8 @@ export async function fetchMessagesAction(
       throw new Error(`Session encryption not ready for ${sessionId}`);
     }
 
-    const initialAfterSeq = ctx.sessionLastSeq.get(sessionId) ?? 0;
+    const cursor = ctx.getCursor(sessionId);
+    const initialAfterSeq = cursor.lastSeq();
     const fetchStrategy = resolveMessageHistoryFetchStrategy({ initialAfterSeq });
     const shouldApplyImmediately = shouldApplyMessagesImmediately(fetchStrategy);
     let afterSeq = initialAfterSeq;
@@ -353,8 +352,7 @@ export async function fetchMessagesAction(
         });
         if (cursorAdvance.cursorSeq !== null) {
           if (shouldApplyImmediately) {
-            ctx.sessionLastSeq.set(sessionId, cursorAdvance.cursorSeq);
-            saveLastSeq(sessionId, cursorAdvance.cursorSeq);
+            cursor.advanceTo(cursorAdvance.cursorSeq);
           } else {
             pendingCursorSeq = cursorAdvance.cursorSeq;
           }
@@ -411,8 +409,7 @@ export async function fetchMessagesAction(
         processedSeqs: decryptResult.processedSeqs,
       });
       if (cursorAdvance.cursorSeq !== null) {
-        ctx.sessionLastSeq.set(sessionId, cursorAdvance.cursorSeq);
-        saveLastSeq(sessionId, cursorAdvance.cursorSeq);
+        cursor.advanceTo(cursorAdvance.cursorSeq);
       }
 
       hasMore = !!data.hasMore;
@@ -443,8 +440,7 @@ export async function fetchMessagesAction(
       applyMessagesAction(ctx, sessionId, pendingNormalizedMessages);
     }
     if (!shouldApplyImmediately && pendingCursorSeq !== null) {
-      ctx.sessionLastSeq.set(sessionId, pendingCursorSeq);
-      saveLastSeq(sessionId, pendingCursorSeq);
+      cursor.advanceTo(pendingCursorSeq);
     }
 
     // Surface side-channel session signals after all messages are merged in seq order.

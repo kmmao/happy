@@ -6,6 +6,7 @@
 
 import { Session, MachineMetadata, GitStatus } from "./storageTypes";
 import { ServerProject } from "./apiProjects";
+import { registerSessionScopedStore } from "./sessionScopedStore";
 
 /**
  * Unique project identifier based on machine ID and path
@@ -211,6 +212,10 @@ class ProjectManager {
     if (project.sessionIds.length === 0 && !project.serverId) {
       this.removeProject(projectId);
     }
+  }
+
+  disposeSession(sessionId: string): void {
+    this.removeSession(sessionId);
   }
 
   /**
@@ -655,6 +660,7 @@ class ProjectManager {
 
 // Singleton instance
 export const projectManager = new ProjectManager();
+registerSessionScopedStore(projectManager);
 
 /**
  * Helper function to create a project key

@@ -3,6 +3,7 @@ import { shouldPublishCountdownRemaining } from "./autoOptionCountdown";
 import type { Message } from "./typesMessage";
 
 const applyLocalSettings = vi.fn();
+let credentials: { token: string } | null = null;
 const sendMessage = vi.fn<(
     sessionId: string,
     text: string,
@@ -61,7 +62,7 @@ vi.mock("./apiOptionScore", () => ({
 
 vi.mock("./sync", () => ({
     sync: {
-        getCredentials: () => null,
+        getCredentials: () => credentials,
     },
 }));
 
@@ -137,6 +138,7 @@ describe("AutoOptionSendService timer", () => {
         });
         sendMessage.mockResolvedValue(undefined);
         applyLocalSettings.mockClear();
+        credentials = null;
         storageState.localSettings = {};
         storageState.sessionMessages = {
             "session-1": {
@@ -189,5 +191,56 @@ describe("AutoOptionSendService timer", () => {
 
         expect(sendMessage).not.toHaveBeenCalled();
         expect(service.getState("session-1").status).toBe("off");
+    });
+
+    it("disposes countdown state and clears the session timer", async () => {
+        const { createAutoOptionSendServiceForTesting } = await import("./autoOptionSendService");
+        const service = createAutoOptionSendServiceForTesting();
+        const internals = service as unknown as { activeSessionId: string | null };
+        service.init(sendMessage);
+
+        service.toggle("session-1", true);
+        internals.activeSessionId = "session-1";
+        expect(service.getState("session-1").status).toBe("armed");
+        expect(vi.getTimerCount()).toBeGreaterThan(0);
+
+        service.disposeSession("session-1");
+
+        expect(vi.getTimerCount()).toBe(0);
+        expect(service.getState("session-1").status).toBe("off");
+        expect(internals.activeSessionId).toBeNull();
+    });
+
+    it("aborts and removes session controllers", async () => {
+        const { createAutoOptionSendServiceForTesting } = await import("./autoOptionSendService");
+        const service = createAutoOptionSendServiceForTesting();
+        const abortSpy = vi.spyOn(AbortController.prototype, "abort");
+        const semanticController = new AbortController();
+        const passiveController = new AbortController();
+        const generationController = new AbortController();
+        const autoGenerationController = new AbortController();
+        const internals = service as unknown as {
+            semanticControllers: Map<string, AbortController>;
+            passiveScoringControllers: Map<string, AbortController>;
+            generationControllers: Map<string, AbortController>;
+            autoGenerationControllers: Map<string, AbortController>;
+        };
+
+        internals.semanticControllers.set("session-1", semanticController);
+        internals.passiveScoringControllers.set("session-1", passiveController);
+        internals.generationControllers.set("session-1", generationController);
+        internals.autoGenerationControllers.set("session-1", autoGenerationController);
+
+        service.disposeSession("session-1");
+
+        expect(semanticController.signal.aborted).toBe(true);
+        expect(passiveController.signal.aborted).toBe(true);
+        expect(generationController.signal.aborted).toBe(true);
+        expect(autoGenerationController.signal.aborted).toBe(true);
+        expect(abortSpy).toHaveBeenCalledTimes(4);
+        expect(internals.semanticControllers.has("session-1")).toBe(false);
+        expect(internals.passiveScoringControllers.has("session-1")).toBe(false);
+        expect(internals.generationControllers.has("session-1")).toBe(false);
+        expect(internals.autoGenerationControllers.has("session-1")).toBe(false);
     });
 });

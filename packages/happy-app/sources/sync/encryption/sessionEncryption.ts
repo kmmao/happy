@@ -141,27 +141,6 @@ export class SessionEncryption {
     return results;
   }
 
-  /**
-   * Legacy batch view over {@link decryptMessageOutcomes}: maps each outcome
-   * back to the historical `(DecryptedMessage | null)[]` shape — a missing slot
-   * is `null`, any other failure is a content-null placeholder — so callers that
-   * have not adopted outcomes see byte-identical results.
-   */
-  async decryptMessages(
-    messages: ApiMessage[],
-  ): Promise<(DecryptedMessage | null)[]> {
-    const outcomes = await this.decryptMessageOutcomes(messages);
-    return outcomes.map((outcome, i) => {
-      if (outcome.ok) {
-        return outcome.message;
-      }
-      if (outcome.reason === "missing") {
-        return null;
-      }
-      return this.placeholderFor(messages[i]);
-    });
-  }
-
   private placeholderFor(message: ApiMessage): DecryptedMessage {
     return {
       id: message.id,
@@ -170,19 +149,6 @@ export class SessionEncryption {
       content: null,
       createdAt: message.createdAt,
     };
-  }
-
-  /**
-   * Single message convenience method
-   */
-  async decryptMessage(
-    message: ApiMessage | null | undefined,
-  ): Promise<DecryptedMessage | null> {
-    if (!message) {
-      return null;
-    }
-    const results = await this.decryptMessages([message]);
-    return results[0];
   }
 
   /**

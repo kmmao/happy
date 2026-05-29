@@ -11,6 +11,7 @@ import {
 } from "./typesRaw";
 import type { Session, Machine } from "./storageTypes";
 import type { Encryption } from "./encryption/encryption";
+import type { SessionMessageCursor } from "./sessionMessageCursor";
 import type { SessionEncryption } from "./encryption/sessionEncryption";
 import { ArtifactEncryption } from "./encryption/artifactEncryption";
 import type { DecryptedArtifact } from "./artifactTypes";
@@ -24,7 +25,7 @@ import {
     SUPPORTED_SCHEMA_VERSION,
 } from "./settings";
 import { gitStatusSync } from "./gitStatusSync";
-import { projectManager } from "./projectManager";
+import { disposeSessionScopedState } from "./sessionScopedStore";
 import { removeWorktree } from "./gitWorktreeOps";
 import { issueSessionStore } from "./issueSessionStore";
 import { isIssueSessionKey } from "./issueSessionTypes";
@@ -64,8 +65,9 @@ export type UpdateHandlerContext = {
     getMessagesSync: (sessionId: string) => { invalidate: () => void } | null;
     fetchSessions: () => void;
     onSessionVisible: (sessionId: string) => void;
-    sessionLastSeq: Map<string, number>;
-    saveLastSeq: (sessionId: string, seq: number) => void;
+    /** The single owner of per-session seq + live dedup. */
+    getCursor: (sessionId: string) => SessionMessageCursor;
+    deleteCursor: (sessionId: string) => void;
     deleted404Sessions: Set<string>;
     messagesSync: Map<string, { stop: () => void }>;
     sendSync: Map<string, { stop: () => void }>;
@@ -80,7 +82,6 @@ export type UpdateHandlerContext = {
     projectsSync: { invalidate: () => void };
     sessionsSync: { invalidate: () => void; awaitQueue: () => Promise<void> };
     assumeUsers: (userIds: string[]) => Promise<void>;
-    processedWebSocketMessageIds: Map<string, Set<string>>;
 };
 
 // [stream-perf] delta arrival interval tracking
@@ -115,7 +116,19 @@ export async function handleNewMessageUpdate(
     // Decrypt message
     let lastMessage: NormalizedMessage | null = null;
     if (body.message) {
-        const decrypted = await encryption.decryptMessage(body.message);
+        const [outcome] = await encryption.decryptMessageOutcomes([body.message]);
+        if (!outcome.ok && outcome.reason === "decrypt-failed") {
+            // A live decrypt failure almost always means our session key is stale
+            // after a reconnect/rotation. Surface it and refetch so the recovered
+            // key can re-decrypt — don't mark the message processed.
+            // (not-encrypted / missing are benign and fall through below.)
+            log.warn(
+                `decrypt-failed for live message seq=${outcome.seq} in session ${body.sid}; refetching sessions to recover key (likely key mismatch after reconnect)`,
+            );
+            ctx.fetchSessions();
+            return;
+        }
+        const decrypted = outcome.ok ? outcome.message : null;
         if (decrypted) {
             // Keep prompt suggestion / needsContinue in sync for multi-device history and live updates.
             if (isUserMessageRaw(decrypted.content)) {
@@ -297,40 +310,25 @@ export async function handleNewMessageUpdate(
                 ctx.fetchSessions();
             }
 
-            // Apply current message immediately
-            const currentLastSeq = ctx.sessionLastSeq.get(body.sid);
+            // Apply current message immediately. The per-session cursor owns
+            // seq + dedup; classification decides apply-direct vs gap-fetch.
+            const cursor = ctx.getCursor(body.sid);
             const incomingSeq = body.message.seq;
-            const isConsecutive =
-                lastMessage &&
-                currentLastSeq !== undefined &&
-                incomingSeq === currentLastSeq + 1;
+            const classification = cursor.classifyIncoming(incomingSeq);
 
-            // Guard against the same WebSocket event being processed twice (e.g. after
-            // reconnect or due to any delivery quirk). The server DB message ID is a
-            // stable, unique identifier for each stored message.
-            const msgDbId = body.message.id;
-            let seenIds = ctx.processedWebSocketMessageIds.get(body.sid);
-            if (!seenIds) {
-                seenIds = new Set();
-                ctx.processedWebSocketMessageIds.set(body.sid, seenIds);
-            }
-            if (seenIds.has(msgDbId)) {
+            // Guard against the same WebSocket event being applied twice (e.g.
+            // after reconnect or any delivery quirk). The server DB message id is
+            // a stable, unique identifier; the cursor caps the dedup set.
+            if (cursor.markApplied(body.message.id) === "duplicate") {
                 return;
-            }
-            seenIds.add(msgDbId);
-            // Cap the Set to prevent unbounded growth
-            if (seenIds.size > 200) {
-                const oldest = seenIds.values().next().value as string;
-                seenIds.delete(oldest);
             }
 
             if (lastMessage) {
                 ctx.enqueueMessages(body.sid, [lastMessage]);
 
-                if (currentLastSeq === undefined || incomingSeq > currentLastSeq) {
-                    ctx.sessionLastSeq.set(body.sid, incomingSeq);
-                    ctx.saveLastSeq(body.sid, incomingSeq);
-                }
+                // advanceTo is the single seq write point (and persists). Echoes
+                // (seq <= lastSeq) are non-advancing no-ops inside advanceTo.
+                cursor.advanceTo(incomingSeq);
 
                 // Check for mutable tool calls to refresh git status
                 let hasMutableTool = false;
@@ -348,12 +346,11 @@ export async function handleNewMessageUpdate(
                 }
             }
 
-            // If seq is non-consecutive, also fetch missing messages from server.
-            // But skip when incomingSeq <= currentLastSeq — that means the message
-            // is an echo (already received via POST response or earlier fetch), not
-            // a gap.  Fetching in that case races with the next socket push and can
-            // cause duplicate messages (e.g. double "Context was reset" on /clear).
-            if (!isConsecutive && (currentLastSeq === undefined || incomingSeq > currentLastSeq)) {
+            // If seq is a gap (missed messages), fetch the missing ones. We do
+            // NOT fetch on an echo (already received via POST ack or earlier
+            // fetch) — that races with the next socket push and can duplicate
+            // (e.g. double "Context was reset" on /clear).
+            if (classification === "gap") {
                 ctx.getMessagesSync(body.sid)?.invalidate();
             }
         }
@@ -413,8 +410,7 @@ export function handleDeleteSessionUpdate(
     // Remove encryption keys from memory
     ctx.encryption.removeSessionEncryption(sessionId);
 
-    // Remove from project manager
-    projectManager.removeSession(sessionId);
+    disposeSessionScopedState(sessionId);
 
     // Stop and clean up syncs
     const msgSync = ctx.messagesSync.get(sessionId);
@@ -428,10 +424,9 @@ export function handleDeleteSessionUpdate(
         ctx.sendSync.delete(sessionId);
     }
 
-    // Clear any cached git status and remaining state
-    gitStatusSync.clearForSession(sessionId);
+    // Clear remaining sync-local state
     ctx.pendingOutbox.delete(sessionId);
-    ctx.sessionLastSeq.delete(sessionId);
+    ctx.deleteCursor(sessionId);
     ctx.deleteLastSeq(sessionId);
     deleteBackfillBoundary(sessionId);
     deleteMessageCache(sessionId);
