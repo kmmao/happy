@@ -38,6 +38,15 @@ interface SidePanelGitPanelProps {
 export const SidePanelGitPanel = React.memo<SidePanelGitPanelProps>(
     function SidePanelGitPanel({ sessionId, onFilePress }) {
         const [activeTab, setActiveTab] = React.useState<GitTabId>("changes");
+        // Lazy-mount strategy: a sub-tab is only mounted once the user has
+        // actually visited it. Tabs that stay unvisited never subscribe to
+        // the git/issue/PR stores, so the once-per-mutable-tool gitStatus
+        // refresh no longer fans out into 5 hidden re-renders. Already-mounted
+        // tabs are kept around (hidden via display:none) so scroll position
+        // and any loaded pages persist when the user comes back.
+        const [visitedTabs, setVisitedTabs] = React.useState<ReadonlySet<GitTabId>>(
+            () => new Set<GitTabId>(["changes"]),
+        );
         const [selectedRepoPath, setSelectedRepoPath] = React.useState<string | null>(null);
         const [isRepoSelectorExpanded, setIsRepoSelectorExpanded] = React.useState(false);
         const [isRefreshing, setIsRefreshing] = React.useState(false);
@@ -124,6 +133,12 @@ export const SidePanelGitPanel = React.memo<SidePanelGitPanelProps>(
 
         const handleTabChange = React.useCallback((tab: GitTabId) => {
             setActiveTab(tab);
+            setVisitedTabs((prev) => {
+                if (prev.has(tab)) return prev;
+                const next = new Set(prev);
+                next.add(tab);
+                return next;
+            });
         }, []);
 
         // Convert git-relative path to absolute path for file preview
@@ -300,95 +315,107 @@ export const SidePanelGitPanel = React.memo<SidePanelGitPanelProps>(
                     </Pressable>
                 </View>
 
-                <View
-                    style={{
-                        flex: 1,
-                        display: activeTab === "changes" ? "flex" : "none",
-                    }}
-                >
-                    <GitChangesTab
-                        key={`changes-${refreshTrigger}`}
-                        sessionId={sessionId}
-                        repoPath={selectedRepoPath ?? undefined}
-                        compact
-                        onFilePress={onFilePress ? handleChangesFilePress : undefined}
-                        onPullDown={hasSubmodules ? handlePullDown : undefined}
-                        onScrollUp={hasSubmodules ? handleScrollUp : undefined}
-                    />
-                </View>
-                <View
-                    style={{
-                        flex: 1,
-                        display: activeTab === "history" ? "flex" : "none",
-                    }}
-                >
-                    <GitHistoryTab
-                        key={`history-${refreshTrigger}`}
-                        sessionId={sessionId}
-                        repoPath={selectedRepoPath ?? undefined}
-                        onPullDown={hasSubmodules ? handlePullDown : undefined}
-                        onScrollUp={hasSubmodules ? handleScrollUp : undefined}
-                        onCommitFilePress={handleHistoryFilePress}
-                    />
-                </View>
-                <View
-                    style={{
-                        flex: 1,
-                        display: activeTab === "branches" ? "flex" : "none",
-                    }}
-                >
-                    <GitBranchesTab
-                        key={`branches-${refreshTrigger}`}
-                        sessionId={sessionId}
-                        repoPath={selectedRepoPath ?? undefined}
-                        onPullDown={hasSubmodules ? handlePullDown : undefined}
-                        onScrollUp={hasSubmodules ? handleScrollUp : undefined}
-                    />
-                </View>
-                <View
-                    style={{
-                        flex: 1,
-                        display: activeTab === "stash" ? "flex" : "none",
-                    }}
-                >
-                    <GitStashTab
-                        key={`stash-${refreshTrigger}`}
-                        sessionId={sessionId}
-                        repoPath={selectedRepoPath ?? undefined}
-                        onPullDown={hasSubmodules ? handlePullDown : undefined}
-                        onScrollUp={hasSubmodules ? handleScrollUp : undefined}
-                    />
-                </View>
-                <View
-                    style={{
-                        flex: 1,
-                        display: activeTab === "issues" ? "flex" : "none",
-                    }}
-                >
-                    <GitIssuesTab
-                        key={`issues-${refreshTrigger}`}
-                        sessionId={sessionId}
-                        gitStatus={gitStatus}
-                        submodules={submodules}
-                        onPullDown={hasSubmodules ? handlePullDown : undefined}
-                        onScrollUp={hasSubmodules ? handleScrollUp : undefined}
-                    />
-                </View>
-                <View
-                    style={{
-                        flex: 1,
-                        display: activeTab === "prs" ? "flex" : "none",
-                    }}
-                >
-                    <GitPRsTab
-                        key={`prs-${refreshTrigger}`}
-                        sessionId={sessionId}
-                        gitStatus={gitStatus}
-                        submodules={submodules}
-                        onPullDown={hasSubmodules ? handlePullDown : undefined}
-                        onScrollUp={hasSubmodules ? handleScrollUp : undefined}
-                    />
-                </View>
+                {visitedTabs.has("changes") && (
+                    <View
+                        style={{
+                            flex: 1,
+                            display: activeTab === "changes" ? "flex" : "none",
+                        }}
+                    >
+                        <GitChangesTab
+                            key={`changes-${refreshTrigger}`}
+                            sessionId={sessionId}
+                            repoPath={selectedRepoPath ?? undefined}
+                            compact
+                            onFilePress={onFilePress ? handleChangesFilePress : undefined}
+                            onPullDown={hasSubmodules ? handlePullDown : undefined}
+                            onScrollUp={hasSubmodules ? handleScrollUp : undefined}
+                        />
+                    </View>
+                )}
+                {visitedTabs.has("history") && (
+                    <View
+                        style={{
+                            flex: 1,
+                            display: activeTab === "history" ? "flex" : "none",
+                        }}
+                    >
+                        <GitHistoryTab
+                            key={`history-${refreshTrigger}`}
+                            sessionId={sessionId}
+                            repoPath={selectedRepoPath ?? undefined}
+                            onPullDown={hasSubmodules ? handlePullDown : undefined}
+                            onScrollUp={hasSubmodules ? handleScrollUp : undefined}
+                            onCommitFilePress={handleHistoryFilePress}
+                        />
+                    </View>
+                )}
+                {visitedTabs.has("branches") && (
+                    <View
+                        style={{
+                            flex: 1,
+                            display: activeTab === "branches" ? "flex" : "none",
+                        }}
+                    >
+                        <GitBranchesTab
+                            key={`branches-${refreshTrigger}`}
+                            sessionId={sessionId}
+                            repoPath={selectedRepoPath ?? undefined}
+                            onPullDown={hasSubmodules ? handlePullDown : undefined}
+                            onScrollUp={hasSubmodules ? handleScrollUp : undefined}
+                        />
+                    </View>
+                )}
+                {visitedTabs.has("stash") && (
+                    <View
+                        style={{
+                            flex: 1,
+                            display: activeTab === "stash" ? "flex" : "none",
+                        }}
+                    >
+                        <GitStashTab
+                            key={`stash-${refreshTrigger}`}
+                            sessionId={sessionId}
+                            repoPath={selectedRepoPath ?? undefined}
+                            onPullDown={hasSubmodules ? handlePullDown : undefined}
+                            onScrollUp={hasSubmodules ? handleScrollUp : undefined}
+                        />
+                    </View>
+                )}
+                {visitedTabs.has("issues") && (
+                    <View
+                        style={{
+                            flex: 1,
+                            display: activeTab === "issues" ? "flex" : "none",
+                        }}
+                    >
+                        <GitIssuesTab
+                            key={`issues-${refreshTrigger}`}
+                            sessionId={sessionId}
+                            gitStatus={gitStatus}
+                            submodules={submodules}
+                            onPullDown={hasSubmodules ? handlePullDown : undefined}
+                            onScrollUp={hasSubmodules ? handleScrollUp : undefined}
+                        />
+                    </View>
+                )}
+                {visitedTabs.has("prs") && (
+                    <View
+                        style={{
+                            flex: 1,
+                            display: activeTab === "prs" ? "flex" : "none",
+                        }}
+                    >
+                        <GitPRsTab
+                            key={`prs-${refreshTrigger}`}
+                            sessionId={sessionId}
+                            gitStatus={gitStatus}
+                            submodules={submodules}
+                            onPullDown={hasSubmodules ? handlePullDown : undefined}
+                            onScrollUp={hasSubmodules ? handleScrollUp : undefined}
+                        />
+                    </View>
+                )}
             </View>
         );
     },

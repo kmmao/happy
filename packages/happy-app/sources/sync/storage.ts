@@ -63,6 +63,10 @@ import {
   overlayPendingSessionPreferences,
 } from "./sessionPreferencesState";
 import { compareMessagesDesc, mergeProcessedMessages } from "./messageOrdering";
+import {
+  aggregateLineChanges,
+  gitStatusEqualsIgnoringTimestamp,
+} from "@/utils/gitStatusUtils";
 
 // Debounce timer for realtimeMode changes
 let realtimeModeDebounceTimer: ReturnType<typeof setTimeout> | null = null;
@@ -1520,19 +1524,36 @@ export const storage = create<StorageState>()((set, get) => {
           profile,
         };
       }),
-    applyGitStatus: (sessionId: string, status: GitStatus | null) =>
-      set((state) => {
-        // Update project git status as well
-        projectManager.updateSessionProjectGitStatus(sessionId, status);
+    applyGitStatus: (sessionId: string, status: GitStatus | null) => {
+      // The git fetcher rebuilds GitStatus from scratch every refresh (each
+      // mutable tool call triggers one), and stamps a fresh `lastUpdatedAt`.
+      // Without dedup, every downstream useShallow selector that captures the
+      // GitStatus object sees a new reference per tick and re-renders the
+      // entire side panel tab bar. Reuse the previous reference when the
+      // content is identical so the chain short-circuits.
+      const previous = get().sessionGitStatus[sessionId] ?? null;
+      const effective = gitStatusEqualsIgnoringTimestamp(previous, status)
+        ? previous
+        : status;
 
-        return {
-          ...state,
-          sessionGitStatus: {
-            ...state.sessionGitStatus,
-            [sessionId]: status,
-          },
-        };
-      }),
+      // Always sync the project mirror, but with the deduped reference so it
+      // stays in lockstep with sessionGitStatus.
+      projectManager.updateSessionProjectGitStatus(sessionId, effective);
+
+      if (effective === previous) {
+        // Identical content → skip the set() entirely so zustand does not
+        // notify subscribers at all.
+        return;
+      }
+
+      set((state) => ({
+        ...state,
+        sessionGitStatus: {
+          ...state.sessionGitStatus,
+          [sessionId]: effective,
+        },
+      }));
+    },
     applyNativeUpdateStatus: (
       status: { available: boolean; updateUrl?: string } | null,
     ) =>
@@ -2537,6 +2558,34 @@ export function useSessionProjectSubmodules(sessionId: string | null) {
     useShallow((state) =>
       sessionId ? state.getSessionProjectSubmodules(sessionId) : undefined,
     ),
+  );
+}
+
+/**
+ * Returns the aggregated +N/-N line counts shown on the side panel's
+ * "Changes" tab. The selector returns a tiny `{ totalAdded, totalRemoved }`
+ * object (or null) and is paired with `useShallow`, so the consumer only
+ * re-renders when the numbers themselves change — not when the underlying
+ * GitStatus object reference changes (which happens every mutable-tool tick).
+ */
+export function useSessionChangesInfo(
+  sessionId: string | null,
+): { totalAdded: number; totalRemoved: number } | null {
+  return storage(
+    useShallow((state) => {
+      if (!sessionId) return null;
+      const projectStatus = state.getSessionProjectGitStatus(sessionId);
+      const sessionStatus = state.sessionGitStatus[sessionId] ?? null;
+      const gitStatus = projectStatus || sessionStatus;
+      if (!gitStatus || gitStatus.lastUpdatedAt === 0) return null;
+      const submodules = state.getSessionProjectSubmodules(sessionId);
+      const { totalAdded, totalRemoved } = aggregateLineChanges(
+        gitStatus,
+        submodules,
+      );
+      if (totalAdded === 0 && totalRemoved === 0) return null;
+      return { totalAdded, totalRemoved };
+    }),
   );
 }
 

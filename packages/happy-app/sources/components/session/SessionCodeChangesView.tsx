@@ -98,10 +98,18 @@ const LegacyCodeChangesView = React.memo(function LegacyCodeChangesView({
   const session = useSession(sessionId);
   const metadata = session?.metadata ?? null;
 
+  // During streaming, the messages array reference is replaced on every
+  // chunk. collectToolCalls + extractFileChanges is O(messages × tool calls),
+  // and the resulting file list scrolls the whole side panel. Defer the
+  // expensive derivation so React only catches up to the latest messages
+  // when the main thread is idle — mid-stream frames are dropped, and the
+  // final state always lands. This keeps streaming responsive without
+  // sacrificing eventual accuracy.
+  const deferredMessages = React.useDeferredValue(messages);
   const fileChanges = React.useMemo(() => {
-    const toolCalls = collectToolCalls(messages);
+    const toolCalls = collectToolCalls(deferredMessages);
     return extractFileChanges(toolCalls, metadata);
-  }, [messages, metadata]);
+  }, [deferredMessages, metadata]);
 
   const totalFiles = fileChanges.length;
   const totalAdditions = fileChanges.reduce(

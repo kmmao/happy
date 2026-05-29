@@ -270,6 +270,11 @@ export const SessionProgressPanel = React.memo<SessionProgressPanelProps>(
     function SessionProgressPanel({ sessionId }) {
         const { theme } = useUnistyles();
         const { messages } = useSessionMessages(sessionId);
+        // During streaming the messages array reference flips on every chunk,
+        // and the five useMemos below are all O(messages). Defer the heavy
+        // derivations so React catches up only when the main thread is idle;
+        // intermediate frames are dropped, the final value always lands.
+        const deferredMessages = React.useDeferredValue(messages);
         const session = useSession(sessionId);
         const appendToInput = useAppendToInput();
         const isCodex = session?.metadata?.flavor?.toLowerCase() === "codex";
@@ -293,7 +298,10 @@ export const SessionProgressPanel = React.memo<SessionProgressPanelProps>(
             return () => clearInterval(interval);
         }, []);
 
-        const data = React.useMemo(() => computeSessionProgress(messages), [messages]);
+        const data = React.useMemo(
+            () => computeSessionProgress(deferredMessages),
+            [deferredMessages],
+        );
         const tabs = React.useMemo(
             () => getChecklistTabs(session?.metadata?.progress),
             [session?.metadata?.progress],
@@ -317,8 +325,8 @@ export const SessionProgressPanel = React.memo<SessionProgressPanelProps>(
         );
         const counts = React.useMemo(() => countTodoProgress(checklist.todos), [checklist.todos]);
         const codexPlan = React.useMemo(
-            () => resolveCodexPlanData(checklist, messages),
-            [checklist, messages],
+            () => resolveCodexPlanData(checklist, deferredMessages),
+            [checklist, deferredMessages],
         );
 
         const [showListFiles, setShowListFiles] = React.useState(false);
@@ -327,16 +335,16 @@ export const SessionProgressPanel = React.memo<SessionProgressPanelProps>(
         // Bucketing spans the full session timeline into a fixed count so the
         // three sparklines share an X axis and can be visually compared.
         const sparkline = React.useMemo(
-            () => buildSparklineData(messages, SPARKLINE_BUCKETS),
-            [messages],
+            () => buildSparklineData(deferredMessages, SPARKLINE_BUCKETS),
+            [deferredMessages],
         );
         const rhythm = React.useMemo(
-            () => computeRhythm(messages),
-            [messages],
+            () => computeRhythm(deferredMessages),
+            [deferredMessages],
         );
         const toolMix = React.useMemo(
-            () => computeToolMix(messages, TOOL_MIX_TOP_N, session?.metadata ?? null),
-            [messages, session?.metadata],
+            () => computeToolMix(deferredMessages, TOOL_MIX_TOP_N, session?.metadata ?? null),
+            [deferredMessages, session?.metadata],
         );
         const toolsPerTurn = data.agentTurns > 0
             ? data.toolCalls / data.agentTurns
@@ -362,12 +370,12 @@ export const SessionProgressPanel = React.memo<SessionProgressPanelProps>(
                     for (const child of msg.children) walk(child);
                 }
             };
-            for (const m of messages) walk(m);
+            for (const m of deferredMessages) walk(m);
             return extractFileChanges(scoped, session?.metadata ?? null);
         }, [
             checklist.listId,
             session?.metadata,
-            messages,
+            deferredMessages,
         ]);
         const listFileTotalAdditions = React.useMemo(
             () => listFileChanges.reduce((sum, f) => sum + f.totalAdditions, 0),

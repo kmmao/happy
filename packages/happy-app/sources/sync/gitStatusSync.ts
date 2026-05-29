@@ -308,13 +308,17 @@ export class GitStatusSync {
       // Apply to storage (this also updates the project git status via the modified applyGitStatus)
       storage.getState().applyGitStatus(sessionId, gitStatus);
 
-      // Additionally, update the project directly for efficiency
+      // Additionally, update the project directly for efficiency. Read back
+      // the deduped reference applyGitStatus may have kept so we don't undo
+      // the dedup by writing a fresh object onto the project mirror.
       if (session.metadata?.machineId) {
         const pk = createProjectKey(
           session.metadata.machineId,
           session.metadata.path,
         );
-        projectManager.updateProjectGitStatus(pk, gitStatus);
+        const effectiveStatus =
+          storage.getState().sessionGitStatus[sessionId] ?? gitStatus;
+        projectManager.updateProjectGitStatus(pk, effectiveStatus);
 
         // Fetch submodule statuses (conditionally to avoid excessive calls)
         await this.fetchSubmodulesIfNeeded(

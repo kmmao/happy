@@ -9,14 +9,11 @@ import { Typography } from "@/constants/Typography";
 import { InputContext } from "@/hooks/useInputContext";
 import {
     useProjectForSession,
-    useSessionGitStatus,
-    useSessionProjectGitStatus,
-    useSessionProjectSubmodules,
+    useSessionChangesInfo,
     useSetting,
 } from "@/sync/storage";
 import { useProjectKnowledgeConfig } from "@/hooks/useProjectKnowledgeConfig";
 import { t } from "@/text";
-import { aggregateLineChanges } from "@/utils/gitStatusUtils";
 import { SidePanelFilePreview } from "./SidePanelFilePreview";
 import { SidePanelGitPanel } from "./SidePanelGitPanel";
 import { SidePanelPreviewTab } from "./SidePanelPreviewTab";
@@ -77,17 +74,11 @@ export const SessionSidePanel = React.memo<SessionSidePanelProps>(
             [inputContext],
         );
 
-        const projectGitStatus = useSessionProjectGitStatus(sessionId);
-        const sessionGitStatus = useSessionGitStatus(sessionId);
-        const gitStatus = projectGitStatus || sessionGitStatus;
-        const submodules = useSessionProjectSubmodules(sessionId);
-
-        const changesInfo = React.useMemo(() => {
-            if (!gitStatus || gitStatus.lastUpdatedAt === 0) return null;
-            const { totalAdded, totalRemoved } = aggregateLineChanges(gitStatus, submodules);
-            if (totalAdded === 0 && totalRemoved === 0) return null;
-            return { totalAdded, totalRemoved };
-        }, [gitStatus, submodules]);
+        // Tiny `{ totalAdded, totalRemoved } | null` selector under useShallow.
+        // Decouples the tab bar from the full GitStatus / submodules
+        // references, which the git fetcher replaces on every mutable-tool
+        // tick even when the numbers haven't moved.
+        const changesInfo = useSessionChangesInfo(sessionId);
 
         const tabDefinitions = React.useMemo(
             () => getSessionPanelTabDefinitions({ enablePreviewTab, knowledgeBaseEnabled }),
