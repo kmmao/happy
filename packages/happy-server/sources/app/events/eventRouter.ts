@@ -1,5 +1,6 @@
 import { Socket } from "socket.io";
 import { log } from "@/utils/log";
+import { recipientMatches } from "./recipientMatcher";
 import { GitHubProfile } from "@/app/api/types";
 import { AccountProfile } from "@/types";
 import { getPublicUrl } from "@/storage/files";
@@ -562,39 +563,7 @@ class EventRouter {
     connection: ClientConnection,
     filter: RecipientFilter,
   ): boolean {
-    switch (filter.type) {
-      case "all-interested-in-session":
-        // Send to session-scoped with matching session + all user-scoped
-        if (connection.connectionType === "session-scoped") {
-          if (connection.sessionId !== filter.sessionId) {
-            return false; // Wrong session
-          }
-        } else if (connection.connectionType === "machine-scoped") {
-          return false; // Machines don't need session updates
-        }
-        // user-scoped always gets it
-        return true;
-
-      case "user-scoped-only":
-        return connection.connectionType === "user-scoped";
-
-      case "machine-scoped-only":
-        // Send to user-scoped (mobile/web needs all machine updates) + only the specific machine
-        if (connection.connectionType === "user-scoped") {
-          return true;
-        }
-        if (connection.connectionType === "machine-scoped") {
-          return connection.machineId === filter.machineId;
-        }
-        return false; // session-scoped doesn't need machine updates
-
-      case "all-user-authenticated-connections":
-        // Send to all connection types (default behavior)
-        return true;
-
-      default:
-        return false;
-    }
+    return recipientMatches(connection, filter);
   }
 
   private emit(params: {
