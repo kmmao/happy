@@ -641,7 +641,7 @@ class AutoOptionSendService {
         const scoringOverrides = storage.getState().localSettings.scoringModelOverride ?? {};
         // When auto-send is enabled, prefer the highest available model unless user has set a custom override.
         const autoSendPreferredModels: Record<string, string> = {
-            anthropic: "claude-opus-4-7",
+            anthropic: "claude-opus-4-8",
             openai: "gpt-4.5",
         };
         const effectiveOverrides = Object.keys(scoringOverrides).length > 0
@@ -1062,7 +1062,7 @@ class AutoOptionSendService {
         const profileId = session.profileId ?? null;
 
         const preferredModels: Record<string, string> = {
-            anthropic: "claude-opus-4-7",
+            anthropic: "claude-opus-4-8",
             openai: "gpt-4.5",
         };
 
@@ -1136,7 +1136,7 @@ class AutoOptionSendService {
 
         // Prefer high-quality model for proactive generation
         const preferredModels: Record<string, string> = {
-            anthropic: "claude-opus-4-7",
+            anthropic: "claude-opus-4-8",
             openai: "gpt-4.5",
         };
 

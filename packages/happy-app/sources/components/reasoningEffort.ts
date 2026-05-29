@@ -2,10 +2,10 @@ import type { Metadata } from "@/sync/storageTypes";
 import type { ReasoningProps } from "./AgentInputTypes";
 
 // Effort ordering: max > xhigh > high > medium > low
-// xhigh is Opus 4.7 only (SDK 0.2.111+). When CLI reports supportedEffortLevels
-// on a model (e.g. Opus 4.7), xhigh is surfaced via the dynamic path below.
-// The static fallback deliberately omits xhigh so non-Opus-4.7 models don't
-// expose an option the SDK will reject.
+// xhigh is Opus 4.7/4.8 only (SDK 0.2.111+). When CLI reports
+// supportedEffortLevels on a model (e.g. Opus 4.7/4.8), xhigh is surfaced via
+// the dynamic path below. The static fallback deliberately omits xhigh so
+// other models don't expose an option the SDK will reject.
 const CLAUDE_EFFORT_LEVELS = ["max", "high", "medium", "low"] as const;
 const CODEX_EFFORT_LEVELS = ["xhigh", "high", "medium", "low"] as const;
 const ALL_EFFORT_LEVELS = [
@@ -18,19 +18,27 @@ const ALL_EFFORT_LEVELS = [
 
 type EffortLevel = (typeof ALL_EFFORT_LEVELS)[number];
 
-// Opus 4.7 supports xhigh natively (SDK 0.2.112+). When the SDK omits xhigh
-// from supportedEffortLevels for Opus 4.7, surface it anyway so users aren't
-// forced back to max.
-const OPUS_47_MODEL_CODES = new Set([
+// Opus 4.7 and 4.8 support xhigh natively (SDK 0.2.112+). When the SDK omits
+// xhigh from supportedEffortLevels for these models, surface it anyway so users
+// aren't forced back to max.
+const OPUS_XHIGH_MODEL_CODES = new Set([
     "opus-4-7",
     "opus-4-7-1m",
     "claude-opus-4-7",
     "claude-opus-4-7[1m]",
+    "opus-4-8",
+    "opus-4-8-1m",
+    "claude-opus-4-8",
+    "claude-opus-4-8[1m]",
 ]);
 
-function isOpus47ModelCode(code: string | null | undefined): boolean {
+function isOpusXhighModelCode(code: string | null | undefined): boolean {
     if (!code) return false;
-    return OPUS_47_MODEL_CODES.has(code) || code.startsWith("claude-opus-4-7");
+    return (
+        OPUS_XHIGH_MODEL_CODES.has(code) ||
+        code.startsWith("claude-opus-4-7") ||
+        code.startsWith("claude-opus-4-8")
+    );
 }
 
 function resolveCurrentModelInfo(params: {
@@ -98,7 +106,7 @@ export function getVisibleEffortLevels(params: {
             ? params.modelModeKey
             : params.currentModelCode ?? params.metadata?.currentModelCode ?? null;
 
-    if (!isOpus47ModelCode(selectedModelCode)) {
+    if (!isOpusXhighModelCode(selectedModelCode)) {
         return baseLevels;
     }
 

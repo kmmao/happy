@@ -75,6 +75,8 @@ const CLAUDE_MODEL_PRICING: Record<string, string> = {
   "opus-1m": "$5/$25",
   "opus-4-7": "$5/$25",
   "opus-4-7-1m": "$5/$25",
+  "opus-4-8": "$5/$25",
+  "opus-4-8-1m": "$5/$25",
 };
 
 function enrichDescription(code: string, description: string | null | undefined): string | null {
@@ -203,9 +205,14 @@ export function getClaudeModelModes(): ModelMode[] {
       description: "Sonnet 4.6 \u00B7 $3/$15",
     },
     {
+      key: "opus-4-8",
+      name: "Opus 4.8",
+      description: "Opus 4.8 \u00B7 Latest \u00B7 $5/$25",
+    },
+    {
       key: "opus-4-7",
       name: "Opus 4.7",
-      description: "Opus 4.7 \u00B7 Latest \u00B7 $5/$25",
+      description: "Opus 4.7 \u00B7 $5/$25",
     },
     {
       key: "opus",
