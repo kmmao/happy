@@ -1125,6 +1125,7 @@ export const zhHans: TranslationStructure = {
   toolView: {
     input: "输入",
     output: "输出",
+    arguments: "参数",
   },
 
   diff: {

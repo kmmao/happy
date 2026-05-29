@@ -1125,6 +1125,7 @@ export const zhHant: TranslationStructure = {
   toolView: {
     input: "輸入",
     output: "輸出",
+    arguments: "參數",
   },
 
   diff: {

@@ -1288,6 +1288,7 @@ export const ja: TranslationStructure = {
   toolView: {
     input: "入力",
     output: "出力",
+    arguments: "引数",
   },
 
   diff: {

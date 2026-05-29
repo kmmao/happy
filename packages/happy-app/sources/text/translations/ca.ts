@@ -1166,6 +1166,7 @@ export const ca: TranslationStructure = {
   toolView: {
     input: "Entrada",
     output: "Sortida",
+    arguments: "Arguments",
   },
 
   diff: {

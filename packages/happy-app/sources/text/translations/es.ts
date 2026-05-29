@@ -1167,6 +1167,7 @@ export const es: TranslationStructure = {
   toolView: {
     input: "Entrada",
     output: "Salida",
+    arguments: "Argumentos",
   },
 
   diff: {

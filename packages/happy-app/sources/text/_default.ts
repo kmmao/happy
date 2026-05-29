@@ -1153,6 +1153,7 @@ export const en = {
   toolView: {
     input: "Input",
     output: "Output",
+    arguments: "Arguments",
   },
 
   diff: {

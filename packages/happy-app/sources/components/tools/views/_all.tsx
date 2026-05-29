@@ -20,6 +20,8 @@ import { GeminiEditView } from "./GeminiEditView";
 import { GeminiExecuteView } from "./GeminiExecuteView";
 import { HappyUpdateProgressView } from "./HappyUpdateProgressView";
 import { TaskManagementView } from "./TaskManagementView";
+import { SkillView } from "./SkillView";
+import { SkillViewFull } from "./SkillViewFull";
 
 export type ToolViewProps = {
   tool: ToolCall;
@@ -53,6 +55,7 @@ export const toolViewRegistry: Record<string, ToolViewComponent> = {
   TaskCreate: TaskManagementView,
   TaskUpdate: TaskManagementView,
   TaskList: TaskManagementView,
+  Skill: SkillView,
   mcp__happy__update_progress: HappyUpdateProgressView,
   // Gemini tools (lowercase)
   edit: GeminiEditView,
@@ -66,6 +69,7 @@ export const toolFullViewRegistry: Record<string, ToolViewComponent> = {
   CodexDiff: CodexDiffView,
   Edit: EditViewFull,
   MultiEdit: MultiEditViewFull,
+  Skill: SkillViewFull,
   mcp__happy__update_progress: HappyUpdateProgressView,
 };
 
@@ -100,3 +104,5 @@ export { GeminiEditView } from "./GeminiEditView";
 export { GeminiExecuteView } from "./GeminiExecuteView";
 export { HappyUpdateProgressView } from "./HappyUpdateProgressView";
 export { TaskManagementView } from "./TaskManagementView";
+export { SkillView } from "./SkillView";
+export { SkillViewFull } from "./SkillViewFull";
