@@ -1,5 +1,5 @@
 import * as React from "react";
-import { View, ScrollView } from "react-native";
+import { View, FlatList, type ListRenderItem } from "react-native";
 import { Text } from "@/components/StyledText";
 import { useLocalSearchParams } from "expo-router";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
@@ -129,10 +129,37 @@ const DetailChips = React.memo(({ detail }: { detail: Record<string, unknown> })
     );
 });
 
+const keyExtractor = (item: ServerSessionEvent) => item.id;
+
 export default React.memo(function TimelinePage() {
     const { id: sessionId } = useLocalSearchParams<{ id: string }>();
     const { events, total, loading, error, refresh } = useSessionTimeline(sessionId);
     const { theme } = useUnistyles();
+
+    // The "last" event (no trailing connector line) is the array tail. New
+    // ephemeral events are prepended in useSessionTimeline, so this id stays
+    // stable as the list grows — keeping TimelineEventCard's React.memo intact
+    // for every row except the actual last one.
+    const lastEventId =
+        events.length > 0 ? events[events.length - 1].id : null;
+
+    const renderItem = React.useCallback<ListRenderItem<ServerSessionEvent>>(
+        ({ item }) => (
+            <TimelineEventCard event={item} isLast={item.id === lastEventId} />
+        ),
+        [lastEventId],
+    );
+
+    const ListHeader = React.useMemo(
+        () => (
+            <Text
+                style={[styles.countLabel, { color: theme.colors.textSecondary }]}
+            >
+                {t("timeline.eventCount", total)}
+            </Text>
+        ),
+        [theme.colors.textSecondary, total],
+    );
 
     if (loading) {
         return (
@@ -169,21 +196,21 @@ export default React.memo(function TimelinePage() {
     }
 
     return (
-        <ScrollView
+        <FlatList
+            data={events}
+            renderItem={renderItem}
+            keyExtractor={keyExtractor}
+            ListHeaderComponent={ListHeader}
             style={{ flex: 1 }}
             contentContainerStyle={styles.scrollContent}
-        >
-            <Text style={[styles.countLabel, { color: theme.colors.textSecondary }]}>
-                {t("timeline.eventCount", total)}
-            </Text>
-            {events.map((event, index) => (
-                <TimelineEventCard
-                    key={event.id}
-                    event={event}
-                    isLast={index === events.length - 1}
-                />
-            ))}
-        </ScrollView>
+            // Virtualization tuning: only mount the rows in (and just outside)
+            // the visible window. With 200+ events the previous ScrollView
+            // mounted every TimelineEventCard up front.
+            removeClippedSubviews
+            initialNumToRender={15}
+            maxToRenderPerBatch={10}
+            windowSize={7}
+        />
     );
 });
 
