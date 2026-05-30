@@ -26,6 +26,10 @@ import type {
 } from "@/claude/jsonl";
 import type { ClaudePtyController } from "@/claude/pty/claudePtyController";
 import { startHappyServer } from "@/claude/utils/startHappyServer";
+import {
+  buildHappyMcpServers,
+  type HappyMcpServerEntry,
+} from "@/claude/utils/generateHookSettings";
 import { formatClaudeMessageForInk } from "@/ui/messageFormatterInk";
 import { logger } from "@/ui/logger";
 import { ClaudeJsonlToLogConverter } from "./utils/jsonlToLogConverter";
@@ -2262,11 +2266,16 @@ export async function claudeRemoteLauncher(
       const stopHappyHttp = happyHttp.stop;
       void stopHappyHttp; // ensure the var is retained; cleanup happens in finally
 
-      const happyMcpEntry = { type: "http" as const, url: happyHttpUrl };
-      const knowledgeMcpEntry = knowledgeEnabled ? happyMcpEntry : null;
-
-      const knowledgeMcpServer: { type: "http"; url: string } | null = knowledgeMcpEntry;
-      const happyMcpServer: { type: "http"; url: string } = happyMcpEntry;
+      // Build via the shared helper so the `alwaysLoad: true` flag (Claude
+      // Code 2.1.121+) stays attached to every happy server — that keeps the
+      // App's permission/sync tools loaded across `/clear`, plan-mode swaps,
+      // and skill-driven tool-search deferrals.
+      const happyServers = buildHappyMcpServers(happyHttpUrl, {
+        includeKnowledge: knowledgeEnabled,
+      });
+      const happyMcpServer: HappyMcpServerEntry = happyServers.happy;
+      const knowledgeMcpServer: HappyMcpServerEntry | null =
+        happyServers["happy-knowledge"] ?? null;
 
       // Fetch persistent MCP registry from server KV (non-blocking — falls back to {} on error)
       const registryServers = await fetchMcpRegistryServers(session.api);

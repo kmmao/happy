@@ -26,11 +26,15 @@ import { projectPath } from "@/projectPath";
 /**
  * Shape of a single MCP server entry. Used by `buildHappyMcpServers`
  * (consumed downstream by `claudeCliFlags.mcpServers` → `--mcp-config`).
+ *
+ * `alwaysLoad` (Claude Code 2.1.121+) opts the server out of tool-search
+ * deferral so its tools stay loaded across `/clear`, plan-mode toggles,
+ * and skill activations. Unknown to older CLIs — they ignore it.
  */
 export type HappyMcpServerEntry =
-  | { type: "http"; url: string; headers?: Record<string, string> }
-  | { type: "stdio"; command: string; args?: string[]; env?: Record<string, string> }
-  | { type: "sse"; url: string; headers?: Record<string, string> };
+  | { type: "http"; url: string; headers?: Record<string, string>; alwaysLoad?: boolean }
+  | { type: "stdio"; command: string; args?: string[]; env?: Record<string, string>; alwaysLoad?: boolean }
+  | { type: "sse"; url: string; headers?: Record<string, string>; alwaysLoad?: boolean };
 
 /**
  * Build the Happy MCP server config block. Pass the result through
@@ -41,6 +45,11 @@ export type HappyMcpServerEntry =
  * (when knowledge is enabled) `happy-knowledge` namespaces — they're
  * registered as separate MCP servers so the App / claude can address them
  * by name, but the actual transport is a single HTTP endpoint.
+ *
+ * Both servers are marked `alwaysLoad: true` so happy tools (permission
+ * prompts, App sync, knowledge lookup) stay attached when Claude reloads
+ * tool config mid-session — otherwise the App appears to go briefly
+ * "deaf" until the user invokes a happy tool again.
  */
 export function buildHappyMcpServers(
   httpUrl: string,
@@ -48,10 +57,10 @@ export function buildHappyMcpServers(
 ): Record<string, HappyMcpServerEntry> {
   const normalized = httpUrl.endsWith("/") ? httpUrl.slice(0, -1) : httpUrl;
   const out: Record<string, HappyMcpServerEntry> = {
-    happy: { type: "http", url: normalized },
+    happy: { type: "http", url: normalized, alwaysLoad: true },
   };
   if (options.includeKnowledge) {
-    out["happy-knowledge"] = { type: "http", url: normalized };
+    out["happy-knowledge"] = { type: "http", url: normalized, alwaysLoad: true };
   }
   return out;
 }

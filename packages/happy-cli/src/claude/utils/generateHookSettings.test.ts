@@ -40,7 +40,7 @@ describe("buildHappyMcpServers", () => {
   it("returns happy only by default", () => {
     const map = buildHappyMcpServers("http://127.0.0.1:54321/");
     expect(map).toEqual({
-      happy: { type: "http", url: "http://127.0.0.1:54321" },
+      happy: { type: "http", url: "http://127.0.0.1:54321", alwaysLoad: true },
     });
   });
 
@@ -49,18 +49,31 @@ describe("buildHappyMcpServers", () => {
       includeKnowledge: true,
     });
     expect(map).toEqual({
-      happy: { type: "http", url: "http://127.0.0.1:54321" },
-      "happy-knowledge": { type: "http", url: "http://127.0.0.1:54321" },
+      happy: { type: "http", url: "http://127.0.0.1:54321", alwaysLoad: true },
+      "happy-knowledge": {
+        type: "http",
+        url: "http://127.0.0.1:54321",
+        alwaysLoad: true,
+      },
     });
   });
 
   it("strips a single trailing slash but preserves nested paths", () => {
     expect(buildHappyMcpServers("http://127.0.0.1:1234/mcp/")).toEqual({
-      happy: { type: "http", url: "http://127.0.0.1:1234/mcp" },
+      happy: { type: "http", url: "http://127.0.0.1:1234/mcp", alwaysLoad: true },
     });
     expect(buildHappyMcpServers("http://127.0.0.1:1234/mcp")).toEqual({
-      happy: { type: "http", url: "http://127.0.0.1:1234/mcp" },
+      happy: { type: "http", url: "http://127.0.0.1:1234/mcp", alwaysLoad: true },
     });
+  });
+
+  it("marks every server with alwaysLoad=true so happy tools survive Claude's tool-search deferral (Claude Code 2.1.121+)", () => {
+    const map = buildHappyMcpServers("http://127.0.0.1:1234", {
+      includeKnowledge: true,
+    });
+    for (const entry of Object.values(map)) {
+      expect(entry.alwaysLoad).toBe(true);
+    }
   });
 
   it("output shape matches what claudeCliFlags expects in `mcpServers`", () => {
@@ -69,7 +82,13 @@ describe("buildHappyMcpServers", () => {
     const map = buildHappyMcpServers("http://127.0.0.1:1234");
     const wire = JSON.stringify({ mcpServers: map });
     expect(JSON.parse(wire)).toEqual({
-      mcpServers: { happy: { type: "http", url: "http://127.0.0.1:1234" } },
+      mcpServers: {
+        happy: {
+          type: "http",
+          url: "http://127.0.0.1:1234",
+          alwaysLoad: true,
+        },
+      },
     });
   });
 });
