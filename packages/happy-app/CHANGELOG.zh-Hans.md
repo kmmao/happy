@@ -1,5 +1,22 @@
 # 更新日志
 
+## 2.36.0 - 2026-05-31
+
+在 Claude Code 2.1.121+ 上运行的会话现在能实时把 Claude 的工作区动态带回聊天界面 —— 你能看到 Claude 何时离开了你启动它的目录、新建了哪些 worktree、最近动过哪些文件，全都不用离开会话页。
+
+### 聊天头部
+- 新增第三行淡色头部，当 Claude 的实时工作目录与会话启动时的目录不同时显示 —— Claude 刚 `cd` 进项目子目录时折叠成 `./relative`，跑去别处时显示 `…/parent/name`。旧版 Claude Code CLI 不发 `CwdChanged` 钩子，头部保持原先两行不变。
+
+### 会话信息（Session Info）
+- 新增「Worktree Activity」区，记录 Claude 自己管理的最新 worktree 新建/移除事件，带相对时间和按事件类型上色的图标。与已有的 Happy 自管 Worktree Info 区并存 —— 现在是两种不同来源的 worktree 状态。
+- 新增「Recent File Changes」区，列出 Claude 最近触及的文件（新增 / 修改 / 删除），每行带事件图标和相对时间。最多显示 10 行；底层环形缓冲区最多保留 20 条。
+
+### 幕后改动
+- CLI 端订阅了四个 Claude Code 新会话状态钩子（`CwdChanged`、`FileChanged`、`WorktreeCreate`、`WorktreeRemove`），通过 `session.metadata` 透传到 App，无需新增 wire envelope —— 完整钩子服务器重写见 happy-coder 0.87.0。
+- CLI 端 `--settings` 钩子注入切换到 Claude Code 2.1.139+ 的 exec 形式（`{command, args[]}`），forwarder 路径含空格、引号、shell 元字符时再也不会破解或被注入。
+- Happy 自己的 MCP 服务器标记 `alwaysLoad: true`，这样在 Claude 跨 `/clear`、plan 模式切换、skill 激活重载工具集时，App 的权限提示和同步工具仍保持挂载。
+- 把 timeline 内部的相对时间 helper 抽出到共享工具（`formatTimeAgo`），后续新页面可复用相同的时间桶和翻译键。
+
 ## 2.35.0 - 2026-05-30
 
 新增实验性「Session Fork & Duplicate」功能，允许从任意历史用户消息位置分叉出新会话；同步优化了侧边栏 / 流式 / 代码变更视图的性能；新增 Opus 4.8 模型选项；Web 端切换到生产 nginx 容器替代 dev metro，首屏更快。

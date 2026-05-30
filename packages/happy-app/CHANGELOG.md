@@ -1,5 +1,22 @@
 # Changelog
 
+## 2.36.0 - 2026-05-31
+
+Sessions running against Claude Code 2.1.121+ now surface live workspace activity right in the chat — you can see when Claude has moved out of the directory you launched it from, what worktrees it has spun up, and which files it has touched recently, all without leaving the session.
+
+### Chat header
+- Added a third faint header line that shows Claude's live working directory whenever it differs from the directory the session was launched in — collapsed as `./relative` when Claude has just `cd`-ed inside the project, or `…/parent/name` when it has wandered elsewhere on disk. Older Claude Code CLIs that don't emit the `CwdChanged` hook leave the header at its original two lines.
+
+### Session Info
+- Added a "Worktree Activity" section that records the most recent Claude-managed worktree create/remove event with a relative timestamp and color-coded icon. Coexists with the existing Happy-managed Worktree Info section above it — these are now two distinct flavors of worktree state.
+- Added a "Recent File Changes" section that lists Claude's last few file touches (added / modified / deleted) with per-event icons and a relative timestamp. Capped at ten visible rows; the underlying ring buffer holds up to twenty.
+
+### Behind the scenes
+- Subscribed the CLI to four new Claude Code session-state hooks (`CwdChanged`, `FileChanged`, `WorktreeCreate`, `WorktreeRemove`) and surfaced them through `session.metadata` so no new wire envelope was needed — see happy-coder 0.87.0 for the full hook-server rewrite.
+- Switched the CLI's `--settings` hook injection to Claude Code 2.1.139+ exec form (`{command, args[]}`) so a forwarder script path with spaces, quotes, or shell metacharacters can no longer break or smuggle through the shell.
+- Marked Happy's own MCP servers as `alwaysLoad: true` so the App's permission prompts and sync tools stay attached when Claude reloads its tool set across `/clear`, plan-mode swaps, or skill activations.
+- Lifted the timeline's relative-time helper into a shared utility (`formatTimeAgo`) so future surfaces can reuse the same buckets and translation keys.
+
 ## 2.35.0 - 2026-05-30
 
 Adds an experimental "Session Fork & Duplicate" feature that lets you branch a chat from any of your earlier prompts, plus a perf pass across sidebar / streaming / code-changes views, the new Opus 4.8 model option, and a faster Web build served from production nginx instead of dev metro.

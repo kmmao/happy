@@ -12,6 +12,10 @@ This monorepo contains multiple packages, each with its own changelog:
 
 ## Recent Highlights
 
+### 2026-05-31
+
+- **happy-cli 0.87.0 + happy-app 2.36.0** — Claude Code 2.1.x hook surface integration. CLI now subscribes to `CwdChanged`, `FileChanged`, `WorktreeCreate`, and `WorktreeRemove` (Claude Code 2.1.121+/2.1.157+) and surfaces them through `session.metadata` — no new wire envelope. App shows Claude's live working directory as a third chat-header line, and adds Worktree Activity + Recent File Changes sections to Session Info. Hook injection also switched to Claude Code 2.1.139+ exec form (no more shell parsing in the hook command), and happy's MCP servers now ride with `alwaysLoad: true` so they survive Claude's tool-search deferral across `/clear` and plan-mode swaps.
+
 ### 2026-05-26
 
 - **happy-cli 0.86.0** — PTY-mode reliability & performance: subagent (Task/Agent) results now appear in milliseconds via a per-session `subagents/` watcher, long sessions parse only newly appended log bytes, ExitPlanMode auto-approval detects the picker from the current screen snapshot, the context-usage panel splits into Cached context / Cache write / New input, and an optional deep MCP `initialize` handshake probe (`HAPPY_MCP_HANDSHAKE_PROBE=1`) verifies stdio servers really speak MCP.

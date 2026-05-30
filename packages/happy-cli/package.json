@@ -1,6 +1,6 @@
 {
   "name": "@kmmao/happy-coder",
-  "version": "0.86.12",
+  "version": "0.87.0",
   "description": "Mobile and Web client for Claude Code and Codex",
   "author": "kmmao",
   "license": "MIT",

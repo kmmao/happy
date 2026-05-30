@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.87.0 - 2026-05-31
+
+Claude Code 2.1.x hook surface — happy now subscribes to four new session-state hooks and tightens the existing two-hook injection. Sessions started against Claude Code 2.1.121+ will surface live working-directory changes, file activity, and Claude-managed worktree events all the way through to the App; older CLIs ignore the extra hook keys and keep working unchanged.
+
+- Subscribed `CwdChanged` (2.1.121+), `FileChanged` (2.1.121+), `WorktreeCreate` and `WorktreeRemove` (2.1.157+) in the generated `--settings` hook block. The hook server's dispatch table was rewritten with typed payloads — previously every event except `StopFailure` silently fell through to the `SessionStart` handler and could quietly poison the session id; now each known event has a dedicated route and unknown events still fall through for forward compat.
+- Surfaced the new hooks through `session.metadata` (no new wire envelope): `activeCwd` reflects the live cwd, `lastWorktreeEvent` records the most recent worktree create/remove, and `recentFileChanges` keeps a head-deduped ring buffer (capped at 20) so autosave bursts can't blow up the encrypted metadata payload.
+- Switched the hook injection itself to Claude Code 2.1.139+ exec form `{command: "node", args: [...]}`. The old shell-string form `"node \"<path>\" <port>"` worked but was vulnerable to misparsing whenever the forwarder path contained spaces, quotes, `$()`, backticks, or semicolons. The new form runs `execvp` directly with no shell.
+- Marked happy's own MCP servers (`happy`, `happy-knowledge`) with `alwaysLoad: true` (Claude Code 2.1.121+). This opts them out of tool-search deferral so the App's permission prompts and sync tools stay attached when Claude reloads its tool set across `/clear`, plan-mode swaps, or skill activations. Older CLIs ignore the field.
+
 ## 0.86.11 - 2026-05-30
 
 Consistent turn and subagent lifecycle across Claude and Codex sessions.
