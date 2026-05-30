@@ -328,6 +328,9 @@ export const zhHant: TranslationStructure = {
     previewTabEnabled: "會話側邊欄顯示預覽 Tab",
     previewTabDisabled: "隱藏預覽 Tab",
     hideInactiveSessionsSubtitle: "僅在清單中顯示活躍的聊天",
+    expResumeSession: "Session Fork & Duplicate",
+    expResumeSessionEnabled: "Long-press messages to duplicate from any point",
+    expResumeSessionDisabled: "Fork & duplicate UI hidden",
     enhancedSessionWizard: "增強工作階段精靈",
     enhancedSessionWizardEnabled: "設定檔優先的工作階段啟動器已啟用",
     enhancedSessionWizardDisabled: "使用標準工作階段啟動器",
@@ -577,6 +580,13 @@ export const zhHant: TranslationStructure = {
   },
 
   session: {
+    duplicateTitle: "Duplicate from message",
+    duplicateSubtitle: "Pick a previous prompt to rewind to. The new session keeps everything up to that point.",
+    duplicateEmpty: "No previous user messages to rewind from.",
+    duplicateNoAnchor: "No rewind anchor",
+    duplicateMenuTitle: "Duplicate from message…",
+    duplicateMenuSubtitle: "Branch a new session from any of your earlier prompts",
+    forkFailed: "Could not fork from this message",
     loadingProgress: ({ percent, loaded, total }: { percent: number; loaded: number; total: number }) => `載入中 ${percent}%（${loaded}/${total}）`,
     inputPlaceholder: "輸入訊息...",
     startedByDaemon: "守護程序",
@@ -834,9 +844,10 @@ export const zhHant: TranslationStructure = {
       successAndArchived: "Worktree 已移除，工作階段已封存",
       failed: ({ error }: { error: string }) => `移除 Worktree 失敗：${error}`,
     },
-  },
+        },
 
   sessionInfo: {
+
     // Used by Session Info screen (app/(app)/session/[id]/info.tsx)
     tagBranch: "分支",
     tagMain: "主線",

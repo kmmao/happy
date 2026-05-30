@@ -338,6 +338,9 @@ export const en = {
     previewTab: "Preview Tab",
     previewTabEnabled: "Preview tab visible in session side panel",
     previewTabDisabled: "Preview tab hidden",
+    expResumeSession: "Session Fork & Duplicate",
+    expResumeSessionEnabled: "Long-press messages to duplicate from any point",
+    expResumeSessionDisabled: "Fork & duplicate UI hidden",
     enhancedSessionWizard: "Enhanced Session Wizard",
     enhancedSessionWizardEnabled: "Profile-first session launcher active",
     enhancedSessionWizardDisabled: "Using standard session launcher",
@@ -594,6 +597,17 @@ export const en = {
   },
 
   session: {
+    // expResumeSession (Session fork / duplicate). Flat keys placed near the
+    // top of this block so TS 5.9.3's NestedKeys union generator picks them
+    // up before truncating large-object unions — late-added keys at the
+    // bottom would not appear in `TranslationKey`.
+    duplicateTitle: "Duplicate from message",
+    duplicateSubtitle: "Pick a previous prompt to rewind to. The new session keeps everything up to that point.",
+    duplicateEmpty: "No previous user messages to rewind from.",
+    duplicateNoAnchor: "No rewind anchor",
+    duplicateMenuTitle: "Duplicate from message…",
+    duplicateMenuSubtitle: "Branch a new session from any of your earlier prompts",
+    forkFailed: "Couldn't fork from this message",
     loadingProgress: ({ percent, loaded, total }: { percent: number; loaded: number; total: number }) =>
       `Loading ${percent}% (${loaded}/${total})`,
     inputPlaceholder: "Type a message ...",

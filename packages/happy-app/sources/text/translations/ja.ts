@@ -473,6 +473,9 @@ export const ja: TranslationStructure = {
     previewTabEnabled: "セッションのサイドパネルにプレビュータブを表示",
     previewTabDisabled: "プレビュータブを非表示",
     hideInactiveSessionsSubtitle: "アクティブなチャットのみをリストに表示",
+    expResumeSession: "Session Fork & Duplicate",
+    expResumeSessionEnabled: "Long-press messages to duplicate from any point",
+    expResumeSessionDisabled: "Fork & duplicate UI hidden",
     enhancedSessionWizard: "拡張セッションウィザード",
     enhancedSessionWizardEnabled: "プロファイル優先セッションランチャーが有効",
     enhancedSessionWizardDisabled: "標準セッションランチャーを使用",
@@ -729,6 +732,13 @@ export const ja: TranslationStructure = {
   },
 
   session: {
+    duplicateTitle: "Duplicate from message",
+    duplicateSubtitle: "Pick a previous prompt to rewind to. The new session keeps everything up to that point.",
+    duplicateEmpty: "No previous user messages to rewind from.",
+    duplicateNoAnchor: "No rewind anchor",
+    duplicateMenuTitle: "Duplicate from message…",
+    duplicateMenuSubtitle: "Branch a new session from any of your earlier prompts",
+    forkFailed: "Could not fork from this message",
     loadingProgress: ({ percent, loaded, total }: { percent: number; loaded: number; total: number }) => `読み込み中 ${percent}%（${loaded}/${total}）`,
     inputPlaceholder: "メッセージを入力...",
     startedByDaemon: "デーモン",
@@ -992,9 +1002,10 @@ export const ja: TranslationStructure = {
       failed: ({ error }: { error: string }) =>
         `Worktree の削除に失敗しました: ${error}`,
     },
-  },
+        },
 
   sessionInfo: {
+
     // Used by Session Info screen (app/(app)/session/[id]/info.tsx)
     tagBranch: "ブランチ",
     tagMain: "メイン",

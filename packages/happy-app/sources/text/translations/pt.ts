@@ -345,6 +345,9 @@ export const pt: TranslationStructure = {
     previewTabEnabled: "A aba de pré-visualização aparece no painel lateral da sessão",
     previewTabDisabled: "A aba de pré-visualização está oculta",
     hideInactiveSessionsSubtitle: "Mostre apenas os chats ativos na sua lista",
+    expResumeSession: "Session Fork & Duplicate",
+    expResumeSessionEnabled: "Long-press messages to duplicate from any point",
+    expResumeSessionDisabled: "Fork & duplicate UI hidden",
     enhancedSessionWizard: "Assistente de sessão aprimorado",
     enhancedSessionWizardEnabled: "Lançador de sessão com perfil ativo",
     enhancedSessionWizardDisabled: "Usando o lançador de sessão padrão",
@@ -606,6 +609,13 @@ export const pt: TranslationStructure = {
   },
 
   session: {
+    duplicateTitle: "Duplicate from message",
+    duplicateSubtitle: "Pick a previous prompt to rewind to. The new session keeps everything up to that point.",
+    duplicateEmpty: "No previous user messages to rewind from.",
+    duplicateNoAnchor: "No rewind anchor",
+    duplicateMenuTitle: "Duplicate from message…",
+    duplicateMenuSubtitle: "Branch a new session from any of your earlier prompts",
+    forkFailed: "Could not fork from this message",
     loadingProgress: ({ percent, loaded, total }: { percent: number; loaded: number; total: number }) => `Carregando ${percent}% (${loaded}/${total})`,
     inputPlaceholder: "Digite uma mensagem ...",
     startedByDaemon: "daemon",
@@ -867,9 +877,10 @@ export const pt: TranslationStructure = {
       failed: ({ error }: { error: string }) =>
         `Falha ao remover Worktree: ${error}`,
     },
-  },
+        },
 
   sessionInfo: {
+
     // Used by Session Info screen (app/(app)/session/[id]/info.tsx)
     tagBranch: "Ramo",
     tagMain: "Principal",

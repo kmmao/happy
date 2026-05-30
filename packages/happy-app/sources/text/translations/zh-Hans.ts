@@ -328,6 +328,9 @@ export const zhHans: TranslationStructure = {
     previewTab: "预览 Tab",
     previewTabEnabled: "会话侧边栏显示预览 Tab",
     previewTabDisabled: "隐藏预览 Tab",
+    expResumeSession: "Session Fork & Duplicate",
+    expResumeSessionEnabled: "Long-press messages to duplicate from any point",
+    expResumeSessionDisabled: "Fork & duplicate UI hidden",
     enhancedSessionWizard: "增强会话向导",
     enhancedSessionWizardEnabled: "配置文件优先启动器已激活",
     enhancedSessionWizardDisabled: "使用标准会话启动器",
@@ -577,6 +580,13 @@ export const zhHans: TranslationStructure = {
   },
 
   session: {
+    duplicateTitle: "Duplicate from message",
+    duplicateSubtitle: "Pick a previous prompt to rewind to. The new session keeps everything up to that point.",
+    duplicateEmpty: "No previous user messages to rewind from.",
+    duplicateNoAnchor: "No rewind anchor",
+    duplicateMenuTitle: "Duplicate from message…",
+    duplicateMenuSubtitle: "Branch a new session from any of your earlier prompts",
+    forkFailed: "Could not fork from this message",
     loadingProgress: ({ percent, loaded, total }: { percent: number; loaded: number; total: number }) => `加载中 ${percent}%（${loaded}/${total}）`,
     inputPlaceholder: "输入消息...",
     startedByDaemon: "守护进程",
@@ -834,9 +844,10 @@ export const zhHans: TranslationStructure = {
       successAndArchived: "Worktree 已移除，会话已归档",
       failed: ({ error }: { error: string }) => `移除 Worktree 失败：${error}`,
     },
-  },
+        },
 
   sessionInfo: {
+
     // Used by Session Info screen (app/(app)/session/[id]/info.tsx)
     tagBranch: "分支",
     tagMain: "主线",

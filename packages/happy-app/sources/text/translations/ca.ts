@@ -346,6 +346,9 @@ export const ca: TranslationStructure = {
     previewTabEnabled: "La pestanya de previsualització es mostra al panell lateral de la sessió",
     previewTabDisabled: "La pestanya de previsualització està amagada",
     hideInactiveSessionsSubtitle: "Mostra només els xats actius a la llista",
+    expResumeSession: "Session Fork & Duplicate",
+    expResumeSessionEnabled: "Long-press messages to duplicate from any point",
+    expResumeSessionDisabled: "Fork & duplicate UI hidden",
     enhancedSessionWizard: "Assistent de sessió millorat",
     enhancedSessionWizardEnabled: "Llançador de sessió amb perfil actiu",
     enhancedSessionWizardDisabled: "Usant el llançador de sessió estàndard",
@@ -608,6 +611,13 @@ export const ca: TranslationStructure = {
   },
 
   session: {
+    duplicateTitle: "Duplicate from message",
+    duplicateSubtitle: "Pick a previous prompt to rewind to. The new session keeps everything up to that point.",
+    duplicateEmpty: "No previous user messages to rewind from.",
+    duplicateNoAnchor: "No rewind anchor",
+    duplicateMenuTitle: "Duplicate from message…",
+    duplicateMenuSubtitle: "Branch a new session from any of your earlier prompts",
+    forkFailed: "Could not fork from this message",
     loadingProgress: ({ percent, loaded, total }: { percent: number; loaded: number; total: number }) => `Carregant ${percent}% (${loaded}/${total})`,
     inputPlaceholder: "Escriu un missatge...",
     startedByDaemon: "daemon",
@@ -870,9 +880,10 @@ export const ca: TranslationStructure = {
       failed: ({ error }: { error: string }) =>
         `Error en eliminar el Worktree: ${error}`,
     },
-  },
+        },
 
   sessionInfo: {
+
     // Used by Session Info screen (app/(app)/session/[id]/info.tsx)
     tagBranch: "Branca",
     tagMain: "Principal",

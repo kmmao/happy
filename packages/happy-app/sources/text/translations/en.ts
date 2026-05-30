@@ -352,6 +352,9 @@ export const en: TranslationStructure = {
     previewTab: "Preview Tab",
     previewTabEnabled: "Preview tab visible in session side panel",
     previewTabDisabled: "Preview tab hidden",
+    expResumeSession: "Session Fork & Duplicate",
+    expResumeSessionEnabled: "Long-press messages to duplicate from any point",
+    expResumeSessionDisabled: "Fork & duplicate UI hidden",
     enhancedSessionWizard: "Enhanced Session Wizard",
     enhancedSessionWizardEnabled: "Profile-first session launcher active",
     enhancedSessionWizardDisabled: "Using standard session launcher",
@@ -608,6 +611,13 @@ export const en: TranslationStructure = {
   },
 
   session: {
+    duplicateTitle: "Duplicate from message",
+    duplicateSubtitle: "Pick a previous prompt to rewind to. The new session keeps everything up to that point.",
+    duplicateEmpty: "No previous user messages to rewind from.",
+    duplicateNoAnchor: "No rewind anchor",
+    duplicateMenuTitle: "Duplicate from message…",
+    duplicateMenuSubtitle: "Branch a new session from any of your earlier prompts",
+    forkFailed: "Could not fork from this message",
     loadingProgress: ({ percent, loaded, total }: { percent: number; loaded: number; total: number }) => `Loading ${percent}% (${loaded}/${total})`,
     inputPlaceholder: "Type a message ...",
     startedByDaemon: "daemon",
@@ -871,9 +881,10 @@ export const en: TranslationStructure = {
       failed: ({ error }: { error: string }) =>
         `Failed to remove worktree: ${error}`,
     },
-  },
+        },
 
   sessionInfo: {
+
     // Used by Session Info screen (app/(app)/session/[id]/info.tsx)
     tagBranch: "Branch",
     tagMain: "Main",
