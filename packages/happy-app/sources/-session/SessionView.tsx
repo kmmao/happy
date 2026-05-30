@@ -474,6 +474,13 @@ export const SessionView = React.memo((props: { id: string }) => {
     return {
       title: getSessionName(session),
       subtitle,
+      // Header renders a third faint line with Claude's live cwd whenever
+      // it has moved out of the launch dir (Claude Code 2.1.121+
+      // CwdChanged hook writes `metadata.activeCwd`). Both fields are
+      // optional — ChatHeaderView suppresses the row if `activeCwd` is
+      // missing or matches `launchPath`.
+      launchPath: session.metadata?.path,
+      activeCwd: session.metadata?.activeCwd,
       avatarId: getSessionAvatarId(session),
       onAvatarPress: () => router.push(`/session/${sessionId}/info`),
       isConnected: isConnected,

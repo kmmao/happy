@@ -97,6 +97,29 @@ export const MetadataSchema = z.object({
       error: z.string().optional(),
     })
     .optional(),
+  // ── Live session-state hooks (Claude Code 2.1.121+ / 2.1.157+) ──────────
+  // Written by happy-cli when Claude emits CwdChanged / Worktree* /
+  // FileChanged hooks. Mirrors the CLI's Metadata schema in
+  // packages/happy-cli/src/api/types.ts. All optional — sessions started
+  // on older Claude CLIs simply won't carry them.
+  activeCwd: z.string().optional(),
+  lastWorktreeEvent: z
+    .object({
+      kind: z.enum(["create", "remove"]),
+      name: z.string().optional(),
+      path: z.string().optional(),
+      at: z.number(),
+    })
+    .optional(),
+  recentFileChanges: z
+    .array(
+      z.object({
+        filePath: z.string(),
+        event: z.enum(["change", "add", "unlink"]),
+        at: z.number(),
+      }),
+    )
+    .optional(),
 });
 
 export type Metadata = z.infer<typeof MetadataSchema>;
