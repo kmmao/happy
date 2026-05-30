@@ -1532,6 +1532,20 @@ export const en: TranslationStructure = {
       "Are you sure you want to logout? Make sure you have backed up your secret key!",
   },
 
+  settingsAgents: {
+    title: "Agent Defaults",
+    subtitle: "Default model, effort, and permissions",
+    groupTitle: "Agent Defaults",
+    clearOverrides: "Clear Overrides",
+    clearOverridesSubtitle: "Return every agent to code defaults",
+    useCodeDefault: "Use code default",
+    noneLabel: "none",
+    defaultDetail: ({ value }: { value: string }) => `Default (${value})`,
+    fieldPermission: "Permission",
+    fieldModel: "Model",
+    fieldEffort: "Effort",
+  },
+
   settingsAppLock: {
     title: "App Lock",
     enable: "App Lock",

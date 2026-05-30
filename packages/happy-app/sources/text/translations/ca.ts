@@ -1536,6 +1536,20 @@ export const ca: TranslationStructure = {
       "Estàs segur que vols tancar la sessió? Assegura't d'haver fet una còpia de seguretat de la teva clau secreta!",
   },
 
+  settingsAgents: {
+    title: "Valors per defecte de l'agent",
+    subtitle: "Model, esforç i permisos per defecte",
+    groupTitle: "Valors per defecte de l'agent",
+    clearOverrides: "Esborra anul·lacions",
+    clearOverridesSubtitle: "Retorna tots els agents als valors del codi",
+    useCodeDefault: "Usa el valor per defecte del codi",
+    noneLabel: "cap",
+    defaultDetail: ({ value }: { value: string }) => `Per defecte (${value})`,
+    fieldPermission: "Permís",
+    fieldModel: "Model",
+    fieldEffort: "Esforç",
+  },
+
   settingsAppLock: {
     title: "Bloqueig de l'app",
     enable: "Bloqueig de l'app",

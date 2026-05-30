@@ -1,4 +1,6 @@
 import type { Session } from "./storageTypes";
+import type { Settings } from "./settings";
+import { getAgentDefaultOverride } from "./agentDefaults";
 import type { PermissionModeKey } from "@/components/PermissionModeSelector";
 
 function isSandboxEnabled(
@@ -38,20 +40,43 @@ export function resolveMessageModeMeta(
     | "maxBudgetUsd"
     | "taskBudgetTokens"
   >,
+  settings?: Pick<Settings, "agentDefaultOverrides">,
 ): ResolvedMessageMeta {
-  const sandboxEnabled = isSandboxEnabled(session.metadata);
-  const permissionMode: PermissionModeKey =
-    session.permissionMode && session.permissionMode !== "default"
-      ? session.permissionMode
-      : sandboxEnabled
-        ? "bypassPermissions"
-        : "default";
+  // Per-agent overrides users picked in the Agent Defaults settings screen.
+  // Always lower priority than an explicit session-level value; only kicks
+  // in when the session field is unset / `'default'`.
+  const agentOverrides = getAgentDefaultOverride(
+    settings?.agentDefaultOverrides,
+    session.metadata?.flavor,
+  );
 
-  const modelMode = session.modelMode || "default";
-  // Use the session-pinned model first so profile/model mapping changes cannot
-  // silently retarget an existing session after creation.
+  const sandboxEnabled = isSandboxEnabled(session.metadata);
+  // Priority: session override → settings agentDefault → sandbox auto-bypass → 'default'.
+  let permissionMode: PermissionModeKey;
+  if (session.permissionMode && session.permissionMode !== "default") {
+    permissionMode = session.permissionMode;
+  } else if (agentOverrides.permissionMode) {
+    permissionMode = agentOverrides.permissionMode as PermissionModeKey;
+  } else if (sandboxEnabled) {
+    permissionMode = "bypassPermissions";
+  } else {
+    permissionMode = "default";
+  }
+
+  // Priority: session.modelMode → settings agentDefault.modelMode → 'default'.
+  // The 'default' case yields null → CLI uses its own DEFAULT_*_MODEL constant.
+  const resolvedModelKey =
+    session.modelMode && session.modelMode !== "default"
+      ? session.modelMode
+      : agentOverrides.modelMode && agentOverrides.modelMode !== "default"
+        ? agentOverrides.modelMode
+        : "default";
+  // Pinned model wins over the resolved key so profile/model mapping changes
+  // can't silently retarget an existing session after creation. When no pin,
+  // fall back to the resolved key (which already considered overrides).
   const rawModel =
-    session.pinnedModelId ?? (modelMode !== "default" ? modelMode : null);
+    session.pinnedModelId ??
+    (resolvedModelKey !== "default" ? resolvedModelKey : null);
   const model =
     rawModel && session.pinnedModelId == null && session.modelMappings?.[rawModel]
       ? session.modelMappings[rawModel]
@@ -71,8 +96,9 @@ export function resolveMessageModeMeta(
         }
       : null;
 
-  // Resolve effort level
-  const effortLevel = session.effortLevel;
+  // Resolve effort level — session value first, then settings agentDefault.
+  // null in both → CLI uses its own DEFAULT_*_EFFORT.
+  const effortLevel = session.effortLevel ?? agentOverrides.effortLevel ?? null;
   const effort = effortLevel
     ? (effortLevel as "low" | "medium" | "high" | "max" | "xhigh")
     : null;

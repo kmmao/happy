@@ -1482,6 +1482,20 @@ export const zhHans: TranslationStructure = {
     logoutConfirm: "您确定要登出吗？请确保您已备份密钥！",
   },
 
+  settingsAgents: {
+    title: "Agent 默认值",
+    subtitle: "默认模型、推理强度和权限",
+    groupTitle: "Agent 默认值",
+    clearOverrides: "清除覆盖",
+    clearOverridesSubtitle: "所有 agent 恢复到代码默认值",
+    useCodeDefault: "使用代码默认值",
+    noneLabel: "无",
+    defaultDetail: ({ value }: { value: string }) => `默认（${value}）`,
+    fieldPermission: "权限",
+    fieldModel: "模型",
+    fieldEffort: "推理强度",
+  },
+
   settingsAppLock: {
     title: "应用锁",
     enable: "应用锁",

@@ -54,6 +54,7 @@ import {
   AIBackendProfile,
   validateProfileForAgent,
 } from "@/sync/settings";
+import { resolveAgentDefaultConfig } from "@/sync/agentDefaults";
 import { getBuiltInProfile, DEFAULT_PROFILES } from "@/sync/profileUtils";
 import { AgentInput } from "@/components/AgentInput";
 import { getSuggestions } from "@/components/autocomplete/suggestions";
@@ -220,6 +221,12 @@ function NewSessionWizard() {
   const useEnhancedSessionWizard = useSetting("useEnhancedSessionWizard");
   const lastUsedPermissionMode = useSetting("lastUsedPermissionMode");
   const lastUsedModelMode = useSetting("lastUsedModelMode");
+  // Per-agent defaults the user configured in Settings → Agent Defaults.
+  // Slotted between `lastUsedXxx` (heuristic memory of last selection) and
+  // the hardcoded code defaults in the fallback chain below, so an explicit
+  // choice in settings beats the code default but never overrides the
+  // user's most recent choice.
+  const agentDefaultOverrides = useSetting("agentDefaultOverrides");
   const lastUsedThinkingMode = useSetting("lastUsedThinkingMode");
   const lastUsedEffortLevel = useSetting("lastUsedEffortLevel");
   const experimentsEnabled = useSetting("experiments");
@@ -362,12 +369,21 @@ function NewSessionWizard() {
     [agentType, availableModels],
   );
 
+  // effectiveAgentDefaults: settings override → code default. Used as the
+  // fallback layer between `lastUsedXxx` (recent-selection heuristic) and
+  // the hardcoded `getDefault*Key` floor below.
+  const effectiveAgentDefaults = React.useMemo(
+    () => resolveAgentDefaultConfig(agentDefaultOverrides, agentType),
+    [agentDefaultOverrides, agentType],
+  );
+
   const [permissionMode, setPermissionMode] = React.useState<PermissionMode>(
     () => {
       const modes = getAvailablePermissionModes(agentType, null, t);
       return (
         resolveCurrentOption(modes, [
           lastUsedPermissionMode,
+          effectiveAgentDefaults.permissionMode,
           getDefaultPermissionModeKey(agentType),
         ]) ?? modes[0]
       );
@@ -381,6 +397,7 @@ function NewSessionWizard() {
     );
     return resolveCurrentOption(models, [
       lastUsedModelMode,
+      effectiveAgentDefaults.modelMode,
       getDefaultModelKey(agentType),
     ]);
   });
@@ -393,22 +410,34 @@ function NewSessionWizard() {
         resolveCurrentOption(availableModes, [
           current.key,
           lastUsedPermissionMode,
+          effectiveAgentDefaults.permissionMode,
           getDefaultPermissionModeKey(agentType),
         ]) ?? availableModes[0];
       return resolved ?? current;
     });
-  }, [availableModes, agentType, lastUsedPermissionMode]);
+  }, [
+    availableModes,
+    agentType,
+    lastUsedPermissionMode,
+    effectiveAgentDefaults.permissionMode,
+  ]);
 
   React.useEffect(() => {
     setModelMode((current) => {
       const resolved = resolveCurrentOption(selectableModels, [
         current?.key,
         lastUsedModelMode,
+        effectiveAgentDefaults.modelMode,
         getDefaultModelKey(agentType),
       ]);
       return resolved ?? current;
     });
-  }, [selectableModels, agentType, lastUsedModelMode]);
+  }, [
+    selectableModels,
+    agentType,
+    lastUsedModelMode,
+    effectiveAgentDefaults.modelMode,
+  ]);
 
   const handlePermissionModeChange = React.useCallback(
     (mode: PermissionMode) => {

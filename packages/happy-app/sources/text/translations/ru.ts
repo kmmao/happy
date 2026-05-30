@@ -2574,6 +2574,20 @@ export const ru: TranslationStructure = {
     rejectPlaceholder: "Опишите, что нужно изменить...",
   },
 
+  settingsAgents: {
+    title: "Настройки агентов по умолчанию",
+    subtitle: "Модель, усилие и разрешения по умолчанию",
+    groupTitle: "Настройки агентов по умолчанию",
+    clearOverrides: "Очистить переопределения",
+    clearOverridesSubtitle: "Вернуть все агенты к встроенным значениям",
+    useCodeDefault: "Использовать значение по умолчанию",
+    noneLabel: "нет",
+    defaultDetail: ({ value }: { value: string }) => `По умолчанию (${value})`,
+    fieldPermission: "Разрешения",
+    fieldModel: "Модель",
+    fieldEffort: "Усилие",
+  },
+
   settingsAppLock: {
     title: "Блокировка приложения",
     enable: "Блокировка приложения",

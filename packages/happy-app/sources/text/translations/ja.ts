@@ -1655,6 +1655,20 @@ export const ja: TranslationStructure = {
       "ログアウトしてもよろしいですか？シークレットキーのバックアップを取っていることを確認してください！",
   },
 
+  settingsAgents: {
+    title: "Agent のデフォルト",
+    subtitle: "デフォルトのモデル、推論強度、権限",
+    groupTitle: "Agent のデフォルト",
+    clearOverrides: "上書きをクリア",
+    clearOverridesSubtitle: "すべての agent をコードデフォルトに戻す",
+    useCodeDefault: "コードのデフォルトを使用",
+    noneLabel: "なし",
+    defaultDetail: ({ value }: { value: string }) => `デフォルト（${value}）`,
+    fieldPermission: "権限",
+    fieldModel: "モデル",
+    fieldEffort: "推論強度",
+  },
+
   settingsAppLock: {
     title: "アプリロック",
     enable: "アプリロック",

@@ -130,6 +130,13 @@ export async function claudeLocalLauncher(
     async function doSwitch() {
       logger.debug("[local]: doSwitch");
 
+      // Reset live mode tracking back to configured defaults before the
+      // remote runner takes over, so it doesn't inherit state captured by
+      // the local runner mid-turn (e.g. a user picked a non-default model
+      // for a single message). runClaude wires session.onAbort to its
+      // resetCurrentModeDefaults().
+      session.onAbort();
+
       // Switching to remote mode
       if (!exitReason) {
         exitReason = { type: "switch" };

@@ -1536,6 +1536,20 @@ export const es: TranslationStructure = {
       "¿Seguro que quieres cerrar sesión? ¡Asegúrate de haber guardado tu clave secreta!",
   },
 
+  settingsAgents: {
+    title: "Valores predeterminados del agente",
+    subtitle: "Modelo, esfuerzo y permisos predeterminados",
+    groupTitle: "Valores predeterminados del agente",
+    clearOverrides: "Borrar anulaciones",
+    clearOverridesSubtitle: "Devuelve todos los agentes a los valores del código",
+    useCodeDefault: "Usar valor predeterminado del código",
+    noneLabel: "ninguno",
+    defaultDetail: ({ value }: { value: string }) => `Predeterminado (${value})`,
+    fieldPermission: "Permiso",
+    fieldModel: "Modelo",
+    fieldEffort: "Esfuerzo",
+  },
+
   settingsAppLock: {
     title: "Bloqueo de la app",
     enable: "Bloqueo de la app",

@@ -64,6 +64,12 @@ interface LoopOptions {
   permissionMode?: PermissionMode;
   startingMode?: "local" | "remote";
   onModeChange: (mode: "local" | "remote") => void;
+  /**
+   * Forwarded to Session.onAbort() — runClaude wires this to reset the live
+   * permission/model/effort tracking back to its configured defaults after
+   * an abort, so the next turn doesn't inherit the aborted state.
+   */
+  onAbort?: () => void;
   mcpServers: Record<string, any>;
   session: ApiSessionClient;
   api: ApiClient;
@@ -97,6 +103,7 @@ export async function loop(opts: LoopOptions): Promise<number> {
     allowedTools: opts.allowedTools,
     sandboxConfig: opts.sandboxConfig,
     onModeChange: opts.onModeChange,
+    onAbort: opts.onAbort,
     hookSettingsPath: opts.hookSettingsPath,
     jsRuntime: opts.jsRuntime,
     model: opts.model,

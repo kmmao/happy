@@ -1533,6 +1533,20 @@ export const pt: TranslationStructure = {
       "Tem certeza de que quer sair? Certifique-se de ter feito backup da sua chave secreta!",
   },
 
+  settingsAgents: {
+    title: "Padrões do agente",
+    subtitle: "Modelo, esforço e permissões padrão",
+    groupTitle: "Padrões do agente",
+    clearOverrides: "Limpar substituições",
+    clearOverridesSubtitle: "Volta cada agente aos valores do código",
+    useCodeDefault: "Usar padrão do código",
+    noneLabel: "nenhum",
+    defaultDetail: ({ value }: { value: string }) => `Padrão (${value})`,
+    fieldPermission: "Permissão",
+    fieldModel: "Modelo",
+    fieldEffort: "Esforço",
+  },
+
   settingsAppLock: {
     title: "Bloqueio do app",
     enable: "Bloqueio do app",

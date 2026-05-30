@@ -72,6 +72,7 @@ import {
   Settings,
   settingsDefaults,
   settingsParse,
+  settingsToSyncPayload,
 } from "./settings";
 import {
   mergeServerSettingsWithLocalProfiles,
@@ -802,8 +803,11 @@ class Sync {
       storage.getState().applySessions([{ ...session, needsAttention: false }]);
     }
 
+    // Pass current settings so resolveMessageModeMeta can fall back to the
+    // user's per-agent defaults (settings.agentDefaultOverrides) when the
+    // session itself has no explicit override.
     const { permissionMode, model, thinking, effort, maxBudgetUsd, taskBudget } =
-      resolveMessageModeMeta(session);
+      resolveMessageModeMeta(session, storage.getState().settings);
 
     // Generate local ID (or use provided one)
     const localId = options?.localId ?? randomUUID();
@@ -1682,7 +1686,9 @@ class Sync {
         const response = await fetch(`${API_ENDPOINT}/v1/account/settings`, {
           method: "POST",
           body: JSON.stringify({
-            settings: await this.encryption.encryptRaw(settings),
+            settings: await this.encryption.encryptRaw(
+              settingsToSyncPayload(settings),
+            ),
             expectedVersion: version ?? 0,
           }),
           headers: {

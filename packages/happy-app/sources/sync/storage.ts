@@ -236,6 +236,15 @@ interface StorageState {
   updateSessionPermissionMode: (sessionId: string, mode: string) => void;
   updateSessionStarred: (sessionId: string, starred: boolean) => void;
   updateSessionModelMode: (sessionId: string, mode: string) => void;
+  /**
+   * Clear per-session permission/model/effort overrides so they fall back
+   * to either the user's `agentDefaultOverrides` (settings) or the code
+   * defaults. permissionMode and modelMode are set to `'default'` (this
+   * fork's "no override" sentinel — see messageMeta.ts), effortLevel to
+   * null. thinking/budget fields are left untouched — they are managed
+   * via updateSessionSdkSettings and are out of scope for agent defaults.
+   */
+  resetSessionAgentOverrides: (sessionId: string) => void;
   updateSessionPinnedModelId: (sessionId: string, modelId: string | null) => void;
   updateSessionCustomModels: (
     sessionId: string,
@@ -1765,6 +1774,46 @@ export const storage = create<StorageState>()((set, get) => {
         saveSessionModelModes(allModelModes);
 
         // No need to rebuild sessionListViewData since model mode doesn't affect the list display
+        return {
+          ...state,
+          sessions: updatedSessions,
+        };
+      });
+      stagePendingSessionPreferences(sessionId);
+      onPreferencesChanged?.(sessionId);
+    },
+    resetSessionAgentOverrides: (sessionId: string) => {
+      set((state) => {
+        const session = state.sessions[sessionId];
+        if (!session) return state;
+
+        const updatedSessions = {
+          ...state.sessions,
+          [sessionId]: {
+            ...session,
+            permissionMode: "default",
+            modelMode: "default",
+            effortLevel: null,
+            pinnedModelId: null,
+          },
+        };
+
+        // Re-persist permission / model / effort maps with this session's
+        // override dropped. Iterates all sessions so the non-default
+        // condition stays the source of truth.
+        const permissionModes: Record<string, PermissionModeKey> = {};
+        const modelModes: Record<string, string> = {};
+        Object.entries(updatedSessions).forEach(([id, sess]) => {
+          if (sess.permissionMode && sess.permissionMode !== "default") {
+            permissionModes[id] = sess.permissionMode;
+          }
+          if (sess.modelMode && sess.modelMode !== "default") {
+            modelModes[id] = sess.modelMode;
+          }
+        });
+        saveSessionPermissionModes(permissionModes);
+        saveSessionModelModes(modelModes);
+
         return {
           ...state,
           sessions: updatedSessions,

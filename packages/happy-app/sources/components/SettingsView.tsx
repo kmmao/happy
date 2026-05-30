@@ -302,6 +302,12 @@ export const SettingsView = React.memo(function SettingsView() {
           />
         )}
         <Item
+          title={t("settingsAgents.title")}
+          subtitle={t("settingsAgents.subtitle")}
+          icon={<Ionicons name="options-outline" size={29} color={theme.colors.accentBlue} />}
+          onPress={() => router.push("/settings/agents" as any)}
+        />
+        <Item
           title={t("settings.featuresTitle")}
           subtitle={t("settings.featuresSubtitle")}
           icon={<Ionicons name="flask-outline" size={29} color={theme.colors.accentOrange} />}

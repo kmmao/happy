@@ -5,6 +5,7 @@ import {
   Settings,
   settingsDefaults,
   settingsParse,
+  settingsToSyncPayload,
   SettingsSchema,
 } from "./settings";
 import {
@@ -53,7 +54,13 @@ export function loadSettings(): { settings: Settings; version: number | null } {
 }
 
 export function saveSettings(settings: Settings, version: number) {
-  mmkv.set("settings", JSON.stringify({ settings, version }));
+  // Strip empty agentDefaultOverrides entries so MMKV doesn't accumulate
+  // ghost "claude: {}" / "codex: {}" objects after the user clears
+  // overrides one field at a time.
+  mmkv.set(
+    "settings",
+    JSON.stringify({ settings: settingsToSyncPayload(settings), version }),
+  );
 }
 
 export function loadPendingSettings(): Partial<Settings> {

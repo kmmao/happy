@@ -55,6 +55,21 @@ import {
 /** JavaScript runtime to use for spawning Claude Code */
 export type JsRuntime = "node" | "bun";
 
+// ── Per-agent code defaults (upstream b042d834a, adapted) ─────────────────
+//
+// User-facing defaults that runClaude applies when:
+//   1. the spawning App / CLI didn't explicitly pin a value, and
+//   2. the active session has no agentDefaultOverrides for this field.
+//
+// `permissionMode` differs from upstream — upstream defaults to `'yolo'`
+// (bypass all prompts) as a UX choice. We keep `'default'` to preserve the
+// project's safety posture; users who want yolo can pick it explicitly in
+// the App's Agent Defaults screen.
+const DEFAULT_CLAUDE_PERMISSION_MODE: PermissionMode = "default";
+const DEFAULT_CLAUDE_MODEL = "opus";
+const DEFAULT_CLAUDE_EFFORT: "low" | "medium" | "high" | "xhigh" | "max" =
+  "medium";
+
 export interface StartOptions {
   model?: string;
   permissionMode?: PermissionMode;
@@ -119,7 +134,7 @@ export async function runClaude(
   const sandboxEnabled = Boolean(sandboxConfig?.enabled);
   const initialPermissionMode = applySandboxPermissionPolicy(
     resolveInitialClaudePermissionMode(
-      options.permissionMode,
+      options.permissionMode ?? DEFAULT_CLAUDE_PERMISSION_MODE,
       options.claudeArgs,
     ),
     sandboxEnabled,
@@ -561,7 +576,7 @@ export async function runClaude(
   // Permission modes: Use the unified 7-mode type, mapping happens at SDK boundary in claudeRemote.ts
   let currentPermissionMode: PermissionMode | undefined = initialPermissionMode;
 
-  let currentModel = options.model; // Track current model state
+  let currentModel: string | undefined = options.model ?? DEFAULT_CLAUDE_MODEL; // Track current model state
   let currentFallbackModel: string | undefined = undefined; // Track current fallback model
   let currentCustomSystemPrompt: string | undefined = undefined; // Track current custom system prompt
   let currentAppendSystemPrompt: string | undefined = undefined; // Track current append system prompt
@@ -610,8 +625,23 @@ export async function runClaude(
   }
   let currentTaskBudget: { total: number } | undefined = undefined; // Track current task budget
   let currentThinking: EnhancedMode["thinking"] = undefined; // Track current thinking config
-  let currentEffort: EnhancedMode["effort"] = undefined; // Track current effort level
+  let currentEffort: EnhancedMode["effort"] = DEFAULT_CLAUDE_EFFORT; // Track current effort level
   let currentLocale: string | undefined = undefined; // Track current locale
+
+  // Reset live mode tracking back to configured defaults. Wired to
+  // Session.onAbort so a remote abort or local→remote switch starts the next
+  // turn from a clean slate instead of inheriting one-message overrides.
+  const resetCurrentModeDefaults = () => {
+    currentPermissionMode = initialPermissionMode;
+    currentModel = options.model ?? DEFAULT_CLAUDE_MODEL;
+    currentFallbackModel = undefined;
+    currentCustomSystemPrompt = undefined;
+    currentAppendSystemPrompt = undefined;
+    currentAllowedTools = undefined;
+    currentDisallowedTools = undefined;
+    currentEffort = DEFAULT_CLAUDE_EFFORT;
+    logger.debug("[loop] Reset current mode defaults after abort");
+  };
   session.onUserMessage((message) => {
     // Resolve permission mode from meta - pass through as-is, mapping happens at SDK boundary
     let messagePermissionMode: PermissionMode | undefined =
@@ -1017,6 +1047,7 @@ export async function runClaude(
         controlledByUser: newMode === "local",
       }));
     },
+    onAbort: resetCurrentModeDefaults,
     onSessionReady: (sessionInstance) => {
       // Store reference for hook server callback
       currentSession = sessionInstance;

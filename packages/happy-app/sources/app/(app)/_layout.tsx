@@ -143,6 +143,12 @@ export default function RootLayout() {
         }}
       />
       <Stack.Screen
+        name="settings/agents"
+        options={{
+          headerTitle: t("settingsAgents.title"),
+        }}
+      />
+      <Stack.Screen
         name="settings/features"
         options={{
           headerTitle: t("settings.features"),

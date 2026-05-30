@@ -165,4 +165,124 @@ describe("resolveMessageModeMeta", () => {
 
     expect(meta.thinking).toBeNull();
   });
+
+  // ── agentDefaultOverrides fallback (modified A port of upstream b042d834a) ──
+
+  it("falls back to settings-level permission override when session has none", () => {
+    const meta = resolveMessageModeMeta(
+      {
+        permissionMode: null,
+        modelMode: null,
+        metadata: { flavor: "claude" },
+      } as any,
+      {
+        agentDefaultOverrides: {
+          claude: { permissionMode: "bypassPermissions" },
+        },
+      } as any,
+    );
+
+    expect(meta.permissionMode).toBe("bypassPermissions");
+  });
+
+  it("falls back to settings-level model override when session modelMode is 'default'", () => {
+    const meta = resolveMessageModeMeta(
+      {
+        permissionMode: "default",
+        modelMode: "default",
+        metadata: { flavor: "codex" },
+      } as any,
+      {
+        agentDefaultOverrides: {
+          codex: { modelMode: "gpt-5.5" },
+        },
+      } as any,
+    );
+
+    expect(meta.model).toBe("gpt-5.5");
+  });
+
+  it("falls back to settings-level effort override when session effortLevel is null", () => {
+    const meta = resolveMessageModeMeta(
+      {
+        permissionMode: "default",
+        modelMode: null,
+        effortLevel: null,
+        metadata: { flavor: "claude" },
+      } as any,
+      {
+        agentDefaultOverrides: {
+          claude: { effortLevel: "high" },
+        },
+      } as any,
+    );
+
+    expect(meta.effort).toBe("high");
+  });
+
+  it("session-level explicit value beats settings-level override", () => {
+    const meta = resolveMessageModeMeta(
+      {
+        permissionMode: "acceptEdits",
+        modelMode: "gpt-5.4",
+        effortLevel: "xhigh",
+        metadata: { flavor: "codex" },
+      } as any,
+      {
+        agentDefaultOverrides: {
+          codex: {
+            permissionMode: "yolo",
+            modelMode: "gpt-5.5",
+            effortLevel: "medium",
+          },
+        },
+      } as any,
+    );
+
+    expect(meta.permissionMode).toBe("acceptEdits");
+    expect(meta.model).toBe("gpt-5.4");
+    expect(meta.effort).toBe("xhigh");
+  });
+
+  it("settings override does not erode the existing 6-field shape (modified A keeps thinking/maxBudget/taskBudget)", () => {
+    // The upstream commit shrinks the return type to {permissionMode?, model?,
+    // effort?}. This fork keeps the full shape; pin that contract here so a
+    // future merge attempt has to revisit it intentionally.
+    const meta = resolveMessageModeMeta(
+      {
+        permissionMode: null,
+        modelMode: null,
+        effortLevel: null,
+        metadata: { flavor: "claude" },
+      } as any,
+      {
+        agentDefaultOverrides: {
+          claude: { permissionMode: "bypassPermissions" },
+        },
+      } as any,
+    );
+
+    expect(meta).toMatchObject({
+      permissionMode: "bypassPermissions",
+      thinking: { type: "adaptive" }, // default thinking still resolved
+      maxBudgetUsd: null,
+      taskBudget: null,
+    });
+  });
+
+  it("sandbox auto-bypass is still applied when neither session nor settings override", () => {
+    // Existing local behaviour: sandbox.enabled + permissionMode 'default'
+    // yields bypassPermissions. Settings overrides take priority over sandbox
+    // only when the override is explicit.
+    const meta = resolveMessageModeMeta(
+      {
+        permissionMode: "default",
+        modelMode: null,
+        metadata: { flavor: "claude", sandbox: { enabled: true } },
+      } as any,
+      { agentDefaultOverrides: {} } as any,
+    );
+
+    expect(meta.permissionMode).toBe("bypassPermissions");
+  });
 });

@@ -1482,6 +1482,20 @@ export const zhHant: TranslationStructure = {
     logoutConfirm: "您確定要登出嗎？請確保您已備份金鑰！",
   },
 
+  settingsAgents: {
+    title: "Agent 預設值",
+    subtitle: "預設模型、推理強度與權限",
+    groupTitle: "Agent 預設值",
+    clearOverrides: "清除覆寫",
+    clearOverridesSubtitle: "所有 agent 還原為程式碼預設值",
+    useCodeDefault: "使用程式碼預設值",
+    noneLabel: "無",
+    defaultDetail: ({ value }: { value: string }) => `預設（${value}）`,
+    fieldPermission: "權限",
+    fieldModel: "模型",
+    fieldEffort: "推理強度",
+  },
+
   settingsAppLock: {
     title: "應用程式鎖",
     enable: "應用程式鎖",

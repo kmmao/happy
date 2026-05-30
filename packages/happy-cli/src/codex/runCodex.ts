@@ -57,6 +57,18 @@ import { CHANGE_TITLE_INSTRUCTION } from "@/gemini/constants";
 import { notifyDaemonSessionStarted } from "@/daemon/controlClient";
 import { startSessionHeartbeat } from "@/daemon/sessionHeartbeat";
 import { registerKillSessionHandler } from "@/claude/registerKillSessionHandler";
+
+// ── Per-agent code defaults (upstream b042d834a, adapted) ─────────────────
+//
+// `permissionMode` differs from upstream — upstream defaults to `'yolo'` for
+// Codex to match its native auto-approve. We keep `'default'` so a Happy
+// user has to opt into yolo explicitly via the App's Agent Defaults screen.
+const DEFAULT_CODEX_PERMISSION_MODE: import("@/api/types").PermissionMode =
+  "default";
+const DEFAULT_CODEX_MODEL = "gpt-5.5";
+const DEFAULT_CODEX_EFFORT: NonNullable<
+  import("@/api/types").MessageMeta["effort"]
+> = "medium";
 import { delay as _delay } from "@/utils/time";
 import { stopCaffeinate } from "@/utils/caffeinate";
 import { connectionState } from "@/utils/serverConnectionErrors";
@@ -499,12 +511,23 @@ export async function runCodex(opts: {
   // Track current overrides to apply per message
   // Use shared PermissionMode type from api/types for cross-agent compatibility
   let currentPermissionMode: import("@/api/types").PermissionMode | undefined =
-    undefined;
-  let currentModel: string | undefined = undefined;
+    DEFAULT_CODEX_PERMISSION_MODE;
+  let currentModel: string | undefined = DEFAULT_CODEX_MODEL;
   let currentReasoningEffort:
     | NonNullable<import("@/api/types").MessageMeta["effort"]>
-    | undefined = undefined;
+    | undefined = DEFAULT_CODEX_EFFORT;
   let currentAppendSystemPrompt: string | undefined = undefined;
+
+  // Reset live mode tracking back to configured defaults. Called from the
+  // abort path below so the next turn doesn't inherit one-message overrides
+  // from the aborted turn (e.g. user picked xhigh for one tough question).
+  const resetCurrentModeDefaults = () => {
+    currentPermissionMode = DEFAULT_CODEX_PERMISSION_MODE;
+    currentModel = DEFAULT_CODEX_MODEL;
+    currentReasoningEffort = DEFAULT_CODEX_EFFORT;
+    currentAppendSystemPrompt = undefined;
+    logger.debug("[Codex] Reset current mode defaults after abort");
+  };
   session.onUserMessage((message) => {
     const perfSocketReceivedAt = session.lastPerfSocketReceivedAt;
     const perfQueuedAt = Date.now();
@@ -662,6 +685,7 @@ export async function runCodex(opts: {
         );
       }
 
+      resetCurrentModeDefaults();
       abortController.abort();
       reasoningProcessor.abort();
       logger.debug("[Codex] Abort completed - session remains active");

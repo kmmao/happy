@@ -1,4 +1,5 @@
 import * as z from "zod";
+import { AgentDefaultOverridesSchema } from "./agentDefaults";
 import { log } from '@/log';
 import {
   AIBackendProfileSchema as SharedAIBackendProfileSchema,
@@ -359,6 +360,11 @@ export const SettingsSchema = z.object({
     .describe(
       "Custom Git host provider mappings (e.g. GitHub Enterprise → github, self-hosted Gitea → gitea)",
     ),
+  // Per-agent user defaults — see sync/agentDefaults.ts. Compact serialization
+  // strips empty agent objects via settingsToSyncPayload before MMKV / server.
+  agentDefaultOverrides: AgentDefaultOverridesSchema.describe(
+    "User-selected agent defaults. Missing values fall back to code defaults and are not sent as agent metadata.",
+  ),
   // Auto issue session: configured per-host in gitHosts array
   dismissedCLIWarnings: z
     .object({
@@ -485,6 +491,8 @@ export const settingsDefaults: Settings = {
   gitHosts: [],
   // Project tab visibility (hidden by default)
   showProjectTab: false,
+  // Per-agent user defaults (empty by default — code defaults apply)
+  agentDefaultOverrides: {},
   // Dismissed CLI warnings (empty by default)
   dismissedCLIWarnings: { perMachine: {}, global: {} },
   // Browser notifications (web only, off by default)
@@ -580,5 +588,33 @@ export function applySettings(
     }
   });
 
+  return result;
+}
+
+/**
+ * Prepare settings for MMKV / server serialization. Strips
+ * `agentDefaultOverrides` entries that are empty objects (no per-field
+ * override) so we don't bloat the encrypted payload or surface ghost
+ * "claude: {}" entries that the UI would still treat as "has override".
+ *
+ * Missing-keys-equal-defaults semantics: if every override is gone, the
+ * key is dropped entirely; the schema's `.default({})` rehydrates it on
+ * the next load.
+ */
+export function settingsToSyncPayload(settings: Settings): Partial<Settings> {
+  const result: Partial<Settings> = { ...settings };
+  const compactAgentOverrides = Object.fromEntries(
+    Object.entries(settings.agentDefaultOverrides ?? {}).filter(
+      ([, value]) =>
+        value &&
+        typeof value === "object" &&
+        Object.keys(value).length > 0,
+    ),
+  ) as Settings["agentDefaultOverrides"];
+  if (Object.keys(compactAgentOverrides).length === 0) {
+    delete result.agentDefaultOverrides;
+  } else {
+    result.agentDefaultOverrides = compactAgentOverrides;
+  }
   return result;
 }

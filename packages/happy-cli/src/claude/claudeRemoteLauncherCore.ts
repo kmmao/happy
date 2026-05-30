@@ -459,12 +459,16 @@ export async function claudeRemoteLauncher(
 
   async function doAbort() {
     logger.debug("[remote]: doAbort");
+    // Reset live mode tracking back to configured defaults — see Session.onAbort.
+    // Idempotent; safe to call alongside doSwitch.
+    session.onAbort();
     executionGuard.abort("abort");
     await abort();
   }
 
   async function doSwitch() {
     logger.debug("[remote]: doSwitch");
+    session.onAbort();
     executionGuard.abort("switch_transport");
     if (!exitReason) {
       exitReason = "switch";

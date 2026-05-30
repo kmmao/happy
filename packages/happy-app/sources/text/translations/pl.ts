@@ -1546,6 +1546,20 @@ export const pl: TranslationStructure = {
       "Czy na pewno chcesz się wylogować? Upewnij się, że masz kopię zapasową klucza tajnego!",
   },
 
+  settingsAgents: {
+    title: "Domyślne ustawienia agenta",
+    subtitle: "Domyślny model, wysiłek i uprawnienia",
+    groupTitle: "Domyślne ustawienia agenta",
+    clearOverrides: "Wyczyść nadpisania",
+    clearOverridesSubtitle: "Przywróć wszystkie agenty do wartości domyślnych",
+    useCodeDefault: "Użyj wartości domyślnej",
+    noneLabel: "brak",
+    defaultDetail: ({ value }: { value: string }) => `Domyślne (${value})`,
+    fieldPermission: "Uprawnienia",
+    fieldModel: "Model",
+    fieldEffort: "Wysiłek",
+  },
+
   settingsAppLock: {
     title: "Blokada aplikacji",
     enable: "Blokada aplikacji",

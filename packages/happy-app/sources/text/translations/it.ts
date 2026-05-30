@@ -1672,6 +1672,20 @@ export const it: TranslationStructure = {
       "Sei sicuro di voler uscire? Assicurati di aver fatto il backup della tua chiave segreta!",
   },
 
+  settingsAgents: {
+    title: "Valori predefiniti dell'agente",
+    subtitle: "Modello, sforzo e permessi predefiniti",
+    groupTitle: "Valori predefiniti dell'agente",
+    clearOverrides: "Cancella sostituzioni",
+    clearOverridesSubtitle: "Riporta ogni agente ai valori del codice",
+    useCodeDefault: "Usa il valore predefinito del codice",
+    noneLabel: "nessuno",
+    defaultDetail: ({ value }: { value: string }) => `Predefinito (${value})`,
+    fieldPermission: "Permesso",
+    fieldModel: "Modello",
+    fieldEffort: "Sforzo",
+  },
+
   settingsAppLock: {
     title: "Blocco app",
     enable: "Blocco app",
