@@ -68,6 +68,17 @@ export function buildHappyMcpServers(
 /**
  * Build the JSON object written to settings.json. Exposed for tests so we
  * can assert on the shape without round-tripping through the filesystem.
+ *
+ * Hook is emitted in Claude Code 2.1.139+ exec form: `command` holds the
+ * executable, `args` holds the argv tail. Claude runs `execvp(command,
+ * args)` directly — no `sh -c`, so the forwarder path can contain spaces,
+ * quotes, `$()`, backticks, semicolons, etc. without shell-injection risk.
+ *
+ * The previous shape `{command: 'node "<path>" <port>'}` was a shell
+ * string. It worked, but a forwarder path or a port value containing any
+ * shell metacharacter would either break parsing or smuggle commands.
+ * Codium pins `@anthropic-ai/claude-code@2.1.157`, so the runtime CLI is
+ * already guaranteed to be ≥ 2.1.139 in supported deployments.
  */
 export function buildHookSettings(port: number): Record<string, unknown> {
   const forwarderScript = resolve(
@@ -75,12 +86,17 @@ export function buildHookSettings(port: number): Record<string, unknown> {
     "scripts",
     "session_hook_forwarder.cjs",
   );
-  const hookCommand = `node "${forwarderScript}" ${port}`;
 
   const hookEntry = [
     {
       matcher: "*",
-      hooks: [{ type: "command", command: hookCommand }],
+      hooks: [
+        {
+          type: "command",
+          command: "node",
+          args: [forwarderScript, String(port)],
+        },
+      ],
     },
   ];
 

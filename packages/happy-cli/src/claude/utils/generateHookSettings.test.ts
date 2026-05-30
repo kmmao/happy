@@ -18,16 +18,45 @@ import {
   buildHappyMcpServers,
 } from "./generateHookSettings";
 
+type HookEntry = {
+  matcher: string;
+  hooks: Array<{ type: string; command: string; args?: string[] }>;
+};
+
 describe("buildHookSettings", () => {
   it("emits SessionStart and StopFailure hooks for the given port", () => {
     const settings = buildHookSettings(12345);
     expect(settings.hooks).toBeDefined();
-    const hooks = settings.hooks as Record<string, unknown[]>;
+    const hooks = settings.hooks as Record<string, HookEntry[]>;
     expect(Array.isArray(hooks.SessionStart)).toBe(true);
     expect(Array.isArray(hooks.StopFailure)).toBe(true);
 
-    const entry = (hooks.SessionStart as Array<{ hooks: Array<{ command: string }> }>)[0];
-    expect(entry.hooks[0].command).toMatch(/session_hook_forwarder\.cjs"\s+12345$/);
+    const entry = hooks.SessionStart[0];
+    const hook = entry.hooks[0];
+    expect(hook.command).toBe("node");
+    expect(hook.args).toEqual([
+      expect.stringMatching(/session_hook_forwarder\.cjs$/),
+      "12345",
+    ]);
+  });
+
+  it("uses Claude Code 2.1.139+ exec form (args array, not shell string) so a forwarder path with spaces / quotes / shell metacharacters cannot be misparsed or injected", () => {
+    const settings = buildHookSettings(54321);
+    const hooks = (settings.hooks as Record<string, HookEntry[]>).SessionStart[0]
+      .hooks[0];
+    // command is the executable, NOT a shell pipeline.
+    expect(hooks.command).toBe("node");
+    // args is the argv tail; port is stringified.
+    expect(Array.isArray(hooks.args)).toBe(true);
+    expect(hooks.args).toContain("54321");
+    // No embedded quoting / interpolation must leak in.
+    expect(hooks.command).not.toMatch(/[" $`;|&]/);
+  });
+
+  it("SessionStart and StopFailure share the same exec entry shape", () => {
+    const settings = buildHookSettings(8080);
+    const hooks = settings.hooks as Record<string, HookEntry[]>;
+    expect(hooks.StopFailure[0]).toEqual(hooks.SessionStart[0]);
   });
 
   it("never carries mcpServers (use --mcp-config instead)", () => {
