@@ -181,6 +181,11 @@ function buildSessionInfo(
   let tag: string | undefined;
   let createdAt: number | undefined;
 
+  // Fallback title surfaced on the init system message via SessionStart hook
+  // (Claude Code 2.1.152+ writes hookSpecificOutput.sessionTitle here). Only
+  // used when no explicit `custom-title` record exists.
+  let initSessionTitle: string | undefined;
+
   for (const raw of records) {
     if (!raw || typeof raw !== "object") continue;
     const r = raw as Record<string, unknown>;
@@ -197,6 +202,15 @@ function buildSessionInfo(
     if (r.type === "tag" && typeof r.tag === "string") {
       tag = r.tag;
       continue;
+    }
+    if (
+      initSessionTitle === undefined &&
+      r.type === "system" &&
+      r.subtype === "init" &&
+      typeof r.session_title === "string" &&
+      r.session_title.length > 0
+    ) {
+      initSessionTitle = r.session_title;
     }
 
     if (gitBranch === undefined && typeof r.gitBranch === "string") {
@@ -229,7 +243,9 @@ function buildSessionInfo(
     summary,
     lastModified: Math.floor(mtime),
     fileSize: size,
-    customTitle,
+    // Prefer an explicit `custom-title` record (manual rename), fall back to
+    // the SessionStart-hook-provided init title when present.
+    customTitle: customTitle ?? initSessionTitle,
     firstPrompt,
     gitBranch,
     cwd,

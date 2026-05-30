@@ -152,6 +152,35 @@ describe("sessionStoreRpc.listSessions", () => {
     expect(info?.customTitle).toBe("v2-latest");
   });
 
+  it("falls back to init system message session_title (SessionStart hook output)", async () => {
+    fx.writeJsonl(SID_A, [
+      {
+        type: "system",
+        subtype: "init",
+        sessionId: SID_A,
+        session_title: "hook-set title",
+      },
+      { type: "user", uuid: "u1", sessionId: SID_A, message: { content: "hi" } },
+    ]);
+    const info = await getSessionInfo(SID_A, { dir: fx.cwd });
+    expect(info?.customTitle).toBe("hook-set title");
+  });
+
+  it("explicit custom-title record overrides init session_title fallback", async () => {
+    fx.writeJsonl(SID_A, [
+      {
+        type: "system",
+        subtype: "init",
+        sessionId: SID_A,
+        session_title: "hook-set title",
+      },
+      { type: "user", uuid: "u1", sessionId: SID_A, message: { content: "hi" } },
+      { type: "custom-title", sessionId: SID_A, customTitle: "user rename" },
+    ]);
+    const info = await getSessionInfo(SID_A, { dir: fx.cwd });
+    expect(info?.customTitle).toBe("user rename");
+  });
+
   it("uses summary record over firstPrompt when both present", async () => {
     fx.writeJsonl(SID_A, [
       { type: "summary", summary: "explicit summary" },

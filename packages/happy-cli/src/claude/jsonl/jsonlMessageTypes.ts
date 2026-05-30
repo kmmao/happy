@@ -102,7 +102,13 @@ export type HookEvent =
   | "WorktreeRemove"
   | "InstructionsLoaded"
   | "CwdChanged"
-  | "FileChanged";
+  | "FileChanged"
+  // MessageDisplay (Claude Code 2.1.152+): display-only hook that replaces the
+  // assistant message delta on the TUI screen without altering the stored
+  // JSONL message or what the model sees. Happy CLI reads JSONL, so this hook
+  // has no effect on the chat envelope sent to mobile/web — listed here only
+  // for type completeness against the upstream HookEvent union.
+  | "MessageDisplay";
 
 // ─── OPAQUE — Happy CLI only forwards these through option bags ────────────
 
@@ -298,6 +304,14 @@ export interface ClaudeJsonlSystemMessage {
   skills: string[];
   plugins: Array<{ name: string; path: string }>;
   fast_mode_state?: FastModeState;
+  /**
+   * Session title set via SessionStart hook's hookSpecificOutput.sessionTitle
+   * (Claude Code 2.1.152+). Claude Code may surface this on the init system
+   * message so consumers can pick it up without scanning later `custom-title`
+   * records. `sessionStoreRpc.buildSessionInfo` reads it as a fallback when
+   * no `custom-title` record is present.
+   */
+  session_title?: string;
   uuid: UUID;
   session_id: string;
 }
