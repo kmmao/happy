@@ -34,6 +34,7 @@ import { useUnistyles } from "react-native-unistyles";
 import { useLayout } from "@/components/layout";
 import { t } from "@/text";
 import { isVersionSupported, MINIMUM_CLI_VERSION } from "@/utils/versionUtils";
+import { formatTimeAgo } from "@/utils/formatTimeAgo";
 import { useSessionUpgrade } from "@/hooks/useSessionUpgrade";
 import { CodeView } from "@/components/CodeView";
 import { BinaryVersionRow } from "@/components/claudeControl/BinaryVersionRow";
@@ -575,6 +576,94 @@ function SessionInfoContent({ session }: { session: Session }) {
               machineId={session.metadata.machineId}
               worktree={session.metadata.worktree}
             />
+          )}
+
+        {/* Claude-managed worktree event (Claude Code 2.1.157+ WorktreeCreate /
+            WorktreeRemove hooks). Distinct from the WorktreeInfoSection above
+            which describes a happy-managed worktree. Suppressed entirely when
+            no event has fired yet. */}
+        {session.metadata?.lastWorktreeEvent && (
+          <ItemGroup title={t("sessionInfo.worktreeActivity")}>
+            <Item
+              title={
+                session.metadata.lastWorktreeEvent.kind === "create"
+                  ? t("sessionInfo.worktreeCreated")
+                  : t("sessionInfo.worktreeRemoved")
+              }
+              subtitle={
+                session.metadata.lastWorktreeEvent.name ??
+                session.metadata.lastWorktreeEvent.path ??
+                ""
+              }
+              detail={formatTimeAgo(session.metadata.lastWorktreeEvent.at)}
+              icon={
+                <Ionicons
+                  name="git-branch-outline"
+                  size={29}
+                  color={
+                    session.metadata.lastWorktreeEvent.kind === "create"
+                      ? "#34C759"
+                      : "#FF9500"
+                  }
+                />
+              }
+              showChevron={false}
+            />
+          </ItemGroup>
+        )}
+
+        {/* Recent file changes ring buffer (Claude Code 2.1.121+ FileChanged
+            hook). Capped at 20 entries by the CLI; we render at most the
+            first 10 here to keep the screen scrollable. */}
+        {session.metadata?.recentFileChanges &&
+          session.metadata.recentFileChanges.length > 0 && (
+            <ItemGroup title={t("sessionInfo.recentFileChanges")}>
+              {session.metadata.recentFileChanges
+                .slice(0, 10)
+                .map((change, idx) => {
+                  const lastSlash = Math.max(
+                    change.filePath.lastIndexOf("/"),
+                    change.filePath.lastIndexOf("\\"),
+                  );
+                  const fileName =
+                    lastSlash >= 0
+                      ? change.filePath.slice(lastSlash + 1)
+                      : change.filePath;
+                  const eventLabel =
+                    change.event === "add"
+                      ? t("sessionInfo.fileEventAdd")
+                      : change.event === "unlink"
+                        ? t("sessionInfo.fileEventUnlink")
+                        : t("sessionInfo.fileEventChange");
+                  const iconName =
+                    change.event === "add"
+                      ? "add-circle-outline"
+                      : change.event === "unlink"
+                        ? "trash-outline"
+                        : "create-outline";
+                  const iconColor =
+                    change.event === "add"
+                      ? "#34C759"
+                      : change.event === "unlink"
+                        ? "#FF3B30"
+                        : "#5856D6";
+                  return (
+                    <Item
+                      key={`${change.filePath}-${change.at}-${idx}`}
+                      title={fileName}
+                      subtitle={`${eventLabel} · ${formatTimeAgo(change.at)}`}
+                      icon={
+                        <Ionicons
+                          name={iconName}
+                          size={29}
+                          color={iconColor}
+                        />
+                      }
+                      showChevron={false}
+                    />
+                  );
+                })}
+            </ItemGroup>
           )}
 
         {/* Quick Actions */}

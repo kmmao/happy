@@ -9,6 +9,7 @@ import { t } from "@/text";
 import { useSessionTimeline } from "@/hooks/useSessionTimeline";
 import { ServerSessionEvent } from "@/sync/apiSessionEvents";
 import { SharedStateView } from "@/components/SharedStateView";
+import { formatTimeAgo } from "@/utils/formatTimeAgo";
 
 // Event type → icon mapping
 const EVENT_TYPE_ICONS: Record<string, { name: string; color: string }> = {
@@ -20,17 +21,6 @@ const EVENT_TYPE_ICONS: Record<string, { name: string; color: string }> = {
     session_start: { name: "play-circle-outline", color: "#30D158" },
     session_end: { name: "stop-circle-outline", color: "#8E8E93" },
 };
-
-function formatTimeAgo(ts: number): string {
-    const diff = Date.now() - ts;
-    const minutes = Math.floor(diff / 60000);
-    if (minutes < 1) return t("timeline.justNow");
-    if (minutes < 60) return t("timeline.minutesAgo", minutes);
-    const hours = Math.floor(minutes / 60);
-    if (hours < 24) return t("timeline.hoursAgo", hours);
-    const days = Math.floor(hours / 24);
-    return t("timeline.daysAgo", days);
-}
 
 function formatEventType(eventType: string): string {
     const typeMap: Record<string, string> = {
