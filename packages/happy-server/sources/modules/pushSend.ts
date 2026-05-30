@@ -1,5 +1,6 @@
 import Expo, { type ExpoPushMessage, type ExpoPushTicket } from "expo-server-sdk";
 import { db } from "@/storage/db";
+import { isUserActive } from "@/app/push/focusTracker";
 import { log } from "@/utils/log";
 
 const expo = new Expo();
@@ -46,6 +47,19 @@ export function buildBriefPushBody(brief: BriefPushInput): string {
     return truncatePushBody(structuredSummary || summary || "Loop completed");
 }
 
+interface PushSendOptions {
+    /**
+     * If true, skip sending the push when the recipient has at least one
+     * active non-machine socket (mobile/web/desktop) connected. The intent
+     * is "don't buzz the phone if they're already looking at the App" —
+     * realtime socket updates already cover the same information in-app.
+     *
+     * Off by default to preserve the previous always-send behavior for
+     * callers that haven't opted in.
+     */
+    suppressIfActive?: boolean;
+}
+
 /**
  * Send push notifications to all devices registered for a given account.
  * Automatically cleans up invalid tokens (DeviceNotRegistered).
@@ -53,7 +67,13 @@ export function buildBriefPushBody(brief: BriefPushInput): string {
 export async function pushSend(
     accountId: string,
     payload: PushPayload,
+    options: PushSendOptions = {},
 ): Promise<void> {
+    if (options.suppressIfActive && isUserActive(accountId)) {
+        log({ module: "push" }, `Suppressed push for ${accountId}: user active`);
+        return;
+    }
+
     const tokenRecords = await db.accountPushToken.findMany({
         where: { accountId },
         select: { token: true },
@@ -171,15 +191,24 @@ export async function pushSupervisorNotification(
         return;
     }
 
-    await pushSend(accountId, {
-        title: opts.title,
-        body: opts.body,
-        data: {
-            type: "supervisor",
-            projectId: opts.projectId,
-            runId: opts.runId,
-            notificationType: opts.type,
+    await pushSend(
+        accountId,
+        {
+            title: opts.title,
+            body: opts.body,
+            data: {
+                type: "supervisor",
+                projectId: opts.projectId,
+                runId: opts.runId,
+                notificationType: opts.type,
+            },
+            categoryId: "supervisor",
         },
-        categoryId: "supervisor",
-    });
+        // Supervisor notifications announce work the user requested
+        // ("analysis complete", "fix complete", "critical finding").
+        // When the user already has a non-machine client connected they
+        // see the same outcome in-app via realtime updates — skip the
+        // push to avoid an extra buzz on the same event.
+        { suppressIfActive: true },
+    );
 }

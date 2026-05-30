@@ -17,6 +17,7 @@ import {
     buildUsageEphemeral,
     buildMachineStatusEphemeral,
     buildUpdateMachineUpdate,
+    eventRouter,
 } from "./eventRouter";
 
 describe("buildSessionActivityEphemeral", () => {
@@ -279,5 +280,46 @@ describe("buildUpdateMachineUpdate", () => {
         expect(result.body.machineId).toBe("machine-1");
         expect(result.body.metadata).toEqual({ value: "meta", version: 1 });
         expect(result.body.daemonState).toEqual({ value: "daemon-state", version: 2 });
+    });
+});
+
+describe("EventRouter.hasActiveNonMachineSocket", () => {
+    const fakeSocket = {} as unknown;
+    const userId = "u-active-test";
+
+    beforeEach(() => {
+        // Clean any leftover singleton state from prior tests.
+        const existing = (eventRouter as any).userConnections.get(userId) as Set<unknown> | undefined;
+        if (existing) {
+            for (const c of [...existing]) eventRouter.removeConnection(userId, c as any);
+        }
+    });
+
+    it("returns false when there are no connections", () => {
+        expect(eventRouter.hasActiveNonMachineSocket(userId)).toBe(false);
+    });
+
+    it("returns false when only machine-scoped connections are present", () => {
+        const machineConn = { connectionType: "machine-scoped", socket: fakeSocket, userId, machineId: "m1" } as any;
+        eventRouter.addConnection(userId, machineConn);
+        expect(eventRouter.hasActiveNonMachineSocket(userId)).toBe(false);
+        eventRouter.removeConnection(userId, machineConn);
+    });
+
+    it("returns true when a user-scoped connection is present", () => {
+        const userConn = { connectionType: "user-scoped", socket: fakeSocket, userId } as any;
+        eventRouter.addConnection(userId, userConn);
+        expect(eventRouter.hasActiveNonMachineSocket(userId)).toBe(true);
+        eventRouter.removeConnection(userId, userConn);
+    });
+
+    it("returns true when a session-scoped connection is present (even alongside machines)", () => {
+        const machineConn = { connectionType: "machine-scoped", socket: fakeSocket, userId, machineId: "m1" } as any;
+        const sessionConn = { connectionType: "session-scoped", socket: fakeSocket, userId, sessionId: "s1" } as any;
+        eventRouter.addConnection(userId, machineConn);
+        eventRouter.addConnection(userId, sessionConn);
+        expect(eventRouter.hasActiveNonMachineSocket(userId)).toBe(true);
+        eventRouter.removeConnection(userId, machineConn);
+        eventRouter.removeConnection(userId, sessionConn);
     });
 });

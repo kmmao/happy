@@ -521,6 +521,29 @@ class EventRouter {
     return this.userConnections.get(userId);
   }
 
+  /**
+   * Returns true if the user has at least one active *non-machine* socket
+   * connection — i.e. a session-scoped or user-scoped connection from a real
+   * client (mobile/web/desktop), not a CLI daemon.
+   *
+   * Used by push-dispatch suppression: if the user is already looking at the
+   * App, we skip the Expo push because in-app realtime updates over socket
+   * are sufficient. CLI/daemon machine sockets do not count — they receive
+   * machine updates but cannot display chat notifications to a human.
+   *
+   * Note: this is a best-effort check based on connected sockets only. We
+   * don't track foreground/background app-state yet — any non-machine socket
+   * being connected is treated as "user is reachable in-app".
+   */
+  hasActiveNonMachineSocket(userId: string): boolean {
+    const connections = this.userConnections.get(userId);
+    if (!connections || connections.size === 0) return false;
+    for (const c of connections) {
+      if (c.connectionType !== "machine-scoped") return true;
+    }
+    return false;
+  }
+
   // === EVENT EMISSION METHODS ===
 
   emitUpdate(params: {
