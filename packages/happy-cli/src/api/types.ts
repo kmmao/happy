@@ -502,6 +502,39 @@ export type Metadata = {
     prUrl?: string;
     error?: string;
   };
+  /**
+   * Live working directory reported by Claude's CwdChanged hook (Claude Code
+   * 2.1.121+). Differs from `path`, which is the cwd Claude was launched in
+   * and never changes. Absent when no CwdChanged event has fired —
+   * consumers should fall back to `path` in that case.
+   */
+  activeCwd?: string;
+  /**
+   * Latest WorktreeCreate / WorktreeRemove event from Claude Code 2.1.157+.
+   *
+   * The two hook inputs are asymmetric — Create only carries `name`
+   * (the worktree path is in the SDK's hookSpecificOutput which command
+   * hooks don't see), Remove only carries `worktree_path`. We surface
+   * whichever fields the event provided and let the App render. Absent
+   * until the first event fires. Distinct from `worktree` above, which
+   * describes a Happy-managed worktree created via `happy worktree create`.
+   */
+  lastWorktreeEvent?: {
+    kind: "create" | "remove";
+    name?: string;
+    path?: string;
+    at: number;
+  };
+  /**
+   * Ring buffer of the most recent FileChanged events from Claude Code
+   * 2.1.121+. Capped at 20 entries to keep the encrypted-metadata payload
+   * bounded — FileChanged can fire on every editor save. Most recent first.
+   */
+  recentFileChanges?: Array<{
+    filePath: string;
+    event: "change" | "add" | "unlink";
+    at: number;
+  }>;
 };
 
 export type AgentState = {

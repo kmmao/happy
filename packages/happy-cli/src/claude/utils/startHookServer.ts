@@ -83,11 +83,59 @@ export interface StopFailureHookData {
     [key: string]: unknown;
 }
 
+// ─── Session-state hooks (Claude Code 2.1.121+ / 2.1.157+) ─────────────────
+// Payload shapes mirror the SDK HookInput types verbatim. Field names use
+// snake_case because the CLI's hook protocol writes that way on the wire;
+// the SDK's TypeScript types match.
+
+/** Fired when Claude's working directory changes mid-session (Claude Code 2.1.121+). */
+export interface CwdChangedHookData {
+    hook_event_name: 'CwdChanged';
+    session_id?: string;
+    old_cwd: string;
+    new_cwd: string;
+    [key: string]: unknown;
+}
+
+/** Fired for each file write/delete that Claude observes (Claude Code 2.1.121+). */
+export interface FileChangedHookData {
+    hook_event_name: 'FileChanged';
+    session_id?: string;
+    file_path: string;
+    event: 'change' | 'add' | 'unlink';
+    [key: string]: unknown;
+}
+
+/** Fired when Claude creates a managed worktree (Claude Code 2.1.157+). */
+export interface WorktreeCreateHookData {
+    hook_event_name: 'WorktreeCreate';
+    session_id?: string;
+    name: string;
+    [key: string]: unknown;
+}
+
+/** Fired when Claude removes a managed worktree (Claude Code 2.1.157+). */
+export interface WorktreeRemoveHookData {
+    hook_event_name: 'WorktreeRemove';
+    session_id?: string;
+    worktree_path: string;
+    [key: string]: unknown;
+}
+
 export interface HookServerOptions {
     /** Called when a session hook is received with a valid session ID */
     onSessionHook: (sessionId: string, data: SessionHookData) => void;
     /** Called when a StopFailure hook is received */
     onStopFailure?: (data: StopFailureHookData) => void;
+    /** Called when Claude's cwd changes (Claude Code 2.1.121+, optional). */
+    onCwdChanged?: (data: CwdChangedHookData) => void;
+    /** Called for each FileChanged event (high-frequency; consumer must
+     *  debounce / cap). Claude Code 2.1.121+, optional. */
+    onFileChanged?: (data: FileChangedHookData) => void;
+    /** Called when Claude creates a managed worktree (Claude Code 2.1.157+, optional). */
+    onWorktreeCreate?: (data: WorktreeCreateHookData) => void;
+    /** Called when Claude removes a managed worktree (Claude Code 2.1.157+, optional). */
+    onWorktreeRemove?: (data: WorktreeRemoveHookData) => void;
 }
 
 export interface HookServer {
@@ -104,7 +152,14 @@ export interface HookServer {
  * @returns Promise resolving to the server instance with port info
  */
 export async function startHookServer(options: HookServerOptions): Promise<HookServer> {
-    const { onSessionHook, onStopFailure } = options;
+    const {
+        onSessionHook,
+        onStopFailure,
+        onCwdChanged,
+        onFileChanged,
+        onWorktreeCreate,
+        onWorktreeRemove,
+    } = options;
 
     async function parseBody(req: IncomingMessage): Promise<Record<string, unknown> | null> {
         const ac = new AbortController();
@@ -154,6 +209,20 @@ export async function startHookServer(options: HookServerOptions): Promise<HookS
         onStopFailure?.(data);
     }
 
+    // Typed dispatch keyed on `hook_event_name`. Unlisted events fall through
+    // to `handleSessionStart` for backwards compatibility — the old behaviour
+    // was "anything other than StopFailure is SessionStart" and some
+    // session-lifecycle hooks Claude might add later are best served by that
+    // generic path until they get a dedicated handler.
+    const dispatch: Record<string, (data: Record<string, unknown>) => void> = {
+        SessionStart: (data) => handleSessionStart(data as SessionHookData),
+        StopFailure: (data) => handleStopFailure(data as StopFailureHookData),
+        CwdChanged: (data) => onCwdChanged?.(data as CwdChangedHookData),
+        FileChanged: (data) => onFileChanged?.(data as FileChangedHookData),
+        WorktreeCreate: (data) => onWorktreeCreate?.(data as WorktreeCreateHookData),
+        WorktreeRemove: (data) => onWorktreeRemove?.(data as WorktreeRemoveHookData),
+    };
+
     return new Promise((resolve, reject) => {
         const server: Server = createServer(async (req: IncomingMessage, res: ServerResponse) => {
             // Handle POST /hook (generic) and POST /hook/session-start (backwards compat)
@@ -165,13 +234,8 @@ export async function startHookServer(options: HookServerOptions): Promise<HookS
                 }
 
                 const eventName = (data as SessionHookData).hook_event_name;
-
-                if (eventName === 'StopFailure') {
-                    handleStopFailure(data as StopFailureHookData);
-                } else {
-                    // Default: treat as SessionStart (or any session-related hook)
-                    handleSessionStart(data as SessionHookData);
-                }
+                const handler = (eventName && dispatch[eventName]) || dispatch.SessionStart;
+                handler(data);
 
                 res.writeHead(200, { 'Content-Type': 'text/plain' }).end('ok');
                 return;

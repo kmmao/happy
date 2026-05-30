@@ -104,6 +104,15 @@ export function buildHookSettings(port: number): Record<string, unknown> {
     hooks: {
       SessionStart: hookEntry,
       StopFailure: hookEntry,
+      // Optional session-state hooks (Claude Code 2.1.121+ for CwdChanged /
+      // FileChanged, 2.1.157+ for Worktree*). Unknown events on older CLIs
+      // are silently ignored — the user just doesn't see live cwd / worktree
+      // updates in the App. The forwarder hands every event off by name; the
+      // dispatch table in startHookServer.ts decides what to do with each.
+      CwdChanged: hookEntry,
+      FileChanged: hookEntry,
+      WorktreeCreate: hookEntry,
+      WorktreeRemove: hookEntry,
     },
   };
 }

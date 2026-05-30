@@ -463,6 +463,65 @@ export async function runClaude(
         }));
       }
     },
+    // ── Session-state hooks (Claude Code 2.1.121+ / 2.1.157+) ──────────────
+    // Surface Claude's live cwd / worktree / file-change activity through
+    // the session-metadata channel so the App can render it without us
+    // having to invent a new envelope type. Each handler is a small,
+    // independent write; nothing here blocks the hook ack.
+    onCwdChanged: (data) => {
+      if (!currentSession) return;
+      logger.debug(`[START] CwdChanged: ${data.old_cwd} -> ${data.new_cwd}`);
+      currentSession.client.updateMetadata((m) => ({
+        ...m,
+        activeCwd: data.new_cwd,
+      }));
+    },
+    onWorktreeCreate: (data) => {
+      if (!currentSession) return;
+      logger.debug(`[START] WorktreeCreate: ${data.name}`);
+      currentSession.client.updateMetadata((m) => ({
+        ...m,
+        lastWorktreeEvent: {
+          kind: "create",
+          name: data.name,
+          at: Date.now(),
+        },
+      }));
+    },
+    onWorktreeRemove: (data) => {
+      if (!currentSession) return;
+      logger.debug(`[START] WorktreeRemove: ${data.worktree_path}`);
+      currentSession.client.updateMetadata((m) => ({
+        ...m,
+        lastWorktreeEvent: {
+          kind: "remove",
+          path: data.worktree_path,
+          at: Date.now(),
+        },
+      }));
+    },
+    onFileChanged: (data) => {
+      // FileChanged can fire on every editor save — keep the ring buffer
+      // capped and don't push duplicate consecutive events for the same
+      // (filePath, event) pair (debounces autosave bursts cheaply).
+      if (!currentSession) return;
+      currentSession.client.updateMetadata((m) => {
+        const buf = m.recentFileChanges ?? [];
+        const head = buf[0];
+        if (
+          head &&
+          head.filePath === data.file_path &&
+          head.event === data.event
+        ) {
+          return m;
+        }
+        const next = [
+          { filePath: data.file_path, event: data.event, at: Date.now() },
+          ...buf,
+        ].slice(0, 20);
+        return { ...m, recentFileChanges: next };
+      });
+    },
   });
   logger.debug(`[START] Hook server started on port ${hookServer.port}`);
 

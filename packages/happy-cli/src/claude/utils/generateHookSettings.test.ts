@@ -59,6 +59,22 @@ describe("buildHookSettings", () => {
     expect(hooks.StopFailure[0]).toEqual(hooks.SessionStart[0]);
   });
 
+  it("subscribes session-state hooks CwdChanged / FileChanged / WorktreeCreate / WorktreeRemove so the App can render Claude's live cwd / worktree / file-change activity (Claude Code 2.1.121+ / 2.1.157+)", () => {
+    const settings = buildHookSettings(9000);
+    const hooks = settings.hooks as Record<string, HookEntry[]>;
+    for (const key of [
+      "CwdChanged",
+      "FileChanged",
+      "WorktreeCreate",
+      "WorktreeRemove",
+    ]) {
+      expect(Array.isArray(hooks[key])).toBe(true);
+      // Each new subscription reuses the same exec entry — there is one
+      // forwarder process per session and it addresses every event by name.
+      expect(hooks[key][0]).toEqual(hooks.SessionStart[0]);
+    }
+  });
+
   it("never carries mcpServers (use --mcp-config instead)", () => {
     const settings = buildHookSettings(1);
     expect("mcpServers" in settings).toBe(false);
