@@ -117,6 +117,21 @@ services:
       server:
         condition: service_healthy
 
+  # Web 端生产构建：expo export 静态文件，nginx 提供服务。
+  # Caddy 通过宿主机 host.docker.internal:8081 反代到 w.sangreal.code.xycloud.info；
+  # 之后想改成走 compose 内部网络（webapp:80）时去掉 ports 即可。
+  webapp:
+    container_name: happy-webapp
+    build:
+      context: .
+      dockerfile: Dockerfile.webapp
+      args:
+        POSTHOG_API_KEY: ${POSTHOG_API_KEY:-}
+        REVENUE_CAT_STRIPE: ${REVENUE_CAT_STRIPE:-}
+    ports:
+      - "8081:80"
+    restart: unless-stopped
+
   caddy:
     build:
       context: .
