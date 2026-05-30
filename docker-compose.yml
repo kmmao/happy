@@ -117,6 +117,22 @@ services:
       server:
         condition: service_healthy
 
+  # Anthropic API 透传代理：宿主机原本由 launchd com.happy.anthropic-proxy
+  # 跑 socat TCP-LISTEN:8899 → TCP:100.85.22.83:8899（Tailscale 内网）。
+  # 容器化后宿主端口 8899 由这个容器占据，server 继续以
+  # ANTHROPIC_BASE_URL=http://host.docker.internal:8899 访问，链路无感切换。
+  # 容器走默认 bridge 网络即可命中 Tailscale 路由（宿主 utun 接口透传给 NAT）。
+  #
+  # 回滚到 launchd 版本：docker compose stop anthropic-proxy &&
+  #                     launchctl load -w ~/Library/LaunchAgents/com.happy.anthropic-proxy.plist
+  anthropic-proxy:
+    image: alpine/socat:latest
+    container_name: happy-anthropic-proxy
+    command: TCP-LISTEN:8899,fork,reuseaddr TCP:100.85.22.83:8899
+    ports:
+      - "8899:8899"
+    restart: unless-stopped
+
   # Web 端生产构建：expo export 静态文件，nginx 提供服务。
   # Caddy 通过宿主机 host.docker.internal:8081 反代到 w.sangreal.code.xycloud.info；
   # 之后想改成走 compose 内部网络（webapp:80）时去掉 ports 即可。
