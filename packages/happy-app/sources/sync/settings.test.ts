@@ -28,14 +28,6 @@ describe("settings", () => {
       });
     });
 
-    it("keeps LiveKit WSS URL", () => {
-      const parsed = settingsParse({
-        viewInline: true,
-        livekitWssUrl: "wss://example.livekit.cloud",
-      });
-
-      expect(parsed.livekitWssUrl).toBe("wss://example.livekit.cloud");
-    });
   });
 
   describe("applySettings", () => {
@@ -58,10 +50,11 @@ describe("settings", () => {
   });
 
   describe("settingsDefaults", () => {
-    it("includes LiveKit WSS URL and excludes removed TTS fields", () => {
-      expect(settingsDefaults.livekitWssUrl).toBeNull();
-      expect(settingsDefaults.livekitApiKey).toBeNull();
-      expect(settingsDefaults.livekitApiSecret).toBeNull();
+    it("excludes removed LiveKit and TTS fields", () => {
+      expect("livekitWssUrl" in settingsDefaults).toBe(false);
+      expect("livekitApiKey" in settingsDefaults).toBe(false);
+      expect("livekitApiSecret" in settingsDefaults).toBe(false);
+      expect("voiceBackend" in settingsDefaults).toBe(false);
       expect("ttsProvider" in settingsDefaults).toBe(false);
       expect("voiceboxEndpoint" in settingsDefaults).toBe(false);
     });

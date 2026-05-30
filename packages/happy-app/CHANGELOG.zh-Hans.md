@@ -4,6 +4,9 @@
 
 在 Claude Code 2.1.121+ 上运行的会话现在能实时把 Claude 的工作区动态带回聊天界面 —— 你能看到 Claude 何时离开了你启动它的目录、新建了哪些 worktree、最近动过哪些文件，全都不用离开会话页。
 
+### 语音
+- 移除 LiveKit 实时语音后端、自带 LiveKit Cloud 凭据（BYOK）的配置入口以及配套的 `voice-agent` Docker 容器。ElevenLabs 成为唯一的实时语音后端 —— 语音设置不再显示后端选择器，直接呈现 ElevenLabs 配置项。
+
 ### 聊天头部
 - 新增第三行淡色头部，当 Claude 的实时工作目录与会话启动时的目录不同时显示 —— Claude 刚 `cd` 进项目子目录时折叠成 `./relative`，跑去别处时显示 `…/parent/name`。旧版 Claude Code CLI 不发 `CwdChanged` 钩子，头部保持原先两行不变。
 

@@ -33,7 +33,6 @@ const PRODUCT_IDENTIFIER_KEYS = new Set<string>([
     "machine.tailscaleIp",
     "machine.tailscaleServes",
     "settingsVoice.elevenLabsConfig",
-    "settingsVoice.livekitConfig",
     "agentInput.context.sourceSdkCategories",
     "agentInput.context.sourceFallback",
     "installGuide.codexTitle",
@@ -63,8 +62,6 @@ const PLACEHOLDER_KEYS = new Set<string>([
     "preview.urlPlaceholder",
     "sub2api.apiUrlPlaceholder",
     "sub2api.emailPlaceholder",
-    "settingsVoice.livekitApiSecretPlaceholder",
-    "settingsVoice.livekitApiKeyPlaceholder",
 ]);
 
 const PLACEHOLDER_VALUE_PATTERNS: RegExp[] = [

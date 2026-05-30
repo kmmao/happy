@@ -4,6 +4,9 @@
 
 Sessions running against Claude Code 2.1.121+ now surface live workspace activity right in the chat — you can see when Claude has moved out of the directory you launched it from, what worktrees it has spun up, and which files it has touched recently, all without leaving the session.
 
+### Voice
+- Removed the LiveKit realtime voice backend, the BYOK LiveKit Cloud configuration UI, and the `voice-agent` Docker service. ElevenLabs is now the only realtime voice backend — voice settings drop the backend picker and surface ElevenLabs configuration directly.
+
 ### Chat header
 - Added a third faint header line that shows Claude's live working directory whenever it differs from the directory the session was launched in — collapsed as `./relative` when Claude has just `cd`-ed inside the project, or `…/parent/name` when it has wandered elsewhere on disk. Older Claude Code CLIs that don't emit the `CwdChanged` hook leave the header at its original two lines.
 

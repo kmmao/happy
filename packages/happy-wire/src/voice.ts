@@ -22,11 +22,4 @@ export const VoiceTokenResponseSchema = z.discriminatedUnion('allowed', [
     VoiceTokenDeniedSchema,
 ]);
 
-export const LiveKitTokenResponseSchema = z.object({
-    token: z.string(),
-    url: z.string(),
-    roomName: z.string(),
-});
-
 export type VoiceTokenResponse = z.infer<typeof VoiceTokenResponseSchema>;
-export type LiveKitTokenResponse = z.infer<typeof LiveKitTokenResponseSchema>;

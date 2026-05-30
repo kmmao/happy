@@ -7,7 +7,6 @@ export interface AppConfig {
   revenueCatGoogleKey?: string;
   revenueCatStripeKey?: string;
   elevenLabsAgentId?: string;
-  livekitUrl?: string;
   serverUrl?: string;
 }
 
@@ -99,13 +98,6 @@ export function loadAppConfig(): AppConfig {
     config.elevenLabsAgentId !== process.env.EXPO_PUBLIC_ELEVENLABS_AGENT_ID
   ) {
     config.elevenLabsAgentId = process.env.EXPO_PUBLIC_ELEVENLABS_AGENT_ID;
-  }
-
-  if (
-    process.env.EXPO_PUBLIC_LIVEKIT_URL &&
-    config.livekitUrl !== process.env.EXPO_PUBLIC_LIVEKIT_URL
-  ) {
-    config.livekitUrl = process.env.EXPO_PUBLIC_LIVEKIT_URL;
   }
 
   return config as AppConfig;

@@ -101,22 +101,6 @@ services:
       cd /repo && yarn --cwd packages/happy-server start
       "
 
-  voice-agent:
-    profiles:
-      - voice
-    build:
-      context: ./voice-agent
-      dockerfile: Dockerfile
-    env_file:
-      - path: voice-agent/.env.local
-        required: false
-    environment:
-      LOG_LEVEL: DEBUG
-    restart: unless-stopped
-    depends_on:
-      server:
-        condition: service_healthy
-
   # Anthropic API 透传代理：宿主机原本由 launchd com.happy.anthropic-proxy
   # 跑 socat TCP-LISTEN:8899 → TCP:100.85.22.83:8899（Tailscale 内网）。
   # 容器化后宿主端口 8899 由这个容器占据，server 继续以

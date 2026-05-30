@@ -1,9 +1,8 @@
 import type { VoiceSession } from './types';
-import { fetchLiveKitToken, fetchVoiceToken } from '@/sync/apiVoice';
+import { fetchVoiceToken } from '@/sync/apiVoice';
 import { sync } from '@/sync/sync';
 import { Modal } from '@/modal';
 import { TokenStorage } from '@/auth/tokenStorage';
-import { storage } from '@/sync/storage';
 import { t } from '@/text';
 import { requestMicrophonePermission, showMicrophonePermissionDeniedAlert } from '@/utils/microphonePermissions';
 
@@ -29,24 +28,6 @@ export async function startRealtimeSession(sessionId: string, initialContext?: s
         const credentials = await TokenStorage.getCredentials();
         if (!credentials) {
             Modal.alert(t('common.error'), t('errors.authenticationFailed'));
-            return;
-        }
-
-        const voiceBackend = storage.getState().settings.voiceBackend;
-
-        if (voiceBackend === 'livekit') {
-            const response = await fetchLiveKitToken(credentials, sessionId);
-
-            currentSessionId = sessionId;
-            voiceSessionStarted = true;
-
-            await voiceSession.startSession({
-                sessionId,
-                initialContext,
-                livekitToken: response.token,
-                livekitUrl: response.url,
-                livekitRoomName: response.roomName,
-            });
             return;
         }
 

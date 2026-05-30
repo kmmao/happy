@@ -8,8 +8,6 @@ export type VoiceTokenResponse =
     | { allowed: true; token: string; agentId: string; elevenUserId: string; usedSeconds: number; limitSeconds: number }
     | { allowed: false; reason: string; usedSeconds: number; limitSeconds: number; agentId: string };
 
-export type LiveKitTokenResponse = { token: string; url: string; roomName: string };
-
 export async function fetchVoiceToken(
     credentials: AuthCredentials,
     _sessionId: string
@@ -37,60 +35,6 @@ export async function fetchVoiceToken(
     });
 
     throwIfNotOk(response, 'Voice token request failed');
-
-    return await response.json();
-}
-
-export async function fetchLiveKitToken(
-    credentials: AuthCredentials,
-    sessionId: string
-): Promise<LiveKitTokenResponse> {
-    const serverUrl = getServerUrl();
-    const settings = storage.getState().settings;
-    const userApiKey = settings.livekitApiKey || undefined;
-    const userApiSecret = settings.livekitApiSecret || undefined;
-    const userLivekitUrl = settings.livekitWssUrl || undefined;
-
-    const response = await fetch(`${serverUrl}/v1/voice/livekit-token`, {
-        method: 'POST',
-        headers: {
-            'Authorization': `Bearer ${credentials.token}`,
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-            sessionId,
-            ...(userApiKey ? { userApiKey } : {}),
-            ...(userApiSecret ? { userApiSecret } : {}),
-            ...(userLivekitUrl ? { userLivekitUrl } : {}),
-        })
-    });
-
-    throwIfNotOk(response, 'LiveKit token request failed');
-
-    return await response.json();
-}
-
-export async function verifyLiveKitCredentials(
-    credentials: AuthCredentials,
-    apiKey: string,
-    apiSecret: string,
-    livekitUrl?: string
-): Promise<{ valid: boolean; error?: string; activeRooms?: number; totalParticipants?: number; cloudDashboardUrl?: string }> {
-    const serverUrl = getServerUrl();
-    const response = await fetch(`${serverUrl}/v1/voice/livekit-verify`, {
-        method: 'POST',
-        headers: {
-            'Authorization': `Bearer ${credentials.token}`,
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-            apiKey,
-            apiSecret,
-            ...(livekitUrl ? { livekitUrl } : {}),
-        })
-    });
-
-    throwIfNotOk(response, 'LiveKit verify request failed');
 
     return await response.json();
 }
