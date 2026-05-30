@@ -73,6 +73,10 @@ export type ProtocolIntent =
       subagent?: string;
       subagentTitle?: string;
       openTurn?: boolean;
+      /** Optional Claude-side JSONL message UUID for the emitted envelope;
+       *  used by the App as a precise rewind/fork anchor. Non-Claude producers
+       *  leave this unset. */
+      claudeUuid?: string;
     }
   /** Explicitly open a Turn now, for producers that have a provider turn-start
    *  signal (Codex `task_started`, ACP `startTurn`). Idempotent: a no-op while
@@ -143,7 +147,7 @@ export function reduce(
   // is read live, so a `turn-start` emitted in the same step carries its own id.
   const emit = (
     ev: SessionEvent,
-    opts: { role?: SessionRole; subagent?: string } = {},
+    opts: { role?: SessionRole; subagent?: string; claudeUuid?: string } = {},
   ): void => {
     envelopes.push(
       createEnvelope(opts.role ?? "agent", ev, {
@@ -151,6 +155,7 @@ export function reduce(
         time: clock.now(),
         ...(currentTurnId ? { turn: currentTurnId } : {}),
         ...(opts.subagent ? { subagent: opts.subagent } : {}),
+        ...(opts.claudeUuid ? { claudeUuid: opts.claudeUuid } : {}),
       }),
     );
   };
@@ -188,7 +193,11 @@ export function reduce(
           { subagent: intent.subagent },
         );
       }
-      emit(intent.ev, { role: intent.role, subagent: intent.subagent });
+      emit(intent.ev, {
+        role: intent.role,
+        subagent: intent.subagent,
+        claudeUuid: intent.claudeUuid,
+      });
       break;
     }
     case "turnBegin": {

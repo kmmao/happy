@@ -225,6 +225,38 @@ describe("createEnvelope", () => {
     ).toThrow();
   });
 
+  it("threads claudeUuid through when provided", () => {
+    const envelope = createEnvelope(
+      "agent",
+      { t: "text", text: "hi" },
+      { id: "env-1", time: 1, claudeUuid: "claude-msg-uuid-123" },
+    );
+    expect(envelope.claudeUuid).toBe("claude-msg-uuid-123");
+  });
+
+  it("omits claudeUuid when not provided", () => {
+    const envelope = createEnvelope(
+      "agent",
+      { t: "text", text: "hi" },
+      { id: "env-1", time: 1 },
+    );
+    expect("claudeUuid" in envelope).toBe(false);
+  });
+
+  it("rejects empty claudeUuid string on the schema", () => {
+    // createEnvelope's spread skips falsy claudeUuid, so the schema's min(1)
+    // check is only exercised when something else writes the field directly.
+    expect(() =>
+      sessionEnvelopeSchema.parse({
+        id: "env-1",
+        time: 1,
+        role: "agent",
+        claudeUuid: "",
+        ev: { t: "text", text: "hi" },
+      }),
+    ).toThrow();
+  });
+
   it("creates tool-call-end with background task fields", () => {
     const envelope = createEnvelope("agent", {
       t: "tool-call-end",

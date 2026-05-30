@@ -272,6 +272,17 @@ export const sessionEnvelopeSchema = z
         message: "subagent must be a cuid2 value",
       })
       .optional(),
+    /**
+     * Optional Claude-side message UUID for this envelope. Populated by the
+     * CLI when an envelope mirrors a specific JSONL record, so the App can
+     * use it as a precise rewind/fork anchor (the CLI's `forkSession` RPC
+     * accepts this value as `upToMessageId`).
+     *
+     * Backward-compatible: older CLIs / non-Claude agents simply omit it.
+     * App code MUST treat absence as "no fork anchor available" rather than
+     * an error.
+     */
+    claudeUuid: z.string().min(1).optional(),
     ev: sessionEventSchema,
   })
   .superRefine((envelope, ctx) => {
@@ -314,6 +325,8 @@ export type CreateEnvelopeOptions = {
   time?: number;
   turn?: string;
   subagent?: string;
+  /** Optional Claude-side message UUID; see sessionEnvelopeSchema.claudeUuid. */
+  claudeUuid?: string;
 };
 
 export function createEnvelope(
@@ -327,6 +340,7 @@ export function createEnvelope(
     role,
     ...(opts.turn ? { turn: opts.turn } : {}),
     ...(opts.subagent ? { subagent: opts.subagent } : {}),
+    ...(opts.claudeUuid ? { claudeUuid: opts.claudeUuid } : {}),
     ev,
   });
 }

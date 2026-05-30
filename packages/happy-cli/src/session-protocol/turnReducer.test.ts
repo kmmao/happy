@@ -211,6 +211,28 @@ describe("turnReducer — behavior table", () => {
     expect(turnStarts).toHaveLength(2);
     expect(turnStarts[0].turn).not.toBe(turnStarts[1].turn);
   });
+
+  it("threads claudeUuid onto content envelopes (fork anchor)", () => {
+    const { envelopes } = run([
+      {
+        kind: "content",
+        ev: { t: "text", text: "hi" },
+        claudeUuid: "msg-uuid-1",
+      },
+    ]);
+    expect(types(envelopes)).toEqual(["turn-start", "text"]);
+    // turn-start is reducer-generated → no anchor.
+    expect(envelopes[0].claudeUuid).toBeUndefined();
+    // Content envelope carries the source record's UUID for fork purposes.
+    expect(envelopes[1].claudeUuid).toBe("msg-uuid-1");
+  });
+
+  it("omits claudeUuid when intent does not supply one", () => {
+    const { envelopes } = run([text("plain")]);
+    for (const env of envelopes) {
+      expect("claudeUuid" in env).toBe(false);
+    }
+  });
 });
 
 // ── Explicit turnBegin (for provider-driven turn-start signals) ──────────────

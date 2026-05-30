@@ -457,11 +457,18 @@ function applyIntent(
 
 // Emit one agent content event, lazily opening the Turn — and the Subagent's
 // `start` (titled from its Task registration) — as needed.
+//
+// `claudeUuid`, when provided, is the Claude JSONL message UUID of the source
+// record. We thread it onto the emitted envelope so the App can use it as a
+// precise rewind/fork anchor (passed back to the CLI's `forkSession` RPC as
+// `upToMessageId`). Stream-only deltas and turn-lifecycle events leave it
+// unset — only single-record content envelopes carry the anchor.
 function emitContent(
   state: ClaudeSessionProtocolState,
   ev: SessionEvent,
   subagent: string | undefined,
   envelopes: SessionEnvelope[],
+  claudeUuid?: string,
 ): void {
   applyIntent(
     state,
@@ -471,8 +478,9 @@ function emitContent(
           ev,
           subagent,
           subagentTitle: getSubagentTitles(state).get(subagent),
+          claudeUuid,
         }
-      : { kind: "content", ev },
+      : { kind: "content", ev, claudeUuid },
     envelopes,
   );
 }
@@ -576,10 +584,20 @@ function mapClaudeLogMessageToSessionEnvelopesInternal(
     const blocks = Array.isArray(message.message?.content)
       ? message.message.content
       : [];
+    // Same record-level UUID is threaded onto every envelope emitted from
+    // this assistant message, so a multi-block message (text + tool_use)
+    // shares a single fork anchor pointing at the source JSONL record.
+    const assistantClaudeUuid = pickUuid(message);
 
     for (const block of blocks) {
       if (block.type === "text" && typeof block.text === "string") {
-        emitContent(state, { t: "text", text: block.text }, subagent, envelopes);
+        emitContent(
+          state,
+          { t: "text", text: block.text },
+          subagent,
+          envelopes,
+          assistantClaudeUuid,
+        );
         continue;
       }
 
@@ -595,6 +613,7 @@ function mapClaudeLogMessageToSessionEnvelopesInternal(
           { t: "text", text: block.thinking, thinking: true },
           subagent,
           envelopes,
+          assistantClaudeUuid,
         );
         continue;
       }
@@ -641,6 +660,7 @@ function mapClaudeLogMessageToSessionEnvelopesInternal(
           },
           subagent,
           envelopes,
+          assistantClaudeUuid,
         );
         const buffered = consumeBufferedSubagentMessages(state, call);
         for (const bufferedMessage of buffered) {
@@ -683,12 +703,15 @@ function mapClaudeLogMessageToSessionEnvelopesInternal(
           { t: "text", text: message.message.content },
           subagent,
           envelopes,
+          pickUuid(message),
         );
       } else {
         closeTurn(state, "completed", envelopes);
+        const userUuid = pickUuid(message);
         envelopes.push(
           createEnvelope("user", { t: "text", text: message.message.content }, {
-            id: pickUuid(message),
+            id: userUuid,
+            ...(userUuid ? { claudeUuid: userUuid } : {}),
           }),
         );
       }
@@ -710,6 +733,10 @@ function mapClaudeLogMessageToSessionEnvelopesInternal(
         dropped: [{ type: message.type, reason: "empty-user-content" }],
       };
     }
+    // Single anchor per source record — same idea as the assistant branch:
+    // tool_result + sidechain text blocks emitted from one user message all
+    // point at the same JSONL UUID for fork purposes.
+    const userBlocksClaudeUuid = pickUuid(message);
 
     for (const block of blocks) {
       if (
@@ -755,7 +782,13 @@ function mapClaudeLogMessageToSessionEnvelopesInternal(
           toolCallEnd.outputFile = bgMatch[2];
         }
 
-        emitContent(state, toolCallEnd as unknown as SessionEvent, subagent, envelopes);
+        emitContent(
+          state,
+          toolCallEnd as unknown as SessionEvent,
+          subagent,
+          envelopes,
+          userBlocksClaudeUuid,
+        );
         continue;
       }
 
@@ -764,7 +797,13 @@ function mapClaudeLogMessageToSessionEnvelopesInternal(
         typeof block.text === "string" &&
         block.text.trim().length > 0
       ) {
-        emitContent(state, { t: "text", text: block.text }, subagent, envelopes);
+        emitContent(
+          state,
+          { t: "text", text: block.text },
+          subagent,
+          envelopes,
+          userBlocksClaudeUuid,
+        );
       }
     }
 
