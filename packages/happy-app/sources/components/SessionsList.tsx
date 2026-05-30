@@ -468,16 +468,19 @@ export function SessionsList({ hideUpdateBanner }: SessionsListProps = {}) {
     return result;
   }, [data, activeTag]);
 
-  const dataWithSelected = selectable
-    ? React.useMemo(() => {
-        return filteredData?.map((item) => ({
-          ...item,
-          selected: pathname.startsWith(
-            `/session/${item.type === "session" ? item.session.id : ""}`,
-          ),
-        }));
-      }, [filteredData, pathname])
-    : filteredData;
+  // Selection is derived once from pathname so the data array stays stable
+  // across navigations. This keeps FlatList virtualization intact: only the
+  // previously- and newly-selected rows actually re-render (via extraData),
+  // instead of the whole visible window being remounted on every pathname
+  // change.
+  //
+  // Also fixes a rules-of-hooks violation — the previous version called
+  // React.useMemo inside a ternary (`selectable ? useMemo(...) : data`).
+  const selectedSessionId = React.useMemo<string | undefined>(() => {
+    if (!selectable) return undefined;
+    if (!pathname.startsWith("/session/")) return undefined;
+    return pathname.split("/")[2];
+  }, [selectable, pathname]);
 
   // Request review
   React.useEffect(() => {
@@ -492,7 +495,7 @@ export function SessionsList({ hideUpdateBanner }: SessionsListProps = {}) {
   }
 
   const keyExtractor = React.useCallback(
-    (item: SessionListViewItem & { selected?: boolean }, index: number) => {
+    (item: SessionListViewItem, index: number) => {
       switch (item.type) {
         case "header":
           return `header-${item.title}-${index}`;
@@ -512,7 +515,7 @@ export function SessionsList({ hideUpdateBanner }: SessionsListProps = {}) {
       item,
       index,
     }: {
-      item: SessionListViewItem & { selected?: boolean };
+      item: SessionListViewItem;
       index: number;
     }) => {
       switch (item.type) {
@@ -524,20 +527,13 @@ export function SessionsList({ hideUpdateBanner }: SessionsListProps = {}) {
           );
 
         case "active-sessions":
-          // Extract just the session ID from pathname (e.g., /session/abc123/file -> abc123)
-          let selectedId: string | undefined;
-          if (isTablet && pathname.startsWith("/session/")) {
-            const parts = pathname.split("/");
-            selectedId = parts[2]; // parts[0] is empty, parts[1] is 'session', parts[2] is the ID
-          }
-
           const ActiveComponent = compactSessionView
             ? ActiveSessionsGroupCompact
             : ActiveSessionsGroup;
           return (
             <ActiveComponent
               sessions={item.sessions}
-              selectedSessionId={selectedId}
+              selectedSessionId={selectedSessionId}
             />
           );
 
@@ -559,10 +555,10 @@ export function SessionsList({ hideUpdateBanner }: SessionsListProps = {}) {
         case "session":
           // Determine card styling based on position within date group
           const prevItem =
-            index > 0 && dataWithSelected ? dataWithSelected[index - 1] : null;
+            index > 0 && filteredData ? filteredData[index - 1] : null;
           const nextItem =
-            index < (dataWithSelected?.length || 0) - 1 && dataWithSelected
-              ? dataWithSelected[index + 1]
+            index < (filteredData?.length || 0) - 1 && filteredData
+              ? filteredData[index + 1]
               : null;
 
           const isFirst = prevItem?.type === "header";
@@ -571,11 +567,12 @@ export function SessionsList({ hideUpdateBanner }: SessionsListProps = {}) {
             nextItem == null ||
             nextItem?.type === "active-sessions";
           const isSingle = isFirst && isLast;
+          const selected = item.session.id === selectedSessionId;
 
           return (
             <SessionItem
               session={item.session}
-              selected={item.selected}
+              selected={selected}
               isFirst={isFirst}
               isLast={isLast}
               isSingle={isSingle}
@@ -583,7 +580,7 @@ export function SessionsList({ hideUpdateBanner }: SessionsListProps = {}) {
           );
       }
     },
-    [pathname, dataWithSelected, compactSessionView],
+    [selectedSessionId, filteredData, compactSessionView],
   );
 
   // Remove this section as we'll use FlatList for all items now
@@ -705,9 +702,10 @@ export function SessionsList({ hideUpdateBanner }: SessionsListProps = {}) {
     <View style={styles.container}>
       <View style={styles.contentContainer}>
         <FlatList
-          data={dataWithSelected}
+          data={filteredData}
           renderItem={renderItem}
           keyExtractor={keyExtractor}
+          extraData={selectedSessionId}
           contentContainerStyle={{
             paddingBottom: safeArea.bottom + 128,
             maxWidth: layout.maxWidth,
