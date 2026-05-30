@@ -1,5 +1,41 @@
 # Changelog
 
+## 2.35.0 - 2026-05-30
+
+Adds an experimental "Session Fork & Duplicate" feature that lets you branch a chat from any of your earlier prompts, plus a perf pass across sidebar / streaming / code-changes views, the new Opus 4.8 model option, and a faster Web build served from production nginx instead of dev metro.
+
+### Session Fork & Duplicate (experiment)
+- Added an Experiments setting "Session Fork & Duplicate" — when on, every user message in your chats becomes a possible rewind point
+- Added long-press on your own messages to instantly fork a new session truncated at that point
+- Added a "Duplicate from message…" entry on Session Info that opens a picker listing all your earlier prompts so you can pick any rewind anchor without scrolling the chat
+- Added a fork badge in the chat header on forked sessions — tap it to jump back to the source
+
+### Models
+- Added Opus 4.8 model option across the model picker (App / CLI / Codium)
+
+### Streaming and rendering
+- Improved Skill tool arguments — they now render as proper Markdown instead of raw JSON
+- Improved SidePanel performance during streaming — fewer wholesale re-renders during heavy chat traffic
+- Improved Timeline page with FlatList virtualization so very long timelines stay responsive
+- Improved Session "Code changes" view (both legacy and Codex variants) with FlatList virtualization
+
+### Sidebar performance
+- Fixed the sidebar re-rendering its whole visible window on every navigation — the data array is now stable across pathname changes, only the previously and newly selected rows re-render
+- Fixed a rules-of-hooks violation in the sidebar that would have crashed if the tablet / non-tablet branch ever flipped at runtime
+
+### Recovery
+- Added a "Restart Session" button on the Stop Failure banner so you can recover from a failed turn without leaving the chat
+
+### Behind the scenes
+- Updated the Anthropic SDK to 0.100 in the CLI (happy-coder 0.86.12) — picks up Opus 4.8, the thinking-token-count beta, mid-conversation system blocks, and the new cache diagnostics path
+- Added Claude message UUID plumbing through the wire envelope so the fork picker can target the exact Claude message you tapped
+- Added smart push notification routing on the server — when you already have the app open on another device, supervisor notifications skip the push and rely on realtime updates instead
+- Improved CLI SessionStart hook handling — a hook's sessionTitle output now surfaces in the App sidebar without a manual rename
+- Released @kmmao/happy-wire 0.24.0 and @kmmao/happy-agent 0.7.2 to carry the new fork-anchor field through to all clients
+
+### Web build
+- Web app now ships from a production nginx container (expo export) instead of the dev metro process — faster first paint and more reliable through unstable network conditions
+
 ## 2.34.1 - 2026-05-28
 
 Fixes a remaining case where a question or permission option card could still appear above the assistant text that introduced it, when the card and the conclusion arrived in separate streaming batches (common in PTY/Yolo mode).

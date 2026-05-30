@@ -2,6 +2,32 @@
   "entries": {
     "en": [
       {
+        "version": "2.35.0",
+        "date": "2026-05-30",
+        "summary": "Adds an experimental \"Session Fork & Duplicate\" feature that lets you branch a chat from any of your earlier prompts, plus a perf pass across sidebar / streaming / code-changes views, the new Opus 4.8 model option, and a faster Web build served from production nginx instead of dev metro.",
+        "changes": [
+          "Added an Experiments setting \"Session Fork & Duplicate\" — when on, every user message in your chats becomes a possible rewind point",
+          "Added long-press on your own messages to instantly fork a new session truncated at that point",
+          "Added a \"Duplicate from message…\" entry on Session Info that opens a picker listing all your earlier prompts so you can pick any rewind anchor without scrolling the chat",
+          "Added a fork badge in the chat header on forked sessions — tap it to jump back to the source",
+          "Added Opus 4.8 model option across the model picker (App / CLI / Codium)",
+          "Improved Skill tool arguments — they now render as proper Markdown instead of raw JSON",
+          "Improved SidePanel performance during streaming — fewer wholesale re-renders during heavy chat traffic",
+          "Improved Timeline page with FlatList virtualization so very long timelines stay responsive",
+          "Improved Session \"Code changes\" view (both legacy and Codex variants) with FlatList virtualization",
+          "Fixed the sidebar re-rendering its whole visible window on every navigation — the data array is now stable across pathname changes, only the previously and newly selected rows re-render",
+          "Fixed a rules-of-hooks violation in the sidebar that would have crashed if the tablet / non-tablet branch ever flipped at runtime",
+          "Added a \"Restart Session\" button on the Stop Failure banner so you can recover from a failed turn without leaving the chat",
+          "Updated the Anthropic SDK to 0.100 in the CLI (happy-coder 0.86.12) — picks up Opus 4.8, the thinking-token-count beta, mid-conversation system blocks, and the new cache diagnostics path",
+          "Added Claude message UUID plumbing through the wire envelope so the fork picker can target the exact Claude message you tapped",
+          "Added smart push notification routing on the server — when you already have the app open on another device, supervisor notifications skip the push and rely on realtime updates instead",
+          "Improved CLI SessionStart hook handling — a hook's sessionTitle output now surfaces in the App sidebar without a manual rename",
+          "Released @kmmao/happy-wire 0.24.0 and @kmmao/happy-agent 0.7.2 to carry the new fork-anchor field through to all clients",
+          "Web app now ships from a production nginx container (expo export) instead of the dev metro process — faster first paint and more reliable through unstable network conditions"
+        ],
+        "rawMarkdown": "## 2.35.0 - 2026-05-30\n\n\nAdds an experimental \"Session Fork & Duplicate\" feature that lets you branch a chat from any of your earlier prompts, plus a perf pass across sidebar / streaming / code-changes views, the new Opus 4.8 model option, and a faster Web build served from production nginx instead of dev metro.\n\n### Session Fork & Duplicate (experiment)\n- Added an Experiments setting \"Session Fork & Duplicate\" — when on, every user message in your chats becomes a possible rewind point\n- Added long-press on your own messages to instantly fork a new session truncated at that point\n- Added a \"Duplicate from message…\" entry on Session Info that opens a picker listing all your earlier prompts so you can pick any rewind anchor without scrolling the chat\n- Added a fork badge in the chat header on forked sessions — tap it to jump back to the source\n\n### Models\n- Added Opus 4.8 model option across the model picker (App / CLI / Codium)\n\n### Streaming and rendering\n- Improved Skill tool arguments — they now render as proper Markdown instead of raw JSON\n- Improved SidePanel performance during streaming — fewer wholesale re-renders during heavy chat traffic\n- Improved Timeline page with FlatList virtualization so very long timelines stay responsive\n- Improved Session \"Code changes\" view (both legacy and Codex variants) with FlatList virtualization\n\n### Sidebar performance\n- Fixed the sidebar re-rendering its whole visible window on every navigation — the data array is now stable across pathname changes, only the previously and newly selected rows re-render\n- Fixed a rules-of-hooks violation in the sidebar that would have crashed if the tablet / non-tablet branch ever flipped at runtime\n\n### Recovery\n- Added a \"Restart Session\" button on the Stop Failure banner so you can recover from a failed turn without leaving the chat\n\n### Behind the scenes\n- Updated the Anthropic SDK to 0.100 in the CLI (happy-coder 0.86.12) — picks up Opus 4.8, the thinking-token-count beta, mid-conversation system blocks, and the new cache diagnostics path\n- Added Claude message UUID plumbing through the wire envelope so the fork picker can target the exact Claude message you tapped\n- Added smart push notification routing on the server — when you already have the app open on another device, supervisor notifications skip the push and rely on realtime updates instead\n- Improved CLI SessionStart hook handling — a hook's sessionTitle output now surfaces in the App sidebar without a manual rename\n- Released @kmmao/happy-wire 0.24.0 and @kmmao/happy-agent 0.7.2 to carry the new fork-anchor field through to all clients\n\n### Web build\n- Web app now ships from a production nginx container (expo export) instead of the dev metro process — faster first paint and more reliable through unstable network conditions"
+      },
+      {
         "version": "2.34.1",
         "date": "2026-05-28",
         "summary": "Fixes a remaining case where a question or permission option card could still appear above the assistant text that introduced it, when the card and the conclusion arrived in separate streaming batches (common in PTY/Yolo mode).",
@@ -887,6 +913,32 @@
     ],
     "zh-Hans": [
       {
+        "version": "2.35.0",
+        "date": "2026-05-30",
+        "summary": "新增实验性「Session Fork & Duplicate」功能，允许从任意历史用户消息位置分叉出新会话；同步优化了侧边栏 / 流式 / 代码变更视图的性能；新增 Opus 4.8 模型选项；Web 端切换到生产 nginx 容器替代 dev metro，首屏更快。",
+        "changes": [
+          "新增 Experiments 中的「Session Fork & Duplicate」设置 —— 开启后，你聊天里发的每条用户消息都可作为分叉点",
+          "新增聊天里长按自己的消息直接 fork 新会话，截断到该位置",
+          "新增 Session Info 页面的「Duplicate from message…」入口，打开 picker 列出所有历史 prompt，无需滚动聊天即可挑选任意 rewind 锚点",
+          "新增分叉会话聊天头部的 fork 徽章 —— 点击跳回源会话",
+          "新增 Opus 4.8 模型选项（App / CLI / Codium 三端的模型选择器）",
+          "改进 Skill 工具参数 —— 现在渲染为 Markdown 而非原始 JSON",
+          "改进 SidePanel 在流式过程中的性能 —— 大量聊天流量下不再整片重渲染",
+          "改进 Timeline 页面 —— 用 FlatList 虚拟化，超长 timeline 保持流畅",
+          "改进 Session「代码变更」视图（含 legacy 与 Codex 两种变体）—— FlatList 虚拟化",
+          "修复侧边栏每次导航重渲染整个可见窗口的问题 —— data 数组现在跨 pathname 切换保持稳定，仅前后被选中行重新渲染",
+          "修复侧边栏里的 rules-of-hooks 违规问题，避免 tablet / 非 tablet 分支切换时崩溃",
+          "新增 Stop Failure 横幅上的「Restart Session」按钮，让你从失败的回合中恢复，无需退出聊天",
+          "升级 CLI 端 Anthropic SDK 到 0.100（happy-coder 0.86.12）—— 引入 Opus 4.8、thinking-token-count beta、对话中段 system blocks、新版缓存诊断路径",
+          "新增 Claude 消息 UUID 通过 wire envelope 透传 —— fork picker 可精准定位你点击的那条 Claude 消息",
+          "新增服务端 smart push notification routing —— 如果你已经在另一台设备打开 app，supervisor 通知会跳过推送，改用实时更新",
+          "改进 CLI SessionStart hook 处理 —— hook 设置的 sessionTitle 现在直接在 App 侧边栏体现，无需手动重命名",
+          "发布 @kmmao/happy-wire 0.24.0 和 @kmmao/happy-agent 0.7.2，将新的 fork-anchor 字段贯穿到所有客户端",
+          "Web 端现在由生产 nginx 容器（expo export）提供，替代了 dev metro 进程 —— 首屏更快，弱网更稳定"
+        ],
+        "rawMarkdown": "## 2.35.0 - 2026-05-30\n\n\n新增实验性「Session Fork & Duplicate」功能，允许从任意历史用户消息位置分叉出新会话；同步优化了侧边栏 / 流式 / 代码变更视图的性能；新增 Opus 4.8 模型选项；Web 端切换到生产 nginx 容器替代 dev metro，首屏更快。\n\n### Session Fork & Duplicate（实验功能）\n- 新增 Experiments 中的「Session Fork & Duplicate」设置 —— 开启后，你聊天里发的每条用户消息都可作为分叉点\n- 新增聊天里长按自己的消息直接 fork 新会话，截断到该位置\n- 新增 Session Info 页面的「Duplicate from message…」入口，打开 picker 列出所有历史 prompt，无需滚动聊天即可挑选任意 rewind 锚点\n- 新增分叉会话聊天头部的 fork 徽章 —— 点击跳回源会话\n\n### 模型\n- 新增 Opus 4.8 模型选项（App / CLI / Codium 三端的模型选择器）\n\n### 流式与渲染\n- 改进 Skill 工具参数 —— 现在渲染为 Markdown 而非原始 JSON\n- 改进 SidePanel 在流式过程中的性能 —— 大量聊天流量下不再整片重渲染\n- 改进 Timeline 页面 —— 用 FlatList 虚拟化，超长 timeline 保持流畅\n- 改进 Session「代码变更」视图（含 legacy 与 Codex 两种变体）—— FlatList 虚拟化\n\n### 侧边栏性能\n- 修复侧边栏每次导航重渲染整个可见窗口的问题 —— data 数组现在跨 pathname 切换保持稳定，仅前后被选中行重新渲染\n- 修复侧边栏里的 rules-of-hooks 违规问题，避免 tablet / 非 tablet 分支切换时崩溃\n\n### 恢复\n- 新增 Stop Failure 横幅上的「Restart Session」按钮，让你从失败的回合中恢复，无需退出聊天\n\n### 幕后改动\n- 升级 CLI 端 Anthropic SDK 到 0.100（happy-coder 0.86.12）—— 引入 Opus 4.8、thinking-token-count beta、对话中段 system blocks、新版缓存诊断路径\n- 新增 Claude 消息 UUID 通过 wire envelope 透传 —— fork picker 可精准定位你点击的那条 Claude 消息\n- 新增服务端 smart push notification routing —— 如果你已经在另一台设备打开 app，supervisor 通知会跳过推送，改用实时更新\n- 改进 CLI SessionStart hook 处理 —— hook 设置的 sessionTitle 现在直接在 App 侧边栏体现，无需手动重命名\n- 发布 @kmmao/happy-wire 0.24.0 和 @kmmao/happy-agent 0.7.2，将新的 fork-anchor 字段贯穿到所有客户端\n\n### Web 构建\n- Web 端现在由生产 nginx 容器（expo export）提供，替代了 dev metro 进程 —— 首屏更快，弱网更稳定"
+      },
+      {
         "version": "2.34.1",
         "date": "2026-05-28",
         "summary": "修复了问答 / 权限选项卡片仍可能显示在引出它的助手文本上方的遗留情况 —— 当卡片与结论分别在不同的流式批次到达时（PTY / Yolo 模式下常见）。",
@@ -1749,7 +1801,7 @@
       }
     ]
   },
-  "latestVersion": "2.34.1",
+  "latestVersion": "2.35.0",
   "availableLocales": [
     "en",
     "zh-Hans"

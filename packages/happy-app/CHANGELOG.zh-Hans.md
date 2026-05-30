@@ -1,5 +1,41 @@
 # 更新日志
 
+## 2.35.0 - 2026-05-30
+
+新增实验性「Session Fork & Duplicate」功能，允许从任意历史用户消息位置分叉出新会话；同步优化了侧边栏 / 流式 / 代码变更视图的性能；新增 Opus 4.8 模型选项；Web 端切换到生产 nginx 容器替代 dev metro，首屏更快。
+
+### Session Fork & Duplicate（实验功能）
+- 新增 Experiments 中的「Session Fork & Duplicate」设置 —— 开启后，你聊天里发的每条用户消息都可作为分叉点
+- 新增聊天里长按自己的消息直接 fork 新会话，截断到该位置
+- 新增 Session Info 页面的「Duplicate from message…」入口，打开 picker 列出所有历史 prompt，无需滚动聊天即可挑选任意 rewind 锚点
+- 新增分叉会话聊天头部的 fork 徽章 —— 点击跳回源会话
+
+### 模型
+- 新增 Opus 4.8 模型选项（App / CLI / Codium 三端的模型选择器）
+
+### 流式与渲染
+- 改进 Skill 工具参数 —— 现在渲染为 Markdown 而非原始 JSON
+- 改进 SidePanel 在流式过程中的性能 —— 大量聊天流量下不再整片重渲染
+- 改进 Timeline 页面 —— 用 FlatList 虚拟化，超长 timeline 保持流畅
+- 改进 Session「代码变更」视图（含 legacy 与 Codex 两种变体）—— FlatList 虚拟化
+
+### 侧边栏性能
+- 修复侧边栏每次导航重渲染整个可见窗口的问题 —— data 数组现在跨 pathname 切换保持稳定，仅前后被选中行重新渲染
+- 修复侧边栏里的 rules-of-hooks 违规问题，避免 tablet / 非 tablet 分支切换时崩溃
+
+### 恢复
+- 新增 Stop Failure 横幅上的「Restart Session」按钮，让你从失败的回合中恢复，无需退出聊天
+
+### 幕后改动
+- 升级 CLI 端 Anthropic SDK 到 0.100（happy-coder 0.86.12）—— 引入 Opus 4.8、thinking-token-count beta、对话中段 system blocks、新版缓存诊断路径
+- 新增 Claude 消息 UUID 通过 wire envelope 透传 —— fork picker 可精准定位你点击的那条 Claude 消息
+- 新增服务端 smart push notification routing —— 如果你已经在另一台设备打开 app，supervisor 通知会跳过推送，改用实时更新
+- 改进 CLI SessionStart hook 处理 —— hook 设置的 sessionTitle 现在直接在 App 侧边栏体现，无需手动重命名
+- 发布 @kmmao/happy-wire 0.24.0 和 @kmmao/happy-agent 0.7.2，将新的 fork-anchor 字段贯穿到所有客户端
+
+### Web 构建
+- Web 端现在由生产 nginx 容器（expo export）提供，替代了 dev metro 进程 —— 首屏更快，弱网更稳定
+
 ## 2.34.1 - 2026-05-28
 
 修复了问答 / 权限选项卡片仍可能显示在引出它的助手文本上方的遗留情况 —— 当卡片与结论分别在不同的流式批次到达时（PTY / Yolo 模式下常见）。
