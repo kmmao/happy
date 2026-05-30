@@ -325,6 +325,13 @@ const sessionEnvelopeSchema = z
         message: "subagent must be a cuid2 value",
       })
       .optional(),
+    /**
+     * Optional Claude-side JSONL message UUID for this envelope. Set by the
+     * CLI when the envelope mirrors a specific Claude message record; used
+     * by the App as a precise rewind/fork anchor (`forkSession` RPC accepts
+     * it as `upToMessageId`). Older CLIs / non-Claude agents omit it.
+     */
+    claudeUuid: z.string().min(1).optional(),
     ev: sessionEventSchema,
   })
   .superRefine((envelope, ctx) => {
@@ -847,6 +854,13 @@ export type NormalizedMessage = (
   parentRef?: string | null; // Subagent/parent reference for sidechain linking (event messages)
   meta?: MessageMeta;
   usage?: UsageData;
+  /**
+   * Claude JSONL message UUID — used by the fork/duplicate UI as a precise
+   * rewind anchor. Passed back to the CLI's forkSession RPC as
+   * `upToMessageId`. Only set for envelopes originating from Claude; codex
+   * messages and synthetic events leave this undefined.
+   */
+  claudeUuid?: string;
   /** Present on task-start messages to register a new background task */
   taskStartInfo?: {
     taskId: string;
@@ -868,7 +882,24 @@ export type NormalizedMessage = (
   };
 };
 
+// Public wrapper around the dispatch below. Attaches the envelope's
+// `claudeUuid` to whatever NormalizedMessage variant the core produces, so
+// every chat/event message carries a fork anchor when one is available —
+// without having to thread it through 25+ branch returns.
 function normalizeSessionEnvelope(
+  envelope: SessionEnvelope,
+  localId: string | null,
+  createdAt: number,
+  meta: MessageMeta | undefined,
+): NormalizedMessage | null {
+  const result = normalizeSessionEnvelopeCore(envelope, localId, createdAt, meta);
+  if (result && envelope.claudeUuid) {
+    return { ...result, claudeUuid: envelope.claudeUuid };
+  }
+  return result;
+}
+
+function normalizeSessionEnvelopeCore(
   envelope: SessionEnvelope,
   localId: string | null,
   createdAt: number,

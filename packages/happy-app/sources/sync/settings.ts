@@ -89,6 +89,11 @@ export const SettingsSchema = z.object({
   enablePreviewTab: z
     .boolean()
     .describe("Enable preview tab in session side panel (experimental)"),
+  expResumeSession: z
+    .boolean()
+    .describe(
+      "Enable fork/duplicate UI on chat sessions (experimental). Surfaces long-press menu on messages, DuplicateSheet picker, and fork/duplicate entries on session info. Requires Claude-side claudeUuid to be available on the source messages.",
+    ),
   useEnhancedSessionWizard: z
     .boolean()
     .describe("A/B test flag: Use enhanced profile-based session wizard UI"),
@@ -431,6 +436,7 @@ export const settingsDefaults: Settings = {
   showAgentsDashboard: false,
   knowledgeBase: false,
   enablePreviewTab: false,
+  expResumeSession: false,
   useEnhancedSessionWizard: false,
   alwaysShowContextSize: true,
   agentInputEnterToSend: true,

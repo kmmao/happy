@@ -26,6 +26,7 @@ import { AgentDot } from "./AgentDot";
 import { MessageImage } from "./MessageImage";
 import { parseImageRefs } from "@/utils/parseImageRefs";
 import { useBookmarks } from "@/hooks/useBookmarks";
+import { useSessionFork } from "@/hooks/useSessionFork";
 import { useAppendToInput } from "@/hooks/useInputContext";
 import { parseTaskStatusMessage, getThinkingLabelTitle } from "./messageProgress";
 import { parseLegacyCodexDiffPreview } from "./tools/codexDiffCompat";
@@ -180,6 +181,16 @@ function UserTextBlock(props: { message: UserTextMessage; metadata: Metadata | n
   const { theme } = useUnistyles();
   const router = useRouter();
   const session = useSession(props.sessionId);
+  // SessionView wires this callback through SessionForkProvider when the
+  // expResumeSession experiment is on. Undefined ⇒ no fork affordance.
+  const { requestDuplicate } = useSessionFork();
+  // Long-press is only meaningful when (a) the experiment provides a handler
+  // and (b) this message has a Claude UUID to anchor the fork against.
+  const canDuplicate = requestDuplicate != null && props.message.realId != null;
+  const handleLongPress = React.useCallback(() => {
+    if (!canDuplicate || !requestDuplicate) return;
+    requestDuplicate(props.message);
+  }, [canDuplicate, requestDuplicate, props.message]);
 
   // The user's own slash-command input is shown optimistically (carries a
   // localId); the SDK then injects the canonical wrapper chip. Hide the raw
@@ -267,7 +278,16 @@ function UserTextBlock(props: { message: UserTextMessage; metadata: Metadata | n
       )}
       {displayText.length > 0 && (
         <View style={styles.userBubbleRow}>
-          <View style={styles.userMessageBubble}>
+          <Pressable
+            // Long-press → trigger duplicate-from-message via SessionForkContext.
+            // No-op when the experiment is off (requestDuplicate undefined) or
+            // the message has no Claude UUID anchor. Bubble keeps its normal
+            // rendering — `unstable_pressDelay` is omitted so taps elsewhere
+            // (links, bookmark button) still feel instant.
+            onLongPress={canDuplicate ? handleLongPress : undefined}
+            delayLongPress={400}
+            style={styles.userMessageBubble}
+          >
             <MarkdownView
               markdown={displayText}
               onOptionPress={handleOptionPress}
@@ -295,7 +315,7 @@ function UserTextBlock(props: { message: UserTextMessage; metadata: Metadata | n
                 </Text>
               </Pressable>
             )}
-          </View>
+          </Pressable>
           <View style={styles.userActionsRow}>
             <Pressable
               style={({ pressed }) => [

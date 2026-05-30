@@ -13,7 +13,9 @@ import {
   useIsDataReady,
   useSession,
   useSessionMessages,
+  useSetting,
 } from "@/sync/storage";
+import { DuplicateSheet } from "@/components/DuplicateSheet";
 import type { Message } from "@/sync/typesMessage";
 import {
   getSessionName,
@@ -125,6 +127,14 @@ function SessionInfoContent({ session }: { session: Session }) {
     (!session.metadata?.flavor || session.metadata.flavor === "claude") &&
     !!machine &&
     isMachineOnline(machine);
+
+  // The duplicate-from-message picker is gated behind expResumeSession AND
+  // the same Claude-only / online-machine preconditions as `canFork`. The
+  // picker still needs to walk the source JSONL to truncate, which requires
+  // the daemon to be reachable.
+  const expResumeSession = useSetting("expResumeSession");
+  const canDuplicate = expResumeSession && canFork;
+  const [showDuplicateSheet, setShowDuplicateSheet] = React.useState(false);
 
   const { needsUpgrade, machineCliVersion, handleUpgradeDirect: handleUpgradeSession } = useSessionUpgrade(session, machine);
 
@@ -652,6 +662,14 @@ function SessionInfoContent({ session }: { session: Session }) {
               onPress={handleForkSession}
             />
           )}
+          {canDuplicate && (
+            <Item
+              title={t("session.duplicateMenuTitle")}
+              subtitle={t("session.duplicateMenuSubtitle")}
+              icon={<Ionicons name="copy-outline" size={29} color={theme.colors.textLink} />}
+              onPress={() => setShowDuplicateSheet(true)}
+            />
+          )}
           {!sessionStatus.isConnected && !session.active && (
             <Item
               title={t("sessionInfo.deleteSession")}
@@ -882,6 +900,43 @@ function SessionInfoContent({ session }: { session: Session }) {
           </ItemGroup>
         )}
       </ItemList>
+      {/*
+        Picker for "duplicate from a previous user message". Mounted at the
+        SessionInfoContent root so it overlays the whole sheet stack; the
+        forkSession flow lives inside the picker, which navigates to the new
+        session id on success and closes itself.
+      */}
+      {canFork && (
+        <DuplicateSheet
+          visible={showDuplicateSheet}
+          session={session}
+          baseSpawnOptions={{
+            machineId: session.metadata!.machineId!,
+            directory: session.metadata!.path!,
+            agent: "claude",
+            happySessionId: randomUUID(),
+            ...buildSessionRespawnProfile(
+              session,
+              storage.getState().settings.profiles ?? [],
+            ),
+          }}
+          onClose={() => setShowDuplicateSheet(false)}
+          onSuccess={(newSessionId) => {
+            void (async () => {
+              await sync.refreshSessions();
+              applySessionStartPreferences(
+                storage.getState(),
+                buildForkSessionStartPreferences(session, newSessionId),
+              );
+              if (auth.credentials) {
+                await setSessionForkSource(newSessionId, session.id, auth.credentials);
+              }
+              Modal.toast(t("sessionInfo.forkSessionSuccess"));
+              navigateToSession(newSessionId);
+            })();
+          }}
+        />
+      )}
     </>
   );
 }

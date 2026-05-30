@@ -49,6 +49,17 @@ import {
 import { sessionInterrupt, sessionStopTask, sessionBash } from "@/sync/ops";
 import { QueueBanner, QueuePreviewOverlay, type QueuedMessageItem } from "@/components/QueueBanner";
 import { reactivateArchivedSession } from "@/sync/sessionResumeFlow";
+import { forkSessionFromMessage } from "@/sync/sessionForkFlow";
+import { SessionForkProvider } from "@/hooks/useSessionFork";
+import { setSessionForkSource } from "@/sync/apiProjects";
+import { useAuth } from "@/auth/AuthContext";
+import {
+    applySessionStartPreferences,
+    buildForkSessionStartPreferences,
+} from "@/app/(app)/new/sessionStartPreferences";
+import { useNavigateToSession } from "@/hooks/useNavigateToSession";
+import { isMachineOnline } from "@/utils/machineUtils";
+import type { UserTextMessage } from "@/sync/typesMessage";
 import { runWithSessionReactivationGuard } from "@/sync/sessionResumeGuard";
 import { resolveSessionReactivationContext } from "@/hooks/sessionResumeSupport";
 import { buildSessionRespawnProfile } from "@/hooks/sessionUpgradeProfile";
@@ -264,6 +275,71 @@ export const SessionView = React.memo((props: { id: string }) => {
       });
     });
   });
+
+  // ── Fork-from-message wiring ─────────────────────────────────────────────
+  //
+  // The chat's UserTextBlock long-press handler raises a "duplicate from
+  // this message" intent via the SessionForkContext. When the experiment
+  // toggle is off we leave `requestDuplicate` undefined so the affordance
+  // disappears at the consumer (no UI gating needed in MessageView).
+  //
+  // The fork itself reuses the same machinery as the session-info page:
+  // forkSession RPC → spawnSession with claudeSessionId + forkSourceId →
+  // record fork lineage on the server → navigate to the new session.
+  const expResumeSession = useSetting("expResumeSession");
+  const navigateToSession = useNavigateToSession();
+  const auth = useAuth();
+  const canForkFromMessage =
+    expResumeSession &&
+    session?.presence === "online" &&
+    !!session?.metadata?.claudeSessionId &&
+    !!session?.metadata?.machineId &&
+    !!session?.metadata?.path &&
+    (!session?.metadata?.flavor || session.metadata.flavor === "claude") &&
+    !!machine &&
+    isMachineOnline(machine);
+  const [, performForkFromMessage] = useHappyAction(async () => {
+    const anchor = pendingForkAnchorRef.current;
+    pendingForkAnchorRef.current = null;
+    if (!anchor || !session || !canForkFromMessage) return;
+    const realId = anchor.realId;
+    if (!realId) return;
+    const spawnProfile = buildSessionRespawnProfile(
+      session,
+      storage.getState().settings.profiles ?? [],
+    );
+    const result = await forkSessionFromMessage({
+      sourceSessionId: session.id,
+      upToMessageId: realId,
+      baseSpawnOptions: {
+        machineId: session.metadata!.machineId!,
+        directory: session.metadata!.path!,
+        agent: "claude",
+        happySessionId: randomUUID(),
+        ...spawnProfile,
+      },
+    });
+    if (result.type === "error") {
+      throw new HappyError(result.errorMessage, false);
+    }
+    if (result.type === "success") {
+      await sync.refreshSessions();
+      applySessionStartPreferences(
+        storage.getState(),
+        buildForkSessionStartPreferences(session, result.sessionId),
+      );
+      if (auth.credentials) {
+        await setSessionForkSource(result.sessionId, session.id, auth.credentials);
+      }
+      Modal.toast(t("sessionInfo.forkSessionSuccess"));
+      navigateToSession(result.sessionId);
+    }
+  });
+  const pendingForkAnchorRef = React.useRef<UserTextMessage | null>(null);
+  const requestDuplicate = React.useCallback((message: UserTextMessage) => {
+    pendingForkAnchorRef.current = message;
+    performForkFromMessage();
+  }, [performForkFromMessage]);
 
   const isDataReady = useIsDataReady();
   const { theme } = useUnistyles();
@@ -545,6 +621,7 @@ export const SessionView = React.memo((props: { id: string }) => {
                   canReactivate={canReactivate}
                   onReactivate={performReactivation}
                   reactivating={reactivating}
+                  requestDuplicate={requestDuplicate}
                 />
               )}
             </View>
@@ -589,6 +666,7 @@ function SessionViewLoaded({
   canReactivate,
   onReactivate,
   reactivating,
+  requestDuplicate,
 }: {
   sessionId: string;
   session: Session;
@@ -596,17 +674,20 @@ function SessionViewLoaded({
   canReactivate: boolean;
   onReactivate: () => void;
   reactivating: boolean;
+  requestDuplicate?: (message: UserTextMessage) => void;
 }) {
   return (
     <BookmarkProvider sessionId={sessionId}>
-      <SessionViewInner
-        sessionId={sessionId}
-        session={session}
-        appendToInputRef={appendToInputRef}
-        canReactivate={canReactivate}
-        onReactivate={onReactivate}
-        reactivating={reactivating}
-      />
+      <SessionForkProvider requestDuplicate={requestDuplicate}>
+        <SessionViewInner
+          sessionId={sessionId}
+          session={session}
+          appendToInputRef={appendToInputRef}
+          canReactivate={canReactivate}
+          onReactivate={onReactivate}
+          reactivating={reactivating}
+        />
+      </SessionForkProvider>
     </BookmarkProvider>
   );
 }

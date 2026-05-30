@@ -33,6 +33,9 @@ function FeaturesSettingsScreen() {
   const [enablePreviewTab, setEnablePreviewTab] = useSettingMutable(
     "enablePreviewTab",
   );
+  const [expResumeSession, setExpResumeSession] = useSettingMutable(
+    "expResumeSession",
+  );
   const [useEnhancedSessionWizard, setUseEnhancedSessionWizard] =
     useSettingMutable("useEnhancedSessionWizard");
   const [knowledgeBase, setKnowledgeBase] = useSettingMutable("knowledgeBase");
@@ -117,6 +120,22 @@ function FeaturesSettingsScreen() {
             <Switch
               value={enablePreviewTab}
               onValueChange={setEnablePreviewTab}
+            />
+          }
+          showChevron={false}
+        />
+        <Item
+          title={t("settingsFeatures.expResumeSession")}
+          subtitle={
+            expResumeSession
+              ? t("settingsFeatures.expResumeSessionEnabled")
+              : t("settingsFeatures.expResumeSessionDisabled")
+          }
+          icon={<Ionicons name="git-branch-outline" size={29} color={theme.colors.accentBlue} />}
+          rightElement={
+            <Switch
+              value={expResumeSession}
+              onValueChange={setExpResumeSession}
             />
           }
           showChevron={false}
