@@ -92,7 +92,7 @@
   "dependencies": {
     "@agentclientprotocol/sdk": "^0.20.0",
     "@anthropic-ai/sandbox-runtime": "0.0.52",
-    "@anthropic-ai/sdk": "^0.91.1",
+    "@anthropic-ai/sdk": "^0.100.1",
     "@kmmao/happy-wire": "^0.23.0",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "@paralleldrive/cuid2": "^2.2.2",
