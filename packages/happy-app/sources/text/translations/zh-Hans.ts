@@ -697,6 +697,7 @@ export const zhHans: TranslationStructure = {
     workflowAgentCount: ({ n }: { n: number }) => `${n} 个 agent`,
     workflowTokensUsed: ({ n }: { n: number }) => `${n.toLocaleString()} tokens`,
     workflowTokensInline: ({ n }: { n: number }) => `${n} tok`,
+    workflowEmpty: "暂无 workflow 运行",
     progressTodoNudgeLabel: "建议验证",
     progressSummaryRefreshLabel: "更新",
     progressSummaryRefreshPrompt:

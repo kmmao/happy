@@ -730,6 +730,7 @@ export const pt: TranslationStructure = {
     workflowTokensUsed: ({ n }: { n: number }) =>
       `${n.toLocaleString()} tokens`,
     workflowTokensInline: ({ n }: { n: number }) => `${n} tok`,
+    workflowEmpty: "Ainda não há execuções de workflow",
     progressTodoNudgeLabel: "Verificação sugerida",
     progressSummaryRefreshLabel: "Atualizar",
     progressSummaryRefreshPrompt:

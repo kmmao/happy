@@ -138,7 +138,13 @@ export class WorkflowRunWatcher {
       if (run.agents.has(entry.agentId)) return;
       const startedAt = Date.now();
       run.agents.set(entry.agentId, { startedAt });
-      this.callbacks.onAgentStart(run.taskId, run.runId, entry.agentId, startedAt);
+      // Guard the consumer: a throwing callback must not abort the poll
+      // loop, which would drop every later entry and wedge the watcher.
+      try {
+        this.callbacks.onAgentStart(run.taskId, run.runId, entry.agentId, startedAt);
+      } catch {
+        // Swallow; the next entry/poll continues unaffected.
+      }
       return;
     }
     if (entry.type === "result") {
@@ -150,14 +156,18 @@ export class WorkflowRunWatcher {
         typeof entry.result === "string" && entry.result.length > 0
           ? entry.result.slice(0, OUTPUT_PREVIEW_LIMIT)
           : undefined;
-      this.callbacks.onAgentEnd(
-        run.taskId,
-        run.runId,
-        entry.agentId,
-        outputPreview,
-        durationMs,
-        endedAt,
-      );
+      try {
+        this.callbacks.onAgentEnd(
+          run.taskId,
+          run.runId,
+          entry.agentId,
+          outputPreview,
+          durationMs,
+          endedAt,
+        );
+      } catch {
+        // Swallow; the next entry/poll continues unaffected.
+      }
     }
     // Future types (errored / skipped / phase-*) flow through here once
     // the runtime starts writing them; for now they're silently ignored.

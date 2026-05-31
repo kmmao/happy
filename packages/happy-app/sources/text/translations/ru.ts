@@ -969,6 +969,7 @@ export const ru: TranslationStructure = {
     workflowTokensUsed: ({ n }: { n: number }) =>
       `${n.toLocaleString()} токенов`,
     workflowTokensInline: ({ n }: { n: number }) => `${n} ток`,
+    workflowEmpty: "Пока нет запусков workflow",
     progressTodoNudgeLabel: "Рекомендуется проверка",
     progressSummaryRefreshLabel: "Обновить",
     progressSummaryRefreshPrompt:

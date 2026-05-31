@@ -412,9 +412,29 @@ export const SessionProgressPanel = React.memo<SessionProgressPanelProps>(
                 style={{ flex: 1 }}
                 contentContainerStyle={styles.scrollContent}
             >
-                {orderedWorkflowRuns.map((run) => (
-                    <WorkflowRunCard key={run.runId} run={run} nowMs={nowMs} />
-                ))}
+                {orderedWorkflowRuns.length > 0 ? (
+                    orderedWorkflowRuns.map((run) => (
+                        <WorkflowRunCard key={run.runId} run={run} nowMs={nowMs} />
+                    ))
+                ) : !isCodex ? (
+                    <GlassCard style={styles.section}>
+                        <View style={styles.sectionHeader}>
+                            <Ionicons
+                                name="git-network-outline"
+                                size={14}
+                                color={theme.colors.textSecondary}
+                            />
+                            <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
+                                Workflow
+                            </Text>
+                        </View>
+                        <View style={styles.emptyBlock}>
+                            <Text style={[styles.emptyText, { color: theme.colors.textSecondary }]}>
+                                {t("session.workflowEmpty")}
+                            </Text>
+                        </View>
+                    </GlassCard>
+                ) : null}
                 {isCodex ? (
                     <>
                         <CodexPlanSection

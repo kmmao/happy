@@ -76,8 +76,12 @@ export interface WorkflowPhaseState {
   title: string;
   /** 0-based index in observed phase order (NOT meta.phases index). */
   index: number;
-  /** Wall-clock when the phase-start event was observed. */
-  startedAt?: number;
+  /**
+   * Wall-clock when the phase-start event was observed. Required: wire's
+   * sessionWorkflowPhaseStartEventSchema mandates startedAt, and every code
+   * path that builds a phase sets it.
+   */
+  startedAt: number;
   /** AgentIds dispatched while this phase was active (preserves order). */
   agentIds: string[];
 }

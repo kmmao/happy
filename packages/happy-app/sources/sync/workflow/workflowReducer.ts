@@ -151,7 +151,7 @@ function handleAgentStart(
     agents: { ...run.agents, [event.agentId]: agent },
     agentOrder: [...run.agentOrder, event.agentId],
     phases: event.phase
-      ? attachAgentToPhase(run.phases, event.phase, event.agentId)
+      ? attachAgentToPhase(run.phases, event.phase, event.agentId, event.startedAt)
       : run.phases,
   };
   return { ...runs, [event.runId]: nextRun };
@@ -241,23 +241,27 @@ function attachAgentToPhase(
   phases: ReadonlyArray<WorkflowPhaseState>,
   phaseTitle: string,
   agentId: string,
+  startedAt: number,
 ): WorkflowPhaseState[] {
   const idx = phases.findIndex((p) => p.title === phaseTitle);
   if (idx < 0) {
     // Agent declared a phase we haven't seen a phase-start for — append a
     // synthetic phase to preserve the agent's association. The phase's
-    // index falls back to the count of currently-known phases.
+    // index falls back to the count of currently-known phases, and its
+    // startedAt approximates from the agent's own start time.
     return [
       ...phases,
       {
         title: phaseTitle,
         index: phases.length,
+        startedAt,
         agentIds: [agentId],
       },
     ];
   }
   const existing = phases[idx]!;
-  // Idempotent: don't duplicate agentIds on a phase.
+  // Idempotent: don't duplicate agentIds on a phase. Preserve the original
+  // array reference when nothing changes so downstream Object.is holds.
   if (existing.agentIds.includes(agentId)) return phases.slice();
   const updated: WorkflowPhaseState = {
     ...existing,
