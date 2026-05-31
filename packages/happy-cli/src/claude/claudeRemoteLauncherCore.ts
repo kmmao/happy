@@ -48,6 +48,12 @@ import {
 import { fetchMcpRegistryServers } from "@/claude/utils/mcpRegistryReader";
 import { EnhancedMode } from "./loop";
 import { createSessionEventReporter } from "./sessionEventReporter";
+import {
+  extractRunId,
+  findRecentRunDir,
+  getWorkflowsRoot,
+} from "@/workflow/workflowDirDiscovery";
+import { WorkflowRunWatcher } from "@/workflow/workflowRunWatcher";
 import { hashObject } from "@/utils/deterministicJson";
 import { getProjectPath } from "./utils/path";
 import { readFile, writeFile, mkdir } from "node:fs/promises";
@@ -920,6 +926,64 @@ export async function claudeRemoteLauncher(
    */
   let planModeLockdownActive = false;
 
+  /**
+   * Tracks SDK background-task IDs that we've recognized as local_workflow
+   * runs. When the matching `task_notification` fires later we use this
+   * registry to also emit a structured `workflow-run-end` envelope
+   * alongside the regular `task-end` — without it we'd have no way to know
+   * which `task_id` was a workflow (the notification message itself only
+   * carries the id, not the task_type).
+   *
+   * `runId` is the workflow runtime's wf_<id> when we successfully resolved
+   * the transcript directory (the workflow-agent-* events flowing through
+   * the watcher use the same value, so the App reducer can correlate); it
+   * falls back to the SDK task_id when the directory couldn't be located.
+   */
+  interface ActiveWorkflowRun {
+    workflowName: string;
+    description: string;
+    toolUseId: string | null;
+    startedAt: number;
+    runId: string;
+  }
+  const activeWorkflowRuns = new Map<string, ActiveWorkflowRun>();
+
+  /**
+   * Polls each active workflow's journal.jsonl and surfaces per-agent
+   * lifecycle events. Callbacks here build the wire envelope and forward
+   * via the same session.client channel used by the task-* events. The
+   * timer is unref'd inside the watcher so it never blocks process exit.
+   */
+  const workflowWatcher = new WorkflowRunWatcher({
+    onAgentStart: (_taskId, runId, agentId, startedAt) => {
+      const envelope = buildProtocolMessage("agent", {
+        t: "workflow-agent-start",
+        runId,
+        agentId,
+        // promptPreview / hasSchema not yet sourced (PR 2c). Empty string
+        // satisfies the wire schema's `.max(500)` constraint.
+        promptPreview: "",
+        hasSchema: false,
+        startedAt,
+      });
+      session.client.sendSessionProtocolMessage(envelope as any);
+    },
+    onAgentEnd: (_taskId, runId, agentId, outputPreview, durationMs, endedAt) => {
+      const envelope = buildProtocolMessage("agent", {
+        t: "workflow-agent-end",
+        runId,
+        agentId,
+        // Journal currently only records successful results; errored /
+        // skipped lifecycles arrive once the workflow runtime adds them.
+        status: "completed",
+        durationMs,
+        outputPreview,
+        endedAt,
+      });
+      session.client.sendSessionProtocolMessage(envelope as any);
+    },
+  });
+
   function onMessage(message: ClaudeJsonlMessage) {
     // A parsed JSONL message is one liveness source for the stranded-turn
     // watchdog (the load-bearing one is raw PTY byte activity — see
@@ -1599,6 +1663,55 @@ export async function claudeRemoteLauncher(
         workflowName: (m as any).workflow_name,
       });
       session.client.sendSessionProtocolMessage(envelope as any);
+
+      // Workflow protocol — emit structured workflow-run-start alongside
+      // the generic task-start whenever the SDK reports a local_workflow,
+      // then begin tailing the runtime's journal.jsonl so we can also emit
+      // workflow-agent-start / workflow-agent-end as sub-agents progress.
+      const workflowName = (m as any).workflow_name as string | undefined;
+      if (m.task_type === "local_workflow" && workflowName) {
+        const startedAt = Date.now();
+        // Try to recover the workflow runtime's wf_<id> from disk. The
+        // runtime creates its run directory before emitting task_started,
+        // so a synchronous scan hits in the common case. When it misses
+        // (filesystem race, unusual layout) we fall back to the SDK
+        // task_id — this keeps the wire envelope valid but disables
+        // per-agent event emission for that run.
+        let runId = m.task_id;
+        let runDir: string | null = null;
+        const sessionId = session.sessionId;
+        if (sessionId) {
+          const root = getWorkflowsRoot(sessionId, process.cwd());
+          const dir = findRecentRunDir(root, startedAt);
+          if (dir) {
+            runDir = dir;
+            runId = extractRunId(dir);
+          } else {
+            logger.debug(
+              `[workflow] task ${m.task_id} (${workflowName}): no wf_* run dir resolved under ${root}; agent events suppressed`,
+            );
+          }
+        }
+        activeWorkflowRuns.set(m.task_id, {
+          workflowName,
+          description: m.description ?? "",
+          toolUseId: m.tool_use_id ?? null,
+          startedAt,
+          runId,
+        });
+        const workflowEnvelope = buildProtocolMessage("agent", {
+          t: "workflow-run-start",
+          runId,
+          toolUseId: m.tool_use_id ?? m.task_id,
+          name: workflowName,
+          description: m.description ?? "",
+          startedAt,
+        });
+        session.client.sendSessionProtocolMessage(workflowEnvelope as any);
+        if (runDir) {
+          workflowWatcher.start(m.task_id, runId, runDir);
+        }
+      }
     }
 
     // Forward Task progress to session protocol
@@ -1668,6 +1781,36 @@ export async function claudeRemoteLauncher(
           : undefined,
       });
       session.client.sendSessionProtocolMessage(envelope as any);
+
+      // Workflow protocol — mirror task-end with workflow-run-end when this
+      // task_id was previously tracked as a workflow run. Stopping the
+      // watcher first runs a final synchronous poll, so any pending
+      // workflow-agent-end events emit BEFORE workflow-run-end (preserving
+      // App-side reducer ordering invariants).
+      const tracked = activeWorkflowRuns.get(m.task_id);
+      if (tracked) {
+        activeWorkflowRuns.delete(m.task_id);
+        const { agentCount } = workflowWatcher.stop(m.task_id);
+        const endedAt = Date.now();
+        const status =
+          m.status === "completed"
+            ? "completed"
+            : m.status === "stopped"
+              ? "aborted"
+              : "errored";
+        const durationMs = m.usage?.duration_ms ?? endedAt - tracked.startedAt;
+        const totalTokens = m.usage?.total_tokens ?? 0;
+        const workflowEndEnvelope = buildProtocolMessage("agent", {
+          t: "workflow-run-end",
+          runId: tracked.runId,
+          status,
+          agentCount,
+          totalTokens,
+          durationMs,
+          endedAt,
+        });
+        session.client.sendSessionProtocolMessage(workflowEndEnvelope as any);
+      }
     }
 
     // Forward Task updated (patch) to session protocol (SDK 0.3.142+)

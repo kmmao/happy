@@ -2381,5 +2381,157 @@ describe('Zod Transform - WOLOG Content Normalization', () => {
 
             expect(normalized).toBeNull();
         });
+
+        // Forward-compat: outer rawRecordSchema is permissive so envelopes
+        // carrying event types this App build doesn't yet know about parse
+        // successfully (instead of being dropped with a Zod error log). The
+        // dispatcher (normalizeSessionEnvelope) still re-strict-parses and
+        // returns null for unknown events — so the user sees nothing rendered
+        // but no log spam and no cascade failure.
+        it('attaches workflowEvent on workflow-run-start normalized message', () => {
+            const normalized = normalizeRawMessage('db-w-1', null, 1, {
+                role: 'session',
+                content: {
+                    id: 'env-w-1',
+                    time: 1,
+                    role: 'agent',
+                    turn: 'turn-1',
+                    ev: {
+                        t: 'workflow-run-start',
+                        runId: 'wf_x',
+                        toolUseId: 'tu_x',
+                        name: 'demo',
+                        description: 'desc',
+                        startedAt: 1,
+                    },
+                },
+            } as any);
+            expect(normalized).toBeTruthy();
+            expect(normalized?.workflowEvent?.t).toBe('workflow-run-start');
+            if (normalized && normalized.role === 'agent') {
+                // Workflow events do not render as chat content
+                expect(normalized.content).toEqual([]);
+            }
+        });
+
+        it('attaches workflowEvent on each of the 5 workflow event types', () => {
+            const baseEnvelope = {
+                role: 'session' as const,
+                content: {
+                    time: 1,
+                    role: 'agent',
+                    turn: 'turn-1',
+                },
+            };
+            const cases = [
+                {
+                    t: 'workflow-run-start',
+                    runId: 'wf_x',
+                    toolUseId: 'tu_x',
+                    name: 'n',
+                    description: 'd',
+                    startedAt: 1,
+                },
+                { t: 'workflow-phase-start', runId: 'wf_x', index: 0, title: 'p1', startedAt: 1 },
+                {
+                    t: 'workflow-agent-start',
+                    runId: 'wf_x',
+                    agentId: 'a1',
+                    promptPreview: '',
+                    hasSchema: false,
+                    startedAt: 1,
+                },
+                {
+                    t: 'workflow-agent-end',
+                    runId: 'wf_x',
+                    agentId: 'a1',
+                    status: 'completed',
+                    durationMs: 100,
+                    endedAt: 101,
+                },
+                {
+                    t: 'workflow-run-end',
+                    runId: 'wf_x',
+                    status: 'completed',
+                    agentCount: 1,
+                    totalTokens: 100,
+                    durationMs: 100,
+                    endedAt: 101,
+                },
+            ];
+            for (const ev of cases) {
+                const normalized = normalizeRawMessage(`db-${ev.t}`, null, 1, {
+                    ...baseEnvelope,
+                    content: {
+                        ...baseEnvelope.content,
+                        id: `env-${ev.t}`,
+                        ev,
+                    },
+                } as any);
+                expect(normalized?.workflowEvent?.t, `expected ${ev.t}`).toBe(ev.t);
+            }
+        });
+
+        it('silently skips unknown future event types in agent.session.data shape', () => {
+            const normalized = normalizeRawMessage('db-fc-1', null, 1, {
+                ...base,
+                content: {
+                    type: 'session',
+                    data: {
+                        id: 'env-fc-1',
+                        time: 1,
+                        role: 'agent',
+                        turn: 'turn-1',
+                        ev: {
+                            t: 'workflow-future-not-yet-known',
+                            arbitraryPayload: { foo: 1, bar: 'baz' },
+                        },
+                    },
+                },
+            } as any);
+
+            expect(normalized).toBeNull();
+        });
+
+        it('silently skips unknown future event types in direct session-role shape', () => {
+            const normalized = normalizeRawMessage('db-fc-2', null, 1, {
+                role: 'session',
+                content: {
+                    id: 'env-fc-2',
+                    time: 1,
+                    role: 'agent',
+                    turn: 'turn-1',
+                    ev: {
+                        t: 'some-future-protocol-extension',
+                        whatever: 'data',
+                    },
+                },
+            } as any);
+
+            expect(normalized).toBeNull();
+        });
+
+        it('still parses known events normally when unknown types coexist in the schema family', () => {
+            // Confirm permissive parser did not regress strict event handling.
+            const normalized = normalizeRawMessage('db-fc-3', null, 1, {
+                role: 'session',
+                content: {
+                    id: 'env-fc-3',
+                    time: 1,
+                    role: 'agent',
+                    turn: 'turn-1',
+                    ev: { t: 'text', text: 'still works' },
+                },
+            } as any);
+
+            expect(normalized).toBeTruthy();
+            expect(normalized?.id).toBe('env-fc-3');
+            if (normalized && normalized.role === 'agent') {
+                expect(normalized.content[0]).toMatchObject({
+                    type: 'text',
+                    text: 'still works',
+                });
+            }
+        });
     });
 });

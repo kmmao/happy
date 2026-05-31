@@ -2,6 +2,14 @@ import * as z from "zod";
 import { isCuid } from "@paralleldrive/cuid2";
 import { MessageMetaSchema, MessageMeta } from "./typesMessageMeta";
 import { log } from '@/log';
+import type { WorkflowEvent } from "@/sync/workflow/typesWorkflow";
+import {
+  sessionWorkflowAgentEndEventSchema,
+  sessionWorkflowAgentStartEventSchema,
+  sessionWorkflowPhaseStartEventSchema,
+  sessionWorkflowRunEndEventSchema,
+  sessionWorkflowRunStartEventSchema,
+} from "@kmmao/happy-wire";
 
 //
 // Raw types
@@ -311,6 +319,12 @@ const sessionEventSchema = z.discriminatedUnion("t", [
   sessionNeedsContinueEventSchema,
   sessionStateChangedEventSchema,
   sessionContextUsageEventSchema,
+  // ---- workflow-* (PR 3b) ----
+  sessionWorkflowRunStartEventSchema,
+  sessionWorkflowPhaseStartEventSchema,
+  sessionWorkflowAgentStartEventSchema,
+  sessionWorkflowAgentEndEventSchema,
+  sessionWorkflowRunEndEventSchema,
 ]);
 
 const sessionEnvelopeSchema = z
@@ -364,6 +378,42 @@ const sessionEnvelopeSchema = z
     }
   });
 type SessionEnvelope = z.infer<typeof sessionEnvelopeSchema>;
+
+/**
+ * Forward-compatible variant of sessionEnvelopeSchema used at the outer
+ * parsing boundary (rawRecordSchema). Same envelope shape, but the `ev`
+ * field accepts any object with a string `t` — so envelopes carrying event
+ * types this App build doesn't know about are kept alive in the raw stream
+ * rather than being dropped at parse time (which would log a Zod error and
+ * silently lose the message).
+ *
+ * The dispatcher (normalizeSessionEnvelope) still operates on the strict
+ * SessionEnvelope type — call sites must re-strict-parse via
+ * sessionEnvelopeSchema before dispatching. Unknown event types fail the
+ * re-parse and result in a silent null (no log spam, no message loss for
+ * known types in the same stream).
+ *
+ * No superRefine here: we cannot encode role/event constraints for unknown
+ * event types. Known events' constraints are enforced by the strict
+ * re-parse downstream.
+ */
+const sessionEnvelopeSchemaPermissive = z.object({
+  id: z.string(),
+  time: z.number(),
+  role: z.enum(["user", "agent"]),
+  turn: z.string().optional(),
+  subagent: z
+    .string()
+    .refine((value) => isCuid(value), {
+      message: "subagent must be a cuid2 value",
+    })
+    .optional(),
+  claudeUuid: z.string().min(1).optional(),
+  ev: z.union([
+    sessionEventSchema,
+    z.object({ t: z.string() }).passthrough(),
+  ]),
+});
 
 const rawTextContentSchema = z
   .object({
@@ -600,7 +650,7 @@ const rawAgentRecordSchema = z.discriminatedUnion("type", [
   }),
   z.object({
     type: z.literal("session"),
-    data: sessionEnvelopeSchema,
+    data: sessionEnvelopeSchemaPermissive,
   }),
   z.object({
     // ACP (Agent Communication Protocol) - unified format for all agent providers
@@ -757,7 +807,7 @@ const rawRecordSchema = z.preprocess(
       role: z.literal("session"),
       content: z.object({
         type: z.literal("session"),
-        data: sessionEnvelopeSchema,
+        data: sessionEnvelopeSchemaPermissive,
       }),
       meta: MessageMetaSchema.optional(),
     }),
@@ -880,6 +930,14 @@ export type NormalizedMessage = (
     taskId: string;
     status: "completed" | "failed" | "stopped";
   };
+  /**
+   * Present on workflow-* envelope events (workflow-run-start, -phase-start,
+   * -agent-start, -agent-end, -run-end). The main reducer folds these into
+   * a `workflowRuns` slice via `applyWorkflowEvent` and renders them in the
+   * Progress tab — they do NOT appear inline in the chat stream (content is
+   * left empty by the normalizer).
+   */
+  workflowEvent?: WorkflowEvent;
 };
 
 // Public wrapper around the dispatch below. Attaches the envelope's
@@ -1300,6 +1358,30 @@ function normalizeSessionEnvelopeCore(
     return null;
   }
 
+  if (
+    envelope.ev.t === "workflow-run-start" ||
+    envelope.ev.t === "workflow-phase-start" ||
+    envelope.ev.t === "workflow-agent-start" ||
+    envelope.ev.t === "workflow-agent-end" ||
+    envelope.ev.t === "workflow-run-end"
+  ) {
+    // Workflow envelope events drive a parallel `workflowRuns` slice on
+    // ReducerState — they do NOT render as chat content (content: []).
+    // The main reducer picks `workflowEvent` off the normalized message
+    // and folds it via applyWorkflowEvent(); the Progress tab subscribes
+    // via useWorkflowRuns(sessionId).
+    return {
+      id: messageId,
+      localId,
+      createdAt: messageCreatedAt,
+      role: "agent",
+      isSidechain,
+      content: [],
+      meta,
+      workflowEvent: envelope.ev,
+    } satisfies NormalizedMessage;
+  }
+
   return null;
 }
 
@@ -1475,12 +1557,16 @@ export function normalizeRawMessage(
     };
   }
   if (raw.role === "session") {
-    return normalizeSessionEnvelope(
-      raw.content.data,
-      localId,
-      createdAt,
-      raw.meta,
-    );
+    // Outer schema is permissive (forward-compat). Re-strict-parse here so
+    // the dispatcher always sees a typed SessionEvent. Unknown event types
+    // (e.g. a newer CLI emitting workflow-* before this App build knows
+    // about them) silently produce null — no log spam, and the envelope
+    // was already preserved at the outer raw layer.
+    const strict = sessionEnvelopeSchema.safeParse(raw.content.data);
+    if (!strict.success) {
+      return null;
+    }
+    return normalizeSessionEnvelope(strict.data, localId, createdAt, raw.meta);
   }
   if (raw.role === "agent") {
     if (raw.content.type === "output") {
@@ -1729,8 +1815,14 @@ export function normalizeRawMessage(
       }
     }
     if (raw.content.type === "session") {
+      // See note on the session-role branch above: outer schema is permissive,
+      // dispatch requires strict. Unknown event types → silent null.
+      const strict = sessionEnvelopeSchema.safeParse(raw.content.data);
+      if (!strict.success) {
+        return null;
+      }
       return normalizeSessionEnvelope(
-        raw.content.data,
+        strict.data,
         localId,
         createdAt,
         raw.meta,

@@ -3,7 +3,9 @@ import { createId } from "@paralleldrive/cuid2";
 import {
   createEnvelope,
   sessionEnvelopeSchema,
+  sessionEnvelopeSchemaPermissive,
   sessionEventSchema,
+  sessionEventSchemaPermissive,
   type SessionEvent,
 } from "./sessionProtocol";
 
@@ -81,6 +83,52 @@ describe("session protocol schemas", () => {
         taskType: "local_workflow",
         workflowName: "spec",
       },
+      {
+        t: "workflow-run-start",
+        runId: "wf_abc123",
+        toolUseId: "tool_use_xyz",
+        name: "demo",
+        description: "demo workflow",
+        phases: [{ title: "调研" }, { title: "汇总", detail: "synth" }],
+        startedAt: 1000,
+      },
+      {
+        t: "workflow-phase-start",
+        runId: "wf_abc123",
+        index: 0,
+        title: "调研",
+        startedAt: 1001,
+      },
+      {
+        t: "workflow-agent-start",
+        runId: "wf_abc123",
+        agentId: "agent-1",
+        label: "CLI 端",
+        phase: "调研",
+        parallelGroupId: "agent-1",
+        promptPreview: "在仓库中调研...",
+        hasSchema: false,
+        startedAt: 1002,
+      },
+      {
+        t: "workflow-agent-end",
+        runId: "wf_abc123",
+        agentId: "agent-1",
+        status: "completed",
+        tokens: { input: 1200, output: 800, cacheRead: 500 },
+        durationMs: 12000,
+        outputPreview: "结果...",
+        endedAt: 13002,
+      },
+      {
+        t: "workflow-run-end",
+        runId: "wf_abc123",
+        status: "completed",
+        agentCount: 3,
+        totalTokens: 2400,
+        durationMs: 55205,
+        endedAt: 56205,
+      },
     ];
 
     for (const event of events) {
@@ -123,6 +171,30 @@ describe("session protocol schemas", () => {
     ).toBe(false);
     expect(
       sessionEventSchema.safeParse({ t: "session-state-changed" }).success,
+    ).toBe(false);
+    // workflow-* malformed
+    expect(
+      sessionEventSchema.safeParse({ t: "workflow-run-start" }).success,
+    ).toBe(false);
+    expect(
+      sessionEventSchema.safeParse({
+        t: "workflow-agent-end",
+        runId: "x",
+        agentId: "y",
+        status: "invalid",
+        durationMs: 0,
+        endedAt: 0,
+      }).success,
+    ).toBe(false);
+    expect(
+      sessionEventSchema.safeParse({
+        t: "workflow-agent-start",
+        runId: "x",
+        agentId: "y",
+        promptPreview: "a".repeat(501),
+        hasSchema: false,
+        startedAt: 0,
+      }).success,
     ).toBe(false);
   });
 
@@ -171,6 +243,61 @@ describe("session protocol schemas", () => {
     });
 
     expect(parsed.success).toBe(false);
+  });
+
+  it("rejects workflow events from non-agent role", () => {
+    const minimalEvents: SessionEvent[] = [
+      {
+        t: "workflow-run-start",
+        runId: "wf_x",
+        toolUseId: "t1",
+        name: "n",
+        description: "d",
+        startedAt: 0,
+      },
+      {
+        t: "workflow-phase-start",
+        runId: "wf_x",
+        index: 0,
+        title: "p",
+        startedAt: 0,
+      },
+      {
+        t: "workflow-agent-start",
+        runId: "wf_x",
+        agentId: "a",
+        promptPreview: "p",
+        hasSchema: false,
+        startedAt: 0,
+      },
+      {
+        t: "workflow-agent-end",
+        runId: "wf_x",
+        agentId: "a",
+        status: "completed",
+        durationMs: 0,
+        endedAt: 0,
+      },
+      {
+        t: "workflow-run-end",
+        runId: "wf_x",
+        status: "completed",
+        agentCount: 0,
+        totalTokens: 0,
+        durationMs: 0,
+        endedAt: 0,
+      },
+    ];
+
+    for (const ev of minimalEvents) {
+      const parsed = sessionEnvelopeSchema.safeParse({
+        id: "m",
+        time: 0,
+        role: "user",
+        ev,
+      });
+      expect(parsed.success, `${ev.t} should require role agent`).toBe(false);
+    }
   });
 
   it("rejects non-cuid subagent values", () => {
@@ -271,5 +398,119 @@ describe("createEnvelope", () => {
       backgroundTaskId: "btask123",
       outputFile: "/tmp/tasks/btask123.output",
     });
+  });
+});
+
+describe("sessionEventSchemaPermissive", () => {
+  it("parses known event types into their typed shape", () => {
+    const parsed = sessionEventSchemaPermissive.safeParse({
+      t: "text",
+      text: "hello",
+    });
+    expect(parsed.success).toBe(true);
+    if (parsed.success && "text" in parsed.data && parsed.data.t === "text") {
+      expect(parsed.data.text).toBe("hello");
+    }
+  });
+
+  it("parses known workflow events into their typed shape", () => {
+    const parsed = sessionEventSchemaPermissive.safeParse({
+      t: "workflow-run-start",
+      runId: "wf_x",
+      toolUseId: "t1",
+      name: "n",
+      description: "d",
+      startedAt: 0,
+    });
+    expect(parsed.success).toBe(true);
+    if (parsed.success && parsed.data.t === "workflow-run-start") {
+      expect(parsed.data.runId).toBe("wf_x");
+    }
+  });
+
+  it("falls through unknown event types into passthrough bucket", () => {
+    const parsed = sessionEventSchemaPermissive.safeParse({
+      t: "some-future-event",
+      payload: { foo: 1 },
+    });
+    expect(parsed.success).toBe(true);
+    if (parsed.success) {
+      expect(parsed.data.t).toBe("some-future-event");
+      expect((parsed.data as Record<string, unknown>).payload).toEqual({
+        foo: 1,
+      });
+    }
+  });
+
+  it("rejects events with non-string discriminator", () => {
+    expect(sessionEventSchemaPermissive.safeParse({ t: 42 }).success).toBe(
+      false,
+    );
+    expect(sessionEventSchemaPermissive.safeParse({}).success).toBe(false);
+  });
+});
+
+describe("sessionEnvelopeSchemaPermissive", () => {
+  it("accepts envelopes with known event types (same as strict)", () => {
+    const parsed = sessionEnvelopeSchemaPermissive.safeParse({
+      id: "m",
+      time: 0,
+      role: "agent",
+      ev: { t: "text", text: "hello" },
+    });
+    expect(parsed.success).toBe(true);
+  });
+
+  it("accepts envelopes with unknown event types into passthrough bucket", () => {
+    const parsed = sessionEnvelopeSchemaPermissive.safeParse({
+      id: "m",
+      time: 0,
+      role: "agent",
+      ev: { t: "future-event", payload: { foo: 1 } },
+    });
+    expect(parsed.success).toBe(true);
+    if (parsed.success) {
+      expect(parsed.data.ev.t).toBe("future-event");
+    }
+  });
+
+  it("still enforces role=agent for known workflow events", () => {
+    const parsed = sessionEnvelopeSchemaPermissive.safeParse({
+      id: "m",
+      time: 0,
+      role: "user",
+      ev: {
+        t: "workflow-run-start",
+        runId: "wf_x",
+        toolUseId: "t1",
+        name: "n",
+        description: "d",
+        startedAt: 0,
+      },
+    });
+    expect(parsed.success).toBe(false);
+  });
+
+  it("does NOT enforce role constraints for unknown event types", () => {
+    // Cannot encode constraints we don't know about — receivers should still
+    // gate behavior on a known t.
+    const parsed = sessionEnvelopeSchemaPermissive.safeParse({
+      id: "m",
+      time: 0,
+      role: "user",
+      ev: { t: "future-agent-only-event" },
+    });
+    expect(parsed.success).toBe(true);
+  });
+
+  it("still rejects malformed envelopes (non-cuid subagent)", () => {
+    const parsed = sessionEnvelopeSchemaPermissive.safeParse({
+      id: "m",
+      time: 0,
+      role: "agent",
+      subagent: "not-a-cuid",
+      ev: { t: "text", text: "x" },
+    });
+    expect(parsed.success).toBe(false);
   });
 });

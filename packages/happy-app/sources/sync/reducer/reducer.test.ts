@@ -3410,4 +3410,100 @@ describe('reducer', () => {
             }
         });
     });
+
+    describe('workflow envelope folding (PR 3b)', () => {
+        function makeWorkflowMsg(id: string, ev: any, createdAt = 1000): NormalizedMessage {
+            return {
+                id,
+                localId: null,
+                createdAt,
+                role: 'agent',
+                isSidechain: false,
+                content: [],
+                workflowEvent: ev,
+            } as NormalizedMessage;
+        }
+
+        it('starts with an empty workflowRuns slice', () => {
+            const state = createReducer();
+            expect(state.workflowRuns).toEqual({});
+        });
+
+        it('folds workflow-run-start into workflowRuns slice', () => {
+            const state = createReducer();
+            reducer(state, [
+                makeWorkflowMsg('m1', {
+                    t: 'workflow-run-start',
+                    runId: 'wf_demo',
+                    toolUseId: 'tu_x',
+                    name: 'demo',
+                    description: 'd',
+                    startedAt: 1000,
+                }),
+            ]);
+            expect(state.workflowRuns.wf_demo).toBeDefined();
+            expect(state.workflowRuns.wf_demo.name).toBe('demo');
+            expect(state.workflowRuns.wf_demo.status).toBe('running');
+        });
+
+        it('end-to-end folds a full lifecycle of 5 events into terminal state', () => {
+            const state = createReducer();
+            const events = [
+                {
+                    t: 'workflow-run-start',
+                    runId: 'wf_a',
+                    toolUseId: 'tu',
+                    name: 'a',
+                    description: '',
+                    startedAt: 1000,
+                },
+                { t: 'workflow-phase-start', runId: 'wf_a', index: 0, title: 'p', startedAt: 1010 },
+                {
+                    t: 'workflow-agent-start',
+                    runId: 'wf_a',
+                    agentId: 'ag1',
+                    phase: 'p',
+                    promptPreview: '',
+                    hasSchema: false,
+                    startedAt: 1020,
+                },
+                {
+                    t: 'workflow-agent-end',
+                    runId: 'wf_a',
+                    agentId: 'ag1',
+                    status: 'completed',
+                    durationMs: 500,
+                    endedAt: 1520,
+                    outputPreview: 'ok',
+                },
+                {
+                    t: 'workflow-run-end',
+                    runId: 'wf_a',
+                    status: 'completed',
+                    agentCount: 1,
+                    totalTokens: 100,
+                    durationMs: 520,
+                    endedAt: 1520,
+                },
+            ];
+            reducer(
+                state,
+                events.map((ev, i) => makeWorkflowMsg(`m${i}`, ev, 1000 + i)),
+            );
+            const run = state.workflowRuns.wf_a;
+            expect(run.status).toBe('completed');
+            expect(run.agentCount).toBe(1);
+            expect(run.agentOrder).toEqual(['ag1']);
+            expect(run.agents.ag1.outputPreview).toBe('ok');
+            expect(run.phases).toHaveLength(1);
+            expect(run.phases[0].agentIds).toEqual(['ag1']);
+        });
+
+        it('preserves workflowRuns reference when no workflow event arrives', () => {
+            const state = createReducer();
+            const initial = state.workflowRuns;
+            reducer(state, []);
+            expect(state.workflowRuns).toBe(initial);
+        });
+    });
 });

@@ -688,6 +688,15 @@ export const zhHant: TranslationStructure = {
       "請查看目前工作狀態，用 TodoWrite 重寫清單以符合實際：每一條任務標註準確狀態（completed / in_progress / pending），in_progress 的項請填寫 activeForm。如果尚無清單，請先規劃再寫。",
     progressRefreshPromptCodex:
       "請查看目前工作狀態，呼叫 mcp__happy__update_progress 重寫清單以符合實際：每一條任務標註準確狀態（completed / in_progress / pending），必要時補充 currentStage 或 blockers。如果尚無清單，請先建立第一版。只有在真正進入新階段時才使用 listId: \"new\"。",
+    workflowUnnamedRun: "未命名工作流",
+    workflowStatusRunning: "執行中",
+    workflowStatusCompleted: "已完成",
+    workflowStatusErrored: "發生錯誤",
+    workflowStatusAborted: "已中止",
+    workflowPendingPhase: "待開始",
+    workflowAgentCount: ({ n }: { n: number }) => `${n} 個 agent`,
+    workflowTokensUsed: ({ n }: { n: number }) => `${n.toLocaleString()} tokens`,
+    workflowTokensInline: ({ n }: { n: number }) => `${n} tok`,
     progressTodoNudgeLabel: "建議驗證",
     progressSummaryRefreshLabel: "更新",
     progressSummaryRefreshPrompt:

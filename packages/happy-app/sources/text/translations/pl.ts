@@ -731,6 +731,17 @@ export const pl: TranslationStructure = {
       "Sprawdź aktualny stan pracy i przepisz listę TodoWrite, by odzwierciedlała rzeczywistość: każde zadanie z poprawnym statusem (completed / in_progress / pending). Dla in_progress podaj activeForm. Jeśli planu jeszcze nie ma, najpierw go naszkicuj.",
     progressRefreshPromptCodex:
       "Please review the current work state and call mcp__happy__update_progress to rewrite the checklist so it matches reality: every task with an accurate status (completed / in_progress / pending). Include currentStage or blockers when useful. If no checklist exists yet, create the first one. Use listId: \"new\" only when you are starting a genuinely new phase.",
+    workflowUnnamedRun: "Workflow bez nazwy",
+    workflowStatusRunning: "Trwa",
+    workflowStatusCompleted: "Zakończony",
+    workflowStatusErrored: "Błąd",
+    workflowStatusAborted: "Przerwany",
+    workflowPendingPhase: "Oczekiwanie",
+    workflowAgentCount: ({ n }: { n: number }) =>
+      `${n} ${n === 1 ? "agent" : "agentów"}`,
+    workflowTokensUsed: ({ n }: { n: number }) =>
+      `${n.toLocaleString()} tokenów`,
+    workflowTokensInline: ({ n }: { n: number }) => `${n} tok`,
     progressTodoNudgeLabel: "Zalecana weryfikacja",
     progressSummaryRefreshLabel: "Aktualizuj",
     progressSummaryRefreshPrompt:

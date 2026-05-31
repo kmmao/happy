@@ -58,6 +58,11 @@ import { FeedItem } from "./feedTypes";
 import { hasUnreadMessages as computeHasUnreadMessages } from "./unread";
 import { resolvePinnedModelIdFromSelection } from "./pinnedModel";
 import {
+  EMPTY_WORKFLOW_RUNS,
+  type WorkflowRunsMap,
+  type WorkflowRunState,
+} from "./workflow/typesWorkflow";
+import {
   areSessionPreferencesEqual,
   buildSessionPreferencesSnapshot,
   overlayPendingSessionPreferences,
@@ -2438,6 +2443,32 @@ export function useBackgroundTaskEntries(
 ): ReadonlyMap<string, BackgroundTaskEntry> {
   return storage(
     (state) => state.sessionMessages[sessionId]?.reducerState.backgroundTasks ?? emptyBackgroundTasks,
+  );
+}
+
+/**
+ * Returns the workflowRuns map from reducer state. The reducer replaces
+ * the map reference (not mutates) only when a workflow-* envelope event
+ * actually changed something, so Zustand's default reference-equality
+ * check produces correct re-renders without over-firing.
+ */
+export function useWorkflowRuns(sessionId: string): WorkflowRunsMap {
+  return storage(
+    (state) =>
+      state.sessionMessages[sessionId]?.reducerState.workflowRuns ?? EMPTY_WORKFLOW_RUNS,
+  );
+}
+
+/** Returns a single workflow run by id, or null if it's not present. */
+export function useWorkflowRun(
+  sessionId: string,
+  runId: string,
+): WorkflowRunState | null {
+  return storage(
+    useShallow((state) => {
+      const session = state.sessionMessages[sessionId];
+      return session?.reducerState?.workflowRuns?.[runId] ?? null;
+    }),
   );
 }
 

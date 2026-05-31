@@ -843,6 +843,15 @@ export const ja: TranslationStructure = {
       "現在の作業状態を確認し、TodoWrite で実際の状態に合わせてチェックリストを書き直してください：各タスクに正確なステータス（completed / in_progress / pending）を付け、in_progress のものには activeForm を記入してください。まだ計画がなければ、先に作成してください。",
     progressRefreshPromptCodex:
       "Please review the current work state and call mcp__happy__update_progress to rewrite the checklist so it matches reality: every task with an accurate status (completed / in_progress / pending). Include currentStage or blockers when useful. If no checklist exists yet, create the first one. Use listId: \"new\" only when you are starting a genuinely new phase.",
+    workflowUnnamedRun: "無題のワークフロー",
+    workflowStatusRunning: "実行中",
+    workflowStatusCompleted: "完了",
+    workflowStatusErrored: "エラー",
+    workflowStatusAborted: "中止",
+    workflowPendingPhase: "待機中",
+    workflowAgentCount: ({ n }: { n: number }) => `${n} エージェント`,
+    workflowTokensUsed: ({ n }: { n: number }) => `${n.toLocaleString()} トークン`,
+    workflowTokensInline: ({ n }: { n: number }) => `${n} tok`,
     progressTodoNudgeLabel: "検証推奨",
     progressSummaryRefreshLabel: "更新",
     progressSummaryRefreshPrompt:
