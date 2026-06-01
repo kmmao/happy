@@ -68,6 +68,10 @@ export interface WorkflowAgentState {
   hasSchema?: boolean;
   /** First ~500 chars of agent return value (text or JSON.stringified). */
   outputPreview?: string;
+  /** Full agent result (untruncated) sourced from the transcript, when the
+   *  CLI could provide it. Rendered as a key/value table when it parses as a
+   *  JSON object, otherwise as full text. */
+  outputFull?: string;
   /** Error text when status === "errored". */
   errorMessage?: string;
   /** Token usage from the agent's SDK transcript (if available). */

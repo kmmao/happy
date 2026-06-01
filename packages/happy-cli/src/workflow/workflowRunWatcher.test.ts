@@ -19,6 +19,7 @@ interface CapturedEvent {
   model?: string;
   tokens?: { input: number; output: number; cacheRead?: number; cacheWrite?: number };
   status?: "completed" | "errored" | "skipped";
+  outputFull?: string;
   // phase fields
   index?: number;
   title?: string;
@@ -72,6 +73,7 @@ describe("WorkflowRunWatcher", () => {
         model,
         tokens,
         status,
+        outputFull,
       ) => {
         captured.push({
           kind: "end",
@@ -83,6 +85,7 @@ describe("WorkflowRunWatcher", () => {
           model,
           tokens,
           status,
+          outputFull,
         });
       },
     });
@@ -312,7 +315,7 @@ describe("WorkflowRunWatcher — progress JSON snapshot source", () => {
           agentType,
         });
       },
-      onAgentEnd: (taskId, runId, agentId, outputPreview, durationMs, _endedAt, model, tokens, status) => {
+      onAgentEnd: (taskId, runId, agentId, outputPreview, durationMs, _endedAt, model, tokens, status, outputFull) => {
         captured.push({
           kind: "end",
           taskId,
@@ -323,6 +326,7 @@ describe("WorkflowRunWatcher — progress JSON snapshot source", () => {
           model,
           tokens,
           status,
+          outputFull,
         });
       },
     });
@@ -406,6 +410,42 @@ describe("WorkflowRunWatcher — progress JSON snapshot source", () => {
     expect(end?.outputPreview).toBe('{"name":"Happy Coder",…}');
 
     expect(agentCount).toBe(2);
+  });
+
+  it("sources the untruncated outputFull from the agent StructuredOutput transcript", () => {
+    // The snapshot resultPreview is short/truncated; the full structured
+    // result lives in the agent transcript's StructuredOutput tool input.
+    const agentId = "a4f6f161bb236f946";
+    const structured = {
+      package: "@kmmao/happy-coder",
+      purpose: "x".repeat(1200),
+      techStack: ["TypeScript", "Fastify", "Zod"],
+    };
+    fs.writeFileSync(
+      path.join(runDir, `agent-${agentId}.jsonl`),
+      [
+        JSON.stringify({ type: "user", message: { content: "explore root" } }),
+        JSON.stringify({
+          type: "assistant",
+          message: {
+            content: [
+              { type: "text", text: "done" },
+              { type: "tool_use", name: "StructuredOutput", input: structured },
+            ],
+          },
+        }),
+      ].join("\n"),
+    );
+    fs.writeFileSync(progressPath, JSON.stringify(doneSnapshot()));
+
+    watcher.start("task-1", "wf_test", runDir);
+    watcher.stop("task-1");
+
+    const end = captured.find((e) => e.kind === "end" && e.agentId === agentId);
+    expect(end?.outputFull).toBeDefined();
+    // Full structured result, not the ~400-char preview.
+    expect(end!.outputFull!.length).toBeGreaterThan(1000);
+    expect(JSON.parse(end!.outputFull!)).toEqual(structured);
   });
 
   it("maps non-done terminal states to errored / skipped", () => {

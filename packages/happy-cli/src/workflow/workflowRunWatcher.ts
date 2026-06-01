@@ -102,6 +102,7 @@ export interface WorkflowAgentEventCallbacks {
     model?: string,
     tokens?: WorkflowAgentTokenStats,
     status?: "completed" | "errored" | "skipped",
+    outputFull?: string,
   ) => void;
 }
 
@@ -135,6 +136,7 @@ interface ActiveRun {
 
 const POLL_INTERVAL_MS = 600;
 const OUTPUT_PREVIEW_LIMIT = 500;
+const OUTPUT_FULL_LIMIT = 16384;
 const LABEL_LIMIT = 60;
 const PROMPT_PREVIEW_LIMIT = 500;
 
@@ -231,6 +233,66 @@ export function readAgentMeta(runDir: string, agentId: string): WorkflowAgentMet
 
 function numField(value: unknown): number {
   return typeof value === "number" && Number.isFinite(value) ? value : 0;
+}
+
+/**
+ * Extract the agent's FULL result from its `agent-<id>.jsonl` transcript.
+ *
+ * The progress snapshot's resultPreview is truncated by Claude Code (~400
+ * chars). The complete result lives in the transcript: schema agents call a
+ * `StructuredOutput` tool whose input IS the structured return value, while
+ * plain agents return their final assistant text. We prefer the last
+ * StructuredOutput tool input (JSON.stringified), falling back to the last
+ * assistant text block. Capped to OUTPUT_FULL_LIMIT. Returns undefined when
+ * nothing usable is found or the file is unreadable — never throws.
+ */
+export function readAgentFullResult(
+  runDir: string,
+  agentId: string,
+): string | undefined {
+  let content: string;
+  try {
+    content = fs.readFileSync(path.join(runDir, `agent-${agentId}.jsonl`), "utf8");
+  } catch {
+    return undefined;
+  }
+  let structured: string | undefined;
+  let lastText: string | undefined;
+  for (const line of content.split("\n")) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    let obj: Record<string, unknown>;
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (!parsed || typeof parsed !== "object") continue;
+      obj = parsed as Record<string, unknown>;
+    } catch {
+      continue;
+    }
+    if (obj.type !== "assistant") continue;
+    const message = obj.message as { content?: unknown } | undefined;
+    const blocks = message?.content;
+    if (!Array.isArray(blocks)) {
+      if (typeof blocks === "string" && blocks.length > 0) lastText = blocks;
+      continue;
+    }
+    for (const block of blocks) {
+      if (!block || typeof block !== "object") continue;
+      const b = block as Record<string, unknown>;
+      if (b.type === "tool_use" && b.name === "StructuredOutput") {
+        try {
+          structured = JSON.stringify(b.input ?? {});
+        } catch {
+          /* skip unserializable */
+        }
+      } else if (b.type === "text" && typeof b.text === "string" && b.text.length > 0) {
+        lastText = b.text;
+      }
+    }
+  }
+  const result = structured ?? lastText;
+  if (!result) return undefined;
+  return result.length > OUTPUT_FULL_LIMIT ? result.slice(0, OUTPUT_FULL_LIMIT) : result;
 }
 
 /**
@@ -396,6 +458,9 @@ export class WorkflowRunWatcher {
           agent.tokens !== undefined
             ? { input: agent.tokens, output: 0 }
             : undefined;
+        // Full result (untruncated) from the transcript — the snapshot's
+        // resultPreview is capped by Claude Code at ~400 chars.
+        const outputFull = readAgentFullResult(run.runDir, agent.agentId);
         try {
           this.callbacks.onAgentEnd(
             run.taskId,
@@ -407,6 +472,7 @@ export class WorkflowRunWatcher {
             agent.model,
             tokens,
             mapEndStatus(agent.state),
+            outputFull,
           );
         } catch {
           // Swallow.
@@ -464,6 +530,7 @@ export class WorkflowRunWatcher {
           ? entry.result.slice(0, OUTPUT_PREVIEW_LIMIT)
           : undefined;
       const meta = readAgentMeta(run.runDir, entry.agentId);
+      const outputFull = readAgentFullResult(run.runDir, entry.agentId);
       try {
         this.callbacks.onAgentEnd(
           run.taskId,
@@ -475,6 +542,7 @@ export class WorkflowRunWatcher {
           meta.model,
           meta.tokens,
           "completed",
+          outputFull,
         );
       } catch {
         // Swallow.

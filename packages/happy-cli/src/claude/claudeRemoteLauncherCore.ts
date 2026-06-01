@@ -1083,6 +1083,7 @@ export async function claudeRemoteLauncher(
       model,
       tokens,
       status,
+      outputFull,
     ) => {
       const envelope = createEnvelope("agent", {
         t: "workflow-agent-end",
@@ -1091,6 +1092,7 @@ export async function claudeRemoteLauncher(
         status: status ?? "completed",
         durationMs,
         outputPreview,
+        ...(outputFull ? { outputFull } : {}),
         ...(model ? { model } : {}),
         ...(tokens ? { tokens } : {}),
         endedAt,

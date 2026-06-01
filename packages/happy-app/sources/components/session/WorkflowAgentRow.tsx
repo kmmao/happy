@@ -55,6 +55,69 @@ function formatModel(model: string): string {
   return model.replace(/-\d{6,}$/, "");
 }
 
+/** Render a scalar (or compact-JSON for nested containers) to a string. */
+function scalar(v: unknown): string {
+  if (v === null || v === undefined) return "";
+  if (typeof v === "object") {
+    try {
+      return JSON.stringify(v);
+    } catch {
+      return String(v);
+    }
+  }
+  return String(v);
+}
+
+/** One array item → a single readable line. */
+function itemToLine(item: unknown): string {
+  if (item && typeof item === "object" && !Array.isArray(item)) {
+    return Object.entries(item as Record<string, unknown>)
+      .map(([k, val]) => `${k}: ${scalar(val)}`)
+      .join(" · ");
+  }
+  if (Array.isArray(item)) return item.map(scalar).join(", ");
+  return String(item);
+}
+
+/** A field value → one or more display lines. */
+function valueToLines(v: unknown): string[] {
+  if (v === null || v === undefined) return ["—"];
+  if (Array.isArray(v)) {
+    return v.length === 0 ? ["—"] : v.map(itemToLine);
+  }
+  if (typeof v === "object") {
+    return Object.entries(v as Record<string, unknown>).map(
+      ([k, val]) => `${k}: ${scalar(val)}`,
+    );
+  }
+  return [String(v)];
+}
+
+type ParsedOutput =
+  | { kind: "table"; entries: [string, unknown][] }
+  | { kind: "text"; text: string };
+
+/** Decide how to render the full output: a key/value table for JSON objects,
+ *  otherwise plain (full) text. */
+function parseOutput(full?: string, preview?: string): ParsedOutput | null {
+  const raw = full ?? preview;
+  if (!raw) return null;
+  if (full) {
+    try {
+      const obj = JSON.parse(full);
+      if (obj && typeof obj === "object" && !Array.isArray(obj)) {
+        return { kind: "table", entries: Object.entries(obj) };
+      }
+      // Arrays / primitives: pretty-print so they stay readable.
+      return { kind: "text", text: JSON.stringify(obj, null, 2) };
+    } catch {
+      // Not JSON — show the raw full text.
+      return { kind: "text", text: full };
+    }
+  }
+  return { kind: "text", text: raw };
+}
+
 export const WorkflowAgentRow = React.memo<Props>(function WorkflowAgentRow({
   agent,
   nowMs,
@@ -69,7 +132,11 @@ export const WorkflowAgentRow = React.memo<Props>(function WorkflowAgentRow({
       : agent.durationMs ?? 0;
 
   const label = agent.label ?? agent.agentId.slice(0, 8);
-  const hasPreview = !!(agent.outputPreview || agent.errorMessage);
+  const parsed = React.useMemo(
+    () => parseOutput(agent.outputFull, agent.outputPreview),
+    [agent.outputFull, agent.outputPreview],
+  );
+  const hasPreview = !!(parsed || agent.errorMessage);
 
   return (
     <View>
@@ -143,14 +210,36 @@ export const WorkflowAgentRow = React.memo<Props>(function WorkflowAgentRow({
             >
               {agent.errorMessage}
             </Text>
-          ) : (
+          ) : parsed?.kind === "table" ? (
+            <View style={styles.table}>
+              {parsed.entries.map(([key, value]) => (
+                <View key={key} style={styles.tableRow}>
+                  <Text
+                    style={[styles.tableKey, { color: theme.colors.textSecondary }]}
+                  >
+                    {key}
+                  </Text>
+                  <View style={styles.tableValue}>
+                    {valueToLines(value).map((line, i) => (
+                      <Text
+                        key={i}
+                        style={[styles.previewText, { color: theme.colors.text }]}
+                      >
+                        {line}
+                      </Text>
+                    ))}
+                  </View>
+                </View>
+              ))}
+            </View>
+          ) : parsed ? (
             <Text
+              selectable
               style={[styles.previewText, { color: theme.colors.text }]}
-              numberOfLines={6}
             >
-              {agent.outputPreview}
+              {parsed.text}
             </Text>
-          )}
+          ) : null}
         </View>
       ) : null}
     </View>
@@ -213,5 +302,23 @@ const styles = StyleSheet.create({
     ...Typography.default("regular"),
     fontSize: 12,
     lineHeight: 16,
+  },
+  table: {
+    gap: 6,
+  },
+  tableRow: {
+    flexDirection: "row",
+    gap: 8,
+    alignItems: "flex-start",
+  },
+  tableKey: {
+    ...Typography.mono("regular"),
+    fontSize: 11,
+    width: 96,
+    flexShrink: 0,
+  },
+  tableValue: {
+    flex: 1,
+    gap: 1,
   },
 });
