@@ -666,6 +666,32 @@ function SessionInfoContent({ session }: { session: Session }) {
             </ItemGroup>
           )}
 
+        {/* Tool calls denied by Claude Code's permission system
+            (PermissionDenied hook, 2.1.157+). Distinct from Happy's own MCP
+            approval prompts shown under Agent State. Suppressed when none. */}
+        {session.metadata?.recentPermissionDenials &&
+          session.metadata.recentPermissionDenials.length > 0 && (
+            <ItemGroup title={t("sessionInfo.recentPermissionDenials")}>
+              {session.metadata.recentPermissionDenials
+                .slice(0, 10)
+                .map((denial, idx) => (
+                  <Item
+                    key={`${denial.toolName}-${denial.at}-${idx}`}
+                    title={denial.toolName}
+                    subtitle={`${denial.reason} · ${formatTimeAgo(denial.at)}`}
+                    icon={
+                      <Ionicons
+                        name="shield-outline"
+                        size={29}
+                        color="#FF9500"
+                      />
+                    }
+                    showChevron={false}
+                  />
+                ))}
+            </ItemGroup>
+          )}
+
         {/* Quick Actions */}
         <ItemGroup title={t("sessionInfo.quickActions")}>
           {session.metadata?.machineId && (

@@ -75,6 +75,16 @@ describe("buildHookSettings", () => {
     }
   });
 
+  it("subscribes observability hooks InstructionsLoaded / PermissionDenied / PostToolBatch (verified present in claude-code 2.1.157's HookEvent union)", () => {
+    const settings = buildHookSettings(9100);
+    const hooks = settings.hooks as Record<string, HookEntry[]>;
+    for (const key of ["InstructionsLoaded", "PermissionDenied", "PostToolBatch"]) {
+      expect(Array.isArray(hooks[key])).toBe(true);
+      // Reuses the single per-session forwarder exec entry, like every other hook.
+      expect(hooks[key][0]).toEqual(hooks.SessionStart[0]);
+    }
+  });
+
   it("never carries mcpServers (use --mcp-config instead)", () => {
     const settings = buildHookSettings(1);
     expect("mcpServers" in settings).toBe(false);

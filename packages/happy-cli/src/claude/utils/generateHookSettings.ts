@@ -113,6 +113,13 @@ export function buildHookSettings(port: number): Record<string, unknown> {
       FileChanged: hookEntry,
       WorktreeCreate: hookEntry,
       WorktreeRemove: hookEntry,
+      // Observability hooks verified present in claude-code 2.1.157's
+      // HookEvent union. Same fire-and-forget treatment: the forwarder ships
+      // each by name and startHookServer's dispatch table decides what to do.
+      // Unknown events on older CLIs are silently ignored.
+      InstructionsLoaded: hookEntry,
+      PermissionDenied: hookEntry,
+      PostToolBatch: hookEntry,
     },
   };
 }

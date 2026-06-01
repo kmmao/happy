@@ -28,6 +28,9 @@ type Calls = {
   fileChanged: Array<{ filePath: string; event: string }>;
   worktreeCreate: Array<{ name: string }>;
   worktreeRemove: Array<{ path: string }>;
+  instructionsLoaded: Array<{ filePath: string; memoryType: string }>;
+  permissionDenied: Array<{ toolName: string; reason: string }>;
+  postToolBatch: Array<{ count: number }>;
 };
 
 function newCalls(): Calls {
@@ -38,6 +41,9 @@ function newCalls(): Calls {
     fileChanged: [],
     worktreeCreate: [],
     worktreeRemove: [],
+    instructionsLoaded: [],
+    permissionDenied: [],
+    postToolBatch: [],
   };
 }
 
@@ -56,6 +62,18 @@ function optionsFor(calls: Calls): HookServerOptions {
       calls.worktreeCreate.push({ name: data.name }),
     onWorktreeRemove: (data) =>
       calls.worktreeRemove.push({ path: data.worktree_path }),
+    onInstructionsLoaded: (data) =>
+      calls.instructionsLoaded.push({
+        filePath: data.file_path,
+        memoryType: data.memory_type,
+      }),
+    onPermissionDenied: (data) =>
+      calls.permissionDenied.push({
+        toolName: data.tool_name,
+        reason: data.reason,
+      }),
+    onPostToolBatch: (data) =>
+      calls.postToolBatch.push({ count: data.tool_calls.length }),
   };
 }
 
@@ -125,6 +143,41 @@ describe("startHookServer dispatch", () => {
       { path: "/repos/foo/.worktrees/feature-x" },
     ]);
     expect(calls.sessionHook).toEqual([]);
+  });
+
+  it("routes InstructionsLoaded / PermissionDenied / PostToolBatch to their distinct callbacks (NOT the SessionStart fallback)", async () => {
+    const calls = newCalls();
+    server = await startHookServer(optionsFor(calls));
+
+    await postHook(server.port, {
+      hook_event_name: "InstructionsLoaded",
+      file_path: "/repo/CLAUDE.md",
+      memory_type: "Project",
+      load_reason: "session_start",
+    });
+    await postHook(server.port, {
+      hook_event_name: "PermissionDenied",
+      tool_name: "Bash",
+      tool_input: { command: "rm -rf /" },
+      tool_use_id: "tu_1",
+      reason: "blocked by deny rule",
+    });
+    await postHook(server.port, {
+      hook_event_name: "PostToolBatch",
+      tool_calls: [
+        { tool_name: "Read", tool_input: {}, tool_use_id: "a" },
+        { tool_name: "Grep", tool_input: {}, tool_use_id: "b" },
+      ],
+    });
+
+    expect(calls.instructionsLoaded).toEqual([
+      { filePath: "/repo/CLAUDE.md", memoryType: "Project" },
+    ]);
+    expect(calls.permissionDenied).toEqual([
+      { toolName: "Bash", reason: "blocked by deny rule" },
+    ]);
+    expect(calls.postToolBatch).toEqual([{ count: 2 }]);
+    expect(calls.sessionHook).toEqual([]); // critical: do not poison sessionId
   });
 
   it("falls through unknown event names to SessionStart (forward-compatible)", async () => {

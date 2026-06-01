@@ -895,6 +895,7 @@ export const zhHant: TranslationStructure = {
     fileEventAdd: "新增",
     fileEventChange: "修改",
     fileEventUnlink: "刪除",
+    recentPermissionDenials: "最近權限拒絕",
     happyHome: "Happy 主目錄",
     copyMetadata: "複製中繼資料",
     copyMetadataSubtitle: "複製原始會話中繼資料 JSON",

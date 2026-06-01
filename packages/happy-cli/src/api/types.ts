@@ -535,6 +535,18 @@ export type Metadata = {
     event: "change" | "add" | "unlink";
     at: number;
   }>;
+  /**
+   * Ring buffer of tool calls denied by Claude Code's permission system
+   * (PermissionDenied hook, claude-code 2.1.157+). Capped at 10 — denials are
+   * sparser than file changes. Most recent first. Distinct from AgentState's
+   * permission *requests*, which are Happy's own MCP-driven approval prompts;
+   * these are denials Claude made internally (deny rules, plan mode, etc.).
+   */
+  recentPermissionDenials?: Array<{
+    toolName: string;
+    reason: string;
+    at: number;
+  }>;
 };
 
 export type AgentState = {

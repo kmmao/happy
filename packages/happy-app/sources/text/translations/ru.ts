@@ -711,6 +711,7 @@ export const ru: TranslationStructure = {
     fileEventAdd: "Добавлен",
     fileEventChange: "Изменён",
     fileEventUnlink: "Удалён",
+    recentPermissionDenials: "Недавние отказы в доступе",
     happyHome: "Домашний каталог Happy",
     copyMetadata: "Копировать метаданные",
     copyMetadataSubtitle: "Скопировать сырой JSON метаданных сессии",

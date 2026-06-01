@@ -953,6 +953,7 @@ export const ca: TranslationStructure = {
     fileEventAdd: "Afegit",
     fileEventChange: "Modificat",
     fileEventUnlink: "Eliminat",
+    recentPermissionDenials: "Denegacions de permisos recents",
     happyHome: "Directori de Happy",
     copyMetadata: "Copia les metadades",
     copyMetadataSubtitle: "Copia el JSON brut de metadades de la sessió",

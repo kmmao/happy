@@ -1075,6 +1075,7 @@ export const ja: TranslationStructure = {
     fileEventAdd: "追加",
     fileEventChange: "変更",
     fileEventUnlink: "削除",
+    recentPermissionDenials: "最近の権限拒否",
     happyHome: "Happy Home",
     copyMetadata: "メタデータをコピー",
     copyMetadataSubtitle: "セッションの生メタデータJSONをコピー",

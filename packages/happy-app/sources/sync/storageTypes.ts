@@ -120,6 +120,18 @@ export const MetadataSchema = z.object({
       }),
     )
     .optional(),
+  // Tool calls denied by Claude Code's permission system (PermissionDenied
+  // hook, 2.1.157+). Mirrors the CLI Metadata schema. Capped at 10 by the CLI.
+  // Distinct from AgentState permission requests (Happy's own MCP prompts).
+  recentPermissionDenials: z
+    .array(
+      z.object({
+        toolName: z.string(),
+        reason: z.string(),
+        at: z.number(),
+      }),
+    )
+    .optional(),
 });
 
 export type Metadata = z.infer<typeof MetadataSchema>;

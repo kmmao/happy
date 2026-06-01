@@ -537,6 +537,44 @@ export async function runClaude(
         return { ...m, recentFileChanges: next };
       });
     },
+    // ── Observability hooks (Claude Code 2.1.157+) ─────────────────────────
+    // InstructionsLoaded / PostToolBatch are logged only — surfacing them in
+    // the App would need metadata + UI + i18n, deferred pending a product
+    // decision. PermissionDenied IS surfaced end-to-end (writes metadata).
+    onInstructionsLoaded: (data) => {
+      logger.debug(
+        `[START] InstructionsLoaded: ${data.memory_type} ${data.file_path} (${data.load_reason})`,
+      );
+    },
+    onPermissionDenied: (data) => {
+      if (!currentSession) return;
+      logger.debug(
+        `[START] PermissionDenied: ${data.tool_name} denied (${data.reason})`,
+      );
+      currentSession.client.updateMetadata((m) => {
+        const buf = m.recentPermissionDenials ?? [];
+        const head = buf[0];
+        // Collapse consecutive identical denials (same tool + reason) so a
+        // repeatedly-blocked tool doesn't flood the capped buffer.
+        if (
+          head &&
+          head.toolName === data.tool_name &&
+          head.reason === data.reason
+        ) {
+          return m;
+        }
+        const next = [
+          { toolName: data.tool_name, reason: data.reason, at: Date.now() },
+          ...buf,
+        ].slice(0, 10);
+        return { ...m, recentPermissionDenials: next };
+      });
+    },
+    onPostToolBatch: (data) => {
+      logger.debug(
+        `[START] PostToolBatch: ${data.tool_calls?.length ?? 0} tool call(s) resolved`,
+      );
+    },
   });
   logger.debug(`[START] Hook server started on port ${hookServer.port}`);
 

@@ -122,6 +122,58 @@ export interface WorktreeRemoveHookData {
     [key: string]: unknown;
 }
 
+// ─── Observability hooks (verified present in @anthropic-ai/claude-code ────
+// 2.1.157's HookEvent union). Field shapes mirror the SDK *HookInput types
+// verbatim — snake_case on the wire. We receive them out of band like the
+// session-state hooks above; the dispatch table routes each by name.
+
+/**
+ * Fired when a memory / instructions file (CLAUDE.md, .claude/rules/*.md, an
+ * `@`-include, etc.) is loaded into context. `load_reason` says why.
+ */
+export interface InstructionsLoadedHookData {
+    hook_event_name: 'InstructionsLoaded';
+    session_id?: string;
+    file_path: string;
+    memory_type: 'User' | 'Project' | 'Local' | 'Managed';
+    load_reason: 'session_start' | 'nested_traversal' | 'path_glob_match' | 'include' | 'compact';
+    globs?: string[];
+    trigger_file_path?: string;
+    parent_file_path?: string;
+    [key: string]: unknown;
+}
+
+/** Fired when a tool call is denied by the permission system. */
+export interface PermissionDeniedHookData {
+    hook_event_name: 'PermissionDenied';
+    session_id?: string;
+    tool_name: string;
+    tool_input: unknown;
+    tool_use_id: string;
+    reason: string;
+    [key: string]: unknown;
+}
+
+/** A single resolved tool call inside a PostToolBatch payload. */
+export interface PostToolBatchToolCall {
+    tool_name: string;
+    tool_input: unknown;
+    tool_use_id: string;
+    tool_response?: unknown;
+}
+
+/**
+ * Fired exactly once after every tool call in a batch has resolved, before
+ * the next model request. (PostToolUse fires per-tool and may run
+ * concurrently for parallel calls; PostToolBatch fires once with the lot.)
+ */
+export interface PostToolBatchHookData {
+    hook_event_name: 'PostToolBatch';
+    session_id?: string;
+    tool_calls: PostToolBatchToolCall[];
+    [key: string]: unknown;
+}
+
 export interface HookServerOptions {
     /** Called when a session hook is received with a valid session ID */
     onSessionHook: (sessionId: string, data: SessionHookData) => void;
@@ -136,6 +188,12 @@ export interface HookServerOptions {
     onWorktreeCreate?: (data: WorktreeCreateHookData) => void;
     /** Called when Claude removes a managed worktree (Claude Code 2.1.157+, optional). */
     onWorktreeRemove?: (data: WorktreeRemoveHookData) => void;
+    /** Called when an instructions / memory file is loaded (Claude Code 2.1.157+, optional). */
+    onInstructionsLoaded?: (data: InstructionsLoadedHookData) => void;
+    /** Called when a tool call is denied by the permission system (Claude Code 2.1.157+, optional). */
+    onPermissionDenied?: (data: PermissionDeniedHookData) => void;
+    /** Called once after a batch of tool calls resolves (Claude Code 2.1.157+, optional). */
+    onPostToolBatch?: (data: PostToolBatchHookData) => void;
 }
 
 export interface HookServer {
@@ -159,6 +217,9 @@ export async function startHookServer(options: HookServerOptions): Promise<HookS
         onFileChanged,
         onWorktreeCreate,
         onWorktreeRemove,
+        onInstructionsLoaded,
+        onPermissionDenied,
+        onPostToolBatch,
     } = options;
 
     async function parseBody(req: IncomingMessage): Promise<Record<string, unknown> | null> {
@@ -221,6 +282,9 @@ export async function startHookServer(options: HookServerOptions): Promise<HookS
         FileChanged: (data) => onFileChanged?.(data as FileChangedHookData),
         WorktreeCreate: (data) => onWorktreeCreate?.(data as WorktreeCreateHookData),
         WorktreeRemove: (data) => onWorktreeRemove?.(data as WorktreeRemoveHookData),
+        InstructionsLoaded: (data) => onInstructionsLoaded?.(data as InstructionsLoadedHookData),
+        PermissionDenied: (data) => onPermissionDenied?.(data as PermissionDeniedHookData),
+        PostToolBatch: (data) => onPostToolBatch?.(data as PostToolBatchHookData),
     };
 
     return new Promise((resolve, reject) => {

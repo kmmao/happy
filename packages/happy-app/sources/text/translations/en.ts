@@ -952,6 +952,7 @@ export const en: TranslationStructure = {
     fileEventAdd: "Added",
     fileEventChange: "Modified",
     fileEventUnlink: "Deleted",
+    recentPermissionDenials: "Recent Permission Denials",
     happyHome: "Happy Home",
     copyMetadata: "Copy Metadata",
     copyMetadataSubtitle: "Copy raw session metadata JSON",
