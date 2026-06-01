@@ -12,6 +12,10 @@ This monorepo contains multiple packages, each with its own changelog:
 
 ## Recent Highlights
 
+### 2026-06-02
+
+- **happy-cli 0.88.1** — Three more Claude Code 2.1.x hooks (`InstructionsLoaded`, `PermissionDenied`, `PostToolBatch`, verified against 2.1.157's `HookEvent` type) wired through the hook server with hand-mirrored payload types (no agent-sdk dependency). `PermissionDenied` is surfaced end-to-end: a capped, head-deduped `recentPermissionDenials` ring buffer in `session.metadata`, rendered as a "Recent Permission Denials" list on the App's Session Info screen (App UI shipped in code, pending an App release).
+
 ### 2026-05-31
 
 - **happy-cli 0.87.0 + happy-app 2.36.0** — Claude Code 2.1.x hook surface integration. CLI now subscribes to `CwdChanged`, `FileChanged`, `WorktreeCreate`, and `WorktreeRemove` (Claude Code 2.1.121+/2.1.157+) and surfaces them through `session.metadata` — no new wire envelope. App shows Claude's live working directory as a third chat-header line, and adds Worktree Activity + Recent File Changes sections to Session Info. Hook injection also switched to Claude Code 2.1.139+ exec form (no more shell parsing in the hook command), and happy's MCP servers now ride with `alwaysLoad: true` so they survive Claude's tool-search deferral across `/clear` and plan-mode swaps.

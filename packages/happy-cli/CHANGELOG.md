@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.88.1 - 2026-06-02
+
+Three more Claude Code 2.1.x hook events wired through the hook server, with tool-permission denials surfaced to the App.
+
+- Subscribed `InstructionsLoaded`, `PermissionDenied`, and `PostToolBatch` in the generated `--settings` hook block. Event names and payload shapes were verified against Claude Code 2.1.157's `HookEvent` / `*HookInput` types; the payload interfaces are hand-mirrored (snake_case on the wire) with **no** `@anthropic-ai/claude-agent-sdk` dependency — the CLI drives Claude via PTY. The hook server's typed dispatch table routes each event by name; `InstructionsLoaded` and `PostToolBatch` are logged only for now.
+- Surfaced `PermissionDenied` through `session.metadata` (no new wire envelope): `recentPermissionDenials` keeps a head-deduped ring buffer (capped at 10) of tool calls that Claude's own permission system denied — distinct from Happy's MCP-driven approval prompts in `agentState`. The App renders these as a "Recent Permission Denials" list on the Session Info screen.
+
 ## 0.87.0 - 2026-05-31
 
 Claude Code 2.1.x hook surface — happy now subscribes to four new session-state hooks and tightens the existing two-hook injection. Sessions started against Claude Code 2.1.121+ will surface live working-directory changes, file activity, and Claude-managed worktree events all the way through to the App; older CLIs ignore the extra hook keys and keep working unchanged.
