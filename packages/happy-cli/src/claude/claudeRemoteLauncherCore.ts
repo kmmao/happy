@@ -54,6 +54,7 @@ import {
   getWorkflowsRoot,
 } from "@/workflow/workflowDirDiscovery";
 import { WorkflowRunWatcher } from "@/workflow/workflowRunWatcher";
+import { parseWorkflowMeta } from "@/workflow/workflowMeta";
 import { hashObject } from "@/utils/deterministicJson";
 import { getProjectPath } from "./utils/path";
 import { readFile, writeFile, mkdir } from "node:fs/promises";
@@ -984,6 +985,106 @@ export async function claudeRemoteLauncher(
     },
   });
 
+  /**
+   * Handle a foreground (caller.type === "direct") Workflow tool call.
+   *
+   * Unlike background workflow tasks — which arrive as `task_started` /
+   * `task_notification` system messages and are handled in onMessage's
+   * task-* branches — a direct Workflow call surfaces only as a plain
+   * assistant `tool_use` block keyed by its tool_use_id. The SDK never emits
+   * a `local_workflow` task for it, so without this path the App's
+   * `workflowRuns` slice stays empty and the Progress panel shows nothing.
+   *
+   * We emit workflow-run-start immediately (so the card appears even before
+   * any sub-agent runs), then try to locate the runtime's wf_<id> directory.
+   * The directory is created asynchronously while the workflow executes, so
+   * a single synchronous scan usually misses; we retry on a short timer and
+   * attach the journal watcher once it appears. If it never resolves, the
+   * run still renders as a start→end shell with no per-agent rows.
+   */
+  function handleDirectWorkflowStart(
+    toolUseId: string,
+    input: unknown,
+  ): void {
+    if (activeWorkflowRuns.has(toolUseId)) return;
+    const startedAt = Date.now();
+    const meta = parseWorkflowMeta(input);
+    // runId defaults to the toolUseId; replaced with the real wf_<id> once
+    // the run directory resolves. The App reducer keys runs by runId, so the
+    // initial run-start and a later directory-based correlation must agree —
+    // hence we keep emitting under this id and only attach the watcher (which
+    // emits agent events under the same id) after resolution.
+    const runId = toolUseId;
+    activeWorkflowRuns.set(toolUseId, {
+      workflowName: meta.name,
+      description: meta.description,
+      toolUseId,
+      startedAt,
+      runId,
+    });
+    const startEnvelope = buildProtocolMessage("agent", {
+      t: "workflow-run-start",
+      runId,
+      toolUseId,
+      name: meta.name,
+      description: meta.description,
+      startedAt,
+    });
+    session.client.sendSessionProtocolMessage(startEnvelope as any);
+
+    // Poll for the wf_<id> dir for a few seconds. The watcher emits
+    // workflow-agent-* events under the SAME runId we already announced.
+    const sessionId = session.sessionId;
+    if (!sessionId) return;
+    const root = getWorkflowsRoot(sessionId, process.cwd());
+    let attempts = 0;
+    const maxAttempts = 10; // ~5s at 500ms
+    const timer = setInterval(() => {
+      attempts++;
+      // Bail if the run already ended (tool_result arrived first).
+      if (!activeWorkflowRuns.has(toolUseId)) {
+        clearInterval(timer);
+        return;
+      }
+      const dir = findRecentRunDir(root, startedAt);
+      if (dir) {
+        clearInterval(timer);
+        workflowWatcher.start(toolUseId, runId, dir);
+        logger.debug(
+          `[workflow] direct call ${toolUseId} (${meta.name}): attached watcher at ${dir}`,
+        );
+      } else if (attempts >= maxAttempts) {
+        clearInterval(timer);
+        logger.debug(
+          `[workflow] direct call ${toolUseId} (${meta.name}): no wf_* run dir resolved under ${root}; agent events suppressed`,
+        );
+      }
+    }, 500);
+    timer.unref?.();
+  }
+
+  /**
+   * Close a direct Workflow run when its tool_result lands. Stops the watcher
+   * (flushing any pending agent-end events first) and emits workflow-run-end.
+   */
+  function handleDirectWorkflowEnd(toolUseId: string, isError: boolean): void {
+    const tracked = activeWorkflowRuns.get(toolUseId);
+    if (!tracked) return;
+    activeWorkflowRuns.delete(toolUseId);
+    const { agentCount } = workflowWatcher.stop(toolUseId);
+    const endedAt = Date.now();
+    const endEnvelope = buildProtocolMessage("agent", {
+      t: "workflow-run-end",
+      runId: tracked.runId,
+      status: isError ? "errored" : "completed",
+      agentCount,
+      totalTokens: 0,
+      durationMs: endedAt - tracked.startedAt,
+      endedAt,
+    });
+    session.client.sendSessionProtocolMessage(endEnvelope as any);
+  }
+
   function onMessage(message: ClaudeJsonlMessage) {
     // A parsed JSONL message is one liveness source for the stranded-turn
     // watchdog (the load-bearing one is raw PTY byte activity — see
@@ -1605,6 +1706,19 @@ export async function claudeRemoteLauncher(
             ongoingToolCalls.set(c.id!, {
               parentToolCallId: umessage.parent_tool_use_id ?? null,
             });
+            // Workflow protocol — a foreground (caller.type === "direct")
+            // Workflow tool call surfaces as a plain assistant tool_use, NOT
+            // as a `task_started` background task, so the local_workflow
+            // branch below never fires for it. Recognize it here so the
+            // Progress panel lights up: emit workflow-run-start now and tail
+            // the runtime's journal once its wf_<id> dir appears on disk.
+            if (
+              c.name === "Workflow" &&
+              c.id &&
+              !umessage.parent_tool_use_id
+            ) {
+              handleDirectWorkflowStart(c.id, c.input);
+            }
           }
         }
       }
@@ -1618,6 +1732,10 @@ export async function claudeRemoteLauncher(
           if (c.type === "tool_result" && c.tool_use_id) {
             ongoingToolCalls.delete(c.tool_use_id);
             releaseIds.push(c.tool_use_id);
+            // Workflow protocol — close the direct-call workflow run when its
+            // tool_result lands (mirrors the task_notification → run-end path
+            // used for background workflow tasks).
+            handleDirectWorkflowEnd(c.tool_use_id, c.is_error === true);
           }
         }
       }
