@@ -62,6 +62,8 @@ export interface WorkflowAgentState {
   parallelGroupId?: string;
   /** First ~500 chars of the prompt passed to agent(). */
   promptPreview?: string;
+  /** Model id from the agent's SDK transcript (e.g. claude-haiku-4-5). */
+  model?: string;
   /** True when agent() was called with a schema option. */
   hasSchema?: boolean;
   /** First ~500 chars of agent return value (text or JSON.stringified). */

@@ -722,7 +722,7 @@ export const en = {
     workflowAgentCount: ({ n }: { n: number }) =>
       `${n} agent${n === 1 ? "" : "s"}`,
     workflowTokensUsed: ({ n }: { n: number }) => `${n.toLocaleString()} tokens`,
-    workflowTokensInline: ({ n }: { n: number }) => `${n} tok`,
+    workflowTokensInline: ({ n }: { n: number | string }) => `${n} tok`,
     workflowEmpty: "No workflow runs yet",
     progressTodoNudgeLabel: "Verification suggested",
     progressSummaryRefreshLabel: "Update",

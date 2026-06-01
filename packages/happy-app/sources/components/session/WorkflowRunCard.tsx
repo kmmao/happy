@@ -124,14 +124,27 @@ export const WorkflowRunCard = React.memo<Props>(function WorkflowRunCard({
         </Text>
       ) : null}
 
-      {run.phases.map((phase) => (
+      {run.phases.map((phase) => {
+        const doneCount = phase.agentIds.filter(
+          (aid) => run.agents[aid] && run.agents[aid]!.status !== "running",
+        ).length;
+        return (
         <View key={`${phase.title}-${phase.index}`} style={styles.phaseBlock}>
-          <Text
-            style={[styles.phaseTitle, { color: theme.colors.text }]}
-            numberOfLines={1}
-          >
-            {phase.title}
-          </Text>
+          <View style={styles.phaseHeader}>
+            <Text
+              style={[styles.phaseTitle, { color: theme.colors.text }]}
+              numberOfLines={1}
+            >
+              {phase.title}
+            </Text>
+            {phase.agentIds.length > 0 ? (
+              <Text
+                style={[styles.phaseCount, { color: theme.colors.textSecondary }]}
+              >
+                {`${doneCount}/${phase.agentIds.length}`}
+              </Text>
+            ) : null}
+          </View>
           {phase.agentIds.length === 0 ? (
             <Text
               style={[styles.muted, { color: theme.colors.textSecondary }]}
@@ -152,7 +165,8 @@ export const WorkflowRunCard = React.memo<Props>(function WorkflowRunCard({
             })
           )}
         </View>
-      ))}
+        );
+      })}
 
       {looseAgentIds.length > 0 ? (
         <View style={styles.looseBlock}>
@@ -219,9 +233,20 @@ const styles = StyleSheet.create({
     marginTop: 6,
     gap: 2,
   },
+  phaseHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 8,
+  },
   phaseTitle: {
     ...Typography.default("semiBold"),
     fontSize: 12,
+    flex: 1,
+  },
+  phaseCount: {
+    ...Typography.mono("regular"),
+    fontSize: 10,
   },
   looseBlock: {
     marginTop: 6,

@@ -44,6 +44,17 @@ function formatDuration(ms: number): string {
   return s > 0 ? `${m}m ${s}s` : `${m}m`;
 }
 
+/** Compact token count: 35900 → "35.9k", 950 → "950". */
+function formatTokenCount(n: number): string {
+  if (n < 1000) return `${n}`;
+  return `${(n / 1000).toFixed(1)}k`;
+}
+
+/** Strip the trailing date suffix from a model id: claude-haiku-4-5-20251001 → claude-haiku-4-5. */
+function formatModel(model: string): string {
+  return model.replace(/-\d{6,}$/, "");
+}
+
 export const WorkflowAgentRow = React.memo<Props>(function WorkflowAgentRow({
   agent,
   nowMs,
@@ -75,6 +86,14 @@ export const WorkflowAgentRow = React.memo<Props>(function WorkflowAgentRow({
         >
           {label}
         </Text>
+        {agent.model ? (
+          <Text
+            style={[styles.model, { color: theme.colors.textSecondary }]}
+            numberOfLines={1}
+          >
+            {formatModel(agent.model)}
+          </Text>
+        ) : null}
         <Text
           style={[styles.duration, { color: theme.colors.textSecondary }]}
           numberOfLines={1}
@@ -87,7 +106,7 @@ export const WorkflowAgentRow = React.memo<Props>(function WorkflowAgentRow({
             numberOfLines={1}
           >
             {t("session.workflowTokensInline", {
-              n: agent.tokens.input + agent.tokens.output,
+              n: formatTokenCount(agent.tokens.input + agent.tokens.output),
             })}
           </Text>
         ) : null}
@@ -140,6 +159,10 @@ const styles = StyleSheet.create({
     ...Typography.default("regular"),
     fontSize: 13,
     flex: 1,
+  },
+  model: {
+    ...Typography.mono("regular"),
+    fontSize: 10,
   },
   duration: {
     ...Typography.mono("regular"),

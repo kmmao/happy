@@ -144,6 +144,7 @@ function handleAgentStart(
     parentAgentId: event.parentAgentId,
     parallelGroupId: event.parallelGroupId,
     promptPreview: event.promptPreview,
+    model: event.model,
     hasSchema: event.hasSchema,
   };
   const nextRun: WorkflowRunState = {
@@ -175,6 +176,7 @@ function handleAgentEnd(
         durationMs: event.durationMs,
         outputPreview: event.outputPreview ?? existingAgent.outputPreview,
         errorMessage: event.errorMessage ?? existingAgent.errorMessage,
+        model: event.model ?? existingAgent.model,
         tokens: event.tokens ?? existingAgent.tokens,
       }
     : {
@@ -185,6 +187,7 @@ function handleAgentEnd(
         durationMs: event.durationMs,
         outputPreview: event.outputPreview,
         errorMessage: event.errorMessage,
+        model: event.model,
         tokens: event.tokens,
       };
   const wasInOrder = existingAgent !== undefined;

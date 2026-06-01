@@ -851,7 +851,7 @@ export const ja: TranslationStructure = {
     workflowPendingPhase: "待機中",
     workflowAgentCount: ({ n }: { n: number }) => `${n} エージェント`,
     workflowTokensUsed: ({ n }: { n: number }) => `${n.toLocaleString()} トークン`,
-    workflowTokensInline: ({ n }: { n: number }) => `${n} tok`,
+    workflowTokensInline: ({ n }: { n: number | string }) => `${n} tok`,
     workflowEmpty: "workflow の実行はまだありません",
     progressTodoNudgeLabel: "検証推奨",
     progressSummaryRefreshLabel: "更新",

@@ -696,7 +696,7 @@ export const zhHant: TranslationStructure = {
     workflowPendingPhase: "待開始",
     workflowAgentCount: ({ n }: { n: number }) => `${n} 個 agent`,
     workflowTokensUsed: ({ n }: { n: number }) => `${n.toLocaleString()} tokens`,
-    workflowTokensInline: ({ n }: { n: number }) => `${n} tok`,
+    workflowTokensInline: ({ n }: { n: number | string }) => `${n} tok`,
     workflowEmpty: "暫無 workflow 執行",
     progressTodoNudgeLabel: "建議驗證",
     progressSummaryRefreshLabel: "更新",

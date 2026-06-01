@@ -12,6 +12,10 @@ interface CapturedEvent {
   agentId: string;
   outputPreview?: string;
   durationMs?: number;
+  label?: string;
+  promptPreview?: string;
+  model?: string;
+  tokens?: { input: number; output: number; cacheRead?: number; cacheWrite?: number };
 }
 
 describe("WorkflowRunWatcher", () => {
@@ -28,10 +32,10 @@ describe("WorkflowRunWatcher", () => {
     journalPath = path.join(runDir, "journal.jsonl");
     captured = [];
     watcher = new WorkflowRunWatcher({
-      onAgentStart: (taskId, runId, agentId) => {
-        captured.push({ kind: "start", taskId, runId, agentId });
+      onAgentStart: (taskId, runId, agentId, _startedAt, label, promptPreview) => {
+        captured.push({ kind: "start", taskId, runId, agentId, label, promptPreview });
       },
-      onAgentEnd: (taskId, runId, agentId, outputPreview, durationMs) => {
+      onAgentEnd: (taskId, runId, agentId, outputPreview, durationMs, _endedAt, model, tokens) => {
         captured.push({
           kind: "end",
           taskId,
@@ -39,6 +43,8 @@ describe("WorkflowRunWatcher", () => {
           agentId,
           outputPreview,
           durationMs,
+          model,
+          tokens,
         });
       },
     });
@@ -155,6 +161,69 @@ describe("WorkflowRunWatcher", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it("sources label/promptPreview on start and model/tokens on end from agent-<id>.jsonl", () => {
+    const agentId = "a7c67f4";
+    const prompt =
+      "调研 happy-app 的结构,找出 workflow 卡片相关组件。请尽量详细。第二句应被截断。";
+    fs.writeFileSync(
+      path.join(runDir, `agent-${agentId}.jsonl`),
+      [
+        JSON.stringify({ type: "user", message: { content: prompt } }),
+        JSON.stringify({
+          type: "assistant",
+          message: {
+            model: "claude-haiku-4-5",
+            usage: {
+              input_tokens: 1000,
+              output_tokens: 200,
+              cache_read_input_tokens: 50,
+              cache_creation_input_tokens: 30,
+            },
+          },
+        }),
+        JSON.stringify({
+          type: "assistant",
+          message: {
+            model: "claude-haiku-4-5",
+            usage: { input_tokens: 500, output_tokens: 100 },
+          },
+        }),
+      ].join("\n"),
+    );
+
+    watcher.start("task-1", "wf_test", runDir);
+    flushAndStop("task-1", [
+      `{"type":"started","key":"v2:k1","agentId":"${agentId}"}`,
+      `{"type":"result","key":"v2:k1","agentId":"${agentId}","result":"done"}`,
+    ]);
+
+    const start = captured.find((e) => e.kind === "start" && e.agentId === agentId);
+    expect(start?.label).toBe("调研 happy-app 的结构,找出 workflow 卡片相关组件。");
+    expect(start?.promptPreview).toBe(prompt);
+
+    const end = captured.find((e) => e.kind === "end" && e.agentId === agentId);
+    expect(end?.model).toBe("claude-haiku-4-5");
+    expect(end?.tokens).toEqual({
+      input: 1500,
+      output: 300,
+      cacheRead: 50,
+      cacheWrite: 30,
+    });
+  });
+
+  it("returns empty meta when the agent transcript is missing", () => {
+    watcher.start("task-1", "wf_test", runDir);
+    flushAndStop("task-1", [
+      '{"type":"started","key":"v2:k1","agentId":"no-file"}',
+      '{"type":"result","key":"v2:k1","agentId":"no-file","result":"x"}',
+    ]);
+    const start = captured.find((e) => e.kind === "start" && e.agentId === "no-file");
+    expect(start?.label).toBeUndefined();
+    const end = captured.find((e) => e.kind === "end" && e.agentId === "no-file");
+    expect(end?.model).toBeUndefined();
+    expect(end?.tokens).toBeUndefined();
   });
 
   it("shutdown drops in-flight runs without further emission", () => {

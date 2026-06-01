@@ -176,6 +176,30 @@ describe("workflow-agent-start", () => {
     expect(runs.wf_demo.agents.a1.parallelGroupId).toBe("group-a");
   });
 
+  it("records label on start and model/tokens on end", () => {
+    let runs: WorkflowRunsMap = applyWorkflowEvent(EMPTY_WORKFLOW_RUNS, runStart());
+    runs = applyWorkflowEvent(
+      runs,
+      agentStart({ agentId: "a1", label: "调研 happy-app" }),
+    );
+    expect(runs.wf_demo.agents.a1.label).toBe("调研 happy-app");
+    runs = applyWorkflowEvent(
+      runs,
+      agentEnd({
+        agentId: "a1",
+        model: "claude-haiku-4-5",
+        tokens: { input: 1500, output: 300, cacheRead: 50, cacheWrite: 30 },
+      }),
+    );
+    expect(runs.wf_demo.agents.a1.model).toBe("claude-haiku-4-5");
+    expect(runs.wf_demo.agents.a1.tokens).toEqual({
+      input: 1500,
+      output: 300,
+      cacheRead: 50,
+      cacheWrite: 30,
+    });
+  });
+
   it("attaches agentId to the matching phase when event.phase is set", () => {
     let runs: WorkflowRunsMap = applyWorkflowEvent(EMPTY_WORKFLOW_RUNS, runStart());
     runs = applyWorkflowEvent(runs, phaseStart({ title: "调研" }));

@@ -270,6 +270,8 @@ export const sessionWorkflowAgentStartEventSchema = z.object({
   promptPreview: z.string().max(500),
   /** True when agent() was called with a schema option. */
   hasSchema: z.boolean(),
+  /** Model id from the agent's SDK transcript (e.g. claude-haiku-4-5). */
+  model: z.string().optional(),
   startedAt: z.number(),
 });
 
@@ -278,6 +280,8 @@ export const sessionWorkflowAgentEndEventSchema = z.object({
   runId: z.string(),
   agentId: z.string(),
   status: z.enum(["completed", "errored", "skipped"]),
+  /** Model id from the agent's SDK transcript (e.g. claude-haiku-4-5). */
+  model: z.string().optional(),
   tokens: workflowTokenStatsSchema.optional(),
   durationMs: z.number(),
   /** First ~500 chars of agent return value (text or JSON.stringified). */

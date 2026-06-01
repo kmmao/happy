@@ -731,7 +731,7 @@ export const ca: TranslationStructure = {
       `${n} agent${n === 1 ? "" : "s"}`,
     workflowTokensUsed: ({ n }: { n: number }) =>
       `${n.toLocaleString()} tokens`,
-    workflowTokensInline: ({ n }: { n: number }) => `${n} tok`,
+    workflowTokensInline: ({ n }: { n: number | string }) => `${n} tok`,
     workflowEmpty: "Encara no hi ha execucions de workflow",
     progressTodoNudgeLabel: "Verificació suggerida",
     progressSummaryRefreshLabel: "Actualitza",

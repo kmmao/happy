@@ -1039,20 +1039,30 @@ export async function claudeRemoteLauncher(
    * timer is unref'd inside the watcher so it never blocks process exit.
    */
   const workflowWatcher = new WorkflowRunWatcher({
-    onAgentStart: (_taskId, runId, agentId, startedAt) => {
+    onAgentStart: (_taskId, runId, agentId, startedAt, label, promptPreview) => {
       const envelope = createEnvelope("agent", {
         t: "workflow-agent-start",
         runId,
         agentId,
-        // promptPreview / hasSchema not yet sourced (PR 2c). Empty string
-        // satisfies the wire schema's `.max(500)` constraint.
-        promptPreview: "",
+        // label / promptPreview sourced from the agent's SDK transcript by the
+        // watcher; both may be undefined if the transcript isn't readable yet.
+        ...(label ? { label } : {}),
+        promptPreview: promptPreview ?? "",
         hasSchema: false,
         startedAt,
       });
       session.client.sendSessionProtocolMessage(envelope);
     },
-    onAgentEnd: (_taskId, runId, agentId, outputPreview, durationMs, endedAt) => {
+    onAgentEnd: (
+      _taskId,
+      runId,
+      agentId,
+      outputPreview,
+      durationMs,
+      endedAt,
+      model,
+      tokens,
+    ) => {
       const envelope = createEnvelope("agent", {
         t: "workflow-agent-end",
         runId,
@@ -1062,6 +1072,8 @@ export async function claudeRemoteLauncher(
         status: "completed",
         durationMs,
         outputPreview,
+        ...(model ? { model } : {}),
+        ...(tokens ? { tokens } : {}),
         endedAt,
       });
       session.client.sendSessionProtocolMessage(envelope);
