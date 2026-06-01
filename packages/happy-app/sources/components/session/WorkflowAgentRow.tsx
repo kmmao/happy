@@ -79,44 +79,53 @@ export const WorkflowAgentRow = React.memo<Props>(function WorkflowAgentRow({
         accessibilityRole={hasPreview ? "button" : undefined}
         accessibilityLabel={label}
       >
-        <Ionicons name={icon} size={14} color={iconColor} />
-        <Text
-          style={[styles.label, { color: theme.colors.text }]}
-          numberOfLines={1}
-        >
-          {label}
-        </Text>
-        {agent.model ? (
-          <Text
-            style={[styles.model, { color: theme.colors.textSecondary }]}
-            numberOfLines={1}
-          >
-            {formatModel(agent.model)}
-          </Text>
-        ) : null}
-        <Text
-          style={[styles.duration, { color: theme.colors.textSecondary }]}
-          numberOfLines={1}
-        >
-          {formatDuration(elapsedMs)}
-        </Text>
-        {agent.tokens ? (
-          <Text
-            style={[styles.tokens, { color: theme.colors.textSecondary }]}
-            numberOfLines={1}
-          >
-            {t("session.workflowTokensInline", {
-              n: formatTokenCount(agent.tokens.input + agent.tokens.output),
-            })}
-          </Text>
-        ) : null}
-        {hasPreview ? (
-          <Ionicons
-            name={expanded ? "chevron-down" : "chevron-forward"}
-            size={12}
-            color={theme.colors.textSecondary}
-          />
-        ) : null}
+        <Ionicons name={icon} size={14} color={iconColor} style={styles.icon} />
+        <View style={styles.body}>
+          <View style={styles.labelLine}>
+            <Text
+              style={[styles.label, { color: theme.colors.text }]}
+              numberOfLines={2}
+            >
+              {label}
+            </Text>
+            {hasPreview ? (
+              <Ionicons
+                name={expanded ? "chevron-down" : "chevron-forward"}
+                size={12}
+                color={theme.colors.textSecondary}
+                style={styles.chevron}
+              />
+            ) : null}
+          </View>
+          {/* Meta moves to a wrapping sub-row so a long label never squeezes
+              model/duration/token off-screen. */}
+          <View style={styles.metaLine}>
+            {agent.model ? (
+              <Text
+                style={[styles.model, { color: theme.colors.textSecondary }]}
+                numberOfLines={1}
+              >
+                {formatModel(agent.model)}
+              </Text>
+            ) : null}
+            <Text
+              style={[styles.duration, { color: theme.colors.textSecondary }]}
+              numberOfLines={1}
+            >
+              {formatDuration(elapsedMs)}
+            </Text>
+            {agent.tokens ? (
+              <Text
+                style={[styles.tokens, { color: theme.colors.textSecondary }]}
+                numberOfLines={1}
+              >
+                {t("session.workflowTokensInline", {
+                  n: formatTokenCount(agent.tokens.input + agent.tokens.output),
+                })}
+              </Text>
+            ) : null}
+          </View>
+        </View>
       </Pressable>
       {expanded && hasPreview ? (
         <View
@@ -151,14 +160,35 @@ export const WorkflowAgentRow = React.memo<Props>(function WorkflowAgentRow({
 const styles = StyleSheet.create({
   row: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
     gap: 8,
     paddingVertical: 4,
+  },
+  icon: {
+    marginTop: 2,
+  },
+  body: {
+    flex: 1,
+    gap: 2,
+  },
+  labelLine: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 6,
+  },
+  chevron: {
+    marginTop: 3,
   },
   label: {
     ...Typography.default("regular"),
     fontSize: 13,
     flex: 1,
+  },
+  metaLine: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "center",
+    gap: 8,
   },
   model: {
     ...Typography.mono("regular"),
