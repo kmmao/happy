@@ -210,10 +210,20 @@ export async function claudeRemoteLauncher(
   // genuinely working refreshes lastClaudeOutputAt via the spinner's sub-second
   // PTY bytes within ~300ms, so it never accumulates even this much idle. Re-
   // delivery is double-execution safe here (zero output = nothing ran), so we
-  // recover in ~40s instead of paying the full 120s general threshold on every
+  // recover in ~90s instead of paying the full 120s general threshold on every
   // wedged turn — the user-visible "very slow / no response" on large sessions
   // where the wedge recurred on every turn (~140s lost each).
-  const WATCHDOG_WEDGE_RECOVER_MS = 30_000;
+  //
+  // Why 90s (was 30s): Opus 4.x in "超高" (extended thinking, [1m] budget) mode
+  // can sit silent for 60–90s while the API processes the thinking phase before
+  // emitting any PTY bytes. The former 30s threshold caused false-positive wedge
+  // detections that re-delivered the prompt mid-thinking, surfacing as a duplicate
+  // response or a confusing "Aborted" right before Claude answered (observed in
+  // pid-47807: sdk_call→first_response=75022ms with tier-1 recovery at 49s).
+  // A real submission wedge (prompt stuck in the TUI composer, Claude never
+  // received it) still has zero PTY echo bytes, so 90s still catches it while
+  // giving the API enough headroom for extended-thinking first-token latency.
+  const WATCHDOG_WEDGE_RECOVER_MS = 90_000;
   // Post-write submission-wedge check (armed at the moment each prompt is
   // written, see onPromptWritten). A normal submit echoes the pasted prompt
   // back as raw PTY bytes within milliseconds; a wedge produces zero echo and

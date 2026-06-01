@@ -140,11 +140,23 @@ export async function createSessionScanner(opts: {
             }
         }
 
-        // Update watchers for all sessions
+        // Update watchers for all sessions.
+        // Existence-gated: a brand-new session's JSONL file doesn't exist until
+        // Claude writes its first message. Attempting to watch a non-existent file
+        // causes `fs.watch` to throw ENOENT on every iteration, flooding the log
+        // with per-second "[FILE_WATCHER] Watch error: ENOENT … restarting watcher"
+        // entries for the entire first-turn wait (observed in 46924).
+        // The periodic poll below is the fallback that catches the file once it
+        // appears; the watcher is then armed on the next scanner cycle.
         for (let p of sessions) {
             if (!watchers.has(p)) {
-                logger.debug(`[SESSION_SCANNER] Starting watcher for session: ${p}`);
-                watchers.set(p, startFileWatcher(join(projectDir, `${p}.jsonl`), () => { sync.invalidate(); }));
+                const jsonlPath = join(projectDir, `${p}.jsonl`);
+                if (existsSync(jsonlPath)) {
+                    logger.debug(`[SESSION_SCANNER] Starting watcher for session: ${p}`);
+                    watchers.set(p, startFileWatcher(jsonlPath, () => { sync.invalidate(); }));
+                }
+                // else: file not yet written; periodic poll will catch it and
+                // the watcher will be started on the next scanner cycle.
             }
         }
 
