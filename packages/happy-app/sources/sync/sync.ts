@@ -517,7 +517,7 @@ class Sync {
         log.log(
           `💬 Restored ${cached.messages.length} cached messages for ${sessionId} (trimmed: ${cached.isTrimmed})`,
         );
-      } else if (this.cursors.has(sessionId)) {
+      } else if (this.cursors.peekSeq(sessionId) > 0) {
         // lastSeq exists but no cache (e.g. first launch after feature rollout)
         // Reset to 0 to force full re-fetch, otherwise history would be missing.
         // Clear any stale backfill boundary too — the tail range it claims to

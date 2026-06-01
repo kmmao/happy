@@ -158,4 +158,27 @@ describe("SessionMessageCursorRegistry (single owner)", () => {
     reg.seed("s1", 5); // lower → no-op
     expect(reg.get("s1").lastSeq()).toBe(20);
   });
+
+  describe("peekSeq (read without creating a cursor)", () => {
+    it("returns the persisted seed when no cursor has been created yet", () => {
+      const reg = new SessionMessageCursorRegistry(
+        vi.fn(),
+        new Map([["s1", 30]]),
+      );
+      // peek must not create a cursor — only seeds exist here.
+      expect(reg.peekSeq("s1")).toBe(30);
+      expect(reg.has("s1")).toBe(false);
+    });
+
+    it("returns the live cursor's latest seq once created and advanced", () => {
+      const reg = new SessionMessageCursorRegistry(vi.fn());
+      reg.get("s1").advanceTo(42);
+      expect(reg.peekSeq("s1")).toBe(42);
+    });
+
+    it("returns 0 when neither a cursor nor a seed exists", () => {
+      const reg = new SessionMessageCursorRegistry(vi.fn());
+      expect(reg.peekSeq("unknown")).toBe(0);
+    });
+  });
 });

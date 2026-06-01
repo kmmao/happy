@@ -150,6 +150,14 @@ export class SessionMessageCursorRegistry {
     return this.cursors.has(sessionId);
   }
 
+  /** Highest known seq for a session without creating a cursor — checks the
+   *  live cursor first, then the persisted seed. Returns 0 if neither exists. */
+  peekSeq(sessionId: string): number {
+    const cursor = this.cursors.get(sessionId);
+    if (cursor) return cursor.lastSeq();
+    return this.seeds.get(sessionId) ?? 0;
+  }
+
   /** Seed (or reset) a session's seq before its cursor is first read — used when
    *  re-hydrating from cache. No-op if the cursor already exists and is ahead. */
   seed(sessionId: string, seq: number): void {
