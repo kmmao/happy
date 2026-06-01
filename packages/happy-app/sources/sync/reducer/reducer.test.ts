@@ -2961,6 +2961,7 @@ describe('reducer', () => {
         // Helper: create a task-start NormalizedMessage
         function taskStart(taskId: string, description: string, opts?: {
             id?: string; createdAt?: number; toolUseId?: string;
+            taskType?: string | null; workflowName?: string | null;
         }): NormalizedMessage {
             return {
                 id: opts?.id ?? `ts-${taskId}`,
@@ -2973,7 +2974,8 @@ describe('reducer', () => {
                     taskId,
                     toolUseId: opts?.toolUseId ?? null,
                     description,
-                    taskType: null,
+                    taskType: opts?.taskType ?? null,
+                    workflowName: opts?.workflowName ?? null,
                 },
             };
         }
@@ -3128,6 +3130,27 @@ describe('reducer', () => {
 
             const entry = state.backgroundTasks.get('bg-1');
             expect(entry!.status).toBe('completed');
+        });
+
+        it('should carry workflowName and taskType from task-start into the registry', () => {
+            const state = createReducer();
+            reducer(state, [taskStart('wf-1', 'Reviewing changes', {
+                taskType: 'workflow',
+                workflowName: 'review-changes',
+            })]);
+
+            const entry = state.backgroundTasks.get('wf-1');
+            expect(entry!.taskType).toBe('workflow');
+            expect(entry!.workflowName).toBe('review-changes');
+        });
+
+        it('defaults taskType and workflowName to null for non-workflow tasks', () => {
+            const state = createReducer();
+            reducer(state, [taskStart('bg-1', 'Running npm start')]);
+
+            const entry = state.backgroundTasks.get('bg-1');
+            expect(entry!.taskType).toBeNull();
+            expect(entry!.workflowName).toBeNull();
         });
 
         it('should mark failed from task-end', () => {

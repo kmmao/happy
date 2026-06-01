@@ -149,6 +149,7 @@ export const pl: TranslationStructure = {
     error: "błąd",
     online: "online",
     ready: "gotowy",
+    workflow: "wykonywanie przepływu pracy",
     offline: "offline",
     lastSeen: ({ time }: { time: string }) => `ostatnio widziano ${time}`,
     permissionRequired: "wymagane uprawnienie",

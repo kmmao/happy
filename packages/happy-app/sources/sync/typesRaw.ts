@@ -903,6 +903,7 @@ export type NormalizedMessage = (
     toolUseId: string | null;
     description: string;
     taskType: string | null;
+    workflowName: string | null;
   };
   /** Present on task-progress messages to update background task status.
    *  Only emitted when envelope.ev.summary is non-empty (guard in normalizer). */
@@ -995,6 +996,7 @@ function normalizeSessionEnvelopeCore(
         toolUseId: envelope.ev.toolUseId ?? null,
         description: envelope.ev.description,
         taskType: envelope.ev.taskType ?? null,
+        workflowName: envelope.ev.workflowName ?? null,
       },
     } satisfies NormalizedMessage;
   }

@@ -137,6 +137,7 @@ export const en = {
     error: "error",
     online: "online",
     ready: "ready",
+    workflow: "running workflow",
     offline: "offline",
     lastSeen: ({ time }: { time: string }) => `last seen ${time}`,
     permissionRequired: "permission required",

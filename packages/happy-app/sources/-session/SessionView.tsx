@@ -99,6 +99,7 @@ import {
   useIsTablet,
 } from "@/utils/responsive";
 import {
+  applyRunningWorkflowStatus,
   getSessionAvatarId,
   getSessionName,
   getSessionProviderKey,
@@ -929,7 +930,17 @@ function SessionViewInner({
     ? modelMode.key
     : (session.pinnedModelId ?? session.metadata?.currentModelCode ?? modelMode?.key);
 
-  const sessionStatus = useSessionStatus(session);
+  const baseSessionStatus = useSessionStatus(session);
+  // A running background Workflow overrides the idle/thinking status so the
+  // user can tell a workflow is in progress (see applyRunningWorkflowStatus).
+  const hasRunningWorkflow = React.useMemo(
+    () => backgroundTasks.some((task) => task.isWorkflow),
+    [backgroundTasks],
+  );
+  const sessionStatus = React.useMemo(
+    () => applyRunningWorkflowStatus(baseSessionStatus, hasRunningWorkflow),
+    [baseSessionStatus, hasRunningWorkflow],
+  );
   const modelSummaryRpcState = React.useMemo(
     () =>
       resolveSessionRpcVisualState({

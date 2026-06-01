@@ -136,6 +136,7 @@ export const ca: TranslationStructure = {
     error: "error",
     online: "en línia",
     ready: "preparat",
+    workflow: "executant flux de treball",
     offline: "fora de línia",
     lastSeen: ({ time }: { time: string }) => `vist per última vegada ${time}`,
     permissionRequired: "permís requerit",

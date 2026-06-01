@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import {
+    applyRunningWorkflowStatus,
     formatApiRetryStatus,
     getLatestUserRequestPreview,
     getSessionProviderDisplayLabel,
@@ -8,6 +9,7 @@ import {
     formatPathRelativeToHome,
     isSessionRunning,
     shouldClearQueuedMessagesOnTransition,
+    type SessionStatus,
 } from './sessionUtils';
 import { Session } from '@/sync/storageTypes';
 import { Message } from '@/sync/typesMessage';
@@ -17,6 +19,7 @@ vi.mock('@/text', () => ({
     t: (key: string, params?: Record<string, unknown>) => {
         const translations: Record<string, string | ((params?: Record<string, unknown>) => string)> = {
             'status.unknown': 'Unknown',
+            'status.workflow': 'running workflow',
             'session.startedByDaemon': 'daemon',
             'session.startedByTerminal': 'Terminal',
             'agentInput.agent.codex': 'Codex',
@@ -392,6 +395,44 @@ describe('sessionUtils', () => {
             } as Partial<Session>);
 
             expect(getSessionStatusState(session)).toBe('needs_attention');
+        });
+    });
+
+    describe('applyRunningWorkflowStatus', () => {
+        function baseStatus(state: SessionStatus['state']): SessionStatus {
+            return {
+                state,
+                isConnected: true,
+                statusText: 'base',
+                shouldShowStatus: state !== 'waiting',
+                statusColor: '#000',
+                statusDotColor: '#000',
+            };
+        }
+
+        it('overrides waiting (ready) with the workflow status', () => {
+            const result = applyRunningWorkflowStatus(baseStatus('waiting'), true);
+            expect(result.state).toBe('workflow');
+            expect(result.statusText).toBe('running workflow');
+            expect(result.shouldShowStatus).toBe(true);
+            expect(result.isPulsing).toBe(true);
+        });
+
+        it('overrides thinking with the workflow status', () => {
+            const result = applyRunningWorkflowStatus(baseStatus('thinking'), true);
+            expect(result.state).toBe('workflow');
+        });
+
+        it('does not override when no workflow is running', () => {
+            const status = baseStatus('waiting');
+            expect(applyRunningWorkflowStatus(status, false)).toBe(status);
+        });
+
+        it('never overrides states that need user attention or a connection', () => {
+            for (const state of ['permission_required', 'needs_attention', 'disconnected'] as const) {
+                const status = baseStatus(state);
+                expect(applyRunningWorkflowStatus(status, true)).toBe(status);
+            }
         });
     });
 });

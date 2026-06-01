@@ -136,6 +136,7 @@ export const es: TranslationStructure = {
     error: "error",
     online: "en línea",
     ready: "listo",
+    workflow: "ejecutando flujo de trabajo",
     offline: "desconectado",
     lastSeen: ({ time }: { time: string }) => `visto por última vez ${time}`,
     permissionRequired: "permiso requerido",

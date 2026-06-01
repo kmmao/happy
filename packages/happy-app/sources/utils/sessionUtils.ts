@@ -15,7 +15,8 @@ export type SessionState =
   | "thinking"
   | "waiting"
   | "permission_required"
-  | "needs_attention";
+  | "needs_attention"
+  | "workflow";
 
 export interface SessionStatus {
   state: SessionState;
@@ -255,6 +256,34 @@ export function useSessionStatus(session: Session): SessionStatus {
     shouldShowStatus: false,
     statusColor: "#34C759",
     statusDotColor: "#34C759",
+  };
+}
+
+/**
+ * Overlays a "workflow" status when one or more Workflow runs are executing in
+ * the background. A running workflow is the session's notable activity, so it
+ * takes precedence over the idle "waiting" (ready) and "thinking" states — but
+ * never over states that demand the user's attention (permission_required /
+ * needs_attention) or a lost connection (disconnected).
+ */
+export function applyRunningWorkflowStatus(
+  status: SessionStatus,
+  hasRunningWorkflow: boolean,
+): SessionStatus {
+  if (!hasRunningWorkflow) {
+    return status;
+  }
+  if (status.state !== "waiting" && status.state !== "thinking") {
+    return status;
+  }
+  return {
+    state: "workflow",
+    isConnected: true,
+    statusText: t("status.workflow"),
+    shouldShowStatus: true,
+    statusColor: "#5856D6",
+    statusDotColor: "#5856D6",
+    isPulsing: true,
   };
 }
 

@@ -816,6 +816,7 @@ export const ru: TranslationStructure = {
     error: "ошибка",
     online: "online",
     ready: "готов",
+    workflow: "выполняется рабочий процесс",
     offline: "offline",
     lastSeen: ({ time }: { time: string }) => `в сети ${time}`,
     permissionRequired: "требуется разрешение",

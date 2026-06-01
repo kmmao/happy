@@ -273,6 +273,7 @@ export const ja: TranslationStructure = {
     error: "エラー",
     online: "オンライン",
     ready: "準備完了",
+    workflow: "ワークフロー実行中",
     offline: "オフライン",
     lastSeen: ({ time }: { time: string }) => `最終アクセス: ${time}`,
     permissionRequired: "権限が必要です",

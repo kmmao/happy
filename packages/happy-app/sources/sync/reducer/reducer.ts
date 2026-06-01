@@ -137,6 +137,10 @@ export type BackgroundTaskEntry = {
   readonly startedAt: number;
   readonly status: "running" | "completed" | "failed" | "stopped";
   readonly summary: string | null;
+  /** task_type reported by Claude on task-start (e.g. "workflow", "subagent"). */
+  readonly taskType: string | null;
+  /** Workflow name when this background task is a Workflow run; null otherwise. */
+  readonly workflowName: string | null;
 };
 
 export type ReducerState = {
@@ -1075,6 +1079,7 @@ export function reducer(
                 bgTasksDirty = true;
               }
             } else {
+              const isWorkflowTool = message.tool.name === "Workflow";
               state.backgroundTasks.set(c.backgroundTaskId, {
                 taskId: c.backgroundTaskId,
                 toolUseId: null,
@@ -1085,6 +1090,9 @@ export function reducer(
                 startedAt: message.tool.startedAt ?? message.createdAt,
                 status: "running",
                 summary: null,
+                taskType: isWorkflowTool ? "workflow" : null,
+                workflowName: isWorkflowTool && typeof message.tool.input?.name === "string"
+                  ? message.tool.input.name : null,
               });
               bgTasksDirty = true;
             }
@@ -1122,7 +1130,7 @@ export function reducer(
 
     // task-start → create entry in backgroundTasks
     if (msg.taskStartInfo) {
-      const { taskId, toolUseId, description } = msg.taskStartInfo;
+      const { taskId, toolUseId, description, taskType, workflowName } = msg.taskStartInfo;
       const existing = state.backgroundTasks.get(taskId);
       if (existing) {
         // task-start activates the entry. Deliberately NOT routed through
@@ -1138,6 +1146,8 @@ export function reducer(
           toolUseId: toolUseId ?? existing.toolUseId,
           description,
           status: "running",
+          taskType: taskType ?? existing.taskType,
+          workflowName: workflowName ?? existing.workflowName,
         });
       } else {
         // Try to get command/outputFile from tool message if it was processed
@@ -1156,6 +1166,8 @@ export function reducer(
           startedAt: msg.createdAt,
           status: "running",
           summary: null,
+          taskType,
+          workflowName,
         });
       }
       bgTasksDirty = true;
@@ -1180,6 +1192,8 @@ export function reducer(
           startedAt: msg.createdAt,
           status: "running",
           summary: msg.taskProgressInfo.summary,
+          taskType: null,
+          workflowName: null,
         });
       }
       bgTasksDirty = true;

@@ -138,6 +138,7 @@ export const zhHant: TranslationStructure = {
     error: "錯誤",
     online: "線上",
     ready: "就緒",
+    workflow: "工作流程執行中",
     offline: "離線",
     lastSeen: ({ time }: { time: string }) => `最後活躍時間 ${time}`,
     permissionRequired: "需要權限",
