@@ -612,13 +612,17 @@ export async function claudeRemoteLauncher(
     }
   }
 
-  // Pre-fetch global world config (narrative/laws) for injection (non-blocking)
-  session.client.fetchWorldConfig().then((cfg) => {
-    if (cfg && (cfg.narrative || cfg.laws)) {
-      worldConfig = cfg;
-      logger.debug(`[world-config] Loaded narrative=${!!cfg.narrative}, laws=${!!cfg.laws}`);
-    }
-  }).catch(() => {});
+  // Pre-fetch global world config (narrative/laws) for injection (non-blocking).
+  // Gated by knowledgeEnabled: world-config is part of the knowledge-base feature
+  // and should not generate any server requests when the user has disabled it.
+  if (knowledgeEnabled) {
+    session.client.fetchWorldConfig().then((cfg) => {
+      if (cfg && (cfg.narrative || cfg.laws)) {
+        worldConfig = cfg;
+        logger.debug(`[world-config] Loaded narrative=${!!cfg.narrative}, laws=${!!cfg.laws}`);
+      }
+    }).catch(() => {});
+  }
 
   // Pre-fetch knowledge context for injection (non-blocking)
   if (knowledgeEnabled) {
