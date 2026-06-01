@@ -214,103 +214,6 @@ export const sessionTaskLogEventSchema = z.object({
   offset: z.number(),
 });
 
-// ---- Workflow events (协议级 Workflow 子结构) ----
-// Claude Code 的 Workflow 工具会派生子 agent 树（phase / parallel / pipeline）。
-// 现有 task-* 只承载线性 lifecycle，无法表达层级；新增 workflow-* 系列。
-
-export const workflowTokenStatsSchema = z.object({
-  input: z.number(),
-  output: z.number(),
-  cacheRead: z.number().optional(),
-  cacheWrite: z.number().optional(),
-});
-
-export const sessionWorkflowRunStartEventSchema = z.object({
-  t: z.literal("workflow-run-start"),
-  /** Workflow runtime run id (e.g. wf_xxxxx). */
-  runId: z.string(),
-  /** Outer Workflow tool-use id; ties the run back to the message stream. */
-  toolUseId: z.string(),
-  /** meta.name from the script. */
-  name: z.string(),
-  /** meta.description from the script. */
-  description: z.string(),
-  /** Pre-declared phases from meta.phases. Runtime may emit phase-start
-   *  events with titles outside this list (no enforced relation). */
-  phases: z
-    .array(z.object({ title: z.string(), detail: z.string().optional() }))
-    .optional(),
-  startedAt: z.number(),
-});
-
-export const sessionWorkflowPhaseStartEventSchema = z.object({
-  t: z.literal("workflow-phase-start"),
-  runId: z.string(),
-  /** 0-based index in observed phase order (NOT meta.phases index). */
-  index: z.number(),
-  title: z.string(),
-  startedAt: z.number(),
-});
-
-export const sessionWorkflowAgentStartEventSchema = z.object({
-  t: z.literal("workflow-agent-start"),
-  runId: z.string(),
-  /** Stable id derived from transcript filename agent-<id>.jsonl. */
-  agentId: z.string(),
-  /** agent() opts.label if provided. */
-  label: z.string().optional(),
-  /** Phase title at time of dispatch, when inside phase(). */
-  phase: z.string().optional(),
-  /** For nested workflow() calls — the parent workflow's agentId. */
-  parentAgentId: z.string().optional(),
-  /** Siblings spawned by the same parallel() / pipeline() call share an id.
-   *  Convention: id of the first agent in the group. */
-  parallelGroupId: z.string().optional(),
-  /** First ~500 chars of the agent prompt. */
-  promptPreview: z.string().max(500),
-  /** True when agent() was called with a schema option. */
-  hasSchema: z.boolean(),
-  /** Model id from the agent's SDK transcript (e.g. claude-haiku-4-5). */
-  model: z.string().optional(),
-  startedAt: z.number(),
-});
-
-export const sessionWorkflowAgentEndEventSchema = z.object({
-  t: z.literal("workflow-agent-end"),
-  runId: z.string(),
-  agentId: z.string(),
-  status: z.enum(["completed", "errored", "skipped"]),
-  /** Model id from the agent's SDK transcript (e.g. claude-haiku-4-5). */
-  model: z.string().optional(),
-  tokens: workflowTokenStatsSchema.optional(),
-  durationMs: z.number(),
-  /** First ~500 chars of agent return value (text or JSON.stringified). */
-  outputPreview: z.string().max(500).optional(),
-  /** Full agent result when the CLI could source it from the agent transcript
-   *  (the last StructuredOutput tool input, or the final assistant text).
-   *  Capped to bound payload size; the App renders this in the expanded row,
-   *  parsing JSON into a key/value table when possible. */
-  outputFull: z.string().max(16384).optional(),
-  errorMessage: z.string().optional(),
-  endedAt: z.number(),
-});
-
-export const sessionWorkflowRunEndEventSchema = z.object({
-  t: z.literal("workflow-run-end"),
-  runId: z.string(),
-  status: z.enum(["completed", "errored", "aborted"]),
-  agentCount: z.number(),
-  totalTokens: z.number(),
-  durationMs: z.number(),
-  endedAt: z.number(),
-});
-
-export type WorkflowTokenStats = z.infer<typeof workflowTokenStatsSchema>;
-export type SessionWorkflowRunStartEvent = z.infer<typeof sessionWorkflowRunStartEventSchema>;
-export type SessionWorkflowPhaseStartEvent = z.infer<typeof sessionWorkflowPhaseStartEventSchema>;
-export type SessionWorkflowAgentStartEvent = z.infer<typeof sessionWorkflowAgentStartEventSchema>;
-export type SessionWorkflowAgentEndEvent = z.infer<typeof sessionWorkflowAgentEndEventSchema>;
-export type SessionWorkflowRunEndEvent = z.infer<typeof sessionWorkflowRunEndEventSchema>;
 
 export const sessionContextUsageEventSchema = z.object({
   t: z.literal("context-usage"),
@@ -354,12 +257,6 @@ export const sessionEventSchema = z.discriminatedUnion("t", [
   sessionStateChangedEventSchema,
   sessionContextUsageEventSchema,
   sessionTaskLogEventSchema,
-  // ---- workflow-* ----
-  sessionWorkflowRunStartEventSchema,
-  sessionWorkflowPhaseStartEventSchema,
-  sessionWorkflowAgentStartEventSchema,
-  sessionWorkflowAgentEndEventSchema,
-  sessionWorkflowRunEndEventSchema,
 ]);
 
 export type SessionEvent = z.infer<typeof sessionEventSchema>;
@@ -432,12 +329,7 @@ export const sessionEnvelopeSchema = z
         envelope.ev.t === "needs-continue" ||
         envelope.ev.t === "session-state-changed" ||
         envelope.ev.t === "context-usage" ||
-        envelope.ev.t === "task-log" ||
-        envelope.ev.t === "workflow-run-start" ||
-        envelope.ev.t === "workflow-phase-start" ||
-        envelope.ev.t === "workflow-agent-start" ||
-        envelope.ev.t === "workflow-agent-end" ||
-        envelope.ev.t === "workflow-run-end") &&
+        envelope.ev.t === "task-log") &&
       envelope.role !== "agent"
     ) {
       ctx.addIssue({
@@ -502,12 +394,7 @@ export const sessionEnvelopeSchemaPermissive = z
         envelope.ev.t === "needs-continue" ||
         envelope.ev.t === "session-state-changed" ||
         envelope.ev.t === "context-usage" ||
-        envelope.ev.t === "task-log" ||
-        envelope.ev.t === "workflow-run-start" ||
-        envelope.ev.t === "workflow-phase-start" ||
-        envelope.ev.t === "workflow-agent-start" ||
-        envelope.ev.t === "workflow-agent-end" ||
-        envelope.ev.t === "workflow-run-end") &&
+        envelope.ev.t === "task-log") &&
       envelope.role !== "agent"
     ) {
       ctx.addIssue({

@@ -44,7 +44,7 @@
     "@fastify/multipart": "^10.0.0",
     "@fastify/rate-limit": "^10.3.0",
     "@fastify/websocket": "^11.2.0",
-    "@kmmao/happy-wire": "^0.25.2",
+    "@kmmao/happy-wire": "^0.26.0",
     "@prisma/adapter-pg": "^7.7.0",
     "@prisma/client": "^7.7.0",
     "@socket.io/redis-streams-adapter": "^0.2.2",
