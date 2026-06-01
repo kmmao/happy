@@ -1778,6 +1778,67 @@ describe('Zod Transform - WOLOG Content Normalization', () => {
             }
         });
 
+        it('normalizes workflow-run-start (agent role, NO turn) into a workflowEvent', () => {
+            // Regression: workflow envelopes are role "agent" with NO turn (they
+            // drive the parallel workflowRuns slice, not chat). The no-turn drop
+            // guard must exempt them, or the Progress card never populates.
+            const normalized = normalizeRawMessage('wf-1', null, 1, {
+                role: 'session',
+                content: {
+                    id: 'wf-env-1',
+                    time: 1,
+                    role: 'agent',
+                    // intentionally NO turn — matches what the CLI emits
+                    ev: {
+                        t: 'workflow-run-start',
+                        runId: 'toolu_x',
+                        toolUseId: 'toolu_x',
+                        name: 'survey-monorepo',
+                        description: 'desc',
+                        startedAt: 1,
+                    },
+                },
+            } as any);
+
+            expect(normalized).toBeTruthy();
+            expect(normalized?.workflowEvent).toMatchObject({
+                t: 'workflow-run-start',
+                runId: 'toolu_x',
+                name: 'survey-monorepo',
+            });
+            // Workflow events render no chat content.
+            if (normalized && normalized.role === 'agent') {
+                expect(normalized.content).toEqual([]);
+            }
+        });
+
+        it('normalizes workflow-run-end (agent role, NO turn) into a workflowEvent', () => {
+            const normalized = normalizeRawMessage('wf-2', null, 1, {
+                role: 'session',
+                content: {
+                    id: 'wf-env-2',
+                    time: 1,
+                    role: 'agent',
+                    ev: {
+                        t: 'workflow-run-end',
+                        runId: 'toolu_x',
+                        status: 'completed',
+                        agentCount: 8,
+                        totalTokens: 0,
+                        durationMs: 1000,
+                        endedAt: 2,
+                    },
+                },
+            } as any);
+
+            expect(normalized).toBeTruthy();
+            expect(normalized?.workflowEvent).toMatchObject({
+                t: 'workflow-run-end',
+                runId: 'toolu_x',
+                status: 'completed',
+            });
+        });
+
         it('normalizes thinking text events', () => {
             const normalized = normalizeRawMessage('db-2', null, 1, {
                 ...base,

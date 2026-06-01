@@ -966,12 +966,27 @@ function normalizeSessionEnvelopeCore(
   // Session protocol requires turn id on most agent-originated envelopes.
   // Drop malformed agent events without turn to avoid attaching stray messages.
   // Exception: task lifecycle events (task-start/progress/end) may arrive without
-  // a turn (e.g. manual task-end from idle stopTask fallback).
+  // a turn (e.g. manual task-end from idle stopTask fallback). Workflow envelope
+  // events are likewise turn-independent — they drive the parallel workflowRuns
+  // slice (Progress panel), not chat content, and the CLI emits them with
+  // role "agent" but no turn. Without this exemption they'd be dropped here and
+  // the Progress card would never populate ("暂无 workflow 运行").
   const isTaskLifecycleEvent =
     envelope.ev.t === "task-start" ||
     envelope.ev.t === "task-progress" ||
     envelope.ev.t === "task-end";
-  if (envelope.role === "agent" && !envelope.turn && !isTaskLifecycleEvent) {
+  const isWorkflowEvent =
+    envelope.ev.t === "workflow-run-start" ||
+    envelope.ev.t === "workflow-run-end" ||
+    envelope.ev.t === "workflow-phase-start" ||
+    envelope.ev.t === "workflow-agent-start" ||
+    envelope.ev.t === "workflow-agent-end";
+  if (
+    envelope.role === "agent" &&
+    !envelope.turn &&
+    !isTaskLifecycleEvent &&
+    !isWorkflowEvent
+  ) {
     return null;
   }
 
