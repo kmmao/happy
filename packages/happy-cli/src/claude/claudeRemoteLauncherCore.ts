@@ -256,6 +256,11 @@ export async function claudeRemoteLauncher(
   let inFlightPrompt: { message: string; mode: EnhancedMode } | null = null;
   let turnProducedOutput = false;
   let strandRedeliverCount = 0;
+  // Wall-clock when the current watchdog started (= turn start). Used to
+  // measure total elapsed thinking time independent of lastClaudeOutputAt,
+  // which a live PTY spinner keeps refreshing — masking deep extended-thinking
+  // hangs from the existing idle-based strand detector.
+  let turnStartedAt = 0;
 
   const strandDiagState = (): string => {
     const snap = executionGuard.getSnapshot();
@@ -277,6 +282,7 @@ export async function claudeRemoteLauncher(
     // detector then aborts the just-started turn — surfacing to the user as a
     // spurious "Aborted by user" the moment the turn begins.
     lastClaudeOutputAt = Date.now();
+    turnStartedAt = Date.now();
     turnWatchdog = setInterval(() => {
       const snap = executionGuard.getSnapshot();
       if (snap.state !== "running") return;
@@ -284,6 +290,7 @@ export async function claudeRemoteLauncher(
       // pending MCP elicitation explains the silence without being a strand.
       if (ongoingToolCalls.size > 0 || pendingElicitations.size > 0) return;
       const idleMs = Date.now() - lastClaudeOutputAt;
+      const elapsedMs = Date.now() - turnStartedAt;
       // Fast wedge recovery: turn produced no output AND the PTY has been silent
       // since it started — the prompt never submitted. Recover well before the
       // general threshold (a working turn's spinner bytes keep idleMs tiny, so
@@ -298,6 +305,47 @@ export async function claudeRemoteLauncher(
         );
         void recoverStrandedTurn(idleMs);
         return;
+      }
+      // Extended-thinking hang detection.
+      //
+      // Problem: Opus with --effort xhigh / [1m] thinking budget keeps the PTY
+      // spinner running (refreshing lastClaudeOutputAt via onPtyActivity), so the
+      // idle-based strand detector never fires. But the user has seen zero chat
+      // output for potentially many minutes — this happens when the API call is
+      // queued or slow at a proxy (e.g. a One-API relay with high RTT). The
+      // session appears "dead" from the App's perspective.
+      //
+      // Fix: track wall-clock elapsed since turn START (independent of
+      // lastClaudeOutputAt). When no JSONL output has arrived but the turn has
+      // been alive for a long time, emit heartbeat events so the App can show
+      // "still thinking (Nm elapsed)" to the user. If we reach 5 minutes with
+      // still no JSONL, force a tier-1 interrupt — the API is almost certainly
+      // hung or rate-limited; re-delivery is safe because zero JSONL means
+      // nothing has executed.
+      if (!turnProducedOutput && idleMs < WATCHDOG_WEDGE_RECOVER_MS) {
+        if (elapsedMs >= 5 * 60_000 && !strandRecoveryInFlight) {
+          logger.debug(
+            `[remote][strand] extended-thinking hang — no JSONL output after ${elapsedMs}ms (PTY spinner active). Forcing recovery. ${strandDiagState()}`,
+          );
+          void recoverStrandedTurn(elapsedMs);
+          return;
+        }
+        // Heartbeat at 2m and 4m so the App can show "still thinking…".
+        // Use modular arithmetic against the tick interval so we fire once
+        // per threshold crossing, not every tick after it.
+        const hbThresholds = [2 * 60_000, 4 * 60_000];
+        for (const t of hbThresholds) {
+          if (elapsedMs >= t && elapsedMs < t + WATCHDOG_TICK_MS) {
+            const elapsedMin = Math.round(elapsedMs / 60_000);
+            logger.debug(
+              `[remote][strand] extended-thinking in progress — no JSONL output after ${elapsedMs}ms. Sending heartbeat. ${strandDiagState()}`,
+            );
+            session.client.sendSessionEvent({
+              type: "message",
+              message: `Still thinking… (${elapsedMin}m elapsed)`,
+            });
+          }
+        }
       }
       if (idleMs < WATCHDOG_IDLE_WARN_MS) return;
       if (idleMs >= WATCHDOG_IDLE_RECOVER_MS && !strandRecoveryInFlight) {
