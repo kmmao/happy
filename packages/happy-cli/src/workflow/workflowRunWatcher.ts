@@ -2,16 +2,25 @@
  * Polls each active workflow run's progress JSON snapshot and emits
  * structured phase- and agent-level events as the runtime rewrites it.
  *
- * Primary data source — the runtime's incrementally-rewritten snapshot:
+ * Primary (authoritative) data source — the runtime's progress snapshot:
  *   <session>/workflows/wf_<id>.json
  * (read via readWorkflowProgress). It carries the real opts.label, phase
  * grouping, model, token totals, and per-agent state — so labels/phases are
  * exact rather than guessed from transcripts.
  *
- * Fallback data source — the append-only journal (and per-agent jsonl
- * transcripts) used by older Claude Code versions that don't write the
- * snapshot. When the snapshot file is absent, poll() degrades to the journal
- * reader + readAgentMeta so we still surface (lower-fidelity) labels.
+ * IMPORTANT timing note: this snapshot is NOT necessarily written live. On
+ * the observed Claude Code build it only lands near run completion (the
+ * journal had started/result entries ~90s before the snapshot file appeared).
+ * The journal, by contrast, lacks any phase or opts.label data and only
+ * yields a 60-char prompt headline. Because the App reducer is start-once
+ * (a later, better agent-start is dropped as a duplicate), letting the
+ * journal emit FIRST would permanently poison the run with prompt-headline
+ * labels and no phase grouping — exactly the bug this avoids.
+ *
+ * So: during the run we WAIT for the snapshot rather than emit from the
+ * journal. The journal is used ONLY as a last resort, and ONLY at the final
+ * stop() poll, when the snapshot never appeared at all (older Claude Code
+ * that doesn't write it). readAgentMeta backs that fallback path.
  *
  * State machine, per run:
  *   start(taskId, runId, runDir)
@@ -118,6 +127,10 @@ interface ActiveRun {
   agentStates: Map<string, AgentEmitState>;
   /** Most recent observed agent count (snapshot length or fallback size). */
   agentCount: number;
+  /** True once the progress snapshot has been read successfully at least
+   *  once. Gates the journal last-resort so it never poisons a run whose
+   *  snapshot simply arrives late. */
+  sawProgress: boolean;
 }
 
 const POLL_INTERVAL_MS = 600;
@@ -255,6 +268,7 @@ export class WorkflowRunWatcher {
       emittedPhases: new Set(),
       agentStates: new Map(),
       agentCount: 0,
+      sawProgress: false,
     });
     this.ensurePolling();
   }
@@ -270,7 +284,7 @@ export class WorkflowRunWatcher {
   stop(taskId: string): { agentCount: number } {
     const run = this.runs.get(taskId);
     if (!run) return { agentCount: 0 };
-    this.poll(run);
+    this.poll(run, true);
     const result = { agentCount: run.agentCount };
     this.runs.delete(taskId);
     if (this.runs.size === 0 && this.pollTimer) {
@@ -304,12 +318,19 @@ export class WorkflowRunWatcher {
     this.pollTimer.unref?.();
   }
 
-  private poll(run: ActiveRun): void {
+  private poll(run: ActiveRun, isFinal = false): void {
     const snapshot = readWorkflowProgress(run.progressPath);
     if (snapshot) {
+      run.sawProgress = true;
       this.pollProgress(run, snapshot);
-    } else {
-      // Fallback: older Claude Code that only writes journal.jsonl.
+      return;
+    }
+    // No snapshot yet. During the run we WAIT — emitting from the journal now
+    // would lock in prompt-headline labels with no phase (the reducer can't be
+    // corrected once an agent has started). The journal is a last resort used
+    // only at the final stop() poll, and only when the snapshot never appeared
+    // (older Claude Code that doesn't write it).
+    if (isFinal && !run.sawProgress) {
       this.pollJournal(run);
     }
   }

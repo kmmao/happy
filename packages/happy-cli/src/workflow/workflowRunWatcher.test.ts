@@ -174,28 +174,30 @@ describe("WorkflowRunWatcher", () => {
     expect(ends[0].outputPreview).toBeUndefined();
   });
 
-  it("processes only new lines on subsequent polls", () => {
+  it("defers the journal fallback to stop() — timer polls never emit from it", () => {
+    // The journal is a last resort: with no progress snapshot present, timer
+    // polls during the run must NOT emit (emitting prompt-headline labels with
+    // no phase would poison the start-once reducer). Only stop()'s final poll
+    // flushes the journal.
     vi.useFakeTimers();
     try {
       watcher.start("task-1", "wf_test", runDir);
       fs.writeFileSync(
         journalPath,
-        '{"type":"started","key":"v2:k1","agentId":"a1"}\n',
+        [
+          '{"type":"started","key":"v2:k1","agentId":"a1"}',
+          '{"type":"result","key":"v2:k1","agentId":"a1","result":"done"}',
+        ].join("\n"),
       );
-      // Trigger one poll cycle manually via private timer
-      vi.advanceTimersByTime(700);
-      expect(captured.filter((e) => e.kind === "start")).toHaveLength(1);
+      // Several timer polls — still nothing, because the snapshot never showed
+      // up and this isn't the final poll.
+      vi.advanceTimersByTime(2000);
+      expect(captured).toHaveLength(0);
 
-      // Append a result; should fire on next poll without re-emitting start
-      fs.appendFileSync(
-        journalPath,
-        '{"type":"result","key":"v2:k1","agentId":"a1","result":"done"}\n',
-      );
-      vi.advanceTimersByTime(700);
+      // The final stop() poll flushes the journal as a last resort.
+      watcher.stop("task-1");
       expect(captured.filter((e) => e.kind === "start")).toHaveLength(1);
       expect(captured.filter((e) => e.kind === "end")).toHaveLength(1);
-
-      watcher.stop("task-1");
     } finally {
       vi.useRealTimers();
     }
@@ -473,5 +475,55 @@ describe("WorkflowRunWatcher — progress JSON snapshot source", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it("never falls back to the journal once a snapshot was seen (no poisoning)", () => {
+    // Snapshot present AND a journal with a different agent also present. The
+    // snapshot must win and the journal agent must never leak in — even after
+    // a transient snapshot read miss before stop().
+    fs.writeFileSync(
+      progressPath,
+      JSON.stringify({
+        workflowProgress: [
+          {
+            type: "workflow_agent",
+            agentId: "snap1",
+            label: "analyze:happy-cli",
+            phaseTitle: "Analyze",
+            state: "done",
+            tokens: 10,
+          },
+        ],
+      }),
+    );
+    fs.writeFileSync(
+      path.join(runDir, "journal.jsonl"),
+      [
+        '{"type":"started","key":"v2:k1","agentId":"jrnl"}',
+        '{"type":"result","key":"v2:k1","agentId":"jrnl","result":"x"}',
+      ].join("\n"),
+    );
+
+    vi.useFakeTimers();
+    try {
+      watcher.start("task-1", "wf_test", runDir);
+      // A timer poll reads the snapshot → sawProgress latches.
+      vi.advanceTimersByTime(700);
+      // Now the file vanishes mid-rewrite right before the final poll.
+      fs.rmSync(progressPath);
+      watcher.stop("task-1");
+    } finally {
+      vi.useRealTimers();
+    }
+
+    const starts = captured.filter((e) => e.kind === "start");
+    expect(starts).toHaveLength(1);
+    expect(starts[0]).toMatchObject({
+      agentId: "snap1",
+      label: "analyze:happy-cli",
+      phase: "Analyze",
+    });
+    // The journal agent "jrnl" must not appear.
+    expect(starts.find((s) => s.agentId === "jrnl")).toBeUndefined();
   });
 });
