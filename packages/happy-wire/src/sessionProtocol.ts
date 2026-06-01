@@ -286,6 +286,11 @@ export const sessionWorkflowAgentEndEventSchema = z.object({
   durationMs: z.number(),
   /** First ~500 chars of agent return value (text or JSON.stringified). */
   outputPreview: z.string().max(500).optional(),
+  /** Full agent result when the CLI could source it from the agent transcript
+   *  (the last StructuredOutput tool input, or the final assistant text).
+   *  Capped to bound payload size; the App renders this in the expanded row,
+   *  parsing JSON into a key/value table when possible. */
+  outputFull: z.string().max(16384).optional(),
   errorMessage: z.string().optional(),
   endedAt: z.number(),
 });
