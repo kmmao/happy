@@ -98,21 +98,6 @@ export class WorkflowRunWatcher {
   }
 
   /**
-   * Re-key an active run from one task id to another, preserving its journal
-   * cursor and emitted-agent state. Used when a direct Workflow tool call's
-   * tracking moves from the tool_use id to the background task id (so a later
-   * task_notification can stop it). No-op if `fromTaskId` isn't tracked.
-   */
-  rekey(fromTaskId: string, toTaskId: string): void {
-    if (fromTaskId === toTaskId) return;
-    const run = this.runs.get(fromTaskId);
-    if (!run) return;
-    run.taskId = toTaskId;
-    this.runs.delete(fromTaskId);
-    this.runs.set(toTaskId, run);
-  }
-
-  /**
    * Hard reset — clears all in-flight runs without emitting. Used when the
    * launcher process exits (or switches sessions) so we don't leak timers.
    */

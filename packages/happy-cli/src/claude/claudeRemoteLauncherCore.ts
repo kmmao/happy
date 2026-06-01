@@ -1115,31 +1115,49 @@ export async function claudeRemoteLauncher(
     });
     session.client.sendSessionProtocolMessage(startEnvelope);
 
-    // Poll for the wf_<id> dir for a few seconds. The watcher emits
+    // Poll for the wf_<id> dir, then tail its journal so we can emit
     // workflow-agent-* events under the SAME runId we already announced.
+    //
+    // Timing notes for BACKGROUND workflows (the common case): the tool_result
+    // ("launched in background") arrives within ~1s and re-keys the tracked run
+    // from toolUseId onto the background task id (see handleDirectWorkflowResult).
+    // The wf_<id> directory + journal are created slightly later as the runtime
+    // spins up. So: (a) we must keep polling after the re-key — bail only when
+    // the run is gone under EITHER key, and (b) the watcher is keyed by runId
+    // (stable across the re-key) rather than the volatile task/tool id, so the
+    // task_notification handler's workflowWatcher.stop(taskId) won't match — we
+    // therefore also stop by runId in the end handlers. A generous window covers
+    // slow dir creation under load.
     const sessionId = session.sessionId;
     if (!sessionId) return;
     const root = getWorkflowsRoot(sessionId, process.cwd());
     let attempts = 0;
-    const maxAttempts = 10; // ~5s at 500ms
+    const maxAttempts = 40; // ~20s at 500ms — covers slow wf_ dir creation
     const timer = setInterval(() => {
       attempts++;
-      // Bail if the run already ended (tool_result arrived first).
-      if (!activeWorkflowRuns.has(toolUseId)) {
+      // The run may have been re-keyed (toolUseId → backgroundTaskId). It's
+      // still "active" as long as SOME entry references this runId. Bail only
+      // when no active run carries our runId anymore (truly ended).
+      const stillActive = Array.from(activeWorkflowRuns.values()).some(
+        (r) => r.runId === runId,
+      );
+      if (!stillActive) {
         clearInterval(timer);
         return;
       }
       const dir = findRecentRunDir(root, startedAt);
       if (dir) {
         clearInterval(timer);
-        workflowWatcher.start(toolUseId, runId, dir);
+        // Key the watcher by runId (stable across re-key) so stop-by-runId in
+        // the end handlers flushes it.
+        workflowWatcher.start(runId, runId, dir);
         logger.debug(
-          `[workflow] direct call ${toolUseId} (${meta.name}): attached watcher at ${dir}`,
+          `[workflow] direct call ${toolUseId} (${meta.name}): attached watcher at ${dir} (runId=${runId})`,
         );
       } else if (attempts >= maxAttempts) {
         clearInterval(timer);
         logger.debug(
-          `[workflow] direct call ${toolUseId} (${meta.name}): no wf_* run dir resolved under ${root}; agent events suppressed`,
+          `[workflow] direct call ${toolUseId} (${meta.name}): no wf_* run dir resolved under ${root} after ${maxAttempts} tries; agent events suppressed`,
         );
       }
     }, 500);
@@ -1178,14 +1196,13 @@ export async function claudeRemoteLauncher(
     const m = /Task ID:\s*(\S+)/.exec(resultText);
     const backgroundTaskId = m?.[1];
     if (backgroundTaskId && /launched in background/i.test(resultText)) {
-      // Re-key: remove the toolUseId entry, register under the task id so the
-      // task_notification handler closes it later. Keep the same runId so the
-      // App correlates run-start (already sent) with the eventual run-end.
+      // Re-key the tracked run from the toolUseId onto the background task id
+      // so the task_notification handler can find it. Keep the same runId so
+      // the App correlates run-start (already sent) with the eventual run-end.
+      // NOTE: the journal watcher is keyed by runId (not task/tool id), so it
+      // needs no migration here — the end handlers stop it by runId.
       activeWorkflowRuns.delete(toolUseId);
       activeWorkflowRuns.set(backgroundTaskId, tracked);
-      // Migrate the journal watcher (if it attached) onto the same key so the
-      // task_notification handler's workflowWatcher.stop(taskId) can flush it.
-      workflowWatcher.rekey(toolUseId, backgroundTaskId);
       logger.debug(
         `[workflow] direct call ${toolUseId} launched background task ${backgroundTaskId} (runId=${tracked.runId}); deferring run-end to task_notification`,
       );
@@ -1194,7 +1211,7 @@ export async function claudeRemoteLauncher(
 
     // Foreground workflow — the result is final. End now.
     activeWorkflowRuns.delete(toolUseId);
-    const { agentCount } = workflowWatcher.stop(toolUseId);
+    const { agentCount } = workflowWatcher.stop(tracked.runId);
     const endedAt = Date.now();
     const endEnvelope = createEnvelope("agent", {
       t: "workflow-run-end",
@@ -1220,7 +1237,7 @@ export async function claudeRemoteLauncher(
     const tracked = activeWorkflowRuns.get(taskId);
     if (!tracked) return;
     activeWorkflowRuns.delete(taskId);
-    const { agentCount } = workflowWatcher.stop(taskId);
+    const { agentCount } = workflowWatcher.stop(tracked.runId);
     const endedAt = Date.now();
     // task-notification status is typically "completed" | "stopped" | "failed".
     const status =
