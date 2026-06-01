@@ -1197,6 +1197,7 @@ export const ca: TranslationStructure = {
     input: "Entrada",
     output: "Sortida",
     arguments: "Arguments",
+    workflowPhases: "Fases",
   },
 
   diff: {

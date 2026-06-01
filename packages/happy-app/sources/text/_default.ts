@@ -1186,6 +1186,7 @@ export const en = {
     input: "Input",
     output: "Output",
     arguments: "Arguments",
+    workflowPhases: "Phases",
   },
 
   diff: {

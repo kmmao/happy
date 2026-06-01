@@ -1154,6 +1154,7 @@ export const zhHant: TranslationStructure = {
     input: "輸入",
     output: "輸出",
     arguments: "參數",
+    workflowPhases: "階段",
   },
 
   diff: {

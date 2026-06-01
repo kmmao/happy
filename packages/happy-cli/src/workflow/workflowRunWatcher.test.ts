@@ -167,4 +167,34 @@ describe("WorkflowRunWatcher", () => {
     // No emissions because shutdown drops the run before the next poll cycle
     expect(captured).toHaveLength(0);
   });
+
+  it("rekey moves a run so stop() under the new id still flushes it", () => {
+    // Start under the tool_use id, then re-key onto the background task id —
+    // mirrors a direct Workflow launch handing off to its background task.
+    watcher.start("toolu_x", "wf_test", runDir);
+    watcher.rekey("toolu_x", "wsh_bg");
+    const { agentCount } = flushAndStop("wsh_bg", [
+      '{"type":"started","key":"v2:k1","agentId":"a1"}',
+      '{"type":"result","key":"v2:k1","agentId":"a1","result":"done"}',
+    ]);
+    expect(agentCount).toBe(1);
+    // Events carry the NEW task id.
+    expect(captured.find((e) => e.kind === "start")).toMatchObject({
+      taskId: "wsh_bg",
+      runId: "wf_test",
+      agentId: "a1",
+    });
+    // Old id no longer resolves.
+    expect(watcher.stop("toolu_x")).toEqual({ agentCount: 0 });
+  });
+
+  it("rekey is a no-op for an unknown or identical id", () => {
+    watcher.start("task-1", "wf_test", runDir);
+    watcher.rekey("nonexistent", "whatever"); // no throw
+    watcher.rekey("task-1", "task-1"); // identical → no-op
+    const { agentCount } = flushAndStop("task-1", [
+      '{"type":"started","key":"v2:k1","agentId":"a1"}',
+    ]);
+    expect(agentCount).toBe(1);
+  });
 });

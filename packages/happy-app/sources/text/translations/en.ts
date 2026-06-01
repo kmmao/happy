@@ -1195,6 +1195,7 @@ export const en: TranslationStructure = {
     input: "Input",
     output: "Output",
     arguments: "Arguments",
+    workflowPhases: "Phases",
   },
 
   diff: {

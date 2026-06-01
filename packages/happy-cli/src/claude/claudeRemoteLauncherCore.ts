@@ -1149,9 +1149,49 @@ export async function claudeRemoteLauncher(
    * Close a direct Workflow run when its tool_result lands. Stops the watcher
    * (flushing any pending agent-end events first) and emits workflow-run-end.
    */
-  function handleDirectWorkflowEnd(toolUseId: string, isError: boolean): void {
+  /**
+   * Handle a direct Workflow tool's tool_result.
+   *
+   * The Workflow tool runs the workflow as a BACKGROUND task and its
+   * tool_result is only a launch acknowledgement:
+   *   "Workflow launched in background. Task ID: wsh39t2av\nSummary: …"
+   * The real run finishes minutes later via a `task_notification` carrying
+   * that same task id. So when we detect a background launch we must NOT emit
+   * run-end now — instead we re-key the tracked run from the toolUseId onto the
+   * background task id, so the task_notification handler (which looks up
+   * activeWorkflowRuns by task id) emits run-end at the correct time.
+   *
+   * If the result is NOT a background-launch ack (a synchronous/foreground
+   * workflow that returned its output directly), we end the run immediately.
+   */
+  function handleDirectWorkflowResult(
+    toolUseId: string,
+    resultText: string,
+    isError: boolean,
+  ): void {
     const tracked = activeWorkflowRuns.get(toolUseId);
     if (!tracked) return;
+
+    // Detect the background-launch ack and extract the task id it will report
+    // completion under.
+    const m = /Task ID:\s*(\S+)/.exec(resultText);
+    const backgroundTaskId = m?.[1];
+    if (backgroundTaskId && /launched in background/i.test(resultText)) {
+      // Re-key: remove the toolUseId entry, register under the task id so the
+      // task_notification handler closes it later. Keep the same runId so the
+      // App correlates run-start (already sent) with the eventual run-end.
+      activeWorkflowRuns.delete(toolUseId);
+      activeWorkflowRuns.set(backgroundTaskId, tracked);
+      // Migrate the journal watcher (if it attached) onto the same key so the
+      // task_notification handler's workflowWatcher.stop(taskId) can flush it.
+      workflowWatcher.rekey(toolUseId, backgroundTaskId);
+      logger.debug(
+        `[workflow] direct call ${toolUseId} launched background task ${backgroundTaskId} (runId=${tracked.runId}); deferring run-end to task_notification`,
+      );
+      return;
+    }
+
+    // Foreground workflow — the result is final. End now.
     activeWorkflowRuns.delete(toolUseId);
     const { agentCount } = workflowWatcher.stop(toolUseId);
     const endedAt = Date.now();
@@ -1814,10 +1854,23 @@ export async function claudeRemoteLauncher(
           if (c.type === "tool_result" && c.tool_use_id) {
             ongoingToolCalls.delete(c.tool_use_id);
             releaseIds.push(c.tool_use_id);
-            // Workflow protocol — close the direct-call workflow run when its
-            // tool_result lands (mirrors the task_notification → run-end path
-            // used for background workflow tasks).
-            handleDirectWorkflowEnd(c.tool_use_id, c.is_error === true);
+            // Workflow protocol — handle the direct-call workflow's tool_result.
+            // For a BACKGROUND workflow the result is just a launch ack
+            // ("Workflow launched in background. Task ID: …"); the real run
+            // finishes later via task_notification, so we must NOT end here —
+            // instead we re-key the tracked run onto the background task id so
+            // the task_notification handler emits run-end at the right time.
+            // For a FOREGROUND workflow the result IS the final output, so end.
+            const rc = (c as unknown as Record<string, unknown>).content;
+            const resultText = typeof rc === "string"
+              ? rc
+              : Array.isArray(rc)
+                ? (rc as Array<Record<string, unknown>>)
+                    .filter((b) => b.type === "text" && typeof b.text === "string")
+                    .map((b) => b.text as string)
+                    .join("\n")
+                : "";
+            handleDirectWorkflowResult(c.tool_use_id, resultText, c.is_error === true);
           }
         }
       }

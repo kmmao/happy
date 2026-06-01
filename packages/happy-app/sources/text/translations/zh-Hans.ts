@@ -1154,6 +1154,7 @@ export const zhHans: TranslationStructure = {
     input: "输入",
     output: "输出",
     arguments: "参数",
+    workflowPhases: "阶段",
   },
 
   diff: {

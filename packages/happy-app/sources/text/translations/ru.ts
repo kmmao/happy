@@ -1207,6 +1207,7 @@ export const ru: TranslationStructure = {
     input: "Входные данные",
     output: "Результат",
     arguments: "Аргументы",
+    workflowPhases: "Этапы",
   },
 
   diff: {
