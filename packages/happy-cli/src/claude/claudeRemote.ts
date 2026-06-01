@@ -225,51 +225,79 @@ function writePromptToPty(pty: ClaudePtyHandle, message: string): boolean {
   logger.debug(
     `[claudeRemote] writePromptToPty len=${message.length} multiline=${message.includes("\n")} preview=${JSON.stringify(preview)}`,
   );
-  return pty.write(`\x1b[200~${message}\x1b[201~\r`);
+  // Submit in TWO steps with the carriage return SEPARATED from the paste.
+  //
+  // Why (the bug this fixes): the old one-shot write
+  //   `\x1b[200~<msg>\x1b[201~\r`
+  // pasted the text into the composer but the trailing \r did NOT submit on
+  // Claude Code 2.1.158's TUI — observed on EVERY new session's first turn
+  // (pid-14653, 88968, 1830 …): echo confirmed the text reached the composer,
+  // yet the turn hung 60s with zero JSONL until the watchdog's Esc+re-deliver,
+  // after which the re-paste answered in ~5s. The TUI appears to swallow a \r
+  // that arrives in the same write as the bracketed-paste end marker (it's
+  // treated as part of the paste burst, not a discrete Enter keypress).
+  //
+  // Fix: write the bracketed paste WITHOUT the \r first, then send the \r as a
+  // separate write a tick later. A standalone \r is unambiguously the submit
+  // key. The caller (writePromptWithEchoConfirm) schedules the \r; this helper
+  // just does the paste so the two are independently retryable.
+  return pty.write(`\x1b[200~${message}\x1b[201~`);
+}
+
+/** Send a standalone carriage return — the discrete "submit" keypress. */
+function writeSubmitNewline(pty: ClaudePtyHandle): boolean {
+  return pty.write("\r");
 }
 
 /**
- * Write a prompt and confirm the Claude TUI actually received it, retrying if
- * the bracketed-paste was dropped.
+ * Write a prompt and reliably submit it, retrying if the TUI didn't accept it.
  *
- * Root cause this guards: even after waitForPtyReady() resolves (~1s on the
- * slow first-chunk path, since current Claude builds emit no alt-screen
- * sequence we can fast-detect on), the TUI's raw-mode keystroke handler is
- * occasionally not yet wired. The pasted bytes are silently consumed and the
- * prompt never submits — the turn hangs with zero JSONL until the launcher's
- * watchdog re-delivers it (observed in pid-88968: 110s of silence, then a
- * re-delivery answered in 6s). Same args run directly answer in ~6s, proving
- * the model is fine and the loss is purely a PTY submission race.
+ * Two distinct failures plagued new sessions' first turn (100% reproducible —
+ * pid-14653, 88968, 1830 all hung 60s then recovered on watchdog re-deliver):
  *
- * Confirmation signal: a successful bracketed-paste makes the TUI echo the
- * prompt's printable characters into the composer within milliseconds. We
- * subscribe to PTY data right before writing and look for a distinctive slice
- * of the prompt in the echoed bytes. If it doesn't appear within
- * `echoWindowMs`, we send Esc (clears whatever partial state the composer is
- * in — a half-landed paste, stray bytes, nothing) and re-paste. The Esc makes
- * the retry safe against the one dangerous case (first paste's text landed but
- * its \r didn't): we never end up with "hihi" submitted, because each retry
- * starts from a cleared composer. Bounded to `maxRetries`.
+ *  1. The trailing \r in the old one-shot `\x1b[200~<msg>\x1b[201~\r` was
+ *     swallowed — text reached the composer (echo confirmed!) but never
+ *     submitted. Fixed by writePromptToPty now omitting the \r, and this
+ *     function sending a STANDALONE \r a tick after the paste (a discrete
+ *     Enter keypress the TUI can't mistake for paste content).
  *
- * Returns true if the initial write succeeded (PTY alive); the async
- * confirm/retry runs in the background. Returns false only when the PTY is
- * already dead.
+ *  2. Occasionally the paste itself is dropped (raw-mode handler not yet wired
+ *     even after waitForPtyReady). Detected by absence of echo.
+ *
+ * Sequence: paste → wait `submitDelayMs` → send \r. Then watch for the prompt's
+ * printable characters echoed into the composer. If no echo within
+ * `echoWindowMs`, send Esc (clears any partial composer state so a re-paste
+ * can't concatenate into "hihi") and repeat the paste+\r. Bounded to
+ * `maxRetries`. The launcher's watchdog remains the final backstop.
+ *
+ * Returns true if the initial paste write succeeded (PTY alive); the async
+ * confirm/retry runs in the background. Returns false only when the PTY is dead.
  */
 function writePromptWithEchoConfirm(
   pty: ClaudePtyHandle,
   message: string,
-  opts: { echoWindowMs?: number; maxRetries?: number } = {},
+  opts: { echoWindowMs?: number; maxRetries?: number; submitDelayMs?: number } = {},
 ): boolean {
-  const echoWindowMs = opts.echoWindowMs ?? 700;
+  const echoWindowMs = opts.echoWindowMs ?? 1200;
   const maxRetries = opts.maxRetries ?? 2;
+  const submitDelayMs = opts.submitDelayMs ?? 80;
 
   // Pick a short printable needle from the prompt to look for in the echo.
-  // Strip control chars; take the first run of visible characters. For very
-  // short prompts ("hi") the whole thing is the needle.
   const visible = message.replace(/[\x00-\x1f\x7f]/g, "").trim();
   const needle = visible.slice(0, Math.min(12, visible.length));
 
-  if (!writePromptToPty(pty, message)) return false;
+  // Paste the text, then submit with a standalone \r shortly after.
+  const pasteAndSubmit = (): boolean => {
+    const ok = writePromptToPty(pty, message);
+    if (!ok) return false;
+    const st = setTimeout(() => {
+      if (!pty.exited) writeSubmitNewline(pty);
+    }, submitDelayMs);
+    if (typeof st.unref === "function") st.unref();
+    return true;
+  };
+
+  if (!pasteAndSubmit()) return false;
 
   // Empty/whitespace prompts have no echo to confirm — fire and forget.
   if (needle.length === 0) return true;
@@ -306,12 +334,12 @@ function writePromptWithEchoConfirm(
     attempt++;
     buf = "";
     logger.debug(
-      `[claudeRemote] prompt echo not seen in ${echoWindowMs}ms — clearing composer + re-writing (attempt ${attempt}/${maxRetries})`,
+      `[claudeRemote] prompt echo not seen in ${echoWindowMs}ms — Esc + re-paste+submit (attempt ${attempt}/${maxRetries})`,
     );
     // Esc clears any partial composer state so the re-paste can't concatenate
     // onto a half-landed first attempt (which would submit "hihi").
     pty.write("\x1b");
-    writePromptToPty(pty, message);
+    pasteAndSubmit();
     const t = setTimeout(checkAndRetry, echoWindowMs);
     if (typeof t.unref === "function") t.unref();
   };
