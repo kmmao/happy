@@ -126,11 +126,6 @@ import {
     extractSdkResultData,
 } from "./reducerHelpers";
 import { transitionBackgroundTaskEntry } from "@/utils/backgroundTaskStatus";
-import { applyWorkflowEvent } from "@/sync/workflow/workflowReducer";
-import {
-  EMPTY_WORKFLOW_RUNS,
-  type WorkflowRunsMap,
-} from "@/sync/workflow/typesWorkflow";
 
 /** SDK event-driven background task entry, maintained by task-start/progress/end events */
 export type BackgroundTaskEntry = {
@@ -215,13 +210,6 @@ export type ReducerState = {
   /** Timestamps of recent lifecycle event messages, keyed by message content.
    * Used to deduplicate rapid duplicates (race between WebSocket push and API fetch). */
   recentEventMessageTimes: Map<string, number>;
-  /**
-   * Per-runId map of folded WorkflowRunState, driven by the five
-   * `workflow-*` envelope events. The reducer applies each event via
-   * `applyWorkflowEvent` and replaces the reference only when the fold
-   * changed something — so Zustand selectors short-circuit on Object.is.
-   */
-  workflowRuns: WorkflowRunsMap;
 };
 
 export function createReducer(): ReducerState {
@@ -240,7 +228,6 @@ export function createReducer(): ReducerState {
     backgroundTasks: new Map(),
     turnHadUsageStats: false,
     recentEventMessageTimes: new Map(),
-    workflowRuns: EMPTY_WORKFLOW_RUNS,
   };
 }
 
@@ -1545,29 +1532,6 @@ export function reducer(
   // Replace Map reference so Zustand detects the change
   if (bgTasksDirty) {
     state.backgroundTasks = new Map(state.backgroundTasks);
-  }
-
-  //
-  // Phase 3.6: Fold workflow-* envelope events into workflowRuns slice
-  //
-  // The workflow envelope events (workflow-run-start, -phase-start,
-  // -agent-start, -agent-end, -run-end) carry no chat content — they are
-  // attached as `workflowEvent` on the normalized message by typesRaw's
-  // dispatcher, and we fold them here into a parallel `workflowRuns` map
-  // that the Progress panel subscribes to via useWorkflowRuns(sessionId).
-  //
-  // applyWorkflowEvent returns the SAME map reference when nothing
-  // changed (idempotent replays), so we only assign back when it changed
-  // — that preserves Object.is short-circuits for downstream selectors.
-  //
-  let nextWorkflowRuns = state.workflowRuns;
-  for (const msg of nonSidechainMessages) {
-    if (msg.role !== "agent") continue;
-    if (!msg.workflowEvent) continue;
-    nextWorkflowRuns = applyWorkflowEvent(nextWorkflowRuns, msg.workflowEvent);
-  }
-  if (nextWorkflowRuns !== state.workflowRuns) {
-    state.workflowRuns = nextWorkflowRuns;
   }
 
   //

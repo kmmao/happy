@@ -2346,31 +2346,6 @@ export const knownTools = {
     icon: ICON_SEARCH,
     hidden: true,
   },
-  Workflow: {
-    title: (opts: { metadata: Metadata | null; tool: ToolCall }) => {
-      // Pull meta.name out of the script for the header; fall back to a
-      // saved-workflow `name`, then a generic label.
-      const input = opts.tool.input as Record<string, any> | undefined;
-      if (input && typeof input.name === "string" && input.name) {
-        return input.name;
-      }
-      const script = typeof input?.script === "string" ? input.script : "";
-      const m = /name\s*:\s*(["'])((?:\\.|(?!\1).)*)\1/.exec(
-        script.slice(script.indexOf("meta"), script.indexOf("meta") + 4000),
-      );
-      return m ? m[2] : "Workflow";
-    },
-    icon: ICON_GIT,
-    noStatus: true,
-    input: z
-      .object({
-        script: z.string().optional(),
-        name: z.string().optional(),
-        args: z.any().optional(),
-      })
-      .partial()
-      .passthrough(),
-  },
 } satisfies Record<
   string,
   {

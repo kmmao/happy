@@ -22,7 +22,6 @@ import { HappyUpdateProgressView } from "./HappyUpdateProgressView";
 import { TaskManagementView } from "./TaskManagementView";
 import { SkillView } from "./SkillView";
 import { SkillViewFull } from "./SkillViewFull";
-import { WorkflowToolView } from "./WorkflowToolView";
 
 export type ToolViewProps = {
   tool: ToolCall;
@@ -57,7 +56,6 @@ export const toolViewRegistry: Record<string, ToolViewComponent> = {
   TaskUpdate: TaskManagementView,
   TaskList: TaskManagementView,
   Skill: SkillView,
-  Workflow: WorkflowToolView,
   mcp__happy__update_progress: HappyUpdateProgressView,
   // Gemini tools (lowercase)
   edit: GeminiEditView,
@@ -108,4 +106,3 @@ export { HappyUpdateProgressView } from "./HappyUpdateProgressView";
 export { TaskManagementView } from "./TaskManagementView";
 export { SkillView } from "./SkillView";
 export { SkillViewFull } from "./SkillViewFull";
-export { WorkflowToolView } from "./WorkflowToolView";

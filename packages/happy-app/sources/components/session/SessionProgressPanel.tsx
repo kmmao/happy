@@ -7,9 +7,8 @@ import { Ionicons } from "@expo/vector-icons";
 import { Typography } from "@/constants/Typography";
 import { useAppendToInput } from "@/hooks/useInputContext";
 import { Modal } from "@/modal";
-import { useSession, useSessionMessages, useWorkflowRuns } from "@/sync/storage";
+import { useSession, useSessionMessages } from "@/sync/storage";
 import { t } from "@/text";
-import { WorkflowRunCard } from "./WorkflowRunCard";
 import {
     computeSessionProgress,
     countTodoProgress,
@@ -391,50 +390,11 @@ export const SessionProgressPanel = React.memo<SessionProgressPanelProps>(
         const hasChecklistState = checklist.source !== "none";
         const hasFootprint = data.toolCalls > 0 || data.userTurns > 0 || data.agentTurns > 0;
 
-        const workflowRuns = useWorkflowRuns(sessionId);
-        const orderedWorkflowRuns = React.useMemo(() => {
-            // Show running runs first (top, sorted by most recent), then finished
-            // runs below (sorted by most recent end). Within each group, newest
-            // at the top — this matches users' "what's happening now" mental
-            // model for the Progress tab.
-            const all = Object.values(workflowRuns);
-            const running = all
-                .filter((r) => r.status === "running")
-                .sort((a, b) => b.startedAt - a.startedAt);
-            const done = all
-                .filter((r) => r.status !== "running")
-                .sort((a, b) => (b.endedAt ?? 0) - (a.endedAt ?? 0));
-            return [...running, ...done];
-        }, [workflowRuns]);
-
         return (
             <ScrollView
                 style={{ flex: 1 }}
                 contentContainerStyle={styles.scrollContent}
             >
-                {orderedWorkflowRuns.length > 0 ? (
-                    orderedWorkflowRuns.map((run) => (
-                        <WorkflowRunCard key={run.runId} run={run} nowMs={nowMs} />
-                    ))
-                ) : !isCodex ? (
-                    <GlassCard style={styles.section}>
-                        <View style={styles.sectionHeader}>
-                            <Ionicons
-                                name="git-network-outline"
-                                size={14}
-                                color={theme.colors.textSecondary}
-                            />
-                            <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
-                                Workflow
-                            </Text>
-                        </View>
-                        <View style={styles.emptyBlock}>
-                            <Text style={[styles.emptyText, { color: theme.colors.textSecondary }]}>
-                                {t("session.workflowEmpty")}
-                            </Text>
-                        </View>
-                    </GlassCard>
-                ) : null}
                 {isCodex ? (
                     <>
                         <CodexPlanSection

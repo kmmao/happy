@@ -2,14 +2,6 @@ import * as z from "zod";
 import { isCuid } from "@paralleldrive/cuid2";
 import { MessageMetaSchema, MessageMeta } from "./typesMessageMeta";
 import { log } from '@/log';
-import type { WorkflowEvent } from "@/sync/workflow/typesWorkflow";
-import {
-  sessionWorkflowAgentEndEventSchema,
-  sessionWorkflowAgentStartEventSchema,
-  sessionWorkflowPhaseStartEventSchema,
-  sessionWorkflowRunEndEventSchema,
-  sessionWorkflowRunStartEventSchema,
-} from "@kmmao/happy-wire";
 
 //
 // Raw types
@@ -319,12 +311,6 @@ const sessionEventSchema = z.discriminatedUnion("t", [
   sessionNeedsContinueEventSchema,
   sessionStateChangedEventSchema,
   sessionContextUsageEventSchema,
-  // ---- workflow-* (PR 3b) ----
-  sessionWorkflowRunStartEventSchema,
-  sessionWorkflowPhaseStartEventSchema,
-  sessionWorkflowAgentStartEventSchema,
-  sessionWorkflowAgentEndEventSchema,
-  sessionWorkflowRunEndEventSchema,
 ]);
 
 const sessionEnvelopeSchema = z
@@ -930,14 +916,6 @@ export type NormalizedMessage = (
     taskId: string;
     status: "completed" | "failed" | "stopped";
   };
-  /**
-   * Present on workflow-* envelope events (workflow-run-start, -phase-start,
-   * -agent-start, -agent-end, -run-end). The main reducer folds these into
-   * a `workflowRuns` slice via `applyWorkflowEvent` and renders them in the
-   * Progress tab — they do NOT appear inline in the chat stream (content is
-   * left empty by the normalizer).
-   */
-  workflowEvent?: WorkflowEvent;
 };
 
 // Public wrapper around the dispatch below. Attaches the envelope's
@@ -966,26 +944,15 @@ function normalizeSessionEnvelopeCore(
   // Session protocol requires turn id on most agent-originated envelopes.
   // Drop malformed agent events without turn to avoid attaching stray messages.
   // Exception: task lifecycle events (task-start/progress/end) may arrive without
-  // a turn (e.g. manual task-end from idle stopTask fallback). Workflow envelope
-  // events are likewise turn-independent — they drive the parallel workflowRuns
-  // slice (Progress panel), not chat content, and the CLI emits them with
-  // role "agent" but no turn. Without this exemption they'd be dropped here and
-  // the Progress card would never populate ("暂无 workflow 运行").
+  // a turn (e.g. manual task-end from idle stopTask fallback).
   const isTaskLifecycleEvent =
     envelope.ev.t === "task-start" ||
     envelope.ev.t === "task-progress" ||
     envelope.ev.t === "task-end";
-  const isWorkflowEvent =
-    envelope.ev.t === "workflow-run-start" ||
-    envelope.ev.t === "workflow-run-end" ||
-    envelope.ev.t === "workflow-phase-start" ||
-    envelope.ev.t === "workflow-agent-start" ||
-    envelope.ev.t === "workflow-agent-end";
   if (
     envelope.role === "agent" &&
     !envelope.turn &&
-    !isTaskLifecycleEvent &&
-    !isWorkflowEvent
+    !isTaskLifecycleEvent
   ) {
     return null;
   }
@@ -1371,30 +1338,6 @@ function normalizeSessionEnvelopeCore(
     // Prompt suggestions are side-channel signals, not chat messages.
     // They are extracted separately via extractPromptSuggestionFromRaw().
     return null;
-  }
-
-  if (
-    envelope.ev.t === "workflow-run-start" ||
-    envelope.ev.t === "workflow-phase-start" ||
-    envelope.ev.t === "workflow-agent-start" ||
-    envelope.ev.t === "workflow-agent-end" ||
-    envelope.ev.t === "workflow-run-end"
-  ) {
-    // Workflow envelope events drive a parallel `workflowRuns` slice on
-    // ReducerState — they do NOT render as chat content (content: []).
-    // The main reducer picks `workflowEvent` off the normalized message
-    // and folds it via applyWorkflowEvent(); the Progress tab subscribes
-    // via useWorkflowRuns(sessionId).
-    return {
-      id: messageId,
-      localId,
-      createdAt: messageCreatedAt,
-      role: "agent",
-      isSidechain,
-      content: [],
-      meta,
-      workflowEvent: envelope.ev,
-    } satisfies NormalizedMessage;
   }
 
   return null;

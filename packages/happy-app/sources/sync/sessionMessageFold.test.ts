@@ -36,7 +36,6 @@ function makeReducerState(
         backgroundTaskIdToMessageId: new Map(),
         backgroundTasks: new Map(),
         recentEventMessageTimes: new Map(),
-        workflowRuns: {},
         ...overrides,
     };
 }
