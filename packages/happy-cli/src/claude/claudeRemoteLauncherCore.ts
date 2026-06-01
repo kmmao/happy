@@ -55,6 +55,7 @@ import {
 } from "@/workflow/workflowDirDiscovery";
 import { WorkflowRunWatcher } from "@/workflow/workflowRunWatcher";
 import { parseWorkflowMeta } from "@/workflow/workflowMeta";
+import { createEnvelope } from "@kmmao/happy-wire";
 import { hashObject } from "@/utils/deterministicJson";
 import { getProjectPath } from "./utils/path";
 import { readFile, writeFile, mkdir } from "node:fs/promises";
@@ -1039,7 +1040,7 @@ export async function claudeRemoteLauncher(
    */
   const workflowWatcher = new WorkflowRunWatcher({
     onAgentStart: (_taskId, runId, agentId, startedAt) => {
-      const envelope = buildProtocolMessage("agent", {
+      const envelope = createEnvelope("agent", {
         t: "workflow-agent-start",
         runId,
         agentId,
@@ -1049,10 +1050,10 @@ export async function claudeRemoteLauncher(
         hasSchema: false,
         startedAt,
       });
-      session.client.sendSessionProtocolMessage(envelope as any);
+      session.client.sendSessionProtocolMessage(envelope);
     },
     onAgentEnd: (_taskId, runId, agentId, outputPreview, durationMs, endedAt) => {
-      const envelope = buildProtocolMessage("agent", {
+      const envelope = createEnvelope("agent", {
         t: "workflow-agent-end",
         runId,
         agentId,
@@ -1063,7 +1064,7 @@ export async function claudeRemoteLauncher(
         outputPreview,
         endedAt,
       });
-      session.client.sendSessionProtocolMessage(envelope as any);
+      session.client.sendSessionProtocolMessage(envelope);
     },
   });
 
@@ -1104,7 +1105,7 @@ export async function claudeRemoteLauncher(
       startedAt,
       runId,
     });
-    const startEnvelope = buildProtocolMessage("agent", {
+    const startEnvelope = createEnvelope("agent", {
       t: "workflow-run-start",
       runId,
       toolUseId,
@@ -1112,7 +1113,7 @@ export async function claudeRemoteLauncher(
       description: meta.description,
       startedAt,
     });
-    session.client.sendSessionProtocolMessage(startEnvelope as any);
+    session.client.sendSessionProtocolMessage(startEnvelope);
 
     // Poll for the wf_<id> dir for a few seconds. The watcher emits
     // workflow-agent-* events under the SAME runId we already announced.
@@ -1195,7 +1196,7 @@ export async function claudeRemoteLauncher(
     activeWorkflowRuns.delete(toolUseId);
     const { agentCount } = workflowWatcher.stop(toolUseId);
     const endedAt = Date.now();
-    const endEnvelope = buildProtocolMessage("agent", {
+    const endEnvelope = createEnvelope("agent", {
       t: "workflow-run-end",
       runId: tracked.runId,
       status: isError ? "errored" : "completed",
@@ -1204,7 +1205,43 @@ export async function claudeRemoteLauncher(
       durationMs: endedAt - tracked.startedAt,
       endedAt,
     });
-    session.client.sendSessionProtocolMessage(endEnvelope as any);
+    session.client.sendSessionProtocolMessage(endEnvelope);
+  }
+
+  /**
+   * Close a background workflow run when its `<task-notification>` arrives.
+   * The run was re-keyed onto the background task id by handleDirectWorkflowResult,
+   * so we look it up by that id. Idempotent: a no-op if already closed.
+   */
+  function handleDirectWorkflowTaskNotification(
+    taskId: string,
+    statusText: string | undefined,
+  ): void {
+    const tracked = activeWorkflowRuns.get(taskId);
+    if (!tracked) return;
+    activeWorkflowRuns.delete(taskId);
+    const { agentCount } = workflowWatcher.stop(taskId);
+    const endedAt = Date.now();
+    // task-notification status is typically "completed" | "stopped" | "failed".
+    const status =
+      statusText === "stopped" || statusText === "cancelled"
+        ? "aborted"
+        : statusText === "failed" || statusText === "error"
+          ? "errored"
+          : "completed";
+    const endEnvelope = createEnvelope("agent", {
+      t: "workflow-run-end",
+      runId: tracked.runId,
+      status,
+      agentCount,
+      totalTokens: 0,
+      durationMs: endedAt - tracked.startedAt,
+      endedAt,
+    });
+    session.client.sendSessionProtocolMessage(endEnvelope);
+    logger.debug(
+      `[workflow] background task ${taskId} (runId=${tracked.runId}) completed (${status}) — emitted workflow-run-end`,
+    );
   }
 
   function onMessage(message: ClaudeJsonlMessage) {
@@ -1849,6 +1886,30 @@ export async function claudeRemoteLauncher(
     let releaseIds: string[] = [];
     if (message.type === "user") {
       let umessage = message as ClaudeJsonlUserMessage;
+      // Workflow protocol — a background workflow signals completion via a
+      // synthetic USER message whose content is a `<task-notification>` block
+      // with origin.kind === "task-notification" (NOT a system task_notification
+      // message). Detect it here and emit workflow-run-end for the tracked run
+      // keyed by its <task-id>. Without this the Progress card stays "running"
+      // forever (or, with the old code, the run never closed at all).
+      const origin = (umessage as unknown as Record<string, unknown>).origin as
+        | { kind?: string }
+        | undefined;
+      const rawContent = (umessage.message as unknown as Record<string, unknown>)
+        ?.content;
+      const contentStr =
+        typeof rawContent === "string" ? rawContent : "";
+      if (
+        (origin?.kind === "task-notification" ||
+          contentStr.includes("<task-notification>")) &&
+        contentStr.includes("<task-id>")
+      ) {
+        const tid = /<task-id>\s*([^<\s]+)\s*<\/task-id>/.exec(contentStr)?.[1];
+        const status = /<status>\s*([^<\s]+)\s*<\/status>/.exec(contentStr)?.[1];
+        if (tid) {
+          handleDirectWorkflowTaskNotification(tid, status);
+        }
+      }
       if (umessage.message.content && Array.isArray(umessage.message.content)) {
         for (let c of umessage.message.content) {
           if (c.type === "tool_result" && c.tool_use_id) {
@@ -1952,7 +2013,7 @@ export async function claudeRemoteLauncher(
           startedAt,
           runId,
         });
-        const workflowEnvelope = buildProtocolMessage("agent", {
+        const workflowEnvelope = createEnvelope("agent", {
           t: "workflow-run-start",
           runId,
           toolUseId: m.tool_use_id ?? m.task_id,
@@ -1960,7 +2021,7 @@ export async function claudeRemoteLauncher(
           description: m.description ?? "",
           startedAt,
         });
-        session.client.sendSessionProtocolMessage(workflowEnvelope as any);
+        session.client.sendSessionProtocolMessage(workflowEnvelope);
         if (runDir) {
           workflowWatcher.start(m.task_id, runId, runDir);
         }
@@ -2053,7 +2114,7 @@ export async function claudeRemoteLauncher(
               : "errored";
         const durationMs = m.usage?.duration_ms ?? endedAt - tracked.startedAt;
         const totalTokens = m.usage?.total_tokens ?? 0;
-        const workflowEndEnvelope = buildProtocolMessage("agent", {
+        const workflowEndEnvelope = createEnvelope("agent", {
           t: "workflow-run-end",
           runId: tracked.runId,
           status,
@@ -2062,7 +2123,7 @@ export async function claudeRemoteLauncher(
           durationMs,
           endedAt,
         });
-        session.client.sendSessionProtocolMessage(workflowEndEnvelope as any);
+        session.client.sendSessionProtocolMessage(workflowEndEnvelope);
       }
     }
 
