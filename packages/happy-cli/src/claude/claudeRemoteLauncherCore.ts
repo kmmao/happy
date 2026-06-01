@@ -324,9 +324,14 @@ export async function claudeRemoteLauncher(
       // nothing has executed.
       if (!turnProducedOutput && idleMs < WATCHDOG_WEDGE_RECOVER_MS) {
         if (elapsedMs >= 5 * 60_000 && !strandRecoveryInFlight) {
+          const elapsedMin = Math.round(elapsedMs / 60_000);
           logger.debug(
             `[remote][strand] extended-thinking hang — no JSONL output after ${elapsedMs}ms (PTY spinner active). Forcing recovery. ${strandDiagState()}`,
           );
+          session.client.sendSessionEvent({
+            type: "message",
+            message: `No response after ${elapsedMin}m — the API may be overloaded. Forcing recovery…`,
+          });
           void recoverStrandedTurn(elapsedMs);
           return;
         }
@@ -342,7 +347,7 @@ export async function claudeRemoteLauncher(
             );
             session.client.sendSessionEvent({
               type: "message",
-              message: `Still thinking… (${elapsedMin}m elapsed)`,
+              message: `Still thinking… (${elapsedMin}m elapsed, model: extended reasoning)`,
             });
           }
         }
@@ -398,9 +403,16 @@ export async function claudeRemoteLauncher(
     strandRecoveryInFlight = true;
     const interruptAt = Date.now();
     try {
+      const idleSec = Math.round(idleMs / 1000);
       logger.debug(
         `[remote][strand] auto-recovery tier-1 (graceful interrupt) after ${idleMs}ms PTY silence. ${strandDiagState()}`,
       );
+      // Surface tier-1 attempt to the user so they know something is happening
+      // rather than staring at an unresponsive chat indefinitely.
+      session.client.sendSessionEvent({
+        type: "message",
+        message: `No response for ${idleSec}s — attempting recovery…`,
+      });
       await doInterrupt();
       await new Promise<void>((resolve) =>
         setTimeout(resolve, STRAND_TIER1_GRACE_MS),
@@ -416,11 +428,19 @@ export async function claudeRemoteLauncher(
         logger.debug(
           "[remote][strand] tier-1 ineffective but tier-2 cold restart suppressed (rate limit) — spinner already cleared, will retry next window.",
         );
+        session.client.sendSessionEvent({
+          type: "message",
+          message: "Recovery attempt finished — session unblocked (restart suppressed by rate limit).",
+        });
         return;
       }
       logger.debug(
         `[remote][strand] tier-1 ineffective — escalating to tier-2 cold restart. ${strandDiagState()}`,
       );
+      session.client.sendSessionEvent({
+        type: "message",
+        message: "Recovery attempt failed — restarting session process…",
+      });
       lastColdRestartAt = Date.now();
       strandColdRestart = true;
       await abort();
@@ -454,6 +474,10 @@ export async function claudeRemoteLauncher(
     logger.debug(
       `[remote][strand] re-delivering stranded prompt (turn produced 0 output, attempt ${strandRedeliverCount}) — ${message.length} chars`,
     );
+    session.client.sendSessionEvent({
+      type: "message",
+      message: "Session recovered — resending your message…",
+    });
     session.queue.push(message, mode, undefined, {
       priority: "urgent",
       kind: "prompt",
@@ -3228,7 +3252,9 @@ export async function claudeRemoteLauncher(
           // a user action (the user never pressed anything; the turn was stuck).
           session.client.sendSessionEvent({
             type: "message",
-            message: strandColdRestart ? "Recovered a stuck turn" : "Aborted by user",
+            message: strandColdRestart
+              ? "Session process restarted — ready for your next message"
+              : "Aborted by user",
           });
         }
       } catch (e: unknown) {
