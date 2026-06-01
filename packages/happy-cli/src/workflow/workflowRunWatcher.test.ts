@@ -6,7 +6,7 @@ import * as path from "path";
 import { WorkflowRunWatcher } from "./workflowRunWatcher";
 
 interface CapturedEvent {
-  kind: "start" | "end";
+  kind: "phase" | "start" | "end";
   taskId: string;
   runId: string;
   agentId: string;
@@ -14,8 +14,14 @@ interface CapturedEvent {
   durationMs?: number;
   label?: string;
   promptPreview?: string;
+  phase?: string;
+  agentType?: string;
   model?: string;
   tokens?: { input: number; output: number; cacheRead?: number; cacheWrite?: number };
+  status?: "completed" | "errored" | "skipped";
+  // phase fields
+  index?: number;
+  title?: string;
 }
 
 describe("WorkflowRunWatcher", () => {
@@ -32,10 +38,41 @@ describe("WorkflowRunWatcher", () => {
     journalPath = path.join(runDir, "journal.jsonl");
     captured = [];
     watcher = new WorkflowRunWatcher({
-      onAgentStart: (taskId, runId, agentId, _startedAt, label, promptPreview) => {
-        captured.push({ kind: "start", taskId, runId, agentId, label, promptPreview });
+      onPhaseStart: (taskId, runId, index, title) => {
+        captured.push({ kind: "phase", taskId, runId, agentId: "", index, title });
       },
-      onAgentEnd: (taskId, runId, agentId, outputPreview, durationMs, _endedAt, model, tokens) => {
+      onAgentStart: (
+        taskId,
+        runId,
+        agentId,
+        _startedAt,
+        label,
+        promptPreview,
+        phase,
+        agentType,
+      ) => {
+        captured.push({
+          kind: "start",
+          taskId,
+          runId,
+          agentId,
+          label,
+          promptPreview,
+          phase,
+          agentType,
+        });
+      },
+      onAgentEnd: (
+        taskId,
+        runId,
+        agentId,
+        outputPreview,
+        durationMs,
+        _endedAt,
+        model,
+        tokens,
+        status,
+      ) => {
         captured.push({
           kind: "end",
           taskId,
@@ -45,6 +82,7 @@ describe("WorkflowRunWatcher", () => {
           durationMs,
           model,
           tokens,
+          status,
         });
       },
     });
@@ -235,5 +273,205 @@ describe("WorkflowRunWatcher", () => {
     watcher.shutdown();
     // No emissions because shutdown drops the run before the next poll cycle
     expect(captured).toHaveLength(0);
+  });
+});
+
+describe("WorkflowRunWatcher — progress JSON snapshot source", () => {
+  let tmpDir: string;
+  let sessionDir: string;
+  let runDir: string;
+  let progressPath: string;
+  let captured: CapturedEvent[];
+  let watcher: WorkflowRunWatcher;
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "wfp-"));
+    // Mirror the real layout: <session>/subagents/workflows/wf_test  and
+    // <session>/workflows/wf_test.json as its sibling.
+    sessionDir = path.join(tmpDir, "session");
+    runDir = path.join(sessionDir, "subagents", "workflows", "wf_test");
+    fs.mkdirSync(runDir, { recursive: true });
+    fs.mkdirSync(path.join(sessionDir, "workflows"), { recursive: true });
+    progressPath = path.join(sessionDir, "workflows", "wf_test.json");
+    captured = [];
+    watcher = new WorkflowRunWatcher({
+      onPhaseStart: (taskId, runId, index, title) => {
+        captured.push({ kind: "phase", taskId, runId, agentId: "", index, title });
+      },
+      onAgentStart: (taskId, runId, agentId, _startedAt, label, promptPreview, phase, agentType) => {
+        captured.push({
+          kind: "start",
+          taskId,
+          runId,
+          agentId,
+          label,
+          promptPreview,
+          phase,
+          agentType,
+        });
+      },
+      onAgentEnd: (taskId, runId, agentId, outputPreview, durationMs, _endedAt, model, tokens, status) => {
+        captured.push({
+          kind: "end",
+          taskId,
+          runId,
+          agentId,
+          outputPreview,
+          durationMs,
+          model,
+          tokens,
+          status,
+        });
+      },
+    });
+  });
+
+  afterEach(() => {
+    watcher.shutdown();
+    try {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    } catch {
+      /* ignore */
+    }
+  });
+
+  /** Real-shape snapshot: 2 phases + 2 done agents across both phases. */
+  function doneSnapshot(): unknown {
+    return {
+      status: "completed",
+      agentCount: 2,
+      workflowProgress: [
+        { type: "workflow_phase", index: 1, title: "Explore" },
+        { type: "workflow_phase", index: 2, title: "Synthesize" },
+        {
+          type: "workflow_agent",
+          index: 1,
+          label: "explore:root",
+          phaseIndex: 1,
+          phaseTitle: "Explore",
+          agentId: "a4f6f161bb236f946",
+          agentType: "Explore",
+          model: "claude-haiku-4-5-20251001",
+          state: "done",
+          tokens: 28456,
+          durationMs: 36592,
+          promptPreview: "Explore the directory `/Users/.../happy` …",
+          resultPreview: '{"name":"Happy Coder",…}',
+          startedAt: 1780307480941,
+        },
+        {
+          type: "workflow_agent",
+          index: 2,
+          label: "synthesize",
+          phaseIndex: 2,
+          phaseTitle: "Synthesize",
+          agentId: "ab31c256ac25e3213",
+          agentType: "None",
+          model: "claude-haiku-4-5-20251001",
+          state: "done",
+          tokens: 32268,
+          durationMs: 54958,
+          promptPreview: "Merge the package maps …",
+          resultPreview: "完成。结构概览文档已生成。",
+          startedAt: 1780307490000,
+        },
+      ],
+    };
+  }
+
+  it("emits real phase + agent data from the progress snapshot", () => {
+    fs.writeFileSync(progressPath, JSON.stringify(doneSnapshot()));
+    watcher.start("task-1", "wf_test", runDir);
+    const { agentCount } = watcher.stop("task-1");
+
+    const phases = captured.filter((e) => e.kind === "phase");
+    expect(phases.map((p) => p.title)).toEqual(["Explore", "Synthesize"]);
+    expect(phases[0]).toMatchObject({ index: 1, title: "Explore" });
+
+    const start = captured.find((e) => e.kind === "start" && e.agentId === "a4f6f161bb236f946");
+    expect(start).toMatchObject({
+      label: "explore:root",
+      phase: "Explore",
+      agentType: "Explore",
+    });
+
+    const end = captured.find((e) => e.kind === "end" && e.agentId === "a4f6f161bb236f946");
+    expect(end?.model).toBe("claude-haiku-4-5-20251001");
+    // Single integer total mapped onto input, output 0.
+    expect(end?.tokens).toEqual({ input: 28456, output: 0 });
+    expect(end?.durationMs).toBe(36592);
+    expect(end?.status).toBe("completed");
+    expect(end?.outputPreview).toBe('{"name":"Happy Coder",…}');
+
+    expect(agentCount).toBe(2);
+  });
+
+  it("maps non-done terminal states to errored / skipped", () => {
+    const snap = {
+      workflowProgress: [
+        { type: "workflow_agent", agentId: "x1", state: "error", label: "a", phaseTitle: "P" },
+        { type: "workflow_agent", agentId: "x2", state: "cancelled", label: "b", phaseTitle: "P" },
+      ],
+    };
+    fs.writeFileSync(progressPath, JSON.stringify(snap));
+    watcher.start("task-1", "wf_test", runDir);
+    watcher.stop("task-1");
+
+    expect(captured.find((e) => e.kind === "end" && e.agentId === "x1")?.status).toBe("errored");
+    expect(captured.find((e) => e.kind === "end" && e.agentId === "x2")?.status).toBe("skipped");
+  });
+
+  it("does not double-emit across incremental snapshot rewrites", () => {
+    vi.useFakeTimers();
+    try {
+      // First snapshot: phase known, agent still running → only start fires.
+      fs.writeFileSync(
+        progressPath,
+        JSON.stringify({
+          workflowProgress: [
+            { type: "workflow_phase", index: 1, title: "Explore" },
+            {
+              type: "workflow_agent",
+              agentId: "a1",
+              label: "explore:root",
+              phaseTitle: "Explore",
+              state: "running",
+            },
+          ],
+        }),
+      );
+      watcher.start("task-1", "wf_test", runDir);
+      vi.advanceTimersByTime(700);
+      expect(captured.filter((e) => e.kind === "phase")).toHaveLength(1);
+      expect(captured.filter((e) => e.kind === "start")).toHaveLength(1);
+      expect(captured.filter((e) => e.kind === "end")).toHaveLength(0);
+
+      // Rewrite with the same agent now done → exactly one end, no re-start,
+      // no re-phase.
+      fs.writeFileSync(
+        progressPath,
+        JSON.stringify({
+          workflowProgress: [
+            { type: "workflow_phase", index: 1, title: "Explore" },
+            {
+              type: "workflow_agent",
+              agentId: "a1",
+              label: "explore:root",
+              phaseTitle: "Explore",
+              state: "done",
+              tokens: 100,
+            },
+          ],
+        }),
+      );
+      vi.advanceTimersByTime(700);
+      expect(captured.filter((e) => e.kind === "phase")).toHaveLength(1);
+      expect(captured.filter((e) => e.kind === "start")).toHaveLength(1);
+      expect(captured.filter((e) => e.kind === "end")).toHaveLength(1);
+
+      watcher.stop("task-1");
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

@@ -1039,14 +1039,34 @@ export async function claudeRemoteLauncher(
    * timer is unref'd inside the watcher so it never blocks process exit.
    */
   const workflowWatcher = new WorkflowRunWatcher({
-    onAgentStart: (_taskId, runId, agentId, startedAt, label, promptPreview) => {
+    onPhaseStart: (_taskId, runId, index, title, startedAt) => {
+      const envelope = createEnvelope("agent", {
+        t: "workflow-phase-start",
+        runId,
+        index,
+        title,
+        startedAt,
+      });
+      session.client.sendSessionProtocolMessage(envelope);
+    },
+    onAgentStart: (
+      _taskId,
+      runId,
+      agentId,
+      startedAt,
+      label,
+      promptPreview,
+      phase,
+      _agentType,
+    ) => {
       const envelope = createEnvelope("agent", {
         t: "workflow-agent-start",
         runId,
         agentId,
-        // label / promptPreview sourced from the agent's SDK transcript by the
-        // watcher; both may be undefined if the transcript isn't readable yet.
+        // label / phase / promptPreview now sourced from the progress snapshot
+        // (real opts.label + phaseTitle); the journal fallback omits phase.
         ...(label ? { label } : {}),
+        ...(phase ? { phase } : {}),
         promptPreview: promptPreview ?? "",
         hasSchema: false,
         startedAt,
@@ -1062,14 +1082,13 @@ export async function claudeRemoteLauncher(
       endedAt,
       model,
       tokens,
+      status,
     ) => {
       const envelope = createEnvelope("agent", {
         t: "workflow-agent-end",
         runId,
         agentId,
-        // Journal currently only records successful results; errored /
-        // skipped lifecycles arrive once the workflow runtime adds them.
-        status: "completed",
+        status: status ?? "completed",
         durationMs,
         outputPreview,
         ...(model ? { model } : {}),
