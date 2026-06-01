@@ -44,7 +44,6 @@ yarn-error.*
 # Claude Code - ignore local state, keep commands
 .claude/settings.local.json
 .claude/worktrees/
-.claude/skills/
 .claude/todo.md
 .claude/scheduled_tasks.json
 .claude/scheduled_tasks.lock
