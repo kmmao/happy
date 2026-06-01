@@ -1,6 +1,7 @@
 import * as React from 'react';
 import { Message } from '@/sync/typesMessage';
 import { knownTools } from '@/components/tools/knownTools';
+import { shouldHideToolCall } from '@/components/tools/shouldHideToolCall';
 import { t } from '@/text';
 
 // Display item types for the grouped message list
@@ -32,50 +33,53 @@ export type DisplayItem = TextItem | ToolGroupItem;
  * pre-grouping behavior where MessageView renders each message (and
  * returns null for hidden tools/thinking) on its own.
  */
+export function groupMessages(messages: Message[], enabled: boolean = true): DisplayItem[] {
+    if (!enabled) {
+        return messages.map((msg) => ({ type: 'message', id: msg.id, message: msg } as TextItem));
+    }
+
+    const result: DisplayItem[] = [];
+    let buffer: Message[] = [];
+
+    const flushBuffer = () => {
+        if (buffer.length === 0) return;
+
+        let hasRunning = false;
+        for (const msg of buffer) {
+            if (msg.kind === 'tool-call' && msg.tool.state === 'running') {
+                hasRunning = true;
+                break;
+            }
+        }
+
+        result.push({
+            type: 'tool-group',
+            id: `group-${buffer[buffer.length - 1].id}`,
+            messages: buffer,
+            hasRunning,
+        });
+        buffer = [];
+    };
+
+    for (const msg of messages) {
+        if (isStandaloneMessage(msg) || isUserAttachment(msg)) {
+            flushBuffer();
+            result.push({ type: 'message', id: msg.id, message: msg });
+        } else if (isInvisibleMessage(msg)) {
+            // Skip messages that render as null (hidden tools, thinking, empty text)
+            continue;
+        } else {
+            buffer.push(msg);
+        }
+    }
+
+    flushBuffer();
+    return result;
+}
+
+/** React wrapper around {@link groupMessages} memoized on its inputs. */
 export function useGroupedMessages(messages: Message[], enabled: boolean = true): DisplayItem[] {
-    return React.useMemo(() => {
-        if (!enabled) {
-            return messages.map((msg) => ({ type: 'message', id: msg.id, message: msg } as TextItem));
-        }
-
-        const result: DisplayItem[] = [];
-        let buffer: Message[] = [];
-
-        const flushBuffer = () => {
-            if (buffer.length === 0) return;
-
-            let hasRunning = false;
-            for (const msg of buffer) {
-                if (msg.kind === 'tool-call' && msg.tool.state === 'running') {
-                    hasRunning = true;
-                    break;
-                }
-            }
-
-            result.push({
-                type: 'tool-group',
-                id: `group-${buffer[buffer.length - 1].id}`,
-                messages: buffer,
-                hasRunning,
-            });
-            buffer = [];
-        };
-
-        for (const msg of messages) {
-            if (isStandaloneMessage(msg) || isUserAttachment(msg)) {
-                flushBuffer();
-                result.push({ type: 'message', id: msg.id, message: msg });
-            } else if (isInvisibleMessage(msg)) {
-                // Skip messages that render as null (hidden tools, thinking, empty text)
-                continue;
-            } else {
-                buffer.push(msg);
-            }
-        }
-
-        flushBuffer();
-        return result;
-    }, [messages, enabled]);
+    return React.useMemo(() => groupMessages(messages, enabled), [messages, enabled]);
 }
 
 /** Returns true for messages that should NOT be grouped (displayed standalone) */
@@ -96,7 +100,12 @@ function isInvisibleMessage(msg: Message): boolean {
     // Hidden tools (ToolSearch, CodexReasoning, etc.)
     if (msg.kind === 'tool-call') {
         const known = knownTools[msg.tool.name as keyof typeof knownTools] as any;
-        return known?.hidden === true;
+        if (known?.hidden === true) return true;
+        // ToolView also dynamically renders successful happy MCP tools
+        // (change_title, update_session_summary, …) as null. Exclude them too,
+        // otherwise a lone hidden tool pads an empty "Used N tools" group whose
+        // expanded content is blank. Keep in sync with ToolView's hideToolCall.
+        return shouldHideToolCall(msg.tool);
     }
     // Thinking messages render as null in MessageView
     if (msg.kind === 'agent-text') {
