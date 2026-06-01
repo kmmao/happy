@@ -229,6 +229,99 @@ function writePromptToPty(pty: ClaudePtyHandle, message: string): boolean {
 }
 
 /**
+ * Write a prompt and confirm the Claude TUI actually received it, retrying if
+ * the bracketed-paste was dropped.
+ *
+ * Root cause this guards: even after waitForPtyReady() resolves (~1s on the
+ * slow first-chunk path, since current Claude builds emit no alt-screen
+ * sequence we can fast-detect on), the TUI's raw-mode keystroke handler is
+ * occasionally not yet wired. The pasted bytes are silently consumed and the
+ * prompt never submits — the turn hangs with zero JSONL until the launcher's
+ * watchdog re-delivers it (observed in pid-88968: 110s of silence, then a
+ * re-delivery answered in 6s). Same args run directly answer in ~6s, proving
+ * the model is fine and the loss is purely a PTY submission race.
+ *
+ * Confirmation signal: a successful bracketed-paste makes the TUI echo the
+ * prompt's printable characters into the composer within milliseconds. We
+ * subscribe to PTY data right before writing and look for a distinctive slice
+ * of the prompt in the echoed bytes. If it doesn't appear within
+ * `echoWindowMs`, we send Esc (clears whatever partial state the composer is
+ * in — a half-landed paste, stray bytes, nothing) and re-paste. The Esc makes
+ * the retry safe against the one dangerous case (first paste's text landed but
+ * its \r didn't): we never end up with "hihi" submitted, because each retry
+ * starts from a cleared composer. Bounded to `maxRetries`.
+ *
+ * Returns true if the initial write succeeded (PTY alive); the async
+ * confirm/retry runs in the background. Returns false only when the PTY is
+ * already dead.
+ */
+function writePromptWithEchoConfirm(
+  pty: ClaudePtyHandle,
+  message: string,
+  opts: { echoWindowMs?: number; maxRetries?: number } = {},
+): boolean {
+  const echoWindowMs = opts.echoWindowMs ?? 700;
+  const maxRetries = opts.maxRetries ?? 2;
+
+  // Pick a short printable needle from the prompt to look for in the echo.
+  // Strip control chars; take the first run of visible characters. For very
+  // short prompts ("hi") the whole thing is the needle.
+  const visible = message.replace(/[\x00-\x1f\x7f]/g, "").trim();
+  const needle = visible.slice(0, Math.min(12, visible.length));
+
+  if (!writePromptToPty(pty, message)) return false;
+
+  // Empty/whitespace prompts have no echo to confirm — fire and forget.
+  if (needle.length === 0) return true;
+
+  let attempt = 0;
+  let echoSeen = false;
+  let buf = "";
+
+  const dispose = pty.onData((data: string) => {
+    if (echoSeen) return;
+    buf += data;
+    if (buf.length > 4096) buf = buf.slice(-2048);
+    if (buf.includes(needle)) {
+      echoSeen = true;
+      logger.debug(
+        `[claudeRemote] prompt echo confirmed (attempt ${attempt}) — submission landed`,
+      );
+      dispose?.();
+    }
+  });
+
+  const checkAndRetry = (): void => {
+    if (echoSeen || pty.exited) {
+      dispose?.();
+      return;
+    }
+    if (attempt >= maxRetries) {
+      logger.warn(
+        `[claudeRemote] prompt echo NOT seen after ${maxRetries} retries — leaving to watchdog. needle=${JSON.stringify(needle)}`,
+      );
+      dispose?.();
+      return;
+    }
+    attempt++;
+    buf = "";
+    logger.debug(
+      `[claudeRemote] prompt echo not seen in ${echoWindowMs}ms — clearing composer + re-writing (attempt ${attempt}/${maxRetries})`,
+    );
+    // Esc clears any partial composer state so the re-paste can't concatenate
+    // onto a half-landed first attempt (which would submit "hihi").
+    pty.write("\x1b");
+    writePromptToPty(pty, message);
+    const t = setTimeout(checkAndRetry, echoWindowMs);
+    if (typeof t.unref === "function") t.unref();
+  };
+
+  const t0 = setTimeout(checkAndRetry, echoWindowMs);
+  if (typeof t0.unref === "function") t0.unref();
+  return true;
+}
+
+/**
  * Resolve once the Claude TUI is ready to accept keystrokes.
  *
  * Why this exists: `pty.write` calls issued immediately after `startClaudePty`
@@ -814,7 +907,7 @@ export async function claudeRemote(opts: {
   // "Compaction completed" use) so the App's transcript shows that this
   // particular send failed, and warn-log for the server-side debugger.
   const writePromptAndMarkThinking = (msg: string): void => {
-    if (writePromptToPty(pty, msg)) {
+    if (writePromptWithEchoConfirm(pty, msg)) {
       opts.onPromptWritten?.(msg);
       updateThinking(true);
       return;

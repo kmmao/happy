@@ -306,50 +306,46 @@ export async function claudeRemoteLauncher(
         void recoverStrandedTurn(idleMs);
         return;
       }
-      // Extended-thinking hang detection.
+      // Lost-first-response / submission-wedge detection.
       //
-      // Problem: Opus with --effort xhigh / [1m] thinking budget keeps the PTY
-      // spinner running (refreshing lastClaudeOutputAt via onPtyActivity), so the
-      // idle-based strand detector never fires. But the user has seen zero chat
-      // output for potentially many minutes — this happens when the API call is
-      // queued or slow at a proxy (e.g. a One-API relay with high RTT). The
-      // session appears "dead" from the App's perspective.
+      // Two failure modes share one signature — turn is "running" but ZERO
+      // JSONL has arrived:
       //
-      // Fix: track wall-clock elapsed since turn START (independent of
-      // lastClaudeOutputAt). When no JSONL output has arrived but the turn has
-      // been alive for a long time, emit heartbeat events so the App can show
-      // "still thinking (Nm elapsed)" to the user. If we reach 5 minutes with
-      // still no JSONL, force a tier-1 interrupt — the API is almost certainly
-      // hung or rate-limited; re-delivery is safe because zero JSONL means
-      // nothing has executed.
+      //   (a) Submission wedge: the bracketed-paste prompt was written before
+      //       the Claude TUI's raw-mode keyboard handler was ready, so the
+      //       bytes were dropped and the prompt never submitted. The TUI sits
+      //       idle forever. This is a race — PTY-ready detection (~1064ms slow
+      //       path, since this Claude build emits no alt-screen sequence) is
+      //       sometimes too early. Observed in pid-88968: 110s of silence then
+      //       recovery re-delivered "hi" and it answered in 6s.
+      //
+      //   (b) Extended-thinking / slow-proxy hang: the API call is queued or
+      //       the One-API relay is slow, so the thinking phase blocks for
+      //       minutes with the spinner running.
+      //
+      // The old idle-based "zero-output submission wedge" check above only
+      // fires when the PTY is fully silent (idleMs >= 90s) — but the TUI's
+      // startup spinner keeps refreshing lastClaudeOutputAt, masking case (a).
+      // So we ALSO key off wall-clock elapsed since turn start, independent of
+      // PTY bytes. Re-delivery is double-execution safe in BOTH cases because
+      // zero JSONL means nothing executed.
+      //
+      // Threshold is 45s: long enough that a genuinely fast turn (first token
+      // in <10s typically) never trips it, short enough that a wedge recovers
+      // in ~45s instead of the old 110s. Heartbeats at 2m/4m only matter for
+      // case (b) on a genuinely slow-but-alive API.
       if (!turnProducedOutput && idleMs < WATCHDOG_WEDGE_RECOVER_MS) {
-        if (elapsedMs >= 5 * 60_000 && !strandRecoveryInFlight) {
-          const elapsedMin = Math.round(elapsedMs / 60_000);
+        if (elapsedMs >= 45_000 && !strandRecoveryInFlight) {
+          const elapsedSec = Math.round(elapsedMs / 1000);
           logger.debug(
-            `[remote][strand] extended-thinking hang — no JSONL output after ${elapsedMs}ms (PTY spinner active). Forcing recovery. ${strandDiagState()}`,
+            `[remote][strand] no JSONL output ${elapsedMs}ms after turn start (PTY spinner may be active) — likely a dropped submission or hung API. Forcing recovery. ${strandDiagState()}`,
           );
           session.client.sendSessionEvent({
             type: "message",
-            message: `No response after ${elapsedMin}m — the API may be overloaded. Forcing recovery…`,
+            message: `No response after ${elapsedSec}s — re-sending your message…`,
           });
           void recoverStrandedTurn(elapsedMs);
           return;
-        }
-        // Heartbeat at 2m and 4m so the App can show "still thinking…".
-        // Use modular arithmetic against the tick interval so we fire once
-        // per threshold crossing, not every tick after it.
-        const hbThresholds = [2 * 60_000, 4 * 60_000];
-        for (const t of hbThresholds) {
-          if (elapsedMs >= t && elapsedMs < t + WATCHDOG_TICK_MS) {
-            const elapsedMin = Math.round(elapsedMs / 60_000);
-            logger.debug(
-              `[remote][strand] extended-thinking in progress — no JSONL output after ${elapsedMs}ms. Sending heartbeat. ${strandDiagState()}`,
-            );
-            session.client.sendSessionEvent({
-              type: "message",
-              message: `Still thinking… (${elapsedMin}m elapsed, model: extended reasoning)`,
-            });
-          }
         }
       }
       if (idleMs < WATCHDOG_IDLE_WARN_MS) return;
