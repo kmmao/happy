@@ -191,7 +191,7 @@ export function supervisorRoutes(app: Fastify) {
                     return { conflict: "Cannot reprocess while a scan is running" as const };
                 }
 
-                // Find all matching pending actions
+                // Find all matching pending actions (capped at 200 to prevent memory issues)
                 const pendingActions = await tx.supervisorAction.findMany({
                     where: {
                         projectId: id,
@@ -207,7 +207,12 @@ export function supervisorRoutes(app: Fastify) {
                         suggestedFix: true,
                         category: true,
                     },
+                    take: 200,
                 });
+
+                if (pendingActions.length >= 200) {
+                    log({ module: "supervisor", level: "warn" }, `pendingActions query hit the 200-record cap for project ${id}`);
+                }
 
                 if (pendingActions.length === 0) {
                     const totalPending = await tx.supervisorAction.count({
