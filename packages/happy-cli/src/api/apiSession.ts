@@ -360,6 +360,10 @@ export class ApiSessionClient extends EventEmitter {
       this.reconnect.schedule();
     });
 
+    // Kick the reconnect loop immediately so that an initial connection
+    // failure (before any connect/connect_error fires) is retried.
+    this.reconnect.schedule();
+
     // Server events
     this.socket.on("update", (data: Update) => {
       try {

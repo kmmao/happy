@@ -1607,6 +1607,10 @@ export class ApiMachineClient {
       this.reconnect?.schedule();
     });
 
+    // Kick the reconnect loop immediately so that an initial connection
+    // failure (before any connect/connect_error fires) is retried.
+    this.reconnect?.schedule();
+
     this.socket.io.on("error", (error: any) => {
       logger.debug("[API MACHINE] Socket error:", error);
     });
