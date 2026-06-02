@@ -487,6 +487,49 @@ export async function startHappyServer(client: ApiSessionClient) {
       }
     });
 
+    registerHappyTool("report_preview", async (args: any) => {
+        const sessionId = client.sessionId;
+        if (!sessionId) {
+          return {
+            content: [{ type: "text", text: "No active session for preview report." }],
+            isError: true,
+          };
+        }
+        try {
+          const report = {
+            sessionId,
+            protocol: args.protocol ?? "http",
+            host: args.host ?? "127.0.0.1",
+            port: args.port,
+            path: args.path,
+            devServerType: args.devServerType,
+            command: args.command,
+            cwd: args.cwd,
+            pid: args.pid,
+          };
+          // Report to server via the session socket
+          const result = await client.emitPreviewCandidateReport(report);
+          if (result?.ok) {
+            return {
+              content: [{
+                type: "text",
+                text: `Preview candidate reported (${report.host}:${report.port}). The user can now open the Preview tab to view it.`,
+              }],
+              isError: false,
+            };
+          }
+          return {
+            content: [{ type: "text", text: `Preview report rejected: ${result?.error ?? "unknown error"}` }],
+            isError: true,
+          };
+        } catch (err) {
+          return {
+            content: [{ type: "text", text: `Failed to report preview: ${err instanceof Error ? err.message : String(err)}` }],
+            isError: true,
+          };
+        }
+      });
+
     registerHappyTool("update_session_summary", async (args: any) => {
         const response = await summaryHandler(args);
         if (response.success) {

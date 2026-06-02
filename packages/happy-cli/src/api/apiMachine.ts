@@ -37,6 +37,7 @@ import {
 } from "@kmmao/happy-wire";
 import { createCipher, type Cipher } from "./encryption";
 import { backoff } from "@/utils/time";
+import { registerPreviewProxy, type PreviewCandidate } from "@/preview";
 import { RpcHandlerManager } from "./rpc/RpcHandlerManager";
 import { detectTailscale, detectTailscaleServe, type TailscaleInfo } from "@/utils/tailscale";
 import type { TunnelManager } from "@/tunnel";
@@ -435,6 +436,9 @@ export class ApiMachineClient {
   private sessionSyncProvider: (() => string[]) | null = null;
   // Provided by run.ts — terminates all tracked child processes after prolonged server disconnect
   private disconnectCleanupHandler: (() => void) | null = null;
+
+  // Preview proxy: cleanup function for the registered preview proxy handler
+  private previewProxyCleanup: (() => void) | null = null;
 
   constructor(
     private token: string,
@@ -1383,6 +1387,34 @@ export class ApiMachineClient {
     }
   }
 
+  /**
+   * Register preview proxy on the machine socket.
+   *
+   * Listens for `preview-start-proxy` from the server (sent after tunnel
+   * creation) and activates `registerPreviewProxy` which handles
+   * `preview-proxy-request` / `preview-ws-connect` events.
+   */
+  private registerPreviewProxyHandlers() {
+    // Clean up any previous proxy
+    this.previewProxyCleanup?.();
+    this.previewProxyCleanup = null;
+
+    // Listen for server telling us to start proxying
+    this.socket.on("preview-start-proxy" as any, (data: { tunnelId: string; candidate: PreviewCandidate }) => {
+      logger.debug(`[PREVIEW] Starting proxy for tunnel ${data.tunnelId} → ${data.candidate.host}:${data.candidate.port}`);
+      // Clean up any previous proxy
+      this.previewProxyCleanup?.();
+      this.previewProxyCleanup = registerPreviewProxy(this.socket as any, data.candidate);
+    });
+
+    // Listen for server telling us to stop proxying
+    this.socket.on("preview-stop-proxy" as any, () => {
+      logger.debug("[PREVIEW] Stopping proxy");
+      this.previewProxyCleanup?.();
+      this.previewProxyCleanup = null;
+    });
+  }
+
   connect() {
     const serverUrl = configuration.serverUrl.replace(/^http/, "ws");
     logger.debug(`[API MACHINE] Connecting to ${serverUrl}`);
@@ -1466,6 +1498,11 @@ export class ApiMachineClient {
       this.flushPendingTaskStatuses();
 
       this.syncActiveSessions();
+
+      // Register preview proxy handlers on machine socket.
+      // The server sends preview-proxy-request events when a tunnel is active;
+      // the handler fetches from the local dev server and streams back.
+      this.registerPreviewProxyHandlers();
 
       // Start keep-alive
       this.startKeepAlive();

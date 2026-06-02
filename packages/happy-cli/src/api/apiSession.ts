@@ -1111,6 +1111,37 @@ export class ApiSessionClient extends EventEmitter {
   }
 
   /**
+   * Report a preview candidate (dev server) to the server.
+   * The server stores it and broadcasts to interested App clients.
+   */
+  async emitPreviewCandidateReport(report: {
+    sessionId: string;
+    protocol: string;
+    host: string;
+    port: number;
+    path?: string;
+    devServerType?: string;
+    command?: string;
+    cwd?: string;
+    pid?: number;
+  }): Promise<{ ok: boolean; candidateId?: string; error?: string }> {
+    if (!this.socket.connected) {
+      return { ok: false, error: "socket-disconnected" };
+    }
+    return new Promise((resolve) => {
+      this.socket.emit(
+        "preview-candidate-report" as any,
+        report,
+        (response: any) => {
+          resolve(response ?? { ok: false, error: "no-response" });
+        },
+      );
+      // Timeout after 10s
+      setTimeout(() => resolve({ ok: false, error: "timeout" }), 10_000);
+    });
+  }
+
+  /**
    * Send session death message
    */
   sendSessionDeath() {
