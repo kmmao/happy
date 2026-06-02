@@ -114,6 +114,11 @@ happy sandbox disable    # Disable sandboxing
 - `--claude-env KEY=VALUE` - Set environment variable for Claude Code
 - `--claude-arg ARG` - Pass additional argument to Claude CLI
 
+### Codex Options
+
+- `--permission-mode <mode>` - Permission mode for Codex: default, yolo, safe-yolo, read-only, etc.
+- `--yolo` - Shorthand for `--permission-mode yolo` (skip all permission prompts)
+
 ### Global Options
 
 - `-h, --help` - Show help

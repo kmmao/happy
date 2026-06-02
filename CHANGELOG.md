@@ -14,6 +14,8 @@ This monorepo contains multiple packages, each with its own changelog:
 
 ### 2026-06-02
 
+- **happy-cli 0.89.0** — Codex permission-mode pipeline: new `--permission-mode <mode>` and `--yolo` CLI flags plumb an explicit permission mode through `runCodex`, mapping `yolo`/`bypassPermissions` to the `never` approval policy so full-yolo sessions skip all permission prompts. Also fixes initial socket reconnect (smart reconnect now kicks immediately after socket setup, preventing silent connection failures on cold start). App-side: new `new-machine` live-update handler initializes per-machine encryption from the carried data key, so freshly onboarded machines appear instantly without an app restart.
+
 - **happy-cli 0.88.1** — Three more Claude Code 2.1.x hooks (`InstructionsLoaded`, `PermissionDenied`, `PostToolBatch`, verified against 2.1.157's `HookEvent` type) wired through the hook server with hand-mirrored payload types (no agent-sdk dependency). `PermissionDenied` is surfaced end-to-end: a capped, head-deduped `recentPermissionDenials` ring buffer in `session.metadata`, rendered as a "Recent Permission Denials" list on the App's Session Info screen (App UI shipped in code, pending an App release).
 
 ### 2026-05-31
