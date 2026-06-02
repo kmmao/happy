@@ -354,12 +354,17 @@ function filterAutomationAudit<T extends { kind: string; status?: string; projec
       // Parse startedBy argument
       let startedBy: "daemon" | "terminal" | undefined = undefined;
       let happySessionId: string | undefined = undefined;
+      let permissionMode: import("@/api/types").PermissionMode | undefined = undefined;
       const codexArgs = extractNoSandboxFlag(args.slice(1));
       for (let i = 0; i < codexArgs.args.length; i++) {
         if (codexArgs.args[i] === "--started-by") {
           startedBy = codexArgs.args[++i] as "daemon" | "terminal";
         } else if (codexArgs.args[i] === "--happy-session-id") {
           happySessionId = codexArgs.args[++i];
+        } else if (codexArgs.args[i] === "--permission-mode") {
+          permissionMode = codexArgs.args[++i] as import("@/api/types").PermissionMode;
+        } else if (codexArgs.args[i] === "--yolo") {
+          permissionMode = "yolo";
         }
       }
 
@@ -379,6 +384,7 @@ function filterAutomationAudit<T extends { kind: string; status?: string; projec
         startedBy,
         noSandbox: codexArgs.noSandbox,
         happySessionId,
+        permissionMode,
       });
       // Do not force exit here; allow instrumentation to show lingering handles
     } catch (error) {

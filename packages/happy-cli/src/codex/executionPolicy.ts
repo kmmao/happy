@@ -34,12 +34,12 @@ export function resolveCodexExecutionPolicy(
             };
         case 'yolo':
             return {
-                approvalPolicy: 'on-failure',
+                approvalPolicy: 'never',
                 sandbox: 'danger-full-access',
             };
         case 'bypassPermissions':
             return {
-                approvalPolicy: 'on-failure',
+                approvalPolicy: 'never',
                 sandbox: 'danger-full-access',
             };
         case 'acceptEdits':

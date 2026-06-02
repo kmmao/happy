@@ -268,6 +268,7 @@ export async function runCodex(opts: {
   startedBy?: "daemon" | "terminal";
   noSandbox?: boolean;
   happySessionId?: string;
+  permissionMode?: import("@/api/types").PermissionMode;
 }): Promise<void> {
   //
   // Define session
@@ -345,11 +346,16 @@ export async function runCodex(opts: {
   // Create session
   //
 
+  const initialPermissionMode = opts.permissionMode ?? DEFAULT_CODEX_PERMISSION_MODE;
+
   const { state, metadata: rawMetadata } = createSessionMetadata({
     flavor: "codex",
     machineId,
     startedBy: opts.startedBy,
     sandbox: sandboxConfig,
+    dangerouslySkipPermissions:
+      initialPermissionMode === "yolo" ||
+      initialPermissionMode === "bypassPermissions",
   });
   const localSurface = await collectCodexLocalSurface({
     cwd: process.cwd(),
@@ -511,7 +517,7 @@ export async function runCodex(opts: {
   // Track current overrides to apply per message
   // Use shared PermissionMode type from api/types for cross-agent compatibility
   let currentPermissionMode: import("@/api/types").PermissionMode | undefined =
-    DEFAULT_CODEX_PERMISSION_MODE;
+    initialPermissionMode;
   let currentModel: string | undefined = DEFAULT_CODEX_MODEL;
   let currentReasoningEffort:
     | NonNullable<import("@/api/types").MessageMeta["effort"]>
@@ -522,7 +528,7 @@ export async function runCodex(opts: {
   // abort path below so the next turn doesn't inherit one-message overrides
   // from the aborted turn (e.g. user picked xhigh for one tough question).
   const resetCurrentModeDefaults = () => {
-    currentPermissionMode = DEFAULT_CODEX_PERMISSION_MODE;
+    currentPermissionMode = initialPermissionMode;
     currentModel = DEFAULT_CODEX_MODEL;
     currentReasoningEffort = DEFAULT_CODEX_EFFORT;
     currentAppendSystemPrompt = undefined;
