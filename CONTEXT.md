@@ -56,6 +56,22 @@ _Avoid_: Agent, service, worker
 **DaemonState**:
 A real-time status snapshot of a Daemon, stored as an encrypted field on Machine. Contains daemon status, port, Tailscale/tunnel info, automation summaries, CLI install info, and recent errors.
 
+**Preview**:
+A live remote view of a local dev server from within a Session. Session-scoped — each Session has at most one active Preview. Consists of a PreviewCandidate (reported dev server) and an optional PreviewTunnel (active proxy connection). The Daemon proxies HTTP/WebSocket traffic between the App and the local server; the App renders the page in an iframe/WebView. Not an independent entity — an ephemeral capability of a Session.
+_Avoid_: Remote desktop, screen share
+
+**PreviewCandidate**:
+A dev server reported by the Agent via the `report_preview` MCP tool. Records protocol, host, port, and optional metadata (devServerType, command, pid). Transitions through states: reported → available → invalid. Session-scoped and ephemeral (in-memory only).
+_Avoid_: Preview target, preview source
+
+**PreviewTunnel**:
+An active proxy connection that makes a local dev server reachable through a public URL on the Server. Created by the Account from a PreviewCandidate. Traffic flows: App → Server (HTTP gateway) → Daemon (Socket.IO) → localhost. Includes WebSocket proxying for HMR. Subject to lease (8h) and idle timeout (45min). One per Session at most.
+_Avoid_: Preview connection, proxy session
+
+**VisualAnnotation**:
+A UI feedback action within a Preview — the Account clicks an element, writes a comment, and sends structured data (CSS selector, XPath, computed style, ancestor chain) back to the Session as a message. The injected annotation runtime tracks element positions via MutationObserver so comment pins stay anchored across DOM changes.
+_Avoid_: Screenshot annotation, markup
+
 **SessionMessage**:
 An immutable, encrypted message in a Session's conversation log. Seq-ordered for causal tracking, deduplicated by localId. The primary content stream users see in the App.
 _Avoid_: Chat message, log entry
@@ -107,6 +123,10 @@ _Avoid_: Profile, backend, config
 - A **SupervisorAction** can spawn a fix **Session**
 - **Knowledge** entries relate to each other via KnowledgeRelation (related/contradicts/refines/combines)
 - A **Trigger** belongs to a **Project** and references an **AiBackendProfile**
+- A **Session** has at most one active **Preview** (0..1)
+- A **Preview** has exactly one **PreviewCandidate** and at most one **PreviewTunnel**
+- A **PreviewTunnel** is proxied through the **Daemon** on the Session's **Machine**
+- A **VisualAnnotation** belongs to a **Preview** and produces a **SessionMessage**
 
 ## Example dialogue
 
@@ -122,4 +142,8 @@ _Avoid_: Profile, backend, config
 - "Skill" in Happy means a reusable instruction template for Tasks — not a Claude Code agent skill (mattpocock/skills).
 - "Artifact" in Happy means an encrypted data container — not a Claude.ai conversation artifact.
 - "Task" strictly means an automated work unit — not a UI todo/checklist item.
+- **PreviewTunnel** publicUrl is same-origin with the Server (`/preview/{tunnelId}`). The tunnelId (12-char random) is the sole authentication — no cookie/JWT check. Acceptable because: Server auth uses Bearer tokens (no cookies at risk), tunnelId has ~62 bits entropy, and tunnels are short-lived (8h max). If cookie-based auth is ever added, revisit with subdomain isolation.
+- Code uses `PreviewConnection` / `preview-connection-updated` but the canonical domain term is **PreviewTunnel**. The wire schemas are already published under the old name; align in a future breaking version bump.
+- **Preview** traffic (HTML, JS, CSS, images) flows through the Server in plaintext — it is **not** E2E encrypted. The Server can see the full content of previewed pages. This is an inherent limitation of the HTTP proxy architecture (the browser needs valid HTTP, not ciphertext). All other Session content (SessionMessages, SessionEvents, DaemonState) remains E2E encrypted.
+- **VisualAnnotation** data travels as a markdown **SessionMessage** with an embedded fenced JSON block (`visual-annotation`), not as a structured inputBlock or session protocol field. This is a drift from Lody's `visual_annotation_reference` inputBlock model. Acceptable for now because Happy injects messages via PTY (no inputBlock channel); if a structured annotation channel is added later, migrate the format.
 
