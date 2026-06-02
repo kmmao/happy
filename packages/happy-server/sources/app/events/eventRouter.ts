@@ -474,6 +474,36 @@ export type EphemeralEvent =
         parentTaskId?: string | null;
       };
     }
+  | {
+      type: "preview-candidate-reported";
+      sessionId: string;
+      candidate: {
+          id: string;
+          sessionId: string;
+          state: string;
+          protocol: string;
+          host: string;
+          port: number;
+          path?: string;
+          devServerType?: string;
+          reportedAt: number;
+      };
+    }
+  | {
+      type: "preview-connection-updated";
+      sessionId: string;
+      connection: {
+          tunnelId: string;
+          candidateId: string;
+          sessionId: string;
+          publicUrl: string;
+          status: string;
+          createdAt: number;
+          leaseExpiresAt: number;
+          idleTimeoutMs: number;
+          lastActiveAt: number;
+      } | null;
+    }
 ;
 
 // === EVENT PAYLOAD TYPES ===
@@ -542,6 +572,21 @@ class EventRouter {
       if (c.connectionType !== "machine-scoped") return true;
     }
     return false;
+  }
+
+  /**
+   * Find a machine-scoped socket connection by machineId across all users.
+   * Used for routing proxy requests from the preview gateway to the correct CLI daemon.
+   */
+  findMachineSocket(machineId: string): Socket | null {
+    for (const connections of this.userConnections.values()) {
+      for (const connection of connections) {
+        if (connection.connectionType === "machine-scoped" && connection.machineId === machineId) {
+          return connection.socket;
+        }
+      }
+    }
+    return null;
   }
 
   // === EVENT EMISSION METHODS ===
@@ -1342,5 +1387,47 @@ export function buildWorldEventCreatedEphemeral(event: {
   return {
     type: "world-event-created",
     event,
+  };
+}
+
+export function buildPreviewCandidateReportedEphemeral(opts: {
+  sessionId: string;
+  candidate: {
+    id: string;
+    sessionId: string;
+    state: string;
+    protocol: string;
+    host: string;
+    port: number;
+    path?: string;
+    devServerType?: string;
+    reportedAt: number;
+  };
+}): EphemeralPayload {
+  return {
+    type: "preview-candidate-reported",
+    sessionId: opts.sessionId,
+    candidate: opts.candidate,
+  };
+}
+
+export function buildPreviewConnectionUpdatedEphemeral(opts: {
+  sessionId: string;
+  connection: {
+    tunnelId: string;
+    candidateId: string;
+    sessionId: string;
+    publicUrl: string;
+    status: string;
+    createdAt: number;
+    leaseExpiresAt: number;
+    idleTimeoutMs: number;
+    lastActiveAt: number;
+  } | null;
+}): EphemeralPayload {
+  return {
+    type: "preview-connection-updated",
+    sessionId: opts.sessionId,
+    connection: opts.connection,
   };
 }

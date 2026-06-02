@@ -3708,6 +3708,14 @@ export const ja: TranslationStructure = {
       "probing-http": "HTTPサービスを探査中...",
       done: "完了",
     },
+    tunnelStatus: "トンネル",
+    createTunnel: "トンネルを作成",
+    revokeTunnel: "切断",
+    tunnelActive: "トンネルがアクティブ",
+    tunnelCreating: "トンネルを作成中...",
+    tunnelError: "トンネルエラー",
+    annotationTitle: "要素の注釈",
+    annotationPlaceholder: "報告したい変更または問題を説明してください...",
   },
 
   backgroundTasks: {

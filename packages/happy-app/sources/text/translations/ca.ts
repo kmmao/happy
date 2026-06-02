@@ -3738,6 +3738,14 @@ export const ca: TranslationStructure = {
       "probing-http": "Provant serveis HTTP...",
       done: "Fet",
     },
+    tunnelStatus: "Túnel",
+    createTunnel: "Crear túnel",
+    revokeTunnel: "Desconnectar",
+    tunnelActive: "Túnel actiu",
+    tunnelCreating: "Creant túnel...",
+    tunnelError: "Error de túnel",
+    annotationTitle: "Anotació d'element",
+    annotationPlaceholder: "Descriu el canvi o problema que vols informar...",
   },
 
   backgroundTasks: {

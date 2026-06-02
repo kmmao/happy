@@ -3754,6 +3754,14 @@ export const pl: TranslationStructure = {
       "probing-http": "Testowanie usług HTTP...",
       done: "Gotowe",
     },
+    tunnelStatus: "Tunel",
+    createTunnel: "Utwórz tunel",
+    revokeTunnel: "Rozłącz",
+    tunnelActive: "Tunel aktywny",
+    tunnelCreating: "Tworzenie tunelu...",
+    tunnelError: "Błąd tunelu",
+    annotationTitle: "Adnotacja elementu",
+    annotationPlaceholder: "Opisz zmianę lub problem, który chcesz zgłosić...",
   },
 
   backgroundTasks: {

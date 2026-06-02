@@ -3725,6 +3725,14 @@ export const en: TranslationStructure = {
       "probing-http": "Probing HTTP services...",
       done: "Done",
     },
+    tunnelStatus: "Tunnel",
+    createTunnel: "Create Tunnel",
+    revokeTunnel: "Disconnect",
+    tunnelActive: "Tunnel Active",
+    tunnelCreating: "Creating tunnel...",
+    tunnelError: "Tunnel error",
+    annotationTitle: "Element Annotation",
+    annotationPlaceholder: "Describe the change or issue you'd like to report...",
   },
 
   backgroundTasks: {

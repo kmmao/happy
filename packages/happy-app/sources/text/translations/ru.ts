@@ -3752,6 +3752,14 @@ export const ru: TranslationStructure = {
       "probing-http": "Проверка HTTP сервисов...",
       done: "Готово",
     },
+    tunnelStatus: "Туннель",
+    createTunnel: "Создать туннель",
+    revokeTunnel: "Отключить",
+    tunnelActive: "Туннель активен",
+    tunnelCreating: "Создание туннеля...",
+    tunnelError: "Ошибка туннеля",
+    annotationTitle: "Аннотация элемента",
+    annotationPlaceholder: "Опишите изменение или проблему, которую вы хотите сообщить...",
   },
 
   backgroundTasks: {

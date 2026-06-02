@@ -54,6 +54,9 @@ import { optionGenerateRoutes } from "./routes/optionGenerateRoutes";
 import { supervisorDimensionRoutes } from "./routes/supervisorDimensionRoutes";
 import { agentLoopSuggestRoutes } from "./routes/agentLoopSuggestRoutes";
 import { mcpServerRoutes } from "./routes/mcpServerRoutes";
+import { previewRoutes } from "./routes/previewRoutes";
+import { previewGateway } from "./routes/previewGateway";
+import { attachPreviewWsGateway } from "./routes/previewWsGateway";
 import { isLocalStorage, getLocalFilesDir } from "@/storage/files";
 import { startKnowledgeLifecycleScheduler, stopKnowledgeLifecycleScheduler } from "@/modules/knowledgeLifecycleScheduler";
 import { startTaskStaleReaper, stopTaskStaleReaper } from "@/modules/taskStaleReaper";
@@ -181,6 +184,8 @@ export async function startApi() {
   supervisorDimensionRoutes(typed);
   agentLoopSuggestRoutes(typed);
   mcpServerRoutes(typed);
+  previewRoutes(typed);
+  previewGateway(typed);
 
   // Start HTTP
   const port = process.env.PORT ? parseInt(process.env.PORT, 10) : 3005;
@@ -191,6 +196,9 @@ export async function startApi() {
 
   // Start Socket
   startSocket(typed);
+
+  // Attach preview WebSocket gateway (must be after Socket.IO)
+  attachPreviewWsGateway(app.server);
 
   // Start knowledge lifecycle scheduler (decay/merge jobs)
   startKnowledgeLifecycleScheduler();

@@ -18,6 +18,10 @@ interface LivePreviewViewProps {
     onError?: (error: string) => void;
     /** Key to force WebView remount (increment to reload) */
     reloadKey?: number;
+    /** Callback when user annotates an element on the preview. */
+    onAnnotation?: (payload: any) => void;
+    /** Whether annotation mode is enabled. */
+    annotationMode?: boolean;
 }
 
 // ── Native WebView implementation ────────────────────────────────────────────
@@ -29,10 +33,13 @@ function NativePreview({
     onLoad,
     onError,
     reloadKey,
+    onAnnotation,
+    annotationMode,
 }: LivePreviewViewProps) {
     const { theme } = useUnistyles();
     const [loading, setLoading] = React.useState(true);
     const [hasError, setHasError] = React.useState(false);
+    const webViewRef = React.useRef<any>(null);
 
     // Lazy-import WebView to avoid web bundle issues
     const WebViewComponent = React.useMemo(() => {
@@ -44,6 +51,18 @@ function NativePreview({
             return null;
         }
     }, []);
+
+    // Send annotation mode to WebView
+    React.useEffect(() => {
+        if (!webViewRef.current || !WebViewComponent) return;
+        const injected = `
+            window.ANNOTATION_MODE = ${annotationMode ? "true" : "false"};
+            if (window._annotationModeChangeListener) {
+                window._annotationModeChangeListener(${annotationMode ? "true" : "false"});
+            }
+        `;
+        webViewRef.current?.injectJavaScript(injected);
+    }, [annotationMode, WebViewComponent]);
 
     if (!WebViewComponent) {
         return (
@@ -95,6 +114,7 @@ function NativePreview({
                     }}
                 >
                     <WebViewComponent
+                        ref={webViewRef}
                         key={reloadKey}
                         source={{ uri: url }}
                         style={{ flex: 1 }}
@@ -119,6 +139,19 @@ function NativePreview({
                                 onError?.(`HTTP ${e.nativeEvent.statusCode}`);
                             }
                         }}
+                        onMessage={(e: any) => {
+                            try {
+                                const data = JSON.parse(e.nativeEvent.data);
+                                if (
+                                    data.type === "HAPPY_ANNOTATION_TARGET" &&
+                                    onAnnotation
+                                ) {
+                                    onAnnotation(data.payload);
+                                }
+                            } catch {
+                                // Ignore invalid JSON
+                            }
+                        }}
                     />
                 </View>
             </View>
@@ -135,6 +168,8 @@ function WebPreview({
     onLoad,
     onError,
     reloadKey,
+    onAnnotation,
+    annotationMode,
 }: LivePreviewViewProps) {
     const { theme } = useUnistyles();
     const [loading, setLoading] = React.useState(true);
@@ -149,6 +184,30 @@ function WebPreview({
         setLoading(true);
         setHasError(false);
     }, [url, reloadKey]);
+
+    // Listen for annotation messages from iframe
+    React.useEffect(() => {
+        const handleMessage = (e: MessageEvent) => {
+            if (
+                e.source === iframeRef.current?.contentWindow &&
+                e.data?.type === "HAPPY_ANNOTATION_TARGET" &&
+                onAnnotation
+            ) {
+                onAnnotation(e.data.payload);
+            }
+        };
+        window.addEventListener("message", handleMessage);
+        return () => window.removeEventListener("message", handleMessage);
+    }, [onAnnotation]);
+
+    // Send annotation mode to iframe
+    React.useEffect(() => {
+        if (!iframeRef.current?.contentWindow) return;
+        iframeRef.current.contentWindow.postMessage(
+            { type: "SET_ANNOTATION_MODE", enabled: annotationMode },
+            "*",
+        );
+    }, [annotationMode]);
 
     return (
         <View style={[styles.previewContainer, { backgroundColor: theme.colors.surfaceHighest }]}>

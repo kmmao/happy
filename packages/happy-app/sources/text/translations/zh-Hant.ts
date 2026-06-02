@@ -3635,6 +3635,14 @@ export const zhHant: TranslationStructure = {
       "probing-http": "正在探測 HTTP 服務...",
       done: "完成",
     },
+    tunnelStatus: "隧道",
+    createTunnel: "建立隧道",
+    revokeTunnel: "斷開連線",
+    tunnelActive: "隧道已啟用",
+    tunnelCreating: "正在建立隧道...",
+    tunnelError: "隧道錯誤",
+    annotationTitle: "元素標註",
+    annotationPlaceholder: "描述你想報告的變更或問題...",
   },
 
   backgroundTasks: {

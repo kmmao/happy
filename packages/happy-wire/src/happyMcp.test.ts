@@ -43,6 +43,7 @@ describe("happyMcp", () => {
       "change_title",
       "update_progress",
       "update_session_summary",
+      "report_preview",
     ]);
     expect(HAPPY_MCP_SILENT_SUCCESS_TOOL_NAMES).toEqual(["change_title"]);
     expect(

@@ -24,6 +24,7 @@ import { t } from "@/text";
 import { Ionicons } from "@expo/vector-icons";
 import { usePreview, type DetectedPort } from "@/hooks/usePreview";
 import { useRemotePreview } from "@/hooks/useRemotePreview";
+import { usePreviewTunnel } from "@/hooks/usePreviewTunnel";
 import { useHiddenProcesses } from "@/hooks/useHiddenProcesses";
 import { useSession } from "@/sync/storage";
 import { screenLayoutMaxWidth } from "@/components/layout";
@@ -32,6 +33,7 @@ import { PreviewModeSwitch } from "@/components/preview/PreviewModeSwitch";
 import { PreviewToolbar } from "@/components/preview/PreviewToolbar";
 import { LivePreviewView } from "@/components/preview/LivePreviewView";
 import { AnnotationOverlay } from "@/components/preview/AnnotationOverlay";
+import { AnnotationCommentSheet } from "@/components/preview/AnnotationCommentSheet";
 import { sync } from "@/sync/sync";
 import { uploadImage } from "@/utils/imageUpload.shared";
 
@@ -45,6 +47,7 @@ export default React.memo(function PreviewPage() {
 
     // ── Live Preview state ───────────────────────────────────────────────────
     const remote = useRemotePreview(sessionId);
+    const tunnel = usePreviewTunnel(sessionId);
 
     // ── Screenshot mode state (original) ─────────────────────────────────────
     const {
@@ -66,6 +69,8 @@ export default React.memo(function PreviewPage() {
     const [diffTab, setDiffTab] = React.useState<DiffTab>("after");
     const [reloadKey, setReloadKey] = React.useState(0);
     const [annotating, setAnnotating] = React.useState(false);
+    const [annotationPayload, setAnnotationPayload] = React.useState<any>(null);
+    const [annotationMode, setAnnotationMode] = React.useState(false);
 
     // Auto-detect ports on mount for screenshot mode
     React.useEffect(() => {
@@ -136,6 +141,26 @@ export default React.memo(function PreviewPage() {
     const handleAnnotationCancel = React.useCallback(() => {
         setAnnotating(false);
     }, []);
+
+    const handleElementAnnotation = React.useCallback((payload: any) => {
+        setAnnotationPayload(payload);
+    }, []);
+
+    const handleCommentSubmit = React.useCallback(
+        (comment: string) => {
+            // Format annotation message
+            const elementInfo = annotationPayload?.target;
+            const elementTag = elementInfo
+                ? `<${elementInfo.tag}${elementInfo.id ? ` id="${elementInfo.id}"` : ""}>`
+                : "Element";
+            const url = annotationPayload?.page?.url ?? remote.state.url;
+
+            const annotationMessage = `[Visual Annotation]\n**Element**: ${elementTag}\n**URL**: ${url}\n**Comment**: ${comment}`;
+            sync.sendMessage(sessionId, annotationMessage);
+            setAnnotationPayload(null);
+        },
+        [sessionId, annotationPayload, remote.state.url],
+    );
 
     // ── Derive port lists ────────────────────────────────────────────────────
 
@@ -210,12 +235,14 @@ export default React.memo(function PreviewPage() {
                         ) : (
                             <View style={styles.previewArea}>
                                 <LivePreviewView
-                                    url={remote.state.url}
+                                    url={tunnel.connection?.publicUrl || remote.state.url}
                                     viewport={remote.state.viewport}
                                     zoom={remote.state.zoom}
                                     onLoad={remote.onWebViewLoad}
                                     onError={remote.onWebViewError}
                                     reloadKey={reloadKey}
+                                    onAnnotation={handleElementAnnotation}
+                                    annotationMode={annotationMode}
                                 />
                             </View>
                         )}
@@ -432,6 +459,15 @@ export default React.memo(function PreviewPage() {
                         </View>
                     )}
                 </View>
+
+                {/* ── Annotation Comment Sheet ─────────────────────────── */}
+                {annotationPayload && (
+                    <AnnotationCommentSheet
+                        annotation={annotationPayload}
+                        onSubmit={handleCommentSubmit}
+                        onDismiss={() => setAnnotationPayload(null)}
+                    />
+                )}
             </View>
         </View>
     );

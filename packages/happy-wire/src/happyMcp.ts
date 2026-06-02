@@ -6,6 +6,7 @@ export const HAPPY_MCP_TOOL_NAMES = [
   "update_progress",
   "update_session_summary",
   "ask_user",
+  "report_preview",
 ] as const;
 
 export type HappyMcpCanonicalToolName = (typeof HAPPY_MCP_TOOL_NAMES)[number];
@@ -182,6 +183,63 @@ export const HAPPY_MCP_TOOL_SPECS: Record<
     dynamicAction: "Waiting for user to answer",
     fallbackAction: "Ask user",
     reasonPhrases: ["ask user", "user input", "ask_user"],
+  },
+  report_preview: {
+    title: "Report Preview",
+    description:
+      "Use this immediately after starting or discovering a frontend/web dev server for the current session. " +
+      "Report the loopback host and port before telling the user the server is ready, so the app can offer a " +
+      "remote preview. This only reports a candidate; the user creates or opens the preview from the app. " +
+      "After a successful report, tell the user they can open the Preview tab to view it.",
+    failureLabel: "Failed to report preview",
+    inputSchema: {
+      protocol: z
+        .enum(["http", "https"])
+        .default("http")
+        .describe("Protocol of the local dev server."),
+      host: z
+        .string()
+        .min(1)
+        .describe(
+          "Loopback host for the local dev server, usually 127.0.0.1 or localhost.",
+        ),
+      port: z
+        .number()
+        .int()
+        .min(1)
+        .max(65535)
+        .describe("Local frontend dev server port, such as 5173 or 3000."),
+      path: z
+        .string()
+        .optional()
+        .describe("Optional initial path to open first, such as /."),
+      devServerType: z
+        .string()
+        .optional()
+        .describe(
+          "Optional dev server type, such as vite, next, astro, or storybook.",
+        ),
+      command: z
+        .string()
+        .optional()
+        .describe("Optional command used to start the server."),
+      cwd: z
+        .string()
+        .optional()
+        .describe("Optional working directory of the server command."),
+      pid: z
+        .number()
+        .int()
+        .positive()
+        .optional()
+        .describe("Optional dev server process id."),
+    },
+    hideSuccessfulCall: false,
+    autoApproveByDefault: true,
+    permissionAction: "Waiting for approval to report preview",
+    dynamicAction: "Reporting preview candidate",
+    fallbackAction: "Report preview",
+    reasonPhrases: ["report preview", "preview report", "report_preview"],
   },
   update_session_summary: {
     title: "Update Session Summary",

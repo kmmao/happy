@@ -3735,6 +3735,14 @@ export const pt: TranslationStructure = {
       "probing-http": "Testando serviços HTTP...",
       done: "Concluído",
     },
+    tunnelStatus: "Túnel",
+    createTunnel: "Criar túnel",
+    revokeTunnel: "Desconectar",
+    tunnelActive: "Túnel ativo",
+    tunnelCreating: "Criando túnel...",
+    tunnelError: "Erro do túnel",
+    annotationTitle: "Anotação de elemento",
+    annotationPlaceholder: "Descreva a mudança ou problema que deseja relatar...",
   },
 
   backgroundTasks: {
