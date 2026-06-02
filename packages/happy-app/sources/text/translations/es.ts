@@ -3741,6 +3741,13 @@ export const es: TranslationStructure = {
     tunnelError: "Error del túnel",
     annotationTitle: "Anotación de elemento",
     annotationPlaceholder: "Describe el cambio o problema que deseas reportar...",
+    openExternal: "Abrir en navegador",
+    disconnect: "Desconectar",
+    rotateViewport: "Rotar",
+    annotateMode: "Modo anotación",
+    annotateModeActive: "Toca un elemento para anotar",
+    candidateDetected: "Servidor de desarrollo detectado",
+    viewPreview: "Ver",
   },
 
   backgroundTasks: {

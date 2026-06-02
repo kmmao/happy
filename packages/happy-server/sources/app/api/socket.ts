@@ -254,7 +254,37 @@ export function startSocket(app: Fastify) {
     sessionEventHandler(socket, userId);
     terminalHandler(userId, socket);
     interAgentMessageHandler(socket, userId);
-    previewProxyHandler(userId, socket);
+    previewProxyHandler(userId, socket, machineId!);
+
+    // F4: when a daemon reconnects, replay active preview tunnels so the
+    // daemon-side proxy handler resumes. The CLI's apiMachine reattaches
+    // registerPreviewProxyHandlers on every connect, but it only knows the
+    // target candidate from a preview-start-proxy event.
+    if (metadata.clientType === "machine-scoped" && machineId) {
+      void (async () => {
+        const { previewStore } = await import("@/app/preview/previewStore");
+        const { db } = await import("@/storage/db");
+        for (const conn of previewStore.listConnections()) {
+          if (conn.machineId !== machineId) continue;
+          const candidate = previewStore.getCandidate(conn.candidateId);
+          if (!candidate) continue;
+          // Verify session still belongs to user (defence in depth)
+          const session = await db.session.findFirst({
+            where: { id: conn.sessionId, accountId: userId },
+            select: { id: true },
+          });
+          if (!session) continue;
+          socket.emit("preview-start-proxy", {
+            tunnelId: conn.tunnelId,
+            candidate: {
+              protocol: candidate.protocol,
+              host: candidate.host,
+              port: candidate.port,
+            },
+          });
+        }
+      })().catch(() => {});
+    }
 
     // Authenticated and all event listeners are now registered. Machine/session
     // clients use this as the reliable readiness barrier before emitting their

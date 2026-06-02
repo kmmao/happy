@@ -3733,6 +3733,13 @@ export const en: TranslationStructure = {
     tunnelError: "Tunnel error",
     annotationTitle: "Element Annotation",
     annotationPlaceholder: "Describe the change or issue you'd like to report...",
+    openExternal: "Open in browser",
+    disconnect: "Disconnect",
+    rotateViewport: "Rotate",
+    annotateMode: "Annotation mode",
+    annotateModeActive: "Tap an element to annotate",
+    candidateDetected: "Dev server detected",
+    viewPreview: "View",
   },
 
   backgroundTasks: {

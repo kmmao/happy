@@ -3641,6 +3641,13 @@ export const zhHans: TranslationStructure = {
     tunnelError: "隧道错误",
     annotationTitle: "元素标注",
     annotationPlaceholder: "描述你想报告的变更或问题...",
+    openExternal: "在浏览器中打开",
+    disconnect: "断开连接",
+    rotateViewport: "旋转",
+    annotateMode: "标注模式",
+    annotateModeActive: "点击元素以标注",
+    candidateDetected: "检测到开发服务器",
+    viewPreview: "查看",
   },
 
   backgroundTasks: {

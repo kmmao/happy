@@ -24,6 +24,17 @@ interface PreviewToolbarProps {
     onZoomIn: () => void;
     onZoomOut: () => void;
     onAnnotate?: () => void;
+    /** U6: annotation mode toggle button */
+    annotationModeActive?: boolean;
+    onToggleAnnotationMode?: () => void;
+    /** U8: open preview in external browser tab (web only) */
+    onOpenExternal?: () => void;
+    /** U9: rotate viewport (portrait/landscape) */
+    orientation?: "portrait" | "landscape";
+    onToggleOrientation?: () => void;
+    /** Hand-pan mode (drag to pan when zoomed) */
+    handMode?: boolean;
+    onToggleHandMode?: (active: boolean) => void;
     compact?: boolean;
 }
 
@@ -39,6 +50,13 @@ export const PreviewToolbar = React.memo<PreviewToolbarProps>(
         onZoomIn,
         onZoomOut,
         onAnnotate,
+        annotationModeActive = false,
+        onToggleAnnotationMode,
+        onOpenExternal,
+        orientation = "portrait",
+        onToggleOrientation,
+        handMode = false,
+        onToggleHandMode,
         compact = false,
     }) {
         const { theme } = useUnistyles();
@@ -104,6 +122,30 @@ export const PreviewToolbar = React.memo<PreviewToolbarProps>(
                         ))}
                     </View>
 
+                    {/* U9: rotate viewport — disabled on desktop */}
+                    {onToggleOrientation && (
+                        <ToolbarButton
+                            icon={
+                                orientation === "portrait"
+                                    ? "phone-portrait-outline"
+                                    : "phone-landscape-outline"
+                            }
+                            onPress={onToggleOrientation}
+                            compact={compact}
+                            disabled={viewport.key === "desktop"}
+                        />
+                    )}
+
+                    {/* Hand-pan mode */}
+                    {onToggleHandMode && (
+                        <ToolbarButton
+                            icon={handMode ? "hand-left" : "hand-left-outline"}
+                            onPress={() => onToggleHandMode(!handMode)}
+                            compact={compact}
+                            accent={handMode}
+                        />
+                    )}
+
                     {/* Resolution label */}
                     {!compact && (
                         <Text style={[styles.resolutionText, { color: theme.colors.textSecondary }]}>
@@ -131,7 +173,26 @@ export const PreviewToolbar = React.memo<PreviewToolbarProps>(
                         />
                     </View>
 
-                    {/* Annotate button */}
+                    {/* U6: annotation mode toggle (element pick) */}
+                    {onToggleAnnotationMode && (
+                        <ToolbarButton
+                            icon={annotationModeActive ? "locate" : "locate-outline"}
+                            onPress={onToggleAnnotationMode}
+                            compact={compact}
+                            accent={annotationModeActive}
+                        />
+                    )}
+
+                    {/* U8: external open (web only) */}
+                    {onOpenExternal && (
+                        <ToolbarButton
+                            icon="open-outline"
+                            onPress={onOpenExternal}
+                            compact={compact}
+                        />
+                    )}
+
+                    {/* Legacy screenshot-mode annotate */}
                     {onAnnotate && (
                         <ToolbarButton
                             icon="pencil-outline"
@@ -153,17 +214,20 @@ function ToolbarButton({
     onPress,
     compact = false,
     accent = false,
+    disabled = false,
 }: {
     icon: keyof typeof Ionicons.glyphMap;
     onPress: () => void;
     compact?: boolean;
     accent?: boolean;
+    disabled?: boolean;
 }) {
     const { theme } = useUnistyles();
 
     return (
         <Pressable
             onPress={onPress}
+            disabled={disabled}
             style={({ pressed }) => [
                 styles.iconButton,
                 compact && styles.iconButtonCompact,
@@ -171,7 +235,7 @@ function ToolbarButton({
                     backgroundColor: accent
                         ? theme.colors.textLink + "20"
                         : theme.colors.surfaceHighest,
-                    opacity: pressed ? 0.6 : 1,
+                    opacity: disabled ? 0.4 : pressed ? 0.6 : 1,
                 },
             ]}
         >

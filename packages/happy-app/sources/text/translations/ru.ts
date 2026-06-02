@@ -3760,6 +3760,13 @@ export const ru: TranslationStructure = {
     tunnelError: "Ошибка туннеля",
     annotationTitle: "Аннотация элемента",
     annotationPlaceholder: "Опишите изменение или проблему, которую вы хотите сообщить...",
+    openExternal: "Открыть в браузере",
+    disconnect: "Отключить",
+    rotateViewport: "Повернуть",
+    annotateMode: "Режим аннотаций",
+    annotateModeActive: "Нажмите на элемент для аннотации",
+    candidateDetected: "Обнаружен сервер разработки",
+    viewPreview: "Показать",
   },
 
   backgroundTasks: {

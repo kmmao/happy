@@ -157,11 +157,19 @@ export const PreviewWsConnectSchema = z.object({
 });
 export type PreviewWsConnect = z.infer<typeof PreviewWsConnectSchema>;
 
-/** Bidirectional: a WebSocket frame. */
+/**
+ * Bidirectional: a WebSocket frame.
+ *
+ * `data` is:
+ *   - `string` for text frames (isBinary: false)
+ *   - `Uint8Array` / `Buffer` for binary frames (isBinary: true) — Socket.IO
+ *     encodes these natively as binary on the wire, avoiding base64 overhead.
+ *     For backward compatibility, base64 strings are still accepted on read.
+ */
 export const PreviewWsFrameSchema = z.object({
   tunnelId: z.string(),
   requestId: z.string(),
-  data: z.string(), // base64 for binary, plain for text
+  data: z.union([z.string(), z.instanceof(Uint8Array)]),
   isBinary: z.boolean().default(false),
 });
 export type PreviewWsFrame = z.infer<typeof PreviewWsFrameSchema>;

@@ -3762,6 +3762,13 @@ export const pl: TranslationStructure = {
     tunnelError: "Błąd tunelu",
     annotationTitle: "Adnotacja elementu",
     annotationPlaceholder: "Opisz zmianę lub problem, który chcesz zgłosić...",
+    openExternal: "Otwórz w przeglądarce",
+    disconnect: "Rozłącz",
+    rotateViewport: "Obróć",
+    annotateMode: "Tryb adnotacji",
+    annotateModeActive: "Dotknij elementu, aby dodać adnotację",
+    candidateDetected: "Wykryto serwer deweloperski",
+    viewPreview: "Pokaż",
   },
 
   backgroundTasks: {

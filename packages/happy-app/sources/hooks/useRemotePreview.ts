@@ -57,6 +57,9 @@ export interface LivePreviewState {
     readonly viewport: ViewportPreset;
     readonly zoom: number;
     readonly error?: string;
+    readonly orientation: "portrait" | "landscape";
+    readonly handMode: boolean;
+    readonly panOffset: { x: number; y: number };
 }
 
 export interface UseRemotePreviewResult {
@@ -74,6 +77,10 @@ export interface UseRemotePreviewResult {
     readonly onWebViewLoad: () => void;
     readonly onWebViewError: (error: string) => void;
     readonly detectPorts: () => void;
+    readonly toggleOrientation: () => void;
+    readonly setHandMode: (enabled: boolean) => void;
+    readonly setPanOffset: (offset: { x: number; y: number }) => void;
+    readonly resetPan: () => void;
 }
 
 /**
@@ -125,6 +132,9 @@ export function useRemotePreview(sessionId: string | undefined): UseRemotePrevie
         ports: [],
         viewport: DEFAULT_VIEWPORT,
         zoom: ZOOM_DEFAULT,
+        orientation: "portrait",
+        handMode: false,
+        panOffset: { x: 0, y: 0 },
     });
 
     const stateRef = React.useRef(state);
@@ -155,7 +165,7 @@ export function useRemotePreview(sessionId: string | undefined): UseRemotePrevie
 
             setState((prev) => ({
                 ...prev,
-                status: url ? "ready" : "ready",
+                status: url ? "ready" : "idle",
                 url: prev.url || url,
                 ports: webPorts,
             }));
@@ -259,6 +269,27 @@ export function useRemotePreview(sessionId: string | undefined): UseRemotePrevie
         }));
     }, []);
 
+    // ── Orientation, hand mode, pan ────────────────────────────────────────────
+
+    const toggleOrientation = React.useCallback(() => {
+        setState((prev) => ({
+            ...prev,
+            orientation: prev.orientation === "portrait" ? "landscape" : "portrait",
+        }));
+    }, []);
+
+    const setHandMode = React.useCallback((enabled: boolean) => {
+        setState((prev) => ({ ...prev, handMode: enabled }));
+    }, []);
+
+    const setPanOffset = React.useCallback((offset: { x: number; y: number }) => {
+        setState((prev) => ({ ...prev, panOffset: offset }));
+    }, []);
+
+    const resetPan = React.useCallback(() => {
+        setState((prev) => ({ ...prev, panOffset: { x: 0, y: 0 } }));
+    }, []);
+
     // ── Auto-refresh ports every 15s ─────────────────────────────────────────
 
     React.useEffect(() => {
@@ -295,5 +326,9 @@ export function useRemotePreview(sessionId: string | undefined): UseRemotePrevie
         onWebViewLoad,
         onWebViewError,
         detectPorts,
+        toggleOrientation,
+        setHandMode,
+        setPanOffset,
+        resetPan,
     };
 }

@@ -13,8 +13,19 @@ const ANNOTATION_BROWSER_SCRIPT = String.raw`
 
   var SET_MODE = "SET_ANNOTATION_MODE";
   var TARGET = "HAPPY_ANNOTATION_TARGET";
+  var ANCHOR_UPDATE = "HAPPY_ANNOTATION_ANCHOR_UPDATE";
+  var TRACK = "HAPPY_ANNOTATION_TRACK";
+  var UNTRACK = "HAPPY_ANNOTATION_UNTRACK";
   var OVERLAY_ATTR = "data-happy-annotation-overlay";
   var MAX_PARENT_DEPTH = 5;
+
+  // B2: trusted parent origins. The injected page only accepts SET_MODE / TRACK
+  // / UNTRACK messages from these origins; anyone embedding the preview from
+  // elsewhere can't toggle annotation mode or steal selector data.
+  var TRUSTED_ORIGINS_RE = /^(https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$)|(^https?:\/\/.+\.lody\.ai$)|(^https?:\/\/lody\.ai$)|(^null$)/;
+  // The first valid SET_MODE pins parentOrigin. After that, all incoming
+  // messages must come from the same origin (or a trusted variant).
+  var parentOrigin = null;
 
   var STYLE_FIELDS = [
     "display","position","width","height","margin","padding","gap",
@@ -236,13 +247,120 @@ const ANNOTATION_BROWSER_SCRIPT = String.raw`
     postToParent({ type: TARGET, payload: buildPayload(target, e) });
   }
 
-  // Message listener for mode toggling
+  // B2: validate that an inbound message origin is trusted.
+  function isTrustedOrigin(origin) {
+    if (!origin || origin === "null") return TRUSTED_ORIGINS_RE.test("null");
+    return TRUSTED_ORIGINS_RE.test(origin);
+  }
+
+  function originMatchesParent(origin) {
+    if (parentOrigin === null) return true;          // not pinned yet
+    if (parentOrigin === "null") return origin === "null";
+    return origin === parentOrigin;
+  }
+
+  // F8: tracked anchors — keep selector/xpath references to elements the user
+  // already annotated. On DOM mutation/scroll/resize we re-resolve them and
+  // post their current rect to the parent so the comment pin stays attached.
+  var trackedAnchors = [];      // { id, selector, xpath }
+  var trackedFrame = 0;
+  var trackedObserver = null;
+
+  function resolveAnchor(a) {
+    try {
+      if (a.selector) {
+        var el = document.querySelector(a.selector);
+        if (el && el.nodeType === 1) return el;
+      }
+    } catch(_) {}
+    try {
+      if (a.xpath && typeof document.evaluate === "function") {
+        var res = document.evaluate(a.xpath, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null);
+        if (res && res.singleNodeValue && res.singleNodeValue.nodeType === 1) return res.singleNodeValue;
+      }
+    } catch(_) {}
+    return null;
+  }
+
+  function flushTrackedAnchors() {
+    trackedFrame = 0;
+    if (!trackedAnchors.length) return;
+    var updates = [];
+    var vw = window.innerWidth, vh = window.innerHeight;
+    for (var i = 0; i < trackedAnchors.length; i++) {
+      var a = trackedAnchors[i];
+      var el = resolveAnchor(a);
+      if (!el) { updates.push({ id: a.id, lost: true }); continue; }
+      var r = el.getBoundingClientRect();
+      updates.push({
+        id: a.id,
+        rect: { x: round(r.left), y: round(r.top), width: round(r.width), height: round(r.height) },
+        rectRatio: { x: ratio(r.left, vw), y: ratio(r.top, vh), width: ratio(r.width, vw), height: ratio(r.height, vh) },
+        visible: r.width > 0 && r.height > 0
+      });
+    }
+    postToParent({ type: ANCHOR_UPDATE, updates: updates });
+  }
+
+  function scheduleAnchorFlush() {
+    if (trackedFrame || !trackedAnchors.length) return;
+    trackedFrame = window.requestAnimationFrame(flushTrackedAnchors);
+  }
+
+  function ensureTrackedObserver() {
+    if (trackedObserver) return;
+    trackedObserver = new MutationObserver(scheduleAnchorFlush);
+    trackedObserver.observe(document.documentElement, {
+      attributes: true,
+      childList: true,
+      subtree: true,
+      characterData: false
+    });
+    window.addEventListener("scroll", scheduleAnchorFlush, { capture: true, passive: true });
+    window.addEventListener("resize", scheduleAnchorFlush, { passive: true });
+  }
+
+  function trackAnchor(anchor) {
+    if (!anchor || !anchor.id) return;
+    // De-dupe by id
+    for (var i = 0; i < trackedAnchors.length; i++) {
+      if (trackedAnchors[i].id === anchor.id) { trackedAnchors[i] = anchor; ensureTrackedObserver(); scheduleAnchorFlush(); return; }
+    }
+    trackedAnchors.push(anchor);
+    ensureTrackedObserver();
+    scheduleAnchorFlush();
+  }
+
+  function untrackAnchor(id) {
+    trackedAnchors = trackedAnchors.filter(function(a) { return a.id !== id; });
+  }
+
+  // Message listener for mode toggling + anchor tracking
   window.addEventListener("message", function(e) {
+    // B2: origin gate
+    if (!isTrustedOrigin(e.origin)) return;
+    if (!originMatchesParent(e.origin)) return;
+
     var data = e.data;
     if (typeof data === "string") { try { data = JSON.parse(data); } catch(err) { return; } }
-    if (!data || data.type !== SET_MODE) return;
-    enabled = !!data.enabled;
-    if (!enabled) { updateOverlay(null); currentTarget = null; }
+    if (!data || typeof data !== "object") return;
+
+    // Pin parent origin on first trusted message
+    if (parentOrigin === null) parentOrigin = e.origin || "null";
+
+    if (data.type === SET_MODE) {
+      enabled = !!data.enabled;
+      if (!enabled) { updateOverlay(null); currentTarget = null; }
+      return;
+    }
+    if (data.type === TRACK && data.anchor) {
+      trackAnchor(data.anchor);
+      return;
+    }
+    if (data.type === UNTRACK && data.id) {
+      untrackAnchor(data.id);
+      return;
+    }
   });
 
   document.addEventListener("mousemove", onMouseMove, true);

@@ -3745,6 +3745,13 @@ export const en = {
     tunnelError: "Tunnel error",
     annotationTitle: "Element Annotation",
     annotationPlaceholder: "Describe the change or issue you'd like to report...",
+    candidateDetected: "Dev server detected",
+    viewPreview: "View",
+    disconnect: "Disconnect",
+    openExternal: "Open in browser",
+    rotateViewport: "Rotate",
+    annotateMode: "Annotation mode",
+    annotateModeActive: "Tap an element to annotate",
   },
 
   backgroundTasks: {

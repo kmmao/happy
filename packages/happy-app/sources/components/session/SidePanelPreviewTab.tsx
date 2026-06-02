@@ -129,6 +129,11 @@ export const SidePanelPreviewTab = React.memo<SidePanelPreviewTabProps>(
                             onZoomIn={remote.zoomIn}
                             onZoomOut={remote.zoomOut}
                             compact
+                            orientation={remote.state.orientation}
+                            handMode={remote.state.handMode}
+                            onToggleOrientation={remote.toggleOrientation}
+                            onToggleHandMode={remote.setHandMode}
+                            onOpenExternal={() => {}}
                         />
 
                         {remote.state.status === "detecting" ? (
@@ -147,6 +152,10 @@ export const SidePanelPreviewTab = React.memo<SidePanelPreviewTabProps>(
                                     onLoad={remote.onWebViewLoad}
                                     onError={remote.onWebViewError}
                                     reloadKey={reloadKey}
+                                    orientation={remote.state.orientation}
+                                    handMode={remote.state.handMode}
+                                    panOffset={remote.state.panOffset}
+                                    onPanChange={remote.setPanOffset}
                                 />
                             </View>
                         )}

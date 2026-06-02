@@ -2,12 +2,31 @@ import { type Fastify } from "../types";
 import { db } from "@/storage/db";
 import { z } from "zod";
 import { randomKeyNaked } from "@/utils/randomKeyNaked";
-import { PreviewCandidateReportSchema } from "@kmmao/happy-wire";
+import {
+    PreviewCandidateReportSchema,
+    DEFAULT_PREVIEW_LEASE_MS,
+    DEFAULT_PREVIEW_IDLE_TIMEOUT_MS,
+    PREVIEW_CREATE_RATE_LIMIT_WINDOW_MS,
+    PREVIEW_CREATE_RATE_LIMIT_MAX,
+} from "@kmmao/happy-wire";
 import { previewStore } from "@/app/preview/previewStore";
 import { eventRouter, buildPreviewCandidateReportedEphemeral, buildPreviewConnectionUpdatedEphemeral } from "@/app/events/eventRouter";
 
-const DEFAULT_PREVIEW_LEASE_MS = 8 * 60 * 60 * 1000;        // 8 hours
-const DEFAULT_PREVIEW_IDLE_TIMEOUT_MS = 45 * 60 * 1000;      // 45 minutes
+// F7: per-user sliding-window rate limit for tunnel creation
+const createAttempts = new Map<string, number[]>(); // userId → recent createdAt[]
+
+function checkAndRecordCreateAttempt(userId: string): { ok: true } | { ok: false; retryAfterMs: number } {
+    const now = Date.now();
+    const cutoff = now - PREVIEW_CREATE_RATE_LIMIT_WINDOW_MS;
+    const attempts = (createAttempts.get(userId) ?? []).filter((t) => t > cutoff);
+    if (attempts.length >= PREVIEW_CREATE_RATE_LIMIT_MAX) {
+        const oldest = attempts[0]!;
+        return { ok: false, retryAfterMs: oldest + PREVIEW_CREATE_RATE_LIMIT_WINDOW_MS - now };
+    }
+    attempts.push(now);
+    createAttempts.set(userId, attempts);
+    return { ok: true };
+}
 
 /**
  * REST routes for preview lifecycle.
@@ -32,10 +51,20 @@ export function previewRoutes(app: Fastify) {
             // Verify session belongs to user
             const session = await db.session.findFirst({
                 where: { id: sessionId, accountId: userId },
-                select: { id: true },
+                select: { id: true, projectId: true },
             });
             if (!session) {
                 return reply.status(404).send({ error: "session-not-found" });
+            }
+
+            // Resolve machineId from session's project
+            let candidateMachineId = "";
+            if (session.projectId) {
+                const project = await db.project.findUnique({
+                    where: { id: session.projectId },
+                    select: { machineId: true },
+                });
+                if (project) candidateMachineId = project.machineId;
             }
 
             // Generate candidate ID
@@ -45,6 +74,7 @@ export function previewRoutes(app: Fastify) {
             const candidate = {
                 id: candidateId,
                 sessionId,
+                machineId: candidateMachineId,
                 state: "available",
                 protocol: candidateData.protocol || "http",
                 host: candidateData.host,
@@ -102,6 +132,16 @@ export function previewRoutes(app: Fastify) {
             const userId = request.userId;
             const { sessionId } = request.params;
             const { candidateId } = request.body;
+
+            // F7: rate limit (5 creates per minute per user)
+            const rate = checkAndRecordCreateAttempt(userId);
+            if (!rate.ok) {
+                reply.header("Retry-After", String(Math.ceil(rate.retryAfterMs / 1000)));
+                return reply.status(429).send({
+                    error: "rate-limit-exceeded",
+                    retryAfterMs: rate.retryAfterMs,
+                });
+            }
 
             // Verify session belongs to user and get project/machineId
             const session = await db.session.findFirst({
@@ -246,6 +286,66 @@ export function previewRoutes(app: Fastify) {
             });
 
             return reply.send({ ok: true });
+        },
+    );
+
+    // POST /v3/sessions/:sessionId/preview/refresh — Extend tunnel lease (F5)
+    app.post(
+        "/v3/sessions/:sessionId/preview/refresh",
+        {
+            preHandler: app.authenticate,
+            schema: {
+                params: z.object({ sessionId: z.string() }),
+                body: z.object({ tunnelId: z.string() }),
+            },
+        },
+        async (request, reply) => {
+            const userId = request.userId;
+            const { sessionId } = request.params;
+            const { tunnelId } = request.body;
+
+            const session = await db.session.findFirst({
+                where: { id: sessionId, accountId: userId },
+                select: { id: true },
+            });
+            if (!session) {
+                return reply.status(404).send({ error: "session-not-found" });
+            }
+
+            const conn = previewStore.getConnection(tunnelId);
+            if (!conn || conn.sessionId !== sessionId) {
+                return reply.status(404).send({ error: "tunnel-not-found" });
+            }
+
+            const refreshed = previewStore.refreshLease(tunnelId, DEFAULT_PREVIEW_LEASE_MS);
+            if (!refreshed) {
+                return reply.status(404).send({ error: "tunnel-not-found" });
+            }
+
+            // Broadcast updated lease so app updates its countdown
+            eventRouter.emitEphemeral({
+                userId,
+                payload: buildPreviewConnectionUpdatedEphemeral({
+                    sessionId,
+                    connection: {
+                        tunnelId: refreshed.tunnelId,
+                        candidateId: refreshed.candidateId,
+                        sessionId: refreshed.sessionId,
+                        publicUrl: refreshed.publicUrl,
+                        status: refreshed.status,
+                        createdAt: refreshed.createdAt,
+                        leaseExpiresAt: refreshed.leaseExpiresAt,
+                        idleTimeoutMs: refreshed.idleTimeoutMs,
+                        lastActiveAt: refreshed.lastActiveAt,
+                    },
+                }),
+                recipientFilter: { type: "all-interested-in-session", sessionId },
+            });
+
+            return reply.send({
+                leaseExpiresAt: refreshed.leaseExpiresAt,
+                lastActiveAt: refreshed.lastActiveAt,
+            });
         },
     );
 

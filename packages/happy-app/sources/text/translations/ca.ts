@@ -3746,6 +3746,13 @@ export const ca: TranslationStructure = {
     tunnelError: "Error de túnel",
     annotationTitle: "Anotació d'element",
     annotationPlaceholder: "Descriu el canvi o problema que vols informar...",
+    openExternal: "Obre al navegador",
+    disconnect: "Desconnecta",
+    rotateViewport: "Gira",
+    annotateMode: "Mode anotació",
+    annotateModeActive: "Toca un element per anotar",
+    candidateDetected: "Servidor de desenvolupament detectat",
+    viewPreview: "Veure",
   },
 
   backgroundTasks: {

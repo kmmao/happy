@@ -9,7 +9,7 @@ import { db } from "@/storage/db";
  * Socket handler for machine-scoped preview proxy operations.
  * Listens for preview events from CLI daemon and routes them to clients.
  */
-export function previewProxyHandler(userId: string, socket: Socket) {
+export function previewProxyHandler(userId: string, socket: Socket, machineId: string) {
     // Listen for preview candidate reports from CLI daemon
     socket.on("preview-candidate-report", async (data: any, callback?: (response: any) => void) => {
         try {
@@ -39,6 +39,7 @@ export function previewProxyHandler(userId: string, socket: Socket) {
             const candidate = {
                 id: candidateId,
                 sessionId: reportData.sessionId,
+                machineId,
                 state: "available",
                 protocol: reportData.protocol || "http",
                 host: reportData.host,

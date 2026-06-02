@@ -26,6 +26,8 @@ export interface UsePreviewTunnelResult {
     readonly createTunnel: () => Promise<void>;
     /** Revoke the active tunnel. */
     readonly revokeTunnel: () => Promise<void>;
+    /** Extend the active tunnel's lease (resets countdown). */
+    readonly refreshLease: () => Promise<void>;
 }
 
 async function previewFetch(
@@ -119,5 +121,34 @@ export function usePreviewTunnel(sessionId: string | undefined): UsePreviewTunne
         } catch {}
     }, [sessionId, connection]);
 
-    return { candidate, connection, creating, createTunnel, revokeTunnel };
+    /**
+     * Extend the active tunnel's lease by another DEFAULT_PREVIEW_LEASE_MS.
+     * Calls the server's POST /preview/refresh which resets leaseExpiresAt
+     * and lastActiveAt. The connection state is updated via the ephemeral
+     * preview-connection-updated event the server broadcasts, but we also
+     * patch it locally for instant feedback.
+     */
+    const refreshLease = React.useCallback(async () => {
+        if (!sessionId || !connection) return;
+        try {
+            const resp = await previewFetch(
+                `/v3/sessions/${sessionId}/preview/refresh`,
+                {
+                    method: "POST",
+                    body: JSON.stringify({ tunnelId: connection.tunnelId }),
+                },
+            );
+            if (!resp.ok) return;
+            const data = await resp.json();
+            if (data.leaseExpiresAt) {
+                setConnection({
+                    ...connection,
+                    leaseExpiresAt: data.leaseExpiresAt,
+                    lastActiveAt: data.lastActiveAt ?? Date.now(),
+                });
+            }
+        } catch {}
+    }, [sessionId, connection]);
+
+    return { candidate, connection, creating, createTunnel, revokeTunnel, refreshLease };
 }

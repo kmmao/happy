@@ -12,7 +12,8 @@ describe("PreviewStore", () => {
         it("adds and retrieves a candidate", () => {
             const candidate = {
                 id: "cand-test-1",
-                sessionId: "sess-1",
+                machineId: "machine-test",
+            sessionId: "sess-1",
                 state: "available",
                 protocol: "http",
                 host: "127.0.0.1",
@@ -32,6 +33,7 @@ describe("PreviewStore", () => {
             const older = {
                 id: "cand-sess-old-" + Date.now(),
                 sessionId,
+                machineId: "machine-test",
                 state: "available",
                 protocol: "http",
                 host: "127.0.0.1",
@@ -41,6 +43,7 @@ describe("PreviewStore", () => {
             const newer = {
                 id: "cand-sess-new-" + Date.now(),
                 sessionId,
+                machineId: "machine-test",
                 state: "available",
                 protocol: "http",
                 host: "127.0.0.1",
@@ -61,7 +64,8 @@ describe("PreviewStore", () => {
         it("stores optional candidate fields", () => {
             const candidate = {
                 id: "cand-full-" + Date.now(),
-                sessionId: "sess-full",
+                machineId: "machine-test",
+            sessionId: "sess-full",
                 state: "available",
                 protocol: "http",
                 host: "127.0.0.1",

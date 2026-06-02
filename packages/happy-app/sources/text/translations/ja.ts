@@ -3716,6 +3716,13 @@ export const ja: TranslationStructure = {
     tunnelError: "トンネルエラー",
     annotationTitle: "要素の注釈",
     annotationPlaceholder: "報告したい変更または問題を説明してください...",
+    openExternal: "ブラウザで開く",
+    disconnect: "切断",
+    rotateViewport: "回転",
+    annotateMode: "注釈モード",
+    annotateModeActive: "要素をタップして注釈",
+    candidateDetected: "開発サーバを検出",
+    viewPreview: "表示",
   },
 
   backgroundTasks: {

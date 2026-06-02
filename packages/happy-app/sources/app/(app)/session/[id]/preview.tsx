@@ -15,6 +15,7 @@ import {
     Pressable,
     TextInput,
     Platform,
+    Linking,
 } from "react-native";
 import { Image } from "expo-image";
 import { useLocalSearchParams } from "expo-router";
@@ -30,10 +31,14 @@ import { useSession } from "@/sync/storage";
 import { screenLayoutMaxWidth } from "@/components/layout";
 import { SharedStateView } from "@/components/SharedStateView";
 import { PreviewModeSwitch } from "@/components/preview/PreviewModeSwitch";
+import { PreviewStatusBar } from "@/components/preview/PreviewStatusBar";
+import { PreviewCandidateToast } from "@/components/preview/PreviewCandidateToast";
 import { PreviewToolbar } from "@/components/preview/PreviewToolbar";
 import { LivePreviewView } from "@/components/preview/LivePreviewView";
+import { AnnotationPinsOverlay, type AnnotationPin } from "@/components/preview/AnnotationPinsOverlay";
 import { AnnotationOverlay } from "@/components/preview/AnnotationOverlay";
 import { AnnotationCommentSheet } from "@/components/preview/AnnotationCommentSheet";
+import { usePreviewAnnotations, type AnchorRef } from "@/hooks/usePreviewAnnotations";
 import { sync } from "@/sync/sync";
 import { uploadImage } from "@/utils/imageUpload.shared";
 
@@ -71,6 +76,11 @@ export default React.memo(function PreviewPage() {
     const [annotating, setAnnotating] = React.useState(false);
     const [annotationPayload, setAnnotationPayload] = React.useState<any>(null);
     const [annotationMode, setAnnotationMode] = React.useState(false);
+    const [toastDismissed, setToastDismissed] = React.useState(false);
+    const [selectedPin, setSelectedPin] = React.useState<AnnotationPin | null>(null);
+
+    // Annotation pins state
+    const annotations = usePreviewAnnotations(sessionId);
 
     // Auto-detect ports on mount for screenshot mode
     React.useEffect(() => {
@@ -78,6 +88,11 @@ export default React.memo(function PreviewPage() {
             detectScreenshotPorts();
         }
     }, [sessionId, remote.mode, detectScreenshotPorts]);
+
+    // Clear annotations when URL changes (page reload)
+    React.useEffect(() => {
+        annotations.clear();
+    }, [remote.state.url]);
 
     // ── Handlers ─────────────────────────────────────────────────────────────
 
@@ -148,18 +163,77 @@ export default React.memo(function PreviewPage() {
 
     const handleCommentSubmit = React.useCallback(
         (comment: string) => {
-            // Format annotation message
-            const elementInfo = annotationPayload?.target;
-            const elementTag = elementInfo
-                ? `<${elementInfo.tag}${elementInfo.id ? ` id="${elementInfo.id}"` : ""}>`
-                : "Element";
-            const url = annotationPayload?.page?.url ?? remote.state.url;
+            // F9: structured annotation — pack full anchor data into the message
+            // as a fenced JSON block so the agent can parse selector/xpath/style
+            // alongside the human-readable summary.
+            const target = annotationPayload?.target;
+            const page = annotationPayload?.page;
+            const ancestors = annotationPayload?.ancestors;
+            const style = annotationPayload?.style;
 
-            const annotationMessage = `[Visual Annotation]\n**Element**: ${elementTag}\n**URL**: ${url}\n**Comment**: ${comment}`;
-            sync.sendMessage(sessionId, annotationMessage);
+            const elementTag = target
+                ? `<${target.tag}${target.id ? ` id="${target.id}"` : ""}${target.className ? ` class="${String(target.className).split(" ")[0]}"` : ""}>`
+                : "Element";
+            const url = page?.url ?? remote.state.url;
+            const textSummary = target?.text
+                ? `\n**Text**: ${target.text}`
+                : "";
+
+            // Compact JSON block: only the fields the agent needs to act on.
+            const structured = {
+                source: "preview-annotation",
+                anchor: {
+                    page: page
+                        ? { url: page.url, pathname: page.pathname, title: page.title }
+                        : undefined,
+                    target: target
+                        ? {
+                              tag: target.tag,
+                              id: target.id,
+                              className: target.className,
+                              role: target.role,
+                              text: target.text,
+                              selector: target.selector,
+                              xpath: target.xpath,
+                              rect: target.rect,
+                              outerHTMLPreview: target.outerHTMLPreview,
+                              attributes: target.attributes,
+                          }
+                        : undefined,
+                    ancestors: Array.isArray(ancestors)
+                        ? ancestors.slice(0, 3).map((a: any) => ({
+                              tag: a.tag,
+                              id: a.id,
+                              selector: a.selector,
+                          }))
+                        : undefined,
+                    style,
+                },
+                comment,
+            };
+
+            const message =
+                `[Visual Annotation]\n` +
+                `**Element**: ${elementTag}\n` +
+                `**URL**: ${url}${textSummary}\n` +
+                `**Comment**: ${comment}\n\n` +
+                "```json visual-annotation\n" +
+                JSON.stringify(structured, null, 2) +
+                "\n```";
+
+            sync.sendMessage(sessionId, message);
+
+            // Add pin to overlay if target has selector
+            if (target?.selector) {
+                annotations.addPin(comment, {
+                    selector: target.selector,
+                    xpath: target.xpath,
+                });
+            }
+
             setAnnotationPayload(null);
         },
-        [sessionId, annotationPayload, remote.state.url],
+        [sessionId, annotationPayload, remote.state.url, annotations],
     );
 
     // ── Derive port lists ────────────────────────────────────────────────────
@@ -206,6 +280,25 @@ export default React.memo(function PreviewPage() {
                 {/* ── Live Preview Mode ───────────────────────────────────── */}
                 {remote.mode === "live" && (
                     <>
+                        <PreviewCandidateToast
+                            candidate={tunnel.candidate}
+                            onView={() => {
+                                setToastDismissed(true);
+                            }}
+                            onDismiss={() => {
+                                setToastDismissed(true);
+                            }}
+                        />
+
+                        <PreviewStatusBar
+                            candidate={tunnel.candidate}
+                            connection={tunnel.connection}
+                            creating={tunnel.creating}
+                            onCreate={tunnel.createTunnel}
+                            onRevoke={tunnel.revokeTunnel}
+                            onRefreshLease={tunnel.refreshLease}
+                        />
+
                         <PreviewToolbar
                             url={remote.state.url}
                             viewport={remote.state.viewport}
@@ -217,7 +310,43 @@ export default React.memo(function PreviewPage() {
                             onZoomIn={remote.zoomIn}
                             onZoomOut={remote.zoomOut}
                             onAnnotate={handleAnnotate}
+                            orientation={remote.state.orientation}
+                            handMode={remote.state.handMode}
+                            onToggleOrientation={remote.toggleOrientation}
+                            onToggleHandMode={remote.setHandMode}
+                            annotationModeActive={annotationMode}
+                            onToggleAnnotationMode={() => setAnnotationMode((v) => !v)}
+                            onOpenExternal={() => {
+                                const urlToOpen = tunnel.connection?.publicUrl ?? remote.state.url;
+                                Linking.openURL(urlToOpen);
+                            }}
                         />
+
+                        {/* U7: visual hint when annotation mode is active */}
+                        {annotationMode && (
+                            <View
+                                style={[
+                                    styles.annotationHintBar,
+                                    { backgroundColor: theme.colors.textLink + "18" },
+                                ]}
+                            >
+                                <Ionicons
+                                    name="locate-outline"
+                                    size={14}
+                                    color={theme.colors.textLink}
+                                />
+                                <Text
+                                    style={{
+                                        flex: 1,
+                                        fontSize: 12,
+                                        fontWeight: "500",
+                                        color: theme.colors.textLink,
+                                    }}
+                                >
+                                    {t("preview.annotateModeActive")}
+                                </Text>
+                            </View>
+                        )}
 
                         {remote.state.status === "detecting" ? (
                             <SharedStateView
@@ -243,6 +372,20 @@ export default React.memo(function PreviewPage() {
                                     reloadKey={reloadKey}
                                     onAnnotation={handleElementAnnotation}
                                     annotationMode={annotationMode}
+                                    orientation={remote.state.orientation}
+                                    handMode={remote.state.handMode}
+                                    panOffset={remote.state.panOffset}
+                                    onPanChange={remote.setPanOffset}
+                                    onAnchorUpdate={annotations.applyAnchorUpdates}
+                                    tracksToSend={annotations.getPendingTracks()}
+                                />
+                                <AnnotationPinsOverlay
+                                    pins={annotations.pins}
+                                    viewportWidth={remote.state.viewport.width}
+                                    viewportHeight={remote.state.viewport.height}
+                                    scale={remote.state.zoom / 100}
+                                    panOffset={remote.state.panOffset}
+                                    onPinPress={setSelectedPin}
                                 />
                             </View>
                         )}
@@ -468,6 +611,41 @@ export default React.memo(function PreviewPage() {
                         onDismiss={() => setAnnotationPayload(null)}
                     />
                 )}
+
+                {/* ── Pin Comment Modal ──────────────────────────────────── */}
+                {selectedPin && (
+                    <Pressable
+                        style={styles.modalBackdrop}
+                        onPress={() => setSelectedPin(null)}
+                    >
+                        <Pressable
+                            style={[styles.pinCommentModal, { backgroundColor: theme.colors.surface }]}
+                            onPress={() => {}}
+                        >
+                            <View style={styles.pinCommentHeader}>
+                                <View
+                                    style={[
+                                        styles.pinBadge,
+                                        { backgroundColor: selectedPin.lost ? theme.colors.textDestructive : theme.colors.textLink },
+                                    ]}
+                                >
+                                    <Text style={styles.pinBadgeText}>{selectedPin.index}</Text>
+                                </View>
+                                <Pressable onPress={() => setSelectedPin(null)} style={styles.closeButton}>
+                                    <Ionicons name="close" size={20} color={theme.colors.textSecondary} />
+                                </Pressable>
+                            </View>
+                            <Text style={[styles.pinCommentText, { color: theme.colors.text }]}>
+                                {selectedPin.comment}
+                            </Text>
+                            {selectedPin.lost && (
+                                <Text style={[styles.pinLostWarning, { color: theme.colors.textDestructive }]}>
+                                    Element not found on current page
+                                </Text>
+                            )}
+                        </Pressable>
+                    </Pressable>
+                )}
             </View>
         </View>
     );
@@ -495,6 +673,16 @@ const styles = StyleSheet.create((theme, rt) => ({
         borderRadius: 10,
         overflow: "hidden",
         backgroundColor: theme.colors.surfaceHighest,
+    },
+    annotationHintBar: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 6,
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+        marginHorizontal: 8,
+        marginTop: 4,
+        borderRadius: 6,
     },
     screenshotContent: {
         paddingHorizontal: 16,
@@ -608,5 +796,56 @@ const styles = StyleSheet.create((theme, rt) => ({
     emptyPortsText: {
         fontSize: 14,
         color: theme.colors.textSecondary,
+    },
+    modalBackdrop: {
+        position: "absolute",
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: "rgba(0, 0, 0, 0.4)",
+        justifyContent: "center",
+        alignItems: "center",
+        zIndex: 200,
+    },
+    pinCommentModal: {
+        maxWidth: 300,
+        borderRadius: 12,
+        padding: 16,
+        gap: 12,
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.2,
+        shadowRadius: 8,
+        elevation: 8,
+    },
+    pinCommentHeader: {
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "space-between",
+    },
+    pinBadge: {
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        justifyContent: "center",
+        alignItems: "center",
+    },
+    pinBadgeText: {
+        color: "#fff",
+        fontSize: 14,
+        fontWeight: "700",
+    },
+    closeButton: {
+        padding: 4,
+    },
+    pinCommentText: {
+        fontSize: 14,
+        lineHeight: 20,
+    },
+    pinLostWarning: {
+        fontSize: 12,
+        fontStyle: "italic",
+        marginTop: 4,
     },
 }));

@@ -89,16 +89,17 @@ function handlePreviewWs(
     });
 
     // ── Step 2: Bridge frames Browser → CLI ──────────────────────────────
+    //
+    // F10: send binary frames as a Buffer directly — socket.io v4 ships them
+    // as a side-channel binary attachment instead of inlining base64 in the
+    // JSON envelope. Saves ~33% bandwidth and the encode/decode CPU cost.
+    // Text frames stay as strings.
 
     browserWs.on("message", (data: Buffer | string, isBinary: boolean) => {
-        const payload = isBinary
-            ? Buffer.from(data as Buffer).toString("base64")
-            : String(data);
-
         machineSocket.emit("preview-ws-frame-to-local", {
             tunnelId,
             requestId,
-            data: payload,
+            data: isBinary ? (data as Buffer) : String(data),
             isBinary,
         });
     });
@@ -122,16 +123,32 @@ function handlePreviewWs(
     });
 
     // ── Step 3: Bridge frames CLI → Browser ──────────────────────────────
+    //
+    // F10: accept binary frames as Buffer (preferred) or base64 string
+    // (backward compat with older CLI builds).
 
-    const onFrame = (msg: { requestId: string; data: string; isBinary: boolean }) => {
+    const onFrame = (msg: {
+        requestId: string;
+        data: Buffer | Uint8Array | string;
+        isBinary: boolean;
+    }) => {
         if (msg.requestId !== requestId) return;
         if (browserWs.readyState !== WebSocket.OPEN) return;
 
         try {
             if (msg.isBinary) {
-                browserWs.send(Buffer.from(msg.data, "base64"));
+                const buf = Buffer.isBuffer(msg.data)
+                    ? msg.data
+                    : msg.data instanceof Uint8Array
+                      ? Buffer.from(msg.data)
+                      : Buffer.from(String(msg.data), "base64");
+                browserWs.send(buf);
             } else {
-                browserWs.send(msg.data);
+                browserWs.send(
+                    typeof msg.data === "string"
+                        ? msg.data
+                        : Buffer.from(msg.data as Uint8Array).toString("utf-8"),
+                );
             }
         } catch {
             // Browser socket already closed

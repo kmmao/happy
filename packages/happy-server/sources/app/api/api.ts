@@ -57,6 +57,7 @@ import { mcpServerRoutes } from "./routes/mcpServerRoutes";
 import { previewRoutes } from "./routes/previewRoutes";
 import { previewGateway } from "./routes/previewGateway";
 import { attachPreviewWsGateway } from "./routes/previewWsGateway";
+import { startPreviewCleanup, stopPreviewCleanup } from "@/app/preview/previewCleanup";
 import { isLocalStorage, getLocalFilesDir } from "@/storage/files";
 import { startKnowledgeLifecycleScheduler, stopKnowledgeLifecycleScheduler } from "@/modules/knowledgeLifecycleScheduler";
 import { startTaskStaleReaper, stopTaskStaleReaper } from "@/modules/taskStaleReaper";
@@ -199,6 +200,12 @@ export async function startApi() {
 
   // Attach preview WebSocket gateway (must be after Socket.IO)
   attachPreviewWsGateway(app.server);
+
+  // Start preview lease/idle cleanup
+  startPreviewCleanup();
+  onShutdown("preview-cleanup", async () => {
+    stopPreviewCleanup();
+  });
 
   // Start knowledge lifecycle scheduler (decay/merge jobs)
   startKnowledgeLifecycleScheduler();

@@ -6,10 +6,18 @@
  */
 
 import { Socket } from "socket.io-client";
+import { setImmediate as setImmediateAsync } from "node:timers/promises";
 import WebSocket from "ws";
 import { logger } from "@/ui/logger";
 import { injectAnnotationRuntime } from "./annotationRuntime";
-import { PREVIEW_PROXY_CHUNK_SIZE } from "@kmmao/happy-wire";
+import {
+  PREVIEW_PROXY_CHUNK_SIZE,
+  DEFAULT_PREVIEW_RESOURCE_LIMITS,
+} from "@kmmao/happy-wire";
+
+const MAX_REQUEST_BODY_BYTES = DEFAULT_PREVIEW_RESOURCE_LIMITS.maxRequestBodyBytes;
+const MAX_RESPONSE_BODY_BYTES = DEFAULT_PREVIEW_RESOURCE_LIMITS.maxResponseBodyBytes;
+const MAX_REQUEST_DURATION_MS = DEFAULT_PREVIEW_RESOURCE_LIMITS.maxRequestDurationMs;
 
 export interface PreviewCandidate {
   protocol: string;
@@ -44,40 +52,64 @@ export function registerPreviewProxy(
       // Force identity encoding so we can inspect/inject HTML
       sanitizedHeaders["accept-encoding"] = "identity";
 
-      // Reconstruct body from base64 chunks
+      // Reconstruct body from base64 chunks; enforce request body limit
       let body: Buffer | undefined;
       if (request.bodyChunks.length > 0) {
         const buffers = request.bodyChunks.map((c) => Buffer.from(c, "base64"));
         body = Buffer.concat(buffers);
+        if (body.byteLength > MAX_REQUEST_BODY_BYTES) {
+          throw new Error(
+            `Request body exceeds ${MAX_REQUEST_BODY_BYTES} byte limit`,
+          );
+        }
       }
 
-      // Local fetch
-      const resp = await fetch(localUrl, {
-        method,
-        headers: sanitizedHeaders,
-        body: body && method !== "GET" && method !== "HEAD" ? body : undefined,
-        redirect: "manual",
-        signal: AbortSignal.timeout(5 * 60 * 1000), // 5 min
-      });
+      // Local fetch — AbortController unifies user-cancel with the request
+      // duration limit; AbortSignal.timeout would have been enough on its own
+      // but a controller lets us abort downstream if the response is too big.
+      const abortController = new AbortController();
+      const durationTimer = setTimeout(
+        () => abortController.abort(new Error("Request duration limit exceeded")),
+        MAX_REQUEST_DURATION_MS,
+      );
+      let resp: Response;
+      try {
+        resp = await fetch(localUrl, {
+          method,
+          headers: sanitizedHeaders,
+          body:
+            body && method !== "GET" && method !== "HEAD" ? body : undefined,
+          redirect: "manual",
+          signal: abortController.signal,
+        });
+      } catch (e) {
+        clearTimeout(durationTimer);
+        throw e;
+      }
 
-      // Check if HTML → inject annotation script
       const contentType = resp.headers.get("content-type") ?? "";
       const isHtml =
         contentType.includes("text/html") && method !== "HEAD";
 
-      let responseHeaders = sanitizeResponseHeaders(resp.headers);
+      const responseHeaders = sanitizeResponseHeaders(resp.headers);
+      rewriteLocationHeader(responseHeaders, candidate);
 
       if (isHtml && resp.body) {
         const html = await resp.text();
+        clearTimeout(durationTimer);
         const injected = injectAnnotationRuntime(html);
         const bodyBuffer = Buffer.from(injected, "utf-8");
 
-        // Update content-length, strip content-encoding
+        if (bodyBuffer.byteLength > MAX_RESPONSE_BODY_BYTES) {
+          throw new Error(
+            `HTML response exceeds ${MAX_RESPONSE_BODY_BYTES} byte limit`,
+          );
+        }
+
         responseHeaders["content-length"] = String(bodyBuffer.byteLength);
         delete responseHeaders["content-encoding"];
         responseHeaders["cache-control"] = "no-store";
 
-        // Send as single response
         socket.emit("preview-proxy-response-start", {
           tunnelId,
           requestId,
@@ -87,26 +119,9 @@ export function registerPreviewProxy(
           hasBody: true,
         });
 
-        // Chunk and send body
-        for (
-          let offset = 0;
-          offset < bodyBuffer.byteLength;
-          offset += PREVIEW_PROXY_CHUNK_SIZE
-        ) {
-          const chunk = bodyBuffer.subarray(
-            offset,
-            offset + PREVIEW_PROXY_CHUNK_SIZE,
-          );
-          socket.emit("preview-proxy-response-body", {
-            tunnelId,
-            requestId,
-            chunk: chunk.toString("base64"),
-          });
-        }
-
+        await emitChunks(socket, tunnelId, requestId, bodyBuffer);
         socket.emit("preview-proxy-response-end", { tunnelId, requestId });
       } else {
-        // Non-HTML: stream response
         responseHeaders["cache-control"] = "no-store";
         socket.emit("preview-proxy-response-start", {
           tunnelId,
@@ -119,30 +134,25 @@ export function registerPreviewProxy(
 
         if (resp.body) {
           const reader = resp.body.getReader();
-          let done = false;
-          while (!done) {
-            const result = await reader.read();
-            done = result.done;
-            if (result.value) {
-              // Chunk the value
-              const buf = Buffer.from(result.value);
-              for (
-                let offset = 0;
-                offset < buf.byteLength;
-                offset += PREVIEW_PROXY_CHUNK_SIZE
-              ) {
-                socket.emit("preview-proxy-response-body", {
-                  tunnelId,
-                  requestId,
-                  chunk: buf
-                    .subarray(offset, offset + PREVIEW_PROXY_CHUNK_SIZE)
-                    .toString("base64"),
-                });
+          let totalBytes = 0;
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            if (value) {
+              const buf = Buffer.from(value);
+              totalBytes += buf.byteLength;
+              if (totalBytes > MAX_RESPONSE_BODY_BYTES) {
+                abortController.abort();
+                throw new Error(
+                  `Response exceeds ${MAX_RESPONSE_BODY_BYTES} byte limit`,
+                );
               }
+              await emitChunks(socket, tunnelId, requestId, buf);
             }
           }
         }
 
+        clearTimeout(durationTimer);
         socket.emit("preview-proxy-response-end", { tunnelId, requestId });
       }
     } catch (error) {
@@ -188,14 +198,13 @@ export function registerPreviewProxy(
       });
 
       localWs.on("message", (data: Buffer | string, isBinary: boolean) => {
-        const payload = isBinary
-          ? Buffer.from(data as Buffer).toString("base64")
-          : String(data);
-
+        // F10: send binary frames as Buffer — socket.io v4 transports
+        // them as a binary attachment (no base64 inflation). Text frames
+        // remain plain strings.
         socket.emit("preview-ws-frame-from-local", {
           tunnelId: msg.tunnelId,
           requestId,
-          data: payload,
+          data: isBinary ? (data as Buffer) : String(data),
           isBinary,
         });
       });
@@ -230,10 +239,14 @@ export function registerPreviewProxy(
     }
   };
 
-  /** Forward a frame from the browser to the local WebSocket. */
+  /**
+   * Forward a frame from the browser to the local WebSocket.
+   * F10: accept binary as native Buffer/Uint8Array (preferred) or base64
+   * string (backward compat with older servers).
+   */
   const wsFrameToLocalHandler = (msg: {
     requestId: string;
-    data: string;
+    data: Buffer | Uint8Array | string;
     isBinary: boolean;
   }) => {
     const localWs = localWebSockets.get(msg.requestId);
@@ -241,9 +254,18 @@ export function registerPreviewProxy(
 
     try {
       if (msg.isBinary) {
-        localWs.send(Buffer.from(msg.data, "base64"));
+        const buf = Buffer.isBuffer(msg.data)
+          ? msg.data
+          : msg.data instanceof Uint8Array
+            ? Buffer.from(msg.data)
+            : Buffer.from(String(msg.data), "base64");
+        localWs.send(buf);
       } else {
-        localWs.send(msg.data);
+        const text =
+          typeof msg.data === "string"
+            ? msg.data
+            : Buffer.from(msg.data as Uint8Array).toString("utf-8");
+        localWs.send(text);
       }
     } catch {
       // Local socket already closed
@@ -283,6 +305,59 @@ export function registerPreviewProxy(
       }
     }
   };
+}
+
+/**
+ * Emit a Buffer as base64 chunks over Socket.IO, yielding to the event loop
+ * between chunks so we don't starve other I/O or saturate the send buffer.
+ * This is a coarse backpressure mechanism — socket.io-client doesn't surface
+ * its internal buffer state, so we yield every chunk and rely on the event
+ * loop to drain naturally.
+ */
+async function emitChunks(
+  socket: Socket,
+  tunnelId: string,
+  requestId: string,
+  buf: Buffer,
+): Promise<void> {
+  for (let offset = 0; offset < buf.byteLength; offset += PREVIEW_PROXY_CHUNK_SIZE) {
+    const chunk = buf.subarray(offset, offset + PREVIEW_PROXY_CHUNK_SIZE);
+    socket.emit("preview-proxy-response-body", {
+      tunnelId,
+      requestId,
+      chunk: chunk.toString("base64"),
+    });
+    // Yield to the event loop after each chunk — lets reconnect / heartbeats
+    // run, and prevents a huge synchronous emit burst.
+    await setImmediateAsync();
+  }
+}
+
+/**
+ * Rewrite a Location header pointing at the local dev server into a relative
+ * URL so the browser stays on the preview tunnel origin.
+ *
+ * Without this, a 301 redirect from `http://localhost:5173/` to
+ * `http://localhost:5173/login` would send the browser to localhost directly
+ * (and fail) instead of `/preview/{tunnelId}/login`.
+ */
+function rewriteLocationHeader(
+  headers: Record<string, string>,
+  candidate: PreviewCandidate,
+): void {
+  const loc = headers["location"] ?? headers["Location"];
+  if (!loc || !/^https?:\/\//i.test(loc)) return;
+  try {
+    const url = new URL(loc);
+    const expectedHost = `${candidate.host}:${candidate.port}`;
+    if (url.host === expectedHost || url.hostname === candidate.host) {
+      const relative = url.pathname + url.search + url.hash;
+      delete headers["Location"];
+      headers["location"] = relative;
+    }
+  } catch {
+    // Malformed URL — leave it alone
+  }
 }
 
 function sanitizeRequestHeaders(headers: Record<string, string>): Record<string, string> {

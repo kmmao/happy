@@ -3643,6 +3643,13 @@ export const zhHant: TranslationStructure = {
     tunnelError: "隧道錯誤",
     annotationTitle: "元素標註",
     annotationPlaceholder: "描述你想報告的變更或問題...",
+    openExternal: "在瀏覽器中開啟",
+    disconnect: "斷開連線",
+    rotateViewport: "旋轉",
+    annotateMode: "標註模式",
+    annotateModeActive: "點擊元素以標註",
+    candidateDetected: "偵測到開發伺服器",
+    viewPreview: "查看",
   },
 
   backgroundTasks: {

@@ -10,6 +10,34 @@ import { Text } from "@/components/StyledText";
 import { Ionicons } from "@expo/vector-icons";
 import type { ViewportPreset } from "@/hooks/useRemotePreview";
 
+// ── Shared TRACK/UNTRACK helpers ──────────────────────────────────────────────
+//
+// Extracted so both NativePreview (injectJavaScript) and WebPreview (postMessage)
+// share the message-shape logic. If the protocol changes (e.g. add a version
+// field) there's one place to update.
+
+type PostFn = (msg: Record<string, unknown>) => void;
+
+function sendTracksToPreview(
+    post: PostFn,
+    tracks: ReadonlyArray<{ id: string; selector: string; xpath?: string }> | undefined,
+): void {
+    if (!tracks || tracks.length === 0) return;
+    for (const anchor of tracks) {
+        post({ type: "HAPPY_ANNOTATION_TRACK", anchor });
+    }
+}
+
+function sendUntracksToPreview(
+    post: PostFn,
+    ids: readonly string[] | undefined,
+): void {
+    if (!ids || ids.length === 0) return;
+    for (const id of ids) {
+        post({ type: "HAPPY_ANNOTATION_UNTRACK", id });
+    }
+}
+
 interface LivePreviewViewProps {
     url: string;
     viewport: ViewportPreset;
@@ -22,6 +50,25 @@ interface LivePreviewViewProps {
     onAnnotation?: (payload: any) => void;
     /** Whether annotation mode is enabled. */
     annotationMode?: boolean;
+    /** Receive anchor position updates from injected script. */
+    onAnchorUpdate?: (updates: Array<{
+        id: string;
+        rect?: { x: number; y: number; width: number; height: number };
+        visible?: boolean;
+        lost?: boolean;
+    }>) => void;
+    /** Anchors to track in the injected script. */
+    tracksToSend?: ReadonlyArray<{ id: string; selector: string; xpath?: string }>;
+    /** Anchor IDs to stop tracking. */
+    untrackIds?: string[];
+    /** Viewport orientation. */
+    orientation?: "portrait" | "landscape";
+    /** Hand mode (pan/drag instead of interact). */
+    handMode?: boolean;
+    /** Pan/drag offset in hand mode. */
+    panOffset?: { x: number; y: number };
+    /** Called when pan offset changes. */
+    onPanChange?: (offset: { x: number; y: number }) => void;
 }
 
 // ── Native WebView implementation ────────────────────────────────────────────
@@ -35,6 +82,13 @@ function NativePreview({
     reloadKey,
     onAnnotation,
     annotationMode,
+    onAnchorUpdate,
+    tracksToSend,
+    untrackIds,
+    orientation = "portrait",
+    handMode = false,
+    panOffset = { x: 0, y: 0 },
+    onPanChange,
 }: LivePreviewViewProps) {
     const { theme } = useUnistyles();
     const [loading, setLoading] = React.useState(true);
@@ -63,6 +117,16 @@ function NativePreview({
         `;
         webViewRef.current?.injectJavaScript(injected);
     }, [annotationMode, WebViewComponent]);
+
+    // Send TRACK / UNTRACK messages to the injected script (shared helper)
+    React.useEffect(() => {
+        if (!webViewRef.current) return;
+        const post: PostFn = (msg) => {
+            webViewRef.current?.injectJavaScript(`window.postMessage(${JSON.stringify(msg)}, "*"); true;`);
+        };
+        sendTracksToPreview(post, tracksToSend);
+        sendUntracksToPreview(post, untrackIds);
+    }, [tracksToSend, untrackIds]);
 
     if (!WebViewComponent) {
         return (
@@ -147,6 +211,12 @@ function NativePreview({
                                     onAnnotation
                                 ) {
                                     onAnnotation(data.payload);
+                                } else if (
+                                    data.type === "HAPPY_ANNOTATION_ANCHOR_UPDATE" &&
+                                    data.updates &&
+                                    onAnchorUpdate
+                                ) {
+                                    onAnchorUpdate(data.updates);
                                 }
                             } catch {
                                 // Ignore invalid JSON
@@ -170,6 +240,13 @@ function WebPreview({
     reloadKey,
     onAnnotation,
     annotationMode,
+    onAnchorUpdate,
+    tracksToSend,
+    untrackIds,
+    orientation = "portrait",
+    handMode = false,
+    panOffset = { x: 0, y: 0 },
+    onPanChange,
 }: LivePreviewViewProps) {
     const { theme } = useUnistyles();
     const [loading, setLoading] = React.useState(true);
@@ -188,17 +265,23 @@ function WebPreview({
     // Listen for annotation messages from iframe
     React.useEffect(() => {
         const handleMessage = (e: MessageEvent) => {
+            if (e.source !== iframeRef.current?.contentWindow) return;
             if (
-                e.source === iframeRef.current?.contentWindow &&
                 e.data?.type === "HAPPY_ANNOTATION_TARGET" &&
                 onAnnotation
             ) {
                 onAnnotation(e.data.payload);
+            } else if (
+                e.data?.type === "HAPPY_ANNOTATION_ANCHOR_UPDATE" &&
+                e.data.updates &&
+                onAnchorUpdate
+            ) {
+                onAnchorUpdate(e.data.updates);
             }
         };
         window.addEventListener("message", handleMessage);
         return () => window.removeEventListener("message", handleMessage);
-    }, [onAnnotation]);
+    }, [onAnnotation, onAnchorUpdate]);
 
     // Send annotation mode to iframe
     React.useEffect(() => {
@@ -208,6 +291,15 @@ function WebPreview({
             "*",
         );
     }, [annotationMode]);
+
+    // Send TRACK / UNTRACK messages to the iframe (shared helper)
+    React.useEffect(() => {
+        if (!iframeRef.current?.contentWindow) return;
+        const win = iframeRef.current.contentWindow;
+        const post: PostFn = (msg) => win.postMessage(msg, "*");
+        sendTracksToPreview(post, tracksToSend);
+        sendUntracksToPreview(post, untrackIds);
+    }, [tracksToSend, untrackIds]);
 
     return (
         <View style={[styles.previewContainer, { backgroundColor: theme.colors.surfaceHighest }]}>
