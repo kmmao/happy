@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.36.1 - 2026-06-03
+
+Fixed a Web-only paste bug where the input box still pasted the previous screenshot — even though the OS clipboard already held the newer one — when you took a screenshot in another app and immediately switched back to the browser to paste.
+
+### Chat input
+- Fixed pasted images sometimes being the previous screenshot on Web. Chrome's OS-clipboard sync runs asynchronously after the page regains focus, so both `e.clipboardData` and an immediately-issued `navigator.clipboard.read()` can return the stale snapshot. The paste handler now waits a brief tick before reading and retries once if the first read returns a blob the exact size of the synchronous fallback (a strong stale-snapshot signal), so the newest screenshot lands in the input even when you switched windows fast.
+
 ## 2.36.0 - 2026-05-31
 
 Sessions running against Claude Code 2.1.121+ now surface live workspace activity right in the chat — you can see when Claude has moved out of the directory you launched it from, what worktrees it has spun up, and which files it has touched recently, all without leaving the session.

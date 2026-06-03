@@ -294,24 +294,65 @@ export const MultiTextInput = React.forwardRef<
           // Use navigator.clipboard.read() for fresh clipboard data.
           // Chrome may serve stale data in e.clipboardData.items when the
           // clipboard was updated (e.g. macOS screenshot) after the page
-          // last gained focus. The modern Clipboard API always reads the
-          // current OS clipboard.
+          // last gained focus. The modern Clipboard API can pull the
+          // current OS clipboard — but only AFTER Chrome has finished its
+          // internal OS-clipboard sync, which is asynchronous and not
+          // guaranteed to complete before the paste handler fires. We
+          // therefore (1) wait a short tick to give Chrome time to sync,
+          // and (2) treat a same-size-as-fallback result as suspected
+          // stale and retry once with a longer delay.
           if (typeof navigator?.clipboard?.read === "function" && onImagePaste) {
-            void (async () => {
+            const fallbackImage = capturedFiles.find((f) => f.isImage);
+            const fallbackImageSize = fallbackImage?.file.size;
+
+            const readClipboardImage = async (): Promise<Blob | null> => {
               try {
                 const clipboardItems = await navigator.clipboard.read();
                 for (const ci of clipboardItems) {
-                  const imageType = ci.types.find((t: string) => t.startsWith("image/"));
+                  const imageType = ci.types.find((t: string) =>
+                    t.startsWith("image/"),
+                  );
                   if (imageType) {
-                    const blob = await ci.getType(imageType);
-                    log.log(`[paste] clipboard.read() image: ${imageType}/${blob.size}B`);
-                    onImagePaste(blob);
-                    return;
+                    return await ci.getType(imageType);
                   }
                 }
               } catch (err) {
-                log.log("[paste] clipboard.read() failed, using fallback", err);
+                log.log("[paste] clipboard.read() failed", err);
               }
+              return null;
+            };
+
+            void (async () => {
+              // Brief delay so Chrome can finish syncing the OS clipboard
+              // after the page regained focus. 80ms is below the human
+              // latency threshold (~100ms). Transient activation persists
+              // 5s, so subsequent clipboard.read() calls remain allowed.
+              await new Promise((resolve) => setTimeout(resolve, 80));
+              let blob = await readClipboardImage();
+
+              // Same size as the fallback file strongly suggests Chrome's
+              // OS-clipboard sync hasn't caught up yet (both reads served
+              // from the same stale snapshot). Retry once with a longer
+              // delay before giving up.
+              if (
+                blob &&
+                fallbackImageSize !== undefined &&
+                blob.size === fallbackImageSize
+              ) {
+                log.log(
+                  `[paste] clipboard.read() blob size matched fallback (${blob.size}B), retrying after 200ms`,
+                );
+                await new Promise((resolve) => setTimeout(resolve, 200));
+                const retried = await readClipboardImage();
+                if (retried) blob = retried;
+              }
+
+              if (blob) {
+                log.log(`[paste] clipboard.read() image: ${blob.size}B`);
+                onImagePaste(blob);
+                return;
+              }
+
               // Fallback: use synchronously captured file from clipboardData
               const first = capturedFiles[0];
               if (first.isImage && onImagePaste) {
