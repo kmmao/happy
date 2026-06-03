@@ -69,7 +69,7 @@ function detectChangedPackages(
  * Steps:
  * 1. Stash uncommitted changes (if any)
  * 2. Fetch + rebase from origin
- * 3. On conflict: attempt auto-resolve via Claude, abort if fails
+ * 3. On conflict: list affected files, abort, surface error to caller (ADR-0008)
  * 4. Detect changed files and affected packages
  * 5. Deploy/release affected infrastructure packages
  * 6. Restore stashed changes
@@ -168,23 +168,32 @@ export async function runPreflightSync(
     );
 
     if (rebaseResult.exitCode !== 0) {
-      // Rebase conflict — attempt Claude-assisted resolution
-      logger.debug("[PREFLIGHT] Rebase conflict detected, attempting resolution");
-      progress("resolving-conflicts");
-
-      const resolved = await attemptConflictResolution(repoPath);
-      if (!resolved) {
-        // Abort rebase and restore
-        await execFileAsync("git", ["rebase", "--abort"], repoPath);
-        await restoreStash(repoPath, stashed);
-        return {
-          success: false,
-          pulled: false,
-          changedFiles: [],
-          deployedPackages: [],
-          error: "Git rebase conflict could not be auto-resolved. Please resolve manually.",
-        };
-      }
+      // Rebase conflict — list conflicting files, abort, surface to caller.
+      // Per ADR-0008 we no longer attempt headless auto-resolution; the user
+      // resolves conflicts in their regular interactive Session.
+      logger.debug("[PREFLIGHT] Rebase conflict detected, aborting");
+      const conflictListResult = await execFileAsync(
+        "git",
+        ["diff", "--name-only", "--diff-filter=U"],
+        repoPath,
+      );
+      const conflictFiles = conflictListResult.stdout
+        .trim()
+        .split("\n")
+        .filter((f) => f.length > 0);
+      await execFileAsync("git", ["rebase", "--abort"], repoPath);
+      await restoreStash(repoPath, stashed);
+      const fileList =
+        conflictFiles.length > 0
+          ? ` Conflicting files: ${conflictFiles.join(", ")}`
+          : "";
+      return {
+        success: false,
+        pulled: false,
+        changedFiles: [],
+        deployedPackages: [],
+        error: `Git rebase conflict requires manual resolution.${fileList}`,
+      };
     }
 
     // 6. Detect changed files
@@ -243,101 +252,6 @@ export async function runPreflightSync(
       error: `Preflight sync error: ${msg}`,
     };
   }
-}
-
-/**
- * Attempt to auto-resolve rebase conflicts using Claude.
- * Spawns a short Claude session to resolve the conflict files.
- * Returns true if all conflicts are resolved and rebase can continue.
- */
-async function attemptConflictResolution(
-  repoPath: string,
-): Promise<boolean> {
-  // List conflicting files
-  const conflictResult = await execFileAsync(
-    "git",
-    ["diff", "--name-only", "--diff-filter=U"],
-    repoPath,
-  );
-  const conflictFiles = conflictResult.stdout
-    .trim()
-    .split("\n")
-    .filter((f) => f.length > 0);
-
-  if (conflictFiles.length === 0) {
-    return false;
-  }
-
-  logger.debug(
-    `[PREFLIGHT] ${conflictFiles.length} conflicting file(s): ${conflictFiles.join(", ")}`,
-  );
-
-  // Use Claude CLI in non-interactive mode to resolve conflicts
-  const resolvePrompt = [
-    "You are resolving git rebase conflicts. The following files have conflicts:",
-    ...conflictFiles.map((f) => `  - ${f}`),
-    "",
-    "For each file:",
-    "1. Read the file and find the conflict markers (<<<<<<< HEAD, =======, >>>>>>>)",
-    "2. Analyze both sides and merge them intelligently",
-    "3. Remove all conflict markers",
-    "4. Save the resolved file",
-    "5. Run: git add <file>",
-    "",
-    "After resolving ALL files, run: git rebase --continue",
-    "",
-    "If you cannot resolve a conflict safely, output CONFLICT_UNRESOLVABLE and stop.",
-  ].join("\n");
-
-  const claudeResult = await execFileAsync(
-    "claude",
-    ["-p", resolvePrompt, "--max-turns", "20"],
-    repoPath,
-    180_000, // 3 minutes
-  );
-
-  if (claudeResult.exitCode === 0) {
-    // Check if rebase is still in progress (means --continue failed or wasn't run)
-    const rebaseCheck = await execFileAsync(
-      "git",
-      ["rev-parse", "--git-path", "rebase-merge"],
-      repoPath,
-    );
-    const rebaseDirCheck = await execFileAsync(
-      "test",
-      ["-d", rebaseCheck.stdout.trim()],
-      repoPath,
-    );
-    if (rebaseDirCheck.exitCode === 0) {
-      // Rebase still in progress — try to continue
-      const continueResult = await execFileAsync(
-        "git",
-        ["rebase", "--continue"],
-        repoPath,
-        60_000,
-      );
-      if (continueResult.exitCode !== 0) {
-        logger.debug("[PREFLIGHT] git rebase --continue failed after Claude resolution");
-        return false;
-      }
-    }
-    logger.debug("[PREFLIGHT] Conflicts resolved by Claude");
-    return true;
-  }
-
-  // Check output for explicit unresolvable marker
-  if (
-    claudeResult.stdout.includes("CONFLICT_UNRESOLVABLE") ||
-    claudeResult.stderr.includes("CONFLICT_UNRESOLVABLE")
-  ) {
-    logger.debug("[PREFLIGHT] Claude reported conflicts as unresolvable");
-    return false;
-  }
-
-  logger.debug(
-    `[PREFLIGHT] Claude conflict resolution failed (exit ${claudeResult.exitCode})`,
-  );
-  return false;
 }
 
 /**

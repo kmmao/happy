@@ -352,7 +352,7 @@ export async function handleSupervisorTrigger(
         stashing: { dimension: "preflight_stash", index: 1, total: 5 },
         fetching: { dimension: "preflight_fetch", index: 2, total: 5 },
         pulling: { dimension: "preflight_pull", index: 3, total: 5 },
-        "resolving-conflicts": { dimension: "preflight_resolve", index: 3, total: 5 },
+        // "resolving-conflicts" removed: preflight no longer auto-resolves (ADR-0008)
         deploying: { dimension: "preflight_deploy", index: 4, total: 5 },
         "deploying-happy-cli": { dimension: "preflight_deploy_cli", index: 4, total: 5 },
         "deploying-happy-server": { dimension: "preflight_deploy_server", index: 4, total: 5 },

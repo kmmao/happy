@@ -144,6 +144,23 @@ Phase 1-5 已完成并发布 @kmmao/happy-agent@0.4.0。Phase 6.1 已完成（�
 
 ---
 
+## Codium Claude 运行时脱钩 SDK（2026-06-04 记录）
+
+依据 [ADR-0008](./docs/adr/0008-claude-runtime-interactive-pty-only.md)：happy 不再使用 `@anthropic-ai/claude-agent-sdk` 与 `claude -p` headless 模式。
+`happy-cli` 主路径 + supervisor preflight 已在 ADR 范围内处理；**`happy-codium` 的 SDK worker 是剩下的大头**，需要单独决策。
+
+### 待决策路线（三选一或组合）
+- [ ] **C. PTY 复刻**：codium 改 spawn `claude` 交互二进制，复用 happy-cli `claude/pty/*`。需破例 codium "不依赖任何 `@kmmao/*` 内部包"约束（CLAUDE.md），或把 PTY 那套抽成独立可发布包
+- [ ] **D. 收敛到 happy-cli daemon**：codium 退化为 happy-app 的桌面孪生，通过 IPC/socket 连 daemon。需要重新定位 codium 身份
+- [ ] **A. 砍 Claude**：codium 只保留 Codex / 其他 plugin。最硬，需先聊 codium 定位
+
+### 影响面参考
+- 入口：`packages/happy-codium/sources/boot/main/agent-worker/worker.ts`（~500 行 SDK consume 循环）
+- 兼容：`packages/happy-codium/sources/plugins/anthropic/` 现在是 API key 仓库，最终落到同一 SDK worker
+- 隔离：与 happy-cli 物理隔离（nohoist），不影响 ADR-0008 第一阶段交付
+
+---
+
 ## Auto-Option-Send 跨设备同步（2026-04-11 记录）
 
 当前 auto-send 开关存储在 `localSettings`（device-local MMKV），不跨设备同步。
