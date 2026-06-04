@@ -1,5 +1,18 @@
 # Changelog
 
+## 2.36.2 - 2026-06-05
+
+Tightened the chat header by folding Claude's live working directory into the existing "Process ID" subtitle line, so what used to be a faint third row is now part of a single subtitle like `Process ID 99118 · gs-frontend`. The cwd label is now always shown — including when Claude is still in the directory you launched from — so you can see "where am I" at a glance without an extra row stealing vertical space.
+
+### Chat header
+- Improved chat header layout — folded the live working directory into the existing Process ID line as `Process ID N · <cwd>`, removing the dedicated third row introduced in 2.36.0. Saves one row of vertical space on every session screen.
+- Improved cwd display to always render something when path data is available — falls back to the launch directory's basename (e.g. `gs-frontend`) when Claude has not moved out, instead of hiding the label entirely. When Claude has moved, you still see the compact relative form (`./src/app` for subdirs, `…/parent/name` for siblings).
+- Improved long-subtitle handling — `Process ID · cwd` tail-truncates inside the header subtitle's single line; the underlying chip components removed in this change are no longer rendered above the chat content.
+
+### Behind the scenes
+- Added `formatSessionCwdLabel` helper alongside the existing `formatActiveCwd` — picks the best label across activeCwd / launchPath with a strict basename fallback so callers always get a short, render-safe string. Covered by 18 unit tests (10 existing + 8 new) for POSIX / Windows / sibling / missing-path cases.
+- Removed the `SessionCwdBadge` component and `launchPath` / `activeCwd` props from `ChatHeaderView` — the header is now strictly two-line (`title` + `subtitle`), and the cwd composition lives where the rest of the subtitle is built (in `SessionView.tsx`).
+
 ## 2.36.1 - 2026-06-03
 
 Fixed a Web-only paste bug where the input box still pasted the previous screenshot — even though the OS clipboard already held the newer one — when you took a screenshot in another app and immediately switched back to the browser to paste.

@@ -17,26 +17,10 @@ import { screenHeaderMaxWidth } from "@/components/layout";
 import { useUnistyles } from "react-native-unistyles";
 import { DevButton } from "@/components/DevButton";
 import type { DevButtonState } from "@/hooks/useDevButton";
-import { formatActiveCwd } from "./chatHeaderActiveCwd";
 
 interface ChatHeaderViewProps {
   title: string;
   subtitle?: string;
-  /**
-   * The cwd the session was launched in (`metadata.path`). Shown as a
-   * faint third line **only** when `activeCwd` is present and differs
-   * from `launchPath` — i.e. Claude has actually moved out of the launch
-   * directory. We display only the basename so the row stays compact;
-   * full path lives on Session Info.
-   */
-  launchPath?: string;
-  /**
-   * Claude's current working directory, written by happy-cli when the
-   * Claude Code 2.1.121+ `CwdChanged` hook fires. Absent on older CLIs
-   * and before the first cwd change — the header silently omits the row
-   * in that case.
-   */
-  activeCwd?: string;
   onBackPress?: () => void;
   onAvatarPress?: () => void;
   onPanelPress?: () => void;
@@ -62,8 +46,6 @@ interface ChatHeaderViewProps {
 export const ChatHeaderView: React.FC<ChatHeaderViewProps> = ({
   title,
   subtitle,
-  launchPath,
-  activeCwd,
   onBackPress,
   onAvatarPress,
   onPanelPress,
@@ -162,33 +144,9 @@ export const ChatHeaderView: React.FC<ChatHeaderViewProps> = ({
                 {subtitle}
               </Text>
             )}
-            {/* Live working directory — third header line, only when Claude
-                has actually moved out of the launch cwd. Suppressed when
-                activeCwd is unset (older CLIs) or equal to launchPath. */}
-            {activeCwd && activeCwd !== launchPath && (
-              <View style={styles.activeCwdRow}>
-                <Ionicons
-                  name="folder-open-outline"
-                  size={10}
-                  color={theme.colors.header.tint}
-                  style={{ opacity: 0.55 }}
-                />
-                <Text
-                  numberOfLines={1}
-                  ellipsizeMode="middle"
-                  style={[
-                    styles.activeCwd,
-                    {
-                      color: theme.colors.header.tint,
-                      opacity: 0.55,
-                      ...Typography.default(),
-                    },
-                  ]}
-                >
-                  {formatActiveCwd(activeCwd, launchPath)}
-                </Text>
-              </View>
-            )}
+            {/* Live working directory used to render here as a third
+                faint line. It now sits above AgentInput as a small label
+                (see SessionCwdBadge) so the header stays compact. */}
           </View>
 
           {knowledgeCount != null && knowledgeCount > 0 && (
@@ -346,19 +304,6 @@ const styles = StyleSheet.create((_, rt) => ({
     fontSize: 12,
     fontWeight: "400",
     lineHeight: 14,
-  },
-  activeCwdRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 3,
-    marginTop: 1,
-    width: "100%",
-  },
-  activeCwd: {
-    fontSize: 11,
-    fontWeight: "400",
-    lineHeight: 13,
-    flexShrink: 1,
   },
   actionButton: {
     width: 36,

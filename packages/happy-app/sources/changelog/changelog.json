@@ -2,6 +2,19 @@
   "entries": {
     "en": [
       {
+        "version": "2.36.2",
+        "date": "2026-06-05",
+        "summary": "Tightened the chat header by folding Claude's live working directory into the existing \"Process ID\" subtitle line, so what used to be a faint third row is now part of a single subtitle like `Process ID 99118 · gs-frontend`. The cwd label is now always shown — including when Claude is still in the directory you launched from — so you can see \"where am I\" at a glance without an extra row stealing vertical space.",
+        "changes": [
+          "Improved chat header layout — folded the live working directory into the existing Process ID line as `Process ID N · <cwd>`, removing the dedicated third row introduced in 2.36.0. Saves one row of vertical space on every session screen.",
+          "Improved cwd display to always render something when path data is available — falls back to the launch directory's basename (e.g. `gs-frontend`) when Claude has not moved out, instead of hiding the label entirely. When Claude has moved, you still see the compact relative form (`./src/app` for subdirs, `…/parent/name` for siblings).",
+          "Improved long-subtitle handling — `Process ID · cwd` tail-truncates inside the header subtitle's single line; the underlying chip components removed in this change are no longer rendered above the chat content.",
+          "Added `formatSessionCwdLabel` helper alongside the existing `formatActiveCwd` — picks the best label across activeCwd / launchPath with a strict basename fallback so callers always get a short, render-safe string. Covered by 18 unit tests (10 existing + 8 new) for POSIX / Windows / sibling / missing-path cases.",
+          "Removed the `SessionCwdBadge` component and `launchPath` / `activeCwd` props from `ChatHeaderView` — the header is now strictly two-line (`title` + `subtitle`), and the cwd composition lives where the rest of the subtitle is built (in `SessionView.tsx`)."
+        ],
+        "rawMarkdown": "## 2.36.2 - 2026-06-05\n\n\nTightened the chat header by folding Claude's live working directory into the existing \"Process ID\" subtitle line, so what used to be a faint third row is now part of a single subtitle like `Process ID 99118 · gs-frontend`. The cwd label is now always shown — including when Claude is still in the directory you launched from — so you can see \"where am I\" at a glance without an extra row stealing vertical space.\n\n### Chat header\n- Improved chat header layout — folded the live working directory into the existing Process ID line as `Process ID N · <cwd>`, removing the dedicated third row introduced in 2.36.0. Saves one row of vertical space on every session screen.\n- Improved cwd display to always render something when path data is available — falls back to the launch directory's basename (e.g. `gs-frontend`) when Claude has not moved out, instead of hiding the label entirely. When Claude has moved, you still see the compact relative form (`./src/app` for subdirs, `…/parent/name` for siblings).\n- Improved long-subtitle handling — `Process ID · cwd` tail-truncates inside the header subtitle's single line; the underlying chip components removed in this change are no longer rendered above the chat content.\n\n### Behind the scenes\n- Added `formatSessionCwdLabel` helper alongside the existing `formatActiveCwd` — picks the best label across activeCwd / launchPath with a strict basename fallback so callers always get a short, render-safe string. Covered by 18 unit tests (10 existing + 8 new) for POSIX / Windows / sibling / missing-path cases.\n- Removed the `SessionCwdBadge` component and `launchPath` / `activeCwd` props from `ChatHeaderView` — the header is now strictly two-line (`title` + `subtitle`), and the cwd composition lives where the rest of the subtitle is built (in `SessionView.tsx`)."
+      },
+      {
         "version": "2.36.1",
         "date": "2026-06-03",
         "summary": "Fixed a Web-only paste bug where the input box still pasted the previous screenshot — even though the OS clipboard already held the newer one — when you took a screenshot in another app and immediately switched back to the browser to paste.",
@@ -938,6 +951,19 @@
     ],
     "zh-Hans": [
       {
+        "version": "2.36.2",
+        "date": "2026-06-05",
+        "summary": "收紧了聊天头部布局 —— Claude 的实时工作目录从原先单独的第三行，合并到「进程 ID」副标题那一行，形成 `进程 ID 99118 · gs-frontend` 这样的单行展示。cwd 标签现在**始终显示**（即使 Claude 还没离开启动目录，也会显示启动目录末段名），让你随时一眼看到「自己在哪」，同时省下一行垂直空间。",
+        "changes": [
+          "改进聊天头部布局 —— 把实时工作目录折叠到「进程 ID」副标题那一行，形成 `进程 ID N · <cwd>` 的格式，移除了 2.36.0 引入的独立第三行。每个会话页节省一行垂直空间。",
+          "改进 cwd 展示逻辑 —— 只要路径数据可用就一定显示。Claude 还没离开启动目录时退化为启动目录末段名（如 `gs-frontend`），不再隐藏；Claude 已经移到子目录或别处时仍显示紧凑的相对形式（子目录 `./src/app`，旁支 `…/parent/name`）。",
+          "改进长副标题处理 —— `进程 ID · cwd` 在副标题单行内尾部截断；之前挂在聊天内容上方的 chip 组件已移除。",
+          "在已有的 `formatActiveCwd` 之外新增 `formatSessionCwdLabel` 辅助函数 —— 在 activeCwd / launchPath 之间挑选最合适的标签，并严格退化到 basename，调用方拿到的总是一个短小、可安全渲染的字符串。覆盖了 18 个单元测试（已有 10 个 + 新增 8 个），涵盖 POSIX / Windows / 旁支目录 / 路径缺失等场景。",
+          "移除 `SessionCwdBadge` 组件，以及 `ChatHeaderView` 的 `launchPath` / `activeCwd` props —— 头部现在严格保持两行（`title` + `subtitle`），cwd 组合逻辑迁移到副标题构建的同一处（`SessionView.tsx`）。"
+        ],
+        "rawMarkdown": "## 2.36.2 - 2026-06-05\n\n\n收紧了聊天头部布局 —— Claude 的实时工作目录从原先单独的第三行，合并到「进程 ID」副标题那一行，形成 `进程 ID 99118 · gs-frontend` 这样的单行展示。cwd 标签现在**始终显示**（即使 Claude 还没离开启动目录，也会显示启动目录末段名），让你随时一眼看到「自己在哪」，同时省下一行垂直空间。\n\n### 聊天头部\n- 改进聊天头部布局 —— 把实时工作目录折叠到「进程 ID」副标题那一行，形成 `进程 ID N · <cwd>` 的格式，移除了 2.36.0 引入的独立第三行。每个会话页节省一行垂直空间。\n- 改进 cwd 展示逻辑 —— 只要路径数据可用就一定显示。Claude 还没离开启动目录时退化为启动目录末段名（如 `gs-frontend`），不再隐藏；Claude 已经移到子目录或别处时仍显示紧凑的相对形式（子目录 `./src/app`，旁支 `…/parent/name`）。\n- 改进长副标题处理 —— `进程 ID · cwd` 在副标题单行内尾部截断；之前挂在聊天内容上方的 chip 组件已移除。\n\n### 幕后改动\n- 在已有的 `formatActiveCwd` 之外新增 `formatSessionCwdLabel` 辅助函数 —— 在 activeCwd / launchPath 之间挑选最合适的标签，并严格退化到 basename，调用方拿到的总是一个短小、可安全渲染的字符串。覆盖了 18 个单元测试（已有 10 个 + 新增 8 个），涵盖 POSIX / Windows / 旁支目录 / 路径缺失等场景。\n- 移除 `SessionCwdBadge` 组件，以及 `ChatHeaderView` 的 `launchPath` / `activeCwd` props —— 头部现在严格保持两行（`title` + `subtitle`），cwd 组合逻辑迁移到副标题构建的同一处（`SessionView.tsx`）。"
+      },
+      {
         "version": "2.36.1",
         "date": "2026-06-03",
         "summary": "修复了 Web 端「粘贴最新截图」的问题 —— 你在别的 App 里刚截完图、立刻切回浏览器按 Cmd+V 时，输入框有时仍会贴上一张旧截图，即便操作系统的剪贴板里其实已经是新图。",
@@ -1851,7 +1877,7 @@
       }
     ]
   },
-  "latestVersion": "2.36.1",
+  "latestVersion": "2.36.2",
   "availableLocales": [
     "en",
     "zh-Hans"

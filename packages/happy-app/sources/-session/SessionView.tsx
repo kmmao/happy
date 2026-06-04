@@ -21,6 +21,7 @@ import {
 import type { ModelMode, PermissionMode } from "@/components/modelModeOptions";
 import { getSuggestions } from "@/components/autocomplete/suggestions";
 import { ChatHeaderView } from "@/components/ChatHeaderView";
+import { formatSessionCwdLabel } from "@/components/chatHeaderActiveCwd";
 import { OptionScoringMetaProvider } from "@/components/markdown/MarkdownView";
 import { ChatList, ChatListHandle, LOAD_MORE_INCREMENT } from "@/components/ChatList";
 import { Deferred } from "@/components/Deferred";
@@ -468,20 +469,26 @@ export const SessionView = React.memo((props: { id: string }) => {
     // Normal state - show session info
     const isConnected = session.presence === "online";
 
-    const subtitle = session.metadata?.hostPid != null
+    // Header subtitle combines process ID + cwd on a single line so the
+    // user can see "what process / where am I" without an extra row.
+    // Falls back gracefully when either piece is missing.
+    const pidLabel = session.metadata?.hostPid != null
       ? `${t("sessionInfo.processId")} ${session.metadata.hostPid}`
+      : null;
+    const cwdLabel = formatSessionCwdLabel(
+      session.metadata?.activeCwd,
+      session.metadata?.path,
+    );
+    const subtitleParts = [pidLabel, cwdLabel].filter(
+      (s): s is string => Boolean(s),
+    );
+    const subtitle = subtitleParts.length > 0
+      ? subtitleParts.join(" · ")
       : undefined;
 
     return {
       title: getSessionName(session),
       subtitle,
-      // Header renders a third faint line with Claude's live cwd whenever
-      // it has moved out of the launch dir (Claude Code 2.1.121+
-      // CwdChanged hook writes `metadata.activeCwd`). Both fields are
-      // optional — ChatHeaderView suppresses the row if `activeCwd` is
-      // missing or matches `launchPath`.
-      launchPath: session.metadata?.path,
-      activeCwd: session.metadata?.activeCwd,
       avatarId: getSessionAvatarId(session),
       onAvatarPress: () => router.push(`/session/${sessionId}/info`),
       isConnected: isConnected,

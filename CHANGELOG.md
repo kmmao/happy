@@ -12,6 +12,10 @@ This monorepo contains multiple packages, each with its own changelog:
 
 ## Recent Highlights
 
+### 2026-06-05
+
+- **happy-app 2.36.2** — Chat header tightening: the live working directory introduced in 2.36.0 as a faint third row is folded into the existing Process ID subtitle as `Process ID N · <cwd>`, saving one row of vertical space on every session screen. The cwd label is now always rendered (falls back to the launch directory's basename when Claude has not moved), so you always see "where am I" at a glance. Backed by a new `formatSessionCwdLabel` helper with 18 unit tests covering POSIX / Windows / sibling / missing-path cases.
+
 ### 2026-06-02
 
 - **happy-cli 0.89.0** — Codex permission-mode pipeline: new `--permission-mode <mode>` and `--yolo` CLI flags plumb an explicit permission mode through `runCodex`, mapping `yolo`/`bypassPermissions` to the `never` approval policy so full-yolo sessions skip all permission prompts. Also fixes initial socket reconnect (smart reconnect now kicks immediately after socket setup, preventing silent connection failures on cold start). App-side: new `new-machine` live-update handler initializes per-machine encryption from the carried data key, so freshly onboarded machines appear instantly without an app restart.
