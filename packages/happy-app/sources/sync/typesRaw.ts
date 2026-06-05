@@ -269,6 +269,19 @@ const sessionStateChangedEventSchema = z.object({
   state: z.enum(["idle", "running", "requires_action"]),
 });
 
+// Mirrors @kmmao/happy-wire's sessionTerminalSignalEventSchema. PTY mode
+// observes OSC control sequences the TUI emits (window-title updates, iTerm2
+// notifications, BEL) and surfaces them here so remote App / Web clients can
+// render them as a banner / push notification without having to attach a
+// terminal. Older Apps that did not know about this discriminator drop the
+// envelope via sessionEventSchemaPermissive — see normalizeRawMessage.
+const sessionTerminalSignalEventSchema = z.object({
+  t: z.literal("terminal-signal"),
+  kind: z.enum(["window-title", "notification", "bell", "other"]),
+  text: z.string().optional(),
+  oscCode: z.string().optional(),
+});
+
 const sessionContextUsageEventSchema = z.object({
   t: z.literal("context-usage"),
   totalTokens: z.number(),
@@ -311,6 +324,7 @@ const sessionEventSchema = z.discriminatedUnion("t", [
   sessionNeedsContinueEventSchema,
   sessionStateChangedEventSchema,
   sessionContextUsageEventSchema,
+  sessionTerminalSignalEventSchema,
 ]);
 
 const sessionEnvelopeSchema = z
@@ -353,7 +367,8 @@ const sessionEnvelopeSchema = z
         envelope.ev.t === "tool-progress" ||
         envelope.ev.t === "prompt-suggestion" ||
         envelope.ev.t === "session-state-changed" ||
-        envelope.ev.t === "context-usage") &&
+        envelope.ev.t === "context-usage" ||
+        envelope.ev.t === "terminal-signal") &&
       envelope.role !== "agent"
     ) {
       ctx.addIssue({
@@ -1342,6 +1357,13 @@ function normalizeSessionEnvelopeCore(
     return null;
   }
 
+  if (envelope.ev.t === "terminal-signal") {
+    // TUI terminal control signals (window-title, OSC 9 notifications, BEL)
+    // are surfaced through dedicated UI affordances rather than chat. See
+    // extractTerminalSignalFromRaw() for the consumer.
+    return null;
+  }
+
   return null;
 }
 
@@ -1388,6 +1410,49 @@ export function extractPromptSuggestionFromRaw(
     return envelope.ev.suggestion;
   }
   return null;
+}
+
+/**
+ * Shape of a terminal-signal event surfaced to App state. Matches the wire
+ * schema (kind + optional text + optional oscCode) one-to-one so downstream
+ * code can pattern-match the discriminator without re-parsing.
+ */
+export type TerminalSignal = {
+  kind: "window-title" | "notification" | "bell" | "other";
+  text?: string;
+  oscCode?: string;
+};
+
+/**
+ * Extract a terminal-signal payload from a raw record. Returns null when the
+ * envelope is not a terminal-signal or the discriminator does not match —
+ * callers iterate the latest batch of raw records and dispatch the non-null
+ * results to whichever UI handles them (toast, title bar, push, …).
+ */
+export function extractTerminalSignalFromRaw(
+  raw: RawRecord | null | undefined,
+): TerminalSignal | null {
+  if (!raw) return null;
+  const envelope = getSessionEnvelope(raw);
+  if (envelope?.ev?.t !== "terminal-signal") return null;
+  const ev = envelope.ev as {
+    kind?: unknown;
+    text?: unknown;
+    oscCode?: unknown;
+  };
+  if (
+    ev.kind !== "window-title" &&
+    ev.kind !== "notification" &&
+    ev.kind !== "bell" &&
+    ev.kind !== "other"
+  ) {
+    return null;
+  }
+  return {
+    kind: ev.kind,
+    text: typeof ev.text === "string" ? ev.text : undefined,
+    oscCode: typeof ev.oscCode === "string" ? ev.oscCode : undefined,
+  };
 }
 
 /**

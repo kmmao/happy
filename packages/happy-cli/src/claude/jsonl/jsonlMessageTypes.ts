@@ -246,11 +246,19 @@ export type ClaudeJsonlMessageOrigin =
   | { kind: "coordinator" };
 export type FastModeState = Record<string, unknown>;
 
+// Claude Code 2.1.150 split 529 out of "rate_limit" into a dedicated
+// "overloaded" code; "rate_limit" is now reserved for 429. Consumers that
+// branched on "rate_limit" must also handle "overloaded" (or check
+// `error_status === 529`).
+// Claude Code 2.1.162 added "refusal" so callers can detect Anthropic-side
+// content refusals without pattern-matching the assistant text.
 export type ClaudeJsonlAssistantMessageError =
   | "authentication_failed"
   | "oauth_org_not_allowed"
   | "billing_error"
   | "rate_limit"
+  | "overloaded"
+  | "refusal"
   | "invalid_request"
   | "model_not_found"
   | "server_error"

@@ -5,10 +5,19 @@ function parseTable(lines: string[], startIndex: number): { table: MarkdownBlock
     let index = startIndex;
     const tableLines: string[] = [];
 
-    // Collect consecutive lines that contain pipe characters to identify potential table rows
-    while (index < lines.length && lines[index].includes('|')) {
-        tableLines.push(lines[index]);
-        index++;
+    // Collect consecutive pipe-bearing lines that look like table rows.
+    // LLMs sometimes insert blank lines between rows (PR #730); skip those
+    // rather than terminating the table parse, but stop on any other non-pipe
+    // line so a trailing paragraph doesn't get swallowed.
+    while (index < lines.length) {
+        if (lines[index].includes('|')) {
+            tableLines.push(lines[index]);
+            index++;
+        } else if (lines[index].trim() === '') {
+            index++;
+        } else {
+            break;
+        }
     }
 
     if (tableLines.length < 2) {

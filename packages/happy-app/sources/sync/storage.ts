@@ -150,6 +150,14 @@ interface StorageState {
   setPromptSuggestion: (sessionId: string, suggestion: string | null) => void;
   sessionNeedsContinue: Record<string, boolean>;
   setNeedsContinue: (sessionId: string, value: boolean) => void;
+  /**
+   * Latest TUI window-title from a `terminal-signal` wire event (OSC 0/2).
+   * Used by `getSessionSubtitle` as a higher-priority subtitle than path so
+   * remote users see the same title a native terminal would render. Cleared
+   * on session removal and on logout.
+   */
+  sessionTerminalTitles: Record<string, string | null>;
+  setTerminalTitle: (sessionId: string, title: string | null) => void;
   // Pending message queue per session (in-memory only, survives tab switches)
   sessionPendingQueues: Record<string, Array<{ localId: string; message: string; displayText?: string }>>;
   appendToPendingQueue: (sessionId: string, item: { localId: string; message: string; displayText?: string }) => void;
@@ -558,6 +566,24 @@ export const storage = create<StorageState>()((set, get) => {
           [sessionId]: value,
         },
       })),
+    sessionTerminalTitles: {},
+    setTerminalTitle: (sessionId: string, title: string | null) =>
+      set((prev) => {
+        // No-op when value hasn't changed — terminal-signal events can fire
+        // many times per second from animated TUIs that rewrite the title in
+        // a tight loop (e.g. a build progress bar). Skipping equal writes
+        // saves React from re-rendering every subtitle consumer on each
+        // identical update.
+        if ((prev.sessionTerminalTitles[sessionId] ?? null) === title) {
+          return prev;
+        }
+        return {
+          sessionTerminalTitles: {
+            ...prev.sessionTerminalTitles,
+            [sessionId]: title,
+          },
+        };
+      }),
     sessionPendingQueues: savedPendingQueues,
     appendToPendingQueue: (sessionId, item) => {
       set((prev) => ({
@@ -2174,6 +2200,14 @@ export const storage = create<StorageState>()((set, get) => {
           ...remainingPromptSuggestions
         } = state.sessionPromptSuggestions;
 
+        // Drop any TUI-supplied window title — the next session that reuses
+        // this id (highly unlikely but possible) should not inherit a stale
+        // title from a prior process.
+        const {
+          [sessionId]: _deletedTerminalTitle,
+          ...remainingTerminalTitles
+        } = state.sessionTerminalTitles;
+
         // Clear drafts and permission modes from persistent storage
         const drafts = loadSessionDrafts();
         delete drafts[sessionId];
@@ -2230,6 +2264,7 @@ export const storage = create<StorageState>()((set, get) => {
           sessionMessagesLRU: remainingSessionMessagesLRU,
           sessionGitStatus: remainingGitStatus,
           sessionPromptSuggestions: remainingPromptSuggestions,
+          sessionTerminalTitles: remainingTerminalTitles,
           sessionLastViewed: { ...sessionLastViewed },
           sessionListViewData,
         };
@@ -2741,6 +2776,19 @@ export function usePromptSuggestion(sessionId: string): string | null {
 export function useNeedsContinue(sessionId: string): boolean {
   return storage(
     useShallow((state) => state.sessionNeedsContinue[sessionId] ?? false),
+  );
+}
+
+/**
+ * Latest TUI window title for `sessionId`, or `null` if none has been
+ * received. Updated by `syncUpdateHandlers` whenever a `terminal-signal`
+ * envelope of kind `window-title` lands. Consumers should treat it as a
+ * higher-priority subtitle than the static project path so the user sees the
+ * same context their native terminal would show.
+ */
+export function useSessionTerminalTitle(sessionId: string): string | null {
+  return storage(
+    useShallow((state) => state.sessionTerminalTitles[sessionId] ?? null),
   );
 }
 

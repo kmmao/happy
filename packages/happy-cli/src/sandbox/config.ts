@@ -95,5 +95,10 @@ export function buildSandboxRuntimeConfig(
             allowWrite,
             denyWrite: resolvePaths(sandboxConfig.denyWritePaths, sessionPath),
         },
+        // Linux/WSL only. The runtime treats `undefined` as "discover on PATH"
+        // (the historical default), so omitting these here keeps existing
+        // installs behaving as before. macOS ignores both.
+        ...(sandboxConfig.bwrapPath ? { bwrapPath: sandboxConfig.bwrapPath } : {}),
+        ...(sandboxConfig.socatPath ? { socatPath: sandboxConfig.socatPath } : {}),
     };
 }

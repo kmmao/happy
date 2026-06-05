@@ -144,6 +144,13 @@ vi.mock("@/log", () => ({
   },
 }));
 
+// dispatchTerminalSignal posts to expo-notifications for OSC 9 events; mock
+// it so the test environment doesn't need to load Expo's winter runtime
+// (the real module path resolution fails outside an Expo-backed test host).
+vi.mock("expo-notifications", () => ({
+  scheduleNotificationAsync: vi.fn(() => Promise.resolve("notification-id")),
+}));
+
 function makeBaselineSession() {
   return {
     id: "session-1",

@@ -1530,6 +1530,8 @@ export const ja: TranslationStructure = {
     preview: "プレビュー",
     code: "コード",
     terminal: "ターミナル",
+    claude: "Claude",
+    claudeNotRunning: "このセッションで Claude は起動していません",
     collapse: "折りたたむ",
     expand: "展開する",
     noProject: "プロジェクト未連携",
@@ -4202,6 +4204,9 @@ export const ja: TranslationStructure = {
     errorLabels: {
       billing_error: "請求エラー",
       rate_limit: "レート制限に達しました",
+      overloaded: "サービス過負荷",
+      refusal: "リクエスト拒否",
+      model_not_found: "モデルが見つかりません",
       authentication_failed: "認証に失敗しました",
       oauth_org_not_allowed: "組織が許可されていません",
       invalid_request: "無効なリクエスト",

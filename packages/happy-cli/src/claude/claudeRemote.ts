@@ -69,6 +69,10 @@ import { mergeThinkingIntoSettings } from "@/claude/utils/mergeThinkingIntoSetti
 import { mergeExitPlanAutoApproveIntoSettings } from "@/claude/utils/mergeExitPlanAutoApproveIntoSettings";
 import { buildPtyDisallowedTools } from "@/claude/utils/disallowedTools";
 import { rawToJsonlMessage } from "@/claude/pty/rawToJsonlMessage";
+import {
+  createTerminalSequenceExtractor,
+  type TerminalSequenceEvent,
+} from "@/claude/pty/terminalSequences";
 import { attachClaudePtyRouter } from "@/claude/pty/claudePtyRouter";
 import {
   bridgeAttach,
@@ -508,6 +512,19 @@ export async function claudeRemote(opts: {
    */
   onPtyActivity?: () => void;
   /**
+   * Fires whenever the TUI emits a terminal control signal that the user
+   * would normally see on their attached terminal — a window-title update,
+   * an iTerm2 OSC 9 notification, or a BEL. Plumbed up so the launcher can
+   * mirror these to the App via a `terminal-signal` wire event and remote
+   * users get the same banner/bell native terminals already receive.
+   *
+   * Backed by `createTerminalSequenceExtractor`: this is a STREAMING parser,
+   * so we attach exactly one extractor per PTY (state must persist across
+   * onData chunks for OSC frames that straddle a boundary). Each emitted
+   * event corresponds to a complete OSC frame.
+   */
+  onTerminalSignal?: (event: TerminalSequenceEvent) => void;
+  /**
    * Fires with the EXACT text written to the PTY composer for a turn —
    * the bracketed-paste payload as Claude actually received it, including any
    * once-per-session prefixes (CONTEXT.md / world-config / knowledge) the
@@ -782,6 +799,34 @@ export async function claudeRemote(opts: {
   const disposePtyActivity = opts.onPtyActivity
     ? pty.onData(() => opts.onPtyActivity!())
     : undefined;
+
+  // Terminal-signal extractor — passive observer that yields a structured
+  // event whenever the TUI emits an OSC frame (window-title, iTerm2
+  // notification, plain BEL, …). The launcher forwards these to the App via
+  // the `terminal-signal` wire event so remote users see the same banner /
+  // bell native terminals already receive. Disposed in finishOnce so it
+  // dies with the PTY on cold restart (extractor state would otherwise leak
+  // a half-decoded OSC frame into the next PTY's stream).
+  const terminalSignalExtractor = opts.onTerminalSignal
+    ? createTerminalSequenceExtractor()
+    : null;
+  const disposeTerminalSignal = terminalSignalExtractor
+    ? pty.onData((chunk: string) => {
+        const events = terminalSignalExtractor.feed(chunk);
+        for (const ev of events) {
+          try {
+            opts.onTerminalSignal!(ev);
+          } catch (err) {
+            // Never let an App-side rendering bug knock out PTY data flow.
+            logger.debug(
+              `[claudeRemote] onTerminalSignal threw: ${
+                err instanceof Error ? err.message : String(err)
+              }`,
+            );
+          }
+        }
+      })
+    : undefined;
   // Shared usage snapshot — updated by the session scanner's onMessage as
   // each assistant message arrives; read by controller.getContextUsage() so
   // the App's context-window panel shows real token counts in PTY mode.
@@ -1011,6 +1056,8 @@ export async function claudeRemote(opts: {
     if (exitResolved) return;
     exitResolved = true;
     disposePtyActivity?.();
+    disposeTerminalSignal?.();
+    terminalSignalExtractor?.reset();
     teardownPtyBridge?.();
     teardownPtyBridge = undefined;
     exitResolve();

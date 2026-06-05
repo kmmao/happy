@@ -12,7 +12,7 @@ import { Item } from "@/components/Item";
 import { ItemGroup } from "@/components/ItemGroup";
 import { ItemList } from "@/components/ItemList";
 import { Typography } from "@/constants/Typography";
-import { useSessions, useMachine } from "@/sync/storage";
+import { useSessions, useMachine, useSessionTerminalTitle } from "@/sync/storage";
 import { Ionicons, Octicons } from "@expo/vector-icons";
 import type { Session } from "@/sync/storageTypes";
 import {
@@ -121,6 +121,39 @@ const styles = StyleSheet.create((theme) => ({
     maxWidth: 220,
   },
 }));
+
+// Subscribes to the per-session TUI window title so each row independently
+// re-renders only when its own title changes. Avoids a global subscription
+// that would cascade re-renders across every row whenever any one TUI
+// rewrites its title.
+const PreviousSessionRow = React.memo(function PreviousSessionRow({
+  session,
+  navigateToSession,
+}: {
+  session: Session;
+  navigateToSession: (id: string) => void;
+}) {
+  const { theme } = useUnistyles();
+  const terminalTitle = useSessionTerminalTitle(session.id);
+  return (
+    <Item
+      title={getSessionName(session)}
+      subtitle={getSessionSubtitle(session, terminalTitle)}
+      onPress={() => navigateToSession(session.id)}
+      showChevron={false}
+      rightElement={
+        <View style={styles.previousSessionRight}>
+          <SessionProviderTag session={session} includeModel />
+          <Ionicons
+            name="chevron-forward"
+            size={20}
+            color={theme.colors.groupped.chevron}
+          />
+        </View>
+      }
+    />
+  );
+});
 
 function MachineDetailScreen() {
   const { theme } = useUnistyles();
@@ -788,22 +821,10 @@ function MachineDetailScreen() {
         {previousSessions.length > 0 && (
           <ItemGroup title={t("machine.previousSessions")}>
             {previousSessions.map((session) => (
-              <Item
+              <PreviousSessionRow
                 key={session.id}
-                title={getSessionName(session)}
-                subtitle={getSessionSubtitle(session)}
-                onPress={() => navigateToSession(session.id)}
-                showChevron={false}
-                rightElement={
-                  <View style={styles.previousSessionRight}>
-                    <SessionProviderTag session={session} includeModel />
-                    <Ionicons
-                      name="chevron-forward"
-                      size={20}
-                      color={theme.colors.groupped.chevron}
-                    />
-                  </View>
-                }
+                session={session}
+                navigateToSession={navigateToSession}
               />
             ))}
           </ItemGroup>

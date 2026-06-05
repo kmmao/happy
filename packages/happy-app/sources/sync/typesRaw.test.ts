@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, it, expect } from 'vitest';
 import { createId } from '@paralleldrive/cuid2';
-import { normalizeRawMessage, collectBatchHistorySignals, collectSequencedHistorySignals } from './typesRaw';
+import { normalizeRawMessage, collectBatchHistorySignals, collectSequencedHistorySignals, extractTerminalSignalFromRaw } from './typesRaw';
 
 /**
  * WOLOG Content Normalization Tests
@@ -2448,6 +2448,104 @@ describe('Zod Transform - WOLOG Content Normalization', () => {
                     text: 'still works',
                 });
             }
+        });
+    });
+
+    describe('terminal-signal handling', () => {
+        const wrap = (ev: Record<string, unknown>): RawRecord => ({
+            role: 'agent',
+            content: {
+                type: 'session',
+                data: {
+                    id: `env-${Math.random().toString(36).slice(2, 8)}`,
+                    time: 1,
+                    role: 'agent',
+                    turn: 'turn-1',
+                    ev,
+                },
+            },
+        } as any);
+
+        it('drops terminal-signal envelopes from chat normalization', () => {
+            // terminal-signal events are surfaced via a dedicated extractor —
+            // letting them through normalizeRawMessage would leak OSC payloads
+            // into the message stream as visible text.
+            const normalized = normalizeRawMessage(
+                'db-ts-1',
+                null,
+                1,
+                wrap({ t: 'terminal-signal', kind: 'bell' }),
+            );
+            expect(normalized).toBeNull();
+        });
+
+        it('extracts a window-title signal', () => {
+            const signal = extractTerminalSignalFromRaw(
+                wrap({ t: 'terminal-signal', kind: 'window-title', text: 'build done' }),
+            );
+            expect(signal).toEqual({ kind: 'window-title', text: 'build done' });
+        });
+
+        it('extracts a notification signal (OSC 9)', () => {
+            const signal = extractTerminalSignalFromRaw(
+                wrap({ t: 'terminal-signal', kind: 'notification', text: 'tests passed' }),
+            );
+            expect(signal).toEqual({ kind: 'notification', text: 'tests passed' });
+        });
+
+        it('extracts a bell with no payload', () => {
+            const signal = extractTerminalSignalFromRaw(
+                wrap({ t: 'terminal-signal', kind: 'bell' }),
+            );
+            expect(signal).toEqual({ kind: 'bell', text: undefined, oscCode: undefined });
+        });
+
+        it('preserves oscCode on opaque "other" signals for downstream routing', () => {
+            const signal = extractTerminalSignalFromRaw(
+                wrap({
+                    t: 'terminal-signal',
+                    kind: 'other',
+                    text: 'c;ZGF0YQ==',
+                    oscCode: '52',
+                }),
+            );
+            expect(signal).toEqual({ kind: 'other', text: 'c;ZGF0YQ==', oscCode: '52' });
+        });
+
+        it('returns null for non-terminal-signal envelopes', () => {
+            const signal = extractTerminalSignalFromRaw(
+                wrap({ t: 'text', text: 'not a signal' }),
+            );
+            expect(signal).toBeNull();
+        });
+
+        it('returns null for unknown signal kinds', () => {
+            // Forward-compat guard: a future kind we don't recognise should
+            // be dropped rather than mis-routed to the existing UI.
+            const signal = extractTerminalSignalFromRaw(
+                wrap({ t: 'terminal-signal', kind: 'progress-bar', text: '42%' }),
+            );
+            expect(signal).toBeNull();
+        });
+
+        it('rejects terminal-signal with role !== "agent" at schema layer', () => {
+            // role guard mirrors prompt-suggestion / session-state-changed —
+            // user-role terminal signals are nonsensical and should be
+            // dropped by RawRecordSchema before they ever reach extractors.
+            const result = RawRecordSchema.safeParse({
+                role: 'user',
+                content: {
+                    type: 'session',
+                    data: {
+                        id: 'env-bad-role',
+                        time: 1,
+                        role: 'user',
+                        turn: 'turn-1',
+                        ev: { t: 'terminal-signal', kind: 'bell' },
+                    },
+                },
+            });
+            expect(result.success).toBe(false);
         });
     });
 });

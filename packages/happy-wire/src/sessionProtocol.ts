@@ -215,6 +215,40 @@ export const sessionTaskLogEventSchema = z.object({
 });
 
 
+/**
+ * Terminal control signals captured from the PTY output stream.
+ *
+ * Claude Code 2.1.139+ hooks can write OSC (Operating System Command)
+ * sequences to set the window title, fire a desktop notification, or ring
+ * the terminal bell — for example a long-running build hook writing
+ * `\x1b]9;tests passed\x07` once it finishes. In PTY mode those bytes pass
+ * through to the native terminal as usual; this event mirrors them to
+ * remote App / Web clients so the user can see the same banner/bell even
+ * when no terminal is attached.
+ *
+ * Backwards-compat: older Apps that do not recognise the event simply skip
+ * it (sessionEventSchemaPermissive). New Apps may render it as a toast,
+ * update the session title, or trigger a push notification.
+ */
+export const sessionTerminalSignalEventSchema = z.object({
+  t: z.literal("terminal-signal"),
+  /**
+   * The kind of signal extracted from the OSC stream:
+   *  - `window-title`: title text to display (OSC 0 / 2)
+   *  - `notification`: desktop notification body (OSC 9 — iTerm2 style)
+   *  - `bell`: a plain BEL (0x07) outside any OSC frame
+   *  - `other`: a recognized OSC frame the CLI chose to forward but did
+   *     not classify; consumers should treat it as opaque (forward-compat
+   *     channel for OSC 4, 52, 1337, …).
+   */
+  kind: z.enum(["window-title", "notification", "bell", "other"]),
+  /** Title / notification body / opaque payload depending on `kind`. */
+  text: z.string().optional(),
+  /** Raw OSC `Ps` code for `kind: "other"` so consumers can route by id. */
+  oscCode: z.string().optional(),
+});
+export type SessionTerminalSignalEvent = z.infer<typeof sessionTerminalSignalEventSchema>;
+
 export const sessionContextUsageEventSchema = z.object({
   t: z.literal("context-usage"),
   totalTokens: z.number(),
@@ -257,6 +291,7 @@ export const sessionEventSchema = z.discriminatedUnion("t", [
   sessionStateChangedEventSchema,
   sessionContextUsageEventSchema,
   sessionTaskLogEventSchema,
+  sessionTerminalSignalEventSchema,
 ]);
 
 export type SessionEvent = z.infer<typeof sessionEventSchema>;

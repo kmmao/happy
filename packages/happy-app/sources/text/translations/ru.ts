@@ -1417,6 +1417,8 @@ export const ru: TranslationStructure = {
     preview: "Просмотр",
     code: "Код",
     terminal: "Терминал",
+    claude: "Claude",
+    claudeNotRunning: "Claude не запущен в этой сессии",
     collapse: "Свернуть",
     expand: "Развернуть",
     noProject: "Проект не привязан",
@@ -4248,6 +4250,9 @@ export const ru: TranslationStructure = {
     errorLabels: {
       billing_error: "Ошибка оплаты",
       rate_limit: "Превышен лимит запросов",
+      overloaded: "Сервис перегружен",
+      refusal: "Запрос отклонён",
+      model_not_found: "Модель не найдена",
       authentication_failed: "Ошибка аутентификации",
       oauth_org_not_allowed: "Организация не разрешена",
       invalid_request: "Неверный запрос",

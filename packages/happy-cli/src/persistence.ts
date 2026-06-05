@@ -41,6 +41,15 @@ export const SandboxConfigSchema = z.object({
   allowedDomains: z.array(z.string()).default([]),
   deniedDomains: z.array(z.string()).default([]),
   allowLocalBinding: z.boolean().default(true),
+  // Linux/WSL only — passed straight through to @anthropic-ai/sandbox-runtime
+  // so operators on hosts with bwrap/socat in a non-standard location (Nix
+  // profiles, custom prefixes, container images that ship them outside
+  // /usr/bin) can point us at the right binary. Matches the
+  // `sandbox.bwrapPath` / `sandbox.socatPath` managed settings introduced in
+  // Claude Code 2.1.133. macOS ignores both — sandbox-exec / seatbelt are
+  // built in to the OS.
+  bwrapPath: z.string().optional(),
+  socatPath: z.string().optional(),
 });
 
 export type SandboxConfig = z.infer<typeof SandboxConfigSchema>;

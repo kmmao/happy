@@ -900,7 +900,9 @@ export async function startDaemon(): Promise<void> {
               return ` --claude-env ${shellescape(key + "=" + value)}`;
             })
             .join("");
-          const fullCommand = `node --no-warnings --no-deprecation ${cliPath} ${agent} --happy-starting-mode remote --started-by daemon${resumeArg}${happySessionArg}${forkSourceArg}${claudeEnvArgs}`;
+          // Quote `cliPath` so a project path containing spaces survives the
+          // shell that tmux ultimately runs (upstream PR #698).
+          const fullCommand = `node --no-warnings --no-deprecation ${shellescape(cliPath)} ${agent} --happy-starting-mode remote --started-by daemon${resumeArg}${happySessionArg}${forkSourceArg}${claudeEnvArgs}`;
 
           // Spawn in tmux with environment variables
           // IMPORTANT: Pass complete environment (process.env + extraEnv) because:

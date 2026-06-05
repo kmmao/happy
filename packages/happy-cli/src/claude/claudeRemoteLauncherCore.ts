@@ -2731,6 +2731,35 @@ export async function claudeRemoteLauncher(
           onPtyActivity: () => {
             lastClaudeOutputAt = Date.now();
           },
+          // Mirror TUI terminal control signals (window-title updates, iTerm2
+          // OSC 9 notifications, BEL) to remote App / Web clients via a
+          // `terminal-signal` wire event. Claude Code 2.1.139+ hooks can use
+          // `terminalSequence` to surface progress/notifications even when the
+          // user has no terminal attached; in PTY mode we observe those bytes
+          // and re-emit them in structured form so the App can render them as
+          // a banner / push notification without having to parse ANSI itself.
+          onTerminalSignal: (event) => {
+            // Map the four parser kinds to the wire's discriminated enum,
+            // collapsing optional payload fields. App-side rendering is
+            // permissive (sessionEventSchemaPermissive) so unknown kinds added
+            // here in future versions just fall through; we still tag the OSC
+            // code on `other` events for downstream routing.
+            const payload =
+              event.kind === "windowTitle"
+                ? { t: "terminal-signal", kind: "window-title", text: event.title }
+                : event.kind === "notification"
+                ? { t: "terminal-signal", kind: "notification", text: event.body }
+                : event.kind === "bell"
+                ? { t: "terminal-signal", kind: "bell" }
+                : {
+                    t: "terminal-signal",
+                    kind: "other",
+                    text: event.payload,
+                    oscCode: event.ps,
+                  };
+            const envelope = buildProtocolMessage("agent", payload);
+            session.client.sendSessionProtocolMessage(envelope as any);
+          },
           // Capture the EXACT text written to the composer (bracketed-paste
           // payload, including any once-per-session prefixes the launcher
           // prepended) as the in-flight prompt. If a tier-1 Esc recovery has

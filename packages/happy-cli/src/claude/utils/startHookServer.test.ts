@@ -49,8 +49,9 @@ function newCalls(): Calls {
 
 function optionsFor(calls: Calls): HookServerOptions {
   return {
-    onSessionHook: (sessionId, data) =>
-      calls.sessionHook.push({ sessionId, event: data.hook_event_name }),
+    onSessionHook: (sessionId, data) => {
+      calls.sessionHook.push({ sessionId, event: data.hook_event_name });
+    },
     onStopFailure: () => {
       calls.stopFailure += 1;
     },
@@ -212,8 +213,9 @@ describe("startHookServer dispatch", () => {
     // to a different consumer — they should drop on the floor instead.
     const calls = newCalls();
     server = await startHookServer({
-      onSessionHook: (sessionId, data) =>
-        calls.sessionHook.push({ sessionId, event: data.hook_event_name }),
+      onSessionHook: (sessionId, data) => {
+        calls.sessionHook.push({ sessionId, event: data.hook_event_name });
+      },
       // onCwdChanged is intentionally omitted
     });
 

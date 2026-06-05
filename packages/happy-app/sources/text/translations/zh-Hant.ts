@@ -1359,6 +1359,8 @@ export const zhHant: TranslationStructure = {
     preview: "預覽",
     code: "程式碼",
     terminal: "終端",
+    claude: "Claude",
+    claudeNotRunning: "目前工作階段未啟動 Claude",
     collapse: "收起",
     expand: "展開",
     noProject: "未關聯專案",
@@ -4129,6 +4131,9 @@ export const zhHant: TranslationStructure = {
     errorLabels: {
       billing_error: "帳單錯誤",
       rate_limit: "已達請求頻率限制",
+      overloaded: "服務過載",
+      refusal: "請求被拒絕",
+      model_not_found: "模型不存在",
       authentication_failed: "身份驗證失敗",
       oauth_org_not_allowed: "組織未授權",
       invalid_request: "無效請求",

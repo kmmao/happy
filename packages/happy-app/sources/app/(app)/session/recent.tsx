@@ -1,7 +1,7 @@
 import React from "react";
 import { View, FlatList } from "react-native";
 import { Text } from "@/components/StyledText";
-import { useAllSessions, useSetting } from "@/sync/storage";
+import { useAllSessions, useSetting, useSessionTerminalTitle } from "@/sync/storage";
 import { Session } from "@/sync/storageTypes";
 import { Avatar } from "@/components/Avatar";
 import {
@@ -25,6 +25,22 @@ interface SessionHistoryItem {
   session?: Session;
   date?: string;
 }
+
+// Renders just the per-row subtitle so each row independently re-subscribes
+// to its own sessionTerminalTitles slice — avoids re-rendering every row when
+// any one TUI rewrites its window title.
+const SessionSubtitleLine = React.memo(function SessionSubtitleLine({
+  session,
+}: {
+  session: Session;
+}) {
+  const terminalTitle = useSessionTerminalTitle(session.id);
+  return (
+    <Text style={styles.sessionSubtitle} numberOfLines={1}>
+      {getSessionSubtitle(session, terminalTitle)}
+    </Text>
+  );
+});
 
 const styles = StyleSheet.create((theme, rt) => ({
   container: {
@@ -225,7 +241,6 @@ function SessionHistory() {
       if (item.type === "session" && item.session) {
         const session = item.session;
         const sessionName = getSessionName(session);
-        const sessionSubtitle = getSessionSubtitle(session);
         const avatarId = getSessionAvatarId(session);
         const providerKey = getSessionProviderKey(session);
 
@@ -270,9 +285,7 @@ function SessionHistory() {
                 ) : null}
                 <SessionProviderTag session={session} includeModel />
               </View>
-              <Text style={styles.sessionSubtitle} numberOfLines={1}>
-                {sessionSubtitle}
-              </Text>
+              <SessionSubtitleLine session={session} />
               <Text style={styles.sessionLastActive} numberOfLines={1}>
                 {formatLastSeen(session.activeAt, session.active)}
               </Text>

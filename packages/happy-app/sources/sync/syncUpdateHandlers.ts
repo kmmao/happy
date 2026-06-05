@@ -1,11 +1,13 @@
 import { Platform } from "react-native";
 import { storage } from "./storage";
 import { log } from "@/log";
+import * as Notifications from "expo-notifications";
 import {
     normalizeRawMessage,
     extractPromptSuggestionFromRaw,
     extractNeedsContinueFromRaw,
     extractSessionStateFromRaw,
+    extractTerminalSignalFromRaw,
     isUserMessageRaw,
     type NormalizedMessage,
 } from "./typesRaw";
@@ -91,6 +93,70 @@ let _perfLastDeltaAt = 0;
 let _perfDeltaCount = 0;
 let _perfDeltaLogAt = 0;
 
+/**
+ * Convert a terminal-signal envelope into App-visible side effects:
+ *   - `window-title` updates `sessionTerminalTitles[sid]` so the subtitle
+ *     prefers the live TUI title over the static project path.
+ *   - `notification` schedules a foreground/background banner via
+ *     expo-notifications (same channel used by syncBackgroundSend).
+ *   - `bell` is intentionally silent in the App today: native terminals
+ *     ring their bell as a foot-gun deterrent, but on a phone an unexpected
+ *     audible ping is more annoying than informative. We log it so users
+ *     who care can see hooks fired, without surfacing UI noise.
+ *   - `other` is opaque; downstream consumers can decide what to do via the
+ *     stored `oscCode`. We just log it for now.
+ *
+ * Errors are swallowed so a single malformed event never breaks the live
+ * message pipeline.
+ */
+function dispatchTerminalSignal(
+    sid: string,
+    rawContent: ReturnType<typeof normalizeRawMessage> extends infer _ ? unknown : never,
+): void {
+    let signal: ReturnType<typeof extractTerminalSignalFromRaw>;
+    try {
+        signal = extractTerminalSignalFromRaw(rawContent as any);
+    } catch (err) {
+        log.log(`[terminal-signal] extract failed: ${err}`);
+        return;
+    }
+    if (!signal) return;
+
+    switch (signal.kind) {
+        case "window-title": {
+            // Empty string is treated as "clear the title" — TUIs commonly
+            // emit `\x1b]0;\x07` to wipe a stale label, and the subtitle
+            // helper falls back to the static path when null.
+            const next = signal.text && signal.text.length > 0 ? signal.text : null;
+            storage.getState().setTerminalTitle(sid, next);
+            return;
+        }
+        case "notification": {
+            const body = signal.text?.trim();
+            if (!body) return;
+            const session = storage.getState().sessions[sid];
+            const title = session ? getSessionName(session) : t("status.unknown");
+            // trigger: null = deliver immediately. Foreground delivery shows
+            // a banner; background delivery becomes a system notification.
+            Notifications.scheduleNotificationAsync({
+                content: { title, body, sound: false },
+                trigger: null,
+            }).catch((err) => {
+                log.log(`[terminal-signal] notification schedule failed: ${err}`);
+            });
+            return;
+        }
+        case "bell":
+            log.log(`[terminal-signal] bell from session ${sid}`);
+            return;
+        case "other":
+            log.log(
+                `[terminal-signal] OSC ${signal.oscCode ?? "?"} from session ${sid}: ${signal.text ?? ""}`,
+            );
+            return;
+    }
+}
+
 // ---------------------------------------------------------------------------
 // new-message
 // ---------------------------------------------------------------------------
@@ -151,6 +217,15 @@ export async function handleNewMessageUpdate(
                     ]);
                 }
             }
+
+            // Terminal-signal dispatch — `terminal-signal` envelopes carry
+            // OSC control sequences the TUI emitted (window-title updates,
+            // iTerm2 notifications, BEL). Live update path: surface them to
+            // remote App / Web users so they get the same banner/title a
+            // native attached terminal would render. History replay is
+            // intentionally skipped (see syncMessageFetch) — re-firing a
+            // weeks-old notification on session resume would be hostile.
+            dispatchTerminalSignal(body.sid, decrypted.content);
 
             lastMessage = normalizeRawMessage(
                 decrypted.id,

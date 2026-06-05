@@ -85,6 +85,19 @@ describe('sessionUtils', () => {
             expect(statusText).toBe('Waiting for rate limit reset (8s)…');
         });
 
+        it('treats 529 overloaded as the same wait-and-retry state as 429', () => {
+            // Claude Code 2.1.150 split overloaded (529) out of rate_limit (429);
+            // both still mean "wait then retry" from the user's perspective.
+            const statusText = formatApiRetryStatus({
+                attempt: 2,
+                maxRetries: 5,
+                retryDelayMs: 8000,
+                errorStatus: 529,
+            });
+
+            expect(statusText).toBe('Waiting for rate limit reset (8s)…');
+        });
+
         it('falls back to generic retry text for non-rate-limit retries', () => {
             const statusText = formatApiRetryStatus({
                 attempt: 2,
@@ -112,6 +125,49 @@ describe('sessionUtils', () => {
         it('returns path relative to home for terminal sessions', () => {
             const session = createSession();
             expect(getSessionSubtitle(session)).toBe('~/projects/my-app');
+        });
+
+        it('prefers a TUI window title over the static path', () => {
+            // terminal-signal event with kind=window-title sets this via
+            // sessionTerminalTitles[id]; the subtitle should display it
+            // instead of the project path so remote users see the same
+            // context a native terminal would show.
+            const session = createSession();
+            expect(getSessionSubtitle(session, 'build · passing')).toBe(
+                'build · passing',
+            );
+        });
+
+        it('falls back to the path when the TUI title is empty/whitespace', () => {
+            // Empty or whitespace-only window titles are an OSC "clear" — the
+            // subtitle should not render a blank line.
+            const session = createSession();
+            expect(getSessionSubtitle(session, '')).toBe('~/projects/my-app');
+            expect(getSessionSubtitle(session, '   ')).toBe(
+                '~/projects/my-app',
+            );
+            expect(getSessionSubtitle(session, null)).toBe('~/projects/my-app');
+        });
+
+        it('keeps the worktree branch label even when a TUI title is present', () => {
+            // Worktree sessions identify themselves by branch arrow — that
+            // identifier is more useful than whatever the TUI is currently
+            // displaying, so the branch view wins.
+            const session = createSession({
+                metadata: {
+                    path: '/home/user/projects/my-app',
+                    host: 'localhost',
+                    homeDir: '/home/user',
+                    worktree: {
+                        isWorktree: true,
+                        branchName: 'feat/x',
+                        parentBranch: 'main',
+                    },
+                },
+            } as Partial<Session>);
+            expect(getSessionSubtitle(session, 'build done')).toBe(
+                'feat/x → main',
+            );
         });
 
         it('appends daemon label when session was started by daemon', () => {

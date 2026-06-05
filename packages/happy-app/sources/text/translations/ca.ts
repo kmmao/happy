@@ -1406,6 +1406,8 @@ export const ca: TranslationStructure = {
     preview: "Previsualització",
     code: "Codi",
     terminal: "Terminal",
+    claude: "Claude",
+    claudeNotRunning: "Claude no s'està executant en aquesta sessió",
     collapse: "Replega",
     expand: "Desplega",
     noProject: "Cap projecte vinculat",
@@ -4234,6 +4236,9 @@ export const ca: TranslationStructure = {
     errorLabels: {
       billing_error: "Error de facturació",
       rate_limit: "Límit de sol·licituds assolit",
+      overloaded: "Servei sobrecarregat",
+      refusal: "Sol·licitud rebutjada",
+      model_not_found: "Model no trobat",
       authentication_failed: "Error d'autenticació",
       oauth_org_not_allowed: "Organització no permesa",
       invalid_request: "Sol·licitud no vàlida",

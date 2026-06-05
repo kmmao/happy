@@ -21,9 +21,16 @@ interface Props {
 
 const BILLING_URL = "https://console.anthropic.com/settings/billing";
 
+// Claude Code 2.1.150 split overloaded (529) out of rate_limit (429); 2.1.144
+// introduced model_not_found in place of generic invalid_request when the
+// requested model is missing; 2.1.162 added refusal so callers can detect
+// Anthropic-side content refusals without text pattern matching.
 type KnownErrorType =
     | "billing_error"
     | "rate_limit"
+    | "overloaded"
+    | "refusal"
+    | "model_not_found"
     | "authentication_failed"
     | "oauth_org_not_allowed"
     | "invalid_request"
@@ -34,6 +41,9 @@ type KnownErrorType =
 const KNOWN_ERROR_TYPES: KnownErrorType[] = [
     "billing_error",
     "rate_limit",
+    "overloaded",
+    "refusal",
+    "model_not_found",
     "authentication_failed",
     "oauth_org_not_allowed",
     "invalid_request",

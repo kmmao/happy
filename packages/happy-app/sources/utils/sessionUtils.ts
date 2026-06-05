@@ -83,11 +83,16 @@ export function formatApiRetryStatus(apiRetry: {
   errorStatus?: number | null;
 }): string {
   const retryDelaySeconds = Math.max(0, Math.ceil(apiRetry.retryDelayMs / 1000));
+  // Claude Code 2.1.150 split overloaded (529) out of rate_limit (429). Both
+  // still mean "wait then retry" from the user's perspective, so we surface
+  // them with the same "rate limited" copy and avoid a translation churn
+  // until the desktop/app text differentiates the two.
   return t("status.apiRetry", {
     attempt: apiRetry.attempt,
     maxRetries: apiRetry.maxRetries,
     retryDelaySeconds,
-    isRateLimit: apiRetry.errorStatus === 429,
+    isRateLimit:
+      apiRetry.errorStatus === 429 || apiRetry.errorStatus === 529,
   });
 }
 
@@ -357,7 +362,25 @@ export function formatPathRelativeToHome(
  * Returns the session path for the subtitle.
  * For worktree sessions, shows branch → parent branch instead of path.
  */
-export function getSessionSubtitle(session: Session): string {
+export function getSessionSubtitle(
+  session: Session,
+  terminalTitle?: string | null,
+): string {
+  // A TUI-supplied window title (via the `terminal-signal` wire event) takes
+  // priority over the static project path: the user's hook may be surfacing
+  // a build status, current task name, or progress indicator that is much
+  // more informative than the cwd. Worktree sessions still prefer their
+  // branch arrow because that's a user-facing identifier the TUI never has
+  // a more accurate version of.
+  const trimmedTerminalTitle =
+    typeof terminalTitle === "string" ? terminalTitle.trim() : "";
+  if (
+    trimmedTerminalTitle.length > 0 &&
+    !session.metadata?.worktree?.isWorktree
+  ) {
+    return trimmedTerminalTitle;
+  }
+
   if (session.metadata) {
     // For worktree sessions, show branch info
     if (session.metadata.worktree?.isWorktree) {

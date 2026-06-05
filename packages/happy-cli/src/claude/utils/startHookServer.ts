@@ -61,6 +61,17 @@ import { createServer, IncomingMessage, ServerResponse, Server } from 'node:http
 import { logger } from '@/ui/logger';
 
 /**
+ * Effort level surfaced to hooks. Claude Code 2.1.133+ exposes this both as
+ * the `effort.level` JSON field and as the `$CLAUDE_EFFORT` env var; the
+ * forwarder folds the env var into `effort.level` so consumers see a single
+ * shape regardless of how the runtime delivered it.
+ */
+export interface HookEffortContext {
+    level?: string;
+    [key: string]: unknown;
+}
+
+/**
  * Data received from Claude's SessionStart hook
  */
 export interface SessionHookData {
@@ -70,6 +81,8 @@ export interface SessionHookData {
     cwd?: string;
     hook_event_name?: string;
     source?: string;
+    /** Current effort level (Claude Code 2.1.133+). May be missing on older CLIs. */
+    effort?: HookEffortContext;
     [key: string]: unknown;
 }
 
@@ -174,9 +187,38 @@ export interface PostToolBatchHookData {
     [key: string]: unknown;
 }
 
+/**
+ * Optional response body the SessionStart hook may return to Claude Code.
+ * Mirrors `hookSpecificOutput` semantics introduced in Claude Code 2.1.152:
+ *   - `sessionTitle`: pre-seeds the session title before any model interaction;
+ *     surfaces as `system.init.session_title` in the JSONL.
+ *   - `reloadSkills`: triggers a skill rescan on the Claude side. Only useful
+ *     when something between session-start and the first turn invalidates
+ *     the current skill set (e.g. happy installing additional skills on the
+ *     fly). Returning `false`/omitting it is a no-op.
+ *
+ * Other fields are passed through verbatim under `hookSpecificOutput` for
+ * forward-compatibility with future Claude Code 2.1.x additions.
+ */
+export interface SessionStartHookResponse {
+    hookSpecificOutput?: {
+        sessionTitle?: string;
+        reloadSkills?: boolean;
+        [key: string]: unknown;
+    };
+}
+
 export interface HookServerOptions {
-    /** Called when a session hook is received with a valid session ID */
-    onSessionHook: (sessionId: string, data: SessionHookData) => void;
+    /**
+     * Called when a session hook is received with a valid session ID. May
+     * return a {@link SessionStartHookResponse} (or a promise to one) to
+     * influence Claude's behaviour — `undefined` keeps the old fire-and-forget
+     * semantics.
+     */
+    onSessionHook: (
+        sessionId: string,
+        data: SessionHookData,
+    ) => void | SessionStartHookResponse | Promise<void | SessionStartHookResponse>;
     /** Called when a StopFailure hook is received */
     onStopFailure?: (data: StopFailureHookData) => void;
     /** Called when Claude's cwd changes (Claude Code 2.1.121+, optional). */
@@ -255,14 +297,21 @@ export async function startHookServer(options: HookServerOptions): Promise<HookS
         }
     }
 
-    function handleSessionStart(data: SessionHookData) {
+    async function handleSessionStart(
+        data: SessionHookData,
+    ): Promise<SessionStartHookResponse | undefined> {
         const sessionId = data.session_id || data.sessionId;
-        if (sessionId) {
-            logger.debug(`[hookServer] Session hook received session ID: ${sessionId}`);
-            onSessionHook(sessionId, data);
-        } else {
+        if (!sessionId) {
             logger.debug('[hookServer] Session hook received but no session_id found in data');
+            return undefined;
         }
+        logger.debug(`[hookServer] Session hook received session ID: ${sessionId}`);
+        const maybeResponse = onSessionHook(sessionId, data);
+        if (!maybeResponse) return undefined;
+        // Accept both sync return and async — return undefined to skip the
+        // hookSpecificOutput envelope entirely (preserves the legacy
+        // fire-and-forget behavior).
+        return (await maybeResponse) ?? undefined;
     }
 
     function handleStopFailure(data: StopFailureHookData) {
@@ -274,8 +323,12 @@ export async function startHookServer(options: HookServerOptions): Promise<HookS
     // to `handleSessionStart` for backwards compatibility — the old behaviour
     // was "anything other than StopFailure is SessionStart" and some
     // session-lifecycle hooks Claude might add later are best served by that
-    // generic path until they get a dedicated handler.
-    const dispatch: Record<string, (data: Record<string, unknown>) => void> = {
+    // generic path until they get a dedicated handler. SessionStart is the
+    // only entry that may produce a response body (see SessionStartHookResponse).
+    const dispatch: Record<
+        string,
+        (data: Record<string, unknown>) => void | Promise<SessionStartHookResponse | undefined>
+    > = {
         SessionStart: (data) => handleSessionStart(data as SessionHookData),
         StopFailure: (data) => handleStopFailure(data as StopFailureHookData),
         CwdChanged: (data) => onCwdChanged?.(data as CwdChangedHookData),
@@ -299,9 +352,18 @@ export async function startHookServer(options: HookServerOptions): Promise<HookS
 
                 const eventName = (data as SessionHookData).hook_event_name;
                 const handler = (eventName && dispatch[eventName]) || dispatch.SessionStart;
-                handler(data);
+                const maybeResponse = await handler(data);
 
-                res.writeHead(200, { 'Content-Type': 'text/plain' }).end('ok');
+                // SessionStart may return a JSON body that Claude reads as
+                // hookSpecificOutput (Claude Code 2.1.152+ — sessionTitle,
+                // reloadSkills, etc.). Other events keep the legacy plain-text
+                // 'ok' response.
+                if (maybeResponse && typeof maybeResponse === 'object') {
+                    res.writeHead(200, { 'Content-Type': 'application/json' })
+                       .end(JSON.stringify(maybeResponse));
+                } else {
+                    res.writeHead(200, { 'Content-Type': 'text/plain' }).end('ok');
+                }
                 return;
             }
 

@@ -1542,6 +1542,8 @@ export const it: TranslationStructure = {
     preview: "Anteprima",
     code: "Codice",
     terminal: "Terminale",
+    claude: "Claude",
+    claudeNotRunning: "Claude non è in esecuzione in questa sessione",
     collapse: "Comprimi",
     expand: "Espandi",
     noProject: "Nessun progetto collegato",
@@ -4228,6 +4230,9 @@ export const it: TranslationStructure = {
     errorLabels: {
       billing_error: "Errore di fatturazione",
       rate_limit: "Limite di richieste raggiunto",
+      overloaded: "Servizio sovraccarico",
+      refusal: "Richiesta rifiutata",
+      model_not_found: "Modello non trovato",
       authentication_failed: "Autenticazione fallita",
       oauth_org_not_allowed: "Organizzazione non consentita",
       invalid_request: "Richiesta non valida",

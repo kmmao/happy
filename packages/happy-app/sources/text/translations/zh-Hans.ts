@@ -1359,6 +1359,8 @@ export const zhHans: TranslationStructure = {
     preview: "预览",
     code: "代码",
     terminal: "终端",
+    claude: "Claude",
+    claudeNotRunning: "当前会话未启动 Claude",
     collapse: "收起",
     expand: "展开",
     noProject: "未关联项目",
@@ -4123,6 +4125,9 @@ export const zhHans: TranslationStructure = {
     errorLabels: {
       billing_error: "账单错误",
       rate_limit: "已达请求频率限制",
+      overloaded: "服务过载",
+      refusal: "请求被拒绝",
+      model_not_found: "模型不存在",
       authentication_failed: "身份验证失败",
       oauth_org_not_allowed: "组织未授权",
       invalid_request: "无效请求",
