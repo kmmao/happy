@@ -4,7 +4,8 @@ export type SessionPanelTab =
     | "changes"
     | "preview"
     | "knowledge"
-    | "terminal";
+    | "terminal"
+    | "claude";
 
 export type SessionPanelTabTranslationKey =
     | "sidePanel.session"
@@ -12,7 +13,8 @@ export type SessionPanelTabTranslationKey =
     | "sidePanel.changes"
     | "sidePanel.preview"
     | "sidePanel.knowledge"
-    | "sidePanel.terminal";
+    | "sidePanel.terminal"
+    | "sidePanel.claude";
 
 export interface SessionPanelTabDefinition {
     key: SessionPanelTab;
@@ -45,6 +47,10 @@ export function getSessionPanelTabDefinitions(
             ? ([{ key: "preview", labelKey: "sidePanel.preview" }] as const)
             : []),
         { key: "terminal", labelKey: "sidePanel.terminal" },
+        // Always present — mirrors the Claude CLI PTY for the session. When
+        // no Claude TUI is attached the tab itself renders a placeholder
+        // (mirrors how SidePanelTerminalTab handles `sessionOffline`).
+        { key: "claude", labelKey: "sidePanel.claude" },
     ];
 }
 

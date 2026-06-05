@@ -168,14 +168,35 @@ export function setupWebErrorHandlers() {
     };
 
     window.addEventListener("error", (event) => {
-        recordCrash("error", event.message, event.filename ? `${event.filename}:${event.lineno}` : undefined);
+        // Prefer event.error.stack (full JS stack across frames). Fall back to
+        // filename:lineno:colno when error is missing/null (cross-origin script
+        // errors, runtime panics that null out the error object). Append the
+        // location to the stack — having both is cheap and makes greppable
+        // bug reports when source maps aren't loaded.
+        const stackParts: string[] = [];
+        if (event.error instanceof Error && event.error.stack) {
+            stackParts.push(event.error.stack);
+        }
+        if (event.filename) {
+            const loc = `${event.filename}:${event.lineno}${event.colno ? `:${event.colno}` : ""}`;
+            if (!stackParts.some((s) => s.includes(loc))) stackParts.push(`at ${loc}`);
+        }
+        const stack = stackParts.length > 0 ? stackParts.join("\n") : undefined;
+        recordCrash("error", event.message, stack);
         log.error("Uncaught error:", event.message, event.filename, event.lineno);
     });
 
     window.addEventListener("unhandledrejection", (event) => {
         const reason = event.reason;
         const message = reason instanceof Error ? reason.message : String(reason);
-        const stack = reason instanceof Error ? reason.stack : undefined;
+        // Stack from a thrown Error is the common case; for non-Error rejects
+        // (e.g., `Promise.reject("string")`) we have no stack, but still log
+        // the string form so the message at least lands in the trail.
+        let stack = reason instanceof Error ? reason.stack : undefined;
+        if (!stack && reason && typeof reason === "object") {
+            const candidate = (reason as { stack?: unknown }).stack;
+            if (typeof candidate === "string") stack = candidate;
+        }
         recordCrash("unhandledrejection", message, stack);
         log.error("Unhandled promise rejection:", event.reason);
     });

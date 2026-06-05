@@ -20,6 +20,7 @@ import { SidePanelPreviewTab } from "./SidePanelPreviewTab";
 import { SidePanelSessionTab } from "./SidePanelSessionTab";
 import { SidePanelSummaryTab } from "./SidePanelSummaryTab";
 import { SidePanelTerminalTab } from "./SidePanelTerminalTab";
+import { SidePanelClaudeTab } from "./SidePanelClaudeTab";
 import { SessionGlassTabBar, type SessionGlassTabBarItem } from "./SessionGlassTabBar";
 import {
     getSessionPanelTabDefinitions,
@@ -227,6 +228,9 @@ export const SessionSidePanel = React.memo<SessionSidePanelProps>(
                             )}
                             {effectiveActiveTab === "terminal" && (
                                 <SidePanelTerminalTab sessionId={sessionId} />
+                            )}
+                            {effectiveActiveTab === "claude" && (
+                                <SidePanelClaudeTab sessionId={sessionId} />
                             )}
                         </View>
                     </>

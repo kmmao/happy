@@ -40,6 +40,7 @@ describe("mobileSessionPanelState", () => {
             "files",
             "preview",
             "terminal",
+            "claude",
         ]);
     });
 
@@ -55,6 +56,7 @@ describe("mobileSessionPanelState", () => {
             "changes",
             "files",
             "terminal",
+            "claude",
         ]);
     });
 
@@ -69,6 +71,7 @@ describe("mobileSessionPanelState", () => {
             "changes",
             "files",
             "terminal",
+            "claude",
         ]);
     });
 });

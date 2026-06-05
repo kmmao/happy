@@ -90,9 +90,21 @@ const MAX_TERMINALS_GLOBAL = 20;
 const MAX_OUTPUT_CHUNK = TERMINAL_OUTPUT_CHUNK_BYTES;
 const MAX_OUTPUT_BUFFER = TERMINAL_REPLAY_BUFFER_BYTES;
 
+/**
+ * Per-session indices split by PTY kind. The external (Claude TUI) PTY is
+ * part of the session lifecycle, not a user-visible shell — keeping it on
+ * a separate set means it doesn't eat into the 5-shells-per-session quota
+ * and `terminal-list` can return shells only, while a dedicated
+ * `claude-pty-attach` RPC reaches the external one.
+ */
+interface SessionPtyIndex {
+  internal: Set<string>;
+  external: Set<string>;
+}
+
 export class TerminalManager {
   private ptys = new Map<string, ManagedPty>();
-  private sessionIndex = new Map<string, Set<string>>(); // sessionId → terminalIds
+  private sessionIndex = new Map<string, SessionPtyIndex>();
   private onOutput: TerminalOutputHandler | null = null;
   private onExit: TerminalExitHandler | null = null;
 
@@ -123,7 +135,7 @@ export class TerminalManager {
     }
     const managed = wrapExternalAttachment(attachment);
     this.ptys.set(attachment.terminalId, managed);
-    this.indexSession(attachment.sessionId, attachment.terminalId);
+    this.indexSession(attachment.sessionId, attachment.terminalId, "external");
     logger.debug(
       `[TERMINAL] External PTY attached: ${attachment.terminalId} (session ${attachment.sessionId})`,
     );
@@ -134,8 +146,27 @@ export class TerminalManager {
     const pty = this.ptys.get(terminalId);
     if (!pty || pty.kind !== "external") return;
     this.ptys.delete(terminalId);
-    this.unindexSession(pty.sessionId, terminalId);
+    this.unindexSession(pty.sessionId, terminalId, "external");
     logger.debug(`[TERMINAL] External PTY detached: ${terminalId}`);
+  }
+
+  /**
+   * Look up the external (Claude TUI) PTY currently attached to a session,
+   * if any. Used by the `claude-pty-attach` RPC so the App's dedicated
+   * Claude tab can mirror the running Claude process without going through
+   * `terminal-spawn` (which would otherwise have to special-case external
+   * PTYs and risk colliding with shell spawn requests).
+   *
+   * By convention only one external PTY is attached per session.
+   */
+  getExternalForSession(sessionId: string): ManagedPty | undefined {
+    const index = this.sessionIndex.get(sessionId);
+    if (!index) return undefined;
+    for (const id of index.external) {
+      const pty = this.ptys.get(id);
+      if (pty) return pty;
+    }
+    return undefined;
   }
 
   /**
@@ -183,6 +214,18 @@ export class TerminalManager {
       if (options.cols && options.rows) {
         existing.resize(options.cols, options.rows);
       }
+      // Reattach (isExisting=true) — spawn is idempotent per
+      // (terminalId, sessionId). Surfaced explicitly because clients
+      // that don't honor `isExisting` can mistake it for a fresh spawn
+      // and produce duplicate UI tabs (see SidePanelTerminalTab).
+      const matchedBy = options.terminalId && this.ptys.get(options.terminalId) === existing
+        ? "terminalId"
+        : "sessionId";
+      logger.debug(
+        `[TERMINAL] Reattach (isExisting=true) ${existing.terminalId} ` +
+        `(kind=${existing.kind}, matchedBy=${matchedBy}, ` +
+        `reqTerminalId=${options.terminalId ?? "-"}, reqSessionId=${options.sessionId ?? "-"})`,
+      );
       return {
         success: true,
         terminalId: existing.terminalId,
@@ -192,8 +235,11 @@ export class TerminalManager {
     }
 
     if (options.sessionId) {
-      const ids = this.sessionIndex.get(options.sessionId);
-      if (ids && ids.size >= MAX_TERMINALS_PER_SESSION) {
+      // Only internal shell PTYs count against the per-session quota — the
+      // external Claude TUI is part of the session lifecycle, not a user
+      // shell. See SessionPtyIndex above.
+      const index = this.sessionIndex.get(options.sessionId);
+      if (index && index.internal.size >= MAX_TERMINALS_PER_SESSION) {
         return {
           success: false,
           error: `Maximum ${MAX_TERMINALS_PER_SESSION} terminals per session reached`,
@@ -253,14 +299,14 @@ export class TerminalManager {
         emitExit: (code) => {
           // Pull from map first so a re-entrant exit handler can't double-emit.
           if (this.ptys.delete(id)) {
-            this.unindexSession(options.sessionId, id);
+            this.unindexSession(options.sessionId, id, "internal");
           }
           this.onExit?.(id, code);
         },
       });
 
       this.ptys.set(id, managed);
-      this.indexSession(options.sessionId, id);
+      this.indexSession(options.sessionId, id, "internal");
       logger.debug(
         `[TERMINAL] Spawned terminal ${id} (shell=${shell}, cwd=${cwd}, ${cols}x${rows}, pid=${child.pid})`,
       );
@@ -298,23 +344,34 @@ export class TerminalManager {
     return true;
   }
 
+  /**
+   * List PTYs attached to a session. The default ("internal") matches the
+   * App's "Terminal" side panel, which only wants user shells. Pass
+   * "external" to enumerate the Claude TUI attachment, or "all" if a caller
+   * genuinely needs the union (currently nobody does).
+   */
   listBySession(
     sessionId: string,
+    kind: "internal" | "external" | "all" = "internal",
   ): Array<{ id: string; createdAt: number; cols: number; rows: number; cwd: string }> {
-    const ids = this.sessionIndex.get(sessionId);
-    if (!ids) return [];
+    const index = this.sessionIndex.get(sessionId);
+    if (!index) return [];
     const result: Array<{ id: string; createdAt: number; cols: number; rows: number; cwd: string }> = [];
-    for (const id of ids) {
-      const pty = this.ptys.get(id);
-      if (!pty) continue;
-      result.push({
-        id: pty.terminalId,
-        createdAt: pty.createdAt,
-        cols: pty.cols,
-        rows: pty.rows,
-        cwd: pty.cwd,
-      });
-    }
+    const collect = (ids: Set<string>) => {
+      for (const id of ids) {
+        const pty = this.ptys.get(id);
+        if (!pty) continue;
+        result.push({
+          id: pty.terminalId,
+          createdAt: pty.createdAt,
+          cols: pty.cols,
+          rows: pty.rows,
+          cwd: pty.cwd,
+        });
+      }
+    };
+    if (kind === "internal" || kind === "all") collect(index.internal);
+    if (kind === "external" || kind === "all") collect(index.external);
     return result;
   }
 
@@ -341,46 +398,55 @@ export class TerminalManager {
 
   // ── Internal helpers ───────────────────────────────────────────────────
 
+  /**
+   * Resolve an existing PTY for a `terminal-spawn` reattach request.
+   *
+   * We deliberately do NOT fall back to "any pty under this session" when
+   * only `sessionId` is given — that path used to short-circuit to the
+   * external Claude TUI, which silently swallowed shell `+` clicks (the
+   * App got `isExisting: true` for a terminalId it already had a tab for,
+   * and the new shell was never spawned). The dedicated `claude-pty-attach`
+   * RPC owns the Claude PTY reattach path now; `terminal-spawn` is shells
+   * only, and a missing `terminalId` always means "create a new shell".
+   *
+   * Direct lookup by `terminalId` still works for both internal and
+   * external PTYs — callers that genuinely want to reattach to the Claude
+   * PTY through this RPC may pass the explicit `claude:<sessionId>` id.
+   */
   private resolveExisting(
     terminalId: string | undefined,
-    sessionId: string | undefined,
+    _sessionId: string | undefined,
   ): ManagedPty | undefined {
-    if (terminalId) {
-      const direct = this.ptys.get(terminalId);
-      if (direct) return direct;
-    }
-    if (sessionId) {
-      const ids = this.sessionIndex.get(sessionId);
-      if (ids) {
-        // Prefer external attachment if present — the App's "open raw
-        // Claude terminal" button passes sessionId and expects the TUI,
-        // not an ad-hoc shell that happened to be tagged with the same
-        // session id.
-        for (const id of ids) {
-          const pty = this.ptys.get(id);
-          if (pty?.kind === "external") return pty;
-        }
-      }
-    }
-    return undefined;
+    if (!terminalId) return undefined;
+    return this.ptys.get(terminalId);
   }
 
-  private indexSession(sessionId: string | undefined, terminalId: string): void {
+  private indexSession(
+    sessionId: string | undefined,
+    terminalId: string,
+    kind: "internal" | "external",
+  ): void {
     if (!sessionId) return;
-    let ids = this.sessionIndex.get(sessionId);
-    if (!ids) {
-      ids = new Set();
-      this.sessionIndex.set(sessionId, ids);
+    let index = this.sessionIndex.get(sessionId);
+    if (!index) {
+      index = { internal: new Set(), external: new Set() };
+      this.sessionIndex.set(sessionId, index);
     }
-    ids.add(terminalId);
+    index[kind].add(terminalId);
   }
 
-  private unindexSession(sessionId: string | undefined, terminalId: string): void {
+  private unindexSession(
+    sessionId: string | undefined,
+    terminalId: string,
+    kind: "internal" | "external",
+  ): void {
     if (!sessionId) return;
-    const ids = this.sessionIndex.get(sessionId);
-    if (!ids) return;
-    ids.delete(terminalId);
-    if (ids.size === 0) this.sessionIndex.delete(sessionId);
+    const index = this.sessionIndex.get(sessionId);
+    if (!index) return;
+    index[kind].delete(terminalId);
+    if (index.internal.size === 0 && index.external.size === 0) {
+      this.sessionIndex.delete(sessionId);
+    }
   }
 }
 

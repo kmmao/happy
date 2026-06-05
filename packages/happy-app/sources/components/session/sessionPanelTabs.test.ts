@@ -53,6 +53,7 @@ describe("sessionPanelTabs", () => {
             { key: "files", labelKey: "sidePanel.files" },
             { key: "preview", labelKey: "sidePanel.preview" },
             { key: "terminal", labelKey: "sidePanel.terminal" },
+            { key: "claude", labelKey: "sidePanel.claude" },
         ]);
     });
 

@@ -119,7 +119,7 @@ export const SidePanelPreviewTab = React.memo<SidePanelPreviewTabProps>(
                 {remote.mode === "live" && (
                     <View style={{ flex: 1 }}>
                         <PreviewToolbar
-                            url={remote.state.url}
+                            url={remote.displayUrl}
                             viewport={remote.state.viewport}
                             zoom={remote.state.zoom}
                             onUrlChange={remote.setUrl}
@@ -160,15 +160,22 @@ export const SidePanelPreviewTab = React.memo<SidePanelPreviewTabProps>(
                             </View>
                         )}
 
-                        {/* Dev servers */}
-                        <View style={{ paddingHorizontal: 8, paddingBottom: 8 }}>
+                        {/* Dev servers — capped height + scrollable so a long list
+                            (e.g. many daemon RPC sockets on the same host) cannot
+                            push the iframe above off-screen. The flex:1 LivePreview
+                            container above is given priority via flexShrink:0 here. */}
+                        <View style={{ paddingHorizontal: 8, paddingBottom: 8, flexShrink: 0 }}>
                             <Text style={{ fontSize: 11, fontWeight: "600", color: theme.colors.textSecondary, textTransform: "uppercase", letterSpacing: 0.5, marginTop: 8, marginBottom: 6 }}>
                                 {t("preview.devServers")}
                             </Text>
                             {webPorts.length === 0 ? (
                                 <Text style={{ fontSize: 12, color: theme.colors.textSecondary }}>{t("preview.noPorts")}</Text>
                             ) : (
-                                <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
+                                <ScrollView
+                                    style={{ maxHeight: 140 }}
+                                    showsVerticalScrollIndicator={false}
+                                    contentContainerStyle={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}
+                                >
                                     {webPorts.map((p) => (
                                         <Pressable
                                             key={p.port}
@@ -195,7 +202,7 @@ export const SidePanelPreviewTab = React.memo<SidePanelPreviewTabProps>(
                                             <Text style={{ fontSize: 11, color: theme.colors.textSecondary, maxWidth: 80 }} numberOfLines={1}>{p.process}</Text>
                                         </Pressable>
                                     ))}
-                                </View>
+                                </ScrollView>
                             )}
                         </View>
                     </View>

@@ -50,9 +50,25 @@ export type LivePreviewStatus =
     | "error"
     | "unreachable";
 
+/**
+ * The current PreviewTarget — a (port, path) pair on the remote Machine's loopback.
+ * Mirrors lody's PreviewTarget (`dist/index.js:46736`), and is the source of truth
+ * for the toolbar's target-form display URL (ADR-0007, criterion 6).
+ *
+ * `state.url` remains the iframe's transport URL (reachable origin via Tailscale /
+ * tunnel / Caddy + this path); `target` is the loopback form the Account sees in
+ * the URL bar. Edits to the URL bar mutate `target` and the transport URL is
+ * recomputed against the current Machine.
+ */
+export interface PreviewTarget {
+    readonly port: number;
+    readonly path: string;
+}
+
 export interface LivePreviewState {
     readonly status: LivePreviewStatus;
     readonly url: string;
+    readonly target: PreviewTarget | null;
     readonly ports: readonly DetectedPort[];
     readonly viewport: ViewportPreset;
     readonly zoom: number;
@@ -65,6 +81,12 @@ export interface LivePreviewState {
 export interface UseRemotePreviewResult {
     readonly state: LivePreviewState;
     readonly mode: PreviewMode;
+    /**
+     * Target-form URL displayed in the toolbar (`http://localhost:{port}{path}`).
+     * Derived from `state.target`. Independent of `state.url` (transport URL) —
+     * see ADR-0007 criterion 6.
+     */
+    readonly displayUrl: string;
     readonly setMode: (mode: PreviewMode) => void;
     readonly setUrl: (url: string) => void;
     readonly setViewport: (preset: ViewportPreset) => void;
@@ -120,6 +142,66 @@ function buildReachableUrl(port: number, machine: Machine | null): string {
     return `http://localhost:${port}`;
 }
 
+/**
+ * Resolve a path against a reachable origin. Uses the URL API so an absolute
+ * path replaces the origin's pathname (matching how browsers navigate). Falls
+ * back to naive concatenation if the origin is not a parseable URL.
+ */
+function applyPathToReachable(origin: string, path: string): string {
+    if (!origin) return "";
+    try {
+        return new URL(path || "/", origin).toString();
+    } catch {
+        return origin + path;
+    }
+}
+
+/**
+ * Format a PreviewTarget as the toolbar's display URL — `http://localhost:{port}{path}`.
+ * This is what the Account types and reads; the iframe still loads `state.url`.
+ */
+function formatDisplayUrl(target: PreviewTarget | null): string {
+    if (!target) return "";
+    return `http://localhost:${target.port}${target.path || "/"}`;
+}
+
+/**
+ * Parse user input from the toolbar's URL bar into a {port, path} target.
+ *
+ * Accepts:
+ *   - Full URLs:        `http://localhost:3000/foo?q=1`, `https://example.com/bar`
+ *   - Host:port:        `localhost:3000/foo`, `127.0.0.1:8082`
+ *   - Bare paths:       `/foo`, `/bar?q=1`  (keeps the current port)
+ *
+ * Returns `null` for unparseable input or a bare path when there's no current
+ * port to fall back to. Callers should leave state alone on `null`.
+ */
+function parseDisplayInput(input: string, currentPort: number | null): PreviewTarget | null {
+    const trimmed = input.trim();
+    if (!trimmed) return null;
+
+    // Bare path — keep current port
+    if (trimmed.startsWith("/") && !trimmed.startsWith("//")) {
+        if (currentPort == null) return null;
+        return { port: currentPort, path: trimmed };
+    }
+
+    // Add a scheme if the user typed `host:port/...` without one
+    const candidate = /^https?:\/\//i.test(trimmed) ? trimmed : `http://${trimmed}`;
+
+    try {
+        const parsed = new URL(candidate);
+        const port = parsed.port
+            ? parseInt(parsed.port, 10)
+            : (parsed.protocol === "https:" ? 443 : 80);
+        if (!Number.isInteger(port) || port <= 0 || port > 65535) return null;
+        const path = (parsed.pathname || "/") + parsed.search + parsed.hash;
+        return { port, path };
+    } catch {
+        return null;
+    }
+}
+
 export function useRemotePreview(sessionId: string | undefined): UseRemotePreviewResult {
     const session = useSession(sessionId ?? "");
     const machineId = session?.metadata?.machineId ?? "";
@@ -129,6 +211,7 @@ export function useRemotePreview(sessionId: string | undefined): UseRemotePrevie
     const [state, setState] = React.useState<LivePreviewState>({
         status: "idle",
         url: "",
+        target: null,
         ports: [],
         viewport: DEFAULT_VIEWPORT,
         zoom: ZOOM_DEFAULT,
@@ -157,16 +240,21 @@ export function useRemotePreview(sessionId: string | undefined): UseRemotePrevie
             const ports = await detectAllPorts(bash, { filterByCwd: true });
             const webPorts = ports.filter((p) => p.isWeb);
 
-            // Auto-select first common dev port, or first web port
+            // Auto-select first common dev port, or first web port — but never
+            // overwrite an existing user selection (prev.url / prev.target).
             const autoPort = webPorts.find((p) => p.isCommonDevPort) ?? webPorts[0];
-            const url = autoPort
-                ? buildReachableUrl(autoPort.port, machine ?? null)
+            const autoTarget: PreviewTarget | null = autoPort
+                ? { port: autoPort.port, path: "/" }
+                : null;
+            const autoUrl = autoTarget
+                ? applyPathToReachable(buildReachableUrl(autoTarget.port, machine ?? null), autoTarget.path)
                 : "";
 
             setState((prev) => ({
                 ...prev,
-                status: url ? "ready" : "idle",
-                url: prev.url || url,
+                status: (prev.url || autoUrl) ? "ready" : "idle",
+                url: prev.url || autoUrl,
+                target: prev.target ?? autoTarget,
                 ports: webPorts,
             }));
         } catch {
@@ -189,19 +277,42 @@ export function useRemotePreview(sessionId: string | undefined): UseRemotePrevie
 
     // ── URL management ───────────────────────────────────────────────────────
 
-    const setUrl = React.useCallback((url: string) => {
+    /**
+     * Update the preview target from the toolbar's URL bar.
+     *
+     * The input is treated as a target-form URL (see ADR-0007 criterion 6):
+     * `http://localhost:{port}{path}` or just `/path`. We parse it into a
+     * (port, path) pair, recompute the transport URL against the current
+     * Machine's reachability (Tailscale / tunnel / Caddy / localhost
+     * fallback), and store both. Unparseable input is ignored so the user
+     * can keep typing without the iframe flickering.
+     */
+    const setUrl = React.useCallback((input: string) => {
+        const currentTarget = stateRef.current.target;
+        const next = parseDisplayInput(input, currentTarget?.port ?? null);
+        if (!next) return;
+        const transportUrl = applyPathToReachable(
+            buildReachableUrl(next.port, machine ?? null),
+            next.path,
+        );
         setState((prev) => ({
             ...prev,
-            url,
-            status: url ? "ready" : prev.status,
+            url: transportUrl,
+            target: next,
+            status: "ready",
         }));
-    }, []);
+    }, [machine]);
 
     const selectPort = React.useCallback((port: DetectedPort) => {
-        const url = buildReachableUrl(port.port, machine ?? null);
+        const target: PreviewTarget = { port: port.port, path: "/" };
+        const url = applyPathToReachable(
+            buildReachableUrl(port.port, machine ?? null),
+            target.path,
+        );
         setState((prev) => ({
             ...prev,
             url,
+            target,
             status: "loading",
         }));
     }, [machine]);
@@ -311,9 +422,15 @@ export function useRemotePreview(sessionId: string | undefined): UseRemotePrevie
         return () => clearInterval(interval);
     }, [sessionId, mode]);
 
+    const displayUrl = React.useMemo(
+        () => formatDisplayUrl(state.target),
+        [state.target],
+    );
+
     return {
         state,
         mode,
+        displayUrl,
         setMode,
         setUrl,
         setViewport,

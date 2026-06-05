@@ -300,7 +300,7 @@ export default React.memo(function PreviewPage() {
                         />
 
                         <PreviewToolbar
-                            url={remote.state.url}
+                            url={remote.displayUrl}
                             viewport={remote.state.viewport}
                             zoom={remote.state.zoom}
                             onUrlChange={remote.setUrl}

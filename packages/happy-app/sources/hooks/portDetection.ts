@@ -450,6 +450,20 @@ export async function detectAllPorts(
         }
     }
 
+    // Exclude happy-cli daemon's local RPC/SSE sockets. The daemon opens many
+    // listening sockets per session (one or more per active turn) which all
+    // respond `HTTP/...` to curl and would otherwise flood the dev-server list.
+    //
+    // The label comes from extractProcessLabel("node /…/happy-cli/dist/index.js …")
+    // → fileBase "index" (GENERIC_ENTRY_FILES) → parent "dist" (filtered) →
+    //   grandparent "happy-cli". The "happy" branch covers the legacy/global
+    // install location where the entry file is named "happy".
+    for (const [port, process] of Array.from(portMap)) {
+        if (process === "happy-cli" || process === "happy") {
+            portMap.delete(port);
+        }
+    }
+
     // Filter ports by CWD: only keep processes whose working directory is under the session's CWD.
     // This ensures only services related to the current project are shown.
     // Skipped in global mode (filterByCwd=false) to show all processes.

@@ -2721,3 +2721,41 @@ export function machineTerminalInput(
 ): void {
     apiSocket.send("terminal-input", { machineId, terminalId, data });
 }
+
+// ---------------------------------------------------------------------------
+// Claude PTY (dedicated side panel "Claude" tab)
+// ---------------------------------------------------------------------------
+//
+// `terminal-spawn` / `terminal-list` are shells-only now; the Claude TUI PTY
+// owned by claudePtyRuntime in the session child is reached through this
+// dedicated RPC instead. resize / close / input keep using the shared
+// terminal-* paths (they route by terminalId straight to the ManagedPty
+// adapter on the daemon side — see TerminalManager).
+
+export interface ClaudePtyAttachResult {
+    success: boolean;
+    /**
+     * `false` means the session is online but no Claude TUI is currently
+     * attached. The App should render a "Claude not running" placeholder.
+     */
+    exists?: boolean;
+    terminalId?: string;
+    cols?: number;
+    rows?: number;
+    cwd?: string;
+    createdAt?: number;
+    /** Recent PTY output for replay on first attach. */
+    snapshot?: string;
+    error?: string;
+}
+
+export async function machineClaudePtyAttach(
+    machineId: string,
+    sessionId: string,
+): Promise<ClaudePtyAttachResult> {
+    try {
+        return await apiSocket.machineRPC(machineId, "claude-pty-attach", { sessionId });
+    } catch (error) {
+        return { success: false, error: getErrorMessage(error) };
+    }
+}

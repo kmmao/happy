@@ -56,6 +56,7 @@ import { agentLoopSuggestRoutes } from "./routes/agentLoopSuggestRoutes";
 import { mcpServerRoutes } from "./routes/mcpServerRoutes";
 import { previewRoutes } from "./routes/previewRoutes";
 import { previewGateway } from "./routes/previewGateway";
+import { webDiagnosticsRoutes } from "./routes/webDiagnosticsRoutes";
 import { attachPreviewWsGateway } from "./routes/previewWsGateway";
 import { startPreviewCleanup, stopPreviewCleanup } from "@/app/preview/previewCleanup";
 import { isLocalStorage, getLocalFilesDir } from "@/storage/files";
@@ -187,6 +188,7 @@ export async function startApi() {
   mcpServerRoutes(typed);
   previewRoutes(typed);
   previewGateway(typed);
+  webDiagnosticsRoutes(typed);
 
   // Start HTTP
   const port = process.env.PORT ? parseInt(process.env.PORT, 10) : 3005;

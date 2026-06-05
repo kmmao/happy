@@ -917,8 +917,36 @@ export class ApiMachineClient {
     this.rpcHandlerManager.registerHandler("terminal-list", async (params: any) => {
       const { sessionId } = params || {};
       if (!sessionId) return { success: false, error: "sessionId required" };
-      const terminals = this.terminalManager.listBySession(sessionId);
+      // Shells only — the App's "Terminal" side panel must not see the
+      // Claude TUI PTY mixed in. The dedicated "Claude" tab uses
+      // `claude-pty-attach` below.
+      const terminals = this.terminalManager.listBySession(sessionId, "internal");
       return { success: true, terminals };
+    });
+
+    /**
+     * Claude PTY attach — reports the externally-attached Claude TUI PTY
+     * for a session (if any) so the App's dedicated "Claude" side panel
+     * tab can mirror it. Read-only; lifecycle stays with
+     * `claudePtyRuntime` in the session child.
+     */
+    this.rpcHandlerManager.registerHandler("claude-pty-attach", async (params: any) => {
+      const sessionId = params?.sessionId;
+      if (typeof sessionId !== "string" || sessionId.length === 0) {
+        return { success: false, error: "sessionId required" };
+      }
+      const pty = this.terminalManager.getExternalForSession(sessionId);
+      if (!pty) return { success: true, exists: false };
+      return {
+        success: true,
+        exists: true,
+        terminalId: pty.terminalId,
+        cols: pty.cols,
+        rows: pty.rows,
+        cwd: pty.cwd,
+        createdAt: pty.createdAt,
+        snapshot: pty.snapshot(),
+      };
     });
 
     this.rpcHandlerManager.registerHandler("terminal-resize", async (params: any) => {

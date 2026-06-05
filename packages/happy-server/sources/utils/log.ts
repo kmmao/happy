@@ -1,6 +1,7 @@
 import pino from 'pino';
 import pretty from 'pino-pretty';
 import { mkdirSync } from 'fs';
+import { readdir, unlink } from 'fs/promises';
 import { join } from 'path';
 
 // Single log file name created once at startup
@@ -83,6 +84,111 @@ export const logger = pino(baseOptions, logStream);
 export const fileConsolidatedLogger = fileEnabled
     ? pino(baseOptions, pino.destination({ dest: consolidatedLogFile!, mkdir: true }))
     : undefined;
+
+// Dedicated file-only logger for web-diagnostics uploads (crash trails from
+// happy-app web client). Always enabled — crash uploads are low frequency,
+// and we want them captured even without the dangerous AI-debug flag.
+//
+// Writes to .logs/web-diagnostics-YYYY-MM-DD.log (one file per local day).
+// Rotation happens lazily inside the destination's write() — a cheap date
+// comparison per line, no setInterval (which would pin a timer ref and
+// block process shutdown). On startup we prune files older than 14 days
+// so disk use stays bounded.
+//
+// Why a hand-rolled rotation instead of pino-roll: pino transports run
+// inside a worker thread that require()s targets at runtime by file path,
+// which breaks inside `bun build --compile` single-file binaries — the
+// same reason pretty-stream above is built as an in-process stream rather
+// than via pino.transport().
+const WEB_DIAG_LOGS_DIR = join(process.cwd(), '.logs');
+const WEB_DIAG_FILE_PREFIX = 'web-diagnostics-';
+const WEB_DIAG_FILE_SUFFIX = '.log';
+const WEB_DIAG_RETENTION_DAYS = 14;
+
+function webDiagDailyKey(date = new Date()): string {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+}
+
+function webDiagPathForKey(key: string): string {
+    return join(WEB_DIAG_LOGS_DIR, `${WEB_DIAG_FILE_PREFIX}${key}${WEB_DIAG_FILE_SUFFIX}`);
+}
+
+function createWebDiagRotatingDestination(): pino.DestinationStream | undefined {
+    try {
+        mkdirSync(WEB_DIAG_LOGS_DIR, { recursive: true });
+    } catch (error) {
+        console.error('Failed to create logs directory for web-diagnostics:', error);
+        return undefined;
+    }
+
+    let currentKey = webDiagDailyKey();
+    let currentDest = pino.destination({ dest: webDiagPathForKey(currentKey), mkdir: true });
+
+    function rotateIfNeeded() {
+        const key = webDiagDailyKey();
+        if (key === currentKey) return;
+        // Hand off cleanly so the previous day's tail isn't truncated.
+        try {
+            (currentDest as { flushSync?: () => void }).flushSync?.();
+            (currentDest as { end?: () => void }).end?.();
+        } catch {
+            // best-effort
+        }
+        currentKey = key;
+        currentDest = pino.destination({ dest: webDiagPathForKey(currentKey), mkdir: true });
+    }
+
+    // pino accepts any { write(msg: string): void } as a DestinationStream.
+    // We also expose flushSync/end so shutdown still drains the buffer.
+    return {
+        write(msg: string) {
+            rotateIfNeeded();
+            currentDest.write(msg);
+        },
+        flushSync() {
+            (currentDest as { flushSync?: () => void }).flushSync?.();
+        },
+        end() {
+            (currentDest as { end?: () => void }).end?.();
+        },
+    } as unknown as pino.DestinationStream;
+}
+
+async function pruneOldWebDiagLogs(): Promise<void> {
+    try {
+        const entries = await readdir(WEB_DIAG_LOGS_DIR);
+        const cutoff = Date.now() - WEB_DIAG_RETENTION_DAYS * 24 * 60 * 60 * 1000;
+        for (const name of entries) {
+            if (!name.startsWith(WEB_DIAG_FILE_PREFIX) || !name.endsWith(WEB_DIAG_FILE_SUFFIX)) {
+                continue;
+            }
+            const datePart = name.slice(WEB_DIAG_FILE_PREFIX.length, -WEB_DIAG_FILE_SUFFIX.length);
+            // YYYY-MM-DD parses as UTC midnight; precise enough for a 14-day cutoff.
+            const ts = Date.parse(datePart);
+            if (!Number.isFinite(ts)) continue;
+            if (ts < cutoff) {
+                try {
+                    await unlink(join(WEB_DIAG_LOGS_DIR, name));
+                } catch {
+                    // ignore — best-effort
+                }
+            }
+        }
+    } catch {
+        // ignore — no .logs dir yet, or unreadable
+    }
+}
+
+const webDiagDestination = createWebDiagRotatingDestination();
+export const webDiagnosticsLogger = webDiagDestination
+    ? pino(baseOptions, webDiagDestination)
+    : undefined;
+
+// Fire-and-forget prune on startup. Never throws.
+void pruneOldWebDiagLogs();
 
 function resolveLogLevel(src: any): pino.LevelWithSilent | null {
     if (!src || typeof src !== 'object' || Array.isArray(src)) {

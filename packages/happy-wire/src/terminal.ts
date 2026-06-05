@@ -41,6 +41,43 @@ export const terminalCloseRequestSchema = z.object({
 });
 export type TerminalCloseRequest = z.infer<typeof terminalCloseRequestSchema>;
 
+/**
+ * Claude PTY attach RPC — App asks the daemon "does this session have a
+ * Claude TUI PTY right now, and if so, what's its current geometry plus
+ * recent screen buffer for replay". Used by the App's dedicated "Claude"
+ * side panel tab, which mirrors the running Claude CLI process separately
+ * from the user's shell terminals.
+ *
+ * Unlike `terminal-spawn`, this RPC never creates a PTY — it only reports
+ * on the externally-managed one owned by claudePtyRuntime in the session
+ * child. After receiving `exists: true`, the App wires its xterm.js view
+ * to the returned `terminalId` using the existing
+ * `terminal-input` / `terminal-resize` / `terminal-close` paths.
+ */
+export const claudePtyAttachRequestSchema = z.object({
+  sessionId: z.string().min(1),
+});
+export type ClaudePtyAttachRequest = z.infer<typeof claudePtyAttachRequestSchema>;
+
+export const claudePtyAttachResponseSchema = z.object({
+  success: z.boolean(),
+  /**
+   * `false` means the session is online but no Claude TUI is currently
+   * attached (e.g. the user is running `happy` without a Claude child). The
+   * App should render a "Claude not running" placeholder.
+   */
+  exists: z.boolean().optional(),
+  terminalId: z.string().optional(),
+  cols: z.number().int().positive().optional(),
+  rows: z.number().int().positive().optional(),
+  cwd: z.string().optional(),
+  createdAt: z.number().optional(),
+  /** Recent PTY output for replay on first attach. */
+  snapshot: z.string().optional(),
+  error: z.string().optional(),
+});
+export type ClaudePtyAttachResponse = z.infer<typeof claudePtyAttachResponseSchema>;
+
 // --- Streaming event schemas (used via socket.io events) ---
 
 /** App → Server → CLI: keyboard/paste input */

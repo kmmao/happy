@@ -32,13 +32,18 @@ export const SidePanelTerminalTab = React.memo<SidePanelTerminalTabProps>(
         const [tabs, setTabs] = React.useState<TerminalTab[]>([]);
         const [activeTabId, setActiveTabId] = React.useState<string | null>(null);
         const [isLoading, setIsLoading] = React.useState(true);
-        const labelCounterRef = React.useRef(0);
 
         // Refs for stable callbacks
         const tabsRef = React.useRef<TerminalTab[]>([]);
         const activeTabIdRef = React.useRef<string | null>(null);
         React.useEffect(() => { tabsRef.current = tabs; }, [tabs]);
         React.useEffect(() => { activeTabIdRef.current = activeTabId; }, [activeTabId]);
+
+        // Compute the next labelIndex from the current tabs — derived from
+        // state so Strict-Mode-doubled updaters stay pure and concurrent
+        // spawns can't collide on a shared counter.
+        const nextLabelIndex = (prev: TerminalTab[]) =>
+            prev.reduce((max, t) => Math.max(max, t.labelIndex), 0) + 1;
 
         // Initialize: restore existing terminals or spawn the first one
         React.useEffect(() => {
@@ -56,19 +61,22 @@ export const SidePanelTerminalTab = React.memo<SidePanelTerminalTabProps>(
                     if (cancelled) return;
 
                     if (listResult.success && listResult.terminals && listResult.terminals.length > 0) {
-                        const restoredTabs = listResult.terminals.map((term, i) => ({
-                            terminalId: term.id,
-                            labelIndex: i + 1,
-                        }));
-                        labelCounterRef.current = restoredTabs.length;
+                        // Dedupe by id defensively — duplicate ids would
+                        // collide as React keys (see handleAddTerminal).
+                        const seen = new Set<string>();
+                        const restoredTabs: TerminalTab[] = [];
+                        for (const term of listResult.terminals) {
+                            if (seen.has(term.id)) continue;
+                            seen.add(term.id);
+                            restoredTabs.push({ terminalId: term.id, labelIndex: restoredTabs.length + 1 });
+                        }
                         setTabs(restoredTabs);
-                        setActiveTabId(restoredTabs[0].terminalId);
+                        setActiveTabId(restoredTabs[0]?.terminalId ?? null);
                     } else {
                         // No existing terminals — spawn first one
                         const spawnResult = await machineTerminalSpawn(machineId!, { cwd, sessionId });
                         if (cancelled) return;
                         if (spawnResult.success && spawnResult.terminalId) {
-                            labelCounterRef.current = 1;
                             setTabs([{ terminalId: spawnResult.terminalId, labelIndex: 1 }]);
                             setActiveTabId(spawnResult.terminalId);
                         }
@@ -85,11 +93,18 @@ export const SidePanelTerminalTab = React.memo<SidePanelTerminalTabProps>(
         const handleAddTerminal = React.useCallback(async () => {
             if (!machineId) return;
             const result = await machineTerminalSpawn(machineId, { cwd, sessionId });
-            if (result.success && result.terminalId) {
-                const newIndex = ++labelCounterRef.current;
-                setTabs((prev) => [...prev, { terminalId: result.terminalId!, labelIndex: newIndex }]);
-                setActiveTabId(result.terminalId);
-            }
+            if (!result.success || !result.terminalId) return;
+            const id = result.terminalId;
+            setTabs((prev) => {
+                // Defensive dedupe: Strict-Mode-doubled effects or a fast
+                // double-click on "+" could otherwise push the same shell id
+                // twice and trigger React's duplicate-key warning. (The old
+                // external-Claude-PTY collision is gone — server now keeps
+                // shells and Claude TUI on separate RPC families.)
+                if (prev.some((t) => t.terminalId === id)) return prev;
+                return [...prev, { terminalId: id, labelIndex: nextLabelIndex(prev) }];
+            });
+            setActiveTabId(id);
         }, [machineId, cwd, sessionId]);
 
         const handleCloseTab = React.useCallback(async (terminalId: string) => {

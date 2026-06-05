@@ -34,6 +34,11 @@ import { RealtimeProvider } from "@/realtime/RealtimeProvider";
 import { FaviconPermissionIndicator } from "@/components/web/FaviconPermissionIndicator";
 import { WebErrorBoundary, setupWebErrorHandlers } from "@/components/web/WebErrorBoundary";
 import { startMemoryWatchdog } from "@/sync/memoryWatchdog";
+import { startWebPerfBufferGuard } from "@/sync/webPerfBufferGuard";
+import {
+  uploadWebDiagnosticsOnce,
+  installWebDiagnosticsConsoleHook,
+} from "@/sync/webDiagnosticsUpload";
 import { CommandPaletteProvider } from "@/components/CommandPalette/CommandPaletteProvider";
 import { StatusBarProvider } from "@/components/StatusBarProvider";
 // import * as SystemUI from 'expo-system-ui';
@@ -205,6 +210,17 @@ export default function RootLayout() {
     // Web-only heap watchdog: persists a localStorage trail so the run-up to a
     // renderer-OOM crash (Chrome error code 5) can be inspected after reload.
     startMemoryWatchdog();
+    // Dev bundles inject heavy performance.mark/measure instrumentation; on
+    // long-lived tabs the Performance entry buffer fills and the next
+    // measure() call throws DataCloneError ("out of memory"). Periodic clear
+    // every 30s keeps it bounded.
+    startWebPerfBufferGuard();
+    // After startMemoryWatchdog() promotes the previous run's RING_KEY to
+    // LAST_KEY, fire-and-forget upload it (plus any new crash records) to
+    // happy-server's /v1/web-diagnostics/trail. Waits internally for auth
+    // to be restored; failures never block startup.
+    installWebDiagnosticsConsoleHook();
+    void uploadWebDiagnosticsOnce();
   }, []);
 
   React.useEffect(() => {
