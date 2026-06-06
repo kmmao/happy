@@ -126,8 +126,21 @@ export const SupervisorLoopConfigPanel = React.memo(
 
         const [maxIterations, setMaxIterations] = React.useState(5);
         const [autoApproveThreshold, setAutoApproveThreshold] = React.useState(80);
+        // After this many consecutive failed runs the loop bails out with
+        // `consecutive_failures` exit reason. Server default: 2.
+        const [maxConsecutiveFailures, setMaxConsecutiveFailures] = React.useState(2);
+        // Optional convergence target — when set, the loop exits with
+        // `health_target` once currentHealthScore drops to/below the value.
+        // null = no target (loop converges via no_new_actions / goal_achieved
+        // / max_iterations / cost cap instead).
+        const [healthTargetEnabled, setHealthTargetEnabled] = React.useState(false);
+        const [healthScoreTarget, setHealthScoreTarget] = React.useState(15);
         const [costCapEnabled, setCostCapEnabled] = React.useState(false);
         const [costCapUsd, setCostCapUsd] = React.useState(10);
+        // Hard wall-clock cap — loop is forcibly completed with `timeout`
+        // when its createdAt + this many minutes elapses. Server default: 240
+        // (4 hours).
+        const [maxDurationMinutes, setMaxDurationMinutes] = React.useState(240);
         // ADR-0022 C-1 — N consecutive empty analysis passes required before
         // the loop exits with `goal_achieved` (vs. legacy `no_new_actions`
         // after the first empty pass). Server-side default for new loops is 2.
@@ -182,13 +195,29 @@ export const SupervisorLoopConfigPanel = React.memo(
                 const config: LoopConfig = {
                     maxIterations,
                     autoApproveThreshold,
+                    maxConsecutiveFailures,
+                    maxDurationMinutes,
                     emptyIterationsToConfirm,
                     ...(costCapEnabled ? { costCapUsd } : {}),
+                    ...(healthTargetEnabled ? { healthScoreTarget } : {}),
                     ...selectedRequestProfile,
                 };
                 const loop = await startSupervisorLoop(credentials, projectId, config);
                 onStarted(loop);
-            }, [projectId, maxIterations, autoApproveThreshold, emptyIterationsToConfirm, costCapEnabled, costCapUsd, selectedRequestProfile, onStarted]),
+            }, [
+                projectId,
+                maxIterations,
+                autoApproveThreshold,
+                maxConsecutiveFailures,
+                healthTargetEnabled,
+                healthScoreTarget,
+                costCapEnabled,
+                costCapUsd,
+                maxDurationMinutes,
+                emptyIterationsToConfirm,
+                selectedRequestProfile,
+                onStarted,
+            ]),
         );
 
         return (
@@ -250,6 +279,62 @@ export const SupervisorLoopConfigPanel = React.memo(
                     </Text>
                 </View>
 
+                {/* Max Consecutive Failures */}
+                <View style={styles.configRow}>
+                    <View style={styles.configLabelRow}>
+                        <Text style={styles.configLabel}>
+                            {t("supervisor.loopConfigMaxFailures")}
+                        </Text>
+                        <Stepper
+                            value={maxConsecutiveFailures}
+                            min={1}
+                            max={10}
+                            step={1}
+                            onChange={setMaxConsecutiveFailures}
+                        />
+                    </View>
+                    <Text style={styles.configHint}>
+                        {t("supervisor.loopConfigMaxFailuresHint", {
+                            count: maxConsecutiveFailures,
+                        })}
+                    </Text>
+                </View>
+
+                {/* Health Score Target (optional) */}
+                <View style={styles.configRow}>
+                    <Pressable
+                        style={styles.configLabelRow}
+                        onPress={() => setHealthTargetEnabled((v) => !v)}
+                    >
+                        <Text style={styles.configLabel}>
+                            {t("supervisor.loopConfigHealthTarget")}
+                        </Text>
+                        <Ionicons
+                            name={healthTargetEnabled ? "checkbox" : "square-outline"}
+                            size={20}
+                            color={healthTargetEnabled ? theme.colors.header.tint : theme.colors.textSecondary}
+                        />
+                    </Pressable>
+                    {healthTargetEnabled && (
+                        <View style={styles.costCapStepper}>
+                            <Stepper
+                                value={healthScoreTarget}
+                                min={0}
+                                max={100}
+                                step={5}
+                                onChange={setHealthScoreTarget}
+                            />
+                        </View>
+                    )}
+                    <Text style={styles.configHint}>
+                        {healthTargetEnabled
+                            ? t("supervisor.loopConfigHealthTargetHint", {
+                                  value: healthScoreTarget,
+                              })
+                            : t("supervisor.loopConfigHealthTargetHintOff")}
+                    </Text>
+                </View>
+
                 {/* Cost Cap */}
                 <View style={styles.configRow}>
                     <Pressable
@@ -279,6 +364,28 @@ export const SupervisorLoopConfigPanel = React.memo(
                     )}
                     <Text style={styles.configHint}>
                         {t("supervisor.loopConfigCostCapHint")}
+                    </Text>
+                </View>
+
+                {/* Wall-Clock Cap (timeout) */}
+                <View style={styles.configRow}>
+                    <View style={styles.configLabelRow}>
+                        <Text style={styles.configLabel}>
+                            {t("supervisor.loopConfigDuration")}
+                        </Text>
+                        <Stepper
+                            value={maxDurationMinutes}
+                            min={30}
+                            max={480}
+                            step={30}
+                            suffix="m"
+                            onChange={setMaxDurationMinutes}
+                        />
+                    </View>
+                    <Text style={styles.configHint}>
+                        {t("supervisor.loopConfigDurationHint", {
+                            hours: Math.round((maxDurationMinutes / 60) * 10) / 10,
+                        })}
                     </Text>
                 </View>
 
