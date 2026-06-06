@@ -455,6 +455,14 @@ model Project {
     supervisorCustomRules             String?   // User-defined analysis rules (plaintext, appended to prompt)
     fixStrategy                       String?   // "direct" | "pr" — null means "direct" (default)
 
+    // ── ADR-0022 D-1 — autonomous loop discovery ──
+    // When set, an AgentLoop (role=supervisor) is auto-started whenever a
+    // standalone (non-loop) SupervisorRun completes with healthScore >= the
+    // threshold. null = disabled (default). lastAutoLoopStartedAt enforces a
+    // 24h debounce so a noisy project doesn't fire repeatedly.
+    autoLoopHealthThreshold           Int?
+    lastAutoLoopStartedAt             DateTime?
+
     // Knowledge base configuration (project-level overrides)
     // null = inherit hardcoded defaults (enabled:false, mode:auto, sensitivity:balanced)
     knowledgeConfig                   String?   // JSON: KnowledgeConfig

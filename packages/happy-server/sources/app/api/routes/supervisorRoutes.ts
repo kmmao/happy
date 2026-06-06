@@ -39,6 +39,11 @@ export function supervisorRoutes(app: Fastify) {
                     supervisorNotifyPrefs: z.string().max(200).nullable().optional(),
                     supervisorCustomRules: z.string().max(2000).nullable().optional(),
                     fixStrategy: z.enum(["direct", "pr"]).nullable().optional(),
+                    // ADR-0022 D-1 — autonomous loop discovery. null disables;
+                    // 0..100 sets the healthScore threshold above which a
+                    // standalone run's completion auto-starts a supervisor
+                    // loop. 24h debounce is enforced on the server.
+                    autoLoopHealthThreshold: z.number().int().min(0).max(100).nullable().optional(),
                 }),
             },
         },
@@ -55,6 +60,7 @@ export function supervisorRoutes(app: Fastify) {
                 supervisorNotifyPrefs,
                 supervisorCustomRules,
                 fixStrategy,
+                autoLoopHealthThreshold,
             } = request.body;
 
             const existing = await db.project.findFirst({
@@ -99,6 +105,9 @@ export function supervisorRoutes(app: Fastify) {
             }
             if (fixStrategy !== undefined) {
                 updateData.fixStrategy = fixStrategy;
+            }
+            if (autoLoopHealthThreshold !== undefined) {
+                updateData.autoLoopHealthThreshold = autoLoopHealthThreshold;
             }
 
             // Compute nextRunAt when scheduling is enabled/changed

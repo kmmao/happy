@@ -45,6 +45,7 @@ import {
 import { computeHealthScore, countSeverities } from "@/modules/supervisorScoring";
 import { aggregateSessionUsage, scheduleDelayedCostAggregation } from "@/modules/supervisorUsage";
 import { activityCache } from "@/app/presence/sessionCache";
+import { maybeAutoStartLoop } from "@/modules/supervisorAutoLoop";
 import { onRunCompleted as loopOnRunCompleted } from "@/modules/supervisorLoopEngine";
 import { handleAutoApproval } from "./supervisorAutoApproval";
 import { pushSupervisorNotification } from "@/modules/pushSend";
@@ -362,6 +363,29 @@ export async function supervisorRunStatusApply(
                       }
                     : {}),
             },
+        });
+
+        // ADR-0022 D-1 — autonomous loop discovery. If the project has an
+        // auto-loop threshold set and this standalone run reports a
+        // healthScore at/above it, spawn a supervisor-role AgentLoop. The
+        // helper is best-effort: skipped silently when the run is already
+        // inside a loop, debounce window is active, or startLoop's own
+        // guards (already-active, daily limit) say no.
+        const runForLoopGuard = await db.supervisorRun.findUnique({
+            where: { id: runId },
+            select: { loopId: true },
+        });
+        void maybeAutoStartLoop({
+            userId,
+            projectId: id,
+            runId,
+            healthScore,
+            runLoopId: runForLoopGuard?.loopId ?? null,
+        }).catch((err) => {
+            log(
+                { module: "supervisor", level: "warn" },
+                `D-1 auto-loop dispatch failed (run ${runId}): ${err}`,
+            );
         });
 
         // Delayed re-aggregation: the turn-end cost report arrives AFTER
