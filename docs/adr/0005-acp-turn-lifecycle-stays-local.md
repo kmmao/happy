@@ -12,7 +12,7 @@ ACP is a genuinely different shape, not a third instance of the same one:
 - **Its Turn boundaries are explicit and externally driven.** `startTurn()`/`endTurn()` are called by the ACP driver, are idempotent, and emit turn-start/turn-end directly. There is nothing to infer and therefore nothing to share.
 - **It owns ACP-specific stream glue** — pending model-output/thinking text accumulated and flushed on a type change or on `endTurn()`, including a flush that fires even with no active Turn. That logic has no analogue in Claude/Codex.
 
-Forcing ACP onto the reducer would union three divergent views behind one interface for ~zero shared behavior — the same shallow over-abstraction ADR-0001 (spawnsession) and ADR-0004 (encryption scope) warn against. The deletion test agrees: ACP's `startTurn`/`endTurn` cannot be deleted in favor of the reducer (the driver still needs explicit, idempotent boundaries), and routing ACP through it would only add impedance-matching glue.
+Forcing ACP onto the reducer would union three divergent views behind one interface for ~zero shared behavior — the same shallow over-abstraction ADR-0009 (spawnsession) and ADR-0004 (encryption scope) warn against. The deletion test agrees: ACP's `startTurn`/`endTurn` cannot be deleted in favor of the reducer (the driver still needs explicit, idempotent boundaries), and routing ACP through it would only add impedance-matching glue.
 
 ## Turn opening: lazy vs. explicit
 
@@ -25,7 +25,7 @@ This is why the reducer is intentionally not "lazy-open only."
 
 ## Considered alternatives
 
-- **Migrate all three producers onto the reducer.** Rejected: ACP would need its public `startTurn`/`endTurn` contract rewritten and its ~30 lifecycle tests changed, plus a Turn-start timing change, all for a producer with no Subagents. High churn, contradicts ADR-0001.
+- **Migrate all three producers onto the reducer.** Rejected: ACP would need its public `startTurn`/`endTurn` contract rewritten and its ~30 lifecycle tests changed, plus a Turn-start timing change, all for a producer with no Subagents. High churn, contradicts ADR-0009.
 - **Migrate only Claude.** Rejected: the Subagent lifecycle is shared by Claude *and* Codex; capturing only one leaves the seam at a single adapter (hypothetical, not real).
 
 ## Consequences

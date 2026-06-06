@@ -13,7 +13,7 @@ We distilled the invariant into a single owner — `sources/sync/syncEncryptionS
 
 ## Artifacts are deliberately NOT covered
 
-`handleNewArtifactUpdate` resolves a **per-Artifact data key** (`decryptEncryptionKey` + `ArtifactEncryption`), not a scope encryptor fetched from `ctx.encryption`. Per ADR-0001 (E2E encryption) and the domain model, an Artifact "is a generic encrypted data container with its own encryption key." Folding it into `resolveScope` would union two unrelated "obtain an encryptor" shapes behind one interface — the same shallow over-abstraction ADR-0001 (spawnsession) warns against. Artifact readiness stays in its own handler.
+`handleNewArtifactUpdate` resolves a **per-Artifact data key** (`decryptEncryptionKey` + `ArtifactEncryption`), not a scope encryptor fetched from `ctx.encryption`. Per ADR-0001 (E2E encryption) and the domain model, an Artifact "is a generic encrypted data container with its own encryption key." Folding it into `resolveScope` would union two unrelated "obtain an encryptor" shapes behind one interface — the same shallow over-abstraction ADR-0009 (spawnsession) warns against. Artifact readiness stays in its own handler.
 
 ## Considered alternatives
 

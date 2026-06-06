@@ -2,6 +2,12 @@
 
 这个目录用于集中放 Happy 自主 loop / 自动化系统的操作文档。
 
+> ⚠️ **Last verified: 2026-04-02**（全套手册集体提交日）。
+>
+> **审计结论（2026-06-07）**：手册描述的 18 个 `happy loop` 子命令 + AgentLoopBrief / Memory / Context / Bootstrap / Auto-Dream / CI bridge / GitHub Actions 都仍在 `packages/happy-cli/src/automation/`，App 端 BriefSection 等 UI 也都在。**100% 命令仍准确**。
+>
+> **已知 drift**：自 4-02 以来，automation/ 新增了 4 个模块（`AgentLoopSuggestionAI` 2026-04-26、`ProjectTodoWatcher` 2026-05-03、`TaskRunner` 2026-04-04、`SessionTranscriptScanner` 2026-04-03），可能涉及 `happy loop suggest` 的 AI 模式或新触发源——本套手册未覆盖。遇到新功能请以代码为准。
+
 ## 目录
 
 ### Getting Started

@@ -9,7 +9,7 @@
 ## 相关文档
 
 - 如果你想看通用 daemon automation / `happy loop` / guardian / recovered session 的操作说明，请先看 `docs/automation-operations-guide.md`。
-- 如果你想看当前实现状态与架构边界，请看 `docs/plans/automation-loop-platform.md` 与 `docs/plans/agent-loop-system.md`。
+- 如果你想看当前实现状态与架构边界，请看 `docs/archive/plans/automation-loop-platform.md` 与 `docs/archive/plans/agent-loop-system.md`。
 
 ## 目录
 

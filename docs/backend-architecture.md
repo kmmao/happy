@@ -170,6 +170,8 @@ The backend does not store passwords. Instead:
 - Tokens are generated and verified by privacy-kit using `HANDY_MASTER_SECRET`.
 - Tokens are cached in-memory for fast verification.
 
+> See ADR-0011.
+
 GitHub OAuth uses short-lived "ephemeral" tokens to protect the callback and is separate from normal auth.
 
 ## Realtime sync architecture

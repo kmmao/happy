@@ -14,8 +14,8 @@
 - CLI 与 App UI 的主要操作入口
 
 如果你想看实现状态与架构关系，优先看：
-- `docs/plans/automation-loop-platform.md`
-- `docs/plans/agent-loop-system.md`
+- `docs/archive/plans/automation-loop-platform.md`
+- `docs/archive/plans/agent-loop-system.md`
 
 ## 一句话理解当前系统
 Happy 现在的“自动化 / 自主 loop”不是独立旁路工具，而是构建在同一套 daemon automation runtime 之上的统一系统。

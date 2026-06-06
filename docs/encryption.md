@@ -154,6 +154,8 @@ This blob is then wrapped with a version byte before being sent/stored:
 
 The resulting bytes are base64-encoded and placed in fields such as `dataEncryptionKey` for sessions/machines/artifacts.
 
+> See ADR-0017.
+
 ## Where encryption is applied
 
 ```mermaid
@@ -257,6 +259,8 @@ Wire schemas: `packages/happy-wire/src/claudeControlRpc.ts`
 CLI handlers: `packages/happy-cli/src/claude/rpc/claudeControlHandlers.ts`
 App client:   `packages/happy-app/sources/sync/apiClaudeControl.ts`
 
+> See ADR-0018.
+
 ### Tier 1 — plaintext content
 
 Payloads never carry user source, paths, or credentials. If the E2E layer
@@ -300,6 +304,8 @@ App responsibilities for Tier 3:
 3. Persist audit-visible records of confirmed MCP tool invocations on the App
    side in addition to the CLI audit log.
 
+> See ADR-0019.
+
 ### What is still server-observable (out of E2E scope)
 
 The RPC `method` names themselves (e.g., `claude-control:mcp_call`) are
@@ -313,6 +319,8 @@ Rate limits per method (when enabled) also operate on the plaintext method
 name and must be configured explicitly — recommended limits noted in the CLI
 security-review report: `read_file` 20/min/user, `file_suggestions`
 60/min/user, `mcp_call` 10/min/user.
+
+> See ADR-0021.
 
 ## On-wire formats (encrypted fields)
 

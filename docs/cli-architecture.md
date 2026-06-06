@@ -388,6 +388,8 @@ RPC is used to send commands over the Socket.IO connection:
 
 This mechanism allows the server and mobile clients to drive local actions without exposing a broad REST surface.
 
+> See ADR-0016.
+
 ## Claude PTY session (Remote mode)
 
 In **Remote mode**, the CLI no longer drives Claude through the Agent SDK's

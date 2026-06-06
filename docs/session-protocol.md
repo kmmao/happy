@@ -27,6 +27,8 @@ The real [Agent Communication Protocol](https://agentcommunicationprotocol.dev) 
 3. **Instant image rendering** — ACP has no thumbhash or dimensions. Our `file` event can carry image metadata for instant placeholder layout.
 4. **Simplicity** — 9 event types total. A client implements the full protocol in a single `switch`.
 
+> See ADR-0014.
+
 **What we take from ACP:**
 
 - Role on the envelope (`user` / `agent`)
@@ -230,7 +232,7 @@ User sending an image file:
 2. **Upload-first** — files are uploaded to the server, then referenced by `ref`
 3. **Every message has identity** — `id` (cuid2) + `time` (ms) on the envelope
 4. **9 event types** — simple `switch(ev.t)` in any client
-5. **Provider-agnostic** — no agent backend leaks into the protocol
+5. **Provider-agnostic** — no agent backend leaks into the protocol → see ADR-0015
 6. **Consistent naming** — all `kebab-case`, no mixed conventions
 7. **Inline markdown** — `title` and `description` support `` `code` ``, **bold**, *italic*, [links]
 

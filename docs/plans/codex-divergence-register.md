@@ -5,8 +5,8 @@
 - Drafted on 2026-04-21
 - Purpose: PR-1C deliverable
 - Related docs:
-  - `docs/plans/codex-upstream-alignment-roadmap.md`
-  - `docs/plans/codex-upstream-alignment-matrix.md`
+  - `docs/archive/plans/codex-upstream-alignment-roadmap.md`
+  - `docs/archive/plans/codex-upstream-alignment-matrix.md`
 
 ## Scope
 
