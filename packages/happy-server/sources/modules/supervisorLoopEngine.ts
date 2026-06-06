@@ -34,6 +34,13 @@ export interface LoopConfig {
     autoApproveThreshold: number;
     maxConsecutiveFailures?: number;
     maxDurationMinutes?: number;
+    /**
+     * ADR-0022 C-1 — number of consecutive iterations with zero approvable
+     * actions required before exiting with `goal_achieved`. When unset,
+     * startLoop defaults to 2; setting to 1 reverts to legacy `no_new_actions`
+     * single-iteration semantics.
+     */
+    emptyIterationsToConfirm?: number;
     runtimeProfile?: ResolvedRuntimeProfile;
 }
 
@@ -42,6 +49,7 @@ export type LoopExitReason =
     | "cost_cap"
     | "health_target"
     | "no_new_actions"
+    | "goal_achieved"
     | "consecutive_failures"
     | "user_stopped"
     | "timeout";
@@ -191,6 +199,10 @@ export async function startLoop(
                 autoApproveThreshold: config.autoApproveThreshold,
                 maxConsecutiveFailures: config.maxConsecutiveFailures ?? 2,
                 maxDurationMinutes: config.maxDurationMinutes ?? 240,
+                // ADR-0022 C-1: new loops require a confirmation iteration by
+                // default (single empty pass is too noisy). Callers can opt
+                // back to legacy single-iteration exit by passing 1.
+                emptyIterationsToConfirm: config.emptyIterationsToConfirm ?? 2,
                 profileId: config.runtimeProfile?.profileId ?? null,
                 runtimeProfile: config.runtimeProfile ?? undefined,
             },
@@ -574,9 +586,43 @@ async function decideNextStep(
     });
 
     if (approvableActions.length === 0) {
-        // Nothing to fix — check exit conditions and complete
+        // ADR-0022 C-1: a single empty analysis can be a false negative. Wait
+        // for N consecutive empties (configured via emptyIterationsToConfirm)
+        // before declaring convergence. Numeric exit conditions (cost cap,
+        // iteration limit, timeout, etc.) still take precedence so the loop
+        // never spends more cycles confirming than the user authorised.
+        const threshold = loop.emptyIterationsToConfirm;
+        const nextEmptyCount = loop.consecutiveEmptyIterations + 1;
+
+        if (nextEmptyCount >= threshold) {
+            const exitCheck = checkExitConditions(loop);
+            const confirmedReason: LoopExitReason = threshold > 1
+                ? "goal_achieved"   // multi-iteration confirmed → semantic exit
+                : "no_new_actions"; // threshold == 1 → legacy single-pass exit
+            await completeLoop(
+                userId,
+                loop,
+                exitCheck.shouldExit ? exitCheck.reason! : confirmedReason,
+            );
+            return;
+        }
+
+        // Below threshold — record the empty pass and either schedule another
+        // analysis OR exit if a numeric limit just fired.
+        await db.agentLoop.updateMany({
+            where: { id: loop.id, role: "supervisor", status: "running" },
+            data: { consecutiveEmptyIterations: nextEmptyCount },
+        });
+
         const exitCheck = checkExitConditions(loop);
-        await completeLoop(userId, loop, exitCheck.shouldExit ? exitCheck.reason! : "no_new_actions");
+        if (exitCheck.shouldExit) {
+            await completeLoop(userId, loop, exitCheck.reason!);
+            return;
+        }
+
+        // Refetch so triggerNextAnalysis sees the updated counter.
+        const refreshed = await db.agentLoop.findUnique({ where: { id: loop.id } });
+        if (refreshed) await triggerNextAnalysis(userId, projectId, refreshed);
         return;
     }
 
@@ -595,6 +641,10 @@ async function decideNextStep(
         where: { id: loop.id, role: "supervisor", status: "running" },
         data: {
             currentPhase: "fixing",
+            // Productive iteration → reset the C-1 empty-streak counter so a
+            // run that only had stale findings doesn't "carry over" toward the
+            // goal_achieved threshold.
+            consecutiveEmptyIterations: 0,
             totalActionsFound: { increment: approvableActions.length },
         },
     });

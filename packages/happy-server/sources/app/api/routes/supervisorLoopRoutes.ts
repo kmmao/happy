@@ -30,6 +30,10 @@ export function supervisorLoopRoutes(app: Fastify) {
                     autoApproveThreshold: z.number().int().min(50).max(100).default(80),
                     maxConsecutiveFailures: z.number().int().min(1).max(10).default(2),
                     maxDurationMinutes: z.number().int().min(10).max(480).default(240),
+                    // ADR-0022 C-1: N consecutive empty iterations → goal_achieved.
+                    // 1 keeps legacy single-iteration `no_new_actions` exit;
+                    // 2 is the recommended default for new loops.
+                    emptyIterationsToConfirm: z.number().int().min(1).max(5).optional(),
                     profileId: z.string().optional(),
                     runtimeProfile: ResolvedRuntimeProfileSchema.optional(),
                 }),

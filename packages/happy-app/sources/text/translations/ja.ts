@@ -4102,6 +4102,7 @@ export const ja: TranslationStructure = {
     loopExit_cost_cap: "コスト上限に到達",
     loopExit_health_target: "ヘルス目標に到達",
     loopExit_no_new_actions: "修正すべき問題がありません",
+    loopExit_goal_achieved: "目標達成 — 連続して問題なし",
     loopExit_consecutive_failures: "連続失敗が多すぎます",
     loopExit_user_stopped: "ユーザーにより停止",
     loopExit_timeout: "タイムアウト",

@@ -4148,6 +4148,7 @@ export const ru: TranslationStructure = {
     loopExit_cost_cap: "Достигнут лимит стоимости",
     loopExit_health_target: "Достигнута цель здоровья",
     loopExit_no_new_actions: "Больше нет проблем для исправления",
+    loopExit_goal_achieved: "Цель достигнута — несколько подряд чистых проходов",
     loopExit_consecutive_failures: "Слишком много последовательных ошибок",
     loopExit_user_stopped: "Остановлено пользователем",
     loopExit_timeout: "Время истекло",

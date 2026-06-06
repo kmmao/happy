@@ -584,6 +584,15 @@ model AgentLoop {
     totalActionsFixed       Int       @default(0)
     consecutiveFailures     Int       @default(0)
 
+    // ── ADR-0022 C-1 — semantic convergence ──
+    // Number of consecutive iterations with zero approvable actions required
+    // before the loop exits with `goal_achieved`. Default 1 preserves the
+    // legacy `no_new_actions` semantic for in-flight rows; new loops created
+    // via startLoop pick a higher value (today: 2) so single-iteration false
+    // negatives don't end runs prematurely.
+    emptyIterationsToConfirm   Int       @default(1)
+    consecutiveEmptyIterations Int       @default(0)
+
     // Health score snapshots
     initialHealthScore      Int?
     currentHealthScore      Int?

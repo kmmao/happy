@@ -4023,6 +4023,7 @@ export const zhHans: TranslationStructure = {
     loopExit_cost_cap: "已达费用上限",
     loopExit_health_target: "已达健康度目标",
     loopExit_no_new_actions: "没有更多问题需要修复",
+    loopExit_goal_achieved: "目标已达成 — 连续多轮无新问题",
     loopExit_consecutive_failures: "连续失败次数过多",
     loopExit_user_stopped: "被用户停止",
     loopExit_timeout: "已超时",

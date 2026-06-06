@@ -4150,6 +4150,7 @@ export const pl: TranslationStructure = {
     loopExit_cost_cap: "Osiągnięto limit kosztów",
     loopExit_health_target: "Osiągnięto cel zdrowia",
     loopExit_no_new_actions: "Brak kolejnych problemów do naprawy",
+    loopExit_goal_achieved: "Cel osiągnięty — kolejne czyste przejścia",
     loopExit_consecutive_failures: "Zbyt wiele kolejnych niepowodzeń",
     loopExit_user_stopped: "Zatrzymano przez użytkownika",
     loopExit_timeout: "Przekroczono limit czasu",

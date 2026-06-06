@@ -40,6 +40,26 @@ function makeLoop(overrides: Partial<AgentLoop>): AgentLoop {
     return { ...base, ...overrides } as AgentLoop;
 }
 
+describe("goal_achieved exit reason (ADR-0022 C-1)", () => {
+    it("flows through the brief snapshot unchanged", () => {
+        const brief = buildSupervisorLoopBrief(
+            makeLoop({ exitReason: "goal_achieved", status: "completed" }),
+        );
+        expect(brief.exitReason).toBe("goal_achieved");
+    });
+
+    it("appears in the summary tail when set", () => {
+        const brief = buildSupervisorLoopBrief(
+            makeLoop({
+                exitReason: "goal_achieved",
+                totalActionsFound: 12,
+                totalActionsFixed: 12,
+            }),
+        );
+        expect(brief.summary).toContain("goal_achieved");
+    });
+});
+
 describe("buildSupervisorLoopBrief", () => {
     it("preserves DB fields verbatim on the snapshot", () => {
         const loop = makeLoop({

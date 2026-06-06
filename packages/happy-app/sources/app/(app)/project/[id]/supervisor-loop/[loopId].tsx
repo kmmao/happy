@@ -92,6 +92,7 @@ const exitReasonLabels: Record<string, () => string> = {
     cost_cap: () => t("supervisor.loopExit_cost_cap"),
     health_target: () => t("supervisor.loopExit_health_target"),
     no_new_actions: () => t("supervisor.loopExit_no_new_actions"),
+    goal_achieved: () => t("supervisor.loopExit_goal_achieved"),
     consecutive_failures: () => t("supervisor.loopExit_consecutive_failures"),
     user_stopped: () => t("supervisor.loopExit_user_stopped"),
     timeout: () => t("supervisor.loopExit_timeout"),

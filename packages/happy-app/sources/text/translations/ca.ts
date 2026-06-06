@@ -4134,6 +4134,7 @@ export const ca: TranslationStructure = {
     loopExit_cost_cap: "S'ha assolit el límit de cost",
     loopExit_health_target: "S'ha assolit l'objectiu de salut",
     loopExit_no_new_actions: "No hi ha més problemes per corregir",
+    loopExit_goal_achieved: "Objectiu assolit — passades netes consecutives",
     loopExit_consecutive_failures: "Massa fallades consecutives",
     loopExit_user_stopped: "Aturat per l'usuari",
     loopExit_timeout: "Temps esgotat",

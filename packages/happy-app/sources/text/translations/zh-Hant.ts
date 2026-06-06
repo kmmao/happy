@@ -4029,6 +4029,7 @@ export const zhHant: TranslationStructure = {
     loopExit_cost_cap: "已達費用上限",
     loopExit_health_target: "已達健康度目標",
     loopExit_no_new_actions: "沒有更多問題需要修復",
+    loopExit_goal_achieved: "目標已達成 — 連續多輪無新問題",
     loopExit_consecutive_failures: "連續失敗次數過多",
     loopExit_user_stopped: "被使用者停止",
     loopExit_timeout: "已逾時",
