@@ -3972,6 +3972,7 @@ export const ja: TranslationStructure = {
     autoLoopResetMessage: "このプロジェクトのクールダウンクロックをクリアします。次の適格なラン完了で即座に自動 Loop が発火可能になります。",
     autoLoopResetConfirm: "リセット",
     autoLoopResetDone: "自動 Loop クールダウンをリセットしました",
+    autoLoopFiredToast: ({ healthScore, threshold }: { healthScore: number; threshold: number }) => `自動 Loop 起動 — healthScore ${healthScore} ≥ しきい値 ${threshold}`,
 
     fixStrategySection: "修正戦略",
     fixStrategyDirect: "直接マージ",

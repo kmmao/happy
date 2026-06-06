@@ -276,6 +276,13 @@ class Sync {
     costCapUsd: number | null;
     summary: string;
   }) => void>();
+  private autoLoopFiredListeners = new Set<(event: {
+    projectId: string;
+    loopId: string;
+    healthScore: number;
+    threshold: number;
+    firedAt: number;
+  }) => void>();
   private inboxNewItemListeners = new Set<(item: {
     id: string;
     category: string;
@@ -2327,6 +2334,7 @@ class Sync {
       taskStatusListeners: this.taskStatusListeners,
       supervisorLoopStatusListeners: this.supervisorLoopStatusListeners,
       supervisorLoopBriefListeners: this.supervisorLoopBriefListeners,
+      autoLoopFiredListeners: this.autoLoopFiredListeners,
       inboxNewItemListeners: this.inboxNewItemListeners,
       inboxUnreadCountListeners: this.inboxUnreadCountListeners,
       sessionEventCreatedListeners: this.sessionEventCreatedListeners,
@@ -2479,6 +2487,19 @@ class Sync {
   }) => void): () => void {
     this.supervisorLoopBriefListeners.add(listener);
     return () => { this.supervisorLoopBriefListeners.delete(listener); };
+  }
+
+  // --- D-1 auto-loop-fired (one-shot when the system auto-starts a loop) ---
+
+  onAutoLoopFired(listener: (event: {
+    projectId: string;
+    loopId: string;
+    healthScore: number;
+    threshold: number;
+    firedAt: number;
+  }) => void): () => void {
+    this.autoLoopFiredListeners.add(listener);
+    return () => { this.autoLoopFiredListeners.delete(listener); };
   }
 
   // --- Task log streaming subscription ---

@@ -3897,6 +3897,7 @@ export const zhHant: TranslationStructure = {
     autoLoopResetMessage: "清空本專案的冷卻時鐘。下一次合格的執行完成將立即觸發自動起 Loop。",
     autoLoopResetConfirm: "重設",
     autoLoopResetDone: "自動起 Loop 冷卻已重設",
+    autoLoopFiredToast: ({ healthScore, threshold }: { healthScore: number; threshold: number }) => `已自動起 Loop — healthScore ${healthScore} ≥ 閾值 ${threshold}`,
 
     fixStrategySection: "修復策略",
     fixStrategyDirect: "直接合併",

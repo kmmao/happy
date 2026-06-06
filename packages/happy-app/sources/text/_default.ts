@@ -4040,6 +4040,7 @@ export const en = {
     autoLoopResetMessage: "Clears the cooldown clock for this project. The next eligible run completion can fire an auto-loop immediately.",
     autoLoopResetConfirm: "Reset",
     autoLoopResetDone: "Auto-loop cooldown reset",
+    autoLoopFiredToast: ({ healthScore, threshold }: { healthScore: number; threshold: number }) => `Auto-loop started — healthScore ${healthScore} ≥ threshold ${threshold}`,
 
     // Settings: Fix strategy
     fixStrategySection: "Fix Strategy",

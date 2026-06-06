@@ -16,6 +16,10 @@
 import { db } from "@/storage/db";
 import { log } from "@/utils/log";
 import { startLoop } from "@/modules/supervisorLoopEngine";
+import {
+    eventRouter,
+    buildAutoLoopFiredEphemeral,
+} from "@/app/events/eventRouter";
 
 /**
  * Default debounce between auto-starts on the same project — 24h, matching
@@ -146,10 +150,28 @@ export async function maybeAutoStartLoop(opts: {
             return { fire: false, reason: "disabled" };
         }
 
+        const firedAt = opts.now ?? Date.now();
+
+        // Emit a real-time event so the App can surface a "system just spawned
+        // a loop on your behalf" toast. Done BEFORE stamping the debounce
+        // clock so a subsequent crash leaves no silent fire — the user always
+        // sees the event for any loop that actually started.
+        eventRouter.emitEphemeral({
+            userId: opts.userId,
+            payload: buildAutoLoopFiredEphemeral({
+                projectId: opts.projectId,
+                loopId: result.loopId,
+                healthScore: opts.healthScore!, // non-null guaranteed by decideAutoLoop guard
+                threshold: project.autoLoopHealthThreshold!,
+                firedAt,
+            }),
+            recipientFilter: { type: "user-scoped-only" },
+        });
+
         // Stamp debounce only after a successful start.
         await db.project.update({
             where: { id: opts.projectId },
-            data: { lastAutoLoopStartedAt: new Date(opts.now ?? Date.now()) },
+            data: { lastAutoLoopStartedAt: new Date(firedAt) },
         });
 
         log(

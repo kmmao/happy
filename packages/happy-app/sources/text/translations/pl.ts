@@ -4020,6 +4020,7 @@ export const pl: TranslationStructure = {
     autoLoopResetMessage: "Czyści zegar chłodzenia dla tego projektu. Następne kwalifikujące się zakończenie może natychmiast uruchomić auto-pętlę.",
     autoLoopResetConfirm: "Zresetuj",
     autoLoopResetDone: "Chłodzenie auto-pętli zresetowane",
+    autoLoopFiredToast: ({ healthScore, threshold }: { healthScore: number; threshold: number }) => `Auto-pętla uruchomiona — healthScore ${healthScore} ≥ próg ${threshold}`,
 
     fixStrategySection: "Strategia napraw",
     fixStrategyDirect: "Bezpośrednie scalanie",

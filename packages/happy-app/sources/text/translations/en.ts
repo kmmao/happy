@@ -3993,6 +3993,7 @@ export const en: TranslationStructure = {
     autoLoopResetMessage: "Clears the cooldown clock for this project. The next eligible run completion can fire an auto-loop immediately.",
     autoLoopResetConfirm: "Reset",
     autoLoopResetDone: "Auto-loop cooldown reset",
+    autoLoopFiredToast: ({ healthScore, threshold }: { healthScore: number; threshold: number }) => `Auto-loop started — healthScore ${healthScore} ≥ threshold ${threshold}`,
 
     fixStrategySection: "Fix Strategy",
     fixStrategyDirect: "Direct Merge",

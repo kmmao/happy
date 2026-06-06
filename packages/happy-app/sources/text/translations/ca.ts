@@ -4004,6 +4004,7 @@ export const ca: TranslationStructure = {
     autoLoopResetMessage: "Esborra el rellotge de refredament d'aquest projecte. La propera finalització elegible pot activar l'auto-loop immediatament.",
     autoLoopResetConfirm: "Reiniciar",
     autoLoopResetDone: "Refredament de l'auto-loop reiniciat",
+    autoLoopFiredToast: ({ healthScore, threshold }: { healthScore: number; threshold: number }) => `Auto-loop iniciat — healthScore ${healthScore} ≥ llindar ${threshold}`,
 
     fixStrategySection: "Estratègia de correcció",
     fixStrategyDirect: "Fusió directa",

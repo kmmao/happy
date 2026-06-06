@@ -327,6 +327,22 @@ export const ApiEphemeralSupervisorLoopStatusSchema = z.object({
 // Supervisor-role loop brief, fired once on loop completion (ADR-0022).
 // Distinct from `supervisor-loop-status` so the "completed" event is easy
 // to subscribe to without filtering every iteration tick.
+// ADR-0022 D-1 — fired on the autonomy server side when a standalone run
+// completion crossed the project's healthScore threshold and a loop was
+// auto-started. App-side toast lives in supervisor-settings.tsx for now;
+// a global subscriber + inbox entry are a follow-up.
+export const ApiEphemeralAutoLoopFiredSchema = z.object({
+  type: z.literal("auto-loop-fired"),
+  projectId: z.string(),
+  loopId: z.string(),
+  healthScore: z.number(),
+  threshold: z.number(),
+  firedAt: z.number(),
+});
+export type ApiEphemeralAutoLoopFired = z.infer<
+  typeof ApiEphemeralAutoLoopFiredSchema
+>;
+
 export const ApiEphemeralSupervisorLoopBriefSchema = z.object({
   type: z.literal("supervisor-loop-brief"),
   loopId: z.string(),
@@ -465,6 +481,7 @@ export const ApiEphemeralUpdateSchema = z.union([
   ApiEphemeralSupervisorStatusSchema,
   ApiEphemeralSupervisorLoopStatusSchema,
   ApiEphemeralSupervisorLoopBriefSchema,
+  ApiEphemeralAutoLoopFiredSchema,
   ApiEphemeralKnowledgeCountSchema,
   ApiEphemeralKnowledgeAccessUpdateSchema,
   ApiEphemeralTaskLogSchema,

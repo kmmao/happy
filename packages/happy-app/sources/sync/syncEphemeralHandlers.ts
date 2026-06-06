@@ -76,6 +76,14 @@ type SupervisorLoopBriefListener = (event: {
   summary: string;
 }) => void;
 
+type AutoLoopFiredListener = (event: {
+  projectId: string;
+  loopId: string;
+  healthScore: number;
+  threshold: number;
+  firedAt: number;
+}) => void;
+
 type InboxNewItemListener = (item: {
   id: string;
   category: string;
@@ -122,6 +130,7 @@ export type EphemeralHandlerContext = {
   taskStatusListeners: Set<TaskStatusListener>;
   supervisorLoopStatusListeners: Set<SupervisorLoopStatusListener>;
   supervisorLoopBriefListeners: Set<SupervisorLoopBriefListener>;
+  autoLoopFiredListeners: Set<AutoLoopFiredListener>;
   inboxNewItemListeners: Set<InboxNewItemListener>;
   inboxUnreadCountListeners: Set<(count: number) => void>;
   sessionEventCreatedListeners: Set<SessionEventCreatedListener>;
@@ -388,6 +397,20 @@ export function handleEphemeralUpdateAction(
     };
     for (const listener of ctx.supervisorLoopStatusListeners) {
       listener(loopEvent);
+    }
+  }
+
+  // Handle auto-loop-fired (ADR-0022 D-1 — system auto-started a loop)
+  if (updateData.type === "auto-loop-fired") {
+    const event = {
+      projectId: updateData.projectId,
+      loopId: updateData.loopId,
+      healthScore: updateData.healthScore,
+      threshold: updateData.threshold,
+      firedAt: updateData.firedAt,
+    };
+    for (const listener of ctx.autoLoopFiredListeners) {
+      listener(event);
     }
   }
 

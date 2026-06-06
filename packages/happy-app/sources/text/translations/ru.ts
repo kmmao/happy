@@ -4018,6 +4018,7 @@ export const ru: TranslationStructure = {
     autoLoopResetMessage: "Очищает часы остывания для этого проекта. Следующее подходящее завершение запустит авто-цикл немедленно.",
     autoLoopResetConfirm: "Сбросить",
     autoLoopResetDone: "Остывание авто-цикла сброшено",
+    autoLoopFiredToast: ({ healthScore, threshold }: { healthScore: number; threshold: number }) => `Авто-цикл запущен — healthScore ${healthScore} ≥ порог ${threshold}`,
 
     fixStrategySection: "Стратегия исправлений",
     fixStrategyDirect: "Прямое слияние",

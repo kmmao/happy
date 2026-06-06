@@ -361,6 +361,14 @@ export type EphemeralEvent =
       summary: string;
     }
   | {
+      type: "auto-loop-fired";
+      projectId: string;
+      loopId: string;
+      healthScore: number;
+      threshold: number;
+      firedAt: number;
+    }
+  | {
       type: "knowledge-count";
       id: string;
       count: number;
@@ -1283,6 +1291,30 @@ export interface SupervisorLoopBriefOptions {
 export function buildSupervisorLoopBriefEphemeral(opts: SupervisorLoopBriefOptions): EphemeralPayload {
   return {
     type: "supervisor-loop-brief",
+    ...opts,
+  };
+}
+
+export interface AutoLoopFiredOptions {
+  projectId: string;
+  loopId: string;
+  healthScore: number;
+  threshold: number;
+  firedAt: number;
+}
+
+/**
+ * Ephemeral emitted when D-1 (autonomous loop discovery, per ADR-0022) fires
+ * — i.e. a standalone SupervisorRun completion crossed the project's
+ * configured threshold and we just started a supervisor-role AgentLoop on
+ * the user's behalf. Lets the App surface a real-time toast so the user
+ * knows the system acted, instead of having to discover the new loop on
+ * their next visit. Separate from `supervisor-loop-brief` because that fires
+ * at completion (the other end of the lifecycle).
+ */
+export function buildAutoLoopFiredEphemeral(opts: AutoLoopFiredOptions): EphemeralPayload {
+  return {
+    type: "auto-loop-fired",
     ...opts,
   };
 }

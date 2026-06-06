@@ -270,6 +270,25 @@ function SupervisorSettingsScreen() {
         setInitialAutoLoopDebounceHours(hours);
     }, [project?.autoLoopDebounceMinutes]);
 
+    // ADR-0022 D-1 — surface a toast when the server just auto-spawned a loop
+    // on this project. The settings page is the natural place to subscribe
+    // because it's where the user configured the threshold; if they're on
+    // another screen they'll still see the new loop on their next visit, plus
+    // the brief push when it completes.
+    React.useEffect(() => {
+        const serverId = project?.serverId;
+        if (!serverId) return;
+        return sync.onAutoLoopFired((event) => {
+            if (event.projectId !== serverId) return;
+            Modal.toast(
+                t("supervisor.autoLoopFiredToast", {
+                    healthScore: event.healthScore,
+                    threshold: event.threshold,
+                }),
+            );
+        });
+    }, [project?.serverId]);
+
     const isDirty = React.useMemo(
         () =>
             JSON.stringify(config) !== JSON.stringify(initialConfig) ||

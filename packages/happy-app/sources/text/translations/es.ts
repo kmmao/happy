@@ -3999,6 +3999,7 @@ export const es: TranslationStructure = {
     autoLoopResetMessage: "Borra el reloj de enfriamiento de este proyecto. La próxima finalización elegible puede activar auto-loop inmediatamente.",
     autoLoopResetConfirm: "Reiniciar",
     autoLoopResetDone: "Enfriamiento de auto-loop reiniciado",
+    autoLoopFiredToast: ({ healthScore, threshold }: { healthScore: number; threshold: number }) => `Auto-loop iniciado — healthScore ${healthScore} ≥ umbral ${threshold}`,
 
     fixStrategySection: "Estrategia de corrección",
     fixStrategyDirect: "Fusión directa",
