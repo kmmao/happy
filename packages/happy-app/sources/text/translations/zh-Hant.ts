@@ -4037,6 +4037,9 @@ export const zhHant: TranslationStructure = {
     loopDetailActions: ({ count }: { count: number }) => `操作 (${count})`,
     loopDetailNoRuns: "暫無迭代記錄",
     loopDetailNoActions: "暫無操作記錄",
+    loopBriefTitle: "最新簡報",
+    loopBriefHeader: ({ completedAt }: { completedAt: string }) => `迴圈已完成${completedAt ? ` · ${completedAt}` : ""}`,
+    loopBriefHint: "根據本次迴圈退出狀態自動產生的摘要。",
     loadRunError: "載入運行詳情失敗",
     loadLoopError: "載入循環詳情失敗",
 

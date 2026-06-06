@@ -4156,6 +4156,9 @@ export const ru: TranslationStructure = {
     loopDetailActions: ({ count }: { count: number }) => `Действия (${count})`,
     loopDetailNoRuns: "Итераций пока нет",
     loopDetailNoActions: "Действий пока нет",
+    loopBriefTitle: "Последняя сводка",
+    loopBriefHeader: ({ completedAt }: { completedAt: string }) => `Цикл завершён${completedAt ? ` · ${completedAt}` : ""}`,
+    loopBriefHint: "Авто-сводка по состоянию выхода этого цикла.",
     loadRunError: "Не удалось загрузить данные запуска",
     loadLoopError: "Не удалось загрузить данные цикла",
 

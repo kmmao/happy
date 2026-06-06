@@ -4142,6 +4142,9 @@ export const ca: TranslationStructure = {
     loopDetailActions: ({ count }: { count: number }) => `Accions (${count})`,
     loopDetailNoRuns: "Sense iteracions encara",
     loopDetailNoActions: "Sense accions encara",
+    loopBriefTitle: "Resum més recent",
+    loopBriefHeader: ({ completedAt }: { completedAt: string }) => `Bucle completat${completedAt ? ` · ${completedAt}` : ""}`,
+    loopBriefHint: "Resum autogenerat segons l'estat de sortida d'aquest bucle.",
     loadRunError: "No s'han pogut carregar els detalls de l'execució",
     loadLoopError: "No s'han pogut carregar els detalls del bucle",
 

@@ -342,6 +342,25 @@ export type EphemeralEvent =
       consecutiveFailures: number;
     }
   | {
+      type: "supervisor-loop-brief";
+      loopId: string;
+      projectId: string;
+      status: string;
+      exitReason: string | null;
+      generatedAt: number;
+      currentIteration: number;
+      maxIterations: number;
+      initialHealthScore: number | null;
+      currentHealthScore: number | null;
+      healthDelta: number | null;
+      totalActionsFound: number;
+      totalActionsFixed: number;
+      consecutiveFailures: number;
+      totalCostUsd: number;
+      costCapUsd: number | null;
+      summary: string;
+    }
+  | {
       type: "knowledge-count";
       id: string;
       count: number;
@@ -1230,6 +1249,40 @@ export interface SupervisorLoopStatusOptions {
 export function buildSupervisorLoopStatusEphemeral(opts: SupervisorLoopStatusOptions): EphemeralPayload {
   return {
     type: "supervisor-loop-status",
+    ...opts,
+  };
+}
+
+export interface SupervisorLoopBriefOptions {
+  loopId: string;
+  projectId: string;
+  status: string;
+  exitReason: string | null;
+  generatedAt: number;
+  currentIteration: number;
+  maxIterations: number;
+  initialHealthScore: number | null;
+  currentHealthScore: number | null;
+  healthDelta: number | null;
+  totalActionsFound: number;
+  totalActionsFixed: number;
+  consecutiveFailures: number;
+  totalCostUsd: number;
+  costCapUsd: number | null;
+  summary: string;
+}
+
+/**
+ * Ephemeral payload emitted when a SupervisorLoop completes (per ADR-0022).
+ * The App's loop detail screen consumes this to render the "Latest Brief"
+ * card without an extra HTTP round-trip; future push notifications will
+ * read `summary` as the body. Distinct from `supervisor-loop-status` so
+ * subscribers can opt into completion notifications without firehose
+ * filtering on every iteration.
+ */
+export function buildSupervisorLoopBriefEphemeral(opts: SupervisorLoopBriefOptions): EphemeralPayload {
+  return {
+    type: "supervisor-loop-brief",
     ...opts,
   };
 }

@@ -467,7 +467,7 @@ model Project {
     // Relations
     sessions              Session[]
     supervisorRuns        SupervisorRun[]
-    supervisorLoops       SupervisorLoop[]
+    agentLoops            AgentLoop[]
     supervisorDimensions  SupervisorDimension[]
     knowledgeEntries      ProjectKnowledge[]
     profile               ProjectProfile?
@@ -505,14 +505,65 @@ model SupervisorDimension {
 }
 
 //
-// Supervisor Loops (autopilot mode — iterative analyze → fix → re-analyze cycles)
+// Agent Loops (persistent autonomy primitive — see ADR-0022)
 //
+// Renamed from `SupervisorLoop` in Phase 2 of the AgentLoop convergence. The
+// physical table remains `SupervisorLoop` (via @@map) so existing rows and
+// foreign keys don't move — Phase 4 will drop the @@map and rename the DB
+// table once CLI-side AgentLoops also land here.
+//
+// The `role` discriminator partitions rows by behaviour:
+//   - "supervisor": today's autopilot — analyze → fix → re-analyze, exits on
+//                   max_iterations / cost_cap / health_target / etc., produces
+//                   SupervisorRun + SupervisorAction.
+//   - "generic":    reserved for Phase 3 — CLI-side AgentLoop definitions
+//                   (goal-driven, working memory, downstream cascade).
+// Existing rows get role='supervisor' from the column default so no data
+// migration is needed; new supervisor mutations filter by role='supervisor'
+// as a defence in depth against accidental cross-role writes.
 
-model SupervisorLoop {
+model AgentLoop {
     id                      String    @id @default(cuid())
     projectId               String
     project                 Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
     accountId               String
+
+    // ADR-0022 role discriminator. Default 'supervisor' backfills existing
+    // SupervisorLoop rows in place; generic-role rows land here in Phase 3.
+    role                    String    @default("supervisor")  // supervisor | generic
+
+    // ── Phase 3a generic-role configuration (ADR-0022) ──
+    // These columns are only populated for role='generic' rows. They mirror
+    // the CLI-side AgentLoopDefinition (packages/happy-cli/.../AgentLoopStore.ts).
+    // Supervisor-role rows leave them NULL. Phase 3b will land the CLI
+    // pipeline that reads them on daemon boot.
+
+    // Identity
+    prompt                  String?                              // The persistent goal prompt the agent re-issues each iteration
+    directory               String?                              // Working directory on the machine
+    agent                   String?                              // "claude" | "codex" | "gemini"
+
+    // Scheduling
+    intervalMs              Int?                                 // Inter-iteration interval (ms); cron expression takes precedence when set
+    cronExpression          String?                              // Optional cron — if present, server scheduler computes nextRunAt
+    enabled                 Boolean   @default(true)             // Pauseable without changing status; status is the state-machine, enabled is the user toggle
+    nextRunAt               BigInt?                              // Server-computed; epoch ms — queried by scheduler to know when to fire
+
+    // Continuity (lets the daemon re-attach to a long-lived session across restarts)
+    continuityKey           String?                              // Stable identifier — agent-loop:<id> by convention
+    iteration               Int       @default(0)                // Generic-role iteration counter (independent of currentIteration which is supervisor-only)
+
+    // Long-tail config bag. Holds the fields that are arrays / nested
+    // objects / rarely-queried scalars: environmentVariables, file/github/ci
+    // bridge toggles, eventSourceAllowlist, eventKeywordFilters, goal,
+    // currentFocus, lastReflectionSummary, quietHoursStart/End,
+    // maxAutoRunsPerDay, maxConsecutiveFailures, retryBackoffMs, cooldownMs,
+    // stopOnSuccess, downstreamLoopIds, downstreamTriggerOn, notifyEvents,
+    // notificationChannels, notificationWebhookUrl, maxUsdPerRun, maxUsdPerDay,
+    // and the CLI-side agent role triplet (roleId/roleName/roleType). Phase 3b
+    // / Phase 4 will promote frequently-queried fields out to typed columns
+    // as access patterns crystallise.
+    genericConfig           Json?                                // see comment above
 
     // State machine
     status                  String    @default("running")   // running | paused | completed | failed | stopped
@@ -560,6 +611,13 @@ model SupervisorLoop {
     @@index([projectId])
     @@index([projectId, status])
     @@index([accountId, status])
+    @@index([role, status])
+    // Phase 3a — generic-role scheduler needs to find "enabled loops whose
+    // nextRunAt is in the past" cheaply across all accounts. Composite over
+    // (role, enabled, nextRunAt) makes that a single index scan.
+    @@index([role, enabled, nextRunAt])
+
+    @@map("SupervisorLoop")
 }
 
 //
@@ -599,7 +657,7 @@ model SupervisorRun {
 
     // Loop association (optional — null for standalone runs)
     loopId          String?
-    loop            SupervisorLoop?   @relation(fields: [loopId], references: [id], onDelete: SetNull)
+    loop            AgentLoop?        @relation(fields: [loopId], references: [id], onDelete: SetNull)
     loopIteration   Int?              // Which iteration of the loop this run belongs to
     loopPhase       String?           // "analyzing" | "fixing"
 

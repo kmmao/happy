@@ -4139,6 +4139,9 @@ export const pt: TranslationStructure = {
     loopDetailActions: ({ count }: { count: number }) => `Ações (${count})`,
     loopDetailNoRuns: "Nenhuma iteração ainda",
     loopDetailNoActions: "Nenhuma ação ainda",
+    loopBriefTitle: "Resumo mais recente",
+    loopBriefHeader: ({ completedAt }: { completedAt: string }) => `Ciclo concluído${completedAt ? ` · ${completedAt}` : ""}`,
+    loopBriefHint: "Resumo autogerado a partir do estado de saída deste ciclo.",
     loadRunError: "Falha ao carregar detalhes da execução",
     loadLoopError: "Falha ao carregar detalhes do ciclo",
 

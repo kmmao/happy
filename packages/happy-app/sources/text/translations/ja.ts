@@ -4110,6 +4110,9 @@ export const ja: TranslationStructure = {
     loopDetailActions: ({ count }: { count: number }) => `アクション (${count})`,
     loopDetailNoRuns: "イテレーション記録はありません",
     loopDetailNoActions: "アクション記録はありません",
+    loopBriefTitle: "最新のブリーフ",
+    loopBriefHeader: ({ completedAt }: { completedAt: string }) => `ループ完了${completedAt ? ` · ${completedAt}` : ""}`,
+    loopBriefHint: "このループの終了状態から自動生成されたサマリーです。",
     loadRunError: "実行詳細の読み込みに失敗しました",
     loadLoopError: "ループ詳細の読み込みに失敗しました",
 

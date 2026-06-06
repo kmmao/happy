@@ -324,6 +324,32 @@ export const ApiEphemeralSupervisorLoopStatusSchema = z.object({
   consecutiveFailures: z.number(),
 });
 
+// Supervisor-role loop brief, fired once on loop completion (ADR-0022).
+// Distinct from `supervisor-loop-status` so the "completed" event is easy
+// to subscribe to without filtering every iteration tick.
+export const ApiEphemeralSupervisorLoopBriefSchema = z.object({
+  type: z.literal("supervisor-loop-brief"),
+  loopId: z.string(),
+  projectId: z.string(),
+  status: z.string(),
+  exitReason: z.string().nullable(),
+  generatedAt: z.number(),
+  currentIteration: z.number(),
+  maxIterations: z.number(),
+  initialHealthScore: z.number().nullable(),
+  currentHealthScore: z.number().nullable(),
+  healthDelta: z.number().nullable(),
+  totalActionsFound: z.number(),
+  totalActionsFixed: z.number(),
+  consecutiveFailures: z.number(),
+  totalCostUsd: z.number(),
+  costCapUsd: z.number().nullable(),
+  summary: z.string(),
+});
+export type ApiEphemeralSupervisorLoopBrief = z.infer<
+  typeof ApiEphemeralSupervisorLoopBriefSchema
+>;
+
 export const ApiEphemeralKnowledgeCountSchema = z.object({
   type: z.literal("knowledge-count"),
   id: z.string(),  // sessionId
@@ -438,6 +464,7 @@ export const ApiEphemeralUpdateSchema = z.union([
   ApiEphemeralSupervisorTriggerSchema,
   ApiEphemeralSupervisorStatusSchema,
   ApiEphemeralSupervisorLoopStatusSchema,
+  ApiEphemeralSupervisorLoopBriefSchema,
   ApiEphemeralKnowledgeCountSchema,
   ApiEphemeralKnowledgeAccessUpdateSchema,
   ApiEphemeralTaskLogSchema,

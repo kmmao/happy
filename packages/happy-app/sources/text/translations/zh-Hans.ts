@@ -4031,6 +4031,9 @@ export const zhHans: TranslationStructure = {
     loopDetailActions: ({ count }: { count: number }) => `操作 (${count})`,
     loopDetailNoRuns: "暂无迭代记录",
     loopDetailNoActions: "暂无操作记录",
+    loopBriefTitle: "最新简报",
+    loopBriefHeader: ({ completedAt }: { completedAt: string }) => `循环已完成${completedAt ? ` · ${completedAt}` : ""}`,
+    loopBriefHint: "根据本次循环退出状态自动生成的摘要。",
     loadRunError: "加载运行详情失败",
     loadLoopError: "加载循环详情失败",
 

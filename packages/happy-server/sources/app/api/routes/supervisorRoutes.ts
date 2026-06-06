@@ -166,10 +166,11 @@ export function supervisorRoutes(app: Fastify) {
             // Atomic: check for conflicts + find + approve in a single transaction
             const txResult = await db.$transaction(async (tx) => {
                 // Check for active loop
-                const activeLoop = await tx.supervisorLoop.findFirst({
+                const activeLoop = await tx.agentLoop.findFirst({
                     where: {
                         projectId: id,
                         accountId: userId,
+                        role: "supervisor",
                         status: { in: ["running", "paused"] },
                     },
                     select: { id: true },

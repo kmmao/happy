@@ -32,15 +32,19 @@ _Avoid_: Token, secret, credential
 A reusable instruction template (versioned content + optional attachments), global or Project-scoped. Injected into Tasks via TaskSkillBinding to guide AI behavior; injection order matters. Not to be confused with Claude Code agent skills (mattpocock/skills etc.).
 _Avoid_: Prompt template, recipe, plugin
 
+**AgentLoop**:
+The single persistent-autonomy primitive — a long-running agent bound to a Machine + directory (and optionally a Project), executing a goal-driven prompt on cron, file-watch, CI, or webhook triggers, with working memory persisted across iterations, periodic `/brief` reports, Auto-Dream memory consolidation, and optional downstream cascade to other AgentLoops. Carries a `role` discriminator (`generic` or `supervisor`) that selects role-specific config and output shape. Per ADR-0022 SupervisorLoop is now the `role: "supervisor"` variant of AgentLoop; the standalone `SupervisorLoop` Prisma model exists during the migration window only.
+_Avoid_: Supervisor (the role name only — the runtime is AgentLoop), Watcher, Daemon process (Daemon is the host)
+
 **Supervisor**:
-The automated health analysis system for Projects. Not a single entity — an umbrella term for SupervisorRun, SupervisorLoop, and SupervisorAction.
+A `role` on AgentLoop that runs the analyze → fix → re-analyze autopilot on a Project. Not a single entity — an umbrella for the supervisor-role AgentLoop plus its outputs (SupervisorRun, SupervisorAction).
 _Avoid_: Monitor, watcher, analyzer
 
 **SupervisorRun**:
-A single analysis/fix pass on a Project. Produces SupervisorActions (findings) and an optional Artifact (encrypted report). Triggered by schedule, manual request, event, or research.
+A single analysis/fix pass produced by a supervisor-role AgentLoop iteration (or a one-off trigger). Produces SupervisorActions (findings) and an optional Artifact (encrypted report). Triggered by schedule, manual request, event, or research.
 
 **SupervisorLoop**:
-A multi-iteration autopilot: analyze → fix → re-analyze until an exit condition is met (max iterations, cost cap, health target, consecutive failures, user stop, or timeout).
+The legacy name for the supervisor-role AgentLoop. Per ADR-0022, it is being absorbed: new work targets AgentLoop with `role: "supervisor"`; `model SupervisorLoop` survives only as a DB view during the migration. The autopilot semantics (analyze → fix → re-analyze until exit on max iterations, cost cap, health target, consecutive failures, user stop, or timeout) carry over unchanged as supervisor-role config on AgentLoop.
 
 **SupervisorAction**:
 An individual finding from a SupervisorRun — title, description, suggested fix, severity (critical/high/medium/low), category (security/dependencies/architecture/techDebt/codeQuality/testCoverage). Follows an approval workflow: pending → approved/skipped/ignored. Can spawn a fix Session.
@@ -113,13 +117,15 @@ _Avoid_: Profile, backend, config
 - A **Session** contains ordered **SessionMessages** and **SessionEvents**
 - A **Session** is a sequence of **Turns**; a **Turn** contains ordered **SessionEvents** and zero or more concurrent **Subagents**, all bracketed by its turn-start/turn-end pair
 - A **Project** lives on exactly one **Machine** at a specific path
-- A **Project** contains **Knowledge**, **Skills**, **Triggers**, and **SupervisorRuns**
+- A **Project** contains **Knowledge**, **Skills**, **Triggers**, **AgentLoops**, and **SupervisorRuns**
 - A **Task** is dispatched to a **Machine**, optionally within a **Project** context
 - A **Task** can be created by an **Account** (manual), a **TriggerSchedule**, or a **WebhookTrigger**
 - A **Task** binds one or more **Skills** via TaskSkillBinding (ordered)
 - A **Task** can nest — a parent **Task** decomposes into child **Tasks** (Steps)
-- A **SupervisorRun** belongs to a **Project** and produces **SupervisorActions**
-- A **SupervisorLoop** orchestrates multiple **SupervisorRuns** on the same **Project**
+- An **AgentLoop** is bound to a **Machine** and a directory, optionally scoped to a **Project**; it carries a `role` (`generic` or `supervisor`)
+- An **AgentLoop** with `role: "supervisor"` produces **SupervisorRuns** (the legacy **SupervisorLoop** is this case)
+- An **AgentLoop** can cascade — completing or failing triggers downstream **AgentLoops** via `downstreamLoopIds`
+- A **SupervisorRun** belongs to a **Project** and produces **SupervisorActions**; if it was produced inside an AgentLoop iteration, it also belongs to that **AgentLoop**
 - A **SupervisorAction** can spawn a fix **Session**
 - **Knowledge** entries relate to each other via KnowledgeRelation (related/contradicts/refines/combines)
 - A **Trigger** belongs to a **Project** and references an **AiBackendProfile**
@@ -142,8 +148,9 @@ _Avoid_: Profile, backend, config
 - "Skill" in Happy means a reusable instruction template for Tasks — not a Claude Code agent skill (mattpocock/skills).
 - "Artifact" in Happy means an encrypted data container — not a Claude.ai conversation artifact.
 - "Task" strictly means an automated work unit — not a UI todo/checklist item.
-- **PreviewTunnel** publicUrl is same-origin with the Server (`/preview/{tunnelId}`). The tunnelId (12-char random) is the sole authentication — no cookie/JWT check. Acceptable because: Server auth uses Bearer tokens (no cookies at risk), tunnelId has ~62 bits entropy, and tunnels are short-lived (8h max). If cookie-based auth is ever added, revisit with subdomain isolation.
+- **PreviewTunnel** authenticates browser access by tunnelId only — see ADR-0010.
 - Code uses `PreviewConnection` / `preview-connection-updated` but the canonical domain term is **PreviewTunnel**. The wire schemas are already published under the old name; align in a future breaking version bump.
-- **Preview** traffic (HTML, JS, CSS, images) flows through the Server in plaintext — it is **not** E2E encrypted. The Server can see the full content of previewed pages. This is an inherent limitation of the HTTP proxy architecture (the browser needs valid HTTP, not ciphertext). All other Session content (SessionMessages, SessionEvents, DaemonState) remains E2E encrypted.
-- **VisualAnnotation** data travels as a markdown **SessionMessage** with an embedded fenced JSON block (`visual-annotation`), not as a structured inputBlock or session protocol field. This is a drift from Lody's `visual_annotation_reference` inputBlock model. Acceptable for now because Happy injects messages via PTY (no inputBlock channel); if a structured annotation channel is added later, migrate the format.
+- **AgentLoop ↔ SupervisorLoop** convergence is in flight — see ADR-0022. Phase 2 has landed: `model AgentLoop` is the canonical Prisma model (`@@map("SupervisorLoop")` keeps the physical table name during the migration window), with a `role` discriminator (`supervisor` | `generic`). Every supervisor mutation filters by `role: "supervisor"` defensively. Phase 3a has landed: 10 columns for generic-role configuration (prompt, directory, agent, intervalMs, cronExpression, enabled, nextRunAt, continuityKey, iteration, genericConfig Json) are present but NOT yet populated — the CLI-local `.happy/agent-loops/` pipeline still owns them. Phase 3b (CLI fetches AgentLoop definitions from server on daemon boot) is the next milestone. Until then, treat code that still says "SupervisorLoop" as legacy unless it's inside the supervisor-role specialization (output shape: SupervisorRun + SupervisorAction).
+- **Preview** traffic is not E2E encrypted (HTTP proxy needs plaintext for the browser); all other Session content remains E2E — see ADR-0001 and ADR-0007.
+- **VisualAnnotation** currently travels as a markdown SessionMessage with a fenced JSON block; migrating to `visual_annotation_reference` inputBlock — see ADR-0007.
 

@@ -4136,6 +4136,9 @@ export const it: TranslationStructure = {
     loopDetailActions: ({ count }: { count: number }) => `Azioni (${count})`,
     loopDetailNoRuns: "Nessuna iterazione ancora",
     loopDetailNoActions: "Nessuna azione ancora",
+    loopBriefTitle: "Riepilogo più recente",
+    loopBriefHeader: ({ completedAt }: { completedAt: string }) => `Ciclo completato${completedAt ? ` · ${completedAt}` : ""}`,
+    loopBriefHint: "Riepilogo autogenerato dallo stato di uscita di questo ciclo.",
     loadRunError: "Impossibile caricare i dettagli dell'esecuzione",
     loadLoopError: "Impossibile caricare i dettagli del ciclo",
 

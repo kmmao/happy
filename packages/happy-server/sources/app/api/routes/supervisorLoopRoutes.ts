@@ -66,7 +66,7 @@ export function supervisorLoopRoutes(app: Fastify) {
                 return reply.code(result.code).send({ error: result.error });
             }
 
-            const loop = await db.supervisorLoop.findUnique({
+            const loop = await db.agentLoop.findUnique({
                 where: { id: result.loopId },
             });
 
@@ -87,10 +87,11 @@ export function supervisorLoopRoutes(app: Fastify) {
             const userId = request.userId;
             const { id } = request.params;
 
-            const loop = await db.supervisorLoop.findFirst({
+            const loop = await db.agentLoop.findFirst({
                 where: {
                     projectId: id,
                     accountId: userId,
+                    role: "supervisor",
                     status: { in: ["running", "paused"] },
                 },
             });
@@ -121,16 +122,17 @@ export function supervisorLoopRoutes(app: Fastify) {
             const where = {
                 projectId: id,
                 accountId: userId,
+                role: "supervisor",
             };
 
             const [loops, total] = await Promise.all([
-                db.supervisorLoop.findMany({
+                db.agentLoop.findMany({
                     where,
                     orderBy: { createdAt: "desc" },
                     take: limit,
                     skip: offset,
                 }),
-                db.supervisorLoop.count({ where }),
+                db.agentLoop.count({ where }),
             ]);
 
             return reply.send({
@@ -162,11 +164,12 @@ export function supervisorLoopRoutes(app: Fastify) {
             const runsLimit = request.query?.runsLimit ?? 50;
             const runsOffset = request.query?.runsOffset ?? 0;
 
-            const loop = await db.supervisorLoop.findFirst({
+            const loop = await db.agentLoop.findFirst({
                 where: {
                     id: loopId,
                     projectId: id,
                     accountId: userId,
+                    role: "supervisor",
                 },
             });
 
@@ -246,10 +249,11 @@ export function supervisorLoopRoutes(app: Fastify) {
             const userId = request.userId;
             const { id } = request.params;
 
-            const result = await db.supervisorLoop.deleteMany({
+            const result = await db.agentLoop.deleteMany({
                 where: {
                     projectId: id,
                     accountId: userId,
+                    role: "supervisor",
                     status: { notIn: ["running", "paused"] },
                 },
             });
@@ -274,8 +278,8 @@ export function supervisorLoopRoutes(app: Fastify) {
             const userId = request.userId;
             const { id, loopId } = request.params;
 
-            const loop = await db.supervisorLoop.findFirst({
-                where: { id: loopId, projectId: id, accountId: userId },
+            const loop = await db.agentLoop.findFirst({
+                where: { id: loopId, projectId: id, accountId: userId, role: "supervisor" },
                 select: { status: true },
             });
 
@@ -287,7 +291,7 @@ export function supervisorLoopRoutes(app: Fastify) {
                 return reply.code(409).send({ error: "Cannot delete an active loop. Stop it first." });
             }
 
-            await db.supervisorLoop.delete({ where: { id: loopId } });
+            await db.agentLoop.delete({ where: { id: loopId } });
 
             return reply.send({ deleted: true });
         },
@@ -314,7 +318,7 @@ export function supervisorLoopRoutes(app: Fastify) {
                 return reply.code(404).send({ error: "Active loop not found" });
             }
 
-            const loop = await db.supervisorLoop.findUnique({ where: { id: loopId } });
+            const loop = await db.agentLoop.findUnique({ where: { id: loopId } });
             return reply.send({ loop: loop ? serializeLoop(loop) : { id: loopId } });
         },
     );
@@ -340,7 +344,7 @@ export function supervisorLoopRoutes(app: Fastify) {
                 return reply.code(404).send({ error: "Paused loop not found" });
             }
 
-            const loop = await db.supervisorLoop.findUnique({ where: { id: loopId } });
+            const loop = await db.agentLoop.findUnique({ where: { id: loopId } });
             return reply.send({ loop: loop ? serializeLoop(loop) : { id: loopId } });
         },
     );
@@ -366,7 +370,7 @@ export function supervisorLoopRoutes(app: Fastify) {
                 return reply.code(404).send({ error: "Active loop not found" });
             }
 
-            const loop = await db.supervisorLoop.findUnique({ where: { id: loopId } });
+            const loop = await db.agentLoop.findUnique({ where: { id: loopId } });
             return reply.send({ loop: loop ? serializeLoop(loop) : { id: loopId } });
         },
     );

@@ -258,6 +258,24 @@ class Sync {
     exitReason: string | null;
     consecutiveFailures: number;
   }) => void>();
+  private supervisorLoopBriefListeners = new Set<(event: {
+    loopId: string;
+    projectId: string;
+    status: string;
+    exitReason: string | null;
+    generatedAt: number;
+    currentIteration: number;
+    maxIterations: number;
+    initialHealthScore: number | null;
+    currentHealthScore: number | null;
+    healthDelta: number | null;
+    totalActionsFound: number;
+    totalActionsFixed: number;
+    consecutiveFailures: number;
+    totalCostUsd: number;
+    costCapUsd: number | null;
+    summary: string;
+  }) => void>();
   private inboxNewItemListeners = new Set<(item: {
     id: string;
     category: string;
@@ -2308,6 +2326,7 @@ class Sync {
       taskLogListeners: this.taskLogListeners,
       taskStatusListeners: this.taskStatusListeners,
       supervisorLoopStatusListeners: this.supervisorLoopStatusListeners,
+      supervisorLoopBriefListeners: this.supervisorLoopBriefListeners,
       inboxNewItemListeners: this.inboxNewItemListeners,
       inboxUnreadCountListeners: this.inboxUnreadCountListeners,
       sessionEventCreatedListeners: this.sessionEventCreatedListeners,
@@ -2436,6 +2455,30 @@ class Sync {
   }) => void): () => void {
     this.supervisorLoopStatusListeners.add(listener);
     return () => { this.supervisorLoopStatusListeners.delete(listener); };
+  }
+
+  // --- Supervisor Loop brief (one-shot on completion, per ADR-0022) ---
+
+  onSupervisorLoopBrief(listener: (event: {
+    loopId: string;
+    projectId: string;
+    status: string;
+    exitReason: string | null;
+    generatedAt: number;
+    currentIteration: number;
+    maxIterations: number;
+    initialHealthScore: number | null;
+    currentHealthScore: number | null;
+    healthDelta: number | null;
+    totalActionsFound: number;
+    totalActionsFixed: number;
+    consecutiveFailures: number;
+    totalCostUsd: number;
+    costCapUsd: number | null;
+    summary: string;
+  }) => void): () => void {
+    this.supervisorLoopBriefListeners.add(listener);
+    return () => { this.supervisorLoopBriefListeners.delete(listener); };
   }
 
   // --- Task log streaming subscription ---

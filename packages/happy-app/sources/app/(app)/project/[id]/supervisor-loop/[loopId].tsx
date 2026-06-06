@@ -20,6 +20,8 @@ import { Ionicons } from "@expo/vector-icons";
 import { ItemGroup } from "@/components/ItemGroup";
 import { screenLayoutMaxWidth } from "@/components/layout";
 import { useProject } from "@/hooks/useProjects";
+import { sync } from "@/sync/sync";
+import { Modal } from "@/modal";
 
 // --- Helpers ---
 
@@ -44,6 +46,45 @@ function formatDuration(startMs: number, endMs: number | null): string {
     const hours = Math.floor(minutes / 60);
     const remainingMinutes = minutes % 60;
     return `${hours}h ${remainingMinutes}m`;
+}
+
+// Mirror of supervisorLoopBrief.composeSummary on the server so the brief
+// card renders identically whether or not the live ephemeral was observed.
+// If the formats diverge, the live ephemeral's `summary` field wins (the
+// listener overwrites this with a toast and a fetched detail refresh).
+function buildBriefSummaryLine(params: {
+    currentIteration: number;
+    maxIterations: number;
+    initialHealthScore: number | null;
+    currentHealthScore: number | null;
+    healthDelta: number | null;
+    totalActionsFound: number;
+    totalActionsFixed: number;
+    totalCostUsd: number;
+    exitReason: string | null;
+}): string {
+    const parts: string[] = [];
+
+    if (params.healthDelta != null && params.initialHealthScore != null && params.currentHealthScore != null) {
+        const arrow = params.healthDelta < 0 ? "↓" : params.healthDelta > 0 ? "↑" : "→";
+        parts.push(`Health ${params.initialHealthScore}${arrow}${params.currentHealthScore}`);
+    }
+    if (params.totalActionsFixed > 0) {
+        parts.push(`fixed ${params.totalActionsFixed}`);
+    }
+    const pending = params.totalActionsFound - params.totalActionsFixed;
+    if (pending > 0) {
+        parts.push(`pending ${pending}`);
+    }
+    if (params.totalCostUsd > 0) {
+        parts.push(`$${params.totalCostUsd.toFixed(2)}`);
+    }
+    const stats = parts.length > 0 ? parts.join(", ") : "no changes";
+    const itersLabel = params.maxIterations > 0
+        ? `${params.currentIteration}/${params.maxIterations} iters`
+        : `${params.currentIteration} iters`;
+    const reason = params.exitReason ? ` — ${params.exitReason}` : "";
+    return `Loop done (${itersLabel}): ${stats}${reason}`;
 }
 
 const exitReasonLabels: Record<string, () => string> = {
@@ -350,6 +391,28 @@ function SupervisorLoopDetailScreen() {
         return () => { cancelled = true; };
     }, [id, project?.serverId, loopId, waitingForProject]);
 
+    // Subscribe to brief ephemeral (ADR-0022 cherry-pick): when this loop
+    // completes (or completion is observed live), refresh detail so the
+    // "Latest Brief" card reflects the final state, and surface the summary
+    // as a toast so the completion is noticeable even if the user is
+    // scrolled past the summary card.
+    React.useEffect(() => {
+        if (!loopId) return;
+        return sync.onSupervisorLoopBrief(async (event) => {
+            if (event.loopId !== loopId) return;
+            Modal.toast(event.summary);
+            try {
+                const credentials = await TokenStorage.getCredentials();
+                const projectServerId = project?.serverId;
+                if (!credentials || !projectServerId) return;
+                const data = await fetchLoopDetail(credentials, projectServerId, loopId);
+                setDetail(data);
+            } catch {
+                // best-effort refresh; the toast already conveyed the event
+            }
+        });
+    }, [loopId, project?.serverId]);
+
     React.useLayoutEffect(() => {
         const title = detail
             ? formatDate(detail.loop.createdAt)
@@ -387,11 +450,59 @@ function SupervisorLoopDetailScreen() {
         ? (exitReasonLabels[loop.exitReason]?.() ?? loop.exitReason)
         : null;
 
+    // Terminal loops show a "Latest Brief" card — a post-mortem digest of
+    // exit reason, health movement, action throughput, and cost. Computed
+    // locally from loop fields so it's available regardless of whether the
+    // brief ephemeral arrived in this session (matches what the server
+    // composes in supervisorLoopBrief.ts).
+    const isTerminal = loop.status === "completed" || loop.status === "failed" || loop.status === "stopped";
+    const briefLine = isTerminal
+        ? buildBriefSummaryLine({
+            currentIteration: loop.currentIteration,
+            maxIterations: loop.maxIterations,
+            initialHealthScore: loop.initialHealthScore,
+            currentHealthScore: loop.currentHealthScore,
+            healthDelta,
+            totalActionsFound: loop.totalActionsFound,
+            totalActionsFixed: loop.totalActionsFixed,
+            totalCostUsd: loop.totalCostUsd,
+            exitReason: loop.exitReason,
+        })
+        : null;
+
     return (
         <ScrollView
             style={styles.scroll}
             contentContainerStyle={styles.scrollContent}
         >
+            {/* Latest Brief (ADR-0022) — terminal loops only */}
+            {briefLine && (
+                <ItemGroup title={t("supervisor.loopBriefTitle")}>
+                    <View style={styles.briefCard}>
+                        <View style={styles.briefHeaderRow}>
+                            <Ionicons
+                                name="sparkles-outline"
+                                size={18}
+                                color={theme.colors.textLink}
+                            />
+                            <Text style={styles.briefHeaderText}>
+                                {t("supervisor.loopBriefHeader", {
+                                    completedAt: loop.completedAt
+                                        ? formatDate(loop.completedAt)
+                                        : "",
+                                })}
+                            </Text>
+                        </View>
+                        <Text style={styles.briefSummary} selectable>
+                            {briefLine}
+                        </Text>
+                        <Text style={styles.briefHint}>
+                            {t("supervisor.loopBriefHint")}
+                        </Text>
+                    </View>
+                </ItemGroup>
+            )}
+
             {/* Summary */}
             <ItemGroup title={statusText}>
                 <View style={styles.metadataCard}>
@@ -499,6 +610,32 @@ const styles = StyleSheet.create((theme, rt) => ({
     metadataCard: {
         paddingHorizontal: 16,
         paddingVertical: 8,
+    },
+    briefCard: {
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+        gap: 8,
+    },
+    briefHeaderRow: {
+        flexDirection: "row" as const,
+        alignItems: "center" as const,
+        gap: 8,
+    },
+    briefHeaderText: {
+        ...Typography.default("semiBold"),
+        fontSize: 13,
+        color: theme.colors.textSecondary,
+    },
+    briefSummary: {
+        ...Typography.default(),
+        fontSize: 15,
+        color: theme.colors.text,
+        lineHeight: 22,
+    },
+    briefHint: {
+        ...Typography.default(),
+        fontSize: 12,
+        color: theme.colors.textSecondary,
     },
     timelineContainer: {
         paddingHorizontal: 16,

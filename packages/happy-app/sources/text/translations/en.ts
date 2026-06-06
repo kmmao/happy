@@ -4135,6 +4135,9 @@ export const en: TranslationStructure = {
     loopDetailActions: ({ count }: { count: number }) => `Actions (${count})`,
     loopDetailNoRuns: "No iterations yet",
     loopDetailNoActions: "No actions yet",
+    loopBriefTitle: "Latest Brief",
+    loopBriefHeader: ({ completedAt }: { completedAt: string }) => `Loop completed${completedAt ? ` · ${completedAt}` : ""}`,
+    loopBriefHint: "Auto-generated digest based on this loop's exit state.",
     loadRunError: "Failed to load run details",
     loadLoopError: "Failed to load loop details",
 

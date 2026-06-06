@@ -22,6 +22,16 @@ import { fetchTriggerSchedules } from "@/sync/apiTriggerSchedules";
 import { fetchWebhookTriggers } from "@/sync/apiWebhookTriggers";
 import { TokenStorage } from "@/auth/tokenStorage";
 import { sync } from "@/sync/sync";
+import {
+    formatRate,
+    getGuardianStateLabel,
+    getJobSubtitle,
+    getJobTitle,
+    getStatusColor,
+    getStatusLabel,
+    truncateGuardianKey,
+    type AutomationJobLike,
+} from "./automationSummaryFormatters";
 
 type Props = {
     machine: Machine;
@@ -34,22 +44,6 @@ type PendingJobAction =
     | { type: "stop"; jobId: string; sessionId: string }
     | null;
 
-type AutomationJobLike = {
-    id: string;
-    dedupeKey: string;
-    status: string;
-    updatedAt: number;
-    nextRunAt?: number;
-    sessionId?: string;
-    errorMessage?: string;
-    label?: string;
-    projectId?: string;
-    loopId?: string;
-    loopIteration?: number;
-    continuityKey?: string;
-    recovered?: boolean;
-};
-
 type AutomationGuardianLike = {
     key: string;
     projectId: string;
@@ -60,95 +54,6 @@ type AutomationGuardianLike = {
     attached?: boolean;
     recovered?: boolean;
 };
-
-function truncateGuardianKey(key: string): string {
-    const prefix = "agent-loop:";
-    if (key.startsWith(prefix)) {
-        return `${prefix}${key.slice(prefix.length, prefix.length + 8)}`;
-    }
-    return key;
-}
-
-function getStatusLabel(status: string): string {
-    switch (status) {
-        case "queued":
-            return t("machine.automationQueued");
-        case "dispatching":
-        case "running":
-            return t("machine.automationRunning");
-        case "completed":
-            return t("machine.automationCompleted");
-        case "failed":
-            return t("machine.automationFailed");
-        case "cancelled":
-            return t("machine.automationCancelled");
-        default:
-            return status;
-    }
-}
-
-function getStatusColor(status: string): string | undefined {
-    switch (status) {
-        case "queued":
-            return "#FF9500";
-        case "dispatching":
-        case "running":
-            return "#0A84FF";
-        case "completed":
-            return "#34C759";
-        case "failed":
-            return "#FF3B30";
-        case "cancelled":
-            return "#8E8E93";
-        default:
-            return undefined;
-    }
-}
-
-function getJobTitle(job: AutomationJobLike): string {
-    return job.label || job.dedupeKey;
-}
-
-function getJobSubtitle(job: AutomationJobLike): string {
-    if (job.errorMessage) {
-        return job.errorMessage;
-    }
-
-    const parts: string[] = [];
-    if (job.loopIteration != null) {
-        parts.push(
-            t("supervisor.loopIterationUnlimited", {
-                current: job.loopIteration,
-            }),
-        );
-    }
-    if (job.continuityKey) {
-        const shortKey = job.continuityKey.startsWith("agent-loop:")
-            ? job.continuityKey.slice(0, "agent-loop:".length + 8)
-            : job.continuityKey;
-        parts.push(`${t("machine.automationContinuity")}: ${shortKey}`);
-    }
-    if (job.sessionId) {
-        parts.push(`${t("machine.automationSession")}: ${job.sessionId.slice(0, 12)}…`);
-    }
-    if (job.nextRunAt) {
-        parts.push(`${t("machine.automationNextRunAt")}: ${new Date(job.nextRunAt).toLocaleString()}`);
-    }
-    if (job.recovered) {
-        parts.push(t("machine.automationRecoveredShort"));
-    }
-    if (parts.length === 0) {
-        parts.push(new Date(job.updatedAt).toLocaleString());
-    }
-    return parts.join(" • ");
-}
-
-function formatRate(value?: number): string {
-    if (value == null || Number.isNaN(value)) {
-        return "0%";
-    }
-    return `${Math.round(value * 100)}%`;
-}
 
 export const AutomationSummaryItem = React.memo(function AutomationSummaryItem({
     machine,
@@ -189,13 +94,6 @@ export const AutomationSummaryItem = React.memo(function AutomationSummaryItem({
         />
     );
 });
-
-function getGuardianStateLabel(attached?: boolean, recovered?: boolean): string {
-    if (attached && recovered) {
-        return t("machine.automationGuardianRecovered");
-    }
-    return attached ? t("machine.automationGuardianAttached") : t("machine.automationGuardianPersisted");
-}
 
 export const AgentLoopsSummaryItem = React.memo(function AgentLoopsSummaryItem({
     machine,

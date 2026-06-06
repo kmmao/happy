@@ -4158,6 +4158,9 @@ export const pl: TranslationStructure = {
     loopDetailActions: ({ count }: { count: number }) => `Akcje (${count})`,
     loopDetailNoRuns: "Brak iteracji",
     loopDetailNoActions: "Brak akcji",
+    loopBriefTitle: "Najnowsze podsumowanie",
+    loopBriefHeader: ({ completedAt }: { completedAt: string }) => `Pętla zakończona${completedAt ? ` · ${completedAt}` : ""}`,
+    loopBriefHint: "Automatyczne podsumowanie na podstawie stanu wyjścia tej pętli.",
     loadRunError: "Nie udało się załadować szczegółów uruchomienia",
     loadLoopError: "Nie udało się załadować szczegółów pętli",
 

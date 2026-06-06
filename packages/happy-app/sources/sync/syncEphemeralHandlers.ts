@@ -57,6 +57,25 @@ type SupervisorLoopStatusListener = (event: {
   consecutiveFailures: number;
 }) => void;
 
+type SupervisorLoopBriefListener = (event: {
+  loopId: string;
+  projectId: string;
+  status: string;
+  exitReason: string | null;
+  generatedAt: number;
+  currentIteration: number;
+  maxIterations: number;
+  initialHealthScore: number | null;
+  currentHealthScore: number | null;
+  healthDelta: number | null;
+  totalActionsFound: number;
+  totalActionsFixed: number;
+  consecutiveFailures: number;
+  totalCostUsd: number;
+  costCapUsd: number | null;
+  summary: string;
+}) => void;
+
 type InboxNewItemListener = (item: {
   id: string;
   category: string;
@@ -102,6 +121,7 @@ export type EphemeralHandlerContext = {
   taskLogListeners: Set<TaskLogListener>;
   taskStatusListeners: Set<TaskStatusListener>;
   supervisorLoopStatusListeners: Set<SupervisorLoopStatusListener>;
+  supervisorLoopBriefListeners: Set<SupervisorLoopBriefListener>;
   inboxNewItemListeners: Set<InboxNewItemListener>;
   inboxUnreadCountListeners: Set<(count: number) => void>;
   sessionEventCreatedListeners: Set<SessionEventCreatedListener>;
@@ -368,6 +388,31 @@ export function handleEphemeralUpdateAction(
     };
     for (const listener of ctx.supervisorLoopStatusListeners) {
       listener(loopEvent);
+    }
+  }
+
+  // Handle supervisor-loop-brief (ADR-0022 cherry-pick — fires once on loop completion)
+  if (updateData.type === "supervisor-loop-brief") {
+    const briefEvent = {
+      loopId: updateData.loopId,
+      projectId: updateData.projectId,
+      status: updateData.status,
+      exitReason: updateData.exitReason,
+      generatedAt: updateData.generatedAt,
+      currentIteration: updateData.currentIteration,
+      maxIterations: updateData.maxIterations,
+      initialHealthScore: updateData.initialHealthScore,
+      currentHealthScore: updateData.currentHealthScore,
+      healthDelta: updateData.healthDelta,
+      totalActionsFound: updateData.totalActionsFound,
+      totalActionsFixed: updateData.totalActionsFixed,
+      consecutiveFailures: updateData.consecutiveFailures,
+      totalCostUsd: updateData.totalCostUsd,
+      costCapUsd: updateData.costCapUsd,
+      summary: updateData.summary,
+    };
+    for (const listener of ctx.supervisorLoopBriefListeners) {
+      listener(briefEvent);
     }
   }
 }

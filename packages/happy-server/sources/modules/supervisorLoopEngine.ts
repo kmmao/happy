@@ -13,7 +13,9 @@ import {
     eventRouter,
     buildSupervisorTriggerEphemeral,
     buildSupervisorLoopStatusEphemeral,
+    buildSupervisorLoopBriefEphemeral,
 } from "@/app/events/eventRouter";
+import { buildSupervisorLoopBrief } from "@/modules/supervisorLoopBrief";
 import { checkDailyRunLimit, incrementDailyRunCount } from "@/modules/supervisorLimits";
 import { auth } from "@/app/auth/auth";
 import {
@@ -137,10 +139,11 @@ export async function startLoop(
 
     // Mutual exclusion: no active loop, no active run
     const [activeLoop, activeRun] = await Promise.all([
-        db.supervisorLoop.findFirst({
+        db.agentLoop.findFirst({
             where: {
                 projectId,
                 accountId,
+                role: "supervisor",
                 status: { in: ["running", "paused"] },
             },
             select: { id: true },
@@ -173,10 +176,11 @@ export async function startLoop(
 
     // Create loop + first run atomically
     const loop = await db.$transaction(async (tx) => {
-        const newLoop = await tx.supervisorLoop.create({
+        const newLoop = await tx.agentLoop.create({
             data: {
                 projectId,
                 accountId,
+                role: "supervisor",
                 status: "running",
                 currentPhase: "analyzing",
                 currentIteration: 1,
@@ -203,7 +207,7 @@ export async function startLoop(
             },
         });
 
-        await tx.supervisorLoop.update({
+        await tx.agentLoop.update({
             where: { id: newLoop.id },
             data: { activeRunId: run.id },
         });
@@ -307,7 +311,7 @@ async function progressLoopAfterRun(
 
     if (!run?.loopId) return; // Not part of a loop
 
-    const loop = await db.supervisorLoop.findUnique({
+    const loop = await db.agentLoop.findUnique({
         where: { id: run.loopId },
     });
 
@@ -317,7 +321,7 @@ async function progressLoopAfterRun(
     const costDelta = run.costUsd ?? 0;
     const tokenDelta = run.tokenCount ?? 0;
 
-    await db.supervisorLoop.update({
+    await db.agentLoop.update({
         where: { id: loop.id },
         data: {
             totalCostUsd: { increment: costDelta },
@@ -330,7 +334,7 @@ async function progressLoopAfterRun(
     });
 
     // Re-fetch with updated values
-    const updatedLoop = await db.supervisorLoop.findUnique({
+    const updatedLoop = await db.agentLoop.findUnique({
         where: { id: loop.id },
     });
     if (!updatedLoop) return;
@@ -388,14 +392,14 @@ async function progressLoopAfterFix(
     });
     if (!run?.loopId) return;
 
-    const loop = await db.supervisorLoop.findUnique({
+    const loop = await db.agentLoop.findUnique({
         where: { id: run.loopId },
     });
     if (!loop || loop.status !== "running" || loop.currentPhase !== "fixing") return;
 
     // Track fix result
     if (fixStatus === "completed") {
-        await db.supervisorLoop.update({
+        await db.agentLoop.update({
             where: { id: loop.id },
             data: {
                 totalActionsFixed: { increment: 1 },
@@ -403,7 +407,7 @@ async function progressLoopAfterFix(
             },
         });
     } else {
-        await db.supervisorLoop.update({
+        await db.agentLoop.update({
             where: { id: loop.id },
             data: {
                 consecutiveFailures: { increment: 1 },
@@ -425,7 +429,7 @@ async function progressLoopAfterFix(
     if (pendingFixes > 0) return; // Still waiting for other fixes
 
     // All fixes done — re-fetch loop and check exit conditions
-    const updatedLoop = await db.supervisorLoop.findUnique({
+    const updatedLoop = await db.agentLoop.findUnique({
         where: { id: loop.id },
     });
     if (!updatedLoop || updatedLoop.status !== "running") return;
@@ -446,10 +450,11 @@ export async function pauseLoop(
     loopId: string,
     userId: string,
 ): Promise<{ success: boolean }> {
-    const result = await db.supervisorLoop.updateMany({
+    const result = await db.agentLoop.updateMany({
         where: {
             id: loopId,
             accountId: userId,
+            role: "supervisor",
             status: "running",
         },
         data: {
@@ -459,7 +464,7 @@ export async function pauseLoop(
 
     if (result.count === 0) return { success: false };
 
-    const loop = await db.supervisorLoop.findUnique({ where: { id: loopId } });
+    const loop = await db.agentLoop.findUnique({ where: { id: loopId } });
     if (loop) emitLoopStatus(userId, loop);
 
     log({ module: "supervisor" }, `Loop ${loopId} paused`);
@@ -470,10 +475,11 @@ export async function resumeLoop(
     loopId: string,
     userId: string,
 ): Promise<{ success: boolean }> {
-    const loop = await db.supervisorLoop.findFirst({
+    const loop = await db.agentLoop.findFirst({
         where: {
             id: loopId,
             accountId: userId,
+            role: "supervisor",
             status: "paused",
         },
     });
@@ -481,15 +487,15 @@ export async function resumeLoop(
     if (!loop) return { success: false };
 
     // Optimistic lock: only resume if still paused
-    const result = await db.supervisorLoop.updateMany({
-        where: { id: loopId, status: "paused" },
+    const result = await db.agentLoop.updateMany({
+        where: { id: loopId, role: "supervisor", status: "paused" },
         data: { status: "running" },
     });
 
     if (result.count === 0) return { success: false };
 
     // Re-fetch and decide next step based on current phase
-    const updated = await db.supervisorLoop.findUnique({ where: { id: loopId } });
+    const updated = await db.agentLoop.findUnique({ where: { id: loopId } });
     if (!updated) return { success: false };
 
     emitLoopStatus(userId, updated);
@@ -509,10 +515,11 @@ export async function stopLoop(
     loopId: string,
     userId: string,
 ): Promise<{ success: boolean }> {
-    const result = await db.supervisorLoop.updateMany({
+    const result = await db.agentLoop.updateMany({
         where: {
             id: loopId,
             accountId: userId,
+            role: "supervisor",
             status: { in: ["running", "paused"] },
         },
         data: {
@@ -524,7 +531,7 @@ export async function stopLoop(
 
     if (result.count === 0) return { success: false };
 
-    const loop = await db.supervisorLoop.findUnique({ where: { id: loopId } });
+    const loop = await db.agentLoop.findUnique({ where: { id: loopId } });
     if (loop) emitLoopStatus(userId, loop);
 
     log({ module: "supervisor" }, `Loop ${loopId} stopped by user`);
@@ -536,7 +543,7 @@ export async function stopLoop(
 async function decideNextStep(
     userId: string,
     projectId: string,
-    loop: NonNullable<Awaited<ReturnType<typeof db.supervisorLoop.findUnique>>>,
+    loop: NonNullable<Awaited<ReturnType<typeof db.agentLoop.findUnique>>>,
 ): Promise<void> {
     // Find actions eligible for auto-approval BEFORE checking exit conditions.
     // This ensures the last iteration's findings get processed even if we've
@@ -583,8 +590,8 @@ async function decideNextStep(
     }
 
     // Update loop metrics
-    await db.supervisorLoop.updateMany({
-        where: { id: loop.id, status: "running" },
+    await db.agentLoop.updateMany({
+        where: { id: loop.id, role: "supervisor", status: "running" },
         data: {
             currentPhase: "fixing",
             totalActionsFound: { increment: approvableActions.length },
@@ -660,7 +667,7 @@ async function decideNextStep(
         });
     }
 
-    const updatedLoop = await db.supervisorLoop.findUnique({ where: { id: loop.id } });
+    const updatedLoop = await db.agentLoop.findUnique({ where: { id: loop.id } });
     if (updatedLoop) emitLoopStatus(userId, updatedLoop);
 
     log(
@@ -678,7 +685,7 @@ async function decideNextStep(
 async function triggerNextAnalysis(
     userId: string,
     projectId: string,
-    loop: NonNullable<Awaited<ReturnType<typeof db.supervisorLoop.findUnique>>>,
+    loop: NonNullable<Awaited<ReturnType<typeof db.agentLoop.findUnique>>>,
 ): Promise<void> {
     const nextIteration = loop.currentIteration + 1;
 
@@ -702,8 +709,8 @@ async function triggerNextAnalysis(
         },
     });
 
-    await db.supervisorLoop.updateMany({
-        where: { id: loop.id, status: "running" },
+    await db.agentLoop.updateMany({
+        where: { id: loop.id, role: "supervisor", status: "running" },
         data: {
             currentPhase: "analyzing",
             currentIteration: nextIteration,
@@ -780,7 +787,7 @@ async function triggerNextAnalysis(
         },
     });
 
-    const updatedLoop = await db.supervisorLoop.findUnique({ where: { id: loop.id } });
+    const updatedLoop = await db.agentLoop.findUnique({ where: { id: loop.id } });
     if (updatedLoop) emitLoopStatus(userId, updatedLoop);
 
     log(
@@ -791,9 +798,9 @@ async function triggerNextAnalysis(
 
 async function handleRunFailed(
     userId: string,
-    loop: NonNullable<Awaited<ReturnType<typeof db.supervisorLoop.findUnique>>>,
+    loop: NonNullable<Awaited<ReturnType<typeof db.agentLoop.findUnique>>>,
 ): Promise<void> {
-    const updated = await db.supervisorLoop.update({
+    const updated = await db.agentLoop.update({
         where: { id: loop.id },
         data: {
             consecutiveFailures: { increment: 1 },
@@ -815,9 +822,10 @@ async function completeLoop(
     loop: { id: string; projectId: string },
     reason: LoopExitReason,
 ): Promise<void> {
-    await db.supervisorLoop.updateMany({
+    await db.agentLoop.updateMany({
         where: {
             id: loop.id,
+            role: "supervisor",
             status: { in: ["running", "paused"] },
         },
         data: {
@@ -829,8 +837,19 @@ async function completeLoop(
         },
     });
 
-    const updated = await db.supervisorLoop.findUnique({ where: { id: loop.id } });
-    if (updated) emitLoopStatus(userId, updated);
+    const updated = await db.agentLoop.findUnique({ where: { id: loop.id } });
+    if (updated) {
+        emitLoopStatus(userId, updated);
+        // Emit a brief snapshot on completion. Per ADR-0022 this is the supervisor-role
+        // equivalent of AgentLoopBrief — for the cherry-pick it's computed-only (no
+        // Artifact persistence yet); the App's loop detail screen consumes it directly.
+        const brief = buildSupervisorLoopBrief(updated);
+        eventRouter.emitEphemeral({
+            userId,
+            payload: buildSupervisorLoopBriefEphemeral(brief),
+            recipientFilter: { type: "user-scoped-only" },
+        });
+    }
 
     log(
         { module: "supervisor" },
@@ -917,7 +936,7 @@ function scheduleFixWatchdog(
     setTimeout(async () => {
         try {
             // Only act if loop is still running and in fixing phase
-            const loop = await db.supervisorLoop.findUnique({
+            const loop = await db.agentLoop.findUnique({
                 where: { id: loopId },
                 select: { status: true, currentPhase: true },
             });
