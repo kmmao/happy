@@ -169,6 +169,56 @@ async function isSupervisorNotifyEnabled(
 }
 
 /**
+ * Send a supervisor-role AgentLoop completion notification to the project
+ * owner. Companion to pushSupervisorNotification — diverges only in that the
+ * data payload carries a `loopId` (rather than a per-run `runId`), because
+ * a loop completion is one event per loop, not per analysis run.
+ *
+ * Until users have explicitly opted out via supervisorNotifyPrefs, this
+ * follows the same per-project pref filter (unknown notificationType falls
+ * through to "always send", which is what we want for loop_complete during
+ * the rollout window — see ADR-0022 Phase 1 follow-up).
+ */
+export async function pushSupervisorLoopNotification(
+    accountId: string,
+    opts: {
+        projectId: string;
+        loopId: string;
+        type: "loop_complete";
+        title: string;
+        body: string;
+    },
+): Promise<void> {
+    const enabled = await isSupervisorNotifyEnabled(opts.projectId, opts.type);
+    if (!enabled) {
+        log(
+            { module: "push" },
+            `Supervisor loop notification suppressed (type: ${opts.type}, project: ${opts.projectId})`,
+        );
+        return;
+    }
+
+    await pushSend(
+        accountId,
+        {
+            title: opts.title,
+            body: opts.body,
+            data: {
+                type: "supervisor",
+                projectId: opts.projectId,
+                loopId: opts.loopId,
+                notificationType: opts.type,
+            },
+            categoryId: "supervisor",
+        },
+        // The brief ephemeral already delivers the same content to any
+        // connected non-machine client; skip the buzz when the user is
+        // already looking at the App.
+        { suppressIfActive: true },
+    );
+}
+
+/**
  * Send a supervisor notification to the project owner.
  * Respects per-project notification preferences.
  */

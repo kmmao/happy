@@ -16,6 +16,7 @@ import {
     buildSupervisorLoopBriefEphemeral,
 } from "@/app/events/eventRouter";
 import { buildSupervisorLoopBrief } from "@/modules/supervisorLoopBrief";
+import { pushSupervisorLoopNotification } from "@/modules/pushSend";
 import { checkDailyRunLimit, incrementDailyRunCount } from "@/modules/supervisorLimits";
 import { auth } from "@/app/auth/auth";
 import {
@@ -848,6 +849,23 @@ async function completeLoop(
             userId,
             payload: buildSupervisorLoopBriefEphemeral(brief),
             recipientFilter: { type: "user-scoped-only" },
+        });
+
+        // Push notification — closes the KAIROS-style "done → user gets pinged
+        // on phone" loop. Best-effort; the brief already lives in the ephemeral
+        // above so a push failure does not lose the event.
+        const titleVerb = reason === "user_stopped" ? "stopped" : "completed";
+        void pushSupervisorLoopNotification(userId, {
+            projectId: updated.projectId,
+            loopId: updated.id,
+            type: "loop_complete",
+            title: `Supervisor loop ${titleVerb}`,
+            body: brief.summary,
+        }).catch((err) => {
+            log(
+                { module: "supervisor", level: "warn" },
+                `Push notification failed for loop ${updated.id}: ${err}`,
+            );
         });
     }
 
