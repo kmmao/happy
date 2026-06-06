@@ -70,6 +70,12 @@ export interface Project {
   supervisorPushTriggerEnabled?: boolean;
   /** User-defined custom analysis rules */
   supervisorCustomRules?: string | null;
+  /**
+   * ADR-0022 D-1 — healthScore threshold (0..100, higher = unhealthier).
+   * When set, a standalone SupervisorRun completion at/above this value
+   * auto-starts a supervisor loop. null = feature disabled.
+   */
+  autoLoopHealthThreshold?: number | null;
   /** Project creation timestamp */
   createdAt: number;
   /** Last update timestamp */
@@ -488,6 +494,7 @@ class ProjectManager {
       existing.supervisorEnabledDimensions = serverProject.supervisorEnabledDimensions;
       existing.supervisorPushTriggerEnabled = serverProject.supervisorPushTriggerEnabled;
       existing.supervisorCustomRules = serverProject.supervisorCustomRules;
+      existing.autoLoopHealthThreshold = serverProject.autoLoopHealthThreshold;
       existing.updatedAt = Date.now();
       return existing;
     }
@@ -509,6 +516,7 @@ class ProjectManager {
       supervisorEnabledDimensions: serverProject.supervisorEnabledDimensions,
       supervisorPushTriggerEnabled: serverProject.supervisorPushTriggerEnabled,
       supervisorCustomRules: serverProject.supervisorCustomRules,
+      autoLoopHealthThreshold: serverProject.autoLoopHealthThreshold,
       createdAt: serverProject.createdAt,
       updatedAt: serverProject.updatedAt,
     };
@@ -585,6 +593,7 @@ class ProjectManager {
           project.supervisorEnabledDimensions = sp.supervisorEnabledDimensions;
           project.supervisorPushTriggerEnabled = sp.supervisorPushTriggerEnabled;
           project.supervisorCustomRules = sp.supervisorCustomRules;
+          project.autoLoopHealthThreshold = sp.autoLoopHealthThreshold;
         }
       } else {
         // Server-only project (no active sessions locally)
@@ -605,6 +614,7 @@ class ProjectManager {
           supervisorEnabledDimensions: sp.supervisorEnabledDimensions,
           supervisorPushTriggerEnabled: sp.supervisorPushTriggerEnabled,
           supervisorCustomRules: sp.supervisorCustomRules,
+          autoLoopHealthThreshold: sp.autoLoopHealthThreshold,
           createdAt: sp.createdAt,
           updatedAt: sp.updatedAt,
         };

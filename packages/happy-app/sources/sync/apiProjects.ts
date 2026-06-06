@@ -23,6 +23,8 @@ export interface ServerProject {
     supervisorEnabledDimensions: string | null;
     supervisorPushTriggerEnabled: boolean;
     supervisorCustomRules: string | null;
+    /** ADR-0022 D-1 — health threshold above which standalone runs auto-start a supervisor loop; null disables. */
+    autoLoopHealthThreshold: number | null;
     archived: boolean;
     sessionCount?: number;
     createdAt: number;

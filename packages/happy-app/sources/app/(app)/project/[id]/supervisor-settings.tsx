@@ -122,6 +122,10 @@ function SupervisorSettingsScreen() {
     const [profilePickerOpen, setProfilePickerOpen] = React.useState(false);
 
     const [config, setConfig] = React.useState<SupervisorConfig>(defaultConfig);
+    // ADR-0022 D-1 — stored as a Project column, not inside supervisorConfig
+    // JSON. Loaded from project.autoLoopHealthThreshold; null = feature off.
+    const [autoLoopThreshold, setAutoLoopThreshold] = React.useState<number | null>(null);
+    const [initialAutoLoopThreshold, setInitialAutoLoopThreshold] = React.useState<number | null>(null);
     const [initialConfig, setInitialConfig] =
         React.useState<SupervisorConfig>(defaultConfig);
     const [saving, setSaving] = React.useState(false);
@@ -247,11 +251,18 @@ function SupervisorSettingsScreen() {
         }
     }, [project?.supervisorConfig]);
 
+    React.useEffect(() => {
+        const threshold = project?.autoLoopHealthThreshold ?? null;
+        setAutoLoopThreshold(threshold);
+        setInitialAutoLoopThreshold(threshold);
+    }, [project?.autoLoopHealthThreshold]);
+
     const isDirty = React.useMemo(
         () =>
             JSON.stringify(config) !== JSON.stringify(initialConfig) ||
-            JSON.stringify(localCustomDimensions) !== JSON.stringify(customDimensions),
-        [config, initialConfig, localCustomDimensions, customDimensions],
+            JSON.stringify(localCustomDimensions) !== JSON.stringify(customDimensions) ||
+            autoLoopThreshold !== initialAutoLoopThreshold,
+        [config, initialConfig, localCustomDimensions, customDimensions, autoLoopThreshold, initialAutoLoopThreshold],
     );
 
     const mountedRef = React.useRef(true);
@@ -306,6 +317,7 @@ function SupervisorSettingsScreen() {
                     supervisorCustomRules:
                         config.customRules.trim() || null,
                     fixStrategy: config.fixStrategy,
+                    autoLoopHealthThreshold: autoLoopThreshold,
                 },
             );
             const localProject = projectManager.getProject(id);
@@ -320,6 +332,7 @@ function SupervisorSettingsScreen() {
                     .join(",");
                 localProject.supervisorPushTriggerEnabled = config.pushTrigger.enabled;
                 localProject.supervisorCustomRules = config.customRules.trim() || null;
+                localProject.autoLoopHealthThreshold = autoLoopThreshold;
             }
             // Sync custom dimension changes (create / update / delete)
             const serverIds = new Set(customDimensions.map((d) => d.id));
@@ -362,6 +375,7 @@ function SupervisorSettingsScreen() {
 
             if (!mountedRef.current) return;
             setInitialConfig(config);
+            setInitialAutoLoopThreshold(autoLoopThreshold);
             Modal.toast(t("supervisor.settingsSaved"));
 
             const modeOrder: Record<string, number> = { suggest: 0, "semi-auto": 1, auto: 2 };
@@ -949,6 +963,47 @@ function SupervisorSettingsScreen() {
                     subtitle={t("supervisor.pushTriggerDesc")}
                     isLast
                 />
+            </ItemGroup>
+
+            {/* Auto-Loop on Health Regression (ADR-0022 D-1) */}
+            <ItemGroup title={t("supervisor.autoLoopSection")}>
+                <ToggleRow
+                    label={t("supervisor.autoLoopEnabled")}
+                    value={autoLoopThreshold !== null}
+                    onToggle={() =>
+                        setAutoLoopThreshold((prev) => (prev === null ? 30 : null))
+                    }
+                    subtitle={t("supervisor.autoLoopDesc")}
+                    isLast={autoLoopThreshold === null}
+                />
+                {autoLoopThreshold !== null && (
+                    <View style={styles.thresholdRow}>
+                        <Text style={styles.thresholdLabel}>
+                            {t("supervisor.autoLoopThreshold")}
+                        </Text>
+                        <View style={styles.thresholdInputWrap}>
+                            <TextInput
+                                value={String(autoLoopThreshold)}
+                                onChangeText={(text) => {
+                                    const parsed = parseInt(text, 10);
+                                    if (Number.isFinite(parsed)) {
+                                        setAutoLoopThreshold(Math.min(100, Math.max(0, parsed)));
+                                    } else if (text === "") {
+                                        setAutoLoopThreshold(0);
+                                    }
+                                }}
+                                keyboardType="number-pad"
+                                style={styles.thresholdInput}
+                                maxLength={3}
+                            />
+                        </View>
+                    </View>
+                )}
+                {autoLoopThreshold !== null && (
+                    <Text style={styles.safetyText}>
+                        {t("supervisor.autoLoopThresholdHint", { value: autoLoopThreshold })}
+                    </Text>
+                )}
             </ItemGroup>
 
             {/* Fix Strategy */}
@@ -1679,6 +1734,40 @@ const styles = StyleSheet.create((theme, rt) => ({
         fontSize: 13,
         color: theme.colors.textSecondary,
         lineHeight: 18,
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+    },
+    thresholdRow: {
+        flexDirection: "row" as const,
+        alignItems: "center" as const,
+        justifyContent: "space-between" as const,
+        paddingHorizontal: 16,
+        paddingVertical: 10,
+        gap: 12,
+    },
+    thresholdLabel: {
+        ...Typography.default(),
+        fontSize: 14,
+        color: theme.colors.text,
+        flex: 1,
+    },
+    thresholdInputWrap: {
+        backgroundColor: theme.colors.surfaceHigh,
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: theme.colors.divider,
+        paddingHorizontal: 10,
+        paddingVertical: 4,
+        minWidth: 56,
+        alignItems: "center" as const,
+    },
+    thresholdInput: {
+        ...Typography.default(),
+        fontSize: 15,
+        color: theme.colors.text,
+        textAlign: "center" as const,
+        minWidth: 36,
+        padding: 0,
     },
     customRulesCard: {
         padding: 16,

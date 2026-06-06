@@ -4026,6 +4026,13 @@ export const en = {
     pushTriggerEnabled: "Scan on Push",
     pushTriggerDesc: "Run incremental analysis when code is pushed",
 
+    // Settings: Auto-loop on health regression (ADR-0022 D-1)
+    autoLoopSection: "Auto-Start on Health Regression",
+    autoLoopEnabled: "Enable Auto-Loop",
+    autoLoopDesc: "Automatically start a supervisor loop when an analysis run reports a health score at or above the threshold",
+    autoLoopThreshold: "Health threshold",
+    autoLoopThresholdHint: ({ value }: { value: number }) => `Auto-loop fires when healthScore ≥ ${value}. Higher = unhealthier. 24-hour cooldown between auto-starts.`,
+
     // Settings: Fix strategy
     fixStrategySection: "Fix Strategy",
     fixStrategyDirect: "Direct Merge",
@@ -4160,6 +4167,9 @@ export const en = {
     loopConfigThresholdHint: "Only auto-fix actions with AI confidence above this level",
     loopConfigCostCap: "Cost Limit",
     loopConfigCostCapHint: "Stop the loop when cumulative cost reaches this amount",
+    loopConfigEmptyIters: "Confirm convergence",
+    loopConfigEmptyItersHint: ({ count }: { count: number }) => `Loop exits with "goal achieved" after ${count} consecutive empty analyses`,
+    loopConfigEmptyItersHintLegacy: "Loop exits on the first empty analysis (legacy single-pass behaviour)",
     loopConfigSafety: "Loop uses direct merge. Each fix runs in an isolated worktree. You can pause or stop at any time.",
     loopConfigStart: "Start Loop",
     loopHistory: "Loop History",

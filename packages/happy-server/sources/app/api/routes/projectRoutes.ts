@@ -457,6 +457,7 @@ function serializeProject(project: {
     supervisorEnabledDimensions: string | null;
     supervisorPushTriggerEnabled: boolean;
     supervisorCustomRules: string | null;
+    autoLoopHealthThreshold: number | null;
     archived: boolean;
     createdAt: Date;
     updatedAt: Date;
@@ -476,6 +477,7 @@ function serializeProject(project: {
         supervisorEnabledDimensions: project.supervisorEnabledDimensions,
         supervisorPushTriggerEnabled: project.supervisorPushTriggerEnabled,
         supervisorCustomRules: project.supervisorCustomRules,
+        autoLoopHealthThreshold: project.autoLoopHealthThreshold,
         archived: project.archived,
         createdAt: project.createdAt.getTime(),
         updatedAt: project.updatedAt.getTime(),

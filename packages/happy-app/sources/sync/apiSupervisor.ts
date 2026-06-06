@@ -195,6 +195,13 @@ export async function updateSupervisorConfig(
         supervisorNotifyPrefs?: string | null;
         supervisorCustomRules?: string | null;
         fixStrategy?: "direct" | "pr" | null;
+        /**
+         * ADR-0022 D-1 — healthScore threshold (0..100, higher = unhealthier)
+         * at or above which a standalone SupervisorRun's completion
+         * auto-starts a supervisor loop. null disables. 24h debounce is
+         * enforced server-side.
+         */
+        autoLoopHealthThreshold?: number | null;
     },
 ): Promise<SupervisorConfigResponse> {
     const API_ENDPOINT = getServerUrl();
@@ -267,6 +274,12 @@ export interface LoopConfig {
     autoApproveThreshold?: number;
     maxConsecutiveFailures?: number;
     maxDurationMinutes?: number;
+    /**
+     * ADR-0022 C-1 — number of consecutive empty analysis iterations required
+     * to exit with `goal_achieved` rather than `no_new_actions`. Server-side
+     * default for new loops is 2; pass 1 to keep legacy single-pass exit.
+     */
+    emptyIterationsToConfirm?: number;
     profileId?: string;
     runtimeProfile?: ResolvedRuntimeProfile;
 }

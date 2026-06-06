@@ -128,6 +128,10 @@ export const SupervisorLoopConfigPanel = React.memo(
         const [autoApproveThreshold, setAutoApproveThreshold] = React.useState(80);
         const [costCapEnabled, setCostCapEnabled] = React.useState(false);
         const [costCapUsd, setCostCapUsd] = React.useState(10);
+        // ADR-0022 C-1 — N consecutive empty analysis passes required before
+        // the loop exits with `goal_achieved` (vs. legacy `no_new_actions`
+        // after the first empty pass). Server-side default for new loops is 2.
+        const [emptyIterationsToConfirm, setEmptyIterationsToConfirm] = React.useState(2);
         // Profile selection: inherit default from supervisor settings, allow per-run override
         const [profileSelectionState, setProfileSelectionState] = React.useState(() =>
             createSupervisorProfileSelectionState(defaultProfileId ?? null),
@@ -178,12 +182,13 @@ export const SupervisorLoopConfigPanel = React.memo(
                 const config: LoopConfig = {
                     maxIterations,
                     autoApproveThreshold,
+                    emptyIterationsToConfirm,
                     ...(costCapEnabled ? { costCapUsd } : {}),
                     ...selectedRequestProfile,
                 };
                 const loop = await startSupervisorLoop(credentials, projectId, config);
                 onStarted(loop);
-            }, [projectId, maxIterations, autoApproveThreshold, costCapEnabled, costCapUsd, selectedRequestProfile, onStarted]),
+            }, [projectId, maxIterations, autoApproveThreshold, emptyIterationsToConfirm, costCapEnabled, costCapUsd, selectedRequestProfile, onStarted]),
         );
 
         return (
@@ -274,6 +279,29 @@ export const SupervisorLoopConfigPanel = React.memo(
                     )}
                     <Text style={styles.configHint}>
                         {t("supervisor.loopConfigCostCapHint")}
+                    </Text>
+                </View>
+
+                {/* Empty Iterations to Confirm (ADR-0022 C-1) */}
+                <View style={styles.configRow}>
+                    <View style={styles.configLabelRow}>
+                        <Text style={styles.configLabel}>
+                            {t("supervisor.loopConfigEmptyIters")}
+                        </Text>
+                        <Stepper
+                            value={emptyIterationsToConfirm}
+                            min={1}
+                            max={5}
+                            step={1}
+                            onChange={setEmptyIterationsToConfirm}
+                        />
+                    </View>
+                    <Text style={styles.configHint}>
+                        {emptyIterationsToConfirm === 1
+                            ? t("supervisor.loopConfigEmptyItersHintLegacy")
+                            : t("supervisor.loopConfigEmptyItersHint", {
+                                count: emptyIterationsToConfirm,
+                              })}
                     </Text>
                 </View>
 
