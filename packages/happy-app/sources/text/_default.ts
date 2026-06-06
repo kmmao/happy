@@ -4031,7 +4031,15 @@ export const en = {
     autoLoopEnabled: "Enable Auto-Loop",
     autoLoopDesc: "Automatically start a supervisor loop when an analysis run reports a health score at or above the threshold",
     autoLoopThreshold: "Health threshold",
-    autoLoopThresholdHint: ({ value }: { value: number }) => `Auto-loop fires when healthScore ≥ ${value}. Higher = unhealthier. 24-hour cooldown between auto-starts.`,
+    autoLoopThresholdHint: ({ value }: { value: number }) => `Auto-loop fires when healthScore ≥ ${value}. Higher = unhealthier.`,
+    autoLoopDebounce: "Cooldown (hours)",
+    autoLoopDebounceHint: ({ hours }: { hours: number }) => `Wait ${hours}h between auto-loop starts on this project`,
+    autoLoopDebounceHintOff: "No cooldown — auto-loop fires on every eligible run completion (testing mode)",
+    autoLoopResetButton: "Reset cooldown now",
+    autoLoopResetTitle: "Reset auto-loop cooldown?",
+    autoLoopResetMessage: "Clears the cooldown clock for this project. The next eligible run completion can fire an auto-loop immediately.",
+    autoLoopResetConfirm: "Reset",
+    autoLoopResetDone: "Auto-loop cooldown reset",
 
     // Settings: Fix strategy
     fixStrategySection: "Fix Strategy",

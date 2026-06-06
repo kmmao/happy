@@ -76,6 +76,12 @@ export interface Project {
    * auto-starts a supervisor loop. null = feature disabled.
    */
   autoLoopHealthThreshold?: number | null;
+  /**
+   * ADR-0022 D-1 follow-up — debounce window (minutes) between auto-loop
+   * starts. 0 disables debounce; default 1440 (24h). Reset the cooldown
+   * with POST /v1/projects/:id/supervisor/autoloop/reset-debounce.
+   */
+  autoLoopDebounceMinutes?: number;
   /** Project creation timestamp */
   createdAt: number;
   /** Last update timestamp */
@@ -495,6 +501,7 @@ class ProjectManager {
       existing.supervisorPushTriggerEnabled = serverProject.supervisorPushTriggerEnabled;
       existing.supervisorCustomRules = serverProject.supervisorCustomRules;
       existing.autoLoopHealthThreshold = serverProject.autoLoopHealthThreshold;
+      existing.autoLoopDebounceMinutes = serverProject.autoLoopDebounceMinutes;
       existing.updatedAt = Date.now();
       return existing;
     }
@@ -517,6 +524,7 @@ class ProjectManager {
       supervisorPushTriggerEnabled: serverProject.supervisorPushTriggerEnabled,
       supervisorCustomRules: serverProject.supervisorCustomRules,
       autoLoopHealthThreshold: serverProject.autoLoopHealthThreshold,
+      autoLoopDebounceMinutes: serverProject.autoLoopDebounceMinutes,
       createdAt: serverProject.createdAt,
       updatedAt: serverProject.updatedAt,
     };
@@ -594,6 +602,7 @@ class ProjectManager {
           project.supervisorPushTriggerEnabled = sp.supervisorPushTriggerEnabled;
           project.supervisorCustomRules = sp.supervisorCustomRules;
           project.autoLoopHealthThreshold = sp.autoLoopHealthThreshold;
+          project.autoLoopDebounceMinutes = sp.autoLoopDebounceMinutes;
         }
       } else {
         // Server-only project (no active sessions locally)
@@ -615,6 +624,7 @@ class ProjectManager {
           supervisorPushTriggerEnabled: sp.supervisorPushTriggerEnabled,
           supervisorCustomRules: sp.supervisorCustomRules,
           autoLoopHealthThreshold: sp.autoLoopHealthThreshold,
+          autoLoopDebounceMinutes: sp.autoLoopDebounceMinutes,
           createdAt: sp.createdAt,
           updatedAt: sp.updatedAt,
         };

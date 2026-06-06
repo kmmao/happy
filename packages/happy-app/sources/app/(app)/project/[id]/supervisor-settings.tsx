@@ -8,7 +8,7 @@ import { useProject } from "@/hooks/useProjects";
 import { ItemGroup } from "@/components/ItemGroup";
 import { t } from "@/text";
 import { TokenStorage } from "@/auth/tokenStorage";
-import { updateSupervisorConfig, fetchActionStats, reprocessPendingActions, fetchCustomDimensions, createCustomDimension, updateCustomDimension, deleteCustomDimension, generateDimensionPrompt, type SupervisorDimension } from "@/sync/apiSupervisor";
+import { updateSupervisorConfig, resetAutoLoopDebounce, fetchActionStats, reprocessPendingActions, fetchCustomDimensions, createCustomDimension, updateCustomDimension, deleteCustomDimension, generateDimensionPrompt, type SupervisorDimension } from "@/sync/apiSupervisor";
 import { setCustomDimensionLabels } from "@/components/project/supervisorDimensionLabels";
 import { getDimensionPrompt } from "@/components/project/supervisorDimensionPrompts";
 import { projectManager } from "@/sync/projectManager";
@@ -126,6 +126,12 @@ function SupervisorSettingsScreen() {
     // JSON. Loaded from project.autoLoopHealthThreshold; null = feature off.
     const [autoLoopThreshold, setAutoLoopThreshold] = React.useState<number | null>(null);
     const [initialAutoLoopThreshold, setInitialAutoLoopThreshold] = React.useState<number | null>(null);
+    // ADR-0022 D-1 follow-up — debounce window in HOURS (server stores minutes).
+    // Default 24h. 0 = debounce disabled. The reset button below clears the
+    // cooldown clock immediately via a separate endpoint.
+    const [autoLoopDebounceHours, setAutoLoopDebounceHours] = React.useState(24);
+    const [initialAutoLoopDebounceHours, setInitialAutoLoopDebounceHours] = React.useState(24);
+    const [resettingDebounce, setResettingDebounce] = React.useState(false);
     const [initialConfig, setInitialConfig] =
         React.useState<SupervisorConfig>(defaultConfig);
     const [saving, setSaving] = React.useState(false);
@@ -257,12 +263,29 @@ function SupervisorSettingsScreen() {
         setInitialAutoLoopThreshold(threshold);
     }, [project?.autoLoopHealthThreshold]);
 
+    React.useEffect(() => {
+        const minutes = project?.autoLoopDebounceMinutes ?? 1440;
+        const hours = Math.round(minutes / 60);
+        setAutoLoopDebounceHours(hours);
+        setInitialAutoLoopDebounceHours(hours);
+    }, [project?.autoLoopDebounceMinutes]);
+
     const isDirty = React.useMemo(
         () =>
             JSON.stringify(config) !== JSON.stringify(initialConfig) ||
             JSON.stringify(localCustomDimensions) !== JSON.stringify(customDimensions) ||
-            autoLoopThreshold !== initialAutoLoopThreshold,
-        [config, initialConfig, localCustomDimensions, customDimensions, autoLoopThreshold, initialAutoLoopThreshold],
+            autoLoopThreshold !== initialAutoLoopThreshold ||
+            autoLoopDebounceHours !== initialAutoLoopDebounceHours,
+        [
+            config,
+            initialConfig,
+            localCustomDimensions,
+            customDimensions,
+            autoLoopThreshold,
+            initialAutoLoopThreshold,
+            autoLoopDebounceHours,
+            initialAutoLoopDebounceHours,
+        ],
     );
 
     const mountedRef = React.useRef(true);
@@ -318,6 +341,7 @@ function SupervisorSettingsScreen() {
                         config.customRules.trim() || null,
                     fixStrategy: config.fixStrategy,
                     autoLoopHealthThreshold: autoLoopThreshold,
+                    autoLoopDebounceMinutes: autoLoopDebounceHours * 60,
                 },
             );
             const localProject = projectManager.getProject(id);
@@ -333,6 +357,7 @@ function SupervisorSettingsScreen() {
                 localProject.supervisorPushTriggerEnabled = config.pushTrigger.enabled;
                 localProject.supervisorCustomRules = config.customRules.trim() || null;
                 localProject.autoLoopHealthThreshold = autoLoopThreshold;
+                localProject.autoLoopDebounceMinutes = autoLoopDebounceHours * 60;
             }
             // Sync custom dimension changes (create / update / delete)
             const serverIds = new Set(customDimensions.map((d) => d.id));
@@ -376,6 +401,7 @@ function SupervisorSettingsScreen() {
             if (!mountedRef.current) return;
             setInitialConfig(config);
             setInitialAutoLoopThreshold(autoLoopThreshold);
+            setInitialAutoLoopDebounceHours(autoLoopDebounceHours);
             Modal.toast(t("supervisor.settingsSaved"));
 
             const modeOrder: Record<string, number> = { suggest: 0, "semi-auto": 1, auto: 2 };
@@ -1003,6 +1029,81 @@ function SupervisorSettingsScreen() {
                     <Text style={styles.safetyText}>
                         {t("supervisor.autoLoopThresholdHint", { value: autoLoopThreshold })}
                     </Text>
+                )}
+                {autoLoopThreshold !== null && (
+                    <View style={styles.thresholdRow}>
+                        <Text style={styles.thresholdLabel}>
+                            {t("supervisor.autoLoopDebounce")}
+                        </Text>
+                        <View style={styles.thresholdInputWrap}>
+                            <TextInput
+                                value={String(autoLoopDebounceHours)}
+                                onChangeText={(text) => {
+                                    const parsed = parseInt(text, 10);
+                                    if (Number.isFinite(parsed)) {
+                                        setAutoLoopDebounceHours(Math.min(168, Math.max(0, parsed)));
+                                    } else if (text === "") {
+                                        setAutoLoopDebounceHours(0);
+                                    }
+                                }}
+                                keyboardType="number-pad"
+                                style={styles.thresholdInput}
+                                maxLength={3}
+                            />
+                        </View>
+                    </View>
+                )}
+                {autoLoopThreshold !== null && (
+                    <Text style={styles.safetyText}>
+                        {autoLoopDebounceHours === 0
+                            ? t("supervisor.autoLoopDebounceHintOff")
+                            : t("supervisor.autoLoopDebounceHint", { hours: autoLoopDebounceHours })}
+                    </Text>
+                )}
+                {autoLoopThreshold !== null && (
+                    <Pressable
+                        style={({ pressed }) => [
+                            styles.resetButton,
+                            { opacity: resettingDebounce || pressed ? 0.5 : 1 },
+                        ]}
+                        disabled={resettingDebounce || !project?.serverId}
+                        onPress={async () => {
+                            if (!project?.serverId) return;
+                            const confirmed = await Modal.confirm(
+                                t("supervisor.autoLoopResetTitle"),
+                                t("supervisor.autoLoopResetMessage"),
+                                {
+                                    confirmText: t("supervisor.autoLoopResetConfirm"),
+                                    cancelText: t("common.cancel"),
+                                },
+                            );
+                            if (!confirmed) return;
+                            setResettingDebounce(true);
+                            try {
+                                const credentials = await TokenStorage.getCredentials();
+                                if (!credentials) return;
+                                await resetAutoLoopDebounce(credentials, project.serverId);
+                                const localProject = projectManager.getProject(id);
+                                if (localProject) localProject.updatedAt = Date.now();
+                                Modal.toast(t("supervisor.autoLoopResetDone"));
+                            } catch (err) {
+                                Modal.alert(
+                                    t("common.error"),
+                                    err instanceof Error ? err.message : String(err),
+                                );
+                            } finally {
+                                if (mountedRef.current) setResettingDebounce(false);
+                            }
+                        }}
+                    >
+                        {resettingDebounce ? (
+                            <ActivityIndicator size="small" color="#FF9500" />
+                        ) : (
+                            <Text style={styles.resetButtonText}>
+                                {t("supervisor.autoLoopResetButton")}
+                            </Text>
+                        )}
+                    </Pressable>
                 )}
             </ItemGroup>
 
@@ -1768,6 +1869,23 @@ const styles = StyleSheet.create((theme, rt) => ({
         textAlign: "center" as const,
         minWidth: 36,
         padding: 0,
+    },
+    resetButton: {
+        marginHorizontal: 16,
+        marginTop: 8,
+        marginBottom: 12,
+        paddingVertical: 10,
+        paddingHorizontal: 16,
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: "#FF9500",
+        alignItems: "center" as const,
+        justifyContent: "center" as const,
+    },
+    resetButtonText: {
+        ...Typography.default("semiBold"),
+        fontSize: 14,
+        color: "#FF9500",
     },
     customRulesCard: {
         padding: 16,

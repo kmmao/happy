@@ -198,10 +198,16 @@ export async function updateSupervisorConfig(
         /**
          * ADR-0022 D-1 — healthScore threshold (0..100, higher = unhealthier)
          * at or above which a standalone SupervisorRun's completion
-         * auto-starts a supervisor loop. null disables. 24h debounce is
-         * enforced server-side.
+         * auto-starts a supervisor loop. null disables.
          */
         autoLoopHealthThreshold?: number | null;
+        /**
+         * ADR-0022 D-1 follow-up — debounce window (minutes) between
+         * auto-loop starts. 0 disables debounce; default 1440 (24h). Cap
+         * 10080 (7 days). Reset the cooldown clock with
+         * resetAutoLoopDebounce().
+         */
+        autoLoopDebounceMinutes?: number;
     },
 ): Promise<SupervisorConfigResponse> {
     const API_ENDPOINT = getServerUrl();
@@ -222,6 +228,35 @@ export async function updateSupervisorConfig(
         throwIfNotOk(response, 'Failed to update supervisor config');
 
         return (await response.json()) as SupervisorConfigResponse;
+    });
+}
+
+/**
+ * ADR-0022 D-1 follow-up — clear a project's auto-loop cooldown clock so the
+ * very next eligible SupervisorRun completion can fire an auto-loop without
+ * waiting out the configured debounce window. Idempotent.
+ */
+export async function resetAutoLoopDebounce(
+    credentials: AuthCredentials,
+    projectId: string,
+): Promise<{ ok: boolean; previousLastAutoLoopStartedAt: number | null }> {
+    const API_ENDPOINT = getServerUrl();
+
+    return await backoff(async () => {
+        const response = await fetch(
+            `${API_ENDPOINT}/v1/projects/${projectId}/supervisor/autoloop/reset-debounce`,
+            {
+                method: "POST",
+                headers: authHeaders(credentials),
+            },
+        );
+
+        throwIfNotOk(response, 'Failed to reset auto-loop debounce');
+
+        return (await response.json()) as {
+            ok: boolean;
+            previousLastAutoLoopStartedAt: number | null;
+        };
     });
 }
 

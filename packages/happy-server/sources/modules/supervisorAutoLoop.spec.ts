@@ -1,11 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
-    AUTO_LOOP_DEBOUNCE_MS,
+    DEFAULT_AUTO_LOOP_DEBOUNCE_MS,
     decideAutoLoop,
     type AutoLoopDecisionInput,
 } from "./supervisorAutoLoop";
 
 const NOW = 1_700_000_000_000;
+const ONE_HOUR_MS = 60 * 60 * 1000;
 
 function base(overrides: Partial<AutoLoopDecisionInput>): AutoLoopDecisionInput {
     return {
@@ -13,6 +14,7 @@ function base(overrides: Partial<AutoLoopDecisionInput>): AutoLoopDecisionInput 
         healthScore: 50,
         lastAutoLoopStartedAt: null,
         runLoopId: null,
+        debounceMs: DEFAULT_AUTO_LOOP_DEBOUNCE_MS,
         now: NOW,
         ...overrides,
     };
@@ -54,19 +56,19 @@ describe("decideAutoLoop (ADR-0022 D-1)", () => {
 
     describe("debounce boundary behaviour:", () => {
         it("exactly at the boundary is still debounced (strict less-than)", () => {
-            const lastStart = new Date(NOW - AUTO_LOOP_DEBOUNCE_MS);
+            const lastStart = new Date(NOW - DEFAULT_AUTO_LOOP_DEBOUNCE_MS);
             const decision = decideAutoLoop(base({ lastAutoLoopStartedAt: lastStart }));
             expect(decision).toEqual({ fire: true });
         });
 
         it("just past the boundary fires", () => {
-            const lastStart = new Date(NOW - AUTO_LOOP_DEBOUNCE_MS - 1);
+            const lastStart = new Date(NOW - DEFAULT_AUTO_LOOP_DEBOUNCE_MS - 1);
             const decision = decideAutoLoop(base({ lastAutoLoopStartedAt: lastStart }));
             expect(decision).toEqual({ fire: true });
         });
 
         it("just inside the boundary still debounces", () => {
-            const lastStart = new Date(NOW - AUTO_LOOP_DEBOUNCE_MS + 1);
+            const lastStart = new Date(NOW - DEFAULT_AUTO_LOOP_DEBOUNCE_MS + 1);
             const decision = decideAutoLoop(base({ lastAutoLoopStartedAt: lastStart }));
             expect(decision).toEqual({ fire: false, reason: "debounced" });
         });
@@ -86,6 +88,56 @@ describe("decideAutoLoop (ADR-0022 D-1)", () => {
         it("threshold 0 fires for any non-null health score", () => {
             const decision = decideAutoLoop(base({ threshold: 0, healthScore: 0 }));
             expect(decision).toEqual({ fire: true });
+        });
+    });
+
+    describe("configurable debounce window:", () => {
+        it("respects a project's custom short window", () => {
+            // 1h debounce; last start 30 min ago → still in window
+            const lastStart = new Date(NOW - 30 * 60 * 1000);
+            const decision = decideAutoLoop(base({
+                lastAutoLoopStartedAt: lastStart,
+                debounceMs: ONE_HOUR_MS,
+            }));
+            expect(decision).toEqual({ fire: false, reason: "debounced" });
+        });
+
+        it("fires when the custom short window has elapsed", () => {
+            // 1h debounce; last start 90 min ago → window passed
+            const lastStart = new Date(NOW - 90 * 60 * 1000);
+            const decision = decideAutoLoop(base({
+                lastAutoLoopStartedAt: lastStart,
+                debounceMs: ONE_HOUR_MS,
+            }));
+            expect(decision).toEqual({ fire: true });
+        });
+
+        it("respects a project's custom long window (1 week)", () => {
+            // 7-day debounce; last start 3 days ago → still in window
+            const sevenDays = 7 * 24 * 60 * 60 * 1000;
+            const lastStart = new Date(NOW - 3 * 24 * 60 * 60 * 1000);
+            const decision = decideAutoLoop(base({
+                lastAutoLoopStartedAt: lastStart,
+                debounceMs: sevenDays,
+            }));
+            expect(decision).toEqual({ fire: false, reason: "debounced" });
+        });
+
+        it("debounceMs = 0 disables debounce entirely (testing / manual reset)", () => {
+            const lastStart = new Date(NOW - 1000); // 1s ago
+            const decision = decideAutoLoop(base({
+                lastAutoLoopStartedAt: lastStart,
+                debounceMs: 0,
+            }));
+            expect(decision).toEqual({ fire: true });
+        });
+
+        it("debounceMs = 0 still gates everything else (threshold, in_loop, etc.)", () => {
+            const decision = decideAutoLoop(base({
+                threshold: null,
+                debounceMs: 0,
+            }));
+            expect(decision).toEqual({ fire: false, reason: "disabled" });
         });
     });
 

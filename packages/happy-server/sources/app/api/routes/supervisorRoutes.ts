@@ -42,8 +42,13 @@ export function supervisorRoutes(app: Fastify) {
                     // ADR-0022 D-1 — autonomous loop discovery. null disables;
                     // 0..100 sets the healthScore threshold above which a
                     // standalone run's completion auto-starts a supervisor
-                    // loop. 24h debounce is enforced on the server.
+                    // loop. Debounce window between auto-starts is configurable
+                    // separately (autoLoopDebounceMinutes). Manual reset via
+                    // POST autoloop/reset-debounce.
                     autoLoopHealthThreshold: z.number().int().min(0).max(100).nullable().optional(),
+                    // 0..10080 minutes (0 disables debounce; 10080 = 7 days
+                    // cap). Default at column level is 1440 (24h).
+                    autoLoopDebounceMinutes: z.number().int().min(0).max(10080).optional(),
                 }),
             },
         },
@@ -61,6 +66,7 @@ export function supervisorRoutes(app: Fastify) {
                 supervisorCustomRules,
                 fixStrategy,
                 autoLoopHealthThreshold,
+                autoLoopDebounceMinutes,
             } = request.body;
 
             const existing = await db.project.findFirst({
@@ -109,6 +115,9 @@ export function supervisorRoutes(app: Fastify) {
             if (autoLoopHealthThreshold !== undefined) {
                 updateData.autoLoopHealthThreshold = autoLoopHealthThreshold;
             }
+            if (autoLoopDebounceMinutes !== undefined) {
+                updateData.autoLoopDebounceMinutes = autoLoopDebounceMinutes;
+            }
 
             // Compute nextRunAt when scheduling is enabled/changed
             if (supervisorScheduleEnabled === true) {
@@ -129,6 +138,45 @@ export function supervisorRoutes(app: Fastify) {
             return reply.send({
                 supervisorConfig: updated.supervisorConfig,
                 supervisorConfigVersion: updated.supervisorConfigVersion,
+            });
+        },
+    );
+
+    // POST /v1/projects/:id/supervisor/autoloop/reset-debounce
+    // ADR-0022 D-1 follow-up — clears the project's auto-loop cooldown clock
+    // so the very next eligible SupervisorRun completion can fire an auto-
+    // loop without waiting out the configured window. Useful for testing and
+    // for incident response. Idempotent; safe to call when no cooldown is
+    // currently active (lastAutoLoopStartedAt is already null).
+    app.post(
+        "/v1/projects/:id/supervisor/autoloop/reset-debounce",
+        {
+            preHandler: app.authenticate,
+            schema: {
+                params: z.object({ id: z.string() }),
+            },
+        },
+        async (request, reply) => {
+            const userId = request.userId;
+            const { id } = request.params;
+
+            const existing = await db.project.findFirst({
+                where: { id, accountId: userId },
+                select: { id: true, lastAutoLoopStartedAt: true },
+            });
+            if (!existing) {
+                return reply.code(404).send({ error: "Project not found" });
+            }
+
+            await db.project.update({
+                where: { id },
+                data: { lastAutoLoopStartedAt: null },
+            });
+
+            return reply.send({
+                ok: true,
+                previousLastAutoLoopStartedAt:
+                    existing.lastAutoLoopStartedAt?.getTime() ?? null,
             });
         },
     );

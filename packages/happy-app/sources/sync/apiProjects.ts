@@ -25,6 +25,8 @@ export interface ServerProject {
     supervisorCustomRules: string | null;
     /** ADR-0022 D-1 — health threshold above which standalone runs auto-start a supervisor loop; null disables. */
     autoLoopHealthThreshold: number | null;
+    /** ADR-0022 D-1 — debounce window (minutes) between auto-loop starts. 0 disables debounce. Default 1440 (24h). */
+    autoLoopDebounceMinutes: number;
     archived: boolean;
     sessionCount?: number;
     createdAt: number;

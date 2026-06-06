@@ -18,12 +18,12 @@ import { log } from "@/utils/log";
 import { startLoop } from "@/modules/supervisorLoopEngine";
 
 /**
- * 24h debounce between auto-starts on the same project. A noisy project (e.g.
- * health score perpetually above threshold because a fix isn't possible)
- * should not auto-spawn a fresh loop every hour. Inside the window we still
- * surface the run normally — we just don't add a new loop on top.
+ * Default debounce between auto-starts on the same project — 24h, matching
+ * the original D-1 commit. Projects can override via
+ * Project.autoLoopDebounceMinutes (0 = disable debounce; useful for testing
+ * and for the manual reset flow below).
  */
-export const AUTO_LOOP_DEBOUNCE_MS = 24 * 60 * 60 * 1000;
+export const DEFAULT_AUTO_LOOP_DEBOUNCE_MS = 24 * 60 * 60 * 1000;
 
 export interface AutoLoopDecisionInput {
     /** Threshold from Project.autoLoopHealthThreshold; null = disabled. */
@@ -34,6 +34,13 @@ export interface AutoLoopDecisionInput {
     lastAutoLoopStartedAt: Date | null;
     /** Run's loopId — non-null means the run is already inside a loop. */
     runLoopId: string | null;
+    /**
+     * Debounce window length in ms. 0 disables debounce (always fires when
+     * other guards pass). Comes from Project.autoLoopDebounceMinutes × 60_000;
+     * the wrapper falls back to DEFAULT_AUTO_LOOP_DEBOUNCE_MS if the column
+     * read fails.
+     */
+    debounceMs: number;
     /** Caller-controlled clock for tests. */
     now: number;
 }
@@ -63,8 +70,9 @@ export function decideAutoLoop(input: AutoLoopDecisionInput): AutoLoopDecision {
         return { fire: false, reason: "below_threshold" };
     }
     if (
+        input.debounceMs > 0 &&
         input.lastAutoLoopStartedAt &&
-        input.now - input.lastAutoLoopStartedAt.getTime() < AUTO_LOOP_DEBOUNCE_MS
+        input.now - input.lastAutoLoopStartedAt.getTime() < input.debounceMs
     ) {
         return { fire: false, reason: "debounced" };
     }
@@ -111,16 +119,19 @@ export async function maybeAutoStartLoop(opts: {
             where: { id: opts.projectId },
             select: {
                 autoLoopHealthThreshold: true,
+                autoLoopDebounceMinutes: true,
                 lastAutoLoopStartedAt: true,
             },
         });
         if (!project) return { fire: false, reason: "disabled" };
 
+        const debounceMinutes = Math.max(0, project.autoLoopDebounceMinutes);
         const decision = decideAutoLoop({
             threshold: project.autoLoopHealthThreshold,
             healthScore: opts.healthScore,
             lastAutoLoopStartedAt: project.lastAutoLoopStartedAt,
             runLoopId: opts.runLoopId,
+            debounceMs: debounceMinutes * 60_000,
             now: opts.now ?? Date.now(),
         });
         if (!decision.fire) return decision;

@@ -459,8 +459,13 @@ model Project {
     // When set, an AgentLoop (role=supervisor) is auto-started whenever a
     // standalone (non-loop) SupervisorRun completes with healthScore >= the
     // threshold. null = disabled (default). lastAutoLoopStartedAt enforces a
-    // 24h debounce so a noisy project doesn't fire repeatedly.
+    // configurable debounce so a noisy project doesn't fire repeatedly.
+    // autoLoopDebounceMinutes is the window length in minutes (default 1440 =
+    // 24h); set to 0 to disable debounce entirely (useful for testing). Reset
+    // the cooldown manually via POST /v1/projects/:id/supervisor/autoloop/
+    // reset-debounce.
     autoLoopHealthThreshold           Int?
+    autoLoopDebounceMinutes           Int       @default(1440)
     lastAutoLoopStartedAt             DateTime?
 
     // Knowledge base configuration (project-level overrides)
