@@ -12,6 +12,7 @@ import {
     resumeLoop,
     stopLoop,
 } from "@/modules/supervisorLoopEngine";
+import { inboxCreate } from "@/modules/inboxCreate";
 import { resolveConfiguredSupervisorProfile } from "@/modules/supervisorConfiguredProfile";
 import { ResolvedRuntimeProfileSchema } from "@/types/aiBackendProfile";
 
@@ -72,6 +73,33 @@ export function supervisorLoopRoutes(app: Fastify) {
 
             const loop = await db.agentLoop.findUnique({
                 where: { id: result.loopId },
+            });
+
+            // Persistent audit trail — symmetric with the D-1 auto-loop-fired
+            // inbox entry (ADR-0022 — see modules/supervisorAutoLoop.ts) so the
+            // inbox carries every loop start, not just the autonomous ones.
+            // This row only fires for the manual POST path; D-1 has its own
+            // call site, avoiding a duplicate entry for the same loop. The
+            // event type ("loopStarted") is deliberately distinct from
+            // auto-loop-fired so the inbox view can show whether the user or
+            // the system initiated each loop.
+            void inboxCreate({
+                accountId: userId,
+                category: "supervisor",
+                eventType: "supervisor.loopStarted",
+                severity: "info",
+                title: `Supervisor loop started (max ${request.body.maxIterations} iter)`,
+                body: `Manual start. Auto-approve at confidence ≥ ${request.body.autoApproveThreshold}%.`,
+                referenceUrl: `/project/${id}/supervisor-loop/${result.loopId}`,
+                refType: "project",
+                refId: id,
+                // One entry per loop start; the surrounding mutual-exclusion
+                // guard in startLoop already prevents a second concurrent
+                // start, so this is just defence in depth.
+                groupKey: `loop-start:${result.loopId}`,
+                // User just clicked Start — they already know. The brief push
+                // on completion is where we ring the phone.
+                skipPush: true,
             });
 
             return reply.send({ loop: loop ? serializeLoop(loop) : { id: result.loopId } });
