@@ -20,6 +20,7 @@ import {
     eventRouter,
     buildAutoLoopFiredEphemeral,
 } from "@/app/events/eventRouter";
+import { inboxCreate } from "@/modules/inboxCreate";
 
 /**
  * Default debounce between auto-starts on the same project — 24h, matching
@@ -166,6 +167,27 @@ export async function maybeAutoStartLoop(opts: {
                 firedAt,
             }),
             recipientFilter: { type: "user-scoped-only" },
+        });
+
+        // Persistent audit trail — the toast above only fires for users who
+        // are on the settings page at the moment we fire. The inbox entry
+        // makes the autonomous decision discoverable later, so users can
+        // build trust in the auto-loop behaviour by reviewing what it did
+        // and when. skipPush=true: the brief push at completion is the
+        // right moment to ring the user; firing is low-info "FYI". Dedup
+        // groupKey within 1h covers daemon restart / retry edge cases.
+        void inboxCreate({
+            accountId: opts.userId,
+            category: "supervisor",
+            eventType: "supervisor.autoLoopFired",
+            severity: "info",
+            title: `Auto-loop started (health ${opts.healthScore} ≥ ${project.autoLoopHealthThreshold})`,
+            body: `Supervisor loop ${result.loopId} was started automatically because the latest run's health score crossed the configured threshold.`,
+            referenceUrl: `/project/${opts.projectId}/supervisor-loop/${result.loopId}`,
+            refType: "project",
+            refId: opts.projectId,
+            groupKey: `auto-loop-fired:${opts.projectId}`,
+            skipPush: true,
         });
 
         // Stamp debounce only after a successful start.
