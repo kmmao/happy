@@ -17,6 +17,25 @@ import {
 } from "@/app/events/eventRouter";
 import { buildSupervisorLoopBrief } from "@/modules/supervisorLoopBrief";
 import { pushSupervisorLoopNotification } from "@/modules/pushSend";
+import { inboxCreate } from "@/modules/inboxCreate";
+
+/**
+ * ADR-0022 — map an exitReason to inbox severity for the loop-completion
+ * audit entry. Cost cap, repeated failures, and wall-clock timeout are user-
+ * actionable "something didn't fully work out" signals → warning. Everything
+ * else (clean convergence, user stop, max iterations reached as configured)
+ * is informational.
+ */
+function severityForExitReason(reason: LoopExitReason): "info" | "warning" {
+    switch (reason) {
+        case "cost_cap":
+        case "consecutive_failures":
+        case "timeout":
+            return "warning";
+        default:
+            return "info";
+    }
+}
 import { checkDailyRunLimit, incrementDailyRunCount } from "@/modules/supervisorLimits";
 import { auth } from "@/app/auth/auth";
 import {
@@ -916,6 +935,30 @@ async function completeLoop(
                 { module: "supervisor", level: "warn" },
                 `Push notification failed for loop ${updated.id}: ${err}`,
             );
+        });
+
+        // Persistent audit trail — symmetric with the auto-loop-fired entry
+        // so the inbox carries both the start and end of every supervisor
+        // loop. Severity maps from exitReason (cost cap / repeat failures /
+        // timeout → warning; everything else → info). skipPush=true because
+        // pushSupervisorLoopNotification above already rings the phone — we
+        // don't want a second buzz from the inbox push path.
+        void inboxCreate({
+            accountId: userId,
+            category: "supervisor",
+            eventType: "supervisor.loopCompleted",
+            severity: severityForExitReason(reason),
+            title: `Supervisor loop ${titleVerb} — ${reason}`,
+            body: brief.summary,
+            referenceUrl: `/project/${updated.projectId}/supervisor-loop/${updated.id}`,
+            refType: "project",
+            refId: updated.projectId,
+            // groupKey scoped to the loop id (not the project) so one loop
+            // can only produce one completion entry; subsequent state
+            // transitions on the same row are no-ops here anyway because
+            // updateMany above filters status: {in: ["running", "paused"]}.
+            groupKey: `loop-complete:${updated.id}`,
+            skipPush: true,
         });
     }
 
