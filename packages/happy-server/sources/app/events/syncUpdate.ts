@@ -195,7 +195,10 @@ export async function emitSyncUpdate(
         const seq = await allocateUserSeq(accountId);
         const id = randomKeyNaked(12);
         const payload = buildPayload(accountId, body, seq, id);
-        eventRouter.emitUpdate({
+        // Direct call to the transport-level multicast sink. Only this seam
+        // is allowed to invoke `_emitUpdateInternal` — callers route through
+        // `emitSyncUpdate` above (ADR-0023).
+        eventRouter._emitUpdateInternal({
             userId: accountId,
             payload,
             recipientFilter: recipientFilterFor(body),

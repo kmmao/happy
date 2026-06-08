@@ -618,7 +618,19 @@ class EventRouter {
 
   // === EVENT EMISSION METHODS ===
 
-  emitUpdate(params: {
+  /**
+   * @internal Transport-level SyncUpdate multicast sink. Do NOT call this
+   * directly from action / route / handler code — call `emitSyncUpdate`
+   * from `@/app/events/syncUpdate` instead, which owns the SyncUpdate
+   * lifecycle (seq + id + recipient set + afterTx coordination) per
+   * ADR-0023. The underscore + `Internal` suffix marks this method as
+   * private to the seam; the only legitimate caller is `syncUpdate.ts`.
+   *
+   * Spec files may continue to stub this method via `vi.mock` to capture
+   * emissions for assertions — those tests observe what reaches the
+   * transport, which is exactly what this method represents.
+   */
+  _emitUpdateInternal(params: {
     userId: string;
     payload: UpdatePayload;
     recipientFilter?: RecipientFilter;

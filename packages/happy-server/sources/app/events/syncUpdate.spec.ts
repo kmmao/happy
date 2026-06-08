@@ -42,10 +42,11 @@ const {
 
 // After PR 1.f the 15 wire payload constructors live in syncUpdate.ts as
 // private helpers, so eventRouter no longer exports them. We only stub
-// eventRouter.emitUpdate (the transport sink) — the real builders run end-to-
-// end, which means these tests also exercise the wire shape unintrusively.
+// eventRouter._emitUpdateInternal (the transport sink, renamed in PR 1.g to
+// mark it private to the seam) — the real builders run end-to-end, which
+// means these tests also exercise the wire shape unintrusively.
 vi.mock("@/app/events/eventRouter", () => ({
-    eventRouter: { emitUpdate: emitUpdateMock },
+    eventRouter: { _emitUpdateInternal: emitUpdateMock },
 }));
 
 vi.mock("@/storage/inTx", () => ({
@@ -238,7 +239,7 @@ describe("emitSyncUpdate — lifecycle invariants (seq, id, ordering)", () => {
         expect(payload.body.t).toBe("delete-session");
     });
 
-    it("uses accountId as userId on eventRouter.emitUpdate", async () => {
+    it("uses accountId as userId on eventRouter._emitUpdateInternal", async () => {
         await emitSyncUpdate(A, { t: "kv-batch-update", changes: [] });
         expect(emitUpdateMock.mock.calls[0][0].userId).toBe(A);
     });
@@ -297,7 +298,7 @@ describe("emitSyncUpdate — transaction coordination (Q3=A: tx optional)", () =
 });
 
 describe("emitSyncUpdate — skipSenderConnection forwarding", () => {
-    it("forwards skipSenderConnection to eventRouter.emitUpdate when given", async () => {
+    it("forwards skipSenderConnection to eventRouter._emitUpdateInternal when given", async () => {
         const conn = { connectionType: "user-scoped" } as any;
         await emitSyncUpdate(
             A,

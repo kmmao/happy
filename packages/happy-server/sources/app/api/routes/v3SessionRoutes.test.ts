@@ -227,7 +227,7 @@ vi.mock("@/utils/randomKeyNaked", () => ({
 
 vi.mock("@/app/events/eventRouter", () => ({
     eventRouter: {
-        emitUpdate: emitUpdateMock
+        _emitUpdateInternal: emitUpdateMock
     },
     buildNewMessageUpdate: vi.fn((message: unknown, sessionId: string, updateSeq: number, updateId: string) => ({
         id: updateId,

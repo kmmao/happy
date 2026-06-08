@@ -104,7 +104,7 @@ vi.mock("@/utils/log", () => ({ log: vi.fn() }));
 vi.mock("@/utils/randomKeyNaked", () => ({ randomKeyNaked: vi.fn(() => "update-id") }));
 vi.mock("@/storage/seq", () => ({ allocateUserSeq: vi.fn(async () => state.nextSeq++) }));
 vi.mock("@/app/events/eventRouter", () => ({
-    eventRouter: { emitUpdate: emitUpdateMock },
+    eventRouter: { _emitUpdateInternal: emitUpdateMock },
     buildNewMachineUpdate: vi.fn((_m: unknown, seq: number, id: string) => ({ id, seq, body: { t: "new-machine" } })),
     buildUpdateMachineUpdate: vi.fn((_mid: string, seq: number, id: string) => ({ id, seq, body: { t: "update-machine" } })),
 }));

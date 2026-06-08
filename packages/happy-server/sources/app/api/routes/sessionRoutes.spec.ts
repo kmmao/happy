@@ -167,7 +167,7 @@ vi.mock("@/app/presence/sessionCache", () => ({
     },
 }));
 vi.mock("@/app/events/eventRouter", () => ({
-    eventRouter: { emitUpdate: emitUpdateMock },
+    eventRouter: { _emitUpdateInternal: emitUpdateMock },
     buildNewSessionUpdate: vi.fn((_session: unknown, seq: number, id: string) => ({
         id,
         seq,
