@@ -85,8 +85,12 @@ A lightweight timeline entry recording operations during a Session (file edits, 
 _Avoid_: Log, activity
 
 **SyncUpdate**:
-A typed, seq-ordered server→client broadcast that delivers a change to a domain entity (Session, Machine, Account, Project, Artifact, Feed entry, KV) to all Account-owned connections that need to know. Wire shape is `UpdatePayload` (`{id, seq, body: {t, ...}}`); each `body.t` uniquely determines the recipient set (the App, the Session's CLI side, the Machine's Daemon, or some combination). Persistent per ADR-0013: clients dedupe by `id` and reconcile by `seq`, so a SyncUpdate emitted while a client is offline is recoverable from sync state on reconnect. Distinct from SessionEvent (intra-Session timeline) and from Ephemeral broadcasts (no seq, no reconciliation, fire-and-forget).
+A typed, seq-ordered server→client broadcast that delivers a change to a domain entity (Session, Machine, Account, Project, Artifact, Feed entry, KV) to all Account-owned connections that need to know. Wire shape is `UpdatePayload` (`{id, seq, body: {t, ...}}`); each `body.t` uniquely determines the recipient set (the App, the Session's CLI side, the Machine's Daemon, or some combination). Persistent per ADR-0013: clients dedupe by `id` and reconcile by `seq`, so a SyncUpdate emitted while a client is offline is recoverable from sync state on reconnect. Pairs symmetrically with **SyncEphemeral**; the two together cover every server→client broadcast.
 _Avoid_: Notification, broadcast, event (collides with SessionEvent), message (collides with SessionMessage)
+
+**SyncEphemeral**:
+A typed, fire-and-forget server→client broadcast that signals a transient state change (activity ticks, terminal output, task triggers, supervisor progress, preview state, inter-agent fan-out, etc.) without persisting or reconciling. Wire shape is `EphemeralPayload` (`{type, ...}`); each variant's `type` (or seam-internal `t` discriminator) uniquely determines the recipient set. Per ADR-0013: no seq, no client-side dedup, no replay on reconnect — clients that miss a SyncEphemeral simply miss it. Pairs symmetrically with **SyncUpdate**; the SyncEphemeral seam lives in `app/events/syncEphemeral.ts` (per ADR-0024) and shares the `eventRouter` transport adapter and `RecipientFilter` taxonomy with SyncUpdate but not its seq / id / `afterTx` lifecycle.
+_Avoid_: Notification (too generic), broadcast (too generic), Ephemeral on its own (it is a SyncEphemeral; "ephemeral" as an adjective is fine)
 
 **Turn**:
 One agent request→response cycle within a Session, bracketed by a `turn-start`/`turn-end` SessionEvent pair and carrying the ordered SessionEvents (text, tool calls, Subagent activity) produced in between. A Session is a sequence of Turns. The CLI assembles Turns from the underlying provider's stream (Claude JSONL, Codex, ACP) through a single Turn lifecycle reducer rather than per-provider hand-rolled state.
@@ -120,6 +124,7 @@ _Avoid_: Profile, backend, config
 - A **Session** is bound to exactly one **Machine** and has exactly one **AccessKey**
 - A **Session** contains ordered **SessionMessages** and **SessionEvents**
 - Every server-side mutation of a domain entity emits a **SyncUpdate**; its `body.t` determines which Account-owned connections receive it
+- Every server-side transient-state signal emits a **SyncEphemeral**; its discriminator likewise determines the recipient set, but no client-side reconciliation applies
 - A **Session** is a sequence of **Turns**; a **Turn** contains ordered **SessionEvents** and zero or more concurrent **Subagents**, all bracketed by its turn-start/turn-end pair
 - A **Project** lives on exactly one **Machine** at a specific path
 - A **Project** contains **Knowledge**, **Skills**, **Triggers**, **AgentLoops**, and **SupervisorRuns**
@@ -159,4 +164,5 @@ _Avoid_: Profile, backend, config
 - **Preview** traffic is not E2E encrypted (HTTP proxy needs plaintext for the browser); all other Session content remains E2E — see ADR-0001 and ADR-0007.
 - **VisualAnnotation** currently travels as a markdown SessionMessage with a fenced JSON block; migrating to `visual_annotation_reference` inputBlock — see ADR-0007.
 - **SyncUpdate** is the domain term; the wire-level type is still named `UpdatePayload` and the Socket.IO event name is `update`. Align in a future breaking version bump of `@kmmao/happy-wire`. App-side code already uses "sync update" (`syncUpdateHandlers.ts`, `syncUpdateScope.ts`) — the server side adopts the same term via this seam.
+- **SyncEphemeral** is the domain term; the wire-level type is still named `EphemeralPayload` and the Socket.IO event name is `ephemeral`. The same future wire bump will align the naming. The `inter-agent-message-deliver` and `inter-agent-message-echo` seam discriminators both wire-emit `type: "inter-agent-message"` (ADR-0024 decision E3); this is the one place where the seam's body discriminator deliberately differs from the wire `type`.
 
