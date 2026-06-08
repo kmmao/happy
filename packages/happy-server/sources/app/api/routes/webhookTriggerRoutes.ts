@@ -1,7 +1,4 @@
-import {
-    eventRouter,
-    buildTaskTriggerEphemeral,
-} from "@/app/events/eventRouter";
+import { emitSyncEphemeral } from "@/app/events/syncEphemeral";
 import { type Fastify } from "../types";
 import { db } from "@/storage/db";
 import { z } from "zod";
@@ -236,26 +233,21 @@ export function webhookTriggerRoutes(app: Fastify) {
                 return created;
             });
 
-            // Dispatch to CLI daemon (after transaction commits)
-            eventRouter.emitEphemeral({
-                userId: trigger.accountId,
-                payload: buildTaskTriggerEphemeral({
-                    taskId: task.id,
-                    prompt,
-                    directory,
-                    priority: trigger.priority,
-                    projectId: resolvedProjectId ?? undefined,
-                    skillContents,
-                    profileId: resolvedProfileId,
-                    runtimeProfile:
-                        resolvedRuntimeProfile?.ok
-                            ? resolvedRuntimeProfile.runtimeProfile
-                            : undefined,
-                }),
-                recipientFilter: {
-                    type: "machine-scoped-only",
-                    machineId: trigger.machineId,
-                },
+            // Dispatch to CLI daemon (after transaction commits).
+            await emitSyncEphemeral(trigger.accountId, {
+                t: "task-trigger",
+                machineId: trigger.machineId,
+                taskId: task.id,
+                prompt,
+                directory,
+                priority: trigger.priority,
+                projectId: resolvedProjectId ?? undefined,
+                skillContents,
+                profileId: resolvedProfileId,
+                runtimeProfile:
+                    resolvedRuntimeProfile?.ok
+                        ? resolvedRuntimeProfile.runtimeProfile
+                        : undefined,
             });
 
             void inboxCreate({

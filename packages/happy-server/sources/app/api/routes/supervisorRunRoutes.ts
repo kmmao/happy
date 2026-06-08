@@ -1,7 +1,4 @@
-import {
-    eventRouter,
-    buildSupervisorStatusEphemeral,
-} from "@/app/events/eventRouter";
+import { emitSyncEphemeral } from "@/app/events/syncEphemeral";
 import { type Fastify } from "../types";
 import { db } from "@/storage/db";
 import { z } from "zod";
@@ -327,29 +324,27 @@ export function supervisorRunRoutes(app: Fastify) {
                 where: { id: runId },
             });
 
-            // Notify App about cancellation
-            eventRouter.emitEphemeral({
-                userId,
-                payload: buildSupervisorStatusEphemeral(
-                    runId,
-                    id,
-                    "cancelled",
-                ),
-                recipientFilter: { type: "user-scoped-only" },
+            // Notify App about cancellation.
+            await emitSyncEphemeral(userId, {
+                t: "supervisor-status",
+                runId,
+                projectId: id,
+                status: "cancelled",
             });
 
-            // Notify daemon to terminate the underlying CLI process
-            // Supervisor sessions don't have AccessKey records, so use the project's machineId
+            // Notify daemon to terminate the underlying CLI process.
+            // Supervisor sessions don't have AccessKey records, so use the project's machineId.
             if (updated?.sessionId) {
                 const project = await db.project.findUnique({
                     where: { id },
                     select: { machineId: true },
                 });
                 if (project?.machineId) {
-                    eventRouter.emitEphemeral({
-                        userId,
-                        payload: { type: "session-terminate", sessionId: updated.sessionId, reason: "cancelled" },
-                        recipientFilter: { type: "machine-scoped-only", machineId: project.machineId },
+                    await emitSyncEphemeral(userId, {
+                        t: "session-terminate",
+                        sessionId: updated.sessionId,
+                        reason: "cancelled",
+                        machineId: project.machineId,
                     });
                 }
             }

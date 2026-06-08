@@ -1,10 +1,7 @@
 import { type Fastify } from "../types";
 import { db } from "@/storage/db";
 import { z } from "zod";
-import {
-    buildSupervisorStatusEphemeral,
-    eventRouter,
-} from "@/app/events/eventRouter";
+import { emitSyncEphemeral } from "@/app/events/syncEphemeral";
 import { pushSupervisorNotification } from "@/modules/pushSend";
 import { onFixCompleted as loopOnFixCompleted } from "@/modules/supervisorLoopEngine";
 import { emitConfiguredSupervisorFixTrigger } from "@/modules/supervisorFixTrigger";
@@ -602,16 +599,13 @@ export function supervisorActionRoutes(app: Fastify) {
                 where: { id: actionId },
             });
 
-            // Notify App clients about fix status change (mirrors socket handler)
+            // Notify App clients about fix status change (mirrors socket handler).
             if (updated) {
-                eventRouter.emitEphemeral({
-                    userId,
-                    payload: buildSupervisorStatusEphemeral(
-                        updated.runId,
-                        id,
-                        `fix-${fixStatus}`,
-                    ),
-                    recipientFilter: { type: "user-scoped-only" },
+                await emitSyncEphemeral(userId, {
+                    t: "supervisor-status",
+                    runId: updated.runId,
+                    projectId: id,
+                    status: `fix-${fixStatus}`,
                 });
             }
 
@@ -626,18 +620,12 @@ export function supervisorActionRoutes(app: Fastify) {
                 });
 
                 if (project?.machineId) {
-                    eventRouter.emitEphemeral({
-                        userId,
-                        payload: {
-                            type: "supervisor-fix-kill-session",
-                            fixSessionId: updated.fixSessionId,
-                            projectId: id,
-                            fixStatus,
-                        },
-                        recipientFilter: {
-                            type: "machine-scoped-only",
-                            machineId: project.machineId,
-                        },
+                    await emitSyncEphemeral(userId, {
+                        t: "supervisor-fix-kill-session",
+                        fixSessionId: updated.fixSessionId,
+                        projectId: id,
+                        fixStatus,
+                        machineId: project.machineId,
                     });
                 }
 
@@ -734,31 +722,22 @@ export function supervisorActionRoutes(app: Fastify) {
                 });
 
                 if (project?.machineId) {
-                    eventRouter.emitEphemeral({
-                        userId,
-                        payload: {
-                            type: "supervisor-fix-kill-session",
-                            fixSessionId: action.fixSessionId,
-                            projectId: id,
-                            fixStatus: resolution,
-                        },
-                        recipientFilter: {
-                            type: "machine-scoped-only",
-                            machineId: project.machineId,
-                        },
+                    await emitSyncEphemeral(userId, {
+                        t: "supervisor-fix-kill-session",
+                        fixSessionId: action.fixSessionId,
+                        projectId: id,
+                        fixStatus: resolution,
+                        machineId: project.machineId,
                     });
                 }
             }
 
-            // Notify App clients
-            eventRouter.emitEphemeral({
-                userId,
-                payload: buildSupervisorStatusEphemeral(
-                    action.runId,
-                    id,
-                    `fix-${resolution}`,
-                ),
-                recipientFilter: { type: "user-scoped-only" },
+            // Notify App clients.
+            await emitSyncEphemeral(userId, {
+                t: "supervisor-status",
+                runId: action.runId,
+                projectId: id,
+                status: `fix-${resolution}`,
             });
 
             // Send push notification

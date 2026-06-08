@@ -1,7 +1,4 @@
-import {
-    eventRouter,
-    buildSupervisorTriggerEphemeral,
-} from "@/app/events/eventRouter";
+import { emitSyncEphemeral } from "@/app/events/syncEphemeral";
 import { auth } from "@/app/auth/auth";
 import {
     resolveConfiguredSupervisorProfile,
@@ -64,32 +61,26 @@ export async function emitResolvedSupervisorRunTrigger(
         runId: input.runId,
     });
 
-    eventRouter.emitEphemeral({
-        userId: input.userId,
-        payload: buildSupervisorTriggerEphemeral({
-            projectId: input.projectId,
-            runId: input.runId,
-            trigger: input.trigger,
-            machineId: input.machineId,
-            repoPath: input.repoPath,
-            callbackToken,
-            mode: input.mode,
-            dimensions: input.dimensions,
-            changedFiles: input.changedFiles,
-            customRules: input.customRules,
-            customDimensions: input.customDimensions,
-            researchParams: input.researchParams,
-            existingActions: input.existingActions,
-            maxConcurrentAnalysis: input.maxConcurrentAnalysis,
-            maxConcurrentFix: input.maxConcurrentFix,
-            maxFindings: input.maxFindings,
-            runtimeProfile: input.resolvedProfile.runtimeProfile,
-            agent: input.agent,
-        }),
-        recipientFilter: {
-            type: "machine-scoped-only",
-            machineId: input.machineId,
-        },
+    await emitSyncEphemeral(input.userId, {
+        t: "supervisor-trigger",
+        projectId: input.projectId,
+        runId: input.runId,
+        trigger: input.trigger,
+        machineId: input.machineId,
+        repoPath: input.repoPath,
+        callbackToken,
+        mode: input.mode,
+        dimensions: input.dimensions,
+        changedFiles: input.changedFiles,
+        customRules: input.customRules,
+        customDimensions: input.customDimensions,
+        researchParams: input.researchParams,
+        existingActions: input.existingActions,
+        maxConcurrentAnalysis: input.maxConcurrentAnalysis,
+        maxConcurrentFix: input.maxConcurrentFix,
+        maxFindings: input.maxFindings,
+        runtimeProfile: input.resolvedProfile.runtimeProfile,
+        agent: input.agent,
     });
 }
 

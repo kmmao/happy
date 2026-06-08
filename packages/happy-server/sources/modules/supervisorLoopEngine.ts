@@ -9,12 +9,7 @@
 
 import { db } from "@/storage/db";
 import { log } from "@/utils/log";
-import {
-    eventRouter,
-    buildSupervisorTriggerEphemeral,
-    buildSupervisorLoopStatusEphemeral,
-    buildSupervisorLoopBriefEphemeral,
-} from "@/app/events/eventRouter";
+import { emitSyncEphemeral } from "@/app/events/syncEphemeral";
 import { buildSupervisorLoopBrief } from "@/modules/supervisorLoopBrief";
 import { pushSupervisorLoopNotification } from "@/modules/pushSend";
 import { inboxCreate } from "@/modules/inboxCreate";
@@ -263,27 +258,21 @@ export async function startLoop(
         runId: loop.firstRunId,
     });
 
-    eventRouter.emitEphemeral({
-        userId: accountId,
-        payload: buildSupervisorTriggerEphemeral({
-            projectId,
-            runId: loop.firstRunId,
-            trigger: "manual",
-            machineId: project.machineId,
-            repoPath: project.path,
-            callbackToken,
-            mode: project.supervisorMode ?? undefined,
-            dimensions,
-            customRules: project.supervisorCustomRules ?? undefined,
-            maxConcurrentAnalysis: concurrency.maxAnalysis,
-            maxConcurrentFix: concurrency.maxFix,
-            maxFindings: concurrency.maxFindings,
-            runtimeProfile: config.runtimeProfile,
-        }),
-        recipientFilter: {
-            type: "machine-scoped-only",
-            machineId: project.machineId,
-        },
+    await emitSyncEphemeral(accountId, {
+        t: "supervisor-trigger",
+        projectId,
+        runId: loop.firstRunId,
+        trigger: "manual",
+        machineId: project.machineId,
+        repoPath: project.path,
+        callbackToken,
+        mode: project.supervisorMode ?? undefined,
+        dimensions,
+        customRules: project.supervisorCustomRules ?? undefined,
+        maxConcurrentAnalysis: concurrency.maxAnalysis,
+        maxConcurrentFix: concurrency.maxFix,
+        maxFindings: concurrency.maxFindings,
+        runtimeProfile: config.runtimeProfile,
     });
 
     // Broadcast loop status to App
@@ -708,32 +697,26 @@ async function decideNextStep(
             purpose: "fix-status",
             actionId: action.id,
         });
-        eventRouter.emitEphemeral({
-            userId,
-            payload: buildSupervisorTriggerEphemeral({
-                projectId,
-                runId: action.id,
-                trigger: "fix",
-                machineId: project.machineId,
-                repoPath: project.path,
-                callbackToken,
-                mode: "auto",
-                fixAction: {
-                    title: action.title,
-                    description: action.description,
-                    suggestedFix: action.suggestedFix,
-                    category: action.category,
-                    severity: action.severity,
-                },
-                fixStrategy: "direct", // Loop always uses direct strategy
-                maxConcurrentAnalysis: concurrency.maxAnalysis,
-                maxConcurrentFix: concurrency.maxFix,
-                runtimeProfile,
-            }),
-            recipientFilter: {
-                type: "machine-scoped-only",
-                machineId: project.machineId,
+        await emitSyncEphemeral(userId, {
+            t: "supervisor-trigger",
+            projectId,
+            runId: action.id,
+            trigger: "fix",
+            machineId: project.machineId,
+            repoPath: project.path,
+            callbackToken,
+            mode: "auto",
+            fixAction: {
+                title: action.title,
+                description: action.description,
+                suggestedFix: action.suggestedFix,
+                category: action.category,
+                severity: action.severity,
             },
+            fixStrategy: "direct", // Loop always uses direct strategy
+            maxConcurrentAnalysis: concurrency.maxAnalysis,
+            maxConcurrentFix: concurrency.maxFix,
+            runtimeProfile,
         });
     }
 
@@ -831,30 +814,24 @@ async function triggerNextAnalysis(
         runId: run.id,
     });
 
-    eventRouter.emitEphemeral({
-        userId,
-        payload: buildSupervisorTriggerEphemeral({
-            projectId,
-            runId: run.id,
-            trigger: "manual",
-            machineId: project.machineId,
-            repoPath: project.path,
-            callbackToken,
-            mode: project.supervisorMode ?? undefined,
-            dimensions,
-            customRules: project.supervisorCustomRules ?? undefined,
-            existingActions,
-            maxConcurrentAnalysis: concurrency.maxAnalysis,
-            maxConcurrentFix: concurrency.maxFix,
-            runtimeProfile: getStoredLoopRuntimeProfile(
-                loop.profileId ?? null,
-                loop.runtimeProfile,
-            ),
-        }),
-        recipientFilter: {
-            type: "machine-scoped-only",
-            machineId: project.machineId,
-        },
+    await emitSyncEphemeral(userId, {
+        t: "supervisor-trigger",
+        projectId,
+        runId: run.id,
+        trigger: "manual",
+        machineId: project.machineId,
+        repoPath: project.path,
+        callbackToken,
+        mode: project.supervisorMode ?? undefined,
+        dimensions,
+        customRules: project.supervisorCustomRules ?? undefined,
+        existingActions,
+        maxConcurrentAnalysis: concurrency.maxAnalysis,
+        maxConcurrentFix: concurrency.maxFix,
+        runtimeProfile: getStoredLoopRuntimeProfile(
+            loop.profileId ?? null,
+            loop.runtimeProfile,
+        ),
     });
 
     const updatedLoop = await db.agentLoop.findUnique({ where: { id: loop.id } });
@@ -914,11 +891,7 @@ async function completeLoop(
         // equivalent of AgentLoopBrief — for the cherry-pick it's computed-only (no
         // Artifact persistence yet); the App's loop detail screen consumes it directly.
         const brief = buildSupervisorLoopBrief(updated);
-        eventRouter.emitEphemeral({
-            userId,
-            payload: buildSupervisorLoopBriefEphemeral(brief),
-            recipientFilter: { type: "user-scoped-only" },
-        });
+        await emitSyncEphemeral(userId, { t: "supervisor-loop-brief", ...brief });
 
         // Push notification — closes the KAIROS-style "done → user gets pinged
         // on phone" loop. Best-effort; the brief already lives in the ephemeral
@@ -986,24 +959,21 @@ function emitLoopStatus(
         consecutiveFailures: number;
     },
 ): void {
-    eventRouter.emitEphemeral({
-        userId,
-        payload: buildSupervisorLoopStatusEphemeral({
-            loopId: loop.id,
-            projectId: loop.projectId,
-            status: loop.status,
-            currentIteration: loop.currentIteration,
-            maxIterations: loop.maxIterations,
-            currentPhase: loop.currentPhase,
-            totalCostUsd: loop.totalCostUsd,
-            totalActionsFound: loop.totalActionsFound,
-            totalActionsFixed: loop.totalActionsFixed,
-            currentHealthScore: loop.currentHealthScore,
-            initialHealthScore: loop.initialHealthScore,
-            exitReason: loop.exitReason,
-            consecutiveFailures: loop.consecutiveFailures,
-        }),
-        recipientFilter: { type: "user-scoped-only" },
+    void emitSyncEphemeral(userId, {
+        t: "supervisor-loop-status",
+        loopId: loop.id,
+        projectId: loop.projectId,
+        status: loop.status,
+        currentIteration: loop.currentIteration,
+        maxIterations: loop.maxIterations,
+        currentPhase: loop.currentPhase,
+        totalCostUsd: loop.totalCostUsd,
+        totalActionsFound: loop.totalActionsFound,
+        totalActionsFixed: loop.totalActionsFixed,
+        currentHealthScore: loop.currentHealthScore,
+        initialHealthScore: loop.initialHealthScore,
+        exitReason: loop.exitReason,
+        consecutiveFailures: loop.consecutiveFailures,
     });
 }
 

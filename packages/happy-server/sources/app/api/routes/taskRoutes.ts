@@ -1,9 +1,4 @@
-import {
-    eventRouter,
-    buildTaskTriggerEphemeral,
-    buildTaskStatusChangedEphemeral,
-    buildTaskCancelEphemeral,
-} from "@/app/events/eventRouter";
+import { emitSyncEphemeral } from "@/app/events/syncEphemeral";
 import { type Fastify } from "../types";
 import { db } from "@/storage/db";
 import { z } from "zod";
@@ -260,27 +255,22 @@ export function taskRoutes(app: Fastify) {
                 taskId: task.id,
             });
 
-            eventRouter.emitEphemeral({
-                userId,
-                payload: buildTaskTriggerEphemeral({
-                    taskId: task.id,
-                    prompt: task.prompt,
-                    directory,
-                    priority: task.priority,
-                    projectId: resolvedProjectId ?? undefined,
-                    resultToken,
-                    skillContents,
-                    profileId: taskProfileId,
-                    runtimeProfile:
-                        taskRuntimeProfile?.ok
-                            ? taskRuntimeProfile.runtimeProfile
-                            : undefined,
-                    worktreeIsolation: task.worktreeIsolation || undefined,
-                }),
-                recipientFilter: {
-                    type: "machine-scoped-only",
-                    machineId,
-                },
+            await emitSyncEphemeral(userId, {
+                t: "task-trigger",
+                machineId,
+                taskId: task.id,
+                prompt: task.prompt,
+                directory,
+                priority: task.priority,
+                projectId: resolvedProjectId ?? undefined,
+                resultToken,
+                skillContents,
+                profileId: taskProfileId,
+                runtimeProfile:
+                    taskRuntimeProfile?.ok
+                        ? taskRuntimeProfile.runtimeProfile
+                        : undefined,
+                worktreeIsolation: task.worktreeIsolation || undefined,
             });
 
             log({ module: "task" }, `Created task ${task.id} for machine ${machineId} (priority=${priority})`);
@@ -378,24 +368,22 @@ export function taskRoutes(app: Fastify) {
             });
 
             // Notify App (UI update)
-            eventRouter.emitEphemeral({
-                userId: request.userId,
-                payload: buildTaskStatusChangedEphemeral({
-                    taskId: task.id,
-                    machineId: task.machineId,
-                    status: "cancelled",
-                    completedAt: updated.completedAt?.getTime(),
-                    triggerType: task.triggerType,
-                }),
-                recipientFilter: { type: "user-scoped-only" },
+            await emitSyncEphemeral(request.userId, {
+                t: "task-status-changed",
+                taskId: task.id,
+                machineId: task.machineId,
+                status: "cancelled",
+                completedAt: updated.completedAt?.getTime(),
+                triggerType: task.triggerType,
             });
 
             // Notify CLI daemon to abort the running session
             if (task.status === "running" || task.status === "dispatching") {
-                eventRouter.emitEphemeral({
-                    userId: request.userId,
-                    payload: buildTaskCancelEphemeral({ taskId: task.id, sessionId: task.sessionId ?? undefined }),
-                    recipientFilter: { type: "machine-scoped-only", machineId: task.machineId },
+                await emitSyncEphemeral(request.userId, {
+                    t: "task-cancel",
+                    taskId: task.id,
+                    sessionId: task.sessionId ?? undefined,
+                    machineId: task.machineId,
                 });
             }
 
@@ -502,27 +490,22 @@ export function taskRoutes(app: Fastify) {
                 taskId: task.id,
             });
 
-            eventRouter.emitEphemeral({
-                userId: request.userId,
-                payload: buildTaskTriggerEphemeral({
-                    taskId: task.id,
-                    prompt: task.prompt,
-                    directory,
-                    priority: task.priority,
-                    projectId: task.projectId ?? undefined,
-                    resultToken,
-                    skillContents,
-                    profileId: retryProfileId,
-                    runtimeProfile:
-                        retryRuntimeProfile?.ok
-                            ? retryRuntimeProfile.runtimeProfile
-                            : undefined,
-                    worktreeIsolation: task.worktreeIsolation || undefined,
-                }),
-                recipientFilter: {
-                    type: "machine-scoped-only",
-                    machineId: task.machineId,
-                },
+            await emitSyncEphemeral(request.userId, {
+                t: "task-trigger",
+                machineId: task.machineId,
+                taskId: task.id,
+                prompt: task.prompt,
+                directory,
+                priority: task.priority,
+                projectId: task.projectId ?? undefined,
+                resultToken,
+                skillContents,
+                profileId: retryProfileId,
+                runtimeProfile:
+                    retryRuntimeProfile?.ok
+                        ? retryRuntimeProfile.runtimeProfile
+                        : undefined,
+                worktreeIsolation: task.worktreeIsolation || undefined,
             });
 
             log({ module: "task" }, `Retrying task ${task.id} (attempt ${updated.attempt})`);
@@ -600,15 +583,12 @@ export function taskRoutes(app: Fastify) {
                 },
             });
 
-            eventRouter.emitEphemeral({
-                userId: request.userId,
-                payload: buildTaskStatusChangedEphemeral({
-                    taskId: task.id,
-                    machineId: task.machineId,
-                    status: "queued",
-                    triggerType: task.triggerType,
-                }),
-                recipientFilter: { type: "user-scoped-only" },
+            await emitSyncEphemeral(request.userId, {
+                t: "task-status-changed",
+                taskId: task.id,
+                machineId: task.machineId,
+                status: "queued",
+                triggerType: task.triggerType,
             });
 
             log({ module: "task" }, `Restored task ${task.id} to queued`);
@@ -709,16 +689,13 @@ export function taskRoutes(app: Fastify) {
                         include: { skillBindings: { include: { skill: { select: { name: true } } } } },
                     });
 
-                    eventRouter.emitEphemeral({
-                        userId,
-                        payload: buildTaskStatusChangedEphemeral({
-                            taskId: task.id,
-                            machineId: task.machineId,
-                            status: targetStatus,
-                            completedAt: updatedTask.completedAt?.getTime(),
-                            triggerType: task.triggerType,
-                        }),
-                        recipientFilter: { type: "user-scoped-only" },
+                    await emitSyncEphemeral(userId, {
+                        t: "task-status-changed",
+                        taskId: task.id,
+                        machineId: task.machineId,
+                        status: targetStatus,
+                        completedAt: updatedTask.completedAt?.getTime(),
+                        triggerType: task.triggerType,
                     });
 
                     resultTasks.push(serializeTask(updatedTask));
@@ -739,15 +716,12 @@ export function taskRoutes(app: Fastify) {
                         include: { skillBindings: { include: { skill: { select: { name: true } } } } },
                     });
 
-                    eventRouter.emitEphemeral({
-                        userId,
-                        payload: buildTaskStatusChangedEphemeral({
-                            taskId: newTask.id,
-                            machineId,
-                            status: "queued",
-                            triggerType: "todo-file",
-                        }),
-                        recipientFilter: { type: "user-scoped-only" },
+                    await emitSyncEphemeral(userId, {
+                        t: "task-status-changed",
+                        taskId: newTask.id,
+                        machineId,
+                        status: "queued",
+                        triggerType: "todo-file",
                     });
 
                     resultTasks.push(serializeTask(newTask));
@@ -811,29 +785,24 @@ export function taskRoutes(app: Fastify) {
 
             const resultToken = await auth.createTaskResultToken({ userId, taskId: child.id });
 
-            eventRouter.emitEphemeral({
-                userId,
-                payload: buildTaskTriggerEphemeral({
-                    taskId: child.id,
-                    prompt: child.prompt,
-                    directory,
-                    priority: child.priority,
-                    projectId: parent.projectId ?? undefined,
-                    resultToken,
-                    profileId: parent.profileId ?? undefined,
-                }),
-                recipientFilter: { type: "machine-scoped-only", machineId: parent.machineId },
+            await emitSyncEphemeral(userId, {
+                t: "task-trigger",
+                machineId: parent.machineId,
+                taskId: child.id,
+                prompt: child.prompt,
+                directory,
+                priority: child.priority,
+                projectId: parent.projectId ?? undefined,
+                resultToken,
+                profileId: parent.profileId ?? undefined,
             });
 
-            eventRouter.emitEphemeral({
-                userId,
-                payload: buildTaskStatusChangedEphemeral({
-                    taskId: child.id,
-                    machineId: child.machineId,
-                    status: "queued",
-                    triggerType: child.triggerType,
-                }),
-                recipientFilter: { type: "user-scoped-only" },
+            await emitSyncEphemeral(userId, {
+                t: "task-status-changed",
+                taskId: child.id,
+                machineId: child.machineId,
+                status: "queued",
+                triggerType: child.triggerType,
             });
 
             return reply.code(201).send({ task: serializeTask(child) });
@@ -918,18 +887,15 @@ export function taskRoutes(app: Fastify) {
 
             const updated = persisted.task;
 
-            eventRouter.emitEphemeral({
-                userId: request.userId,
-                payload: buildTaskStatusChangedEphemeral({
-                    taskId,
-                    machineId: task.machineId,
-                    status: resolvedStatus,
-                    sessionId: updated.sessionId ?? undefined,
-                    errorMessage: updated.errorMessage ?? undefined,
-                    completedAt: updated.completedAt?.getTime(),
-                    triggerType: task.triggerType,
-                }),
-                recipientFilter: { type: "user-scoped-only" },
+            await emitSyncEphemeral(request.userId, {
+                t: "task-status-changed",
+                taskId,
+                machineId: task.machineId,
+                status: resolvedStatus,
+                sessionId: updated.sessionId ?? undefined,
+                errorMessage: updated.errorMessage ?? undefined,
+                completedAt: updated.completedAt?.getTime(),
+                triggerType: task.triggerType,
             });
 
             log({ module: "task" }, `Task ${taskId} outcome → ${outcome} (status=${resolvedStatus})`);
@@ -1018,27 +984,22 @@ export function taskRoutes(app: Fastify) {
                         taskId: task.id,
                     });
 
-                    eventRouter.emitEphemeral({
-                        userId,
-                        payload: buildTaskTriggerEphemeral({
-                            taskId: task.id,
-                            prompt: task.prompt,
-                            directory,
-                            priority: task.priority,
-                            projectId: task.projectId ?? undefined,
-                            resultToken,
-                            skillContents,
-                            profileId: swarmProfileId,
-                            runtimeProfile:
-                                swarmRuntimeProfile?.ok
-                                    ? swarmRuntimeProfile.runtimeProfile
-                                    : undefined,
-                            worktreeIsolation: true,
-                        }),
-                        recipientFilter: {
-                            type: "machine-scoped-only",
-                            machineId: task.machineId,
-                        },
+                    await emitSyncEphemeral(userId, {
+                        t: "task-trigger",
+                        machineId: task.machineId,
+                        taskId: task.id,
+                        prompt: task.prompt,
+                        directory,
+                        priority: task.priority,
+                        projectId: task.projectId ?? undefined,
+                        resultToken,
+                        skillContents,
+                        profileId: swarmProfileId,
+                        runtimeProfile:
+                            swarmRuntimeProfile?.ok
+                                ? swarmRuntimeProfile.runtimeProfile
+                                : undefined,
+                        worktreeIsolation: true,
                     });
                 }),
             );

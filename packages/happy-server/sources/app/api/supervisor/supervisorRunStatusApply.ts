@@ -37,11 +37,7 @@
 import { Prisma, type SupervisorRun } from "@prisma/client";
 import { db } from "@/storage/db";
 import { log } from "@/utils/log";
-import {
-    eventRouter,
-    buildSupervisorStatusEphemeral,
-    buildSessionActivityEphemeral,
-} from "@/app/events/eventRouter";
+import { emitSyncEphemeral } from "@/app/events/syncEphemeral";
 import { computeHealthScore, countSeverities } from "@/modules/supervisorScoring";
 import { aggregateSessionUsage, scheduleDelayedCostAggregation } from "@/modules/supervisorUsage";
 import { activityCache } from "@/app/presence/sessionCache";
@@ -403,10 +399,11 @@ export async function supervisorRunStatusApply(
                 data: { lastActiveAt: new Date(now), active: false },
             });
             activityCache.invalidateSession(resolvedSessionId);
-            eventRouter.emitEphemeral({
-                userId,
-                payload: buildSessionActivityEphemeral(resolvedSessionId, false, now, false),
-                recipientFilter: { type: "user-scoped-only" },
+            await emitSyncEphemeral(userId, {
+                t: "session-activity",
+                sessionId: resolvedSessionId,
+                active: false,
+                activeAt: now,
             });
         }
     }
@@ -416,30 +413,29 @@ export async function supervisorRunStatusApply(
         where: { id: runId },
     });
 
-    // Notify App clients about status change
-    eventRouter.emitEphemeral({
-        userId,
-        payload: buildSupervisorStatusEphemeral(
-            runId,
-            id,
-            status,
-            artifactId,
-            errorMessage,
-            currentDimension,
-            dimensionIndex,
-            totalDimensions,
-        ),
-        recipientFilter: { type: "user-scoped-only" },
+    // Notify App clients about status change.
+    await emitSyncEphemeral(userId, {
+        t: "supervisor-status",
+        runId,
+        projectId: id,
+        status,
+        artifactId,
+        errorMessage,
+        currentDimension,
+        dimensionIndex,
+        totalDimensions,
     });
 
     // Notify the daemon so it can finalise its local AutomationJob.
     // The HTTP callback (Claude → Server) bypasses the daemon entirely,
     // so without this the AutomationScheduler stays stuck at "running".
     if ((status === "completed" || status === "failed") && machineId) {
-        eventRouter.emitEphemeral({
-            userId,
-            payload: { type: "supervisor-run-complete", runId, projectId: id, status },
-            recipientFilter: { type: "machine-scoped-only", machineId },
+        await emitSyncEphemeral(userId, {
+            t: "supervisor-run-complete",
+            runId,
+            projectId: id,
+            status,
+            machineId,
         });
     }
 

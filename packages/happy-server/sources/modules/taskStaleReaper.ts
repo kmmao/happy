@@ -8,7 +8,7 @@
 
 import { db } from "@/storage/db";
 import { log } from "@/utils/log";
-import { eventRouter, buildTaskStatusChangedEphemeral } from "@/app/events/eventRouter";
+import { emitSyncEphemeral } from "@/app/events/syncEphemeral";
 import { inboxCreate } from "./inboxCreate";
 
 const REAP_INTERVAL_MS = 5 * 60_000; // 5 minutes
@@ -64,17 +64,14 @@ async function reapStaleTasks(): Promise<void> {
                 },
             });
 
-            eventRouter.emitEphemeral({
-                userId: task.accountId,
-                payload: buildTaskStatusChangedEphemeral({
-                    taskId: task.id,
-                    machineId: task.machineId,
-                    status: "failed",
-                    triggerType: task.triggerType,
-                    errorMessage,
-                    completedAt: now.getTime(),
-                }),
-                recipientFilter: { type: "user-scoped-only" },
+            await emitSyncEphemeral(task.accountId, {
+                t: "task-status-changed",
+                taskId: task.id,
+                machineId: task.machineId,
+                status: "failed",
+                triggerType: task.triggerType,
+                errorMessage,
+                completedAt: now.getTime(),
             });
 
             const taskLabel = task.title ?? `Task ${task.id.slice(-6)}`;

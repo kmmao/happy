@@ -13,10 +13,7 @@
 
 import { db } from "@/storage/db";
 import { log } from "@/utils/log";
-import {
-    eventRouter,
-    buildSupervisorStatusEphemeral,
-} from "@/app/events/eventRouter";
+import { emitSyncEphemeral } from "@/app/events/syncEphemeral";
 import { activityCache } from "@/app/presence/sessionCache";
 import { pushSupervisorNotification } from "@/modules/pushSend";
 import { onFixCompleted as loopOnFixCompleted } from "@/modules/supervisorLoopEngine";
@@ -119,15 +116,12 @@ export async function cleanupStaleFixActions(
             `Fix watchdog: force-failed stale action ${action.id} ("${action.title}") — fixStatus was "${action.fixStatus}"`,
         );
 
-        // Notify App clients
-        eventRouter.emitEphemeral({
-            userId,
-            payload: buildSupervisorStatusEphemeral(
-                action.runId,
-                action.projectId,
-                "fix-failed",
-            ),
-            recipientFilter: { type: "user-scoped-only" },
+        // Notify App clients.
+        await emitSyncEphemeral(userId, {
+            t: "supervisor-status",
+            runId: action.runId,
+            projectId: action.projectId,
+            status: "fix-failed",
         });
 
         // Send push notification

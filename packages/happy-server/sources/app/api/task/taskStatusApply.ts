@@ -1,6 +1,6 @@
 import { type Task } from "@prisma/client";
 import { db } from "@/storage/db";
-import { eventRouter, buildTaskStatusChangedEphemeral } from "@/app/events/eventRouter";
+import { emitSyncEphemeral } from "@/app/events/syncEphemeral";
 import { decideTaskTransition, type TaskStatus } from "@/modules/taskStatusLogic";
 
 /** Validated, already-authenticated input for one task status landing. */
@@ -79,18 +79,15 @@ export async function taskStatusApply(
         },
     });
 
-    eventRouter.emitEphemeral({
-        userId,
-        payload: buildTaskStatusChangedEphemeral({
-            taskId,
-            machineId: task.machineId,
-            status: resolvedStatus,
-            sessionId: updated.sessionId ?? undefined,
-            errorMessage: updated.errorMessage ?? undefined,
-            completedAt: updated.completedAt?.getTime(),
-            triggerType: task.triggerType,
-        }),
-        recipientFilter: { type: "user-scoped-only" },
+    await emitSyncEphemeral(userId, {
+        t: "task-status-changed",
+        taskId,
+        machineId: task.machineId,
+        status: resolvedStatus,
+        sessionId: updated.sessionId ?? undefined,
+        errorMessage: updated.errorMessage ?? undefined,
+        completedAt: updated.completedAt?.getTime(),
+        triggerType: task.triggerType,
     });
 
     return { ok: true, task: updated, isTerminal: decision.isTerminal };

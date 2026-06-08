@@ -8,11 +8,7 @@ import { Socket } from "socket.io";
 import { z } from "zod";
 import { db } from "@/storage/db";
 import { log } from "@/utils/log";
-import {
-    eventRouter,
-    buildSupervisorStatusEphemeral,
-    buildSessionActivityEphemeral,
-} from "@/app/events/eventRouter";
+import { emitSyncEphemeral } from "@/app/events/syncEphemeral";
 import { activityCache } from "@/app/presence/sessionCache";
 import { pushSupervisorNotification } from "@/modules/pushSend";
 import { onFixCompleted as loopOnFixCompleted } from "@/modules/supervisorLoopEngine";
@@ -116,15 +112,11 @@ export function supervisorFixStatusHandler(
                         },
                     });
                     activityCache.invalidateSession(resolvedFixSessionId);
-                    eventRouter.emitEphemeral({
-                        userId,
-                        payload: buildSessionActivityEphemeral(
-                            resolvedFixSessionId,
-                            false,
-                            now,
-                            false,
-                        ),
-                        recipientFilter: { type: "user-scoped-only" },
+                    await emitSyncEphemeral(userId, {
+                        t: "session-activity",
+                        sessionId: resolvedFixSessionId,
+                        active: false,
+                        activeAt: now,
                     });
                 }
             }
@@ -160,15 +152,12 @@ export function supervisorFixStatusHandler(
                 });
             }
 
-            // Notify App clients about fix status change
-            eventRouter.emitEphemeral({
-                userId,
-                payload: buildSupervisorStatusEphemeral(
-                    action.runId,
-                    data.projectId,
-                    `fix-${data.fixStatus}`,
-                ),
-                recipientFilter: { type: "user-scoped-only" },
+            // Notify App clients about fix status change.
+            await emitSyncEphemeral(userId, {
+                t: "supervisor-status",
+                runId: action.runId,
+                projectId: data.projectId,
+                status: `fix-${data.fixStatus}`,
             });
 
             // Loop progression: if this fix belongs to a loop, check if all fixes are done

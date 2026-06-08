@@ -16,10 +16,7 @@
 import { db } from "@/storage/db";
 import { log } from "@/utils/log";
 import { startLoop } from "@/modules/supervisorLoopEngine";
-import {
-    eventRouter,
-    buildAutoLoopFiredEphemeral,
-} from "@/app/events/eventRouter";
+import { emitSyncEphemeral } from "@/app/events/syncEphemeral";
 import { inboxCreate } from "@/modules/inboxCreate";
 
 /**
@@ -157,16 +154,13 @@ export async function maybeAutoStartLoop(opts: {
         // a loop on your behalf" toast. Done BEFORE stamping the debounce
         // clock so a subsequent crash leaves no silent fire — the user always
         // sees the event for any loop that actually started.
-        eventRouter.emitEphemeral({
-            userId: opts.userId,
-            payload: buildAutoLoopFiredEphemeral({
-                projectId: opts.projectId,
-                loopId: result.loopId,
-                healthScore: opts.healthScore!, // non-null guaranteed by decideAutoLoop guard
-                threshold: project.autoLoopHealthThreshold!,
-                firedAt,
-            }),
-            recipientFilter: { type: "user-scoped-only" },
+        await emitSyncEphemeral(opts.userId, {
+            t: "auto-loop-fired",
+            projectId: opts.projectId,
+            loopId: result.loopId,
+            healthScore: opts.healthScore!, // non-null guaranteed by decideAutoLoop guard
+            threshold: project.autoLoopHealthThreshold!,
+            firedAt,
         });
 
         // Persistent audit trail — the toast above only fires for users who
