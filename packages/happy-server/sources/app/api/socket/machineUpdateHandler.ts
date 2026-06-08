@@ -1,11 +1,10 @@
 import { machineAliveEventsCounter, websocketEventsCounter } from "@/app/monitoring/metrics2";
 import { activityCache } from "@/app/presence/sessionCache";
-import { buildKnowledgeCountEphemeral, buildMachineActivityEphemeral, buildSessionActivityEphemeral, buildUpdateMachineUpdate, buildWorldEventCreatedEphemeral, eventRouter } from "@/app/events/eventRouter";
+import { buildKnowledgeCountEphemeral, buildMachineActivityEphemeral, buildSessionActivityEphemeral, buildWorldEventCreatedEphemeral, eventRouter } from "@/app/events/eventRouter";
+import { emitSyncUpdate } from "@/app/events/syncUpdate";
 import { log } from "@/utils/log";
 import { db } from "@/storage/db";
 import { Socket } from "socket.io";
-import { allocateUserSeq } from "@/storage/seq";
-import { randomKeyNaked } from "@/utils/randomKeyNaked";
 import { checkAndTriggerScheduledRuns } from "@/modules/supervisorScheduler";
 import { cleanupStaleFixActions } from "@/modules/supervisorFixWatchdog";
 import { checkAndTriggerSchedules } from "@/modules/triggerScheduleRunner";
@@ -157,17 +156,12 @@ export function machineUpdateHandler(userId: string, socket: Socket) {
                 return;
             }
 
-            // Generate machine metadata update
-            const updSeq = await allocateUserSeq(userId);
-            const metadataUpdate = {
-                value: metadata,
-                version: expectedVersion + 1
-            };
-            const updatePayload = buildUpdateMachineUpdate(machineId, updSeq, randomKeyNaked(12), metadataUpdate);
-            eventRouter.emitUpdate({
-                userId,
-                payload: updatePayload,
-                recipientFilter: { type: 'machine-scoped-only', machineId }
+            // Broadcast metadata change. Seam owns seq + id + recipient
+            // (ADR-0023). update-machine -> machine-scoped-only.
+            await emitSyncUpdate(userId, {
+                t: "update-machine",
+                machineId,
+                metadata: { value: metadata, version: expectedVersion + 1 },
             });
 
             // Send success response with new version
@@ -252,17 +246,12 @@ export function machineUpdateHandler(userId: string, socket: Socket) {
                 return;
             }
 
-            // Generate machine daemon state update
-            const updSeq = await allocateUserSeq(userId);
-            const daemonStateUpdate = {
-                value: daemonState,
-                version: expectedVersion + 1
-            };
-            const updatePayload = buildUpdateMachineUpdate(machineId, updSeq, randomKeyNaked(12), undefined, daemonStateUpdate);
-            eventRouter.emitUpdate({
-                userId,
-                payload: updatePayload,
-                recipientFilter: { type: 'machine-scoped-only', machineId }
+            // Broadcast daemon-state change. Seam owns seq + id + recipient
+            // (ADR-0023). update-machine -> machine-scoped-only.
+            await emitSyncUpdate(userId, {
+                t: "update-machine",
+                machineId,
+                daemonState: { value: daemonState, version: expectedVersion + 1 },
             });
 
             // Check for new briefs and send push notifications

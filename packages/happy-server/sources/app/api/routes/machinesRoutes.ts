@@ -1,11 +1,8 @@
-import { eventRouter } from "@/app/events/eventRouter";
+import { emitSyncUpdate } from "@/app/events/syncUpdate";
 import { Fastify } from "../types";
 import { z } from "zod";
 import { db } from "@/storage/db";
 import { log } from "@/utils/log";
-import { randomKeyNaked } from "@/utils/randomKeyNaked";
-import { allocateUserSeq } from "@/storage/seq";
-import { buildNewMachineUpdate, buildUpdateMachineUpdate } from "@/app/events/eventRouter";
 
 export function machinesRoutes(app: Fastify) {
     app.post('/v1/machines', {
@@ -66,28 +63,16 @@ export function machinesRoutes(app: Fastify) {
                 }
             });
 
-            // Emit both new-machine and update-machine events for backward compatibility
-            const updSeq1 = await allocateUserSeq(userId);
-            const updSeq2 = await allocateUserSeq(userId);
-            
-            // Emit new-machine event with all data including dataEncryptionKey
-            const newMachinePayload = buildNewMachineUpdate(newMachine, updSeq1, randomKeyNaked(12));
-            eventRouter.emitUpdate({
-                userId,
-                payload: newMachinePayload,
-                recipientFilter: { type: 'user-scoped-only' }
-            });
-
-            // Emit update-machine event for backward compatibility (without dataEncryptionKey)
-            const machineMetadata = {
-                version: 1,
-                value: metadata
-            };
-            const updatePayload = buildUpdateMachineUpdate(newMachine.id, updSeq2, randomKeyNaked(12), machineMetadata);
-            eventRouter.emitUpdate({
-                userId,
-                payload: updatePayload,
-                recipientFilter: { type: 'machine-scoped-only', machineId: newMachine.id }
+            // Emit both new-machine and update-machine events for backward
+            // compatibility. Two SyncUpdates, two seqs — each emitSyncUpdate
+            // call owns its own seq allocation (ADR-0023). Recipient is
+            // derived from body.t: new-machine -> user-scoped-only;
+            // update-machine -> machine-scoped-only.
+            await emitSyncUpdate(userId, { t: "new-machine", machine: newMachine });
+            await emitSyncUpdate(userId, {
+                t: "update-machine",
+                machineId: newMachine.id,
+                metadata: { value: metadata, version: 1 },
             });
 
             return reply.send({
