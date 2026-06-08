@@ -1,11 +1,9 @@
-import { eventRouter, buildUpdateAccountUpdate } from "@/app/events/eventRouter";
+import { emitSyncUpdate } from "@/app/events/syncUpdate";
 import { db } from "@/storage/db";
 import { Prisma } from "@prisma/client";
 import { Fastify } from "../types";
 import { getPublicUrl } from "@/storage/files";
 import { z } from "zod";
-import { randomKeyNaked } from "@/utils/randomKeyNaked";
-import { allocateUserSeq } from "@/storage/seq";
 import { log } from "@/utils/log";
 
 export function accountRoutes(app: Fastify) {
@@ -142,17 +140,15 @@ export function accountRoutes(app: Fastify) {
                 });
             }
 
-            const updSeq = await allocateUserSeq(userId);
+            // Broadcast settings change. Seam owns seq + id + recipient +
+            // payload (ADR-0023); we only express the domain delta.
             const settingsUpdate = {
                 value: settings,
                 version: expectedVersion + 1,
             };
-
-            const updatePayload = buildUpdateAccountUpdate(userId, { settings: settingsUpdate }, updSeq, randomKeyNaked(12));
-            eventRouter.emitUpdate({
-                userId,
-                payload: updatePayload,
-                recipientFilter: { type: 'user-scoped-only' },
+            await emitSyncUpdate(userId, {
+                t: "update-account",
+                profile: { settings: settingsUpdate },
             });
 
             return reply.send({

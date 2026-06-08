@@ -4,9 +4,7 @@ import { encryptString } from "@/modules/encrypt";
 import { uploadImage } from "@/storage/uploadImage";
 import { separateName } from "@/utils/separateName";
 import { GitHubProfile } from "@/app/api/types";
-import { allocateUserSeq } from "@/storage/seq";
-import { buildUpdateAccountUpdate, eventRouter } from "@/app/events/eventRouter";
-import { randomKeyNaked } from "@/utils/randomKeyNaked";
+import { emitSyncUpdate } from "@/app/events/syncUpdate";
 import { githubDisconnect } from "./githubDisconnect";
 
 /**
@@ -90,19 +88,17 @@ export async function githubConnect(
         });
     });
 
-    // Step 5: Send update via socket (after transaction completes)
-    const updSeq = await allocateUserSeq(userId);
-    const updatePayload = buildUpdateAccountUpdate(userId, {
-        github: githubProfile,
-        username: githubProfile.login,
-        firstName: name.firstName,
-        lastName: name.lastName,
-        avatar: avatar
-    }, updSeq, randomKeyNaked(12));
-
-    eventRouter.emitUpdate({
-        userId,
-        payload: updatePayload,
-        recipientFilter: { type: 'user-scoped-only' }
+    // Step 5: Send update via socket (after transaction completes). The seam
+    // (ADR-0023) handles seq + id + recipient + payload; we only express the
+    // domain change.
+    await emitSyncUpdate(userId, {
+        t: "update-account",
+        profile: {
+            github: githubProfile,
+            username: githubProfile.login,
+            firstName: name.firstName,
+            lastName: name.lastName,
+            avatar: avatar
+        }
     });
 }

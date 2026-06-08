@@ -1,9 +1,7 @@
 import { db } from "@/storage/db";
 import { Context } from "@/context";
 import { log } from "@/utils/log";
-import { allocateUserSeq } from "@/storage/seq";
-import { buildUpdateAccountUpdate, eventRouter } from "@/app/events/eventRouter";
-import { randomKeyNaked } from "@/utils/randomKeyNaked";
+import { emitSyncUpdate } from "@/app/events/syncUpdate";
 
 /**
  * Disconnects a GitHub account from a user profile.
@@ -50,17 +48,11 @@ export async function githubDisconnect(ctx: Context): Promise<void> {
         });
     });
 
-    // Step 3: Send update via socket (after transaction completes)
-    const updSeq = await allocateUserSeq(userId);
-    const updatePayload = buildUpdateAccountUpdate(userId, {
-        github: null,
-        username: null
-    }, updSeq, randomKeyNaked(12));
-
-    eventRouter.emitUpdate({
-        userId,
-        payload: updatePayload,
-        recipientFilter: { type: 'user-scoped-only' }
+    // Step 3: Send update via socket (after transaction completes). Seam owns
+    // seq + id + recipient + payload (ADR-0023).
+    await emitSyncUpdate(userId, {
+        t: "update-account",
+        profile: { github: null, username: null }
     });
 
     log({ module: 'github-disconnect' }, `GitHub account ${githubUserId} disconnected successfully from user ${userId}`);

@@ -84,6 +84,10 @@ _Avoid_: Chat message, log entry
 A lightweight timeline entry recording operations during a Session (file edits, bash commands, tool calls, errors). Plaintext summaries + structured JSON detail. Displayed in the App's timeline view for replay and audit.
 _Avoid_: Log, activity
 
+**SyncUpdate**:
+A typed, seq-ordered server→client broadcast that delivers a change to a domain entity (Session, Machine, Account, Project, Artifact, Feed entry, KV) to all Account-owned connections that need to know. Wire shape is `UpdatePayload` (`{id, seq, body: {t, ...}}`); each `body.t` uniquely determines the recipient set (the App, the Session's CLI side, the Machine's Daemon, or some combination). Persistent per ADR-0013: clients dedupe by `id` and reconcile by `seq`, so a SyncUpdate emitted while a client is offline is recoverable from sync state on reconnect. Distinct from SessionEvent (intra-Session timeline) and from Ephemeral broadcasts (no seq, no reconciliation, fire-and-forget).
+_Avoid_: Notification, broadcast, event (collides with SessionEvent), message (collides with SessionMessage)
+
 **Turn**:
 One agent request→response cycle within a Session, bracketed by a `turn-start`/`turn-end` SessionEvent pair and carrying the ordered SessionEvents (text, tool calls, Subagent activity) produced in between. A Session is a sequence of Turns. The CLI assembles Turns from the underlying provider's stream (Claude JSONL, Codex, ACP) through a single Turn lifecycle reducer rather than per-provider hand-rolled state.
 _Avoid_: Round, exchange, cycle (and do not confuse with the domain Task)
@@ -115,6 +119,7 @@ _Avoid_: Profile, backend, config
 - A **Machine** belongs to exactly one **Account** and runs one **Daemon**
 - A **Session** is bound to exactly one **Machine** and has exactly one **AccessKey**
 - A **Session** contains ordered **SessionMessages** and **SessionEvents**
+- Every server-side mutation of a domain entity emits a **SyncUpdate**; its `body.t` determines which Account-owned connections receive it
 - A **Session** is a sequence of **Turns**; a **Turn** contains ordered **SessionEvents** and zero or more concurrent **Subagents**, all bracketed by its turn-start/turn-end pair
 - A **Project** lives on exactly one **Machine** at a specific path
 - A **Project** contains **Knowledge**, **Skills**, **Triggers**, **AgentLoops**, and **SupervisorRuns**
@@ -153,4 +158,5 @@ _Avoid_: Profile, backend, config
 - **AgentLoop ↔ SupervisorLoop** convergence is in flight — see ADR-0022. Phase 2 has landed: `model AgentLoop` is the canonical Prisma model (`@@map("SupervisorLoop")` keeps the physical table name during the migration window), with a `role` discriminator (`supervisor` | `generic`). Every supervisor mutation filters by `role: "supervisor"` defensively. Phase 3a has landed: 10 columns for generic-role configuration (prompt, directory, agent, intervalMs, cronExpression, enabled, nextRunAt, continuityKey, iteration, genericConfig Json) are present but NOT yet populated — the CLI-local `.happy/agent-loops/` pipeline still owns them. Phase 3b (CLI fetches AgentLoop definitions from server on daemon boot) is the next milestone. Until then, treat code that still says "SupervisorLoop" as legacy unless it's inside the supervisor-role specialization (output shape: SupervisorRun + SupervisorAction).
 - **Preview** traffic is not E2E encrypted (HTTP proxy needs plaintext for the browser); all other Session content remains E2E — see ADR-0001 and ADR-0007.
 - **VisualAnnotation** currently travels as a markdown SessionMessage with a fenced JSON block; migrating to `visual_annotation_reference` inputBlock — see ADR-0007.
+- **SyncUpdate** is the domain term; the wire-level type is still named `UpdatePayload` and the Socket.IO event name is `update`. Align in a future breaking version bump of `@kmmao/happy-wire`. App-side code already uses "sync update" (`syncUpdateHandlers.ts`, `syncUpdateScope.ts`) — the server side adopts the same term via this seam.
 
