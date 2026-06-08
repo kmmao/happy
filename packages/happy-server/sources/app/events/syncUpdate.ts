@@ -121,9 +121,10 @@ export type KVChange = { key: string; value: string | null; version: number };
 // parameter to `emitSyncUpdate` (ADR-0023 / detail 1=A); having it in two
 // places would invite caller mistakes.
 //
-// `buildRelationshipUpdatedEvent` exists in eventRouter.ts but has no
-// production caller (only its spec exercises it). It is deliberately omitted
-// from this union and may be deleted in a future cleanup.
+// `buildRelationshipUpdatedEvent` used to live in eventRouter.ts as a
+// production-orphan; PR 1.5.g deleted it. The wire type
+// `relationship-updated` itself survives in UpdateEvent for backward
+// compatibility but no server-side code emits it.
 
 export type SyncUpdateBody =
     | { t: "update-account"; profile: Partial<AccountProfile> }

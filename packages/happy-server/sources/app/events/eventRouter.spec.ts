@@ -1,8 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import {
-    buildRelationshipUpdatedEvent,
-    eventRouter,
-} from "./eventRouter";
+import { eventRouter } from "./eventRouter";
 
 // NOTE: PR 1.f moved the 15 build*Update payload constructors into
 // syncUpdate.ts as private helpers; PR 1.5.f did the same for the 21 active
@@ -10,22 +7,8 @@ import {
 // buildMachineStatusEphemeral deleted as it had no production caller).
 // Those wire shapes are now exercised end-to-end through emitSyncUpdate
 // (in syncUpdate.spec.ts) and emitSyncEphemeral (in syncEphemeral.spec.ts).
-// buildRelationshipUpdatedEvent continues to live in eventRouter.ts — it
-// has no production caller yet, so no caller migration is meaningful.
-
-describe("buildRelationshipUpdatedEvent", () => {
-    it("should build relationship updated payload", () => {
-        const result = buildRelationshipUpdatedEvent(
-            { uid: "user-1", status: "friend", timestamp: 9999 },
-            7,
-            "upd-4",
-        );
-        expect(result.body.t).toBe("relationship-updated");
-        expect(result.body.uid).toBe("user-1");
-        expect(result.body.status).toBe("friend");
-        expect(result.body.timestamp).toBe(9999);
-    });
-});
+// PR 1.5.g (this commit) deleted buildRelationshipUpdatedEvent — also a
+// production-orphan — alongside its describe block here.
 
 describe("EventRouter.hasActiveNonMachineSocket", () => {
     const fakeSocket = {} as unknown;

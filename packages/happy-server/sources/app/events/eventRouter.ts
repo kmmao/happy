@@ -721,27 +721,11 @@ class EventRouter {
 
 export const eventRouter = new EventRouter();
 
-// === EVENT BUILDER FUNCTIONS ===
-
-export function buildRelationshipUpdatedEvent(
-  data: {
-    uid: string;
-    status: "none" | "requested" | "pending" | "friend" | "rejected";
-    timestamp: number;
-  },
-  updateSeq: number,
-  updateId: string,
-): UpdatePayload {
-  return {
-    id: updateId,
-    seq: updateSeq,
-    body: {
-      t: "relationship-updated",
-      ...data,
-    },
-    createdAt: Date.now(),
-  };
-}
+// No payload constructors live here anymore. They moved into syncUpdate.ts
+// (PR 1.f) and syncEphemeral.ts (PR 1.5.f). The wire type
+// `relationship-updated` survives in UpdateEvent above for backward
+// compatibility with any client that still listens for it, but no server-side
+// code emits it; the orphan builder was deleted in PR 1.5.g cleanup.
 
 /**
  * Ephemeral payload emitted when a SupervisorLoop completes (per ADR-0022).

@@ -83,11 +83,11 @@ The interAgentMessageHandler.ts migration in 1.5.d also splits the two existing 
 - `eventRouter.emitEphemeral` is renamed to `_emitEphemeralInternal` after PR 1.5.e, sealing it like `_emitUpdateInternal` was sealed in PR 1.g.
 - After Phase 1.5 completes, **all server→client broadcast** flows through one of two seams; the only escape hatch into `eventRouter._emit*` is reserved for the seams themselves. A grep for either `_emit*Internal\(` should match exactly one production caller each.
 - ADR-0023's "Phase 1.5 — emitSyncEphemeral parallel" item is closed by this ADR.
-- The orphan `buildRelationshipUpdatedEvent` in `eventRouter.ts` continues to live without a production caller; a future cleanup PR can delete it.
+- The orphan `buildRelationshipUpdatedEvent` in `eventRouter.ts` was deleted in PR 1.5.g hygiene cleanup alongside its spec; the wire `relationship-updated` type itself survives in `UpdateEvent` for backward compatibility with any client still listening for it.
 - A future architecture review that proposes "merge `syncUpdate.ts` and `syncEphemeral.ts` into one seam" should read the E1 alternative above; the lifecycle-invariant split is the load-bearing reason for keeping them separate.
 
 ## Open subordinate questions
 
 - **Scope Y (RecipientFilter taxonomy revisit).** Still deferred to a future ADR per ADR-0023, but now affects both seams.
 - **Compile-time discrimination of the seam's `t` from the wire `type`.** Today `SyncUpdateBody`'s `t` and the wire `body.t` are identical strings; `SyncEphemeralBody`'s `t` diverges for `inter-agent-message-deliver` / `echo` (both wire-emit `type: "inter-agent-message"`). This asymmetry is mild but worth flagging — a future ADR may revisit whether other variants should also separate the seam-discriminator from the wire-discriminator.
-- **`buildRelationshipUpdatedEvent` deletion.** No production caller; survives both seam migrations. A small hygiene PR can remove it.
+- **`buildRelationshipUpdatedEvent` deletion** — closed by PR 1.5.g.
