@@ -97,7 +97,7 @@ const {
 vi.mock("@/storage/db", () => ({ db: dbMock }));
 vi.mock("@/utils/log", () => ({ log: vi.fn() }));
 vi.mock("@/app/events/eventRouter", () => ({
-    eventRouter: { emitEphemeral: emitEphemeralMock },
+    eventRouter: { _emitEphemeralInternal: emitEphemeralMock },
     buildSupervisorStatusEphemeral: vi.fn(
         (runId: string, projectId: string, status: string) => ({
             type: "supervisor-status",

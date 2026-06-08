@@ -383,10 +383,10 @@ export async function emitSyncEphemeral(
     body: SyncEphemeralBody,
     options?: EmitSyncEphemeralOptions,
 ): Promise<void> {
-    // PR 1.5.e will rename this transport sink to
-    // `eventRouter._emitEphemeralInternal` once all 78 callers have moved
-    // through this seam — mirroring the PR 1.a → 1.g sequence for SyncUpdate.
-    eventRouter.emitEphemeral({
+    // Direct call to the transport-level multicast sink. Only this seam
+    // is allowed to invoke `_emitEphemeralInternal` — callers route through
+    // `emitSyncEphemeral` above (ADR-0024).
+    eventRouter._emitEphemeralInternal({
         userId: accountId,
         payload: buildPayload(body),
         recipientFilter: recipientFilterFor(body),

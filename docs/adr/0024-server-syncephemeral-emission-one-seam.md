@@ -64,7 +64,7 @@ The migration is staged in three PRs after the seam stands up:
 
 - **1.5.a** — stand up `syncEphemeral.ts` (this seam) + tests. No callers migrate.
 - **1.5.b–d** — migrate the 78 emit sites by region (terminal/usage/activity ~10 → webhook/inbox/knowledge ~8 → task ~14 → supervisor ~16 → preview/session/interAgent ~10 → misc ~10), each PR independently shippable.
-- **1.5.e** — physically move the 22 `build*Ephemeral` payload constructors from `eventRouter.ts` into `syncEphemeral.ts` as private helpers; rename `eventRouter.emitEphemeral` → `eventRouter._emitEphemeralInternal` + JSDoc `@internal` (mirroring PR 1.g). Update all spec `vi.mock` stubs.
+- **1.5.e** — seal `eventRouter.emitEphemeral` → `eventRouter._emitEphemeralInternal` + JSDoc `@internal` (mirroring PR 1.g). Update the ~10 spec files' `vi.mock` stubs to the new name. The originally planned "physical move of the 21 active `build*Ephemeral` payload constructors into `syncEphemeral.ts`" is **deferred to a separate cleanup PR** — 6 spec files assert directly on `expect(buildXxxEphemeral).toHaveBeenCalled()`, so moving the builders requires reshaping those assertions (to read the wire payload that reaches `_emitEphemeralInternal` instead). That reshape is mechanical but adds spec-file churn without changing seam depth, so it ships as a follow-up rather than blocking the seal.
 
 The interAgentMessageHandler.ts migration in 1.5.d also splits the two existing emits into two `emitSyncEphemeral` calls with the new `-deliver` / `-echo` variants — the wire shape is unchanged.
 

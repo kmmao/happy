@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
-    emitEphemeral: vi.fn(),
+    _emitEphemeralInternal: vi.fn(),
     buildSupervisorTriggerEphemeral: vi.fn((payload: unknown) => payload),
     authCreateSupervisorCallbackToken: vi.fn(),
     resolveSupervisorProfile: vi.fn(),
@@ -9,7 +9,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("@/app/events/eventRouter", () => ({
     eventRouter: {
-        emitEphemeral: mocks.emitEphemeral,
+        _emitEphemeralInternal: mocks._emitEphemeralInternal,
     },
     buildSupervisorTriggerEphemeral: mocks.buildSupervisorTriggerEphemeral,
 }));
@@ -94,7 +94,7 @@ describe("emitConfiguredSupervisorRunTrigger", () => {
                 }),
             }),
         );
-        expect(mocks.emitEphemeral).toHaveBeenCalledWith(
+        expect(mocks._emitEphemeralInternal).toHaveBeenCalledWith(
             expect.objectContaining({
                 userId: "user-1",
                 recipientFilter: {
@@ -129,6 +129,6 @@ describe("emitConfiguredSupervisorRunTrigger", () => {
         });
         expect(mocks.resolveSupervisorProfile).not.toHaveBeenCalled();
         expect(mocks.authCreateSupervisorCallbackToken).not.toHaveBeenCalled();
-        expect(mocks.emitEphemeral).not.toHaveBeenCalled();
+        expect(mocks._emitEphemeralInternal).not.toHaveBeenCalled();
     });
 });

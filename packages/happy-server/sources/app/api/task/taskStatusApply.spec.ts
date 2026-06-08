@@ -46,7 +46,7 @@ const { dbMock, emitEphemeralMock, buildEphemeralMock, resetState, seedTask } =
 
 vi.mock("@/storage/db", () => ({ db: dbMock }));
 vi.mock("@/app/events/eventRouter", () => ({
-    eventRouter: { emitEphemeral: emitEphemeralMock },
+    eventRouter: { _emitEphemeralInternal: emitEphemeralMock },
     buildTaskStatusChangedEphemeral: buildEphemeralMock,
 }));
 

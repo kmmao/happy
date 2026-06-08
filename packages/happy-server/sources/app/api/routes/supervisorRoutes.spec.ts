@@ -294,7 +294,7 @@ vi.mock("@/app/presence/sessionCache", () => ({
     activityCache: { invalidateSession: vi.fn() },
 }));
 vi.mock("@/app/events/eventRouter", () => ({
-    eventRouter: { emitEphemeral: emitEphemeralMock },
+    eventRouter: { _emitEphemeralInternal: emitEphemeralMock },
     buildSupervisorTriggerEphemeral: buildSupervisorTriggerEphemeralMock,
     buildSupervisorStatusEphemeral: vi.fn((...args: unknown[]) => ({ t: "supervisor-status", args })),
     buildSessionActivityEphemeral: vi.fn((...args: unknown[]) => ({ t: "session-activity", args })),

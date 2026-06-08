@@ -646,7 +646,19 @@ class EventRouter {
     });
   }
 
-  emitEphemeral(params: {
+  /**
+   * @internal Transport-level SyncEphemeral multicast sink. Do NOT call this
+   * directly from action / route / handler code — call `emitSyncEphemeral`
+   * from `@/app/events/syncEphemeral` instead, which owns the SyncEphemeral
+   * lifecycle (recipient set + wire payload assembly) per ADR-0024. The
+   * underscore + `Internal` suffix marks this method as private to the seam;
+   * the only legitimate caller is `syncEphemeral.ts`.
+   *
+   * Spec files may continue to stub this method via `vi.mock` to capture
+   * emissions for assertions — those tests observe what reaches the
+   * transport, which is exactly what this method represents.
+   */
+  _emitEphemeralInternal(params: {
     userId: string;
     payload: EphemeralPayload;
     recipientFilter?: RecipientFilter;

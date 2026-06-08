@@ -158,7 +158,7 @@ const { state, dbMock, resetState, seedTask, authMock } = vi.hoisted(() => {
 vi.mock("@/storage/db", () => ({ db: dbMock }));
 vi.mock("@/utils/log", () => ({ log: vi.fn() }));
 vi.mock("@/app/events/eventRouter", () => ({
-    eventRouter: { emitEphemeral: vi.fn() },
+    eventRouter: { _emitEphemeralInternal: vi.fn() },
     buildTaskTriggerEphemeral: vi.fn((payload: unknown) => payload),
     buildTaskStatusChangedEphemeral: vi.fn((payload: unknown) => payload),
 }));

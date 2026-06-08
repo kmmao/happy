@@ -12,7 +12,7 @@ const { emitEphemeralMock, resetState } = vi.hoisted(() => {
 // will physically move the builders into syncEphemeral.ts and these stubs
 // will collapse to a simpler mock.
 vi.mock("@/app/events/eventRouter", () => ({
-    eventRouter: { emitEphemeral: emitEphemeralMock },
+    eventRouter: { _emitEphemeralInternal: emitEphemeralMock },
     buildAutoLoopFiredEphemeral: vi.fn((opts: any) => ({ type: "auto-loop-fired", ...opts })),
     buildInboxNewItemEphemeral: vi.fn((item: any) => ({ type: "inbox-new-item", item })),
     buildInboxUnreadCountEphemeral: vi.fn((count: number) => ({ type: "inbox-unread-count", count })),

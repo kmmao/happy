@@ -8,7 +8,7 @@ const { emitEphemeralMock, logMock, debugMock } = vi.hoisted(() => ({
 
 vi.mock("@/app/events/eventRouter", () => ({
     eventRouter: {
-        emitEphemeral: emitEphemeralMock,
+        _emitEphemeralInternal: emitEphemeralMock,
     },
     buildRpcReadyEphemeral: vi.fn(
         (scope: "machine" | "session", id: string, ready: boolean) => ({

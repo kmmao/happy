@@ -10,7 +10,7 @@ const mocks = vi.hoisted(() => ({
     decryptString: vi.fn(),
     verifyWebhookSignature: vi.fn(),
     checkDailyRunLimit: vi.fn(),
-    emitEphemeral: vi.fn(),
+    _emitEphemeralInternal: vi.fn(),
     buildSupervisorTriggerEphemeral: vi.fn((payload: unknown) => payload),
     authCreateSupervisorCallbackToken: vi.fn(),
     parseDefaultProfileId: vi.fn(),
@@ -47,7 +47,7 @@ vi.mock("@/modules/supervisorLimits", () => ({
 
 vi.mock("@/app/events/eventRouter", () => ({
     eventRouter: {
-        emitEphemeral: mocks.emitEphemeral,
+        _emitEphemeralInternal: mocks._emitEphemeralInternal,
     },
     buildSessionActivityEphemeral: vi.fn((payload: unknown) => payload),
     buildSupervisorTriggerEphemeral: mocks.buildSupervisorTriggerEphemeral,

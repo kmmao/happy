@@ -9,7 +9,7 @@ const mocks = vi.hoisted(() => ({
     txRunCreate: vi.fn(),
     checkDailyRunLimit: vi.fn(),
     incrementDailyRunCount: vi.fn(),
-    emitEphemeral: vi.fn(),
+    _emitEphemeralInternal: vi.fn(),
     buildSupervisorTriggerEphemeral: vi.fn((payload: unknown) => payload),
     authCreateSupervisorCallbackToken: vi.fn(),
     parseDefaultProfileId: vi.fn(),
@@ -33,7 +33,7 @@ vi.mock("@/utils/log", () => ({
 
 vi.mock("@/app/events/eventRouter", () => ({
     eventRouter: {
-        emitEphemeral: mocks.emitEphemeral,
+        _emitEphemeralInternal: mocks._emitEphemeralInternal,
     },
     buildSupervisorTriggerEphemeral: mocks.buildSupervisorTriggerEphemeral,
 }));
@@ -144,7 +144,7 @@ describe("checkAndTriggerScheduledRuns", () => {
                 }),
             }),
         );
-        expect(mocks.emitEphemeral).toHaveBeenCalledWith(
+        expect(mocks._emitEphemeralInternal).toHaveBeenCalledWith(
             expect.objectContaining({
                 userId: "user-1",
                 recipientFilter: {

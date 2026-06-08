@@ -118,7 +118,7 @@ vi.mock("@/app/presence/sessionCache", () => ({
     },
 }));
 vi.mock("@/app/events/eventRouter", () => ({
-    eventRouter: { emitEphemeral: emitEphemeralMock, _emitUpdateInternal: vi.fn() },
+    eventRouter: { _emitEphemeralInternal: emitEphemeralMock, _emitUpdateInternal: vi.fn() },
     buildMachineActivityEphemeral: vi.fn((machineId: string, active: boolean, activeAt: number) => ({
         type: "machine-activity",
         id: machineId,
