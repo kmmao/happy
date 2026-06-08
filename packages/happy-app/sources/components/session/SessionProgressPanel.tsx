@@ -1001,7 +1001,6 @@ const ToolMixBar = React.memo<ToolMixBarProps>(function ToolMixBar({
                         <View style={[styles.toolMixLegendDot, { backgroundColor: entry.color }]} />
                         <Text
                             style={[styles.toolMixLegendName, { color: theme.colors.text }]}
-                            numberOfLines={1}
                         >
                             {entry.name}
                         </Text>
@@ -1308,7 +1307,6 @@ const styles = StyleSheet.create({
     toolMixLegendName: {
         ...Typography.mono("regular"),
         fontSize: 11,
-        maxWidth: 120,
     },
     toolMixLegendCount: {
         ...Typography.default("regular"),

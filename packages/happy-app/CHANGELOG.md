@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.36.8 - 2026-06-09
+
+Small readability fix for the Footprint panel: long tool names in the operation-mix legend were being cut off with an ellipsis (e.g. `mcp__codegraph__c...`, `mcp__happy__chang...`), so users couldn't tell which MCP tool a colored segment actually represented.
+
+### Footprint panel
+- Fixed long tool names being truncated in the operation-mix legend. Removed the `numberOfLines={1}` + `maxWidth: 120` constraints on legend entries; long names like `mcp__codegraph__codegraph_files` or `mcp__happy__change_title` now render in full. The legend container already wraps, so longer entries simply flow to the next row instead of crowding a single line.
+
 ## 2.36.7 - 2026-06-09
 
 Closed the last UX gap from the post-2.36.5 review: the queue-preview overlay used to stay open showing a stale snapshot when the user explicitly drained the previewed item from outside the overlay (chip ▶ or header "Send now" pill). 2.36.5 had removed the auto-close-on-vanish effect to stop it from wiping in-progress edits during auto-dispatch — but that left explicit user actions also unhandled. This release threads that needle.
