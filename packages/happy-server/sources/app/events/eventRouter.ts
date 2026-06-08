@@ -2,12 +2,11 @@ import { Socket } from "socket.io";
 import { log } from "@/utils/log";
 import { recipientMatches } from "./recipientMatcher";
 import { GitHubProfile } from "@/app/api/types";
-import { AccountProfile } from "@/types";
-import { getPublicUrl } from "@/storage/files";
 import type { SessionMessageContent } from "@kmmao/happy-wire";
 import type { ResolvedRuntimeProfile } from "@kmmao/happy-wire";
-
-import * as privacyKit from "privacy-kit";
+// Note: PR 1.f moved the 15 build*Update functions (and their AccountProfile /
+// getPublicUrl / privacyKit imports) into syncUpdate.ts as private helpers.
+// The remaining build*Ephemeral functions in this file have no need for them.
 
 // === CONNECTION TYPES ===
 
