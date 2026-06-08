@@ -12,7 +12,7 @@ import {
 import { type ProtocolIntent } from "@/session-protocol/turnReducer";
 import {
   applyToProvider,
-  type ProviderAdapter,
+  embeddedProtocolAdapter,
 } from "@/session-protocol/providerAdapter";
 
 export type CodexTurnState = {
@@ -58,27 +58,12 @@ function getActiveSubagents(state: CodexTurnState): Set<string> {
 
 /**
  * Codex's ProviderAdapter (CONTEXT.md: Provider, ProviderAdapter; ADR-0025).
- * The three reducer fields are mirrored on CodexTurnState; lift returns the
- * reducer view, write rebuilds CodexTurnState preserving the Codex-only
- * `providerSubagentToSessionSubagent` map by reference.
+ * The three reducer fields are mirrored on CodexTurnState, so the shared
+ * `embeddedProtocolAdapter` covers the lift/write; its `writeProtocol` spread
+ * preserves the Codex-only `providerSubagentToSessionSubagent` map by
+ * reference.
  */
-export const CODEX_ADAPTER: ProviderAdapter<CodexTurnState> = {
-  liftProtocol(state) {
-    return {
-      currentTurnId: state.currentTurnId,
-      startedSubagents: getStartedSubagents(state),
-      activeSubagents: getActiveSubagents(state),
-    };
-  },
-  writeProtocol(state, next) {
-    return {
-      ...state,
-      currentTurnId: next.currentTurnId,
-      startedSubagents: new Set(next.startedSubagents),
-      activeSubagents: new Set(next.activeSubagents),
-    };
-  },
-};
+export const CODEX_ADAPTER = embeddedProtocolAdapter<CodexTurnState>();
 
 function getProviderSubagentToSessionSubagent(
   state: CodexTurnState,

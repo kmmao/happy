@@ -28,6 +28,49 @@ export type ProviderAdapter<T> = {
 };
 
 /**
+ * State shape shared by Providers that embed the three `ProtocolState` fields
+ * directly, under the same names, with the two Subagent Sets optional/lazily
+ * initialised. Claude and Codex both match this; only their *other* fields
+ * (sidechain maps, `parent_call_id` maps) differ.
+ */
+type EmbeddedProtocolState = {
+  currentTurnId: string | null;
+  startedSubagents?: ReadonlySet<string>;
+  activeSubagents?: ReadonlySet<string>;
+};
+
+/**
+ * The `ProviderAdapter` for any Provider whose state embeds the reducer's three
+ * fields inline (see `EmbeddedProtocolState`). `liftProtocol` reads them
+ * (defaulting an absent Set to empty); `writeProtocol` spreads the Provider
+ * state and merges fresh copies back. This collapses the byte-for-byte
+ * identical Claude and Codex adapters into one — a Provider whose protocol view
+ * is stored differently, or that *is* a `ProtocolState` (ACP), still writes its
+ * own adapter. Per ADR-0025 the contract stays two pure functions, not a class.
+ */
+export function embeddedProtocolAdapter<
+  T extends EmbeddedProtocolState,
+>(): ProviderAdapter<T> {
+  return {
+    liftProtocol(state) {
+      return {
+        currentTurnId: state.currentTurnId,
+        startedSubagents: state.startedSubagents ?? new Set<string>(),
+        activeSubagents: state.activeSubagents ?? new Set<string>(),
+      };
+    },
+    writeProtocol(state, next) {
+      return {
+        ...state,
+        currentTurnId: next.currentTurnId,
+        startedSubagents: new Set(next.startedSubagents),
+        activeSubagents: new Set(next.activeSubagents),
+      };
+    },
+  };
+}
+
+/**
  * Run one `ProtocolIntent` through the reducer on behalf of a Provider's
  * state. Returns the new Provider state plus the envelopes the reducer
  * emitted.

@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import { createId, isCuid } from "@paralleldrive/cuid2";
 import {
   closeClaudeTurnWithStatus,
+  createClaudeProtocolState,
   mapClaudeLogMessageToSessionEnvelopes,
 } from "./sessionProtocolMapper";
 
@@ -19,7 +20,7 @@ describe("mapClaudeLogMessageToSessionEnvelopes", () => {
         },
         timestamp: "2025-01-01T00:00:00.000Z",
       } as any,
-      { currentTurnId: null },
+      { ...createClaudeProtocolState(), currentTurnId: null },
     );
 
     expect(result.currentTurnId).toBeNull();
@@ -45,7 +46,7 @@ describe("mapClaudeLogMessageToSessionEnvelopes", () => {
         },
         timestamp: "2025-01-01T00:00:01.000Z",
       } as any,
-      { currentTurnId: null },
+      { ...createClaudeProtocolState(), currentTurnId: null },
     );
 
     expect(result.currentTurnId).not.toBeNull();
@@ -73,7 +74,7 @@ describe("mapClaudeLogMessageToSessionEnvelopes", () => {
         },
         timestamp: "2025-01-01T00:00:01.000Z",
       } as any,
-      { currentTurnId: null },
+      { ...createClaudeProtocolState(), currentTurnId: null },
     );
 
     expect(result.envelopes).toHaveLength(2);
@@ -98,7 +99,7 @@ describe("mapClaudeLogMessageToSessionEnvelopes", () => {
           ],
         },
       } as any,
-      { currentTurnId: null },
+      { ...createClaudeProtocolState(), currentTurnId: null },
     );
 
     expect(started.envelopes.some((e) => e.ev.t === "tool-call-start")).toBe(
@@ -116,7 +117,7 @@ describe("mapClaudeLogMessageToSessionEnvelopes", () => {
           ],
         },
       } as any,
-      { currentTurnId: started.currentTurnId },
+      { ...createClaudeProtocolState(), currentTurnId: started.currentTurnId },
     );
 
     expect(ended.currentTurnId).toBe(started.currentTurnId);
@@ -132,7 +133,7 @@ describe("mapClaudeLogMessageToSessionEnvelopes", () => {
   it("uses parent_tool_use_id as subagent and emits subagent start", () => {
     const mappedSubagent = createId();
     const state = {
-      currentTurnId: "turn-1",
+      ...createClaudeProtocolState(), currentTurnId: "turn-1",
       providerSubagentToSessionSubagent: new Map<string, string>([
         ["task-1", mappedSubagent],
       ]),
@@ -162,7 +163,7 @@ describe("mapClaudeLogMessageToSessionEnvelopes", () => {
   });
 
   it("buffers subagent messages until parent Task registration is known", () => {
-    const state = { currentTurnId: null };
+    const state = { ...createClaudeProtocolState(), currentTurnId: null };
 
     const buffered = mapClaudeLogMessageToSessionEnvelopes(
       {
@@ -221,7 +222,7 @@ describe("mapClaudeLogMessageToSessionEnvelopes", () => {
   });
 
   it("creates and tags subagent chain from Task prompt when parent_tool_use_id is absent", () => {
-    const state = { currentTurnId: null };
+    const state = { ...createClaudeProtocolState(), currentTurnId: null };
     const prompt = "Search for TypeScript 5.6 features";
 
     const taskToolUse = mapClaudeLogMessageToSessionEnvelopes(
@@ -326,7 +327,7 @@ describe("mapClaudeLogMessageToSessionEnvelopes", () => {
       .slice(0, 6)
       .map((line) => JSON.parse(line));
 
-    const state = { currentTurnId: null };
+    const state = { ...createClaudeProtocolState(), currentTurnId: null };
     const envelopes = rows.flatMap((row) => {
       return mapClaudeLogMessageToSessionEnvelopes(row as any, state).envelopes;
     });
@@ -357,7 +358,7 @@ describe("mapClaudeLogMessageToSessionEnvelopes", () => {
   it("emits stop for completed subagent when parent Task tool returns", () => {
     const mappedSubagent = createId();
     const state = {
-      currentTurnId: "turn-1",
+      ...createClaudeProtocolState(), currentTurnId: "turn-1",
       providerSubagentToSessionSubagent: new Map<string, string>([
         ["task-2", mappedSubagent],
       ]),
@@ -423,7 +424,7 @@ describe("mapClaudeLogMessageToSessionEnvelopes", () => {
         summary: "Done",
         leafUuid: "leaf-1",
       } as any,
-      { currentTurnId: "turn-1" },
+      { ...createClaudeProtocolState(), currentTurnId: "turn-1" },
     );
 
     expect(result.currentTurnId).toBe("turn-1");
@@ -449,7 +450,7 @@ describe("background task metadata in tool-call-end", () => {
           ],
         },
       } as any,
-      { currentTurnId: null },
+      { ...createClaudeProtocolState(), currentTurnId: null },
     );
 
     const ended = mapClaudeLogMessageToSessionEnvelopes(
@@ -468,7 +469,7 @@ describe("background task metadata in tool-call-end", () => {
           ],
         },
       } as any,
-      { currentTurnId: started.currentTurnId },
+      { ...createClaudeProtocolState(), currentTurnId: started.currentTurnId },
     );
 
     const toolCallEnd = ended.envelopes.find((e) => e.ev.t === "tool-call-end");
@@ -496,7 +497,7 @@ describe("background task metadata in tool-call-end", () => {
           ],
         },
       } as any,
-      { currentTurnId: null },
+      { ...createClaudeProtocolState(), currentTurnId: null },
     );
 
     const ended = mapClaudeLogMessageToSessionEnvelopes(
@@ -514,7 +515,7 @@ describe("background task metadata in tool-call-end", () => {
           ],
         },
       } as any,
-      { currentTurnId: started.currentTurnId },
+      { ...createClaudeProtocolState(), currentTurnId: started.currentTurnId },
     );
 
     const toolCallEnd = ended.envelopes.find((e) => e.ev.t === "tool-call-end");
@@ -527,7 +528,7 @@ describe("background task metadata in tool-call-end", () => {
 describe("closeClaudeTurnWithStatus", () => {
   it("emits turn-end with provided status when turn is active", () => {
     const result = closeClaudeTurnWithStatus(
-      { currentTurnId: "turn-1" },
+      { ...createClaudeProtocolState(), currentTurnId: "turn-1" },
       "cancelled",
     );
     expect(result.currentTurnId).toBeNull();
@@ -550,7 +551,7 @@ describe("drop taxonomy", () => {
   it("classifies a summary message as summary-message", () => {
     const result = mapClaudeLogMessageToSessionEnvelopes(
       { type: "summary", summary: "Done", leafUuid: "leaf-1" } as any,
-      { currentTurnId: "turn-1" },
+      { ...createClaudeProtocolState(), currentTurnId: "turn-1" },
     );
     expect(result.envelopes).toHaveLength(0);
     expect(result.dropped).toEqual([
@@ -561,7 +562,7 @@ describe("drop taxonomy", () => {
   it("classifies a system message as system-message", () => {
     const result = mapClaudeLogMessageToSessionEnvelopes(
       { type: "system", uuid: "s-1" } as any,
-      { currentTurnId: "turn-1" },
+      { ...createClaudeProtocolState(), currentTurnId: "turn-1" },
     );
     expect(result.envelopes).toHaveLength(0);
     expect(result.dropped).toEqual([
@@ -577,7 +578,7 @@ describe("drop taxonomy", () => {
         isMeta: true,
         message: { role: "user", content: "skill prompt body" },
       } as any,
-      { currentTurnId: null },
+      { ...createClaudeProtocolState(), currentTurnId: null },
     );
     expect(result.envelopes).toHaveLength(0);
     expect(result.dropped).toEqual([
@@ -592,7 +593,7 @@ describe("drop taxonomy", () => {
         uuid: "u-empty-1",
         message: { role: "user", content: [] },
       } as any,
-      { currentTurnId: null },
+      { ...createClaudeProtocolState(), currentTurnId: null },
     );
     expect(result.envelopes).toHaveLength(0);
     expect(result.dropped).toEqual([
@@ -603,7 +604,7 @@ describe("drop taxonomy", () => {
   it("classifies an unhandled message type as unhandled-message-type", () => {
     const result = mapClaudeLogMessageToSessionEnvelopes(
       { type: "result", uuid: "r-1", subtype: "success" } as any,
-      { currentTurnId: "turn-1" },
+      { ...createClaudeProtocolState(), currentTurnId: "turn-1" },
     );
     expect(result.envelopes).toHaveLength(0);
     expect(result.dropped).toEqual([
@@ -612,7 +613,7 @@ describe("drop taxonomy", () => {
   });
 
   it("classifies a pending-subagent message as a deferral, then clears it on replay", () => {
-    const state = { currentTurnId: null };
+    const state = { ...createClaudeProtocolState(), currentTurnId: null };
 
     const buffered = mapClaudeLogMessageToSessionEnvelopes(
       {
@@ -666,7 +667,7 @@ describe("drop taxonomy", () => {
         uuid: "u-ok-1",
         message: { role: "user", content: "hello" },
       } as any,
-      { currentTurnId: null },
+      { ...createClaudeProtocolState(), currentTurnId: null },
     );
     expect(result.envelopes).toHaveLength(1);
     expect(result.dropped).toEqual([]);

@@ -30,12 +30,11 @@ import {
   type SessionEnvelope,
   type SessionTurnEndStatus,
 } from "@kmmao/happy-wire";
+import { type TurnMeta } from "@/claude/utils/sessionProtocolMapper";
 import {
-  closeClaudeTurnWithStatus,
-  mapClaudeLogMessageToSessionEnvelopes,
-  type ClaudeSessionProtocolState,
-  type TurnMeta,
-} from "@/claude/utils/sessionProtocolMapper";
+  createClaudeProtocolDriver,
+  type ClaudeProtocolDriver,
+} from "@/claude/claudeProtocolDriver";
 import { InvalidateSync } from "@/utils/sync";
 import axios from "axios";
 
@@ -203,17 +202,7 @@ export class ApiSessionClient extends EventEmitter {
   private agentStateLock = new AsyncLock();
   private metadataLock = new AsyncLock();
   private readonly cipher: Cipher;
-  private claudeSessionProtocolState: ClaudeSessionProtocolState = {
-    currentTurnId: null,
-    uuidToProviderSubagent: new Map<string, string>(),
-    taskPromptToSubagents: new Map<string, string[]>(),
-    providerSubagentToSessionSubagent: new Map<string, string>(),
-    subagentTitles: new Map<string, string>(),
-    bufferedSubagentMessages: new Map<string, RawJSONLines[]>(),
-    hiddenParentToolCalls: new Set<string>(),
-    startedSubagents: new Set<string>(),
-    activeSubagents: new Set<string>(),
-  };
+  private claudeDriver: ClaudeProtocolDriver = createClaudeProtocolDriver();
   private lastSeq: number;
   private pendingOutbox: Array<{ content: string; localId: string }> = [];
   private currentTurnStartTime: number | null = null;
@@ -237,7 +226,7 @@ export class ApiSessionClient extends EventEmitter {
 
   /** Current session protocol turn ID, or null if no turn is open. */
   get currentTurnId(): string | null {
-    return this.claudeSessionProtocolState.currentTurnId;
+    return this.claudeDriver.currentTurnId;
   }
 
   /**
@@ -248,8 +237,8 @@ export class ApiSessionClient extends EventEmitter {
    * Returns the current (possibly freshly-created) turn ID.
    */
   ensureCurrentTurn(): string {
-    if (this.claudeSessionProtocolState.currentTurnId) {
-      return this.claudeSessionProtocolState.currentTurnId;
+    if (this.claudeDriver.currentTurnId) {
+      return this.claudeDriver.currentTurnId;
     }
     const turnId = createId();
     const envelope = createEnvelope(
@@ -257,7 +246,7 @@ export class ApiSessionClient extends EventEmitter {
       { t: "turn-start" as const },
       { turn: turnId },
     );
-    this.claudeSessionProtocolState.currentTurnId = turnId;
+    this.claudeDriver.setCurrentTurn(turnId);
     this.currentTurnStartTime = Date.now();
     this.sendSessionProtocolMessage(envelope);
     return turnId;
@@ -685,12 +674,8 @@ export class ApiSessionClient extends EventEmitter {
     // Strip large image base64 from tool results to prevent oversized messages
     body = stripLargeImageContent(body);
 
-    const prevTurnId = this.claudeSessionProtocolState.currentTurnId;
-    const mapped = mapClaudeLogMessageToSessionEnvelopes(
-      body,
-      this.claudeSessionProtocolState,
-    );
-    this.claudeSessionProtocolState.currentTurnId = mapped.currentTurnId;
+    const prevTurnId = this.claudeDriver.currentTurnId;
+    const mapped = this.claudeDriver.ingest(body);
 
     // Surface intentionally-unemitted messages for diagnostics. These used to
     // vanish silently; now the mapper classifies each, so "why didn't my
@@ -702,7 +687,7 @@ export class ApiSessionClient extends EventEmitter {
     }
 
     // Track turn start time when a new turn is opened
-    if (!prevTurnId && this.claudeSessionProtocolState.currentTurnId) {
+    if (!prevTurnId && this.claudeDriver.currentTurnId) {
       this.currentTurnStartTime = Date.now();
     }
 
@@ -744,7 +729,7 @@ export class ApiSessionClient extends EventEmitter {
         this.sendUsageData(body.message.usage, effectiveModel);
 
         // Send per-request usage-update envelope to App for real-time display
-        const turnId = this.claudeSessionProtocolState.currentTurnId;
+        const turnId = this.claudeDriver.currentTurnId;
         if (turnId) {
           const now = Date.now();
           const callDurationMs =
@@ -860,8 +845,7 @@ export class ApiSessionClient extends EventEmitter {
       }
     }
 
-    const mapped = closeClaudeTurnWithStatus(
-      this.claudeSessionProtocolState,
+    const mapped = this.claudeDriver.closeTurn(
       status,
       Object.keys(meta).length > 0 ? meta : undefined,
     );
@@ -873,7 +857,6 @@ export class ApiSessionClient extends EventEmitter {
     this.currentTurnUsage = null;
     this.accumulatedTurnUsage = null;
 
-    this.claudeSessionProtocolState.currentTurnId = mapped.currentTurnId;
     for (const envelope of mapped.envelopes) {
       this.sendSessionProtocolMessage(envelope);
     }
@@ -975,7 +958,7 @@ export class ApiSessionClient extends EventEmitter {
       { turn: turnId },
     );
     this.sendSessionProtocolMessage(turnStartEnvelope);
-    this.claudeSessionProtocolState.currentTurnId = turnId;
+    this.claudeDriver.setCurrentTurn(turnId);
 
     // Send the text result
     const textEnvelope = createEnvelope(

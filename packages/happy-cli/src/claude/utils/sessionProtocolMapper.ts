@@ -9,17 +9,17 @@ import {
 import { type ProtocolIntent } from "@/session-protocol/turnReducer";
 import {
   applyToProvider,
-  type ProviderAdapter,
+  embeddedProtocolAdapter,
 } from "@/session-protocol/providerAdapter";
 
 export type ClaudeSessionProtocolState = {
   currentTurnId: string | null;
-  uuidToProviderSubagent?: Map<string, string>;
-  taskPromptToSubagents?: Map<string, string[]>;
-  providerSubagentToSessionSubagent?: Map<string, string>;
-  subagentTitles?: Map<string, string>;
-  bufferedSubagentMessages?: Map<string, RawJSONLines[]>;
-  hiddenParentToolCalls?: Set<string>;
+  uuidToProviderSubagent: Map<string, string>;
+  taskPromptToSubagents: Map<string, string[]>;
+  providerSubagentToSessionSubagent: Map<string, string>;
+  subagentTitles: Map<string, string>;
+  bufferedSubagentMessages: Map<string, RawJSONLines[]>;
+  hiddenParentToolCalls: Set<string>;
   startedSubagents?: Set<string>;
   activeSubagents?: Set<string>;
 };
@@ -73,11 +73,32 @@ export type DroppedMessage = {
   reason: DropReason;
 };
 
-type ClaudeMapperResult = {
+export type ClaudeMapperResult = {
   currentTurnId: string | null;
   envelopes: SessionEnvelope[];
   dropped: DroppedMessage[];
 };
+
+/**
+ * The single canonical empty Claude protocol state. The subagent-resolution
+ * maps are no longer lazily initialised behind per-field getters — they are
+ * always present from construction, so every reader does a direct field access.
+ * `ClaudeProtocolDriver` and the mapper tests both build state through this one
+ * factory.
+ */
+export function createClaudeProtocolState(): ClaudeSessionProtocolState {
+  return {
+    currentTurnId: null,
+    uuidToProviderSubagent: new Map<string, string>(),
+    taskPromptToSubagents: new Map<string, string[]>(),
+    providerSubagentToSessionSubagent: new Map<string, string>(),
+    subagentTitles: new Map<string, string>(),
+    bufferedSubagentMessages: new Map<string, RawJSONLines[]>(),
+    hiddenParentToolCalls: new Set<string>(),
+    startedSubagents: new Set<string>(),
+    activeSubagents: new Set<string>(),
+  };
+}
 
 function pickProviderSubagent(message: RawJSONLines): string | undefined {
   const raw = message as {
@@ -99,38 +120,11 @@ function pickProviderSubagent(message: RawJSONLines): string | undefined {
   return undefined;
 }
 
-function getUuidToProviderSubagent(
-  state: ClaudeSessionProtocolState,
-): Map<string, string> {
-  if (!state.uuidToProviderSubagent) {
-    state.uuidToProviderSubagent = new Map<string, string>();
-  }
-  return state.uuidToProviderSubagent;
-}
-
-function getTaskPromptToSubagents(
-  state: ClaudeSessionProtocolState,
-): Map<string, string[]> {
-  if (!state.taskPromptToSubagents) {
-    state.taskPromptToSubagents = new Map<string, string[]>();
-  }
-  return state.taskPromptToSubagents;
-}
-
-function getProviderSubagentToSessionSubagent(
-  state: ClaudeSessionProtocolState,
-): Map<string, string> {
-  if (!state.providerSubagentToSessionSubagent) {
-    state.providerSubagentToSessionSubagent = new Map<string, string>();
-  }
-  return state.providerSubagentToSessionSubagent;
-}
-
 function getSessionSubagentIdForProviderSubagent(
   state: ClaudeSessionProtocolState,
   providerSubagent: string,
 ): string | undefined {
-  return getProviderSubagentToSessionSubagent(state).get(providerSubagent);
+  return state.providerSubagentToSessionSubagent.get(providerSubagent);
 }
 
 function ensureSessionSubagentIdForProviderSubagent(
@@ -146,35 +140,8 @@ function ensureSessionSubagentIdForProviderSubagent(
   }
 
   const created = createId();
-  getProviderSubagentToSessionSubagent(state).set(providerSubagent, created);
+  state.providerSubagentToSessionSubagent.set(providerSubagent, created);
   return created;
-}
-
-function getSubagentTitles(
-  state: ClaudeSessionProtocolState,
-): Map<string, string> {
-  if (!state.subagentTitles) {
-    state.subagentTitles = new Map<string, string>();
-  }
-  return state.subagentTitles;
-}
-
-function getBufferedSubagentMessages(
-  state: ClaudeSessionProtocolState,
-): Map<string, RawJSONLines[]> {
-  if (!state.bufferedSubagentMessages) {
-    state.bufferedSubagentMessages = new Map<string, RawJSONLines[]>();
-  }
-  return state.bufferedSubagentMessages;
-}
-
-function getHiddenParentToolCalls(
-  state: ClaudeSessionProtocolState,
-): Set<string> {
-  if (!state.hiddenParentToolCalls) {
-    state.hiddenParentToolCalls = new Set<string>();
-  }
-  return state.hiddenParentToolCalls;
 }
 
 function bufferSubagentMessage(
@@ -182,7 +149,7 @@ function bufferSubagentMessage(
   subagent: string,
   message: RawJSONLines,
 ): void {
-  const buffer = getBufferedSubagentMessages(state);
+  const buffer = state.bufferedSubagentMessages;
   const queue = buffer.get(subagent) ?? [];
   queue.push(message);
   buffer.set(subagent, queue);
@@ -192,25 +159,12 @@ function consumeBufferedSubagentMessages(
   state: ClaudeSessionProtocolState,
   subagent: string,
 ): RawJSONLines[] {
-  const buffer = getBufferedSubagentMessages(state);
+  const buffer = state.bufferedSubagentMessages;
   const queue = buffer.get(subagent) ?? [];
   buffer.delete(subagent);
   return queue;
 }
 
-function getStartedSubagents(state: ClaudeSessionProtocolState): Set<string> {
-  if (!state.startedSubagents) {
-    state.startedSubagents = new Set<string>();
-  }
-  return state.startedSubagents;
-}
-
-function getActiveSubagents(state: ClaudeSessionProtocolState): Set<string> {
-  if (!state.activeSubagents) {
-    state.activeSubagents = new Set<string>();
-  }
-  return state.activeSubagents;
-}
 
 function pickUuid(message: RawJSONLines): string | undefined {
   const raw = message as { uuid?: unknown };
@@ -250,7 +204,7 @@ function queueTaskPromptSubagent(
     return;
   }
 
-  const promptMap = getTaskPromptToSubagents(state);
+  const promptMap = state.taskPromptToSubagents;
   const queue = promptMap.get(normalized) ?? [];
   if (!queue.includes(subagent)) {
     queue.push(subagent);
@@ -267,7 +221,7 @@ function consumeTaskPromptSubagent(
     return undefined;
   }
 
-  const promptMap = getTaskPromptToSubagents(state);
+  const promptMap = state.taskPromptToSubagents;
   const queue = promptMap.get(normalized);
   if (!queue || queue.length === 0) {
     return undefined;
@@ -283,7 +237,7 @@ function consumeTaskPromptSubagent(
 function consumeSinglePendingTaskSubagent(
   state: ClaudeSessionProtocolState,
 ): string | undefined {
-  const promptMap = getTaskPromptToSubagents(state);
+  const promptMap = state.taskPromptToSubagents;
   let candidateKey: string | null = null;
   let candidateSubagent: string | null = null;
 
@@ -341,7 +295,7 @@ function resolveProviderSubagent(
 
   const parentUuid = pickParentUuid(message);
   if (parentUuid && isSidechainMessage(message)) {
-    const inheritedSubagent = getUuidToProviderSubagent(state).get(parentUuid);
+    const inheritedSubagent = state.uuidToProviderSubagent.get(parentUuid);
     if (inheritedSubagent) {
       return inheritedSubagent;
     }
@@ -380,7 +334,7 @@ function rememberSubagentForMessage(
     return;
   }
 
-  getUuidToProviderSubagent(state).set(uuid, providerSubagent);
+  state.uuidToProviderSubagent.set(uuid, providerSubagent);
 }
 
 function pickTaskPrompt(input: unknown): string | undefined {
@@ -421,43 +375,28 @@ function setSubagentTitle(
   if (!title || title.trim().length === 0) {
     return;
   }
-  getSubagentTitles(state).set(subagent, title.trim());
+  state.subagentTitles.set(subagent, title.trim());
 }
 
 function clearResolutionMaps(state: ClaudeSessionProtocolState): void {
-  getUuidToProviderSubagent(state).clear();
-  getTaskPromptToSubagents(state).clear();
-  getProviderSubagentToSessionSubagent(state).clear();
-  getSubagentTitles(state).clear();
-  getBufferedSubagentMessages(state).clear();
-  getHiddenParentToolCalls(state).clear();
+  state.uuidToProviderSubagent.clear();
+  state.taskPromptToSubagents.clear();
+  state.providerSubagentToSessionSubagent.clear();
+  state.subagentTitles.clear();
+  state.bufferedSubagentMessages.clear();
+  state.hiddenParentToolCalls.clear();
 }
 
 /**
  * Claude's ProviderAdapter (CONTEXT.md: Provider, ProviderAdapter; ADR-0025).
- * The three reducer fields are mirrored on ClaudeSessionProtocolState; the
- * Claude-only resolution maps (uuid/taskPrompt/buffered/…) are preserved by
- * reference through `writeProtocol`. Callers continue to use the imperative
+ * The three reducer fields are mirrored on ClaudeSessionProtocolState, so the
+ * shared `embeddedProtocolAdapter` covers the lift/write; the Claude-only
+ * resolution maps (uuid/taskPrompt/buffered/…) are preserved by reference
+ * through its `writeProtocol` spread. Callers continue to use the imperative
  * `applyIntent` boundary below to keep the existing `runMapper` call sites
  * unchanged; the seam itself is now uniform with Codex and ACP.
  */
-export const CLAUDE_ADAPTER: ProviderAdapter<ClaudeSessionProtocolState> = {
-  liftProtocol(state) {
-    return {
-      currentTurnId: state.currentTurnId,
-      startedSubagents: getStartedSubagents(state),
-      activeSubagents: getActiveSubagents(state),
-    };
-  },
-  writeProtocol(state, next) {
-    return {
-      ...state,
-      currentTurnId: next.currentTurnId,
-      startedSubagents: new Set(next.startedSubagents),
-      activeSubagents: new Set(next.activeSubagents),
-    };
-  },
-};
+export const CLAUDE_ADAPTER = embeddedProtocolAdapter<ClaudeSessionProtocolState>();
 
 // Bridge to the shared Turn lifecycle reducer via the ProviderAdapter helper
 // (ADR-0025). The external imperative signature is preserved so existing
@@ -502,7 +441,7 @@ function emitContent(
           kind: "content",
           ev,
           subagent,
-          subagentTitle: getSubagentTitles(state).get(subagent),
+          subagentTitle: state.subagentTitles.get(subagent),
           claudeUuid,
         }
       : { kind: "content", ev, claudeUuid },
@@ -562,13 +501,6 @@ export function closeClaudeTurnWithStatus(
 }
 
 export function mapClaudeLogMessageToSessionEnvelopes(
-  message: RawJSONLines,
-  state: ClaudeSessionProtocolState,
-): ClaudeMapperResult {
-  return mapClaudeLogMessageToSessionEnvelopesInternal(message, state);
-}
-
-function mapClaudeLogMessageToSessionEnvelopesInternal(
   message: RawJSONLines,
   state: ClaudeSessionProtocolState,
 ): ClaudeMapperResult {
@@ -689,7 +621,7 @@ function mapClaudeLogMessageToSessionEnvelopesInternal(
         );
         const buffered = consumeBufferedSubagentMessages(state, call);
         for (const bufferedMessage of buffered) {
-          const replay = mapClaudeLogMessageToSessionEnvelopesInternal(
+          const replay = mapClaudeLogMessageToSessionEnvelopes(
             bufferedMessage,
             state,
           );
@@ -772,7 +704,7 @@ function mapClaudeLogMessageToSessionEnvelopesInternal(
         const sessionSubagentForToolResult =
           getSessionSubagentIdForProviderSubagent(state, block.tool_use_id);
         if (!message.isSidechain) {
-          if (getHiddenParentToolCalls(state).has(block.tool_use_id)) {
+          if (state.hiddenParentToolCalls.has(block.tool_use_id)) {
             if (sessionSubagentForToolResult) {
               applyIntent(
                 state,
@@ -780,7 +712,7 @@ function mapClaudeLogMessageToSessionEnvelopesInternal(
                 envelopes,
               );
             }
-            getHiddenParentToolCalls(state).delete(block.tool_use_id);
+            state.hiddenParentToolCalls.delete(block.tool_use_id);
             continue;
           }
           if (sessionSubagentForToolResult) {
