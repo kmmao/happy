@@ -1,18 +1,17 @@
 import { sessionAliveEventsCounter, websocketEventsCounter } from "@/app/monitoring/metrics2";
 import { activityCache } from "@/app/presence/sessionCache";
 import {
-    buildNewMessageUpdate,
     buildSessionActivityEphemeral,
     buildTaskStatusChangedEphemeral,
     ClientConnection,
     eventRouter,
 } from "@/app/events/eventRouter";
+import { emitSyncUpdate } from "@/app/events/syncUpdate";
 import { inboxCreate } from "@/modules/inboxCreate";
 import { db } from "@/storage/db";
-import { allocateSessionSeq, allocateUserSeq } from "@/storage/seq";
+import { allocateSessionSeq } from "@/storage/seq";
 import { AsyncLock } from "@/utils/lock";
 import { debug, log } from "@/utils/log";
-import { randomKeyNaked } from "@/utils/randomKeyNaked";
 import { Socket } from "socket.io";
 import { sessionVersionedFieldUpdate } from "./sessionVersionedFieldUpdate";
 
@@ -150,8 +149,8 @@ export function sessionUpdateHandler(userId: string, socket: Socket, connection:
                     c: message
                 };
 
-                // Resolve seq
-                const updSeq = await allocateUserSeq(userId);
+                // Resolve seq for the SessionMessage record. The SyncUpdate's
+                // own seq (per-Account) is allocated inside emitSyncUpdate.
                 const msgSeq = await allocateSessionSeq(sid);
 
                 // Check if message already exists
@@ -174,14 +173,14 @@ export function sessionUpdateHandler(userId: string, socket: Socket, connection:
                     }
                 });
 
-                // Emit new message update to relevant clients
-                const updatePayload = buildNewMessageUpdate(msg, sid, updSeq, randomKeyNaked(12));
-                eventRouter.emitUpdate({
-                    userId,
-                    payload: updatePayload,
-                    recipientFilter: { type: 'all-interested-in-session', sessionId: sid },
-                    skipSenderConnection: connection
-                });
+                // new-message SyncUpdate (seam owns seq + id + recipient,
+                // ADR-0023). skipSenderConnection: don't echo to the socket
+                // that just sent the message.
+                await emitSyncUpdate(userId, {
+                    t: "new-message",
+                    sessionId: sid,
+                    message: msg,
+                }, { skipSenderConnection: connection });
             } catch (error) {
                 log({ module: 'websocket', level: 'error' }, `Error in message handler: ${error}`);
             }

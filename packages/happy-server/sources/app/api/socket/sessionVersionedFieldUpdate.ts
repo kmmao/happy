@@ -1,8 +1,6 @@
-import { buildUpdateSessionUpdate, eventRouter } from "@/app/events/eventRouter";
+import { emitSyncUpdate } from "@/app/events/syncUpdate";
 import { versionedUpdate } from "@/modules/versionedUpdate";
 import { db } from "@/storage/db";
-import { allocateUserSeq } from "@/storage/seq";
-import { randomKeyNaked } from "@/utils/randomKeyNaked";
 
 /**
  * The two optimistically-versioned Session fields a client writes over the
@@ -73,19 +71,17 @@ export async function sessionVersionedFieldUpdate(input: {
         return;
     }
 
-    const updSeq = await allocateUserSeq(userId);
     // agentState is nullable, but the update builder types its value as a plain
     // string; cast to keep the historical runtime shape (a null value rides
     // through unchanged) without widening the builder signature here.
     const fieldUpdate = { value, version: result.newVersion } as { value: string; version: number };
-    const updatePayload = field === "metadata"
-        ? buildUpdateSessionUpdate(sid, updSeq, randomKeyNaked(12), fieldUpdate)
-        : buildUpdateSessionUpdate(sid, updSeq, randomKeyNaked(12), undefined, fieldUpdate);
-    eventRouter.emitUpdate({
-        userId,
-        payload: updatePayload,
-        recipientFilter: { type: "all-interested-in-session", sessionId: sid }
-    });
+    // update-session SyncUpdate (seam owns seq + id + recipient, ADR-0023).
+    // The metadata-vs-agentState branch lives at the body level: each
+    // emitSyncUpdate carries exactly one of the two versioned-field slots.
+    await emitSyncUpdate(userId, field === "metadata"
+        ? { t: "update-session", sessionId: sid, metadata: fieldUpdate }
+        : { t: "update-session", sessionId: sid, agentState: fieldUpdate }
+    );
 
     callback?.({ result: "success", version: result.newVersion, [field]: value });
 }

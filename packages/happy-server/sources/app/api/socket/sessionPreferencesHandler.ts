@@ -1,8 +1,7 @@
-import { buildUpdateSessionUpdate, ClientConnection, eventRouter } from "@/app/events/eventRouter";
+import { ClientConnection } from "@/app/events/eventRouter";
+import { emitSyncUpdate } from "@/app/events/syncUpdate";
 import { db } from "@/storage/db";
-import { allocateUserSeq } from "@/storage/seq";
 import { log } from "@/utils/log";
-import { randomKeyNaked } from "@/utils/randomKeyNaked";
 import { Socket } from "socket.io";
 
 export function sessionPreferencesHandler(userId: string, socket: Socket, connection: ClientConnection) {
@@ -48,17 +47,12 @@ export function sessionPreferencesHandler(userId: string, socket: Socket, connec
                 return;
             }
 
-            // Generate session preferences update
-            const updSeq = await allocateUserSeq(userId);
-            const preferencesUpdate = {
-                value: preferences,
-                version: expectedVersion + 1
-            };
-            const updatePayload = buildUpdateSessionUpdate(sid, updSeq, randomKeyNaked(12), undefined, undefined, preferencesUpdate);
-            eventRouter.emitUpdate({
-                userId,
-                payload: updatePayload,
-                recipientFilter: { type: 'all-interested-in-session', sessionId: sid }
+            // Broadcast update-session (preferences slot). Seam owns seq + id
+            // + recipient (ADR-0023).
+            await emitSyncUpdate(userId, {
+                t: "update-session",
+                sessionId: sid,
+                preferences: { value: preferences, version: expectedVersion + 1 },
             });
 
             // Send success response with new version via callback
