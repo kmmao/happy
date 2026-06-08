@@ -11,7 +11,8 @@
  */
 
 import { previewStore } from "./previewStore";
-import { eventRouter, buildPreviewConnectionUpdatedEphemeral } from "@/app/events/eventRouter";
+import { eventRouter } from "@/app/events/eventRouter";
+import { emitSyncEphemeral } from "@/app/events/syncEphemeral";
 import { db } from "@/storage/db";
 import { log } from "@/utils/log";
 
@@ -54,16 +55,10 @@ async function runCleanup(): Promise<void> {
                 select: { accountId: true },
             });
             if (session) {
-                eventRouter.emitEphemeral({
-                    userId: session.accountId,
-                    payload: buildPreviewConnectionUpdatedEphemeral({
-                        sessionId: conn.sessionId,
-                        connection: null,
-                    }),
-                    recipientFilter: {
-                        type: "all-interested-in-session",
-                        sessionId: conn.sessionId,
-                    },
+                await emitSyncEphemeral(session.accountId, {
+                    t: "preview-connection-updated",
+                    sessionId: conn.sessionId,
+                    connection: null,
                 });
             }
         } catch {

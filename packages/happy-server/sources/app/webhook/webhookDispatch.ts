@@ -29,10 +29,7 @@ import type {
   ParsedWebhookCiRun,
 } from "./webhookParsers";
 import { redis } from "@/storage/redis";
-import {
-  buildSessionActivityEphemeral,
-  eventRouter,
-} from "@/app/events/eventRouter";
+import { emitSyncEphemeral } from "@/app/events/syncEphemeral";
 import { fetchIssueLabelsFromProvider } from "./webhookFetchLabels";
 import { checkDailyRunLimit } from "@/modules/supervisorLimits";
 import { emitConfiguredSupervisorRunTrigger } from "@/modules/supervisorRunTrigger";
@@ -473,27 +470,21 @@ async function processRoute(
     }
   }
 
-  eventRouter.emitEphemeral({
-    userId: route.accountId,
-    payload: {
-      type: "webhook-trigger",
-      webhookEventId: event.id,
-      issueNumber: issue.issueNumber,
-      issueTitle: issue.issueTitle,
-      issueBody: issue.issueBody,
-      issueAuthor: issue.issueAuthor,
-      issueLabels: effectiveLabels,
-      issueUrl: issue.issueUrl,
-      repoUrl: issue.repoUrl,
-      repoPath: route.repoPath,
-      provider,
-      apiToken: decryptedApiToken,
-      ...(resolvedRuntimeProfile?.ok ? { runtimeProfile: resolvedRuntimeProfile.runtimeProfile } : {}),
-    },
-    recipientFilter: {
-      type: "machine-scoped-only",
-      machineId: route.machineId,
-    },
+  await emitSyncEphemeral(route.accountId, {
+    t: "webhook-trigger",
+    machineId: route.machineId,
+    webhookEventId: event.id,
+    issueNumber: issue.issueNumber,
+    issueTitle: issue.issueTitle,
+    issueBody: issue.issueBody,
+    issueAuthor: issue.issueAuthor,
+    issueLabels: effectiveLabels,
+    issueUrl: issue.issueUrl,
+    repoUrl: issue.repoUrl,
+    repoPath: route.repoPath,
+    provider,
+    apiToken: decryptedApiToken ?? null,
+    ...(resolvedRuntimeProfile?.ok ? { runtimeProfile: resolvedRuntimeProfile.runtimeProfile } : {}),
   });
 
   await db.webhookEvent.update({
@@ -637,29 +628,21 @@ async function processRoutePRMerge(
 
     activityCache.invalidateSession(webhookEvent.sessionId);
 
-    eventRouter.emitEphemeral({
-      userId: route.accountId,
-      payload: buildSessionActivityEphemeral(
-        webhookEvent.sessionId,
-        false,
-        now,
-        false,
-      ),
-      recipientFilter: { type: "user-scoped-only" },
+    await emitSyncEphemeral(route.accountId, {
+      t: "session-activity",
+      sessionId: webhookEvent.sessionId,
+      active: false,
+      activeAt: now,
     });
 
-    eventRouter.emitEphemeral({
-      userId: route.accountId,
-      payload: {
-        type: "webhook-pr-merged",
-        prNumber: prMerge.prNumber,
-        prUrl: prMerge.prUrl,
-        issueNumber: webhookEvent.issueNumber,
-        sessionId: webhookEvent.sessionId,
-        machineId: route.machineId,
-        repoPath: route.repoPath,
-      },
-      recipientFilter: { type: "user-scoped-only" },
+    await emitSyncEphemeral(route.accountId, {
+      t: "webhook-pr-merged",
+      prNumber: prMerge.prNumber,
+      prUrl: prMerge.prUrl,
+      issueNumber: webhookEvent.issueNumber,
+      sessionId: webhookEvent.sessionId,
+      machineId: route.machineId,
+      repoPath: route.repoPath,
     });
 
     log(

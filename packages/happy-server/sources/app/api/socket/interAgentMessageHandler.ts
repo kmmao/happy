@@ -9,10 +9,7 @@ import { Socket } from "socket.io";
 import { z } from "zod";
 import { db } from "@/storage/db";
 import { log } from "@/utils/log";
-import {
-    eventRouter,
-    buildInterAgentMessageEphemeral,
-} from "@/app/events/eventRouter";
+import { emitSyncEphemeral } from "@/app/events/syncEphemeral";
 
 const interAgentMessageSchema = z.object({
     fromSessionId: z.string().min(1),
@@ -60,28 +57,22 @@ export function interAgentMessageHandler(socket: Socket, userId: string): void {
                 return;
             }
 
-            const payload = buildInterAgentMessageEphemeral({
+            // Per ADR-0024 E3: the two emits below are split at the seam
+            // discriminator (-deliver to the target Session, -echo back to
+            // the sender's user-scoped App) but both wire-emit the same
+            // `type: "inter-agent-message"` payload — clients see no event
+            // type change.
+            await emitSyncEphemeral(userId, {
+                t: "inter-agent-message-deliver",
                 fromSessionId,
                 toSessionId,
                 message,
             });
-
-            // Deliver to all clients interested in the target session
-            eventRouter.emitEphemeral({
-                userId,
-                payload,
-                recipientFilter: {
-                    type: "all-interested-in-session",
-                    sessionId: toSessionId,
-                },
-            });
-
-            // Also fan out to App (user-scoped) clients so the dashboard can
-            // show outbound messages on the sender's card too.
-            eventRouter.emitEphemeral({
-                userId,
-                payload,
-                recipientFilter: { type: "user-scoped-only" },
+            await emitSyncEphemeral(userId, {
+                t: "inter-agent-message-echo",
+                fromSessionId,
+                toSessionId,
+                message,
             });
         } catch (error) {
             log(

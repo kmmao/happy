@@ -1,6 +1,27 @@
 import type { ResolvedRuntimeProfile } from "@kmmao/happy-wire";
 import {
     eventRouter,
+    buildAutoLoopFiredEphemeral,
+    buildInboxNewItemEphemeral,
+    buildInboxUnreadCountEphemeral,
+    buildInterAgentMessageEphemeral,
+    buildKnowledgeAccessUpdateEphemeral,
+    buildKnowledgeCountEphemeral,
+    buildMachineActivityEphemeral,
+    buildPreviewCandidateReportedEphemeral,
+    buildPreviewConnectionUpdatedEphemeral,
+    buildRpcReadyEphemeral,
+    buildSessionActivityEphemeral,
+    buildSessionEventCreatedEphemeral,
+    buildSupervisorLoopBriefEphemeral,
+    buildSupervisorLoopStatusEphemeral,
+    buildSupervisorStatusEphemeral,
+    buildSupervisorTriggerEphemeral,
+    buildTaskCancelEphemeral,
+    buildTaskStatusChangedEphemeral,
+    buildTaskTriggerEphemeral,
+    buildUsageEphemeral,
+    buildWorldEventCreatedEphemeral,
     type ClientConnection,
     type EphemeralPayload,
     type RecipientFilter,
@@ -444,61 +465,44 @@ function recipientFilterFor(body: SyncEphemeralBody): RecipientFilter {
 // stays unchanged in shape.
 
 function buildPayload(body: SyncEphemeralBody): EphemeralPayload {
+    // PR 1.5.a delegates to the existing build*Ephemeral exports in
+    // eventRouter.ts. PR 1.5.e will move them physically into this file as
+    // private helpers; this switch shape stays unchanged.
     switch (body.t) {
         case "session-activity":
-            return {
-                type: "activity",
-                id: body.sessionId,
-                active: body.active,
-                activeAt: body.activeAt,
-                thinking: body.thinking || false,
-                ...(body.apiRetry ? { apiRetry: body.apiRetry } : {}),
-            };
+            return buildSessionActivityEphemeral(body.sessionId, body.active, body.activeAt, body.thinking, body.apiRetry);
         case "machine-activity":
-            return {
-                type: "machine-activity",
-                id: body.machineId,
-                active: body.active,
-                activeAt: body.activeAt,
-            };
+            return buildMachineActivityEphemeral(body.machineId, body.active, body.activeAt);
         case "rpc-ready":
-            return { type: "rpc-ready", scope: body.scope, id: body.id, ready: body.ready };
+            return buildRpcReadyEphemeral(body.scope, body.id, body.ready);
         case "usage":
-            return {
-                type: "usage",
-                id: body.sessionId,
-                key: body.key,
-                tokens: body.tokens,
-                cost: body.cost,
-                timestamp: Date.now(),
-            };
+            return buildUsageEphemeral(body.sessionId, body.key, body.tokens, body.cost);
         case "supervisor-trigger": {
-            const { t: _t, ...rest } = body;
-            return { type: "supervisor-trigger", ...rest };
+            const { t: _t, ...opts } = body;
+            return buildSupervisorTriggerEphemeral(opts);
         }
         case "supervisor-status":
-            return {
-                type: "supervisor-status",
-                runId: body.runId,
-                projectId: body.projectId,
-                status: body.status,
-                artifactId: body.artifactId,
-                errorMessage: body.errorMessage,
-                currentDimension: body.currentDimension,
-                dimensionIndex: body.dimensionIndex,
-                totalDimensions: body.totalDimensions,
-            };
+            return buildSupervisorStatusEphemeral(
+                body.runId,
+                body.projectId,
+                body.status,
+                body.artifactId,
+                body.errorMessage,
+                body.currentDimension,
+                body.dimensionIndex,
+                body.totalDimensions,
+            );
         case "supervisor-loop-status": {
-            const { t: _t, ...rest } = body;
-            return { type: "supervisor-loop-status", ...rest };
+            const { t: _t, ...opts } = body;
+            return buildSupervisorLoopStatusEphemeral(opts);
         }
         case "supervisor-loop-brief": {
-            const { t: _t, ...rest } = body;
-            return { type: "supervisor-loop-brief", ...rest };
+            const { t: _t, ...opts } = body;
+            return buildSupervisorLoopBriefEphemeral(opts);
         }
         case "auto-loop-fired": {
-            const { t: _t, ...rest } = body;
-            return { type: "auto-loop-fired", ...rest };
+            const { t: _t, ...opts } = body;
+            return buildAutoLoopFiredEphemeral(opts);
         }
         case "supervisor-run-complete":
             return {
@@ -515,26 +519,24 @@ function buildPayload(body: SyncEphemeralBody): EphemeralPayload {
                 fixStatus: body.fixStatus,
             };
         case "knowledge-count":
-            return { type: "knowledge-count", id: body.sessionId, count: body.count };
+            return buildKnowledgeCountEphemeral(body.sessionId, body.count);
         case "knowledge-access-update":
-            return {
-                type: "knowledge-access-update",
+            return buildKnowledgeAccessUpdateEphemeral({
                 sessionId: body.sessionId,
-                at: Date.now(),
                 hit: body.hit,
                 miss: body.miss,
                 evicted: body.evicted,
-            };
+            });
         case "task-trigger": {
-            const { t: _t, machineId: _m, ...rest } = body;
-            return { type: "task-trigger", ...rest };
+            const { t: _t, machineId: _m, ...opts } = body;
+            return buildTaskTriggerEphemeral(opts);
         }
         case "task-status-changed": {
-            const { t: _t, ...rest } = body;
-            return { type: "task-status-changed", ...rest };
+            const { t: _t, ...opts } = body;
+            return buildTaskStatusChangedEphemeral(opts);
         }
         case "task-cancel":
-            return { type: "task-cancel", taskId: body.taskId, sessionId: body.sessionId };
+            return buildTaskCancelEphemeral({ taskId: body.taskId, sessionId: body.sessionId });
         case "task-log":
             return {
                 type: "task-log",
@@ -545,37 +547,33 @@ function buildPayload(body: SyncEphemeralBody): EphemeralPayload {
                 offset: body.offset,
             };
         case "inbox-new-item":
-            return { type: "inbox-new-item", item: body.item };
+            return buildInboxNewItemEphemeral(body.item);
         case "inbox-unread-count":
-            return { type: "inbox-unread-count", count: body.count };
+            return buildInboxUnreadCountEphemeral(body.count);
         case "session-event-created":
-            return { type: "session-event-created", event: body.event };
+            return buildSessionEventCreatedEphemeral(body.event);
         case "session-terminate":
             return { type: "session-terminate", sessionId: body.sessionId, reason: body.reason };
         case "inter-agent-message-deliver":
         case "inter-agent-message-echo":
             // Both seam variants emit the same wire `type` per ADR-0024 E3.
-            return {
-                type: "inter-agent-message",
+            return buildInterAgentMessageEphemeral({
                 fromSessionId: body.fromSessionId,
                 toSessionId: body.toSessionId,
                 message: body.message,
-                sentAt: Date.now(),
-            };
+            });
         case "world-event-created":
-            return { type: "world-event-created", event: body.event };
+            return buildWorldEventCreatedEphemeral(body.event);
         case "preview-candidate-reported":
-            return {
-                type: "preview-candidate-reported",
+            return buildPreviewCandidateReportedEphemeral({
                 sessionId: body.sessionId,
                 candidate: body.candidate,
-            };
+            });
         case "preview-connection-updated":
-            return {
-                type: "preview-connection-updated",
+            return buildPreviewConnectionUpdatedEphemeral({
                 sessionId: body.sessionId,
                 connection: body.connection,
-            };
+            });
         case "terminal-output":
             return {
                 type: "terminal-output",

@@ -1,6 +1,6 @@
 import { db } from "@/storage/db";
 import { log } from "@/utils/log";
-import { eventRouter, buildInboxNewItemEphemeral, buildInboxUnreadCountEphemeral, buildWorldEventCreatedEphemeral } from "@/app/events/eventRouter";
+import { emitSyncEphemeral } from "@/app/events/syncEphemeral";
 import { pushSend } from "./pushSend";
 
 const DEDUP_WINDOW_MS = 60 * 60 * 1000; // 1 hour
@@ -71,20 +71,19 @@ export async function inboxCreate(input: InboxCreateInput): Promise<void> {
             createdAt: item.createdAt.getTime(),
         };
 
-        // Emit new item ephemeral (specific channel for backward compat)
-        eventRouter.emitEphemeral({
-            userId: input.accountId,
-            payload: buildInboxNewItemEphemeral(serialized),
-            recipientFilter: { type: "user-scoped-only" },
+        // Emit new item ephemeral (specific channel for backward compat).
+        await emitSyncEphemeral(input.accountId, {
+            t: "inbox-new-item",
+            item: serialized,
         });
 
-        // Emit unified world event channel
+        // Emit unified world event channel.
         {
             const mapSeverity = (s: string): "info" | "warning" | "critical" =>
                 s === "error" || s === "critical" ? "critical" : s === "warning" ? "warning" : "info";
-            eventRouter.emitEphemeral({
-                userId: input.accountId,
-                payload: buildWorldEventCreatedEphemeral({
+            await emitSyncEphemeral(input.accountId, {
+                t: "world-event-created",
+                event: {
                     id: `inbox-${item.id}`,
                     eventType: input.category === "trigger" ? item.eventType : `decision.${item.eventType}`,
                     title: item.title,
@@ -96,19 +95,17 @@ export async function inboxCreate(input: InboxCreateInput): Promise<void> {
                         projectId: item.refType === "project" ? (item.refId ?? null) : null,
                     },
                     originalId: item.id,
-                }),
-                recipientFilter: { type: "user-scoped-only" },
+                },
             });
         }
 
-        // Emit updated unread count
+        // Emit updated unread count.
         const unreadCount = await db.inboxItem.count({
             where: { accountId: input.accountId, read: false },
         });
-        eventRouter.emitEphemeral({
-            userId: input.accountId,
-            payload: buildInboxUnreadCountEphemeral(unreadCount),
-            recipientFilter: { type: "user-scoped-only" },
+        await emitSyncEphemeral(input.accountId, {
+            t: "inbox-unread-count",
+            count: unreadCount,
         });
 
         // Push notification (unless skipped)

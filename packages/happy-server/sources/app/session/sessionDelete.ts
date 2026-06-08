@@ -1,7 +1,7 @@
 import { Context } from "@/context";
 import { inTx, afterTx } from "@/storage/inTx";
-import { eventRouter } from "@/app/events/eventRouter";
 import { emitSyncUpdate } from "@/app/events/syncUpdate";
+import { emitSyncEphemeral } from "@/app/events/syncEphemeral";
 import { log } from "@/utils/log";
 
 /**
@@ -96,15 +96,16 @@ export async function sessionDelete(ctx: Context, sessionId: string): Promise<bo
         // wrapping, ADR-0023).
         await emitSyncUpdate(ctx.uid, { t: "delete-session", sessionId }, { tx });
 
-        // Notify CLI daemons to terminate the process for this session.
-        // Ephemerals stay on the eventRouter primitive (out of scope for
-        // Phase 1 / Scope X — see Phase 1.5 in ADR-0023).
+        // Notify CLI daemons to terminate the process for this session
+        // (Phase 1.5 / ADR-0024: ephemerals now flow through the
+        // SyncEphemeral seam).
         afterTx(tx, async () => {
             for (const machineId of machineIds) {
-                eventRouter.emitEphemeral({
-                    userId: ctx.uid,
-                    payload: { type: 'session-terminate', sessionId, reason: 'deleted' },
-                    recipientFilter: { type: 'machine-scoped-only', machineId }
+                await emitSyncEphemeral(ctx.uid, {
+                    t: "session-terminate",
+                    sessionId,
+                    reason: "deleted",
+                    machineId,
                 });
             }
         });

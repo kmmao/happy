@@ -1,10 +1,7 @@
 import { db } from "@/storage/db";
 import { inTx } from "@/storage/inTx";
 import { log } from "@/utils/log";
-import {
-    eventRouter,
-    buildTaskTriggerEphemeral,
-} from "@/app/events/eventRouter";
+import { emitSyncEphemeral } from "@/app/events/syncEphemeral";
 import { CronExpressionParser } from "cron-parser";
 import { inboxCreate } from "./inboxCreate";
 import {
@@ -236,26 +233,21 @@ export async function checkAndTriggerSchedules(
 
             const { task } = result;
 
-            // Dispatch to CLI daemon via ephemeral
-            eventRouter.emitEphemeral({
-                userId,
-                payload: buildTaskTriggerEphemeral({
-                    taskId: task.id,
-                    prompt: schedule.prompt,
-                    directory,
-                    priority: schedule.priority,
-                    projectId: resolvedProjectId ?? undefined,
-                    skillContents,
-                    profileId: resolvedProfileId,
-                    runtimeProfile:
-                        resolvedRuntimeProfile?.ok
-                            ? resolvedRuntimeProfile.runtimeProfile
-                            : undefined,
-                }),
-                recipientFilter: {
-                    type: "machine-scoped-only",
-                    machineId,
-                },
+            // Dispatch to CLI daemon via ephemeral.
+            await emitSyncEphemeral(userId, {
+                t: "task-trigger",
+                machineId,
+                taskId: task.id,
+                prompt: schedule.prompt,
+                directory,
+                priority: schedule.priority,
+                projectId: resolvedProjectId ?? undefined,
+                skillContents,
+                profileId: resolvedProfileId,
+                runtimeProfile:
+                    resolvedRuntimeProfile?.ok
+                        ? resolvedRuntimeProfile.runtimeProfile
+                        : undefined,
             });
 
             void inboxCreate({

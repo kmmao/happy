@@ -9,7 +9,7 @@ import { Socket } from "socket.io";
 import { z } from "zod";
 import { db } from "@/storage/db";
 import { log } from "@/utils/log";
-import { eventRouter } from "@/app/events/eventRouter";
+import { emitSyncEphemeral } from "@/app/events/syncEphemeral";
 
 const webhookStatusSchema = z.object({
   webhookEventId: z.string().min(1),
@@ -87,24 +87,18 @@ export function webhookStatusHandler(socket: Socket, userId: string): void {
         });
 
         if (route) {
-          eventRouter.emitEphemeral({
-            userId,
-            payload: {
-              type: "webhook-issue-linked",
-              issueNumber: event.issueNumber,
-              issueTitle: event.issueTitle,
-              issueBody: event.issueBody,
-              issueAuthor: event.issueAuthor,
-              issueLabels: event.issueLabels,
-              issueUrl: event.issueUrl,
-              repoUrl: event.repoUrl,
-              repoPath: route.repoPath,
-              machineId: event.machineId,
-              sessionId: data.sessionId,
-            },
-            recipientFilter: {
-              type: "user-scoped-only",
-            },
+          await emitSyncEphemeral(userId, {
+            t: "webhook-issue-linked",
+            issueNumber: event.issueNumber,
+            issueTitle: event.issueTitle,
+            issueBody: event.issueBody,
+            issueAuthor: event.issueAuthor,
+            issueLabels: event.issueLabels,
+            issueUrl: event.issueUrl,
+            repoUrl: event.repoUrl,
+            repoPath: route.repoPath,
+            machineId: event.machineId,
+            sessionId: data.sessionId,
           });
         }
       }

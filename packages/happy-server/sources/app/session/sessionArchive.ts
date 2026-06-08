@@ -1,6 +1,6 @@
 import { Context } from "@/context";
 import { inTx, afterTx } from "@/storage/inTx";
-import { eventRouter, buildSessionActivityEphemeral } from "@/app/events/eventRouter";
+import { emitSyncEphemeral } from "@/app/events/syncEphemeral";
 import { activityCache } from "@/app/presence/sessionCache";
 import { log } from "@/utils/log";
 
@@ -56,24 +56,26 @@ export async function sessionArchive(ctx: Context, sessionId: string): Promise<b
 
         afterTx(tx, async () => {
             if (wasActive) {
-                // Evict heartbeat cache so the session is immediately seen as inactive
+                // Evict heartbeat cache so the session is immediately seen as inactive.
                 activityCache.invalidateSession(sessionId);
 
-                // Notify App clients: session is now inactive
-                eventRouter.emitEphemeral({
-                    userId: ctx.uid,
-                    payload: buildSessionActivityEphemeral(sessionId, false, now, false),
-                    recipientFilter: { type: "user-scoped-only" },
+                // Notify App clients: session is now inactive.
+                await emitSyncEphemeral(ctx.uid, {
+                    t: "session-activity",
+                    sessionId,
+                    active: false,
+                    activeAt: now,
                 });
             }
 
             // Always send session-terminate — the daemon will kill the process if it is
             // still running, and will silently ignore the event if it is already gone.
             for (const machineId of machineIds) {
-                eventRouter.emitEphemeral({
-                    userId: ctx.uid,
-                    payload: { type: "session-terminate", sessionId, reason: "archived" },
-                    recipientFilter: { type: "machine-scoped-only", machineId },
+                await emitSyncEphemeral(ctx.uid, {
+                    t: "session-terminate",
+                    sessionId,
+                    reason: "archived",
+                    machineId,
                 });
             }
 

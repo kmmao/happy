@@ -2,7 +2,8 @@ import { Socket } from "socket.io";
 import { log } from "@/utils/log";
 import { PreviewCandidateReportSchema, PreviewProxyResponseStartSchema, PreviewProxyResponseBodySchema, PreviewProxyResponseEndSchema, PreviewProxyResponseErrorSchema } from "@kmmao/happy-wire";
 import { previewStore } from "@/app/preview/previewStore";
-import { eventRouter, buildPreviewCandidateReportedEphemeral } from "@/app/events/eventRouter";
+import { eventRouter } from "@/app/events/eventRouter";
+import { emitSyncEphemeral } from "@/app/events/syncEphemeral";
 import { db } from "@/storage/db";
 
 /**
@@ -54,24 +55,21 @@ export function previewProxyHandler(userId: string, socket: Socket, machineId: s
 
             previewStore.addCandidate(candidate);
 
-            // Emit ephemeral to all clients interested in this session
-            eventRouter.emitEphemeral({
-                userId,
-                payload: buildPreviewCandidateReportedEphemeral({
-                    sessionId: reportData.sessionId,
-                    candidate: {
-                        id: candidate.id,
-                        sessionId: candidate.sessionId,
-                        state: candidate.state,
-                        protocol: candidate.protocol,
-                        host: candidate.host,
-                        port: candidate.port,
-                        path: candidate.path,
-                        devServerType: candidate.devServerType,
-                        reportedAt: candidate.reportedAt,
-                    },
-                }),
-                recipientFilter: { type: "all-interested-in-session", sessionId: reportData.sessionId },
+            // Emit ephemeral to all clients interested in this session.
+            await emitSyncEphemeral(userId, {
+                t: "preview-candidate-reported",
+                sessionId: reportData.sessionId,
+                candidate: {
+                    id: candidate.id,
+                    sessionId: candidate.sessionId,
+                    state: candidate.state,
+                    protocol: candidate.protocol,
+                    host: candidate.host,
+                    port: candidate.port,
+                    path: candidate.path,
+                    devServerType: candidate.devServerType,
+                    reportedAt: candidate.reportedAt,
+                },
             });
 
             log({ module: "preview" }, `Candidate reported from daemon: ${candidateId} for session ${reportData.sessionId}`);

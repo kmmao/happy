@@ -10,7 +10,8 @@ import {
     PREVIEW_CREATE_RATE_LIMIT_MAX,
 } from "@kmmao/happy-wire";
 import { previewStore } from "@/app/preview/previewStore";
-import { eventRouter, buildPreviewCandidateReportedEphemeral, buildPreviewConnectionUpdatedEphemeral } from "@/app/events/eventRouter";
+import { eventRouter } from "@/app/events/eventRouter";
+import { emitSyncEphemeral } from "@/app/events/syncEphemeral";
 
 // F7: per-user sliding-window rate limit for tunnel creation
 const createAttempts = new Map<string, number[]>(); // userId → recent createdAt[]
@@ -89,24 +90,21 @@ export function previewRoutes(app: Fastify) {
 
             previewStore.addCandidate(candidate);
 
-            // Emit ephemeral event to all interested clients
-            eventRouter.emitEphemeral({
-                userId,
-                payload: buildPreviewCandidateReportedEphemeral({
-                    sessionId,
-                    candidate: {
-                        id: candidate.id,
-                        sessionId: candidate.sessionId,
-                        state: candidate.state,
-                        protocol: candidate.protocol,
-                        host: candidate.host,
-                        port: candidate.port,
-                        path: candidate.path,
-                        devServerType: candidate.devServerType,
-                        reportedAt: candidate.reportedAt,
-                    },
-                }),
-                recipientFilter: { type: "all-interested-in-session", sessionId },
+            // Emit ephemeral event to all interested clients.
+            await emitSyncEphemeral(userId, {
+                t: "preview-candidate-reported",
+                sessionId,
+                candidate: {
+                    id: candidate.id,
+                    sessionId: candidate.sessionId,
+                    state: candidate.state,
+                    protocol: candidate.protocol,
+                    host: candidate.host,
+                    port: candidate.port,
+                    path: candidate.path,
+                    devServerType: candidate.devServerType,
+                    reportedAt: candidate.reportedAt,
+                },
             });
 
             return reply.send({
@@ -207,24 +205,21 @@ export function previewRoutes(app: Fastify) {
                 });
             }
 
-            // Emit ephemeral event
-            eventRouter.emitEphemeral({
-                userId,
-                payload: buildPreviewConnectionUpdatedEphemeral({
-                    sessionId,
-                    connection: {
-                        tunnelId: connection.tunnelId,
-                        candidateId: connection.candidateId,
-                        sessionId: connection.sessionId,
-                        publicUrl: connection.publicUrl,
-                        status: connection.status,
-                        createdAt: connection.createdAt,
-                        leaseExpiresAt: connection.leaseExpiresAt,
-                        idleTimeoutMs: connection.idleTimeoutMs,
-                        lastActiveAt: connection.lastActiveAt,
-                    },
-                }),
-                recipientFilter: { type: "all-interested-in-session", sessionId },
+            // Emit ephemeral event.
+            await emitSyncEphemeral(userId, {
+                t: "preview-connection-updated",
+                sessionId,
+                connection: {
+                    tunnelId: connection.tunnelId,
+                    candidateId: connection.candidateId,
+                    sessionId: connection.sessionId,
+                    publicUrl: connection.publicUrl,
+                    status: connection.status,
+                    createdAt: connection.createdAt,
+                    leaseExpiresAt: connection.leaseExpiresAt,
+                    idleTimeoutMs: connection.idleTimeoutMs,
+                    lastActiveAt: connection.lastActiveAt,
+                },
             });
 
             return reply.send({
@@ -275,14 +270,11 @@ export function previewRoutes(app: Fastify) {
             // Remove connection
             previewStore.removeConnection(tunnelId);
 
-            // Emit ephemeral event with null connection (indicating revoked)
-            eventRouter.emitEphemeral({
-                userId,
-                payload: buildPreviewConnectionUpdatedEphemeral({
-                    sessionId,
-                    connection: null,
-                }),
-                recipientFilter: { type: "all-interested-in-session", sessionId },
+            // Emit ephemeral event with null connection (indicating revoked).
+            await emitSyncEphemeral(userId, {
+                t: "preview-connection-updated",
+                sessionId,
+                connection: null,
             });
 
             return reply.send({ ok: true });
@@ -322,24 +314,21 @@ export function previewRoutes(app: Fastify) {
                 return reply.status(404).send({ error: "tunnel-not-found" });
             }
 
-            // Broadcast updated lease so app updates its countdown
-            eventRouter.emitEphemeral({
-                userId,
-                payload: buildPreviewConnectionUpdatedEphemeral({
-                    sessionId,
-                    connection: {
-                        tunnelId: refreshed.tunnelId,
-                        candidateId: refreshed.candidateId,
-                        sessionId: refreshed.sessionId,
-                        publicUrl: refreshed.publicUrl,
-                        status: refreshed.status,
-                        createdAt: refreshed.createdAt,
-                        leaseExpiresAt: refreshed.leaseExpiresAt,
-                        idleTimeoutMs: refreshed.idleTimeoutMs,
-                        lastActiveAt: refreshed.lastActiveAt,
-                    },
-                }),
-                recipientFilter: { type: "all-interested-in-session", sessionId },
+            // Broadcast updated lease so app updates its countdown.
+            await emitSyncEphemeral(userId, {
+                t: "preview-connection-updated",
+                sessionId,
+                connection: {
+                    tunnelId: refreshed.tunnelId,
+                    candidateId: refreshed.candidateId,
+                    sessionId: refreshed.sessionId,
+                    publicUrl: refreshed.publicUrl,
+                    status: refreshed.status,
+                    createdAt: refreshed.createdAt,
+                    leaseExpiresAt: refreshed.leaseExpiresAt,
+                    idleTimeoutMs: refreshed.idleTimeoutMs,
+                    lastActiveAt: refreshed.lastActiveAt,
+                },
             });
 
             return reply.send({
