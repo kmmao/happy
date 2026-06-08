@@ -31,6 +31,13 @@ w.sangreal.code.xycloud.info {
 	import cloudflare_tls
 }
 
+gs.sangreal.code.xycloud.info {
+	# Upstream MUST be 172.18.0.1 docker bridge gateway, not host.docker.internal.
+	# The latter is hijacked by upstream AUTOPROXY returning fake nginx/1.12.2.
+	reverse_proxy 172.18.0.1:80
+	import cloudflare_tls
+}
+
 # Pre-sign wildcard cert so new subdomains are instant
 *.code.xycloud.info {
 	tls {
