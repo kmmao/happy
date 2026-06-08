@@ -1,7 +1,7 @@
 import { machineAliveEventsCounter, websocketEventsCounter } from "@/app/monitoring/metrics2";
 import { activityCache } from "@/app/presence/sessionCache";
-import { buildKnowledgeCountEphemeral, buildMachineActivityEphemeral, buildSessionActivityEphemeral, buildWorldEventCreatedEphemeral, eventRouter } from "@/app/events/eventRouter";
 import { emitSyncUpdate } from "@/app/events/syncUpdate";
+import { emitSyncEphemeral } from "@/app/events/syncEphemeral";
 import { log } from "@/utils/log";
 import { db } from "@/storage/db";
 import { Socket } from "socket.io";
@@ -61,11 +61,11 @@ export function machineUpdateHandler(userId: string, socket: Socket) {
             // Queue database update (will only update if time difference is significant)
             activityCache.queueMachineUpdate(data.machineId, t);
 
-            const machineActivity = buildMachineActivityEphemeral(data.machineId, true, t);
-            eventRouter.emitEphemeral({
-                userId,
-                payload: machineActivity,
-                recipientFilter: { type: 'user-scoped-only' }
+            await emitSyncEphemeral(userId, {
+                t: "machine-activity",
+                machineId: data.machineId,
+                active: true,
+                activeAt: t,
             });
 
             // Check for scheduled supervisor runs (fire-and-forget, throttled)
@@ -330,15 +330,11 @@ export function machineUpdateHandler(userId: string, socket: Socket) {
 
             for (const session of updatedSessions) {
                 activityCache.invalidateSession(session.id);
-                eventRouter.emitEphemeral({
-                    userId,
-                    payload: buildSessionActivityEphemeral(
-                        session.id,
-                        true,
-                        session.lastActiveAt.getTime(),
-                        false,
-                    ),
-                    recipientFilter: { type: 'user-scoped-only' },
+                await emitSyncEphemeral(userId, {
+                    t: "session-activity",
+                    sessionId: session.id,
+                    active: true,
+                    activeAt: session.lastActiveAt.getTime(),
                 });
             }
 
@@ -414,9 +410,9 @@ export function machineUpdateHandler(userId: string, socket: Socket) {
                     const label = tags.length > 0
                         ? `${created.entryType}: ${tags.slice(0, 3).join(", ")}`
                         : created.entryType;
-                    eventRouter.emitEphemeral({
-                        userId,
-                        payload: buildWorldEventCreatedEphemeral({
+                    await emitSyncEphemeral(userId, {
+                        t: "world-event-created",
+                        event: {
                             id: `memory-${created.id}`,
                             eventType: "memory.created",
                             title: label,
@@ -429,8 +425,7 @@ export function machineUpdateHandler(userId: string, socket: Socket) {
                                 sessionId: created.sessionId ?? null,
                             },
                             originalId: created.id,
-                        }),
-                        recipientFilter: { type: "user-scoped-only" },
+                        },
                     });
                 }
             }
@@ -440,11 +435,7 @@ export function machineUpdateHandler(userId: string, socket: Socket) {
                 const knowledgeCount = await db.projectKnowledge.count({
                     where: { sessionId, status: "active" },
                 });
-                eventRouter.emitEphemeral({
-                    userId,
-                    payload: buildKnowledgeCountEphemeral(sessionId, knowledgeCount),
-                    recipientFilter: { type: "user-scoped-only" },
-                });
+                await emitSyncEphemeral(userId, { t: "knowledge-count", sessionId, count: knowledgeCount });
             }
 
             log({ module: 'knowledge' }, `Processed ${turns.length} transcript knowledge entries`);

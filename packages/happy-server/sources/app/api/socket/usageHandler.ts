@@ -1,7 +1,7 @@
 import { Socket } from "socket.io";
 import { AsyncLock } from "@/utils/lock";
 import { db } from "@/storage/db";
-import { buildUsageEphemeral, eventRouter } from "@/app/events/eventRouter";
+import { emitSyncEphemeral } from "@/app/events/syncEphemeral";
 import { debug, log } from "@/utils/log";
 
 export function usageHandler(userId: string, socket: Socket) {
@@ -97,18 +97,14 @@ export function usageHandler(userId: string, socket: Socket) {
               `Usage report saved: key=${key}, sessionId=${sessionId || "none"}, userId=${userId}`,
             );
 
-            // Emit usage ephemeral update if sessionId is provided
+            // Emit usage ephemeral update if sessionId is provided.
             if (sessionId) {
-              const usageEvent = buildUsageEphemeral(
+              await emitSyncEphemeral(userId, {
+                t: "usage",
                 sessionId,
                 key,
-                usageData.tokens,
-                usageData.cost,
-              );
-              eventRouter.emitEphemeral({
-                userId,
-                payload: usageEvent,
-                recipientFilter: { type: "user-scoped-only" },
+                tokens: usageData.tokens,
+                cost: usageData.cost,
               });
             }
 

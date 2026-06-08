@@ -1,5 +1,5 @@
 import { Socket } from "socket.io";
-import { eventRouter } from "@/app/events/eventRouter";
+import { emitSyncEphemeral } from "@/app/events/syncEphemeral";
 import { activityCache } from "@/app/presence/sessionCache";
 import { log } from "@/utils/log";
 
@@ -39,20 +39,13 @@ export function taskLogHandler(userId: string, socket: Socket) {
                 return;
             }
 
-            eventRouter.emitEphemeral({
-                userId,
-                payload: {
-                    type: "task-log",
-                    sessionId: payload.sid,
-                    taskId: payload.taskId,
-                    outputFile: payload.outputFile,
-                    chunk: payload.chunk,
-                    offset: payload.offset,
-                },
-                recipientFilter: {
-                    type: "all-interested-in-session",
-                    sessionId: payload.sid,
-                },
+            await emitSyncEphemeral(userId, {
+                t: "task-log",
+                sessionId: payload.sid,
+                taskId: payload.taskId,
+                outputFile: payload.outputFile,
+                chunk: payload.chunk,
+                offset: payload.offset,
             });
         } catch (error) {
             log({ module: "websocket", level: "error" }, `Error in task-log handler: ${error}`);

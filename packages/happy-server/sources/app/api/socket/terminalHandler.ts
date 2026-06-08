@@ -1,5 +1,5 @@
 import { Socket } from "socket.io";
-import { eventRouter } from "@/app/events/eventRouter";
+import { emitSyncEphemeral } from "@/app/events/syncEphemeral";
 import { log } from "@/utils/log";
 
 const MAX_TERMINAL_CHUNK = 16 * 1024; // 16KB safety limit
@@ -31,15 +31,11 @@ export function terminalHandler(userId: string, socket: Socket) {
             if (payload.data.trim()) {
                 log({ module: "terminal" }, `terminal-output: machineId=${payload.machineId} terminalId=${payload.terminalId} data=${JSON.stringify(payload.data.slice(0, 200))}`);
             }
-            eventRouter.emitEphemeral({
-                userId,
-                payload: {
-                    type: "terminal-output",
-                    machineId: payload.machineId,
-                    terminalId: payload.terminalId,
-                    data: payload.data,
-                },
-                recipientFilter: { type: "user-scoped-only" },
+            void emitSyncEphemeral(userId, {
+                t: "terminal-output",
+                machineId: payload.machineId,
+                terminalId: payload.terminalId,
+                data: payload.data,
             });
         } catch (error) {
             log({ module: "websocket", level: "error" }, `Error in terminal-output handler: ${error}`);
@@ -57,15 +53,11 @@ export function terminalHandler(userId: string, socket: Socket) {
                 return;
             }
             log({ module: "terminal" }, `terminal-exit: machineId=${payload.machineId} terminalId=${payload.terminalId} exitCode=${payload.exitCode}`);
-            eventRouter.emitEphemeral({
-                userId,
-                payload: {
-                    type: "terminal-exit",
-                    machineId: payload.machineId,
-                    terminalId: payload.terminalId,
-                    exitCode: payload.exitCode ?? -1,
-                },
-                recipientFilter: { type: "user-scoped-only" },
+            void emitSyncEphemeral(userId, {
+                t: "terminal-exit",
+                machineId: payload.machineId,
+                terminalId: payload.terminalId,
+                exitCode: payload.exitCode ?? -1,
             });
         } catch (error) {
             log({ module: "websocket", level: "error" }, `Error in terminal-exit handler: ${error}`);
@@ -86,19 +78,12 @@ export function terminalHandler(userId: string, socket: Socket) {
             if (payload.data.length > 4096) {
                 return;
             }
-            // Forward to the specific machine's daemon socket
-            eventRouter.emitEphemeral({
-                userId,
-                payload: {
-                    type: "terminal-input",
-                    machineId: payload.machineId,
-                    terminalId: payload.terminalId,
-                    data: payload.data,
-                },
-                recipientFilter: {
-                    type: "machine-scoped-only",
-                    machineId: payload.machineId,
-                },
+            // Forward to the specific machine's daemon socket.
+            void emitSyncEphemeral(userId, {
+                t: "terminal-input",
+                machineId: payload.machineId,
+                terminalId: payload.terminalId,
+                data: payload.data,
             });
         } catch (error) {
             log({ module: "websocket", level: "error" }, `Error in terminal-input handler: ${error}`);

@@ -8,7 +8,7 @@ import { Socket } from "socket.io";
 import { z } from "zod";
 import { db } from "@/storage/db";
 import { log } from "@/utils/log";
-import { eventRouter, buildSessionEventCreatedEphemeral } from "@/app/events/eventRouter";
+import { emitSyncEphemeral } from "@/app/events/syncEphemeral";
 
 const sessionEventSchema = z.object({
     sessionId: z.string().min(1),
@@ -55,20 +55,16 @@ export function sessionEventHandler(socket: Socket, userId: string): void {
                 },
             });
 
-            // Broadcast to App clients watching this session
-            eventRouter.emitEphemeral({
-                userId,
-                payload: buildSessionEventCreatedEphemeral({
+            // Broadcast to App clients watching this session.
+            await emitSyncEphemeral(userId, {
+                t: "session-event-created",
+                event: {
                     id: event.id,
                     sessionId: event.sessionId,
                     eventType: event.eventType,
                     summary: event.summary,
                     detail: (event.detail as Record<string, unknown>) ?? undefined,
                     createdAt: event.createdAt.getTime(),
-                }),
-                recipientFilter: {
-                    type: "all-interested-in-session",
-                    sessionId: data.sessionId,
                 },
             });
         } catch (error) {

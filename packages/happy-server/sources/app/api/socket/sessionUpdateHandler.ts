@@ -1,12 +1,8 @@
 import { sessionAliveEventsCounter, websocketEventsCounter } from "@/app/monitoring/metrics2";
 import { activityCache } from "@/app/presence/sessionCache";
-import {
-    buildSessionActivityEphemeral,
-    buildTaskStatusChangedEphemeral,
-    ClientConnection,
-    eventRouter,
-} from "@/app/events/eventRouter";
+import { ClientConnection } from "@/app/events/eventRouter";
 import { emitSyncUpdate } from "@/app/events/syncUpdate";
+import { emitSyncEphemeral } from "@/app/events/syncEphemeral";
 import { inboxCreate } from "@/modules/inboxCreate";
 import { db } from "@/storage/db";
 import { allocateSessionSeq } from "@/storage/seq";
@@ -113,12 +109,14 @@ export function sessionUpdateHandler(userId: string, socket: Socket, connection:
             // Queue database update (will only update if time difference is significant)
             activityCache.queueSessionUpdate(sid, t);
 
-            // Emit session activity update (include apiRetry if present)
-            const sessionActivity = buildSessionActivityEphemeral(sid, true, t, thinking || false, data.apiRetry);
-            eventRouter.emitEphemeral({
-                userId,
-                payload: sessionActivity,
-                recipientFilter: { type: 'user-scoped-only' }
+            // Emit session activity update (include apiRetry if present).
+            await emitSyncEphemeral(userId, {
+                t: "session-activity",
+                sessionId: sid,
+                active: true,
+                activeAt: t,
+                thinking: thinking || false,
+                apiRetry: data.apiRetry,
             });
         } catch (error) {
             log({ module: 'websocket', level: 'error' }, `Error in session-alive: ${error}`);
@@ -259,17 +257,14 @@ export function sessionUpdateHandler(userId: string, socket: Socket, connection:
                     refId: task.id,
                     groupKey: `task:${task.id}:completed`,
                 });
-                eventRouter.emitEphemeral({
-                    userId,
-                    payload: buildTaskStatusChangedEphemeral({
-                        taskId: task.id,
-                        machineId: task.machineId,
-                        status: "completed",
-                        triggerType: task.triggerType,
-                        sessionId: updated.sessionId ?? undefined,
-                        completedAt: completedAt.getTime(),
-                    }),
-                    recipientFilter: { type: "user-scoped-only" },
+                await emitSyncEphemeral(userId, {
+                    t: "task-status-changed",
+                    taskId: task.id,
+                    machineId: task.machineId,
+                    status: "completed",
+                    triggerType: task.triggerType,
+                    sessionId: updated.sessionId ?? undefined,
+                    completedAt: completedAt.getTime(),
                 });
             }
             if (inProgressTasks.length > 0) {
@@ -279,12 +274,12 @@ export function sessionUpdateHandler(userId: string, socket: Socket, connection:
                 );
             }
 
-            // Emit session activity update
-            const sessionActivity = buildSessionActivityEphemeral(sid, false, t, false);
-            eventRouter.emitEphemeral({
-                userId,
-                payload: sessionActivity,
-                recipientFilter: { type: 'user-scoped-only' }
+            // Emit session activity update.
+            await emitSyncEphemeral(userId, {
+                t: "session-activity",
+                sessionId: sid,
+                active: false,
+                activeAt: t,
             });
         } catch (error) {
             log({ module: 'websocket', level: 'error' }, `Error in session-end: ${error}`);

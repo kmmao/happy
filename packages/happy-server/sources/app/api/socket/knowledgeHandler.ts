@@ -7,12 +7,7 @@ import { parseProfileContent, safeParseJsonArray } from "@/modules/knowledgeSeri
 import { storeKnowledgeEmbedding } from "@/modules/knowledgeEmbedding";
 import { trackKnowledgeCreation } from "@/modules/knowledgeAutoProfile";
 import { refineKnowledgeEntry } from "@/modules/knowledgeRefiner";
-import {
-    buildKnowledgeAccessUpdateEphemeral,
-    buildKnowledgeCountEphemeral,
-    buildWorldEventCreatedEphemeral,
-    eventRouter,
-} from "@/app/events/eventRouter";
+import { emitSyncEphemeral } from "@/app/events/syncEphemeral";
 import { inTx } from "@/storage/inTx";
 import { addRelations, supersedeEntry, type KnowledgeRelationType } from "@/modules/knowledgeRelation";
 import { resolveKnowledgeConfig } from "@/modules/knowledgeConfigResolver";
@@ -167,11 +162,7 @@ export function knowledgeHandler(userId: string, socket: Socket) {
             const knowledgeCount = await db.projectKnowledge.count({
                 where: { sessionId: sid, status: "active" },
             });
-            eventRouter.emitEphemeral({
-                userId,
-                payload: buildKnowledgeCountEphemeral(sid, knowledgeCount),
-                recipientFilter: { type: "user-scoped-only" },
-            });
+            await emitSyncEphemeral(userId, { t: "knowledge-count", sessionId: sid, count: knowledgeCount });
 
             // Push unified world event so Stream Mode shows memory.created in real-time
             {
@@ -180,9 +171,9 @@ export function knowledgeHandler(userId: string, socket: Socket) {
                 const label = tags.length > 0
                     ? `${created.entryType}: ${tags.slice(0, 3).join(", ")}`
                     : created.entryType;
-                eventRouter.emitEphemeral({
-                    userId,
-                    payload: buildWorldEventCreatedEphemeral({
+                await emitSyncEphemeral(userId, {
+                    t: "world-event-created",
+                    event: {
                         id: `memory-${created.id}`,
                         eventType: "memory.created",
                         title: label,
@@ -195,8 +186,7 @@ export function knowledgeHandler(userId: string, socket: Socket) {
                             sessionId: created.sessionId ?? null,
                         },
                         originalId: created.id,
-                    }),
-                    recipientFilter: { type: "user-scoped-only" },
+                    },
                 });
             }
 
@@ -315,11 +305,7 @@ export function knowledgeHandler(userId: string, socket: Socket) {
                     isInitialInjection,
                 ).then(() => {
                     // Signal the App to refresh injected/referenced views.
-                    eventRouter.emitEphemeral({
-                        userId,
-                        payload: buildKnowledgeAccessUpdateEphemeral({ sessionId: sid }),
-                        recipientFilter: { type: "user-scoped-only" },
-                    });
+                    void emitSyncEphemeral(userId, { t: "knowledge-access-update", sessionId: sid });
                 }).catch((err) => {
                     log({ module: "knowledge" }, `Error recording access: ${err}`);
                 });
@@ -416,15 +402,12 @@ export function knowledgeHandler(userId: string, socket: Socket) {
             // Push an ephemeral signal so the App invalidates knowledge access caches
             // and re-fetches turnsRemaining / hitCount for the Summary + References UI.
             if (summary.hit > 0 || summary.miss > 0 || summary.evicted > 0) {
-                eventRouter.emitEphemeral({
-                    userId,
-                    payload: buildKnowledgeAccessUpdateEphemeral({
-                        sessionId: sid,
-                        hit: summary.hit,
-                        miss: summary.miss,
-                        evicted: summary.evicted,
-                    }),
-                    recipientFilter: { type: "user-scoped-only" },
+                await emitSyncEphemeral(userId, {
+                    t: "knowledge-access-update",
+                    sessionId: sid,
+                    hit: summary.hit,
+                    miss: summary.miss,
+                    evicted: summary.evicted,
                 });
             }
         } catch (err) {

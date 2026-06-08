@@ -1,4 +1,4 @@
-import { buildRpcReadyEphemeral, eventRouter } from "@/app/events/eventRouter";
+import { emitSyncEphemeral } from "@/app/events/syncEphemeral";
 import { debug, log } from "@/utils/log";
 import { Socket } from "socket.io";
 import { checkRpcRateLimit } from "./rpcRateLimit";
@@ -71,11 +71,7 @@ function broadcastRpcReady(
             clearTimeout(pending);
             pendingBroadcasts.delete(key);
         }
-        eventRouter.emitEphemeral({
-            userId,
-            payload: buildRpcReadyEphemeral(scope, scopeId, false),
-            recipientFilter: { type: "user-scoped-only" },
-        });
+        void emitSyncEphemeral(userId, { t: "rpc-ready", scope, id: scopeId, ready: false });
         return;
     }
 
@@ -88,11 +84,7 @@ function broadcastRpcReady(
         key,
         setTimeout(() => {
             pendingBroadcasts.delete(key);
-            eventRouter.emitEphemeral({
-                userId,
-                payload: buildRpcReadyEphemeral(scope, scopeId, true),
-                recipientFilter: { type: "user-scoped-only" },
-            });
+            void emitSyncEphemeral(userId, { t: "rpc-ready", scope, id: scopeId, ready: true });
         }, 200),
     );
 }

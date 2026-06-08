@@ -2,7 +2,7 @@ import { db } from "@/storage/db";
 import { delay } from "@/utils/delay";
 import { forever } from "@/utils/forever";
 import { shutdownSignal } from "@/utils/shutdown";
-import { buildMachineActivityEphemeral, buildSessionActivityEphemeral, eventRouter } from "@/app/events/eventRouter";
+import { emitSyncEphemeral } from "@/app/events/syncEphemeral";
 
 const TIMEOUT_BATCH_SIZE = 100;
 
@@ -37,18 +37,20 @@ export function startTimeout() {
                     if (updated.length === 0) {
                         continue;
                     }
-                    eventRouter.emitEphemeral({
-                        userId: session.accountId,
-                        payload: buildSessionActivityEphemeral(session.id, false, updated[0].lastActiveAt.getTime(), false),
-                        recipientFilter: { type: 'user-scoped-only' }
+                    await emitSyncEphemeral(session.accountId, {
+                        t: "session-activity",
+                        sessionId: session.id,
+                        active: false,
+                        activeAt: updated[0].lastActiveAt.getTime(),
                     });
-                    // Notify the CLI daemon to terminate the process for this session
+                    // Notify the CLI daemon to terminate the process for this session.
                     const accessKey = accessKeyBySessionId.get(session.id);
                     if (accessKey) {
-                        eventRouter.emitEphemeral({
-                            userId: session.accountId,
-                            payload: { type: 'session-terminate', sessionId: session.id, reason: 'timeout' },
-                            recipientFilter: { type: 'machine-scoped-only', machineId: accessKey.machineId }
+                        await emitSyncEphemeral(session.accountId, {
+                            t: "session-terminate",
+                            sessionId: session.id,
+                            reason: "timeout",
+                            machineId: accessKey.machineId,
                         });
                     }
                 }
@@ -74,10 +76,11 @@ export function startTimeout() {
                     if (updated.length === 0) {
                         continue;
                     }
-                    eventRouter.emitEphemeral({
-                        userId: machine.accountId,
-                        payload: buildMachineActivityEphemeral(machine.id, false, updated[0].lastActiveAt.getTime()),
-                        recipientFilter: { type: 'user-scoped-only' }
+                    await emitSyncEphemeral(machine.accountId, {
+                        t: "machine-activity",
+                        machineId: machine.id,
+                        active: false,
+                        activeAt: updated[0].lastActiveAt.getTime(),
                     });
                 }
             } while (machineBatch.length === TIMEOUT_BATCH_SIZE);

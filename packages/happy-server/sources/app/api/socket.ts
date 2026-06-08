@@ -1,11 +1,11 @@
 import { onShutdown } from "@/utils/shutdown";
 import { Fastify } from "./types";
 import {
-  buildMachineActivityEphemeral,
   buildRpcReadyEphemeral,
   ClientConnection,
   eventRouter,
 } from "@/app/events/eventRouter";
+import { emitSyncEphemeral } from "@/app/events/syncEphemeral";
 import { Server, Socket } from "socket.io";
 import { debug, log } from "@/utils/log";
 import { auth } from "@/app/auth/auth";
@@ -142,18 +142,13 @@ export function startSocket(app: Fastify) {
     eventRouter.addConnection(userId, connection);
     incrementWebSocketConnection(connection.connectionType);
 
-    // Broadcast daemon online status
+    // Broadcast daemon online status.
     if (connection.connectionType === "machine-scoped") {
-      // Broadcast daemon online
-      const machineActivity = buildMachineActivityEphemeral(
-        machineId!,
-        true,
-        Date.now(),
-      );
-      eventRouter.emitEphemeral({
-        userId,
-        payload: machineActivity,
-        recipientFilter: { type: "user-scoped-only" },
+      void emitSyncEphemeral(userId, {
+        t: "machine-activity",
+        machineId: machineId!,
+        active: true,
+        activeAt: Date.now(),
       });
     }
 
@@ -166,17 +161,13 @@ export function startSocket(app: Fastify) {
 
       debug({ module: "websocket" }, `User disconnected: ${userId}`);
 
-      // Broadcast daemon offline status
+      // Broadcast daemon offline status.
       if (connection.connectionType === "machine-scoped") {
-        const machineActivity = buildMachineActivityEphemeral(
-          connection.machineId,
-          false,
-          Date.now(),
-        );
-        eventRouter.emitEphemeral({
-          userId,
-          payload: machineActivity,
-          recipientFilter: { type: "user-scoped-only" },
+        void emitSyncEphemeral(userId, {
+          t: "machine-activity",
+          machineId: connection.machineId,
+          active: false,
+          activeAt: Date.now(),
         });
       }
     });
@@ -230,11 +221,7 @@ export function startSocket(app: Fastify) {
                   : null;
       if (rpcScope) {
         for (const scopeId of affectedScopes) {
-          eventRouter.emitEphemeral({
-            userId,
-            payload: buildRpcReadyEphemeral(rpcScope, scopeId, false),
-            recipientFilter: { type: "user-scoped-only" },
-          });
+          void emitSyncEphemeral(userId, { t: "rpc-ready", scope: rpcScope, id: scopeId, ready: false });
         }
       }
     });
