@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 // A tiny in-memory `db.task` whose findFirst/update operate over `state.tasks`,
 // plus a spy for the App notification, so taskStatusApply is exercised through
 // its interface (input → result + emitted ephemeral) without Prisma or sockets.
-const { dbMock, emitEphemeralMock, buildEphemeralMock, resetState, seedTask } =
+const { dbMock, emitEphemeralMock, resetState, seedTask } =
     vi.hoisted(() => {
         const state = { tasks: [] as any[] };
         const resetState = () => {
@@ -39,15 +39,16 @@ const { dbMock, emitEphemeralMock, buildEphemeralMock, resetState, seedTask } =
         };
 
         const emitEphemeralMock = vi.fn();
-        const buildEphemeralMock = vi.fn((args: unknown) => ({ type: "task-status-changed", args }));
 
-        return { dbMock, emitEphemeralMock, buildEphemeralMock, resetState, seedTask, state };
+        return { dbMock, emitEphemeralMock, resetState, seedTask, state };
     });
 
 vi.mock("@/storage/db", () => ({ db: dbMock }));
+// PR 1.5.f: build*Ephemeral functions moved into syncEphemeral.ts as private
+// helpers. We mock only the transport sink and assert on the wire payload
+// that reaches it.
 vi.mock("@/app/events/eventRouter", () => ({
     eventRouter: { _emitEphemeralInternal: emitEphemeralMock },
-    buildTaskStatusChangedEphemeral: buildEphemeralMock,
 }));
 
 import { taskStatusApply } from "./taskStatusApply";
@@ -89,9 +90,15 @@ describe("taskStatusApply", () => {
         expect(result.task.dispatchedAt).toEqual(now);
         expect(result.task.sessionId).toBe("sess-9");
         expect(emitEphemeralMock).toHaveBeenCalledTimes(1);
-        expect(buildEphemeralMock).toHaveBeenCalledWith(
-            expect.objectContaining({ taskId: "t1", status: "running", sessionId: "sess-9" }),
-        );
+        // PR 1.5.f: the wire payload is the assertion target now, not the
+        // intermediate builder call. task-status-changed → `type: "task-status-changed"`.
+        const payload = emitEphemeralMock.mock.calls[0][0].payload;
+        expect(payload).toEqual(expect.objectContaining({
+            type: "task-status-changed",
+            taskId: "t1",
+            status: "running",
+            sessionId: "sess-9",
+        }));
     });
 
     it("marks isTerminal and stamps completedAt for a terminal transition", async () => {

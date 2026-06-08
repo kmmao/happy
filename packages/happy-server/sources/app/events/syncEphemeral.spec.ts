@@ -6,34 +6,12 @@ const { emitEphemeralMock, resetState } = vi.hoisted(() => {
     return { emitEphemeralMock, resetState };
 });
 
-// PR 1.5.a: syncEphemeral delegates to the existing build*Ephemeral functions
-// exported by eventRouter. Stub each one as identity-on-payload so tests can
-// assert on the wire shape that reaches eventRouter.emitEphemeral. PR 1.5.e
-// will physically move the builders into syncEphemeral.ts and these stubs
-// will collapse to a simpler mock.
+// PR 1.5.f physically moved the 21 active build*Ephemeral functions into
+// syncEphemeral.ts as private helpers. We only stub the transport sink
+// (`_emitEphemeralInternal`) here — the real private builders run end-to-end,
+// which means these tests also exercise the wire shape unintrusively.
 vi.mock("@/app/events/eventRouter", () => ({
     eventRouter: { _emitEphemeralInternal: emitEphemeralMock },
-    buildAutoLoopFiredEphemeral: vi.fn((opts: any) => ({ type: "auto-loop-fired", ...opts })),
-    buildInboxNewItemEphemeral: vi.fn((item: any) => ({ type: "inbox-new-item", item })),
-    buildInboxUnreadCountEphemeral: vi.fn((count: number) => ({ type: "inbox-unread-count", count })),
-    buildInterAgentMessageEphemeral: vi.fn((opts: any) => ({ type: "inter-agent-message", ...opts, sentAt: 0 })),
-    buildKnowledgeAccessUpdateEphemeral: vi.fn((opts: any) => ({ type: "knowledge-access-update", at: 0, ...opts })),
-    buildKnowledgeCountEphemeral: vi.fn((sessionId: string, count: number) => ({ type: "knowledge-count", id: sessionId, count })),
-    buildMachineActivityEphemeral: vi.fn((machineId: string, active: boolean, activeAt: number) => ({ type: "machine-activity", id: machineId, active, activeAt })),
-    buildPreviewCandidateReportedEphemeral: vi.fn((opts: any) => ({ type: "preview-candidate-reported", ...opts })),
-    buildPreviewConnectionUpdatedEphemeral: vi.fn((opts: any) => ({ type: "preview-connection-updated", ...opts })),
-    buildRpcReadyEphemeral: vi.fn((scope: any, id: string, ready: boolean) => ({ type: "rpc-ready", scope, id, ready })),
-    buildSessionActivityEphemeral: vi.fn((sessionId: string, active: boolean, activeAt: number, thinking?: boolean, apiRetry?: any) => ({ type: "activity", id: sessionId, active, activeAt, thinking: thinking || false, ...(apiRetry ? { apiRetry } : {}) })),
-    buildSessionEventCreatedEphemeral: vi.fn((event: any) => ({ type: "session-event-created", event })),
-    buildSupervisorLoopBriefEphemeral: vi.fn((opts: any) => ({ type: "supervisor-loop-brief", ...opts })),
-    buildSupervisorLoopStatusEphemeral: vi.fn((opts: any) => ({ type: "supervisor-loop-status", ...opts })),
-    buildSupervisorStatusEphemeral: vi.fn((runId: string, projectId: string, status: string, artifactId?: string, errorMessage?: string, currentDimension?: string, dimensionIndex?: number, totalDimensions?: number) => ({ type: "supervisor-status", runId, projectId, status, artifactId, errorMessage, currentDimension, dimensionIndex, totalDimensions })),
-    buildSupervisorTriggerEphemeral: vi.fn((opts: any) => ({ type: "supervisor-trigger", ...opts })),
-    buildTaskCancelEphemeral: vi.fn((opts: any) => ({ type: "task-cancel", ...opts })),
-    buildTaskStatusChangedEphemeral: vi.fn((opts: any) => ({ type: "task-status-changed", ...opts })),
-    buildTaskTriggerEphemeral: vi.fn((opts: any) => ({ type: "task-trigger", ...opts })),
-    buildUsageEphemeral: vi.fn((sessionId: string, key: string, tokens: any, cost: any) => ({ type: "usage", id: sessionId, key, tokens, cost, timestamp: 0 })),
-    buildWorldEventCreatedEphemeral: vi.fn((event: any) => ({ type: "world-event-created", event })),
 }));
 
 import { emitSyncEphemeral, type SyncEphemeralBody } from "./syncEphemeral";

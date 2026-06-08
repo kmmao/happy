@@ -47,7 +47,6 @@ type RunRecord = {
 const {
     dbMock,
     emitEphemeralMock,
-    buildSupervisorTriggerEphemeralMock,
     resolveSupervisorProfileMock,
     authCreateSupervisorCallbackTokenMock,
     resetState,
@@ -252,7 +251,6 @@ const {
     };
 
     const emitEphemeralMock = vi.fn();
-    const buildSupervisorTriggerEphemeralMock = vi.fn((args: Record<string, unknown>) => ({ t: "supervisor-trigger", ...args }));
     const resolveSupervisorProfileMock = vi.fn(async (): Promise<{
         runtimeProfile?: {
             profileId?: string;
@@ -269,7 +267,6 @@ const {
     return {
         dbMock,
         emitEphemeralMock,
-        buildSupervisorTriggerEphemeralMock,
         resolveSupervisorProfileMock,
         authCreateSupervisorCallbackTokenMock,
         resetState,
@@ -293,11 +290,11 @@ vi.mock("@/modules/supervisorUsage", () => ({
 vi.mock("@/app/presence/sessionCache", () => ({
     activityCache: { invalidateSession: vi.fn() },
 }));
+// PR 1.5.f: build*Ephemeral functions moved into syncEphemeral.ts as private
+// helpers. We mock only the transport sink and assert on the wire payload
+// that reaches it.
 vi.mock("@/app/events/eventRouter", () => ({
     eventRouter: { _emitEphemeralInternal: emitEphemeralMock },
-    buildSupervisorTriggerEphemeral: buildSupervisorTriggerEphemeralMock,
-    buildSupervisorStatusEphemeral: vi.fn((...args: unknown[]) => ({ t: "supervisor-status", args })),
-    buildSessionActivityEphemeral: vi.fn((...args: unknown[]) => ({ t: "session-activity", args })),
 }));
 vi.mock("@/modules/supervisorProfileResolver", () => ({
     resolveSupervisorProfile: resolveSupervisorProfileMock,
@@ -365,7 +362,7 @@ describe("supervisorRoutes", () => {
     beforeEach(() => {
         resetState();
         emitEphemeralMock.mockClear();
-        buildSupervisorTriggerEphemeralMock.mockClear();
+        emitEphemeralMock.mockClear();
         resolveSupervisorProfileMock.mockReset();
         resolveSupervisorProfileMock.mockResolvedValue({
             runtimeProfile: undefined,
@@ -442,15 +439,19 @@ describe("supervisorRoutes", () => {
                 purpose: "run-status",
                 runId: "run-1",
             });
-            expect(buildSupervisorTriggerEphemeralMock).toHaveBeenCalledWith(
-                expect.objectContaining({
-                    callbackToken: "callback-token",
-                    runtimeProfile: expect.objectContaining({
-                        profileId: "profile-1",
-                        environmentVariables: { OPENAI_API_KEY: "sk-test" },
-                    }),
+            expect(emitEphemeralMock).toHaveBeenCalledWith(
+            expect.objectContaining({
+                payload: expect.objectContaining({
+                    type: "supervisor-trigger",
+                        callbackToken: "callback-token",
+                        runtimeProfile: expect.objectContaining({
+                            profileId: "profile-1",
+                            environmentVariables: { OPENAI_API_KEY: "sk-test" },
+                        }),
+                    
                 }),
-            );
+            }),
+        );
         });
 
         it("accepts a trusted built-in runtimeProfile payload on manual run trigger", async () => {
@@ -490,13 +491,17 @@ describe("supervisorRoutes", () => {
 
             expect(res.statusCode).toBe(200);
             expect(resolveSupervisorProfileMock).toHaveBeenCalledWith("user-1", "openai");
-            expect(buildSupervisorTriggerEphemeralMock).toHaveBeenCalledWith(
-                expect.objectContaining({
-                    runtimeProfile: expect.objectContaining({
-                        profileId: "openai",
-                    }),
+            expect(emitEphemeralMock).toHaveBeenCalledWith(
+            expect.objectContaining({
+                payload: expect.objectContaining({
+                    type: "supervisor-trigger",
+                        runtimeProfile: expect.objectContaining({
+                            profileId: "openai",
+                        }),
+                    
                 }),
-            );
+            }),
+        );
         });
 
         it("rejects non-built-in runtimeProfile payloads on manual run trigger", async () => {
@@ -750,17 +755,21 @@ describe("supervisorRoutes", () => {
                 purpose: "fix-status",
                 actionId: "action-1",
             });
-            expect(buildSupervisorTriggerEphemeralMock).toHaveBeenCalledWith(
-                expect.objectContaining({
-                    callbackToken: "callback-token",
-                    runtimeProfile: expect.objectContaining({
-                        profileId: "profile-1",
-                        environmentVariables: { ANTHROPIC_API_KEY: "test-key" },
-                    }),
-                    fixMode: "analyze-first",
-                    analyzeAutoFix: true,
+            expect(emitEphemeralMock).toHaveBeenCalledWith(
+            expect.objectContaining({
+                payload: expect.objectContaining({
+                    type: "supervisor-trigger",
+                        callbackToken: "callback-token",
+                        runtimeProfile: expect.objectContaining({
+                            profileId: "profile-1",
+                            environmentVariables: { ANTHROPIC_API_KEY: "test-key" },
+                        }),
+                        fixMode: "analyze-first",
+                        analyzeAutoFix: true,
+                    
                 }),
-            );
+            }),
+        );
         });
 
         it("emits resolved profile when auto approval triggers fix", async () => {
@@ -800,16 +809,20 @@ describe("supervisorRoutes", () => {
             await handleAutoApproval("user-1", "proj-1", "run-1");
 
             expect(resolveSupervisorProfileMock).toHaveBeenCalledWith("user-1", "profile-1");
-            expect(buildSupervisorTriggerEphemeralMock).toHaveBeenCalledWith(
-                expect.objectContaining({
-                    runtimeProfile: expect.objectContaining({
-                        profileId: "profile-1",
-                        environmentVariables: { OPENAI_API_KEY: "sk-test" },
-                    }),
-                    runId: "action-1",
-                    trigger: "fix",
+            expect(emitEphemeralMock).toHaveBeenCalledWith(
+            expect.objectContaining({
+                payload: expect.objectContaining({
+                    type: "supervisor-trigger",
+                        runtimeProfile: expect.objectContaining({
+                            profileId: "profile-1",
+                            environmentVariables: { OPENAI_API_KEY: "sk-test" },
+                        }),
+                        runId: "action-1",
+                        trigger: "fix",
+                    
                 }),
-            );
+            }),
+        );
         });
 
         it("emits resolved profile when reprocess triggers fixes", async () => {
@@ -858,18 +871,22 @@ describe("supervisorRoutes", () => {
                 throw new Error(res.body);
             }
             expect(resolveSupervisorProfileMock).toHaveBeenCalledWith("user-1", "profile-1");
-            expect(buildSupervisorTriggerEphemeralMock).toHaveBeenCalledWith(
-                expect.objectContaining({
-                    projectId: "proj-1",
-                    runId: "action-1",
-                    trigger: "fix",
-                    callbackToken: "callback-token",
-                    runtimeProfile: expect.objectContaining({
-                        profileId: "profile-1",
-                        environmentVariables: { OPENAI_API_KEY: "sk-test" },
-                    }),
+            expect(emitEphemeralMock).toHaveBeenCalledWith(
+            expect.objectContaining({
+                payload: expect.objectContaining({
+                    type: "supervisor-trigger",
+                        projectId: "proj-1",
+                        runId: "action-1",
+                        trigger: "fix",
+                        callbackToken: "callback-token",
+                        runtimeProfile: expect.objectContaining({
+                            profileId: "profile-1",
+                            environmentVariables: { OPENAI_API_KEY: "sk-test" },
+                        }),
+                    
                 }),
-            );
+            }),
+        );
         });
     });
 });

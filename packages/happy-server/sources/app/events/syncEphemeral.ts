@@ -1,27 +1,6 @@
 import type { ResolvedRuntimeProfile } from "@kmmao/happy-wire";
 import {
     eventRouter,
-    buildAutoLoopFiredEphemeral,
-    buildInboxNewItemEphemeral,
-    buildInboxUnreadCountEphemeral,
-    buildInterAgentMessageEphemeral,
-    buildKnowledgeAccessUpdateEphemeral,
-    buildKnowledgeCountEphemeral,
-    buildMachineActivityEphemeral,
-    buildPreviewCandidateReportedEphemeral,
-    buildPreviewConnectionUpdatedEphemeral,
-    buildRpcReadyEphemeral,
-    buildSessionActivityEphemeral,
-    buildSessionEventCreatedEphemeral,
-    buildSupervisorLoopBriefEphemeral,
-    buildSupervisorLoopStatusEphemeral,
-    buildSupervisorStatusEphemeral,
-    buildSupervisorTriggerEphemeral,
-    buildTaskCancelEphemeral,
-    buildTaskStatusChangedEphemeral,
-    buildTaskTriggerEphemeral,
-    buildUsageEphemeral,
-    buildWorldEventCreatedEphemeral,
     type ClientConnection,
     type EphemeralPayload,
     type RecipientFilter,
@@ -49,12 +28,18 @@ import {
  * place where the seam discriminator deliberately differs from the wire
  * `type` — both emit `type: "inter-agent-message"` on the wire while differing
  * only in recipient set. See ADR-0024 decision E3.
+ *
+ * PR 1.5.f physically moved the 21 active `build*Ephemeral` payload
+ * constructors from eventRouter.ts into this file as private helpers
+ * (`*Payload`), mirroring PR 1.f for SyncUpdate. `buildMachineStatusEphemeral`
+ * had no production caller and was deleted entirely as part of the same PR.
  */
 
-// === Options shapes shared with eventRouter.ts during the migration ====
+// === Options shapes carried by SyncEphemeralBody variants ==============
 //
-// PR 1.5.e will move the corresponding build*Ephemeral function bodies into
-// this file and these interfaces will likely move with them.
+// These were exported from eventRouter.ts before PR 1.5.f; they live here
+// now because they are the parameter shapes for the seam's private payload
+// constructors. Callers reference them via SyncEphemeralBody, not directly.
 
 export interface SupervisorTriggerOptions {
     projectId: string;
@@ -236,10 +221,6 @@ export interface ApiRetryPayload {
 // `accountId` is NOT carried inside any variant — it is always the first
 // parameter to `emitSyncEphemeral` (same convention as SyncUpdate, ADR-0023
 // detail 1=A).
-//
-// `buildMachineStatusEphemeral` is omitted — no production caller (it can be
-// deleted from eventRouter.ts in a future cleanup PR alongside
-// `buildRelationshipUpdatedEvent`).
 
 export type SyncEphemeralBody =
     // --- session/machine activity & status ---
@@ -361,9 +342,7 @@ export type SyncEphemeralBody =
           sessionId: string;
           machineId: string;
           repoPath: string;
-      }
-    // --- auto-loop fired is already covered above ---
-    ;
+      };
 
 export type EmitSyncEphemeralOptions = {
     /** Suppress echo to the originating socket connection. */
@@ -458,31 +437,38 @@ function recipientFilterFor(body: SyncEphemeralBody): RecipientFilter {
     }
 }
 
-// === Internal: body → EphemeralPayload =================================
+// === Internal: body → EphemeralPayload + private payload constructors ====
 //
-// Phase 1.5.a delegates to inline construction; PR 1.5.e physically absorbs
-// the 21 active `build*Ephemeral` exports as private helpers and this switch
-// stays unchanged in shape.
+// Dispatch + the 21 wire payload constructors (`buildMachineStatusEphemeral`
+// had no production caller and is deleted entirely). Names are `*Payload`
+// to mark them as private to the seam; PR 1.5.e renamed the corresponding
+// transport sink to `_emitEphemeralInternal` for the same reason. Adding a
+// new SyncEphemeral variant adds one case here, one case in
+// recipientFilterFor, and one entry in SyncEphemeralBody — all in this file.
+// TypeScript exhaustiveness checks the switch at compile time.
 
 function buildPayload(body: SyncEphemeralBody): EphemeralPayload {
-    // PR 1.5.a delegates to the existing build*Ephemeral exports in
-    // eventRouter.ts. PR 1.5.e will move them physically into this file as
-    // private helpers; this switch shape stays unchanged.
     switch (body.t) {
         case "session-activity":
-            return buildSessionActivityEphemeral(body.sessionId, body.active, body.activeAt, body.thinking, body.apiRetry);
+            return buildSessionActivityPayload(
+                body.sessionId,
+                body.active,
+                body.activeAt,
+                body.thinking,
+                body.apiRetry,
+            );
         case "machine-activity":
-            return buildMachineActivityEphemeral(body.machineId, body.active, body.activeAt);
+            return buildMachineActivityPayload(body.machineId, body.active, body.activeAt);
         case "rpc-ready":
-            return buildRpcReadyEphemeral(body.scope, body.id, body.ready);
+            return buildRpcReadyPayload(body.scope, body.id, body.ready);
         case "usage":
-            return buildUsageEphemeral(body.sessionId, body.key, body.tokens, body.cost);
+            return buildUsagePayload(body.sessionId, body.key, body.tokens, body.cost);
         case "supervisor-trigger": {
             const { t: _t, ...opts } = body;
-            return buildSupervisorTriggerEphemeral(opts);
+            return buildSupervisorTriggerPayload(opts);
         }
         case "supervisor-status":
-            return buildSupervisorStatusEphemeral(
+            return buildSupervisorStatusPayload(
                 body.runId,
                 body.projectId,
                 body.status,
@@ -494,15 +480,15 @@ function buildPayload(body: SyncEphemeralBody): EphemeralPayload {
             );
         case "supervisor-loop-status": {
             const { t: _t, ...opts } = body;
-            return buildSupervisorLoopStatusEphemeral(opts);
+            return buildSupervisorLoopStatusPayload(opts);
         }
         case "supervisor-loop-brief": {
             const { t: _t, ...opts } = body;
-            return buildSupervisorLoopBriefEphemeral(opts);
+            return buildSupervisorLoopBriefPayload(opts);
         }
         case "auto-loop-fired": {
             const { t: _t, ...opts } = body;
-            return buildAutoLoopFiredEphemeral(opts);
+            return buildAutoLoopFiredPayload(opts);
         }
         case "supervisor-run-complete":
             return {
@@ -519,9 +505,9 @@ function buildPayload(body: SyncEphemeralBody): EphemeralPayload {
                 fixStatus: body.fixStatus,
             };
         case "knowledge-count":
-            return buildKnowledgeCountEphemeral(body.sessionId, body.count);
+            return buildKnowledgeCountPayload(body.sessionId, body.count);
         case "knowledge-access-update":
-            return buildKnowledgeAccessUpdateEphemeral({
+            return buildKnowledgeAccessUpdatePayload({
                 sessionId: body.sessionId,
                 hit: body.hit,
                 miss: body.miss,
@@ -529,14 +515,14 @@ function buildPayload(body: SyncEphemeralBody): EphemeralPayload {
             });
         case "task-trigger": {
             const { t: _t, machineId: _m, ...opts } = body;
-            return buildTaskTriggerEphemeral(opts);
+            return buildTaskTriggerPayload(opts);
         }
         case "task-status-changed": {
             const { t: _t, ...opts } = body;
-            return buildTaskStatusChangedEphemeral(opts);
+            return buildTaskStatusChangedPayload(opts);
         }
         case "task-cancel":
-            return buildTaskCancelEphemeral({ taskId: body.taskId, sessionId: body.sessionId });
+            return buildTaskCancelPayload({ taskId: body.taskId, sessionId: body.sessionId });
         case "task-log":
             return {
                 type: "task-log",
@@ -547,30 +533,30 @@ function buildPayload(body: SyncEphemeralBody): EphemeralPayload {
                 offset: body.offset,
             };
         case "inbox-new-item":
-            return buildInboxNewItemEphemeral(body.item);
+            return buildInboxNewItemPayload(body.item);
         case "inbox-unread-count":
-            return buildInboxUnreadCountEphemeral(body.count);
+            return buildInboxUnreadCountPayload(body.count);
         case "session-event-created":
-            return buildSessionEventCreatedEphemeral(body.event);
+            return buildSessionEventCreatedPayload(body.event);
         case "session-terminate":
             return { type: "session-terminate", sessionId: body.sessionId, reason: body.reason };
         case "inter-agent-message-deliver":
         case "inter-agent-message-echo":
             // Both seam variants emit the same wire `type` per ADR-0024 E3.
-            return buildInterAgentMessageEphemeral({
+            return buildInterAgentMessagePayload({
                 fromSessionId: body.fromSessionId,
                 toSessionId: body.toSessionId,
                 message: body.message,
             });
         case "world-event-created":
-            return buildWorldEventCreatedEphemeral(body.event);
+            return buildWorldEventCreatedPayload(body.event);
         case "preview-candidate-reported":
-            return buildPreviewCandidateReportedEphemeral({
+            return buildPreviewCandidateReportedPayload({
                 sessionId: body.sessionId,
                 candidate: body.candidate,
             });
         case "preview-connection-updated":
-            return buildPreviewConnectionUpdatedEphemeral({
+            return buildPreviewConnectionUpdatedPayload({
                 sessionId: body.sessionId,
                 connection: body.connection,
             });
@@ -608,4 +594,199 @@ function buildPayload(body: SyncEphemeralBody): EphemeralPayload {
             return { type: "webhook-pr-merged", ...rest };
         }
     }
+}
+
+// === Private payload constructors (PR 1.5.f physical move) =============
+//
+// One per wire variant that today uses a constructor (the 10 simple inline
+// variants — terminal-*, webhook-*, session-terminate, supervisor-run-complete,
+// supervisor-fix-kill-session, task-log — stay inline in `buildPayload`
+// above). Function bodies preserve the exact wire behaviour the previous
+// eventRouter.ts exports had — including `Date.now()` timestamps and the
+// optional `apiRetry` shape collapse on session-activity.
+
+function buildSessionActivityPayload(
+    sessionId: string,
+    active: boolean,
+    activeAt: number,
+    thinking?: boolean,
+    apiRetry?: ApiRetryPayload,
+): EphemeralPayload {
+    return {
+        type: "activity",
+        id: sessionId,
+        active,
+        activeAt,
+        thinking: thinking || false,
+        ...(apiRetry ? { apiRetry } : {}),
+    };
+}
+
+function buildMachineActivityPayload(
+    machineId: string,
+    active: boolean,
+    activeAt: number,
+): EphemeralPayload {
+    return { type: "machine-activity", id: machineId, active, activeAt };
+}
+
+function buildRpcReadyPayload(
+    scope: "machine" | "session",
+    id: string,
+    ready: boolean,
+): EphemeralPayload {
+    return { type: "rpc-ready", scope, id, ready };
+}
+
+function buildUsagePayload(
+    sessionId: string,
+    key: string,
+    tokens: Record<string, number>,
+    cost: Record<string, number>,
+): EphemeralPayload {
+    return {
+        type: "usage",
+        id: sessionId,
+        key,
+        tokens,
+        cost,
+        timestamp: Date.now(),
+    };
+}
+
+function buildSupervisorTriggerPayload(opts: SupervisorTriggerOptions): EphemeralPayload {
+    return { type: "supervisor-trigger", ...opts };
+}
+
+function buildSupervisorStatusPayload(
+    runId: string,
+    projectId: string,
+    status: string,
+    artifactId?: string,
+    errorMessage?: string,
+    currentDimension?: string,
+    dimensionIndex?: number,
+    totalDimensions?: number,
+): EphemeralPayload {
+    return {
+        type: "supervisor-status",
+        runId,
+        projectId,
+        status,
+        artifactId,
+        errorMessage,
+        currentDimension,
+        dimensionIndex,
+        totalDimensions,
+    };
+}
+
+function buildSupervisorLoopStatusPayload(
+    opts: SupervisorLoopStatusOptions,
+): EphemeralPayload {
+    return { type: "supervisor-loop-status", ...opts };
+}
+
+function buildSupervisorLoopBriefPayload(
+    opts: SupervisorLoopBriefOptions,
+): EphemeralPayload {
+    return { type: "supervisor-loop-brief", ...opts };
+}
+
+function buildAutoLoopFiredPayload(opts: AutoLoopFiredOptions): EphemeralPayload {
+    return { type: "auto-loop-fired", ...opts };
+}
+
+function buildKnowledgeCountPayload(
+    sessionId: string,
+    count: number,
+): EphemeralPayload {
+    return { type: "knowledge-count", id: sessionId, count };
+}
+
+function buildKnowledgeAccessUpdatePayload(opts: {
+    sessionId: string;
+    hit?: number;
+    miss?: number;
+    evicted?: number;
+}): EphemeralPayload {
+    return {
+        type: "knowledge-access-update",
+        sessionId: opts.sessionId,
+        at: Date.now(),
+        hit: opts.hit,
+        miss: opts.miss,
+        evicted: opts.evicted,
+    };
+}
+
+function buildTaskTriggerPayload(opts: TaskTriggerOptions): EphemeralPayload {
+    return { type: "task-trigger", ...opts };
+}
+
+function buildTaskStatusChangedPayload(opts: TaskStatusChangedOptions): EphemeralPayload {
+    return { type: "task-status-changed", ...opts };
+}
+
+function buildTaskCancelPayload(opts: {
+    taskId: string;
+    sessionId?: string;
+}): EphemeralPayload {
+    return { type: "task-cancel", ...opts };
+}
+
+function buildInboxNewItemPayload(item: InboxItemPayload): EphemeralPayload {
+    return { type: "inbox-new-item", item };
+}
+
+function buildInboxUnreadCountPayload(count: number): EphemeralPayload {
+    return { type: "inbox-unread-count", count };
+}
+
+function buildSessionEventCreatedPayload(
+    event: SessionEventCreatedPayload,
+): EphemeralPayload {
+    return { type: "session-event-created", event };
+}
+
+function buildInterAgentMessagePayload(opts: {
+    fromSessionId: string;
+    toSessionId: string;
+    message: string;
+}): EphemeralPayload {
+    return {
+        type: "inter-agent-message",
+        fromSessionId: opts.fromSessionId,
+        toSessionId: opts.toSessionId,
+        message: opts.message,
+        sentAt: Date.now(),
+    };
+}
+
+function buildWorldEventCreatedPayload(
+    event: WorldEventCreatedPayload,
+): EphemeralPayload {
+    return { type: "world-event-created", event };
+}
+
+function buildPreviewCandidateReportedPayload(opts: {
+    sessionId: string;
+    candidate: PreviewCandidatePayload;
+}): EphemeralPayload {
+    return {
+        type: "preview-candidate-reported",
+        sessionId: opts.sessionId,
+        candidate: opts.candidate,
+    };
+}
+
+function buildPreviewConnectionUpdatedPayload(opts: {
+    sessionId: string;
+    connection: PreviewConnectionPayload | null;
+}): EphemeralPayload {
+    return {
+        type: "preview-connection-updated",
+        sessionId: opts.sessionId,
+        connection: opts.connection,
+    };
 }

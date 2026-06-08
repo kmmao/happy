@@ -24,7 +24,8 @@ type TaskRecord = {
     updatedAt: Date;
 };
 
-const { state, dbMock, resetState, seedTask, authMock } = vi.hoisted(() => {
+const { state, dbMock, emitEphemeralMock, resetState, seedTask, authMock } = vi.hoisted(() => {
+    const emitEphemeralMock = vi.fn();
     const state = {
         tasks: [] as TaskRecord[],
         repeatKeys: new Map<string, { key: string; value: string; expiresAt: Date; createdAt: Date }>(),
@@ -152,15 +153,16 @@ const { state, dbMock, resetState, seedTask, authMock } = vi.hoisted(() => {
         createTaskResultToken: vi.fn(async ({ taskId }: { taskId: string }) => `task-token-for-${taskId}`),
     };
 
-    return { state, dbMock, resetState, seedTask, authMock };
+    return { state, dbMock, emitEphemeralMock, resetState, seedTask, authMock };
 });
 
 vi.mock("@/storage/db", () => ({ db: dbMock }));
 vi.mock("@/utils/log", () => ({ log: vi.fn() }));
+// PR 1.5.f: build*Ephemeral functions moved into syncEphemeral.ts as private
+// helpers. We mock only the transport sink and assert on the wire payload
+// that reaches it.
 vi.mock("@/app/events/eventRouter", () => ({
-    eventRouter: { _emitEphemeralInternal: vi.fn() },
-    buildTaskTriggerEphemeral: vi.fn((payload: unknown) => payload),
-    buildTaskStatusChangedEphemeral: vi.fn((payload: unknown) => payload),
+    eventRouter: { _emitEphemeralInternal: emitEphemeralMock },
 }));
 vi.mock("@/app/auth/auth", () => ({
     auth: authMock,
@@ -299,9 +301,11 @@ describe("taskRoutes POST /v1/tasks", () => {
         });
 
         expect(res.statusCode).toBe(201);
-        const { buildTaskTriggerEphemeral } = await import("@/app/events/eventRouter");
-        expect(buildTaskTriggerEphemeral).toHaveBeenCalled();
-        const payload = (buildTaskTriggerEphemeral as any).mock.calls[0][0];
+        // PR 1.5.f: assert on the wire payload that reaches the seam's
+        // transport sink, rather than on an intermediate builder call.
+        expect(emitEphemeralMock).toHaveBeenCalled();
+        const payload = emitEphemeralMock.mock.calls[0][0].payload;
+        expect(payload.type).toBe("task-trigger");
         expect(payload.resultToken).toBeTypeOf("string");
     });
 
@@ -365,8 +369,9 @@ describe("taskRoutes POST /v1/tasks/status", () => {
         expect(res.json().task.status).toBe("failed");
         expect(res.json().task.errorMessage).toContain("Need human decision");
         expect(state.tasks[0]?.status).toBe("failed");
-        const { buildTaskStatusChangedEphemeral } = await import("@/app/events/eventRouter");
-        const payload = (buildTaskStatusChangedEphemeral as any).mock.calls[0][0];
+        // PR 1.5.f: assert on the wire payload that reaches the seam's sink.
+        const payload = emitEphemeralMock.mock.calls[0][0].payload;
+        expect(payload.type).toBe("task-status-changed");
         expect(payload.machineId).toBe("machine-1");
     });
 
@@ -443,8 +448,9 @@ describe("taskRoutes POST /v1/tasks/result", () => {
 
         expect(res.statusCode).toBe(200);
         expect(res.json().task.status).toBe("failed");
-        const { buildTaskStatusChangedEphemeral } = await import("@/app/events/eventRouter");
-        const payload = (buildTaskStatusChangedEphemeral as any).mock.calls[0][0];
+        // PR 1.5.f: assert on the wire payload that reaches the seam's sink.
+        const payload = emitEphemeralMock.mock.calls[0][0].payload;
+        expect(payload.type).toBe("task-status-changed");
         expect(payload.machineId).toBe("machine-1");
     });
 
@@ -763,8 +769,9 @@ describe("taskRoutes POST /v1/tasks/:id/retry", () => {
         });
 
         expect(res.statusCode).toBe(200);
-        const { buildTaskTriggerEphemeral } = await import("@/app/events/eventRouter");
-        const payload = (buildTaskTriggerEphemeral as any).mock.calls[0][0];
+        // PR 1.5.f: assert on the wire payload that reaches the seam's sink.
+        const payload = emitEphemeralMock.mock.calls[0][0].payload;
+        expect(payload.type).toBe("task-trigger");
         expect(payload.directory).toBe("/repo/.dev/worktree/task-1");
     });
 });

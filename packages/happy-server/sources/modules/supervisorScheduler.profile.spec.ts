@@ -10,7 +10,6 @@ const mocks = vi.hoisted(() => ({
     checkDailyRunLimit: vi.fn(),
     incrementDailyRunCount: vi.fn(),
     _emitEphemeralInternal: vi.fn(),
-    buildSupervisorTriggerEphemeral: vi.fn((payload: unknown) => payload),
     authCreateSupervisorCallbackToken: vi.fn(),
     parseDefaultProfileId: vi.fn(),
     resolveSupervisorProfile: vi.fn(),
@@ -31,11 +30,13 @@ vi.mock("@/utils/log", () => ({
     log: mocks.log,
 }));
 
+// PR 1.5.f: build*Ephemeral functions moved into syncEphemeral.ts as private
+// helpers. We mock only the transport sink and assert on the wire payload
+// that reaches it.
 vi.mock("@/app/events/eventRouter", () => ({
     eventRouter: {
         _emitEphemeralInternal: mocks._emitEphemeralInternal,
     },
-    buildSupervisorTriggerEphemeral: mocks.buildSupervisorTriggerEphemeral,
 }));
 
 vi.mock("./supervisorLimits", () => ({
@@ -124,26 +125,6 @@ describe("checkAndTriggerScheduledRuns", () => {
             "user-1",
             "profile-1",
         );
-        expect(mocks.buildSupervisorTriggerEphemeral).toHaveBeenCalledWith(
-            expect.objectContaining({
-                projectId: "project-1",
-                runId: "run-1",
-                trigger: "scheduled",
-                machineId: "machine-1",
-                repoPath: "/repo",
-                mode: "suggest",
-                dimensions: ["security", "architecture"],
-                customRules: "focus on auth",
-                maxFindings: 7,
-                callbackToken: "callback-token",
-                runtimeProfile: expect.objectContaining({
-                    profileId: "profile-1",
-                    environmentVariables: {
-                        OPENAI_API_KEY: "sk-live",
-                    },
-                }),
-            }),
-        );
         expect(mocks._emitEphemeralInternal).toHaveBeenCalledWith(
             expect.objectContaining({
                 userId: "user-1",
@@ -151,9 +132,25 @@ describe("checkAndTriggerScheduledRuns", () => {
                     type: "machine-scoped-only",
                     machineId: "machine-1",
                 },
+                // PR 1.5.f: wire payload is the assertion target after the
+                // build*Ephemeral functions became private to syncEphemeral.ts.
                 payload: expect.objectContaining({
+                    type: "supervisor-trigger",
+                    projectId: "project-1",
+                    runId: "run-1",
+                    trigger: "scheduled",
+                    machineId: "machine-1",
+                    repoPath: "/repo",
+                    mode: "suggest",
+                    dimensions: ["security", "architecture"],
+                    customRules: "focus on auth",
+                    maxFindings: 7,
+                    callbackToken: "callback-token",
                     runtimeProfile: expect.objectContaining({
                         profileId: "profile-1",
+                        environmentVariables: {
+                            OPENAI_API_KEY: "sk-live",
+                        },
                     }),
                 }),
             }),

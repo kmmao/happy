@@ -1,7 +1,6 @@
 import { onShutdown } from "@/utils/shutdown";
 import { Fastify } from "./types";
 import {
-  buildRpcReadyEphemeral,
   ClientConnection,
   eventRouter,
 } from "@/app/events/eventRouter";
@@ -183,11 +182,18 @@ export function startSocket(app: Fastify) {
     }
 
     if (connection.connectionType === "user-scoped") {
+      // Direct catch-up emit to the just-connected socket only (NOT
+      // broadcast). The SyncEphemeral seam's rpc-ready variant would
+      // broadcast to every user-scoped socket; that is wrong here — we
+      // are replaying ready state to one socket. Construct the wire
+      // payload inline (same shape as the seam's rpc-ready Payload).
       for (const readyScope of listRpcReadyScopes(userRpcListeners)) {
-        socket.emit(
-          "ephemeral",
-          buildRpcReadyEphemeral(readyScope.scope, readyScope.id, true),
-        );
+        socket.emit("ephemeral", {
+          type: "rpc-ready",
+          scope: readyScope.scope,
+          id: readyScope.id,
+          ready: true,
+        });
       }
     }
 

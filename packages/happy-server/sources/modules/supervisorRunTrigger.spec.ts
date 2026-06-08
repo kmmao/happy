@@ -2,16 +2,17 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
     _emitEphemeralInternal: vi.fn(),
-    buildSupervisorTriggerEphemeral: vi.fn((payload: unknown) => payload),
     authCreateSupervisorCallbackToken: vi.fn(),
     resolveSupervisorProfile: vi.fn(),
 }));
 
+// PR 1.5.f: build*Ephemeral functions moved into syncEphemeral.ts as private
+// helpers. We mock only the transport sink and assert on the wire payload
+// that reaches it.
 vi.mock("@/app/events/eventRouter", () => ({
     eventRouter: {
         _emitEphemeralInternal: mocks._emitEphemeralInternal,
     },
-    buildSupervisorTriggerEphemeral: mocks.buildSupervisorTriggerEphemeral,
 }));
 
 vi.mock("@/app/auth/auth", () => ({
@@ -83,17 +84,6 @@ describe("emitConfiguredSupervisorRunTrigger", () => {
             purpose: "run-status",
             runId: "run-1",
         });
-        expect(mocks.buildSupervisorTriggerEphemeral).toHaveBeenCalledWith(
-            expect.objectContaining({
-                projectId: "project-1",
-                runId: "run-1",
-                trigger: "manual",
-                callbackToken: "callback-token",
-                runtimeProfile: expect.objectContaining({
-                    profileId: "openai",
-                }),
-            }),
-        );
         expect(mocks._emitEphemeralInternal).toHaveBeenCalledWith(
             expect.objectContaining({
                 userId: "user-1",
@@ -101,6 +91,18 @@ describe("emitConfiguredSupervisorRunTrigger", () => {
                     type: "machine-scoped-only",
                     machineId: "machine-1",
                 },
+                // PR 1.5.f: wire payload is the assertion target after the
+                // build*Ephemeral functions became private to syncEphemeral.ts.
+                payload: expect.objectContaining({
+                    type: "supervisor-trigger",
+                    projectId: "project-1",
+                    runId: "run-1",
+                    trigger: "manual",
+                    callbackToken: "callback-token",
+                    runtimeProfile: expect.objectContaining({
+                        profileId: "openai",
+                    }),
+                }),
             }),
         );
     });

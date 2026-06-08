@@ -96,25 +96,11 @@ const {
 
 vi.mock("@/storage/db", () => ({ db: dbMock }));
 vi.mock("@/utils/log", () => ({ log: vi.fn() }));
+// PR 1.5.f: build*Ephemeral functions moved into syncEphemeral.ts as private
+// helpers. We mock only the transport sink and assert on the wire payload
+// that reaches it.
 vi.mock("@/app/events/eventRouter", () => ({
     eventRouter: { _emitEphemeralInternal: emitEphemeralMock },
-    buildSupervisorStatusEphemeral: vi.fn(
-        (runId: string, projectId: string, status: string) => ({
-            type: "supervisor-status",
-            runId,
-            projectId,
-            status,
-        }),
-    ),
-    buildSessionActivityEphemeral: vi.fn(
-        (sessionId: string, active: boolean, activeAt: number, thinking: boolean) => ({
-            type: "session-activity",
-            sessionId,
-            active,
-            activeAt,
-            thinking,
-        }),
-    ),
 }));
 vi.mock("@/app/presence/sessionCache", () => ({
     activityCache: { invalidateSession: invalidateSessionMock },
@@ -203,13 +189,16 @@ describe("supervisorFixStatusHandler", () => {
         // Activity cache should be invalidated
         expect(invalidateSessionMock).toHaveBeenCalledWith(FIX_SESSION_ID);
 
-        // Session activity ephemeral should be emitted
+        // Session activity ephemeral should be emitted. The wire payload
+        // (per ADR-0013) uses `type: "activity"` (legacy name) and `id` for
+        // the sessionId — the seam owns that shape detail; spec asserts what
+        // actually reaches the transport sink.
         expect(emitEphemeralMock).toHaveBeenCalledWith(
             expect.objectContaining({
                 userId: USER_ID,
                 payload: expect.objectContaining({
-                    type: "session-activity",
-                    sessionId: FIX_SESSION_ID,
+                    type: "activity",
+                    id: FIX_SESSION_ID,
                     active: false,
                 }),
             }),

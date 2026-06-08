@@ -11,7 +11,6 @@ const mocks = vi.hoisted(() => ({
     verifyWebhookSignature: vi.fn(),
     checkDailyRunLimit: vi.fn(),
     _emitEphemeralInternal: vi.fn(),
-    buildSupervisorTriggerEphemeral: vi.fn((payload: unknown) => payload),
     authCreateSupervisorCallbackToken: vi.fn(),
     parseDefaultProfileId: vi.fn(),
     resolveSupervisorProfile: vi.fn(),
@@ -45,12 +44,13 @@ vi.mock("@/modules/supervisorLimits", () => ({
     checkDailyRunLimit: mocks.checkDailyRunLimit,
 }));
 
+// PR 1.5.f: build*Ephemeral functions moved into syncEphemeral.ts as private
+// helpers. We mock only the transport sink and assert on the wire payload
+// that reaches it.
 vi.mock("@/app/events/eventRouter", () => ({
     eventRouter: {
         _emitEphemeralInternal: mocks._emitEphemeralInternal,
     },
-    buildSessionActivityEphemeral: vi.fn((payload: unknown) => payload),
-    buildSupervisorTriggerEphemeral: mocks.buildSupervisorTriggerEphemeral,
 }));
 
 vi.mock("@/app/auth/auth", () => ({
@@ -171,18 +171,23 @@ describe("dispatchWebhook push supervisor trigger", () => {
             "user-1",
             "profile-1",
         );
-        expect(mocks.buildSupervisorTriggerEphemeral).toHaveBeenCalledWith(
+        // PR 1.5.f: wire payload is the assertion target after the
+        // build*Ephemeral functions became private to syncEphemeral.ts.
+        expect(mocks._emitEphemeralInternal).toHaveBeenCalledWith(
             expect.objectContaining({
-                projectId: "project-1",
-                runId: "run-1",
-                trigger: "push",
-                callbackToken: "callback-token",
-                changedFiles: ["src/index.ts"],
-                runtimeProfile: expect.objectContaining({
-                    profileId: "profile-1",
-                    environmentVariables: {
-                        OPENAI_API_KEY: "sk-live",
-                    },
+                payload: expect.objectContaining({
+                    type: "supervisor-trigger",
+                    projectId: "project-1",
+                    runId: "run-1",
+                    trigger: "push",
+                    callbackToken: "callback-token",
+                    changedFiles: ["src/index.ts"],
+                    runtimeProfile: expect.objectContaining({
+                        profileId: "profile-1",
+                        environmentVariables: {
+                            OPENAI_API_KEY: "sk-live",
+                        },
+                    }),
                 }),
             }),
         );
