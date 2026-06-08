@@ -1,20 +1,5 @@
 import type { SessionMessageContent } from "@kmmao/happy-wire";
 import {
-    buildDeleteArtifactUpdate,
-    buildDeleteProjectUpdate,
-    buildDeleteSessionUpdate,
-    buildKVBatchUpdateUpdate,
-    buildNewArtifactUpdate,
-    buildNewFeedPostUpdate,
-    buildNewMachineUpdate,
-    buildNewMessageUpdate,
-    buildNewProjectUpdate,
-    buildNewSessionUpdate,
-    buildUpdateAccountUpdate,
-    buildUpdateArtifactUpdate,
-    buildUpdateMachineUpdate,
-    buildUpdateProjectUpdate,
-    buildUpdateSessionUpdate,
     eventRouter,
     type ClientConnection,
     type RecipientFilter,
@@ -22,8 +7,10 @@ import {
 } from "@/app/events/eventRouter";
 import { afterTx, type Tx } from "@/storage/inTx";
 import { allocateUserSeq } from "@/storage/seq";
+import { getPublicUrl } from "@/storage/files";
 import { AccountProfile } from "@/types";
 import { randomKeyNaked } from "@/utils/randomKeyNaked";
+import * as privacyKit from "privacy-kit";
 
 /**
  * Server-side SyncUpdate emission seam (CONTEXT.md → SyncUpdate).
@@ -43,16 +30,15 @@ import { randomKeyNaked } from "@/utils/randomKeyNaked";
  *               tx mode is the only knob: per ADR-0023 (Q3=A) the tx is
  *               optional in Phase 1, may tighten to required in a future ADR.
  *
- * `eventRouter` remains the transport-level multicast primitive. PR 1.f moves
- * the 15 `build*Update` payload constructors physically into this file.
+ * `eventRouter` remains the transport-level multicast primitive. The 15 wire
+ * payload constructors live in this file as private helpers (PR 1.f physically
+ * moved them out of eventRouter.ts).
  */
 
 // === Row types — shapes the SyncUpdateBody variants carry ==============
 //
-// These mirror the existing build*Update inline signatures one-for-one; they
-// are extracted as named aliases so SyncUpdateBody stays readable. PR 1.f
-// (which physically moves the builders into this file) absorbs them as the
-// builders' own parameter types.
+// These mirror the historical build*Update inline signatures one-for-one and
+// are extracted as named aliases so SyncUpdateBody stays readable.
 
 export type VersionedField = { value: string; version: number };
 export type NullableVersionedField = { value: string | null; version: number };
@@ -256,9 +242,12 @@ function recipientFilterFor(body: SyncUpdateBody): RecipientFilter {
 
 // === Internal: body → UpdatePayload ====================================
 //
-// Phase 1.a delegates to the 15 existing `build*Update` exports in
-// eventRouter.ts. PR 1.f moves them physically into this file as private
-// helpers; this switch shape stays unchanged.
+// Dispatch + the 15 wire payload constructors. Names are `*Payload` to mark
+// them as private to this seam (the old `*Update` exports on eventRouter.ts
+// were removed in PR 1.f). Adding a new SyncUpdate variant adds one case
+// here, one case in recipientFilterFor, and one entry in SyncUpdateBody —
+// all in this file. TypeScript exhaustiveness checks the switch at compile
+// time.
 
 function buildPayload(
     accountId: string,
@@ -268,9 +257,9 @@ function buildPayload(
 ): UpdatePayload {
     switch (body.t) {
         case "update-account":
-            return buildUpdateAccountUpdate(accountId, body.profile, seq, id);
+            return buildUpdateAccountPayload(accountId, body.profile, seq, id);
         case "update-session":
-            return buildUpdateSessionUpdate(
+            return buildUpdateSessionPayload(
                 body.sessionId,
                 seq,
                 id,
@@ -279,7 +268,7 @@ function buildPayload(
                 body.preferences,
             );
         case "update-machine":
-            return buildUpdateMachineUpdate(
+            return buildUpdateMachinePayload(
                 body.machineId,
                 seq,
                 id,
@@ -287,21 +276,21 @@ function buildPayload(
                 body.daemonState,
             );
         case "new-session":
-            return buildNewSessionUpdate(body.session, seq, id);
+            return buildNewSessionPayload(body.session, seq, id);
         case "new-message":
-            return buildNewMessageUpdate(body.message, body.sessionId, seq, id);
+            return buildNewMessagePayload(body.message, body.sessionId, seq, id);
         case "new-machine":
-            return buildNewMachineUpdate(body.machine, seq, id);
+            return buildNewMachinePayload(body.machine, seq, id);
         case "delete-session":
-            return buildDeleteSessionUpdate(body.sessionId, seq, id);
+            return buildDeleteSessionPayload(body.sessionId, seq, id);
         case "new-feed-post":
-            return buildNewFeedPostUpdate(body.post, seq, id);
+            return buildNewFeedPostPayload(body.post, seq, id);
         case "kv-batch-update":
-            return buildKVBatchUpdateUpdate(body.changes, seq, id);
+            return buildKVBatchUpdatePayload(body.changes, seq, id);
         case "new-artifact":
-            return buildNewArtifactUpdate(body.artifact, seq, id);
+            return buildNewArtifactPayload(body.artifact, seq, id);
         case "update-artifact":
-            return buildUpdateArtifactUpdate(
+            return buildUpdateArtifactPayload(
                 body.artifactId,
                 seq,
                 id,
@@ -309,11 +298,11 @@ function buildPayload(
                 body.body,
             );
         case "delete-artifact":
-            return buildDeleteArtifactUpdate(body.artifactId, seq, id);
+            return buildDeleteArtifactPayload(body.artifactId, seq, id);
         case "new-project":
-            return buildNewProjectUpdate(body.project, seq, id);
+            return buildNewProjectPayload(body.project, seq, id);
         case "update-project":
-            return buildUpdateProjectUpdate(
+            return buildUpdateProjectPayload(
                 body.projectId,
                 seq,
                 id,
@@ -321,6 +310,296 @@ function buildPayload(
                 body.archived,
             );
         case "delete-project":
-            return buildDeleteProjectUpdate(body.projectId, seq, id);
+            return buildDeleteProjectPayload(body.projectId, seq, id);
     }
+}
+
+function buildUpdateAccountPayload(
+    userId: string,
+    profile: Partial<AccountProfile>,
+    updateSeq: number,
+    updateId: string,
+): UpdatePayload {
+    return {
+        id: updateId,
+        seq: updateSeq,
+        body: {
+            t: "update-account",
+            id: userId,
+            ...profile,
+            avatar: profile.avatar
+                ? { ...profile.avatar, url: getPublicUrl(profile.avatar.path) }
+                : undefined,
+        },
+        createdAt: Date.now(),
+    };
+}
+
+function buildNewSessionPayload(
+    session: NewSessionRow,
+    updateSeq: number,
+    updateId: string,
+): UpdatePayload {
+    return {
+        id: updateId,
+        seq: updateSeq,
+        body: {
+            t: "new-session",
+            id: session.id,
+            seq: session.seq,
+            metadata: session.metadata,
+            metadataVersion: session.metadataVersion,
+            agentState: session.agentState,
+            agentStateVersion: session.agentStateVersion,
+            dataEncryptionKey: session.dataEncryptionKey
+                ? privacyKit.encodeBase64(new Uint8Array(session.dataEncryptionKey))
+                : null,
+            active: session.active,
+            activeAt: session.lastActiveAt.getTime(),
+            createdAt: session.createdAt.getTime(),
+            updatedAt: session.updatedAt.getTime(),
+            forkedFromSessionId: session.forkedFromSessionId ?? null,
+            parentSessionId: session.parentSessionId ?? null,
+        },
+        createdAt: Date.now(),
+    };
+}
+
+function buildNewMessagePayload(
+    message: NewMessageRow,
+    sessionId: string,
+    updateSeq: number,
+    updateId: string,
+): UpdatePayload {
+    return {
+        id: updateId,
+        seq: updateSeq,
+        body: {
+            t: "new-message",
+            sid: sessionId,
+            message: {
+                id: message.id,
+                seq: message.seq,
+                content: message.content,
+                localId: message.localId,
+                createdAt: message.createdAt.getTime(),
+                updatedAt: message.updatedAt.getTime(),
+            },
+        },
+        createdAt: Date.now(),
+    };
+}
+
+function buildUpdateSessionPayload(
+    sessionId: string,
+    updateSeq: number,
+    updateId: string,
+    metadata?: VersionedField,
+    agentState?: VersionedField,
+    preferences?: VersionedField,
+): UpdatePayload {
+    return {
+        id: updateId,
+        seq: updateSeq,
+        body: {
+            t: "update-session",
+            id: sessionId,
+            metadata,
+            agentState,
+            preferences,
+        },
+        createdAt: Date.now(),
+    };
+}
+
+function buildDeleteSessionPayload(
+    sessionId: string,
+    updateSeq: number,
+    updateId: string,
+): UpdatePayload {
+    return {
+        id: updateId,
+        seq: updateSeq,
+        body: { t: "delete-session", sid: sessionId },
+        createdAt: Date.now(),
+    };
+}
+
+function buildNewMachinePayload(
+    machine: NewMachineRow,
+    updateSeq: number,
+    updateId: string,
+): UpdatePayload {
+    return {
+        id: updateId,
+        seq: updateSeq,
+        body: {
+            t: "new-machine",
+            machineId: machine.id,
+            seq: machine.seq,
+            metadata: machine.metadata,
+            metadataVersion: machine.metadataVersion,
+            daemonState: machine.daemonState,
+            daemonStateVersion: machine.daemonStateVersion,
+            dataEncryptionKey: machine.dataEncryptionKey
+                ? privacyKit.encodeBase64(new Uint8Array(machine.dataEncryptionKey))
+                : null,
+            active: machine.active,
+            activeAt: machine.lastActiveAt.getTime(),
+            createdAt: machine.createdAt.getTime(),
+            updatedAt: machine.updatedAt.getTime(),
+        },
+        createdAt: Date.now(),
+    };
+}
+
+function buildUpdateMachinePayload(
+    machineId: string,
+    updateSeq: number,
+    updateId: string,
+    metadata?: VersionedField,
+    daemonState?: VersionedField,
+): UpdatePayload {
+    return {
+        id: updateId,
+        seq: updateSeq,
+        body: { t: "update-machine", machineId, metadata, daemonState },
+        createdAt: Date.now(),
+    };
+}
+
+function buildNewArtifactPayload(
+    artifact: NewArtifactRow,
+    updateSeq: number,
+    updateId: string,
+): UpdatePayload {
+    return {
+        id: updateId,
+        seq: updateSeq,
+        body: {
+            t: "new-artifact",
+            artifactId: artifact.id,
+            seq: artifact.seq,
+            header: privacyKit.encodeBase64(new Uint8Array(artifact.header)),
+            headerVersion: artifact.headerVersion,
+            body: privacyKit.encodeBase64(new Uint8Array(artifact.body)),
+            bodyVersion: artifact.bodyVersion,
+            dataEncryptionKey: privacyKit.encodeBase64(new Uint8Array(artifact.dataEncryptionKey)),
+            createdAt: artifact.createdAt.getTime(),
+            updatedAt: artifact.updatedAt.getTime(),
+        },
+        createdAt: Date.now(),
+    };
+}
+
+function buildUpdateArtifactPayload(
+    artifactId: string,
+    updateSeq: number,
+    updateId: string,
+    header?: VersionedField,
+    body?: VersionedField,
+): UpdatePayload {
+    return {
+        id: updateId,
+        seq: updateSeq,
+        body: { t: "update-artifact", artifactId, header, body },
+        createdAt: Date.now(),
+    };
+}
+
+function buildDeleteArtifactPayload(
+    artifactId: string,
+    updateSeq: number,
+    updateId: string,
+): UpdatePayload {
+    return {
+        id: updateId,
+        seq: updateSeq,
+        body: { t: "delete-artifact", artifactId },
+        createdAt: Date.now(),
+    };
+}
+
+function buildNewFeedPostPayload(
+    feedItem: FeedPostRow,
+    updateSeq: number,
+    updateId: string,
+): UpdatePayload {
+    return {
+        id: updateId,
+        seq: updateSeq,
+        body: {
+            t: "new-feed-post",
+            id: feedItem.id,
+            body: feedItem.body,
+            cursor: feedItem.cursor,
+            createdAt: feedItem.createdAt,
+        },
+        createdAt: Date.now(),
+    };
+}
+
+function buildKVBatchUpdatePayload(
+    changes: KVChange[],
+    updateSeq: number,
+    updateId: string,
+): UpdatePayload {
+    return {
+        id: updateId,
+        seq: updateSeq,
+        body: { t: "kv-batch-update", changes },
+        createdAt: Date.now(),
+    };
+}
+
+function buildNewProjectPayload(
+    project: NewProjectRow,
+    updateSeq: number,
+    updateId: string,
+): UpdatePayload {
+    return {
+        id: updateId,
+        seq: updateSeq,
+        body: {
+            t: "new-project",
+            projectId: project.id,
+            machineId: project.machineId,
+            path: project.path,
+            repoUrl: project.repoUrl,
+            metadata: project.metadata,
+            metadataVersion: project.metadataVersion,
+            archived: project.archived,
+            createdAt: project.createdAt.getTime(),
+            updatedAt: project.updatedAt.getTime(),
+        },
+        createdAt: Date.now(),
+    };
+}
+
+function buildUpdateProjectPayload(
+    projectId: string,
+    updateSeq: number,
+    updateId: string,
+    metadata?: NullableVersionedField,
+    archived?: boolean,
+): UpdatePayload {
+    return {
+        id: updateId,
+        seq: updateSeq,
+        body: { t: "update-project", projectId, metadata, archived },
+        createdAt: Date.now(),
+    };
+}
+
+function buildDeleteProjectPayload(
+    projectId: string,
+    updateSeq: number,
+    updateId: string,
+): UpdatePayload {
+    return {
+        id: updateId,
+        seq: updateSeq,
+        body: { t: "delete-project", projectId },
+        createdAt: Date.now(),
+    };
 }

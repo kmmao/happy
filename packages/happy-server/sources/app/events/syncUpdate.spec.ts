@@ -40,102 +40,12 @@ const {
     };
 });
 
+// After PR 1.f the 15 wire payload constructors live in syncUpdate.ts as
+// private helpers, so eventRouter no longer exports them. We only stub
+// eventRouter.emitUpdate (the transport sink) — the real builders run end-to-
+// end, which means these tests also exercise the wire shape unintrusively.
 vi.mock("@/app/events/eventRouter", () => ({
     eventRouter: { emitUpdate: emitUpdateMock },
-    // The 15 build*Update functions are real (not mocked) — we assert that the
-    // payload that reaches eventRouter.emitUpdate carries the right body.t,
-    // seq, and id, which exercises the builders end-to-end without coupling
-    // the spec to their inline output shape.
-    buildUpdateAccountUpdate: (userId: string, profile: any, seq: number, id: string) => ({
-        id,
-        seq,
-        body: { t: "update-account", id: userId, ...profile },
-        createdAt: 0,
-    }),
-    buildUpdateSessionUpdate: (sid: string, seq: number, id: string, metadata?: any, agentState?: any, preferences?: any) => ({
-        id,
-        seq,
-        body: { t: "update-session", id: sid, metadata, agentState, preferences },
-        createdAt: 0,
-    }),
-    buildUpdateMachineUpdate: (mid: string, seq: number, id: string, metadata?: any, daemonState?: any) => ({
-        id,
-        seq,
-        body: { t: "update-machine", machineId: mid, metadata, daemonState },
-        createdAt: 0,
-    }),
-    buildNewSessionUpdate: (_session: unknown, seq: number, id: string) => ({
-        id,
-        seq,
-        body: { t: "new-session" },
-        createdAt: 0,
-    }),
-    buildNewMessageUpdate: (_msg: unknown, sid: string, seq: number, id: string) => ({
-        id,
-        seq,
-        body: { t: "new-message", sid },
-        createdAt: 0,
-    }),
-    buildNewMachineUpdate: (_m: unknown, seq: number, id: string) => ({
-        id,
-        seq,
-        body: { t: "new-machine" },
-        createdAt: 0,
-    }),
-    buildDeleteSessionUpdate: (sid: string, seq: number, id: string) => ({
-        id,
-        seq,
-        body: { t: "delete-session", sid },
-        createdAt: 0,
-    }),
-    buildNewFeedPostUpdate: (_p: unknown, seq: number, id: string) => ({
-        id,
-        seq,
-        body: { t: "new-feed-post" },
-        createdAt: 0,
-    }),
-    buildKVBatchUpdateUpdate: (changes: unknown, seq: number, id: string) => ({
-        id,
-        seq,
-        body: { t: "kv-batch-update", changes },
-        createdAt: 0,
-    }),
-    buildNewArtifactUpdate: (_a: unknown, seq: number, id: string) => ({
-        id,
-        seq,
-        body: { t: "new-artifact" },
-        createdAt: 0,
-    }),
-    buildUpdateArtifactUpdate: (aid: string, seq: number, id: string, header?: any, body?: any) => ({
-        id,
-        seq,
-        body: { t: "update-artifact", artifactId: aid, header, body },
-        createdAt: 0,
-    }),
-    buildDeleteArtifactUpdate: (aid: string, seq: number, id: string) => ({
-        id,
-        seq,
-        body: { t: "delete-artifact", artifactId: aid },
-        createdAt: 0,
-    }),
-    buildNewProjectUpdate: (_p: unknown, seq: number, id: string) => ({
-        id,
-        seq,
-        body: { t: "new-project" },
-        createdAt: 0,
-    }),
-    buildUpdateProjectUpdate: (pid: string, seq: number, id: string, metadata?: any, archived?: boolean) => ({
-        id,
-        seq,
-        body: { t: "update-project", projectId: pid, metadata, archived },
-        createdAt: 0,
-    }),
-    buildDeleteProjectUpdate: (pid: string, seq: number, id: string) => ({
-        id,
-        seq,
-        body: { t: "delete-project", projectId: pid },
-        createdAt: 0,
-    }),
 }));
 
 vi.mock("@/storage/inTx", () => ({
@@ -150,11 +60,96 @@ vi.mock("@/utils/randomKeyNaked", () => ({
     randomKeyNaked: randomKeyNakedMock,
 }));
 
+vi.mock("@/storage/files", () => ({
+    // Only exercised when SyncUpdateBody.update-account carries an avatar; none
+    // of these tests do.
+    getPublicUrl: vi.fn((path: string) => `https://cdn.test/${path}`),
+}));
+
 vi.mock("@/types", () => ({}));
 
 import { emitSyncUpdate, type SyncUpdateBody } from "./syncUpdate";
 
 const A = "account-1";
+
+// === Minimal Row factories — only the fields the real builders touch =====
+
+const nowDate = new Date(0); // deterministic; the builders only read getTime()
+
+function makeSessionRow(overrides: Partial<{ id: string; seq: number }> = {}) {
+    return {
+        id: overrides.id ?? "session-row",
+        seq: overrides.seq ?? 0,
+        metadata: "",
+        metadataVersion: 0,
+        agentState: null,
+        agentStateVersion: 0,
+        dataEncryptionKey: null,
+        active: true,
+        lastActiveAt: nowDate,
+        createdAt: nowDate,
+        updatedAt: nowDate,
+    };
+}
+
+function makeMachineRow(overrides: Partial<{ id: string; seq: number }> = {}) {
+    return {
+        id: overrides.id ?? "machine-row",
+        seq: overrides.seq ?? 0,
+        metadata: "",
+        metadataVersion: 0,
+        daemonState: null,
+        daemonStateVersion: 0,
+        dataEncryptionKey: null,
+        active: true,
+        lastActiveAt: nowDate,
+        createdAt: nowDate,
+        updatedAt: nowDate,
+    };
+}
+
+function makeArtifactRow() {
+    return {
+        id: "artifact-row",
+        seq: 0,
+        header: new Uint8Array(0),
+        headerVersion: 0,
+        body: new Uint8Array(0),
+        bodyVersion: 0,
+        dataEncryptionKey: new Uint8Array(0),
+        createdAt: nowDate,
+        updatedAt: nowDate,
+    };
+}
+
+function makeProjectRow() {
+    return {
+        id: "project-row",
+        machineId: "m-row",
+        path: "/p",
+        repoUrl: null,
+        metadata: null,
+        metadataVersion: 0,
+        archived: false,
+        createdAt: nowDate,
+        updatedAt: nowDate,
+    };
+}
+
+function makeFeedPostRow() {
+    return { id: "post-row", body: {}, cursor: "c", createdAt: 0 };
+}
+
+function makeMessageRow() {
+    return {
+        id: "msg-row",
+        seq: 0,
+        content: { t: "encrypted" as const, c: "x" },
+        localId: null,
+        createdAt: nowDate,
+        updatedAt: nowDate,
+    };
+}
 
 beforeEach(() => {
     resetState();
@@ -176,15 +171,15 @@ describe("emitSyncUpdate — invariants per body.t", () => {
     // `update-machine` derive the session/machine variants verified separately.
     const userScopedCases: RecipientCase[] = [
         { name: "update-account", body: { t: "update-account", profile: { username: "alice" } }, expected: { type: "user-scoped-only" } },
-        { name: "new-session", body: { t: "new-session", session: {} as any }, expected: { type: "user-scoped-only" } },
+        { name: "new-session", body: { t: "new-session", session: makeSessionRow() }, expected: { type: "user-scoped-only" } },
         { name: "delete-session", body: { t: "delete-session", sessionId: "s1" }, expected: { type: "user-scoped-only" } },
-        { name: "new-machine", body: { t: "new-machine", machine: {} as any }, expected: { type: "user-scoped-only" } },
-        { name: "new-feed-post", body: { t: "new-feed-post", post: {} as any }, expected: { type: "user-scoped-only" } },
+        { name: "new-machine", body: { t: "new-machine", machine: makeMachineRow() }, expected: { type: "user-scoped-only" } },
+        { name: "new-feed-post", body: { t: "new-feed-post", post: makeFeedPostRow() }, expected: { type: "user-scoped-only" } },
         { name: "kv-batch-update", body: { t: "kv-batch-update", changes: [] }, expected: { type: "user-scoped-only" } },
-        { name: "new-artifact", body: { t: "new-artifact", artifact: {} as any }, expected: { type: "user-scoped-only" } },
+        { name: "new-artifact", body: { t: "new-artifact", artifact: makeArtifactRow() }, expected: { type: "user-scoped-only" } },
         { name: "update-artifact", body: { t: "update-artifact", artifactId: "a1" }, expected: { type: "user-scoped-only" } },
         { name: "delete-artifact", body: { t: "delete-artifact", artifactId: "a1" }, expected: { type: "user-scoped-only" } },
-        { name: "new-project", body: { t: "new-project", project: {} as any }, expected: { type: "user-scoped-only" } },
+        { name: "new-project", body: { t: "new-project", project: makeProjectRow() }, expected: { type: "user-scoped-only" } },
         { name: "update-project", body: { t: "update-project", projectId: "p1" }, expected: { type: "user-scoped-only" } },
         { name: "delete-project", body: { t: "delete-project", projectId: "p1" }, expected: { type: "user-scoped-only" } },
     ];
@@ -209,7 +204,7 @@ describe("emitSyncUpdate — invariants per body.t", () => {
         await emitSyncUpdate(A, {
             t: "new-message",
             sessionId: "s8",
-            message: {} as any,
+            message: makeMessageRow(),
         });
         expect(emitUpdateMock.mock.calls[0][0].recipientFilter).toEqual({
             type: "all-interested-in-session",
@@ -306,7 +301,7 @@ describe("emitSyncUpdate — skipSenderConnection forwarding", () => {
         const conn = { connectionType: "user-scoped" } as any;
         await emitSyncUpdate(
             A,
-            { t: "new-message", sessionId: "s1", message: {} as any },
+            { t: "new-message", sessionId: "s1", message: makeMessageRow() },
             { skipSenderConnection: conn },
         );
         expect(emitUpdateMock.mock.calls[0][0].skipSenderConnection).toBe(conn);
@@ -315,5 +310,81 @@ describe("emitSyncUpdate — skipSenderConnection forwarding", () => {
     it("omits skipSenderConnection when not given", async () => {
         await emitSyncUpdate(A, { t: "kv-batch-update", changes: [] });
         expect(emitUpdateMock.mock.calls[0][0].skipSenderConnection).toBeUndefined();
+    });
+});
+
+describe("emitSyncUpdate — wire payload shape (end-to-end through real builders)", () => {
+    // These spot-check the real wire shape that the syncUpdate.ts private
+    // builders produce. They complement the per-body-type filter tests above:
+    // those tests assert what reaches eventRouter; these assert the body
+    // structure is correct so clients can deserialise.
+
+    it("update-session puts metadata/agentState/preferences slots in body", async () => {
+        await emitSyncUpdate(A, {
+            t: "update-session",
+            sessionId: "s1",
+            metadata: { value: "m", version: 2 },
+            preferences: { value: "p", version: 3 },
+        });
+        const body = emitUpdateMock.mock.calls[0][0].payload.body;
+        expect(body.t).toBe("update-session");
+        expect(body.id).toBe("s1");
+        expect(body.metadata).toEqual({ value: "m", version: 2 });
+        expect(body.preferences).toEqual({ value: "p", version: 3 });
+        expect(body.agentState).toBeUndefined();
+    });
+
+    it("update-machine puts machineId + versioned fields in body", async () => {
+        await emitSyncUpdate(A, {
+            t: "update-machine",
+            machineId: "m9",
+            daemonState: { value: "d", version: 7 },
+        });
+        const body = emitUpdateMock.mock.calls[0][0].payload.body;
+        expect(body.t).toBe("update-machine");
+        expect(body.machineId).toBe("m9");
+        expect(body.daemonState).toEqual({ value: "d", version: 7 });
+    });
+
+    it("delete-session uses 'sid' (not 'id') for the session id in body", async () => {
+        // Wire-shape quirk worth pinning: delete-session uses `sid`, while
+        // update-session uses `id`. Both refer to the Session being changed.
+        await emitSyncUpdate(A, { t: "delete-session", sessionId: "s7" });
+        const body = emitUpdateMock.mock.calls[0][0].payload.body;
+        expect(body.t).toBe("delete-session");
+        expect(body.sid).toBe("s7");
+    });
+
+    it("new-message wraps the message and uses 'sid' for sessionId", async () => {
+        await emitSyncUpdate(A, {
+            t: "new-message",
+            sessionId: "s2",
+            message: makeMessageRow(),
+        });
+        const body = emitUpdateMock.mock.calls[0][0].payload.body;
+        expect(body.t).toBe("new-message");
+        expect(body.sid).toBe("s2");
+        expect(body.message.id).toBe("msg-row");
+        expect(typeof body.message.createdAt).toBe("number");
+    });
+
+    it("kv-batch-update preserves the changes array verbatim", async () => {
+        const changes = [
+            { key: "k1", value: "v1", version: 1 },
+            { key: "k2", value: null, version: -1 },
+        ];
+        await emitSyncUpdate(A, { t: "kv-batch-update", changes });
+        const body = emitUpdateMock.mock.calls[0][0].payload.body;
+        expect(body.t).toBe("kv-batch-update");
+        expect(body.changes).toEqual(changes);
+    });
+
+    it("new-project flattens project row into body fields", async () => {
+        await emitSyncUpdate(A, { t: "new-project", project: makeProjectRow() });
+        const body = emitUpdateMock.mock.calls[0][0].payload.body;
+        expect(body.t).toBe("new-project");
+        expect(body.projectId).toBe("project-row");
+        expect(body.machineId).toBe("m-row");
+        expect(body.archived).toBe(false);
     });
 });
