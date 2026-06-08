@@ -9,11 +9,11 @@ import {
   type SessionEnvelope,
   type SessionEvent,
 } from "@kmmao/happy-wire";
+import { type ProtocolIntent } from "@/session-protocol/turnReducer";
 import {
-  reduce,
-  type ProtocolIntent,
-  type ProtocolState,
-} from "@/session-protocol/turnReducer";
+  applyToProvider,
+  type ProviderAdapter,
+} from "@/session-protocol/providerAdapter";
 
 export type CodexTurnState = {
   currentTurnId: string | null;
@@ -55,6 +55,30 @@ function getStartedSubagents(state: CodexTurnState): Set<string> {
 function getActiveSubagents(state: CodexTurnState): Set<string> {
   return state.activeSubagents ?? new Set<string>();
 }
+
+/**
+ * Codex's ProviderAdapter (CONTEXT.md: Provider, ProviderAdapter; ADR-0025).
+ * The three reducer fields are mirrored on CodexTurnState; lift returns the
+ * reducer view, write rebuilds CodexTurnState preserving the Codex-only
+ * `providerSubagentToSessionSubagent` map by reference.
+ */
+export const CODEX_ADAPTER: ProviderAdapter<CodexTurnState> = {
+  liftProtocol(state) {
+    return {
+      currentTurnId: state.currentTurnId,
+      startedSubagents: getStartedSubagents(state),
+      activeSubagents: getActiveSubagents(state),
+    };
+  },
+  writeProtocol(state, next) {
+    return {
+      ...state,
+      currentTurnId: next.currentTurnId,
+      startedSubagents: new Set(next.startedSubagents),
+      activeSubagents: new Set(next.activeSubagents),
+    };
+  },
+};
 
 function getProviderSubagentToSessionSubagent(
   state: CodexTurnState,
@@ -366,26 +390,23 @@ export function mapCodexMcpMessageToSessionEnvelopes(
   const providerSubagentToSessionSubagent =
     getProviderSubagentToSessionSubagent(state);
 
-  // Lifecycle bridge: currentTurnId + started/activeSubagents ARE the reducer's
-  // ProtocolState (see CONTEXT.md: Turn, Subagent). We thread a snapshot through
-  // reduce; Codex-specific subagent resolution (providerSubagentToSessionSubagent)
-  // stays here. Codex opens Turns explicitly on `task_started` (turnBegin) — the
-  // reducer's lazy-open never triggers because content always has an open Turn.
-  let protocol: ProtocolState = {
-    currentTurnId: state.currentTurnId,
-    startedSubagents: getStartedSubagents(state),
-    activeSubagents: getActiveSubagents(state),
-  };
+  // Lifecycle bridge (CONTEXT.md: Provider, Turn, Subagent; ADR-0025).
+  // CODEX_ADAPTER lifts the reducer's view of CodexTurnState; the helper
+  // does reduce + write-back; Codex-specific subagent resolution
+  // (providerSubagentToSessionSubagent) stays in this file. Codex opens Turns
+  // explicitly on `task_started` (turnBegin) — the reducer's lazy-open never
+  // triggers because content always has an open Turn.
+  let codexState: CodexTurnState = state;
   const lifecycleEnvelopes: SessionEnvelope[] = [];
   const apply = (intent: ProtocolIntent): void => {
-    const r = reduce(protocol, intent);
-    protocol = r.state;
+    const r = applyToProvider(CODEX_ADAPTER, codexState, intent);
+    codexState = r.state;
     lifecycleEnvelopes.push(...r.envelopes);
   };
   const result = (): CodexMapperResult => ({
-    currentTurnId: protocol.currentTurnId,
-    startedSubagents: new Set(protocol.startedSubagents),
-    activeSubagents: new Set(protocol.activeSubagents),
+    currentTurnId: codexState.currentTurnId,
+    startedSubagents: getStartedSubagents(codexState),
+    activeSubagents: getActiveSubagents(codexState),
     providerSubagentToSessionSubagent,
     envelopes: lifecycleEnvelopes,
   });
@@ -393,7 +414,8 @@ export function mapCodexMcpMessageToSessionEnvelopes(
   if (type === "task_started") {
     providerSubagentToSessionSubagent.clear();
     // Fresh Turn: drop any stale subagent tracking, then open a new Turn.
-    protocol = {
+    codexState = {
+      ...codexState,
       currentTurnId: null,
       startedSubagents: new Set(),
       activeSubagents: new Set(),
@@ -403,7 +425,7 @@ export function mapCodexMcpMessageToSessionEnvelopes(
   }
 
   if (type === "task_complete" || type === "turn_aborted") {
-    if (!protocol.currentTurnId) {
+    if (!codexState.currentTurnId) {
       return result();
     }
     providerSubagentToSessionSubagent.clear();

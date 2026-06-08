@@ -6,7 +6,11 @@ import {
   type SessionEvent,
   type SessionTurnEndStatus,
 } from "@kmmao/happy-wire";
-import { reduce, type ProtocolIntent } from "@/session-protocol/turnReducer";
+import { type ProtocolIntent } from "@/session-protocol/turnReducer";
+import {
+  applyToProvider,
+  type ProviderAdapter,
+} from "@/session-protocol/providerAdapter";
 
 export type ClaudeSessionProtocolState = {
   currentTurnId: string | null;
@@ -429,30 +433,51 @@ function clearResolutionMaps(state: ClaudeSessionProtocolState): void {
   getHiddenParentToolCalls(state).clear();
 }
 
-// Bridge to the shared Turn lifecycle reducer (see CONTEXT.md: Turn, Subagent).
-// The three lifecycle fields on ClaudeSessionProtocolState — currentTurnId,
-// startedSubagents, activeSubagents — ARE the reducer's ProtocolState, so we
-// lift them in, reduce, and write them back. This keeps the external state
-// shape (and apiSession's `.currentTurnId` reads) untouched while turn opening,
-// subagent start/stop dedup, and ordering live in one place instead of being
-// hand-rolled here. Claude-specific subagent *resolution* stays below.
+/**
+ * Claude's ProviderAdapter (CONTEXT.md: Provider, ProviderAdapter; ADR-0025).
+ * The three reducer fields are mirrored on ClaudeSessionProtocolState; the
+ * Claude-only resolution maps (uuid/taskPrompt/buffered/…) are preserved by
+ * reference through `writeProtocol`. Callers continue to use the imperative
+ * `applyIntent` boundary below to keep the existing `runMapper` call sites
+ * unchanged; the seam itself is now uniform with Codex and ACP.
+ */
+export const CLAUDE_ADAPTER: ProviderAdapter<ClaudeSessionProtocolState> = {
+  liftProtocol(state) {
+    return {
+      currentTurnId: state.currentTurnId,
+      startedSubagents: getStartedSubagents(state),
+      activeSubagents: getActiveSubagents(state),
+    };
+  },
+  writeProtocol(state, next) {
+    return {
+      ...state,
+      currentTurnId: next.currentTurnId,
+      startedSubagents: new Set(next.startedSubagents),
+      activeSubagents: new Set(next.activeSubagents),
+    };
+  },
+};
+
+// Bridge to the shared Turn lifecycle reducer via the ProviderAdapter helper
+// (ADR-0025). The external imperative signature is preserved so existing
+// callers in `runMapper` keep their current shape; an open subordinate
+// question in ADR-0025 covers a future return-thread cleanup that would
+// remove the `envelopes` side-channel.
 function applyIntent(
   state: ClaudeSessionProtocolState,
   intent: ProtocolIntent,
   envelopes: SessionEnvelope[],
 ): void {
-  const { state: next, envelopes: emitted } = reduce(
-    {
-      currentTurnId: state.currentTurnId,
-      startedSubagents: getStartedSubagents(state),
-      activeSubagents: getActiveSubagents(state),
-    },
-    intent,
-  );
-  state.currentTurnId = next.currentTurnId;
-  state.startedSubagents = new Set(next.startedSubagents);
-  state.activeSubagents = new Set(next.activeSubagents);
-  envelopes.push(...emitted);
+  const result = applyToProvider(CLAUDE_ADAPTER, state, intent);
+  // Mutate caller's state to keep the existing API stable. The Claude-only
+  // map fields on result.state are shared by reference with the caller's
+  // state (writeProtocol uses `{ ...state, …}`), so only the three reducer
+  // fields differ.
+  state.currentTurnId = result.state.currentTurnId;
+  state.startedSubagents = result.state.startedSubagents;
+  state.activeSubagents = result.state.activeSubagents;
+  envelopes.push(...result.envelopes);
 }
 
 // Emit one agent content event, lazily opening the Turn — and the Subagent's

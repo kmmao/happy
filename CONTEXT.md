@@ -93,12 +93,16 @@ A typed, fire-and-forget server→client broadcast that signals a transient stat
 _Avoid_: Notification (too generic), broadcast (too generic), Ephemeral on its own (it is a SyncEphemeral; "ephemeral" as an adjective is fine)
 
 **Turn**:
-One agent request→response cycle within a Session, bracketed by a `turn-start`/`turn-end` SessionEvent pair and carrying the ordered SessionEvents (text, tool calls, Subagent activity) produced in between. A Session is a sequence of Turns. The CLI assembles Turns from the underlying provider's stream (Claude JSONL, Codex, ACP) through a single Turn lifecycle reducer rather than per-provider hand-rolled state.
+One agent request→response cycle within a Session, bracketed by a `turn-start`/`turn-end` SessionEvent pair and carrying the ordered SessionEvents (text, tool calls, Subagent activity) produced in between. A Session is a sequence of Turns. The CLI assembles Turns from each **Provider**'s stream through a single Turn lifecycle reducer (`session-protocol/turnReducer.ts`); every Provider integrates via a **ProviderAdapter** rather than hand-rolling Turn or Subagent lifecycle (ADR-0025).
 _Avoid_: Round, exchange, cycle (and do not confuse with the domain Task)
 
 **Subagent**:
 A nested agent spawned within a Turn (e.g. via Claude Code's Agent/Task tool or a local workflow), identified by a cuid2 carried on SessionEnvelopes. Its activity is bracketed by subagent start/stop SessionEvents scoped to the parent Turn; multiple Subagents can be active concurrently within one Turn, and any still active when the Turn ends are stopped with it.
 _Avoid_: Child session, worker (and do not confuse with the domain Task, a server-dispatched automated work unit)
+
+**Provider**:
+A backend that produces the raw stream the CLI converts into SessionEnvelopes — today **Claude** (JSONL on disk), **Codex** (app-server stream), and **ACP** (interactive protocol). Each Provider has its own wire format and its own Subagent-identification rules; the **Turn lifecycle** (turn-start ordering, exactly-once Subagent start, auto-stop on turn-end) is identical across all three and lives in `session-protocol/turnReducer.ts`. Per ADR-0025, every Provider is integrated into that reducer through a **ProviderAdapter**: a type contract (`liftProtocol`/`writeProtocol`) that lifts the reducer's `ProtocolState` out of the Provider's larger per-stream state, calls `reduce`, and writes the result back. New Providers add an Adapter + signal-extraction code; they do not re-implement Turn or Subagent lifecycle.
+_Avoid_: AI provider (collides with AiBackendProfile, which names the *model/profile* not the *stream format*), backend, adapter on its own
 
 **Artifact**:
 A generic encrypted data container (header + body) with its own encryption key. Used for Supervisor reports, research documents, and user-created content. Not related to Claude.ai's "Artifact" concept.
@@ -125,6 +129,7 @@ _Avoid_: Profile, backend, config
 - A **Session** contains ordered **SessionMessages** and **SessionEvents**
 - Every server-side mutation of a domain entity emits a **SyncUpdate**; its `body.t` determines which Account-owned connections receive it
 - Every server-side transient-state signal emits a **SyncEphemeral**; its discriminator likewise determines the recipient set, but no client-side reconciliation applies
+- A **Session** is a sequence of **Turns**; each **Turn** is assembled from one **Provider**'s stream via that Provider's **ProviderAdapter** + the shared Turn lifecycle reducer
 - A **Session** is a sequence of **Turns**; a **Turn** contains ordered **SessionEvents** and zero or more concurrent **Subagents**, all bracketed by its turn-start/turn-end pair
 - A **Project** lives on exactly one **Machine** at a specific path
 - A **Project** contains **Knowledge**, **Skills**, **Triggers**, **AgentLoops**, and **SupervisorRuns**

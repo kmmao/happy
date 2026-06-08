@@ -3,8 +3,18 @@ import {
   createEnvelope,
   type CreateEnvelopeOptions,
   type SessionEnvelope,
+  type SessionEvent,
 } from "@kmmao/happy-wire";
 import type { AgentMessage } from "@/agent/core";
+import {
+  initialProtocolState,
+  type ProtocolClock,
+  type ProtocolState,
+} from "@/session-protocol/turnReducer";
+import {
+  applyToProvider,
+  type ProviderAdapter,
+} from "@/session-protocol/providerAdapter";
 
 function turnOptions(
   turnId: string | null,
@@ -49,12 +59,39 @@ function parseThinkingPayload(payload: unknown): {
   return { text, streaming };
 }
 
+/**
+ * ACP's ProviderAdapter (CONTEXT.md: Provider, ProviderAdapter; ADR-0025).
+ * ACP's reducer view is just `ProtocolState` itself — no extra Provider-only
+ * fields ride on top of the lifecycle state. The Provider's signal-extraction
+ * state (`acpCallToSessionCall`, `pendingText`, `pendingType`, `lastTime`)
+ * lives on the class instance, NOT in the adapter's state argument.
+ */
+export const ACP_ADAPTER: ProviderAdapter<ProtocolState> = {
+  liftProtocol(state) {
+    return state;
+  },
+  writeProtocol(_state, next) {
+    return next;
+  },
+};
+
 export class AcpSessionManager {
-  private currentTurnId: string | null = null;
+  /** Reducer view (CONTEXT.md: Turn, Subagent). Replaces the standalone
+   *  `currentTurnId` field used before ADR-0025 — startedSubagents and
+   *  activeSubagents are tracked too even though ACP has no Subagent concept
+   *  today, so the reducer's auto-stop guarantee is in place ahead of time. */
+  private protocol: ProtocolState = initialProtocolState();
   private readonly acpCallToSessionCall = new Map<string, string>();
 
-  /** Monotonic clock: max(lastTime + 1, Date.now()) */
+  /** Monotonic clock: max(lastTime + 1, Date.now()). Injected into the
+   *  reducer as a ProtocolClock so ACP envelopes keep the same time semantic
+   *  they had before ADR-0025 (Claude and Codex continue to use the default
+   *  realClock — see ADR-0025 decision D3). */
   private lastTime = 0;
+  private readonly clock: ProtocolClock = {
+    now: () => this.nextTime(),
+    newId: () => createId(),
+  };
 
   /** Pending text waiting to be flushed when the stream type changes */
   private pendingText = "";
@@ -76,6 +113,22 @@ export class AcpSessionManager {
     return created;
   }
 
+  /** Run one content intent through the reducer. Pre-bound `openTurn: false`
+   *  because ACP has explicit Turn boundaries (startTurn / endTurn) — content
+   *  outside a Turn stays Turn-less rather than forcing one open, which
+   *  matches the test "flushes pending text on endTurn() even without
+   *  active turn". */
+  private emitContent(ev: SessionEvent): SessionEnvelope[] {
+    const result = applyToProvider(
+      ACP_ADAPTER,
+      this.protocol,
+      { kind: "content", ev, openTurn: false },
+      this.clock,
+    );
+    this.protocol = result.state;
+    return result.envelopes;
+  }
+
   private flush(): SessionEnvelope[] {
     if (!this.pendingText || !this.pendingType) {
       return [];
@@ -88,57 +141,57 @@ export class AcpSessionManager {
     if (!text) {
       return [];
     }
-    if (type === "thinking") {
-      return [
-        createEnvelope(
-          "agent",
-          { t: "text", text, thinking: true },
-          turnOptions(this.currentTurnId, this.nextTime()),
-        ),
-      ];
-    }
-    return [
-      createEnvelope(
-        "agent",
-        { t: "text", text },
-        turnOptions(this.currentTurnId, this.nextTime()),
-      ),
-    ];
+    return this.emitContent(
+      type === "thinking" ? { t: "text", text, thinking: true } : { t: "text", text },
+    );
+  }
+
+  /** Tool-call envelopes (start/end) reuse the class's monotonic clock via
+   *  `turnOptions` rather than routing through the reducer — they are not
+   *  Turn or Subagent boundary events, so the reducer would add no value
+   *  beyond stamping the current `turn`, which `turnOptions` already does.
+   *  Keeping them direct avoids a second `applyToProvider` round-trip per
+   *  tool call. */
+  private buildToolEnvelope(ev: SessionEvent): SessionEnvelope {
+    return createEnvelope(
+      "agent",
+      ev,
+      turnOptions(this.protocol.currentTurnId, this.nextTime()),
+    );
   }
 
   startTurn(): SessionEnvelope[] {
-    if (this.currentTurnId) {
-      return [];
+    const before = this.protocol.currentTurnId;
+    const result = applyToProvider(
+      ACP_ADAPTER,
+      this.protocol,
+      { kind: "turnBegin" },
+      this.clock,
+    );
+    this.protocol = result.state;
+    // turnBegin is idempotent at the reducer level; reset the ACP-specific
+    // tool-call routing only when we actually opened a new Turn.
+    if (before === null && this.protocol.currentTurnId !== null) {
+      this.acpCallToSessionCall.clear();
     }
-
-    this.currentTurnId = createId();
-    this.acpCallToSessionCall.clear();
-    return [
-      createEnvelope(
-        "agent",
-        { t: "turn-start" },
-        { turn: this.currentTurnId, time: this.nextTime() },
-      ),
-    ];
+    return result.envelopes;
   }
 
   endTurn(status: "completed" | "failed" | "cancelled"): SessionEnvelope[] {
     const flushed = this.flush();
-    if (!this.currentTurnId) {
+    if (!this.protocol.currentTurnId) {
       return flushed;
     }
 
-    const turnId = this.currentTurnId;
-    this.currentTurnId = null;
+    const result = applyToProvider(
+      ACP_ADAPTER,
+      this.protocol,
+      { kind: "turnEnd", status },
+      this.clock,
+    );
+    this.protocol = result.state;
     this.acpCallToSessionCall.clear();
-    return [
-      ...flushed,
-      createEnvelope(
-        "agent",
-        { t: "turn-end", status },
-        { turn: turnId, time: this.nextTime() },
-      ),
-    ];
+    return [...flushed, ...result.envelopes];
   }
 
   mapMessage(msg: AgentMessage): SessionEnvelope[] {
@@ -163,11 +216,7 @@ export class AcpSessionManager {
       }
       return [
         ...this.flush(),
-        createEnvelope(
-          "agent",
-          { t: "text", text: trimmed, thinking: true },
-          turnOptions(this.currentTurnId, this.nextTime()),
-        ),
+        ...this.emitContent({ t: "text", text: trimmed, thinking: true }),
       ];
     }
 
@@ -192,18 +241,14 @@ export class AcpSessionManager {
       const call = this.ensureSessionCallId(msg.callId);
       return [
         ...flushed,
-        createEnvelope(
-          "agent",
-          {
-            t: "tool-call-start",
-            call,
-            name: msg.toolName,
-            title: buildToolTitle(msg.toolName),
-            description: buildToolDescription(msg.toolName),
-            args: msg.args,
-          },
-          turnOptions(this.currentTurnId, this.nextTime()),
-        ),
+        this.buildToolEnvelope({
+          t: "tool-call-start",
+          call,
+          name: msg.toolName,
+          title: buildToolTitle(msg.toolName),
+          description: buildToolDescription(msg.toolName),
+          args: msg.args,
+        }),
       ];
     }
 
@@ -212,11 +257,7 @@ export class AcpSessionManager {
       const call = this.ensureSessionCallId(msg.callId);
       return [
         ...flushed,
-        createEnvelope(
-          "agent",
-          { t: "tool-call-end", call },
-          turnOptions(this.currentTurnId, this.nextTime()),
-        ),
+        this.buildToolEnvelope({ t: "tool-call-end", call }),
       ];
     }
 
@@ -231,23 +272,15 @@ export class AcpSessionManager {
 
       return [
         ...flushed,
-        createEnvelope(
-          "agent",
-          {
-            t: "tool-call-start",
-            call,
-            name: "file-edit",
-            title: "file-edit",
-            description: buildFsEditDescription(msg),
-            args,
-          },
-          turnOptions(this.currentTurnId, this.nextTime()),
-        ),
-        createEnvelope(
-          "agent",
-          { t: "tool-call-end", call },
-          turnOptions(this.currentTurnId, this.nextTime()),
-        ),
+        this.buildToolEnvelope({
+          t: "tool-call-start",
+          call,
+          name: "file-edit",
+          title: "file-edit",
+          description: buildFsEditDescription(msg),
+          args,
+        }),
+        this.buildToolEnvelope({ t: "tool-call-end", call }),
       ];
     }
 
