@@ -120,7 +120,7 @@ class AutoOptionSendService {
             text: string,
             displayText?: string,
             options?: { source?: "auto-option-send" },
-        ) => Promise<void>)
+        ) => Promise<boolean | void>)
         | null = null;
 
     /** Unique ID for this tab/instance, used for cross-tab dedup. */
@@ -169,7 +169,7 @@ class AutoOptionSendService {
             text: string,
             displayText?: string,
             options?: { source?: "auto-option-send" },
-        ) => Promise<void>,
+        ) => Promise<boolean | void>,
     ): void {
         this.sendMessageFn = sendMessage;
         const sessions =

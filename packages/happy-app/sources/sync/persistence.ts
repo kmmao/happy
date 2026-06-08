@@ -202,6 +202,36 @@ export function savePendingQueues(queues: Record<string, PendingQueueItem[]>) {
   }
 }
 
+/**
+ * Per-session "queue paused" flag. When true, the auto-dispatch effect in
+ * SessionView won't pop the next message off the queue when the AI becomes
+ * idle — the user has to explicitly send via the chip ▶ button or the header
+ * "Send now" pill. Persisted so the choice survives reloads.
+ */
+export function loadPendingQueuePaused(): Record<string, boolean> {
+  const raw = mmkv.getString("session-pending-queue-paused");
+  if (raw) {
+    try {
+      return JSON.parse(raw);
+    } catch (e) {
+      log.error("Failed to parse pending queue paused", e);
+      return {};
+    }
+  }
+  return {};
+}
+
+export function savePendingQueuePaused(paused: Record<string, boolean>) {
+  const filtered = Object.fromEntries(
+    Object.entries(paused).filter(([, v]) => v),
+  );
+  if (Object.keys(filtered).length === 0) {
+    mmkv.delete("session-pending-queue-paused");
+  } else {
+    mmkv.set("session-pending-queue-paused", JSON.stringify(filtered));
+  }
+}
+
 export function loadNewSessionDraft(): NewSessionDraft | null {
   const raw = mmkv.getString(NEW_SESSION_DRAFT_KEY);
   if (!raw) {

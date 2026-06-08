@@ -46,6 +46,8 @@ import {
   deleteSessionBookmarks,
   loadPendingQueues,
   savePendingQueues,
+  loadPendingQueuePaused,
+  savePendingQueuePaused,
 } from "./persistence";
 import type { PermissionModeKey } from "@/components/PermissionModeSelector";
 import type { CustomerInfo } from "./revenueCat/types";
@@ -158,13 +160,30 @@ interface StorageState {
    */
   sessionTerminalTitles: Record<string, string | null>;
   setTerminalTitle: (sessionId: string, title: string | null) => void;
-  // Pending message queue per session (in-memory only, survives tab switches)
+  // Pending message queue per session (persisted via mmkv, survives reloads)
   sessionPendingQueues: Record<string, Array<{ localId: string; message: string; displayText?: string }>>;
   appendToPendingQueue: (sessionId: string, item: { localId: string; message: string; displayText?: string }) => void;
   shiftPendingQueue: (sessionId: string) => { localId: string; message: string; displayText?: string } | undefined;
   removePendingQueueItem: (sessionId: string, localId: string) => void;
   reorderPendingQueueItemToFront: (sessionId: string, localId: string) => void;
+  /**
+   * Replace the message/displayText of a single queued item, keeping its
+   * localId and position. Returns true if the item was found and updated,
+   * false if it was already shifted out (race with auto-dispatch).
+   */
+  updatePendingQueueItem: (
+    sessionId: string,
+    localId: string,
+    patch: { message: string; displayText?: string },
+  ) => boolean;
   clearPendingQueue: (sessionId: string) => void;
+  /**
+   * Per-session "auto-dispatch paused" flag. When true, the SessionView
+   * effect won't pop the next queued message when the AI becomes idle —
+   * the user has to explicitly send via the chip ▶ or the header "Send now".
+   */
+  sessionPendingQueuePaused: Record<string, boolean>;
+  setPendingQueuePaused: (sessionId: string, paused: boolean) => void;
   machines: Record<string, Machine>;
   artifacts: Record<string, DecryptedArtifact>; // New artifacts storage
   friends: Record<string, UserProfile>; // All relationships (friends, pending, requested, etc.)
@@ -514,6 +533,7 @@ export const storage = create<StorageState>()((set, get) => {
   let pendingSessionPreferences = loadPendingSessionPreferences();
   let sessionLastViewed = loadSessionLastViewed();
   const savedPendingQueues = loadPendingQueues();
+  const savedPendingQueuePaused = loadPendingQueuePaused();
 
   const stagePendingSessionPreferences = (sessionId: string) => {
     const session = get().sessions[sessionId];
@@ -641,12 +661,55 @@ export const storage = create<StorageState>()((set, get) => {
       });
       savePendingQueues(get().sessionPendingQueues);
     },
+    updatePendingQueueItem: (sessionId, localId, patch) => {
+      let found = false;
+      set((prev) => {
+        const queue = prev.sessionPendingQueues[sessionId];
+        if (!queue) return prev;
+        const idx = queue.findIndex((m) => m.localId === localId);
+        if (idx === -1) return prev;
+        found = true;
+        const next = queue.slice();
+        next[idx] = {
+          localId,
+          message: patch.message,
+          displayText: patch.displayText,
+        };
+        return {
+          sessionPendingQueues: {
+            ...prev.sessionPendingQueues,
+            [sessionId]: next,
+          },
+        };
+      });
+      if (found) savePendingQueues(get().sessionPendingQueues);
+      return found;
+    },
     clearPendingQueue: (sessionId) => {
       set((prev) => {
         const { [sessionId]: _, ...rest } = prev.sessionPendingQueues;
         return { sessionPendingQueues: rest };
       });
       savePendingQueues(get().sessionPendingQueues);
+    },
+    sessionPendingQueuePaused: savedPendingQueuePaused,
+    setPendingQueuePaused: (sessionId, paused) => {
+      set((prev) => {
+        const current = prev.sessionPendingQueuePaused[sessionId] ?? false;
+        if (current === paused) return prev;
+        if (paused) {
+          return {
+            sessionPendingQueuePaused: {
+              ...prev.sessionPendingQueuePaused,
+              [sessionId]: true,
+            },
+          };
+        }
+        // Pruning false entries keeps the persisted blob small.
+        const { [sessionId]: _, ...rest } = prev.sessionPendingQueuePaused;
+        return { sessionPendingQueuePaused: rest };
+      });
+      savePendingQueuePaused(get().sessionPendingQueuePaused);
     },
     realtimeStatus: "disconnected",
     realtimeMode: "idle",

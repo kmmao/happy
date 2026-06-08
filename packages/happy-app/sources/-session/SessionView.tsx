@@ -1047,58 +1047,298 @@ function SessionViewInner({
   const pendingQueue = storage(
     (s) => s.sessionPendingQueues[sessionId] ?? EMPTY_PENDING_QUEUE,
   );
-  const [previewQueueItem, setPreviewQueueItem] = React.useState<QueuedMessageItem | null>(null);
+  const queuePaused = storage(
+    (s) => s.sessionPendingQueuePaused[sessionId] ?? false,
+  );
+  const [previewQueueItem, setPreviewQueueItem] = React.useState<{
+    item: QueuedMessageItem;
+    startInEdit: boolean;
+  } | null>(null);
   const pendingQueueRef = React.useRef(pendingQueue);
   pendingQueueRef.current = pendingQueue;
 
-  // Drain one message from the pending queue each time the AI becomes idle.
-  // Also watch `pendingQueue.length` — the onSend handler uses the debounced
-  // `sessionStatus.state === "thinking"` to decide whether to queue, while
-  // `isRunning` is computed from the raw (un-debounced) session state. During
-  // the THINKING_EXIT_DELAY_MS window these diverge: isRunning is already
-  // false but sessionStatus still shows "thinking". A message queued during
-  // that window would be stuck because isRunning never transitions again.
-  React.useEffect(() => {
-    if (!isRunning && pendingQueueRef.current.length > 0) {
-      const next = storage.getState().shiftPendingQueue(sessionId);
-      if (next) {
-        sync.sendMessage(sessionId, next.message, next.displayText, {
-          localId: next.localId,
-        });
-      }
+  // Auto-dispatch the next queued message when the AI becomes idle.
+  //
+  // Three things we have to be careful about:
+  //
+  // 1. RACE — sync.sendMessage is async on the network round-trip, so after we
+  //    shift one off and dispatch it, `isRunning` does not flip to true
+  //    immediately. The next `pendingQueue.length` decrement (because we
+  //    shifted) re-runs this effect with `isRunning` still false, and without
+  //    the in-flight guard we'd dispatch the NEXT message instantly — exactly
+  //    the "everything fires at once" behavior the user reported.
+  //
+  // 2. STARTUP — we still want length to be a trigger, otherwise an item
+  //    appended while AI is already idle (rare but possible, e.g. cross-client)
+  //    would never auto-dispatch. So we keep the length dependency but gate it
+  //    on the in-flight ref, which is cleared when isRunning actually rises.
+  //
+  // 3. FALLBACK TIMER SURVIVAL — the safety timer used to be `setTimeout(..., 3000)`
+  //    returned from useEffect with `clearTimeout` in the cleanup. That caused
+  //    a second bug: when the effect re-ran (e.g. on the `pendingQueue.length`
+  //    decrement immediately after a shift) the cleanup cleared the timer, and
+  //    the re-run's early return at the in-flight gate did NOT schedule a new
+  //    one. If `isRunning` never rose (silent server reject), the lock stayed
+  //    true forever. Now the timer is held in a ref so it survives effect
+  //    re-runs; we only clear it when the dispatch is resolved (isRunning
+  //    became true) or the component unmounts.
+  //
+  // We also pass `bypassRunningCheck: true` to sync.sendMessage so a stale
+  // session.sdkSessionState read inside sendMessage cannot re-enqueue our just-
+  // shifted item with the same localId (and then make the dispatch loop forever).
+  const dispatchInFlightRef = React.useRef(false);
+  const dispatchFallbackTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [dispatchTick, setDispatchTick] = React.useState(0);
+  const clearDispatchFallback = React.useCallback(() => {
+    if (dispatchFallbackTimerRef.current) {
+      clearTimeout(dispatchFallbackTimerRef.current);
+      dispatchFallbackTimerRef.current = null;
     }
-  }, [isRunning, sessionId, pendingQueue.length]);
+  }, []);
+  React.useEffect(() => () => clearDispatchFallback(), [clearDispatchFallback]);
+  React.useEffect(() => {
+    if (isRunning) {
+      // The dispatched message took effect — open the door for the next one.
+      dispatchInFlightRef.current = false;
+      clearDispatchFallback();
+      return;
+    }
+    if (queuePaused) return;
+    if (dispatchInFlightRef.current) return;
+    if (pendingQueueRef.current.length === 0) return;
 
-  // Auto-close preview when the previewed item is removed from the queue.
-  React.useEffect(() => {
-    if (previewQueueItem && !pendingQueue.some((m) => m.localId === previewQueueItem.localId)) {
-      setPreviewQueueItem(null);
-    }
-  }, [pendingQueue, previewQueueItem]);
+    const next = storage.getState().shiftPendingQueue(sessionId);
+    if (!next) return;
+    dispatchInFlightRef.current = true;
+    sync.sendMessage(sessionId, next.message, next.displayText, {
+      localId: next.localId,
+      bypassRunningCheck: true,
+    });
+
+    // 15 s safety net for silent failures (offline, encryption reject, server
+    // never echoes back). Held in a ref so re-runs of this effect don't clear
+    // it. When it fires we bump `dispatchTick` so the effect re-evaluates and
+    // can drain the next item.
+    clearDispatchFallback();
+    dispatchFallbackTimerRef.current = setTimeout(() => {
+      dispatchInFlightRef.current = false;
+      dispatchFallbackTimerRef.current = null;
+      setDispatchTick((t) => t + 1);
+    }, 15000);
+  }, [isRunning, sessionId, pendingQueue.length, queuePaused, dispatchTick, clearDispatchFallback]);
+
+  // (V6) Deliberately no auto-close-when-item-vanishes effect. Previously the
+  // effect closed the overlay the moment the previewed item left the queue,
+  // which silently wiped any unsaved edits when auto-dispatch shifted it. Now
+  // the overlay stays open; if the user clicks Save/Save&Send on an item that
+  // is already gone, `handleSaveQueuedEdit` / `handleSaveAndSendQueuedEdit`
+  // return false and the overlay surfaces a stale-error banner.
+  //
+  // Explicit user actions that delete the item (chip ×) call setPreviewQueueItem
+  // (null) inline so the overlay still closes promptly in that path.
 
   const queuedMessages = React.useMemo(
     () =>
-      pendingQueue.map((item) => ({
-        localId: item.localId,
-        displayText: (item.displayText ?? item.message).includes("[image:")
-          ? t("session.sentImage")
-          : (item.displayText ?? item.message.slice(0, 200)),
-        fullMessage: item.message,
-      })),
+      pendingQueue.map((item) => {
+        // Count `[image: /path]` segments so the chip can render a camera badge.
+        const imageMatches = item.message.match(/\[image:\s*[^\]]+\]/g) ?? [];
+        const imageCount = imageMatches.length;
+        // Strip image tags out of the raw message to derive a text-only preview when
+        // displayText is missing (e.g. for older items persisted before this field).
+        const textOnly = item.message.replace(/\[image:\s*[^\]]+\]/g, "").trim();
+        const hasOnlyImages = imageCount > 0 && textOnly.length === 0;
+
+        let displayText: string;
+        if (item.displayText && item.displayText.length > 0) {
+          // The composer already produced a sensible label — trust it, but if
+          // displayText accidentally contains image tags (legacy persisted
+          // items) fall back to the synthesised label.
+          displayText = item.displayText.includes("[image:")
+            ? (imageCount === 1
+                ? t("session.sentImage")
+                : t("session.sentImages", { count: imageCount }))
+            : item.displayText;
+        } else if (hasOnlyImages) {
+          displayText = imageCount === 1
+            ? t("session.sentImage")
+            : t("session.sentImages", { count: imageCount });
+        } else {
+          displayText = textOnly.slice(0, 200);
+        }
+
+        return {
+          localId: item.localId,
+          displayText,
+          fullMessage: item.message,
+          imageCount,
+          hasOnlyImages,
+        };
+      }),
     [pendingQueue],
   );
 
   const handleCancelQueuedItem = React.useCallback((localId: string) => {
     storage.getState().removePendingQueueItem(sessionId, localId);
+    // If the user is currently previewing/editing the same item, close the
+    // overlay too — the auto-close effect was removed (V6) so we have to do
+    // this explicitly on intentional cancel.
+    setPreviewQueueItem((prev) => (prev && prev.item.localId === localId ? null : prev));
   }, [sessionId]);
+
+  const handleTogglePaused = React.useCallback(() => {
+    const current = storage.getState().sessionPendingQueuePaused[sessionId] ?? false;
+    storage.getState().setPendingQueuePaused(sessionId, !current);
+  }, [sessionId]);
+
+  const handleEditQueuedItem = React.useCallback((item: QueuedMessageItem) => {
+    setPreviewQueueItem({ item, startInEdit: true });
+  }, []);
+
+  const handleOpenPreview = React.useCallback((item: QueuedMessageItem) => {
+    setPreviewQueueItem({ item, startInEdit: false });
+  }, []);
+
+  const handleSaveQueuedEdit = React.useCallback(
+    (localId: string, message: string, displayText: string | undefined) => {
+      const ok = storage.getState().updatePendingQueueItem(sessionId, localId, {
+        message,
+        displayText,
+      });
+      if (!ok) return false;
+      // V7: refresh the previewQueueItem snapshot so the overlay's preview
+      // mode (and re-edit/cancel paths) operate on the SAVED content, not the
+      // pre-edit snapshot the user opened the overlay with. We recompute
+      // imageCount / hasOnlyImages from the new message so chip metadata stays
+      // accurate too.
+      setPreviewQueueItem((prev) => {
+        if (!prev || prev.item.localId !== localId) return prev;
+        const imageMatches = message.match(/\[image:\s*[^\]]+\]/g) ?? [];
+        const imageCount = imageMatches.length;
+        const textOnly = message.replace(/\[image:\s*[^\]]+\]/g, "").trim();
+        const hasOnlyImages = imageCount > 0 && textOnly.length === 0;
+        return {
+          ...prev,
+          item: {
+            ...prev.item,
+            fullMessage: message,
+            displayText: displayText ?? prev.item.displayText,
+            imageCount,
+            hasOnlyImages,
+          },
+        };
+      });
+      return true;
+    },
+    [sessionId],
+  );
+
+  const handleSaveAndSendQueuedEdit = React.useCallback(
+    (localId: string, message: string, displayText: string | undefined) => {
+      // V3 + V4 (atomic save+send that bypasses both the auto-dispatch effect
+      // and the paused gate), plus two further race fixes from the post-2.36.5
+      // review:
+      //
+      // FIX #1 — multi-send race. The OLD code did remove → interrupt → send
+      // without setting dispatchInFlightRef. The queue-length decrement triggers
+      // a re-render; the dispatch effect runs; isRunning is still true so it
+      // CLEARS dispatchInFlightRef (line: "if (isRunning) { ... = false; }")
+      // and returns. A moment later the server pushes the interrupt-ack (idle)
+      // BEFORE the running-state for our new message arrives; the effect re-
+      // runs, finds isRunning=false, inflight=false, length>0 → shifts the
+      // NEXT queued item and ships it too. The user clicked Save&Send on ONE
+      // item and silently saw two messages sent. Gate the effect first.
+      //
+      // FIX #2 — silent message loss. The OLD code removed the queue item
+      // BEFORE calling sync.sendMessage, then fire-and-forgot the promise.
+      // If sync.sendMessage early-returned (no encryption, session missing)
+      // or its async pipeline rejected (encryptRawRecord throw, socket
+      // failure mid-flush), the item was gone from the queue with no recovery.
+      // sendMessage now returns Promise<boolean>; we only remove on `true`
+      // and surface failures so the user can retry.
+      const ok = storage.getState().updatePendingQueueItem(sessionId, localId, {
+        message,
+        displayText,
+      });
+      if (!ok) return false;
+
+      // Pre-emptively gate auto-dispatch BEFORE we touch the queue or the
+      // running state. Arm the same 15s fallback timer the dispatch effect
+      // uses so we never permanently jam the queue if isRunning never rises.
+      dispatchInFlightRef.current = true;
+      clearDispatchFallback();
+      dispatchFallbackTimerRef.current = setTimeout(() => {
+        dispatchInFlightRef.current = false;
+        dispatchFallbackTimerRef.current = null;
+        setDispatchTick((t) => t + 1);
+      }, 15000);
+
+      if (isRunning) {
+        sessionInterrupt(sessionId);
+      }
+
+      // Fire the send. Item stays in queue until sendMessage confirms it
+      // entered the outbox — only THEN do we remove. If sendMessage returns
+      // false (early-return) or the promise rejects (throw), the item is
+      // preserved for the user to retry; we also surface an alert so they
+      // know something went wrong.
+      const releaseGate = () => {
+        dispatchInFlightRef.current = false;
+        clearDispatchFallback();
+        setDispatchTick((t) => t + 1);
+      };
+      sync
+        .sendMessage(sessionId, message, displayText, {
+          localId,
+          bypassRunningCheck: true,
+        })
+        .then((accepted) => {
+          if (accepted) {
+            // The outbox owns the message now; safe to drop the queue copy.
+            storage.getState().removePendingQueueItem(sessionId, localId);
+          } else {
+            log.error(
+              `save&send: sync.sendMessage rejected for session=${sessionId} localId=${localId}; item retained in queue`,
+            );
+            releaseGate();
+            Modal.alert(t("common.error"), t("session.saveAndSendFailed"));
+          }
+        })
+        .catch((err) => {
+          log.error(
+            `save&send: sync.sendMessage threw for session=${sessionId} localId=${localId}; item retained in queue`,
+            err,
+          );
+          releaseGate();
+          Modal.alert(t("common.error"), t("session.saveAndSendFailed"));
+        });
+
+      return true;
+    },
+    [sessionId, isRunning, clearDispatchFallback],
+  );
 
   const handleSendNow = React.useCallback(() => {
     sessionInterrupt(sessionId);
+    // If the previewed item is currently at the head of the queue, it's the
+    // one about to be drained — close the overlay so we don't leave a stale
+    // snapshot behind. Items further back in the queue are NOT affected by
+    // this action, so the preview stays open for them. (V6 still applies for
+    // auto-dispatch: only explicit user actions close the overlay.)
+    setPreviewQueueItem((prev) => {
+      if (!prev) return prev;
+      const head = storage.getState().sessionPendingQueues[sessionId]?.[0];
+      return head && head.localId === prev.item.localId ? null : prev;
+    });
   }, [sessionId]);
 
   const handleSendItemNow = React.useCallback((localId: string) => {
     storage.getState().reorderPendingQueueItemToFront(sessionId, localId);
     sessionInterrupt(sessionId);
+    // The chip ▶ action explicitly targets THIS item — reorder-to-front +
+    // interrupt guarantees it will be the next drain. If the overlay is
+    // showing the same item, close it so the user doesn't see a stale
+    // snapshot once it ships. (V6 still applies for auto-dispatch.)
+    setPreviewQueueItem((prev) => (prev && prev.item.localId === localId ? null : prev));
   }, [sessionId]);
 
   const rawPromptSuggestion = usePromptSuggestion(sessionId);
@@ -1221,14 +1461,17 @@ function SessionViewInner({
         reason: "manual-send",
       });
       setShowOptionsPopover(false);
-      if (isRunning) {
-        storage.getState().appendToPendingQueue(sessionId, { localId: randomUUID(), message: option });
-      } else {
-        sync.sendMessage(sessionId, option);
-      }
+      // Always enqueue — see the onSend handler for the rationale. Even though
+      // floating-option taps are usually well-spaced, the same dual-path race
+      // exists: a quick double-tap on two different options while AI is briefly
+      // idle would send both directly.
+      storage.getState().appendToPendingQueue(sessionId, {
+        localId: randomUUID(),
+        message: option,
+      });
       trackMessageSent();
     },
-    [sessionId, latestOptionsHash, isRunning],
+    [sessionId, latestOptionsHash],
   );
 
   const { bookmarks, toggleBookmark } = useBookmarks();
@@ -1237,14 +1480,14 @@ function SessionViewInner({
   const handleBookmarkOptionPress = React.useCallback(
     (option: string) => {
       setShowBookmarksPopover(false);
-      if (isRunning) {
-        storage.getState().appendToPendingQueue(sessionId, { localId: randomUUID(), message: option });
-      } else {
-        sync.sendMessage(sessionId, option);
-      }
+      // Always enqueue — same rationale as the onSend handler.
+      storage.getState().appendToPendingQueue(sessionId, {
+        localId: randomUUID(),
+        message: option,
+      });
       trackMessageSent();
     },
-    [sessionId, isRunning],
+    [sessionId],
   );
 
   // Slash command popover
@@ -1786,8 +2029,11 @@ function SessionViewInner({
         onSendNow={handleSendNow}
         onSendItemNow={handleSendItemNow}
         onCancelItem={handleCancelQueuedItem}
-        onOpenPreview={setPreviewQueueItem}
+        onOpenPreview={handleOpenPreview}
+        onEditItem={handleEditQueuedItem}
         isRunning={isRunning}
+        paused={queuePaused}
+        onTogglePaused={handleTogglePaused}
       />
       <View onLayout={(e) => setAgentInputHeight(e.nativeEvent.layout.height)}>
       <AgentInput
@@ -1887,13 +2133,20 @@ function SessionViewInner({
                   ? t("session.sentImage")
                   : t("session.sentImages", { count: imageCount }))
               : visibleText || pasteBlocks[0]?.summary;
-          if (isRunning) {
-            storage.getState().appendToPendingQueue(sessionId, { localId: localIdForSend, message: finalMessage, displayText });
-          } else {
-            sync.sendMessage(sessionId, finalMessage, displayText, {
-              localId: localIdForSend,
-            });
-          }
+          // Always enqueue. The auto-dispatch effect drains one-at-a-time when
+          // AI is idle, so when the user is idle there is just a one-tick hop
+          // through the queue. The dual-path "if isRunning enqueue else send
+          // directly" pattern caused a race: two rapid sends in the short
+          // window where isRunning has not yet been pushed back from the
+          // server would BOTH take the direct-send branch and burst onto the
+          // wire, bypassing every queue/pause/dispatch guard. Funneling all
+          // sends through the queue is the only way to make that race
+          // unrepresentable.
+          storage.getState().appendToPendingQueue(sessionId, {
+            localId: localIdForSend,
+            message: finalMessage,
+            displayText,
+          });
           trackMessageSent();
         }}
         onMicPress={micButtonState.onMicPress}
@@ -2144,15 +2397,24 @@ function SessionViewInner({
         />
         {previewQueueItem != null && (
           <QueuePreviewOverlay
-            item={previewQueueItem}
+            // S8: keying by localId remounts the overlay when the user opens
+            // a different queue item, so internal state (isEditing, editText,
+            // editImages, staleError) is reset cleanly. Same-localId updates
+            // — e.g. V7's post-save refresh — keep the same mount and just
+            // re-render with new props.
+            key={previewQueueItem.item.localId}
+            item={previewQueueItem.item}
+            startInEdit={previewQueueItem.startInEdit}
             onClose={() => setPreviewQueueItem(null)}
             onSendNow={isRunning && handleSendItemNow
               ? () => {
-                  handleSendItemNow(previewQueueItem.localId);
+                  handleSendItemNow(previewQueueItem.item.localId);
                   setPreviewQueueItem(null);
                 }
               : undefined
             }
+            onSaveEdit={handleSaveQueuedEdit}
+            onSaveAndSend={handleSaveAndSendQueuedEdit}
           />
         )}
       </View>

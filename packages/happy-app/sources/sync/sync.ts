@@ -782,6 +782,24 @@ class Sync {
     this.syncBgSendState(state);
   }
 
+  /**
+   * Send a user message.
+   *
+   * Returns `true` once the message has been accepted into the local
+   * pipeline — either appended to the pending queue (running-check path)
+   * OR added to the local message list and the outbox (normal-send path).
+   * Once it returns `true`, the outbox retry layer takes responsibility for
+   * actual delivery and the caller can safely drop its own copy.
+   *
+   * Returns `false` only when no progress was possible (session record
+   * missing, no encryption key available) — these are genuine "dropped on
+   * the floor" cases. Callers that own the source-of-truth copy (e.g. the
+   * pending queue) should KEEP their copy when `false` is returned so the
+   * user can retry.
+   *
+   * Existing callers that ignored the previous `Promise<void>` return value
+   * continue to work; the new boolean is purely additive.
+   */
   async sendMessage(
     sessionId: string,
     text: string,
@@ -790,8 +808,17 @@ class Sync {
       continue?: boolean;
       localId?: string;
       source?: "auto-option-send";
+      /**
+       * Skip the "session is running → re-enqueue" guard at the top of this
+       * method. The auto-dispatch effect in SessionView passes this when it
+       * pops an item off the queue so a stale session.sdkSessionState read
+       * does NOT push the same item right back into the queue (same localId →
+       * duplicate). Unlike `continue: true`, this flag is local-only and
+       * does NOT propagate to the server meta.
+       */
+      bypassRunningCheck?: boolean;
     },
-  ) {
+  ): Promise<boolean> {
     // Clear any existing prompt suggestion and needsContinue when user sends a message
     storage.getState().setPromptSuggestion(sessionId, null);
     storage.getState().setNeedsContinue(sessionId, false);
@@ -804,7 +831,7 @@ class Sync {
     if (!encryption) {
       // Should never happen
       log.error(`Session ${sessionId} not found`);
-      return;
+      return false;
     }
 
     // Get session data from storage
@@ -812,15 +839,19 @@ class Sync {
     const session = state.sessions[sessionId];
     if (!session) {
       log.error(`Session ${sessionId} not found in storage`);
-      return;
+      return false;
     }
 
     // If the session is currently running, queue the message instead of sending.
     // This covers cross-client scenarios (e.g. AI started from Web, user sends from App).
-    if (isSessionRunning(session) && !options?.continue) {
+    // The auto-dispatch effect in SessionView passes `bypassRunningCheck: true`
+    // when draining the queue — without it, a stale running flag would push the
+    // shifted item right back into the queue with the same localId, creating a
+    // duplicate that the dispatch effect would then try to send again.
+    if (isSessionRunning(session) && !options?.continue && !options?.bypassRunningCheck) {
       const localId = options?.localId ?? randomUUID();
       storage.getState().appendToPendingQueue(sessionId, { localId, message: text, displayText });
-      return;
+      return true;
     }
 
     // Clear needsAttention when user sends a message (user has responded)
@@ -905,6 +936,7 @@ class Sync {
 
     this.getSendSync(sessionId)?.invalidate();
     this.maybeStartBackgroundSendWatchdog();
+    return true;
   }
 
   applySettings = (delta: Partial<Settings>) => {
