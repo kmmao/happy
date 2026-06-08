@@ -1,8 +1,5 @@
-import { db } from "@/storage/db";
-import { inTx, afterTx } from "@/storage/inTx";
-import { allocateUserSeq } from "@/storage/seq";
-import { randomKeyNaked } from "@/utils/randomKeyNaked";
-import { eventRouter, buildKVBatchUpdateUpdate } from "@/app/events/eventRouter";
+import { inTx } from "@/storage/inTx";
+import { emitSyncUpdate } from "@/app/events/syncUpdate";
 import * as privacyKit from "privacy-kit";
 
 export interface KVMutation {
@@ -124,15 +121,9 @@ export async function kvMutate(
             }
         }
 
-        // Send single bundled notification for all changes
-        afterTx(tx, async () => {
-            const updateSeq = await allocateUserSeq(ctx.uid);
-            eventRouter.emitUpdate({
-                userId: ctx.uid,
-                payload: buildKVBatchUpdateUpdate(changes, updateSeq, randomKeyNaked(12)),
-                recipientFilter: { type: 'user-scoped-only' }
-            });
-        });
+        // Send single bundled notification for all changes after tx commits.
+        // Seam owns seq + id + recipient + afterTx wrapping (ADR-0023).
+        await emitSyncUpdate(ctx.uid, { t: "kv-batch-update", changes }, { tx });
 
         return { success: true, results };
     });

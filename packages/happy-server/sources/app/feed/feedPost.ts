@@ -1,9 +1,7 @@
 import { Context } from "@/context";
 import { FeedBody, UserFeedItem } from "./types";
-import { afterTx, Tx } from "@/storage/inTx";
-import { allocateUserSeq } from "@/storage/seq";
-import { eventRouter, buildNewFeedPostUpdate } from "@/app/events/eventRouter";
-import { randomKeyNaked } from "@/utils/randomKeyNaked";
+import { Tx } from "@/storage/inTx";
+import { emitSyncUpdate } from "@/app/events/syncUpdate";
 
 /**
  * Add a post to user's feed.
@@ -51,17 +49,9 @@ export async function feedPost(
         cursor: '0-' + item.counter.toString(10)
     };
 
-    // Emit socket event after transaction completes
-    afterTx(tx, async () => {
-        const updateSeq = await allocateUserSeq(ctx.uid);
-        const updatePayload = buildNewFeedPostUpdate(result, updateSeq, randomKeyNaked(12));
-
-        eventRouter.emitUpdate({
-            userId: ctx.uid,
-            payload: updatePayload,
-            recipientFilter: { type: 'user-scoped-only' }
-        });
-    });
+    // Broadcast after the surrounding tx commits. The seam (ADR-0023) owns
+    // seq + id + recipient + afterTx wrapping; passing { tx } defers emission.
+    await emitSyncUpdate(ctx.uid, { t: "new-feed-post", post: result }, { tx });
 
     return result;
 }

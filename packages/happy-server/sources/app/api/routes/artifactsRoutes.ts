@@ -1,9 +1,7 @@
-import { eventRouter, buildNewArtifactUpdate, buildUpdateArtifactUpdate, buildDeleteArtifactUpdate } from "@/app/events/eventRouter";
+import { emitSyncUpdate } from "@/app/events/syncUpdate";
 import { db } from "@/storage/db";
 import { Fastify } from "../types";
 import { z } from "zod";
-import { randomKeyNaked } from "@/utils/randomKeyNaked";
-import { allocateUserSeq } from "@/storage/seq";
 import { log } from "@/utils/log";
 import * as privacyKit from "privacy-kit";
 import { artifactVersionedUpdate } from "@/app/api/artifact/artifactVersionedUpdate";
@@ -217,14 +215,8 @@ export function artifactsRoutes(app: Fastify) {
                 }
             });
 
-            // Emit new-artifact event
-            const updSeq = await allocateUserSeq(userId);
-            const newArtifactPayload = buildNewArtifactUpdate(artifact, updSeq, randomKeyNaked(12));
-            eventRouter.emitUpdate({
-                userId,
-                payload: newArtifactPayload,
-                recipientFilter: { type: 'user-scoped-only' }
-            });
+            // Broadcast new-artifact. Seam owns seq + id + recipient (ADR-0023).
+            await emitSyncUpdate(userId, { t: "new-artifact", artifact });
 
             return reply.send({
                 id: artifact.id,
@@ -327,12 +319,11 @@ export function artifactsRoutes(app: Fastify) {
             const bodyUpdate = result.bodyVersion !== undefined && bodyArg
                 ? { value: bodyArg.data, version: result.bodyVersion }
                 : undefined;
-            const updSeq = await allocateUserSeq(userId);
-            const updatePayload = buildUpdateArtifactUpdate(id, updSeq, randomKeyNaked(12), headerUpdate, bodyUpdate);
-            eventRouter.emitUpdate({
-                userId,
-                payload: updatePayload,
-                recipientFilter: { type: 'user-scoped-only' }
+            await emitSyncUpdate(userId, {
+                t: "update-artifact",
+                artifactId: id,
+                header: headerUpdate,
+                body: bodyUpdate,
             });
 
             return reply.send({
@@ -387,14 +378,8 @@ export function artifactsRoutes(app: Fastify) {
                 where: { id }
             });
 
-            // Emit delete-artifact event
-            const updSeq = await allocateUserSeq(userId);
-            const deletePayload = buildDeleteArtifactUpdate(id, updSeq, randomKeyNaked(12));
-            eventRouter.emitUpdate({
-                userId,
-                payload: deletePayload,
-                recipientFilter: { type: 'user-scoped-only' }
-            });
+            // Broadcast delete-artifact. Seam owns seq + id + recipient (ADR-0023).
+            await emitSyncUpdate(userId, { t: "delete-artifact", artifactId: id });
 
             return reply.send({ success: true });
         } catch (error) {

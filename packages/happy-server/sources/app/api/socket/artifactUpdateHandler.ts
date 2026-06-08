@@ -1,9 +1,7 @@
 import { websocketEventsCounter } from "@/app/monitoring/metrics2";
-import { buildNewArtifactUpdate, buildUpdateArtifactUpdate, buildDeleteArtifactUpdate, eventRouter } from "@/app/events/eventRouter";
+import { emitSyncUpdate } from "@/app/events/syncUpdate";
 import { db } from "@/storage/db";
-import { allocateUserSeq } from "@/storage/seq";
 import { log } from "@/utils/log";
-import { randomKeyNaked } from "@/utils/randomKeyNaked";
 import { Socket } from "socket.io";
 import * as privacyKit from "privacy-kit";
 import { artifactVersionedUpdate } from "@/app/api/artifact/artifactVersionedUpdate";
@@ -150,12 +148,11 @@ export function artifactUpdateHandler(userId: string, socket: Socket) {
             const bodyUpdate = result.bodyVersion !== undefined && body
                 ? { value: body.data, version: result.bodyVersion }
                 : undefined;
-            const updSeq = await allocateUserSeq(userId);
-            const updatePayload = buildUpdateArtifactUpdate(artifactId, updSeq, randomKeyNaked(12), headerUpdate, bodyUpdate);
-            eventRouter.emitUpdate({
-                userId,
-                payload: updatePayload,
-                recipientFilter: { type: 'user-scoped-only' }
+            await emitSyncUpdate(userId, {
+                t: "update-artifact",
+                artifactId,
+                header: headerUpdate,
+                body: bodyUpdate,
             });
 
             // Send success response
@@ -246,14 +243,8 @@ export function artifactUpdateHandler(userId: string, socket: Socket) {
                 }
             });
 
-            // Emit new-artifact event
-            const updSeq = await allocateUserSeq(userId);
-            const newArtifactPayload = buildNewArtifactUpdate(artifact, updSeq, randomKeyNaked(12));
-            eventRouter.emitUpdate({
-                userId,
-                payload: newArtifactPayload,
-                recipientFilter: { type: 'user-scoped-only' }
-            });
+            // Broadcast new-artifact. Seam owns seq + id + recipient (ADR-0023).
+            await emitSyncUpdate(userId, { t: "new-artifact", artifact });
 
             // Return created artifact
             callback({
@@ -314,14 +305,8 @@ export function artifactUpdateHandler(userId: string, socket: Socket) {
                 where: { id: artifactId }
             });
 
-            // Emit delete-artifact event
-            const updSeq = await allocateUserSeq(userId);
-            const deletePayload = buildDeleteArtifactUpdate(artifactId, updSeq, randomKeyNaked(12));
-            eventRouter.emitUpdate({
-                userId,
-                payload: deletePayload,
-                recipientFilter: { type: 'user-scoped-only' }
-            });
+            // Broadcast delete-artifact. Seam owns seq + id + recipient (ADR-0023).
+            await emitSyncUpdate(userId, { t: "delete-artifact", artifactId });
 
             // Send success response
             callback({ result: 'success' });

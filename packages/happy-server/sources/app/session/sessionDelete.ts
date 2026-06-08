@@ -1,8 +1,7 @@
 import { Context } from "@/context";
 import { inTx, afterTx } from "@/storage/inTx";
-import { eventRouter, buildDeleteSessionUpdate } from "@/app/events/eventRouter";
-import { allocateUserSeq } from "@/storage/seq";
-import { randomKeyNaked } from "@/utils/randomKeyNaked";
+import { eventRouter } from "@/app/events/eventRouter";
+import { emitSyncUpdate } from "@/app/events/syncUpdate";
 import { log } from "@/utils/log";
 
 /**
@@ -93,26 +92,14 @@ export async function sessionDelete(ctx: Context, sessionId: string): Promise<bo
             sessionId 
         }, `Session deleted successfully`);
 
-        // Send notification after transaction commits
+        // delete-session SyncUpdate (seam owns seq + id + recipient + afterTx
+        // wrapping, ADR-0023).
+        await emitSyncUpdate(ctx.uid, { t: "delete-session", sessionId }, { tx });
+
+        // Notify CLI daemons to terminate the process for this session.
+        // Ephemerals stay on the eventRouter primitive (out of scope for
+        // Phase 1 / Scope X — see Phase 1.5 in ADR-0023).
         afterTx(tx, async () => {
-            const updSeq = await allocateUserSeq(ctx.uid);
-            const updatePayload = buildDeleteSessionUpdate(sessionId, updSeq, randomKeyNaked(12));
-
-            log({
-                module: 'session-delete',
-                userId: ctx.uid,
-                sessionId,
-                updateType: 'delete-session',
-                updatePayload: JSON.stringify(updatePayload)
-            }, `Emitting delete-session update to user-scoped connections`);
-
-            eventRouter.emitUpdate({
-                userId: ctx.uid,
-                payload: updatePayload,
-                recipientFilter: { type: 'user-scoped-only' }
-            });
-
-            // Notify CLI daemons to terminate the process for this session
             for (const machineId of machineIds) {
                 eventRouter.emitEphemeral({
                     userId: ctx.uid,

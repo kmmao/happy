@@ -1,12 +1,10 @@
-import { eventRouter, buildNewSessionUpdate, buildNewProjectUpdate } from "@/app/events/eventRouter";
+import { emitSyncUpdate } from "@/app/events/syncUpdate";
 import { type Fastify } from "../types";
 import { db } from "@/storage/db";
 import type { FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 import { Prisma } from "@prisma/client";
 import { log } from "@/utils/log";
-import { randomKeyNaked } from "@/utils/randomKeyNaked";
-import { allocateUserSeq } from "@/storage/seq";
 import { sessionDelete } from "@/app/session/sessionDelete";
 import { sessionArchive } from "@/app/session/sessionArchive";
 import { activityCache } from "@/app/presence/sessionCache";
@@ -88,19 +86,10 @@ async function resolveAndLinkProject(
             data: { projectId: project.id },
         });
 
-        // Always emit project event — App merge is idempotent,
-        // and skipping on false negatives would defeat the purpose of this fix
-        const updSeq = await allocateUserSeq(accountId);
-        const payload = buildNewProjectUpdate(
-            project,
-            updSeq,
-            randomKeyNaked(12),
-        );
-        eventRouter.emitUpdate({
-            userId: accountId,
-            payload,
-            recipientFilter: { type: "user-scoped-only" },
-        });
+        // Always emit project event — App merge is idempotent, and skipping
+        // on false negatives would defeat the purpose of this fix. Seam owns
+        // seq + id + recipient (ADR-0023).
+        await emitSyncUpdate(accountId, { t: "new-project", project });
     } catch (error) {
         // Non-critical: log and continue — session still works without project link
         log(
@@ -386,9 +375,8 @@ export function sessionRoutes(app: Fastify) {
               },
             });
             await resolveAndLinkProject(userId, created.id, machineId, path);
-            const updSeq = await allocateUserSeq(userId);
-            const updatePayload = buildNewSessionUpdate(created, updSeq, randomKeyNaked(12));
-            eventRouter.emitUpdate({ userId, payload: updatePayload, recipientFilter: { type: "user-scoped-only" } });
+            // new-session SyncUpdate (seam owns seq + id + recipient, ADR-0023).
+            await emitSyncUpdate(userId, { t: "new-session", session: created });
             return reply.send(buildSessionResponse(created));
           } catch (error) {
             if (!hasPrismaErrorCode(error, "P2002")) {
@@ -417,9 +405,6 @@ export function sessionRoutes(app: Fastify) {
           { module: "session-create", sessionId: existing.id, userId },
           `Reconnecting to existing session: ${existing.id}`,
         );
-
-        // Resolve seq for the update event
-        const updSeq = await allocateUserSeq(userId);
 
         // Reactivate the session and rotate the encryption key if provided.
         // IMPORTANT: Do not overwrite `metadata` here. The encrypted blob
@@ -453,17 +438,9 @@ export function sessionRoutes(app: Fastify) {
           await resolveAndLinkProject(userId, existing.id, machineId, path);
         }
 
-        // Emit new-session event so App re-fetches sessions and picks up the new dataEncryptionKey
-        const updatePayload = buildNewSessionUpdate(
-          updated,
-          updSeq,
-          randomKeyNaked(12),
-        );
-        eventRouter.emitUpdate({
-          userId,
-          payload: updatePayload,
-          recipientFilter: { type: "user-scoped-only" },
-        });
+        // Emit new-session so App re-fetches sessions and picks up the new
+        // dataEncryptionKey. Seam owns seq + id + recipient (ADR-0023).
+        await emitSyncUpdate(userId, { t: "new-session", session: updated });
 
         return reply.send(buildSessionResponse(updated));
       }
@@ -511,28 +488,9 @@ export function sessionRoutes(app: Fastify) {
           // Auto-resolve project if machineId + path provided
           await resolveAndLinkProject(userId, session.id, machineId, path);
 
-          // Emit new session update
-          const updSeq = await allocateUserSeq(userId);
-          const updatePayload = buildNewSessionUpdate(
-            session,
-            updSeq,
-            randomKeyNaked(12),
-          );
-          log(
-            {
-              module: "session-create",
-              userId,
-              sessionId: session.id,
-              updateType: "new-session",
-              updatePayload: JSON.stringify(updatePayload),
-            },
-            `Emitting new-session update to user-scoped connections`,
-          );
-          eventRouter.emitUpdate({
-            userId,
-            payload: updatePayload,
-            recipientFilter: { type: "user-scoped-only" },
-          });
+          // Emit new-session SyncUpdate (seam owns seq + id + recipient,
+          // ADR-0023).
+          await emitSyncUpdate(userId, { t: "new-session", session });
 
           return reply.send(buildSessionResponse(session));
         } catch (error) {
@@ -721,8 +679,6 @@ export function sessionRoutes(app: Fastify) {
         return reply.code(400).send({ error: "Session is already active" });
       }
 
-      const updSeq = await allocateUserSeq(userId);
-
       const updated = await db.session.update({
         where: { id: sessionId },
         data: {
@@ -734,16 +690,8 @@ export function sessionRoutes(app: Fastify) {
       // Evict stale cache so heartbeats are accepted immediately
       activityCache.invalidateSession(sessionId);
 
-      const updatePayload = buildNewSessionUpdate(
-        updated,
-        updSeq,
-        randomKeyNaked(12),
-      );
-      eventRouter.emitUpdate({
-        userId,
-        payload: updatePayload,
-        recipientFilter: { type: "user-scoped-only" },
-      });
+      // new-session SyncUpdate (seam owns seq + id + recipient, ADR-0023).
+      await emitSyncUpdate(userId, { t: "new-session", session: updated });
 
       return reply.send({ success: true });
   };
@@ -824,18 +772,13 @@ export function sessionRoutes(app: Fastify) {
         return reply.code(404).send({ error: "Session not found" });
       }
 
-      const updSeq = await allocateUserSeq(userId);
       const updated = await db.session.update({
         where: { id: sessionId },
         data: { forkedFromSessionId },
       });
 
-      const updatePayload = buildNewSessionUpdate(updated, updSeq, randomKeyNaked(12));
-      eventRouter.emitUpdate({
-        userId,
-        payload: updatePayload,
-        recipientFilter: { type: "user-scoped-only" },
-      });
+      // new-session SyncUpdate (seam owns seq + id + recipient, ADR-0023).
+      await emitSyncUpdate(userId, { t: "new-session", session: updated });
 
       return reply.send({ success: true });
     },

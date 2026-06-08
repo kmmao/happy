@@ -1,15 +1,8 @@
-import {
-    eventRouter,
-    buildNewProjectUpdate,
-    buildUpdateProjectUpdate,
-    buildDeleteProjectUpdate,
-} from "@/app/events/eventRouter";
+import { emitSyncUpdate } from "@/app/events/syncUpdate";
 import { type Fastify } from "../types";
 import { db } from "@/storage/db";
 import { z } from "zod";
 import { Prisma } from "@prisma/client";
-import { allocateUserSeq } from "@/storage/seq";
-import { randomKeyNaked } from "@/utils/randomKeyNaked";
 
 /**
  * Project CRUD + resolve routes.
@@ -114,17 +107,8 @@ export function projectRoutes(app: Fastify) {
                 Math.abs(result.createdAt.getTime() - result.updatedAt.getTime()) < 100;
 
             if (wasCreated) {
-                const updSeq = await allocateUserSeq(userId);
-                const payload = buildNewProjectUpdate(
-                    result,
-                    updSeq,
-                    randomKeyNaked(12),
-                );
-                eventRouter.emitUpdate({
-                    userId,
-                    payload,
-                    recipientFilter: { type: "user-scoped-only" },
-                });
+                // new-project. Seam owns seq + id + recipient (ADR-0023).
+                await emitSyncUpdate(userId, { t: "new-project", project: result });
             }
 
             return reply.send({
@@ -211,24 +195,14 @@ export function projectRoutes(app: Fastify) {
                 data,
             });
 
-            // Emit update-project event
-            const updSeq = await allocateUserSeq(userId);
-            const payload = buildUpdateProjectUpdate(
-                updated.id,
-                updSeq,
-                randomKeyNaked(12),
-                metadata !== undefined
-                    ? {
-                          value: updated.metadata,
-                          version: updated.metadataVersion,
-                      }
+            // Broadcast update-project. Seam owns seq + id + recipient (ADR-0023).
+            await emitSyncUpdate(userId, {
+                t: "update-project",
+                projectId: updated.id,
+                metadata: metadata !== undefined
+                    ? { value: updated.metadata, version: updated.metadataVersion }
                     : undefined,
                 archived,
-            );
-            eventRouter.emitUpdate({
-                userId,
-                payload,
-                recipientFilter: { type: "user-scoped-only" },
             });
 
             return reply.send({
@@ -261,18 +235,8 @@ export function projectRoutes(app: Fastify) {
             // Sessions will have projectId set to null via onDelete: SetNull
             await db.project.delete({ where: { id } });
 
-            // Emit delete-project event
-            const updSeq = await allocateUserSeq(userId);
-            const payload = buildDeleteProjectUpdate(
-                id,
-                updSeq,
-                randomKeyNaked(12),
-            );
-            eventRouter.emitUpdate({
-                userId,
-                payload,
-                recipientFilter: { type: "user-scoped-only" },
-            });
+            // Broadcast delete-project. Seam owns seq + id + recipient (ADR-0023).
+            await emitSyncUpdate(userId, { t: "delete-project", projectId: id });
 
             return reply.send({ ok: true });
         },
@@ -320,17 +284,8 @@ export function projectRoutes(app: Fastify) {
                 Math.abs(result.createdAt.getTime() - result.updatedAt.getTime()) < 100;
 
             if (wasCreated) {
-                const updSeq = await allocateUserSeq(userId);
-                const payload = buildNewProjectUpdate(
-                    result,
-                    updSeq,
-                    randomKeyNaked(12),
-                );
-                eventRouter.emitUpdate({
-                    userId,
-                    payload,
-                    recipientFilter: { type: "user-scoped-only" },
-                });
+                // new-project. Seam owns seq + id + recipient (ADR-0023).
+                await emitSyncUpdate(userId, { t: "new-project", project: result });
             }
 
             return reply.send({
