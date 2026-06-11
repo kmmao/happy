@@ -17,6 +17,7 @@ import { SidePanelGitPanel } from "./SidePanelGitPanel";
 import { SidePanelSessionTab } from "./SidePanelSessionTab";
 import { SidePanelSummaryTab } from "./SidePanelSummaryTab";
 import { SidePanelTerminalTab } from "./SidePanelTerminalTab";
+import { SidePanelClaudeTab } from "./SidePanelClaudeTab";
 import { SidePanelPreviewTab } from "./SidePanelPreviewTab";
 import { SidePanelFilePreview } from "./SidePanelFilePreview";
 import { SessionGlassTabBar, type SessionGlassTabBarItem } from "./SessionGlassTabBar";
@@ -133,6 +134,8 @@ export const MobileSessionPanelSheet = React.memo<MobileSessionPanelSheetProps>(
                     return <SidePanelPreviewTab sessionId={sessionId} />;
                 case "terminal":
                     return <SidePanelTerminalTab sessionId={sessionId} />;
+                case "claude":
+                    return <SidePanelClaudeTab sessionId={sessionId} />;
             }
         };
 
