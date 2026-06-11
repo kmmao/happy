@@ -6,7 +6,13 @@ import { Encryption } from "@/sync/encryption/encryption";
 import { SessionEncryption } from "@/sync/encryption/sessionEncryption";
 import { decodeBase64 } from "@/encryption/base64";
 import { storage, registerPreferencesSyncCallback, registerSessionEvictionCallback } from "./storage";
-import { isSessionRunning } from "@/utils/sessionUtils";
+import { isSessionRunning, getSessionName } from "@/utils/sessionUtils";
+import {
+  notifyPermissionRequest,
+  notifyTaskComplete,
+  clearNotifiedRequests,
+} from "@/utils/webNotification";
+import { handleIssueSessionCompletion as issueHandleCompletion } from "./syncIssueHandlers";
 import { throwIfNotOk } from "@/utils/http";
 import {
   ApiMessage,
@@ -27,21 +33,16 @@ import {
   RawRecord,
 } from "./typesRaw";
 import {
-  handleNewMessageUpdate,
-  handleDeleteSessionUpdate,
-  handleUpdateSessionUpdate,
-  handleUpdateAccountUpdate,
-  handleUpdateMachineUpdate,
-  handleRelationshipUpdate,
-  handleNewArtifactUpdate,
-  handleUpdateArtifactUpdate,
-  handleDeleteArtifactUpdate,
-  handleNewFeedPostUpdate,
-  handleKvBatchUpdate,
-  handleProjectUpdate,
+  // All 12 handle*Update functions have been replaced by SyncUpdateIngest
+  // (PRs 3–5 per ADR-0026). Their exports remain in syncUpdateHandlers.ts
+  // for the moment; removal is deferred to PR 7 cleanup. Only the shared
+  // type aliases are still imported here.
   type UpdateHandlerContext,
   type ResearchConfigChange,
 } from "./syncUpdateHandlers";
+import { ingestSyncUpdate } from "./ingest/syncUpdateIngest";
+import { ingestEvents } from "./ingest/dispatcher";
+import type { IngestContext } from "./ingest/ingestContext";
 import {
   fetchArtifactsList as fetchArtifactsListAction,
   fetchArtifactWithBody as fetchArtifactWithBodyAction,
@@ -133,10 +134,15 @@ import { resolveFetchedSessionRpcReady } from "./fetchSessionRpcReady";
 import { recoverSessionMetadataAfterDecrypt } from "./sessionMetadataRecovery";
 import { fetchMachinesAction } from "./syncMachines";
 import {
-  handleEphemeralUpdateAction,
+  // handleEphemeralUpdateAction — replaced by SyncEphemeralIngest in PR 6.
+  // flushActivityUpdatesAction is still used by the ActivityUpdateAccumulator
+  // flush callback (the seam pushes to the accumulator via
+  // `ctx.addActivityUpdate`; the accumulator decides when to flush and uses
+  // this helper to project pending updates into `applySessions`).
   flushActivityUpdatesAction,
-  type EphemeralHandlerContext,
 } from "./syncEphemeralHandlers";
+import { ingestSyncEphemeral } from "./ingest/syncEphemeralIngest";
+import { ApiEphemeralUpdateSchema } from "./apiTypes";
 import {
   fetchMessagesAction,
   applyMessagesAction,
@@ -452,6 +458,12 @@ class Sync {
   }
 
   async #init() {
+    // Wire SyncUpdateIngest subscribers BEFORE subscribeToUpdates() so
+    // the first incoming update finds its listeners already registered
+    // (see ADR-0026; subscribers live for the process lifetime — Sync is
+    // a singleton, no unsubscribe is tracked).
+    this.registerIngestSubscribers();
+
     // Initialize auto-option-send global service
     autoOptionSendService.init(this.sendMessage.bind(this));
 
@@ -2237,6 +2249,279 @@ class Sync {
     };
   }
 
+  /**
+   * The reduced IngestContext consumed by `ingestSyncUpdate` (ADR-0026).
+   * Compare with the 24-field `updateHandlerCtx` above — everything the
+   * ingest seam doesn't need has moved to `ingestEvents` subscribers
+   * (sync invalidators, listener Sets) or to direct `storage.getState()`
+   * calls inside the seam (Zustand stays the store of record).
+   */
+  private get ingestCtx(): IngestContext {
+    return {
+      encryption: this.encryption,
+      cursor: {
+        get: (sessionId) => this.cursors.get(sessionId),
+        delete: (sessionId) => this.cursors.delete(sessionId),
+      },
+      sessionsSync: {
+        awaitQueue: () => this.sessionsSync.awaitQueue(),
+        forceRefetch: () => { this.fetchSessions(); },
+      },
+      machinesSync: {
+        awaitQueue: () => this.machinesSync.awaitQueue(),
+        forceRefetch: () => { this.fetchMachines(); },
+      },
+      machineDataKeys: {
+        set: (machineId, key) => this.machineDataKeys.set(machineId, key),
+      },
+      assumeUsers: (userIds) => this.assumeUsers(userIds),
+      applySessions: this.applySessions.bind(this),
+      onSessionVisible: this.onSessionVisible.bind(this),
+      artifactDataKeys: {
+        get: (id) => this.artifactDataKeys.get(id),
+        set: (id, key) => this.artifactDataKeys.set(id, key),
+        delete: (id) => this.artifactDataKeys.delete(id),
+      },
+      enqueueMessages: this.enqueueMessages.bind(this),
+      addActivityUpdate: (update) => this.activityAccumulator.addUpdate(update),
+    };
+  }
+
+  /**
+   * Wire SyncUpdateIngest event subscribers (ADR-0026). Called from #init
+   * BEFORE subscribeToUpdates. Each `*.invalidate()` and listener Set call
+   * that used to live inside a SyncUpdate handler becomes a typed subscriber
+   * here — one place to audit every reaction to a server broadcast.
+   */
+  private registerIngestSubscribers() {
+    // Stale-sync subscribers translate ingest events back into the
+    // existing InvalidateSync triggers. This is the "many shallow handlers
+    // collapse to one place" payoff of ADR-0026.
+    ingestEvents.on("sessions-stale", () => this.sessionsSync.invalidate());
+    ingestEvents.on("machines-stale", () => this.machinesSync.invalidate());
+    ingestEvents.on("artifacts-stale", () => this.artifactsSync.invalidate());
+    ingestEvents.on("feed-stale", () => this.feedSync.invalidate());
+    ingestEvents.on("friends-stale", () => this.friendsSync.invalidate());
+    ingestEvents.on("friend-requests-stale", () =>
+      this.friendRequestsSync.invalidate(),
+    );
+    ingestEvents.on("projects-stale", () => this.projectsSync.invalidate());
+
+    // Research config changes fan out to per-feature listener Set. The Set
+    // itself is owned by Sync (Sync exposes register/unregister methods to
+    // feature modules); this subscriber is the single translation point
+    // from "kv update arrived" to "listener invoked per change".
+    ingestEvents.on("research-config-changed", (event) => {
+      for (const change of event.changes) {
+        for (const listener of this.researchConfigListeners) {
+          listener(change);
+        }
+      }
+    });
+
+    // PR 4 subscribers ----------------------------------------------------
+
+    // Session deletion cleanup: every Sync-class internal queue / map /
+    // flag that referenced this session is released here. The seam owns
+    // module-level cleanups (storage, encryption, cache, worktree); this
+    // subscriber owns *class-internal* state.
+    ingestEvents.on("session-deleted", (event) => {
+      const sessionId = event.sid;
+      this.deleted404Sessions.delete(sessionId);
+
+      const msgSync = this.messagesSync.get(sessionId);
+      if (msgSync) {
+        msgSync.stop();
+        this.messagesSync.delete(sessionId);
+      }
+      const sndSync = this.sendSync.get(sessionId);
+      if (sndSync) {
+        sndSync.stop();
+        this.sendSync.delete(sessionId);
+      }
+      this.pendingOutbox.delete(sessionId);
+      deleteLastSeq(sessionId);
+      this.messageProcessor.release(sessionId);
+    });
+
+    // Permission request notification: voice cue always; web notification
+    // only when the setting is enabled (platform check stays in the
+    // subscriber, not in the seam).
+    ingestEvents.on("permission-requested", (event) => {
+      // voiceHooks / notifyPermissionRequest currently require `string` for
+      // toolName even though the request payload's tool field is technically
+      // optional. Default to "" to preserve the existing call shape; a
+      // future signature update can accept undefined directly.
+      const toolName = event.toolName ?? "";
+      voiceHooks.onPermissionRequested(
+        event.sid,
+        event.requestId,
+        toolName,
+        event.toolArguments,
+      );
+      if (Platform.OS === "web" && storage.getState().settings.webNotifications) {
+        const permSession = storage.getState().sessions[event.sid];
+        if (permSession) {
+          const sessionName = getSessionName(permSession);
+          notifyPermissionRequest(
+            sessionName,
+            event.sid,
+            event.requestId,
+            toolName,
+            t("webNotification.permissionRequest"),
+            storage.getState().settings.webNotificationsPersistent,
+          );
+        }
+      }
+    });
+
+    // Permission resolved: clear notified-request tracking on web.
+    ingestEvents.on("permission-resolved", (event) => {
+      if (Platform.OS === "web") {
+        clearNotifiedRequests(event.resolvedRequestIds);
+      }
+    });
+
+    // Control returned to mobile: re-fetch messages so the user sees what
+    // happened while the agent was driving.
+    ingestEvents.on("session-control-returned", (event) => {
+      this.onSessionVisible(event.sid);
+    });
+
+    // Server settings just landed: re-layer local pending settings on top
+    // (pendingSettings is Sync-class internal — the seam doesn't see it).
+    ingestEvents.on("account-settings-applied", () => {
+      if (Object.keys(this.pendingSettings).length > 0) {
+        storage.getState().applySettingsLocal(this.pendingSettings);
+      }
+    });
+
+    // PR 5 subscribers (new-message) ---------------------------------------
+
+    // Terminal signal dispatch — the per-kind switch that used to live in
+    // syncUpdateHandlers.dispatchTerminalSignal moves here. The seam owns
+    // extraction (`extractTerminalSignalFromRaw`); the subscriber owns the
+    // presentation choice per kind.
+    ingestEvents.on("terminal-signal", (event) => {
+      const { sid, signal } = event;
+      switch (signal.kind) {
+        case "window-title": {
+          // Empty string is treated as "clear the title" — TUIs commonly
+          // emit `\x1b]0;\x07` to wipe a stale label, and the subtitle
+          // helper falls back to the static path when null.
+          const next =
+            signal.text && signal.text.length > 0 ? signal.text : null;
+          storage.getState().setTerminalTitle(sid, next);
+          return;
+        }
+        case "notification": {
+          const body = signal.text?.trim();
+          if (!body) return;
+          const session = storage.getState().sessions[sid];
+          const title = session ? getSessionName(session) : t("status.unknown");
+          // trigger: null = deliver immediately. Foreground delivery shows
+          // a banner; background delivery becomes a system notification.
+          Notifications.scheduleNotificationAsync({
+            content: { title, body, sound: false },
+            trigger: null,
+          }).catch((err) => {
+            log.log(`[terminal-signal] notification schedule failed: ${err}`);
+          });
+          return;
+        }
+        case "bell":
+          log.log(`[terminal-signal] bell from session ${sid}`);
+          return;
+        case "other":
+          log.log(
+            `[terminal-signal] OSC ${signal.oscCode ?? "?"} from session ${sid}: ${signal.text ?? ""}`,
+          );
+          return;
+      }
+    });
+
+    // Task completion: web notification (platform + setting gated) AND
+    // forward to issue-session completion handler if a link is processing.
+    ingestEvents.on("task-completed", (event) => {
+      const sid = event.sid;
+      const session = storage.getState().sessions[sid];
+
+      if (
+        session &&
+        Platform.OS === "web" &&
+        storage.getState().settings.webNotifications
+      ) {
+        const settings = storage.getState().settings;
+        const sessionName = getSessionName(session);
+        notifyTaskComplete(
+          sessionName,
+          sid,
+          t("webNotification.taskComplete"),
+          settings.webNotificationsPersistent,
+        );
+      }
+
+      const link = issueSessionStore.getState().findBySessionId(sid);
+      log.log(
+        `🔄 [IssueSession] turn-end: sid=${sid}, link=${link ? `${link.issueKey}(${link.status})` : "NONE"}`,
+      );
+      if (link && link.status === "processing") {
+        void issueHandleCompletion(link);
+      }
+    });
+
+    // Mutable tool observed → refresh per-session git status.
+    ingestEvents.on("mutable-tool-observed", (event) => {
+      gitStatusSync.invalidate(event.sid);
+    });
+
+    // Per-session message gap → trigger a refetch for that session's
+    // messagesSync (if one exists; gap on a session we're not tracking is
+    // a no-op).
+    ingestEvents.on("message-gap", (event) => {
+      this.getMessagesSync(event.sid)?.invalidate();
+    });
+
+    // PR 6 subscribers (SyncEphemeral fan-out) -----------------------------
+    // Each ephemeral listener Set on Sync gets exactly one subscriber. The
+    // Sets remain owned by Sync (feature modules register / unregister via
+    // Sync's public methods); the subscribers are the single translation
+    // point from "ephemeral arrived" to "iterate the Set".
+
+    ingestEvents.on("supervisor-status-update", (e) => {
+      for (const listener of this.supervisorStatusListeners) listener(e.event);
+    });
+    ingestEvents.on("task-log-chunk", (e) => {
+      for (const listener of this.taskLogListeners) {
+        listener(e.sessionId, e.taskId, e.chunk);
+      }
+    });
+    ingestEvents.on("task-status-changed", (e) => {
+      for (const listener of this.taskStatusListeners) listener(e.event);
+    });
+    ingestEvents.on("inbox-new-item", (e) => {
+      for (const listener of this.inboxNewItemListeners) listener(e.item);
+    });
+    ingestEvents.on("inbox-unread-count", (e) => {
+      for (const listener of this.inboxUnreadCountListeners) listener(e.count);
+    });
+    ingestEvents.on("session-event-created", (e) => {
+      for (const listener of this.sessionEventCreatedListeners) listener(e.event);
+    });
+    ingestEvents.on("inter-agent-message-received", (e) => {
+      for (const listener of this.interAgentMessageListeners) listener(e.message);
+    });
+    ingestEvents.on("supervisor-loop-status", (e) => {
+      for (const listener of this.supervisorLoopStatusListeners) listener(e.event);
+    });
+    ingestEvents.on("auto-loop-fired", (e) => {
+      for (const listener of this.autoLoopFiredListeners) listener(e.event);
+    });
+    ingestEvents.on("supervisor-loop-brief", (e) => {
+      for (const listener of this.supervisorLoopBriefListeners) listener(e.event);
+    });
+  }
+
   private handleUpdate = async (update: unknown) => {
     const validatedUpdate = ApiUpdateContainerSchema.safeParse(update);
     if (!validatedUpdate.success) {
@@ -2247,106 +2532,98 @@ class Sync {
     const ctx = this.updateHandlerCtx;
 
     if (updateData.body.t === "new-message") {
-      await handleNewMessageUpdate(updateData, updateData.body, ctx);
+      // PR 5: routed through ingest seam — emits 'terminal-signal',
+      // 'task-completed', 'mutable-tool-observed', 'message-gap' as
+      // applicable. Storage mutations (prompt suggestion, needsContinue,
+      // sdkSessionState, session thinking state) are applied inside the
+      // seam; subscribers handle the per-kind dispatch + web notification
+      // + git status invalidation + per-session refetch.
+      const events = await ingestSyncUpdate(updateData, this.ingestCtx);
+      ingestEvents.emit(events);
     } else if (updateData.body.t === "new-session") {
-      log.log("🆕 New session update received");
-      this.sessionsSync.invalidate();
+      // PR 3: routed through ingest seam — emits 'sessions-stale' which the
+      // subscriber registered in `registerIngestSubscribers()` translates
+      // into `sessionsSync.invalidate()`.
+      const events = await ingestSyncUpdate(updateData, this.ingestCtx);
+      ingestEvents.emit(events);
     } else if (updateData.body.t === "delete-session") {
-      handleDeleteSessionUpdate(updateData.body, ctx);
+      // PR 4: routed through ingest seam — emits 'session-deleted' which
+      // the subscriber translates into Sync-class queue cleanup (messagesSync,
+      // sendSync, pendingOutbox, lastSeq, deleted404Sessions, message processor).
+      const events = await ingestSyncUpdate(updateData, this.ingestCtx);
+      ingestEvents.emit(events);
     } else if (updateData.body.t === "update-session") {
-      await handleUpdateSessionUpdate(updateData, updateData.body, ctx);
+      // PR 4: routed through ingest seam — emits 'permission-requested'
+      // (voice + web notification), 'permission-resolved' (clear notified),
+      // and/or 'session-control-returned' (re-fetch messages).
+      const events = await ingestSyncUpdate(updateData, this.ingestCtx);
+      ingestEvents.emit(events);
     } else if (updateData.body.t === "update-account") {
-      await handleUpdateAccountUpdate(updateData, updateData.body, ctx);
-      if (Object.keys(this.pendingSettings).length > 0) {
-        storage.getState().applySettingsLocal(this.pendingSettings);
-      }
+      // PR 4: routed through ingest seam — emits 'account-settings-applied'
+      // when settings were decrypted; subscriber re-layers pendingSettings.
+      const events = await ingestSyncUpdate(updateData, this.ingestCtx);
+      ingestEvents.emit(events);
     } else if (updateData.body.t === "new-machine") {
-      // Brand-new machines (cold onboarding) arrive via 'new-machine' before
-      // fetchMachines has seen them, so per-machine encryption isn't initialized
-      // yet. The update carries the data encryption key — register it here
-      // (mirroring fetchMachines) or every later decrypt for this machine fails
-      // and it never lands in storage, leaving the new-session screen unable to
-      // start a session until an app restart triggers a full machine refetch.
-      const machineUpdate = updateData.body;
-      const machineId = machineUpdate.machineId;
-
-      const machineKeysMap = new Map<string, Uint8Array | null>();
-      if (machineUpdate.dataEncryptionKey) {
-        const decryptedKey = await this.encryption.decryptEncryptionKey(
-          machineUpdate.dataEncryptionKey,
-        );
-        if (decryptedKey) {
-          machineKeysMap.set(machineId, decryptedKey);
-          this.machineDataKeys.set(machineId, decryptedKey);
-        } else {
-          log.error(`Failed to decrypt data encryption key for new machine ${machineId}`);
-          machineKeysMap.set(machineId, null);
-        }
-      } else {
-        machineKeysMap.set(machineId, null);
-      }
-      await this.encryption.initializeMachines(machineKeysMap);
-
-      const machineEncryption = this.encryption.getMachineEncryption(machineId);
-      if (!machineEncryption) {
-        log.error(`Machine encryption not found for ${machineId} after init — cannot apply new-machine`);
-        return;
-      }
-
-      const existing = storage.getState().machines[machineId];
-      const newMachine: Machine = {
-        id: machineId,
-        seq: machineUpdate.seq,
-        createdAt: existing?.createdAt ?? machineUpdate.createdAt,
-        updatedAt: machineUpdate.updatedAt,
-        active: machineUpdate.active,
-        activeAt: machineUpdate.activeAt,
-        rpcReady: existing?.rpcReady ?? false,
-        metadata: null,
-        metadataVersion: machineUpdate.metadataVersion,
-        daemonState: null,
-        daemonStateVersion: machineUpdate.daemonStateVersion,
-      };
-
-      // Decrypt best-effort; still apply the machine on failure so it stays
-      // visible/usable (matches fetchMachines' fallback behavior).
-      try {
-        newMachine.metadata = machineUpdate.metadata
-          ? await machineEncryption.decryptMetadata(machineUpdate.metadataVersion, machineUpdate.metadata)
-          : null;
-        newMachine.daemonState = machineUpdate.daemonState
-          ? await machineEncryption.decryptDaemonState(machineUpdate.daemonStateVersion, machineUpdate.daemonState)
-          : null;
-      } catch (error) {
-        log.error(`Failed to decrypt new machine ${machineId}:`, error);
-      }
-
-      storage.getState().applyMachines([newMachine]);
+      // Per ADR-0026 PR 2: new-machine is the first variant migrated to the
+      // SyncUpdateIngest seam. The seam owns the encryption-key pre-step
+      // (previously the reason this 62-line block had to be inlined here),
+      // mirrors the decrypted key into Sync.machineDataKeys via
+      // `ctx.machineDataKeys.set`, and applies the new Machine to storage.
+      // The seam returns IngestEvent[]; for new-machine today the list is
+      // empty (no subscribers consume a machine-onboarding event), but the
+      // emit is wired so future events from this variant fan out correctly.
+      const events = await ingestSyncUpdate(updateData, this.ingestCtx);
+      ingestEvents.emit(events);
     } else if (updateData.body.t === "update-machine") {
-      await handleUpdateMachineUpdate(updateData, updateData.body, ctx);
+      // PR 4: routed through ingest seam — uses the same race-recovery
+      // primitives as new-machine; no subscriber-driven side effect today.
+      const events = await ingestSyncUpdate(updateData, this.ingestCtx);
+      ingestEvents.emit(events);
     } else if (updateData.body.t === "relationship-updated") {
-      handleRelationshipUpdate(updateData.body, ctx);
+      // PR 3: routed through ingest seam — emits ['friends-stale',
+      // 'friend-requests-stale', 'feed-stale'] after applying the storage
+      // mutation; subscribers in `registerIngestSubscribers()` call the
+      // matching invalidate().
+      const events = await ingestSyncUpdate(updateData, this.ingestCtx);
+      ingestEvents.emit(events);
     } else if (updateData.body.t === "new-artifact") {
-      await handleNewArtifactUpdate(updateData.body, ctx);
+      // PR 4: routed through ingest seam — populates artifactDataKeys via ctx,
+      // decrypts header/body, applies to storage.
+      const events = await ingestSyncUpdate(updateData, this.ingestCtx);
+      ingestEvents.emit(events);
     } else if (updateData.body.t === "update-artifact") {
-      await handleUpdateArtifactUpdate(updateData, updateData.body, ctx);
+      // PR 4: routed through ingest seam — emits 'artifacts-stale' when the
+      // existing artifact / data key is missing (recovery path).
+      const events = await ingestSyncUpdate(updateData, this.ingestCtx);
+      ingestEvents.emit(events);
     } else if (updateData.body.t === "delete-artifact") {
-      handleDeleteArtifactUpdate(updateData.body, ctx);
+      // PR 4: routed through ingest seam — storage delete + artifactDataKeys
+      // cleanup; no event.
+      const events = await ingestSyncUpdate(updateData, this.ingestCtx);
+      ingestEvents.emit(events);
     } else if (updateData.body.t === "new-feed-post") {
-      await handleNewFeedPostUpdate(updateData.body, ctx);
+      // PR 3: routed through ingest seam — handles the assumeUsers gating
+      // for friend_request / friend_accepted items inline; no event emitted
+      // today (feed-stale is reserved for the relationship-updated path,
+      // which arrives separately).
+      const events = await ingestSyncUpdate(updateData, this.ingestCtx);
+      ingestEvents.emit(events);
     } else if (updateData.body.t === "kv-batch-update") {
-      const { researchConfigChanges } = await handleKvBatchUpdate(updateData.body);
-      for (const change of researchConfigChanges) {
-        for (const listener of this.researchConfigListeners) {
-          listener(change);
-        }
-      }
+      // PR 3: routed through ingest seam — issueSessionStore changes are
+      // applied inside the seam; research-config changes fan out as a
+      // single 'research-config-changed' event whose subscriber iterates
+      // the listener Set (see `registerIngestSubscribers()`).
+      const events = await ingestSyncUpdate(updateData, this.ingestCtx);
+      ingestEvents.emit(events);
     } else if (
       updateData.body.t === "new-project" ||
       updateData.body.t === "update-project" ||
       updateData.body.t === "delete-project"
     ) {
-      handleProjectUpdate(updateData.body, ctx);
+      // PR 3: routed through ingest seam — emits 'projects-stale' which the
+      // subscriber translates into `projectsSync.invalidate()`.
+      const events = await ingestSyncUpdate(updateData, this.ingestCtx);
+      ingestEvents.emit(events);
     }
   };
 
@@ -2356,26 +2633,25 @@ class Sync {
     flushActivityUpdatesAction(this.applySessions.bind(this), updates);
   };
 
-  private get ephemeralHandlerCtx(): EphemeralHandlerContext {
-    return {
-      activityAccumulator: this.activityAccumulator,
-      applySessions: this.applySessions.bind(this),
-      supervisorStatusListeners: this.supervisorStatusListeners,
-      researchConfigListeners: this.researchConfigListeners,
-      taskLogListeners: this.taskLogListeners,
-      taskStatusListeners: this.taskStatusListeners,
-      supervisorLoopStatusListeners: this.supervisorLoopStatusListeners,
-      supervisorLoopBriefListeners: this.supervisorLoopBriefListeners,
-      autoLoopFiredListeners: this.autoLoopFiredListeners,
-      inboxNewItemListeners: this.inboxNewItemListeners,
-      inboxUnreadCountListeners: this.inboxUnreadCountListeners,
-      sessionEventCreatedListeners: this.sessionEventCreatedListeners,
-      interAgentMessageListeners: this.interAgentMessageListeners,
-    };
-  }
-
+  /**
+   * Ephemeral entry point (PR 6, ADR-0026). Parses the wire shape and routes
+   * it through `ingestSyncEphemeral`; subscribers registered in
+   * `registerIngestSubscribers` translate the returned events back into
+   * listener-Set fan-out. Storage mutations (activity, machine-activity,
+   * rpc-ready, usage, knowledge-count / -access-update) are applied inside
+   * the seam. The legacy `EphemeralHandlerContext` and the per-listener-Set
+   * wiring it carried are gone.
+   */
   private handleEphemeralUpdate = (update: unknown) => {
-    handleEphemeralUpdateAction(this.ephemeralHandlerCtx, update);
+    const validated = ApiEphemeralUpdateSchema.safeParse(update);
+    if (!validated.success) {
+      log.log(`Invalid ephemeral update received: ${validated.error}`);
+      return;
+    }
+    const events = ingestSyncEphemeral(validated.data, this.ingestCtx);
+    if (events.length > 0) {
+      ingestEvents.emit(events);
+    }
   };
 
   //
