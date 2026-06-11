@@ -234,6 +234,7 @@ describe("modelModeOptions", () => {
       expect(keys).toContain("opus");
       expect(keys).toContain("opus-4-7");
       expect(keys).toContain("opus-4-8");
+      expect(keys).toContain("fable-5");
     });
 
     it("all options have non-empty description", () => {

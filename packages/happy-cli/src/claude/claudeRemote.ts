@@ -116,6 +116,9 @@ export function resolveModelKey(
     case "opus-4-8":
     case "opus-4-8-1m":
       return "claude-opus-4-8[1m]";
+    case "fable-5":
+    case "fable-5-1m":
+      return "claude-fable-5[1m]";
     // Remaining keys (haiku, opusplan, etc.) pass through unchanged.
     default:
       return modelKey;
@@ -139,6 +142,8 @@ export function is1MModelKey(modelKey: string | undefined): boolean {
     case "opus-4-7-1m":
     case "opus-4-8":
     case "opus-4-8-1m":
+    case "fable-5":
+    case "fable-5-1m":
       return true;
     default:
       return false;

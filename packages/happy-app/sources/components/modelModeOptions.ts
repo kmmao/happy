@@ -77,6 +77,9 @@ const CLAUDE_MODEL_PRICING: Record<string, string> = {
   "opus-4-7-1m": "$5/$25",
   "opus-4-8": "$5/$25",
   "opus-4-8-1m": "$5/$25",
+  // Fable 5: 1M context by default, $10/$50 per Mtok (input/output).
+  "fable-5": "$10/$50",
+  "fable-5-1m": "$10/$50",
 };
 
 function enrichDescription(code: string, description: string | null | undefined): string | null {
@@ -205,9 +208,14 @@ export function getClaudeModelModes(): ModelMode[] {
       description: "Sonnet 4.6 \u00B7 $3/$15",
     },
     {
+      key: "fable-5",
+      name: "Fable 5",
+      description: "Fable 5 \u00B7 Latest \u00B7 $10/$50",
+    },
+    {
       key: "opus-4-8",
       name: "Opus 4.8",
-      description: "Opus 4.8 \u00B7 Latest \u00B7 $5/$25",
+      description: "Opus 4.8 \u00B7 Newest Opus \u00B7 $5/$25",
     },
     {
       key: "opus-4-7",

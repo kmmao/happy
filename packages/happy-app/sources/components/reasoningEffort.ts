@@ -18,10 +18,11 @@ const ALL_EFFORT_LEVELS = [
 
 type EffortLevel = (typeof ALL_EFFORT_LEVELS)[number];
 
-// Opus 4.7 and 4.8 support xhigh natively (SDK 0.2.112+). When the SDK omits
-// xhigh from supportedEffortLevels for these models, surface it anyway so users
+// Opus 4.7/4.8 and Fable 5 support xhigh natively (SDK 0.2.112+ for Opus, 1M
+// context Fable 5 inherits the same effort surface). When the SDK omits xhigh
+// from supportedEffortLevels for these models, surface it anyway so users
 // aren't forced back to max.
-const OPUS_XHIGH_MODEL_CODES = new Set([
+const XHIGH_CAPABLE_MODEL_CODES = new Set([
     "opus-4-7",
     "opus-4-7-1m",
     "claude-opus-4-7",
@@ -30,14 +31,19 @@ const OPUS_XHIGH_MODEL_CODES = new Set([
     "opus-4-8-1m",
     "claude-opus-4-8",
     "claude-opus-4-8[1m]",
+    "fable-5",
+    "fable-5-1m",
+    "claude-fable-5",
+    "claude-fable-5[1m]",
 ]);
 
-function isOpusXhighModelCode(code: string | null | undefined): boolean {
+function isXhighCapableModelCode(code: string | null | undefined): boolean {
     if (!code) return false;
     return (
-        OPUS_XHIGH_MODEL_CODES.has(code) ||
+        XHIGH_CAPABLE_MODEL_CODES.has(code) ||
         code.startsWith("claude-opus-4-7") ||
-        code.startsWith("claude-opus-4-8")
+        code.startsWith("claude-opus-4-8") ||
+        code.startsWith("claude-fable-5")
     );
 }
 
@@ -106,7 +112,7 @@ export function getVisibleEffortLevels(params: {
             ? params.modelModeKey
             : params.currentModelCode ?? params.metadata?.currentModelCode ?? null;
 
-    if (!isOpusXhighModelCode(selectedModelCode)) {
+    if (!isXhighCapableModelCode(selectedModelCode)) {
         return baseLevels;
     }
 
