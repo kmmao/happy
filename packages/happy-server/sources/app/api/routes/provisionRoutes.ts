@@ -2,6 +2,7 @@ import { z } from "zod";
 import { createHash, randomBytes } from "node:crypto";
 import tweetnacl from "tweetnacl";
 import { type Fastify } from "../types";
+import { assertOwnedProvisionToken, ownedProvisionToken } from "../ownership";
 import { db } from "@/storage/db";
 import { auth } from "@/app/auth/auth";
 import { log } from "@/utils/log";
@@ -127,12 +128,7 @@ export function provisionRoutes(app: Fastify) {
         const { id } = request.params;
         const { webappUrl, ttydUrl } = request.body;
 
-        const token = await db.provisionToken.findFirst({
-            where: { id, accountId: request.userId },
-        });
-        if (!token) {
-            return reply.code(404).send({ error: "Token not found" });
-        }
+        await assertOwnedProvisionToken(request.userId, id);
 
         await db.provisionToken.update({
             where: { id },
@@ -160,13 +156,7 @@ export function provisionRoutes(app: Fastify) {
         const { id } = request.params;
         const accountId = request.userId;
 
-        const token = await db.provisionToken.findFirst({
-            where: { id, accountId },
-        });
-
-        if (!token) {
-            return reply.code(404).send({ error: "Token not found" });
-        }
+        const token = await ownedProvisionToken(accountId, id);
 
         if (!token.revokedAt) {
             return reply.code(400).send({ error: "Token is not revoked" });
@@ -197,13 +187,7 @@ export function provisionRoutes(app: Fastify) {
         const { id } = request.params;
         const accountId = request.userId;
 
-        const token = await db.provisionToken.findFirst({
-            where: { id, accountId },
-        });
-
-        if (!token) {
-            return reply.code(404).send({ error: "Token not found" });
-        }
+        const token = await ownedProvisionToken(accountId, id);
 
         if (token.revokedAt) {
             await db.provisionToken.delete({ where: { id } });

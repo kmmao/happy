@@ -5,6 +5,7 @@ import { z } from "zod";
 import { log } from "@/utils/log";
 import * as privacyKit from "privacy-kit";
 import { artifactVersionedUpdate } from "@/app/api/artifact/artifactVersionedUpdate";
+import { assertOwnedArtifact, ownedArtifact } from "../ownership";
 
 export function artifactsRoutes(app: Fastify) {
     // GET /v1/artifacts - List all artifacts for the account
@@ -109,16 +110,7 @@ export function artifactsRoutes(app: Fastify) {
         const { id } = request.params;
 
         try {
-            const artifact = await db.artifact.findFirst({
-                where: {
-                    id,
-                    accountId: userId
-                }
-            });
-
-            if (!artifact) {
-                return reply.code(404).send({ error: 'Artifact not found' });
-            }
+            const artifact = await ownedArtifact(userId, id);
 
             return reply.send({
                 id: artifact.id,
@@ -361,17 +353,7 @@ export function artifactsRoutes(app: Fastify) {
         const { id } = request.params;
 
         try {
-            // Check if artifact exists and belongs to user
-            const artifact = await db.artifact.findFirst({
-                where: {
-                    id,
-                    accountId: userId
-                }
-            });
-
-            if (!artifact) {
-                return reply.code(404).send({ error: 'Artifact not found' });
-            }
+            await assertOwnedArtifact(userId, id);
 
             // Delete artifact
             await db.artifact.delete({

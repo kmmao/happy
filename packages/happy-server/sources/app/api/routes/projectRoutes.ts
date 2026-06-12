@@ -3,6 +3,7 @@ import { type Fastify } from "../types";
 import { db } from "@/storage/db";
 import { z } from "zod";
 import { Prisma } from "@prisma/client";
+import { assertOwnedProject } from "../ownership";
 
 /**
  * Project CRUD + resolve routes.
@@ -170,13 +171,7 @@ export function projectRoutes(app: Fastify) {
             const { id } = request.params;
             const { metadata, repoUrl, archived } = request.body;
 
-            const existing = await db.project.findFirst({
-                where: { id, accountId: userId },
-            });
-
-            if (!existing) {
-                return reply.code(404).send({ error: "Project not found" });
-            }
+            await assertOwnedProject(userId, id);
 
             const data: Prisma.ProjectUpdateInput = {};
             if (metadata !== undefined) {
@@ -224,13 +219,7 @@ export function projectRoutes(app: Fastify) {
             const userId = request.userId;
             const { id } = request.params;
 
-            const existing = await db.project.findFirst({
-                where: { id, accountId: userId },
-            });
-
-            if (!existing) {
-                return reply.code(404).send({ error: "Project not found" });
-            }
+            await assertOwnedProject(userId, id);
 
             // Sessions will have projectId set to null via onDelete: SetNull
             await db.project.delete({ where: { id } });
@@ -312,13 +301,7 @@ export function projectRoutes(app: Fastify) {
             const { id } = request.params;
             const { sessionIds } = request.body;
 
-            const project = await db.project.findFirst({
-                where: { id, accountId: userId },
-            });
-
-            if (!project) {
-                return reply.code(404).send({ error: "Project not found" });
-            }
+            await assertOwnedProject(userId, id);
 
             // Update sessions to link to this project
             const result = await db.session.updateMany({

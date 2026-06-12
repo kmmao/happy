@@ -10,6 +10,7 @@ import {
     DISMISSED_APPROVALS,
     ACTIVE_FIX_STATUSES,
 } from "@/modules/supervisorActionLogic";
+import { assertOwnedProject } from "../ownership";
 
 /**
  * Supervisor action routes for the approval workflow.
@@ -54,14 +55,7 @@ export function supervisorActionRoutes(app: Fastify) {
             const limit = request.query?.limit ?? 50;
             const offset = request.query?.offset ?? 0;
 
-            const project = await db.project.findFirst({
-                where: { id, accountId: userId },
-                select: { id: true },
-            });
-
-            if (!project) {
-                return reply.code(404).send({ error: "Project not found" });
-            }
+            await assertOwnedProject(userId, id);
 
             const where: Record<string, unknown> = {
                 projectId: id,
@@ -198,14 +192,7 @@ export function supervisorActionRoutes(app: Fastify) {
             const { id } = request.params;
             const { actionIds, approval } = request.body;
 
-            const project = await db.project.findFirst({
-                where: { id, accountId: userId },
-                select: { id: true },
-            });
-
-            if (!project) {
-                return reply.code(404).send({ error: "Project not found" });
-            }
+            await assertOwnedProject(userId, id);
 
             const result = await db.supervisorAction.updateMany({
                 where: {
@@ -234,14 +221,7 @@ export function supervisorActionRoutes(app: Fastify) {
             const userId = request.userId;
             const { id } = request.params;
 
-            const project = await db.project.findFirst({
-                where: { id, accountId: userId },
-                select: { id: true },
-            });
-
-            if (!project) {
-                return reply.code(404).send({ error: "Project not found" });
-            }
+            await assertOwnedProject(userId, id);
 
             const result = await db.supervisorAction.deleteMany({
                 where: {
@@ -300,14 +280,7 @@ export function supervisorActionRoutes(app: Fastify) {
             const userId = request.userId;
             const { id } = request.params;
 
-            const project = await db.project.findFirst({
-                where: { id, accountId: userId },
-                select: { id: true },
-            });
-
-            if (!project) {
-                return reply.code(404).send({ error: "Project not found" });
-            }
+            await assertOwnedProject(userId, id);
 
             const [approvalGroups, fixGroups] = await Promise.all([
                 db.supervisorAction.groupBy({

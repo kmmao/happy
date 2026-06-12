@@ -6,6 +6,7 @@ import { log } from "@/utils/log";
 import { parseAutoApproveSeverities } from "@/modules/supervisorConfig";
 import { parseConcurrencyConfig } from "./supervisorRunRoutes";
 import { emitConfiguredSupervisorFixTrigger } from "@/modules/supervisorFixTrigger";
+import { assertOwnedProject, ownedProject } from "../ownership";
 
 /**
  * Supervisor config and action-reprocessing routes.
@@ -66,14 +67,7 @@ export function supervisorRoutes(app: Fastify) {
                 autoLoopDebounceMinutes,
             } = request.body;
 
-            const existing = await db.project.findFirst({
-                where: { id, accountId: userId },
-                select: { id: true },
-            });
-
-            if (!existing) {
-                return reply.code(404).send({ error: "Project not found" });
-            }
+            await assertOwnedProject(userId, id);
 
             // Build update data with plaintext scheduling fields
             const updateData: Prisma.ProjectUpdateInput = {
@@ -157,13 +151,7 @@ export function supervisorRoutes(app: Fastify) {
             const userId = request.userId;
             const { id } = request.params;
 
-            const existing = await db.project.findFirst({
-                where: { id, accountId: userId },
-                select: { id: true, lastAutoLoopStartedAt: true },
-            });
-            if (!existing) {
-                return reply.code(404).send({ error: "Project not found" });
-            }
+            const existing = await ownedProject(userId, id);
 
             await db.project.update({
                 where: { id },
@@ -195,21 +183,7 @@ export function supervisorRoutes(app: Fastify) {
             const { id } = request.params;
             const { mode } = request.body;
 
-            const project = await db.project.findFirst({
-                where: { id, accountId: userId },
-                select: {
-                    id: true,
-                    supervisorConfig: true,
-                    machineId: true,
-                    path: true,
-                    repoUrl: true,
-                    fixStrategy: true,
-                },
-            });
-
-            if (!project) {
-                return reply.code(404).send({ error: "Project not found" });
-            }
+            const project = await ownedProject(userId, id);
 
             // Parse configured severities from project config
             const severities = parseAutoApproveSeverities(project.supervisorConfig, mode);

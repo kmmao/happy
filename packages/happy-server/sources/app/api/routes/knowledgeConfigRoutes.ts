@@ -1,6 +1,7 @@
 import { type Fastify } from "../types";
 import { db } from "@/storage/db";
 import { z } from "zod";
+import { assertOwnedProject } from "../ownership";
 import {
     KnowledgeConfigSchema,
     parseKnowledgeConfig,
@@ -28,6 +29,8 @@ export function knowledgeConfigRoutes(app: Fastify) {
             const userId = request.userId;
             const { id } = request.params;
 
+            // Narrow data select (ADR-0027: data-bearing selects stay
+            // hand-rolled) — the handler needs only knowledgeConfig.
             const project = await db.project.findFirst({
                 where: { id, accountId: userId },
                 select: { knowledgeConfig: true },
@@ -101,12 +104,7 @@ export function knowledgeConfigRoutes(app: Fastify) {
             const userId = request.userId;
             const { id } = request.params;
 
-            const project = await db.project.findFirst({
-                where: { id, accountId: userId },
-            });
-            if (!project) {
-                return reply.code(404).send({ error: "Project not found" });
-            }
+            await assertOwnedProject(userId, id);
 
             await db.project.update({
                 where: { id },

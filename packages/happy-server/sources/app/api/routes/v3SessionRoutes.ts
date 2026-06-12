@@ -3,6 +3,7 @@ import { db } from "@/storage/db";
 import { allocateSessionSeqBatch } from "@/storage/seq";
 import { z } from "zod";
 import { type Fastify } from "../types";
+import { assertOwnedSession, OwnedEntityNotFound } from "../ownership";
 
 // Simple per-session 404 cache to prevent repeated DB lookups from buggy clients.
 // Caches (userId:sessionId) → timestamp of last 404 response.
@@ -35,6 +36,30 @@ function cacheNotFound(key: string): void {
         }
     }
     notFoundCache.set(key, Date.now());
+}
+
+// 404-cache wrapper around the ownership guard. A cached miss short-circuits
+// without a DB query; a fresh miss is cached. Both surface as the same
+// OwnedEntityNotFound the global error handler maps to the legacy flat 404
+// body, so the cached and uncached paths are wire-identical. Only the
+// not-found case is cached — a transient DB error must not poison the cache.
+async function assertSessionWithNotFoundCache(
+    userId: string,
+    sessionId: string,
+): Promise<void> {
+    const cacheKey = `${userId}:${sessionId}`;
+    const cachedAt = notFoundCache.get(cacheKey);
+    if (cachedAt && Date.now() - cachedAt < NOT_FOUND_WINDOW_MS) {
+        throw new OwnedEntityNotFound("Session");
+    }
+    try {
+        await assertOwnedSession(userId, sessionId);
+    } catch (error) {
+        if (error instanceof OwnedEntityNotFound) {
+            cacheNotFound(cacheKey);
+        }
+        throw error;
+    }
 }
 
 const getMessagesQuerySchema = z.object({
@@ -113,26 +138,7 @@ export function v3SessionRoutes(app: Fastify) {
       }
       const after_seq = afterSeqRaw ?? 0;
 
-      // Check 404 cache before hitting DB — prevents repeated DB lookups
-      // for sessions that were already confirmed not to exist.
-      const cacheKey = `${userId}:${sessionId}`;
-      const cachedAt = notFoundCache.get(cacheKey);
-      if (cachedAt && Date.now() - cachedAt < NOT_FOUND_WINDOW_MS) {
-        return reply.code(404).send({ error: "Session not found" });
-      }
-
-      const session = await db.session.findFirst({
-        where: {
-          id: sessionId,
-          accountId: userId,
-        },
-        select: { id: true },
-      });
-
-      if (!session) {
-        cacheNotFound(cacheKey);
-        return reply.code(404).send({ error: "Session not found" });
-      }
+      await assertSessionWithNotFoundCache(userId, sessionId);
 
       // before_seq: reverse pagination — fetch newest messages first.
       // Returns messages with seq < before_seq, ordered by seq DESC,
@@ -213,24 +219,7 @@ export function v3SessionRoutes(app: Fastify) {
       const { sessionId } = request.params;
       const { messages } = request.body;
 
-      const cacheKey = `${userId}:${sessionId}`;
-      const cachedAt = notFoundCache.get(cacheKey);
-      if (cachedAt && Date.now() - cachedAt < NOT_FOUND_WINDOW_MS) {
-        return reply.code(404).send({ error: "Session not found" });
-      }
-
-      const session = await db.session.findFirst({
-        where: {
-          id: sessionId,
-          accountId: userId,
-        },
-        select: { id: true },
-      });
-
-      if (!session) {
-        cacheNotFound(cacheKey);
-        return reply.code(404).send({ error: "Session not found" });
-      }
+      await assertSessionWithNotFoundCache(userId, sessionId);
 
       const firstMessageByLocalId = new Map<
         string,

@@ -1,6 +1,7 @@
 import { type Fastify } from "../types";
 import { db } from "@/storage/db";
 import { z } from "zod";
+import { assertOwnedSession } from "../ownership";
 
 const SessionEventTypeSchema = z.enum([
     "file_edit", "bash_command", "tool_call", "git_operation",
@@ -49,14 +50,7 @@ export function sessionEventRoutes(app: Fastify) {
             const { sessionId } = request.params;
             const { eventType, limit, offset } = request.query;
 
-            // Verify session belongs to user
-            const session = await db.session.findFirst({
-                where: { id: sessionId, accountId: userId },
-                select: { id: true },
-            });
-            if (!session) {
-                return reply.status(404).send({ error: "session-not-found" });
-            }
+            await assertOwnedSession(userId, sessionId);
 
             const where: Record<string, unknown> = { sessionId };
             if (eventType) where.eventType = eventType;

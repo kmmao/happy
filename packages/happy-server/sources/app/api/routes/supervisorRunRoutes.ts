@@ -7,6 +7,7 @@ import { emitResolvedSupervisorRunTrigger } from "@/modules/supervisorRunTrigger
 import { resolveConfiguredSupervisorProfile } from "@/modules/supervisorConfiguredProfile";
 import { ResolvedRuntimeProfileSchema } from "@/types/aiBackendProfile";
 import { supervisorRunStatusApply } from "../supervisor/supervisorRunStatusApply";
+import { assertOwnedProject, ownedProject } from "../ownership";
 
 /**
  * Supervisor run routes: trigger, list, detail, cancel, and status updates.
@@ -42,14 +43,7 @@ export function supervisorRunRoutes(app: Fastify) {
             const userId = request.userId;
             const { id } = request.params;
 
-            const project = await db.project.findFirst({
-                where: { id, accountId: userId },
-                select: { id: true, machineId: true, path: true, supervisorMode: true, supervisorEnabledDimensions: true, supervisorCustomRules: true, supervisorConfig: true },
-            });
-
-            if (!project) {
-                return reply.code(404).send({ error: "Project not found" });
-            }
+            const project = await ownedProject(userId, id);
 
             const resolvedRunProfile = await resolveConfiguredSupervisorProfile({
                 userId,
@@ -215,14 +209,7 @@ export function supervisorRunRoutes(app: Fastify) {
             const offset = request.query?.offset ?? 0;
             const triggerFilter = request.query?.trigger;
 
-            const project = await db.project.findFirst({
-                where: { id, accountId: userId },
-                select: { id: true },
-            });
-
-            if (!project) {
-                return reply.code(404).send({ error: "Project not found" });
-            }
+            await assertOwnedProject(userId, id);
 
             const where = {
                 projectId: id,

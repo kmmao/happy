@@ -1,6 +1,7 @@
 import { type Fastify } from "../types";
 import { db } from "@/storage/db";
 import { z } from "zod";
+import { assertOwnedProject } from "../ownership";
 import { getRelations, addRelations, removeRelationById, serializeRelation, type KnowledgeRelationType } from "@/modules/knowledgeRelation";
 import { runDecayArchive } from "@/modules/knowledgeDecay";
 import { runMergeJob } from "@/modules/knowledgeMergeJob";
@@ -24,12 +25,7 @@ export function knowledgeLifecycleRoutes(app: Fastify) {
             const userId = request.userId;
             const { id, entryId } = request.params;
 
-            const project = await db.project.findFirst({
-                where: { id, accountId: userId },
-            });
-            if (!project) {
-                return reply.code(404).send({ error: "Project not found" });
-            }
+            await assertOwnedProject(userId, id);
 
             // Verify entry belongs to this project
             const entry = await db.projectKnowledge.findFirst({
@@ -66,12 +62,7 @@ export function knowledgeLifecycleRoutes(app: Fastify) {
             const { id, entryId } = request.params;
             const { toEntryId, relationType, metadata } = request.body;
 
-            const project = await db.project.findFirst({
-                where: { id, accountId: userId },
-            });
-            if (!project) {
-                return reply.code(404).send({ error: "Project not found" });
-            }
+            await assertOwnedProject(userId, id);
 
             // Verify both entries exist in this project
             const count = await db.projectKnowledge.count({
@@ -105,12 +96,7 @@ export function knowledgeLifecycleRoutes(app: Fastify) {
             const userId = request.userId;
             const { id, relationId } = request.params;
 
-            const project = await db.project.findFirst({
-                where: { id, accountId: userId },
-            });
-            if (!project) {
-                return reply.code(404).send({ error: "Project not found" });
-            }
+            await assertOwnedProject(userId, id);
 
             // Verify the relation belongs to an entry in this project (prevent IDOR)
             const relation = await db.knowledgeRelation.findFirst({
@@ -138,12 +124,7 @@ export function knowledgeLifecycleRoutes(app: Fastify) {
             const userId = request.userId;
             const { id } = request.params;
 
-            const project = await db.project.findFirst({
-                where: { id, accountId: userId },
-            });
-            if (!project) {
-                return reply.code(404).send({ error: "Project not found" });
-            }
+            await assertOwnedProject(userId, id);
 
             const config = await resolveKnowledgeConfig(id);
             if (!config.decayEnabled) {
@@ -168,12 +149,7 @@ export function knowledgeLifecycleRoutes(app: Fastify) {
             const userId = request.userId;
             const { id } = request.params;
 
-            const project = await db.project.findFirst({
-                where: { id, accountId: userId },
-            });
-            if (!project) {
-                return reply.code(404).send({ error: "Project not found" });
-            }
+            await assertOwnedProject(userId, id);
 
             const [active, superseded, archived, totalRelations] = await Promise.all([
                 db.projectKnowledge.count({ where: { projectId: id, status: "active" } }),
@@ -207,12 +183,7 @@ export function knowledgeLifecycleRoutes(app: Fastify) {
             const userId = request.userId;
             const { id } = request.params;
 
-            const project = await db.project.findFirst({
-                where: { id, accountId: userId },
-            });
-            if (!project) {
-                return reply.code(404).send({ error: "Project not found" });
-            }
+            await assertOwnedProject(userId, id);
 
             const rows = await db.$queryRaw<Array<{ date: string; created: bigint; superseded: bigint; archived: bigint }>>`
                 WITH days AS (
@@ -278,12 +249,7 @@ export function knowledgeLifecycleRoutes(app: Fastify) {
             const userId = request.userId;
             const { id } = request.params;
 
-            const project = await db.project.findFirst({
-                where: { id, accountId: userId },
-            });
-            if (!project) {
-                return reply.code(404).send({ error: "Project not found" });
-            }
+            await assertOwnedProject(userId, id);
 
             const config = await resolveKnowledgeConfig(id);
             if (!config.mergeEnabled) {

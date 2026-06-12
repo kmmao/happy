@@ -2,6 +2,7 @@ import { emitSyncEphemeral } from "@/app/events/syncEphemeral";
 import { type Fastify } from "../types";
 import { db } from "@/storage/db";
 import { z } from "zod";
+import { ownedWebhookTrigger } from "../ownership";
 import { log } from "@/utils/log";
 import crypto from "crypto";
 import { inTx } from "@/storage/inTx";
@@ -385,12 +386,7 @@ export function webhookTriggerRoutes(app: Fastify) {
             schema: { params: z.object({ id: z.string() }) },
         },
         async (request, reply) => {
-            const trigger = await db.webhookTrigger.findFirst({
-                where: { id: request.params.id, accountId: request.userId },
-            });
-            if (!trigger) {
-                return reply.code(404).send({ error: "Webhook trigger not found" });
-            }
+            const trigger = await ownedWebhookTrigger(request.userId, request.params.id);
             return reply.send({ webhookTrigger: serializeWebhookTrigger(trigger) });
         },
     );
@@ -406,12 +402,7 @@ export function webhookTriggerRoutes(app: Fastify) {
             },
         },
         async (request, reply) => {
-            const trigger = await db.webhookTrigger.findFirst({
-                where: { id: request.params.id, accountId: request.userId },
-            });
-            if (!trigger) {
-                return reply.code(404).send({ error: "Webhook trigger not found" });
-            }
+            const trigger = await ownedWebhookTrigger(request.userId, request.params.id);
 
             const { name, prompt, priority, enabled, skillIds, profileId } = request.body;
             const data: Record<string, unknown> = {};
@@ -440,12 +431,7 @@ export function webhookTriggerRoutes(app: Fastify) {
             schema: { params: z.object({ id: z.string() }) },
         },
         async (request, reply) => {
-            const trigger = await db.webhookTrigger.findFirst({
-                where: { id: request.params.id, accountId: request.userId },
-            });
-            if (!trigger) {
-                return reply.code(404).send({ error: "Webhook trigger not found" });
-            }
+            const trigger = await ownedWebhookTrigger(request.userId, request.params.id);
 
             const { secret, secretHash } = generateSecret();
 
@@ -467,12 +453,7 @@ export function webhookTriggerRoutes(app: Fastify) {
             schema: { params: z.object({ id: z.string() }) },
         },
         async (request, reply) => {
-            const trigger = await db.webhookTrigger.findFirst({
-                where: { id: request.params.id, accountId: request.userId },
-            });
-            if (!trigger) {
-                return reply.code(404).send({ error: "Webhook trigger not found" });
-            }
+            const trigger = await ownedWebhookTrigger(request.userId, request.params.id);
 
             await db.webhookTrigger.delete({ where: { id: trigger.id } });
             return reply.send({ deleted: true });

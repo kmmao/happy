@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { type Fastify } from "../types";
+import { ownedWebhookRoute } from "../ownership";
 import { log } from "@/utils/log";
 import { db } from "@/storage/db";
 import { encryptString, decryptString } from "@/modules/encrypt";
@@ -248,12 +249,7 @@ export function webhookRoutes(app: Fastify) {
       const userId = request.userId;
       const { id } = request.params as { id: string };
 
-      const route = await db.webhookRoute.findFirst({
-        where: { id, accountId: userId },
-      });
-      if (!route) {
-        return reply.code(404).send({ error: "Route not found" });
-      }
+      const route = await ownedWebhookRoute(userId, id);
 
       // Delete remote webhook from Git platform (best-effort)
       if (route.remoteWebhookId && route.apiToken) {

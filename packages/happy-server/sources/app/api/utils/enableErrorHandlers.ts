@@ -2,6 +2,7 @@ import { log } from "@/utils/log";
 import { Fastify } from "../types";
 import { FastifyError } from "fastify";
 import { apiError } from "./apiError";
+import { OwnedEntityNotFound } from "../ownership";
 import { IncomingHttpHeaders } from "http";
 
 const SENSITIVE_HEADER_PATTERNS = [/^authorization$/i, /^cookie$/i, /^set-cookie$/i, /^x-happy-/i];
@@ -21,6 +22,14 @@ export function sanitizeHeaders(headers: IncomingHttpHeaders): Record<string, st
 export function enableErrorHandlers(app: Fastify) {
     // Global error handler
     app.setErrorHandler(async (error: FastifyError, request, reply) => {
+        // Ownership loaders signal "not yours / does not exist" by throwing.
+        // Routes historically reply with a flat { error: "<Entity> not found" }
+        // body for this case (clients and specs assert that shape), so it is
+        // mapped here instead of the apiError envelope below.
+        if (error instanceof OwnedEntityNotFound) {
+            return reply.code(404).send({ error: error.message });
+        }
+
         const method = request.method;
         const url = request.url;
         const userAgent = request.headers['user-agent'] || 'unknown';

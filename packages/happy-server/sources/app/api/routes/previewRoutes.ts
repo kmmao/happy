@@ -1,6 +1,7 @@
 import { type Fastify } from "../types";
 import { db } from "@/storage/db";
 import { z } from "zod";
+import { assertOwnedSession, ownedSession } from "../ownership";
 import { randomKeyNaked } from "@/utils/randomKeyNaked";
 import {
     PreviewCandidateReportSchema,
@@ -49,14 +50,7 @@ export function previewRoutes(app: Fastify) {
             const { sessionId } = request.params;
             const candidateData = request.body;
 
-            // Verify session belongs to user
-            const session = await db.session.findFirst({
-                where: { id: sessionId, accountId: userId },
-                select: { id: true, projectId: true },
-            });
-            if (!session) {
-                return reply.status(404).send({ error: "session-not-found" });
-            }
+            const session = await ownedSession(userId, sessionId);
 
             // Resolve machineId from session's project
             let candidateMachineId = "";
@@ -141,14 +135,7 @@ export function previewRoutes(app: Fastify) {
                 });
             }
 
-            // Verify session belongs to user and get project/machineId
-            const session = await db.session.findFirst({
-                where: { id: sessionId, accountId: userId },
-                select: { id: true, projectId: true },
-            });
-            if (!session) {
-                return reply.status(404).send({ error: "session-not-found" });
-            }
+            const session = await ownedSession(userId, sessionId);
 
             // Get project to find machineId
             let machineId = "";
@@ -249,14 +236,7 @@ export function previewRoutes(app: Fastify) {
             const { sessionId } = request.params;
             const { tunnelId } = request.body;
 
-            // Verify session belongs to user
-            const session = await db.session.findFirst({
-                where: { id: sessionId, accountId: userId },
-                select: { id: true },
-            });
-            if (!session) {
-                return reply.status(404).send({ error: "session-not-found" });
-            }
+            await assertOwnedSession(userId, sessionId);
 
             // Tell daemon to stop proxying
             const existingConnection = previewStore.getConnection(tunnelId);
@@ -296,13 +276,7 @@ export function previewRoutes(app: Fastify) {
             const { sessionId } = request.params;
             const { tunnelId } = request.body;
 
-            const session = await db.session.findFirst({
-                where: { id: sessionId, accountId: userId },
-                select: { id: true },
-            });
-            if (!session) {
-                return reply.status(404).send({ error: "session-not-found" });
-            }
+            await assertOwnedSession(userId, sessionId);
 
             const conn = previewStore.getConnection(tunnelId);
             if (!conn || conn.sessionId !== sessionId) {
@@ -351,14 +325,7 @@ export function previewRoutes(app: Fastify) {
             const userId = request.userId;
             const { sessionId } = request.params;
 
-            // Verify session belongs to user
-            const session = await db.session.findFirst({
-                where: { id: sessionId, accountId: userId },
-                select: { id: true },
-            });
-            if (!session) {
-                return reply.status(404).send({ error: "session-not-found" });
-            }
+            await assertOwnedSession(userId, sessionId);
 
             const candidate = previewStore.getCandidateBySession(sessionId);
             const connection = previewStore.getConnectionBySession(sessionId);

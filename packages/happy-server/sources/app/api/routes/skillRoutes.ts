@@ -2,6 +2,7 @@ import { type Fastify } from "../types";
 import { db } from "@/storage/db";
 import { z } from "zod";
 import { log } from "@/utils/log";
+import { assertOwnedProject, ownedSkill } from "../ownership";
 
 // Inline Zod schemas (mirrored from @kmmao/happy-wire/skills — will import after wire publish)
 
@@ -48,13 +49,7 @@ export function skillRoutes(app: Fastify) {
 
             // Verify project ownership if scoped
             if (projectId) {
-                const project = await db.project.findFirst({
-                    where: { id: projectId, accountId: request.userId },
-                    select: { id: true },
-                });
-                if (!project) {
-                    return reply.code(404).send({ error: "Project not found" });
-                }
+                await assertOwnedProject(request.userId, projectId);
             }
 
             try {
@@ -130,12 +125,7 @@ export function skillRoutes(app: Fastify) {
             },
         },
         async (request, reply) => {
-            const skill = await db.skill.findFirst({
-                where: { id: request.params.id, accountId: request.userId },
-            });
-            if (!skill) {
-                return reply.code(404).send({ error: "Skill not found" });
-            }
+            const skill = await ownedSkill(request.userId, request.params.id);
             return reply.send({ skill: serializeSkill(skill) });
         },
     );
@@ -151,12 +141,7 @@ export function skillRoutes(app: Fastify) {
             },
         },
         async (request, reply) => {
-            const skill = await db.skill.findFirst({
-                where: { id: request.params.id, accountId: request.userId },
-            });
-            if (!skill) {
-                return reply.code(404).send({ error: "Skill not found" });
-            }
+            const skill = await ownedSkill(request.userId, request.params.id);
 
             const { name, description, content, attachments } = request.body;
             const data: Record<string, unknown> = {};
@@ -194,12 +179,7 @@ export function skillRoutes(app: Fastify) {
             },
         },
         async (request, reply) => {
-            const skill = await db.skill.findFirst({
-                where: { id: request.params.id, accountId: request.userId },
-            });
-            if (!skill) {
-                return reply.code(404).send({ error: "Skill not found" });
-            }
+            const skill = await ownedSkill(request.userId, request.params.id);
 
             const updated = await db.skill.update({
                 where: { id: skill.id },
@@ -219,12 +199,7 @@ export function skillRoutes(app: Fastify) {
             },
         },
         async (request, reply) => {
-            const skill = await db.skill.findFirst({
-                where: { id: request.params.id, accountId: request.userId },
-            });
-            if (!skill) {
-                return reply.code(404).send({ error: "Skill not found" });
-            }
+            const skill = await ownedSkill(request.userId, request.params.id);
 
             // Check for active task bindings
             const activeBindings = await db.taskSkillBinding.count({

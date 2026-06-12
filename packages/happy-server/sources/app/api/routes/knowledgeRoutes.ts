@@ -1,6 +1,7 @@
 import { type Fastify } from "../types";
 import { db } from "@/storage/db";
 import { z } from "zod";
+import { assertOwnedProject } from "../ownership";
 import { consolidate } from "@/modules/knowledgeConsolidate";
 import { inTx } from "@/storage/inTx";
 import { serializeKnowledgeEntry, parseProfileContent, safeParseJsonArray } from "@/modules/knowledgeSerialize";
@@ -167,12 +168,7 @@ export function knowledgeRoutes(app: Fastify) {
             const { id } = request.params;
             const { entryType, category, status, sessionId, tags, search, limit, offset } = request.query;
 
-            const project = await db.project.findFirst({
-                where: { id, accountId: userId },
-            });
-            if (!project) {
-                return reply.code(404).send({ error: "Project not found" });
-            }
+            await assertOwnedProject(userId, id);
 
             const where: Record<string, unknown> = {
                 projectId: id,
@@ -240,12 +236,7 @@ export function knowledgeRoutes(app: Fastify) {
             const { id } = request.params;
             const body = request.body;
 
-            const project = await db.project.findFirst({
-                where: { id, accountId: userId },
-            });
-            if (!project) {
-                return reply.code(404).send({ error: "Project not found" });
-            }
+            await assertOwnedProject(userId, id);
 
             // Honor the project-level knowledge switch (same as the socket path):
             // when disabled, drop the submission so nothing is written or refined.
@@ -357,12 +348,7 @@ export function knowledgeRoutes(app: Fastify) {
             const { id, entryId } = request.params;
             const body = request.body;
 
-            const project = await db.project.findFirst({
-                where: { id, accountId: userId },
-            });
-            if (!project) {
-                return reply.code(404).send({ error: "Project not found" });
-            }
+            await assertOwnedProject(userId, id);
 
             const entry = await db.projectKnowledge.findFirst({
                 where: { id: entryId, projectId: id },
@@ -401,12 +387,7 @@ export function knowledgeRoutes(app: Fastify) {
             const userId = request.userId;
             const { id, entryId } = request.params;
 
-            const project = await db.project.findFirst({
-                where: { id, accountId: userId },
-            });
-            if (!project) {
-                return reply.code(404).send({ error: "Project not found" });
-            }
+            await assertOwnedProject(userId, id);
 
             await db.projectKnowledge.delete({
                 where: { id: entryId, projectId: id },
@@ -429,12 +410,7 @@ export function knowledgeRoutes(app: Fastify) {
             const userId = request.userId;
             const { id, entryId } = request.params;
 
-            const project = await db.project.findFirst({
-                where: { id, accountId: userId },
-            });
-            if (!project) {
-                return reply.code(404).send({ error: "Project not found" });
-            }
+            await assertOwnedProject(userId, id);
 
             const knowledgeConfig = await resolveKnowledgeConfig(id);
             if (!knowledgeConfig.enabled) {
@@ -491,12 +467,7 @@ export function knowledgeRoutes(app: Fastify) {
             const userId = request.userId;
             const { id } = request.params;
 
-            const project = await db.project.findFirst({
-                where: { id, accountId: userId },
-            });
-            if (!project) {
-                return reply.code(404).send({ error: "Project not found" });
-            }
+            await assertOwnedProject(userId, id);
 
             const profileRecord = await db.projectProfile.findUnique({
                 where: { projectId: id },
@@ -533,12 +504,7 @@ export function knowledgeRoutes(app: Fastify) {
             const { id } = request.params;
             const { content, expectedVersion } = request.body;
 
-            const project = await db.project.findFirst({
-                where: { id, accountId: userId },
-            });
-            if (!project) {
-                return reply.code(404).send({ error: "Project not found" });
-            }
+            await assertOwnedProject(userId, id);
 
             if (expectedVersion !== undefined) {
                 // Atomic optimistic lock: update only if version matches
@@ -596,12 +562,7 @@ export function knowledgeRoutes(app: Fastify) {
             const userId = request.userId;
             const { id, entryId } = request.params;
 
-            const project = await db.project.findFirst({
-                where: { id, accountId: userId },
-            });
-            if (!project) {
-                return reply.code(404).send({ error: "Project not found" });
-            }
+            await assertOwnedProject(userId, id);
 
             const entry = await db.projectKnowledge.findFirst({
                 where: { id: entryId, projectId: id },
@@ -628,12 +589,7 @@ export function knowledgeRoutes(app: Fastify) {
             const userId = request.userId;
             const { id } = request.params;
 
-            const project = await db.project.findFirst({
-                where: { id, accountId: userId },
-            });
-            if (!project) {
-                return reply.code(404).send({ error: "Project not found" });
-            }
+            await assertOwnedProject(userId, id);
 
             const knowledgeConfig = await resolveKnowledgeConfig(id);
             if (!knowledgeConfig.enabled) {
@@ -679,12 +635,7 @@ export function knowledgeRoutes(app: Fastify) {
             const { id } = request.params;
             const { contextHints, sessionId } = request.body;
 
-            const project = await db.project.findFirst({
-                where: { id, accountId: userId },
-            });
-            if (!project) {
-                return reply.code(404).send({ error: "Project not found" });
-            }
+            await assertOwnedProject(userId, id);
 
             // Resolve project-level config — use stored mode, not client-sent mode
             const knowledgeConfig = await resolveKnowledgeConfig(id);
@@ -832,12 +783,7 @@ export function knowledgeRoutes(app: Fastify) {
             const userId = request.userId;
             const { id } = request.params;
 
-            const project = await db.project.findFirst({
-                where: { id, accountId: userId },
-            });
-            if (!project) {
-                return reply.code(404).send({ error: "Project not found" });
-            }
+            await assertOwnedProject(userId, id);
 
             const fourteenDaysAgo = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000);
             const actionItems = await db.projectKnowledge.findMany({
@@ -890,12 +836,7 @@ export function knowledgeRoutes(app: Fastify) {
             const { id } = request.params;
             const { sessionId } = request.query;
 
-            const project = await db.project.findFirst({
-                where: { id, accountId: userId },
-            });
-            if (!project) {
-                return reply.code(404).send({ error: "Project not found" });
-            }
+            await assertOwnedProject(userId, id);
 
             const accesses = await getSessionKnowledgeAccesses(id, sessionId);
 
@@ -938,13 +879,7 @@ export function knowledgeRoutes(app: Fastify) {
             const { id } = request.params;
             const { sessionId, knowledgeId } = request.body;
 
-            const project = await db.project.findFirst({
-                where: { id, accountId: userId },
-                select: { id: true },
-            });
-            if (!project) {
-                return reply.code(404).send({ error: "Project not found" });
-            }
+            await assertOwnedProject(userId, id);
 
             const knowledge = await db.projectKnowledge.findFirst({
                 where: { id: knowledgeId, projectId: id },
@@ -992,13 +927,7 @@ export function knowledgeRoutes(app: Fastify) {
             const { id } = request.params;
             const { sessionId, knowledgeId } = request.body;
 
-            const project = await db.project.findFirst({
-                where: { id, accountId: userId },
-                select: { id: true },
-            });
-            if (!project) {
-                return reply.code(404).send({ error: "Project not found" });
-            }
+            await assertOwnedProject(userId, id);
 
             const updated = await db.knowledgeAccess.updateMany({
                 where: { sessionId, knowledgeId, projectId: id },
@@ -1028,12 +957,7 @@ export function knowledgeRoutes(app: Fastify) {
             const { id } = request.params;
             const { sessionId } = request.query;
 
-            const project = await db.project.findFirst({
-                where: { id, accountId: userId },
-            });
-            if (!project) {
-                return reply.code(404).send({ error: "Project not found" });
-            }
+            await assertOwnedProject(userId, id);
 
             const stats = await getSessionHotStats(sessionId);
             return reply.send(stats);

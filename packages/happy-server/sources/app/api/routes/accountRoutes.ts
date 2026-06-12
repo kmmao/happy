@@ -5,6 +5,7 @@ import { Fastify } from "../types";
 import { getPublicUrl } from "@/storage/files";
 import { z } from "zod";
 import { log } from "@/utils/log";
+import { assertOwnedProject, assertOwnedSession } from "../ownership";
 
 export function accountRoutes(app: Fastify) {
     app.get('/v1/account/profile', {
@@ -193,13 +194,11 @@ export function accountRoutes(app: Fastify) {
 
         try {
             if (sessionId) {
-                const session = await db.session.findFirst({ where: { id: sessionId, accountId: userId } });
-                if (!session) return reply.code(404).send({ error: 'Session not found' });
+                await assertOwnedSession(userId, sessionId);
             }
 
             if (projectId) {
-                const project = await db.project.findFirst({ where: { id: projectId, accountId: userId } });
-                if (!project) return reply.code(404).send({ error: 'Project not found' });
+                await assertOwnedProject(userId, projectId);
             }
 
             const startDate = startTime ? new Date(startTime * 1000) : null;

@@ -8,6 +8,7 @@ import { log } from "@/utils/log";
 import { sessionDelete } from "@/app/session/sessionDelete";
 import { sessionArchive } from "@/app/session/sessionArchive";
 import { activityCache } from "@/app/presence/sessionCache";
+import { assertOwnedSession, ownedSession } from "../ownership";
 
 type SessionResponseRecord = {
     id: string;
@@ -354,9 +355,12 @@ export function sessionRoutes(app: Fastify) {
       // Internal reconnect to an existing Happy session by ID
       // (used by runtime resume and fork pre-allocation, not by simple unarchive).
       if (sessionId) {
-        const existing = await db.session.findFirst({
-          where: { id: sessionId, accountId: userId },
-        });
+        let existing;
+        try {
+          existing = await ownedSession(userId, sessionId);
+        } catch {
+          existing = null;
+        }
         if (!existing) {
           // Session not found — create a new one with the requested ID.
           // For sessionId-driven reconnect/fork pre-allocation we must not reuse
@@ -383,10 +387,10 @@ export function sessionRoutes(app: Fastify) {
               throw error;
             }
 
-            const conflicted = await db.session.findFirst({
-              where: { id: sessionId, accountId: userId },
-            });
-            if (!conflicted) {
+            let conflicted;
+            try {
+              conflicted = await ownedSession(userId, sessionId);
+            } catch {
               throw error;
             }
 
@@ -445,7 +449,7 @@ export function sessionRoutes(app: Fastify) {
         return reply.send(buildSessionResponse(updated));
       }
 
-      const session = await db.session.findFirst({
+      let session = await db.session.findFirst({
         where: {
           accountId: userId,
           tag: tag,
@@ -535,17 +539,7 @@ export function sessionRoutes(app: Fastify) {
       const userId = request.userId;
       const { sessionId } = request.params;
 
-      // Verify session belongs to user
-      const session = await db.session.findFirst({
-        where: {
-          id: sessionId,
-          accountId: userId,
-        },
-      });
-
-      if (!session) {
-        return reply.code(404).send({ error: "Session not found" });
-      }
+      await assertOwnedSession(userId, sessionId);
 
       const messages = await db.sessionMessage.findMany({
         where: { sessionId },
@@ -589,17 +583,7 @@ export function sessionRoutes(app: Fastify) {
       const userId = request.userId;
       const { sessionId } = request.params;
 
-      const session = await db.session.findFirst({
-        where: {
-          id: sessionId,
-          accountId: userId,
-        },
-        select: { id: true },
-      });
-
-      if (!session) {
-        return reply.code(404).send({ error: "Session not found" });
-      }
+      await assertOwnedSession(userId, sessionId);
 
       const reports = await db.usageReport.findMany({
         where: {
@@ -664,16 +648,7 @@ export function sessionRoutes(app: Fastify) {
       const userId = request.userId;
       const { sessionId } = request.params;
 
-      const session = await db.session.findFirst({
-        where: {
-          id: sessionId,
-          accountId: userId,
-        },
-      });
-
-      if (!session) {
-        return reply.code(404).send({ error: "Session not found" });
-      }
+      const session = await ownedSession(userId, sessionId);
 
       if (session.active) {
         return reply.code(400).send({ error: "Session is already active" });
@@ -765,12 +740,7 @@ export function sessionRoutes(app: Fastify) {
       const { sessionId } = request.params;
       const { forkedFromSessionId } = request.body;
 
-      const session = await db.session.findFirst({
-        where: { id: sessionId, accountId: userId },
-      });
-      if (!session) {
-        return reply.code(404).send({ error: "Session not found" });
-      }
+      await assertOwnedSession(userId, sessionId);
 
       const updated = await db.session.update({
         where: { id: sessionId },
@@ -805,14 +775,7 @@ export function sessionRoutes(app: Fastify) {
       const { sessionId } = request.params;
       const format = request.query?.format ?? "jsonl";
 
-      const session = await db.session.findFirst({
-        where: { id: sessionId, accountId: userId },
-        select: { id: true },
-      });
-
-      if (!session) {
-        return reply.code(404).send({ error: "Session not found" });
-      }
+      await assertOwnedSession(userId, sessionId);
 
       const messages = await db.sessionMessage.findMany({
         where: { sessionId },

@@ -5,6 +5,7 @@ import { detectProviderFromEnv } from "@/modules/optionScorer";
 import { decryptAiBackendProfile } from "@/modules/aiBackendProfileCrypto";
 import { getAiBackendProfileEnvironmentVariables } from "@/modules/aiBackendProfileEnv";
 import { log } from "@/utils/log";
+import { assertOwnedProject } from "../ownership";
 
 const BUILT_IN_DIMENSION_KEYS = new Set([
     "security",
@@ -54,14 +55,7 @@ export function supervisorDimensionRoutes(app: Fastify) {
             const userId = request.userId;
             const { id } = request.params;
 
-            const project = await db.project.findFirst({
-                where: { id, accountId: userId },
-                select: { id: true },
-            });
-
-            if (!project) {
-                return reply.code(404).send({ error: "Project not found" });
-            }
+            await assertOwnedProject(userId, id);
 
             const dimensions = await db.supervisorDimension.findMany({
                 where: { projectId: id, accountId: userId },
@@ -100,14 +94,7 @@ export function supervisorDimensionRoutes(app: Fastify) {
             const { id } = request.params;
             const { title, prompt } = request.body;
 
-            const project = await db.project.findFirst({
-                where: { id, accountId: userId },
-                select: { id: true },
-            });
-
-            if (!project) {
-                return reply.code(404).send({ error: "Project not found" });
-            }
+            await assertOwnedProject(userId, id);
 
             const key = titleToKey(title);
 
@@ -264,14 +251,7 @@ export function supervisorDimensionRoutes(app: Fastify) {
             const { id } = request.params;
             const { title, profileId } = request.body;
 
-            const project = await db.project.findFirst({
-                where: { id, accountId: userId },
-                select: { id: true },
-            });
-
-            if (!project) {
-                return reply.code(404).send({ error: "Project not found" });
-            }
+            await assertOwnedProject(userId, id);
 
             const credentials = await resolveCredentials(
                 userId,

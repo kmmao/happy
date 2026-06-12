@@ -3,6 +3,7 @@ import { Fastify } from "../types";
 import { z } from "zod";
 import { db } from "@/storage/db";
 import { log } from "@/utils/log";
+import { ownedMachine } from "../ownership";
 
 export function machinesRoutes(app: Fastify) {
     app.post('/v1/machines', {
@@ -144,20 +145,11 @@ export function machinesRoutes(app: Fastify) {
                 id: z.string()
             })
         }
-    }, async (request, reply) => {
+    }, async (request) => {
         const userId = request.userId;
         const { id } = request.params;
 
-        const machine = await db.machine.findFirst({
-            where: {
-                accountId: userId,
-                id: id
-            }
-        });
-
-        if (!machine) {
-            return reply.code(404).send({ error: 'Machine not found' });
-        }
+        const machine = await ownedMachine(userId, id);
 
         return {
             machine: {

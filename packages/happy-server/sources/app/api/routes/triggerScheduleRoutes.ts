@@ -1,6 +1,7 @@
 import { type Fastify } from "../types";
 import { db } from "@/storage/db";
 import { z } from "zod";
+import { assertOwnedMachine, assertOwnedProject, ownedTriggerSchedule } from "../ownership";
 import { log } from "@/utils/log";
 import { CronExpressionParser } from "cron-parser";
 
@@ -73,23 +74,11 @@ export function triggerScheduleRoutes(app: Fastify) {
             }
 
             // Verify machine belongs to user
-            const machine = await db.machine.findFirst({
-                where: { id: machineId, accountId: userId },
-                select: { id: true },
-            });
-            if (!machine) {
-                return reply.code(404).send({ error: "Machine not found" });
-            }
+            await assertOwnedMachine(userId, machineId);
 
             // Verify project if scoped
             if (projectId) {
-                const project = await db.project.findFirst({
-                    where: { id: projectId, accountId: userId },
-                    select: { id: true },
-                });
-                if (!project) {
-                    return reply.code(404).send({ error: "Project not found" });
-                }
+                await assertOwnedProject(userId, projectId);
             }
 
             const schedule = await db.triggerSchedule.create({
@@ -152,12 +141,7 @@ export function triggerScheduleRoutes(app: Fastify) {
             schema: { params: z.object({ id: z.string() }) },
         },
         async (request, reply) => {
-            const schedule = await db.triggerSchedule.findFirst({
-                where: { id: request.params.id, accountId: request.userId },
-            });
-            if (!schedule) {
-                return reply.code(404).send({ error: "Trigger schedule not found" });
-            }
+            const schedule = await ownedTriggerSchedule(request.userId, request.params.id);
             return reply.send({ triggerSchedule: serializeTriggerSchedule(schedule) });
         },
     );
@@ -173,12 +157,7 @@ export function triggerScheduleRoutes(app: Fastify) {
             },
         },
         async (request, reply) => {
-            const schedule = await db.triggerSchedule.findFirst({
-                where: { id: request.params.id, accountId: request.userId },
-            });
-            if (!schedule) {
-                return reply.code(404).send({ error: "Trigger schedule not found" });
-            }
+            const schedule = await ownedTriggerSchedule(request.userId, request.params.id);
 
             const { name, prompt, cronExpression, priority, skillIds, profileId } = request.body;
             const data: Record<string, unknown> = {};
@@ -217,12 +196,7 @@ export function triggerScheduleRoutes(app: Fastify) {
             schema: { params: z.object({ id: z.string() }) },
         },
         async (request, reply) => {
-            const schedule = await db.triggerSchedule.findFirst({
-                where: { id: request.params.id, accountId: request.userId },
-            });
-            if (!schedule) {
-                return reply.code(404).send({ error: "Trigger schedule not found" });
-            }
+            const schedule = await ownedTriggerSchedule(request.userId, request.params.id);
 
             const newEnabled = !schedule.enabled;
             const data: Record<string, unknown> = { enabled: newEnabled };
@@ -257,12 +231,7 @@ export function triggerScheduleRoutes(app: Fastify) {
             schema: { params: z.object({ id: z.string() }) },
         },
         async (request, reply) => {
-            const schedule = await db.triggerSchedule.findFirst({
-                where: { id: request.params.id, accountId: request.userId },
-            });
-            if (!schedule) {
-                return reply.code(404).send({ error: "Trigger schedule not found" });
-            }
+            const schedule = await ownedTriggerSchedule(request.userId, request.params.id);
 
             await db.triggerSchedule.delete({ where: { id: schedule.id } });
             return reply.send({ deleted: true });

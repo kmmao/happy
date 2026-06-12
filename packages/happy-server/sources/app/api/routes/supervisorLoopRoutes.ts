@@ -15,6 +15,7 @@ import {
 import { inboxCreate } from "@/modules/inboxCreate";
 import { resolveConfiguredSupervisorProfile } from "@/modules/supervisorConfiguredProfile";
 import { ResolvedRuntimeProfileSchema } from "@/types/aiBackendProfile";
+import { ownedProject } from "../ownership";
 
 export function supervisorLoopRoutes(app: Fastify) {
     // POST /v1/projects/:id/supervisor/loop — Start a new loop
@@ -44,13 +45,7 @@ export function supervisorLoopRoutes(app: Fastify) {
             const userId = request.userId;
             const { id } = request.params;
 
-            const project = await db.project.findFirst({
-                where: { id, accountId: userId },
-                select: { supervisorConfig: true },
-            });
-            if (!project) {
-                return reply.code(404).send({ error: "Project not found" });
-            }
+            const project = await ownedProject(userId, id);
 
             const requestedProfile = await resolveConfiguredSupervisorProfile({
                 userId,

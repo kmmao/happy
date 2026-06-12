@@ -9,6 +9,7 @@ import {
     countSeverities,
     computeTrendDirection,
 } from "@/modules/supervisorScoring";
+import { assertOwnedProject, ownedProject } from "../ownership";
 
 /**
  * Supervisor analytics routes: cost, trend, and summary.
@@ -34,14 +35,7 @@ export function supervisorAnalyticsRoutes(app: Fastify) {
             const { id } = request.params;
             const days = request.query?.days ?? 30;
 
-            const project = await db.project.findFirst({
-                where: { id, accountId: userId },
-                select: { id: true },
-            });
-
-            if (!project) {
-                return reply.code(404).send({ error: "Project not found" });
-            }
+            await assertOwnedProject(userId, id);
 
             const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
 
@@ -94,14 +88,7 @@ export function supervisorAnalyticsRoutes(app: Fastify) {
             const { id } = request.params;
             const days = request.query?.days ?? 30;
 
-            const project = await db.project.findFirst({
-                where: { id, accountId: userId },
-                select: { id: true },
-            });
-
-            if (!project) {
-                return reply.code(404).send({ error: "Project not found" });
-            }
+            await assertOwnedProject(userId, id);
 
             const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
 
@@ -153,19 +140,7 @@ export function supervisorAnalyticsRoutes(app: Fastify) {
             const userId = request.userId;
             const { id } = request.params;
 
-            const project = await db.project.findFirst({
-                where: { id, accountId: userId },
-                select: {
-                    id: true,
-                    supervisorNextRunAt: true,
-                    supervisorScheduleEnabled: true,
-                    supervisorScheduleIntervalHours: true,
-                },
-            });
-
-            if (!project) {
-                return reply.code(404).send({ error: "Project not found" });
-            }
+            const project = await ownedProject(userId, id);
 
             // Open issues by severity (pending approval)
             const severityGroups = await db.supervisorAction.groupBy({
