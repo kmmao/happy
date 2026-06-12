@@ -2,6 +2,18 @@
   "entries": {
     "en": [
       {
+        "version": "2.38.0",
+        "date": "2026-06-12",
+        "summary": "Picker alerts now reach you on web: when Claude's terminal blocks on a numbered picker or fires a notification, the web app raises a native browser notification, and blocked sessions are highlighted directly in the sessions list on every platform.",
+        "changes": [
+          "Added native browser notifications on web for terminal picker prompts and notification signals — switch tabs freely; you'll still know when a session needs your input.",
+          "Added an in-page highlight for session rows whose terminal is blocked on a picker, on all platforms.",
+          "Improved the chat rendering pipeline — message visibility filtering, duplicate-diff cleanup and tool-call grouping now run through one shared, fully tested module.",
+          "Improved the data-sync layer: server-driven state updates are now strictly separated from local UI mutations, preventing a class of state-consistency bugs."
+        ],
+        "rawMarkdown": "## 2.38.0 - 2026-06-12\n\n\nPicker alerts now reach you on web: when Claude's terminal blocks on a numbered picker or fires a notification, the web app raises a native browser notification, and blocked sessions are highlighted directly in the sessions list on every platform.\n\n### Picker & notification alerts\n- Added native browser notifications on web for terminal picker prompts and notification signals — switch tabs freely; you'll still know when a session needs your input.\n- Added an in-page highlight for session rows whose terminal is blocked on a picker, on all platforms.\n\n### Stability\n- Improved the chat rendering pipeline — message visibility filtering, duplicate-diff cleanup and tool-call grouping now run through one shared, fully tested module.\n- Improved the data-sync layer: server-driven state updates are now strictly separated from local UI mutations, preventing a class of state-consistency bugs."
+      },
+      {
         "version": "2.37.0",
         "date": "2026-06-12",
         "summary": "Session subtitles now show what Claude is doing in real time. PTY-mode sessions stream their TUI status surface (spinner verb, elapsed time, token counter, progress) to the app, so you can see \"Reasoning… · 12s · 1.2k tokens\" at a glance without opening the raw terminal — across the main sessions list, recent sessions, machine detail, and the chat header.",
@@ -1037,6 +1049,18 @@
     ],
     "zh-Hans": [
       {
+        "version": "2.38.0",
+        "date": "2026-06-12",
+        "summary": "Picker 提醒现在能在 Web 端触达你：当 Claude 的终端阻塞在编号选择器或发出通知信号时，Web App 会弹出浏览器原生通知；所有平台的会话列表也会直接高亮被阻塞的会话行。",
+        "changes": [
+          "新增 Web 端浏览器原生通知 —— 终端 picker 提示和通知信号会触发系统通知，切换标签页也不会错过需要输入的会话。",
+          "新增会话行高亮 —— 终端阻塞在 picker 时，会话列表内对应行会在所有平台上高亮提示。",
+          "改进聊天渲染管线 —— 消息可见性过滤、重复 diff 清理和工具调用分组现在走同一个经过完整测试的共享模块。",
+          "改进数据同步层 —— 服务端状态更新与本地 UI 变更严格分离，杜绝一类状态一致性问题。"
+        ],
+        "rawMarkdown": "## 2.38.0 - 2026-06-12\n\n\nPicker 提醒现在能在 Web 端触达你：当 Claude 的终端阻塞在编号选择器或发出通知信号时，Web App 会弹出浏览器原生通知；所有平台的会话列表也会直接高亮被阻塞的会话行。\n\n### Picker 与通知提醒\n- 新增 Web 端浏览器原生通知 —— 终端 picker 提示和通知信号会触发系统通知，切换标签页也不会错过需要输入的会话。\n- 新增会话行高亮 —— 终端阻塞在 picker 时，会话列表内对应行会在所有平台上高亮提示。\n\n### 稳定性\n- 改进聊天渲染管线 —— 消息可见性过滤、重复 diff 清理和工具调用分组现在走同一个经过完整测试的共享模块。\n- 改进数据同步层 —— 服务端状态更新与本地 UI 变更严格分离，杜绝一类状态一致性问题。"
+      },
+      {
         "version": "2.37.0",
         "date": "2026-06-12",
         "summary": "会话副标题现在可以实时显示 Claude 正在做什么。PTY 模式会话会把 TUI 状态面（spinner 动词、耗时、token 计数、进度）实时同步到 App，无需打开 Raw Terminal 就能一眼看到「Reasoning… · 12s · 1.2k tokens」—— 覆盖主会话列表、最近会话、机器详情页和聊天头部四处入口。",
@@ -2049,7 +2073,7 @@
       }
     ]
   },
-  "latestVersion": "2.37.0",
+  "latestVersion": "2.38.0",
   "availableLocales": [
     "en",
     "zh-Hans"

@@ -1,5 +1,17 @@
 # Changelog
 
+## 2.38.0 - 2026-06-12
+
+Picker alerts now reach you on web: when Claude's terminal blocks on a numbered picker or fires a notification, the web app raises a native browser notification, and blocked sessions are highlighted directly in the sessions list on every platform.
+
+### Picker & notification alerts
+- Added native browser notifications on web for terminal picker prompts and notification signals — switch tabs freely; you'll still know when a session needs your input.
+- Added an in-page highlight for session rows whose terminal is blocked on a picker, on all platforms.
+
+### Stability
+- Improved the chat rendering pipeline — message visibility filtering, duplicate-diff cleanup and tool-call grouping now run through one shared, fully tested module.
+- Improved the data-sync layer: server-driven state updates are now strictly separated from local UI mutations, preventing a class of state-consistency bugs.
+
 ## 2.37.0 - 2026-06-12
 
 Session subtitles now show what Claude is doing in real time. PTY-mode sessions stream their TUI status surface (spinner verb, elapsed time, token counter, progress) to the app, so you can see "Reasoning… · 12s · 1.2k tokens" at a glance without opening the raw terminal — across the main sessions list, recent sessions, machine detail, and the chat header.
