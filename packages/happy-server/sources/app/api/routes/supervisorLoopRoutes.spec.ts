@@ -110,7 +110,7 @@ const {
                 );
             }),
         },
-        supervisorLoop: {
+        agentLoop: {
             findUnique: vi.fn(async (args: any) => {
                 const loopId = args?.where?.id;
                 return state.loops.find((loop) => loop.id === loopId) ?? null;

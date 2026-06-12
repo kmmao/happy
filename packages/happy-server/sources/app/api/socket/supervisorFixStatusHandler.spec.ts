@@ -12,7 +12,6 @@ const {
     resetState,
     seedAction,
     seedSession,
-    state,
 } = vi.hoisted(() => {
     const state = {
         actions: [] as any[],
@@ -52,7 +51,7 @@ const {
 
     const dbMock = {
         supervisorAction: {
-            findFirst: vi.fn(async ({ where, select }: any) => {
+            findFirst: vi.fn(async ({ where }: any) => {
                 return state.actions.find(
                     (a: any) =>
                         a.id === where.id &&

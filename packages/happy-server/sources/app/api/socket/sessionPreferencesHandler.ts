@@ -4,7 +4,7 @@ import { db } from "@/storage/db";
 import { log } from "@/utils/log";
 import { Socket } from "socket.io";
 
-export function sessionPreferencesHandler(userId: string, socket: Socket, connection: ClientConnection) {
+export function sessionPreferencesHandler(userId: string, socket: Socket, _connection: ClientConnection) {
     socket.on('update-preferences', async (data: any, callback: (response: any) => void) => {
         try {
             const { sid, preferences, expectedVersion } = data;

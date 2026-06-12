@@ -2,7 +2,6 @@ import fastify from "fastify";
 import {
     serializerCompiler,
     validatorCompiler,
-    ZodTypeProvider,
 } from "fastify-type-provider-zod";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";

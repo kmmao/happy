@@ -205,7 +205,8 @@ describe("machinesRoutes", () => {
 
             expect(res.statusCode).toBe(200);
             const body = res.json();
-            expect(body).toHaveLength(2);
+            expect(body.machines).toHaveLength(2);
+            expect(body.nextCursor).toBeNull();
         });
 
         it("returns 401 without auth header", async () => {

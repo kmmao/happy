@@ -2,7 +2,6 @@ import { z } from "zod";
 import { type Fastify, GitHubProfile } from "../types";
 import { auth } from "@/app/auth/auth";
 import { log } from "@/utils/log";
-import { eventRouter } from "@/app/events/eventRouter";
 import { decryptString, encryptString } from "@/modules/encrypt";
 import { githubConnect } from "@/app/github/githubConnect";
 import { githubDisconnect } from "@/app/github/githubDisconnect";

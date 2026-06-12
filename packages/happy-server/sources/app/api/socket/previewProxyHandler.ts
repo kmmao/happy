@@ -2,7 +2,6 @@ import { Socket } from "socket.io";
 import { log } from "@/utils/log";
 import { PreviewCandidateReportSchema, PreviewProxyResponseStartSchema, PreviewProxyResponseBodySchema, PreviewProxyResponseEndSchema, PreviewProxyResponseErrorSchema } from "@kmmao/happy-wire";
 import { previewStore } from "@/app/preview/previewStore";
-import { eventRouter } from "@/app/events/eventRouter";
 import { emitSyncEphemeral } from "@/app/events/syncEphemeral";
 import { db } from "@/storage/db";
 

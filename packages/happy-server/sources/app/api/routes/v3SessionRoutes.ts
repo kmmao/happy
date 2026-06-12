@@ -38,7 +38,7 @@ function cacheNotFound(key: string): void {
 }
 
 const getMessagesQuerySchema = z.object({
-  after_seq: z.coerce.number().int().min(0).default(0),
+  after_seq: z.coerce.number().int().min(0).optional(),
   before_seq: z.coerce.number().int().min(0).max(2147483647).optional(),
   limit: z.coerce.number().int().min(1).max(5000).default(100),
 });
@@ -101,7 +101,17 @@ export function v3SessionRoutes(app: Fastify) {
     async (request, reply) => {
       const userId = request.userId;
       const { sessionId } = request.params;
-      const { after_seq, before_seq, limit } = request.query;
+      const { after_seq: afterSeqRaw, before_seq, limit } = request.query;
+
+      // after_seq and before_seq are mutually exclusive pagination cursors —
+      // combining them has no well-defined ordering, so reject explicitly
+      // instead of silently preferring one.
+      if (afterSeqRaw !== undefined && before_seq !== undefined) {
+        return reply.code(400).send({
+          error: "after_seq and before_seq cannot be combined",
+        });
+      }
+      const after_seq = afterSeqRaw ?? 0;
 
       // Check 404 cache before hitting DB — prevents repeated DB lookups
       // for sessions that were already confirmed not to exist.

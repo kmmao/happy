@@ -33,7 +33,6 @@ type WebhookEventRecord = {
 };
 
 const {
-    state,
     dbMock,
     dispatchWebhookMock,
     ensureRemoteWebhookMock,

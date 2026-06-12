@@ -19,7 +19,7 @@
  *   npx tsx sources/scripts/fixCumulativeCostReports.ts
  */
 
-import { PrismaClient, Prisma } from "@prisma/client";
+import { PrismaClient } from "@prisma/client";
 
 const db = new PrismaClient();
 const DRY_RUN = process.env.DRY_RUN === "true";

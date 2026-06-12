@@ -7,7 +7,7 @@ import { log } from "@/utils/log";
 
 export function enableMonitoring(app: Fastify) {
     // Add metrics hooks
-    app.addHook('onRequest', async (request, reply) => {
+    app.addHook('onRequest', async (request, _reply) => {
         request.startTime = Date.now();
     });
 
@@ -25,7 +25,7 @@ export function enableMonitoring(app: Fastify) {
         httpRequestDurationHistogram.observe({ method, route, status }, duration);
     });
 
-    app.get('/health', async (request, reply) => {
+    app.get('/health', async (_request, reply) => {
         const failures: string[] = [];
 
         // Test database connectivity

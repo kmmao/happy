@@ -27,11 +27,11 @@ describe("resolveSupervisorProfile", () => {
 
     const result = await resolveSupervisorProfile("user-1", "openai");
 
-    expect(result.profileName).toBe("OpenAI (GPT-5.4)");
+    expect(result.profileName).toBe("OpenAI (GPT-5.5)");
     expect(result.runtimeProfile).toMatchObject({
       schemaVersion: 1,
       profileId: "openai",
-      profileName: "OpenAI (GPT-5.4)",
+      profileName: "OpenAI (GPT-5.5)",
       source: "built-in-profile",
       trust: "trusted",
       isBuiltIn: true,
@@ -42,11 +42,11 @@ describe("resolveSupervisorProfile", () => {
       },
       environmentVariables: {
         OPENAI_BASE_URL: "https://api.openai.com/v1",
-        OPENAI_MODEL: "gpt-5.4",
+        OPENAI_MODEL: "gpt-5.5",
         OPENAI_API_TIMEOUT_MS: "600000",
-        OPENAI_SMALL_FAST_MODEL: "gpt-5.4",
+        OPENAI_SMALL_FAST_MODEL: "gpt-5.4-mini",
         API_TIMEOUT_MS: "600000",
-        CODEX_SMALL_FAST_MODEL: "gpt-5.4",
+        CODEX_SMALL_FAST_MODEL: "gpt-5.4-mini",
       },
     });
     expect(mocks.decryptAiBackendProfile).not.toHaveBeenCalled();

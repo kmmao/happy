@@ -20,7 +20,6 @@ import { z } from "zod";
 import { kvGet } from "@/app/kv/kvGet";
 import { kvMutate } from "@/app/kv/kvMutate";
 import {
-    McpRegistryEntrySchema,
     McpTransportConfigSchema,
     McpRegistrySchema,
     parseMcpRegistry,
@@ -114,7 +113,7 @@ const ListQuerySchema = z.object({
     ),
 });
 
-const ServerEntryResponseSchema = z.object({
+export const ServerEntryResponseSchema = z.object({
     name: z.string(),
     transport: z.object({
         type: z.string(),

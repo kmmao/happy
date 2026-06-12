@@ -1,6 +1,3 @@
-import {
-    eventRouter,
-} from "@/app/events/eventRouter";
 import { type Fastify } from "../types";
 import { db } from "@/storage/db";
 import { z } from "zod";

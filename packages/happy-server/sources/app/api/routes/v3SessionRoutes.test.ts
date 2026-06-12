@@ -330,7 +330,7 @@ describe("v3SessionRoutes", () => {
         expect(body3.totalCount).toBe(5);
     });
 
-    it("supports backward pagination with before_seq returning newest first", async () => {
+    it("supports backward pagination with before_seq returning ASC pages", async () => {
         seedSession({ id: "session-1", accountId: "user-1" });
         for (let seq = 1; seq <= 5; seq += 1) {
             seedMessage({ sessionId: "session-1", seq, localId: `l${seq}`, content: { t: "encrypted", c: String(seq) } });
@@ -338,17 +338,17 @@ describe("v3SessionRoutes", () => {
 
         app = await createApp();
         // No before_seq cursor → ask for the latest page.
-        // Use Number.MAX_SAFE_INTEGER as the upper bound so the server returns
-        // the newest messages first without the client needing to know the
-        // current max seq.
+        // Use the schema's int32 upper bound (seq is a Postgres int) so the
+        // server returns the newest messages first without the client needing
+        // to know the current max seq.
         const latest = await app.inject({
             method: "GET",
-            url: `/v3/sessions/session-1/messages?before_seq=${Number.MAX_SAFE_INTEGER}&limit=2`,
+            url: "/v3/sessions/session-1/messages?before_seq=2147483647&limit=2",
             headers: { "x-user-id": "user-1" }
         });
         expect(latest.statusCode).toBe(200);
         const body1 = latest.json();
-        expect(body1.messages.map((message: any) => message.seq)).toEqual([5, 4]);
+        expect(body1.messages.map((message: any) => message.seq)).toEqual([4, 5]);
         expect(body1.hasMore).toBe(true);
 
         // Cursor backward from the lowest seq returned in the previous page.
@@ -358,7 +358,7 @@ describe("v3SessionRoutes", () => {
             headers: { "x-user-id": "user-1" }
         });
         const body2 = older.json();
-        expect(body2.messages.map((message: any) => message.seq)).toEqual([3, 2]);
+        expect(body2.messages.map((message: any) => message.seq)).toEqual([2, 3]);
         expect(body2.hasMore).toBe(true);
 
         // Final page: only seq=1 remains.

@@ -18,7 +18,7 @@ export function versionRoutes(app: Fastify) {
             }
         }
     }, async (request, reply) => {
-        const { platform, version, app_id } = request.body;
+        const { platform, version } = request.body;
 
         // Check ios
         if (platform.toLowerCase() === 'ios') {

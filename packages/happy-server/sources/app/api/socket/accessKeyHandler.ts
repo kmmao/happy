@@ -1,7 +1,6 @@
 import { Socket } from "socket.io";
 import { db } from "@/storage/db";
 import { log } from "@/utils/log";
-import { eventRouter } from "@/app/events/eventRouter";
 
 export function accessKeyHandler(userId: string, socket: Socket) {
     // Get access key via socket

@@ -109,7 +109,7 @@ export async function startApi() {
   app.register(import("@fastify/multipart"), {
     limits: { fileSize: 50 * 1024 * 1024 }, // 50MB max audio file
   });
-  app.get("/", function (request, reply) {
+  app.get("/", function (_request, reply) {
     reply.send("Welcome to Happy Server!");
   });
 

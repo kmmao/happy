@@ -199,6 +199,25 @@ vi.mock("@/storage/repeatKey", () => ({
         }
     }),
 }));
+vi.mock("@/modules/runtimeProfileResolver", () => ({
+    isUnifiedRuntimeProfileResolverEnabled: () => true,
+    notifyRuntimeProfileFailure: vi.fn(),
+    resolveRuntimeProfile: vi.fn(async () => ({
+        ok: true,
+        profileId: "profile-1",
+        profileName: "Test Profile",
+        profileSource: "project-default",
+        runtimeProfile: {
+            schemaVersion: 1,
+            profileId: "profile-1",
+            profileName: "Test Profile",
+            source: "built-in-profile",
+            trust: "trusted",
+            isBuiltIn: true,
+            environmentVariables: {},
+        },
+    })),
+}));
 vi.mock("@/modules/taskStatusLogic", () => ({
     normalizeTaskStatusReport: vi.fn(({ status, outcome, errorMessage }: any) => {
         if (outcome === "blocked") {

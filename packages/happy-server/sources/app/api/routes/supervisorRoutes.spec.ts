@@ -233,6 +233,9 @@ const {
                 return r;
             }),
         },
+        supervisorDimension: {
+            findMany: vi.fn(async () => []),
+        },
         supervisorAction: {
             findFirst: vi.fn(async () => null),
             findMany: vi.fn(async () => []),
@@ -241,7 +244,7 @@ const {
             update: vi.fn(async () => ({})),
             updateMany: vi.fn(async () => ({ count: 0 })),
         },
-        supervisorLoop: {
+        agentLoop: {
             findFirst: vi.fn(async () => null),
         },
         session: {
@@ -376,8 +379,8 @@ describe("supervisorRoutes", () => {
         dbMock.supervisorAction.count.mockResolvedValue(0);
         dbMock.supervisorAction.updateMany.mockReset();
         dbMock.supervisorAction.updateMany.mockResolvedValue({ count: 0 });
-        dbMock.supervisorLoop.findFirst.mockReset();
-        dbMock.supervisorLoop.findFirst.mockResolvedValue(null);
+        dbMock.agentLoop.findFirst.mockReset();
+        dbMock.agentLoop.findFirst.mockResolvedValue(null);
         dbMock.webhookRoute.findFirst.mockReset();
         dbMock.webhookRoute.findFirst.mockResolvedValue(null);
     });

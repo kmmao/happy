@@ -697,7 +697,7 @@ export function sessionRoutes(app: Fastify) {
   };
 
   // Unarchive session without restarting the underlying agent process.
-  app.patch(
+  app.patch<{ Params: { sessionId: string } }>(
     "/v1/sessions/:sessionId/unarchive",
     {
       schema: {
@@ -737,7 +737,7 @@ export function sessionRoutes(app: Fastify) {
   );
 
   // Legacy alias kept for backward compatibility.
-  app.patch(
+  app.patch<{ Params: { sessionId: string } }>(
     "/v1/sessions/:sessionId/restore",
     {
       schema: {

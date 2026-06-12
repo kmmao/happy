@@ -1,8 +1,5 @@
 import { db } from "@/storage/db";
 import { log } from "@/utils/log";
-import {
-    eventRouter,
-} from "@/app/events/eventRouter";
 import { checkDailyRunLimit, incrementDailyRunCount } from "./supervisorLimits";
 import { emitConfiguredSupervisorRunTrigger } from "./supervisorRunTrigger";
 
