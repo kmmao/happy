@@ -1,6 +1,6 @@
 {
   "name": "@kmmao/happy-agent",
-  "version": "0.7.3",
+  "version": "0.7.4",
   "description": "CLI client for controlling Happy Coder agents remotely",
   "author": "Kirill Dubovitskiy",
   "license": "MIT",
