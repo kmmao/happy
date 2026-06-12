@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { createId, isCuid } from "@paralleldrive/cuid2";
+import { isCuid } from "@paralleldrive/cuid2";
 import {
   closeClaudeTurnWithStatus,
   createClaudeProtocolState,
@@ -131,13 +131,8 @@ describe("mapClaudeLogMessageToSessionEnvelopes", () => {
   });
 
   it("uses parent_tool_use_id as subagent and emits subagent start", () => {
-    const mappedSubagent = createId();
-    const state = {
-      ...createClaudeProtocolState(), currentTurnId: "turn-1",
-      providerSubagentToSessionSubagent: new Map<string, string>([
-        ["task-1", mappedSubagent],
-      ]),
-    };
+    const state = { ...createClaudeProtocolState(), currentTurnId: "turn-1" };
+    const mappedSubagent = state.subagents.ensureSessionId("task-1");
 
     const result = mapClaudeLogMessageToSessionEnvelopes(
       {
@@ -356,13 +351,8 @@ describe("mapClaudeLogMessageToSessionEnvelopes", () => {
   });
 
   it("emits stop for completed subagent when parent Task tool returns", () => {
-    const mappedSubagent = createId();
-    const state = {
-      ...createClaudeProtocolState(), currentTurnId: "turn-1",
-      providerSubagentToSessionSubagent: new Map<string, string>([
-        ["task-2", mappedSubagent],
-      ]),
-    };
+    const state = { ...createClaudeProtocolState(), currentTurnId: "turn-1" };
+    const mappedSubagent = state.subagents.ensureSessionId("task-2");
 
     const started = mapClaudeLogMessageToSessionEnvelopes(
       {

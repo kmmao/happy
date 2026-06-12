@@ -16,9 +16,9 @@ import {
  * agnostic (a turn cursor + an envelope sink) the way it already is for Codex
  * and ACP, which drive their own mappers externally.
  *
- * The driver exposes only the turn cursor and the two ingest paths; all the
- * Claude-specific maps (subagent resolution, buffering, hidden tool calls) stay
- * hidden behind this seam. Per ADR-0025 the Turn / Subagent lifecycle
+ * The driver exposes only the turn cursor and the two ingest paths; the
+ * Claude-specific Subagent resolution (identity, buffering, titles — see
+ * `subagentResolver.ts`) stays hidden behind this seam. Per ADR-0025 the Turn / Subagent lifecycle
  * invariants still live in `turnReducer`; this module is purely the ownership
  * boundary for Claude's slice of that state.
  */

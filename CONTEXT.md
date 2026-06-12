@@ -105,7 +105,7 @@ One agent request→response cycle within a Session, bracketed by a `turn-start`
 _Avoid_: Round, exchange, cycle (and do not confuse with the domain Task)
 
 **Subagent**:
-A nested agent spawned within a Turn (e.g. via Claude Code's Agent/Task tool or a local workflow), identified by a cuid2 carried on SessionEnvelopes. Its activity is bracketed by subagent start/stop SessionEvents scoped to the parent Turn; multiple Subagents can be active concurrently within one Turn, and any still active when the Turn ends are stopped with it.
+A nested agent spawned within a Turn (e.g. via Claude Code's Agent/Task tool or a local workflow), identified by a cuid2 carried on SessionEnvelopes. Its activity is bracketed by subagent start/stop SessionEvents scoped to the parent Turn; multiple Subagents can be active concurrently within one Turn, and any still active when the Turn ends are stopped with it. Each Provider's Subagent-identification rules live behind a resolver owned by that Provider's mapper (Claude: `claude/utils/subagentResolver.ts` — explicit parent id, parentUuid inheritance, prompt matching, buffering); the lifecycle invariants stay in `turnReducer` per ADR-0025.
 _Avoid_: Child session, worker (and do not confuse with the domain Task, a server-dispatched automated work unit)
 
 **Provider**:
