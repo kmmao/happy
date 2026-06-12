@@ -84,6 +84,7 @@ import {
   useProjectForSession,
   useSetting,
   useMachine,
+  useSessionTerminalStatus,
 } from "@/sync/storage";
 import { useSessionUpgrade } from "@/hooks/useSessionUpgrade";
 import { Session } from "@/sync/storageTypes";
@@ -105,6 +106,7 @@ import {
   getSessionName,
   getSessionProviderKey,
   isSessionRunning,
+  formatTerminalLiveStatus,
   useSessionStatus,
 } from "@/utils/sessionUtils";
 import { isVersionSupported, MINIMUM_CLI_VERSION } from "@/utils/versionUtils";
@@ -438,6 +440,10 @@ export const SessionView = React.memo((props: { id: string }) => {
   const sessionIsConnected = session?.presence === "online";
   const { hasConfig: hasDevConfig } = useDevConfig(sessionId, sessionIsConnected);
 
+  // Live TUI status (spinner verb + counters) from terminal-signal events —
+  // shown as the header subtitle while the session is running.
+  const terminalStatus = useSessionTerminalStatus(sessionId);
+
   // Compute header props based on session state
   const headerProps = useMemo(() => {
     if (!isDataReady) {
@@ -482,9 +488,15 @@ export const SessionView = React.memo((props: { id: string }) => {
     const subtitleParts = [pidLabel, cwdLabel].filter(
       (s): s is string => Boolean(s),
     );
-    const subtitle = subtitleParts.length > 0
+    // While the session is running, the live TUI status line ("Reasoning… ·
+    // 12s · 1.2k tokens") beats the static pid·cwd label; it goes stale the
+    // moment the turn ends, so idle sessions fall back to pid·cwd.
+    const liveStatus = isSessionRunning(session)
+      ? formatTerminalLiveStatus(terminalStatus)
+      : null;
+    const subtitle = liveStatus ?? (subtitleParts.length > 0
       ? subtitleParts.join(" · ")
-      : undefined;
+      : undefined);
 
     return {
       title: getSessionName(session),
@@ -496,7 +508,7 @@ export const SessionView = React.memo((props: { id: string }) => {
       provider: getSessionProviderKey(session),
       tintColor: isConnected ? theme.colors.text : theme.colors.textSecondary,
     };
-  }, [session, isDataReady, sessionId, router, theme]);
+  }, [session, isDataReady, sessionId, router, theme, terminalStatus]);
 
   const handleReload = React.useCallback(() => {
     sync.forceReloadMessages(sessionId);

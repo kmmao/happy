@@ -15,6 +15,8 @@ import {
   useHasUnreadMessages,
   useSetting,
   useMachine,
+  useSessionTerminalTitle,
+  useSessionTerminalStatus,
   storage,
 } from "@/sync/storage";
 import { Ionicons } from "@expo/vector-icons";
@@ -25,6 +27,8 @@ import {
   getSessionAvatarId,
   formatLastSeen,
   getSessionProviderKey,
+  isSessionRunning,
+  formatTerminalLiveStatus,
 } from "@/utils/sessionUtils";
 import { Avatar } from "./Avatar";
 import { ActiveSessionsGroup } from "./ActiveSessionsGroup";
@@ -738,7 +742,15 @@ const SessionItem = React.memo(
     const { theme } = useUnistyles();
     const sessionStatus = useSessionStatus(session);
     const sessionName = getSessionName(session);
-    const sessionSubtitle = getSessionSubtitle(session);
+    // Per-row subscriptions: live TUI status line ("Reasoning… · 1.2k
+    // tokens") wins while the session runs; otherwise the TUI window title;
+    // otherwise the static path inside getSessionSubtitle.
+    const terminalTitle = useSessionTerminalTitle(session.id);
+    const terminalStatus = useSessionTerminalStatus(session.id);
+    const liveStatus = isSessionRunning(session)
+      ? formatTerminalLiveStatus(terminalStatus)
+      : null;
+    const sessionSubtitle = getSessionSubtitle(session, liveStatus ?? terminalTitle);
     const navigateToSession = useNavigateToSession();
     const isTablet = useIsTablet();
     const swipeableRef = React.useRef<Swipeable | null>(null);
