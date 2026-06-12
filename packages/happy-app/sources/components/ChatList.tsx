@@ -25,13 +25,13 @@ import { ToolGroupView } from "./ToolGroupView";
 import { Metadata, Session } from "@/sync/storageTypes";
 import { ChatFooter } from "./ChatFooter";
 import { Message } from "@/sync/typesMessage";
-import { knownTools } from "./tools/knownTools";
-import { parseLegacyCodexDiffPreview } from "./tools/codexDiffCompat";
 import {
-  buildChatDisplayItems,
+  buildVisibleChatDisplayItems,
+  groupToolCallItems,
   isTurnTimelineDisplayItem,
   isTurnStartSeparator,
   type ChatDisplayItem,
+  type FinalChatDisplayItem,
 } from "./chatTimelineDisplay";
 import { type ToolGroupItem } from "@/hooks/useGroupedMessages";
 import { TurnTimelineMessageView } from "./TurnTimelineMessageView";
@@ -288,66 +288,8 @@ const ChatListInternal = React.memo(
     const groupToolCalls = useSetting("groupToolCalls");
     const displayItems: ChatDisplayItem[] = React.useMemo(() => {
       const startedAt = now();
-      const visibleMessages = viewInline
-        ? props.messages
-        : (() => {
-            // When viewInline is off, filter out tool-call messages.
-            const ALWAYS_VISIBLE_TOOLS = new Set([
-              "Task",
-              "Agent",
-              "AskUserQuestion",
-              "TodoWrite",
-              "Read",
-              "Edit",
-              "MultiEdit",
-              "Write",
-              "Grep",
-              "Glob",
-              "LS",
-              "NotebookEdit",
-              "CodexDynamicTool",
-              "CodexPermissions",
-              "unknown",
-              "CodexPatch",
-              "GeminiPatch",
-              "CodexDiff",
-              "GeminiDiff",
-              "edit",
-            ]);
-            return props.messages.filter((msg) => {
-              if (msg.kind !== "tool-call") return true;
-              if (ALWAYS_VISIBLE_TOOLS.has(msg.tool.name)) return true;
-              if (msg.tool.name.startsWith("mcp__")) return true;
-              if (msg.tool.permission?.status === "pending") return true;
-              const knownTool = knownTools[
-                msg.tool.name as keyof typeof knownTools
-              ] as any;
-              if (knownTool?.hidden) return false;
-              return false;
-            });
-          })();
-
-      const dedupedMessages: Message[] = [];
-      for (const msg of visibleMessages) {
-        if (msg.kind === "agent-text") {
-          const preview = parseLegacyCodexDiffPreview(msg.text);
-          const lastMessage = dedupedMessages[dedupedMessages.length - 1];
-          if (preview && lastMessage?.kind === "agent-text") {
-            const lastPreview = parseLegacyCodexDiffPreview(lastMessage.text);
-            if (
-              lastPreview &&
-              lastPreview.unifiedDiff === preview.unifiedDiff &&
-              (lastPreview.prefixMarkdown ?? "") ===
-                (preview.prefixMarkdown ?? "")
-            ) {
-              continue;
-            }
-          }
-        }
-        dedupedMessages.push(msg);
-      }
-
-      const items = buildChatDisplayItems(dedupedMessages, {
+      const items = buildVisibleChatDisplayItems(props.messages, {
+        viewInline,
         showThinkingTimeline: experiments,
       });
       logTiming("displayItems", now() - startedAt);
@@ -356,51 +298,9 @@ const ChatListInternal = React.memo(
 
     // Group consecutive tool calls between text messages into collapsible
     // containers — unless the user disabled it in settings.
-    type FinalDisplayItem = ChatDisplayItem | ToolGroupItem;
-    const finalDisplayItems: FinalDisplayItem[] = React.useMemo(() => {
+    const finalDisplayItems: FinalChatDisplayItem[] = React.useMemo(() => {
       if (!groupToolCalls) return displayItems;
-
-      const result: FinalDisplayItem[] = [];
-      let toolBuffer: Message[] = [];
-
-      const flushBuffer = () => {
-        if (toolBuffer.length === 0) return;
-        const hasRunning = toolBuffer.some(
-          (m) => m.kind === "tool-call" && m.tool.state === "running",
-        );
-        result.push({
-          type: "tool-group",
-          id: `group-${toolBuffer[toolBuffer.length - 1].id}`,
-          messages: [...toolBuffer],
-          hasRunning,
-        });
-        toolBuffer = [];
-      };
-
-      for (const item of displayItems) {
-        // Turn timeline and separator items pass through as-is
-        if (isTurnTimelineDisplayItem(item) || isTurnStartSeparator(item)) {
-          flushBuffer();
-          result.push(item);
-          continue;
-        }
-        // item is a Message
-        const msg = item as Message;
-        const isStandalone =
-          msg.kind === "user-text" ||
-          msg.kind === "agent-event" ||
-          (msg.kind === "agent-text" && !msg.isThinking && msg.text.trim().length > 0);
-        const isFileAttachment = msg.kind === "tool-call" && msg.tool.name === "file";
-
-        if (isStandalone || isFileAttachment) {
-          flushBuffer();
-          result.push(item);
-        } else {
-          toolBuffer.push(msg);
-        }
-      }
-      flushBuffer();
-      return result;
+      return groupToolCallItems(displayItems);
     }, [displayItems, groupToolCalls]);
 
     // Track which groups the user has manually toggled (flips their default state)
@@ -631,9 +531,9 @@ const ChatListInternal = React.memo(
       },
     ]);
 
-    const keyExtractor = useCallback((item: FinalDisplayItem) => item.id, []);
+    const keyExtractor = useCallback((item: FinalChatDisplayItem) => item.id, []);
     const renderItem = useCallback(
-      ({ item }: { item: FinalDisplayItem }) => {
+      ({ item }: { item: FinalChatDisplayItem }) => {
         // Tool group (only when groupToolCalls is on)
         if ("type" in item && (item as ToolGroupItem).type === "tool-group") {
           const group = item as ToolGroupItem;

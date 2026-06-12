@@ -324,3 +324,126 @@ describe("buildChatDisplayItems", () => {
     expect(result.didCollapse).toBe(true);
   });
 });
+
+import {
+  buildVisibleChatDisplayItems,
+  groupToolCallItems,
+  type FinalChatDisplayItem,
+} from "./chatTimelineDisplay";
+import type { UserTextMessage } from "@/sync/typesMessage";
+
+function createNamedToolCall(
+  id: string,
+  createdAt: number,
+  name: string,
+  state: "running" | "completed" = "completed",
+): ToolCallMessage {
+  return {
+    kind: "tool-call",
+    id,
+    localId: null,
+    createdAt,
+    tool: {
+      name,
+      state,
+      input: {},
+      createdAt,
+      startedAt: createdAt,
+      completedAt: state === "completed" ? createdAt + 10 : null,
+      description: null,
+      result: state === "completed" ? "ok" : null,
+    },
+    children: [],
+  } as unknown as ToolCallMessage;
+}
+
+function createUserText(id: string, createdAt: number, text: string): UserTextMessage {
+  return {
+    kind: "user-text",
+    id,
+    realId: null,
+    localId: null,
+    createdAt,
+    text,
+  };
+}
+
+function createAgentText(id: string, createdAt: number, text: string): AgentTextMessage {
+  return {
+    kind: "agent-text",
+    id,
+    localId: null,
+    createdAt,
+    text,
+    isThinking: false,
+  };
+}
+
+describe("buildVisibleChatDisplayItems", () => {
+  it("keeps every tool call when viewInline is on", () => {
+    const messages: Message[] = [
+      createNamedToolCall("t1", 1, "Bash"),
+      createNamedToolCall("t2", 2, "Read"),
+    ];
+    const items = buildVisibleChatDisplayItems(messages, {
+      viewInline: true,
+      showThinkingTimeline: false,
+    });
+    expect(items.map((i) => (i as Message).id)).toEqual(["t1", "t2"]);
+  });
+
+  it("hides non-essential tool calls when viewInline is off, keeping always-visible / mcp / pending ones", () => {
+    const pending = createNamedToolCall("t4", 4, "Bash");
+    (pending.tool as any).permission = { status: "pending" };
+    const messages: Message[] = [
+      createNamedToolCall("t1", 1, "Bash"),
+      createNamedToolCall("t2", 2, "Read"),
+      createNamedToolCall("t3", 3, "mcp__happy__change_title"),
+      pending,
+      createAgentText("a1", 5, "answer"),
+    ];
+    const items = buildVisibleChatDisplayItems(messages, {
+      viewInline: false,
+      showThinkingTimeline: false,
+    });
+    expect(items.map((i) => (i as Message).id)).toEqual(["t2", "t3", "t4", "a1"]);
+  });
+});
+
+describe("groupToolCallItems", () => {
+  it("groups consecutive tool calls between standalone messages and flags running groups", () => {
+    const items = [
+      createUserText("u1", 1, "do it"),
+      createNamedToolCall("t1", 2, "Bash"),
+      createNamedToolCall("t2", 3, "Read", "running"),
+      createAgentText("a1", 4, "done"),
+    ];
+    const grouped = groupToolCallItems(items);
+
+    expect(grouped).toHaveLength(3);
+    expect((grouped[0] as Message).id).toBe("u1");
+    const group = grouped[1] as Extract<FinalChatDisplayItem, { type: "tool-group" }>;
+    expect(group.type).toBe("tool-group");
+    expect(group.id).toBe("group-t2");
+    expect(group.messages.map((m) => m.id)).toEqual(["t1", "t2"]);
+    expect(group.hasRunning).toBe(true);
+    expect((grouped[2] as Message).id).toBe("a1");
+  });
+
+  it("keeps file attachments standalone instead of folding them into a group", () => {
+    const items = [
+      createNamedToolCall("t1", 1, "Bash"),
+      createNamedToolCall("f1", 2, "file"),
+      createNamedToolCall("t2", 3, "Bash"),
+    ];
+    const grouped = groupToolCallItems(items);
+
+    expect(grouped).toHaveLength(3);
+    const first = grouped[0] as Extract<FinalChatDisplayItem, { type: "tool-group" }>;
+    expect(first.type).toBe("tool-group");
+    expect(first.messages.map((m) => m.id)).toEqual(["t1"]);
+    expect((grouped[1] as Message).id).toBe("f1");
+    const last = grouped[2] as Extract<FinalChatDisplayItem, { type: "tool-group" }>;
+    expect(last.messages.map((m) => m.id)).toEqual(["t2"]);
+  });
+});

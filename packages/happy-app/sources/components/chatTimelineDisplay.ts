@@ -5,7 +5,9 @@ import type {
   ToolCallMessage,
 } from "@/sync/typesMessage";
 import { parseLegacyCodexPlanPreview } from "./tools/codexPlanCompat";
+import { parseLegacyCodexDiffPreview } from "./tools/codexDiffCompat";
 import { summarizeHappyProgressInput } from "./tools/views/happyProgressViewData";
+import type { ToolGroupItem } from "@/hooks/useGroupedMessages";
 
 export interface TurnTimelineThinkingStep {
   readonly kind: "thinking";
@@ -404,4 +406,140 @@ function hasAgentContentBetween(items: ChatDisplayItem[], userIdx: number): bool
     if (scan.kind === "turn-timeline") return true;
   }
   return false;
+}
+
+// ─── Full render-list pipeline ──────────────────────────────────────────────
+// ChatList delegates every display decision (visibility, legacy dedup, turn
+// grouping, tool grouping) to this module; the component owns only
+// memoization and timing. Keeping the stages here makes the whole
+// Message[] → render-list contract testable without React.
+
+export type FinalChatDisplayItem = ChatDisplayItem | ToolGroupItem;
+
+// Tool calls that stay visible even when the viewInline setting is off.
+const ALWAYS_VISIBLE_TOOLS = new Set([
+  "Task",
+  "Agent",
+  "AskUserQuestion",
+  "TodoWrite",
+  "Read",
+  "Edit",
+  "MultiEdit",
+  "Write",
+  "Grep",
+  "Glob",
+  "LS",
+  "NotebookEdit",
+  "CodexDynamicTool",
+  "CodexPermissions",
+  "unknown",
+  "CodexPatch",
+  "GeminiPatch",
+  "CodexDiff",
+  "GeminiDiff",
+  "edit",
+]);
+
+function isToolCallVisibleWithoutInline(msg: Message): boolean {
+  if (msg.kind !== "tool-call") return true;
+  if (ALWAYS_VISIBLE_TOOLS.has(msg.tool.name)) return true;
+  if (msg.tool.name.startsWith("mcp__")) return true;
+  if (msg.tool.permission?.status === "pending") return true;
+  return false;
+}
+
+// Legacy Codex streams emit the same diff preview twice as consecutive
+// agent-text messages; drop the duplicate.
+function dedupeLegacyCodexDiffPreviews(messages: readonly Message[]): Message[] {
+  const deduped: Message[] = [];
+  for (const msg of messages) {
+    if (msg.kind === "agent-text") {
+      const preview = parseLegacyCodexDiffPreview(msg.text);
+      const lastMessage = deduped[deduped.length - 1];
+      if (preview && lastMessage?.kind === "agent-text") {
+        const lastPreview = parseLegacyCodexDiffPreview(lastMessage.text);
+        if (
+          lastPreview &&
+          lastPreview.unifiedDiff === preview.unifiedDiff &&
+          (lastPreview.prefixMarkdown ?? "") === (preview.prefixMarkdown ?? "")
+        ) {
+          continue;
+        }
+      }
+    }
+    deduped.push(msg);
+  }
+  return deduped;
+}
+
+/**
+ * Stage 1-3 of the render list: visibility filtering (viewInline off hides
+ * non-essential tool calls), legacy Codex diff dedup, then
+ * {@link buildChatDisplayItems} (turn timelines + separators).
+ */
+export function buildVisibleChatDisplayItems(
+  messages: readonly Message[],
+  options: {
+    viewInline: boolean;
+    showThinkingTimeline: boolean;
+  },
+): ChatDisplayItem[] {
+  const visibleMessages = options.viewInline
+    ? messages
+    : messages.filter(isToolCallVisibleWithoutInline);
+  const dedupedMessages = dedupeLegacyCodexDiffPreviews(visibleMessages);
+  return buildChatDisplayItems(dedupedMessages, {
+    showThinkingTimeline: options.showThinkingTimeline,
+  });
+}
+
+/**
+ * Stage 4: group consecutive non-standalone messages (tool calls, thinking,
+ * empty agent text) between standalone items into collapsible ToolGroupItems.
+ * Turn timelines and separators flush the open group and pass through.
+ */
+export function groupToolCallItems(
+  items: readonly ChatDisplayItem[],
+): FinalChatDisplayItem[] {
+  const result: FinalChatDisplayItem[] = [];
+  let toolBuffer: Message[] = [];
+
+  const flushBuffer = () => {
+    if (toolBuffer.length === 0) return;
+    const hasRunning = toolBuffer.some(
+      (m) => m.kind === "tool-call" && m.tool.state === "running",
+    );
+    result.push({
+      type: "tool-group",
+      id: `group-${toolBuffer[toolBuffer.length - 1].id}`,
+      messages: [...toolBuffer],
+      hasRunning,
+    });
+    toolBuffer = [];
+  };
+
+  for (const item of items) {
+    // Turn timeline and separator items pass through as-is
+    if (isTurnTimelineDisplayItem(item) || isTurnStartSeparator(item)) {
+      flushBuffer();
+      result.push(item);
+      continue;
+    }
+    // item is a Message
+    const msg = item as Message;
+    const isStandalone =
+      msg.kind === "user-text" ||
+      msg.kind === "agent-event" ||
+      (msg.kind === "agent-text" && !msg.isThinking && msg.text.trim().length > 0);
+    const isFileAttachment = msg.kind === "tool-call" && msg.tool.name === "file";
+
+    if (isStandalone || isFileAttachment) {
+      flushBuffer();
+      result.push(item);
+    } else {
+      toolBuffer.push(msg);
+    }
+  }
+  flushBuffer();
+  return result;
 }
