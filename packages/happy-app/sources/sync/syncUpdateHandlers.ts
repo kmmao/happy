@@ -1,4 +1,5 @@
 import { Platform } from "react-native";
+import { sendWebNotification } from "@/utils/webNotification";
 import { storage } from "./storage";
 import { log } from "@/log";
 import * as Notifications from "expo-notifications";
@@ -136,8 +137,21 @@ function dispatchTerminalSignal(
             if (!body) return;
             const session = storage.getState().sessions[sid];
             const title = session ? getSessionName(session) : t("status.unknown");
-            // trigger: null = deliver immediately. Foreground delivery shows
-            // a banner; background delivery becomes a system notification.
+            // Web: expo-notifications is a no-op in browsers, so route through
+            // the Notification API wrapper (permission + hidden-tab gated,
+            // same opt-in setting as permission-request notifications).
+            if (Platform.OS === "web") {
+                if (storage.getState().settings.webNotifications) {
+                    sendWebNotification(title, {
+                        body,
+                        tag: `terminal-signal-${sid}`,
+                        persistent: storage.getState().settings.webNotificationsPersistent,
+                    });
+                }
+                return;
+            }
+            // Native: trigger: null = deliver immediately. Foreground delivery
+            // shows a banner; background delivery becomes a system notification.
             Notifications.scheduleNotificationAsync({
                 content: { title, body, sound: false },
                 trigger: null,
@@ -181,6 +195,19 @@ function dispatchTerminalSignal(
             if (body) {
                 const session = storage.getState().sessions[sid];
                 const title = session ? getSessionName(session) : t("status.unknown");
+                if (Platform.OS === "web") {
+                    // Browser Notification API path — same gating as the
+                    // notification case above. `tag` per session so a re-fired
+                    // picker replaces the previous banner instead of stacking.
+                    if (storage.getState().settings.webNotifications) {
+                        sendWebNotification(title, {
+                            body,
+                            tag: `picker-${sid}`,
+                            persistent: storage.getState().settings.webNotificationsPersistent,
+                        });
+                    }
+                    return;
+                }
                 Notifications.scheduleNotificationAsync({
                     content: { title, body, sound: false },
                     trigger: null,
