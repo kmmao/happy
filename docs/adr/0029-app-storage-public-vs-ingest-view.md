@@ -23,3 +23,12 @@ compile.
 optimistic local updates. They stay on the public view until each call site
 gets an intent-named mutation; do not widen the public view with new `apply*`
 methods.
+
+## Drift guard
+
+Because the narrowed export is produced by a cast, the key lists are the only
+enforcement — so they are themselves guarded: a compile-time assertion next to
+`SyncIngestMutations` requires every `apply*` key on `StorageState` to appear
+in exactly one of the two lists (`SyncIngestMutations` or the documented
+`PublicAppliers` allowlist). Adding an `apply*` mutation without classifying
+it fails `tsc` at the assertion (issue #128).

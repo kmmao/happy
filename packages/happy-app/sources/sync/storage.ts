@@ -240,6 +240,7 @@ interface StorageState {
   ) => void;
   applyMachines: (machines: Machine[], replace?: boolean) => void;
   applyReady: () => void;
+  applyFakeDriftProbe: () => void;
   applyMessages: (
     sessionId: string,
     messages: NormalizedMessage[],
@@ -2546,6 +2547,34 @@ type SyncIngestMutations = Pick<
   | "applySessionUsageBaseline"
   | "applyUsers"
 >;
+
+/**
+ * Local-intent appliers deliberately kept on the public view — components
+ * call them as optimistic updates today (ADR-0029, "Deliberately still
+ * public"). Do not add keys here for new server-driven mutations; those
+ * belong in SyncIngestMutations.
+ */
+type PublicAppliers = Pick<
+  StorageState,
+  | "applyFriends"
+  | "applyLocalSettings"
+  | "applySessions"
+  | "applySettings"
+  | "applySettingsLocal"
+>;
+
+// Drift guard (#128): every `apply*` mutation on StorageState must be
+// classified — ingest-only (SyncIngestMutations) or deliberately public
+// (PublicAppliers). The narrowed `storage` export below is produced by a
+// cast, so a forgotten key would otherwise land on the public view with no
+// compile error. If you just added an apply* method and this line stopped
+// compiling, add its key to exactly one of the two lists above.
+type AssertNever<T extends never> = T;
+type UnclassifiedAppliers = Exclude<
+  Extract<keyof StorageState, `apply${string}`>,
+  keyof SyncIngestMutations | keyof PublicAppliers
+>;
+type _StorageAppliersAreClassified = AssertNever<UnclassifiedAppliers>;
 
 /** The storage interface everyone outside `sources/sync/` programs against. */
 export type StoragePublicState = Omit<StorageState, keyof SyncIngestMutations>;
