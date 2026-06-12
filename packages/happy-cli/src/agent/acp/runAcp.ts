@@ -484,18 +484,7 @@ class GenericAcpPermissionHandler
     toolName: string,
     input: unknown,
   ): Promise<PermissionResult> {
-    return new Promise<PermissionResult>((resolve, reject) => {
-      this.pendingRequests.set(toolCallId, {
-        resolve,
-        reject,
-        toolName,
-        input,
-      });
-      this.addPendingRequestToState(toolCallId, toolName, input);
-      logger.debug(
-        `${this.logPrefix} Permission request sent for tool: ${toolName} (${toolCallId})`,
-      );
-    });
+    return this.requestPermission(toolCallId, toolName, input);
   }
 }
 

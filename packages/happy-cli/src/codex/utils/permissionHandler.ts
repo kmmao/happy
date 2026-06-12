@@ -111,37 +111,10 @@ export class CodexPermissionHandler extends BasePermissionHandler {
         `${this.getLogPrefix()} Auto-approving tool ${toolName} (${toolCallId}) in ${this.currentPermissionMode} mode`,
       );
 
-      this.session.updateAgentState((currentState) => ({
-        ...currentState,
-        completedRequests: {
-          ...currentState.completedRequests,
-          [toolCallId]: {
-            tool: toolName,
-            arguments: input,
-            createdAt: Date.now(),
-            completedAt: Date.now(),
-            status: "approved",
-            decision,
-          },
-        },
-      }));
-
+      this.recordAutoApproval(toolCallId, toolName, input, decision);
       return { decision };
     }
 
-    return new Promise<PermissionResult>((resolve, reject) => {
-      this.pendingRequests.set(toolCallId, {
-        resolve,
-        reject,
-        toolName,
-        input,
-      });
-
-      this.addPendingRequestToState(toolCallId, toolName, input);
-
-      logger.debug(
-        `${this.getLogPrefix()} Permission request sent for tool: ${toolName} (${toolCallId}) in ${this.currentPermissionMode} mode`,
-      );
-    });
+    return this.requestPermission(toolCallId, toolName, input);
   }
 }

@@ -1,8 +1,17 @@
 /**
  * Base Permission Handler
  *
- * Abstract base class for permission handlers that manage tool approval requests.
- * Shared by Codex and Gemini permission handlers.
+ * Owns the full tool-approval lifecycle shared by the Codex, Gemini, and ACP
+ * permission handlers: the pending-request map, the 'permission' RPC response
+ * handler, session-swap rebinding, reset semantics, and both decision paths —
+ * `requestPermission` (interactive) and `recordAutoApproval` (auto-approve).
+ * Subclasses contribute only their auto-approval policy and decision choice.
+ *
+ * Claude's `claude/utils/permissionHandler.ts` is intentionally NOT built on
+ * this class: its interface is materially different (permission-mode
+ * computation, decision classifications, allowedTools tracking, plan-mode
+ * restart), and forcing it under this base would widen this interface until
+ * it was as complex as the implementations it hides.
  *
  * @module BasePermissionHandler
  */
@@ -118,6 +127,53 @@ export abstract class BasePermissionHandler {
                 logger.debug(`${this.getLogPrefix()} Permission ${response.approved ? 'approved' : 'denied'} for ${pending.toolName}`);
             }
         );
+    }
+
+    /**
+     * Auto-approval path: record the decision directly as a completed request
+     * in agent state. No pending request is created, so the App renders it as
+     * already decided. Providers pick the decision (their mode rules differ);
+     * the record shape and lifecycle live here.
+     */
+    protected recordAutoApproval(
+        toolCallId: string,
+        toolName: string,
+        input: unknown,
+        decision: 'approved' | 'approved_for_session'
+    ): void {
+        this.session.updateAgentState((currentState) => ({
+            ...currentState,
+            completedRequests: {
+                ...currentState.completedRequests,
+                [toolCallId]: {
+                    tool: toolName,
+                    arguments: input,
+                    createdAt: Date.now(),
+                    completedAt: Date.now(),
+                    status: 'approved',
+                    decision
+                }
+            }
+        }));
+    }
+
+    /**
+     * Interactive path: park the tool call as a pending request and resolve
+     * when the App responds via the 'permission' RPC (or reject on reset()).
+     */
+    protected requestPermission(toolCallId: string, toolName: string, input: unknown): Promise<PermissionResult> {
+        return new Promise<PermissionResult>((resolve, reject) => {
+            this.pendingRequests.set(toolCallId, {
+                resolve,
+                reject,
+                toolName,
+                input
+            });
+
+            this.addPendingRequestToState(toolCallId, toolName, input);
+
+            logger.debug(`${this.getLogPrefix()} Permission request sent for tool: ${toolName} (${toolCallId})`);
+        });
     }
 
     /**
