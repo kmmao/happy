@@ -677,12 +677,28 @@ export class CodexAppServerClient {
   }
 
   async loadCapabilities(): Promise<AppServerCapabilities> {
+    // Optional requests are capped at 10s: codex 0.130.0's
+    // `mcpServerStatus/list` performs live MCP server probing and can simply
+    // never respond, which used to wedge the whole Promise.all below and hang
+    // connect() forever. A timed-out optional capability degrades to null —
+    // same as an error — instead of blocking the session.
+    const OPTIONAL_REQUEST_TIMEOUT_MS = 10_000;
     const safeRequest = async <T>(method: string, params: unknown): Promise<T | null> => {
+      let timer: ReturnType<typeof setTimeout> | undefined;
       try {
-        return (await this.sendRequest(method, params)) as T;
+        const timeout = new Promise<never>((_, reject) => {
+          timer = setTimeout(
+            () => reject(new Error(`timed out after ${OPTIONAL_REQUEST_TIMEOUT_MS}ms`)),
+            OPTIONAL_REQUEST_TIMEOUT_MS,
+          );
+          if (typeof timer.unref === "function") timer.unref();
+        });
+        return (await Promise.race([this.sendRequest(method, params), timeout])) as T;
       } catch (error) {
         logger.debug(`[CodexAppServer] Optional capability request failed: ${method}`, error);
         return null;
+      } finally {
+        if (timer) clearTimeout(timer);
       }
     };
 
