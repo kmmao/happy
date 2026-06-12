@@ -71,6 +71,12 @@ export function enableErrorHandlers(app: Fastify) {
 
     // Error hook for additional logging
     app.addHook('onError', async (request, reply, error) => {
+        // Ownership 404s are routine control flow (clients poll stale ids
+        // constantly) — they are mapped to the legacy body above and must
+        // not spam the error log.
+        if (error instanceof OwnedEntityNotFound) {
+            return;
+        }
         const method = request.method;
         const url = request.url;
         const duration = (Date.now() - (request.startTime || Date.now())) / 1000;
