@@ -1,5 +1,24 @@
 # Changelog
 
+## 2.37.0 - 2026-06-12
+
+Session subtitles now show what Claude is doing in real time. PTY-mode sessions stream their TUI status surface (spinner verb, elapsed time, token counter, progress) to the app, so you can see "Reasoning… · 12s · 1.2k tokens" at a glance without opening the raw terminal — across the main sessions list, recent sessions, machine detail, and the chat header.
+
+### Live session status
+- Added a live TUI status line for running sessions — the spinner verb, elapsed seconds, output-token counter and progress percentage from Claude's terminal now replace the static path/title in session subtitles while a turn is running, and fall back automatically when it ends.
+- Added a notification when Claude's terminal is blocked on a numbered picker waiting for keyboard input — the banner shows the captured prompt so you know to open the raw terminal and answer.
+- Added ConEmu-style progress reporting (OSC 9;4): determinate progress from hooks/builds is tracked per session and shown as a percentage in the live status line.
+- Added the same live status line to the chat header — while running, the subtitle switches from `Process ID · cwd` to the live activity line.
+
+### Session panel
+- Fixed the Claude tab not rendering in the mobile session panel sheet.
+
+### Models
+- Added end-to-end support for Claude Fable 5 (claude-fable-5).
+
+### Stability
+- Reworked the sync update ingest pipeline into a single seam (ADR-0026) for more predictable live-message handling.
+
 ## 2.36.8 - 2026-06-09
 
 Small readability fix for the Footprint panel: long tool names in the operation-mix legend were being cut off with an ellipsis (e.g. `mcp__codegraph__c...`, `mcp__happy__chang...`), so users couldn't tell which MCP tool a colored segment actually represented.

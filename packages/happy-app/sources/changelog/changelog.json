@@ -2,6 +2,21 @@
   "entries": {
     "en": [
       {
+        "version": "2.37.0",
+        "date": "2026-06-12",
+        "summary": "Session subtitles now show what Claude is doing in real time. PTY-mode sessions stream their TUI status surface (spinner verb, elapsed time, token counter, progress) to the app, so you can see \"Reasoning… · 12s · 1.2k tokens\" at a glance without opening the raw terminal — across the main sessions list, recent sessions, machine detail, and the chat header.",
+        "changes": [
+          "Added a live TUI status line for running sessions — the spinner verb, elapsed seconds, output-token counter and progress percentage from Claude's terminal now replace the static path/title in session subtitles while a turn is running, and fall back automatically when it ends.",
+          "Added a notification when Claude's terminal is blocked on a numbered picker waiting for keyboard input — the banner shows the captured prompt so you know to open the raw terminal and answer.",
+          "Added ConEmu-style progress reporting (OSC 9;4): determinate progress from hooks/builds is tracked per session and shown as a percentage in the live status line.",
+          "Added the same live status line to the chat header — while running, the subtitle switches from `Process ID · cwd` to the live activity line.",
+          "Fixed the Claude tab not rendering in the mobile session panel sheet.",
+          "Added end-to-end support for Claude Fable 5 (claude-fable-5).",
+          "Reworked the sync update ingest pipeline into a single seam (ADR-0026) for more predictable live-message handling."
+        ],
+        "rawMarkdown": "## 2.37.0 - 2026-06-12\n\n\nSession subtitles now show what Claude is doing in real time. PTY-mode sessions stream their TUI status surface (spinner verb, elapsed time, token counter, progress) to the app, so you can see \"Reasoning… · 12s · 1.2k tokens\" at a glance without opening the raw terminal — across the main sessions list, recent sessions, machine detail, and the chat header.\n\n### Live session status\n- Added a live TUI status line for running sessions — the spinner verb, elapsed seconds, output-token counter and progress percentage from Claude's terminal now replace the static path/title in session subtitles while a turn is running, and fall back automatically when it ends.\n- Added a notification when Claude's terminal is blocked on a numbered picker waiting for keyboard input — the banner shows the captured prompt so you know to open the raw terminal and answer.\n- Added ConEmu-style progress reporting (OSC 9;4): determinate progress from hooks/builds is tracked per session and shown as a percentage in the live status line.\n- Added the same live status line to the chat header — while running, the subtitle switches from `Process ID · cwd` to the live activity line.\n\n### Session panel\n- Fixed the Claude tab not rendering in the mobile session panel sheet.\n\n### Models\n- Added end-to-end support for Claude Fable 5 (claude-fable-5).\n\n### Stability\n- Reworked the sync update ingest pipeline into a single seam (ADR-0026) for more predictable live-message handling."
+      },
+      {
         "version": "2.36.8",
         "date": "2026-06-09",
         "summary": "Small readability fix for the Footprint panel: long tool names in the operation-mix legend were being cut off with an ellipsis (e.g. `mcp__codegraph__c...`, `mcp__happy__chang...`), so users couldn't tell which MCP tool a colored segment actually represented.",
@@ -1022,6 +1037,21 @@
     ],
     "zh-Hans": [
       {
+        "version": "2.37.0",
+        "date": "2026-06-12",
+        "summary": "会话副标题现在可以实时显示 Claude 正在做什么。PTY 模式会话会把 TUI 状态面（spinner 动词、耗时、token 计数、进度）实时同步到 App，无需打开 Raw Terminal 就能一眼看到「Reasoning… · 12s · 1.2k tokens」—— 覆盖主会话列表、最近会话、机器详情页和聊天头部四处入口。",
+        "changes": [
+          "新增运行中会话的实时 TUI 状态行 —— Claude 终端里的 spinner 动词、耗时秒数、输出 token 计数和进度百分比，会在回合运行期间替代副标题里的静态路径/标题，回合结束后自动回落。",
+          "新增「等待选择」通知 —— 当 Claude 终端被编号选择框（picker）阻塞等待键盘输入时，App 会推送横幅并附上捕获的选项文本，提示你去 Raw Terminal 作答。",
+          "新增 ConEmu 风格进度上报（OSC 9;4）：hook/构建产生的确定性进度按会话跟踪，并以百分比形式显示在实时状态行中。",
+          "新增聊天头部的实时状态行 —— 运行中时副标题从「进程 ID · cwd」切换为实时活动行。",
+          "修复移动端会话面板中 Claude 标签页不渲染的问题。",
+          "新增 Claude Fable 5（claude-fable-5）的端到端支持。",
+          "重构同步更新摄取管线为单一接缝（ADR-0026），实时消息处理更可预测。"
+        ],
+        "rawMarkdown": "## 2.37.0 - 2026-06-12\n\n\n会话副标题现在可以实时显示 Claude 正在做什么。PTY 模式会话会把 TUI 状态面（spinner 动词、耗时、token 计数、进度）实时同步到 App，无需打开 Raw Terminal 就能一眼看到「Reasoning… · 12s · 1.2k tokens」—— 覆盖主会话列表、最近会话、机器详情页和聊天头部四处入口。\n\n### 实时会话状态\n- 新增运行中会话的实时 TUI 状态行 —— Claude 终端里的 spinner 动词、耗时秒数、输出 token 计数和进度百分比，会在回合运行期间替代副标题里的静态路径/标题，回合结束后自动回落。\n- 新增「等待选择」通知 —— 当 Claude 终端被编号选择框（picker）阻塞等待键盘输入时，App 会推送横幅并附上捕获的选项文本，提示你去 Raw Terminal 作答。\n- 新增 ConEmu 风格进度上报（OSC 9;4）：hook/构建产生的确定性进度按会话跟踪，并以百分比形式显示在实时状态行中。\n- 新增聊天头部的实时状态行 —— 运行中时副标题从「进程 ID · cwd」切换为实时活动行。\n\n### 会话面板\n- 修复移动端会话面板中 Claude 标签页不渲染的问题。\n\n### 模型\n- 新增 Claude Fable 5（claude-fable-5）的端到端支持。\n\n### 稳定性\n- 重构同步更新摄取管线为单一接缝（ADR-0026），实时消息处理更可预测。"
+      },
+      {
         "version": "2.36.2",
         "date": "2026-06-05",
         "summary": "收紧了聊天头部布局 —— Claude 的实时工作目录从原先单独的第三行，合并到「进程 ID」副标题那一行，形成 `进程 ID 99118 · gs-frontend` 这样的单行展示。cwd 标签现在**始终显示**（即使 Claude 还没离开启动目录，也会显示启动目录末段名），让你随时一眼看到「自己在哪」，同时省下一行垂直空间。",
@@ -1948,7 +1978,7 @@
       }
     ]
   },
-  "latestVersion": "2.36.8",
+  "latestVersion": "2.37.0",
   "availableLocales": [
     "en",
     "zh-Hans"
