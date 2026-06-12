@@ -240,7 +240,6 @@ interface StorageState {
   ) => void;
   applyMachines: (machines: Machine[], replace?: boolean) => void;
   applyReady: () => void;
-  applyFakeDriftProbe: () => void;
   applyMessages: (
     sessionId: string,
     messages: NormalizedMessage[],
