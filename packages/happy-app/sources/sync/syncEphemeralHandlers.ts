@@ -7,7 +7,7 @@
 import { ApiEphemeralUpdateSchema, type ApiEphemeralActivityUpdate } from "./apiTypes";
 import { ActivityUpdateAccumulator } from "./reducer/activityUpdateAccumulator";
 import { resolveActivityThinking } from "./reducer/resolveActivityThinking";
-import { storage } from "./storage";
+import { ingestStorage, storage } from "./storage";
 import { log } from "@/log";
 import { Session, Machine } from "./storageTypes";
 import type { ResearchConfigChange } from "./syncUpdateHandlers";
@@ -211,7 +211,7 @@ export function handleEphemeralUpdateAction(
         active: updateData.active,
         activeAt: updateData.activeAt,
       };
-      storage.getState().applyMachines([updatedMachine]);
+      ingestStorage.getState().applyMachines([updatedMachine]);
     }
   }
 
@@ -220,7 +220,7 @@ export function handleEphemeralUpdateAction(
     if (updateData.scope === "machine") {
       const machine = storage.getState().machines[updateData.id];
       if (machine) {
-        storage.getState().applyMachines([{
+        ingestStorage.getState().applyMachines([{
           ...machine,
           rpcReady: updateData.ready,
         }]);

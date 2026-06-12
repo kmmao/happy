@@ -11,7 +11,7 @@ import {
 import type { SessionMessageCursor } from "./sessionMessageCursor";
 import { AuthCredentials } from "@/auth/tokenStorage";
 import { apiSocket } from "./apiSocket";
-import { storage } from "./storage";
+import { ingestStorage, storage } from "./storage";
 import { log } from "@/log";
 import { AsyncLock } from "@/utils/lock";
 import { NonRetryableError } from "@/utils/time";
@@ -180,7 +180,7 @@ export function applyMessagesAction(
   sessionId: string,
   messages: NormalizedMessage[],
 ): void {
-  const result = storage.getState().applyMessages(sessionId, messages);
+  const result = ingestStorage.getState().applyMessages(sessionId, messages);
   const m: Message[] = [];
   for (const messageId of result.changed) {
     const message =
@@ -399,7 +399,7 @@ export async function fetchMessagesAction(
       totalProcessedMessages += decryptResult.processedSeqs.length;
       applyBatch(decryptResult.normalized);
       if (isFirstBatch && shouldApplyImmediately) {
-        storage.getState().applyMessagesLoaded(sessionId);
+        ingestStorage.getState().applyMessagesLoaded(sessionId);
         isFirstBatch = false;
       }
 
@@ -459,7 +459,7 @@ export async function fetchMessagesAction(
       }
     }
 
-    storage.getState().applyMessagesLoaded(sessionId);
+    ingestStorage.getState().applyMessagesLoaded(sessionId);
     if (initialAfterSeq === 0 && !blockedByUnprocessedMessage) {
       ctx.backfilledSessions.add(sessionId);
     }
@@ -482,7 +482,7 @@ export async function fetchMessagesAction(
       getSessionUsageSummary(ctx.credentials, sessionId)
         .then((summary) => {
           if (summary.reportCount > 0) {
-            storage.getState().applySessionUsageBaseline(sessionId, {
+            ingestStorage.getState().applySessionUsageBaseline(sessionId, {
               totalInputTokens: summary.totalInputTokens,
               totalOutputTokens: summary.totalOutputTokens,
               lastInputTokens: summary.lastInputTokens,

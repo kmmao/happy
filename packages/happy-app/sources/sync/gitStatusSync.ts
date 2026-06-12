@@ -6,7 +6,7 @@
 import { InvalidateSync } from "@/utils/sync";
 import { sessionBash } from "./ops";
 import { GitStatus, Session } from "./storageTypes";
-import { storage } from "./storage";
+import { ingestStorage, storage } from "./storage";
 import {
   parseStatusSummary,
   getStatusCounts,
@@ -204,7 +204,7 @@ export class GitStatusSync {
     this.stop(sessionId);
 
     // Clear git status from storage
-    storage.getState().applyGitStatus(sessionId, null);
+    ingestStorage.getState().applyGitStatus(sessionId, null);
   }
 
   disposeSession(sessionId: string): void {
@@ -238,7 +238,7 @@ export class GitStatusSync {
 
       if (!gitCheckResult.success || gitCheckResult.exitCode !== 0) {
         // Not a git repository - but may contain child git projects
-        storage.getState().applyGitStatus(sessionId, null);
+        ingestStorage.getState().applyGitStatus(sessionId, null);
 
         if (session.metadata?.machineId) {
           const pk = createProjectKey(
@@ -306,7 +306,7 @@ export class GitStatusSync {
       );
 
       // Apply to storage (this also updates the project git status via the modified applyGitStatus)
-      storage.getState().applyGitStatus(sessionId, gitStatus);
+      ingestStorage.getState().applyGitStatus(sessionId, gitStatus);
 
       // Additionally, update the project directly for efficiency. Read back
       // the deduped reference applyGitStatus may have kept so we don't undo

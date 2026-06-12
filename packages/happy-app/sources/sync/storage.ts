@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import type { StoreApi, UseBoundStore } from "zustand";
 import { useShallow } from "zustand/react/shallow";
 import { Session, Machine, GitStatus, type SessionPreferences, type SessionLatestUserRequestPreview } from "./storageTypes";
 import { createReducer, reducer, ReducerState, BackgroundTaskEntry } from "./reducer/reducer";
@@ -238,7 +239,6 @@ interface StorageState {
     replace?: boolean,
   ) => void;
   applyMachines: (machines: Machine[], replace?: boolean) => void;
-  applyLoaded: () => void;
   applyReady: () => void;
   applyMessages: (
     sessionId: string,
@@ -544,7 +544,7 @@ export function registerSessionEvictionCallback(
   onSessionMessagesEvicted = callback;
 }
 
-export const storage = create<StorageState>()((set, get) => {
+const storageStore = create<StorageState>()((set, get) => {
   let { settings, version } = loadSettings();
   let localSettings = loadLocalSettings();
   let purchases = loadPurchases();
@@ -1162,14 +1162,6 @@ export const storage = create<StorageState>()((set, get) => {
           sessionListViewData,
           sessionMessages: updatedSessionMessages,
         };
-      }),
-    applyLoaded: () =>
-      set((state) => {
-        const result = {
-          ...state,
-          sessionsData: [],
-        };
-        return result;
       }),
     applyReady: () =>
       set((state) => ({
@@ -2529,6 +2521,46 @@ export const storage = create<StorageState>()((set, get) => {
       })),
   };
 });
+
+/**
+ * Mutations owned by the SyncUpdate/SyncEphemeral ingest seams and the sync
+ * engine (ADR-0026). They land server-reported state; nothing outside
+ * `sources/sync/` may call them — components react to the resulting state or
+ * the ingest event stream instead. Excluded from the public `storage` type
+ * below; reach them through `ingestStorage`.
+ */
+type SyncIngestMutations = Pick<
+  StorageState,
+  | "applyArtifacts"
+  | "applyFeedItems"
+  | "applyGitStatus"
+  | "applyMachines"
+  | "applyMessages"
+  | "applyMessagesLoaded"
+  | "applyNativeUpdateStatus"
+  | "applyOlderMessages"
+  | "applyProfile"
+  | "applyPurchases"
+  | "applyReady"
+  | "applyRelationshipUpdate"
+  | "applySessionUsageBaseline"
+  | "applyUsers"
+>;
+
+/** The storage interface everyone outside `sources/sync/` programs against. */
+export type StoragePublicState = Omit<StorageState, keyof SyncIngestMutations>;
+
+/**
+ * Public storage view: read-only queries plus local-intent mutations (drafts,
+ * settings, pending queues, per-session preferences). Same store instance as
+ * `ingestStorage`, narrowed at the type level.
+ */
+export const storage = storageStore as unknown as UseBoundStore<
+  StoreApi<StoragePublicState>
+>;
+
+/** Full storage view including ingest mutations. `sources/sync/` only. */
+export const ingestStorage = storageStore;
 
 export function useSessions() {
   return storage(

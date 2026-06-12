@@ -24,7 +24,7 @@
  */
 
 import { log } from "@/log";
-import { storage } from "../storage";
+import { ingestStorage, storage } from "../storage";
 import { issueSessionStore } from "../issueSessionStore";
 import { isIssueSessionKey } from "../issueSessionTypes";
 import { deleteMessageCache, deleteHistoryComplete } from "../messageCache";
@@ -227,7 +227,7 @@ async function ingestNewMachine(
         log.error(`Failed to decrypt new machine ${machineId}:`, error);
     }
 
-    storage.getState().applyMachines([newMachine]);
+    ingestStorage.getState().applyMachines([newMachine]);
 
     return [];
 }
@@ -316,7 +316,7 @@ async function ingestUpdateMachine(
         }
     }
 
-    storage.getState().applyMachines([updatedMachine]);
+    ingestStorage.getState().applyMachines([updatedMachine]);
     return [];
 }
 
@@ -549,7 +549,7 @@ async function ingestUpdateAccount(
             body.github !== undefined ? body.github : currentProfile.github,
         timestamp: update.createdAt,
     };
-    storage.getState().applyProfile(updatedProfile);
+    ingestStorage.getState().applyProfile(updatedProfile);
 
     const events: IngestEvent[] = [];
 
@@ -1012,7 +1012,7 @@ async function ingestNewMessage(
 function ingestRelationshipUpdated(body: RelationshipUpdatedBody): IngestEvent[] {
     log.log("👥 Received relationship-updated update");
 
-    storage.getState().applyRelationshipUpdate({
+    ingestStorage.getState().applyRelationshipUpdate({
         fromUserId: body.fromUserId,
         toUserId: body.toUserId,
         status: body.status,
@@ -1068,7 +1068,7 @@ async function ingestNewFeedPost(
         }
     }
 
-    storage.getState().applyFeedItems([feedItem]);
+    ingestStorage.getState().applyFeedItems([feedItem]);
 
     return [];
 }

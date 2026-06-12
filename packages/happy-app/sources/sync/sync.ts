@@ -5,7 +5,7 @@ import { hasCredentialSecret } from "@/auth/authCredentials";
 import { Encryption } from "@/sync/encryption/encryption";
 import { SessionEncryption } from "@/sync/encryption/sessionEncryption";
 import { decodeBase64 } from "@/encryption/base64";
-import { storage, registerPreferencesSyncCallback, registerSessionEvictionCallback } from "./storage";
+import { ingestStorage, storage, registerPreferencesSyncCallback, registerSessionEvictionCallback } from "./storage";
 import { isSessionRunning, getSessionName } from "@/utils/sessionUtils";
 import {
   notifyPermissionRequest,
@@ -516,7 +516,7 @@ class Sync {
       this.machinesSync.awaitQueue(),
     ])
       .then(() => {
-        storage.getState().applyReady();
+        ingestStorage.getState().applyReady();
         // Load issue-session links so UI can show processing status
         void issueSessionStore.getState().loadLinks();
         // Start PR status polling for processing issue sessions with open PRs
@@ -617,7 +617,7 @@ class Sync {
         sessionId,
       );
       if (decryptResult.normalized.length > 0) {
-        storage.getState().applyOlderMessages(sessionId, decryptResult.normalized);
+        ingestStorage.getState().applyOlderMessages(sessionId, decryptResult.normalized);
       }
       const minSeq = Math.min(...messages.map((m) => m.seq));
       this.sessionOldestSeq.set(sessionId, minSeq);
@@ -1008,7 +1008,7 @@ class Sync {
       const { customerInfo } = await RevenueCat.purchaseStoreProduct(product);
 
       // Update local purchases data
-      storage.getState().applyPurchases(customerInfo);
+      ingestStorage.getState().applyPurchases(customerInfo);
 
       return { success: true };
     } catch (error: any) {
@@ -1135,7 +1135,7 @@ class Sync {
       usersMap[id] = profile;
     });
 
-    storage.getState().applyUsers(usersMap);
+    ingestStorage.getState().applyUsers(usersMap);
     log.log(
       `👤 Applied ${results.length} users to cache (${results.filter((r) => r.profile).length} found, ${results.filter((r) => !r.profile).length} not found)`,
     );
@@ -1717,7 +1717,7 @@ class Sync {
       });
 
       // Apply only compatible items to storage
-      storage.getState().applyFeedItems(compatibleItems);
+      ingestStorage.getState().applyFeedItems(compatibleItems);
       log.log(
         `📰 fetchFeed completed - loaded ${compatibleItems.length} compatible items (${allItems.length - compatibleItems.length} filtered)`,
       );
@@ -1899,7 +1899,7 @@ class Sync {
     const parsedProfile = profileParse(data);
 
     // Apply profile to storage
-    storage.getState().applyProfile(parsedProfile);
+    ingestStorage.getState().applyProfile(parsedProfile);
   };
 
   private fetchNativeUpdate = async () => {
@@ -1955,18 +1955,18 @@ class Sync {
 
       // Apply update status to storage
       if (data.update_required && data.update_url) {
-        storage.getState().applyNativeUpdateStatus({
+        ingestStorage.getState().applyNativeUpdateStatus({
           available: true,
           updateUrl: data.update_url,
         });
       } else {
-        storage.getState().applyNativeUpdateStatus({
+        ingestStorage.getState().applyNativeUpdateStatus({
           available: false,
         });
       }
     } catch (error) {
       log.log(`[fetchNativeUpdate] Error: ${error}`);
-      storage.getState().applyNativeUpdateStatus(null);
+      ingestStorage.getState().applyNativeUpdateStatus(null);
     }
   };
 
@@ -2012,7 +2012,7 @@ class Sync {
       const customerInfo = await RevenueCat.getCustomerInfo();
 
       // Apply to storage (storage handles the transformation)
-      storage.getState().applyPurchases(customerInfo);
+      ingestStorage.getState().applyPurchases(customerInfo);
     } catch (error) {
       log.error("Failed to sync purchases:", error);
       // Don't throw - purchases are optional
@@ -2194,7 +2194,7 @@ class Sync {
         rpcReady: false,
       }));
       if (machinesToReset.length > 0) {
-        syncState.applyMachines(machinesToReset);
+        ingestStorage.getState().applyMachines(machinesToReset);
       }
       this.sessionsSync.invalidate();
       this.machinesSync.invalidate();

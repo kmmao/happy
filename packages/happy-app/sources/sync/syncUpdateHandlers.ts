@@ -1,6 +1,6 @@
 import { Platform } from "react-native";
 import { sendWebNotification } from "@/utils/webNotification";
-import { storage } from "./storage";
+import { ingestStorage, storage } from "./storage";
 import { log } from "@/log";
 import * as Notifications from "expo-notifications";
 import {
@@ -723,7 +723,7 @@ export async function handleUpdateAccountUpdate(
         timestamp: updateData.createdAt,
     };
 
-    storage.getState().applyProfile(updatedProfile);
+    ingestStorage.getState().applyProfile(updatedProfile);
 
     // Handle settings updates
     if (body.settings?.value) {
@@ -820,7 +820,7 @@ export async function handleUpdateMachineUpdate(
         }
     }
 
-    storage.getState().applyMachines([updatedMachine]);
+    ingestStorage.getState().applyMachines([updatedMachine]);
 }
 
 // ---------------------------------------------------------------------------
@@ -832,7 +832,7 @@ export function handleRelationshipUpdate(
 ): void {
     log.log("👥 Received relationship-updated update");
 
-    storage.getState().applyRelationshipUpdate({
+    ingestStorage.getState().applyRelationshipUpdate({
         fromUserId: body.fromUserId,
         toUserId: body.toUserId,
         status: body.status,
@@ -1009,7 +1009,7 @@ export async function handleNewFeedPostUpdate(
         }
     }
 
-    storage.getState().applyFeedItems([feedItem]);
+    ingestStorage.getState().applyFeedItems([feedItem]);
 }
 
 // ---------------------------------------------------------------------------

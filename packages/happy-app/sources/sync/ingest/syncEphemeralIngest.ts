@@ -46,7 +46,7 @@
  */
 
 import { log } from "@/log";
-import { storage } from "../storage";
+import { ingestStorage, storage } from "../storage";
 import {
     handleWebhookIssueLinked as issueHandleWebhookIssueLinked,
     handleWebhookPRMerged as issueHandleWebhookPRMerged,
@@ -76,7 +76,7 @@ export function ingestSyncEphemeral(
                     active: update.active,
                     activeAt: update.activeAt,
                 };
-                storage.getState().applyMachines([updatedMachine]);
+                ingestStorage.getState().applyMachines([updatedMachine]);
             }
             return events;
         }
@@ -85,7 +85,7 @@ export function ingestSyncEphemeral(
             if (update.scope === "machine") {
                 const machine = storage.getState().machines[update.id];
                 if (machine) {
-                    storage.getState().applyMachines([{
+                    ingestStorage.getState().applyMachines([{
                         ...machine,
                         rpcReady: update.ready,
                     }]);

@@ -38,6 +38,10 @@ vi.mock("../storage", () => ({
         getState: mocks.getStateMock,
         setState: mocks.setStateMock,
     },
+    ingestStorage: {
+        getState: mocks.getStateMock,
+        setState: mocks.setStateMock,
+    },
 }));
 
 vi.mock("../syncIssueHandlers", () => ({

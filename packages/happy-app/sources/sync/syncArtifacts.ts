@@ -1,4 +1,4 @@
-import { storage } from "./storage";
+import { ingestStorage, storage } from "./storage";
 import { log } from "@/log";
 import { encodeBase64 } from "@/encryption/base64";
 import {
@@ -92,7 +92,7 @@ export async function fetchArtifactsList(ctx: ArtifactContext): Promise<void> {
         log.log(
             `📦 fetchArtifactsList: Successfully decrypted ${decryptedArtifacts.length} artifacts`,
         );
-        storage.getState().applyArtifacts(decryptedArtifacts, true);
+        ingestStorage.getState().applyArtifacts(decryptedArtifacts, true);
         log.log("📦 fetchArtifactsList: Artifacts applied to storage");
     } catch (error) {
         log.log(`📦 fetchArtifactsList: Error fetching artifacts: ${error}`);

@@ -5,7 +5,7 @@
 
 import { Encryption } from "./encryption/encryption";
 import { AuthCredentials } from "@/auth/tokenStorage";
-import { storage } from "./storage";
+import { ingestStorage, storage } from "./storage";
 import { log } from "@/log";
 import { getServerUrl } from "./serverConfig";
 import { Machine } from "./storageTypes";
@@ -147,7 +147,7 @@ export async function fetchMachinesAction(ctx: MachineContext): Promise<void> {
   }
 
   // Replace entire machine state with fetched machines
-  storage.getState().applyMachines(decryptedMachines, true);
+  ingestStorage.getState().applyMachines(decryptedMachines, true);
   log.log(
     `🖥️ fetchMachines completed - processed ${decryptedMachines.length} machines`,
   );

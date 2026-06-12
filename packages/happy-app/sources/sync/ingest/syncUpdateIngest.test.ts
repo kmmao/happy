@@ -40,6 +40,7 @@ vi.mock("react-native-mmkv", () => ({
 
 vi.mock("../storage", () => ({
     storage: { getState: mocks.getStateMock },
+    ingestStorage: { getState: mocks.getStateMock },
 }));
 
 vi.mock("../issueSessionStore", () => ({
