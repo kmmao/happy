@@ -48,6 +48,7 @@ yarn-error.*
 .claude/scheduled_tasks.json
 .claude/scheduled_tasks.lock
 logs/
+.logs/
 !packages/happy-app/sources/text/translations/logs/
 !packages/happy-app/sources/text/translations/logs/untranslated/
 !packages/happy-app/sources/text/translations/logs/untranslated/*.json

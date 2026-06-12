@@ -17,3 +17,5 @@ cache/
 
 # Daemon runtime
 *.pid
+*.sock
+*.lock
