@@ -73,6 +73,10 @@ import {
   createTerminalSequenceExtractor,
   type TerminalSequenceEvent,
 } from "@/claude/pty/terminalSequences";
+import {
+  createTuiStatusParser,
+  type TuiStatusEvent,
+} from "@/claude/pty/tuiStatusParser";
 import { attachClaudePtyRouter } from "@/claude/pty/claudePtyRouter";
 import {
   bridgeAttach,
@@ -530,6 +534,15 @@ export async function claudeRemote(opts: {
    */
   onTerminalSignal?: (event: TerminalSequenceEvent) => void;
   /**
+   * Fires when the TUI's rendered status surface changes: the animated
+   * status line ("Reasoning… · 1.2k tokens") or a numbered picker appearing
+   * on screen. Emission is debounced inside `createTuiStatusParser` so the
+   * sub-second spinner repaints don't flood the wire — the launcher mirrors
+   * these to the App as `terminal-signal` events (kinds `activity` /
+   * `picker`).
+   */
+  onTuiStatus?: (event: TuiStatusEvent) => void;
+  /**
    * Fires with the EXACT text written to the PTY composer for a turn —
    * the bracketed-paste payload as Claude actually received it, including any
    * once-per-session prefixes (CONTEXT.md / world-config / knowledge) the
@@ -832,6 +845,27 @@ export async function claudeRemote(opts: {
         }
       })
     : undefined;
+  // TUI status parser — same passive-observer contract as the OSC extractor
+  // above, but over the *rendered* text: spinner status line ("Reasoning… ·
+  // 1.2k tokens") and numbered pickers. One instance per PTY (sliding-window
+  // state), disposed in finishOnce alongside the other onData taps.
+  const tuiStatusParser = opts.onTuiStatus ? createTuiStatusParser() : null;
+  const disposeTuiStatus = tuiStatusParser
+    ? pty.onData((chunk: string) => {
+        const events = tuiStatusParser.feed(chunk);
+        for (const ev of events) {
+          try {
+            opts.onTuiStatus!(ev);
+          } catch (err) {
+            logger.debug(
+              `[claudeRemote] onTuiStatus threw: ${
+                err instanceof Error ? err.message : String(err)
+              }`,
+            );
+          }
+        }
+      })
+    : undefined;
   // Shared usage snapshot — updated by the session scanner's onMessage as
   // each assistant message arrives; read by controller.getContextUsage() so
   // the App's context-window panel shows real token counts in PTY mode.
@@ -1063,6 +1097,8 @@ export async function claudeRemote(opts: {
     disposePtyActivity?.();
     disposeTerminalSignal?.();
     terminalSignalExtractor?.reset();
+    disposeTuiStatus?.();
+    tuiStatusParser?.reset();
     teardownPtyBridge?.();
     teardownPtyBridge = undefined;
     exitResolve();

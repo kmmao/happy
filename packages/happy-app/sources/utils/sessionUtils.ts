@@ -1,5 +1,6 @@
 import * as React from "react";
 import { Session } from "@/sync/storageTypes";
+import type { TerminalLiveStatus } from "@/sync/storage";
 import { t } from "@/text";
 import { getSessionDisplayModelLabel } from "@/utils/sessionModelLabel";
 
@@ -356,6 +357,45 @@ export function formatPathRelativeToHome(
   }
 
   return path;
+}
+
+/**
+ * Format a live TUI status (from `useSessionTerminalStatus`) into a one-line
+ * subtitle, e.g. `Reasoning… · 12s · 1.2k tokens · 45%`. Returns null when
+ * there is nothing meaningful to show — callers fall back to the terminal
+ * title / static path. While a picker is pending the captured picker snippet
+ * wins, so the user sees what the TUI is waiting on.
+ *
+ * Only call this for sessions that are currently running
+ * (`isSessionRunning`): the status is a trailing snapshot and goes stale the
+ * moment the turn ends.
+ */
+export function formatTerminalLiveStatus(
+  status: TerminalLiveStatus | null,
+): string | null {
+  if (!status) return null;
+  if (status.pickerPending && status.pickerSnippet) {
+    return status.pickerSnippet;
+  }
+  const parts: string[] = [];
+  if (status.verb) parts.push(`${status.verb}…`);
+  if (typeof status.seconds === "number") parts.push(`${status.seconds}s`);
+  if (typeof status.tokens === "number") {
+    parts.push(
+      status.tokens >= 1000
+        ? `${(status.tokens / 1000).toFixed(1)}k tokens`
+        : `${status.tokens} tokens`,
+    );
+  }
+  if (
+    typeof status.progressValue === "number" &&
+    (status.progressState === "normal" ||
+      status.progressState === "error" ||
+      status.progressState === "paused")
+  ) {
+    parts.push(`${Math.round(status.progressValue)}%`);
+  }
+  return parts.length > 0 ? parts.join(" · ") : null;
 }
 
 /**

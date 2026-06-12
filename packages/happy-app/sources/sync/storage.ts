@@ -133,6 +133,23 @@ export type SessionListViewItem =
 // Legacy type for backward compatibility - to be removed
 export type SessionListItem = string | Session;
 
+/**
+ * Live status of a PTY-mode Claude TUI, merged from `terminal-signal` wire
+ * events. `verb`/`tokens`/`seconds` mirror the parsed spinner status line;
+ * `progressState`/`progressValue` mirror ConEmu OSC 9;4 progress reports;
+ * `pickerPending` flips true when a numbered picker is detected on screen
+ * and back to false on the next activity update.
+ */
+export type TerminalLiveStatus = {
+  verb?: string | null;
+  tokens?: number;
+  seconds?: number;
+  progressState?: "remove" | "normal" | "error" | "indeterminate" | "paused";
+  progressValue?: number;
+  pickerPending?: boolean;
+  pickerSnippet?: string;
+};
+
 interface StorageState {
   settings: Settings;
   settingsVersion: number | null;
@@ -160,6 +177,17 @@ interface StorageState {
    */
   sessionTerminalTitles: Record<string, string | null>;
   setTerminalTitle: (sessionId: string, title: string | null) => void;
+  /**
+   * Live TUI status from `terminal-signal` wire events of kind `activity` /
+   * `progress` / `picker`: spinner verb + counters from the parsed status
+   * line, ConEmu progress state, and whether a numbered picker is blocking
+   * on keyboard input. Ephemeral — cleared on session removal and logout.
+   */
+  sessionTerminalStatus: Record<string, TerminalLiveStatus | null>;
+  mergeTerminalStatus: (
+    sessionId: string,
+    patch: Partial<TerminalLiveStatus>,
+  ) => void;
   // Pending message queue per session (persisted via mmkv, survives reloads)
   sessionPendingQueues: Record<string, Array<{ localId: string; message: string; displayText?: string }>>;
   appendToPendingQueue: (sessionId: string, item: { localId: string; message: string; displayText?: string }) => void;
@@ -586,6 +614,36 @@ export const storage = create<StorageState>()((set, get) => {
           [sessionId]: value,
         },
       })),
+    sessionTerminalStatus: {},
+    mergeTerminalStatus: (
+      sessionId: string,
+      patch: Partial<TerminalLiveStatus>,
+    ) =>
+      set((prev) => {
+        const current = prev.sessionTerminalStatus[sessionId] ?? {};
+        const next = { ...current, ...patch };
+        // Shallow no-op guard — activity events are already debounced CLI-side
+        // (≥1 s), but identical consecutive payloads still happen (e.g. the
+        // same verb re-emitted after a picker clears).
+        const keys = new Set([
+          ...Object.keys(current),
+          ...Object.keys(next),
+        ]) as Set<keyof TerminalLiveStatus>;
+        let changed = false;
+        for (const k of keys) {
+          if (current[k] !== next[k]) {
+            changed = true;
+            break;
+          }
+        }
+        if (!changed) return prev;
+        return {
+          sessionTerminalStatus: {
+            ...prev.sessionTerminalStatus,
+            [sessionId]: next,
+          },
+        };
+      }),
     sessionTerminalTitles: {},
     setTerminalTitle: (sessionId: string, title: string | null) =>
       set((prev) => {
@@ -2270,6 +2328,10 @@ export const storage = create<StorageState>()((set, get) => {
           [sessionId]: _deletedTerminalTitle,
           ...remainingTerminalTitles
         } = state.sessionTerminalTitles;
+        const {
+          [sessionId]: _deletedTerminalStatus,
+          ...remainingTerminalStatus
+        } = state.sessionTerminalStatus;
 
         // Clear drafts and permission modes from persistent storage
         const drafts = loadSessionDrafts();
@@ -2328,6 +2390,7 @@ export const storage = create<StorageState>()((set, get) => {
           sessionGitStatus: remainingGitStatus,
           sessionPromptSuggestions: remainingPromptSuggestions,
           sessionTerminalTitles: remainingTerminalTitles,
+          sessionTerminalStatus: remainingTerminalStatus,
           sessionLastViewed: { ...sessionLastViewed },
           sessionListViewData,
         };
@@ -2852,6 +2915,20 @@ export function useNeedsContinue(sessionId: string): boolean {
 export function useSessionTerminalTitle(sessionId: string): string | null {
   return storage(
     useShallow((state) => state.sessionTerminalTitles[sessionId] ?? null),
+  );
+}
+
+/**
+ * Live TUI status for `sessionId` (spinner verb + counters, ConEmu progress,
+ * picker-pending flag), or `null` if no terminal-signal status events have
+ * been received. Updated by `syncUpdateHandlers` on `activity` / `progress` /
+ * `picker` terminal-signal envelopes.
+ */
+export function useSessionTerminalStatus(
+  sessionId: string,
+): TerminalLiveStatus | null {
+  return storage(
+    useShallow((state) => state.sessionTerminalStatus[sessionId] ?? null),
   );
 }
 

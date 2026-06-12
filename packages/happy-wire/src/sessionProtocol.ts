@@ -237,15 +237,45 @@ export const sessionTerminalSignalEventSchema = z.object({
    *  - `window-title`: title text to display (OSC 0 / 2)
    *  - `notification`: desktop notification body (OSC 9 — iTerm2 style)
    *  - `bell`: a plain BEL (0x07) outside any OSC frame
+   *  - `progress`: ConEmu-style OSC 9;4 progress report (see progressState /
+   *     progressValue) — render as a progress bar / spinner state.
+   *  - `activity`: parsed TUI status line (spinner verb + token counter) —
+   *     `text` is the verb ("Reasoning", "Compacting", …); `tokens` /
+   *     `seconds` carry the live counters when present.
+   *  - `picker`: the TUI is showing an interactive numbered picker and is
+   *     blocked waiting for keyboard input; `text` is the captured prompt /
+   *     options snippet so the App can surface "waiting for choice".
    *  - `other`: a recognized OSC frame the CLI chose to forward but did
    *     not classify; consumers should treat it as opaque (forward-compat
    *     channel for OSC 4, 52, 1337, …).
    */
-  kind: z.enum(["window-title", "notification", "bell", "other"]),
-  /** Title / notification body / opaque payload depending on `kind`. */
+  kind: z.enum([
+    "window-title",
+    "notification",
+    "bell",
+    "progress",
+    "activity",
+    "picker",
+    "other",
+  ]),
+  /** Title / notification body / verb / picker snippet depending on `kind`. */
   text: z.string().optional(),
   /** Raw OSC `Ps` code for `kind: "other"` so consumers can route by id. */
   oscCode: z.string().optional(),
+  /**
+   * ConEmu OSC 9;4 progress state (`kind: "progress"` only):
+   * remove = clear the bar, normal = determinate (see progressValue),
+   * error / paused = determinate with stateful colour, indeterminate = busy.
+   */
+  progressState: z
+    .enum(["remove", "normal", "error", "indeterminate", "paused"])
+    .optional(),
+  /** Progress percentage 0–100 (`kind: "progress"`, determinate states). */
+  progressValue: z.number().min(0).max(100).optional(),
+  /** Live output-token counter from the status line (`kind: "activity"`). */
+  tokens: z.number().optional(),
+  /** Elapsed seconds from the status line (`kind: "activity"`). */
+  seconds: z.number().optional(),
 });
 export type SessionTerminalSignalEvent = z.infer<typeof sessionTerminalSignalEventSchema>;
 

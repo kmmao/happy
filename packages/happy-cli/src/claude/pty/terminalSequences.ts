@@ -17,22 +17,55 @@
  *   - Plain BEL (0x07) outside an OSC frame is yielded as a `bell` event.
  *   - Unknown OSC `Ps` codes are yielded as `other` so callers can decide.
  *
- * Wire-up plan (NOT done in this commit — see `claudePtyController.ts`):
- *   register an instance against `runtime.onData()` alongside the ring
- *   buffer + reverse-server forwarders, then forward `windowTitle` and
- *   `notification` events through `apiSession.sendSessionProtocolMessage`.
- *   Held back until the wire protocol has a dedicated event type so the
- *   App can render them as banners.
+ * Wired up in `claudeRemote.ts`: one extractor per PTY registered against
+ * `pty.onData()`, events forwarded by the launcher as `terminal-signal`
+ * wire envelopes (see `claudeRemoteLauncherCore.ts` onTerminalSignal).
  */
+
+export type TerminalProgressState =
+  | "remove"
+  | "normal"
+  | "error"
+  | "indeterminate"
+  | "paused";
 
 export type TerminalSequenceEvent =
   | { kind: "windowTitle"; title: string }
   // iTerm2 OSC 9 ; <message> BEL — a desktop notification request.
-  // ConEmu uses OSC 9 ; 4 ; ... for progress; we coarsely treat any OSC 9
-  // payload as a notification body so the App can decide what to do.
   | { kind: "notification"; body: string }
+  // ConEmu OSC 9 ; 4 ; <st> ; <pr> — taskbar progress. st: 0 remove,
+  // 1 normal (pr = 0–100), 2 error, 3 indeterminate, 4 paused.
+  | { kind: "progress"; state: TerminalProgressState; value?: number }
   | { kind: "bell" }
   | { kind: "other"; ps: string; payload: string };
+
+const CONEMU_PROGRESS_STATES: Record<string, TerminalProgressState> = {
+  "0": "remove",
+  "1": "normal",
+  "2": "error",
+  "3": "indeterminate",
+  "4": "paused",
+};
+
+/**
+ * Parse a ConEmu progress payload (the `Pt` after `9;`): `4;<st>[;<pr>]`.
+ * Returns null when the payload is not a well-formed progress report so the
+ * caller can fall back to treating it as a plain notification body.
+ */
+function classifyConEmuProgress(pt: string): TerminalSequenceEvent | null {
+  const parts = pt.split(";");
+  if (parts[0] !== "4") return null;
+  const state = CONEMU_PROGRESS_STATES[parts[1] ?? ""];
+  if (!state) return null;
+  if (state === "normal" || state === "error" || state === "paused") {
+    const raw = Number(parts[2]);
+    const value = Number.isFinite(raw)
+      ? Math.min(100, Math.max(0, raw))
+      : undefined;
+    return { kind: "progress", state, value };
+  }
+  return { kind: "progress", state };
+}
 
 const ESC = 0x1b;
 const BEL = 0x07;
@@ -67,7 +100,11 @@ function classify(payload: string): TerminalSequenceEvent | null {
   // 2 = window title only. We treat 0 and 2 as window title and ignore 1
   // (icon-name-only is meaningless to a remote App).
   if (ps === "0" || ps === "2") return { kind: "windowTitle", title: pt };
-  if (ps === "9") return { kind: "notification", body: pt };
+  if (ps === "9") {
+    // OSC 9;4;… is the ConEmu progress sub-protocol; everything else under
+    // OSC 9 is an iTerm2-style notification body.
+    return classifyConEmuProgress(pt) ?? { kind: "notification", body: pt };
+  }
   return { kind: "other", ps, payload: pt };
 }
 

@@ -1418,10 +1418,39 @@ export function extractPromptSuggestionFromRaw(
  * code can pattern-match the discriminator without re-parsing.
  */
 export type TerminalSignal = {
-  kind: "window-title" | "notification" | "bell" | "other";
+  kind:
+    | "window-title"
+    | "notification"
+    | "bell"
+    | "progress"
+    | "activity"
+    | "picker"
+    | "other";
   text?: string;
   oscCode?: string;
+  /** ConEmu OSC 9;4 progress state (`kind: "progress"`). */
+  progressState?: "remove" | "normal" | "error" | "indeterminate" | "paused";
+  /** Progress percentage 0–100 (`kind: "progress"`, determinate states). */
+  progressValue?: number;
+  /** Live output-token counter from the TUI status line (`kind: "activity"`). */
+  tokens?: number;
+  /** Elapsed seconds from the TUI status line (`kind: "activity"`). */
+  seconds?: number;
 };
+
+const TERMINAL_SIGNAL_KINDS: ReadonlySet<TerminalSignal["kind"]> = new Set([
+  "window-title",
+  "notification",
+  "bell",
+  "progress",
+  "activity",
+  "picker",
+  "other",
+]);
+
+const TERMINAL_PROGRESS_STATES: ReadonlySet<
+  NonNullable<TerminalSignal["progressState"]>
+> = new Set(["remove", "normal", "error", "indeterminate", "paused"]);
 
 /**
  * Extract a terminal-signal payload from a raw record. Returns null when the
@@ -1439,19 +1468,27 @@ export function extractTerminalSignalFromRaw(
     kind?: unknown;
     text?: unknown;
     oscCode?: unknown;
+    progressState?: unknown;
+    progressValue?: unknown;
+    tokens?: unknown;
+    seconds?: unknown;
   };
-  if (
-    ev.kind !== "window-title" &&
-    ev.kind !== "notification" &&
-    ev.kind !== "bell" &&
-    ev.kind !== "other"
-  ) {
+  if (!TERMINAL_SIGNAL_KINDS.has(ev.kind as TerminalSignal["kind"])) {
     return null;
   }
   return {
-    kind: ev.kind,
+    kind: ev.kind as TerminalSignal["kind"],
     text: typeof ev.text === "string" ? ev.text : undefined,
     oscCode: typeof ev.oscCode === "string" ? ev.oscCode : undefined,
+    progressState: TERMINAL_PROGRESS_STATES.has(
+      ev.progressState as NonNullable<TerminalSignal["progressState"]>,
+    )
+      ? (ev.progressState as TerminalSignal["progressState"])
+      : undefined,
+    progressValue:
+      typeof ev.progressValue === "number" ? ev.progressValue : undefined,
+    tokens: typeof ev.tokens === "number" ? ev.tokens : undefined,
+    seconds: typeof ev.seconds === "number" ? ev.seconds : undefined,
   };
 }
 

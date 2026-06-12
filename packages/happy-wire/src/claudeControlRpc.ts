@@ -199,6 +199,22 @@ export const GetContextUsageResponseSchema = z.object({
 export type GetContextUsageRequest = z.infer<typeof GetContextUsageRequestSchema>;
 export type GetContextUsageResponse = z.infer<typeof GetContextUsageResponseSchema>;
 
+// ── get_screen_text ─────────────────────────────────────────────────────────
+export const GetScreenTextRequestSchema = z.object({}).strict();
+export const GetScreenTextResponseSchema = z.object({
+    /**
+     * Plain-text rendering of the current PTY screen (ANSI stripped, one
+     * string per visible row joined by \n). Null when no PTY is active or
+     * the snapshot could not be rendered.
+     */
+    text: z.string().nullable(),
+    /** Terminal grid dimensions used for the render. */
+    cols: z.number().int().positive().optional(),
+    rows: z.number().int().positive().optional(),
+}).strict();
+export type GetScreenTextRequest = z.infer<typeof GetScreenTextRequestSchema>;
+export type GetScreenTextResponse = z.infer<typeof GetScreenTextResponseSchema>;
+
 // ── get_context_detail ──────────────────────────────────────────────────────
 export const GetContextDetailRequestSchema = z.object({
     /**
@@ -498,6 +514,7 @@ export const CLAUDE_CONTROL_METHODS = [
     'read_file',
     'mcp_call',
     'get_context_usage',
+    'get_screen_text',
     'get_mcp_servers',
     'get_context_detail',
     'set_mcp_servers',

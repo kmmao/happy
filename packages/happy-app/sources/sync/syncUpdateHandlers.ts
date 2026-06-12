@@ -149,6 +149,47 @@ function dispatchTerminalSignal(
         case "bell":
             log.log(`[terminal-signal] bell from session ${sid}`);
             return;
+        case "activity": {
+            // Live spinner status line ("Reasoning… · 1.2k tokens"). A fresh
+            // activity update also means the TUI is rendering again, so any
+            // pending picker has been answered — clear the flag.
+            storage.getState().mergeTerminalStatus(sid, {
+                verb: signal.text ?? null,
+                tokens: signal.tokens,
+                seconds: signal.seconds,
+                pickerPending: false,
+            });
+            return;
+        }
+        case "progress": {
+            const cleared = signal.progressState === "remove";
+            storage.getState().mergeTerminalStatus(sid, {
+                progressState: cleared ? undefined : signal.progressState,
+                progressValue: cleared ? undefined : signal.progressValue,
+            });
+            return;
+        }
+        case "picker": {
+            storage.getState().mergeTerminalStatus(sid, {
+                pickerPending: true,
+                pickerSnippet: signal.text,
+            });
+            // The TUI is blocked on a choice no chat button can answer —
+            // surface it like a notification so the user opens the raw
+            // terminal. Body is the captured picker text verbatim.
+            const body = signal.text?.trim();
+            if (body) {
+                const session = storage.getState().sessions[sid];
+                const title = session ? getSessionName(session) : t("status.unknown");
+                Notifications.scheduleNotificationAsync({
+                    content: { title, body, sound: false },
+                    trigger: null,
+                }).catch((err) => {
+                    log.log(`[terminal-signal] picker notification failed: ${err}`);
+                });
+            }
+            return;
+        }
         case "other":
             log.log(
                 `[terminal-signal] OSC ${signal.oscCode ?? "?"} from session ${sid}: ${signal.text ?? ""}`,

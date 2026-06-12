@@ -12,7 +12,7 @@ import { Item } from "@/components/Item";
 import { ItemGroup } from "@/components/ItemGroup";
 import { ItemList } from "@/components/ItemList";
 import { Typography } from "@/constants/Typography";
-import { useSessions, useMachine, useSessionTerminalTitle } from "@/sync/storage";
+import { useSessions, useMachine, useSessionTerminalTitle, useSessionTerminalStatus } from "@/sync/storage";
 import { Ionicons, Octicons } from "@expo/vector-icons";
 import type { Session } from "@/sync/storageTypes";
 import {
@@ -27,6 +27,8 @@ import {
   formatPathRelativeToHome,
   getSessionName,
   getSessionSubtitle,
+  isSessionRunning,
+  formatTerminalLiveStatus,
 } from "@/utils/sessionUtils";
 import { isMachineOnline } from "@/utils/machineUtils";
 import { sync } from "@/sync/sync";
@@ -135,10 +137,16 @@ const PreviousSessionRow = React.memo(function PreviousSessionRow({
 }) {
   const { theme } = useUnistyles();
   const terminalTitle = useSessionTerminalTitle(session.id);
+  const terminalStatus = useSessionTerminalStatus(session.id);
+  // Live spinner status beats the static window title while the session is
+  // running; both go through getSessionSubtitle's worktree precedence rules.
+  const liveStatus = isSessionRunning(session)
+    ? formatTerminalLiveStatus(terminalStatus)
+    : null;
   return (
     <Item
       title={getSessionName(session)}
-      subtitle={getSessionSubtitle(session, terminalTitle)}
+      subtitle={getSessionSubtitle(session, liveStatus ?? terminalTitle)}
       onPress={() => navigateToSession(session.id)}
       showChevron={false}
       rightElement={

@@ -75,6 +75,8 @@ import {
   type McpCallResponse,
   type GetContextUsageRequest,
   type GetContextUsageResponse,
+  type GetScreenTextRequest,
+  type GetScreenTextResponse,
   type GetMcpServersRequest,
   type GetMcpServersResponse,
   type SetMcpServersRequest,
@@ -445,6 +447,24 @@ export function registerClaudeControlHandlers(
         errorMessage:
           "mcp_call is not supported in PTY mode — the Claude TUI owns the MCP connections and exposes no programmatic invocation surface. Whitelist and confirm token were accepted.",
       };
+    },
+  );
+
+  // get_screen_text — plain-text render of the current PTY screen (headless
+  // xterm over the router's replay snapshot). Null when no PTY / no router.
+  rpcHandlerManager.registerHandler<GetScreenTextRequest, GetScreenTextResponse>(
+    `${scope}:get_screen_text`,
+    async () => {
+      const q = getCurrentQuery();
+      if (!q) return { text: null };
+      try {
+        const result = await q.screenText();
+        if (!result) return { text: null };
+        return { text: result.text, cols: result.cols, rows: result.rows };
+      } catch (e) {
+        logger.debug("[claudeControl] get_screen_text failed", e);
+        return { text: null };
+      }
     },
   );
 

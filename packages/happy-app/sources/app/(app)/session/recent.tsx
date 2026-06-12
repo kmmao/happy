@@ -1,12 +1,14 @@
 import React from "react";
 import { View, FlatList } from "react-native";
 import { Text } from "@/components/StyledText";
-import { useAllSessions, useSetting, useSessionTerminalTitle } from "@/sync/storage";
+import { useAllSessions, useSetting, useSessionTerminalTitle, useSessionTerminalStatus } from "@/sync/storage";
 import { Session } from "@/sync/storageTypes";
 import { Avatar } from "@/components/Avatar";
 import {
   getSessionName,
   getSessionSubtitle,
+  isSessionRunning,
+  formatTerminalLiveStatus,
   getSessionAvatarId,
   formatLastSeen,
   getSessionProviderKey,
@@ -35,9 +37,16 @@ const SessionSubtitleLine = React.memo(function SessionSubtitleLine({
   session: Session;
 }) {
   const terminalTitle = useSessionTerminalTitle(session.id);
+  const terminalStatus = useSessionTerminalStatus(session.id);
+  // Live spinner status ("Reasoning… · 1.2k tokens") beats the static window
+  // title, but only while the session is actually running — it's a trailing
+  // snapshot that goes stale the moment the turn ends.
+  const liveStatus = isSessionRunning(session)
+    ? formatTerminalLiveStatus(terminalStatus)
+    : null;
   return (
     <Text style={styles.sessionSubtitle} numberOfLines={1}>
-      {getSessionSubtitle(session, terminalTitle)}
+      {getSessionSubtitle(session, liveStatus ?? terminalTitle)}
     </Text>
   );
 });

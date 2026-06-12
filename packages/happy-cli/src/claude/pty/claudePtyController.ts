@@ -279,6 +279,20 @@ export interface ClaudePtyController {
       cache_read_input_tokens: number;
     };
   } | null>;
+  /**
+   * Plain-text rendering of the current PTY screen.
+   *
+   * Feeds the router's ANSI-aware replay snapshot through a headless xterm
+   * (`@xterm/headless`) sized to the live PTY grid, then serialises the
+   * visible buffer row by row with trailing whitespace trimmed. This gives
+   * the App a faithful "what's on screen right now" view (pickers, status
+   * line, partial output) without shipping an ANSI parser to the client or
+   * streaming the raw byte history.
+   *
+   * Returns null when no replay snapshot is available (router not attached —
+   * standalone runs without a daemon bridge) or the render fails.
+   */
+  screenText(): Promise<{ text: string; cols: number; rows: number } | null>;
 }
 
 // ── Factory ───────────────────────────────────────────────────────────────────
@@ -567,6 +581,42 @@ export function createClaudePtyController(
           cache_read_input_tokens: cacheReadInputTokens,
         },
       };
+    },
+
+    async screenText() {
+      const snapshot = getReplaySnapshot();
+      if (!snapshot) return null;
+      const cols = pty.cols > 0 ? pty.cols : 80;
+      const rows = pty.rows > 0 ? pty.rows : 24;
+      try {
+        // Dynamic import: @xterm/headless is only needed by this RPC, and
+        // loading it lazily keeps it off the hot startup path.
+        const { Terminal } = await import("@xterm/headless");
+        const term = new Terminal({
+          cols,
+          rows,
+          allowProposedApi: true,
+          scrollback: 0,
+        });
+        await new Promise<void>((res) => term.write(snapshot, res));
+        const buffer = term.buffer.active;
+        const lines: string[] = [];
+        for (let y = 0; y < rows; y++) {
+          const line = buffer.getLine(buffer.viewportY + y);
+          lines.push(line ? line.translateToString(true) : "");
+        }
+        term.dispose();
+        // Trim trailing blank rows — the App renders a compact block.
+        while (lines.length > 0 && lines[lines.length - 1] === "") {
+          lines.pop();
+        }
+        return { text: lines.join("\n"), cols, rows };
+      } catch (err) {
+        logger.debug(
+          `[ptyController] screenText failed: ${err instanceof Error ? err.message : String(err)}`,
+        );
+        return null;
+      }
     },
   };
 }

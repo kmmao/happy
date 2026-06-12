@@ -2739,7 +2739,7 @@ export async function claudeRemoteLauncher(
           // and re-emit them in structured form so the App can render them as
           // a banner / push notification without having to parse ANSI itself.
           onTerminalSignal: (event) => {
-            // Map the four parser kinds to the wire's discriminated enum,
+            // Map the parser kinds to the wire's discriminated enum,
             // collapsing optional payload fields. App-side rendering is
             // permissive (sessionEventSchemaPermissive) so unknown kinds added
             // here in future versions just fall through; we still tag the OSC
@@ -2749,6 +2749,13 @@ export async function claudeRemoteLauncher(
                 ? { t: "terminal-signal", kind: "window-title", text: event.title }
                 : event.kind === "notification"
                 ? { t: "terminal-signal", kind: "notification", text: event.body }
+                : event.kind === "progress"
+                ? {
+                    t: "terminal-signal",
+                    kind: "progress",
+                    progressState: event.state,
+                    progressValue: event.value,
+                  }
                 : event.kind === "bell"
                 ? { t: "terminal-signal", kind: "bell" }
                 : {
@@ -2756,6 +2763,29 @@ export async function claudeRemoteLauncher(
                     kind: "other",
                     text: event.payload,
                     oscCode: event.ps,
+                  };
+            const envelope = buildProtocolMessage("agent", payload);
+            session.client.sendSessionProtocolMessage(envelope as any);
+          },
+          // Mirror the TUI's *rendered* status surface — the spinner status
+          // line ("Reasoning… · 1.2k tokens") and numbered pickers — as
+          // `terminal-signal` events of kind `activity` / `picker`. The
+          // parser debounces internally (≥1 s between counter-only updates),
+          // so this stays far below the heartbeat cadence.
+          onTuiStatus: (event) => {
+            const payload =
+              event.kind === "activity"
+                ? {
+                    t: "terminal-signal",
+                    kind: "activity",
+                    text: event.verb,
+                    tokens: event.tokens,
+                    seconds: event.seconds,
+                  }
+                : {
+                    t: "terminal-signal",
+                    kind: "picker",
+                    text: event.snippet,
                   };
             const envelope = buildProtocolMessage("agent", payload);
             session.client.sendSessionProtocolMessage(envelope as any);
