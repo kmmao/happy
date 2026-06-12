@@ -751,6 +751,11 @@ const SessionItem = React.memo(
       ? formatTerminalLiveStatus(terminalStatus)
       : null;
     const sessionSubtitle = getSessionSubtitle(session, liveStatus ?? terminalTitle);
+    // Highlight the subtitle when the TUI is blocked on a picker — the
+    // session can't proceed until the user answers, so it deserves the same
+    // visual weight as a warning, on every platform (no notification needed).
+    const pickerWaiting =
+      isSessionRunning(session) && terminalStatus?.pickerPending === true;
     const navigateToSession = useNavigateToSession();
     const isTablet = useIsTablet();
     const swipeableRef = React.useRef<Swipeable | null>(null);
@@ -999,7 +1004,13 @@ const SessionItem = React.memo(
                 })()}
 
               {/* Subtitle line */}
-              <Text style={styles.sessionSubtitle} numberOfLines={1}>
+              <Text
+                style={[
+                  styles.sessionSubtitle,
+                  pickerWaiting && { color: theme.colors.warning },
+                ]}
+                numberOfLines={1}
+              >
                 {sessionSubtitle}
               </Text>
 

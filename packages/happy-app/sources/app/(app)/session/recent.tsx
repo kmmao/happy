@@ -44,8 +44,15 @@ const SessionSubtitleLine = React.memo(function SessionSubtitleLine({
   const liveStatus = isSessionRunning(session)
     ? formatTerminalLiveStatus(terminalStatus)
     : null;
+  // A blocked picker means the session can't proceed until the user answers
+  // — highlight the subtitle so it stands out without a notification.
+  const pickerWaiting =
+    isSessionRunning(session) && terminalStatus?.pickerPending === true;
   return (
-    <Text style={styles.sessionSubtitle} numberOfLines={1}>
+    <Text
+      style={[styles.sessionSubtitle, pickerWaiting && styles.sessionSubtitlePicker]}
+      numberOfLines={1}
+    >
       {getSessionSubtitle(session, liveStatus ?? terminalTitle)}
     </Text>
   );
@@ -134,6 +141,9 @@ const styles = StyleSheet.create((theme, rt) => ({
     fontSize: 13,
     color: theme.colors.textSecondary,
     ...Typography.default(),
+  },
+  sessionSubtitlePicker: {
+    color: theme.colors.warning,
   },
   sessionLastActive: {
     fontSize: 12,

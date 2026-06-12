@@ -374,8 +374,13 @@ export function formatTerminalLiveStatus(
   status: TerminalLiveStatus | null,
 ): string | null {
   if (!status) return null;
-  if (status.pickerPending && status.pickerSnippet) {
-    return status.pickerSnippet;
+  if (status.pickerPending) {
+    // Keyboard glyph marks "blocked waiting for a choice" — a universal,
+    // i18n-free badge that renders on every platform. The captured picker
+    // snippet shows what the TUI is asking; fall back to the last verb when
+    // detection fired before a snippet was captured.
+    const detail = status.pickerSnippet ?? (status.verb ? `${status.verb}…` : "");
+    return `⌨ ${detail}`.trim();
   }
   const parts: string[] = [];
   if (status.verb) parts.push(`${status.verb}…`);
