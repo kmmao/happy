@@ -6,6 +6,7 @@ import type {
 } from "@/sync/typesMessage";
 import { parseLegacyCodexPlanPreview } from "./tools/codexPlanCompat";
 import { parseLegacyCodexDiffPreview } from "./tools/codexDiffCompat";
+import { isToolVisibleWithoutInline } from "./tools/toolVisibility";
 import { summarizeHappyProgressInput } from "./tools/views/happyProgressViewData";
 import type { ToolGroupItem } from "@/hooks/useGroupedMessages";
 
@@ -416,36 +417,10 @@ function hasAgentContentBetween(items: ChatDisplayItem[], userIdx: number): bool
 
 export type FinalChatDisplayItem = ChatDisplayItem | ToolGroupItem;
 
-// Tool calls that stay visible even when the viewInline setting is off.
-const ALWAYS_VISIBLE_TOOLS = new Set([
-  "Task",
-  "Agent",
-  "AskUserQuestion",
-  "TodoWrite",
-  "Read",
-  "Edit",
-  "MultiEdit",
-  "Write",
-  "Grep",
-  "Glob",
-  "LS",
-  "NotebookEdit",
-  "CodexDynamicTool",
-  "CodexPermissions",
-  "unknown",
-  "CodexPatch",
-  "GeminiPatch",
-  "CodexDiff",
-  "GeminiDiff",
-  "edit",
-]);
-
 function isToolCallVisibleWithoutInline(msg: Message): boolean {
   if (msg.kind !== "tool-call") return true;
-  if (ALWAYS_VISIBLE_TOOLS.has(msg.tool.name)) return true;
-  if (msg.tool.name.startsWith("mcp__")) return true;
   if (msg.tool.permission?.status === "pending") return true;
-  return false;
+  return isToolVisibleWithoutInline(msg.tool.name);
 }
 
 // Legacy Codex streams emit the same diff preview twice as consecutive

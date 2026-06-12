@@ -10,6 +10,7 @@ import {
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { Ionicons, Octicons } from "@expo/vector-icons";
 import { getToolViewComponent } from "./views/_all";
+import { isHiddenTool } from "./toolVisibility";
 import { Message, ToolCall } from "@/sync/typesMessage";
 import { CodeView } from "../CodeView";
 import { ToolSectionView } from "./ToolSectionView";
@@ -182,7 +183,7 @@ export const ToolView = React.memo<ToolViewProps>((props) => {
   const isSessionCompact = sessionCompactToolNames.has(tool.name);
 
   // Internal Claude Code tools (e.g. ToolSearch) are completely hidden from the UI
-  if (knownTool?.hidden) {
+  if (isHiddenTool(tool.name)) {
     return null;
   }
 
