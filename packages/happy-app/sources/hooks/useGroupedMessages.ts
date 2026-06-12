@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { Message } from '@/sync/typesMessage';
-import { knownTools } from '@/components/tools/knownTools';
+import { isHiddenTool } from '@/components/tools/toolVisibility';
 import { shouldHideToolCall } from '@/components/tools/shouldHideToolCall';
 import { t } from '@/text';
 
@@ -97,10 +97,9 @@ function isStandaloneMessage(msg: Message): boolean {
 
 /** Returns true for messages that render as null and should be excluded from groups */
 function isInvisibleMessage(msg: Message): boolean {
-    // Hidden tools (ToolSearch, CodexReasoning, etc.)
+    // Hidden tools (ToolSearch, etc.) — toolVisibility is the source of truth
     if (msg.kind === 'tool-call') {
-        const known = knownTools[msg.tool.name as keyof typeof knownTools] as any;
-        if (known?.hidden === true) return true;
+        if (isHiddenTool(msg.tool.name)) return true;
         // ToolView also dynamically renders successful happy MCP tools
         // (change_title, update_session_summary, …) as null. Exclude them too,
         // otherwise a lone hidden tool pads an empty "Used N tools" group whose

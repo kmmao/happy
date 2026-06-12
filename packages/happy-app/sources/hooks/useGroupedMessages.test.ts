@@ -1,14 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
 
-// knownTools.tsx pulls in @expo/vector-icons / RN components that can't load
-// under the node test env. groupMessages only reads `knownTools[name]?.hidden`,
-// so stub the module. Provide one statically-hidden tool to exercise that
-// branch; the happy-MCP dynamic-hide path under test goes through
-// shouldHideToolCall (happy-wire), which does NOT depend on knownTools.
-vi.mock('@/components/tools/knownTools', () => ({
-    knownTools: { __StaticHidden: { hidden: true } },
-}));
-
 // @/text drags in expo-localization / persistence / log (RN-only). groupMessages
 // never calls t() — only generateGroupSummary does — so an identity stub is safe.
 vi.mock('@/text', () => ({ t: (key: string) => key }));
@@ -84,8 +75,8 @@ describe('groupMessages — hidden tools never pad an empty group', () => {
         expect(result.map((i) => i.type)).toEqual(['message', 'message']);
     });
 
-    it('also excludes statically-hidden tools (knownTools.hidden === true)', () => {
-        const result = groupMessages([toolMessage('t1', { name: '__StaticHidden' })]);
+    it('also excludes statically-hidden tools (toolVisibility.isHiddenTool)', () => {
+        const result = groupMessages([toolMessage('t1', { name: 'ToolSearch' })]);
         expect(result).toEqual([]);
     });
 
