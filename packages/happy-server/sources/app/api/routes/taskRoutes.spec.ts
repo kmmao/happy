@@ -218,47 +218,19 @@ vi.mock("@/modules/runtimeProfileResolver", () => ({
         },
     })),
 }));
-vi.mock("@/modules/taskStatusLogic", () => ({
-    normalizeTaskStatusReport: vi.fn(({ status, outcome, errorMessage }: any) => {
-        if (outcome === "blocked") {
-            return { status: "failed", errorMessage: errorMessage ?? "Blocked" };
-        }
-        if (outcome === "failed") {
-            return { status: "failed", errorMessage };
-        }
-        if (outcome === "completed") {
-            return { status: "completed", errorMessage };
-        }
-        return { status, errorMessage };
-    }),
-    shouldApplyTaskStatus: vi.fn((current: string, next: string) => {
-        if (["completed", "failed", "cancelled"].includes(current) && current === next) return true;
-        if (["completed", "failed", "cancelled"].includes(current)) return false;
-        return true;
-    }),
-    decideTaskTransition: vi.fn(({ current, resolvedStatus, now }: any) => {
-        const terminal = ["completed", "failed", "cancelled"];
-        if (current.status === resolvedStatus && terminal.includes(current.status)) {
-            return { apply: false, reason: "duplicate-terminal" };
-        }
-        if (terminal.includes(current.status) && current.status !== resolvedStatus) {
-            return { apply: false, reason: "stale" };
-        }
-        const isTerminal = terminal.includes(resolvedStatus);
-        const timestamps: { dispatchedAt?: Date; completedAt?: Date } = {};
-        if (resolvedStatus === "running" && !current.dispatchedAt) timestamps.dispatchedAt = now;
-        if (isTerminal) timestamps.completedAt = now;
-        return { apply: true, isTerminal, timestamps };
-    }),
-}));
+// taskStatusLogic is deliberately NOT mocked: it is the pure transition module
+// (single source of the state-machine invariant), so the spec exercises the
+// real decisions instead of a shadow implementation that can drift.
 
 import { taskRoutes } from "./taskRoutes";
+import { enableErrorHandlers } from "../utils/enableErrorHandlers";
 
 async function createApp() {
     const app = fastify();
     app.setValidatorCompiler(validatorCompiler);
     app.setSerializerCompiler(serializerCompiler);
     const typed = app.withTypeProvider<ZodTypeProvider>() as unknown as Fastify;
+    enableErrorHandlers(typed);
 
     typed.decorate("authenticate", async (request: any, reply: any) => {
         const userId = request.headers["x-user-id"];

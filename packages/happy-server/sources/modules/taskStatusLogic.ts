@@ -1,5 +1,9 @@
-export type TaskStatus = "queued" | "dispatching" | "running" | "completed" | "failed" | "cancelled";
-export type TaskOutcome = "completed" | "failed" | "blocked";
+import type { TaskStatus, TaskOutcome } from "@kmmao/happy-wire";
+
+// Single source of truth for the status/outcome vocabularies is the wire
+// package (TaskStatusSchema / TaskOutcomeSchema); re-exported here so the
+// transition logic and its consumers share one definition.
+export type { TaskStatus, TaskOutcome };
 
 const TERMINAL_TASK_STATUSES = new Set<TaskStatus>(["completed", "failed", "cancelled"]);
 const TASK_STATUS_PROGRESS: Record<Exclude<TaskStatus, "completed" | "failed" | "cancelled">, number> = {
@@ -69,6 +73,38 @@ export type TaskTransitionDecision =
  * of timestamp fields that should change — callers spread `timestamps` into the
  * update so untouched fields keep their stored value.
  */
+/**
+ * Resolve a raw status/outcome report into the landing payload: the status to
+ * persist, the echoed outcome, and the errorMessage that should accompany it.
+ * An outcome takes precedence over a plain status (blocked lands as failed via
+ * {@link normalizeTaskStatusReport}); a completion clears the errorMessage; a
+ * failure keeps the caller's errorMessage or falls back to its summary.
+ */
+export function buildTaskStatusPayload(input: {
+    status?: TaskStatus;
+    outcome?: TaskOutcome;
+    summary?: string;
+    errorMessage?: string;
+}): { status: TaskStatus; outcome?: TaskOutcome; errorMessage?: string } {
+    if (!input.outcome && input.status) {
+        return {
+            status: input.status,
+            outcome: undefined,
+            errorMessage: input.errorMessage,
+        };
+    }
+
+    const normalized = normalizeTaskStatusReport({
+        status: input.status ?? (input.outcome === "blocked" ? "failed" : input.outcome ?? "failed"),
+        outcome: input.outcome,
+    });
+    return {
+        status: normalized.status,
+        outcome: normalized.outcome,
+        errorMessage: normalized.status === "completed" ? undefined : (input.errorMessage ?? input.summary),
+    };
+}
+
 export function decideTaskTransition(input: {
     current: { status: string; dispatchedAt: Date | null };
     resolvedStatus: TaskStatus;

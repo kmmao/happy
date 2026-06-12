@@ -7,8 +7,8 @@ import { auth } from "@/app/auth/auth";
 import { inTx } from "@/storage/inTx";
 import { claimRepeatKey } from "@/storage/repeatKey";
 import {
-    normalizeTaskStatusReport,
     decideTaskTransition,
+    buildTaskStatusPayload,
 } from "@/modules/taskStatusLogic";
 import { taskStatusApply } from "@/app/api/task/taskStatusApply";
 import {
@@ -16,10 +16,12 @@ import {
     notifyRuntimeProfileFailure,
     resolveRuntimeProfile,
 } from "@/modules/runtimeProfileResolver";
-
-const TaskPrioritySchema = z.enum(["urgent", "user", "background"]);
-const TaskStatusSchema = z.enum(["queued", "dispatching", "running", "completed", "failed", "cancelled"]);
-const TaskOutcomeSchema = z.enum(["completed", "failed", "blocked"]);
+import { assertOwnedMachine, ownedProject, ownedTask } from "../ownership";
+import {
+    TaskPrioritySchema,
+    TaskOutcomeSchema,
+    TaskStatusReportSchema,
+} from "@kmmao/happy-wire";
 
 const CreateTaskBodySchema = z.object({
     projectId: z.string().optional(),
@@ -37,14 +39,6 @@ const CreateTaskBodySchema = z.object({
 const UpdateTaskBodySchema = z.object({
     prompt: z.string().min(1).optional(),
     priority: TaskPrioritySchema.optional(),
-});
-
-const TaskStatusReportSchema = z.object({
-    taskId: z.string(),
-    status: TaskStatusSchema,
-    outcome: TaskOutcomeSchema.optional(),
-    sessionId: z.string().optional(),
-    errorMessage: z.string().optional(),
 });
 
 const TaskResultReportSchema = z.object({
@@ -69,31 +63,6 @@ function isDirectoryUnderProject(projectPath: string, candidate: string): boolea
     const base = projectPath.replace(/\/+$/, "") || projectPath;
     const dir = candidate.replace(/\/+$/, "") || candidate;
     return dir === base || dir.startsWith(`${base}/`);
-}
-
-function buildTaskStatusPayload(input: {
-    status?: z.infer<typeof TaskStatusSchema>;
-    outcome?: z.infer<typeof TaskOutcomeSchema>;
-    summary?: string;
-    errorMessage?: string;
-}): { status: z.infer<typeof TaskStatusSchema>; outcome?: z.infer<typeof TaskOutcomeSchema>; errorMessage?: string } {
-    if (!input.outcome && input.status) {
-        return {
-            status: input.status,
-            outcome: undefined,
-            errorMessage: input.errorMessage,
-        };
-    }
-
-    const normalized = normalizeTaskStatusReport({
-        status: input.status ?? (input.outcome === "blocked" ? "failed" : input.outcome ?? "failed"),
-        outcome: input.outcome,
-    });
-    return {
-        status: normalized.status as z.infer<typeof TaskStatusSchema>,
-        outcome: normalized.outcome,
-        errorMessage: normalized.status === "completed" ? undefined : (input.errorMessage ?? input.summary),
-    };
 }
 
 interface TaskResultAuthInfo {
@@ -147,23 +116,13 @@ export function taskRoutes(app: Fastify) {
             const userId = request.userId;
             const { machineId, prompt, priority, maxAttempts, skillIds, projectId, profileId: bodyProfileId, directory: bodyDirectory, worktreeIsolation, parentTaskId } = request.body;
 
-            const machine = await db.machine.findFirst({
-                where: { id: machineId, accountId: userId },
-            });
-            if (!machine) {
-                return reply.code(404).send({ error: "Machine not found" });
-            }
+            await assertOwnedMachine(userId, machineId);
 
             let directory = "~";
             let resolvedProjectId: string | null = null;
             let projectSupervisorConfig: string | null = null;
             if (projectId) {
-                const project = await db.project.findFirst({
-                    where: { id: projectId, accountId: userId },
-                });
-                if (!project) {
-                    return reply.code(404).send({ error: "Project not found" });
-                }
+                const project = await ownedProject(userId, projectId);
                 resolvedProjectId = project.id;
                 projectSupervisorConfig = project.supervisorConfig ?? null;
                 if (bodyDirectory?.trim()) {
@@ -352,12 +311,7 @@ export function taskRoutes(app: Fastify) {
             },
         },
         async (request, reply) => {
-            const task = await db.task.findFirst({
-                where: { id: request.params.id, accountId: request.userId },
-            });
-            if (!task) {
-                return reply.code(404).send({ error: "Task not found" });
-            }
+            const task = await ownedTask(request.userId, request.params.id);
             if (!["queued", "dispatching", "running"].includes(task.status)) {
                 return reply.code(400).send({ error: `Cannot cancel task in '${task.status}' state` });
             }
@@ -401,12 +355,7 @@ export function taskRoutes(app: Fastify) {
             },
         },
         async (request, reply) => {
-            const task = await db.task.findFirst({
-                where: { id: request.params.id, accountId: request.userId },
-            });
-            if (!task) {
-                return reply.code(404).send({ error: "Task not found" });
-            }
+            const task = await ownedTask(request.userId, request.params.id);
             if (task.status !== "failed") {
                 return reply.code(400).send({ error: `Can only retry failed tasks, current: '${task.status}'` });
             }
@@ -414,12 +363,7 @@ export function taskRoutes(app: Fastify) {
             let directory = task.directory ?? "~";
             let projectSupervisorConfig: string | null = null;
             if (task.projectId) {
-                const project = await db.project.findFirst({
-                    where: { id: task.projectId, accountId: request.userId },
-                });
-                if (!project) {
-                    return reply.code(404).send({ error: "Project not found" });
-                }
+                const project = await ownedProject(request.userId, task.projectId);
                 if (!task.directory) {
                     directory = project.path;
                 }
@@ -523,12 +467,7 @@ export function taskRoutes(app: Fastify) {
             },
         },
         async (request, reply) => {
-            const task = await db.task.findFirst({
-                where: { id: request.params.id, accountId: request.userId },
-            });
-            if (!task) {
-                return reply.code(404).send({ error: "Task not found" });
-            }
+            const task = await ownedTask(request.userId, request.params.id);
             if (task.status !== "queued") {
                 return reply.code(400).send({ error: `Can only edit queued tasks, current: '${task.status}'` });
             }
@@ -559,12 +498,7 @@ export function taskRoutes(app: Fastify) {
             },
         },
         async (request, reply) => {
-            const task = await db.task.findFirst({
-                where: { id: request.params.id, accountId: request.userId },
-            });
-            if (!task) {
-                return reply.code(404).send({ error: "Task not found" });
-            }
+            const task = await ownedTask(request.userId, request.params.id);
             if (task.status !== "cancelled") {
                 return reply.code(400).send({ error: `Can only restore cancelled tasks, current: '${task.status}'` });
             }
@@ -605,12 +539,7 @@ export function taskRoutes(app: Fastify) {
             },
         },
         async (request, reply) => {
-            const task = await db.task.findFirst({
-                where: { id: request.params.id, accountId: request.userId },
-            });
-            if (!task) {
-                return reply.code(404).send({ error: "Task not found" });
-            }
+            const task = await ownedTask(request.userId, request.params.id);
             if (["queued", "dispatching", "running"].includes(task.status)) {
                 return reply.code(400).send({ error: "Cannot delete active task — cancel it first" });
             }
@@ -642,19 +571,9 @@ export function taskRoutes(app: Fastify) {
             const userId = request.userId;
             const { machineId, projectId, entries } = request.body;
 
-            const machine = await db.machine.findFirst({
-                where: { id: machineId, accountId: userId },
-            });
-            if (!machine) {
-                return reply.code(404).send({ error: "Machine not found" });
-            }
+            await assertOwnedMachine(userId, machineId);
 
-            const project = await db.project.findFirst({
-                where: { id: projectId, accountId: userId },
-            });
-            if (!project) {
-                return reply.code(404).send({ error: "Project not found" });
-            }
+            const project = await ownedProject(userId, projectId);
 
             let created = 0;
             let updated = 0;
@@ -758,12 +677,7 @@ export function taskRoutes(app: Fastify) {
             const { taskId, prompt, directory: bodyDirectory, priority, maxAttempts } = request.body;
             const userId = request.userId;
 
-            const parent = await db.task.findFirst({
-                where: { id: taskId, accountId: userId },
-            });
-            if (!parent) {
-                return reply.code(404).send({ error: "Parent task not found" });
-            }
+            const parent = await ownedTask(userId, taskId);
 
             const directory = bodyDirectory ?? parent.directory ?? "~";
 
@@ -823,12 +737,7 @@ export function taskRoutes(app: Fastify) {
             const resolvedStatus = payload.status;
             const replayKey = (request as any).taskResultJti ? `task-result-jti:${(request as any).taskResultJti}` : null;
 
-            const task = await db.task.findFirst({
-                where: { id: taskId, accountId: request.userId },
-            });
-            if (!task) {
-                return reply.code(404).send({ error: "Task not found" });
-            }
+            const task = await ownedTask(request.userId, taskId);
 
             const persistCompletedResult = async (tx: typeof db) => {
                 if (replayKey) {
@@ -918,12 +827,7 @@ export function taskRoutes(app: Fastify) {
             const userId = request.userId;
             const { taskIds, machineId } = request.body;
 
-            const machine = await db.machine.findFirst({
-                where: { id: machineId, accountId: userId },
-            });
-            if (!machine) {
-                return reply.code(404).send({ error: "Machine not found" });
-            }
+            await assertOwnedMachine(userId, machineId);
 
             const tasks = await db.task.findMany({
                 where: { id: { in: taskIds }, accountId: userId, machineId },
@@ -941,12 +845,12 @@ export function taskRoutes(app: Fastify) {
                     let directory = task.directory ?? "~";
                     let projectSupervisorConfig: string | null = null;
                     if (task.projectId) {
-                        const project = await db.project.findFirst({
-                            where: { id: task.projectId, accountId: userId },
-                        });
-                        if (project) {
+                        try {
+                            const project = await ownedProject(userId, task.projectId);
                             if (!task.directory) directory = project.path;
                             projectSupervisorConfig = project.supervisorConfig ?? null;
+                        } catch {
+                            // Project not found - skip project-specific config
                         }
                     }
 
