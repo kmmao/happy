@@ -14,6 +14,11 @@
  *
  * - `hooks` — could inject arbitrary shell commands
  * - `skillOverrides` — could bypass skill security restrictions
+ * - `disableBundledSkills` — could hide bundled skills/workflows from the model
+ *   (claude-code 2.1.169+); same threat surface as skillOverrides
+ * - `enforceAvailableModels` — managed-only model allowlist enforcement flag
+ *   (claude-code 2.1.175+); user/project scope must not be able to set or
+ *   extend it via the App RPC
  * - `cleanupPeriodDays` — destructive (deletes old sessions)
  *
  * ## Null semantics
@@ -36,6 +41,8 @@ export type SettingsParseResult =
 const BLOCKED_KEYS = new Set([
   "hooks",
   "skillOverrides",
+  "disableBundledSkills",
+  "enforceAvailableModels",
   "cleanupPeriodDays",
 ]);
 

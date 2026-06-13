@@ -106,3 +106,37 @@ export function applySandboxPermissionPolicy(
   }
   return "bypassPermissions";
 }
+
+function isClaudeBypassEquivalent(mode: PermissionMode | undefined): boolean {
+  return mode === "bypassPermissions" || mode === "yolo";
+}
+
+/**
+ * Resolve permission mode overrides from remote app messages.
+ *
+ * Happy app versions can send `permissionMode: "default"` with every message
+ * even when the CLI process was started in yolo/bypass mode. Since Claude maps
+ * both `yolo` and `bypassPermissions` to bypass at the SDK boundary, do not let
+ * that ambient default downgrade either mode, but still allow explicit modes
+ * such as plan to take effect.
+ *
+ * Ported from upstream slopus/happy 72226c73a — applies in PTY mode too, where
+ * every user message arriving from the app carries an ambient permissionMode
+ * regardless of how the CLI was started.
+ */
+export function resolveRemoteClaudePermissionMode(
+  currentMode: PermissionMode | undefined,
+  incomingMode: PermissionMode | undefined,
+  sandboxEnabled: boolean,
+): PermissionMode | undefined {
+  if (!incomingMode) {
+    return currentMode;
+  }
+
+  const nextMode = applySandboxPermissionPolicy(incomingMode, sandboxEnabled);
+  if (isClaudeBypassEquivalent(currentMode) && nextMode === "default") {
+    return currentMode;
+  }
+
+  return nextMode;
+}

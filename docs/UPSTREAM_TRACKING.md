@@ -6,7 +6,7 @@
 
 ---
 
-## 上游分叉现状（2026-06-06 sdk-watch 复核）
+## 上游分叉现状（2026-06-13 sdk-watch 复核）
 
 上游 `slopus/happy` 已与本地大幅分叉，**全量合并不再可行**：
 
@@ -42,6 +42,9 @@
 | #766 | Move @types/* to devDependencies | `b36cac8a` | 2026-02 | 和 #708 #762 一起 |
 | — | ToolSearch hidden, happy-wire, ACP config, etc. | `5ccc8839` | 2026-02 | 大批 upstream merge (21 commits) |
 | — | CLI PATH fallback (from tiann PR #83) | `339b9f65` | 2026-01 | happy-cli 子仓库 PR |
+| `72226c73a` | fix: stabilize Claude remote control permissions | (本期 sdk-watch port) | 2026-06-13 | 仅 port `permissionMode.ts` 新增 `resolveRemoteClaudePermissionMode` + `runClaude.ts` 调用点；`claudeLocalLauncher.ts` 等价行为本地已实现，未 port；`currentRunMode` 守卫不适用本地 PTY 架构 |
+| — | bump fastify-type-provider-zod 4.0.2→5 for zod 4 compat (相当于上游 `4930809e7` 修复) | (本期 sdk-watch port) | 2026-06-13 | 与 happy-server 已用版本对齐，避免 monorepo 内 4/6 版本分裂；controlServer.ts API 用法兼容 |
+| — | settingsParser 拦截 `disableBundledSkills`（claude-code 2.1.169 安全加固） | (本期 sdk-watch port) | 2026-06-13 | 与 `skillOverrides` 同性质，列入 `BLOCKED_KEYS` + 测试 |
 
 ---
 
@@ -65,20 +68,47 @@
 | docs: `CLAUDE_CODE_SESSION_ID` env var (2.1.132, 2.1.163) | — | ✅ 不适用 | Claude Code TUI 自动透传给 stdio MCP 子进程；本项目作为 PTY 包裹层不需要注入 |
 | docs: `skillOverrides` (2.1.129) | — | ✅ 主动拦截 | `utils/settingsParser.ts:38` 把 `skillOverrides` 列入禁字段防绕过 |
 | `dac6ba51d` (本地) | feat(sdk-watch): align with claude-code 2.1.165, surface TUI terminal-signal end-to-end | — | 上一次 sdk-watch 已完成 2.1.165 形态对齐 |
+| `989b8fa6f` | fix(cli): hide compact summaries from chat (upstream Scoteezy 2026-06-08) | ✅ 不适用 | 上游修复的是 SDK `query()` 直接 emit assistant summary 的路径（改 `sdkToLogConverter.ts`、`claudeRemote.ts` 走 SDK 分支）；本地走 PTY 模式，`/compact` 经 TUI 写 `compact_boundary` system message，已被 `jsonlToLogConverter.ts:158-172` 通过 `isMeta` 短路；本地无 `sdkToLogConverter.ts` 文件，本地 `claudeRemote.ts` 已重构走 PTY 路径，原 SDK 代码分支不存在 |
+| `b00c1d4b9` + `d51b11c69` | fix(session) harden archive lifecycle / fix(app) preserve legacy archived sessions | ✅ 不适用 | 上游已自行 revert (`d8c7b4045`、`dcbcbc939`，2026-06-09) |
+| `17937dd16` (Windows path 部分) | fix(server): `isStandaloneEntrypoint` 用 `path.win32.basename` | ✅ 不适用 | 本地 `standalone.ts` 无 `isStandaloneEntrypoint` 函数（本地走 Docker 部署，非 bun 单文件 bundle 路径），无对应代码可适用；MCP SDK bump 部分本地早已对齐 1.29.0 |
+| `004338cac` `a8a4008d5` | feat: pass through xhigh effort for Opus 4.8 / Opus 4.8 + dynamic workflows support | ✅ 已实现 | 本地 `runClaude.ts:70` 已含 `xhigh`；`1f99f234d feat: add Opus 4.8 model option across app/cli/codium` 已完成；本期 grep 验证 |
+| `4930809e7` | fix(cli): bump fastify-type-provider-zod to ^6.1.0 for zod 4 compat | ✅ 已等价 port（升至 `5` 而非 `6.1.0`） | 本期 sdk-watch 选择与 happy-server 一致升至 `5`（已包含 zod 4 兼容修复），避免 monorepo 内 4/6 版本分裂；后续若升 server 到 6.x 再统一 |
+| docs: `--safe-mode` flag、`/cd` 命令、`post-session` hook (2.1.169) | (2.1.169) | ✅ 不需新增适配 | `--safe-mode` PTY 透传；`/cd` 已通过 `CwdChanged` hook 接收；`post-session` 仅自托管 runner，本项目非自托管 runner |
+| docs: `fallbackModel` setting + `--fallback-model` flag (2.1.166) | (2.1.166) | ✅ 已支持 | `claudeCliFlags.ts:17`、`runClaude.ts:601/739/880/908/945` |
+| docs: `disableBundledSkills` setting + `CLAUDE_CODE_DISABLE_BUNDLED_SKILLS` env (2.1.169) | (2.1.169) | ✅ 已拦截 | 本期 port — `settingsParser.ts` `BLOCKED_KEYS` 加入 `disableBundledSkills` + 测试 |
+| docs: `enforceAvailableModels` managed setting (2.1.175) | (2.1.175) | ✅ 已拦截 | 本期 port — `settingsParser.ts` `BLOCKED_KEYS` 加入 `enforceAvailableModels`（managed-only，App RPC 不应能扩展）+ 测试 |
+| docs: `language`/`footerLinksRegexes`/`enforceAvailableModels`/`wheelScrollAccelerationEnabled` setting (2.1.174-176) | (2.1.174-176) | ✅ 不适用 | 仅 TUI 行为/会话标题语言/UI 渲染，不影响 PTY 工作流；`enforceAvailableModels` 在 SaaS 场景非紧迫，列入 P2 监视 |
+| docs: Fable 5 默认 1M `[1m]` 后缀剥离 (2.1.173) | (2.1.173) | ✅ 已支持 | `claudeRemote.ts:113-120` 仅对 opus-4-7/4-8 加 `[1m]`，Fable 5 走默认 case 不带后缀 |
 
 ---
 
-## 运行时依赖对齐（2026-06-06）
+## 运行时依赖对齐（2026-06-13）
 
 | 包 | 项目当前 | npm 最新 | 状态 |
 |---|---|---|---|
-| `@anthropic-ai/sandbox-runtime` | `0.0.54` | `0.0.54` | ✅ 跟上（2026-06-04 刚发布） |
+| `@anthropic-ai/sandbox-runtime` | `0.0.54` | `0.0.54` | ✅ 跟上 |
 | `@modelcontextprotocol/sdk` | `^1.29.0` | `1.29.0` | ✅ 跟上 |
 | `node-pty` | `^1.1.0` | `1.1.0` | ✅ 跟上 |
-| `@anthropic-ai/claude-code`（用户运行时 TUI 基线） | `2.1.165` | `2.1.165` | ✅ 跟上 |
-| `@anthropic-ai/claude-code`（codium 内嵌） | `2.1.165` | `2.1.165` | ✅ 本次同步升至 2.1.165；`@anthropic-ai/claude-agent-sdk` 同步至 `^0.3.166`（codium 走 SDK 模式，与本仓库 PTY 策略无冲突） |
+| `fastify-type-provider-zod`（happy-cli） | `5` | `6.1.0` | ✅ 本期升 `4.0.2 → 5` 修 zod 4 兼容（与 happy-server 对齐）；后续若升 server 到 6.x 再统一 |
+| `fastify-type-provider-zod`（happy-server） | `5` | `6.1.0` | ✅ 监视 6.x |
+| `@anthropic-ai/claude-code`（用户运行时 TUI 基线） | `2.1.165` | `2.1.177` | ⚠️ 本期对齐 2.1.166→2.1.177 的形态变化（见上方"已在本地实现 / 不适用"补录）；本机 `claude --version` = 2.1.173；PTY 测试套件已在 2.1.173 上跑通无回归 |
+| `@anthropic-ai/claude-code`（codium 内嵌） | `2.1.177` | `2.1.177` | ✅ 本期升 `2.1.165 → 2.1.177`；`@anthropic-ai/claude-agent-sdk` 同步至 `^0.3.177`；codium typecheck + 4 测试文件 100 用例全过 |
 
 > 注：本项目走 PTY 模式，**不追踪** `@anthropic-ai/claude-agent-sdk` 与 `claude -p` headless 路径。
+
+---
+
+## 本期上游 codium 包变更（2026-06-13）
+
+启用 `--find-renames=50` 后真实差异 `146 files changed, 12 insertions, 96 deletions`，全部为：
+- 路径回退 `packages/happy-codium → packages/codium`（本地保留 `@kmmao/happy-codium` 命名）
+- 包名 `@kmmao/happy-codium → codium`（不采纳）
+- 删除 `rebuild`/`postinstall` 脚本（本地需保留 better-sqlite3/node-pty 重建）
+- **降级** `@anthropic-ai/claude-code` `2.1.165 → 2.1.143`（不采纳，本地领先）
+- **降级** `@anthropic-ai/claude-agent-sdk` `^0.3.166 → ^0.3.143`（不采纳，本地领先）
+- 删除本地 `packages/happy-codium/CLAUDE.md` 82 行约定文档（不采纳）
+
+**结论**：本期 codium 上游变更全部不合入。上游处于退路模式，本地全面领先。
 
 ---
 

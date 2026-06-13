@@ -51,6 +51,7 @@ import { Session } from "./session";
 import {
   applySandboxPermissionPolicy,
   resolveInitialClaudePermissionMode,
+  resolveRemoteClaudePermissionMode,
 } from "./utils/permissionMode";
 /** JavaScript runtime to use for spawning Claude Code */
 export type JsRuntime = "node" | "bun";
@@ -685,14 +686,31 @@ export async function runClaude(
     let messagePermissionMode: PermissionMode | undefined =
       currentPermissionMode;
     if (message.meta?.permissionMode) {
-      messagePermissionMode = applySandboxPermissionPolicy(
+      // Use resolveRemoteClaudePermissionMode so an ambient `default` from the
+      // app does not silently downgrade an already-active yolo/bypass session
+      // (upstream slopus/happy 72226c73a; the app sends permissionMode on
+      // every message even when the CLI was started in bypass).
+      const previousPermissionMode = currentPermissionMode;
+      messagePermissionMode = resolveRemoteClaudePermissionMode(
+        currentPermissionMode,
         message.meta.permissionMode,
         sandboxEnabled,
       );
       currentPermissionMode = messagePermissionMode;
-      logger.debug(
-        `[loop] Permission mode updated from user message to: ${currentPermissionMode}`,
-      );
+      const ignoredDefaultDowngrade =
+        (previousPermissionMode === "bypassPermissions" ||
+          previousPermissionMode === "yolo") &&
+        message.meta.permissionMode === "default" &&
+        currentPermissionMode === previousPermissionMode;
+      if (ignoredDefaultDowngrade) {
+        logger.debug(
+          `[loop] Ignoring permission mode downgrade from ${previousPermissionMode} to default`,
+        );
+      } else {
+        logger.debug(
+          `[loop] Permission mode updated from user message to: ${currentPermissionMode}`,
+        );
+      }
     } else {
       logger.debug(
         `[loop] User message received with no permission mode override, using current: ${currentPermissionMode}`,

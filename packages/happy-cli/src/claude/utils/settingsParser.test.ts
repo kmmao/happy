@@ -36,6 +36,24 @@ describe("parseAndValidateSettings", () => {
     if (!r.ok) expect(r.error).toMatch(/hooks/);
   });
 
+  it("rejects skillOverrides key (security)", () => {
+    const r = parseAndValidateSettings({ skillOverrides: { foo: "off" } });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error).toMatch(/skillOverrides/);
+  });
+
+  it("rejects disableBundledSkills key (claude-code 2.1.169 security)", () => {
+    const r = parseAndValidateSettings({ disableBundledSkills: true });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error).toMatch(/disableBundledSkills/);
+  });
+
+  it("rejects enforceAvailableModels key (claude-code 2.1.175 managed-only)", () => {
+    const r = parseAndValidateSettings({ enforceAvailableModels: true });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error).toMatch(/enforceAvailableModels/);
+  });
+
   it("rejects unknown keys", () => {
     const r = parseAndValidateSettings({ totallyFakeKey: "lol" });
     expect(r.ok).toBe(false);
