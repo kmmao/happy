@@ -1385,6 +1385,7 @@ export const en: TranslationStructure = {
     source: "Source",
     fileEmpty: "File is empty",
     noChanges: "No changes to display",
+    refresh: "Refresh",
     // Browse mode strings
     browseTab: "Browse",
     changesTab: "Changes",

@@ -18,6 +18,7 @@ import { useUnistyles, StyleSheet } from "react-native-unistyles";
 import { useLayout, screenLayoutMaxWidth } from "@/components/layout";
 import { t } from "@/text";
 import { FileIcon } from "@/components/FileIcon";
+import { Octicons } from "@expo/vector-icons";
 import { base64ToUtf8 } from "@/utils/stringUtils";
 import { log } from '@/log';
 import { CommitDiffView } from "@/components/git/CommitDiffView";
@@ -62,6 +63,13 @@ function FileScreen() {
   const [markdownMode, setMarkdownMode] = React.useState<"preview" | "source">("preview");
   const [isLoading, setIsLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
+  // Increment to force re-reading the file without remounting (preserves
+  // markdownMode toggle across refreshes).
+  const [reloadKey, setReloadKey] = React.useState(0);
+
+  const handleRefresh = React.useCallback(() => {
+    setReloadKey((k) => k + 1);
+  }, []);
 
   // Load file content
   React.useEffect(() => {
@@ -190,7 +198,7 @@ function FileScreen() {
     return () => {
       isCancelled = true;
     };
-  }, [sessionId, filePath, commitHash, isCommitView]);
+  }, [sessionId, filePath, commitHash, isCommitView, reloadKey]);
 
   // Show error modal if there's an error
   React.useEffect(() => {
@@ -353,6 +361,23 @@ function FileScreen() {
         >
           {filePath}
         </Text>
+        <Pressable
+          onPress={handleRefresh}
+          disabled={isLoading}
+          hitSlop={8}
+          accessibilityLabel={t("files.refresh")}
+          style={({ pressed }) => ({
+            padding: 6,
+            marginLeft: 8,
+            opacity: isLoading ? 0.4 : pressed ? 0.5 : 1,
+          })}
+        >
+          <Octicons
+            name="sync"
+            size={18}
+            color={theme.colors.textLink}
+          />
+        </Pressable>
       </View>
 
       {/* Markdown preview/source toggle */}

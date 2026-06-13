@@ -20,7 +20,7 @@ import {
 import { storage } from "@/sync/storage";
 import { issueStore } from "@/sync/issueStore";
 import { prStore } from "@/sync/prStore";
-import { useUnistyles, StyleSheet } from "react-native-unistyles";
+import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { screenLayoutMaxWidth } from "@/components/layout";
 import { Text } from "@/components/StyledText";
 import { Typography } from "@/constants/Typography";
@@ -136,22 +136,6 @@ export default React.memo(function GitScreen() {
     },
     [sessionPath, selectedRepoPath],
   );
-
-  if (previewingFile) {
-    return (
-      <View style={[styles.container, { backgroundColor: theme.colors.surface }]}>
-        <SidePanelFilePreview
-          sessionId={sessionId}
-          filePath={previewingFile}
-          repoPath={previewingRepoPath ?? undefined}
-          onClose={() => {
-            setPreviewingFile(null);
-            setPreviewingRepoPath(null);
-          }}
-        />
-      </View>
-    );
-  }
 
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.surface }]}>
@@ -317,6 +301,28 @@ export default React.memo(function GitScreen() {
           onScrollUp={hasSubmodules ? handleScrollUp : undefined}
         />
       </View>
+
+      {/* File preview overlay — sits on top so the underlying tabs (and the
+       * Browse tab's directory navigation state) stay mounted while the user
+       * is viewing a file, and survive closing the preview. */}
+      {previewingFile && (
+        <View
+          style={[
+            StyleSheet.absoluteFillObject,
+            { backgroundColor: theme.colors.surface },
+          ]}
+        >
+          <SidePanelFilePreview
+            sessionId={sessionId}
+            filePath={previewingFile}
+            repoPath={previewingRepoPath ?? undefined}
+            onClose={() => {
+              setPreviewingFile(null);
+              setPreviewingRepoPath(null);
+            }}
+          />
+        </View>
+      )}
     </View>
   );
 });

@@ -164,76 +164,84 @@ export const SessionSidePanel = React.memo<SessionSidePanelProps>(
                     backgroundColor: theme.colors.surface,
                 }}
             >
-                {previewingFile ? (
-                    <SidePanelFilePreview
-                        sessionId={sessionId}
-                        filePath={previewingFile}
-                        repoPath={previewingRepoPath ?? undefined}
-                        onClose={handleClosePreview}
+                {/* Tabs are always mounted so GitBrowseTab keeps its current
+                 * directory / filter state when the user opens then closes a
+                 * file preview. The preview sits on top as an overlay below. */}
+                <View
+                    style={[
+                        styles.headerWrap,
+                        { backgroundColor: theme.colors.surface },
+                    ]}
+                >
+                    <SessionGlassTabBar
+                        tabs={topTabs}
+                        activeTab={effectiveActiveTab}
+                        onChange={(tabKey) => setActiveTab(tabKey as SessionPanelTab)}
+                        scrollable
+                        tabMinWidth={68}
+                        trailingAccessory={(
+                            <Pressable
+                                onPress={onToggleCollapse}
+                                hitSlop={6}
+                                style={styles.collapseButton}
+                            >
+                                <Ionicons
+                                    name="chevron-forward"
+                                    size={16}
+                                    color={theme.colors.textSecondary}
+                                />
+                            </Pressable>
+                        )}
                     />
-                ) : (
-                    <>
-                        <View
-                            style={[
-                                styles.headerWrap,
-                                { backgroundColor: theme.colors.surface },
-                            ]}
-                        >
-                            <SessionGlassTabBar
-                                tabs={topTabs}
-                                activeTab={effectiveActiveTab}
-                                onChange={(tabKey) => setActiveTab(tabKey as SessionPanelTab)}
-                                scrollable
-                                tabMinWidth={68}
-                                trailingAccessory={(
-                                    <Pressable
-                                        onPress={onToggleCollapse}
-                                        hitSlop={6}
-                                        style={styles.collapseButton}
-                                    >
-                                        <Ionicons
-                                            name="chevron-forward"
-                                            size={16}
-                                            color={theme.colors.textSecondary}
-                                        />
-                                    </Pressable>
-                                )}
-                            />
-                        </View>
+                </View>
 
-                        <View style={{ flex: 1 }}>
-                            {effectiveActiveTab === "files" && (
-                                <GitBrowseTab
-                                    key={sessionId}
-                                    sessionId={sessionId}
-                                    embedded
-                                    onFilePress={handleFilePress}
-                                    onReference={handleReference}
-                                />
-                            )}
-                            {effectiveActiveTab === "changes" && (
-                                <SidePanelGitPanel
-                                    sessionId={sessionId}
-                                    onFilePress={handleFilePress}
-                                />
-                            )}
-                            {effectiveActiveTab === "session" && (
-                                <SidePanelSessionTab sessionId={sessionId} />
-                            )}
-                            {effectiveActiveTab === "preview" && (
-                                <SidePanelPreviewTab sessionId={sessionId} />
-                            )}
-                            {effectiveActiveTab === "knowledge" && (
-                                <SidePanelSummaryTab sessionId={sessionId} />
-                            )}
-                            {effectiveActiveTab === "terminal" && (
-                                <SidePanelTerminalTab sessionId={sessionId} />
-                            )}
-                            {effectiveActiveTab === "claude" && (
-                                <SidePanelClaudeTab sessionId={sessionId} />
-                            )}
-                        </View>
-                    </>
+                <View style={{ flex: 1 }}>
+                    {effectiveActiveTab === "files" && (
+                        <GitBrowseTab
+                            key={sessionId}
+                            sessionId={sessionId}
+                            embedded
+                            onFilePress={handleFilePress}
+                            onReference={handleReference}
+                        />
+                    )}
+                    {effectiveActiveTab === "changes" && (
+                        <SidePanelGitPanel
+                            sessionId={sessionId}
+                            onFilePress={handleFilePress}
+                        />
+                    )}
+                    {effectiveActiveTab === "session" && (
+                        <SidePanelSessionTab sessionId={sessionId} />
+                    )}
+                    {effectiveActiveTab === "preview" && (
+                        <SidePanelPreviewTab sessionId={sessionId} />
+                    )}
+                    {effectiveActiveTab === "knowledge" && (
+                        <SidePanelSummaryTab sessionId={sessionId} />
+                    )}
+                    {effectiveActiveTab === "terminal" && (
+                        <SidePanelTerminalTab sessionId={sessionId} />
+                    )}
+                    {effectiveActiveTab === "claude" && (
+                        <SidePanelClaudeTab sessionId={sessionId} />
+                    )}
+                </View>
+
+                {previewingFile && (
+                    <View
+                        style={[
+                            StyleSheet.absoluteFillObject,
+                            { backgroundColor: theme.colors.surface },
+                        ]}
+                    >
+                        <SidePanelFilePreview
+                            sessionId={sessionId}
+                            filePath={previewingFile}
+                            repoPath={previewingRepoPath ?? undefined}
+                            onClose={handleClosePreview}
+                        />
+                    </View>
                 )}
             </View>
         );

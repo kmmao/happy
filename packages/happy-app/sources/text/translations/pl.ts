@@ -1398,6 +1398,7 @@ export const pl: TranslationStructure = {
     source: "Kod źródłowy",
     fileEmpty: "Plik jest pusty",
     noChanges: "Brak zmian do wyświetlenia",
+    refresh: "Odśwież",
     // Browse mode strings
     browseTab: "Przeglądaj",
     changesTab: "Zmiany",

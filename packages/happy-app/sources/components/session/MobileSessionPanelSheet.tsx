@@ -8,7 +8,7 @@ import { Text } from "@/components/StyledText";
 import { Typography } from "@/constants/Typography";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useUnistyles } from "react-native-unistyles";
+import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { t } from "@/text";
 import { GitBrowseTab } from "@/components/git/GitBrowseTab";
 import { useProjectForSession, useSession, useSetting } from "@/sync/storage";
@@ -98,21 +98,15 @@ export const MobileSessionPanelSheet = React.memo<MobileSessionPanelSheetProps>(
             setPreviewingRepoPath(repoPath ?? null);
         }, []);
 
-        const renderContent = () => {
-            if (previewingFile) {
-                return (
-                    <SidePanelFilePreview
-                        sessionId={sessionId}
-                        filePath={previewingFile}
-                        repoPath={previewingRepoPath ?? undefined}
-                        onClose={() => {
-                            setPreviewingFile(null);
-                            setPreviewingRepoPath(null);
-                        }}
-                    />
-                );
-            }
+        const handleClosePreview = React.useCallback(() => {
+            setPreviewingFile(null);
+            setPreviewingRepoPath(null);
+        }, []);
 
+        // Tab content is always rendered so GitBrowseTab retains its current
+        // directory / filter state across opening + closing a file preview.
+        // The preview is rendered as an absolute overlay above this content.
+        const renderContent = () => {
             switch (effectiveActiveTab) {
                 case "files":
                     return (
@@ -224,6 +218,22 @@ export const MobileSessionPanelSheet = React.memo<MobileSessionPanelSheetProps>(
                             <View style={{ flex: 1, backgroundColor: theme.colors.surface }}>
                                 {renderContent()}
                             </View>
+
+                            {previewingFile && (
+                                <View
+                                    style={[
+                                        StyleSheet.absoluteFillObject,
+                                        { backgroundColor: theme.colors.surface },
+                                    ]}
+                                >
+                                    <SidePanelFilePreview
+                                        sessionId={sessionId}
+                                        filePath={previewingFile}
+                                        repoPath={previewingRepoPath ?? undefined}
+                                        onClose={handleClosePreview}
+                                    />
+                                </View>
+                            )}
                         </View>
                     </View>
                 </Modal>

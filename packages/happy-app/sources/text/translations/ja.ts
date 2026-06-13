@@ -1511,6 +1511,7 @@ export const ja: TranslationStructure = {
     source: "ソース",
     fileEmpty: "ファイルは空です",
     noChanges: "表示する変更はありません",
+    refresh: "更新",
     // Browse mode strings
     browseTab: "ブラウズ",
     changesTab: "変更",

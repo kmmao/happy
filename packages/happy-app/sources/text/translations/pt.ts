@@ -1385,6 +1385,7 @@ export const pt: TranslationStructure = {
     source: "Código-fonte",
     fileEmpty: "Arquivo está vazio",
     noChanges: "Nenhuma alteração para exibir",
+    refresh: "Atualizar",
     // Browse mode strings
     browseTab: "Explorar",
     changesTab: "Alterações",

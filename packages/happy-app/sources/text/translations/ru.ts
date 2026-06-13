@@ -1398,6 +1398,7 @@ export const ru: TranslationStructure = {
     source: "Исходный код",
     fileEmpty: "Файл пустой",
     noChanges: "Нет изменений для отображения",
+    refresh: "Обновить",
     // Browse mode strings
     browseTab: "Обзор",
     changesTab: "Изменения",

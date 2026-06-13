@@ -1387,6 +1387,7 @@ export const ca: TranslationStructure = {
     source: "Codi font",
     fileEmpty: "El fitxer està buit",
     noChanges: "No hi ha canvis a mostrar",
+    refresh: "Actualitza",
     // Browse mode strings
     browseTab: "Navega",
     changesTab: "Canvis",

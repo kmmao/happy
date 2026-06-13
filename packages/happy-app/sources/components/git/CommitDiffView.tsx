@@ -10,7 +10,8 @@
  */
 
 import * as React from "react";
-import { View, ActivityIndicator, Platform, ScrollView } from "react-native";
+import { View, ActivityIndicator, Platform, Pressable, ScrollView } from "react-native";
+import { Octicons } from "@expo/vector-icons";
 import { Text } from "@/components/StyledText";
 import { Typography } from "@/constants/Typography";
 import { useUnistyles } from "react-native-unistyles";
@@ -28,6 +29,13 @@ interface CommitDiffViewProps {
   readonly commitHash: string;
   /** Show a header bar with file icon + path. Defaults to true. */
   readonly showHeader?: boolean;
+  /**
+   * External refresh trigger — incrementing this from the parent forces a
+   * re-fetch without remounting the component. Used by hosts that hide the
+   * built-in header (`showHeader={false}`) and surface their own refresh
+   * affordance instead.
+   */
+  readonly reloadNonce?: number;
 }
 
 /**
@@ -50,12 +58,17 @@ export const CommitDiffView = React.memo<CommitDiffViewProps>(
     fullPath,
     commitHash,
     showHeader = true,
+    reloadNonce,
   }) {
     const { theme } = useUnistyles();
     const [patch, setPatch] = React.useState<string | null>(null);
     const [isBinary, setIsBinary] = React.useState(false);
     const [isLoading, setIsLoading] = React.useState(true);
     const [error, setError] = React.useState<string | null>(null);
+    // Internal nonce drives the built-in header refresh button. Combined with
+    // the optional external `reloadNonce` so either source can re-trigger
+    // the fetch effect.
+    const [internalReloadKey, setInternalReloadKey] = React.useState(0);
 
     const filePath = React.useMemo(
       () => toRepoRelative(fullPath, sessionPath),
@@ -63,6 +76,10 @@ export const CommitDiffView = React.memo<CommitDiffViewProps>(
     );
     const fileName = filePath.split("/").pop() || filePath;
     const language = React.useMemo(() => getLanguageForPath(filePath), [filePath]);
+
+    const handleRefresh = React.useCallback(() => {
+      setInternalReloadKey((k) => k + 1);
+    }, []);
 
     React.useEffect(() => {
       let cancelled = false;
@@ -115,7 +132,7 @@ export const CommitDiffView = React.memo<CommitDiffViewProps>(
       return () => {
         cancelled = true;
       };
-    }, [sessionId, sessionPath, filePath, commitHash]);
+    }, [sessionId, sessionPath, filePath, commitHash, internalReloadKey, reloadNonce]);
 
     return (
       <View style={{ flex: 1, backgroundColor: theme.colors.surface }}>
@@ -143,6 +160,23 @@ export const CommitDiffView = React.memo<CommitDiffViewProps>(
             >
               {filePath}
             </Text>
+            <Pressable
+              onPress={handleRefresh}
+              disabled={isLoading}
+              hitSlop={8}
+              accessibilityLabel={t("files.refresh")}
+              style={({ pressed }) => ({
+                padding: 6,
+                marginLeft: 8,
+                opacity: isLoading ? 0.4 : pressed ? 0.5 : 1,
+              })}
+            >
+              <Octicons
+                name="sync"
+                size={18}
+                color={theme.colors.textLink}
+              />
+            </Pressable>
           </View>
         )}
 

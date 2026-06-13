@@ -1341,6 +1341,7 @@ export const zhHans: TranslationStructure = {
     source: "源码",
     fileEmpty: "文件为空",
     noChanges: "没有要显示的更改",
+    refresh: "刷新",
     // Browse mode strings
     browseTab: "浏览",
     changesTab: "更改",

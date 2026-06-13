@@ -57,6 +57,13 @@ export const SidePanelGitPanel = React.memo<SidePanelGitPanelProps>(
             commitHash: string;
             repoBasePath: string;
         } | null>(null);
+        // Nonce passed to CommitDiffView so the user-visible refresh button in
+        // this panel's custom commit-diff header can force a re-fetch without
+        // remounting the diff view.
+        const [commitDiffReloadNonce, setCommitDiffReloadNonce] = React.useState(0);
+        const handleRefreshCommitDiff = React.useCallback(() => {
+            setCommitDiffReloadNonce((n) => n + 1);
+        }, []);
         const { theme } = useUnistyles();
 
         const [refreshTrigger, setRefreshTrigger] = React.useState(0);
@@ -254,6 +261,23 @@ export const SidePanelGitPanel = React.memo<SidePanelGitPanelProps>(
                                 {shortHash}
                             </Text>
                         </View>
+                        <Pressable
+                            onPress={handleRefreshCommitDiff}
+                            hitSlop={8}
+                            accessibilityRole="button"
+                            accessibilityLabel={t("files.refresh")}
+                            style={(p) => ({
+                                paddingHorizontal: 6,
+                                paddingVertical: 4,
+                                opacity: p.pressed ? 0.5 : 1,
+                            })}
+                        >
+                            <Ionicons
+                                name="refresh"
+                                size={18}
+                                color={theme.colors.textLink}
+                            />
+                        </Pressable>
                     </View>
                     <CommitDiffView
                         sessionId={sessionId}
@@ -261,6 +285,7 @@ export const SidePanelGitPanel = React.memo<SidePanelGitPanelProps>(
                         fullPath={viewedCommitFile.fullPath}
                         commitHash={viewedCommitFile.commitHash}
                         showHeader={false}
+                        reloadNonce={commitDiffReloadNonce}
                     />
                 </View>
             );

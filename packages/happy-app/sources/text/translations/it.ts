@@ -1523,6 +1523,7 @@ export const it: TranslationStructure = {
     source: "Codice sorgente",
     fileEmpty: "File vuoto",
     noChanges: "Nessuna modifica da mostrare",
+    refresh: "Aggiorna",
     // Browse mode strings
     browseTab: "Sfoglia",
     changesTab: "Modifiche",

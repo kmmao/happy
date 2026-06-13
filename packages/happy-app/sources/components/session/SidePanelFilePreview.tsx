@@ -39,10 +39,17 @@ export const SidePanelFilePreview = React.memo<SidePanelFilePreviewProps>(
         const [isBinary, setIsBinary] = React.useState(false);
         const [isLoading, setIsLoading] = React.useState(true);
         const [error, setError] = React.useState<string | null>(null);
+        // Increment to force re-reading the file + diff without remounting
+        // (preserves currently-active mode toggle).
+        const [reloadKey, setReloadKey] = React.useState(0);
 
         const fileName = filePath.split("/").pop() || filePath;
         const language = getLanguageForPath(filePath);
         const isMarkdown = language === "markdown";
+
+        const handleRefresh = React.useCallback(() => {
+            setReloadKey((k) => k + 1);
+        }, []);
 
         React.useEffect(() => {
             let cancelled = false;
@@ -142,7 +149,7 @@ export const SidePanelFilePreview = React.memo<SidePanelFilePreviewProps>(
 
             load();
             return () => { cancelled = true; };
-        }, [sessionId, filePath]);
+        }, [sessionId, filePath, reloadKey]);
 
 
         return (
@@ -180,6 +187,22 @@ export const SidePanelFilePreview = React.memo<SidePanelFilePreviewProps>(
                     >
                         {fileName}
                     </Text>
+                    <Pressable
+                        onPress={handleRefresh}
+                        disabled={isLoading}
+                        hitSlop={8}
+                        accessibilityLabel={t("files.refresh")}
+                        style={({ pressed }) => ({
+                            padding: 4,
+                            opacity: isLoading ? 0.4 : pressed ? 0.5 : 1,
+                        })}
+                    >
+                        <Ionicons
+                            name="refresh"
+                            size={18}
+                            color={theme.colors.textLink}
+                        />
+                    </Pressable>
                 </View>
 
                 {/* Mode toggle */}
