@@ -5,7 +5,7 @@ import { hasCredentialSecret } from "@/auth/authCredentials";
 import { Encryption } from "@/sync/encryption/encryption";
 import { SessionEncryption } from "@/sync/encryption/sessionEncryption";
 import { decodeBase64 } from "@/encryption/base64";
-import { ingestStorage, storage, registerPreferencesSyncCallback, registerSessionEvictionCallback } from "./storage";
+import { ingestStorage, storage, registerPreferencesSyncCallback, registerSessionEvictionCallback, registerPendingQueueDispatchCallback } from "./storage";
 import { isSessionRunning, getSessionName } from "@/utils/sessionUtils";
 import {
   notifyPermissionRequest,
@@ -157,6 +157,7 @@ import {
   prefetchOlderMessagesInBackground,
   type OlderMessagePrefetchDeps,
 } from "./messagePrefetch";
+import { pendingQueueDispatcher } from "./pendingQueueDispatcher";
 
 type V3GetSessionMessagesResponse = {
   messages: ApiMessage[];
@@ -387,6 +388,7 @@ class Sync {
         this.machinesSync.invalidate();
         this.pushTokenSync.invalidate();
         this.sessionsSync.invalidate();
+        pendingQueueDispatcher.scheduleAll();
         this.nativeUpdateSync.invalidate();
         log.log("📱 App became active: Invalidating artifacts sync");
         this.artifactsSync.invalidate();
@@ -464,8 +466,16 @@ class Sync {
     // a singleton, no unsubscribe is tracked).
     this.registerIngestSubscribers();
 
+    pendingQueueDispatcher.init(this.sendMessage.bind(this));
+
     // Initialize auto-option-send global service
     autoOptionSendService.init(this.sendMessage.bind(this));
+
+    // Register pending queue dispatch callback so storage.ts can wake the
+    // app-level queue owner without depending on SessionView mounting.
+    registerPendingQueueDispatchCallback((sessionId) => {
+      pendingQueueDispatcher.schedule(sessionId);
+    });
 
     // Register preferences sync callback so storage.ts can trigger server sync
     registerPreferencesSyncCallback((sessionId) => {
@@ -517,6 +527,7 @@ class Sync {
     ])
       .then(() => {
         ingestStorage.getState().applyReady();
+        pendingQueueDispatcher.scheduleAll();
         // Load issue-session links so UI can show processing status
         void issueSessionStore.getState().loadLinks();
         // Start PR status polling for processing issue sessions with open PRs
@@ -696,6 +707,7 @@ class Sync {
         msgSync.stop();
         this.messagesSync.delete(sessionId);
       }
+      pendingQueueDispatcher.disposeSession(sessionId);
       // Stop and remove send sync
       const sndSync = this.sendSync.get(sessionId);
       if (sndSync) {
@@ -2216,6 +2228,7 @@ class Sync {
       for (const sync of this.sendSync.values()) {
         sync.invalidate();
       }
+      pendingQueueDispatcher.scheduleAll();
     });
   };
 
@@ -2340,6 +2353,7 @@ class Sync {
         this.sendSync.delete(sessionId);
       }
       this.pendingOutbox.delete(sessionId);
+      pendingQueueDispatcher.disposeSession(sessionId);
       deleteLastSeq(sessionId);
       this.messageProcessor.release(sessionId);
     });
@@ -2691,6 +2705,9 @@ class Sync {
     storage.getState().applySessions(sessions, replace);
     const newActive = storage.getState().getActiveSessions();
     this.applySessionDiff(active, newActive);
+    for (const session of sessions) {
+      pendingQueueDispatcher.schedule(session.id);
+    }
   };
 
   private applySessionDiff = (active: Session[], newActive: Session[]) => {

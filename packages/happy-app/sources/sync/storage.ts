@@ -544,6 +544,15 @@ export function registerSessionEvictionCallback(
   onSessionMessagesEvicted = callback;
 }
 
+// Callback for app-level pending queue dispatch.
+// Registered by sync.ts so queue draining does not depend on SessionView mounting.
+let onPendingQueueDispatch: ((sessionId: string) => void) | null = null;
+export function registerPendingQueueDispatchCallback(
+  callback: (sessionId: string) => void,
+) {
+  onPendingQueueDispatch = callback;
+}
+
 const storageStore = create<StorageState>()((set, get) => {
   let { settings, version } = loadSettings();
   let localSettings = loadLocalSettings();
@@ -671,6 +680,7 @@ const storageStore = create<StorageState>()((set, get) => {
         },
       }));
       savePendingQueues(get().sessionPendingQueues);
+      onPendingQueueDispatch?.(sessionId);
     },
     shiftPendingQueue: (sessionId) => {
       let shifted: { localId: string; message: string; displayText?: string } | undefined;
@@ -685,15 +695,20 @@ const storageStore = create<StorageState>()((set, get) => {
           },
         };
       });
-      if (shifted) savePendingQueues(get().sessionPendingQueues);
+      if (shifted) {
+        savePendingQueues(get().sessionPendingQueues);
+        onPendingQueueDispatch?.(sessionId);
+      }
       return shifted;
     },
     removePendingQueueItem: (sessionId, localId) => {
+      let changed = false;
       set((prev) => {
         const queue = prev.sessionPendingQueues[sessionId];
         if (!queue) return prev;
         const filtered = queue.filter((m) => m.localId !== localId);
         if (filtered.length === queue.length) return prev;
+        changed = true;
         return {
           sessionPendingQueues: {
             ...prev.sessionPendingQueues,
@@ -702,14 +717,17 @@ const storageStore = create<StorageState>()((set, get) => {
         };
       });
       savePendingQueues(get().sessionPendingQueues);
+      if (changed) onPendingQueueDispatch?.(sessionId);
     },
     reorderPendingQueueItemToFront: (sessionId, localId) => {
+      let changed = false;
       set((prev) => {
         const queue = prev.sessionPendingQueues[sessionId];
         if (!queue) return prev;
         const idx = queue.findIndex((m) => m.localId === localId);
         if (idx <= 0) return prev;
         const item = queue[idx]!;
+        changed = true;
         return {
           sessionPendingQueues: {
             ...prev.sessionPendingQueues,
@@ -718,6 +736,7 @@ const storageStore = create<StorageState>()((set, get) => {
         };
       });
       savePendingQueues(get().sessionPendingQueues);
+      if (changed) onPendingQueueDispatch?.(sessionId);
     },
     updatePendingQueueItem: (sessionId, localId, patch) => {
       let found = false;
@@ -740,7 +759,9 @@ const storageStore = create<StorageState>()((set, get) => {
           },
         };
       });
-      if (found) savePendingQueues(get().sessionPendingQueues);
+      if (found) {
+        savePendingQueues(get().sessionPendingQueues);
+      }
       return found;
     },
     clearPendingQueue: (sessionId) => {
@@ -749,12 +770,15 @@ const storageStore = create<StorageState>()((set, get) => {
         return { sessionPendingQueues: rest };
       });
       savePendingQueues(get().sessionPendingQueues);
+      onPendingQueueDispatch?.(sessionId);
     },
     sessionPendingQueuePaused: savedPendingQueuePaused,
     setPendingQueuePaused: (sessionId, paused) => {
+      let changed = false;
       set((prev) => {
         const current = prev.sessionPendingQueuePaused[sessionId] ?? false;
         if (current === paused) return prev;
+        changed = true;
         if (paused) {
           return {
             sessionPendingQueuePaused: {
@@ -768,6 +792,7 @@ const storageStore = create<StorageState>()((set, get) => {
         return { sessionPendingQueuePaused: rest };
       });
       savePendingQueuePaused(get().sessionPendingQueuePaused);
+      if (changed && !paused) onPendingQueueDispatch?.(sessionId);
     },
     realtimeStatus: "disconnected",
     realtimeMode: "idle",

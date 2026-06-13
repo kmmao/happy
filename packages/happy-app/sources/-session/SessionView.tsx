@@ -140,6 +140,7 @@ import {
 import { getSessionContentMaxWidth } from "./sessionContentWidth";
 import { useSessionVisibleEffect } from "./useSessionVisibleEffect";
 import { autoOptionSendService } from "@/sync/autoOptionSendService";
+import { pendingQueueDispatcher } from "@/sync/pendingQueueDispatcher";
 import {
   getAutoOptionFeedbackStats,
   subscribeAutoOptionFeedback,
@@ -1069,75 +1070,8 @@ function SessionViewInner({
   const pendingQueueRef = React.useRef(pendingQueue);
   pendingQueueRef.current = pendingQueue;
 
-  // Auto-dispatch the next queued message when the AI becomes idle.
-  //
-  // Three things we have to be careful about:
-  //
-  // 1. RACE — sync.sendMessage is async on the network round-trip, so after we
-  //    shift one off and dispatch it, `isRunning` does not flip to true
-  //    immediately. The next `pendingQueue.length` decrement (because we
-  //    shifted) re-runs this effect with `isRunning` still false, and without
-  //    the in-flight guard we'd dispatch the NEXT message instantly — exactly
-  //    the "everything fires at once" behavior the user reported.
-  //
-  // 2. STARTUP — we still want length to be a trigger, otherwise an item
-  //    appended while AI is already idle (rare but possible, e.g. cross-client)
-  //    would never auto-dispatch. So we keep the length dependency but gate it
-  //    on the in-flight ref, which is cleared when isRunning actually rises.
-  //
-  // 3. FALLBACK TIMER SURVIVAL — the safety timer used to be `setTimeout(..., 3000)`
-  //    returned from useEffect with `clearTimeout` in the cleanup. That caused
-  //    a second bug: when the effect re-ran (e.g. on the `pendingQueue.length`
-  //    decrement immediately after a shift) the cleanup cleared the timer, and
-  //    the re-run's early return at the in-flight gate did NOT schedule a new
-  //    one. If `isRunning` never rose (silent server reject), the lock stayed
-  //    true forever. Now the timer is held in a ref so it survives effect
-  //    re-runs; we only clear it when the dispatch is resolved (isRunning
-  //    became true) or the component unmounts.
-  //
-  // We also pass `bypassRunningCheck: true` to sync.sendMessage so a stale
-  // session.sdkSessionState read inside sendMessage cannot re-enqueue our just-
-  // shifted item with the same localId (and then make the dispatch loop forever).
-  const dispatchInFlightRef = React.useRef(false);
-  const dispatchFallbackTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [dispatchTick, setDispatchTick] = React.useState(0);
-  const clearDispatchFallback = React.useCallback(() => {
-    if (dispatchFallbackTimerRef.current) {
-      clearTimeout(dispatchFallbackTimerRef.current);
-      dispatchFallbackTimerRef.current = null;
-    }
-  }, []);
-  React.useEffect(() => () => clearDispatchFallback(), [clearDispatchFallback]);
-  React.useEffect(() => {
-    if (isRunning) {
-      // The dispatched message took effect — open the door for the next one.
-      dispatchInFlightRef.current = false;
-      clearDispatchFallback();
-      return;
-    }
-    if (queuePaused) return;
-    if (dispatchInFlightRef.current) return;
-    if (pendingQueueRef.current.length === 0) return;
-
-    const next = storage.getState().shiftPendingQueue(sessionId);
-    if (!next) return;
-    dispatchInFlightRef.current = true;
-    sync.sendMessage(sessionId, next.message, next.displayText, {
-      localId: next.localId,
-      bypassRunningCheck: true,
-    });
-
-    // 15 s safety net for silent failures (offline, encryption reject, server
-    // never echoes back). Held in a ref so re-runs of this effect don't clear
-    // it. When it fires we bump `dispatchTick` so the effect re-evaluates and
-    // can drain the next item.
-    clearDispatchFallback();
-    dispatchFallbackTimerRef.current = setTimeout(() => {
-      dispatchInFlightRef.current = false;
-      dispatchFallbackTimerRef.current = null;
-      setDispatchTick((t) => t + 1);
-    }, 15000);
-  }, [isRunning, sessionId, pendingQueue.length, queuePaused, dispatchTick, clearDispatchFallback]);
+  // Pending queue dispatch is owned by sync/pendingQueueDispatcher so queued
+  // messages continue sending even when this SessionView is not mounted.
 
   // (V6) Deliberately no auto-close-when-item-vanishes effect. Previously the
   // effect closed the overlay the moment the previewed item left the queue,
@@ -1246,91 +1180,30 @@ function SessionViewInner({
 
   const handleSaveAndSendQueuedEdit = React.useCallback(
     (localId: string, message: string, displayText: string | undefined) => {
-      // V3 + V4 (atomic save+send that bypasses both the auto-dispatch effect
-      // and the paused gate), plus two further race fixes from the post-2.36.5
-      // review:
-      //
-      // FIX #1 — multi-send race. The OLD code did remove → interrupt → send
-      // without setting dispatchInFlightRef. The queue-length decrement triggers
-      // a re-render; the dispatch effect runs; isRunning is still true so it
-      // CLEARS dispatchInFlightRef (line: "if (isRunning) { ... = false; }")
-      // and returns. A moment later the server pushes the interrupt-ack (idle)
-      // BEFORE the running-state for our new message arrives; the effect re-
-      // runs, finds isRunning=false, inflight=false, length>0 → shifts the
-      // NEXT queued item and ships it too. The user clicked Save&Send on ONE
-      // item and silently saw two messages sent. Gate the effect first.
-      //
-      // FIX #2 — silent message loss. The OLD code removed the queue item
-      // BEFORE calling sync.sendMessage, then fire-and-forgot the promise.
-      // If sync.sendMessage early-returned (no encryption, session missing)
-      // or its async pipeline rejected (encryptRawRecord throw, socket
-      // failure mid-flush), the item was gone from the queue with no recovery.
-      // sendMessage now returns Promise<boolean>; we only remove on `true`
-      // and surface failures so the user can retry.
       const ok = storage.getState().updatePendingQueueItem(sessionId, localId, {
         message,
         displayText,
       });
       if (!ok) return false;
 
-      // Pre-emptively gate auto-dispatch BEFORE we touch the queue or the
-      // running state. Arm the same 15s fallback timer the dispatch effect
-      // uses so we never permanently jam the queue if isRunning never rises.
-      dispatchInFlightRef.current = true;
-      clearDispatchFallback();
-      dispatchFallbackTimerRef.current = setTimeout(() => {
-        dispatchInFlightRef.current = false;
-        dispatchFallbackTimerRef.current = null;
-        setDispatchTick((t) => t + 1);
-      }, 15000);
-
+      storage.getState().reorderPendingQueueItemToFront(sessionId, localId);
       if (isRunning) {
-        sessionInterrupt(sessionId);
-      }
-
-      // Fire the send. Item stays in queue until sendMessage confirms it
-      // entered the outbox — only THEN do we remove. If sendMessage returns
-      // false (early-return) or the promise rejects (throw), the item is
-      // preserved for the user to retry; we also surface an alert so they
-      // know something went wrong.
-      const releaseGate = () => {
-        dispatchInFlightRef.current = false;
-        clearDispatchFallback();
-        setDispatchTick((t) => t + 1);
-      };
-      sync
-        .sendMessage(sessionId, message, displayText, {
-          localId,
-          bypassRunningCheck: true,
-        })
-        .then((accepted) => {
-          if (accepted) {
-            // The outbox owns the message now; safe to drop the queue copy.
-            storage.getState().removePendingQueueItem(sessionId, localId);
-          } else {
-            log.error(
-              `save&send: sync.sendMessage rejected for session=${sessionId} localId=${localId}; item retained in queue`,
-            );
-            releaseGate();
-            Modal.alert(t("common.error"), t("session.saveAndSendFailed"));
-          }
-        })
-        .catch((err) => {
-          log.error(
-            `save&send: sync.sendMessage threw for session=${sessionId} localId=${localId}; item retained in queue`,
-            err,
-          );
-          releaseGate();
-          Modal.alert(t("common.error"), t("session.saveAndSendFailed"));
+        void sessionInterrupt(sessionId).finally(() => {
+          pendingQueueDispatcher.schedule(sessionId, { ignorePaused: true });
         });
+      } else {
+        pendingQueueDispatcher.schedule(sessionId, { ignorePaused: true });
+      }
 
       return true;
     },
-    [sessionId, isRunning, clearDispatchFallback],
+    [sessionId, isRunning],
   );
 
   const handleSendNow = React.useCallback(() => {
-    sessionInterrupt(sessionId);
+    void sessionInterrupt(sessionId).finally(() => {
+      pendingQueueDispatcher.schedule(sessionId, { ignorePaused: true });
+    });
     // If the previewed item is currently at the head of the queue, it's the
     // one about to be drained — close the overlay so we don't leave a stale
     // snapshot behind. Items further back in the queue are NOT affected by
@@ -1345,7 +1218,9 @@ function SessionViewInner({
 
   const handleSendItemNow = React.useCallback((localId: string) => {
     storage.getState().reorderPendingQueueItemToFront(sessionId, localId);
-    sessionInterrupt(sessionId);
+    void sessionInterrupt(sessionId).finally(() => {
+      pendingQueueDispatcher.schedule(sessionId, { ignorePaused: true });
+    });
     // The chip ▶ action explicitly targets THIS item — reorder-to-front +
     // interrupt guarantees it will be the next drain. If the overlay is
     // showing the same item, close it so the user doesn't see a stale
