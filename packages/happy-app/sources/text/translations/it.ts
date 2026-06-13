@@ -1524,6 +1524,8 @@ export const it: TranslationStructure = {
     fileEmpty: "File vuoto",
     noChanges: "Nessuna modifica da mostrare",
     refresh: "Aggiorna",
+    closeTab: "Chiudi scheda",
+    browseMore: "Sfoglia altri file",
     // Browse mode strings
     browseTab: "Sfoglia",
     changesTab: "Modifiche",

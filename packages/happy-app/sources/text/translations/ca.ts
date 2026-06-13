@@ -1388,6 +1388,8 @@ export const ca: TranslationStructure = {
     fileEmpty: "El fitxer està buit",
     noChanges: "No hi ha canvis a mostrar",
     refresh: "Actualitza",
+    closeTab: "Tanca la pestanya",
+    browseMore: "Navega per més fitxers",
     // Browse mode strings
     browseTab: "Navega",
     changesTab: "Canvis",

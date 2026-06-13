@@ -1377,6 +1377,8 @@ export const en = {
     fileEmpty: "File is empty",
     noChanges: "No changes to display",
     refresh: "Refresh",
+    closeTab: "Close tab",
+    browseMore: "Browse for more files",
     // Browse mode strings
     browseTab: "Browse",
     changesTab: "Changes",

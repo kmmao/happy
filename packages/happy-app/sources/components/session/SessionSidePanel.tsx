@@ -14,8 +14,10 @@ import {
 } from "@/sync/storage";
 import { useProjectKnowledgeConfig } from "@/hooks/useProjectKnowledgeConfig";
 import { t } from "@/text";
+import { OpenFilesTabBar } from "./OpenFilesTabBar";
 import { SidePanelFilePreview } from "./SidePanelFilePreview";
 import { SidePanelGitPanel } from "./SidePanelGitPanel";
+import { useOpenFilesStack } from "./useOpenFilesStack";
 import { SidePanelPreviewTab } from "./SidePanelPreviewTab";
 import { SidePanelSessionTab } from "./SidePanelSessionTab";
 import { SidePanelSummaryTab } from "./SidePanelSummaryTab";
@@ -47,8 +49,7 @@ export const SessionSidePanel = React.memo<SessionSidePanelProps>(
         const { theme } = useUnistyles();
         const enablePreviewTab = useSetting("enablePreviewTab");
         const [activeTab, setActiveTab] = React.useState<SessionPanelTab>("session");
-        const [previewingFile, setPreviewingFile] = React.useState<string | null>(null);
-        const [previewingRepoPath, setPreviewingRepoPath] = React.useState<string | null>(null);
+        const openFilesStack = useOpenFilesStack();
         const inputContext = React.useContext(InputContext);
         const project = useProjectForSession(sessionId);
         const { config: knowledgeConfig } = useProjectKnowledgeConfig(
@@ -58,15 +59,12 @@ export const SessionSidePanel = React.memo<SessionSidePanelProps>(
         // out; once the GET returns, the flag reflects the real project setting.
         const knowledgeBaseEnabled = knowledgeConfig?.enabled ?? true;
 
-        const handleFilePress = React.useCallback((fullPath: string, repoPath?: string) => {
-            setPreviewingFile(fullPath);
-            setPreviewingRepoPath(repoPath ?? null);
-        }, []);
-
-        const handleClosePreview = React.useCallback(() => {
-            setPreviewingFile(null);
-            setPreviewingRepoPath(null);
-        }, []);
+        const handleFilePress = React.useCallback(
+            (fullPath: string, repoPath?: string) => {
+                openFilesStack.openFile(fullPath, repoPath);
+            },
+            [openFilesStack],
+        );
 
         const handleReference = React.useCallback(
             (path: string) => {
@@ -96,6 +94,20 @@ export const SessionSidePanel = React.memo<SessionSidePanelProps>(
                 setActiveTab(effectiveActiveTab);
             }
         }, [activeTab, effectiveActiveTab]);
+
+        // "+" in the overlay → minimize. Force-switch to the Files tab only
+        // when the user is on a tab that doesn't surface a file browser
+        // (Session/Preview/Terminal/Claude/Knowledge). When they're already
+        // on Files or Changes, leave the tab alone — both expose a usable
+        // file source and overriding their choice is more disruptive than
+        // helpful (e.g. they were inspecting changed files and the next
+        // file they want is in the same diff list).
+        const handleAddFile = React.useCallback(() => {
+            openFilesStack.minimize();
+            if (effectiveActiveTab !== "files" && effectiveActiveTab !== "changes") {
+                setActiveTab("files");
+            }
+        }, [openFilesStack, effectiveActiveTab]);
 
         const topTabs = React.useMemo<SessionGlassTabBarItem[]>(
             () =>
@@ -228,21 +240,45 @@ export const SessionSidePanel = React.memo<SessionSidePanelProps>(
                     )}
                 </View>
 
-                {previewingFile && (
-                    <View
-                        style={[
-                            StyleSheet.absoluteFillObject,
-                            { backgroundColor: theme.colors.surface },
-                        ]}
-                    >
-                        <SidePanelFilePreview
-                            sessionId={sessionId}
-                            filePath={previewingFile}
-                            repoPath={previewingRepoPath ?? undefined}
-                            onClose={handleClosePreview}
-                        />
-                    </View>
-                )}
+                {openFilesStack.previewVisible &&
+                    openFilesStack.openFiles.length > 0 && (
+                        <View
+                            style={[
+                                StyleSheet.absoluteFillObject,
+                                { backgroundColor: theme.colors.surface },
+                            ]}
+                        >
+                            <OpenFilesTabBar
+                                files={openFilesStack.openFiles}
+                                activeIndex={openFilesStack.activeIndex}
+                                onTabPress={openFilesStack.pressTab}
+                                onTabClose={openFilesStack.closeTab}
+                                onAddFile={handleAddFile}
+                            />
+                            {/* All previews stay mounted (display-toggled) so
+                              * switching tabs is instant and each preview's
+                              * mode toggle / scroll position survives. */}
+                            {openFilesStack.openFiles.map((file, index) => (
+                                <View
+                                    key={file.filePath}
+                                    style={{
+                                        flex: 1,
+                                        display:
+                                            index === openFilesStack.activeIndex
+                                                ? "flex"
+                                                : "none",
+                                    }}
+                                >
+                                    <SidePanelFilePreview
+                                        sessionId={sessionId}
+                                        filePath={file.filePath}
+                                        repoPath={file.repoPath}
+                                        onClose={openFilesStack.minimize}
+                                    />
+                                </View>
+                            ))}
+                        </View>
+                    )}
             </View>
         );
     },

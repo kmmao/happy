@@ -1399,6 +1399,8 @@ export const ru: TranslationStructure = {
     fileEmpty: "Файл пустой",
     noChanges: "Нет изменений для отображения",
     refresh: "Обновить",
+    closeTab: "Закрыть вкладку",
+    browseMore: "Открыть больше файлов",
     // Browse mode strings
     browseTab: "Обзор",
     changesTab: "Изменения",

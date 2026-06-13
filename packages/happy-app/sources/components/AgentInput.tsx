@@ -48,6 +48,7 @@ import { t } from "@/text";
 import { getBuiltInProfile } from "@/sync/profileUtils";
 import { useAnimatedTokensCostValue } from "./AnimatedTokensCost";
 import { GitBrowseTab } from "./git/GitBrowseTab";
+import { useOptionalFilePreview } from "./session/FilePreviewContext";
 
 import type { AgentInputProps } from "./AgentInputTypes";
 import { stylesheet, FAVORITE_CHIP_GRADIENTS, getFavoriteSlashChipGlassStyle, getFloatingGlassChipStyle } from "./AgentInputStyles";
@@ -76,6 +77,10 @@ export const AgentInput = React.memo(
     const styles = stylesheet;
     const { theme } = useUnistyles();
     const { width: screenWidth } = useWindowDimensions();
+    // Chat-level multi-file preview, if a SessionView host has provided one.
+    // When present, the `@` picker routes file taps into the shared overlay
+    // instead of letting GitBrowseTab fall back to the legacy /file route.
+    const filePreview = useOptionalFilePreview();
     // Overlay max height: caller passes available space above input (accurate);
     // fall back to a safe default when not provided (e.g. new-session screen).
     const overlayMaxHeight = props.overlayMaxHeight ?? 400;
@@ -299,6 +304,22 @@ export const AgentInput = React.memo(
     const [showModelSelectorModal, setShowModelSelectorModal] = React.useState(false);
     const [showQuickCommands, setShowQuickCommands] = React.useState(false);
     const [showFileBrowser, setShowFileBrowser] = React.useState(false);
+
+    // Publish a stable picker-open handle to the host via the ref slot.
+    // Matches the @ button's behavior: opens the picker AND collapses any
+    // sibling overlays (settings, quick commands) that share the same surface.
+    const openFilePickerRefProp = props.openFilePickerRef;
+    React.useEffect(() => {
+      if (!openFilePickerRefProp) return;
+      openFilePickerRefProp.current = () => {
+        setShowSettings(false);
+        setShowQuickCommands(false);
+        setShowFileBrowser(true);
+      };
+      return () => {
+        openFilePickerRefProp.current = null;
+      };
+    }, [openFilePickerRefProp]);
 
     // Favorite commands (synced Settings — for QuickCommandsPanel shell commands)
     const [favoriteCommands, setFavoriteCommands] =
@@ -909,6 +930,18 @@ export const AgentInput = React.memo(
                     sessionId={props.sessionId!}
                     embedded
                     onFileOpen={() => setShowFileBrowser(false)}
+                    // When a chat-level preview stack is wired up, tapping a
+                    // file routes into the multi-tab overlay instead of the
+                    // legacy /file deep-link route. Always close the picker
+                    // first so the file content is the focus.
+                    onFilePress={
+                      filePreview
+                        ? (fullPath) => {
+                            setShowFileBrowser(false);
+                            filePreview.openFile(fullPath);
+                          }
+                        : undefined
+                    }
                     onReference={(path) => {
                       const current = props.value;
                       const prefix = current.length > 0 && !current.endsWith(" ") ? " " : "";

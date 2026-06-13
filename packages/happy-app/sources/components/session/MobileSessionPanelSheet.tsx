@@ -19,7 +19,9 @@ import { SidePanelSummaryTab } from "./SidePanelSummaryTab";
 import { SidePanelTerminalTab } from "./SidePanelTerminalTab";
 import { SidePanelClaudeTab } from "./SidePanelClaudeTab";
 import { SidePanelPreviewTab } from "./SidePanelPreviewTab";
+import { OpenFilesTabBar } from "./OpenFilesTabBar";
 import { SidePanelFilePreview } from "./SidePanelFilePreview";
+import { useOpenFilesStack } from "./useOpenFilesStack";
 import { SessionGlassTabBar, type SessionGlassTabBarItem } from "./SessionGlassTabBar";
 import { buildFileReferenceText } from "./sessionSidePanelReference";
 import { InputContext } from "@/hooks/useInputContext";
@@ -47,8 +49,7 @@ export const MobileSessionPanelSheet = React.memo<MobileSessionPanelSheetProps>(
         const insets = useSafeAreaInsets();
         const enablePreviewTab = useSetting("enablePreviewTab");
         const [activeTab, setActiveTab] = React.useState<SessionPanelTab>("session");
-        const [previewingFile, setPreviewingFile] = React.useState<string | null>(null);
-        const [previewingRepoPath, setPreviewingRepoPath] = React.useState<string | null>(null);
+        const openFilesStack = useOpenFilesStack();
         const inputContext = React.useContext(InputContext);
         const session = useSession(sessionId);
         const sessionTitle = session ? getSessionName(session) : "Panel";
@@ -93,15 +94,28 @@ export const MobileSessionPanelSheet = React.memo<MobileSessionPanelSheetProps>(
             [inputContext, onClose],
         );
 
-        const handleFilePress = React.useCallback((fullPath: string, repoPath?: string) => {
-            setPreviewingFile(fullPath);
-            setPreviewingRepoPath(repoPath ?? null);
-        }, []);
+        const handleFilePress = React.useCallback(
+            (fullPath: string, repoPath?: string) => {
+                openFilesStack.openFile(fullPath, repoPath);
+            },
+            [openFilesStack],
+        );
 
-        const handleClosePreview = React.useCallback(() => {
-            setPreviewingFile(null);
-            setPreviewingRepoPath(null);
-        }, []);
+        // "+" in the overlay → minimize. Force-switch to Files only when the
+        // user is on a tab that doesn't surface a file browser; if they're
+        // already on Files or Changes, leave them where they were (both
+        // expose a usable file source, and switching against their choice
+        // is more disruptive than helpful).
+        const handleAddFile = React.useCallback(() => {
+            openFilesStack.minimize();
+            if (effectiveActiveTab !== "files" && effectiveActiveTab !== "changes") {
+                setActiveTab("files");
+            }
+        }, [openFilesStack, effectiveActiveTab]);
+
+        // Hides the entire sheet's top bar + tab bar to give the preview more
+        // vertical room on mobile. Derived so we don't keep a separate flag.
+        const showSheetChrome = !openFilesStack.previewVisible;
 
         // Tab content is always rendered so GitBrowseTab retains its current
         // directory / filter state across opening + closing a file preview.
@@ -156,7 +170,7 @@ export const MobileSessionPanelSheet = React.memo<MobileSessionPanelSheetProps>(
                                 paddingBottom: Math.max(insets.bottom, 8),
                             }}
                         >
-                            {!previewingFile && (
+                            {showSheetChrome && (
                                 <View
                                     style={{
                                         height: layoutConfig.topBarHeight,
@@ -195,7 +209,7 @@ export const MobileSessionPanelSheet = React.memo<MobileSessionPanelSheetProps>(
                                 </View>
                             )}
 
-                            {!previewingFile && (
+                            {showSheetChrome && (
                                 <View
                                     style={{
                                         backgroundColor: theme.colors.surface,
@@ -219,21 +233,45 @@ export const MobileSessionPanelSheet = React.memo<MobileSessionPanelSheetProps>(
                                 {renderContent()}
                             </View>
 
-                            {previewingFile && (
-                                <View
-                                    style={[
-                                        StyleSheet.absoluteFillObject,
-                                        { backgroundColor: theme.colors.surface },
-                                    ]}
-                                >
-                                    <SidePanelFilePreview
-                                        sessionId={sessionId}
-                                        filePath={previewingFile}
-                                        repoPath={previewingRepoPath ?? undefined}
-                                        onClose={handleClosePreview}
-                                    />
-                                </View>
-                            )}
+                            {openFilesStack.previewVisible &&
+                                openFilesStack.openFiles.length > 0 && (
+                                    <View
+                                        style={[
+                                            StyleSheet.absoluteFillObject,
+                                            { backgroundColor: theme.colors.surface },
+                                        ]}
+                                    >
+                                        <OpenFilesTabBar
+                                            files={openFilesStack.openFiles}
+                                            activeIndex={openFilesStack.activeIndex}
+                                            onTabPress={openFilesStack.pressTab}
+                                            onTabClose={openFilesStack.closeTab}
+                                            onAddFile={handleAddFile}
+                                        />
+                                        {/* All previews stay mounted — switching
+                                          * tabs is instant and each tab's mode /
+                                          * scroll state survives. */}
+                                        {openFilesStack.openFiles.map((file, index) => (
+                                            <View
+                                                key={file.filePath}
+                                                style={{
+                                                    flex: 1,
+                                                    display:
+                                                        index === openFilesStack.activeIndex
+                                                            ? "flex"
+                                                            : "none",
+                                                }}
+                                            >
+                                                <SidePanelFilePreview
+                                                    sessionId={sessionId}
+                                                    filePath={file.filePath}
+                                                    repoPath={file.repoPath}
+                                                    onClose={openFilesStack.minimize}
+                                                />
+                                            </View>
+                                        ))}
+                                    </View>
+                                )}
                         </View>
                     </View>
                 </Modal>

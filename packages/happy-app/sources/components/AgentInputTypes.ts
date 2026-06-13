@@ -1,3 +1,5 @@
+import type * as React from "react";
+
 import { PermissionMode, ModelMode } from "./PermissionModeSelector";
 import { Metadata } from "@/sync/storageTypes";
 import type { SessionRpcVisualState } from "@/utils/sessionRpcVisualState";
@@ -45,6 +47,14 @@ export interface AgentInputProps {
     placeholder: string;
     onChangeText: (text: string) => void;
     sessionId?: string;
+    /**
+     * Mutable ref slot the host fills with a callback that opens the
+     * embedded `@` file picker. Lets a chat-column overlay (e.g. the
+     * multi-file preview's "+" button) reopen the picker without the user
+     * having to tap the input's own file-browser button. Optional — when
+     * omitted, AgentInput simply doesn't expose the control.
+     */
+    openFilePickerRef?: React.MutableRefObject<(() => void) | null>;
     onSend: () => void;
     sendIcon?: React.ReactNode;
     onMicPress?: () => void;

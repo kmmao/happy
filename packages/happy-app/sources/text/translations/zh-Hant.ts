@@ -1342,6 +1342,8 @@ export const zhHant: TranslationStructure = {
     fileEmpty: "檔案為空",
     noChanges: "沒有要顯示的更改",
     refresh: "重新整理",
+    closeTab: "關閉標籤",
+    browseMore: "瀏覽更多檔案",
     // Browse mode strings
     browseTab: "瀏覽",
     changesTab: "變更",

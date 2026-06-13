@@ -11,7 +11,9 @@ import { GitIssuesTab } from "@/components/git/issues/GitIssuesTab";
 import { GitPRsTab } from "@/components/git/prs/GitPRsTab";
 import { GitRepoSelector } from "@/components/git/GitRepoSelector";
 import { GitBranchHeader } from "@/components/git/GitBranchHeader";
+import { OpenFilesTabBar } from "@/components/session/OpenFilesTabBar";
 import { SidePanelFilePreview } from "@/components/session/SidePanelFilePreview";
+import { useOpenFilesStack } from "@/components/session/useOpenFilesStack";
 import {
   useSessionGitStatus,
   useSessionProjectGitStatus,
@@ -35,8 +37,7 @@ export default React.memo(function GitScreen() {
   );
   const [isRepoSelectorExpanded, setIsRepoSelectorExpanded] =
     React.useState(false);
-  const [previewingFile, setPreviewingFile] = React.useState<string | null>(null);
-  const [previewingRepoPath, setPreviewingRepoPath] = React.useState<string | null>(null);
+  const openFilesStack = useOpenFilesStack();
   const { theme } = useUnistyles();
 
   const projectGitStatus = useSessionProjectGitStatus(sessionId);
@@ -124,17 +125,27 @@ export default React.memo(function GitScreen() {
     setIsRepoSelectorExpanded(true);
   }, []);
 
-  // Convert git-relative path to absolute path for file preview (with diff)
+  // Convert git-relative path to absolute path for file preview (with diff).
+  // Used by the Changes tab where files arrive as repo-relative paths.
   const handleFilePress = React.useCallback(
     (gitRelativePath: string, submodulePath?: string) => {
       const repoBase = submodulePath ?? selectedRepoPath;
       const basePath = repoBase
         ? `${sessionPath}/${repoBase}`
         : sessionPath;
-      setPreviewingFile(`${basePath}/${gitRelativePath}`);
-      setPreviewingRepoPath(basePath);
+      openFilesStack.openFile(`${basePath}/${gitRelativePath}`, basePath);
     },
-    [sessionPath, selectedRepoPath],
+    [sessionPath, selectedRepoPath, openFilesStack],
+  );
+
+  // GitBrowseTab already emits absolute paths from its tree-walk, so this
+  // handler skips the relative-to-absolute conversion. Repo path is omitted —
+  // SidePanelFilePreview falls back to the session root for diff lookup.
+  const handleBrowseFilePress = React.useCallback(
+    (absolutePath: string) => {
+      openFilesStack.openFile(absolutePath);
+    },
+    [openFilesStack],
   );
 
   return (
@@ -230,6 +241,7 @@ export default React.memo(function GitScreen() {
       >
         <GitBrowseTab
           sessionId={sessionId}
+          onFilePress={handleBrowseFilePress}
           onPullDown={hasSubmodules ? handlePullDown : undefined}
           onScrollUp={hasSubmodules ? handleScrollUp : undefined}
         />
@@ -302,27 +314,44 @@ export default React.memo(function GitScreen() {
         />
       </View>
 
-      {/* File preview overlay — sits on top so the underlying tabs (and the
-       * Browse tab's directory navigation state) stay mounted while the user
-       * is viewing a file, and survive closing the preview. */}
-      {previewingFile && (
-        <View
-          style={[
-            StyleSheet.absoluteFillObject,
-            { backgroundColor: theme.colors.surface },
-          ]}
-        >
-          <SidePanelFilePreview
-            sessionId={sessionId}
-            filePath={previewingFile}
-            repoPath={previewingRepoPath ?? undefined}
-            onClose={() => {
-              setPreviewingFile(null);
-              setPreviewingRepoPath(null);
-            }}
-          />
-        </View>
-      )}
+      {/* Multi-file preview overlay — sits on top so the underlying tabs (and
+       * the Browse tab's directory navigation state) stay mounted while the
+       * user is viewing files. The OpenFilesTabBar lets multiple files stay
+       * open across closing/reopening the overlay. */}
+      {openFilesStack.previewVisible &&
+        openFilesStack.openFiles.length > 0 && (
+          <View
+            style={[
+              StyleSheet.absoluteFillObject,
+              { backgroundColor: theme.colors.surface },
+            ]}
+          >
+            <OpenFilesTabBar
+              files={openFilesStack.openFiles}
+              activeIndex={openFilesStack.activeIndex}
+              onTabPress={openFilesStack.pressTab}
+              onTabClose={openFilesStack.closeTab}
+              onAddFile={openFilesStack.minimize}
+            />
+            {openFilesStack.openFiles.map((file, index) => (
+              <View
+                key={file.filePath}
+                style={{
+                  flex: 1,
+                  display:
+                    index === openFilesStack.activeIndex ? "flex" : "none",
+                }}
+              >
+                <SidePanelFilePreview
+                  sessionId={sessionId}
+                  filePath={file.filePath}
+                  repoPath={file.repoPath}
+                  onClose={openFilesStack.minimize}
+                />
+              </View>
+            ))}
+          </View>
+        )}
     </View>
   );
 });

@@ -1386,6 +1386,8 @@ export const pt: TranslationStructure = {
     fileEmpty: "Arquivo está vazio",
     noChanges: "Nenhuma alteração para exibir",
     refresh: "Atualizar",
+    closeTab: "Fechar aba",
+    browseMore: "Explorar mais arquivos",
     // Browse mode strings
     browseTab: "Explorar",
     changesTab: "Alterações",

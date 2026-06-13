@@ -113,6 +113,10 @@ import { isVersionSupported, MINIMUM_CLI_VERSION } from "@/utils/versionUtils";
 import { SessionSidePanel, SIDE_PANEL_MIN_WINDOW_WIDTH } from "@/components/session/SessionSidePanel";
 import { MobileSessionPanelSheet } from "@/components/session/MobileSessionPanelSheet";
 import { ResizableDivider, DIVIDER_WIDTH } from "@/components/session/ResizableDivider";
+import { FilePreviewContext } from "@/components/session/FilePreviewContext";
+import { OpenFilesTabBar } from "@/components/session/OpenFilesTabBar";
+import { SidePanelFilePreview } from "@/components/session/SidePanelFilePreview";
+import { useOpenFilesStack } from "@/components/session/useOpenFilesStack";
 import { useLayout } from "@/components/layout";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
@@ -741,6 +745,18 @@ function SessionViewInner({
   const safeArea = useSafeAreaInsets();
   const isLandscape = useIsLandscape();
   const deviceType = useDeviceType();
+  // Chat-column multi-file preview stack — independent of the side panel's
+  // own stack so opening a file from the @ picker doesn't fight with files
+  // browsed in the side panel. Provided via FilePreviewContext to AgentInput.
+  const filePreview = useOpenFilesStack();
+  // Ref bridge: AgentInput populates this with a function that opens its
+  // embedded `@` picker. The chat overlay's "+" button uses it to chain
+  // "minimize preview → reopen picker" without the user having to tap `@`.
+  const openFilePickerRef = React.useRef<(() => void) | null>(null);
+  const handleAddFile = React.useCallback(() => {
+    filePreview.minimize();
+    openFilePickerRef.current?.();
+  }, [filePreview]);
   const [message, setMessage] = React.useState("");
   const [pasteBlocks, setPasteBlocks] = React.useState<PasteBlock[]>([]);
   const [autoOptionSend, setAutoOptionSend] = React.useState(() =>
@@ -1926,6 +1942,7 @@ function SessionViewInner({
       <AgentInput
         placeholder={t("session.inputPlaceholder")}
         disabledPlaceholder={disabledInputPlaceholder}
+        openFilePickerRef={openFilePickerRef}
         value={message}
         onChangeText={setMessage}
         pasteBlocks={pasteBlocks}
@@ -2123,6 +2140,7 @@ function SessionViewInner({
     <>
     <OptionScoringMetaProvider value={autoOptionSend.candidate?.scoringMeta ?? null}>
     <InputContext.Provider value={inputContextValue}>
+    <FilePreviewContext.Provider value={filePreview}>
       {/* CLI Version Warning Overlay - Subtle centered pill */}
       {shouldShowCliWarning && !(isLandscape && deviceType === "phone") && (
         <Pressable
@@ -2304,6 +2322,56 @@ function SessionViewInner({
             onSaveAndSend={handleSaveAndSendQueuedEdit}
           />
         )}
+
+        {/* Multi-file preview overlay for the chat column. Mirrors the side
+          * panel's overlay but is driven by FilePreviewContext, so e.g. files
+          * tapped in AgentInput's `@` picker land here instead of the legacy
+          * /file deep-link route.
+          *
+          * The overlay leaves `agentInputHeight + 8` of room at the bottom so
+          * AgentInput stays visible — the user can keep drafting / paste /
+          * `@`-mention more files without dismissing the preview. Before the
+          * input has been measured, fall through to a full-screen overlay
+          * (covers nothing important, since no message has been drafted yet
+          * either). */}
+        {filePreview.previewVisible &&
+          filePreview.openFiles.length > 0 && (
+            <View
+              style={{
+                position: "absolute",
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: agentInputHeight > 0 ? agentInputHeight + 8 : 0,
+                backgroundColor: theme.colors.surface,
+              }}
+            >
+              <OpenFilesTabBar
+                files={filePreview.openFiles}
+                activeIndex={filePreview.activeIndex}
+                onTabPress={filePreview.pressTab}
+                onTabClose={filePreview.closeTab}
+                onAddFile={handleAddFile}
+              />
+              {filePreview.openFiles.map((file, index) => (
+                <View
+                  key={file.filePath}
+                  style={{
+                    flex: 1,
+                    display:
+                      index === filePreview.activeIndex ? "flex" : "none",
+                  }}
+                >
+                  <SidePanelFilePreview
+                    sessionId={sessionId}
+                    filePath={file.filePath}
+                    repoPath={file.repoPath}
+                    onClose={filePreview.minimize}
+                  />
+                </View>
+              ))}
+            </View>
+          )}
       </View>
 
       {/* Back button for landscape phone mode when header is hidden */}
@@ -2342,6 +2410,7 @@ function SessionViewInner({
           />
         </Pressable>
       )}
+    </FilePreviewContext.Provider>
     </InputContext.Provider>
     </OptionScoringMetaProvider>
     {showPermissionSheet && pendingPermission != null && (
