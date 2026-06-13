@@ -129,6 +129,16 @@ An event-driven Trigger with a custom URL slug and secret verification. Fires on
 A named AI backend configuration owned by an Account. Encrypted payload containing environment variables, startup scripts, and permission mode. Bound to Tasks, Projects, or Triggers to select which model/provider to use.
 _Avoid_: Profile, backend, config
 
+**Workflow**:
+The App-side IA primitive for "a thing the Account is asking Happy to do." A *view* over existing entities (not a database table) computed by `useWorkflows()`. Every Workflow has a kind:
+- **Ad-hoc Workflow** — backed by a single manual Session (no Trigger, no AgentLoop). Created implicitly the moment the Account runs `happy`.
+- **Scheduled Workflow** — centered on a `TriggerSchedule`; its Sessions are the Tasks-it-spawned-Sessions.
+- **Event-driven Workflow** — centered on a `WebhookTrigger`.
+- **Loop Workflow** — centered on an `AgentLoop` (either `role` variant); its Sessions are the loop's iteration Sessions, linked via `Session.metadata.automationContext.loopId`.
+
+The Sessions tab in the App is the Workflow list. Sessions still exist as the atomic conversation unit; Workflow is the **grouping** under which the user sees them. See `docs/plans/sessions-and-automation-ia.md` (promoted to accepted on the Workflow-IA rollout).
+_Avoid_: Job (collides with the Task state machine's internal terminology), Routine, Pipeline. Workflow is the user-facing word; Task is the per-execution row inside it.
+
 ## Relationships
 
 - An **Account** owns zero or more **Machines**, **Sessions**, **Projects**, and **AiBackendProfiles**

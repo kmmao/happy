@@ -39,7 +39,7 @@ export const pl: TranslationStructure = {
   tabs: {
     // Tab navigation labels
     inbox: "Skrzynka",
-    sessions: "Terminale",
+    sessions: "Przepływy pracy",
     project: "Projekt",
     openclaw: "OpenClaw",
     settings: "Ustawienia",

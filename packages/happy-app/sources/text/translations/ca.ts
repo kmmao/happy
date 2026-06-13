@@ -26,7 +26,7 @@ export const ca: TranslationStructure = {
   tabs: {
     // Tab navigation labels
     inbox: "Safata",
-    sessions: "Terminals",
+    sessions: "Fluxos de treball",
     project: "Projecte",
     openclaw: "OpenClaw",
     settings: "Configuració",

@@ -505,67 +505,15 @@ export default function RootLayout() {
           headerBackTitle: t("common.back"),
         }}
       />
+      {/* Workflow IA replaces the per-machine automation/loops/tasks/
+          trigger sub-pages — see docs/plans/sessions-and-automation-ia.md.
+          The single Workflow detail screen below handles every kind
+          (ad-hoc / scheduled / event / loop). */}
       <Stack.Screen
-        name="machine/[id]/tasks"
+        name="workflow/[id]"
         options={{
           headerShown: true,
-          headerTitle: t("tasks.title"),
-          headerBackTitle: t("common.back"),
-        }}
-      />
-      <Stack.Screen
-        name="machine/[id]/task/new"
-        options={{
-          headerShown: true,
-          headerTitle: t("tasks.newTask"),
-          headerBackTitle: t("common.back"),
-        }}
-      />
-      <Stack.Screen
-        name="machine/[id]/task/[taskId]"
-        options={{
-          headerShown: true,
-          headerTitle: t("tasks.title"),
-          headerBackTitle: t("common.back"),
-        }}
-      />
-      <Stack.Screen
-        name="machine/[id]/triggers"
-        options={{
-          headerShown: true,
-          headerTitle: t("triggers.title"),
-          headerBackTitle: t("common.back"),
-        }}
-      />
-      <Stack.Screen
-        name="machine/[id]/trigger-schedule/new"
-        options={{
-          headerShown: true,
-          headerTitle: t("triggers.createSchedule"),
-          headerBackTitle: t("common.back"),
-        }}
-      />
-      <Stack.Screen
-        name="machine/[id]/trigger-schedule/[triggerId]"
-        options={{
-          headerShown: true,
-          headerTitle: t("triggers.editSchedule"),
-          headerBackTitle: t("common.back"),
-        }}
-      />
-      <Stack.Screen
-        name="machine/[id]/webhook-trigger/new"
-        options={{
-          headerShown: true,
-          headerTitle: t("triggers.createWebhook"),
-          headerBackTitle: t("common.back"),
-        }}
-      />
-      <Stack.Screen
-        name="machine/[id]/webhook-trigger/[triggerId]"
-        options={{
-          headerShown: true,
-          headerTitle: t("triggers.editWebhook"),
+          headerTitle: "Workflow",
           headerBackTitle: t("common.back"),
         }}
       />

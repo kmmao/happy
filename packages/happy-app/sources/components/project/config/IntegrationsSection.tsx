@@ -110,17 +110,10 @@ export const IntegrationsSection = React.memo<Props>(({ project }) => {
                 </Pressable>
             )}
 
-            <View style={[styles.divider, { backgroundColor: theme.colors.divider }]} />
-            <Pressable
-                style={styles.triggerLink}
-                onPress={() => router.push(`/machine/${machineId}/triggers` as any)}
-            >
-                <Ionicons name="flash-outline" size={16} color={theme.colors.textSecondary} />
-                <Text style={[styles.triggerLinkText, { color: theme.colors.text }]}>
-                    {t("projectConfig.machineTriggers")}
-                </Text>
-                <Ionicons name="chevron-forward" size={16} color={theme.colors.textSecondary} />
-            </Pressable>
+            {/* Per-machine Triggers shortcut removed with the Workflow IA
+                migration (see docs/plans/sessions-and-automation-ia.md);
+                triggers now appear as Scheduled / Event Workflows in the
+                main Workflow list. */}
         </View>
     );
 });

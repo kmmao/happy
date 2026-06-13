@@ -26,7 +26,7 @@ export const it: TranslationStructure = {
   tabs: {
     // Tab navigation labels
     inbox: "Posta",
-    sessions: "Terminali",
+    sessions: "Flussi di lavoro",
     project: "Progetto",
     openclaw: "OpenClaw",
     settings: "Impostazioni",

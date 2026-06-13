@@ -17,7 +17,7 @@ import { useVisibleSessionListViewData } from "@/hooks/useVisibleSessionListView
 import { useIsTablet } from "@/utils/responsive";
 import { useRouter } from "expo-router";
 import { EmptySessionsTablet } from "./EmptySessionsTablet";
-import { SessionsList } from "./SessionsList";
+import { WorkflowList } from "./WorkflowList";
 import { FABWide } from "./FABWide";
 import { TabBar, TabType } from "./TabBar";
 import { InboxView } from "./InboxView";
@@ -362,10 +362,12 @@ export const MainView = React.memo(({ variant }: MainViewProps) => {
       );
     }
 
-    // Sessions list
+    // Workflow list (Phase 1 of the Workflow IA — see
+    // docs/plans/sessions-and-automation-ia.md). Tablet sidebar and phone
+    // tab both render the same WorkflowList so the IA stays consistent.
     return (
       <View style={styles.sidebarContentContainer}>
-        <SessionsList />
+        <WorkflowList />
       </View>
     );
   }

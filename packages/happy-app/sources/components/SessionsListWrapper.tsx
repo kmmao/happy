@@ -1,7 +1,7 @@
 import * as React from 'react';
 import { View } from 'react-native';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
-import { SessionsList } from './SessionsList';
+import { WorkflowList } from './WorkflowList';
 import { EmptyMainScreen } from './EmptyMainScreen';
 import { SharedStateView } from './SharedStateView';
 import { AgentsDashboard } from './AgentsDashboard';
@@ -41,6 +41,11 @@ const stylesheet = StyleSheet.create((theme) => ({
     },
 }));
 
+// Migrated to the Workflow IA (docs/plans/sessions-and-automation-ia.md):
+// the previous SessionsList is replaced by WorkflowList, which renders the
+// same Sessions but groups them under their owning Workflow (Ad-hoc /
+// Scheduled / Event / Loop). Empty/loading shapes are preserved so the
+// dashboard above and the empty-state below stay layout-stable.
 export const SessionsListWrapper = React.memo(() => {
     useUnistyles();
     const sessionListViewData = useVisibleSessionListViewData();
@@ -84,7 +89,7 @@ export const SessionsListWrapper = React.memo(() => {
         <View style={styles.container}>
             {shouldShowDashboard && <UpdateBanner />}
             {shouldShowDashboard && <AgentsDashboard sessions={activeSessions} />}
-            <SessionsList hideUpdateBanner={shouldShowDashboard} />
+            <WorkflowList hideUpdateBanner={shouldShowDashboard} />
         </View>
     );
 });

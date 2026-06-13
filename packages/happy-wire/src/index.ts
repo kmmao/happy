@@ -21,3 +21,4 @@ export * from './mcpRegistry';
 export * from './replayBuffer';
 export * from './spawnSession';
 export * from './previewTypes';
+export * from './sessionAdopt';

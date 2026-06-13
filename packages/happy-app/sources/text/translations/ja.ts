@@ -29,7 +29,7 @@ export const ja: TranslationStructure = {
   tabs: {
     // Tab navigation labels
     inbox: "受信トレイ",
-    sessions: "ターミナル",
+    sessions: "ワークフロー",
     project: "プロジェクト",
     openclaw: "OpenClaw",
     settings: "設定",

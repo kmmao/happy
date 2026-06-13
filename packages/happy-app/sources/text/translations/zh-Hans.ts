@@ -28,7 +28,7 @@ export const zhHans: TranslationStructure = {
   tabs: {
     // Tab navigation labels
     inbox: "收件箱",
-    sessions: "终端",
+    sessions: "工作流",
     project: "项目",
     openclaw: "OpenClaw",
     settings: "设置",
