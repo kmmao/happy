@@ -61,6 +61,10 @@ import {
   resolveProjectSessionTextBadges,
 } from "@/components/project/projectSessionBadges";
 import { SharedGroupHeader } from "./SharedGroupHeader";
+import {
+  useWebHoverProps,
+  webInteractive,
+} from "@/utils/interactiveSurface";
 
 const stylesheet = StyleSheet.create((theme, runtime) => ({
   container: {
@@ -129,10 +133,17 @@ const stylesheet = StyleSheet.create((theme, runtime) => ({
     paddingHorizontal: 14,
     paddingVertical: 12,
     backgroundColor: theme.colors.surface,
+    // Web cursor + transition; no-op on native.
+    ...webInteractive,
   },
   sessionRowWithBorder: {
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: theme.colors.divider,
+  },
+  sessionRowHovered: {
+    // Subtle lift only — compact rows are dense so a strong hover would
+    // shimmer as the cursor sweeps the list.
+    backgroundColor: theme.colors.surfaceHigh,
   },
   sessionRowSelected: {
     backgroundColor: theme.colors.surfaceSelected,
@@ -746,12 +757,17 @@ const CompactSessionRow = React.memo(
       [machine?.metadata?.displayName, session],
     );
 
+    const { isHovered, hoverProps } = useWebHoverProps();
+
     const itemContent = (
       <View>
         <Pressable
+          {...hoverProps}
           style={[
             styles.sessionRow,
             showBorder && styles.sessionRowWithBorder,
+            // selected wins over hover — keep the active-route cue stable.
+            isHovered && !selected && styles.sessionRowHovered,
             selected && styles.sessionRowSelected,
           ]}
           onPressIn={() => {

@@ -22,6 +22,13 @@ import { fetchTriggerSchedules } from "@/sync/apiTriggerSchedules";
 import { fetchWebhookTriggers } from "@/sync/apiWebhookTriggers";
 import { TokenStorage } from "@/auth/tokenStorage";
 import { sync } from "@/sync/sync";
+import { useThrottledCallback } from "@/hooks/useThrottledCallback";
+import {
+    interactiveWebPressScaleSubtle,
+    useWebHoverProps,
+    webInteractive,
+} from "@/utils/interactiveSurface";
+import { AUTOMATION_SUMMARY_THROTTLE_MS } from "./automationConstants";
 import {
     formatRate,
     getGuardianStateLabel,
@@ -605,21 +612,37 @@ function GridCard({
     onPress: () => void;
 }) {
     const { theme } = useUnistyles();
+    const { isHovered, hoverProps } = useWebHoverProps();
     const hasActiveMetric = card.metrics?.some((m) => m.value > 0) ?? false;
+
+    // Card lifts visually as hover/press deepens the surface tone:
+    //   default → surfaceHigh, hovered → surfaceHighest, pressed → surfacePressed.
+    // Active-metric border (primary tint) is preserved at every state so the
+    // "this card has something happening" cue doesn't disappear during press.
+    const backgroundColor = isHovered
+        ? theme.colors.surfaceHighest
+        : theme.colors.surfaceHigh;
+    const borderColor = hasActiveMetric
+        ? theme.colors.primary + "33"
+        : theme.colors.divider;
 
     return (
         <Pressable
-            style={({ pressed }) => ({
-                flex: 1,
-                borderRadius: 12,
-                borderWidth: 1,
-                padding: 12,
-                gap: 6,
-                backgroundColor: theme.colors.surfaceHigh,
-                borderColor: hasActiveMetric ? theme.colors.primary + "33" : theme.colors.divider,
-                opacity: pressed ? 0.75 : 1,
-            })}
+            {...hoverProps}
             onPress={onPress}
+            style={({ pressed }) => [
+                {
+                    flex: 1,
+                    borderRadius: 12,
+                    borderWidth: 1,
+                    padding: 12,
+                    gap: 6,
+                    backgroundColor: pressed ? theme.colors.surfacePressed : backgroundColor,
+                    borderColor,
+                },
+                webInteractive,
+                pressed && interactiveWebPressScaleSubtle,
+            ]}
         >
             <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
                 <View
@@ -706,6 +729,10 @@ export function useAutomationSummaryCounts(machineId: string): SummaryCounts {
             .catch(() => {});
     }, [machineId]);
 
+    // Mount fetch is immediate; subsequent task-status events for this
+    // machine are throttled into a single trailing fetch per window.
+    const throttledLoad = useThrottledCallback(load, AUTOMATION_SUMMARY_THROTTLE_MS);
+
     React.useEffect(() => {
         void load();
     }, [load]);
@@ -713,9 +740,9 @@ export function useAutomationSummaryCounts(machineId: string): SummaryCounts {
     React.useEffect(() => {
         return sync.onTaskStatusChanged((event) => {
             if (event.machineId && event.machineId !== machineId) return;
-            void load();
+            throttledLoad();
         });
-    }, [machineId, load]);
+    }, [machineId, throttledLoad]);
 
     return { activeTaskCount, triggerCount };
 }

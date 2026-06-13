@@ -57,6 +57,10 @@ import {
 import { useAutoOptionSendEnabled } from "@/hooks/useAutoOptionSendEnabled";
 import { SessionProviderTag } from "@/components/session/SessionProviderTag";
 import { SharedGroupHeader } from "./SharedGroupHeader";
+import {
+  useWebHoverProps,
+  webInteractive,
+} from "@/utils/interactiveSurface";
 
 const stylesheet = StyleSheet.create((theme, runtime) => ({
   container: {
@@ -127,6 +131,13 @@ const stylesheet = StyleSheet.create((theme, runtime) => ({
     paddingHorizontal: 16,
     paddingVertical: 10,
     backgroundColor: theme.colors.surface,
+    // Web cursor + transition; no-op on native.
+    ...webInteractive,
+  },
+  sessionRowHovered: {
+    // Subtle lift only — active sessions are visited frequently so
+    // strong hover shading would feel noisy as the cursor sweeps over them.
+    backgroundColor: theme.colors.surfaceHigh,
   },
   sessionTopRow: {
     flexDirection: "row",
@@ -737,13 +748,18 @@ const CompactSessionRow = React.memo(
     }, [session]);
 
     const latestRequestPreview = session.latestUserRequestPreview;
+    const { isHovered, hoverProps } = useWebHoverProps();
 
     const itemContent = (
       <View>
         <Pressable
+          {...hoverProps}
           style={[
             styles.sessionRow,
             showBorder && styles.sessionRowWithBorder,
+            // selected wins over hover — keeps the active-route cue stable
+            // while the cursor visits sibling rows.
+            isHovered && !selected && styles.sessionRowHovered,
             selected && styles.sessionRowSelected,
           ]}
           onPressIn={() => {

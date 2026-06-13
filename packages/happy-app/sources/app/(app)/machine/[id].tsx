@@ -45,7 +45,6 @@ import {
 } from "@/components/MultiTextInput";
 import { NetworkServicesSummaryItem } from "@/components/machine/NetworkServicesSection";
 import { MachineNavigationSummaryItem } from "@/components/machine/MachineNavigationSummaryItem";
-import { AutomationGridSection, AutomationGroupTitle, useAutomationSummaryCounts } from "@/components/machine/AutomationSummarySection";
 import { SessionProviderTag } from "@/components/session/SessionProviderTag";
 
 const styles = StyleSheet.create((theme) => ({
@@ -169,7 +168,6 @@ function MachineDetailScreen() {
   const router = useRouter();
   const sessions = useSessions();
   const machine = useMachine(machineId!);
-  const automationSummaryCounts = useAutomationSummaryCounts(machineId ?? "");
   const navigateToSession = useNavigateToSession();
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isStoppingDaemon, setIsStoppingDaemon] = useState(false);
@@ -616,10 +614,6 @@ function MachineDetailScreen() {
               )}
             </View>
           </View>
-        </ItemGroup>
-
-        <ItemGroup title={<AutomationGroupTitle machine={machine} label={t("machine.automation")} activeTaskCount={automationSummaryCounts.activeTaskCount} />}>
-          <AutomationGridSection machine={machine} machineId={machineId} summaryCounts={automationSummaryCounts} />
         </ItemGroup>
 
         {/* Network Services */}

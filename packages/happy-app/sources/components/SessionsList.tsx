@@ -67,6 +67,11 @@ import {
   resolveProjectSessionTextBadges,
 } from "@/components/project/projectSessionBadges";
 import { SharedGroupHeader } from "./SharedGroupHeader";
+import { SessionsAutomationHeader } from "./machine/SessionsAutomationHeader";
+import {
+  useWebHoverProps,
+  webInteractive,
+} from "@/utils/interactiveSurface";
 
 const stylesheet = StyleSheet.create((theme, rt) => ({
   container: {
@@ -116,6 +121,13 @@ const stylesheet = StyleSheet.create((theme, rt) => ({
     paddingHorizontal: 14,
     paddingVertical: 12,
     backgroundColor: theme.colors.surface,
+    // Cursor + smooth bg transition on web; native ignores it.
+    ...webInteractive,
+  },
+  sessionItemHovered: {
+    // Subtle lift only — list rows live in a dense column so a strong
+    // hover would flicker as the cursor sweeps across the list.
+    backgroundColor: theme.colors.surfaceHigh,
   },
   sessionTopRow: {
     flexDirection: "row",
@@ -593,6 +605,7 @@ export function SessionsList({ hideUpdateBanner }: SessionsListProps = {}) {
     return (
       <>
         {!hideUpdateBanner && <UpdateBanner />}
+        <SessionsAutomationHeader />
         {allTags.length > 0 && (
           <ScrollView
             horizontal
@@ -873,11 +886,17 @@ const SessionItem = React.memo(
       [machine?.metadata?.displayName, session],
     );
 
+    const { isHovered, hoverProps } = useWebHoverProps();
+
     const itemContent = (
       <View>
         <Pressable
+          {...hoverProps}
           style={({ pressed }) => [
             styles.sessionItem,
+            // selected wins over hover — keeps the "this is the route" cue
+            // stable while the cursor visits other rows on tablet/web.
+            isHovered && !selected && styles.sessionItemHovered,
             selected && styles.sessionItemSelected,
             isSingle
               ? styles.sessionItemSingle

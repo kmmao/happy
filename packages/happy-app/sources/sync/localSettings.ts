@@ -72,6 +72,12 @@ export const LocalSettingsSchema = z.object({
   appLockBiometricEnabled: z
     .boolean()
     .describe("Allow Face ID / Touch ID / fingerprint to unlock instead of the PIN"),
+  // Sessions list — collapse the automation header per machine
+  sessionsAutomationCollapsed: z
+    .boolean()
+    .describe(
+      "Whether the per-machine automation header on the sessions list is collapsed",
+    ),
 });
 
 //
@@ -106,6 +112,7 @@ export const localSettingsDefaults: LocalSettings = {
   appLockEnabled: false,
   appLockTimeout: "immediate",
   appLockBiometricEnabled: false,
+  sessionsAutomationCollapsed: false,
 };
 Object.freeze(localSettingsDefaults);
 

@@ -364,9 +364,15 @@ async function reduceNotifications(
 }
 
 describe("Codex raw notification → client → mapper → happy-app chain", () => {
+    // loadCodexModules() runs `yarn workspace @kmmao/happy-coder build` and
+    // then evaluates the built runCodex bundle. The build alone can take
+    // 7–10s solo and routinely tips over vitest's default 10s hookTimeout
+    // when the suite is scheduled alongside others competing for CPU. Bump
+    // the timeout to 60s — generous headroom over the actual cost so the
+    // test stays stable under contention without hiding genuine hangs.
     beforeAll(async () => {
         await loadCodexModules();
-    });
+    }, 60_000);
 
     beforeEach(() => {
         vi.clearAllMocks();

@@ -16,6 +16,10 @@ import { Modal } from "@/modal";
 import { t } from "@/text";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { log } from '@/log';
+import {
+  useWebHoverProps,
+  webInteractive,
+} from "@/utils/interactiveSurface";
 
 export interface ItemProps {
   title: string;
@@ -112,6 +116,8 @@ const stylesheet = StyleSheet.create((theme, runtime) => ({
 export const Item = React.memo<ItemProps>((props) => {
   const { theme } = useUnistyles();
   const styles = stylesheet;
+  // Hook order must stay stable; we read isHovered conditionally below.
+  const { isHovered, hoverProps } = useWebHoverProps();
 
   // Platform-specific measurements
   const isIOS = Platform.OS === "ios";
@@ -316,19 +322,30 @@ export const Item = React.memo<ItemProps>((props) => {
   );
 
   if (isInteractive) {
+    // Web hover only fires when the row is genuinely actionable; ignore
+    // hover on disabled/loading rows so a faded item doesn't gain
+    // background highlight that contradicts its disabled state.
+    const showWebHover = isWeb && isHovered && !disabled && !loading;
     return (
       <Pressable
+        {...hoverProps}
         onPress={handlePress}
         onLongPress={onLongPress}
         onPressIn={handlePressIn}
         onPressOut={handlePressOut}
         disabled={disabled || loading}
         style={({ pressed }) => [
+          // webInteractive only ships cursor + transition on web; on iOS /
+          // Android it's `null` and spreads to nothing, so the existing
+          // press behavior (iOS overlay, Android ripple) is untouched.
+          isWeb && webInteractive,
           {
             backgroundColor:
               pressed && isIOS && !isWeb
                 ? theme.colors.surfacePressedOverlay
-                : "transparent",
+                : showWebHover
+                  ? theme.colors.surfaceHigh
+                  : "transparent",
             opacity: disabled ? 0.5 : 1,
           },
           pressableStyle,

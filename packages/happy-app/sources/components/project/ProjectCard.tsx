@@ -9,6 +9,10 @@ import {
 } from "@/sync/projectManager";
 import { formatPathRelativeToHome } from "@/utils/sessionUtils";
 import { t } from "@/text";
+import {
+    useWebHoverProps,
+    webInteractive,
+} from "@/utils/interactiveSurface";
 
 interface ProjectCardProps {
     project: Project;
@@ -19,6 +23,7 @@ interface ProjectCardProps {
 
 export const ProjectCard = React.memo(({ project, onPress, onLongPress, showDivider }: ProjectCardProps) => {
     const { theme } = useUnistyles();
+    const { isHovered, hoverProps } = useWebHoverProps();
 
     const displayName = getProjectDisplayName(project);
     const sessionCount = project.sessionIds.length;
@@ -55,12 +60,14 @@ export const ProjectCard = React.memo(({ project, onPress, onLongPress, showDivi
 
     return (
         <Pressable
+            {...hoverProps}
             onPress={onPress}
             onLongPress={onLongPress}
             accessibilityRole="button"
             style={({ pressed }) => [
                 styles.container,
                 showDivider && styles.containerDivider,
+                isHovered && styles.containerHovered,
                 pressed && styles.containerPressed,
             ]}
         >
@@ -145,6 +152,13 @@ const styles = StyleSheet.create((theme) => ({
         paddingHorizontal: 14,
         paddingVertical: 12,
         backgroundColor: theme.colors.surface,
+        // Web cursor + transition; no-op on native.
+        ...webInteractive,
+    },
+    containerHovered: {
+        // Subtle lift only — project list is browsed at the same density as
+        // SessionItem, keep the visual language identical.
+        backgroundColor: theme.colors.surfaceHigh,
     },
     containerPressed: {
         backgroundColor: theme.colors.surfacePressedOverlay,

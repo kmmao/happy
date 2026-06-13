@@ -306,3 +306,13 @@ The `cross-env` package ensures this works cross-platform:
 ```
 
 Cross-platform via `cross-env` - works identically on Windows, macOS, and Linux!
+
+## UI patterns
+
+In-depth guides for app-specific UI conventions live under `docs/`:
+
+- **[Web interactive surfaces](./docs/web-interactive-surfaces.md)** —
+  how every clickable thing (chip, card, row, button) gets consistent
+  hover / press / scale feedback on web with zero overhead on native.
+  Read this before adding a new `Pressable`.
+
