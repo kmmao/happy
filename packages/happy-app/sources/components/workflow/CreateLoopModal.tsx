@@ -238,20 +238,37 @@ export const CreateLoopModal = React.memo(function CreateLoopModal({
     const [advancedOpen, setAdvancedOpen] = React.useState(false);
     const [submitting, setSubmitting] = React.useState(false);
 
-    // Reset form on each open. We don't pre-pick the project until the
-    // machine settles (avoids flicker on first paint).
+    // Reset form state only on a fresh open (false → true transition).
+    // Without the ref guard, the effect re-fires whenever `machines`
+    // changes — which happens every ~60s from machine heartbeats — and
+    // wipes everything the user has typed mid-edit. The auto machine-
+    // pick below picks up the slack when machines load after the modal
+    // is already open.
+    const wasVisible = React.useRef(visible);
+    React.useEffect(() => {
+        if (visible && !wasVisible.current) {
+            setPickedMachineId(machines[0]?.id ?? "");
+            setPickedProjectServerId("");
+            setPrompt("");
+            setName("");
+            setSchedule("1h");
+            setCronExpression("*/30 * * * *");
+            setAgent("claude");
+            setAdvancedOpen(false);
+            setSubmitting(false);
+        }
+        wasVisible.current = visible;
+    });
+
+    // Best-effort auto-pick when the modal was opened before machines
+    // arrived. Only fires when there's no pick yet.
     React.useEffect(() => {
         if (!visible) return;
-        setPickedMachineId(machines[0]?.id ?? "");
-        setPickedProjectServerId("");
-        setPrompt("");
-        setName("");
-        setSchedule("1h");
-        setCronExpression("*/30 * * * *");
-        setAgent("claude");
-        setAdvancedOpen(false);
-        setSubmitting(false);
-    }, [visible, machines]);
+        if (pickedMachineId) return;
+        if (machines.length > 0) {
+            setPickedMachineId(machines[0].id);
+        }
+    }, [visible, machines, pickedMachineId]);
 
     // Projects on this machine that have been synced to the server.
     // We can only create loops against `serverId`-known projects — local-

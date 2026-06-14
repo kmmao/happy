@@ -143,7 +143,7 @@ export const zhHans: TranslationStructure = {
     webhookSourceGithubPrompt: "GitHub 触发了事件。检查 $ISSUE_TITLE / $ISSUE_BODY / $REPO_PATH 并作出响应。",
     webhookSourceLinearPrompt: "Linear 上 issue 有更新。用 JSON body 做分类并跟进。",
     webhookSourceZapierPrompt: "Zapier 转发了一个事件。解析 JSON body 后处理。",
-    webhookSlugHelper: "拼到 /v1/triggers/ 后面的 URL 片段。例：github-push。",
+    webhookSlugHelper: "给这个 webhook 起个唯一名字 — 按用途填就行（github-push、nightly-deploy、ci-failed）。会拼成 URL：/v1/triggers/<slug>。",
     webhookNameHelper: "工作流列表里这一行的标题。留空时使用 slug。",
     webhookPromptHelper: "每次 webhook 触发时执行的内容。$ISSUE_TITLE / $ISSUE_BODY / $REPO_PATH 等变量会被注入。",
     loopModalTitle: "创建循环",

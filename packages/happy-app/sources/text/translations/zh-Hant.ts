@@ -143,7 +143,7 @@ export const zhHant: TranslationStructure = {
     webhookSourceGithubPrompt: "GitHub 觸發了事件。檢查 $ISSUE_TITLE / $ISSUE_BODY / $REPO_PATH 並作出回應。",
     webhookSourceLinearPrompt: "Linear 上 issue 有更新。用 JSON body 做分類並跟進。",
     webhookSourceZapierPrompt: "Zapier 轉發了一個事件。解析 JSON body 後處理。",
-    webhookSlugHelper: "拼到 /v1/triggers/ 後面的 URL 片段。例：github-push。",
+    webhookSlugHelper: "給這個 webhook 起個唯一名字 — 按用途填就行（github-push、nightly-deploy、ci-failed）。會拼成 URL：/v1/triggers/<slug>。",
     webhookNameHelper: "工作流程清單裡這一行的標題。留空時使用 slug。",
     webhookPromptHelper: "每次 webhook 觸發時執行的內容。$ISSUE_TITLE / $ISSUE_BODY / $REPO_PATH 等變數會被注入。",
     loopModalTitle: "建立循環",

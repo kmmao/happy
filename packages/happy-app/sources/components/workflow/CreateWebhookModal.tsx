@@ -310,18 +310,38 @@ export const CreateWebhookModal = React.memo(function CreateWebhookModal({
     // the user is free to keep editing afterwards.
     const [pickedSource, setPickedSource] = React.useState<SourcePresetKey | null>(null);
 
+    // Reset form state only on a fresh open (false → true transition).
+    // Without the ref guard, the effect re-fires whenever `machines`
+    // changes — which happens every ~60s from machine heartbeats — and
+    // wipes everything the user has typed mid-edit. The auto machine-
+    // pick below picks up the slack when machines load after the modal
+    // is already open.
+    const wasVisible = React.useRef(visible);
+    React.useEffect(() => {
+        if (visible && !wasVisible.current) {
+            setPickedMachineId(machines[0]?.id ?? "");
+            setSlugRaw("");
+            setPrompt("");
+            setName("");
+            setSubmitting(false);
+            setCreatedSecret(null);
+            setCreatedSlug(null);
+            setFlowOpen(false);
+            setPickedSource(null);
+        }
+        wasVisible.current = visible;
+    });
+
+    // Best-effort auto-pick when the modal was opened before the
+    // machines list arrived. Only fires when there's no pick yet so it
+    // never overrides a user choice.
     React.useEffect(() => {
         if (!visible) return;
-        setPickedMachineId(machines[0]?.id ?? "");
-        setSlugRaw("");
-        setPrompt("");
-        setName("");
-        setSubmitting(false);
-        setCreatedSecret(null);
-        setCreatedSlug(null);
-        setFlowOpen(false);
-        setPickedSource(null);
-    }, [visible, machines]);
+        if (pickedMachineId) return;
+        if (machines.length > 0) {
+            setPickedMachineId(machines[0].id);
+        }
+    }, [visible, machines, pickedMachineId]);
 
     const handlePickSource = React.useCallback(
         (preset: SourcePreset) => {

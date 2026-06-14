@@ -145,7 +145,7 @@ export const ja: TranslationStructure = {
     webhookSourceGithubPrompt: "A GitHub event just fired. Inspect $ISSUE_TITLE / $ISSUE_BODY / $REPO_PATH and respond.",
     webhookSourceLinearPrompt: "A Linear issue changed. Use the JSON body to triage and follow up.",
     webhookSourceZapierPrompt: "Zapier forwarded an event. Parse the JSON body and act on it.",
-    webhookSlugHelper: "URL fragment under /v1/triggers/. Example: github-push.",
+    webhookSlugHelper: "A unique name for this webhook — pick whatever describes its use (github-push, nightly-deploy, ci-failed). It becomes the URL: /v1/triggers/<slug>.",
     webhookNameHelper: "Title shown on the Workflow list row. Defaults to the slug if empty.",
     webhookPromptHelper: "What to run each time the webhook fires. Variables like $ISSUE_TITLE / $ISSUE_BODY / $REPO_PATH are injected.",
     loopModalTitle: "Create a Loop",
