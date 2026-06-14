@@ -34,6 +34,21 @@ export const zhHant: TranslationStructure = {
     settings: "設定",
   },
 
+  workflows: {
+    kindAdhoc: "臨時",
+    kindScheduled: "定時",
+    kindEvent: "事件",
+    kindLoop: "循環",
+    filterAll: "全部",
+    kindAdhocLabel: "臨時工作流",
+    kindScheduledLabel: "定時工作流",
+    kindEventLabel: "事件驅動工作流",
+    kindLoopLabel: "循環工作流",
+    emptyTitle: "尚無工作流",
+    emptyDescription: "在你的機器上執行 `happy` 開始一個會話",
+    cliLocal: "CLI-local",
+  },
+
   inbox: {
     emptyTitle: "空收件匣",
     emptyDescription: "暫無通知",

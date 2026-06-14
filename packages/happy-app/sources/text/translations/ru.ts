@@ -45,6 +45,21 @@ export const ru: TranslationStructure = {
     settings: "Настройки",
   },
 
+  workflows: {
+    kindAdhoc: "Ad-hoc",
+    kindScheduled: "Scheduled",
+    kindEvent: "Event",
+    kindLoop: "Loop",
+    filterAll: "All",
+    kindAdhocLabel: "Ad-hoc workflow",
+    kindScheduledLabel: "Scheduled workflow",
+    kindEventLabel: "Event-driven workflow",
+    kindLoopLabel: "Loop workflow",
+    emptyTitle: "No workflows yet",
+    emptyDescription: "Run `happy` on your Machine to start a conversation",
+    cliLocal: "CLI-local",
+  },
+
   inbox: {
     emptyTitle: "Пустой ящик",
     emptyDescription: "Уведомлений пока нет",

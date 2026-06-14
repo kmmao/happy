@@ -27,6 +27,7 @@ import { SharedStateView } from "@/components/SharedStateView";
 import { formatLastSeen, getSessionName } from "@/utils/sessionUtils";
 import { useMachine } from "@/sync/storage";
 import { MakeRecurringModal } from "@/components/workflow/MakeRecurringModal";
+import { t } from "@/text";
 
 const styles = StyleSheet.create((theme) => ({
     container: {
@@ -71,12 +72,13 @@ const styles = StyleSheet.create((theme) => ({
 const KIND_META: Record<Workflow["kind"], {
     icon: React.ComponentProps<typeof Ionicons>["name"];
     color: string;
-    label: string;
+    /** Translation key under `workflows.*` for the kind's long label */
+    labelKey: "kindAdhocLabel" | "kindScheduledLabel" | "kindEventLabel" | "kindLoopLabel";
 }> = {
-    adhoc: { icon: "chatbubble-ellipses-outline", color: "#8E8E93", label: "Ad-hoc workflow" },
-    scheduled: { icon: "timer-outline", color: "#34C759", label: "Scheduled workflow" },
-    event: { icon: "flash-outline", color: "#0A84FF", label: "Event-driven workflow" },
-    loop: { icon: "repeat-outline", color: "#BF5AF2", label: "Loop workflow" },
+    adhoc: { icon: "chatbubble-ellipses-outline", color: "#8E8E93", labelKey: "kindAdhocLabel" },
+    scheduled: { icon: "timer-outline", color: "#34C759", labelKey: "kindScheduledLabel" },
+    event: { icon: "flash-outline", color: "#0A84FF", labelKey: "kindEventLabel" },
+    loop: { icon: "repeat-outline", color: "#BF5AF2", labelKey: "kindLoopLabel" },
 };
 
 export default function WorkflowDetailScreen() {
@@ -98,8 +100,8 @@ export default function WorkflowDetailScreen() {
     if (loading && !workflow) {
         return (
             <View style={styles.container}>
-                <Stack.Screen options={{ headerTitle: "Workflow" }} />
-                <SharedStateView kind="loading" title="Loading workflow…" />
+                <Stack.Screen options={{ headerTitle: t("tabs.sessions") }} />
+                <SharedStateView kind="loading" title={t("common.loading")} />
             </View>
         );
     }
@@ -107,22 +109,28 @@ export default function WorkflowDetailScreen() {
     if (!workflow) {
         return (
             <View style={styles.container}>
-                <Stack.Screen options={{ headerTitle: "Workflow" }} />
+                <Stack.Screen options={{ headerTitle: t("tabs.sessions") }} />
                 <SharedStateView
                     kind="empty"
-                    title="Workflow not found"
-                    description="It may have been deleted or archived."
+                    title={t("workflows.emptyTitle")}
+                    description={t("workflows.emptyDescription")}
                 />
             </View>
         );
     }
 
     const meta = KIND_META[workflow.kind];
+    // Use an explicit switch so TS validates each translation key literally.
+    const metaLabel =
+        workflow.kind === "adhoc" ? t("workflows.kindAdhocLabel")
+        : workflow.kind === "scheduled" ? t("workflows.kindScheduledLabel")
+        : workflow.kind === "event" ? t("workflows.kindEventLabel")
+        : t("workflows.kindLoopLabel");
     const machineLabel = machine?.metadata?.displayName || machine?.metadata?.host || workflow.machineId;
 
     return (
         <View style={styles.container}>
-            <Stack.Screen options={{ headerTitle: meta.label, headerBackTitle: "Back" }} />
+            <Stack.Screen options={{ headerTitle: metaLabel, headerBackTitle: t("common.back") }} />
             <ScrollView contentContainerStyle={{ paddingBottom: 64 }}>
                 <View style={styles.headerBlock}>
                     <View style={styles.headerRow}>
@@ -132,7 +140,7 @@ export default function WorkflowDetailScreen() {
                         <View style={styles.headerText}>
                             <Text style={styles.title} numberOfLines={3}>{workflow.displayName}</Text>
                             <Text style={styles.subtitle} numberOfLines={2}>
-                                {meta.label} · {machineLabel} · last activity {formatLastSeen(workflow.lastActivityAt, false)}
+                                {metaLabel} · {machineLabel} · last activity {formatLastSeen(workflow.lastActivityAt, false)}
                             </Text>
                         </View>
                     </View>

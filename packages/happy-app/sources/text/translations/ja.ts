@@ -35,6 +35,21 @@ export const ja: TranslationStructure = {
     settings: "設定",
   },
 
+  workflows: {
+    kindAdhoc: "Ad-hoc",
+    kindScheduled: "Scheduled",
+    kindEvent: "Event",
+    kindLoop: "Loop",
+    filterAll: "All",
+    kindAdhocLabel: "Ad-hoc workflow",
+    kindScheduledLabel: "Scheduled workflow",
+    kindEventLabel: "Event-driven workflow",
+    kindLoopLabel: "Loop workflow",
+    emptyTitle: "No workflows yet",
+    emptyDescription: "Run `happy` on your Machine to start a conversation",
+    cliLocal: "CLI-local",
+  },
+
   inbox: {
     emptyTitle: "受信トレイが空です",
     emptyDescription: "まだ通知はありません",

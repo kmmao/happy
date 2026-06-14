@@ -513,7 +513,10 @@ export default function RootLayout() {
         name="workflow/[id]"
         options={{
           headerShown: true,
-          headerTitle: "Workflow",
+          // Header title is set per-instance by WorkflowDetailScreen (kind-
+          // specific label); use tabs.sessions as the fallback when the
+          // screen mounts before useWorkflows resolves.
+          headerTitle: t("tabs.sessions"),
           headerBackTitle: t("common.back"),
         }}
       />

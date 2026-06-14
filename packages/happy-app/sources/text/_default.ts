@@ -32,6 +32,28 @@ export const en = {
     settings: "Settings",
   },
 
+  workflows: {
+    // Workflow IA — see docs/plans/sessions-and-automation-ia.md
+    // Kind labels (used in list rows, filter chips, and detail page header).
+    // English uses "Ad-hoc" (Latin "for this purpose", established term in
+    // automation tooling); zh translates to "临时" for clarity.
+    kindAdhoc: "Ad-hoc",
+    kindScheduled: "Scheduled",
+    kindEvent: "Event",
+    kindLoop: "Loop",
+    // Filter chip "All"
+    filterAll: "All",
+    // Detail page kind label (longer)
+    kindAdhocLabel: "Ad-hoc workflow",
+    kindScheduledLabel: "Scheduled workflow",
+    kindEventLabel: "Event-driven workflow",
+    kindLoopLabel: "Loop workflow",
+    // Generic strings
+    emptyTitle: "No workflows yet",
+    emptyDescription: "Run `happy` on your Machine to start a conversation",
+    cliLocal: "CLI-local",
+  },
+
   inbox: {
     // Inbox screen
     emptyTitle: "Empty Inbox",

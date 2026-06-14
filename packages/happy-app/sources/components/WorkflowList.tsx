@@ -46,11 +46,11 @@ import { t } from "@/text";
 import type { Session } from "@/sync/storageTypes";
 
 const FILTER_VALUES: ReadonlyArray<{ key: "all" | WorkflowKind; label: () => string }> = [
-    { key: "all", label: () => "All" },
-    { key: "adhoc", label: () => "Ad-hoc" },
-    { key: "scheduled", label: () => "Scheduled" },
-    { key: "event", label: () => "Event" },
-    { key: "loop", label: () => "Loop" },
+    { key: "all", label: () => t("workflows.filterAll") },
+    { key: "adhoc", label: () => t("workflows.kindAdhoc") },
+    { key: "scheduled", label: () => t("workflows.kindScheduled") },
+    { key: "event", label: () => t("workflows.kindEvent") },
+    { key: "loop", label: () => t("workflows.kindLoop") },
 ];
 
 const KIND_ICON: Record<WorkflowKind, React.ComponentProps<typeof Ionicons>["name"]> = {
@@ -300,8 +300,8 @@ export const WorkflowList = React.memo<WorkflowListProps>(function WorkflowList(
             <View style={styles.container}>
                 <SharedStateView
                     kind="empty"
-                    title="No workflows yet"
-                    description={"Run `happy` on your Machine to start a conversation"}
+                    title={t("workflows.emptyTitle")}
+                    description={t("workflows.emptyDescription")}
                 />
             </View>
         );
@@ -354,10 +354,10 @@ const WorkflowRow = React.memo(function WorkflowRow({
 
     const kindLabel = React.useMemo(() => {
         switch (workflow.kind) {
-            case "adhoc": return "Ad-hoc";
-            case "scheduled": return "Scheduled";
-            case "event": return "Event";
-            case "loop": return "Loop";
+            case "adhoc": return t("workflows.kindAdhoc");
+            case "scheduled": return t("workflows.kindScheduled");
+            case "event": return t("workflows.kindEvent");
+            case "loop": return t("workflows.kindLoop");
         }
     }, [workflow.kind]);
 
@@ -426,7 +426,7 @@ const WorkflowRow = React.memo(function WorkflowRow({
                                     size={10}
                                     color={theme.colors.warning}
                                 />
-                                <Text style={styles.cliLocalTagText}>CLI-local</Text>
+                                <Text style={styles.cliLocalTagText}>{t("workflows.cliLocal")}</Text>
                             </View>
                         ) : null}
                     </View>

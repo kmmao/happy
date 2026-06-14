@@ -32,6 +32,21 @@ export const pt: TranslationStructure = {
     settings: "Configurações",
   },
 
+  workflows: {
+    kindAdhoc: "Ad-hoc",
+    kindScheduled: "Scheduled",
+    kindEvent: "Event",
+    kindLoop: "Loop",
+    filterAll: "All",
+    kindAdhocLabel: "Ad-hoc workflow",
+    kindScheduledLabel: "Scheduled workflow",
+    kindEventLabel: "Event-driven workflow",
+    kindLoopLabel: "Loop workflow",
+    emptyTitle: "No workflows yet",
+    emptyDescription: "Run `happy` on your Machine to start a conversation",
+    cliLocal: "CLI-local",
+  },
+
   inbox: {
     emptyTitle: "Caixa vazia",
     emptyDescription: "Sem notificações",
