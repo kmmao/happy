@@ -97,6 +97,13 @@ export interface AgentLoopDefinition {
   roleId?: string;
   roleName?: string;
   roleType?: string;
+  /**
+   * ADR-0022 Phase 3b — when the one-shot migration has uploaded this
+   * loop to the server-side AgentLoop table, the returned server loop id
+   * is recorded here. Presence acts as the idempotency marker for
+   * re-runs of the migration; absence means "still CLI-local-only".
+   */
+  migratedToServerLoopId?: string;
 }
 
 interface AgentLoopStoreFile {

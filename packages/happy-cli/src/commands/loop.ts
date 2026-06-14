@@ -35,6 +35,7 @@ import { getAgentLoopContextFilePath, getAgentLoopMemoryFilePath } from "@/autom
 import { readAgentLoopBrief } from "@/automation/AgentLoopBrief";
 import { suggestionToCreateInput } from "@/automation/AgentLoopSuggestion";
 import { buildAgentLoopBootstrapPlan } from "@/automation/AgentLoopBootstrap";
+import { buildCreateBody } from "@/automation/migrateLocalAgentLoops";
 
 function parseIntervalMs(raw: string): number {
   const match = raw.trim().match(/^(\d+)([smhd])$/i);
@@ -1097,6 +1098,7 @@ ${chalk.bold("Usage:")}
   happy loop github-actions-webhook --event <workflow_run|check_run|check_suite> --payload-file <payload.json> [--path <dir>|--loop <id>] [--json]
   happy loop brief <id>
   happy loop remove <id>
+  happy loop migrate-preview [--json]
 `);
 }
 
@@ -1751,6 +1753,65 @@ export async function handleLoopCommand(args: string[]): Promise<void> {
       const result = await removeDaemonAgentLoop(loopId);
       if (!result.success) throw new Error(result.errorMessage ?? "Failed to remove loop");
       logger.print(`Removed loop ${loopId}`);
+      return;
+    }
+    case "migrate-preview": {
+      // ADR-0022 Phase 3b — preview the plan to migrate CLI-local agent
+      // loops to the server-side AgentLoop table. This subcommand runs
+      // the migration core's dry-run path so users see what would happen
+      // before the full `migrate` apply (landed alongside Phase 4 once
+      // server deploy + project resolution wiring is unblocked).
+      const json = args.includes("--json");
+      const loops = await listDaemonAgentLoops();
+      const previews = loops.map((loop) => {
+        const body = buildCreateBody(loop);
+        return {
+          localId: loop.id,
+          name: loop.name ?? null,
+          directory: loop.directory,
+          enabled: loop.enabled,
+          alreadyMigrated: Boolean(loop.migratedToServerLoopId),
+          serverLoopId: loop.migratedToServerLoopId ?? null,
+          plannedBody: body,
+        };
+      });
+      if (json) {
+        logger.print(JSON.stringify({ previews }, null, 2));
+        return;
+      }
+      if (previews.length === 0) {
+        logger.print(chalk.dim("No local agent loops to migrate."));
+        return;
+      }
+      logger.print(chalk.bold(`migrate-preview — ${previews.length} local loop(s):`));
+      for (const p of previews) {
+        const status = p.alreadyMigrated
+          ? chalk.green(`migrated → ${p.serverLoopId}`)
+          : chalk.yellow("pending");
+        const enabled = p.enabled ? chalk.green("enabled") : chalk.dim("disabled");
+        logger.print(`  ${chalk.bold(p.localId)} (${enabled}) — ${status}`);
+        logger.print(`    name: ${p.name ?? "-"}`);
+        logger.print(`    directory: ${p.directory}`);
+        if (p.plannedBody.cronExpression) {
+          logger.print(`    cron: ${p.plannedBody.cronExpression}`);
+        } else if (p.plannedBody.intervalMs) {
+          logger.print(`    interval: ${formatIntervalMs(p.plannedBody.intervalMs)}`);
+        }
+        if (p.plannedBody.profileId) {
+          logger.print(`    profile: ${p.plannedBody.profileId}`);
+        }
+        const longTailKeys = Object.keys(p.plannedBody.genericConfig ?? {});
+        if (longTailKeys.length > 0) {
+          logger.print(`    long-tail: ${longTailKeys.join(", ")}`);
+        }
+      }
+      logger.print("");
+      logger.print(
+        chalk.dim(
+          `Apply path lands when server deploy is verified + project resolver is wired. ` +
+            `Phase 3b code path: \`buildCreateBody\` + \`migrateLocalAgentLoops\` (unit-tested).`,
+        ),
+      );
       return;
     }
     default:
