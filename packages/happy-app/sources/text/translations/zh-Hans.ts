@@ -101,7 +101,7 @@ export const zhHans: TranslationStructure = {
     createMenuScheduled: "创建定时任务",
     createMenuScheduledHint: "Cron 驱动的工作流",
     createMenuWebhook: "创建 Webhook",
-    createMenuWebhookHint: "即将上线 — 需要 CLI 更新",
+    createMenuWebhookHint: "通过 URL 触发的工作流",
     webhookModalTitle: "创建 Webhook 工作流",
     webhookModalSubtitle: "用自定义 URL 触发外部事件。",
     webhookModalInfo: "会以下面的 slug 分配一个公开 URL。Secret 仅在下一步显示一次,务必记录。",

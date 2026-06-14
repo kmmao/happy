@@ -103,7 +103,7 @@ export const ja: TranslationStructure = {
     createMenuScheduled: "Create a schedule",
     createMenuScheduledHint: "Cron-driven workflow",
     createMenuWebhook: "Create a webhook",
-    createMenuWebhookHint: "Coming soon — needs CLI update",
+    createMenuWebhookHint: "Event-driven workflow via URL",
     webhookModalTitle: "Create a webhook workflow",
     webhookModalSubtitle: "Fire on external events with a custom URL.",
     webhookModalInfo: "We will assign a public URL with the slug below. The secret is shown once on the next step — record it then.",
