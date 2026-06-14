@@ -148,6 +148,21 @@ export const en = {
     webhookHintGithub: "GitHub: Settings → Webhooks → Add webhook. Paste the URL; put the secret under Authorization header.",
     webhookHintZapier: "Zapier: \"Webhooks by Zapier\" action → POST. Add an Authorization header with the secret.",
     webhookHintCron: "crontab: pipe curl. Useful when you want a local cron to spawn a session on a remote machine.",
+    // Source preset picker (above SLUG) — clicking a chip prefills slug
+    // + prompt with sensible defaults for common sources.
+    webhookSectionSource: "Source (optional)",
+    webhookSectionSourceHelper: "Tap a source to prefill slug and prompt. You can still edit anything afterwards.",
+    webhookSourceGithub: "GitHub",
+    webhookSourceLinear: "Linear",
+    webhookSourceZapier: "Zapier",
+    webhookSourceCustom: "Custom",
+    webhookSourceGithubPrompt: "A GitHub event just fired. Inspect $ISSUE_TITLE / $ISSUE_BODY / $REPO_PATH and respond.",
+    webhookSourceLinearPrompt: "A Linear issue changed. Use the JSON body to triage and follow up.",
+    webhookSourceZapierPrompt: "Zapier forwarded an event. Parse the JSON body and act on it.",
+    // Per-field helper hints.
+    webhookSlugHelper: "URL fragment under /v1/triggers/. Example: github-push.",
+    webhookNameHelper: "Title shown on the Workflow list row. Defaults to the slug if empty.",
+    webhookPromptHelper: "What to run each time the webhook fires. Variables like $ISSUE_TITLE / $ISSUE_BODY / $REPO_PATH are injected.",
     loopModalTitle: "Create a Loop",
     loopModalSubtitle: "Long-running agent that iterates toward a goal.",
     loopModalInfo: "Loop creation requires a daemon CLI version that exposes the create-loop endpoint. Until both ends ship, this modal only shows readiness.",

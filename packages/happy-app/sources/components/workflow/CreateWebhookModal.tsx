@@ -37,6 +37,57 @@ function sanitizeSlug(input: string): string {
         .replace(/^-|-$/g, "");
 }
 
+/**
+ * Source presets — clicking a chip fills slug + prompt with sensible
+ * defaults for the most common integrations. `custom` is the escape
+ * hatch (no defaults, full manual fill). The presets only auto-fill
+ * when the field is empty or the user previously tapped a different
+ * preset; user edits are never overwritten.
+ */
+type SourcePresetKey = "github" | "linear" | "zapier" | "custom";
+
+interface SourcePreset {
+    key: SourcePresetKey;
+    labelKey:
+        | "workflows.webhookSourceGithub"
+        | "workflows.webhookSourceLinear"
+        | "workflows.webhookSourceZapier"
+        | "workflows.webhookSourceCustom";
+    slugDefault: string;
+    promptKey:
+        | "workflows.webhookSourceGithubPrompt"
+        | "workflows.webhookSourceLinearPrompt"
+        | "workflows.webhookSourceZapierPrompt"
+        | null;
+}
+
+const SOURCE_PRESETS: ReadonlyArray<SourcePreset> = [
+    {
+        key: "github",
+        labelKey: "workflows.webhookSourceGithub",
+        slugDefault: "github-event",
+        promptKey: "workflows.webhookSourceGithubPrompt",
+    },
+    {
+        key: "linear",
+        labelKey: "workflows.webhookSourceLinear",
+        slugDefault: "linear-issue",
+        promptKey: "workflows.webhookSourceLinearPrompt",
+    },
+    {
+        key: "zapier",
+        labelKey: "workflows.webhookSourceZapier",
+        slugDefault: "zapier-event",
+        promptKey: "workflows.webhookSourceZapierPrompt",
+    },
+    {
+        key: "custom",
+        labelKey: "workflows.webhookSourceCustom",
+        slugDefault: "",
+        promptKey: null,
+    },
+];
+
 const styles = StyleSheet.create((theme) => ({
     sectionLabel: {
         fontSize: 12,
@@ -46,6 +97,13 @@ const styles = StyleSheet.create((theme) => ({
         ...Typography.default("semiBold"),
     },
     presetGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 6 },
+    helperText: {
+        fontSize: 11,
+        color: theme.colors.textSecondary,
+        lineHeight: 16,
+        marginTop: 6,
+        ...Typography.default(),
+    },
     input: {
         borderWidth: 1,
         borderColor: theme.colors.divider,
@@ -247,6 +305,10 @@ export const CreateWebhookModal = React.memo(function CreateWebhookModal({
     // closed by default so it doesn't dominate first-time use but is one
     // tap away when users want to understand the lifecycle.
     const [flowOpen, setFlowOpen] = React.useState(false);
+    // Source preset selection — purely UI hint; the chip click prefills
+    // slug + prompt, but the underlying state stays slug/prompt only so
+    // the user is free to keep editing afterwards.
+    const [pickedSource, setPickedSource] = React.useState<SourcePresetKey | null>(null);
 
     React.useEffect(() => {
         if (!visible) return;
@@ -258,7 +320,34 @@ export const CreateWebhookModal = React.memo(function CreateWebhookModal({
         setCreatedSecret(null);
         setCreatedSlug(null);
         setFlowOpen(false);
+        setPickedSource(null);
     }, [visible, machines]);
+
+    const handlePickSource = React.useCallback(
+        (preset: SourcePreset) => {
+            setPickedSource(preset.key);
+            // Only auto-fill if the field is empty OR currently holds the
+            // default of a previously-picked preset. Manual edits win.
+            const previousPreset = SOURCE_PRESETS.find(
+                (p) => p.key === pickedSource,
+            );
+            const slugIsUntouched =
+                slugRaw.length === 0 ||
+                (previousPreset && slugRaw === previousPreset.slugDefault);
+            if (slugIsUntouched && preset.slugDefault) {
+                setSlugRaw(preset.slugDefault);
+            }
+            const previousPromptPreview = previousPreset?.promptKey
+                ? t(previousPreset.promptKey)
+                : "";
+            const promptIsUntouched =
+                prompt.length === 0 || prompt === previousPromptPreview;
+            if (promptIsUntouched && preset.promptKey) {
+                setPrompt(t(preset.promptKey));
+            }
+        },
+        [pickedSource, slugRaw, prompt],
+    );
 
     const slug = sanitizeSlug(slugRaw);
     const valid =
@@ -368,6 +457,8 @@ export const CreateWebhookModal = React.memo(function CreateWebhookModal({
                     setPrompt={setPrompt}
                     flowOpen={flowOpen}
                     setFlowOpen={setFlowOpen}
+                    pickedSource={pickedSource}
+                    onPickSource={handlePickSource}
                 />
             )}
         </BottomSheet>
@@ -387,6 +478,8 @@ function CreateForm({
     setPrompt,
     flowOpen,
     setFlowOpen,
+    pickedSource,
+    onPickSource,
 }: any) {
     const { theme } = useUnistyles();
     return (
@@ -425,6 +518,28 @@ function CreateForm({
                 )}
             </View>
 
+            {/* Source preset picker — clicking a chip prefills slug +
+                prompt with sensible defaults for the most common
+                integrations. "自定义" is the no-op escape hatch. */}
+            <View>
+                <Text style={styles.sectionLabel}>
+                    {t("workflows.webhookSectionSource")}
+                </Text>
+                <Text style={styles.helperText}>
+                    {t("workflows.webhookSectionSourceHelper")}
+                </Text>
+                <View style={styles.presetGrid}>
+                    {SOURCE_PRESETS.map((preset) => (
+                        <PresetChip
+                            key={preset.key}
+                            label={t(preset.labelKey)}
+                            active={pickedSource === preset.key}
+                            onPress={() => onPickSource(preset)}
+                        />
+                    ))}
+                </View>
+            </View>
+
             <View>
                 <Text style={styles.sectionLabel}>{t("workflows.webhookSlugLabel")}</Text>
                 <TextInput
@@ -436,6 +551,9 @@ function CreateForm({
                     autoCapitalize="none"
                     autoCorrect={false}
                 />
+                <Text style={styles.helperText}>
+                    {t("workflows.webhookSlugHelper")}
+                </Text>
                 {slugRaw !== slug && slug ? (
                     <Text style={[styles.infoText, { marginTop: 4 }]}>
                         {t("workflows.webhookSlugSanitized", slug)}
@@ -452,6 +570,9 @@ function CreateForm({
                     placeholder={t("workflows.webhookNamePlaceholder")}
                     placeholderTextColor={theme.colors.textSecondary}
                 />
+                <Text style={styles.helperText}>
+                    {t("workflows.webhookNameHelper")}
+                </Text>
             </View>
 
             <View>
@@ -464,6 +585,9 @@ function CreateForm({
                     placeholder={t("workflows.recurringPromptPlaceholder")}
                     placeholderTextColor={theme.colors.textSecondary}
                 />
+                <Text style={styles.helperText}>
+                    {t("workflows.webhookPromptHelper")}
+                </Text>
             </View>
 
             <Pressable
