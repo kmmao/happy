@@ -1,19 +1,16 @@
 /**
  * MakeRecurringModal — Phase 2 promote action of the Workflow IA.
  *
- * "create-similar" semantics: this modal creates a NEW TriggerSchedule
- * carrying the current Session's prompt and directory. It does NOT
- * server-side bind the existing Session — true adoption (next fire reuses
- * this Session via the GuardianSessionRegistry) requires the CLI to
- * support a `happySessionId` hint on the `task-trigger` ephemeral, which
- * is gated on a coordinated cli/agent release. Once that lands, this
- * modal can flip to the real adopt path with no UI change.
+ * "create-similar" semantics: creates a NEW TriggerSchedule carrying the
+ * current Session's prompt and directory. Real in-place adoption needs the
+ * CLI to support a `happySessionId` hint on the `task-trigger` ephemeral —
+ * gated on ADR-0022 phase 3b and a coordinated cli/agent release.
  *
- * Mobile-friendly layout: backdrop pins the card to the bottom on small
- * viewports so the on-screen keyboard doesn't cover it; card content is
- * scrollable so the Cancel/Create row stays reachable when prompt + cron
- * presets push the layout taller than the viewport. The Cancel/Create
- * footer is sticky outside the ScrollView so it's always tappable.
+ * Renders via RN's built-in `Modal` so it's portal-mounted at the root and
+ * always covers headers / tab bars. Mobile presents a bottom sheet (slide
+ * up, rounded only at the top, sticky footer); desktop centers the card.
+ * Internal ScrollView keeps the form scrollable; the Cancel/Create footer
+ * is sticky outside the ScrollView so it's always reachable.
  */
 
 import * as React from "react";
@@ -25,13 +22,16 @@ import {
     ScrollView,
     KeyboardAvoidingView,
     Platform,
+    Modal as RNModal,
     useWindowDimensions,
+    StatusBar,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Text } from "@/components/StyledText";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { Ionicons } from "@expo/vector-icons";
 import { Typography } from "@/constants/Typography";
-import { Modal } from "@/modal";
+import { Modal as AlertModal } from "@/modal";
 import { useRouter } from "expo-router";
 import { TokenStorage } from "@/auth/tokenStorage";
 import { createTriggerSchedule } from "@/sync/apiTriggerSchedules";
@@ -56,42 +56,79 @@ const CRON_PRESETS: Array<{ id: string; labelKey: () => string; expr: string }> 
     { id: "weekly", labelKey: () => t("workflows.recurringCronWeeklyMon09"), expr: "0 9 * * 1" },
 ];
 
+const MOBILE_BREAKPOINT = 540;
+
 const styles = StyleSheet.create((theme) => ({
-    backdrop: {
+    // Full-screen overlay; RN Modal already portals this to root.
+    overlay: {
         flex: 1,
+    },
+    overlayDesktop: {
+        // Center the card on wide viewports.
         backgroundColor: "rgba(0,0,0,0.45)",
         justifyContent: "center",
         alignItems: "center",
+        paddingHorizontal: 16,
     },
-    backdropMobile: {
-        // On narrow viewports, pin the card to the bottom (like a bottom
-        // sheet) so it never gets covered by a tiny keyboard pop.
+    overlayMobile: {
+        // Pin to bottom; the dim layer is its own pressable behind the card.
+        backgroundColor: "transparent",
         justifyContent: "flex-end",
-        alignItems: "stretch",
+    },
+    // Absolutely-positioned dim layer that intercepts taps to close.
+    backdrop: {
+        position: "absolute",
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: "rgba(0,0,0,0.45)",
     },
     card: {
-        width: "100%",
-        maxWidth: 520,
         backgroundColor: theme.colors.surface,
-        borderRadius: 14,
         overflow: "hidden",
         flexDirection: "column",
+        // Subtle shadow so it lifts off the page.
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: -2 },
+        shadowOpacity: 0.18,
+        shadowRadius: 24,
+        elevation: 12,
+    },
+    cardDesktop: {
+        width: "100%",
+        maxWidth: 520,
+        borderRadius: 14,
     },
     cardMobile: {
-        // Full width on mobile, rounded only at the top.
-        borderTopLeftRadius: 14,
-        borderTopRightRadius: 14,
-        borderBottomLeftRadius: 0,
-        borderBottomRightRadius: 0,
+        width: "100%",
+        borderTopLeftRadius: 16,
+        borderTopRightRadius: 16,
     },
-    scrollArea: {
-        // Internal scroll area takes the rest of the card after the footer
-        // is laid out. Caps at the viewport so the footer is always visible.
-        flexShrink: 1,
+    // Mobile bottom sheet grab handle (visual cue you can swipe / dismiss).
+    grabHandleWrap: {
+        alignItems: "center",
+        paddingTop: 8,
+        paddingBottom: 4,
     },
-    scrollContent: {
-        padding: 20,
-        gap: 16,
+    grabHandle: {
+        width: 36,
+        height: 4,
+        borderRadius: 2,
+        backgroundColor: theme.colors.divider,
+    },
+    headerRow: {
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "space-between",
+        paddingHorizontal: 20,
+        paddingTop: 8,
+        paddingBottom: 12,
+    },
+    titleColumn: {
+        flex: 1,
+        minWidth: 0,
+        gap: 4,
     },
     title: {
         fontSize: 18,
@@ -103,6 +140,25 @@ const styles = StyleSheet.create((theme) => ({
         color: theme.colors.textSecondary,
         ...Typography.default(),
         lineHeight: 18,
+    },
+    closeButton: {
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        alignItems: "center",
+        justifyContent: "center",
+        backgroundColor: theme.colors.surfaceHigh,
+        marginLeft: 12,
+        ...webInteractive,
+    },
+    scrollArea: {
+        flexShrink: 1,
+    },
+    scrollContent: {
+        paddingHorizontal: 20,
+        paddingTop: 4,
+        paddingBottom: 20,
+        gap: 16,
     },
     sectionLabel: {
         fontSize: 12,
@@ -130,7 +186,7 @@ const styles = StyleSheet.create((theme) => ({
         borderColor: theme.colors.accentBlue,
     },
     presetChipText: {
-        fontSize: 12,
+        fontSize: 13,
         color: theme.colors.textSecondary,
         ...Typography.default("semiBold"),
     },
@@ -142,8 +198,8 @@ const styles = StyleSheet.create((theme) => ({
         borderColor: theme.colors.divider,
         borderRadius: 8,
         paddingHorizontal: 10,
-        paddingVertical: 8,
-        fontSize: 13,
+        paddingVertical: 10,
+        fontSize: 14,
         color: theme.colors.text,
         backgroundColor: theme.colors.input?.background ?? theme.colors.groupped.background,
         fontFamily: "Menlo",
@@ -152,28 +208,44 @@ const styles = StyleSheet.create((theme) => ({
         minHeight: 96,
         textAlignVertical: "top",
         fontFamily: "System",
-        fontSize: 13,
+        fontSize: 14,
+    },
+    info: {
+        flexDirection: "row",
+        alignItems: "flex-start",
+        gap: 8,
+        padding: 10,
+        backgroundColor: `${theme.colors.accentOrange}14`,
+        borderRadius: 8,
+    },
+    infoText: {
+        flex: 1,
+        fontSize: 12,
+        color: theme.colors.text,
+        ...Typography.default(),
+        lineHeight: 17,
     },
     footer: {
-        // Sticky footer outside the ScrollView so Cancel/Create stays
-        // reachable however tall the form gets.
         flexDirection: "row",
         justifyContent: "flex-end",
-        gap: 8,
+        gap: 10,
         paddingHorizontal: 20,
-        paddingVertical: 14,
+        paddingTop: 12,
         borderTopWidth: StyleSheet.hairlineWidth,
         borderTopColor: theme.colors.divider,
         backgroundColor: theme.colors.surface,
     },
     button: {
-        paddingHorizontal: 14,
-        paddingVertical: 9,
-        borderRadius: 8,
+        paddingHorizontal: 16,
+        paddingVertical: 11,
+        borderRadius: 10,
+        minWidth: 88,
+        alignItems: "center",
+        justifyContent: "center",
         ...webInteractive,
     },
     buttonCancel: {
-        backgroundColor: "transparent",
+        backgroundColor: theme.colors.surfaceHigh,
     },
     buttonPrimary: {
         backgroundColor: theme.colors.button.primary.background,
@@ -191,24 +263,7 @@ const styles = StyleSheet.create((theme) => ({
     buttonTextCancel: {
         color: theme.colors.textSecondary,
     },
-    info: {
-        flexDirection: "row",
-        alignItems: "flex-start",
-        gap: 8,
-        padding: 10,
-        backgroundColor: `${theme.colors.accentOrange}14`,
-        borderRadius: 8,
-    },
-    infoText: {
-        flex: 1,
-        fontSize: 12,
-        color: theme.colors.text,
-        ...Typography.default(),
-        lineHeight: 17,
-    },
 }));
-
-const MOBILE_BREAKPOINT = 540;
 
 export const MakeRecurringModal = React.memo(function MakeRecurringModal({
     session,
@@ -217,8 +272,10 @@ export const MakeRecurringModal = React.memo(function MakeRecurringModal({
 }: MakeRecurringModalProps) {
     const { theme } = useUnistyles();
     const router = useRouter();
+    const insets = useSafeAreaInsets();
     const { width: viewportWidth, height: viewportHeight } = useWindowDimensions();
     const isMobile = viewportWidth < MOBILE_BREAKPOINT;
+
     const [presetId, setPresetId] = React.useState<string>("daily");
     const [customCron, setCustomCron] = React.useState<string>("");
     const [prompt, setPrompt] = React.useState<string>("");
@@ -236,16 +293,12 @@ export const MakeRecurringModal = React.memo(function MakeRecurringModal({
         setSubmitting(false);
     }, [visible, session]);
 
-    if (!visible) return null;
-
     const cronExpression =
         presetId === "custom"
             ? customCron.trim()
             : CRON_PRESETS.find((p) => p.id === presetId)?.expr ?? "";
 
     const machineId = session.metadata?.machineId ?? "";
-    const directory = session.metadata?.path ?? "";
-
     const valid = cronExpression.length > 0 && prompt.trim().length > 0 && machineId.length > 0;
 
     const handleConfirm = async () => {
@@ -266,113 +319,163 @@ export const MakeRecurringModal = React.memo(function MakeRecurringModal({
             router.push(`/workflow/${encodeURIComponent(`scheduled:${trigger.id}`)}` as any);
         } catch (err) {
             const message = err instanceof Error ? err.message : String(err);
-            Modal.alert(t("workflows.recurringErrorTitle"), message);
+            AlertModal.alert(t("workflows.recurringErrorTitle"), message);
             setSubmitting(false);
         }
     };
 
-    // Cap card height to leave room for OS status bar / keyboard.
-    const cardMaxHeight = Math.floor(viewportHeight * (isMobile ? 0.9 : 0.85));
+    // Mobile bottom-sheet height cap leaves room for status bar so the card
+    // never overlaps OS chrome.
+    const mobileMaxHeight = Math.floor(viewportHeight * 0.9);
+    const desktopMaxHeight = Math.min(680, Math.floor(viewportHeight * 0.85));
+    const cardMaxHeight = isMobile ? mobileMaxHeight : desktopMaxHeight;
+
+    // Bottom inset for the sticky footer so the home-indicator doesn't
+    // overlap the Cancel/Create buttons on iOS.
+    const footerPaddingBottom = (isMobile ? insets.bottom : 14) || 14;
 
     return (
-        <KeyboardAvoidingView
-            style={[styles.backdrop, isMobile && styles.backdropMobile]}
-            behavior={Platform.OS === "ios" ? "padding" : undefined}
-            pointerEvents="box-none"
+        <RNModal
+            visible={visible}
+            transparent
+            animationType={isMobile ? "slide" : "fade"}
+            onRequestClose={submitting ? undefined : onClose}
+            statusBarTranslucent
         >
-            {/* Tapping the dim backdrop dismisses the modal. */}
-            <Pressable
-                style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0 }}
-                onPress={submitting ? undefined : onClose}
-            />
-            <View
+            <KeyboardAvoidingView
                 style={[
-                    styles.card,
-                    isMobile && styles.cardMobile,
-                    { maxHeight: cardMaxHeight },
+                    styles.overlay,
+                    isMobile ? styles.overlayMobile : styles.overlayDesktop,
                 ]}
+                behavior={Platform.OS === "ios" ? "padding" : Platform.OS === "android" ? "height" : undefined}
             >
-                <ScrollView
-                    style={styles.scrollArea}
-                    contentContainerStyle={styles.scrollContent}
-                    keyboardShouldPersistTaps="handled"
-                >
-                    <Text style={styles.title}>{t("workflows.recurringModalTitle")}</Text>
-                    <Text style={styles.subtitle}>{t("workflows.recurringModalSubtitle")}</Text>
+                {/* Dim layer behind the card — tapping it closes the modal. */}
+                <Pressable
+                    style={styles.backdrop}
+                    onPress={submitting ? undefined : onClose}
+                    accessibilityLabel="Close"
+                />
 
-                    <View style={styles.info}>
-                        <Ionicons name="information-circle" size={16} color={theme.colors.accentOrange} />
-                        <Text style={styles.infoText}>{t("workflows.recurringModalInfo")}</Text>
+                <View
+                    style={[
+                        styles.card,
+                        isMobile ? styles.cardMobile : styles.cardDesktop,
+                        { maxHeight: cardMaxHeight },
+                    ]}
+                >
+                    {/* Mobile grab handle (visual affordance for the sheet). */}
+                    {isMobile ? (
+                        <View style={styles.grabHandleWrap}>
+                            <View style={styles.grabHandle} />
+                        </View>
+                    ) : null}
+
+                    {/* Header: title + close (X) button. */}
+                    <View style={styles.headerRow}>
+                        <View style={styles.titleColumn}>
+                            <Text style={styles.title}>{t("workflows.recurringModalTitle")}</Text>
+                            <Text style={styles.subtitle}>{t("workflows.recurringModalSubtitle")}</Text>
+                        </View>
+                        <Pressable
+                            style={styles.closeButton}
+                            onPress={submitting ? undefined : onClose}
+                            hitSlop={8}
+                            accessibilityLabel="Close"
+                        >
+                            <Ionicons name="close" size={18} color={theme.colors.textSecondary} />
+                        </Pressable>
                     </View>
 
-                    <View>
-                        <Text style={styles.sectionLabel}>{t("workflows.recurringScheduleLabel")}</Text>
-                        <View style={[styles.presetGrid, { marginTop: 6 }]}>
-                            {CRON_PRESETS.map((p) => (
+                    {/* Scrollable form area. */}
+                    <ScrollView
+                        style={styles.scrollArea}
+                        contentContainerStyle={styles.scrollContent}
+                        keyboardShouldPersistTaps="handled"
+                        showsVerticalScrollIndicator
+                    >
+                        <View style={styles.info}>
+                            <Ionicons
+                                name="information-circle"
+                                size={16}
+                                color={theme.colors.accentOrange}
+                            />
+                            <Text style={styles.infoText}>{t("workflows.recurringModalInfo")}</Text>
+                        </View>
+
+                        <View>
+                            <Text style={styles.sectionLabel}>{t("workflows.recurringScheduleLabel")}</Text>
+                            <View style={[styles.presetGrid, { marginTop: 6 }]}>
+                                {CRON_PRESETS.map((p) => (
+                                    <PresetChip
+                                        key={p.id}
+                                        label={p.labelKey()}
+                                        active={presetId === p.id}
+                                        onPress={() => setPresetId(p.id)}
+                                    />
+                                ))}
                                 <PresetChip
-                                    key={p.id}
-                                    label={p.labelKey()}
-                                    active={presetId === p.id}
-                                    onPress={() => setPresetId(p.id)}
+                                    label={t("workflows.recurringCronCustom")}
+                                    active={presetId === "custom"}
+                                    onPress={() => setPresetId("custom")}
                                 />
-                            ))}
-                            <PresetChip
-                                label={t("workflows.recurringCronCustom")}
-                                active={presetId === "custom"}
-                                onPress={() => setPresetId("custom")}
+                            </View>
+                            {presetId === "custom" ? (
+                                <TextInput
+                                    style={[styles.input, { marginTop: 8 }]}
+                                    value={customCron}
+                                    onChangeText={setCustomCron}
+                                    placeholder="0 2 * * *"
+                                    placeholderTextColor={theme.colors.textSecondary}
+                                    autoCapitalize="none"
+                                    autoCorrect={false}
+                                />
+                            ) : null}
+                        </View>
+
+                        <View>
+                            <Text style={styles.sectionLabel}>{t("workflows.recurringPromptLabel")}</Text>
+                            <TextInput
+                                style={[styles.input, styles.promptInput, { marginTop: 6 }]}
+                                value={prompt}
+                                onChangeText={setPrompt}
+                                multiline
+                                placeholder={t("workflows.recurringPromptPlaceholder")}
+                                placeholderTextColor={theme.colors.textSecondary}
                             />
                         </View>
-                        {presetId === "custom" ? (
-                            <TextInput
-                                style={[styles.input, { marginTop: 8 }]}
-                                value={customCron}
-                                onChangeText={setCustomCron}
-                                placeholder="0 2 * * *"
-                                placeholderTextColor={theme.colors.textSecondary}
-                                autoCapitalize="none"
-                                autoCorrect={false}
-                            />
-                        ) : null}
-                    </View>
+                    </ScrollView>
 
-                    <View>
-                        <Text style={styles.sectionLabel}>{t("workflows.recurringPromptLabel")}</Text>
-                        <TextInput
-                            style={[styles.input, styles.promptInput, { marginTop: 6 }]}
-                            value={prompt}
-                            onChangeText={setPrompt}
-                            multiline
-                            placeholder={t("workflows.recurringPromptPlaceholder")}
-                            placeholderTextColor={theme.colors.textSecondary}
-                        />
+                    {/* Sticky footer — always reachable. */}
+                    <View style={[styles.footer, { paddingBottom: footerPaddingBottom }]}>
+                        <Pressable
+                            style={[styles.button, styles.buttonCancel]}
+                            onPress={onClose}
+                            disabled={submitting}
+                        >
+                            <Text style={[styles.buttonText, styles.buttonTextCancel]}>
+                                {t("common.cancel")}
+                            </Text>
+                        </Pressable>
+                        <Pressable
+                            style={[
+                                styles.button,
+                                valid && !submitting ? styles.buttonPrimary : styles.buttonPrimaryDisabled,
+                            ]}
+                            onPress={handleConfirm}
+                            disabled={!valid || submitting}
+                        >
+                            {submitting ? (
+                                <ActivityIndicator size="small" color={theme.colors.button.primary.tint} />
+                            ) : (
+                                <Text style={[styles.buttonText, styles.buttonTextPrimary]}>
+                                    {t("workflows.recurringCreate")}
+                                </Text>
+                            )}
+                        </Pressable>
                     </View>
-                </ScrollView>
-
-                <View style={styles.footer}>
-                    <Pressable
-                        style={[styles.button, styles.buttonCancel]}
-                        onPress={onClose}
-                        disabled={submitting}
-                    >
-                        <Text style={[styles.buttonText, styles.buttonTextCancel]}>{t("common.cancel")}</Text>
-                    </Pressable>
-                    <Pressable
-                        style={[
-                            styles.button,
-                            valid && !submitting ? styles.buttonPrimary : styles.buttonPrimaryDisabled,
-                        ]}
-                        onPress={handleConfirm}
-                        disabled={!valid || submitting}
-                    >
-                        {submitting ? (
-                            <ActivityIndicator size="small" color={theme.colors.button.primary.tint} />
-                        ) : (
-                            <Text style={[styles.buttonText, styles.buttonTextPrimary]}>{t("workflows.recurringCreate")}</Text>
-                        )}
-                    </Pressable>
                 </View>
-            </View>
-        </KeyboardAvoidingView>
+            </KeyboardAvoidingView>
+        </RNModal>
     );
 });
 
