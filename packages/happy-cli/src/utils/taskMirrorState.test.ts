@@ -249,4 +249,159 @@ describe("TaskMirrorState", () => {
       expect(state.getTodos()[0]?.status).toBe("completed");
     });
   });
+
+  describe("freezeCompletedBatch", () => {
+    it("returns false when there are no tasks", () => {
+      const state = new TaskMirrorState();
+      expect(state.freezeCompletedBatch()).toBe(false);
+    });
+
+    it("returns false when any live task is not completed", () => {
+      const state = new TaskMirrorState();
+      state.processToolUse("TaskCreate", { subject: "A" });
+      state.processToolUse("TaskUpdate", { taskId: "1", status: "completed" });
+      state.processToolUse("TaskCreate", { subject: "B" });
+
+      expect(state.freezeCompletedBatch()).toBe(false);
+      expect(state.getTodos()).toHaveLength(2);
+    });
+
+    it("freezes all live tasks when every one is completed", () => {
+      const state = new TaskMirrorState();
+      state.processToolUse("TaskCreate", { subject: "A" });
+      state.processToolUse("TaskCreate", { subject: "B" });
+      state.processToolUse("TaskUpdate", { taskId: "1", status: "completed" });
+      state.processToolUse("TaskUpdate", { taskId: "2", status: "completed" });
+
+      expect(state.freezeCompletedBatch()).toBe(true);
+      expect(state.hasTasks()).toBe(false);
+      expect(state.getTodos()).toEqual([]);
+    });
+
+    it("excludes frozen tasks from subsequent emits but leaves new ones visible", () => {
+      const state = new TaskMirrorState();
+      state.processToolUse("TaskCreate", { subject: "A" });
+      state.processToolUse("TaskUpdate", { taskId: "1", status: "completed" });
+      state.freezeCompletedBatch();
+
+      const changed = state.processToolUse("TaskCreate", { subject: "B" });
+      expect(changed).toBe(true);
+      expect(state.hasTasks()).toBe(true);
+      expect(state.getTodos()).toEqual([
+        { content: "B", status: "pending", activeForm: undefined, description: undefined },
+      ]);
+    });
+
+    it("no-ops TaskUpdate on frozen tasks so the archived list stays stable", () => {
+      const state = new TaskMirrorState();
+      state.processToolUse("TaskCreate", { subject: "Frozen task" });
+      state.processToolUse("TaskUpdate", { taskId: "1", status: "completed" });
+      state.freezeCompletedBatch();
+
+      const changed = state.processToolUse("TaskUpdate", {
+        taskId: "1",
+        status: "in_progress",
+      });
+
+      expect(changed).toBe(false);
+      expect(state.getTodos()).toEqual([]);
+    });
+
+    it("still honours deletion of frozen tasks but keeps the consumer unaware", () => {
+      const state = new TaskMirrorState();
+      state.processToolUse("TaskCreate", { subject: "Frozen" });
+      state.processToolUse("TaskUpdate", { taskId: "1", status: "completed" });
+      state.freezeCompletedBatch();
+
+      const changed = state.processToolUse("TaskUpdate", {
+        taskId: "1",
+        status: "deleted",
+      });
+
+      expect(changed).toBe(false);
+      // After deletion the frozen marker is cleaned up too — re-creating the
+      // same subject should not collide with a ghost reference.
+      state.processToolUse("TaskCreate", { subject: "Frozen" }, "toolu_x");
+      state.processToolResult("toolu_x", "Task #2 created successfully: Frozen");
+      expect(
+        state.processToolUse("TaskUpdate", { taskId: "2", status: "completed" }),
+      ).toBe(true);
+    });
+
+    it("supports two consecutive boundaries — A done → freeze → B done → freeze → C", () => {
+      const state = new TaskMirrorState();
+      // Batch A
+      state.processToolUse("TaskCreate", { subject: "A1" });
+      state.processToolUse("TaskCreate", { subject: "A2" });
+      state.processToolUse("TaskUpdate", { taskId: "1", status: "completed" });
+      state.processToolUse("TaskUpdate", { taskId: "2", status: "completed" });
+      expect(state.freezeCompletedBatch()).toBe(true);
+
+      // Batch B
+      state.processToolUse("TaskCreate", { subject: "B1" });
+      state.processToolUse("TaskUpdate", { taskId: "3", status: "completed" });
+      expect(state.getTodos()).toEqual([
+        { content: "B1", status: "completed", activeForm: undefined, description: undefined },
+      ]);
+      expect(state.freezeCompletedBatch()).toBe(true);
+
+      // Batch C
+      state.processToolUse("TaskCreate", { subject: "C1" });
+      expect(state.getTodos()).toEqual([
+        { content: "C1", status: "pending", activeForm: undefined, description: undefined },
+      ]);
+    });
+
+    it("preserves frozen markers across reconcileFromTaskList when IDs survive", () => {
+      const state = new TaskMirrorState();
+      state.processToolUse("TaskCreate", { subject: "A" });
+      state.processToolUse("TaskUpdate", { taskId: "1", status: "completed" });
+      state.freezeCompletedBatch();
+
+      // Runtime still shows the old task; reconcile shouldn't unfreeze it.
+      state.reconcileFromTaskList("#1 [completed] A\n#2 [pending] B");
+
+      expect(state.getTodos()).toEqual([
+        { content: "B", status: "pending", activeForm: undefined, description: undefined },
+      ]);
+    });
+
+    it("drops frozen markers for IDs missing from a reconcile", () => {
+      const state = new TaskMirrorState();
+      state.processToolUse("TaskCreate", { subject: "A" });
+      state.processToolUse("TaskUpdate", { taskId: "1", status: "completed" });
+      state.freezeCompletedBatch();
+
+      // Runtime has dropped the old task entirely; the frozen marker for
+      // it should be cleaned up so re-using the ID later behaves normally.
+      const changed = state.reconcileFromTaskList("#5 [pending] Brand new");
+      expect(changed).toBe(true);
+      expect(state.getTodos()).toEqual([
+        { content: "Brand new", status: "pending", activeForm: undefined, description: undefined },
+      ]);
+    });
+
+    it("does not re-find a frozen task with the same subject during create reconciliation", () => {
+      const state = new TaskMirrorState();
+      state.processToolUse("TaskCreate", { subject: "Same name" }, "toolu_a");
+      state.processToolResult("toolu_a", "Task #1 created successfully: Same name");
+      state.processToolUse("TaskUpdate", { taskId: "1", status: "completed" });
+      state.freezeCompletedBatch();
+
+      // Agent recreates a task with the same subject — must not collide
+      // with the frozen entry's slot.
+      state.processToolUse("TaskCreate", { subject: "Same name" }, "toolu_b");
+      state.processToolResult("toolu_b", "Task #5 created successfully: Same name");
+
+      // The frozen entry stays put under ID 1; the new one lives at ID 5.
+      const changed = state.processToolUse("TaskUpdate", {
+        taskId: "5",
+        status: "in_progress",
+      });
+      expect(changed).toBe(true);
+      const todos = state.getTodos();
+      expect(todos).toHaveLength(1);
+      expect(todos[0]?.status).toBe("in_progress");
+    });
+  });
 });

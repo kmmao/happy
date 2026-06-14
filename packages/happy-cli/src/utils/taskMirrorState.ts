@@ -8,6 +8,16 @@
  * runtime-only tools that don't produce the `oldTodos`/`newTodos` shaped
  * `tool_use_result` the CLI's existing TodoWrite mirror relies on.
  * This module bridges the gap.
+ *
+ * Batch freeze: the Claude runtime keeps completed tasks alive across
+ * conversational turns. Without intervention, the mirror would emit the
+ * union of every task ever created, and `applyHappyProgressUpdate`'s
+ * Jaccard overlap check would never see a topic boundary — every new
+ * `TaskCreate` would be appended to the existing progress list. The
+ * `freezeCompletedBatch()` hook lets the launcher mark the current set
+ * as belonging to a closed batch at a turn boundary; subsequent emits
+ * exclude frozen tasks, so the next `TaskCreate` looks like a fresh
+ * list to the boundary detector and a new progress list is started.
  */
 
 export interface TaskMirrorTodo {
@@ -52,6 +62,13 @@ export class TaskMirrorState {
   private readonly pendingCreates = new Map<string, PendingCreate>();
   // tool_use_ids for TaskList calls awaiting results
   private readonly pendingTaskLists = new Set<string>();
+
+  // Task IDs that belong to a previously-archived progress batch. Frozen
+  // tasks are still tracked in `tasks` (so the runtime's ID space stays
+  // consistent), but they are excluded from `getTodos()` / `hasTasks()` and
+  // `handleUpdate()` no-ops on them. This is what prevents accumulated
+  // completed history from masking a new-topic boundary in the consumer.
+  private readonly frozenTaskIds = new Set<string>();
 
   /**
    * Process an assistant tool_use block. Returns true if the internal
@@ -112,16 +129,42 @@ export class TaskMirrorState {
   }
 
   getTodos(): TaskMirrorTodo[] {
-    return Array.from(this.tasks.values()).map((t) => ({
-      content: t.content,
-      status: t.status,
-      activeForm: t.activeForm,
-      description: t.description,
-    }));
+    const out: TaskMirrorTodo[] = [];
+    for (const [id, t] of this.tasks) {
+      if (this.frozenTaskIds.has(id)) continue;
+      out.push({
+        content: t.content,
+        status: t.status,
+        activeForm: t.activeForm,
+        description: t.description,
+      });
+    }
+    return out;
   }
 
   hasTasks(): boolean {
-    return this.tasks.size > 0;
+    for (const id of this.tasks.keys()) {
+      if (!this.frozenTaskIds.has(id)) return true;
+    }
+    return false;
+  }
+
+  /**
+   * Freeze the current live batch if all of its tasks are completed.
+   * Called at a fresh user-turn boundary so the next TaskCreate looks
+   * like a new list to the consumer rather than an append to the prior
+   * batch. Returns true when at least one task was frozen.
+   */
+  freezeCompletedBatch(): boolean {
+    const liveIds: string[] = [];
+    for (const [id, entry] of this.tasks) {
+      if (this.frozenTaskIds.has(id)) continue;
+      if (entry.status !== "completed") return false;
+      liveIds.push(id);
+    }
+    if (liveIds.length === 0) return false;
+    for (const id of liveIds) this.frozenTaskIds.add(id);
+    return true;
   }
 
   /**
@@ -158,15 +201,19 @@ export class TaskMirrorState {
 
     if (parsed.size === 0) return false;
 
-    // Detect change: compare sizes and each entry
-    let changed = parsed.size !== this.tasks.size;
+    // Detect change ignoring frozen entries: the frozen batch's view is
+    // already locked into an archived progress list, so flip-flopping its
+    // statuses shouldn't surface as a state change to the consumer.
+    const liveBefore = this.collectLiveSnapshot(this.tasks);
+    const liveAfter = this.collectLiveSnapshot(parsed);
+    let changed = liveBefore.size !== liveAfter.size;
     if (!changed) {
-      for (const [id, entry] of parsed) {
-        const existing = this.tasks.get(id);
+      for (const [id, after] of liveAfter) {
+        const before = liveBefore.get(id);
         if (
-          !existing ||
-          existing.content !== entry.content ||
-          existing.status !== entry.status
+          !before ||
+          before.content !== after.content ||
+          before.status !== after.status
         ) {
           changed = true;
           break;
@@ -174,15 +221,26 @@ export class TaskMirrorState {
       }
     }
 
-    if (changed) {
-      this.tasks.clear();
-      for (const [id, entry] of parsed) {
-        this.tasks.set(id, entry);
-      }
-      this.nextId = maxId + 1;
+    // Rebuild tasks; preserve frozen markers for IDs that still exist.
+    this.tasks.clear();
+    for (const [id, entry] of parsed) this.tasks.set(id, entry);
+    for (const id of [...this.frozenTaskIds]) {
+      if (!parsed.has(id)) this.frozenTaskIds.delete(id);
     }
+    this.nextId = maxId + 1;
 
     return changed;
+  }
+
+  private collectLiveSnapshot(
+    source: ReadonlyMap<string, TaskEntry>,
+  ): Map<string, TaskEntry> {
+    const out = new Map<string, TaskEntry>();
+    for (const [id, entry] of source) {
+      if (this.frozenTaskIds.has(id)) continue;
+      out.set(id, entry);
+    }
+    return out;
   }
 
   private handleCreate(
@@ -229,6 +287,19 @@ export class TaskMirrorState {
     const entry = this.tasks.get(taskId);
     if (!entry) return false;
 
+    // Frozen tasks belong to an already-archived progress list. Deletions
+    // are still honoured (they keep the ID space clean) but they should
+    // not show up as a visible state change. Other mutations are dropped
+    // entirely so a stale post-archive TaskUpdate cannot reanimate the
+    // closed list.
+    if (this.frozenTaskIds.has(taskId)) {
+      if (input.status === "deleted") {
+        this.tasks.delete(taskId);
+        this.frozenTaskIds.delete(taskId);
+      }
+      return false;
+    }
+
     let changed = false;
 
     const status = input.status;
@@ -262,8 +333,15 @@ export class TaskMirrorState {
   }
 
   private findTempIdForPending(subject: string): string | undefined {
-    for (const [id, entry] of this.tasks) {
-      if (entry.content === subject) return id;
+    // Walk in reverse insertion order so we match the most recently
+    // created live entry, never a frozen one that happens to share the
+    // subject (e.g. when the agent recreates a task with the same name).
+    const ids = [...this.tasks.keys()];
+    for (let i = ids.length - 1; i >= 0; i--) {
+      const id = ids[i]!;
+      if (this.frozenTaskIds.has(id)) continue;
+      const entry = this.tasks.get(id);
+      if (entry && entry.content === subject) return id;
     }
     return undefined;
   }

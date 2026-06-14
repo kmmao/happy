@@ -1149,6 +1149,35 @@ export async function claudeRemoteLauncher(
       }
     }
 
+    // Freeze the prior TaskCreate/TaskUpdate batch at fresh user-turn
+    // boundaries. The Claude runtime keeps completed tasks alive forever,
+    // so without this step a new turn's TaskCreate would emit the union of
+    // every past task plus the new one — the consumer's Jaccard overlap
+    // check would see near-full overlap and append to the prior progress
+    // list instead of starting a new one. Freezing once all of the current
+    // batch is `completed` makes the next TaskCreate emit a fresh slice
+    // and the consumer's boundary detection takes over from there. We key
+    // off "user message without a tool_use_result" — that's a real prompt
+    // (synthetic auto-summary/progress prompts included; benign there
+    // because they don't drive TaskCreate).
+    if (message.type === "user") {
+      try {
+        const uMsg = message as ClaudeJsonlUserMessage;
+        const content = uMsg.message?.content;
+        const hasToolResultBlock =
+          Array.isArray(content) &&
+          content.some((block) => {
+            const b = block as unknown as Record<string, unknown>;
+            return b?.type === "tool_result";
+          });
+        if (uMsg.tool_use_result === undefined && !hasToolResultBlock) {
+          taskMirrorState.freezeCompletedBatch();
+        }
+      } catch (err) {
+        logger.debug(`[task-mirror] Error checking turn boundary: ${err}`);
+      }
+    }
+
     // Auto-mirror TodoWrite → metadata.progress. Reads SDK-native
     // `TodoWriteOutput` off `user.tool_use_result` (shape: oldTodos, newTodos,
     // verificationNudgeNeeded). Boundary detection = content-set intersection
