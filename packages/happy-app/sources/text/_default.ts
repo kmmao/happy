@@ -49,6 +49,10 @@ export const en = {
     emptyTitle: "No workflows yet",
     emptyDescription: "Run `happy` on your Machine to start a conversation",
     cliLocal: "CLI-local",
+    // ADR-0022 Phase 4 — small inline badge for supervisor-role loops
+    // (autopilot mode) in the workflow list so they're distinguishable
+    // at a glance from generic user-defined loops.
+    roleSupervisor: "Supervisor",
     // List row meta suffixes
     metaCronRuns: (count: number) => `cron · ${count} runs`,
     metaWebhookFires: (count: number) => `webhook · ${count} fires`,

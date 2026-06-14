@@ -47,6 +47,7 @@ export const zhHant: TranslationStructure = {
     emptyTitle: "暂无工作流",
     emptyDescription: "在你的機器上运行 `happy` 开始一個會話",
     cliLocal: "CLI-local",
+    roleSupervisor: "監督者",
     metaCronRuns: (count: number) => `cron · 已執行 ${count} 次`,
     metaWebhookFires: (count: number) => `webhook · 已觸發 ${count} 次`,
     metaLoopIter: (iter: number) => `第 ${iter} 次迭代`,

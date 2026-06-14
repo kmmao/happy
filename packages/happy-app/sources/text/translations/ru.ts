@@ -59,6 +59,7 @@ export const ru: TranslationStructure = {
     emptyTitle: "No workflows yet",
     emptyDescription: "Run `happy` on your Machine to start a conversation",
     cliLocal: "CLI-local",
+    roleSupervisor: "Супервайзер",
     metaCronRuns: (count: number) => `cron · ${count} runs`,
     metaWebhookFires: (count: number) => `webhook · ${count} fires`,
     metaLoopIter: (iter: number) => `iter ${iter}`,

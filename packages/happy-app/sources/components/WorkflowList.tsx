@@ -189,6 +189,20 @@ const styles = StyleSheet.create((theme, rt) => ({
         color: theme.colors.warning,
         ...Typography.default("semiBold"),
     },
+    supervisorRoleTag: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 4,
+        paddingHorizontal: 6,
+        paddingVertical: 2,
+        borderRadius: 6,
+        backgroundColor: `${theme.colors.accentBlue}1F`,
+    },
+    supervisorRoleTagText: {
+        fontSize: 10,
+        color: theme.colors.accentBlue,
+        ...Typography.default("semiBold"),
+    },
     expandToggle: {
         paddingTop: 2,
     },
@@ -587,6 +601,23 @@ const WorkflowRow = React.memo(function WorkflowRow({
                                     color={theme.colors.warning}
                                 />
                                 <Text style={styles.cliLocalTagText}>{t("workflows.cliLocal")}</Text>
+                            </View>
+                        ) : null}
+                        {/* ADR-0022 Phase 4 — small inline role badge so
+                            supervisor-role loops (autopilot mode) are
+                            distinguishable at a glance from the generic
+                            user-defined ones. Skipped for generic since
+                            it would clutter every row. */}
+                        {workflow.kind === "loop" && workflow.role === "supervisor" ? (
+                            <View style={styles.supervisorRoleTag}>
+                                <Ionicons
+                                    name="shield-checkmark-outline"
+                                    size={10}
+                                    color={theme.colors.accentBlue}
+                                />
+                                <Text style={styles.supervisorRoleTagText}>
+                                    {t("workflows.roleSupervisor")}
+                                </Text>
                             </View>
                         ) : null}
                     </View>

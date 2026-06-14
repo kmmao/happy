@@ -87,6 +87,14 @@ export interface LoopWorkflow extends BaseWorkflow {
      * Trigger/Run history is incomplete. Phase 3b removes this flag.
      */
     isCliLocal: boolean;
+    /**
+     * Role discriminator from ADR-0022. Lets the workflow row render a
+     * small "supervisor" badge for autopilot-style loops without
+     * forcing the Workflow IA to split them into a separate kind. CLI-
+     * local loops surfaced through daemonState don't carry a role
+     * field, so they default to "generic".
+     */
+    role: "generic" | "supervisor";
 }
 
 export type Workflow =
@@ -179,7 +187,11 @@ export function useWorkflows(): UseWorkflowsResult {
         const [cron, hooks, loops] = await Promise.all([
             fetchTriggerSchedules(credentials).catch(() => ({ triggerSchedules: [], total: 0 })),
             fetchWebhookTriggers(credentials).catch(() => ({ webhookTriggers: [], total: 0 })),
-            fetchAgentLoopsAcrossProjects(credentials, serverProjectIds, { role: "generic" })
+            // ADR-0022 Phase 4 — omit `role` so the unified endpoint
+            // returns BOTH supervisor + generic rows. The workflow row
+            // renders a small role badge to distinguish supervisor
+            // (autopilot) loops from generic ones.
+            fetchAgentLoopsAcrossProjects(credentials, serverProjectIds)
                 .catch(() => [] as SerializedAgentLoop[]),
         ]);
         setCronTriggers(cron.triggerSchedules);
@@ -233,7 +245,10 @@ export function useWorkflows(): UseWorkflowsResult {
         //      Surfaces loops the App just created via CreateLoopModal
         //      before the daemon-state push arrives, and any loop whose
         //      target daemon is currently offline.
-        const loopsById = new Map<string, { machineId: string; loop: AgentLoopSummary }>();
+        const loopsById = new Map<
+            string,
+            { machineId: string; loop: AgentLoopSummary; role: "generic" | "supervisor" }
+        >();
 
         // Pass 1: server-fetched loops land first; per-machine daemonState
         // entries overwrite them in pass 2 (live runtime state wins).
@@ -254,20 +269,30 @@ export function useWorkflows(): UseWorkflowsResult {
                 loopsById.set(serverLoop.id, {
                     machineId,
                     loop: serializedToSummary(serverLoop),
+                    role: serverLoop.role,
                 });
             }
         }
 
         // Pass 2: walk every machine's daemonState.automation.loops. Each
-        // loop overwrites any same-id server entry from pass 1.
+        // loop overwrites any same-id server entry from pass 1. The CLI
+        // only surfaces generic loops via daemonState (supervisor lives
+        // in a separate server-only table), so the role on this pass is
+        // always "generic" unless the server pass already tagged it as
+        // supervisor (in which case daemonState shouldn't have it).
         for (const machine of allMachines) {
             const loops = ((machine.daemonState?.automation as any)?.loops ?? []) as AgentLoopSummary[];
             for (const loop of loops) {
-                loopsById.set(loop.id, { machineId: machine.id, loop });
+                const existing = loopsById.get(loop.id);
+                loopsById.set(loop.id, {
+                    machineId: machine.id,
+                    loop,
+                    role: existing?.role ?? "generic",
+                });
             }
         }
 
-        for (const { machineId, loop } of loopsById.values()) {
+        for (const { machineId, loop, role } of loopsById.values()) {
             const loopSessions = (allSessions as Session[])
                 .filter((s) => {
                     if (typeof s === "string") return false;
@@ -305,6 +330,7 @@ export function useWorkflows(): UseWorkflowsResult {
                 // (CLI-only, pre-migration); the Batch 4 migration tool
                 // lifts that flag for each row it uploads.
                 isCliLocal: false,
+                role,
             });
         }
 
