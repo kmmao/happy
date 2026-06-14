@@ -1,30 +1,26 @@
 /**
  * CreateWorkflowMenu — header "+" entry point for the Workflow IA.
  *
- * The Sessions tab header used to be a single + that pushed /new
- * (start an Ad-hoc Workflow). With Scheduled/Event Workflows being
- * first-class IA citizens, that single button hid the ability to create
- * automation from scratch (the only previous path was "open a Session,
- * long-press, Make recurring" — discoverable only by users who already
- * knew). This menu surfaces all three creation paths at the top:
+ * Reports surfaced that the previous Modal.alert version silently
+ * failed to open on PC web. This rewrite uses our PopoverMenu (real
+ * popover on desktop, bottom sheet on mobile) which is portal-mounted
+ * via RN Modal and has been verified visible on both surfaces.
  *
+ * Surfaces three creation paths:
  *   - Start a session     → router.push("/new")
- *   - Create a schedule   → opens MakeRecurringModal in standalone mode
- *   - Create a webhook    → disabled (gated on cli/agent updates)
- *
- * The menu opens via Modal.alert so we don't fight platform-specific
- * popover quirks; native users get a familiar action sheet, web users
- * get a centered modal.
+ *   - Create a schedule   → MakeRecurringModal in standalone mode
+ *   - Create a webhook    → CreateWebhookModal in standalone mode
  */
 
 import * as React from "react";
-import { Pressable } from "react-native";
+import { Pressable, View } from "react-native";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useUnistyles } from "react-native-unistyles";
-import { Modal } from "@/modal";
 import { t } from "@/text";
 import { MakeRecurringModal } from "./MakeRecurringModal";
+import { CreateWebhookModal } from "./CreateWebhookModal";
+import { PopoverMenu, usePopoverAnchor } from "@/components/PopoverMenu";
 
 interface CreateWorkflowMenuProps {
     style?: any;
@@ -35,47 +31,67 @@ export const CreateWorkflowMenu = React.memo(function CreateWorkflowMenu({
 }: CreateWorkflowMenuProps) {
     const router = useRouter();
     const { theme } = useUnistyles();
+    const { anchor, ref, open, close, isOpen } = usePopoverAnchor();
     const [scheduleModalVisible, setScheduleModalVisible] = React.useState(false);
-
-    const openMenu = React.useCallback(() => {
-        Modal.alert(
-            t("workflows.createMenuTitle"),
-            "",
-            [
-                { text: t("common.cancel"), style: "cancel" },
-                {
-                    text: t("workflows.createMenuNewSession"),
-                    onPress: () => router.push("/new"),
-                },
-                {
-                    text: t("workflows.createMenuScheduled"),
-                    onPress: () => setScheduleModalVisible(true),
-                },
-                // Webhook intentionally omitted from the action sheet for
-                // now — pre-displaying a disabled option in alert() isn't
-                // ideal UX. When ADR-0022 phase 3b lands and webhook
-                // creation gets wired, add a fourth entry here.
-            ],
-        );
-    }, [router]);
+    const [webhookModalVisible, setWebhookModalVisible] = React.useState(false);
 
     return (
         <>
-            <Pressable
-                onPress={openMenu}
-                hitSlop={15}
-                style={style}
-                accessibilityLabel={t("workflows.createMenuTitle")}
-            >
-                <Ionicons
-                    name="add-outline"
-                    size={28}
-                    color={theme.colors.header.tint}
-                />
-            </Pressable>
+            <View ref={ref} collapsable={false}>
+                <Pressable
+                    onPress={open}
+                    hitSlop={15}
+                    style={style}
+                    accessibilityLabel={t("workflows.createMenuTitle")}
+                >
+                    <Ionicons
+                        name="add-outline"
+                        size={28}
+                        color={theme.colors.header.tint}
+                    />
+                </Pressable>
+            </View>
+
+            <PopoverMenu
+                visible={isOpen}
+                onClose={close}
+                anchor={anchor}
+                title={t("workflows.createMenuTitle")}
+                options={[
+                    {
+                        key: "session",
+                        label: t("workflows.createMenuNewSession"),
+                        hint: t("workflows.createMenuNewSessionHint"),
+                        icon: "chatbubble-ellipses-outline",
+                        iconColor: "#8E8E93",
+                        onPress: () => router.push("/new"),
+                    },
+                    {
+                        key: "schedule",
+                        label: t("workflows.createMenuScheduled"),
+                        hint: t("workflows.createMenuScheduledHint"),
+                        icon: "timer-outline",
+                        iconColor: "#34C759",
+                        onPress: () => setScheduleModalVisible(true),
+                    },
+                    {
+                        key: "webhook",
+                        label: t("workflows.createMenuWebhook"),
+                        hint: t("workflows.createMenuWebhookHint"),
+                        icon: "flash-outline",
+                        iconColor: "#0A84FF",
+                        onPress: () => setWebhookModalVisible(true),
+                    },
+                ]}
+            />
+
             <MakeRecurringModal
                 visible={scheduleModalVisible}
                 onClose={() => setScheduleModalVisible(false)}
+            />
+            <CreateWebhookModal
+                visible={webhookModalVisible}
+                onClose={() => setWebhookModalVisible(false)}
             />
         </>
     );

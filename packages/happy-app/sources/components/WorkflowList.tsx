@@ -206,6 +206,49 @@ const styles = StyleSheet.create((theme, rt) => ({
         gap: 10,
         backgroundColor: theme.colors.surface,
     },
+    // Tree layout: each row carries its own rail segment + T-connector so
+    // we don't need a "full-height rail + cover the bottom" trick.
+    treeRow: {
+        flexDirection: "row",
+        alignItems: "stretch",
+    },
+    treeRail: {
+        width: 14,
+        position: "relative",
+    },
+    // Vertical line for non-terminal rows: top → bottom of the row.
+    treeRailVerticalFull: {
+        position: "absolute",
+        left: 6,
+        top: 0,
+        bottom: 0,
+        width: 1,
+        backgroundColor: theme.colors.divider,
+    },
+    // Vertical line for the LAST row: only the upper half (stops at the
+    // T-connector midline, drawing the └─ corner instead of ├─).
+    treeRailVerticalHalf: {
+        position: "absolute",
+        left: 6,
+        top: 0,
+        height: "50%",
+        width: 1,
+        backgroundColor: theme.colors.divider,
+    },
+    // Horizontal stub from rail to the row content.
+    treeRailConnector: {
+        position: "absolute",
+        left: 7,
+        top: "50%",
+        width: 7,
+        height: 1,
+        marginTop: -0.5,
+        backgroundColor: theme.colors.divider,
+    },
+    treeRowChildren: {
+        flex: 1,
+        minWidth: 0,
+    },
     sectionTitle: {
         fontSize: 11,
         color: theme.colors.textSecondary,
@@ -641,7 +684,10 @@ const WorkflowDetailBody = React.memo(function WorkflowDetailBody({
                 </View>
             ) : null}
 
-            {/* Sessions list (always shown; the whole point of expanding). */}
+            {/* Sessions list — rendered as a tree under the section header
+                so the parent-child relationship reads visually. Each child
+                row is offset behind a vertical rail with a T-connector;
+                the rail ends at the last visible row. */}
             <View>
                 <Text style={styles.sectionTitle}>
                     {t("workflows.sessionsHeader", workflow.sessions.length)}
@@ -649,30 +695,33 @@ const WorkflowDetailBody = React.memo(function WorkflowDetailBody({
                 {workflow.sessions.length === 0 ? (
                     <Text style={styles.emptySessions}>{t("workflows.detailNoSessions")}</Text>
                 ) : (
-                    sessionsToShow.map((session) => (
-                        <SessionLeaf
-                            key={session.id}
-                            session={session}
-                            onPress={() => navigateToSession(session.id)}
-                        />
-                    ))
+                    <View>
+                        {sessionsToShow.map((session, idx) => {
+                            const isLast =
+                                idx === sessionsToShow.length - 1 && moreCount === 0;
+                            return (
+                                <TreeRow key={session.id} isLast={isLast}>
+                                    <SessionLeaf
+                                        session={session}
+                                        onPress={() => navigateToSession(session.id)}
+                                    />
+                                </TreeRow>
+                            );
+                        })}
+                        {moreCount > 0 ? (
+                            <TreeRow isLast>
+                                <Pressable
+                                    style={styles.moreSessionsButton}
+                                    onPress={() => navigateToSession(workflow.sessions[0].id)}
+                                >
+                                    <Text style={styles.moreSessionsText}>
+                                        + {moreCount} more
+                                    </Text>
+                                </Pressable>
+                            </TreeRow>
+                        ) : null}
+                    </View>
                 )}
-                {moreCount > 0 ? (
-                    <Pressable
-                        style={styles.moreSessionsButton}
-                        onPress={() => {
-                            // For now, navigate to the most recent session
-                            // (best proxy until a per-workflow archive page
-                            // exists). Future: show a /workflow/[id]/
-                            // sessions list page if usage demands.
-                            navigateToSession(workflow.sessions[0].id);
-                        }}
-                    >
-                        <Text style={styles.moreSessionsText}>
-                            + {moreCount} more
-                        </Text>
-                    </Pressable>
-                ) : null}
             </View>
         </View>
     );
@@ -686,6 +735,28 @@ function ConfigChip({ label, value }: { label: string; value: string }) {
         </View>
     );
 }
+
+// TreeRow wraps an inline content child in a left rail column, drawing
+// either a ├─ (non-terminal) or └─ (terminal) connector. The rail and
+// connector are inert View slabs — no measurement, no nested gestures —
+// so they cost virtually nothing per row.
+const TreeRow = React.memo(function TreeRow({
+    isLast,
+    children,
+}: {
+    isLast?: boolean;
+    children: React.ReactNode;
+}) {
+    return (
+        <View style={styles.treeRow}>
+            <View style={styles.treeRail}>
+                <View style={isLast ? styles.treeRailVerticalHalf : styles.treeRailVerticalFull} />
+                <View style={styles.treeRailConnector} />
+            </View>
+            <View style={styles.treeRowChildren}>{children}</View>
+        </View>
+    );
+});
 
 const SessionLeaf = React.memo(function SessionLeaf({
     session,

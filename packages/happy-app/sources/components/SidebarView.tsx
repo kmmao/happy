@@ -12,7 +12,7 @@ import { useHeaderHeight } from "@/utils/responsive";
 import { useIsTablet } from "@/utils/responsive";
 import { Typography } from "@/constants/Typography";
 import { StatusDot } from "./StatusDot";
-import { FABWide } from "./FABWide";
+import { CreateWorkflowMenu } from "./workflow/CreateWorkflowMenu";
 import { VoiceAssistantStatusBar } from "./VoiceAssistantStatusBar";
 import { useRealtimeStatus } from "@/sync/storage";
 import { MainView } from "./MainView";
@@ -545,13 +545,7 @@ export const SidebarView = React.memo(() => {
                 tintColor={theme.colors.header.tint}
               />
             </Pressable>
-            <Pressable onPress={handleNewSession} hitSlop={15}>
-              <Ionicons
-                name="add-outline"
-                size={28}
-                color={theme.colors.header.tint}
-              />
-            </Pressable>
+            <CreateWorkflowMenu />
           </View>
         </View>
         {realtimeStatus !== "disconnected" && (
@@ -559,7 +553,10 @@ export const SidebarView = React.memo(() => {
         )}
         <MainView variant="sidebar" />
       </View>
-      <FABWide onPress={handleNewSession} />
+      {/* FABWide removed — the header + menu (CreateWorkflowMenu above)
+          is the single source of truth for creation. The floating button
+          duplicated that entry and only showed "start session", missing
+          the Schedule / Webhook paths the menu exposes. */}
     </>
   );
 });

@@ -651,6 +651,18 @@ function MachineDetailScreen() {
           onPress={() => router.push(`/machine/${machineId}/diagnostics` as any)}
         />
 
+        {/* Advanced automation — daemon-side state (guardians, audit log,
+            bootstrap / auto-dream profiles) that the inline Workflow view
+            doesn't surface. */}
+        <MachineNavigationSummaryItem
+          groupTitle={t("advancedAutomation.entryFromMachineDetail")}
+          title={t("advancedAutomation.entryFromMachineDetail")}
+          subtitle={t("advancedAutomation.entryFromMachineDetailHint")}
+          iconName="construct-outline"
+          iconColor="#BF5AF2"
+          onPress={() => router.push(`/machine/${machineId}/automation` as any)}
+        />
+
         {/* Docker Containers (Provision Tokens) — only if Docker is available */}
         {hasDocker && (
           <MachineNavigationSummaryItem

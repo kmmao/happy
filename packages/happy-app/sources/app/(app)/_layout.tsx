@@ -507,6 +507,17 @@ export default function RootLayout() {
       />
       {/* Workflow IA: workflow detail is rendered inline inside
           WorkflowList rows; no standalone /workflow/[id] page exists. */}
+      {/* Advanced automation (per-machine) — Guardian registry, audit log,
+          bootstrap / auto-dream profiles. Surfaces daemonState.automation
+          extras the inline Workflow view doesn't show. */}
+      <Stack.Screen
+        name="machine/[id]/automation"
+        options={{
+          headerShown: true,
+          headerTitle: t("advancedAutomation.title"),
+          headerBackTitle: t("common.back"),
+        }}
+      />
       <Stack.Screen
         name="machine/[id]/diagnostics"
         options={{
