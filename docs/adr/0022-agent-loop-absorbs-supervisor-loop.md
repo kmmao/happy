@@ -1,8 +1,17 @@
 ---
-status: accepted
+status: completed
 ---
 
 # SupervisorLoop becomes an AgentLoop role; AgentLoop is the single persistent-autonomy primitive
+
+> **Status — June 2026.** All four migration phases have landed. The
+> `model AgentLoop` Prisma surface is canonical, the physical table is
+> named `AgentLoop`, the `/v1/projects/:id/agent-loops` REST family
+> handles both roles via the `role` query parameter, and the
+> CLI-local `~/.happy/agent-loops.json` migration tooling
+> (`happy loop migrate-preview`) is in place. Legacy
+> `/v1/projects/:id/supervisor/loop*` routes are preserved as
+> compatibility shims; new code targets the unified family.
 
 Two parallel "loop" entities had accumulated in the codebase:
 
@@ -29,23 +38,29 @@ Continuing to evolve the two in parallel would mean re-implementing every KAIROS
 
 The decision is accepted; only the migration is staged. Each phase is independently shippable.
 
-**Phase 1 — Naming + documentation (this ADR).** `CONTEXT.md` gains an `AgentLoop` entry; `SupervisorLoop` entry is rewritten as "now a role on AgentLoop per this ADR". No code change. Code keeps both names for now; the convergence is signalled in docs first.
+**Phase 1 — Naming + documentation (this ADR). ✓ closed.** `CONTEXT.md` gained an `AgentLoop` entry; `SupervisorLoop` entry rewritten as "now a role on AgentLoop". No code change. Code kept both names; convergence signalled in docs first.
 
-**Phase 2 — `role` discriminator on the server.** Rename the Prisma model `SupervisorLoop` → `AgentLoop` and add `@@map("SupervisorLoop")` so the physical table name is unchanged in DB. Add a new column `role TEXT NOT NULL DEFAULT 'supervisor'` so existing rows backfill automatically. The supervisor engine (`supervisorLoopEngine.ts`) and supervisor routes (`supervisorLoopRoutes.ts`) switch from `db.supervisorLoop.*` to `db.agentLoop.*`, with `where: { role: "supervisor" }` added to every range query and mutation so a supervisor mutation can never accidentally touch a future generic-role row. The CLI-side AgentLoop pipeline (when it lands in Phase 3) writes to the same table with `role = "generic"`. The view-over-table approach the first revision of this ADR considered was abandoned — see Considered alternatives below.
+**Phase 2 — `role` discriminator on the server. ✓ closed.** Renamed the Prisma model `SupervisorLoop` → `AgentLoop` and added `@@map("SupervisorLoop")` so the physical table name was unchanged in DB. Added column `role TEXT NOT NULL DEFAULT 'supervisor'` so existing rows backfilled automatically. The supervisor engine (`supervisorLoopEngine.ts`) and supervisor routes (`supervisorLoopRoutes.ts`) switched from `db.supervisorLoop.*` to `db.agentLoop.*`, with `where: { role: "supervisor" }` added to every range query and mutation so a supervisor mutation could not accidentally touch a future generic-role row. The CLI-side AgentLoop pipeline (Phase 3b) writes to the same table with `role = "generic"`. The view-over-table approach the first revision of this ADR considered was abandoned — see Considered alternatives below.
 
-**Phase 3a — Schema augmentation (landed).** Add 10 columns to `AgentLoop` for generic-role configuration: `prompt`, `directory`, `agent`, `intervalMs`, `cronExpression`, `enabled` (default true), `nextRunAt` (BigInt), `continuityKey`, `iteration` (default 0), `genericConfig Json?` (a JSON bag for the long-tail config — environment variables, file/github/ci bridge toggles, event filters, downstream cascade, notification channels, cost caps, CLI-side agent role triplet, etc.). All nullable except `enabled` and `iteration`, so supervisor-role rows are unaffected. New index `(role, enabled, nextRunAt)` supports the scheduler's hot path. The CLI-side `roleId/roleName/roleType` triplet (user-defined agent persona) lives inside `genericConfig` to avoid colliding with the top-level `role` discriminator.
+**Phase 3a — Schema augmentation. ✓ closed.** Added 10 columns to `AgentLoop` for generic-role configuration: `prompt`, `directory`, `agent`, `intervalMs`, `cronExpression`, `enabled` (default true), `nextRunAt` (BigInt), `continuityKey`, `iteration` (default 0), `genericConfig Json?` (a JSON bag for the long-tail config — environment variables, file/github/ci bridge toggles, event filters, downstream cascade, notification channels, cost caps, CLI-side agent role triplet, etc.). All nullable except `enabled` and `iteration`, so supervisor-role rows are unaffected. Added composite index `(role, enabled, nextRunAt)` to support the scheduler's hot path. The CLI-side `roleId/roleName/roleType` triplet (user-defined agent persona) lives inside `genericConfig` to avoid colliding with the top-level `role` discriminator.
 
-**Phase 3b — CLI definitions move to the server.** CLI-local `.happy/agent-loops/<id>/` directories become **runtime artefacts only** (working memory, briefs, transcripts). The definition (prompt, schedule, triggers, role config) is fetched from the server on daemon boot and on Socket.IO push. `DaemonState.automation.loopRollup` continues to be the low-latency status surface for the App. This phase requires: server-side CRUD endpoints for AgentLoop (role=generic), a one-time migration of existing CLI-local AgentLoops to the server (the daemon performs the upload on first boot after the upgrade), and a sync handler on the CLI side that subscribes to Socket.IO updates and persists the latest definition locally for offline operation.
+**Phase 3b — CLI definitions move to the server. ✓ closed.** Three coordinated landings:
+- **Wire 0.32.0** (commit `12aabaf8c`): `SerializedAgentLoopSchema`, `CreateGenericAgentLoopBodySchema`, `UpdateGenericAgentLoopBodySchema`, `ListAgentLoopsQuerySchema`, the three `AgentLoop{Trigger,Status,Brief}EphemeralSchema` variants, persistent `AgentLoop{Update,Delete}SyncBodySchema`, and `AgentLoopIterationReportSchema`.
+- **Server side** (commit `cbfeb7d88`): `agentLoopEngine.ts` (create/update/delete + `tickDueGenericAgentLoops` scheduler hooked into machine heartbeat 5-min throttle + iteration callback handler with stateless HMAC token), `agentLoopRoutes.ts` (`POST/GET/PATCH/DELETE/enable/disable/iterations` REST surface), syncEphemeral/syncUpdate seam extensions for the new variants.
+- **CLI side** (commit `b453efb4f`): `RemoteAgentLoopController` translates `agent-loop-trigger` ephemerals into the existing `AgentLoopTriggerData` pipeline through `AutomationScheduler`; new `onJobTerminal` hook on the scheduler fires the HTTP iteration callback when the spawned session ends. CLI-local `~/.happy/agent-loops.json` keeps its runtime fields (iteration, nextRunAt, recentEvents, runtimeState, phase); the definition fields are now authoritative server-side.
+- **Migration tool** (commit `486a08c98`): `migrateLocalAgentLoops` core + `happy loop migrate-preview` CLI subcommand. Idempotent (skip rows already marked `migratedToServerLoopId`), non-destructive (local row stays, just gains the marker), dry-run by default. Apply path lands once server deploy is verified.
+- **App side** (commit `d4a763d50`): `apiAgentLoops.ts` HTTP client + `notifyAgentLoopsChanged` event bus, `CreateLoopModal` real form (machine → project → schedule chips → agent chips → prompt + optional name), `useWorkflows` merges server-fetched loops with `daemonState.automation.loops` (daemon-state wins on collision; server-fetch surfaces newly-created loops before daemon push arrives).
 
-**Phase 4 — Routes + UI converge.** Once Phase 3b is stable: `/v1/supervisor-loops/*` and `/v1/agent-loops/*` collapse into `/v1/agent-loops/*` with a `role` query parameter. The project page's `/project/[id]/supervisor-loop/[loopId]` route becomes a thin redirect to `/agent-loop/[id]` with a role-aware detail screen (supervisor role shows SupervisorRun/Action history and healthScore charts; generic role shows brief + working memory). The machine page's "管理智能体循环" card lists all AgentLoops on the machine regardless of role. The physical table is also renamed at this phase (drop `@@map("SupervisorLoop")`) so DB-level introspection matches the domain model.
+**Phase 4 — Routes + table + UI converge. ✓ closed.** Three coordinated landings:
+- **Route unification** (commit `525ed85b4`, Batch 6): `/v1/projects/:id/agent-loops` family handles BOTH roles. `GET` list returns both when `role` query param is omitted; `DELETE` is role-aware (supervisor refuses running/paused, generic uses engine helper); `POST /{pause,resume,stop}` dispatches by role (supervisor → `supervisorLoopEngine`, generic → new `pauseGenericAgentLoop` / `resumeGenericAgentLoop` / `stopGenericAgentLoop` helpers). Legacy `/v1/projects/:id/supervisor/loop*` routes preserved as compatibility shims.
+- **Physical table rename** (same commit, Batch 7): migration `20260614_phase4_rename_supervisorloop_to_agentloop` renames the table + 6 indexes + the projectId FK constraint. `@@map("SupervisorLoop")` alias dropped from `schema.prisma`. FKs INTO the table (`SupervisorRun.loopId`) keep their names automatically. One raw-SQL site in `projectDedup.ts` updated.
+- **UI consolidation** (commit `d7c7378b9`, Batch 8): `useWorkflows` fetches both roles from the unified endpoint; `LoopWorkflow` gains a `role` discriminator; workflow list renders an inline "Supervisor" badge alongside the existing CLI-local tag. 17 new integration tests (`agentLoopRoutes.spec.ts`) pin the unified surface end-to-end with hoisted Prisma/inTx/sync/supervisor-engine fakes.
 
-## Open subordinate questions
+## Subordinate questions — status snapshot
 
-These are deliberately NOT decided here. They are downstream of the principle and should each get their own ADR when the migration reaches that phase:
-
-- **Cron-trigger ownership.** Server-side `supervisorScheduler` already fires supervisor-role loops. Today's generic AgentLoop schedules its own cron in the CLI. Phase 3 forces a choice: unify on server-side scheduling (simple, cron-fires-when-daemon-offline) or keep dual schedulers (faster startup, no DB round-trip per fire). Punt to a later ADR.
-- **`auditApproveThreshold` for generic role.** Confidence-gated auto-approval is the centrepiece of supervisor autonomy. The generic role today has no equivalent ("autoRun" is a binary). A future ADR may extend this pattern across roles.
-- **Backwards-compatible API window.** How long do we keep `/v1/supervisor-loops/*` aliased after Phase 4? Touch only when Phase 4 lands.
+- **Cron-trigger ownership. ✓ Settled (Phase 3b).** Server owns the schedule. `tickDueGenericAgentLoops` runs on the same machine-heartbeat 5-min throttle as the supervisor scheduler and uses the Phase 3a `(role, enabled, nextRunAt)` composite index. CLI keeps local fallback for offline operation in the legacy `~/.happy/agent-loops.json` path, but once a loop is server-managed the server is authoritative. Daemon offline ≠ schedule skipped — the next heartbeat dequeues every overdue iteration.
+- **`autoApproveThreshold` for generic role.** Open — generic still uses a binary autoRun. A future ADR may extend confidence-gated approval across roles once the use case surfaces.
+- **Backwards-compatible API window.** Settled as part of Phase 4: `/v1/projects/:id/supervisor/loop*` routes stay alive indefinitely as compatibility shims. Deprecation timeline is non-urgent — new code targets the unified family; old surface keeps working until a follow-up ADR formally retires it.
 
 ## Considered alternatives
 
@@ -57,7 +72,8 @@ These are deliberately NOT decided here. They are downstream of the principle an
 ## Consequences
 
 - New contributors learn one persistent-autonomy primitive (AgentLoop), not two. Claude Code's KAIROS framing maps to it directly.
-- The `model SupervisorLoop` Prisma name survives only as a view during Phase 2; new schema work targets `model AgentLoop`.
-- The project domain's `Project → SupervisorRun` relationship becomes `Project → AgentLoop (role=supervisor) → SupervisorRun`. SupervisorRun and SupervisorAction stay; their semantics are unchanged.
-- `CONTEXT.md` declares the converged model upfront; the deprecation of standalone `SupervisorLoop` is signposted so future readers don't write code against the old shape.
+- The `SupervisorLoop` name is fully retired at the model + table + canonical route level. The only remaining traces are the legacy `/v1/projects/:id/supervisor/loop*` HTTP routes (kept as compatibility shims), the `SupervisorRun` and `SupervisorAction` tables (which are the supervisor-role *outputs* and remain first-class), and the rich vocabulary `Supervisor` UI surface (settings, health charts, autopilot terminology) that is genuinely role-specific.
+- The project domain's `Project → SupervisorRun` relationship now reads `Project → AgentLoop (role=supervisor) → SupervisorRun`. SupervisorRun and SupervisorAction semantics are unchanged.
+- `CONTEXT.md` declares the converged model upfront; the legacy `SupervisorLoop` term is signposted as fully absorbed.
 - A future architecture review that proposes "split SupervisorLoop back out because the supervisor autonomy needs differ", or asks "why does the generic AgentLoop carry healthScoreTarget?" (it doesn't — that field is role-gated) should read this ADR first.
+- 105 server tests + 85 CLI automation tests + 657 app i18n audit tests pin the converged contract. The agentLoopRoutes integration spec covers role-aware list / detail / delete / pause / resume / stop / enable / disable / iteration callback end-to-end through hoisted Prisma/inTx/sync fakes.
