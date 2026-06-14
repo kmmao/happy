@@ -98,6 +98,13 @@ export interface AutomationSchedulerOptions {
   onChange?: (jobs: AutomationJob[]) => void;
   sendPushNotification?: (title: string, body: string) => void;
   onTaskStatusReport?: (taskId: string, status: string, sessionId?: string, errorMessage?: string, outcome?: "completed" | "failed" | "blocked") => void;
+  /**
+   * ADR-0022 Phase 3b — fires once per job reaching a terminal status.
+   * The RemoteAgentLoopController subscribes here to POST iteration
+   * reports back to the server. Other consumers may subscribe too — the
+   * callback is invoked best-effort and any throw is logged and dropped.
+   */
+  onJobTerminal?: (job: AutomationJob) => void | Promise<void>;
 }
 
 export class AutomationScheduler {
@@ -110,6 +117,7 @@ export class AutomationScheduler {
   private readonly onChange?: (jobs: AutomationJob[]) => void;
   private readonly sendPushNotification?: (title: string, body: string) => void;
   private readonly onTaskStatusReport?: (taskId: string, status: string, sessionId?: string, errorMessage?: string, outcome?: "completed" | "failed" | "blocked") => void;
+  private readonly onJobTerminal?: (job: AutomationJob) => void | Promise<void>;
   private readonly inFlight = new Set<string>();
   private readonly activeDispatches = new Set<Promise<void>>();
   private interval: NodeJS.Timeout | null = null;
@@ -129,6 +137,7 @@ export class AutomationScheduler {
     this.onChange = options.onChange;
     this.sendPushNotification = options.sendPushNotification;
     this.onTaskStatusReport = options.onTaskStatusReport;
+    this.onJobTerminal = options.onJobTerminal;
   }
 
   async start(recoveredRunningSessionIds?: ReadonlySet<string>): Promise<AutomationRecoveryResult> {
@@ -398,6 +407,20 @@ export class AutomationScheduler {
     await this.store.upsert(updated);
     this.notifyChange();
     this.reportTaskStatus(updated);
+    // ADR-0022 Phase 3b — fire the terminal hook. Best-effort: any throw
+    // from the subscriber must not roll back the scheduler's own state.
+    if (this.onJobTerminal) {
+      try {
+        const maybePromise = this.onJobTerminal(updated);
+        if (maybePromise && typeof (maybePromise as Promise<void>).catch === "function") {
+          (maybePromise as Promise<void>).catch((err) => {
+            logger.debug(`[AUTOMATION] onJobTerminal threw: ${err}`);
+          });
+        }
+      } catch (err) {
+        logger.debug(`[AUTOMATION] onJobTerminal threw sync: ${err}`);
+      }
+    }
     return updated;
   }
 

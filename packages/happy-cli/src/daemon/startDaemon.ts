@@ -42,6 +42,7 @@ import { resolveGuardianSession } from "./resolveGuardianSession";
 import { AutomationAuditStore } from "@/automation/AutomationAuditStore";
 import { deriveAutomationAuditStats, deriveAutomationGuardianUsage } from "@/automation/AutomationAudit";
 import { AutomationScheduler } from "@/automation/AutomationScheduler";
+import { RemoteAgentLoopController } from "@/automation/RemoteAgentLoopController";
 import { AgentLoopStore } from "@/automation/AgentLoopStore";
 import { AgentLoopCoordinator } from "@/automation/AgentLoopCoordinator";
 import { AgentLoopBootstrapStore } from "@/automation/AgentLoopBootstrapStore";
@@ -1376,6 +1377,10 @@ export async function startDaemon(): Promise<void> {
     });
 
     let automationScheduler: AutomationScheduler | null = null;
+    // ADR-0022 Phase 3b — handles server-driven generic AgentLoop iteration
+    // triggers (server emits `agent-loop-trigger` → controller enqueues →
+    // on terminal job, controller POSTs iteration report back to server).
+    let remoteAgentLoopController: RemoteAgentLoopController | null = null;
     let agentLoopCoordinator: AgentLoopCoordinator | null = null;
     let agentLoopBootstrapCoordinator: AgentLoopBootstrapCoordinator | null = null;
     let agentLoopFileWatcher: AgentLoopFileWatcher | null = null;
@@ -2526,6 +2531,45 @@ export async function startDaemon(): Promise<void> {
           logger.debug(`[TASK] Failed to report task status for ${taskId}: ${err}`);
         }
       },
+      // ADR-0022 Phase 3b — route every terminal job through the remote
+      // controller so server-driven AgentLoop iterations get an HTTP
+      // iteration report back. The controller no-ops for jobs it didn't
+      // enqueue, so other kinds (supervisor / webhook / task) are free.
+      onJobTerminal: (job) => {
+        if (!remoteAgentLoopController) return;
+        const sessionId = job.sessionId;
+        const status: "completed" | "failed" | "cancelled" =
+          job.status === "completed" || job.status === "failed" || job.status === "cancelled"
+            ? job.status
+            : "failed";
+        void remoteAgentLoopController.handleJobTerminal({
+          jobId: job.id,
+          status,
+          sessionId,
+          errorMessage: job.errorMessage,
+        });
+      },
+    });
+    // Wire the controller now that the scheduler exists. It uses apiMachine
+    // for the iteration HTTP callback (postAgentLoopIterationReport).
+    remoteAgentLoopController = new RemoteAgentLoopController({
+      scheduler: automationScheduler,
+      httpClient: {
+        postAgentLoopIterationReport: (opts) =>
+          apiMachine.postAgentLoopIterationReport(opts),
+      },
+      logger: {
+        info: (msg, ...args) => logger.info(msg, ...args),
+        warn: (msg, ...args) => logger.warn(msg, ...args),
+        debug: (msg, ...args) => logger.debug(msg, ...args),
+      },
+    });
+    apiMachine.setAgentLoopTriggerHandler((ephemeral) => {
+      void remoteAgentLoopController!
+        .handleTriggerEphemeral(ephemeral)
+        .catch((err) => {
+          logger.debug(`[DAEMON RUN] Failed to handle agent-loop-trigger: ${err}`);
+        });
     });
     const automationRecovery = await automationScheduler.start(recoveredRunningSessionIds);
     const agentLoopStore = new AgentLoopStore(

@@ -34,6 +34,8 @@ import { suggestAgentLoopsWithAI, gatherProjectContext } from "@/automation/Agen
 import {
   normalizeResolvedRuntimeProfile,
   type ResolvedRuntimeProfile,
+  type AgentLoopTriggerEphemeral,
+  type AgentLoopIterationReport,
 } from "@kmmao/happy-wire";
 import { createCipher, type Cipher } from "./encryption";
 import { backoff } from "@/utils/time";
@@ -413,6 +415,10 @@ export class ApiMachineClient {
     | null = null;
   private supervisorRunCompleteHandler:
     | ((data: { runId: string; projectId: string; status: "completed" | "failed" }) => void)
+    | null = null;
+  // ADR-0022 Phase 3b — server-driven generic AgentLoop iteration trigger.
+  private agentLoopTriggerHandler:
+    | ((data: AgentLoopTriggerEphemeral) => void)
     | null = null;
   private pendingWebhookStatuses: Array<{
     webhookEventId: string;
@@ -1016,6 +1022,61 @@ export class ApiMachineClient {
     handler: (data: { runId: string; projectId: string; status: "completed" | "failed" }) => void,
   ) {
     this.supervisorRunCompleteHandler = handler;
+  }
+
+  /**
+   * ADR-0022 Phase 3b — register a handler for `agent-loop-trigger`
+   * ephemerals emitted by the server's generic AgentLoop scheduler. The
+   * handler is called once per iteration the server schedules; it
+   * receives the full wire ephemeral including the per-iteration
+   * `callbackToken` the daemon will present on the iteration HTTP
+   * callback.
+   */
+  setAgentLoopTriggerHandler(handler: (data: AgentLoopTriggerEphemeral) => void) {
+    this.agentLoopTriggerHandler = handler;
+  }
+
+  /**
+   * ADR-0022 Phase 3b — POST the per-iteration report back to the server.
+   * The bearer token comes from the matching `agent-loop-trigger`
+   * ephemeral (see {@link setAgentLoopTriggerHandler}); the server
+   * validates it via constant-time HMAC compare in agentLoopEngine.
+   *
+   * Returns `{ ok }` mirroring the existing fetch helpers — we deliberately
+   * don't throw on non-2xx so the caller (RemoteAgentLoopController) can
+   * log and move on without bubbling into terminal job handling.
+   */
+  async postAgentLoopIterationReport(opts: {
+    projectId: string;
+    loopId: string;
+    bearerToken: string;
+    body: AgentLoopIterationReport;
+  }): Promise<{ ok: boolean; status?: number; error?: string }> {
+    const url =
+      `${configuration.serverUrl}/v1/projects/${encodeURIComponent(opts.projectId)}` +
+      `/agent-loops/${encodeURIComponent(opts.loopId)}/iterations`;
+    try {
+      const resp = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${opts.bearerToken}`,
+        },
+        body: JSON.stringify(opts.body),
+      });
+      if (!resp.ok) {
+        let errText: string | undefined;
+        try {
+          errText = await resp.text();
+        } catch {
+          errText = undefined;
+        }
+        return { ok: false, status: resp.status, error: errText };
+      }
+      return { ok: true, status: resp.status };
+    } catch (err) {
+      return { ok: false, error: (err as Error).message };
+    }
   }
 
   /**
@@ -1659,6 +1720,36 @@ export class ApiMachineClient {
           `[API MACHINE] Received supervisor-run-complete for run ${data.runId} status=${data.status}`,
         );
         this.supervisorRunCompleteHandler(data as unknown as { runId: string; projectId: string; status: "completed" | "failed" });
+      }
+
+      // ADR-0022 Phase 3b — server-driven generic AgentLoop iteration.
+      // Wire ephemeral carries `t` discriminator on the server side; the
+      // Socket.IO event dispatcher rewrites it to `type` so we match on the
+      // App-side type the rest of this switch uses. The runtime shape
+      // matches AgentLoopTriggerEphemeral 1:1 (modulo that rename).
+      if (data.type === "agent-loop-trigger" && this.agentLoopTriggerHandler) {
+        logger.debug(
+          `[API MACHINE] Received agent-loop-trigger for loop ${data.loopId} iter ${data.iteration}`,
+        );
+        // Rebuild a wire-shaped object (server uses `t`, socket forwarded
+        // `type`). The controller reads only the documented fields below.
+        const ephemeral: AgentLoopTriggerEphemeral = {
+          t: "agent-loop-trigger",
+          loopId: data.loopId,
+          projectId: data.projectId,
+          machineId: data.machineId,
+          iteration: data.iteration,
+          prompt: data.prompt,
+          directory: data.directory,
+          agent: data.agent,
+          continuityKey: data.continuityKey,
+          profileId: data.profileId ?? null,
+          runtimeProfile: data.runtimeProfile,
+          genericConfig: data.genericConfig,
+          callbackToken: data.callbackToken,
+          maxDurationMinutes: data.maxDurationMinutes,
+        };
+        this.agentLoopTriggerHandler(ephemeral);
       }
 
       // Terminal input forwarding (from App via Server)
