@@ -65,18 +65,28 @@ RUN rm /etc/nginx/conf.d/default.conf
 # - /_expo/static/* 和 /assets/* —— 文件名带内容 hash，内容变了文件名就变，可以放心长期缓存
 # - index.html 与其他 root 路径 —— 每次都让浏览器校验，避免 entry 引用了已删除的旧 chunk hash
 #   (此前没有 Cache-Control 头，浏览器无限期缓存 index.html，重建后出现 chunk hash 错配 → 404)
+#
+# 兜底策略：
+# - hashed 资源(/_expo/、/assets/)缺失 -> 返回 410 Gone，**不**走 SPA fallback
+#   原因：这些是 content-hash 命名的懒加载 chunk。如果用户浏览器跑着旧 entry chunk、
+#   懒加载请求一个被新部署覆盖掉的旧 hash，nginx 全局 error_page 会把 404 转成 302 -> /，
+#   ES module loader 拿到 text/html 就报 "Loading module ... failed"。
+#   返回 410 让浏览器拿到真错误，由客户端的 chunkReloadGuard 自动整页 reload 拉新 entry。
+# - SPA 路由（非静态资源）仍然走 @handle_404 -> 302 / 兜底
 RUN echo 'server { \
     listen 80; \
     \
     location /_expo/ { \
         root   /usr/share/nginx/html; \
         try_files $uri =404; \
+        error_page 404 = @hashed_asset_gone; \
         add_header Cache-Control "public, max-age=31536000, immutable" always; \
     } \
     \
     location /assets/ { \
         root   /usr/share/nginx/html; \
         try_files $uri =404; \
+        error_page 404 = @hashed_asset_gone; \
         add_header Cache-Control "public, max-age=31536000, immutable" always; \
     } \
     \
@@ -90,6 +100,11 @@ RUN echo 'server { \
         index  index.html index.htm; \
         try_files $uri $uri.html $uri/index.html $uri/index.htm $uri/ /index.html /index.htm =404; \
         add_header Cache-Control "no-cache, must-revalidate" always; \
+    } \
+    \
+    location @hashed_asset_gone { \
+        add_header Cache-Control "no-store" always; \
+        return 410; \
     } \
     \
     error_page 500 502 503 504 /50x.html; \

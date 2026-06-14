@@ -27,6 +27,7 @@ import {
 import { useMachine } from "@/sync/storage";
 import { resolveCliSelfUpgradeSupport } from "@/hooks/cliSelfUpgradeSupport";
 import { useCliVersionCheck } from "@/hooks/useCliVersionCheck";
+import { attemptChunkReload, isChunkLoadError } from "@/utils/chunkReloadGuard";
 import { t } from "@/text";
 
 interface WebTerminalProps {
@@ -228,6 +229,13 @@ function WebTerminalComponent({ machineId, cwd, sessionId, terminalId: terminalI
                 terminalRef.current = null;
             }
             fitAddonRef.current = null;
+            // 旧 entry chunk 引用了已被新部署覆盖的 xterm hash chunk 时会走到这里。
+            // 不展示「重新连接」按钮（点了也没用 — entry chunk 还在内存里），
+            // 直接整页 reload 让浏览器拉新 entry。chunkReloadGuard 内部有 10s 防抖。
+            if (isChunkLoadError(err)) {
+                attemptChunkReload(`WebTerminal init: ${err?.message ?? err}`);
+                return;
+            }
             if (mounted) {
                 setState("error");
                 setErrorMsg(err.message || t("webTerminal.initFailed"));
