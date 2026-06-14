@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.97.2 - 2026-06-15
+
+Progress lists no longer accidentally merge unrelated TaskCreate batches into a single chip.
+
+- Fixed `TaskMirrorState` indefinitely accumulating every `TaskCreate`/`TaskUpdate` it had ever seen — Claude Code (Opus 4.6+) keeps completed runtime tasks alive across turns, so the mirror's emitted todo set grew without bound. The downstream Jaccard overlap check in `applyHappyProgressUpdate` then saw near-full overlap on every emit and silently appended new-topic tasks to the prior progress list (visible in the App as one chip containing 24 items from 8+ unrelated work sessions).
+- Added a batch-freeze hook: when a fresh user prompt arrives (no `tool_use_result`, no `tool_result` blocks) and every live task is already `completed`, freeze the current batch. Frozen entries are excluded from `getTodos()` / `hasTasks()` and `TaskUpdate` no-ops on them, so the next `TaskCreate` emits only fresh items and the existing boundary detector archives the prior list and starts a new one. Same-topic continuations (complete A → create B inside one turn) still merge — the freeze only fires at turn boundaries.
+
 ## 0.88.1 - 2026-06-02
 
 Three more Claude Code 2.1.x hook events wired through the hook server, with tool-permission denials surfaced to the App.
