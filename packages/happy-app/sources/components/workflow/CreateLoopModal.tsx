@@ -1,50 +1,66 @@
 /**
- * CreateLoopModal — gated "Create a Loop" guidance sheet. Real creation
- * is blocked on ADR-0022 Phase 3b (CLI daemon endpoint + server wire RPC
- * both pending). Surfaces machine-by-machine CLI version readiness +
- * upgrade hint so users discover the gating in context instead of asking
- * why "Create a Loop" feels broken.
+ * CreateLoopModal — real Create-a-Loop form (ADR-0022 Phase 3b).
  *
- * Shell, animation, gestures owned by <BottomSheet>; this file only
- * owns the version compare logic + status badges.
+ * The form POSTs to /v1/projects/:projectId/agent-loops (apiAgentLoops.ts).
+ * Required fields: machine → project, prompt, schedule (interval or cron),
+ * agent. The existing CLI-version readiness panel is preserved as a
+ * collapsible "Advanced" section so users can still inspect daemon support
+ * without it dominating the modal.
+ *
+ * Shell, animation, gestures owned by <BottomSheet>; this file owns the
+ * form state, submit, and the readiness fold-out.
  */
 
 import * as React from "react";
-import { View, Pressable, Linking } from "react-native";
+import { View, Pressable, Linking, TextInput, ActivityIndicator } from "react-native";
 import { Text } from "@/components/StyledText";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { Ionicons } from "@expo/vector-icons";
 import { Typography } from "@/constants/Typography";
 import { webInteractive } from "@/utils/interactiveSurface";
 import { t } from "@/text";
-import { useAllMachines } from "@/sync/storage";
+import { useAllMachines, useProjects } from "@/sync/storage";
 import type { Machine } from "@/sync/storageTypes";
 import { isMachineOnline } from "@/utils/machineUtils";
-import { BottomSheet, BottomSheetHandle } from "@/components/BottomSheet";
+import { BottomSheet, BottomSheetHandle, PresetChip } from "@/components/BottomSheet";
+import { Modal as AlertModal } from "@/modal";
+import { TokenStorage } from "@/auth/tokenStorage";
+import { createAgentLoop, notifyAgentLoopsChanged } from "@/sync/apiAgentLoops";
+import type { CreateGenericAgentLoopBody } from "@kmmao/happy-wire";
 
 interface CreateLoopModalProps {
     visible: boolean;
     onClose: () => void;
+    /**
+     * Optional callback the parent can use to refresh the workflow list
+     * after a successful create. The hook re-fetches when this fires.
+     */
+    onCreated?: () => void;
 }
+
+type AgentChoice = "claude" | "codex" | "gemini";
+type ScheduleChoice = "5m" | "1h" | "6h" | "24h" | "cron";
+
+const SCHEDULE_INTERVALS_MS: Record<Exclude<ScheduleChoice, "cron">, number> = {
+    "5m": 5 * 60 * 1000,
+    "1h": 60 * 60 * 1000,
+    "6h": 6 * 60 * 60 * 1000,
+    "24h": 24 * 60 * 60 * 1000,
+};
 
 /**
  * Minimum CLI version that ships the daemon endpoints required for
- * server-driven Loop creation. Bumped when ADR-0022 Phase 3b lands.
+ * server-driven Loop creation. The form is enabled regardless — the
+ * server scheduler will queue triggers and only emit them to daemons
+ * that connect with a compatible version. The readiness panel just
+ * gives users an at-a-glance map.
  */
 const MIN_CLI_VERSION_FOR_LOOPS = "0.97.0";
 
-/**
- * The gating decision (AgentLoop / SupervisorLoop convergence, the
- * generic-role pipeline, and the Phase 3b CLI ↔ server work that
- * unblocks Loop creation from the App) lives in ADR-0022. The Workflow
- * IA PRD only references it second-hand, so we link the source of
- * truth instead.
- */
 const LEARN_MORE_URL =
     "https://github.com/kmmao/happy/blob/main/docs/adr/0022-agent-loop-absorbs-supervisor-loop.md";
 
-// Compare two semver strings (major.minor.patch). Returns -1 / 0 / 1.
-// Treats missing pieces as 0. Returns null if either side isn't parseable.
+// Semver compare — same helper the old guidance-only view used.
 function compareSemver(a: string | undefined | null, b: string): number | null {
     if (!a) return null;
     const parse = (s: string): number[] | null => {
@@ -66,7 +82,6 @@ type MachineSupport = {
     machine: Machine;
     version: string | null;
     online: boolean;
-    /** undefined = unknown version, true/false = comparison vs min. */
     meetsRequirement: boolean | undefined;
 };
 
@@ -99,30 +114,42 @@ const styles = StyleSheet.create((theme) => ({
         ...Typography.default(),
         lineHeight: 17,
     },
-    requirementCard: {
-        padding: 12,
-        borderRadius: 8,
-        backgroundColor: theme.colors.surfaceHigh,
-        gap: 6,
-    },
-    requirementLabel: {
-        fontSize: 11,
-        color: theme.colors.textSecondary,
-        textTransform: "uppercase",
-        letterSpacing: 0.1,
-        ...Typography.default("semiBold"),
-    },
-    requirementValue: {
-        fontSize: 14,
-        color: theme.colors.text,
-        ...Typography.default("semiBold"),
-        fontFamily: "Menlo",
-    },
     sectionLabel: {
         fontSize: 12,
         color: theme.colors.textSecondary,
         textTransform: "uppercase",
         letterSpacing: 0.1,
+        ...Typography.default("semiBold"),
+    },
+    presetGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 6 },
+    input: {
+        borderWidth: 1,
+        borderColor: theme.colors.divider,
+        borderRadius: 8,
+        paddingHorizontal: 10,
+        paddingVertical: 10,
+        fontSize: 14,
+        color: theme.colors.text,
+        backgroundColor: theme.colors.input?.background ?? theme.colors.groupped.background,
+    },
+    promptInput: {
+        minHeight: 96,
+        textAlignVertical: "top",
+        fontSize: 14,
+    },
+    cronInput: {
+        fontFamily: "Menlo",
+    },
+    advancedToggle: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 6,
+        paddingVertical: 8,
+        ...webInteractive,
+    },
+    advancedToggleText: {
+        fontSize: 13,
+        color: theme.colors.textLink,
         ...Typography.default("semiBold"),
     },
     machineRow: {
@@ -182,37 +209,172 @@ const styles = StyleSheet.create((theme) => ({
         justifyContent: "center",
         ...webInteractive,
     },
+    buttonCancel: { backgroundColor: theme.colors.surfaceHigh },
     buttonPrimary: { backgroundColor: theme.colors.button.primary.background },
+    buttonPrimaryDisabled: { backgroundColor: theme.colors.surfaceHigh },
     buttonText: { fontSize: 14, ...Typography.default("semiBold") },
     buttonTextPrimary: { color: theme.colors.button.primary.tint },
+    buttonTextCancel: { color: theme.colors.textSecondary },
 }));
 
 export const CreateLoopModal = React.memo(function CreateLoopModal({
     visible,
     onClose,
+    onCreated,
 }: CreateLoopModalProps) {
     const { theme } = useUnistyles();
     const sheetRef = React.useRef<BottomSheetHandle>(null);
+
     const machines = useAllMachines();
+    const projects = useProjects();
+
+    const [pickedMachineId, setPickedMachineId] = React.useState<string>("");
+    const [pickedProjectServerId, setPickedProjectServerId] = React.useState<string>("");
+    const [prompt, setPrompt] = React.useState("");
+    const [name, setName] = React.useState("");
+    const [schedule, setSchedule] = React.useState<ScheduleChoice>("1h");
+    const [cronExpression, setCronExpression] = React.useState("*/30 * * * *");
+    const [agent, setAgent] = React.useState<AgentChoice>("claude");
+    const [advancedOpen, setAdvancedOpen] = React.useState(false);
+    const [submitting, setSubmitting] = React.useState(false);
+
+    // Reset form on each open. We don't pre-pick the project until the
+    // machine settles (avoids flicker on first paint).
+    React.useEffect(() => {
+        if (!visible) return;
+        setPickedMachineId(machines[0]?.id ?? "");
+        setPickedProjectServerId("");
+        setPrompt("");
+        setName("");
+        setSchedule("1h");
+        setCronExpression("*/30 * * * *");
+        setAgent("claude");
+        setAdvancedOpen(false);
+        setSubmitting(false);
+    }, [visible, machines]);
+
+    // Projects on this machine that have been synced to the server.
+    // We can only create loops against `serverId`-known projects — local-
+    // only project rows are filtered out here so the user can't pick one
+    // that the server doesn't know about.
+    const machineProjects = React.useMemo(() => {
+        if (!pickedMachineId) return [];
+        return projects.filter(
+            (p) => p.key.machineId === pickedMachineId && p.serverId,
+        );
+    }, [projects, pickedMachineId]);
+
+    // Auto-pick the first project when the machine changes. Without
+    // this, the user would land on an empty project pick with the
+    // submit button greyed out for no obvious reason.
+    React.useEffect(() => {
+        if (machineProjects.length === 0) {
+            setPickedProjectServerId("");
+            return;
+        }
+        const stillValid = machineProjects.some(
+            (p) => p.serverId === pickedProjectServerId,
+        );
+        if (!stillValid) {
+            setPickedProjectServerId(machineProjects[0].serverId ?? "");
+        }
+    }, [machineProjects, pickedProjectServerId]);
+
+    const pickedProject = React.useMemo(
+        () => machineProjects.find((p) => p.serverId === pickedProjectServerId),
+        [machineProjects, pickedProjectServerId],
+    );
+
+    // Form validity: project + prompt mandatory. If cron is the chosen
+    // schedule, we also require a non-empty cron string.
+    const valid =
+        pickedProjectServerId.length > 0 &&
+        prompt.trim().length > 0 &&
+        (schedule !== "cron" || cronExpression.trim().length > 0);
+
+    const handleConfirm = async () => {
+        if (!valid || submitting || !pickedProject?.serverId) return;
+        setSubmitting(true);
+        try {
+            const credentials = await TokenStorage.getCredentials();
+            if (!credentials) throw new Error("Not authenticated");
+
+            const body: CreateGenericAgentLoopBody = {
+                prompt: prompt.trim(),
+                directory: pickedProject.key.path,
+                agent,
+                enabled: true,
+            };
+            if (schedule === "cron") {
+                body.cronExpression = cronExpression.trim();
+            } else {
+                body.intervalMs = SCHEDULE_INTERVALS_MS[schedule];
+            }
+            // The trimmed name is folded into genericConfig so the
+            // server preserves it for round-tripping back to the App.
+            const trimmedName = name.trim();
+            if (trimmedName) {
+                body.genericConfig = { name: trimmedName };
+            }
+
+            await createAgentLoop(credentials, pickedProject.serverId, body);
+
+            // Fire the global bus first (so every useWorkflows hook in the
+            // app refetches in lockstep), then the caller-supplied callback.
+            notifyAgentLoopsChanged();
+            onCreated?.();
+            sheetRef.current?.requestClose();
+        } catch (err) {
+            const message = err instanceof Error ? err.message : String(err);
+            AlertModal.alert(t("workflows.loopFormErrorTitle"), message);
+            setSubmitting(false);
+        }
+    };
+
     const support = React.useMemo(() => classifyMachines(machines), [machines]);
-    const anyReady = support.some((s) => s.meetsRequirement === true && s.online);
 
     return (
         <BottomSheet
             ref={sheetRef}
             visible={visible}
             onClose={onClose}
+            busy={submitting}
             title={t("workflows.loopModalTitle")}
             subtitle={t("workflows.loopModalSubtitle")}
+            desktopMaxHeightFraction={0.9}
             footer={
-                <Pressable
-                    style={[styles.button, styles.buttonPrimary]}
-                    onPress={() => sheetRef.current?.requestClose()}
-                >
-                    <Text style={[styles.buttonText, styles.buttonTextPrimary]}>
-                        {t("workflows.loopGotIt")}
-                    </Text>
-                </Pressable>
+                <>
+                    <Pressable
+                        style={[styles.button, styles.buttonCancel]}
+                        onPress={() => sheetRef.current?.requestClose()}
+                        disabled={submitting}
+                    >
+                        <Text style={[styles.buttonText, styles.buttonTextCancel]}>
+                            {t("common.cancel")}
+                        </Text>
+                    </Pressable>
+                    <Pressable
+                        style={[
+                            styles.button,
+                            valid && !submitting
+                                ? styles.buttonPrimary
+                                : styles.buttonPrimaryDisabled,
+                        ]}
+                        onPress={handleConfirm}
+                        disabled={!valid || submitting}
+                    >
+                        {submitting ? (
+                            <ActivityIndicator
+                                size="small"
+                                color={theme.colors.button.primary.tint}
+                            />
+                        ) : (
+                            <Text style={[styles.buttonText, styles.buttonTextPrimary]}>
+                                {t("workflows.loopFormSubmit")}
+                            </Text>
+                        )}
+                    </Pressable>
+                </>
             }
         >
             <View style={styles.info}>
@@ -221,76 +383,224 @@ export const CreateLoopModal = React.memo(function CreateLoopModal({
                     size={16}
                     color={theme.colors.accentOrange}
                 />
-                <Text style={styles.infoText}>{t("workflows.loopModalInfo")}</Text>
+                <Text style={styles.infoText}>{t("workflows.loopFormInfo")}</Text>
             </View>
 
-            <View style={styles.requirementCard}>
-                <Text style={styles.requirementLabel}>
-                    {t("workflows.loopRequirementLabel")}
-                </Text>
-                <Text style={styles.requirementValue}>
-                    @kmmao/happy-coder ≥ {MIN_CLI_VERSION_FOR_LOOPS}
-                </Text>
-            </View>
-
+            {/* Machine picker — only machines that already exist on this
+                account. Loop creation needs a machine + a known project. */}
             <View>
-                <Text style={styles.sectionLabel}>
-                    {t("workflows.loopMachinesLabel", machines.length)}
-                </Text>
+                <Text style={styles.sectionLabel}>{t("workflows.sectionMachine")}</Text>
                 {machines.length === 0 ? (
-                    <View style={[styles.machineRow, { marginTop: 8 }]}>
-                        <Ionicons
-                            name="cube-outline"
-                            size={16}
-                            color={theme.colors.textSecondary}
-                        />
-                        <Text style={styles.machineMeta}>
-                            {t("workflows.standaloneNoMachine")}
-                        </Text>
-                    </View>
+                    <Text
+                        style={[
+                            styles.infoText,
+                            { color: theme.colors.warning, marginTop: 6 },
+                        ]}
+                    >
+                        {t("workflows.standaloneNoMachine")}
+                    </Text>
                 ) : (
-                    <View style={{ marginTop: 8 }}>
-                        {support.map((s) => (
-                            <MachineSupportRow key={s.machine.id} support={s} theme={theme} />
+                    <View style={styles.presetGrid}>
+                        {machines.map((m) => (
+                            <PresetChip
+                                key={m.id}
+                                label={m.metadata?.displayName || m.metadata?.host || m.id}
+                                active={pickedMachineId === m.id}
+                                onPress={() => setPickedMachineId(m.id)}
+                            />
                         ))}
                     </View>
                 )}
             </View>
 
-            {!anyReady ? (
-                <View
-                    style={[
-                        styles.info,
-                        { backgroundColor: `${theme.colors.warning}1A` },
-                    ]}
-                >
-                    <Ionicons
-                        name="arrow-up-circle"
-                        size={16}
-                        color={theme.colors.warning}
-                    />
-                    <Text style={styles.infoText}>
-                        {t("workflows.loopUpgradeHint", MIN_CLI_VERSION_FOR_LOOPS)}
+            {/* Project picker — filtered to projects on the selected
+                machine that have a server id. */}
+            <View>
+                <Text style={styles.sectionLabel}>
+                    {t("workflows.loopSectionProject")}
+                </Text>
+                {!pickedMachineId ? (
+                    <Text
+                        style={[styles.infoText, { marginTop: 6 }]}
+                    >
+                        {t("workflows.loopProjectNone")}
                     </Text>
-                </View>
-            ) : (
-                <View
-                    style={[
-                        styles.info,
-                        { backgroundColor: `${theme.colors.success}1A` },
-                    ]}
-                >
-                    <Ionicons
-                        name="hourglass-outline"
-                        size={16}
-                        color={theme.colors.success}
-                    />
-                    <Text style={styles.infoText}>
-                        {t("workflows.loopReadyButNotYet")}
+                ) : machineProjects.length === 0 ? (
+                    <Text
+                        style={[
+                            styles.infoText,
+                            { color: theme.colors.warning, marginTop: 6 },
+                        ]}
+                    >
+                        {t("workflows.loopProjectEmpty")}
                     </Text>
-                </View>
-            )}
+                ) : (
+                    <View style={styles.presetGrid}>
+                        {machineProjects.map((p) => (
+                            <PresetChip
+                                key={p.id}
+                                label={p.key.path.split("/").filter(Boolean).pop() || p.key.path}
+                                active={p.serverId === pickedProjectServerId}
+                                onPress={() => setPickedProjectServerId(p.serverId ?? "")}
+                            />
+                        ))}
+                    </View>
+                )}
+            </View>
 
+            {/* Schedule — interval chips OR a custom cron expression. */}
+            <View>
+                <Text style={styles.sectionLabel}>
+                    {t("workflows.loopSectionSchedule")}
+                </Text>
+                <View style={styles.presetGrid}>
+                    <PresetChip
+                        label={t("workflows.loopInterval5m")}
+                        active={schedule === "5m"}
+                        onPress={() => setSchedule("5m")}
+                    />
+                    <PresetChip
+                        label={t("workflows.loopInterval1h")}
+                        active={schedule === "1h"}
+                        onPress={() => setSchedule("1h")}
+                    />
+                    <PresetChip
+                        label={t("workflows.loopInterval6h")}
+                        active={schedule === "6h"}
+                        onPress={() => setSchedule("6h")}
+                    />
+                    <PresetChip
+                        label={t("workflows.loopInterval24h")}
+                        active={schedule === "24h"}
+                        onPress={() => setSchedule("24h")}
+                    />
+                    <PresetChip
+                        label={t("workflows.loopIntervalCron")}
+                        active={schedule === "cron"}
+                        onPress={() => setSchedule("cron")}
+                    />
+                </View>
+                {schedule === "cron" ? (
+                    <TextInput
+                        style={[styles.input, styles.cronInput, { marginTop: 8 }]}
+                        value={cronExpression}
+                        onChangeText={setCronExpression}
+                        placeholder={t("workflows.loopCronPlaceholder")}
+                        placeholderTextColor={theme.colors.textSecondary}
+                        autoCapitalize="none"
+                        autoCorrect={false}
+                    />
+                ) : null}
+            </View>
+
+            {/* Agent picker. */}
+            <View>
+                <Text style={styles.sectionLabel}>{t("workflows.loopSectionAgent")}</Text>
+                <View style={styles.presetGrid}>
+                    <PresetChip
+                        label={t("workflows.loopAgentClaude")}
+                        active={agent === "claude"}
+                        onPress={() => setAgent("claude")}
+                    />
+                    <PresetChip
+                        label={t("workflows.loopAgentCodex")}
+                        active={agent === "codex"}
+                        onPress={() => setAgent("codex")}
+                    />
+                    <PresetChip
+                        label={t("workflows.loopAgentGemini")}
+                        active={agent === "gemini"}
+                        onPress={() => setAgent("gemini")}
+                    />
+                </View>
+            </View>
+
+            {/* Prompt textarea. */}
+            <View>
+                <Text style={styles.sectionLabel}>
+                    {t("workflows.loopSectionPrompt")}
+                </Text>
+                <TextInput
+                    style={[styles.input, styles.promptInput, { marginTop: 6 }]}
+                    value={prompt}
+                    onChangeText={setPrompt}
+                    multiline
+                    placeholder={t("workflows.loopPromptPlaceholder")}
+                    placeholderTextColor={theme.colors.textSecondary}
+                />
+            </View>
+
+            {/* Optional name. */}
+            <View>
+                <Text style={styles.sectionLabel}>
+                    {t("workflows.loopOptionalName")}
+                </Text>
+                <TextInput
+                    style={[styles.input, { marginTop: 6 }]}
+                    value={name}
+                    onChangeText={setName}
+                    placeholder={t("workflows.loopOptionalNamePlaceholder")}
+                    placeholderTextColor={theme.colors.textSecondary}
+                />
+            </View>
+
+            {/* Advanced fold-out — CLI readiness panel from the old
+                guidance modal. Hidden by default so it doesn't clutter
+                the form, but available for users debugging machine
+                version drift. */}
+            <Pressable
+                style={styles.advancedToggle}
+                onPress={() => setAdvancedOpen((v) => !v)}
+            >
+                <Ionicons
+                    name={advancedOpen ? "chevron-down" : "chevron-forward"}
+                    size={14}
+                    color={theme.colors.textLink}
+                />
+                <Text style={styles.advancedToggleText}>
+                    {t("workflows.loopAdvancedToggle")}
+                </Text>
+            </Pressable>
+
+            {advancedOpen ? (
+                <CLIReadinessPanel support={support} theme={theme} />
+            ) : null}
+        </BottomSheet>
+    );
+});
+
+function CLIReadinessPanel({
+    support,
+    theme,
+}: {
+    support: MachineSupport[];
+    theme: any;
+}) {
+    return (
+        <>
+            <View>
+                <Text style={styles.sectionLabel}>
+                    {t("workflows.loopRequirementLabel")}
+                </Text>
+                <Text
+                    style={[
+                        styles.machineMeta,
+                        { marginTop: 6, color: theme.colors.text },
+                    ]}
+                >
+                    @kmmao/happy-coder ≥ {MIN_CLI_VERSION_FOR_LOOPS}
+                </Text>
+            </View>
+            <View>
+                <Text style={styles.sectionLabel}>
+                    {t("workflows.loopMachinesLabel", support.length)}
+                </Text>
+                <View style={{ marginTop: 8 }}>
+                    {support.map((s) => (
+                        <MachineSupportRow key={s.machine.id} support={s} theme={theme} />
+                    ))}
+                </View>
+            </View>
             <Pressable
                 style={styles.learnMoreRow}
                 onPress={() => Linking.openURL(LEARN_MORE_URL).catch(() => {})}
@@ -298,9 +608,9 @@ export const CreateLoopModal = React.memo(function CreateLoopModal({
                 <Ionicons name="open-outline" size={14} color={theme.colors.textLink} />
                 <Text style={styles.learnMoreText}>{t("workflows.loopLearnMore")}</Text>
             </Pressable>
-        </BottomSheet>
+        </>
     );
-});
+}
 
 function MachineSupportRow({
     support,

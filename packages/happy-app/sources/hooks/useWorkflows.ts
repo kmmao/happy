@@ -23,9 +23,10 @@ import * as React from "react";
 import {
     useAllMachines,
     useAllSessions,
+    useProjects,
 } from "@/sync/storage";
 import type { Machine, Session } from "@/sync/storageTypes";
-import type { AgentLoopSummary } from "@kmmao/happy-wire";
+import type { AgentLoopSummary, SerializedAgentLoop } from "@kmmao/happy-wire";
 import { TokenStorage } from "@/auth/tokenStorage";
 import {
     fetchTriggerSchedules,
@@ -35,6 +36,10 @@ import {
     fetchWebhookTriggers,
     type ServerWebhookTrigger,
 } from "@/sync/apiWebhookTriggers";
+import {
+    fetchAgentLoopsAcrossProjects,
+    onAgentLoopsChanged,
+} from "@/sync/apiAgentLoops";
 import { sync } from "@/sync/sync";
 import { useThrottledCallback } from "@/hooks/useThrottledCallback";
 import { AUTOMATION_SUMMARY_THROTTLE_MS } from "@/components/machine/automationConstants";
@@ -107,15 +112,63 @@ const safeAutomationContext = (
     return ctx && typeof ctx === "object" ? ctx : null;
 };
 
+/**
+ * Map the server's verbose SerializedAgentLoop into the daemon-side
+ * AgentLoopSummary shape that the workflow renderer already consumes.
+ * Optional fields without server-side equivalents default to the
+ * historical CLI defaults.
+ */
+function serializedToSummary(loop: SerializedAgentLoop): AgentLoopSummary {
+    const genericConfig = (loop.genericConfig ?? null) as Record<string, unknown> | null;
+    const nameFromConfig =
+        genericConfig && typeof genericConfig.name === "string"
+            ? (genericConfig.name as string)
+            : undefined;
+    return {
+        id: loop.id,
+        name: nameFromConfig,
+        directory: loop.directory ?? "",
+        enabled: loop.enabled ?? true,
+        intervalMs: loop.intervalMs ?? 0,
+        cronExpression: loop.cronExpression ?? undefined,
+        iteration: loop.iteration ?? 0,
+        // SerializedAgentLoop's nextRunAt is `number | null | undefined`;
+        // the wire summary expects a number, so coerce to 0 for "no slot".
+        nextRunAt: loop.nextRunAt ?? 0,
+        runtimeState: loop.status === "running" ? "active" : loop.status === "paused" ? "paused" : "idle",
+        phase: loop.status === "running" ? "planning" : "sleeping",
+        agent: loop.agent ?? "claude",
+    };
+}
+
 export function useWorkflows(): UseWorkflowsResult {
     const allSessions = useAllSessions();
     const allMachines = useAllMachines();
+    const allProjects = useProjects();
 
     // Per-machine loops come from storage (daemonState.automation.loops);
     // triggers must be fetched. Keep them in component state and refresh on
     // task-status events.
     const [cronTriggers, setCronTriggers] = React.useState<ServerTriggerSchedule[] | null>(null);
     const [webhookTriggers, setWebhookTriggers] = React.useState<ServerWebhookTrigger[] | null>(null);
+    // ADR-0022 Phase 3b — server-managed generic AgentLoops. Fetched per
+    // project (the only list endpoint we have) and merged with the
+    // per-machine daemonState loops below; daemonState wins on collision
+    // because it carries live runtime state.
+    const [serverLoops, setServerLoops] = React.useState<SerializedAgentLoop[] | null>(null);
+
+    // Snapshot the project ids we want to fan out across, recomputed
+    // when projects change. JSON-stringify lets us treat it as a stable
+    // dependency without depending on object identity.
+    const serverProjectIds = React.useMemo(
+        () =>
+            allProjects
+                .map((p) => p.serverId)
+                .filter((id): id is string => typeof id === "string" && id.length > 0)
+                .sort(),
+        [allProjects],
+    );
+    const serverProjectIdsKey = serverProjectIds.join(",");
 
     const load = React.useCallback(async () => {
         const credentials = await TokenStorage.getCredentials().catch(() => null);
@@ -123,13 +176,16 @@ export function useWorkflows(): UseWorkflowsResult {
         // Fetch all triggers across machines — list view spans the whole
         // account, so a per-machine filter would lose Workflows for
         // currently offline machines.
-        const [cron, hooks] = await Promise.all([
+        const [cron, hooks, loops] = await Promise.all([
             fetchTriggerSchedules(credentials).catch(() => ({ triggerSchedules: [], total: 0 })),
             fetchWebhookTriggers(credentials).catch(() => ({ webhookTriggers: [], total: 0 })),
+            fetchAgentLoopsAcrossProjects(credentials, serverProjectIds, { role: "generic" })
+                .catch(() => [] as SerializedAgentLoop[]),
         ]);
         setCronTriggers(cron.triggerSchedules);
         setWebhookTriggers(hooks.webhookTriggers);
-    }, []);
+        setServerLoops(loops);
+    }, [serverProjectIdsKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
     // Throttle subsequent loads (task fan-out can be high during a swarm).
     // Reuse the shared automation throttle constant so the whole UI ticks
@@ -146,6 +202,14 @@ export function useWorkflows(): UseWorkflowsResult {
         });
     }, [throttledLoad]);
 
+    React.useEffect(() => {
+        // CreateLoopModal fires this when a new loop is POSTed so the
+        // list reflects it without waiting for the next throttle tick.
+        return onAgentLoopsChanged(() => {
+            throttledLoad();
+        });
+    }, [throttledLoad]);
+
     const refresh = React.useCallback(() => {
         void load();
     }, [load]);
@@ -158,51 +222,90 @@ export function useWorkflows(): UseWorkflowsResult {
         const claimedSessions = new Set<string>();
 
         // --- Loop workflows -------------------------------------------
-        // Walk every machine's daemonState.automation.loops. Each loop
-        // becomes a LoopWorkflow; we collect sessions claimed by it via
-        // `metadata.automationContext.loopId === loop.id`.
+        // Two data sources, merged by loop.id (daemon-state row wins
+        // because it carries live runtime state from the daemon):
+        //
+        //   1. Per-machine daemonState.automation.loops — historical and
+        //      still authoritative for CLI-local loops that haven't been
+        //      migrated server-side yet (ADR-0022 migration tool, Batch 4).
+        //   2. Server-fetched generic loops from
+        //      /v1/projects/:projectId/agent-loops (ADR-0022 Phase 3b).
+        //      Surfaces loops the App just created via CreateLoopModal
+        //      before the daemon-state push arrives, and any loop whose
+        //      target daemon is currently offline.
+        const loopsById = new Map<string, { machineId: string; loop: AgentLoopSummary }>();
+
+        // Pass 1: server-fetched loops land first; per-machine daemonState
+        // entries overwrite them in pass 2 (live runtime state wins).
+        if (serverLoops) {
+            // Build a quick projectId → machineId map so we can attribute
+            // server loops to the right machine column. Projects without a
+            // serverId never get matched (they wouldn't be in serverLoops
+            // anyway), and unmatched loops surface under an empty
+            // machineId (filtered out of the list rendering later).
+            const projectIdToMachineId = new Map<string, string>();
+            for (const project of allProjects) {
+                if (project.serverId) {
+                    projectIdToMachineId.set(project.serverId, project.key.machineId);
+                }
+            }
+            for (const serverLoop of serverLoops) {
+                const machineId = projectIdToMachineId.get(serverLoop.projectId) ?? "";
+                loopsById.set(serverLoop.id, {
+                    machineId,
+                    loop: serializedToSummary(serverLoop),
+                });
+            }
+        }
+
+        // Pass 2: walk every machine's daemonState.automation.loops. Each
+        // loop overwrites any same-id server entry from pass 1.
         for (const machine of allMachines) {
             const loops = ((machine.daemonState?.automation as any)?.loops ?? []) as AgentLoopSummary[];
             for (const loop of loops) {
-                const loopSessions = (allSessions as Session[])
-                    .filter((s) => {
-                        if (typeof s === "string") return false;
-                        const ctx = safeAutomationContext(s);
-                        return ctx?.loopId === loop.id && s.metadata?.machineId === machine.id;
-                    })
-                    .sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0));
-                loopSessions.forEach((s) => claimedSessions.add(s.id));
-
-                const latestSessionTs = loopSessions[0]?.updatedAt ?? 0;
-                const lastActivityAt = Math.max(latestSessionTs, loop.nextRunAt ?? 0);
-
-                workflowList.push({
-                    id: `loop:${loop.id}`,
-                    kind: "loop",
-                    displayName:
-                        loop.name?.trim() ||
-                        loop.directory.split("/").filter(Boolean).pop() ||
-                        "Loop",
-                    machineId: machine.id,
-                    sessions: loopSessions,
-                    lastActivityAt,
-                    status: loop.runtimeState === "running"
-                        ? "active"
-                        : loop.runtimeState === "failed"
-                            ? "error"
-                            : loop.enabled
-                                ? "idle"
-                                : "archived",
-                    loop,
-                    // Server-served loops surface through daemonState. CLI-
-                    // local loops won't appear here until ADR-0022 Phase 3b
-                    // lands; when they do, this flag will need flipping
-                    // based on a future `loop.serverManaged` field. For now
-                    // everything we see has been reported by the daemon, so
-                    // it's already server-visible — keep false.
-                    isCliLocal: false,
-                });
+                loopsById.set(loop.id, { machineId: machine.id, loop });
             }
+        }
+
+        for (const { machineId, loop } of loopsById.values()) {
+            const loopSessions = (allSessions as Session[])
+                .filter((s) => {
+                    if (typeof s === "string") return false;
+                    const ctx = safeAutomationContext(s);
+                    return ctx?.loopId === loop.id && s.metadata?.machineId === machineId;
+                })
+                .sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0));
+            loopSessions.forEach((s) => claimedSessions.add(s.id));
+
+            const latestSessionTs = loopSessions[0]?.updatedAt ?? 0;
+            const lastActivityAt = Math.max(latestSessionTs, loop.nextRunAt ?? 0);
+
+            workflowList.push({
+                id: `loop:${loop.id}`,
+                kind: "loop",
+                displayName:
+                    loop.name?.trim() ||
+                    loop.directory.split("/").filter(Boolean).pop() ||
+                    "Loop",
+                machineId,
+                sessions: loopSessions,
+                lastActivityAt,
+                status: loop.runtimeState === "running"
+                    ? "active"
+                    : loop.runtimeState === "failed"
+                        ? "error"
+                        : loop.enabled
+                            ? "idle"
+                            : "archived",
+                loop,
+                // Server-managed loops surface either via daemonState (CLI
+                // already aware) or via the server fetch (CLI hasn't yet
+                // received its trigger). Either way the loop is on the
+                // server — `isCliLocal` is for the inverse case
+                // (CLI-only, pre-migration); the Batch 4 migration tool
+                // lifts that flag for each row it uploads.
+                isCliLocal: false,
+            });
         }
 
         // --- Scheduled workflows --------------------------------------
@@ -321,7 +424,7 @@ export function useWorkflows(): UseWorkflowsResult {
         // first, matching the existing Sessions list mental model.
         workflowList.sort((a, b) => b.lastActivityAt - a.lastActivityAt);
         return workflowList;
-    }, [allSessions, allMachines, cronTriggers, webhookTriggers]);
+    }, [allSessions, allMachines, allProjects, cronTriggers, webhookTriggers, serverLoops]);
 
     return {
         workflows,
