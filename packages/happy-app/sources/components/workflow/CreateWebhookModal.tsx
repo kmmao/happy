@@ -1,42 +1,13 @@
 /**
  * CreateWebhookModal — standalone creator for Event-driven Workflows
- * (WebhookTrigger). Mirrors MakeRecurringModal's shape: same bottom-
- * sheet / swipe-down / portal architecture, same machine picker pattern,
- * but the form swaps the cron presets for a slug input + secret display.
- *
- * Flow:
- *   1. User enters slug (URL-safe ID; we apply a friendly sanitizer)
- *   2. Picks target Machine (default: first online)
- *   3. Writes the prompt
- *   4. Submit → createWebhookTrigger → server returns secret ONCE
- *   5. Show the secret in a copyable confirmation view inside the same
- *      sheet (user must record it; the secret hash on the server can be
- *      regenerated but the plaintext is never re-shown).
- *   6. "Done" closes; the new Event Workflow appears in the list.
+ * (WebhookTrigger). Shell, animation, gestures owned by <BottomSheet>;
+ * this file only owns the slug/secret form and the two-phase
+ * create → secret-reveal flow.
  */
 
 import * as React from "react";
-import {
-    View,
-    Pressable,
-    TextInput,
-    ActivityIndicator,
-    ScrollView,
-    KeyboardAvoidingView,
-    Platform,
-    Modal as RNModal,
-    useWindowDimensions,
-} from "react-native";
+import { View, TextInput, ActivityIndicator, Pressable } from "react-native";
 import * as Clipboard from "expo-clipboard";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Gesture, GestureDetector, GestureHandlerRootView } from "react-native-gesture-handler";
-import Animated, {
-    useSharedValue,
-    useAnimatedStyle,
-    withSpring,
-    withTiming,
-    runOnJS,
-} from "react-native-reanimated";
 import { Text } from "@/components/StyledText";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { Ionicons } from "@expo/vector-icons";
@@ -44,176 +15,15 @@ import { Typography } from "@/constants/Typography";
 import { Modal as AlertModal } from "@/modal";
 import { TokenStorage } from "@/auth/tokenStorage";
 import { createWebhookTrigger } from "@/sync/apiWebhookTriggers";
-import {
-    useWebHoverProps,
-    webInteractive,
-} from "@/utils/interactiveSurface";
+import { webInteractive } from "@/utils/interactiveSurface";
 import { t } from "@/text";
 import { useAllMachines } from "@/sync/storage";
+import { BottomSheet, BottomSheetHandle, PresetChip } from "@/components/BottomSheet";
 
 interface CreateWebhookModalProps {
     visible: boolean;
     onClose: () => void;
 }
-
-const MOBILE_BREAKPOINT = 540;
-const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
-
-const styles = StyleSheet.create((theme) => ({
-    overlay: { flex: 1 },
-    overlayDesktop: {
-        backgroundColor: "rgba(0,0,0,0.45)",
-        justifyContent: "center",
-        alignItems: "center",
-        paddingHorizontal: 16,
-    },
-    overlayMobile: {
-        backgroundColor: "transparent",
-        justifyContent: "flex-end",
-    },
-    backdrop: {
-        position: "absolute",
-        top: 0, left: 0, right: 0, bottom: 0,
-        backgroundColor: "rgba(0,0,0,0.45)",
-    },
-    card: {
-        backgroundColor: theme.colors.surface,
-        overflow: "hidden",
-        flexDirection: "column",
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: -2 },
-        shadowOpacity: 0.18,
-        shadowRadius: 24,
-        elevation: 12,
-    },
-    cardDesktop: {
-        width: "100%",
-        maxWidth: 520,
-        borderRadius: 14,
-    },
-    cardMobile: {
-        width: "100%",
-        borderTopLeftRadius: 16,
-        borderTopRightRadius: 16,
-    },
-    grabHandleWrap: { alignItems: "center", paddingTop: 8, paddingBottom: 4 },
-    grabHandle: {
-        width: 36, height: 4, borderRadius: 2,
-        backgroundColor: theme.colors.divider,
-    },
-    headerRow: {
-        flexDirection: "row",
-        alignItems: "center",
-        justifyContent: "space-between",
-        paddingHorizontal: 20,
-        paddingTop: 8,
-        paddingBottom: 12,
-    },
-    titleColumn: { flex: 1, minWidth: 0, gap: 4 },
-    title: {
-        fontSize: 18,
-        color: theme.colors.text,
-        ...Typography.default("semiBold"),
-    },
-    subtitle: {
-        fontSize: 13,
-        color: theme.colors.textSecondary,
-        ...Typography.default(),
-        lineHeight: 18,
-    },
-    closeButton: {
-        width: 32, height: 32, borderRadius: 16,
-        alignItems: "center", justifyContent: "center",
-        backgroundColor: theme.colors.surfaceHigh,
-        marginLeft: 12,
-        ...webInteractive,
-    },
-    scrollArea: { flexShrink: 1 },
-    scrollContent: { paddingHorizontal: 20, paddingTop: 4, paddingBottom: 20, gap: 16 },
-    sectionLabel: {
-        fontSize: 12,
-        color: theme.colors.textSecondary,
-        textTransform: "uppercase",
-        letterSpacing: 0.1,
-        ...Typography.default("semiBold"),
-    },
-    presetGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-    presetChip: {
-        paddingHorizontal: 12, paddingVertical: 8, borderRadius: 999,
-        borderWidth: 0.5, borderColor: theme.colors.divider,
-        backgroundColor: theme.colors.surface,
-        ...webInteractive,
-    },
-    presetChipActive: {
-        backgroundColor: `${theme.colors.accentBlue}1A`,
-        borderColor: theme.colors.accentBlue,
-    },
-    presetChipText: {
-        fontSize: 13,
-        color: theme.colors.textSecondary,
-        ...Typography.default("semiBold"),
-    },
-    presetChipTextActive: { color: theme.colors.accentBlue },
-    input: {
-        borderWidth: 1, borderColor: theme.colors.divider,
-        borderRadius: 8, paddingHorizontal: 10, paddingVertical: 10,
-        fontSize: 14, color: theme.colors.text,
-        backgroundColor: theme.colors.input?.background ?? theme.colors.groupped.background,
-        fontFamily: "Menlo",
-    },
-    promptInput: {
-        minHeight: 96, textAlignVertical: "top",
-        fontFamily: "System", fontSize: 14,
-    },
-    info: {
-        flexDirection: "row", alignItems: "flex-start", gap: 8,
-        padding: 10, backgroundColor: `${theme.colors.accentOrange}14`,
-        borderRadius: 8,
-    },
-    infoText: {
-        flex: 1, fontSize: 12, color: theme.colors.text,
-        ...Typography.default(), lineHeight: 17,
-    },
-    secretBox: {
-        padding: 12, borderRadius: 8,
-        backgroundColor: theme.colors.surfaceHigh,
-        gap: 8,
-    },
-    secretValue: {
-        fontFamily: "Menlo", fontSize: 12,
-        color: theme.colors.text,
-        flex: 1,
-    },
-    secretRow: { flexDirection: "row", alignItems: "center", gap: 8 },
-    secretCopyButton: {
-        flexDirection: "row", alignItems: "center", gap: 4,
-        paddingHorizontal: 8, paddingVertical: 6, borderRadius: 6,
-        backgroundColor: theme.colors.button.primary.background,
-        ...webInteractive,
-    },
-    secretCopyText: {
-        fontSize: 12, color: theme.colors.button.primary.tint,
-        ...Typography.default("semiBold"),
-    },
-    footer: {
-        flexDirection: "row", justifyContent: "flex-end", gap: 10,
-        paddingHorizontal: 20, paddingTop: 12,
-        borderTopWidth: StyleSheet.hairlineWidth,
-        borderTopColor: theme.colors.divider,
-        backgroundColor: theme.colors.surface,
-    },
-    button: {
-        paddingHorizontal: 16, paddingVertical: 11, borderRadius: 10,
-        minWidth: 88, alignItems: "center", justifyContent: "center",
-        ...webInteractive,
-    },
-    buttonCancel: { backgroundColor: theme.colors.surfaceHigh },
-    buttonPrimary: { backgroundColor: theme.colors.button.primary.background },
-    buttonPrimaryDisabled: { backgroundColor: theme.colors.surfaceHigh },
-    buttonText: { fontSize: 14, ...Typography.default("semiBold") },
-    buttonTextPrimary: { color: theme.colors.button.primary.tint },
-    buttonTextCancel: { color: theme.colors.textSecondary },
-}));
 
 // URL-safe slug: lowercase, alphanumeric + dash, no consecutive dashes
 // or leading/trailing dashes. Server still validates so this is a
@@ -226,14 +36,97 @@ function sanitizeSlug(input: string): string {
         .replace(/^-|-$/g, "");
 }
 
+const styles = StyleSheet.create((theme) => ({
+    sectionLabel: {
+        fontSize: 12,
+        color: theme.colors.textSecondary,
+        textTransform: "uppercase",
+        letterSpacing: 0.1,
+        ...Typography.default("semiBold"),
+    },
+    presetGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 6 },
+    input: {
+        borderWidth: 1,
+        borderColor: theme.colors.divider,
+        borderRadius: 8,
+        paddingHorizontal: 10,
+        paddingVertical: 10,
+        fontSize: 14,
+        color: theme.colors.text,
+        backgroundColor: theme.colors.input?.background ?? theme.colors.groupped.background,
+        fontFamily: "Menlo",
+    },
+    promptInput: {
+        minHeight: 96,
+        textAlignVertical: "top",
+        fontFamily: "System",
+        fontSize: 14,
+    },
+    info: {
+        flexDirection: "row",
+        alignItems: "flex-start",
+        gap: 8,
+        padding: 10,
+        backgroundColor: `${theme.colors.accentOrange}14`,
+        borderRadius: 8,
+    },
+    infoText: {
+        flex: 1,
+        fontSize: 12,
+        color: theme.colors.text,
+        ...Typography.default(),
+        lineHeight: 17,
+    },
+    secretBox: {
+        padding: 12,
+        borderRadius: 8,
+        backgroundColor: theme.colors.surfaceHigh,
+        gap: 8,
+    },
+    secretValue: {
+        fontFamily: "Menlo",
+        fontSize: 12,
+        color: theme.colors.text,
+        flex: 1,
+    },
+    secretCopyButton: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 4,
+        paddingHorizontal: 8,
+        paddingVertical: 6,
+        borderRadius: 6,
+        backgroundColor: theme.colors.button.primary.background,
+        ...webInteractive,
+    },
+    secretCopyText: {
+        fontSize: 12,
+        color: theme.colors.button.primary.tint,
+        ...Typography.default("semiBold"),
+    },
+    button: {
+        paddingHorizontal: 16,
+        paddingVertical: 11,
+        borderRadius: 10,
+        minWidth: 88,
+        alignItems: "center",
+        justifyContent: "center",
+        ...webInteractive,
+    },
+    buttonCancel: { backgroundColor: theme.colors.surfaceHigh },
+    buttonPrimary: { backgroundColor: theme.colors.button.primary.background },
+    buttonPrimaryDisabled: { backgroundColor: theme.colors.surfaceHigh },
+    buttonText: { fontSize: 14, ...Typography.default("semiBold") },
+    buttonTextPrimary: { color: theme.colors.button.primary.tint },
+    buttonTextCancel: { color: theme.colors.textSecondary },
+}));
+
 export const CreateWebhookModal = React.memo(function CreateWebhookModal({
     visible,
     onClose,
 }: CreateWebhookModalProps) {
     const { theme } = useUnistyles();
-    const insets = useSafeAreaInsets();
-    const { width: viewportWidth, height: viewportHeight } = useWindowDimensions();
-    const isMobile = viewportWidth < MOBILE_BREAKPOINT;
+    const sheetRef = React.useRef<BottomSheetHandle>(null);
 
     const machines = useAllMachines();
     const [pickedMachineId, setPickedMachineId] = React.useState<string>("");
@@ -258,7 +151,8 @@ export const CreateWebhookModal = React.memo(function CreateWebhookModal({
     }, [visible, machines]);
 
     const slug = sanitizeSlug(slugRaw);
-    const valid = pickedMachineId.length > 0 && slug.length > 0 && prompt.trim().length > 0;
+    const valid =
+        pickedMachineId.length > 0 && slug.length > 0 && prompt.trim().length > 0;
 
     const handleConfirm = async () => {
         if (!valid || submitting) return;
@@ -281,184 +175,86 @@ export const CreateWebhookModal = React.memo(function CreateWebhookModal({
         }
     };
 
-    // --- Sheet animation (same shape as MakeRecurringModal) ---
-    const mobileMaxHeight = Math.floor(viewportHeight * 0.9);
-    const desktopMaxHeight = Math.min(700, Math.floor(viewportHeight * 0.85));
-    const cardMaxHeight = isMobile ? mobileMaxHeight : desktopMaxHeight;
-    const footerPaddingBottom = (isMobile ? insets.bottom : 14) || 14;
-
-    const translateY = useSharedValue(mobileMaxHeight);
-    const isClosingRef = React.useRef(false);
-
-    React.useEffect(() => {
-        if (visible) {
-            isClosingRef.current = false;
-            translateY.value = mobileMaxHeight;
-            translateY.value = withTiming(0, { duration: 260 });
-        }
-    }, [visible, mobileMaxHeight, translateY]);
-
-    const cardAnimatedStyle = useAnimatedStyle(() => ({
-        transform: isMobile ? [{ translateY: translateY.value }] : [],
-    }));
-    const backdropAnimatedStyle = useAnimatedStyle(() => {
-        if (!isMobile) return {};
-        const progress = 1 - Math.min(1, Math.max(0, translateY.value / mobileMaxHeight));
-        return { opacity: progress };
-    });
-
-    const closeOnJs = React.useCallback(() => onClose(), [onClose]);
-    const requestClose = React.useCallback(() => {
-        if (isClosingRef.current) return;
-        isClosingRef.current = true;
-        if (!isMobile) {
-            onClose();
-            return;
-        }
-        translateY.value = withTiming(mobileMaxHeight, { duration: 220 }, () => {
-            runOnJS(closeOnJs)();
-        });
-    }, [isMobile, mobileMaxHeight, onClose, closeOnJs, translateY]);
-
-    const SWIPE_DISTANCE = mobileMaxHeight / 3;
-    const panGesture = React.useMemo(
-        () =>
-            Gesture.Pan()
-                .enabled(isMobile && !submitting)
-                .onUpdate((e) => { translateY.value = Math.max(0, e.translationY); })
-                .onEnd((e) => {
-                    if (e.translationY > SWIPE_DISTANCE || e.velocityY > 800) {
-                        isClosingRef.current = true;
-                        translateY.value = withTiming(mobileMaxHeight, { duration: 220 }, () => {
-                            runOnJS(closeOnJs)();
-                        });
-                    } else {
-                        translateY.value = withSpring(0, { damping: 20, stiffness: 220 });
-                    }
-                }),
-        [isMobile, submitting, mobileMaxHeight, SWIPE_DISTANCE, translateY, closeOnJs],
-    );
-
     return (
-        <RNModal
+        <BottomSheet
+            ref={sheetRef}
             visible={visible}
-            transparent
-            animationType={isMobile ? "none" : "fade"}
-            onRequestClose={submitting ? undefined : () => requestClose()}
-            statusBarTranslucent
-        >
-            <GestureHandlerRootView style={{ flex: 1 }}>
-                <KeyboardAvoidingView
-                    style={[styles.overlay, isMobile ? styles.overlayMobile : styles.overlayDesktop]}
-                    behavior={Platform.OS === "ios" ? "padding" : Platform.OS === "android" ? "height" : undefined}
-                >
-                    <AnimatedPressable
-                        style={[styles.backdrop, isMobile && backdropAnimatedStyle]}
-                        onPress={submitting ? undefined : () => requestClose()}
-                    />
-                    <Animated.View
-                        style={[
-                            styles.card,
-                            isMobile ? styles.cardMobile : styles.cardDesktop,
-                            { maxHeight: cardMaxHeight },
-                            isMobile && cardAnimatedStyle,
-                        ]}
+            onClose={onClose}
+            busy={submitting}
+            title={
+                createdSecret
+                    ? t("workflows.webhookCreatedTitle")
+                    : t("workflows.webhookModalTitle")
+            }
+            subtitle={
+                createdSecret
+                    ? t("workflows.webhookCreatedSubtitle")
+                    : t("workflows.webhookModalSubtitle")
+            }
+            desktopMaxHeightFraction={0.85}
+            footer={
+                createdSecret ? (
+                    <Pressable
+                        style={[styles.button, styles.buttonPrimary]}
+                        onPress={() => sheetRef.current?.requestClose()}
                     >
-                        <GestureDetector gesture={panGesture}>
-                            <View>
-                                {isMobile ? (
-                                    <View style={styles.grabHandleWrap}>
-                                        <View style={styles.grabHandle} />
-                                    </View>
-                                ) : null}
-                                <View style={styles.headerRow}>
-                                    <View style={styles.titleColumn}>
-                                        <Text style={styles.title}>
-                                            {createdSecret ? t("workflows.webhookCreatedTitle") : t("workflows.webhookModalTitle")}
-                                        </Text>
-                                        <Text style={styles.subtitle}>
-                                            {createdSecret ? t("workflows.webhookCreatedSubtitle") : t("workflows.webhookModalSubtitle")}
-                                        </Text>
-                                    </View>
-                                    <Pressable
-                                        style={styles.closeButton}
-                                        onPress={submitting ? undefined : () => requestClose()}
-                                        hitSlop={8}
-                                    >
-                                        <Ionicons name="close" size={18} color={theme.colors.textSecondary} />
-                                    </Pressable>
-                                </View>
-                            </View>
-                        </GestureDetector>
-
-                        <ScrollView
-                            style={styles.scrollArea}
-                            contentContainerStyle={styles.scrollContent}
-                            keyboardShouldPersistTaps="handled"
+                        <Text style={[styles.buttonText, styles.buttonTextPrimary]}>
+                            {t("workflows.webhookDoneButton")}
+                        </Text>
+                    </Pressable>
+                ) : (
+                    <>
+                        <Pressable
+                            style={[styles.button, styles.buttonCancel]}
+                            onPress={() => sheetRef.current?.requestClose()}
+                            disabled={submitting}
                         >
-                            {createdSecret ? (
-                                <SecretReveal
-                                    slug={createdSlug || slug}
-                                    secret={createdSecret}
+                            <Text style={[styles.buttonText, styles.buttonTextCancel]}>
+                                {t("common.cancel")}
+                            </Text>
+                        </Pressable>
+                        <Pressable
+                            style={[
+                                styles.button,
+                                valid && !submitting
+                                    ? styles.buttonPrimary
+                                    : styles.buttonPrimaryDisabled,
+                            ]}
+                            onPress={handleConfirm}
+                            disabled={!valid || submitting}
+                        >
+                            {submitting ? (
+                                <ActivityIndicator
+                                    size="small"
+                                    color={theme.colors.button.primary.tint}
                                 />
                             ) : (
-                                <CreateForm
-                                    machines={machines}
-                                    pickedMachineId={pickedMachineId}
-                                    setPickedMachineId={setPickedMachineId}
-                                    slugRaw={slugRaw}
-                                    setSlugRaw={setSlugRaw}
-                                    slug={slug}
-                                    name={name}
-                                    setName={setName}
-                                    prompt={prompt}
-                                    setPrompt={setPrompt}
-                                />
+                                <Text style={[styles.buttonText, styles.buttonTextPrimary]}>
+                                    {t("workflows.recurringCreate")}
+                                </Text>
                             )}
-                        </ScrollView>
-
-                        <View style={[styles.footer, { paddingBottom: footerPaddingBottom }]}>
-                            {createdSecret ? (
-                                <Pressable
-                                    style={[styles.button, styles.buttonPrimary]}
-                                    onPress={() => requestClose()}
-                                >
-                                    <Text style={[styles.buttonText, styles.buttonTextPrimary]}>
-                                        {t("workflows.webhookDoneButton")}
-                                    </Text>
-                                </Pressable>
-                            ) : (
-                                <>
-                                    <Pressable
-                                        style={[styles.button, styles.buttonCancel]}
-                                        onPress={() => requestClose()}
-                                        disabled={submitting}
-                                    >
-                                        <Text style={[styles.buttonText, styles.buttonTextCancel]}>{t("common.cancel")}</Text>
-                                    </Pressable>
-                                    <Pressable
-                                        style={[
-                                            styles.button,
-                                            valid && !submitting ? styles.buttonPrimary : styles.buttonPrimaryDisabled,
-                                        ]}
-                                        onPress={handleConfirm}
-                                        disabled={!valid || submitting}
-                                    >
-                                        {submitting ? (
-                                            <ActivityIndicator size="small" color={theme.colors.button.primary.tint} />
-                                        ) : (
-                                            <Text style={[styles.buttonText, styles.buttonTextPrimary]}>
-                                                {t("workflows.recurringCreate")}
-                                            </Text>
-                                        )}
-                                    </Pressable>
-                                </>
-                            )}
-                        </View>
-                    </Animated.View>
-                </KeyboardAvoidingView>
-            </GestureHandlerRootView>
-        </RNModal>
+                        </Pressable>
+                    </>
+                )
+            }
+        >
+            {createdSecret ? (
+                <SecretReveal slug={createdSlug || slug} secret={createdSecret} />
+            ) : (
+                <CreateForm
+                    machines={machines}
+                    pickedMachineId={pickedMachineId}
+                    setPickedMachineId={setPickedMachineId}
+                    slugRaw={slugRaw}
+                    setSlugRaw={setSlugRaw}
+                    slug={slug}
+                    name={name}
+                    setName={setName}
+                    prompt={prompt}
+                    setPrompt={setPrompt}
+                />
+            )}
+        </BottomSheet>
     );
 });
 
@@ -478,18 +274,27 @@ function CreateForm({
     return (
         <>
             <View style={styles.info}>
-                <Ionicons name="information-circle" size={16} color={theme.colors.accentOrange} />
+                <Ionicons
+                    name="information-circle"
+                    size={16}
+                    color={theme.colors.accentOrange}
+                />
                 <Text style={styles.infoText}>{t("workflows.webhookModalInfo")}</Text>
             </View>
 
             <View>
                 <Text style={styles.sectionLabel}>{t("workflows.sectionMachine")}</Text>
                 {machines.length === 0 ? (
-                    <Text style={[styles.infoText, { color: theme.colors.warning, marginTop: 6 }]}>
+                    <Text
+                        style={[
+                            styles.infoText,
+                            { color: theme.colors.warning, marginTop: 6 },
+                        ]}
+                    >
                         {t("workflows.standaloneNoMachine")}
                     </Text>
                 ) : (
-                    <View style={[styles.presetGrid, { marginTop: 6 }]}>
+                    <View style={styles.presetGrid}>
                         {machines.map((m: any) => (
                             <PresetChip
                                 key={m.id}
@@ -567,11 +372,9 @@ function SecretReveal({ slug, secret }: { slug: string; secret: string }) {
             <View>
                 <Text style={styles.sectionLabel}>{t("workflows.webhookSecretLabel")}</Text>
                 <View style={[styles.secretBox, { marginTop: 6 }]}>
-                    <View style={styles.secretRow}>
-                        <Text style={styles.secretValue} selectable numberOfLines={2}>
-                            {secret}
-                        </Text>
-                    </View>
+                    <Text style={styles.secretValue} selectable numberOfLines={2}>
+                        {secret}
+                    </Text>
                     <Pressable style={styles.secretCopyButton} onPress={copyAll}>
                         <Ionicons
                             name={copied ? "checkmark" : "copy-outline"}
@@ -585,30 +388,5 @@ function SecretReveal({ slug, secret }: { slug: string; secret: string }) {
                 </View>
             </View>
         </>
-    );
-}
-
-function PresetChip({
-    label,
-    active,
-    onPress,
-}: {
-    label: string;
-    active: boolean;
-    onPress: () => void;
-}) {
-    const { isHovered, hoverProps } = useWebHoverProps();
-    return (
-        <Pressable
-            {...hoverProps}
-            onPress={onPress}
-            style={[
-                styles.presetChip,
-                active && styles.presetChipActive,
-                isHovered && !active && { backgroundColor: "rgba(0,0,0,0.04)" },
-            ]}
-        >
-            <Text style={[styles.presetChipText, active && styles.presetChipTextActive]}>{label}</Text>
-        </Pressable>
     );
 }
