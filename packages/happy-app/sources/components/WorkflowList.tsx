@@ -364,11 +364,11 @@ const WorkflowRow = React.memo(function WorkflowRow({
     const metaSuffix = React.useMemo(() => {
         switch (workflow.kind) {
             case "scheduled":
-                return `cron · ${workflow.runCount} runs`;
+                return t("workflows.metaCronRuns", workflow.runCount);
             case "event":
-                return `webhook · ${workflow.triggerCount} fires`;
+                return t("workflows.metaWebhookFires", workflow.triggerCount);
             case "loop":
-                return `iter ${workflow.loop.iteration}`;
+                return t("workflows.metaLoopIter", workflow.loop.iteration);
             case "adhoc":
                 return null;
         }
@@ -416,7 +416,7 @@ const WorkflowRow = React.memo(function WorkflowRow({
                         ) : null}
                         {workflow.sessions.length > 0 ? (
                             <Text style={styles.sessionCount}>
-                                · {workflow.sessions.length} session{workflow.sessions.length === 1 ? "" : "s"}
+                                · {t("workflows.sessionCount", workflow.sessions.length)}
                             </Text>
                         ) : null}
                         {workflow.kind === "loop" && workflow.isCliLocal ? (

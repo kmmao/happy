@@ -34,24 +34,73 @@ export const en = {
 
   workflows: {
     // Workflow IA — see docs/plans/sessions-and-automation-ia.md
-    // Kind labels (used in list rows, filter chips, and detail page header).
-    // English uses "Ad-hoc" (Latin "for this purpose", established term in
+    // Kind labels (list rows, filter chips, detail page header). English
+    // keeps "Ad-hoc" (Latin "for this purpose", established term in
     // automation tooling); zh translates to "临时" for clarity.
     kindAdhoc: "Ad-hoc",
     kindScheduled: "Scheduled",
     kindEvent: "Event",
     kindLoop: "Loop",
-    // Filter chip "All"
     filterAll: "All",
-    // Detail page kind label (longer)
     kindAdhocLabel: "Ad-hoc workflow",
     kindScheduledLabel: "Scheduled workflow",
     kindEventLabel: "Event-driven workflow",
     kindLoopLabel: "Loop workflow",
-    // Generic strings
     emptyTitle: "No workflows yet",
     emptyDescription: "Run `happy` on your Machine to start a conversation",
     cliLocal: "CLI-local",
+    // List row meta suffixes
+    metaCronRuns: (count: number) => `cron · ${count} runs`,
+    metaWebhookFires: (count: number) => `webhook · ${count} fires`,
+    metaLoopIter: (iter: number) => `iter ${iter}`,
+    sessionCount: (count: number) => count === 1 ? "1 session" : `${count} sessions`,
+    // Detail page section titles
+    sessionsHeader: (count: number) => `Sessions (${count})`,
+    sectionSchedule: "Schedule",
+    sectionWebhook: "Webhook",
+    sectionLoop: "Loop",
+    sectionActions: "Actions",
+    sectionMachine: "Machine",
+    // Detail page rows
+    detailCronExpression: "Cron expression",
+    detailNextFire: "Next fire",
+    detailRuns: "Runs",
+    detailEnabled: "Enabled",
+    detailSlug: "Slug",
+    detailFires: "Fires",
+    detailDirectory: "Directory",
+    detailAgent: "Agent",
+    detailIteration: "Iteration",
+    detailPhase: "Phase",
+    detailCron: "Cron",
+    detailLastError: "Last error",
+    detailNoSessions: "No sessions yet",
+    detailNoSessionsSubtitle: "This workflow hasn't run.",
+    detailYes: "Yes",
+    detailNo: "No",
+    detailNever: "—",
+    detailLastActivity: (when: string) => `last activity ${when}`,
+    detailOpenMachine: "Open machine detail",
+    // Ad-hoc action items
+    actionMakeRecurringTitle: "Make this recurring",
+    actionMakeRecurringSubtitle: "Create a cron schedule from this conversation",
+    actionAttachLoopTitle: "Attach to existing Loop",
+    actionPromoteLoopTitle: "Promote to Loop",
+    actionLoopGatedSubtitle: "Needs CLI update — see ADR-0022 phase 3b",
+    // Make-recurring modal
+    recurringModalTitle: "Make this recurring",
+    recurringModalSubtitle: "Create a scheduled workflow that runs this conversation's prompt on a cron.",
+    recurringModalInfo: "This creates a new Scheduled Workflow with the same prompt and directory. The current Session stays as-is; each fire starts a fresh Session (true in-place adoption requires a CLI update).",
+    recurringScheduleLabel: "Schedule",
+    recurringPromptLabel: "Prompt",
+    recurringCronEveryHour: "Every hour",
+    recurringCronDaily02: "Every day at 02:00",
+    recurringCronWeekdays09: "Weekdays 09:00",
+    recurringCronWeeklyMon09: "Weekly Monday 09:00",
+    recurringCronCustom: "Custom cron…",
+    recurringPromptPlaceholder: "What should run each time?",
+    recurringCreate: "Create",
+    recurringErrorTitle: "Couldn't create schedule",
   },
 
   inbox: {

@@ -140,46 +140,46 @@ export default function WorkflowDetailScreen() {
                         <View style={styles.headerText}>
                             <Text style={styles.title} numberOfLines={3}>{workflow.displayName}</Text>
                             <Text style={styles.subtitle} numberOfLines={2}>
-                                {metaLabel} · {machineLabel} · last activity {formatLastSeen(workflow.lastActivityAt, false)}
+                                {metaLabel} · {machineLabel} · {t("workflows.detailLastActivity", formatLastSeen(workflow.lastActivityAt, false))}
                             </Text>
                         </View>
                     </View>
                 </View>
 
                 {workflow.kind === "scheduled" ? (
-                    <ItemGroup title="Schedule">
-                        <Item title="Cron expression" detail={workflow.trigger.cronExpression} copy showChevron={false} />
+                    <ItemGroup title={t("workflows.sectionSchedule")}>
+                        <Item title={t("workflows.detailCronExpression")} detail={workflow.trigger.cronExpression} copy showChevron={false} />
                         <Item
-                            title="Next fire"
-                            detail={workflow.nextRunAt ? new Date(workflow.nextRunAt).toLocaleString() : "—"}
+                            title={t("workflows.detailNextFire")}
+                            detail={workflow.nextRunAt ? new Date(workflow.nextRunAt).toLocaleString() : t("workflows.detailNever")}
                             showChevron={false}
                         />
-                        <Item title="Runs" detail={String(workflow.runCount)} showChevron={false} />
-                        <Item title="Enabled" detail={workflow.trigger.enabled ? "Yes" : "No"} showChevron={false} />
+                        <Item title={t("workflows.detailRuns")} detail={String(workflow.runCount)} showChevron={false} />
+                        <Item title={t("workflows.detailEnabled")} detail={workflow.trigger.enabled ? t("workflows.detailYes") : t("workflows.detailNo")} showChevron={false} />
                     </ItemGroup>
                 ) : null}
 
                 {workflow.kind === "event" ? (
-                    <ItemGroup title="Webhook">
-                        <Item title="Slug" detail={workflow.trigger.slug} copy showChevron={false} />
-                        <Item title="Fires" detail={String(workflow.triggerCount)} showChevron={false} />
-                        <Item title="Enabled" detail={workflow.trigger.enabled ? "Yes" : "No"} showChevron={false} />
+                    <ItemGroup title={t("workflows.sectionWebhook")}>
+                        <Item title={t("workflows.detailSlug")} detail={workflow.trigger.slug} copy showChevron={false} />
+                        <Item title={t("workflows.detailFires")} detail={String(workflow.triggerCount)} showChevron={false} />
+                        <Item title={t("workflows.detailEnabled")} detail={workflow.trigger.enabled ? t("workflows.detailYes") : t("workflows.detailNo")} showChevron={false} />
                     </ItemGroup>
                 ) : null}
 
                 {workflow.kind === "loop" ? (
-                    <ItemGroup title="Loop">
-                        <Item title="Directory" detail={workflow.loop.directory} copy showChevron={false} />
-                        <Item title="Agent" detail={workflow.loop.agent} showChevron={false} />
-                        <Item title="Iteration" detail={String(workflow.loop.iteration)} showChevron={false} />
-                        <Item title="Phase" detail={workflow.loop.phase} showChevron={false} />
-                        <Item title="Enabled" detail={workflow.loop.enabled ? "Yes" : "No"} showChevron={false} />
+                    <ItemGroup title={t("workflows.sectionLoop")}>
+                        <Item title={t("workflows.detailDirectory")} detail={workflow.loop.directory} copy showChevron={false} />
+                        <Item title={t("workflows.detailAgent")} detail={workflow.loop.agent} showChevron={false} />
+                        <Item title={t("workflows.detailIteration")} detail={String(workflow.loop.iteration)} showChevron={false} />
+                        <Item title={t("workflows.detailPhase")} detail={workflow.loop.phase} showChevron={false} />
+                        <Item title={t("workflows.detailEnabled")} detail={workflow.loop.enabled ? t("workflows.detailYes") : t("workflows.detailNo")} showChevron={false} />
                         {workflow.loop.cronExpression ? (
-                            <Item title="Cron" detail={workflow.loop.cronExpression} copy showChevron={false} />
+                            <Item title={t("workflows.detailCron")} detail={workflow.loop.cronExpression} copy showChevron={false} />
                         ) : null}
                         {workflow.loop.lastError ? (
                             <Item
-                                title="Last error"
+                                title={t("workflows.detailLastError")}
                                 subtitle={workflow.loop.lastError}
                                 subtitleLines={3}
                                 detailStyle={{ color: theme.colors.status.error }}
@@ -189,9 +189,9 @@ export default function WorkflowDetailScreen() {
                     </ItemGroup>
                 ) : null}
 
-                <ItemGroup title={`Sessions (${workflow.sessions.length})`}>
+                <ItemGroup title={t("workflows.sessionsHeader", workflow.sessions.length)}>
                     {workflow.sessions.length === 0 ? (
-                        <Item title="No sessions yet" subtitle="This workflow hasn't run." showChevron={false} />
+                        <Item title={t("workflows.detailNoSessions")} subtitle={t("workflows.detailNoSessionsSubtitle")} showChevron={false} />
                     ) : (
                         workflow.sessions.map((session) => (
                             <Item
@@ -212,23 +212,23 @@ export default function WorkflowDetailScreen() {
                 </ItemGroup>
 
                 {workflow.kind === "adhoc" ? (
-                    <ItemGroup title="Actions">
+                    <ItemGroup title={t("workflows.sectionActions")}>
                         <Item
-                            title="Make this recurring"
-                            subtitle="Create a cron schedule from this conversation"
+                            title={t("workflows.actionMakeRecurringTitle")}
+                            subtitle={t("workflows.actionMakeRecurringSubtitle")}
                             icon={<Ionicons name="timer-outline" size={20} color={theme.colors.textLink} />}
                             onPress={() => setRecurringModalVisible(true)}
                         />
                         <Item
-                            title="Attach to existing Loop"
-                            subtitle="Needs CLI update — see ADR-0022 phase 3b"
+                            title={t("workflows.actionAttachLoopTitle")}
+                            subtitle={t("workflows.actionLoopGatedSubtitle")}
                             icon={<Ionicons name="repeat-outline" size={20} color={theme.colors.textLink} />}
                             disabled
                             showChevron={false}
                         />
                         <Item
-                            title="Promote to Loop"
-                            subtitle="Needs CLI update — see ADR-0022 phase 3b"
+                            title={t("workflows.actionPromoteLoopTitle")}
+                            subtitle={t("workflows.actionLoopGatedSubtitle")}
                             icon={<Ionicons name="rocket-outline" size={20} color={theme.colors.textLink} />}
                             disabled
                             showChevron={false}
@@ -237,10 +237,10 @@ export default function WorkflowDetailScreen() {
                 ) : null}
 
                 {workflow.kind === "loop" || workflow.kind === "scheduled" || workflow.kind === "event" ? (
-                    <ItemGroup title="Machine">
+                    <ItemGroup title={t("workflows.sectionMachine")}>
                         <Item
                             title={machineLabel}
-                            subtitle="Open machine detail"
+                            subtitle={t("workflows.detailOpenMachine")}
                             icon={<Ionicons name="desktop-outline" size={20} color={theme.colors.textLink} />}
                             onPress={() => router.push(`/machine/${workflow.machineId}` as any)}
                         />

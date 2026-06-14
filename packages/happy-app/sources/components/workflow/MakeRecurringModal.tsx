@@ -9,14 +9,24 @@
  * is gated on a coordinated cli/agent release. Once that lands, this
  * modal can flip to the real adopt path with no UI change.
  *
- * UX:
- *  - Preset cron buttons (Hourly / Daily 02:00 / Weekly Mon 09:00) + Custom
- *  - Prompt prefilled from the Session's latest user message or summary
- *  - Confirm → call createTriggerSchedule → navigate to the new Workflow
+ * Mobile-friendly layout: backdrop pins the card to the bottom on small
+ * viewports so the on-screen keyboard doesn't cover it; card content is
+ * scrollable so the Cancel/Create row stays reachable when prompt + cron
+ * presets push the layout taller than the viewport. The Cancel/Create
+ * footer is sticky outside the ScrollView so it's always tappable.
  */
 
 import * as React from "react";
-import { View, Pressable, TextInput, ActivityIndicator } from "react-native";
+import {
+    View,
+    Pressable,
+    TextInput,
+    ActivityIndicator,
+    ScrollView,
+    KeyboardAvoidingView,
+    Platform,
+    useWindowDimensions,
+} from "react-native";
 import { Text } from "@/components/StyledText";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { Ionicons } from "@expo/vector-icons";
@@ -29,6 +39,7 @@ import {
     useWebHoverProps,
     webInteractive,
 } from "@/utils/interactiveSurface";
+import { t } from "@/text";
 import type { Session } from "@/sync/storageTypes";
 
 interface MakeRecurringModalProps {
@@ -37,11 +48,12 @@ interface MakeRecurringModalProps {
     onClose: () => void;
 }
 
-const CRON_PRESETS: Array<{ id: string; label: string; expr: string }> = [
-    { id: "hourly", label: "Every hour", expr: "0 * * * *" },
-    { id: "daily", label: "Every day at 02:00", expr: "0 2 * * *" },
-    { id: "weekday", label: "Weekdays 09:00", expr: "0 9 * * 1-5" },
-    { id: "weekly", label: "Weekly Monday 09:00", expr: "0 9 * * 1" },
+// Preset id → cron expression. Labels come from i18n at render time.
+const CRON_PRESETS: Array<{ id: string; labelKey: () => string; expr: string }> = [
+    { id: "hourly", labelKey: () => t("workflows.recurringCronEveryHour"), expr: "0 * * * *" },
+    { id: "daily", labelKey: () => t("workflows.recurringCronDaily02"), expr: "0 2 * * *" },
+    { id: "weekday", labelKey: () => t("workflows.recurringCronWeekdays09"), expr: "0 9 * * 1-5" },
+    { id: "weekly", labelKey: () => t("workflows.recurringCronWeeklyMon09"), expr: "0 9 * * 1" },
 ];
 
 const styles = StyleSheet.create((theme) => ({
@@ -50,13 +62,34 @@ const styles = StyleSheet.create((theme) => ({
         backgroundColor: "rgba(0,0,0,0.45)",
         justifyContent: "center",
         alignItems: "center",
-        paddingHorizontal: 16,
+    },
+    backdropMobile: {
+        // On narrow viewports, pin the card to the bottom (like a bottom
+        // sheet) so it never gets covered by a tiny keyboard pop.
+        justifyContent: "flex-end",
+        alignItems: "stretch",
     },
     card: {
         width: "100%",
         maxWidth: 520,
         backgroundColor: theme.colors.surface,
         borderRadius: 14,
+        overflow: "hidden",
+        flexDirection: "column",
+    },
+    cardMobile: {
+        // Full width on mobile, rounded only at the top.
+        borderTopLeftRadius: 14,
+        borderTopRightRadius: 14,
+        borderBottomLeftRadius: 0,
+        borderBottomRightRadius: 0,
+    },
+    scrollArea: {
+        // Internal scroll area takes the rest of the card after the footer
+        // is laid out. Caps at the viewport so the footer is always visible.
+        flexShrink: 1,
+    },
+    scrollContent: {
         padding: 20,
         gap: 16,
     },
@@ -121,11 +154,17 @@ const styles = StyleSheet.create((theme) => ({
         fontFamily: "System",
         fontSize: 13,
     },
-    actionsRow: {
+    footer: {
+        // Sticky footer outside the ScrollView so Cancel/Create stays
+        // reachable however tall the form gets.
         flexDirection: "row",
         justifyContent: "flex-end",
         gap: 8,
-        marginTop: 4,
+        paddingHorizontal: 20,
+        paddingVertical: 14,
+        borderTopWidth: StyleSheet.hairlineWidth,
+        borderTopColor: theme.colors.divider,
+        backgroundColor: theme.colors.surface,
     },
     button: {
         paddingHorizontal: 14,
@@ -169,6 +208,8 @@ const styles = StyleSheet.create((theme) => ({
     },
 }));
 
+const MOBILE_BREAKPOINT = 540;
+
 export const MakeRecurringModal = React.memo(function MakeRecurringModal({
     session,
     visible,
@@ -176,14 +217,13 @@ export const MakeRecurringModal = React.memo(function MakeRecurringModal({
 }: MakeRecurringModalProps) {
     const { theme } = useUnistyles();
     const router = useRouter();
+    const { width: viewportWidth, height: viewportHeight } = useWindowDimensions();
+    const isMobile = viewportWidth < MOBILE_BREAKPOINT;
     const [presetId, setPresetId] = React.useState<string>("daily");
     const [customCron, setCustomCron] = React.useState<string>("");
     const [prompt, setPrompt] = React.useState<string>("");
     const [submitting, setSubmitting] = React.useState(false);
 
-    // Reset state every time the modal is shown — closing leaves the inputs
-    // for a moment during the animation, but reopening should always pick
-    // up the freshest Session prefill.
     React.useEffect(() => {
         if (!visible) return;
         setPresetId("daily");
@@ -223,82 +263,98 @@ export const MakeRecurringModal = React.memo(function MakeRecurringModal({
             });
 
             onClose();
-            // Navigate to the newly-created Workflow page so the user
-            // immediately sees their handiwork.
             router.push(`/workflow/${encodeURIComponent(`scheduled:${trigger.id}`)}` as any);
         } catch (err) {
             const message = err instanceof Error ? err.message : String(err);
-            Modal.alert("Couldn't create schedule", message);
+            Modal.alert(t("workflows.recurringErrorTitle"), message);
             setSubmitting(false);
         }
     };
 
+    // Cap card height to leave room for OS status bar / keyboard.
+    const cardMaxHeight = Math.floor(viewportHeight * (isMobile ? 0.9 : 0.85));
+
     return (
-        <View style={styles.backdrop}>
-            <View style={styles.card}>
-                <Text style={styles.title}>Make this recurring</Text>
-                <Text style={styles.subtitle}>
-                    Create a scheduled workflow that runs this conversation's prompt on a cron.
-                </Text>
+        <KeyboardAvoidingView
+            style={[styles.backdrop, isMobile && styles.backdropMobile]}
+            behavior={Platform.OS === "ios" ? "padding" : undefined}
+            pointerEvents="box-none"
+        >
+            {/* Tapping the dim backdrop dismisses the modal. */}
+            <Pressable
+                style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0 }}
+                onPress={submitting ? undefined : onClose}
+            />
+            <View
+                style={[
+                    styles.card,
+                    isMobile && styles.cardMobile,
+                    { maxHeight: cardMaxHeight },
+                ]}
+            >
+                <ScrollView
+                    style={styles.scrollArea}
+                    contentContainerStyle={styles.scrollContent}
+                    keyboardShouldPersistTaps="handled"
+                >
+                    <Text style={styles.title}>{t("workflows.recurringModalTitle")}</Text>
+                    <Text style={styles.subtitle}>{t("workflows.recurringModalSubtitle")}</Text>
 
-                <View style={styles.info}>
-                    <Ionicons name="information-circle" size={16} color={theme.colors.accentOrange} />
-                    <Text style={styles.infoText}>
-                        This creates a new Scheduled Workflow with the same prompt and
-                        directory. The current Session stays as-is; each fire starts a
-                        fresh Session (true in-place adoption requires a CLI update).
-                    </Text>
-                </View>
+                    <View style={styles.info}>
+                        <Ionicons name="information-circle" size={16} color={theme.colors.accentOrange} />
+                        <Text style={styles.infoText}>{t("workflows.recurringModalInfo")}</Text>
+                    </View>
 
-                <View>
-                    <Text style={styles.sectionLabel}>Schedule</Text>
-                    <View style={[styles.presetGrid, { marginTop: 6 }]}>
-                        {CRON_PRESETS.map((p) => (
+                    <View>
+                        <Text style={styles.sectionLabel}>{t("workflows.recurringScheduleLabel")}</Text>
+                        <View style={[styles.presetGrid, { marginTop: 6 }]}>
+                            {CRON_PRESETS.map((p) => (
+                                <PresetChip
+                                    key={p.id}
+                                    label={p.labelKey()}
+                                    active={presetId === p.id}
+                                    onPress={() => setPresetId(p.id)}
+                                />
+                            ))}
                             <PresetChip
-                                key={p.id}
-                                label={p.label}
-                                active={presetId === p.id}
-                                onPress={() => setPresetId(p.id)}
+                                label={t("workflows.recurringCronCustom")}
+                                active={presetId === "custom"}
+                                onPress={() => setPresetId("custom")}
                             />
-                        ))}
-                        <PresetChip
-                            label="Custom cron…"
-                            active={presetId === "custom"}
-                            onPress={() => setPresetId("custom")}
+                        </View>
+                        {presetId === "custom" ? (
+                            <TextInput
+                                style={[styles.input, { marginTop: 8 }]}
+                                value={customCron}
+                                onChangeText={setCustomCron}
+                                placeholder="0 2 * * *"
+                                placeholderTextColor={theme.colors.textSecondary}
+                                autoCapitalize="none"
+                                autoCorrect={false}
+                            />
+                        ) : null}
+                    </View>
+
+                    <View>
+                        <Text style={styles.sectionLabel}>{t("workflows.recurringPromptLabel")}</Text>
+                        <TextInput
+                            style={[styles.input, styles.promptInput, { marginTop: 6 }]}
+                            value={prompt}
+                            onChangeText={setPrompt}
+                            multiline
+                            placeholder={t("workflows.recurringPromptPlaceholder")}
+                            placeholderTextColor={theme.colors.textSecondary}
                         />
                     </View>
-                    {presetId === "custom" ? (
-                        <TextInput
-                            style={[styles.input, { marginTop: 8 }]}
-                            value={customCron}
-                            onChangeText={setCustomCron}
-                            placeholder="0 2 * * *"
-                            placeholderTextColor={theme.colors.textSecondary}
-                            autoCapitalize="none"
-                            autoCorrect={false}
-                        />
-                    ) : null}
-                </View>
+                </ScrollView>
 
-                <View>
-                    <Text style={styles.sectionLabel}>Prompt</Text>
-                    <TextInput
-                        style={[styles.input, styles.promptInput, { marginTop: 6 }]}
-                        value={prompt}
-                        onChangeText={setPrompt}
-                        multiline
-                        placeholder="What should run each time?"
-                        placeholderTextColor={theme.colors.textSecondary}
-                    />
-                </View>
-
-                <View style={styles.actionsRow}>
+                <View style={styles.footer}>
                     <Pressable
                         style={[styles.button, styles.buttonCancel]}
                         onPress={onClose}
                         disabled={submitting}
                     >
-                        <Text style={[styles.buttonText, styles.buttonTextCancel]}>Cancel</Text>
+                        <Text style={[styles.buttonText, styles.buttonTextCancel]}>{t("common.cancel")}</Text>
                     </Pressable>
                     <Pressable
                         style={[
@@ -311,12 +367,12 @@ export const MakeRecurringModal = React.memo(function MakeRecurringModal({
                         {submitting ? (
                             <ActivityIndicator size="small" color={theme.colors.button.primary.tint} />
                         ) : (
-                            <Text style={[styles.buttonText, styles.buttonTextPrimary]}>Create</Text>
+                            <Text style={[styles.buttonText, styles.buttonTextPrimary]}>{t("workflows.recurringCreate")}</Text>
                         )}
                     </Pressable>
                 </View>
             </View>
-        </View>
+        </KeyboardAvoidingView>
     );
 });
 
