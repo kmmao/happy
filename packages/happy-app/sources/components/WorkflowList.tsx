@@ -30,14 +30,8 @@ import { useWorkflows, type Workflow, type WorkflowKind } from "@/hooks/useWorkf
 import { useNavigateToSession } from "@/hooks/useNavigateToSession";
 import { SharedStateView } from "./SharedStateView";
 import { UpdateBanner } from "./UpdateBanner";
-import { Avatar } from "./Avatar";
 import { StatusDot } from "./StatusDot";
-import {
-    getSessionAvatarId,
-    getSessionName,
-    formatLastSeen,
-    useSessionStatus,
-} from "@/utils/sessionUtils";
+import { formatLastSeen } from "@/utils/sessionUtils";
 import { useLayout } from "./layout";
 import {
     useWebHoverProps,
@@ -47,6 +41,7 @@ import { t } from "@/text";
 import type { Session } from "@/sync/storageTypes";
 import { Modal } from "@/modal";
 import { MakeRecurringModal } from "./workflow/MakeRecurringModal";
+import { WorkflowSessionRow } from "./workflow/WorkflowSessionRow";
 
 const FILTER_VALUES: ReadonlyArray<{ key: "all" | WorkflowKind; label: () => string }> = [
     { key: "all", label: () => t("workflows.filterAll") },
@@ -283,30 +278,6 @@ const styles = StyleSheet.create((theme, rt) => ({
         color: theme.colors.textSecondary,
         ...Typography.default(),
     },
-    sessionRow: {
-        flexDirection: "row",
-        alignItems: "center",
-        paddingVertical: 8,
-        paddingHorizontal: 6,
-        marginHorizontal: -6,
-        borderRadius: 8,
-        gap: 10,
-        ...webInteractive,
-    },
-    sessionRowHovered: {
-        backgroundColor: theme.colors.surfaceHigh,
-    },
-    sessionRowName: {
-        flex: 1,
-        fontSize: 13,
-        color: theme.colors.text,
-        ...Typography.default(),
-    },
-    sessionRowMeta: {
-        fontSize: 11,
-        color: theme.colors.textSecondary,
-        ...Typography.default(),
-    },
     moreSessionsButton: {
         flexDirection: "row",
         alignItems: "center",
@@ -533,12 +504,43 @@ const WorkflowRow = React.memo(function WorkflowRow({
         }
     }, [workflow]);
 
+    // Ad-hoc workflows are rendered as a full SessionItem-style row —
+    // the whole point of an ad-hoc workflow IS the session, so it gets
+    // the full status/preview/tags/avatar-glow treatment that the
+    // pre-Workflow-IA sessions list used to show. The "Make this
+    // recurring" affordance lives in the row's long-press menu (passed
+    // through as an extraMenuActions entry on the row).
+    if (isAdhoc) {
+        const session = (workflow as Extract<Workflow, { kind: "adhoc" }>).session;
+        return (
+            <View style={styles.rowContainer}>
+                <WorkflowSessionRow
+                    session={session}
+                    mode="standalone"
+                    extraMenuActions={[
+                        {
+                            label: t("workflows.actionMakeRecurringTitle"),
+                            onPress: () => setRecurringModalVisible(true),
+                        },
+                    ]}
+                />
+                <MakeRecurringModal
+                    session={session}
+                    visible={recurringModalVisible}
+                    onClose={() => setRecurringModalVisible(false)}
+                />
+            </View>
+        );
+    }
+
+    // Multi-session workflows (Scheduled / Event / Loop) keep the
+    // kind-icon header (since the workflow ≠ a single session here) and
+    // expand below to show tree children.
     return (
         <View style={styles.rowContainer}>
             <Pressable
                 {...hoverProps}
                 onPress={onHeaderPress}
-                onLongPress={isAdhoc ? onHeaderLongPress : undefined}
                 style={({ pressed }) => [
                     styles.rowHeader,
                     isHovered && styles.rowHeaderHovered,
@@ -572,7 +574,7 @@ const WorkflowRow = React.memo(function WorkflowRow({
                         {metaSuffix ? (
                             <Text style={styles.headerMetaText}>· {metaSuffix}</Text>
                         ) : null}
-                        {!isAdhoc && workflow.sessions.length > 0 ? (
+                        {workflow.sessions.length > 0 ? (
                             <Text style={styles.headerMetaText}>
                                 · {t("workflows.sessionCount", workflow.sessions.length)}
                             </Text>
@@ -589,34 +591,15 @@ const WorkflowRow = React.memo(function WorkflowRow({
                         ) : null}
                     </View>
                 </View>
-                {!isAdhoc ? (
-                    <Ionicons
-                        name={expanded ? "chevron-up" : "chevron-down"}
-                        size={16}
-                        color={theme.colors.textSecondary}
-                        style={styles.expandToggle}
-                    />
-                ) : (
-                    <Ionicons
-                        name="chevron-forward"
-                        size={16}
-                        color={theme.colors.textSecondary}
-                        style={styles.expandToggle}
-                    />
-                )}
+                <Ionicons
+                    name={expanded ? "chevron-up" : "chevron-down"}
+                    size={16}
+                    color={theme.colors.textSecondary}
+                    style={styles.expandToggle}
+                />
             </Pressable>
 
-            {!isAdhoc && expanded ? (
-                <WorkflowDetailBody workflow={workflow} />
-            ) : null}
-
-            {isAdhoc ? (
-                <MakeRecurringModal
-                    session={(workflow as Extract<Workflow, { kind: "adhoc" }>).session}
-                    visible={recurringModalVisible}
-                    onClose={() => setRecurringModalVisible(false)}
-                />
-            ) : null}
+            {expanded ? <WorkflowDetailBody workflow={workflow} /> : null}
         </View>
     );
 });
@@ -701,9 +684,12 @@ const WorkflowDetailBody = React.memo(function WorkflowDetailBody({
                                 idx === sessionsToShow.length - 1 && moreCount === 0;
                             return (
                                 <TreeRow key={session.id} isLast={isLast}>
-                                    <SessionLeaf
+                                    {/* Same row component as ad-hoc — keeps
+                                        avatar / live status / preview /
+                                        tags consistent across the IA. */}
+                                    <WorkflowSessionRow
                                         session={session}
-                                        onPress={() => navigateToSession(session.id)}
+                                        mode="treeChild"
                                     />
                                 </TreeRow>
                             );
@@ -758,45 +744,5 @@ const TreeRow = React.memo(function TreeRow({
     );
 });
 
-const SessionLeaf = React.memo(function SessionLeaf({
-    session,
-    onPress,
-}: {
-    session: Session;
-    onPress: () => void;
-}) {
-    const { theme } = useUnistyles();
-    const status = useSessionStatus(session);
-    const { isHovered, hoverProps } = useWebHoverProps();
-    const avatarId = React.useMemo(() => getSessionAvatarId(session), [session]);
-
-    return (
-        <Pressable
-            {...hoverProps}
-            onPress={onPress}
-            style={[
-                styles.sessionRow,
-                isHovered && styles.sessionRowHovered,
-            ]}
-        >
-            <Avatar
-                id={avatarId}
-                size={26}
-                monochrome={!status.isConnected}
-                flavor={session.metadata?.flavor}
-            />
-            <Text style={styles.sessionRowName} numberOfLines={1}>
-                {getSessionName(session)}
-            </Text>
-            <StatusDot color={status.statusDotColor} />
-            <Text style={styles.sessionRowMeta}>
-                {formatLastSeen(session.updatedAt ?? 0, false)}
-            </Text>
-            <Ionicons
-                name="chevron-forward"
-                size={14}
-                color={theme.colors.groupped.chevron}
-            />
-        </Pressable>
-    );
-});
+// SessionLeaf removed — WorkflowSessionRow (mode="treeChild") is the
+// single source of truth for rendering a session inside a workflow.
