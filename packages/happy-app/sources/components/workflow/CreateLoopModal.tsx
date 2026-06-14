@@ -33,9 +33,15 @@ interface CreateLoopModalProps {
  */
 const MIN_CLI_VERSION_FOR_LOOPS = "0.97.0";
 
-/** Planning doc link surfaced in the footer for users who want context. */
+/**
+ * The gating decision (AgentLoop / SupervisorLoop convergence, the
+ * generic-role pipeline, and the Phase 3b CLI ↔ server work that
+ * unblocks Loop creation from the App) lives in ADR-0022. The Workflow
+ * IA PRD only references it second-hand, so we link the source of
+ * truth instead.
+ */
 const LEARN_MORE_URL =
-    "https://github.com/kmmao/happy/blob/main/docs/plans/sessions-and-automation-ia.md";
+    "https://github.com/kmmao/happy/blob/main/docs/adr/0022-agent-loop-absorbs-supervisor-loop.md";
 
 // Compare two semver strings (major.minor.patch). Returns -1 / 0 / 1.
 // Treats missing pieces as 0. Returns null if either side isn't parseable.
