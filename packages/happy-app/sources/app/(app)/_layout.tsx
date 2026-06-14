@@ -505,21 +505,8 @@ export default function RootLayout() {
           headerBackTitle: t("common.back"),
         }}
       />
-      {/* Workflow IA replaces the per-machine automation/loops/tasks/
-          trigger sub-pages — see docs/plans/sessions-and-automation-ia.md.
-          The single Workflow detail screen below handles every kind
-          (ad-hoc / scheduled / event / loop). */}
-      <Stack.Screen
-        name="workflow/[id]"
-        options={{
-          headerShown: true,
-          // Header title is set per-instance by WorkflowDetailScreen (kind-
-          // specific label); use tabs.sessions as the fallback when the
-          // screen mounts before useWorkflows resolves.
-          headerTitle: t("tabs.sessions"),
-          headerBackTitle: t("common.back"),
-        }}
-      />
+      {/* Workflow IA: workflow detail is rendered inline inside
+          WorkflowList rows; no standalone /workflow/[id] page exists. */}
       <Stack.Screen
         name="machine/[id]/diagnostics"
         options={{

@@ -1,14 +1,15 @@
 /**
  * WorkflowList — the Workflow-IA replacement for SessionsList.
  *
- * Per docs/plans/sessions-and-automation-ia.md (Phase 1):
- *  - One row per Workflow (Ad-hoc / Scheduled / Event / Loop)
- *  - Each Workflow row expands to show its child Sessions
- *  - Filter chip row at the top (All / Ad-hoc / Scheduled / Event / Loop)
- *  - Tapping a Workflow opens the Workflow detail page; tapping a Session
- *    inside still goes to the conversation
- *
- * Phase 1 is read-only; Phase 2 adds promote actions on rows.
+ * Phase A (this revision):
+ *  - Ad-hoc workflows are LEAF rows: a single Session, header tap goes
+ *    straight to the conversation (no detail page, no expand state).
+ *  - Scheduled / Event / Loop workflows default to EXPANDED (key config
+ *    + child Sessions visible without an extra tap) and can be collapsed.
+ *    The kind-specific config + actions that used to live on
+ *    /workflow/[id] are now inlined here — the detail page is removed.
+ *  - Promote actions (Make recurring) hang off Ad-hoc workflows via a
+ *    long-press menu — leaf tap is reserved for the most common path.
  */
 
 import React from "react";
@@ -17,10 +18,10 @@ import {
     Pressable,
     FlatList,
     ScrollView,
+    Linking,
 } from "react-native";
 import { Text } from "@/components/StyledText";
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter, usePathname } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
@@ -44,6 +45,8 @@ import {
 } from "@/utils/interactiveSurface";
 import { t } from "@/text";
 import type { Session } from "@/sync/storageTypes";
+import { Modal } from "@/modal";
+import { MakeRecurringModal } from "./workflow/MakeRecurringModal";
 
 const FILTER_VALUES: ReadonlyArray<{ key: "all" | WorkflowKind; label: () => string }> = [
     { key: "all", label: () => t("workflows.filterAll") },
@@ -73,6 +76,11 @@ const STATUS_COLOR: Record<Workflow["status"], string> = {
     error: "#FF3B30",
     archived: "#C7C7CC",
 };
+
+// Show up to this many sessions per expanded workflow before collapsing the
+// tail behind "+ N more". Keeps a busy loop with 100+ iterations from
+// blowing out the list.
+const MAX_INLINE_SESSIONS = 5;
 
 const styles = StyleSheet.create((theme, rt) => ({
     container: {
@@ -189,27 +197,61 @@ const styles = StyleSheet.create((theme, rt) => ({
     expandToggle: {
         paddingTop: 2,
     },
-    sessionsContainer: {
+    // Inline detail body sits below the header row, divided by a hairline.
+    detailBody: {
         borderTopWidth: StyleSheet.hairlineWidth,
         borderTopColor: theme.colors.divider,
+        paddingHorizontal: 14,
+        paddingVertical: 10,
+        gap: 10,
+        backgroundColor: theme.colors.surface,
+    },
+    sectionTitle: {
+        fontSize: 11,
+        color: theme.colors.textSecondary,
+        textTransform: "uppercase",
+        letterSpacing: 0.1,
+        ...Typography.default("semiBold"),
+        marginBottom: 2,
+    },
+    configRow: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 8,
+        flexWrap: "wrap",
+    },
+    configChip: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 4,
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 6,
+        backgroundColor: theme.colors.surfaceHigh,
+    },
+    configChipText: {
+        fontSize: 11,
+        color: theme.colors.text,
+        ...Typography.default(),
+        fontFamily: "Menlo",
+    },
+    configChipLabel: {
+        fontSize: 11,
+        color: theme.colors.textSecondary,
+        ...Typography.default(),
     },
     sessionRow: {
         flexDirection: "row",
         alignItems: "center",
-        paddingHorizontal: 14,
-        paddingVertical: 10,
+        paddingVertical: 8,
+        paddingHorizontal: 6,
+        marginHorizontal: -6,
+        borderRadius: 8,
         gap: 10,
         ...webInteractive,
     },
     sessionRowHovered: {
         backgroundColor: theme.colors.surfaceHigh,
-    },
-    sessionRowDivider: {
-        borderTopWidth: StyleSheet.hairlineWidth,
-        borderTopColor: theme.colors.divider,
-    },
-    sessionRowSelected: {
-        backgroundColor: theme.colors.surfaceSelected,
     },
     sessionRowName: {
         flex: 1,
@@ -222,11 +264,47 @@ const styles = StyleSheet.create((theme, rt) => ({
         color: theme.colors.textSecondary,
         ...Typography.default(),
     },
-    sessionCount: {
-        fontSize: 11,
-        color: theme.colors.textSecondary,
+    moreSessionsButton: {
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "center",
+        paddingVertical: 8,
+        gap: 4,
+        ...webInteractive,
+    },
+    moreSessionsText: {
+        fontSize: 12,
+        color: theme.colors.textLink,
         ...Typography.default("semiBold"),
-        paddingLeft: 4,
+    },
+    actionsRow: {
+        flexDirection: "row",
+        gap: 8,
+        flexWrap: "wrap",
+    },
+    actionButton: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 6,
+        paddingHorizontal: 10,
+        paddingVertical: 7,
+        borderRadius: 8,
+        backgroundColor: theme.colors.surfaceHigh,
+        ...webInteractive,
+    },
+    actionButtonText: {
+        fontSize: 12,
+        color: theme.colors.text,
+        ...Typography.default("semiBold"),
+    },
+    actionButtonDisabled: {
+        opacity: 0.5,
+    },
+    emptySessions: {
+        fontSize: 12,
+        color: theme.colors.textSecondary,
+        ...Typography.default(),
+        paddingVertical: 6,
     },
 }));
 
@@ -241,15 +319,18 @@ export const WorkflowList = React.memo<WorkflowListProps>(function WorkflowList(
     const insets = useSafeAreaInsets();
     const { workflows, loading } = useWorkflows();
     const [activeFilter, setActiveFilter] = React.useState<"all" | WorkflowKind>("all");
-    const [expandedIds, setExpandedIds] = React.useState<Record<string, boolean>>({});
+    // Collapsed-ids: Multi-session workflows default to EXPANDED; only the
+    // ones in this set are collapsed. Inverting the default keeps the
+    // common case zero-click.
+    const [collapsedIds, setCollapsedIds] = React.useState<Record<string, boolean>>({});
 
     const filtered = React.useMemo(() => {
         if (activeFilter === "all") return workflows;
         return workflows.filter((w) => w.kind === activeFilter);
     }, [workflows, activeFilter]);
 
-    const toggleExpanded = React.useCallback((id: string) => {
-        setExpandedIds((prev) => ({ ...prev, [id]: !prev[id] }));
+    const toggleCollapse = React.useCallback((id: string) => {
+        setCollapsedIds((prev) => ({ ...prev, [id]: !prev[id] }));
     }, []);
 
     const HeaderComponent = React.useCallback(
@@ -316,8 +397,10 @@ export const WorkflowList = React.memo<WorkflowListProps>(function WorkflowList(
                     renderItem={({ item }) => (
                         <WorkflowRow
                             workflow={item}
-                            expanded={!!expandedIds[item.id]}
-                            onToggleExpand={() => toggleExpanded(item.id)}
+                            // Ad-hoc rows ignore this; multi-session rows
+                            // default expanded unless user collapsed them.
+                            expanded={!collapsedIds[item.id]}
+                            onToggleCollapse={() => toggleCollapse(item.id)}
                         />
                     )}
                     ListHeaderComponent={HeaderComponent}
@@ -335,22 +418,55 @@ export const WorkflowList = React.memo<WorkflowListProps>(function WorkflowList(
 interface WorkflowRowProps {
     workflow: Workflow;
     expanded: boolean;
-    onToggleExpand: () => void;
+    onToggleCollapse: () => void;
 }
 
 const WorkflowRow = React.memo(function WorkflowRow({
     workflow,
     expanded,
-    onToggleExpand,
+    onToggleCollapse,
 }: WorkflowRowProps) {
     const { theme } = useUnistyles();
-    const router = useRouter();
-    const pathname = usePathname();
+    const navigateToSession = useNavigateToSession();
     const { isHovered, hoverProps } = useWebHoverProps();
+    const [recurringModalVisible, setRecurringModalVisible] = React.useState(false);
 
-    const navigateToWorkflow = React.useCallback(() => {
-        router.push(`/workflow/${encodeURIComponent(workflow.id)}` as any);
-    }, [router, workflow.id]);
+    // Ad-hoc workflows are leaves: the row IS the session, tap goes
+    // straight to the conversation. No collapse/expand toggle, no detail
+    // body — the "1 session" meta would just duplicate the row.
+    const isAdhoc = workflow.kind === "adhoc";
+
+    const onHeaderPress = React.useCallback(() => {
+        if (isAdhoc) {
+            navigateToSession((workflow as Extract<Workflow, { kind: "adhoc" }>).session.id);
+        } else {
+            onToggleCollapse();
+        }
+    }, [isAdhoc, workflow, navigateToSession, onToggleCollapse]);
+
+    // Long-press on an Ad-hoc row reveals the promote menu. This is the
+    // discovery path for "Make this recurring" now that the dedicated
+    // detail page is gone; the new top-level + menu (Phase B) is the
+    // other entry for users who'd rather start fresh.
+    const onHeaderLongPress = React.useCallback(() => {
+        if (!isAdhoc) return;
+        const session = (workflow as Extract<Workflow, { kind: "adhoc" }>).session;
+        Modal.alert(
+            workflow.displayName,
+            "",
+            [
+                { text: t("common.cancel"), style: "cancel" },
+                {
+                    text: t("workflows.actionMakeRecurringTitle"),
+                    onPress: () => setRecurringModalVisible(true),
+                },
+                {
+                    text: t("workflows.detailOpenMachine"),
+                    onPress: () => navigateToSession(session.id),
+                },
+            ],
+        );
+    }, [isAdhoc, workflow, navigateToSession]);
 
     const kindLabel = React.useMemo(() => {
         switch (workflow.kind) {
@@ -374,13 +490,12 @@ const WorkflowRow = React.memo(function WorkflowRow({
         }
     }, [workflow]);
 
-    const canExpand = workflow.kind !== "adhoc" && workflow.sessions.length > 0;
-
     return (
         <View style={styles.rowContainer}>
             <Pressable
                 {...hoverProps}
-                onPress={navigateToWorkflow}
+                onPress={onHeaderPress}
+                onLongPress={isAdhoc ? onHeaderLongPress : undefined}
                 style={({ pressed }) => [
                     styles.rowHeader,
                     isHovered && styles.rowHeaderHovered,
@@ -414,8 +529,8 @@ const WorkflowRow = React.memo(function WorkflowRow({
                         {metaSuffix ? (
                             <Text style={styles.headerMetaText}>· {metaSuffix}</Text>
                         ) : null}
-                        {workflow.sessions.length > 0 ? (
-                            <Text style={styles.sessionCount}>
+                        {!isAdhoc && workflow.sessions.length > 0 ? (
+                            <Text style={styles.headerMetaText}>
                                 · {t("workflows.sessionCount", workflow.sessions.length)}
                             </Text>
                         ) : null}
@@ -431,84 +546,179 @@ const WorkflowRow = React.memo(function WorkflowRow({
                         ) : null}
                     </View>
                 </View>
-                {canExpand ? (
-                    <Pressable
+                {!isAdhoc ? (
+                    <Ionicons
+                        name={expanded ? "chevron-up" : "chevron-down"}
+                        size={16}
+                        color={theme.colors.textSecondary}
                         style={styles.expandToggle}
-                        hitSlop={8}
-                        onPress={(e) => {
-                            e.stopPropagation();
-                            onToggleExpand();
-                        }}
-                    >
-                        <Ionicons
-                            name={expanded ? "chevron-up" : "chevron-down"}
-                            size={16}
-                            color={theme.colors.textSecondary}
-                        />
-                    </Pressable>
-                ) : null}
+                    />
+                ) : (
+                    <Ionicons
+                        name="chevron-forward"
+                        size={16}
+                        color={theme.colors.textSecondary}
+                        style={styles.expandToggle}
+                    />
+                )}
             </Pressable>
 
-            {canExpand && expanded ? (
-                <View style={styles.sessionsContainer}>
-                    {workflow.sessions.map((session, idx) => (
-                        <WorkflowSessionRow
-                            key={session.id}
-                            session={session}
-                            showDivider={idx > 0}
-                            selectedPath={pathname}
-                        />
-                    ))}
-                </View>
+            {!isAdhoc && expanded ? (
+                <WorkflowDetailBody workflow={workflow} />
+            ) : null}
+
+            {isAdhoc ? (
+                <MakeRecurringModal
+                    session={(workflow as Extract<Workflow, { kind: "adhoc" }>).session}
+                    visible={recurringModalVisible}
+                    onClose={() => setRecurringModalVisible(false)}
+                />
             ) : null}
         </View>
     );
 });
 
-const WorkflowSessionRow = React.memo(function WorkflowSessionRow({
-    session,
-    showDivider,
-    selectedPath,
-}: {
-    session: Session;
-    showDivider?: boolean;
-    selectedPath: string;
-}) {
-    const styles2 = styles;
+// --- Detail body (inlined, used to be the /workflow/[id] page) ------------
+
+const WorkflowDetailBody = React.memo(function WorkflowDetailBody({
+    workflow,
+}: { workflow: Workflow }) {
     const { theme } = useUnistyles();
     const navigateToSession = useNavigateToSession();
-    const sessionStatus = useSessionStatus(session);
-    const { isHovered, hoverProps } = useWebHoverProps();
 
-    const selected = selectedPath.startsWith(`/session/${session.id}`);
+    if (workflow.kind === "adhoc") return null;
+
+    const sessionsToShow = workflow.sessions.slice(0, MAX_INLINE_SESSIONS);
+    const moreCount = workflow.sessions.length - sessionsToShow.length;
+
+    return (
+        <View style={styles.detailBody}>
+            {/* Kind-specific configuration chips. Compact, key fields only —
+                full editing still happens through dedicated flows. */}
+            {workflow.kind === "scheduled" ? (
+                <View>
+                    <Text style={styles.sectionTitle}>{t("workflows.sectionSchedule")}</Text>
+                    <View style={styles.configRow}>
+                        <ConfigChip label={t("workflows.detailCronExpression")} value={workflow.trigger.cronExpression} />
+                        {workflow.nextRunAt ? (
+                            <ConfigChip
+                                label={t("workflows.detailNextFire")}
+                                value={new Date(workflow.nextRunAt).toLocaleString()}
+                            />
+                        ) : null}
+                        <ConfigChip
+                            label={t("workflows.detailEnabled")}
+                            value={workflow.trigger.enabled ? t("workflows.detailYes") : t("workflows.detailNo")}
+                        />
+                    </View>
+                </View>
+            ) : null}
+
+            {workflow.kind === "event" ? (
+                <View>
+                    <Text style={styles.sectionTitle}>{t("workflows.sectionWebhook")}</Text>
+                    <View style={styles.configRow}>
+                        <ConfigChip label={t("workflows.detailSlug")} value={workflow.trigger.slug} />
+                        <ConfigChip
+                            label={t("workflows.detailEnabled")}
+                            value={workflow.trigger.enabled ? t("workflows.detailYes") : t("workflows.detailNo")}
+                        />
+                    </View>
+                </View>
+            ) : null}
+
+            {workflow.kind === "loop" ? (
+                <View>
+                    <Text style={styles.sectionTitle}>{t("workflows.sectionLoop")}</Text>
+                    <View style={styles.configRow}>
+                        <ConfigChip label={t("workflows.detailDirectory")} value={workflow.loop.directory} />
+                        <ConfigChip label={t("workflows.detailAgent")} value={workflow.loop.agent} />
+                        <ConfigChip label={t("workflows.detailPhase")} value={workflow.loop.phase} />
+                        {workflow.loop.cronExpression ? (
+                            <ConfigChip label={t("workflows.detailCron")} value={workflow.loop.cronExpression} />
+                        ) : null}
+                    </View>
+                </View>
+            ) : null}
+
+            {/* Sessions list (always shown; the whole point of expanding). */}
+            <View>
+                <Text style={styles.sectionTitle}>
+                    {t("workflows.sessionsHeader", workflow.sessions.length)}
+                </Text>
+                {workflow.sessions.length === 0 ? (
+                    <Text style={styles.emptySessions}>{t("workflows.detailNoSessions")}</Text>
+                ) : (
+                    sessionsToShow.map((session) => (
+                        <SessionLeaf
+                            key={session.id}
+                            session={session}
+                            onPress={() => navigateToSession(session.id)}
+                        />
+                    ))
+                )}
+                {moreCount > 0 ? (
+                    <Pressable
+                        style={styles.moreSessionsButton}
+                        onPress={() => {
+                            // For now, navigate to the most recent session
+                            // (best proxy until a per-workflow archive page
+                            // exists). Future: show a /workflow/[id]/
+                            // sessions list page if usage demands.
+                            navigateToSession(workflow.sessions[0].id);
+                        }}
+                    >
+                        <Text style={styles.moreSessionsText}>
+                            + {moreCount} more
+                        </Text>
+                    </Pressable>
+                ) : null}
+            </View>
+        </View>
+    );
+});
+
+function ConfigChip({ label, value }: { label: string; value: string }) {
+    return (
+        <View style={styles.configChip}>
+            <Text style={styles.configChipLabel}>{label}:</Text>
+            <Text style={styles.configChipText} numberOfLines={1}>{value}</Text>
+        </View>
+    );
+}
+
+const SessionLeaf = React.memo(function SessionLeaf({
+    session,
+    onPress,
+}: {
+    session: Session;
+    onPress: () => void;
+}) {
+    const { theme } = useUnistyles();
+    const status = useSessionStatus(session);
+    const { isHovered, hoverProps } = useWebHoverProps();
     const avatarId = React.useMemo(() => getSessionAvatarId(session), [session]);
-    const name = getSessionName(session);
 
     return (
         <Pressable
             {...hoverProps}
-            onPress={(e) => {
-                e.stopPropagation();
-                navigateToSession(session.id);
-            }}
+            onPress={onPress}
             style={[
-                styles2.sessionRow,
-                showDivider && styles2.sessionRowDivider,
-                isHovered && !selected && styles2.sessionRowHovered,
-                selected && styles2.sessionRowSelected,
+                styles.sessionRow,
+                isHovered && styles.sessionRowHovered,
             ]}
         >
             <Avatar
                 id={avatarId}
                 size={26}
-                monochrome={!sessionStatus.isConnected}
+                monochrome={!status.isConnected}
                 flavor={session.metadata?.flavor}
             />
-            <Text style={styles2.sessionRowName} numberOfLines={1}>
-                {name}
+            <Text style={styles.sessionRowName} numberOfLines={1}>
+                {getSessionName(session)}
             </Text>
-            <StatusDot color={sessionStatus.statusDotColor} />
-            <Text style={styles2.sessionRowMeta}>
+            <StatusDot color={status.statusDotColor} />
+            <Text style={styles.sessionRowMeta}>
                 {formatLastSeen(session.updatedAt ?? 0, false)}
             </Text>
             <Ionicons

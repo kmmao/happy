@@ -106,6 +106,14 @@ export const ru: TranslationStructure = {
     recurringPromptPlaceholder: "What should run each time?",
     recurringCreate: "Create",
     recurringErrorTitle: "Couldn't create schedule",
+    standaloneNoMachine: "No online machines. Start the Happy daemon on a Machine first.",
+    createMenuTitle: "New",
+    createMenuNewSession: "Start a session",
+    createMenuNewSessionHint: "Open a conversation now",
+    createMenuScheduled: "Create a schedule",
+    createMenuScheduledHint: "Cron-driven workflow",
+    createMenuWebhook: "Create a webhook",
+    createMenuWebhookHint: "Coming soon — needs CLI update",
   },
 
   inbox: {

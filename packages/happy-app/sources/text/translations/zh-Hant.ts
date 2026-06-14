@@ -94,6 +94,14 @@ export const zhHant: TranslationStructure = {
     recurringPromptPlaceholder: "每次运行什么?",
     recurringCreate: "创建",
     recurringErrorTitle: "無法创建定時",
+    standaloneNoMachine: "沒有線上的機器。請先在機器上啟動 Happy daemon。",
+    createMenuTitle: "新建",
+    createMenuNewSession: "啟動新會話",
+    createMenuNewSessionHint: "立即開始一個對話",
+    createMenuScheduled: "建立定時任務",
+    createMenuScheduledHint: "Cron 驅動的工作流",
+    createMenuWebhook: "建立 Webhook",
+    createMenuWebhookHint: "即將上線 — 需要 CLI 更新",
   },
 
   inbox: {

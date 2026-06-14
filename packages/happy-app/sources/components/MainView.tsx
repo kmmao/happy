@@ -18,6 +18,7 @@ import { useIsTablet } from "@/utils/responsive";
 import { useRouter } from "expo-router";
 import { EmptySessionsTablet } from "./EmptySessionsTablet";
 import { WorkflowList } from "./WorkflowList";
+import { CreateWorkflowMenu } from "./workflow/CreateWorkflowMenu";
 import { FABWide } from "./FABWide";
 import { TabBar, TabType } from "./TabBar";
 import { InboxView } from "./InboxView";
@@ -202,19 +203,11 @@ const HeaderRight = React.memo(
     const isCustomServer = isUsingCustomServer();
 
     if (activeTab === "sessions") {
-      return (
-        <Pressable
-          onPress={() => router.push("/new")}
-          hitSlop={15}
-          style={styles.headerButton}
-        >
-          <Ionicons
-            name="add-outline"
-            size={28}
-            color={theme.colors.header.tint}
-          />
-        </Pressable>
-      );
+      // Multi-option creation: opens a menu with Start a session / Create
+      // a schedule / Create a webhook so users can build automation
+      // without first opening a Session. See CreateWorkflowMenu for why
+      // we route this through Modal.alert.
+      return <CreateWorkflowMenu style={styles.headerButton} />;
     }
 
     if (activeTab === "inbox") {

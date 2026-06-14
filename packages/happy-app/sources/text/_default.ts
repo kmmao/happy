@@ -101,6 +101,16 @@ export const en = {
     recurringPromptPlaceholder: "What should run each time?",
     recurringCreate: "Create",
     recurringErrorTitle: "Couldn't create schedule",
+    // Standalone create-schedule flow (no source Session)
+    standaloneNoMachine: "No online machines. Start the Happy daemon on a Machine first.",
+    // + button menu in the header
+    createMenuTitle: "New",
+    createMenuNewSession: "Start a session",
+    createMenuNewSessionHint: "Open a conversation now",
+    createMenuScheduled: "Create a schedule",
+    createMenuScheduledHint: "Cron-driven workflow",
+    createMenuWebhook: "Create a webhook",
+    createMenuWebhookHint: "Coming soon — needs CLI update",
   },
 
   inbox: {

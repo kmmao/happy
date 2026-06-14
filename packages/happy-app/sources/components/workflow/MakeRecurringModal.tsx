@@ -47,7 +47,6 @@ import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { Ionicons } from "@expo/vector-icons";
 import { Typography } from "@/constants/Typography";
 import { Modal as AlertModal } from "@/modal";
-import { useRouter } from "expo-router";
 import { TokenStorage } from "@/auth/tokenStorage";
 import { createTriggerSchedule } from "@/sync/apiTriggerSchedules";
 import {
@@ -55,12 +54,17 @@ import {
     webInteractive,
 } from "@/utils/interactiveSurface";
 import { t } from "@/text";
+import { useAllMachines } from "@/sync/storage";
 import type { Session } from "@/sync/storageTypes";
 
 interface MakeRecurringModalProps {
-    session: Session;
     visible: boolean;
     onClose: () => void;
+    // When provided, the modal prefills prompt/directory/machineId from
+    // this Session ("promote this conversation"). When omitted, the modal
+    // is a standalone "create new schedule" — user picks a target Machine
+    // and writes the prompt from scratch.
+    session?: Session;
 }
 
 // Preset id → cron expression. Labels come from i18n at render time.
@@ -290,10 +294,15 @@ export const MakeRecurringModal = React.memo(function MakeRecurringModal({
     onClose,
 }: MakeRecurringModalProps) {
     const { theme } = useUnistyles();
-    const router = useRouter();
     const insets = useSafeAreaInsets();
     const { width: viewportWidth, height: viewportHeight } = useWindowDimensions();
     const isMobile = viewportWidth < MOBILE_BREAKPOINT;
+
+    // In standalone mode the user picks the target machine; in session
+    // mode the machineId is inherited from the source Session.
+    const isStandalone = !session;
+    const machines = useAllMachines();
+    const [pickedMachineId, setPickedMachineId] = React.useState<string>("");
 
     const [presetId, setPresetId] = React.useState<string>("daily");
     const [customCron, setCustomCron] = React.useState<string>("");
@@ -304,20 +313,25 @@ export const MakeRecurringModal = React.memo(function MakeRecurringModal({
         if (!visible) return;
         setPresetId("daily");
         setCustomCron("");
-        const seed =
-            session.latestUserRequestPreview?.text?.trim() ||
-            session.metadata?.summary?.text?.trim() ||
-            "";
+        const seed = session
+            ? session.latestUserRequestPreview?.text?.trim() ||
+              session.metadata?.summary?.text?.trim() ||
+              ""
+            : "";
         setPrompt(seed);
         setSubmitting(false);
-    }, [visible, session]);
+        // Default to first online machine in standalone mode.
+        if (isStandalone) {
+            setPickedMachineId(machines[0]?.id ?? "");
+        }
+    }, [visible, session, isStandalone, machines]);
 
     const cronExpression =
         presetId === "custom"
             ? customCron.trim()
             : CRON_PRESETS.find((p) => p.id === presetId)?.expr ?? "";
 
-    const machineId = session.metadata?.machineId ?? "";
+    const machineId = session?.metadata?.machineId ?? pickedMachineId;
     const valid = cronExpression.length > 0 && prompt.trim().length > 0 && machineId.length > 0;
 
     const handleConfirm = async () => {
@@ -327,19 +341,19 @@ export const MakeRecurringModal = React.memo(function MakeRecurringModal({
             const credentials = await TokenStorage.getCredentials();
             if (!credentials) throw new Error("Not authenticated");
 
-            const trigger = await createTriggerSchedule(credentials, {
+            await createTriggerSchedule(credentials, {
                 machineId,
                 prompt: prompt.trim(),
                 cronExpression,
-                name: session.metadata?.summary?.text?.trim()?.slice(0, 60),
+                name: session?.metadata?.summary?.text?.trim()?.slice(0, 60),
             });
 
-            // Slide the sheet out first, then navigate. Gives a clear
-            // visual "operation complete" beat — the user sees their
-            // workflow being created, the sheet bows out, then they land
-            // on the new Workflow page.
-            const targetUrl = `/workflow/${encodeURIComponent(`scheduled:${trigger.id}`)}`;
-            requestClose(() => router.push(targetUrl as any));
+            // Slide the sheet out — the new Scheduled Workflow auto-
+            // surfaces in the WorkflowList (useWorkflows re-derives on the
+            // next task-status throttle tick). No navigation needed: detail
+            // is inline now, so the user sees the new row appear right
+            // where they were.
+            requestClose();
         } catch (err) {
             const message = err instanceof Error ? err.message : String(err);
             AlertModal.alert(t("workflows.recurringErrorTitle"), message);
@@ -552,6 +566,30 @@ export const MakeRecurringModal = React.memo(function MakeRecurringModal({
                             />
                             <Text style={styles.infoText}>{t("workflows.recurringModalInfo")}</Text>
                         </View>
+
+                        {/* Machine picker — standalone mode only. With a
+                            source Session the target machine is implicit. */}
+                        {isStandalone ? (
+                            <View>
+                                <Text style={styles.sectionLabel}>{t("workflows.sectionMachine")}</Text>
+                                {machines.length === 0 ? (
+                                    <Text style={[styles.infoText, { color: theme.colors.warning, marginTop: 6 }]}>
+                                        {t("workflows.standaloneNoMachine")}
+                                    </Text>
+                                ) : (
+                                    <View style={[styles.presetGrid, { marginTop: 6 }]}>
+                                        {machines.map((m) => (
+                                            <PresetChip
+                                                key={m.id}
+                                                label={m.metadata?.displayName || m.metadata?.host || m.id}
+                                                active={pickedMachineId === m.id}
+                                                onPress={() => setPickedMachineId(m.id)}
+                                            />
+                                        ))}
+                                    </View>
+                                )}
+                            </View>
+                        ) : null}
 
                         <View>
                             <Text style={styles.sectionLabel}>{t("workflows.recurringScheduleLabel")}</Text>
