@@ -15,6 +15,7 @@ import { Typography } from "@/constants/Typography";
 import { Modal as AlertModal } from "@/modal";
 import { TokenStorage } from "@/auth/tokenStorage";
 import { createWebhookTrigger } from "@/sync/apiWebhookTriggers";
+import { getServerUrl } from "@/sync/serverConfig";
 import { webInteractive } from "@/utils/interactiveSurface";
 import { t } from "@/text";
 import { useAllMachines } from "@/sync/storage";
@@ -104,6 +105,110 @@ const styles = StyleSheet.create((theme) => ({
         color: theme.colors.button.primary.tint,
         ...Typography.default("semiBold"),
     },
+    // ── Pre-create flow preview (Section A) ────────────────────────────
+    flowToggle: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 6,
+        paddingVertical: 8,
+        ...webInteractive,
+    },
+    flowToggleText: {
+        fontSize: 13,
+        color: theme.colors.textLink,
+        ...Typography.default("semiBold"),
+    },
+    flowDiagramRow: {
+        flexDirection: "row",
+        alignItems: "stretch",
+        gap: 6,
+        marginTop: 8,
+    },
+    flowStage: {
+        flex: 1,
+        backgroundColor: theme.colors.surfaceHigh,
+        borderRadius: 8,
+        padding: 10,
+        gap: 4,
+    },
+    flowStageLabel: {
+        fontSize: 10,
+        color: theme.colors.textSecondary,
+        textTransform: "uppercase",
+        letterSpacing: 0.2,
+        ...Typography.default("semiBold"),
+    },
+    flowStageTitle: {
+        fontSize: 12,
+        color: theme.colors.text,
+        ...Typography.default("semiBold"),
+    },
+    flowStageBody: {
+        fontSize: 11,
+        color: theme.colors.textSecondary,
+        lineHeight: 15,
+        ...Typography.default(),
+    },
+    flowArrow: {
+        alignSelf: "center",
+    },
+    flowResultRow: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 6,
+        marginTop: 8,
+        paddingHorizontal: 4,
+    },
+    flowResultText: {
+        flex: 1,
+        fontSize: 11,
+        color: theme.colors.textSecondary,
+        lineHeight: 15,
+        ...Typography.default(),
+    },
+    // ── Secret-reveal "how to use" (Section B) ─────────────────────────
+    publicUrlBox: {
+        padding: 10,
+        borderRadius: 8,
+        backgroundColor: theme.colors.surfaceHigh,
+        gap: 6,
+    },
+    publicUrlValue: {
+        fontFamily: "Menlo",
+        fontSize: 12,
+        color: theme.colors.text,
+        flex: 1,
+    },
+    curlBlock: {
+        padding: 10,
+        borderRadius: 8,
+        backgroundColor: theme.colors.surfaceHigh,
+        borderWidth: StyleSheet.hairlineWidth,
+        borderColor: theme.colors.divider,
+        gap: 6,
+    },
+    curlText: {
+        fontFamily: "Menlo",
+        fontSize: 11,
+        color: theme.colors.text,
+        lineHeight: 16,
+    },
+    integrationHint: {
+        flexDirection: "row",
+        alignItems: "flex-start",
+        gap: 6,
+        marginTop: 4,
+    },
+    integrationHintIcon: {
+        marginTop: 2,
+    },
+    integrationHintText: {
+        flex: 1,
+        fontSize: 11,
+        color: theme.colors.textSecondary,
+        lineHeight: 15,
+        ...Typography.default(),
+    },
     button: {
         paddingHorizontal: 16,
         paddingVertical: 11,
@@ -138,6 +243,10 @@ export const CreateWebhookModal = React.memo(function CreateWebhookModal({
     // "secret reveal" view rather than closing immediately.
     const [createdSecret, setCreatedSecret] = React.useState<string | null>(null);
     const [createdSlug, setCreatedSlug] = React.useState<string | null>(null);
+    // Section A — fold-out flow preview ("what happens after firing?"),
+    // closed by default so it doesn't dominate first-time use but is one
+    // tap away when users want to understand the lifecycle.
+    const [flowOpen, setFlowOpen] = React.useState(false);
 
     React.useEffect(() => {
         if (!visible) return;
@@ -148,6 +257,7 @@ export const CreateWebhookModal = React.memo(function CreateWebhookModal({
         setSubmitting(false);
         setCreatedSecret(null);
         setCreatedSlug(null);
+        setFlowOpen(false);
     }, [visible, machines]);
 
     const slug = sanitizeSlug(slugRaw);
@@ -239,7 +349,11 @@ export const CreateWebhookModal = React.memo(function CreateWebhookModal({
             }
         >
             {createdSecret ? (
-                <SecretReveal slug={createdSlug || slug} secret={createdSecret} />
+                <SecretReveal
+                    slug={createdSlug || slug}
+                    secret={createdSecret}
+                    machineId={pickedMachineId}
+                />
             ) : (
                 <CreateForm
                     machines={machines}
@@ -252,6 +366,8 @@ export const CreateWebhookModal = React.memo(function CreateWebhookModal({
                     setName={setName}
                     prompt={prompt}
                     setPrompt={setPrompt}
+                    flowOpen={flowOpen}
+                    setFlowOpen={setFlowOpen}
                 />
             )}
         </BottomSheet>
@@ -269,6 +385,8 @@ function CreateForm({
     setName,
     prompt,
     setPrompt,
+    flowOpen,
+    setFlowOpen,
 }: any) {
     const { theme } = useUnistyles();
     return (
@@ -347,13 +465,124 @@ function CreateForm({
                     placeholderTextColor={theme.colors.textSecondary}
                 />
             </View>
+
+            <Pressable
+                style={styles.flowToggle}
+                onPress={() => setFlowOpen((v: boolean) => !v)}
+            >
+                <Ionicons
+                    name={flowOpen ? "chevron-down" : "chevron-forward"}
+                    size={14}
+                    color={theme.colors.textLink}
+                />
+                <Text style={styles.flowToggleText}>
+                    {t("workflows.webhookFlowToggle")}
+                </Text>
+            </Pressable>
+
+            {flowOpen ? <FlowDiagram theme={theme} /> : null}
         </>
     );
 }
 
-function SecretReveal({ slug, secret }: { slug: string; secret: string }) {
+/**
+ * Three-stage lifecycle preview rendered below the form. Self-contained
+ * + theme-aware; no API calls. Keeps the modal portable.
+ */
+function FlowDiagram({ theme }: { theme: any }) {
+    return (
+        <>
+            <View style={styles.flowDiagramRow}>
+                <View style={styles.flowStage}>
+                    <Text style={styles.flowStageLabel}>
+                        {t("workflows.webhookFlowStageOneLabel")}
+                    </Text>
+                    <Text style={styles.flowStageTitle}>
+                        {t("workflows.webhookFlowStageOneTitle")}
+                    </Text>
+                    <Text style={styles.flowStageBody}>
+                        {t("workflows.webhookFlowStageOneBody")}
+                    </Text>
+                </View>
+                <Ionicons
+                    name="arrow-forward"
+                    size={14}
+                    color={theme.colors.textSecondary}
+                    style={styles.flowArrow}
+                />
+                <View style={styles.flowStage}>
+                    <Text style={styles.flowStageLabel}>
+                        {t("workflows.webhookFlowStageTwoLabel")}
+                    </Text>
+                    <Text style={styles.flowStageTitle}>
+                        {t("workflows.webhookFlowStageTwoTitle")}
+                    </Text>
+                    <Text style={styles.flowStageBody}>
+                        {t("workflows.webhookFlowStageTwoBody")}
+                    </Text>
+                </View>
+                <Ionicons
+                    name="arrow-forward"
+                    size={14}
+                    color={theme.colors.textSecondary}
+                    style={styles.flowArrow}
+                />
+                <View style={styles.flowStage}>
+                    <Text style={styles.flowStageLabel}>
+                        {t("workflows.webhookFlowStageThreeLabel")}
+                    </Text>
+                    <Text style={styles.flowStageTitle}>
+                        {t("workflows.webhookFlowStageThreeTitle")}
+                    </Text>
+                    <Text style={styles.flowStageBody}>
+                        {t("workflows.webhookFlowStageThreeBody")}
+                    </Text>
+                </View>
+            </View>
+            <View style={styles.flowResultRow}>
+                <Ionicons
+                    name="checkmark-circle-outline"
+                    size={14}
+                    color={theme.colors.success}
+                />
+                <Text style={styles.flowResultText}>
+                    {t("workflows.webhookFlowResult")}
+                </Text>
+            </View>
+        </>
+    );
+}
+
+function SecretReveal({
+    slug,
+    secret,
+    machineId: _machineId,
+}: {
+    slug: string;
+    secret: string;
+    machineId: string;
+}) {
     const { theme } = useUnistyles();
     const [copied, setCopied] = React.useState(false);
+    const [urlCopied, setUrlCopied] = React.useState(false);
+    const [curlCopied, setCurlCopied] = React.useState(false);
+
+    const publicUrl = `${getServerUrl().replace(/\/$/, "")}/v1/triggers/${slug}`;
+    const curlSnippet =
+        `curl -X POST ${publicUrl} \\\n` +
+        `  -H "Authorization: Bearer ${secret}" \\\n` +
+        `  -H "Content-Type: application/json"`;
+
+    const copyUrl = async () => {
+        await Clipboard.setStringAsync(publicUrl);
+        setUrlCopied(true);
+        setTimeout(() => setUrlCopied(false), 1500);
+    };
+    const copyCurl = async () => {
+        await Clipboard.setStringAsync(curlSnippet);
+        setCurlCopied(true);
+        setTimeout(() => setCurlCopied(false), 1500);
+    };
     const copyAll = async () => {
         await Clipboard.setStringAsync(secret);
         setCopied(true);
@@ -385,6 +614,86 @@ function SecretReveal({ slug, secret }: { slug: string; secret: string }) {
                             {copied ? t("common.copied") : t("common.copy")}
                         </Text>
                     </Pressable>
+                </View>
+            </View>
+
+            {/* Section B — public URL + curl example so the user knows
+                what to do with the secret they just copied. */}
+            <View>
+                <Text style={styles.sectionLabel}>
+                    {t("workflows.webhookPublicUrlLabel")}
+                </Text>
+                <View style={[styles.publicUrlBox, { marginTop: 6 }]}>
+                    <Text style={styles.publicUrlValue} selectable numberOfLines={2}>
+                        {publicUrl}
+                    </Text>
+                    <Pressable style={styles.secretCopyButton} onPress={copyUrl}>
+                        <Ionicons
+                            name={urlCopied ? "checkmark" : "copy-outline"}
+                            size={14}
+                            color={theme.colors.button.primary.tint}
+                        />
+                        <Text style={styles.secretCopyText}>
+                            {urlCopied ? t("common.copied") : t("common.copy")}
+                        </Text>
+                    </Pressable>
+                </View>
+            </View>
+
+            <View>
+                <Text style={styles.sectionLabel}>
+                    {t("workflows.webhookHowToUseLabel")}
+                </Text>
+                <View style={[styles.curlBlock, { marginTop: 6 }]}>
+                    <Text style={styles.curlText} selectable>
+                        {curlSnippet}
+                    </Text>
+                    <Pressable style={styles.secretCopyButton} onPress={copyCurl}>
+                        <Ionicons
+                            name={curlCopied ? "checkmark" : "copy-outline"}
+                            size={14}
+                            color={theme.colors.button.primary.tint}
+                        />
+                        <Text style={styles.secretCopyText}>
+                            {curlCopied
+                                ? t("common.copied")
+                                : t("workflows.webhookCopyCurl")}
+                        </Text>
+                    </Pressable>
+                </View>
+
+                <View style={styles.integrationHint}>
+                    <Ionicons
+                        name="logo-github"
+                        size={12}
+                        color={theme.colors.textSecondary}
+                        style={styles.integrationHintIcon}
+                    />
+                    <Text style={styles.integrationHintText}>
+                        {t("workflows.webhookHintGithub")}
+                    </Text>
+                </View>
+                <View style={styles.integrationHint}>
+                    <Ionicons
+                        name="flash-outline"
+                        size={12}
+                        color={theme.colors.textSecondary}
+                        style={styles.integrationHintIcon}
+                    />
+                    <Text style={styles.integrationHintText}>
+                        {t("workflows.webhookHintZapier")}
+                    </Text>
+                </View>
+                <View style={styles.integrationHint}>
+                    <Ionicons
+                        name="terminal-outline"
+                        size={12}
+                        color={theme.colors.textSecondary}
+                        style={styles.integrationHintIcon}
+                    />
+                    <Text style={styles.integrationHintText}>
+                        {t("workflows.webhookHintCron")}
+                    </Text>
                 </View>
             </View>
         </>
