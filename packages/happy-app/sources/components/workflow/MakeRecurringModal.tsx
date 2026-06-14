@@ -73,6 +73,10 @@ const CRON_PRESETS: Array<{ id: string; labelKey: () => string; expr: string }> 
 
 const MOBILE_BREAKPOINT = 540;
 
+// Reanimated-wrapped Pressable so the backdrop's opacity can be driven by
+// the same translateY shared value that animates the sheet.
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+
 const styles = StyleSheet.create((theme) => ({
     // Full-screen overlay; RN Modal already portals this to root.
     overlay: {
@@ -330,8 +334,12 @@ export const MakeRecurringModal = React.memo(function MakeRecurringModal({
                 name: session.metadata?.summary?.text?.trim()?.slice(0, 60),
             });
 
-            onClose();
-            router.push(`/workflow/${encodeURIComponent(`scheduled:${trigger.id}`)}` as any);
+            // Slide the sheet out first, then navigate. Gives a clear
+            // visual "operation complete" beat — the user sees their
+            // workflow being created, the sheet bows out, then they land
+            // on the new Workflow page.
+            const targetUrl = `/workflow/${encodeURIComponent(`scheduled:${trigger.id}`)}`;
+            requestClose(() => router.push(targetUrl as any));
         } catch (err) {
             const message = err instanceof Error ? err.message : String(err);
             AlertModal.alert(t("workflows.recurringErrorTitle"), message);
@@ -349,35 +357,82 @@ export const MakeRecurringModal = React.memo(function MakeRecurringModal({
     // overlap the Cancel/Create buttons on iOS.
     const footerPaddingBottom = (isMobile ? insets.bottom : 14) || 14;
 
-    // --- Swipe-to-dismiss (mobile only) -----------------------------------
-    // We track translateY on the card so the user can drag it down with
-    // their finger. Release triggers either a spring-back-to-zero (cancel)
-    // or a slide-out-and-close (commit). The pan gesture is attached only
-    // to the grab handle + header — the form's ScrollView and inputs
-    // deliberately don't participate to avoid hijacking scroll / text
-    // selection.
-    const translateY = useSharedValue(0);
+    // --- Slide-in/out + swipe-to-dismiss (mobile only) --------------------
+    // translateY drives ALL mobile motion: open slides from mobileMaxHeight
+    // up to 0, close slides from 0 down to mobileMaxHeight, swipe-to-dismiss
+    // follows the finger. Backdrop opacity rides along so the dim layer
+    // fades in/out in sync with the sheet — without it the dim layer would
+    // pop on/off instantly while the sheet animates.
+    //
+    // RN's built-in slide animation is intentionally disabled (animationType
+    // = "none" on mobile) so we own every transition; the previous
+    // implementation let RN slide-in then we slide-out, which double-
+    // animated entry and snapped on exit.
+    const translateY = useSharedValue(mobileMaxHeight);
+    const isClosingRef = React.useRef(false);
 
-    // Reset translateY whenever the modal re-opens (otherwise a closed-and-
-    // reopened sheet would briefly render in its previous dragged-down
-    // position before RN's slide animation kicks in).
+    // Slide-in whenever the modal becomes visible. translateY resets to
+    // the bottom first so the spring/animation has somewhere to start
+    // (RN Modal mounts contents immediately on visible=true; without this
+    // reset a reopened sheet would flash at translateY=0 for one frame).
     React.useEffect(() => {
         if (visible) {
-            translateY.value = 0;
+            isClosingRef.current = false;
+            translateY.value = mobileMaxHeight;
+            translateY.value = withTiming(0, { duration: 260 });
         }
-    }, [visible, translateY]);
+    }, [visible, mobileMaxHeight, translateY]);
 
     const cardAnimatedStyle = useAnimatedStyle(() => ({
-        transform: [{ translateY: translateY.value }],
+        // Desktop path skips the translation so the centered card just
+        // fades with RN's fade animationType.
+        transform: isMobile ? [{ translateY: translateY.value }] : [],
     }));
 
-    const closeOnJs = React.useCallback(() => {
-        onClose();
-    }, [onClose]);
+    // Backdrop opacity tracks 1 - (translateY / mobileMaxHeight) so the
+    // dim layer fades together with the sheet. Clamp the result to [0, 1]
+    // — withSpring can briefly overshoot translateY, which would otherwise
+    // tint the backdrop into negative opacity territory.
+    const backdropAnimatedStyle = useAnimatedStyle(() => {
+        if (!isMobile) return {};
+        const progress = 1 - Math.min(1, Math.max(0, translateY.value / mobileMaxHeight));
+        return { opacity: progress };
+    });
 
-    // Threshold rules: dragged more than 1/3 of the sheet OR a strong
-    // downward fling (velocity > 800 px/s) commits dismissal. Otherwise
-    // spring back to the resting position.
+    // Centralized close path. ALL close routes funnel through this — the X
+    // button, Cancel button, backdrop tap, Android back, swipe-to-dismiss,
+    // and successful submit. The optional onDone callback fires after the
+    // exit animation completes (used by success path to defer router.push
+    // until the sheet has visually slid away).
+    const closeOnJs = React.useCallback(
+        (onDone?: () => void) => {
+            onClose();
+            onDone?.();
+        },
+        [onClose],
+    );
+
+    const requestClose = React.useCallback(
+        (onDone?: () => void) => {
+            if (isClosingRef.current) return;
+            isClosingRef.current = true;
+            if (!isMobile) {
+                // Desktop: no slide. RN's fade animationType handles the
+                // visual transition; just invoke close.
+                onClose();
+                onDone?.();
+                return;
+            }
+            translateY.value = withTiming(mobileMaxHeight, { duration: 220 }, () => {
+                runOnJS(closeOnJs)(onDone);
+            });
+        },
+        [isMobile, mobileMaxHeight, onClose, closeOnJs, translateY],
+    );
+
+    // Threshold rules for swipe-to-dismiss: dragged more than 1/3 of the
+    // sheet OR a strong downward fling (velocity > 800 px/s) commits
+    // dismissal. Otherwise spring back to the resting position.
     const SWIPE_DISMISS_DISTANCE = mobileMaxHeight / 3;
     const SWIPE_DISMISS_VELOCITY = 800;
 
@@ -395,12 +450,10 @@ export const MakeRecurringModal = React.memo(function MakeRecurringModal({
                         e.translationY > SWIPE_DISMISS_DISTANCE ||
                         e.velocityY > SWIPE_DISMISS_VELOCITY;
                     if (shouldClose) {
-                        // Slide the sheet off-screen then trigger close on JS
-                        // thread (RN Modal's own animationType=slide will
-                        // hide the rest; we just need to make sure the user
-                        // sees a smooth exit instead of a snap-back-then-
-                        // disappear).
-                        translateY.value = withTiming(mobileMaxHeight, { duration: 180 }, () => {
+                        // Same slide-out as requestClose so the gesture
+                        // path and tap paths look identical at the end.
+                        isClosingRef.current = true;
+                        translateY.value = withTiming(mobileMaxHeight, { duration: 220 }, () => {
                             runOnJS(closeOnJs)();
                         });
                     } else {
@@ -417,8 +470,11 @@ export const MakeRecurringModal = React.memo(function MakeRecurringModal({
         <RNModal
             visible={visible}
             transparent
-            animationType={isMobile ? "slide" : "fade"}
-            onRequestClose={submitting ? undefined : onClose}
+            // We own every transition; RN's slide would double-animate the
+            // entry and snap the exit. Desktop still uses fade since it
+            // doesn't translate the card.
+            animationType={isMobile ? "none" : "fade"}
+            onRequestClose={submitting ? undefined : () => requestClose()}
             statusBarTranslucent
         >
             {/* RN Modal portals into a separate native window outside the
@@ -432,10 +488,12 @@ export const MakeRecurringModal = React.memo(function MakeRecurringModal({
                 ]}
                 behavior={Platform.OS === "ios" ? "padding" : Platform.OS === "android" ? "height" : undefined}
             >
-                {/* Dim layer behind the card — tapping it closes the modal. */}
-                <Pressable
-                    style={styles.backdrop}
-                    onPress={submitting ? undefined : onClose}
+                {/* Dim layer behind the card — tapping it closes the modal.
+                    Mobile uses Animated.View so opacity tracks the sheet
+                    position (1 when sheet is up, 0 when fully slid down). */}
+                <AnimatedPressable
+                    style={[styles.backdrop, isMobile && backdropAnimatedStyle]}
+                    onPress={submitting ? undefined : () => requestClose()}
                     accessibilityLabel="Close"
                 />
 
@@ -469,7 +527,7 @@ export const MakeRecurringModal = React.memo(function MakeRecurringModal({
                                 </View>
                                 <Pressable
                                     style={styles.closeButton}
-                                    onPress={submitting ? undefined : onClose}
+                                    onPress={submitting ? undefined : () => requestClose()}
                                     hitSlop={8}
                                     accessibilityLabel="Close"
                                 >
@@ -542,7 +600,7 @@ export const MakeRecurringModal = React.memo(function MakeRecurringModal({
                     <View style={[styles.footer, { paddingBottom: footerPaddingBottom }]}>
                         <Pressable
                             style={[styles.button, styles.buttonCancel]}
-                            onPress={onClose}
+                            onPress={() => requestClose()}
                             disabled={submitting}
                         >
                             <Text style={[styles.buttonText, styles.buttonTextCancel]}>
