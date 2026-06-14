@@ -174,3 +174,21 @@ Phase 1-5 已完成并发布 @kmmao/happy-agent@0.4.0。Phase 6.1 已完成（�
 - 将 `autoOptionSendSessions` 从 localSettings 迁移到 synced settings 或 Session 模型字段
 - 发送前检查最新消息是否已是相同文本（客户端去重）
 - 或使用 sendMessage 的 `localId` 幂等机制（需 server 配合）
+
+---
+
+## Gemini `<options>` 启发式对齐（2026-06-14 记录）
+
+依据 [ADR-0030](./docs/adr/0030-scope-options-heuristic-to-real-decisions.md)：Claude PTY 的 `<options>` / question 启发式已收紧到「真决策点」+「不可逆操作 plain prose announce」两层模型。**Gemini 不在 ADR-0030 范围内** —— Gemini 的 `<options>` 输出是 **code-driven**（`packages/happy-cli/src/gemini/utils/optionsParser.ts` 的 `formatOptionsAsXml` 由 orchestration 代码主动调用），改 prompt 文本无效，必须改触发它的代码路径。
+
+### 触发条件（满足任一即启动审计）
+- 用户报告 Gemini session 在多步计划中段被 `<options>` chip 反复打断（与 ADR-0030 在 Claude 上修复的痛点同型）
+- 用户主动反映 Gemini 与 Claude 的 chip 行为不一致、体感糟糕
+- 需要把 Gemini 与 Claude 拉齐到统一的"批模式无 chip"语义
+
+### 审计步骤
+- [ ] 枚举 `packages/happy-cli/src/gemini/` 下所有 `formatOptionsAsXml` / `<options>` 输出 call site
+- [ ] 按 ADR-0030 的 4 种 skip 情形分类（Mid-plan / Post-answer / One-shot answer / Self-contained task complete）
+- [ ] 落到 skip 情形里的 call site —— gate 或移除
+- [ ] 把"Before irreversible / outward-facing actions"的 announce 规则镜像到 Gemini orchestration 里所有 outward-facing tool 调用前
+- [ ] Codex N/A —— 不参与 `<options>` 机制
