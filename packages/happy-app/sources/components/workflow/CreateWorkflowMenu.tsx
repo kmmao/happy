@@ -20,6 +20,7 @@ import { useUnistyles } from "react-native-unistyles";
 import { t } from "@/text";
 import { MakeRecurringModal } from "./MakeRecurringModal";
 import { CreateWebhookModal } from "./CreateWebhookModal";
+import { CreateLoopModal } from "./CreateLoopModal";
 import { PopoverMenu, usePopoverAnchor } from "@/components/PopoverMenu";
 
 interface CreateWorkflowMenuProps {
@@ -34,6 +35,7 @@ export const CreateWorkflowMenu = React.memo(function CreateWorkflowMenu({
     const { anchor, ref, open, close, isOpen } = usePopoverAnchor();
     const [scheduleModalVisible, setScheduleModalVisible] = React.useState(false);
     const [webhookModalVisible, setWebhookModalVisible] = React.useState(false);
+    const [loopModalVisible, setLoopModalVisible] = React.useState(false);
 
     return (
         <>
@@ -82,6 +84,19 @@ export const CreateWorkflowMenu = React.memo(function CreateWorkflowMenu({
                         iconColor: "#0A84FF",
                         onPress: () => setWebhookModalVisible(true),
                     },
+                    {
+                        key: "loop",
+                        label: t("workflows.createMenuLoop"),
+                        hint: t("workflows.createMenuLoopHint"),
+                        icon: "repeat-outline",
+                        iconColor: "#BF5AF2",
+                        // Not disabled — the gated modal IS the value here.
+                        // It explains the CLI-version prerequisite and tells
+                        // the user how to upgrade. Pretending the option
+                        // doesn't exist would just push them to ask why
+                        // Loop isn't listed.
+                        onPress: () => setLoopModalVisible(true),
+                    },
                 ]}
             />
 
@@ -92,6 +107,10 @@ export const CreateWorkflowMenu = React.memo(function CreateWorkflowMenu({
             <CreateWebhookModal
                 visible={webhookModalVisible}
                 onClose={() => setWebhookModalVisible(false)}
+            />
+            <CreateLoopModal
+                visible={loopModalVisible}
+                onClose={() => setLoopModalVisible(false)}
             />
         </>
     );
