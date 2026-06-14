@@ -259,6 +259,48 @@ export type SyncEphemeralBody =
     | ({ t: "auto-loop-fired" } & AutoLoopFiredOptions)
     | { t: "supervisor-run-complete"; runId: string; projectId: string; status: string; machineId: string }
     | { t: "supervisor-fix-kill-session"; fixSessionId: string; projectId: string; fixStatus: string; machineId: string }
+    // --- generic AgentLoop lifecycle (ADR-0022 Phase 3b) ---
+    // agent-loop-trigger: server tells the daemon "fire this loop now".
+    // agent-loop-status: low-latency runtime snapshot for the App.
+    // agent-loop-brief: iteration-completion headline.
+    | {
+          t: "agent-loop-trigger";
+          loopId: string;
+          projectId: string;
+          machineId: string;
+          iteration: number;
+          prompt: string;
+          directory: string;
+          agent: "claude" | "codex" | "gemini";
+          continuityKey?: string;
+          profileId?: string | null;
+          runtimeProfile?: unknown;
+          genericConfig?: Record<string, unknown>;
+          callbackToken: string;
+          maxDurationMinutes?: number;
+      }
+    | {
+          t: "agent-loop-status";
+          loopId: string;
+          projectId: string;
+          status: "running" | "paused" | "completed" | "failed" | "stopped";
+          iteration?: number;
+          nextRunAt?: number | null;
+          activeSessionId?: string | null;
+          lastError?: string | null;
+          lastBriefSummary?: string | null;
+          updatedAt: number;
+      }
+    | {
+          t: "agent-loop-brief";
+          loopId: string;
+          projectId: string;
+          iteration: number;
+          sessionId?: string | null;
+          headline: string;
+          iterationStatus: string;
+          generatedAt: number;
+      }
     // --- knowledge ---
     | { t: "knowledge-count"; sessionId: string; count: number }
     | { t: "knowledge-access-update"; sessionId: string; hit?: number; miss?: number; evicted?: number }
@@ -390,6 +432,8 @@ function recipientFilterFor(body: SyncEphemeralBody): RecipientFilter {
         case "supervisor-status":
         case "supervisor-loop-status":
         case "supervisor-loop-brief":
+        case "agent-loop-status":
+        case "agent-loop-brief":
         case "auto-loop-fired":
         case "knowledge-count":
         case "knowledge-access-update":
@@ -421,6 +465,8 @@ function recipientFilterFor(body: SyncEphemeralBody): RecipientFilter {
         case "terminal-input":
             return { type: "machine-scoped-only", machineId: body.machineId };
         case "webhook-trigger":
+            return { type: "machine-scoped-only", machineId: body.machineId };
+        case "agent-loop-trigger":
             return { type: "machine-scoped-only", machineId: body.machineId };
 
         // session-scoped: a specific Session's subscribers (App + CLI session)
@@ -592,6 +638,18 @@ function buildPayload(body: SyncEphemeralBody): EphemeralPayload {
         case "webhook-pr-merged": {
             const { t: _t, ...rest } = body;
             return { type: "webhook-pr-merged", ...rest };
+        }
+        case "agent-loop-trigger": {
+            const { t: _t, ...rest } = body;
+            return { type: "agent-loop-trigger", ...rest };
+        }
+        case "agent-loop-status": {
+            const { t: _t, ...rest } = body;
+            return { type: "agent-loop-status", ...rest };
+        }
+        case "agent-loop-brief": {
+            const { t: _t, ...rest } = body;
+            return { type: "agent-loop-brief", ...rest };
         }
     }
 }

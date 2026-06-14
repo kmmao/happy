@@ -162,7 +162,12 @@ export type SyncUpdateBody =
           metadata?: NullableVersionedField;
           archived?: boolean;
       }
-    | { t: "delete-project"; projectId: string };
+    | { t: "delete-project"; projectId: string }
+    // ADR-0022 Phase 3b — generic AgentLoop persistent updates. Loop carries
+    // the wire-shape SerializedAgentLoop body (kept as Record<string,any> here
+    // to avoid wire-package import cycle through prisma type).
+    | { t: "agent-loop-updated"; loop: Record<string, any> }
+    | { t: "agent-loop-deleted"; loopId: string; projectId: string };
 
 export type EmitSyncUpdateOptions = {
     /**
@@ -234,6 +239,8 @@ function recipientFilterFor(body: SyncUpdateBody): RecipientFilter {
         case "new-project":
         case "update-project":
         case "delete-project":
+        case "agent-loop-updated":
+        case "agent-loop-deleted":
             return { type: "user-scoped-only" };
         case "update-machine":
             return { type: "machine-scoped-only", machineId: body.machineId };
@@ -315,6 +322,24 @@ function buildPayload(
             );
         case "delete-project":
             return buildDeleteProjectPayload(body.projectId, seq, id);
+        case "agent-loop-updated":
+            return {
+                id,
+                seq,
+                body: { t: "agent-loop-updated", loop: body.loop },
+                createdAt: Date.now(),
+            };
+        case "agent-loop-deleted":
+            return {
+                id,
+                seq,
+                body: {
+                    t: "agent-loop-deleted",
+                    loopId: body.loopId,
+                    projectId: body.projectId,
+                },
+                createdAt: Date.now(),
+            };
     }
 }
 

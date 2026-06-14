@@ -34,6 +34,7 @@ import { supervisorReportRoutes } from "./routes/supervisorReportRoutes";
 import { supervisorActionRoutes } from "./routes/supervisorActionRoutes";
 import { supervisorAnalyticsRoutes } from "./routes/supervisorAnalyticsRoutes";
 import { supervisorLoopRoutes } from "./routes/supervisorLoopRoutes";
+import { agentLoopRoutes } from "./routes/agentLoopRoutes";
 import { v3SessionRoutes } from "./routes/v3SessionRoutes";
 import { webhookRoutes } from "./routes/webhookRoutes";
 import { provisionRoutes } from "./routes/provisionRoutes";
@@ -166,6 +167,7 @@ export async function startApi() {
   supervisorActionRoutes(typed);
   supervisorAnalyticsRoutes(typed);
   supervisorLoopRoutes(typed);
+  agentLoopRoutes(typed);
   sessionRoutes(typed);
   v3SessionRoutes(typed);
   provisionRoutes(typed);

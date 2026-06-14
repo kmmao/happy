@@ -6,6 +6,7 @@ import { log } from "@/utils/log";
 import { db } from "@/storage/db";
 import { Socket } from "socket.io";
 import { checkAndTriggerScheduledRuns } from "@/modules/supervisorScheduler";
+import { tickDueGenericAgentLoops } from "@/modules/agentLoopEngine";
 import { cleanupStaleFixActions } from "@/modules/supervisorFixWatchdog";
 import { checkAndTriggerSchedules } from "@/modules/triggerScheduleRunner";
 import { buildBriefPushBody, pushSend } from "@/modules/pushSend";
@@ -82,6 +83,14 @@ export function machineUpdateHandler(userId: string, socket: Socket) {
                 // Check for due cron trigger schedules (shares 5-min heartbeat throttle)
                 checkAndTriggerSchedules(data.machineId, userId).catch(err =>
                     log({ module: 'trigger', level: 'error' }, `Trigger schedule check error: ${err}`)
+                );
+
+                // ADR-0022 Phase 3b — fire due generic AgentLoops on this machine.
+                // Same 5-min throttle as supervisor; the (role, enabled, nextRunAt)
+                // composite index makes this an index scan over the small set of
+                // due loops, not a full table scan.
+                tickDueGenericAgentLoops(data.machineId, userId).catch(err =>
+                    log({ module: 'agent-loop', level: 'error' }, `Agent loop tick error: ${err}`)
                 );
             }
         } catch (error) {

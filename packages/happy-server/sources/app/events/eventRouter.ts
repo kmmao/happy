@@ -213,6 +213,18 @@ export type UpdateEvent =
   | {
       type: "delete-project";
       projectId: string;
+    }
+  | {
+      // ADR-0022 Phase 3b — generic AgentLoop definition created or
+      // mutated server-side. Mirrors the supervisor-loop "row changed"
+      // signal but for the unified agent-loops endpoint.
+      type: "agent-loop-updated";
+      loop: Record<string, any>;
+    }
+  | {
+      type: "agent-loop-deleted";
+      loopId: string;
+      projectId: string;
     };
 
 // === EPHEMERAL EVENT TYPES (Transient) ===
@@ -529,6 +541,47 @@ export type EphemeralEvent =
           idleTimeoutMs: number;
           lastActiveAt: number;
       } | null;
+    }
+  // ADR-0022 Phase 3b — generic AgentLoop runtime events. trigger routes
+  // machine-scoped (server → daemon), status/brief route user-scoped
+  // (daemon/server → App).
+  | {
+      type: "agent-loop-trigger";
+      loopId: string;
+      projectId: string;
+      machineId: string;
+      iteration: number;
+      prompt: string;
+      directory: string;
+      agent: string;
+      continuityKey?: string;
+      profileId?: string | null;
+      runtimeProfile?: ResolvedRuntimeProfile;
+      genericConfig?: Record<string, unknown>;
+      callbackToken: string;
+      maxDurationMinutes?: number;
+    }
+  | {
+      type: "agent-loop-status";
+      loopId: string;
+      projectId: string;
+      status: string;
+      iteration?: number;
+      nextRunAt?: number | null;
+      activeSessionId?: string | null;
+      lastError?: string | null;
+      lastBriefSummary?: string | null;
+      updatedAt: number;
+    }
+  | {
+      type: "agent-loop-brief";
+      loopId: string;
+      projectId: string;
+      iteration: number;
+      sessionId?: string | null;
+      headline: string;
+      iterationStatus: string;
+      generatedAt: number;
     }
 ;
 
