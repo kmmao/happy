@@ -639,7 +639,10 @@ model AgentLoop {
     // (role, enabled, nextRunAt) makes that a single index scan.
     @@index([role, enabled, nextRunAt])
 
-    @@map("SupervisorLoop")
+    // ADR-0022 Phase 4 — the historical @@map("SupervisorLoop") alias is
+    // dropped. The migration in 20260614_phase4_rename_supervisorloop_to_agentloop
+    // renames the physical table to "AgentLoop"; Prisma defaults the
+    // table name to the model name, which is now what we want.
 }
 
 //

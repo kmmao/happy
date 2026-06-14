@@ -354,6 +354,101 @@ export async function updateGenericAgentLoop(opts: {
 }
 
 /**
+ * Pause a generic AgentLoop. For generic loops "paused" means the
+ * scheduler skips them on tick — we mirror the daemon-local semantics by
+ * flipping `enabled: false` while preserving `status: "running"` (so the
+ * supervisor-style status enum isn't repurposed). Idempotent.
+ */
+export async function pauseGenericAgentLoop(opts: {
+    userId: string;
+    loopId: string;
+}): Promise<AgentLoopEngineOutcome<{ loop: AgentLoopRow }>> {
+    const existing = await db.agentLoop.findFirst({
+        where: { id: opts.loopId, accountId: opts.userId, role: "generic" },
+    });
+    if (!existing) return { ok: false, code: 404, error: "Loop not found" };
+
+    const updated = await db.agentLoop.update({
+        where: { id: opts.loopId },
+        data: { enabled: false, nextRunAt: null },
+    });
+
+    await emitSyncUpdate(opts.userId, {
+        t: "agent-loop-updated",
+        loop: serializeAgentLoop(updated),
+    });
+
+    return { ok: true, value: { loop: updated } };
+}
+
+/**
+ * Resume a generic AgentLoop — inverse of {@link pauseGenericAgentLoop}.
+ * Recomputes nextRunAt so the scheduler picks the loop up at the next
+ * tick. Idempotent if the loop is already enabled.
+ */
+export async function resumeGenericAgentLoop(opts: {
+    userId: string;
+    loopId: string;
+}): Promise<AgentLoopEngineOutcome<{ loop: AgentLoopRow }>> {
+    const existing = await db.agentLoop.findFirst({
+        where: { id: opts.loopId, accountId: opts.userId, role: "generic" },
+    });
+    if (!existing) return { ok: false, code: 404, error: "Loop not found" };
+
+    const nextRunAt = computeNextRunAt(
+        existing.intervalMs,
+        existing.cronExpression,
+        Date.now(),
+    );
+
+    const updated = await db.agentLoop.update({
+        where: { id: opts.loopId },
+        data: { enabled: true, nextRunAt: BigInt(nextRunAt) },
+    });
+
+    await emitSyncUpdate(opts.userId, {
+        t: "agent-loop-updated",
+        loop: serializeAgentLoop(updated),
+    });
+
+    return { ok: true, value: { loop: updated } };
+}
+
+/**
+ * Stop a generic AgentLoop. Mirrors the supervisor "user_stopped" exit:
+ * status → stopped, completedAt set, enabled flipped off so the row
+ * doesn't ride along on resume by accident. Stays in the table so the
+ * App can still surface a history row.
+ */
+export async function stopGenericAgentLoop(opts: {
+    userId: string;
+    loopId: string;
+}): Promise<AgentLoopEngineOutcome<{ loop: AgentLoopRow }>> {
+    const existing = await db.agentLoop.findFirst({
+        where: { id: opts.loopId, accountId: opts.userId, role: "generic" },
+    });
+    if (!existing) return { ok: false, code: 404, error: "Loop not found" };
+
+    const updated = await db.agentLoop.update({
+        where: { id: opts.loopId },
+        data: {
+            status: "stopped",
+            enabled: false,
+            nextRunAt: null,
+            exitReason: "user_stopped",
+            completedAt: new Date(),
+        },
+    });
+
+    await emitSyncUpdate(opts.userId, {
+        t: "agent-loop-updated",
+        loop: serializeAgentLoop(updated),
+    });
+
+    return { ok: true, value: { loop: updated } };
+}
+
+/**
  * Delete a generic AgentLoop. Soft-stop running loops first? For Phase 3b
  * we follow the supervisor pattern: refuse to delete a running loop, force
  * the caller to disable/stop first.

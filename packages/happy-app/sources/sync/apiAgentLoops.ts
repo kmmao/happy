@@ -142,6 +142,29 @@ export async function deleteAgentLoop(
     );
 }
 
+/**
+ * ADR-0022 Phase 4 — unified pause / resume / stop. The server dispatches
+ * to the right engine internally (supervisor vs generic) based on the
+ * loop's role, so the App passes the same shape regardless of which
+ * variant the loop is.
+ */
+export async function setAgentLoopRuntimeAction(
+    credentials: AuthCredentials,
+    projectId: string,
+    loopId: string,
+    action: "pause" | "resume" | "stop",
+): Promise<SerializedAgentLoop | null> {
+    const data = await apiRequest<AgentLoopResponse>(
+        credentials,
+        `/v1/projects/${encodeURIComponent(projectId)}/agent-loops/${encodeURIComponent(loopId)}/${action}`,
+        {
+            method: "POST",
+            errorMessage: `Failed to ${action} agent loop`,
+        },
+    );
+    return data.loop;
+}
+
 // ────────────────────────────────────────────────────────────────────────
 // Local event bus — lets the CreateLoopModal nudge useWorkflows to refetch
 // the moment a new loop POST succeeds (instead of waiting for the next

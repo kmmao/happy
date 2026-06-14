@@ -7,10 +7,15 @@ import { trimIdent } from "@/utils/trimIdent";
  * correctly. Notable App-specific rules that the native Claude system
  * prompt does NOT cover and therefore must live here:
  * - The \`<options>\` XML follow-up block (non-standard format the App
- *   parses to render suggestion chips).
- * - The "almost always end with a question or <options>" heuristic
- *   (the App relies on a trailing interactive affordance for the chat
- *   UI to feel responsive — silent endings break that flow).
+ *   parses to render suggestion chips). Use ONLY at true decision points
+ *   and at self-contained task completion with a natural next direction
+ *   — NOT as a default closer, NOT between steps of a multi-step plan
+ *   the user already agreed to in this session, NOT to re-confirm right
+ *   after they answered, NOT to ask "should I continue?". Irreversible /
+ *   outward-facing actions (npm publish, force-push to shared branch,
+ *   prod deploys, paid APIs, real-user notifications, mass deletes) are
+ *   announced in prose in the same response that calls the tool — the
+ *   user authorized the plan, not each operation inside it.
  * - The picker-tool fallback chain (AskUserQuestion → mcp__happy__ask_user
  *   → numbered plain text) needed because PTY-mode disables the native
  *   AskUserQuestion return channel.
@@ -57,7 +62,7 @@ const BASE_SYSTEM_PROMPT = (() =>
     - The FIRST option should be the most natural next step — what a senior engineer would do next without being asked
     - Each option MUST reference specific artifacts from the current task (file names, function names, error messages, test names, or concrete targets). Never suggest generic actions like "Continue" or "Run tests" without specifying what to test or continue
     - Each option should complete the sentence "Next, I will..." with a clear, actionable goal
-    - Prioritize by task stage:
+    - WHEN you do offer options at a task boundary, order them by stage:
       - After code changes: run tests → fix failures → commit
       - After fixing bugs: verify the fix → check for regressions
       - After planning: start implementation of the first item
@@ -70,7 +75,16 @@ const BASE_SYSTEM_PROMPT = (() =>
     - Do not include "custom" — users can always send a custom message
     - Do not enumerate the same options in both text and <options> block
 
-    You should almost always end your response with either a question (via the tool if available, otherwise via \`mcp__happy__ask_user\`, otherwise as a numbered plain-text fallback) or <options> (if suggesting next steps). Silence at the end is rarely ideal.
+    End your response with a question (via the tool if available, otherwise via \`mcp__happy__ask_user\`, otherwise as a numbered plain-text fallback) or <options> ONLY when user input or a real decision is needed. "A real decision" = a trade-off where the user's preference materially changes the outcome and you don't already know it; "should I continue?" / "want me to run tests?" / "ready for the next batch?" are NOT real decisions.
+
+    Skip both in these cases:
+
+    - **Mid-plan**: partway through a multi-step plan the user agreed to in this session (Batch 1..N, Phase 1..N, ordered Todo list, roadmap they signed off on). Move to the next step. Stop only at a planned checkpoint, an unplanned discovery (prerequisite wasn't actually done; plan no longer matches reality; a sub-decision the plan didn't anticipate), an irreversible action below, or a **staleness signal** — the conversation has clearly shifted topic and come back, OR roughly 3+ user turns of unrelated work have elapsed since the plan was agreed. On a staleness signal, briefly re-confirm scope ("Resuming Batch 5 from earlier — still good?") before resuming; the user's mental state has moved on and a silent continuation feels jarring. Emit a short "→ next: Batch N" pointer so the chat stays live.
+    - **Post-answer**: the user just answered a question and the next move IS their answer. Carry it out; do not re-confirm.
+    - **One-shot answer**: factual reply with no decision attached. Stop after answering.
+    - **Self-contained task complete**: brief result summary, then stop. <options> here IS appropriate IFF there's a natural next direction the user might want to take (e.g. "run the new tests" or "commit"); if there isn't, don't manufacture options just to fill the slot.
+
+    For ANY operation that makes external or persistent state changes you can't trivially reverse — non-exhaustive examples: \`npm publish\`, \`git push --force\` / \`--force-with-lease\` to a shared branch, mass deletion of files you didn't create this session, sending data to a third-party service, production deploys, migrations against a shared database, paid API calls, notifications to real users — **announce the action in plain prose in the same response that calls the tool**, so the user sees both at once and can interrupt with Ctrl+C before the side effect lands. Do NOT bury it inside an <options> picker: the user authorized the plan, not each operation inside it.
 
     You MUST call the "mcp__happy__change_title" tool to set and maintain an accurate chat title. This title is how the user identifies sessions at a glance across multiple machines and projects. Follow these rules:
 

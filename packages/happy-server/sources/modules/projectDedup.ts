@@ -53,11 +53,14 @@ async function mergeProjects(
 ): Promise<void> {
     await db.$transaction(async (tx) => {
         // Migrate all foreign-key references from old → keep
+        // ADR-0022 Phase 4 — the physical table named SupervisorLoop was
+        // renamed to AgentLoop. Match the new name so the raw UPDATE
+        // here stays in sync with the Prisma client.
         const tables = [
             "Session",
             "SupervisorRun",
             "SupervisorAction",
-            "SupervisorLoop",
+            "AgentLoop",
             "ProjectKnowledge",
         ] as const;
 

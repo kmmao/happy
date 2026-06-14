@@ -25,9 +25,17 @@ import {
     createGenericAgentLoop,
     updateGenericAgentLoop,
     deleteGenericAgentLoop,
+    pauseGenericAgentLoop,
+    resumeGenericAgentLoop,
+    stopGenericAgentLoop,
     handleAgentLoopIterationCallback,
     serializeAgentLoop,
 } from "@/modules/agentLoopEngine";
+import {
+    pauseLoop as pauseSupervisorLoop,
+    resumeLoop as resumeSupervisorLoop,
+    stopLoop as stopSupervisorLoop,
+} from "@/modules/supervisorLoopEngine";
 import { emitSyncUpdate } from "@/app/events/syncUpdate";
 
 export function agentLoopRoutes(app: Fastify) {
@@ -80,13 +88,17 @@ export function agentLoopRoutes(app: Fastify) {
         async (request, reply) => {
             const userId = request.userId;
             const { projectId } = request.params;
-            const role = request.query?.role ?? "generic";
+            const role = request.query?.role;
             const limit = request.query?.limit ?? 50;
             const offset = request.query?.offset ?? 0;
 
             await ownedProject(userId, projectId);
 
-            const where = { projectId, accountId: userId, role };
+            // ADR-0022 Phase 4 — omitting `role` returns both supervisor
+            // and generic rows. Explicit `role=...` narrows the query.
+            const where = role
+                ? { projectId, accountId: userId, role }
+                : { projectId, accountId: userId };
             const [loops, total] = await Promise.all([
                 db.agentLoop.findMany({
                     where,
@@ -158,7 +170,12 @@ export function agentLoopRoutes(app: Fastify) {
     );
 
     // ───────────────────────────────────────────────────────────────
-    // DELETE /v1/projects/:projectId/agent-loops/:loopId
+    // DELETE /v1/projects/:projectId/agent-loops/:loopId — role-aware
+    // (ADR-0022 Phase 4 unification). Generic rows go through the
+    // engine helper that emits a SyncUpdate; supervisor rows mirror the
+    // existing /v1/projects/:id/supervisor/loops/:loopId DELETE: refuse
+    // active loops, delete inactive ones directly. Old supervisor route
+    // is kept for compatibility (no behaviour change here).
     // ───────────────────────────────────────────────────────────────
     app.delete(
         "/v1/projects/:projectId/agent-loops/:loopId",
@@ -173,7 +190,20 @@ export function agentLoopRoutes(app: Fastify) {
         },
         async (request, reply) => {
             const userId = request.userId;
-            const { loopId } = request.params;
+            const { projectId, loopId } = request.params;
+            const loop = await ownedAgentLoop(userId, loopId);
+            if (loop.projectId !== projectId) {
+                return reply.code(404).send({ error: "Loop not found" });
+            }
+            if (loop.role === "supervisor") {
+                if (loop.status === "running" || loop.status === "paused") {
+                    return reply
+                        .code(409)
+                        .send({ error: "Cannot delete an active loop. Stop it first." });
+                }
+                await db.agentLoop.delete({ where: { id: loopId } });
+                return reply.send({ deleted: true });
+            }
             const result = await deleteGenericAgentLoop({ userId, loopId });
             if (!result.ok) {
                 return reply.code(result.code).send({ error: result.error });
@@ -181,6 +211,74 @@ export function agentLoopRoutes(app: Fastify) {
             return reply.send({ deleted: true });
         },
     );
+
+    // ───────────────────────────────────────────────────────────────
+    // POST /v1/projects/:projectId/agent-loops/:loopId/{pause,resume,stop}
+    // Unified action endpoints. Dispatch by role: supervisor rows call
+    // into supervisorLoopEngine (phase-aware, fires Run side effects);
+    // generic rows use the agentLoopEngine helpers (enabled flag +
+    // SyncUpdate). The endpoint signature is identical so the App can
+    // drop the supervisor/generic split from its API client.
+    // ───────────────────────────────────────────────────────────────
+    for (const action of ["pause", "resume", "stop"] as const) {
+        app.post(
+            `/v1/projects/:projectId/agent-loops/:loopId/${action}`,
+            {
+                preHandler: app.authenticate,
+                schema: {
+                    params: z.object({
+                        projectId: z.string(),
+                        loopId: z.string(),
+                    }),
+                },
+            },
+            async (request, reply) => {
+                const userId = request.userId;
+                const { projectId, loopId } = request.params;
+                const loop = await ownedAgentLoop(userId, loopId);
+                if (loop.projectId !== projectId) {
+                    return reply.code(404).send({ error: "Loop not found" });
+                }
+
+                if (loop.role === "supervisor") {
+                    const fn =
+                        action === "pause"
+                            ? pauseSupervisorLoop
+                            : action === "resume"
+                              ? resumeSupervisorLoop
+                              : stopSupervisorLoop;
+                    const result = await fn(loopId, userId);
+                    if (!result.success) {
+                        return reply.code(404).send({
+                            error:
+                                action === "pause"
+                                    ? "Active loop not found"
+                                    : action === "resume"
+                                      ? "Paused loop not found"
+                                      : "Active loop not found",
+                        });
+                    }
+                    const updated = await db.agentLoop.findUnique({ where: { id: loopId } });
+                    return reply.send({
+                        loop: updated ? serializeAgentLoop(updated) : null,
+                    });
+                }
+
+                // Generic-role path.
+                const fn =
+                    action === "pause"
+                        ? pauseGenericAgentLoop
+                        : action === "resume"
+                          ? resumeGenericAgentLoop
+                          : stopGenericAgentLoop;
+                const result = await fn({ userId, loopId });
+                if (!result.ok) {
+                    return reply.code(result.code).send({ error: result.error });
+                }
+                return reply.send({ loop: serializeAgentLoop(result.value.loop) });
+            },
+        );
+    }
 
     // ───────────────────────────────────────────────────────────────
     // POST /v1/projects/:projectId/agent-loops/:loopId/enable
