@@ -632,87 +632,88 @@ export const WorkflowSessionRow = React.memo(function WorkflowSessionRow({
                 </View>
             </View>
 
-            {/* Tags line — full width at bottom (only on standalone mode;
-                tree children stay compact). */}
-            {!isTree ? (
-                <View style={[styles.tagsRow, { marginTop: 8 }]}>
-                    <View
+            {/* Tags line — full width at bottom. Rendered for both
+                standalone and treeChild modes so a session inside a
+                multi-session workflow shows the same identity badges
+                (scope, provider+model, branch, machine, user tags,
+                auto-send) the user sees on its ad-hoc cousin. */}
+            <View style={[styles.tagsRow, { marginTop: isTree ? 6 : 8 }]}>
+                <View
+                    style={[
+                        styles.tag,
+                        scopeTone === "branch" ? styles.tagBranch : styles.tagMain,
+                    ]}
+                >
+                    <Text
                         style={[
-                            styles.tag,
-                            scopeTone === "branch" ? styles.tagBranch : styles.tagMain,
+                            styles.tagText,
+                            scopeTone === "branch"
+                                ? styles.tagBranchText
+                                : styles.tagMainText,
                         ]}
                     >
+                        {scopeTone === "branch"
+                            ? t("sessionInfo.tagBranch")
+                            : t("sessionInfo.tagMain")}
+                    </Text>
+                </View>
+                <SessionProviderTag session={session} includeModel />
+                {textBadges.map((badge) => (
+                    <View
+                        key={`${session.id}-${badge.kind}-${badge.value}`}
+                        style={[
+                            styles.tag,
+                            badge.kind === "branchName" && styles.branchNameTag,
+                        ]}
+                    >
+                        {badge.kind === "branchName" ? (
+                            <Ionicons
+                                name="git-branch-outline"
+                                size={11}
+                                color={theme.colors.text}
+                            />
+                        ) : null}
                         <Text
                             style={[
                                 styles.tagText,
-                                scopeTone === "branch"
-                                    ? styles.tagBranchText
-                                    : styles.tagMainText,
+                                badge.kind === "branchName" && styles.branchNameTagText,
                             ]}
+                            numberOfLines={1}
                         >
-                            {scopeTone === "branch"
-                                ? t("sessionInfo.tagBranch")
-                                : t("sessionInfo.tagMain")}
+                            {badge.value}
                         </Text>
                     </View>
-                    <SessionProviderTag session={session} includeModel />
-                    {textBadges.map((badge) => (
-                        <View
-                            key={`${session.id}-${badge.kind}-${badge.value}`}
-                            style={[
-                                styles.tag,
-                                badge.kind === "branchName" && styles.branchNameTag,
-                            ]}
+                ))}
+                {session.metadata?.tags?.map((tag) => (
+                    <View
+                        key={`${session.id}-user-tag-${tag}`}
+                        style={[
+                            styles.tag,
+                            { backgroundColor: `${theme.colors.accentBlue}1A` },
+                        ]}
+                    >
+                        <Text
+                            style={[styles.tagText, { color: theme.colors.accentBlue }]}
+                            numberOfLines={1}
                         >
-                            {badge.kind === "branchName" ? (
-                                <Ionicons
-                                    name="git-branch-outline"
-                                    size={11}
-                                    color={theme.colors.text}
-                                />
-                            ) : null}
-                            <Text
-                                style={[
-                                    styles.tagText,
-                                    badge.kind === "branchName" && styles.branchNameTagText,
-                                ]}
-                                numberOfLines={1}
-                            >
-                                {badge.value}
-                            </Text>
-                        </View>
-                    ))}
-                    {session.metadata?.tags?.map((tag) => (
-                        <View
-                            key={`${session.id}-user-tag-${tag}`}
-                            style={[
-                                styles.tag,
-                                { backgroundColor: `${theme.colors.accentBlue}1A` },
-                            ]}
-                        >
-                            <Text
-                                style={[styles.tagText, { color: theme.colors.accentBlue }]}
-                                numberOfLines={1}
-                            >
-                                {tag}
-                            </Text>
-                        </View>
-                    ))}
-                    {isAutoOptionSend && (
-                        <View style={[styles.tag, styles.autoSendBadge]}>
-                            <Ionicons
-                                name="sparkles"
-                                size={10}
-                                color={styles.autoSendBadgeText.color}
-                                style={{ marginRight: 2 }}
-                            />
-                            <Text style={[styles.tagText, styles.autoSendBadgeText]}>
-                                {t("session.autoOptionSendLabel")}
-                            </Text>
-                        </View>
-                    )}
-                </View>
-            ) : null}
+                            {tag}
+                        </Text>
+                    </View>
+                ))}
+                {isAutoOptionSend && (
+                    <View style={[styles.tag, styles.autoSendBadge]}>
+                        <Ionicons
+                            name="sparkles"
+                            size={10}
+                            color={styles.autoSendBadgeText.color}
+                            style={{ marginRight: 2 }}
+                        />
+                        <Text style={[styles.tagText, styles.autoSendBadgeText]}>
+                            {t("session.autoOptionSendLabel")}
+                        </Text>
+                    </View>
+                )}
+            </View>
         </Pressable>
     );
 });
