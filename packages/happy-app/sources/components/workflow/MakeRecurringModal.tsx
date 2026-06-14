@@ -11,6 +11,14 @@
  * up, rounded only at the top, sticky footer); desktop centers the card.
  * Internal ScrollView keeps the form scrollable; the Cancel/Create footer
  * is sticky outside the ScrollView so it's always reachable.
+ *
+ * Mobile gestures: the grab handle + header are wrapped in a Pan gesture
+ * so the user can swipe down to dismiss — standard bottom-sheet
+ * affordance. ScrollView and form inputs deliberately do NOT participate
+ * (they'd fight scroll / text-selection), but the visible "drag" surface
+ * (handle + title row) covers ~80px which is exactly where users instinct-
+ * ively reach. Threshold: drag past 1/3 card height OR fling with velocity
+ * > 800 → close; otherwise spring back to 0.
  */
 
 import * as React from "react";
@@ -24,9 +32,16 @@ import {
     Platform,
     Modal as RNModal,
     useWindowDimensions,
-    StatusBar,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { Gesture, GestureDetector, GestureHandlerRootView } from "react-native-gesture-handler";
+import Animated, {
+    useSharedValue,
+    useAnimatedStyle,
+    withSpring,
+    withTiming,
+    runOnJS,
+} from "react-native-reanimated";
 import { Text } from "@/components/StyledText";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { Ionicons } from "@expo/vector-icons";
@@ -334,6 +349,70 @@ export const MakeRecurringModal = React.memo(function MakeRecurringModal({
     // overlap the Cancel/Create buttons on iOS.
     const footerPaddingBottom = (isMobile ? insets.bottom : 14) || 14;
 
+    // --- Swipe-to-dismiss (mobile only) -----------------------------------
+    // We track translateY on the card so the user can drag it down with
+    // their finger. Release triggers either a spring-back-to-zero (cancel)
+    // or a slide-out-and-close (commit). The pan gesture is attached only
+    // to the grab handle + header — the form's ScrollView and inputs
+    // deliberately don't participate to avoid hijacking scroll / text
+    // selection.
+    const translateY = useSharedValue(0);
+
+    // Reset translateY whenever the modal re-opens (otherwise a closed-and-
+    // reopened sheet would briefly render in its previous dragged-down
+    // position before RN's slide animation kicks in).
+    React.useEffect(() => {
+        if (visible) {
+            translateY.value = 0;
+        }
+    }, [visible, translateY]);
+
+    const cardAnimatedStyle = useAnimatedStyle(() => ({
+        transform: [{ translateY: translateY.value }],
+    }));
+
+    const closeOnJs = React.useCallback(() => {
+        onClose();
+    }, [onClose]);
+
+    // Threshold rules: dragged more than 1/3 of the sheet OR a strong
+    // downward fling (velocity > 800 px/s) commits dismissal. Otherwise
+    // spring back to the resting position.
+    const SWIPE_DISMISS_DISTANCE = mobileMaxHeight / 3;
+    const SWIPE_DISMISS_VELOCITY = 800;
+
+    const panGesture = React.useMemo(
+        () =>
+            Gesture.Pan()
+                .enabled(isMobile && !submitting)
+                .onUpdate((e) => {
+                    // Only allow downward drag; upward motion is clamped to 0
+                    // so the sheet can't be lifted past its resting position.
+                    translateY.value = Math.max(0, e.translationY);
+                })
+                .onEnd((e) => {
+                    const shouldClose =
+                        e.translationY > SWIPE_DISMISS_DISTANCE ||
+                        e.velocityY > SWIPE_DISMISS_VELOCITY;
+                    if (shouldClose) {
+                        // Slide the sheet off-screen then trigger close on JS
+                        // thread (RN Modal's own animationType=slide will
+                        // hide the rest; we just need to make sure the user
+                        // sees a smooth exit instead of a snap-back-then-
+                        // disappear).
+                        translateY.value = withTiming(mobileMaxHeight, { duration: 180 }, () => {
+                            runOnJS(closeOnJs)();
+                        });
+                    } else {
+                        translateY.value = withSpring(0, {
+                            damping: 20,
+                            stiffness: 220,
+                        });
+                    }
+                }),
+        [isMobile, submitting, mobileMaxHeight, SWIPE_DISMISS_DISTANCE, translateY, closeOnJs],
+    );
+
     return (
         <RNModal
             visible={visible}
@@ -342,6 +421,10 @@ export const MakeRecurringModal = React.memo(function MakeRecurringModal({
             onRequestClose={submitting ? undefined : onClose}
             statusBarTranslucent
         >
+            {/* RN Modal portals into a separate native window outside the
+                app's GestureHandlerRootView, so the GestureDetector
+                wouldn't pick up events without our own root here. */}
+            <GestureHandlerRootView style={{ flex: 1 }}>
             <KeyboardAvoidingView
                 style={[
                     styles.overlay,
@@ -356,35 +439,45 @@ export const MakeRecurringModal = React.memo(function MakeRecurringModal({
                     accessibilityLabel="Close"
                 />
 
-                <View
+                <Animated.View
                     style={[
                         styles.card,
                         isMobile ? styles.cardMobile : styles.cardDesktop,
                         { maxHeight: cardMaxHeight },
+                        isMobile && cardAnimatedStyle,
                     ]}
                 >
-                    {/* Mobile grab handle (visual affordance for the sheet). */}
-                    {isMobile ? (
-                        <View style={styles.grabHandleWrap}>
-                            <View style={styles.grabHandle} />
-                        </View>
-                    ) : null}
+                    {/* Pan-gesture region: only the handle + header
+                        participate. Wrapping the ScrollView would hijack
+                        scroll; wrapping the inputs would block keyboard
+                        focus and text selection. The handle is the
+                        canonical bottom-sheet grab target. */}
+                    <GestureDetector gesture={panGesture}>
+                        <View>
+                            {/* Mobile grab handle (visual + gesture target). */}
+                            {isMobile ? (
+                                <View style={styles.grabHandleWrap}>
+                                    <View style={styles.grabHandle} />
+                                </View>
+                            ) : null}
 
-                    {/* Header: title + close (X) button. */}
-                    <View style={styles.headerRow}>
-                        <View style={styles.titleColumn}>
-                            <Text style={styles.title}>{t("workflows.recurringModalTitle")}</Text>
-                            <Text style={styles.subtitle}>{t("workflows.recurringModalSubtitle")}</Text>
+                            {/* Header: title + close (X) button. */}
+                            <View style={styles.headerRow}>
+                                <View style={styles.titleColumn}>
+                                    <Text style={styles.title}>{t("workflows.recurringModalTitle")}</Text>
+                                    <Text style={styles.subtitle}>{t("workflows.recurringModalSubtitle")}</Text>
+                                </View>
+                                <Pressable
+                                    style={styles.closeButton}
+                                    onPress={submitting ? undefined : onClose}
+                                    hitSlop={8}
+                                    accessibilityLabel="Close"
+                                >
+                                    <Ionicons name="close" size={18} color={theme.colors.textSecondary} />
+                                </Pressable>
+                            </View>
                         </View>
-                        <Pressable
-                            style={styles.closeButton}
-                            onPress={submitting ? undefined : onClose}
-                            hitSlop={8}
-                            accessibilityLabel="Close"
-                        >
-                            <Ionicons name="close" size={18} color={theme.colors.textSecondary} />
-                        </Pressable>
-                    </View>
+                    </GestureDetector>
 
                     {/* Scrollable form area. */}
                     <ScrollView
@@ -473,8 +566,9 @@ export const MakeRecurringModal = React.memo(function MakeRecurringModal({
                             )}
                         </Pressable>
                     </View>
-                </View>
+                </Animated.View>
             </KeyboardAvoidingView>
+            </GestureHandlerRootView>
         </RNModal>
     );
 });
