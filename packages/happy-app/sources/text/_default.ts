@@ -113,11 +113,16 @@ export const en = {
     createMenuNewSessionHint: "Open a conversation now",
     createMenuScheduled: "Create a schedule",
     createMenuScheduledHint: "Cron-driven workflow",
-    createMenuWebhook: "Create a webhook",
-    createMenuWebhookHint: "Event-driven workflow via URL",
-    webhookModalTitle: "Create a webhook workflow",
-    webhookModalSubtitle: "Fire on external events with a custom URL.",
+    createMenuWebhook: "Create a Webhook URL",
+    createMenuWebhookHint: "A public URL — anything that can POST triggers it",
+    webhookModalTitle: "Create a Webhook URL",
+    webhookModalSubtitle: "Any external system that POSTs to it runs your prompt.",
     webhookModalInfo: "We will assign a public URL with the slug below. The secret is shown once on the next step — record it then.",
+    // ADR-grade cross-pointer to WebhookRoute (the other webhook in the App).
+    // Surfaces in the modal info area so users hunting the GitHub-aware
+    // path can pivot to it without leaving and re-searching.
+    webhookModalCrossPointer:
+      "Looking for Happy to auto-install a webhook on a GitHub or Gitea repo and filter by label or author? Go to Settings → Git Hosts → Repo Webhook.",
     webhookSlugLabel: "Slug (URL fragment)",
     webhookSlugPlaceholder: "github-push",
     webhookSlugSanitized: (s: string) => `Will be saved as: ${s}`,
@@ -3417,7 +3422,7 @@ export const en = {
     editHost: "Edit Host",
     tabBasic: "Basic",
     tabAutoIssue: "Auto Issue",
-    tabWebhooks: "Webhooks",
+    tabWebhooks: "Repo Webhook",
     hostLabel: "Host",
     providerLabel: "Provider",
     tokenLabel: "API Token",
@@ -3439,9 +3444,14 @@ export const en = {
     autoIssueLabelPlaceholder: "e.g. claude, auto-fix",
     autoIssueAllowedAuthors: "Allowed Authors",
     autoIssueAllowedAuthorsPlaceholder: "username1, username2",
-    webhookSectionTitle: "Webhook Repos",
+    webhookSectionTitle: "Repo Webhook",
     webhookDescription:
       "Receive webhook events from your Git host to automatically process issues without polling. Add repos to monitor below.",
+    // Cross-pointer to WebhookTrigger ("Webhook URL" in the UI). Shown
+    // under the section title so users hunting the generic-webhook path
+    // can pivot to it without leaving the settings page.
+    webhookCrossPointer:
+      "This is for Happy to auto-install an issue webhook on a GitHub or Gitea repo (with label / author filtering). For a generic callback URL any external system can POST to, go to the main list → + → Create a Webhook URL.",
     webhookAddRepo: "Add Webhook Repo",
     webhookRemoveRepo: "Remove",
     webhookRepoUrl: "Repository URL",

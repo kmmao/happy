@@ -117,13 +117,22 @@ A generic encrypted data container (header + body) with its own encryption key. 
 _Avoid_: Document, file, attachment
 
 **Trigger**:
-A rule that automatically creates Tasks. Umbrella term for TriggerSchedule and WebhookTrigger.
+A rule that automatically creates Tasks. Umbrella term for TriggerSchedule, WebhookTrigger, and WebhookRoute.
 
 **TriggerSchedule**:
 A cron-expression-driven Trigger that periodically creates Tasks.
 
 **WebhookTrigger**:
-An event-driven Trigger with a custom URL slug and secret verification. Fires on external events (e.g. GitHub push).
+A generic, provider-agnostic Trigger backed by an Account-defined slug + Server-generated secret. External systems POST any HTTP request body to `https://<server>/v1/triggers/<slug>` with the secret as a Bearer token to spawn a Task running the WebhookTrigger's prompt. **The Account installs the inbound hook themselves at the source** (GitHub repo Settings → Webhooks, Zapier, crontab + curl, monitoring tools). Happy is unaware of the event shape beyond a few environment variables (`HAPPY_WEBHOOK_*`) it injects into the spawned Session. Contrast with **WebhookRoute** (below): that is the GitHub/Gitea-aware variant which filters by label + author and auto-installs the platform webhook on the Account's behalf.
+_Avoid_: just "Webhook" (collides with WebhookRoute), TriggerSchedule (cron variant), Trigger (umbrella).
+
+**WebhookRoute**:
+A GitHub / Gitea / GitLab-aware Trigger bound to a specific `repoUrl` + provider. Happy uses the Account's stored `apiToken` for that provider to **auto-install the inbound webhook on the platform** via its REST API, and stores the platform-side webhook id in `remoteWebhookId`. Inbound deliveries (issue opened, labeled, commented, etc.) are filtered by `labels` + `authors` allowlists before producing a `WebhookEvent` row, which then spawns a Task (or a supervisor fix run). Configured in the App under **Settings → Git Hosts → Webhooks tab** with a repo URL + filter rules; the webhook secret stays server-side (the Account never sees it). Contrast with **WebhookTrigger**: that is the user-installed, provider-agnostic, no-filter generic variant for "any external event spawns a generic Happy session" use cases.
+_Avoid_: just "Webhook" (collides with WebhookTrigger), GitHubWebhook (Gitea / GitLab also supported), Hook.
+
+**WebhookEvent**:
+A single inbound delivery from a `WebhookRoute`'s platform-side webhook. Records the platform's `deliveryId` for idempotency, the issue metadata that arrived (number, title, author, labels, URL), and a state machine `pending → dispatched → completed | failed | skipped`. One WebhookEvent per platform delivery; n WebhookEvents per WebhookRoute over time. WebhookTrigger has no equivalent row (its inbound POST goes straight to Task creation without an intermediate event log).
+_Avoid_: WebhookDelivery, Hook event.
 
 **AiBackendProfile**:
 A named AI backend configuration owned by an Account. Encrypted payload containing environment variables, startup scripts, and permission mode. Bound to Tasks, Projects, or Triggers to select which model/provider to use.

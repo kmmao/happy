@@ -1,5 +1,5 @@
 import React from "react";
-import { View, Text, Pressable } from "react-native";
+import { View, Text, Pressable, StyleSheet as RNStyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Typography } from "@/constants/Typography";
 import { t } from "@/text";
@@ -73,6 +73,41 @@ export const GitHostWebhookForm = React.memo(function GitHostWebhookForm({
             >
                 {t("gitHosts.webhookDescription")}
             </Text>
+
+            {/* Cross-pointer to WebhookTrigger ("Webhook URL" in the
+                Workflow list). Surfaces here so a user looking for
+                a generic callback URL doesn't waste time configuring a
+                repo-bound webhook by mistake. */}
+            <View
+                style={{
+                    flexDirection: "row",
+                    alignItems: "flex-start",
+                    gap: 8,
+                    padding: 10,
+                    marginBottom: 12,
+                    borderRadius: 8,
+                    backgroundColor: `${theme.colors.textLink}14`,
+                    borderWidth: RNStyleSheet.hairlineWidth,
+                    borderColor: `${theme.colors.textLink}33`,
+                }}
+            >
+                <Ionicons
+                    name="link-outline"
+                    size={14}
+                    color={theme.colors.textLink}
+                />
+                <Text
+                    style={{
+                        flex: 1,
+                        fontSize: 12,
+                        color: theme.colors.text,
+                        lineHeight: 16,
+                        ...Typography.default(),
+                    }}
+                >
+                    {t("gitHosts.webhookCrossPointer")}
+                </Text>
+            </View>
 
             {formWebhookRepos.map((repo, idx) => (
                 <WebhookRepoItem

@@ -97,6 +97,23 @@ const styles = StyleSheet.create((theme) => ({
         ...Typography.default("semiBold"),
     },
     presetGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 6 },
+    crossPointer: {
+        flexDirection: "row",
+        alignItems: "flex-start",
+        gap: 8,
+        padding: 10,
+        borderRadius: 8,
+        backgroundColor: `${theme.colors.textLink}14`,
+        borderWidth: StyleSheet.hairlineWidth,
+        borderColor: `${theme.colors.textLink}33`,
+    },
+    crossPointerText: {
+        flex: 1,
+        fontSize: 11,
+        color: theme.colors.text,
+        lineHeight: 15,
+        ...Typography.default(),
+    },
     helperText: {
         fontSize: 11,
         color: theme.colors.textSecondary,
@@ -511,6 +528,22 @@ function CreateForm({
                     color={theme.colors.accentOrange}
                 />
                 <Text style={styles.infoText}>{t("workflows.webhookModalInfo")}</Text>
+            </View>
+
+            {/* Cross-pointer to WebhookRoute (the GitHub/Gitea-aware
+                webhook in Settings → Git Hosts). Distinct accent color
+                from the main info banner so users registering "two
+                webhook surfaces" treat them as siblings rather than
+                blurring them together. */}
+            <View style={styles.crossPointer}>
+                <Ionicons
+                    name="git-branch-outline"
+                    size={14}
+                    color={theme.colors.textLink}
+                />
+                <Text style={styles.crossPointerText}>
+                    {t("workflows.webhookModalCrossPointer")}
+                </Text>
             </View>
 
             <View>
