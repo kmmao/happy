@@ -68,6 +68,12 @@ services:
       DATABASE_URL: postgresql://postgres:postgres@postgres:5432/handy
       REDIS_URL: redis://redis:6379
       HANDY_MASTER_SECRET: ${HANDY_MASTER_SECRET:-change-me-docker-dev-only}
+      # HMAC secret for agent-loop iteration callback tokens. Required in
+      # production (NODE_ENV=production) and must be >=16 chars; without it
+      # agentLoopEngine.callbackHmacSecret throws and cron-triggered loops
+      # never reach the daemon. Long dev fallback keeps cold container
+      # boots usable; real deployments override via host .env.
+      HAPPY_SERVER_SECRET: ${HAPPY_SERVER_SECRET:-change-me-docker-dev-only-agent-loop-secret-32chars}
       S3_HOST: minio
       S3_PORT: "9000"
       S3_USE_SSL: "false"

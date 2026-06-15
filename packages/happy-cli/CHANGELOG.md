@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.98.1 - 2026-06-15
+
+Follow-up to 0.98.0: the `metadata.automationContext` write was wired into the codex / gemini launchers via `createSessionMetadata`, but the **claude launcher** (`runClaude.ts`) builds its own inline `Metadata` literal and never went through that helper — so every claude-flavored automation session (which is the vast majority) was still landing with no `automationContext` field. The App's Workflow IA grouping silently fell through and the sessions appeared in the Ad-hoc tab.
+
+- Extracted `parseAutomationContextEnv()` from `createSessionMetadata.ts` into `utils/parseAutomationContextEnv.ts` so it can be reused.
+- Wired `...parseAutomationContextEnv()` into the claude metadata literal in `runClaude.ts` next to the existing optional spreads (worktree, claudeSessionId, …). Terminal-started claude sessions stay unaffected — the spread is a no-op when the env var is absent.
+- Verified end-to-end: on the next loop iteration after this build, the spawned happy claude process now stamps `metadata.automationContext = {kind: "agent_loop", loopId, projectId, …}` and the App groups the session under its owning Loop row.
+
 ## 0.98.0 - 2026-06-15
 
 Sessions spawned by automation now carry their provenance through to the App's Workflow IA, and the daemon can resume an externally-adopted session on the next trigger.

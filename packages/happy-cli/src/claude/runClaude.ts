@@ -21,6 +21,7 @@ import {
 } from "@/claude/utils/claudeSettings";
 import { parseSpecialCommand } from "@/parsers/specialCommands";
 import { executeShellCommand } from "@/utils/shellCommand";
+import { parseAutomationContextEnv } from "@/utils/parseAutomationContextEnv";
 import { getEnvironmentInfo } from "@/ui/doctor";
 import { configuration } from "@/configuration";
 import { notifyDaemonSessionStarted } from "@/daemon/controlClient";
@@ -194,6 +195,12 @@ export async function runClaude(
     packageScripts,
     // Preserve claudeSessionId during resume so it's not lost before SessionStart hook fires
     ...(resumeSessionId ? { claudeSessionId: resumeSessionId } : {}),
+    // Daemon-injected automation provenance — empty spread when the
+    // env var is absent (terminal-started session). Without this the
+    // App's Workflow IA can't group loop / supervisor / webhook /
+    // task sessions under their owner (createSessionMetadata is for
+    // codex/gemini only — claude builds its own inline metadata).
+    ...parseAutomationContextEnv(),
   };
 
   // Detect if running inside a Happy-managed worktree

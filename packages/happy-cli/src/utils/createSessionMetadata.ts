@@ -15,6 +15,7 @@ import { configuration } from "@/configuration";
 import { projectPath } from "@/projectPath";
 import type { SandboxConfig } from "@/persistence";
 import { detectWorktreeInfo } from "@/utils/detectWorktreeInfo";
+import { parseAutomationContextEnv } from "@/utils/parseAutomationContextEnv";
 import { logger } from "@/ui/logger";
 import packageJson from "../../package.json";
 
@@ -123,41 +124,8 @@ export function createSessionMetadata(
   return { state, metadata };
 }
 
-/**
- * Reconstruct `Metadata.automationContext` from the daemon-injected
- * `HAPPY_AUTOMATION_CONTEXT_JSON` env var. The daemon JSON-encodes the
- * SpawnSessionOptions.automationContext for every automation-spawned
- * session — see daemon's `finalSessionEnv` builder in startDaemon.ts.
- *
- * Returns an empty object (so spread becomes a no-op) when:
- *  - the env var is absent (terminal-started sessions)
- *  - the payload is empty / unparseable
- *  - the payload is missing the discriminator `kind`
- *
- * Unknown future automation kinds parse through verbatim — we only gate
- * on shape, not on the kind enum, so a newer daemon doesn't lose its
- * automationContext when paired with an older happy CLI.
- */
-function parseAutomationContextEnv(): Pick<Metadata, "automationContext"> | {} {
-  const raw = process.env.HAPPY_AUTOMATION_CONTEXT_JSON?.trim();
-  if (!raw) return {};
-  try {
-    const parsed = JSON.parse(raw);
-    if (
-      !parsed ||
-      typeof parsed !== "object" ||
-      typeof parsed.kind !== "string"
-    ) {
-      return {};
-    }
-    return { automationContext: parsed as Metadata["automationContext"] };
-  } catch (error) {
-    logger.debug(
-      `[SESSION] Failed to parse HAPPY_AUTOMATION_CONTEXT_JSON: ${error instanceof Error ? error.message : String(error)}`,
-    );
-    return {};
-  }
-}
+// parseAutomationContextEnv now lives in utils so the claude launcher
+// (runClaude.ts) can share it. See utils/parseAutomationContextEnv.ts.
 
 /**
  * Enrich metadata with worktree information if running inside a Happy-managed worktree.
