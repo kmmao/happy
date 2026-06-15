@@ -168,6 +168,21 @@ export const ApiDeleteProjectSchema = z.object({
   projectId: z.string(),
 });
 
+// AgentLoop SyncUpdates — server already emits these from agentLoopEngine
+// (every CRUD/iteration/pause/resume). Mirror the wire shape minimally
+// (z.any() on the loop blob — actual fields are validated by
+// SerializedAgentLoop downstream when useWorkflows merges them).
+export const ApiAgentLoopUpdatedSchema = z.object({
+  t: z.literal("agent-loop-updated"),
+  loop: z.record(z.string(), z.any()),
+});
+
+export const ApiAgentLoopDeletedSchema = z.object({
+  t: z.literal("agent-loop-deleted"),
+  loopId: z.string(),
+  projectId: z.string(),
+});
+
 // Use a plain union here to avoid runtime discriminator extraction issues
 // when some schemas come from shared package exports.
 export const ApiUpdateSchema = z.union([
@@ -187,6 +202,8 @@ export const ApiUpdateSchema = z.union([
   ApiNewProjectSchema,
   ApiUpdateProjectSchema,
   ApiDeleteProjectSchema,
+  ApiAgentLoopUpdatedSchema,
+  ApiAgentLoopDeletedSchema,
 ]);
 
 export type ApiUpdateNewMessage = z.infer<typeof ApiUpdateNewMessageSchema>;

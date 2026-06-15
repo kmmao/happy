@@ -40,11 +40,30 @@ import {
 import { t } from "@/text";
 import type { Session } from "@/sync/storageTypes";
 import { Modal } from "@/modal";
+import { useRouter } from "expo-router";
 import { MakeRecurringModal } from "./workflow/MakeRecurringModal";
+import { AdoptSessionModal } from "./workflow/AdoptSessionModal";
+import { CreateLoopModal } from "./workflow/CreateLoopModal";
+import { CreateWebhookModal } from "./workflow/CreateWebhookModal";
 import { WorkflowSessionRow } from "./workflow/WorkflowSessionRow";
+import { WorkflowDetailSheet } from "./workflow/WorkflowDetailSheet";
+import { WorkflowEnabledGlow } from "./workflow/WorkflowEnabledGlow";
+import { TokenStorage } from "@/auth/tokenStorage";
+import {
+    setAgentLoopEnabled,
+    deleteAgentLoop,
+} from "@/sync/apiAgentLoops";
+import {
+    updateWebhookTrigger,
+    deleteWebhookTrigger,
+} from "@/sync/apiWebhookTriggers";
+import {
+    toggleTriggerSchedule,
+    deleteTriggerSchedule,
+} from "@/sync/apiTriggerSchedules";
+import { notifyWorkflowSourcesChanged } from "@/sync/workflowBus";
 
-const FILTER_VALUES: ReadonlyArray<{ key: "all" | WorkflowKind; label: () => string }> = [
-    { key: "all", label: () => t("workflows.filterAll") },
+const FILTER_VALUES: ReadonlyArray<{ key: WorkflowKind; label: () => string }> = [
     { key: "adhoc", label: () => t("workflows.kindAdhoc") },
     { key: "scheduled", label: () => t("workflows.kindScheduled") },
     { key: "event", label: () => t("workflows.kindEvent") },
@@ -77,6 +96,51 @@ const STATUS_COLOR: Record<Workflow["status"], string> = {
 // blowing out the list.
 const MAX_INLINE_SESSIONS = 5;
 
+function isWorkflowEnabled(workflow: Workflow): boolean {
+    if (workflow.kind === "adhoc") return workflow.status === "active";
+    if (workflow.kind === "loop") return workflow.loop.enabled;
+    return workflow.trigger.enabled;
+}
+
+function formatRunTimestamp(timestamp: number | null | undefined): string | null {
+    if (!timestamp || timestamp <= 0) return null;
+    return new Date(timestamp).toLocaleString(undefined, {
+        month: "short",
+        day: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+    });
+}
+
+function workflowNextRunText(workflow: Workflow): string | null {
+    if (workflow.kind === "adhoc") return null;
+    if (!isWorkflowEnabled(workflow)) return t("workflows.nextRunDisabled");
+    if (workflow.kind === "event") return t("workflows.nextRunWaitingEvent");
+
+    const nextRunAt = workflow.kind === "scheduled"
+        ? workflow.nextRunAt
+        : workflow.loop.nextRunAt;
+    const formatted = formatRunTimestamp(nextRunAt);
+    if (formatted) return t("workflows.nextRunAt", formatted);
+    if (workflow.kind === "loop" && workflow.status === "active") {
+        return t("workflows.nextRunAfterCurrent");
+    }
+    return t("workflows.nextRunPending");
+}
+
+function workflowSummaryText(workflow: Workflow): string | null {
+    switch (workflow.kind) {
+        case "scheduled":
+            return t("workflows.summaryScheduled");
+        case "event":
+            return t("workflows.summaryEvent");
+        case "loop":
+            return t("workflows.summaryLoop");
+        case "adhoc":
+            return null;
+    }
+}
+
 const styles = StyleSheet.create((theme, rt) => ({
     container: {
         flex: 1,
@@ -87,33 +151,42 @@ const styles = StyleSheet.create((theme, rt) => ({
     contentContainer: {
         flex: 1,
     },
+    // Sticky wrapper around the kind filter chips. Sits on top of the
+    // FlatList so that scrolling the workflow rows underneath never hides
+    // the segmented control — the same pattern iOS uses for tab strips.
+    filterBarSticky: {
+        backgroundColor: theme.colors.groupped.background,
+        borderBottomWidth: StyleSheet.hairlineWidth,
+        borderBottomColor: theme.colors.divider,
+    },
     filterBar: {
         paddingHorizontal: 16,
-        paddingVertical: 8,
-        gap: 6,
+        paddingVertical: 10,
+        gap: 8,
         flexDirection: "row",
         alignItems: "center",
     },
     filterChip: {
-        paddingHorizontal: 10,
-        paddingVertical: 5,
+        paddingHorizontal: 14,
+        paddingVertical: 7,
         borderRadius: 999,
         backgroundColor: theme.colors.surface,
-        borderWidth: 0.5,
+        borderWidth: StyleSheet.hairlineWidth,
         borderColor: theme.colors.divider,
         ...webInteractive,
     },
     filterChipActive: {
-        backgroundColor: `${theme.colors.accentBlue}1A`,
+        backgroundColor: `${theme.colors.accentBlue}10`,
         borderColor: theme.colors.accentBlue,
     },
     filterChipText: {
-        fontSize: 12,
+        fontSize: 13,
         color: theme.colors.textSecondary,
         ...Typography.default("semiBold"),
     },
     filterChipTextActive: {
         color: theme.colors.accentBlue,
+        ...Typography.default("semiBold"),
     },
     rowContainer: {
         marginHorizontal: 16,
@@ -174,6 +247,26 @@ const styles = StyleSheet.create((theme, rt) => ({
         fontSize: 11,
         color: theme.colors.textSecondary,
         ...Typography.default(),
+    },
+    headerSummaryText: {
+        fontSize: 12,
+        color: theme.colors.textSecondary,
+        ...Typography.default(),
+        lineHeight: 17,
+    },
+    headerActions: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 6,
+    },
+    detailIconButton: {
+        width: 30,
+        height: 30,
+        borderRadius: 15,
+        alignItems: "center",
+        justifyContent: "center",
+        backgroundColor: theme.colors.surfaceHigh,
+        ...webInteractive,
     },
     cliLocalTag: {
         flexDirection: "row",
@@ -334,6 +427,53 @@ const styles = StyleSheet.create((theme, rt) => ({
         ...Typography.default(),
         paddingVertical: 6,
     },
+    // Kind-specific empty state shown when the active filter chip has
+    // zero matching workflows. The CTA opens the standalone create-X
+    // modal (or pushes /new for ad-hoc) so the user can fill the
+    // category in one tap.
+    kindEmpty: {
+        alignItems: "center",
+        paddingHorizontal: 32,
+        paddingTop: 56,
+        paddingBottom: 24,
+        gap: 12,
+    },
+    kindEmptyIconBadge: {
+        width: 56,
+        height: 56,
+        borderRadius: 14,
+        alignItems: "center",
+        justifyContent: "center",
+    },
+    kindEmptyTitle: {
+        fontSize: 16,
+        color: theme.colors.text,
+        textAlign: "center",
+        ...Typography.default("semiBold"),
+    },
+    kindEmptyDescription: {
+        fontSize: 13,
+        color: theme.colors.textSecondary,
+        textAlign: "center",
+        lineHeight: 19,
+        ...Typography.default(),
+    },
+    kindEmptyButton: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 6,
+        marginTop: 4,
+        paddingHorizontal: 14,
+        paddingVertical: 9,
+        borderRadius: 999,
+        backgroundColor: theme.colors.accentBlue,
+        ...webInteractive,
+    },
+    kindEmptyButtonText: {
+        fontSize: 13,
+        color: "#FFFFFF",
+        ...Typography.default("semiBold"),
+    },
 }));
 
 interface WorkflowListProps {
@@ -345,26 +485,61 @@ export const WorkflowList = React.memo<WorkflowListProps>(function WorkflowList(
 }) {
     const layout = useLayout();
     const insets = useSafeAreaInsets();
+    const router = useRouter();
     const { workflows, loading } = useWorkflows();
-    const [activeFilter, setActiveFilter] = React.useState<"all" | WorkflowKind>("all");
+    // Default to Ad-hoc — it's where active conversations live, and
+    // removing the "All" tab keeps the kind chips uniformly content-typed.
+    const [activeFilter, setActiveFilter] = React.useState<WorkflowKind>("adhoc");
     // Collapsed-ids: Multi-session workflows default to EXPANDED; only the
     // ones in this set are collapsed. Inverting the default keeps the
     // common case zero-click.
     const [collapsedIds, setCollapsedIds] = React.useState<Record<string, boolean>>({});
+    const [detailWorkflow, setDetailWorkflow] = React.useState<Workflow | null>(null);
+    // Standalone-mode visibility for the create-X modals. Reachable from
+    // the kind-specific empty state CTA below, and mirrored to the
+    // existing header "+" CreateWorkflowMenu (both routes converge on
+    // the same modals running without a `session` prop).
+    const [standaloneScheduleVisible, setStandaloneScheduleVisible] = React.useState(false);
+    const [standaloneWebhookVisible, setStandaloneWebhookVisible] = React.useState(false);
+    const [standaloneLoopVisible, setStandaloneLoopVisible] = React.useState(false);
 
     const filtered = React.useMemo(() => {
-        if (activeFilter === "all") return workflows;
         return workflows.filter((w) => w.kind === activeFilter);
     }, [workflows, activeFilter]);
+
+    const handleEmptyCreate = React.useCallback(() => {
+        switch (activeFilter) {
+            case "adhoc":
+                router.push("/new");
+                break;
+            case "scheduled":
+                setStandaloneScheduleVisible(true);
+                break;
+            case "event":
+                setStandaloneWebhookVisible(true);
+                break;
+            case "loop":
+                setStandaloneLoopVisible(true);
+                break;
+        }
+    }, [activeFilter, router]);
 
     const toggleCollapse = React.useCallback((id: string) => {
         setCollapsedIds((prev) => ({ ...prev, [id]: !prev[id] }));
     }, []);
 
-    const HeaderComponent = React.useCallback(
+    // UpdateBanner stays inside the list so it scrolls away with the
+    // content — it's a one-off nag, not a persistent control. The filter
+    // chips render OUTSIDE the FlatList (see JSX below) so they remain
+    // pinned at the top during scroll.
+    const ListHeader = React.useCallback(
+        () => (hideUpdateBanner ? null : <UpdateBanner />),
+        [hideUpdateBanner],
+    );
+
+    const FilterBar = React.useCallback(
         () => (
-            <>
-                {!hideUpdateBanner && <UpdateBanner />}
+            <View style={styles.filterBarSticky}>
                 <ScrollView
                     horizontal
                     showsHorizontalScrollIndicator={false}
@@ -391,9 +566,9 @@ export const WorkflowList = React.memo<WorkflowListProps>(function WorkflowList(
                         );
                     })}
                 </ScrollView>
-            </>
+            </View>
         ),
-        [activeFilter, hideUpdateBanner],
+        [activeFilter],
     );
 
     if (loading && workflows.length === 0) {
@@ -419,6 +594,11 @@ export const WorkflowList = React.memo<WorkflowListProps>(function WorkflowList(
     return (
         <View style={styles.container}>
             <View style={[styles.contentContainer, { maxWidth: layout.maxWidth }]}>
+                {/* FilterBar lives outside the FlatList so the kind chips
+                    stay pinned at the top while the workflow rows scroll
+                    underneath. UpdateBanner remains in ListHeaderComponent
+                    so it scrolls away with the content. */}
+                <FilterBar />
                 <FlatList
                     data={filtered}
                     keyExtractor={(w) => w.id}
@@ -429,14 +609,41 @@ export const WorkflowList = React.memo<WorkflowListProps>(function WorkflowList(
                             // default expanded unless user collapsed them.
                             expanded={!collapsedIds[item.id]}
                             onToggleCollapse={() => toggleCollapse(item.id)}
+                            onOpenDetails={() => setDetailWorkflow(item)}
                         />
                     )}
-                    ListHeaderComponent={HeaderComponent}
+                    ListHeaderComponent={ListHeader}
+                    ListEmptyComponent={
+                        <WorkflowKindEmptyState
+                            kind={activeFilter}
+                            onCreate={handleEmptyCreate}
+                        />
+                    }
                     contentContainerStyle={{
                         paddingBottom: insets.bottom + 128,
                     }}
                 />
             </View>
+            <WorkflowDetailSheet
+                visible={detailWorkflow !== null}
+                workflow={detailWorkflow}
+                onClose={() => setDetailWorkflow(null)}
+            />
+            {/* Standalone-mode creation modals. Mounted at this level
+                (not inside individual rows) so the empty-state CTAs above
+                can open them without re-walking the row tree. */}
+            <MakeRecurringModal
+                visible={standaloneScheduleVisible}
+                onClose={() => setStandaloneScheduleVisible(false)}
+            />
+            <CreateWebhookModal
+                visible={standaloneWebhookVisible}
+                onClose={() => setStandaloneWebhookVisible(false)}
+            />
+            <CreateLoopModal
+                visible={standaloneLoopVisible}
+                onClose={() => setStandaloneLoopVisible(false)}
+            />
         </View>
     );
 });
@@ -447,17 +654,21 @@ interface WorkflowRowProps {
     workflow: Workflow;
     expanded: boolean;
     onToggleCollapse: () => void;
+    onOpenDetails: () => void;
 }
 
 const WorkflowRow = React.memo(function WorkflowRow({
     workflow,
     expanded,
     onToggleCollapse,
+    onOpenDetails,
 }: WorkflowRowProps) {
     const { theme } = useUnistyles();
     const navigateToSession = useNavigateToSession();
     const { isHovered, hoverProps } = useWebHoverProps();
     const [recurringModalVisible, setRecurringModalVisible] = React.useState(false);
+    const [adoptModalVisible, setAdoptModalVisible] = React.useState(false);
+    const [promoteLoopModalVisible, setPromoteLoopModalVisible] = React.useState(false);
 
     // Ad-hoc workflows are leaves: the row IS the session, tap goes
     // straight to the conversation. No collapse/expand toggle, no detail
@@ -518,6 +729,127 @@ const WorkflowRow = React.memo(function WorkflowRow({
         }
     }, [workflow]);
 
+    const summaryText = React.useMemo(() => workflowSummaryText(workflow), [workflow]);
+    const nextRunText = React.useMemo(() => workflowNextRunText(workflow), [workflow]);
+    const enabled = isWorkflowEnabled(workflow);
+
+    // Long-press menu for Scheduled / Event / Loop rows. Mirrors the
+    // Ad-hoc Modal.alert pattern above, but with two destructive-ish
+    // actions wired straight to the existing toggle/delete APIs:
+    //
+    //   - 启用/停用 — flips the trigger/loop's `enabled` flag in place.
+    //     CLI-local loops (no projectId yet) hide this entry: the
+    //     server-side endpoint would 404.
+    //   - 删除 — destructive; second Modal.alert confirms before firing.
+    //
+    // On success we call notifyWorkflowSourcesChanged() so useWorkflows
+    // refetches and the row disappears (or its enabled state flips)
+    // without waiting for the next throttle tick.
+    const openMultiSessionMenu = React.useCallback(() => {
+        if (workflow.kind === "adhoc") return;
+
+        const currentlyEnabled =
+            workflow.kind === "loop"
+                ? workflow.loop.enabled
+                : workflow.trigger.enabled;
+        // Loop without a projectId means it's CLI-local (pre-ADR-0022
+        // migration). The server can't act on it; only show the delete
+        // entry once that flag flips. Hide the menu entirely to keep the
+        // user from tapping a no-op.
+        const isCliLocalLoop =
+            workflow.kind === "loop" && workflow.projectId === null;
+        if (isCliLocalLoop) return;
+
+        const toggle = async () => {
+            try {
+                const creds = await TokenStorage.getCredentials();
+                if (!creds) throw new Error("Not authenticated");
+                if (workflow.kind === "loop") {
+                    if (!workflow.projectId) return;
+                    await setAgentLoopEnabled(
+                        creds,
+                        workflow.projectId,
+                        workflow.loop.id,
+                        !currentlyEnabled,
+                    );
+                } else if (workflow.kind === "event") {
+                    await updateWebhookTrigger(creds, workflow.trigger.id, {
+                        enabled: !currentlyEnabled,
+                    });
+                } else if (workflow.kind === "scheduled") {
+                    // The schedule API exposes a single /toggle endpoint
+                    // (no "set to value") — server flips the flag for us.
+                    await toggleTriggerSchedule(creds, workflow.trigger.id);
+                }
+                notifyWorkflowSourcesChanged();
+            } catch (err) {
+                const message = err instanceof Error ? err.message : String(err);
+                Modal.alert(t("workflows.actionToggleErrorTitle"), message);
+            }
+        };
+
+        const confirmDelete = () => {
+            Modal.alert(
+                t("workflows.actionDeleteTitle"),
+                t("workflows.actionDeleteMessage", workflow.displayName),
+                [
+                    { text: t("common.cancel"), style: "cancel" },
+                    {
+                        text: t("common.delete"),
+                        style: "destructive",
+                        onPress: async () => {
+                            try {
+                                const creds = await TokenStorage.getCredentials();
+                                if (!creds) throw new Error("Not authenticated");
+                                if (workflow.kind === "loop") {
+                                    if (!workflow.projectId) return;
+                                    await deleteAgentLoop(
+                                        creds,
+                                        workflow.projectId,
+                                        workflow.loop.id,
+                                    );
+                                } else if (workflow.kind === "event") {
+                                    await deleteWebhookTrigger(
+                                        creds,
+                                        workflow.trigger.id,
+                                    );
+                                } else if (workflow.kind === "scheduled") {
+                                    await deleteTriggerSchedule(
+                                        creds,
+                                        workflow.trigger.id,
+                                    );
+                                }
+                                notifyWorkflowSourcesChanged();
+                            } catch (err) {
+                                const message =
+                                    err instanceof Error ? err.message : String(err);
+                                Modal.alert(
+                                    t("workflows.actionDeleteErrorTitle"),
+                                    message,
+                                );
+                            }
+                        },
+                    },
+                ],
+            );
+        };
+
+        Modal.alert(workflow.displayName, "", [
+            { text: t("common.cancel"), style: "cancel" },
+            {
+                text: currentlyEnabled
+                    ? t("workflows.actionDisable")
+                    : t("workflows.actionEnable"),
+                onPress: toggle,
+            },
+            {
+                text: t("common.delete"),
+                style: "destructive",
+                onPress: confirmDelete,
+            },
+        ]);
+    }, [workflow]);
+
     // Ad-hoc workflows are rendered as a full SessionItem-style row —
     // the whole point of an ad-hoc workflow IS the session, so it gets
     // the full status/preview/tags/avatar-glow treatment that the
@@ -533,6 +865,14 @@ const WorkflowRow = React.memo(function WorkflowRow({
                     mode="standalone"
                     extraMenuActions={[
                         {
+                            label: t("workflows.actionAttachToWorkflowTitle"),
+                            onPress: () => setAdoptModalVisible(true),
+                        },
+                        {
+                            label: t("workflows.actionPromoteLoopTitle"),
+                            onPress: () => setPromoteLoopModalVisible(true),
+                        },
+                        {
                             label: t("workflows.actionMakeRecurringTitle"),
                             onPress: () => setRecurringModalVisible(true),
                         },
@@ -542,6 +882,16 @@ const WorkflowRow = React.memo(function WorkflowRow({
                     session={session}
                     visible={recurringModalVisible}
                     onClose={() => setRecurringModalVisible(false)}
+                />
+                <AdoptSessionModal
+                    session={session}
+                    visible={adoptModalVisible}
+                    onClose={() => setAdoptModalVisible(false)}
+                />
+                <CreateLoopModal
+                    session={session}
+                    visible={promoteLoopModalVisible}
+                    onClose={() => setPromoteLoopModalVisible(false)}
                 />
             </View>
         );
@@ -555,24 +905,32 @@ const WorkflowRow = React.memo(function WorkflowRow({
             <Pressable
                 {...hoverProps}
                 onPress={onHeaderPress}
+                onLongPress={openMultiSessionMenu}
+                delayLongPress={400}
                 style={({ pressed }) => [
                     styles.rowHeader,
                     isHovered && styles.rowHeaderHovered,
                     pressed && styles.rowHeaderPressed,
                 ]}
             >
-                <View
-                    style={[
-                        styles.kindIconBadge,
-                        { backgroundColor: `${KIND_COLOR[workflow.kind]}18` },
-                    ]}
+                <WorkflowEnabledGlow
+                    enabled={enabled}
+                    active={workflow.status === "active"}
+                    color={KIND_COLOR[workflow.kind]}
                 >
-                    <Ionicons
-                        name={KIND_ICON[workflow.kind]}
-                        size={20}
-                        color={KIND_COLOR[workflow.kind]}
-                    />
-                </View>
+                    <View
+                        style={[
+                            styles.kindIconBadge,
+                            { backgroundColor: `${KIND_COLOR[workflow.kind]}18` },
+                        ]}
+                    >
+                        <Ionicons
+                            name={KIND_ICON[workflow.kind]}
+                            size={20}
+                            color={KIND_COLOR[workflow.kind]}
+                        />
+                    </View>
+                </WorkflowEnabledGlow>
                 <View style={styles.headerCenter}>
                     <View style={styles.headerTitleRow}>
                         <Text style={styles.headerTitle} numberOfLines={2}>
@@ -592,6 +950,9 @@ const WorkflowRow = React.memo(function WorkflowRow({
                             <Text style={styles.headerMetaText}>
                                 · {t("workflows.sessionCount", workflow.sessions.length)}
                             </Text>
+                        ) : null}
+                        {nextRunText ? (
+                            <Text style={styles.headerMetaText}>· {nextRunText}</Text>
                         ) : null}
                         {workflow.kind === "loop" && workflow.isCliLocal ? (
                             <View style={styles.cliLocalTag}>
@@ -621,13 +982,35 @@ const WorkflowRow = React.memo(function WorkflowRow({
                             </View>
                         ) : null}
                     </View>
+                    {summaryText ? (
+                        <Text style={styles.headerSummaryText} numberOfLines={2}>
+                            {summaryText}
+                        </Text>
+                    ) : null}
                 </View>
-                <Ionicons
-                    name={expanded ? "chevron-up" : "chevron-down"}
-                    size={16}
-                    color={theme.colors.textSecondary}
-                    style={styles.expandToggle}
-                />
+                <View style={styles.headerActions}>
+                    <Pressable
+                        style={styles.detailIconButton}
+                        onPress={(event) => {
+                            event.stopPropagation?.();
+                            onOpenDetails();
+                        }}
+                        accessibilityRole="button"
+                        accessibilityLabel={t("workflows.detailViewDetails")}
+                    >
+                        <Ionicons
+                            name="information-circle-outline"
+                            size={17}
+                            color={theme.colors.textSecondary}
+                        />
+                    </Pressable>
+                    <Ionicons
+                        name={expanded ? "chevron-up" : "chevron-down"}
+                        size={16}
+                        color={theme.colors.textSecondary}
+                        style={styles.expandToggle}
+                    />
+                </View>
             </Pressable>
 
             {expanded ? <WorkflowDetailBody workflow={workflow} /> : null}
@@ -777,3 +1160,77 @@ const TreeRow = React.memo(function TreeRow({
 
 // SessionLeaf removed — WorkflowSessionRow (mode="treeChild") is the
 // single source of truth for rendering a session inside a workflow.
+
+// --- Kind-specific empty state --------------------------------------------
+//
+// Shown via FlatList's ListEmptyComponent when the active filter chip has
+// no matching workflows. Each kind gets its own title/description and a
+// single CTA that drops the user straight into the right standalone-create
+// modal — no detour through the header "+" menu required. Strings are
+// duplicated under workflows.kindEmpty{Adhoc|Schedules|Events|Loops}* so
+// every category can speak to its own concept rather than reuse a generic
+// "no items" line.
+
+interface WorkflowKindEmptyStateProps {
+    kind: WorkflowKind;
+    onCreate: () => void;
+}
+
+const WorkflowKindEmptyState = React.memo(function WorkflowKindEmptyState({
+    kind,
+    onCreate,
+}: WorkflowKindEmptyStateProps) {
+    const { theme } = useUnistyles();
+
+    const { title, description, cta } = React.useMemo(() => {
+        switch (kind) {
+            case "adhoc":
+                return {
+                    title: t("workflows.kindEmptyAdhocTitle"),
+                    description: t("workflows.kindEmptyAdhocDescription"),
+                    cta: t("workflows.createMenuNewSession"),
+                };
+            case "scheduled":
+                return {
+                    title: t("workflows.kindEmptySchedulesTitle"),
+                    description: t("workflows.kindEmptySchedulesDescription"),
+                    cta: t("workflows.createMenuScheduled"),
+                };
+            case "event":
+                return {
+                    title: t("workflows.kindEmptyEventsTitle"),
+                    description: t("workflows.kindEmptyEventsDescription"),
+                    cta: t("workflows.createMenuWebhook"),
+                };
+            case "loop":
+                return {
+                    title: t("workflows.kindEmptyLoopsTitle"),
+                    description: t("workflows.kindEmptyLoopsDescription"),
+                    cta: t("workflows.createMenuLoop"),
+                };
+        }
+    }, [kind]);
+
+    return (
+        <View style={styles.kindEmpty}>
+            <View
+                style={[
+                    styles.kindEmptyIconBadge,
+                    { backgroundColor: `${KIND_COLOR[kind]}1A` },
+                ]}
+            >
+                <Ionicons
+                    name={KIND_ICON[kind]}
+                    size={28}
+                    color={KIND_COLOR[kind]}
+                />
+            </View>
+            <Text style={styles.kindEmptyTitle}>{title}</Text>
+            <Text style={styles.kindEmptyDescription}>{description}</Text>
+            <Pressable style={styles.kindEmptyButton} onPress={onCreate}>
+                <Ionicons name="add" size={16} color="#FFFFFF" />
+                <Text style={styles.kindEmptyButtonText}>{cta}</Text>
+            </Pressable>
+        </View>
+    );
+});

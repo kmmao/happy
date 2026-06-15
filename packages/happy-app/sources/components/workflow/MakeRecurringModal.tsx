@@ -1,16 +1,18 @@
 /**
  * MakeRecurringModal — Phase 2 promote action of the Workflow IA.
  *
- * "create-similar" semantics: creates a NEW TriggerSchedule carrying the
- * current Session's prompt and directory. Real in-place adoption needs
- * the CLI to support a `happySessionId` hint on the `task-trigger`
- * ephemeral — gated on ADR-0022 phase 3b and a coordinated cli/agent
- * release.
+ * When invoked with a Session it now runs the Phase 2 `sessionAdopt` flow
+ * (target.kind = "new-schedule"): the server creates the TriggerSchedule
+ * AND binds the current Session to it via `automationContext`, so the
+ * Session jumps under the new Scheduled Workflow card immediately. The
+ * standalone "create from scratch" mode (no Session) keeps its old
+ * `createTriggerSchedule` behaviour because there's no Session to adopt.
  *
  * Two modes:
  *   - session given → "promote this conversation" (machineId + prompt
- *     prefilled from the Session)
- *   - no session → "create from scratch" (machine picker, empty prompt)
+ *     prefilled from the Session, adopted via sessionAdopt)
+ *   - no session → "create from scratch" (machine picker, empty prompt,
+ *     plain createTriggerSchedule)
  *
  * Shell, animation, swipe-to-dismiss, scroll layout, sticky footer, and
  * close routing all live in <BottomSheet>. This file only owns the form
@@ -26,6 +28,7 @@ import { Typography } from "@/constants/Typography";
 import { Modal as AlertModal } from "@/modal";
 import { TokenStorage } from "@/auth/tokenStorage";
 import { createTriggerSchedule } from "@/sync/apiTriggerSchedules";
+import { sessionAdopt } from "@/sync/apiSessionAdopt";
 import { webInteractive } from "@/utils/interactiveSurface";
 import { t } from "@/text";
 import { useAllMachines } from "@/sync/storage";
@@ -82,12 +85,22 @@ const styles = StyleSheet.create((theme) => ({
         backgroundColor: `${theme.colors.accentOrange}14`,
         borderRadius: 8,
     },
+    infoBody: {
+        flex: 1,
+        gap: 4,
+    },
     infoText: {
         flex: 1,
         fontSize: 12,
         color: theme.colors.text,
         ...Typography.default(),
         lineHeight: 17,
+    },
+    infoHint: {
+        fontSize: 11,
+        color: theme.colors.textSecondary,
+        ...Typography.default(),
+        lineHeight: 16,
     },
     button: {
         paddingHorizontal: 16,
@@ -100,9 +113,14 @@ const styles = StyleSheet.create((theme) => ({
     },
     buttonCancel: { backgroundColor: theme.colors.surfaceHigh },
     buttonPrimary: { backgroundColor: theme.colors.button.primary.background },
-    buttonPrimaryDisabled: { backgroundColor: theme.colors.surfaceHigh },
+    buttonPrimaryDisabled: {
+        backgroundColor: theme.colors.surfaceHigh,
+        borderWidth: StyleSheet.hairlineWidth,
+        borderColor: theme.colors.divider,
+    },
     buttonText: { fontSize: 14, ...Typography.default("semiBold") },
     buttonTextPrimary: { color: theme.colors.button.primary.tint },
+    buttonTextPrimaryDisabled: { color: theme.colors.textSecondary },
     buttonTextCancel: { color: theme.colors.textSecondary },
 }));
 
@@ -121,6 +139,11 @@ export const MakeRecurringModal = React.memo(function MakeRecurringModal({
     const [presetId, setPresetId] = React.useState<string>("daily");
     const [customCron, setCustomCron] = React.useState<string>("");
     const [prompt, setPrompt] = React.useState<string>("");
+    // Optional user-chosen name shown only in standalone mode. Session
+    // mode auto-derives the name from the source session's summary
+    // text inside handleConfirm (see sessionAdopt(... name: ...) below),
+    // so an input here would just duplicate that logic.
+    const [name, setName] = React.useState<string>("");
     const [submitting, setSubmitting] = React.useState(false);
 
     React.useEffect(() => {
@@ -133,6 +156,7 @@ export const MakeRecurringModal = React.memo(function MakeRecurringModal({
               ""
             : "";
         setPrompt(seed);
+        setName("");
         setSubmitting(false);
         if (isStandalone) {
             setPickedMachineId(machines[0]?.id ?? "");
@@ -152,15 +176,38 @@ export const MakeRecurringModal = React.memo(function MakeRecurringModal({
         if (!valid || submitting) return;
         setSubmitting(true);
         try {
-            const credentials = await TokenStorage.getCredentials();
-            if (!credentials) throw new Error("Not authenticated");
-
-            await createTriggerSchedule(credentials, {
-                machineId,
-                prompt: prompt.trim(),
-                cronExpression,
-                name: session?.metadata?.summary?.text?.trim()?.slice(0, 60),
-            });
+            if (session) {
+                // Promote-in-place via Phase 2 sessionAdopt: server creates
+                // the schedule AND binds this Session to it, so the row
+                // jumps under the new Scheduled Workflow without a
+                // refetch race.
+                const result = await sessionAdopt({
+                    sessionId: session.id,
+                    target: {
+                        kind: "new-schedule",
+                        cronExpression,
+                        prompt: prompt.trim(),
+                        name: session.metadata?.summary?.text?.trim()?.slice(0, 60),
+                    },
+                });
+                if (!result.success) {
+                    throw new Error(result.errorMessage);
+                }
+            } else {
+                // Standalone "create from scratch" — no Session to adopt,
+                // just plain TriggerSchedule create. Pass the optional
+                // name through (server treats undefined as "unnamed", so
+                // empty input is just dropped).
+                const credentials = await TokenStorage.getCredentials();
+                if (!credentials) throw new Error("Not authenticated");
+                const trimmedName = name.trim();
+                await createTriggerSchedule(credentials, {
+                    machineId,
+                    prompt: prompt.trim(),
+                    cronExpression,
+                    ...(trimmedName ? { name: trimmedName } : {}),
+                });
+            }
 
             // Slide the sheet out — the new Scheduled Workflow auto-
             // surfaces in the WorkflowList on the next task-status tick.
@@ -205,7 +252,12 @@ export const MakeRecurringModal = React.memo(function MakeRecurringModal({
                                 color={theme.colors.button.primary.tint}
                             />
                         ) : (
-                            <Text style={[styles.buttonText, styles.buttonTextPrimary]}>
+                            <Text style={[
+                                styles.buttonText,
+                                valid && !submitting
+                                    ? styles.buttonTextPrimary
+                                    : styles.buttonTextPrimaryDisabled,
+                            ]}>
                                 {t("workflows.recurringCreate")}
                             </Text>
                         )}
@@ -219,7 +271,10 @@ export const MakeRecurringModal = React.memo(function MakeRecurringModal({
                     size={16}
                     color={theme.colors.accentOrange}
                 />
-                <Text style={styles.infoText}>{t("workflows.recurringModalInfo")}</Text>
+                <View style={styles.infoBody}>
+                    <Text style={styles.infoText}>{t("workflows.recurringModalInfo")}</Text>
+                    <Text style={styles.infoHint}>{t("workflows.recurringDifferentiator")}</Text>
+                </View>
             </View>
 
             {isStandalone ? (
@@ -266,15 +321,20 @@ export const MakeRecurringModal = React.memo(function MakeRecurringModal({
                     />
                 </View>
                 {presetId === "custom" ? (
-                    <TextInput
-                        style={[styles.input, { marginTop: 8 }]}
-                        value={customCron}
-                        onChangeText={setCustomCron}
-                        placeholder="0 2 * * *"
-                        placeholderTextColor={theme.colors.textSecondary}
-                        autoCapitalize="none"
-                        autoCorrect={false}
-                    />
+                    <>
+                        <TextInput
+                            style={[styles.input, { marginTop: 8 }]}
+                            value={customCron}
+                            onChangeText={setCustomCron}
+                            placeholder="0 2 * * *"
+                            placeholderTextColor={theme.colors.textSecondary}
+                            autoCapitalize="none"
+                            autoCorrect={false}
+                        />
+                        <Text style={[styles.infoHint, { marginTop: 6 }]}>
+                            {t("workflows.recurringCustomCronHint")}
+                        </Text>
+                    </>
                 ) : null}
             </View>
 
@@ -289,6 +349,27 @@ export const MakeRecurringModal = React.memo(function MakeRecurringModal({
                     placeholderTextColor={theme.colors.textSecondary}
                 />
             </View>
+
+            {/* Optional name — standalone only. Session mode derives it
+                from the source session's summary text. Reuses the
+                loopOptionalName i18n keys so we don't proliferate
+                near-identical strings; the wording reads correctly for
+                schedules too ("e.g. nightly cleanup"). */}
+            {isStandalone ? (
+                <View>
+                    <Text style={styles.sectionLabel}>
+                        {t("workflows.loopOptionalName")}
+                    </Text>
+                    <TextInput
+                        style={[styles.input, { marginTop: 6, fontFamily: "System" }]}
+                        value={name}
+                        onChangeText={setName}
+                        placeholder={t("workflows.loopOptionalNamePlaceholder")}
+                        placeholderTextColor={theme.colors.textSecondary}
+                        maxLength={200}
+                    />
+                </View>
+            ) : null}
         </BottomSheet>
     );
 });

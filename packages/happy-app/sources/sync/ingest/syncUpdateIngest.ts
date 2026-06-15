@@ -121,6 +121,14 @@ export async function ingestSyncUpdate(
         case "delete-project":
             log.log(`📁 Received ${body.t} event`);
             return [{ kind: "projects-stale" }];
+        case "agent-loop-updated":
+        case "agent-loop-deleted":
+            // Server emits these from agentLoopEngine on every loop
+            // mutation (CRUD/iteration/pause/resume). useWorkflows
+            // subscribes and re-fetches so the Workflow IA shows the
+            // new state without a page reload.
+            log.log(`🔁 Received ${body.t} event`);
+            return [{ kind: "agent-loops-stale" }];
         case "new-message":
             return await ingestNewMessage(update, body, ctx);
         default: {

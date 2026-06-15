@@ -104,6 +104,14 @@ export type IngestEvent =
     | { kind: "friends-stale" }
     | { kind: "friend-requests-stale" }
     | { kind: "projects-stale" }
+    /**
+     * Phase-2 follow-up: server emits `agent-loop-updated` /
+     * `agent-loop-deleted` SyncUpdates from agentLoopEngine on every
+     * loop create/update/iteration/pause/resume/delete. Subscribers
+     * (useWorkflows) react by re-fetching loops so the Workflow IA
+     * reflects changes without a page reload.
+     */
+    | { kind: "agent-loops-stale" }
     // --- SyncUpdate-side: domain-specific batched changes ----------------
     /** A `kv-batch-update` produced ResearchConfig changes that other modules listen for. */
     | { kind: "research-config-changed"; changes: ResearchConfigChange[] }

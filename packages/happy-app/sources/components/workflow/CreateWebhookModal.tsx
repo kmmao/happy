@@ -15,11 +15,13 @@ import { Typography } from "@/constants/Typography";
 import { Modal as AlertModal } from "@/modal";
 import { TokenStorage } from "@/auth/tokenStorage";
 import { createWebhookTrigger } from "@/sync/apiWebhookTriggers";
+import { notifyWorkflowSourcesChanged } from "@/sync/workflowBus";
 import { getServerUrl } from "@/sync/serverConfig";
 import { webInteractive } from "@/utils/interactiveSurface";
 import { t } from "@/text";
-import { useAllMachines } from "@/sync/storage";
+import { useAllMachines, useSettings } from "@/sync/storage";
 import { BottomSheet, BottomSheetHandle, PresetChip } from "@/components/BottomSheet";
+import { router } from "expo-router";
 
 interface CreateWebhookModalProps {
     visible: boolean;
@@ -295,9 +297,14 @@ const styles = StyleSheet.create((theme) => ({
     },
     buttonCancel: { backgroundColor: theme.colors.surfaceHigh },
     buttonPrimary: { backgroundColor: theme.colors.button.primary.background },
-    buttonPrimaryDisabled: { backgroundColor: theme.colors.surfaceHigh },
+    buttonPrimaryDisabled: {
+        backgroundColor: theme.colors.surfaceHigh,
+        borderWidth: StyleSheet.hairlineWidth,
+        borderColor: theme.colors.divider,
+    },
     buttonText: { fontSize: 14, ...Typography.default("semiBold") },
     buttonTextPrimary: { color: theme.colors.button.primary.tint },
+    buttonTextPrimaryDisabled: { color: theme.colors.textSecondary },
     buttonTextCancel: { color: theme.colors.textSecondary },
 }));
 
@@ -404,6 +411,11 @@ export const CreateWebhookModal = React.memo(function CreateWebhookModal({
             });
             setCreatedSecret(result.secret);
             setCreatedSlug(result.webhookTrigger.slug);
+            // Nudge useWorkflows to refetch so the Workflow list reflects
+            // the new Event-driven row immediately — matching CreateLoopModal's
+            // behaviour. Without this the list stays stale until the next
+            // throttle tick or a manual refresh.
+            notifyWorkflowSourcesChanged();
         } catch (err) {
             const message = err instanceof Error ? err.message : String(err);
             AlertModal.alert(t("workflows.webhookErrorTitle"), message);
@@ -465,7 +477,12 @@ export const CreateWebhookModal = React.memo(function CreateWebhookModal({
                                     color={theme.colors.button.primary.tint}
                                 />
                             ) : (
-                                <Text style={[styles.buttonText, styles.buttonTextPrimary]}>
+                                <Text style={[
+                                    styles.buttonText,
+                                    valid && !submitting
+                                        ? styles.buttonTextPrimary
+                                        : styles.buttonTextPrimaryDisabled,
+                                ]}>
                                     {t("workflows.recurringCreate")}
                                 </Text>
                             )}
@@ -496,6 +513,16 @@ export const CreateWebhookModal = React.memo(function CreateWebhookModal({
                     setFlowOpen={setFlowOpen}
                     pickedSource={pickedSource}
                     onPickSource={handlePickSource}
+                    onCloseAndRoute={(path: string) => {
+                        // Close the sheet first so the route push lands
+                        // on a clean stack — otherwise expo-router can
+                        // race the BottomSheet's exit animation and the
+                        // back stack ends up with both visible briefly.
+                        sheetRef.current?.requestClose();
+                        // Slight delay matches the BottomSheet's
+                        // animation duration (~250ms).
+                        setTimeout(() => router.push(path as any), 280);
+                    }}
                 />
             )}
         </BottomSheet>
@@ -517,8 +544,15 @@ function CreateForm({
     setFlowOpen,
     pickedSource,
     onPickSource,
+    onCloseAndRoute,
 }: any) {
     const { theme } = useUnistyles();
+    // Pull the already-configured Git Hosts so we can offer them as
+    // shortcuts. The fully-fledged webhook config (per-repo secret,
+    // machineId, repoPath) lives in /settings/git-hosts — we don't try
+    // to re-implement that surface here; tapping a chip just deep-links
+    // into it so the user finishes configuring there.
+    const gitHosts = useSettings().gitHosts ?? [];
     return (
         <>
             <View style={styles.info}>
@@ -531,11 +565,14 @@ function CreateForm({
             </View>
 
             {/* Cross-pointer to WebhookRoute (the GitHub/Gitea-aware
-                webhook in Settings → Git Hosts). Distinct accent color
-                from the main info banner so users registering "two
-                webhook surfaces" treat them as siblings rather than
-                blurring them together. */}
-            <View style={styles.crossPointer}>
+                webhook in Settings → Git Hosts). Now tappable — jumps
+                straight to the settings page so users who realize their
+                source IS a Git host can switch surfaces without hunting
+                through the settings tree. */}
+            <Pressable
+                onPress={() => onCloseAndRoute?.("/settings/git-hosts")}
+                style={styles.crossPointer}
+            >
                 <Ionicons
                     name="git-branch-outline"
                     size={14}
@@ -544,6 +581,61 @@ function CreateForm({
                 <Text style={styles.crossPointerText}>
                     {t("workflows.webhookModalCrossPointer")}
                 </Text>
+                <Ionicons
+                    name="chevron-forward"
+                    size={12}
+                    color={theme.colors.textLink}
+                />
+            </Pressable>
+
+            {/* "My Git Hosts" shortcut. Each chip jumps into
+                /settings/git-hosts (deep-link by host so the user
+                lands on the right entry to finish per-repo webhook
+                configuration there — that page already wires
+                apiToken + secret + repo metadata in one place).
+                Empty state nudges the user to configure a host first. */}
+            <View>
+                <Text style={styles.sectionLabel}>
+                    {t("workflows.webhookSectionGitHosts")}
+                </Text>
+                <Text style={styles.helperText}>
+                    {t("workflows.webhookGitHostsHint")}
+                </Text>
+                {gitHosts.length === 0 ? (
+                    <Pressable
+                        onPress={() => onCloseAndRoute?.("/settings/git-hosts")}
+                        style={[styles.crossPointer, { marginTop: 6 }]}
+                    >
+                        <Ionicons
+                            name="settings-outline"
+                            size={14}
+                            color={theme.colors.textLink}
+                        />
+                        <Text style={styles.crossPointerText}>
+                            {t("workflows.webhookGitHostsEmpty")}
+                        </Text>
+                        <Ionicons
+                            name="chevron-forward"
+                            size={12}
+                            color={theme.colors.textLink}
+                        />
+                    </Pressable>
+                ) : (
+                    <View style={styles.presetGrid}>
+                        {gitHosts.map((host: any) => (
+                            <PresetChip
+                                key={host.host}
+                                label={host.host}
+                                active={false}
+                                onPress={() =>
+                                    onCloseAndRoute?.(
+                                        `/settings/git-hosts?host=${encodeURIComponent(host.host)}`,
+                                    )
+                                }
+                            />
+                        ))}
+                    </View>
+                )}
             </View>
 
             <View>
@@ -640,6 +732,9 @@ function CreateForm({
                 />
                 <Text style={styles.helperText}>
                     {t("workflows.webhookPromptHelper")}
+                </Text>
+                <Text style={styles.helperText}>
+                    {t("workflows.webhookIssueHint")}
                 </Text>
             </View>
 

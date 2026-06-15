@@ -165,32 +165,6 @@ export async function setAgentLoopRuntimeAction(
     return data.loop;
 }
 
-// ────────────────────────────────────────────────────────────────────────
-// Local event bus — lets the CreateLoopModal nudge useWorkflows to refetch
-// the moment a new loop POST succeeds (instead of waiting for the next
-// task-status throttle tick). Singleton; subscribers come and go freely.
-// ────────────────────────────────────────────────────────────────────────
-
-type AgentLoopsChangedListener = () => void;
-const agentLoopsChangedListeners = new Set<AgentLoopsChangedListener>();
-
-export function onAgentLoopsChanged(listener: AgentLoopsChangedListener): () => void {
-    agentLoopsChangedListeners.add(listener);
-    return () => {
-        agentLoopsChangedListeners.delete(listener);
-    };
-}
-
-export function notifyAgentLoopsChanged(): void {
-    for (const listener of agentLoopsChangedListeners) {
-        try {
-            listener();
-        } catch {
-            // A misbehaving subscriber must not prevent the others from running.
-        }
-    }
-}
-
 /**
  * Fan-out helper — list generic loops across many projects in parallel.
  * Used by useWorkflows to fold server-managed loops into the workflow

@@ -59,6 +59,30 @@ export const MetadataSchema = z.object({
   sessionSummary: sessionSummaryStateSchema.optional(),
   sessionSummaryRefresh: sessionSummaryRefreshStateSchema.optional(),
   machineId: z.string().optional(),
+  /**
+   * Automation provenance stamped by the CLI daemon when this Session
+   * was spawned as part of a Loop / Supervisor / Webhook / Task run.
+   * Source of truth lives in happy-cli's Metadata type (api/types.ts);
+   * mirrored here so safeParse keeps the field instead of stripping it.
+   *
+   * Consumed by `useWorkflows()` to group the Session under its owning
+   * Workflow row (loop → loopId; scheduled/event → triggerRef).
+   *
+   * Absent for manually-started Sessions (startedBy === "terminal").
+   */
+  automationContext: z
+    .object({
+      kind: z.enum(["supervisor", "webhook", "agent_loop", "task"]),
+      trigger: z.string().optional(),
+      projectId: z.string().optional(),
+      runId: z.string().optional(),
+      loopId: z.string().optional(),
+      triggerType: z.enum(["manual", "cron", "webhook"]).optional(),
+      triggerRef: z.string().optional(),
+      dedupeKey: z.string().optional(),
+      adoptedAt: z.number().optional(),
+    })
+    .optional(),
   claudeSessionId: z.string().optional(),
   tools: z.array(z.string()).optional(),
   slashCommands: z.array(z.string()).optional(),

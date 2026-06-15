@@ -20,6 +20,7 @@
  */
 
 import * as React from "react";
+import { AppState } from "react-native";
 import {
     useAllMachines,
     useAllSessions,
@@ -36,15 +37,31 @@ import {
     fetchWebhookTriggers,
     type ServerWebhookTrigger,
 } from "@/sync/apiWebhookTriggers";
-import {
-    fetchAgentLoopsAcrossProjects,
-    onAgentLoopsChanged,
-} from "@/sync/apiAgentLoops";
+import { fetchAgentLoopsAcrossProjects } from "@/sync/apiAgentLoops";
+import { onWorkflowSourcesChanged } from "@/sync/workflowBus";
 import { sync } from "@/sync/sync";
+import { ingestEvents } from "@/sync/ingest/dispatcher";
 import { useThrottledCallback } from "@/hooks/useThrottledCallback";
 import { AUTOMATION_SUMMARY_THROTTLE_MS } from "@/components/machine/automationConstants";
 
+// 30 seconds — fast enough that a cron schedule's lastRunAt/runCount
+// catches up almost-imperceptibly after each tick, slow enough that
+// idle tabs don't hammer the server. Loop changes don't need this
+// poll because they ride on the real-time `agent-loop-updated` /
+// `agent-loop-deleted` SyncUpdates emitted by agentLoopEngine.
+const WORKFLOW_POLL_INTERVAL_MS = 30_000;
+
 export type WorkflowKind = "adhoc" | "scheduled" | "event" | "loop";
+
+type WorkflowAgentLoopSummary = AgentLoopSummary & {
+    prompt?: string;
+    createdAt?: number;
+    updatedAt?: number;
+    lastEnqueuedAt?: number;
+    lastTriggerAt?: number;
+    lastStartedAt?: number;
+    lastCompletedAt?: number;
+};
 
 interface BaseWorkflow {
     /** Stable derived id: `${kind}:${centerEntityId}` */
@@ -80,7 +97,15 @@ export interface EventWorkflow extends BaseWorkflow {
 
 export interface LoopWorkflow extends BaseWorkflow {
     kind: "loop";
-    loop: AgentLoopSummary;
+    loop: WorkflowAgentLoopSummary;
+    /**
+     * Server project id this loop belongs to — required to call the
+     * server-side toggle/delete endpoints
+     * (`/v1/projects/:projectId/agent-loops/...`). `null` for CLI-local
+     * loops that only exist in daemonState (those can't be acted on
+     * from the App; the row's menu skips the destructive actions).
+     */
+    projectId: string | null;
     /**
      * True while ADR-0022 Phase 3b is unlanded for this loop's daemon:
      * the daemon hasn't surfaced this AgentLoop to the server yet, so
@@ -113,10 +138,12 @@ export interface UseWorkflowsResult {
     refresh: () => void;
 }
 
-const safeAutomationContext = (
-    session: Session,
-): { kind?: string; loopId?: string; triggerType?: string; triggerRef?: string } | null => {
-    const ctx = (session.metadata as any)?.automationContext;
+const safeAutomationContext = (session: Session) => {
+    // session.metadata.automationContext is stamped by the CLI daemon when the
+    // Session is spawned by automation — see happy-cli's createSessionMetadata
+    // and MetadataSchema in storageTypes.ts. Manual ("terminal") Sessions
+    // don't have it.
+    const ctx = session.metadata?.automationContext;
     return ctx && typeof ctx === "object" ? ctx : null;
 };
 
@@ -126,7 +153,7 @@ const safeAutomationContext = (
  * Optional fields without server-side equivalents default to the
  * historical CLI defaults.
  */
-function serializedToSummary(loop: SerializedAgentLoop): AgentLoopSummary {
+function serializedToSummary(loop: SerializedAgentLoop): WorkflowAgentLoopSummary {
     const genericConfig = (loop.genericConfig ?? null) as Record<string, unknown> | null;
     const nameFromConfig =
         genericConfig && typeof genericConfig.name === "string"
@@ -140,8 +167,12 @@ function serializedToSummary(loop: SerializedAgentLoop): AgentLoopSummary {
         intervalMs: loop.intervalMs ?? 0,
         cronExpression: loop.cronExpression ?? undefined,
         iteration: loop.iteration ?? 0,
-        // SerializedAgentLoop's nextRunAt is `number | null | undefined`;
-        // the wire summary expects a number, so coerce to 0 for "no slot".
+        prompt: loop.prompt ?? undefined,
+        createdAt: loop.createdAt,
+        updatedAt: loop.updatedAt,
+        // SerializedAgentLoop's nextRunAt is null when no future slot is
+        // scheduled. Preserve that as 0 for the legacy summary shape, but
+        // consumers must treat 0 as "never" instead of formatting 1970.
         nextRunAt: loop.nextRunAt ?? 0,
         runtimeState: loop.status === "running" ? "active" : loop.status === "paused" ? "paused" : "idle",
         phase: loop.status === "running" ? "planning" : "sleeping",
@@ -215,11 +246,57 @@ export function useWorkflows(): UseWorkflowsResult {
     }, [throttledLoad]);
 
     React.useEffect(() => {
-        // CreateLoopModal fires this when a new loop is POSTed so the
-        // list reflects it without waiting for the next throttle tick.
-        return onAgentLoopsChanged(() => {
+        // Workflow create-modals (loop, webhook, schedule) fire this after
+        // a successful POST so the list reflects the new row without
+        // waiting for the next throttle tick.
+        return onWorkflowSourcesChanged(() => {
             throttledLoad();
         });
+    }, [throttledLoad]);
+
+    React.useEffect(() => {
+        // AgentLoop real-time path: server emits `agent-loop-updated` /
+        // `agent-loop-deleted` SyncUpdates from agentLoopEngine on every
+        // CRUD/iteration/pause/resume. The syncUpdateIngest seam funnels
+        // both into a single `agent-loops-stale` IngestEvent, which we
+        // hook here to refetch and re-derive. Without this subscription
+        // Loop iteration/nextRunAt would only refresh on the 30 s poll
+        // below or when the user touches the page.
+        return ingestEvents.on("agent-loops-stale", () => {
+            throttledLoad();
+        });
+    }, [throttledLoad]);
+
+    React.useEffect(() => {
+        // Polling fallback for Scheduled / Event workflows. Their server-
+        // side cron tick / webhook fire updates `lastRunAt`, `runCount`,
+        // `nextRunAt`, etc., but neither path emits a SyncUpdate yet, so
+        // an open WorkflowList would otherwise show stale numbers until
+        // the user navigated away and back. 30 s is a good trade-off
+        // between freshness and request volume.
+        const id = setInterval(() => {
+            throttledLoad();
+        }, WORKFLOW_POLL_INTERVAL_MS);
+        return () => clearInterval(id);
+    }, [throttledLoad]);
+
+    React.useEffect(() => {
+        // App-foreground refresh — same idea as the poll above, but tuned
+        // for the case where the user comes back to a tab/app that's been
+        // backgrounded long enough that even the latest poll is stale.
+        // RN's AppState fires `active` on initial mount AND on every
+        // foreground transition; we skip the initial since the mount-load
+        // effect already covers it.
+        let isFirst = true;
+        const sub = AppState.addEventListener("change", (state) => {
+            if (state !== "active") return;
+            if (isFirst) {
+                isFirst = false;
+                return;
+            }
+            throttledLoad();
+        });
+        return () => sub.remove();
     }, [throttledLoad]);
 
     const refresh = React.useCallback(() => {
@@ -247,7 +324,16 @@ export function useWorkflows(): UseWorkflowsResult {
         //      target daemon is currently offline.
         const loopsById = new Map<
             string,
-            { machineId: string; loop: AgentLoopSummary; role: "generic" | "supervisor" }
+            {
+                machineId: string;
+                loop: WorkflowAgentLoopSummary;
+                role: "generic" | "supervisor";
+                // null = CLI-local (no server projectId yet); set when
+                // pass 1 (serverLoops) sees the loop. Pass 2 (daemonState)
+                // intentionally does NOT clobber a previously-set value
+                // — once a loop is known server-side, that mapping wins.
+                projectId: string | null;
+            }
         >();
 
         // Pass 1: server-fetched loops land first; per-machine daemonState
@@ -270,6 +356,7 @@ export function useWorkflows(): UseWorkflowsResult {
                     machineId,
                     loop: serializedToSummary(serverLoop),
                     role: serverLoop.role,
+                    projectId: serverLoop.projectId,
                 });
             }
         }
@@ -281,18 +368,21 @@ export function useWorkflows(): UseWorkflowsResult {
         // always "generic" unless the server pass already tagged it as
         // supervisor (in which case daemonState shouldn't have it).
         for (const machine of allMachines) {
-            const loops = ((machine.daemonState?.automation as any)?.loops ?? []) as AgentLoopSummary[];
+            const loops = ((machine.daemonState?.automation as any)?.loops ?? []) as WorkflowAgentLoopSummary[];
             for (const loop of loops) {
                 const existing = loopsById.get(loop.id);
                 loopsById.set(loop.id, {
                     machineId: machine.id,
                     loop,
                     role: existing?.role ?? "generic",
+                    // Preserve any projectId already set by pass 1 —
+                    // daemonState has no notion of server projectId.
+                    projectId: existing?.projectId ?? null,
                 });
             }
         }
 
-        for (const { machineId, loop, role } of loopsById.values()) {
+        for (const { machineId, loop, role, projectId } of loopsById.values()) {
             const loopSessions = (allSessions as Session[])
                 .filter((s) => {
                     if (typeof s === "string") return false;
@@ -303,7 +393,14 @@ export function useWorkflows(): UseWorkflowsResult {
             loopSessions.forEach((s) => claimedSessions.add(s.id));
 
             const latestSessionTs = loopSessions[0]?.updatedAt ?? 0;
-            const lastActivityAt = Math.max(latestSessionTs, loop.nextRunAt ?? 0);
+            const loopActivityTs = Math.max(
+                loop.lastStartedAt ?? 0,
+                loop.lastEnqueuedAt ?? 0,
+                loop.lastTriggerAt ?? 0,
+                loop.updatedAt ?? 0,
+                loop.createdAt ?? 0,
+            );
+            const lastActivityAt = Math.max(latestSessionTs, loopActivityTs);
 
             workflowList.push({
                 id: `loop:${loop.id}`,
@@ -315,7 +412,7 @@ export function useWorkflows(): UseWorkflowsResult {
                 machineId,
                 sessions: loopSessions,
                 lastActivityAt,
-                status: loop.runtimeState === "running"
+                status: loop.runtimeState === "running" || loop.runtimeState === "active"
                     ? "active"
                     : loop.runtimeState === "failed"
                         ? "error"
@@ -323,6 +420,7 @@ export function useWorkflows(): UseWorkflowsResult {
                             ? "idle"
                             : "archived",
                 loop,
+                projectId,
                 // Server-managed loops surface either via daemonState (CLI
                 // already aware) or via the server fetch (CLI hasn't yet
                 // received its trigger). Either way the loop is on the

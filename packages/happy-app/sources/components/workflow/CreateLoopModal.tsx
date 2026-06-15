@@ -25,8 +25,11 @@ import { isMachineOnline } from "@/utils/machineUtils";
 import { BottomSheet, BottomSheetHandle, PresetChip } from "@/components/BottomSheet";
 import { Modal as AlertModal } from "@/modal";
 import { TokenStorage } from "@/auth/tokenStorage";
-import { createAgentLoop, notifyAgentLoopsChanged } from "@/sync/apiAgentLoops";
+import { createAgentLoop } from "@/sync/apiAgentLoops";
+import { sessionAdopt } from "@/sync/apiSessionAdopt";
+import { notifyWorkflowSourcesChanged } from "@/sync/workflowBus";
 import type { CreateGenericAgentLoopBody } from "@kmmao/happy-wire";
+import type { Session } from "@/sync/storageTypes";
 
 interface CreateLoopModalProps {
     visible: boolean;
@@ -36,6 +39,15 @@ interface CreateLoopModalProps {
      * after a successful create. The hook re-fetches when this fires.
      */
     onCreated?: () => void;
+    /**
+     * Adopt mode (Phase 2 sessionAdopt — new-loop target). When given,
+     * the modal creates a new loop AND binds this Session to it in a
+     * single round-trip, so the conversation jumps under the new loop
+     * card in the workflow list. Machine/project/agent pickers are hidden
+     * (inherited from the Session); prompt is prefilled from the latest
+     * user message; directory comes from session.metadata.path.
+     */
+    session?: Session;
 }
 
 type AgentChoice = "claude" | "codex" | "gemini";
@@ -47,6 +59,166 @@ const SCHEDULE_INTERVALS_MS: Record<Exclude<ScheduleChoice, "cron">, number> = {
     "6h": 6 * 60 * 60 * 1000,
     "24h": 24 * 60 * 60 * 1000,
 };
+
+/**
+ * Common cron templates shown as one-tap chips above the cron input.
+ *
+ * Picked so the "round-number" intent — every-30min / hourly / 9am-daily /
+ * midnight / weekdays / Mondays / first-of-month — is reachable without
+ * typing a single asterisk. Each chip just rewrites the text box, so the
+ * user can still tweak the expression before submitting.
+ *
+ * The `labelKey` resolves through `t()`, the `cron` is the literal cron
+ * string the input becomes, and `humanKind` is a hint passed to
+ * `humanizeCron()` so the preview line below matches the chip exactly
+ * (no risk of the parser misreading the very expression we just wrote).
+ */
+const CRON_PRESETS: Array<{
+    labelKey:
+        | "workflows.loopCronPresetEvery30m"
+        | "workflows.loopCronPresetHourly"
+        | "workflows.loopCronPresetDaily9"
+        | "workflows.loopCronPresetMidnight"
+        | "workflows.loopCronPresetWorkdays9"
+        | "workflows.loopCronPresetMonday9"
+        | "workflows.loopCronPresetMonthly1st";
+    cron: string;
+}> = [
+    { labelKey: "workflows.loopCronPresetEvery30m", cron: "*/30 * * * *" },
+    { labelKey: "workflows.loopCronPresetHourly", cron: "0 * * * *" },
+    { labelKey: "workflows.loopCronPresetDaily9", cron: "0 9 * * *" },
+    { labelKey: "workflows.loopCronPresetMidnight", cron: "0 0 * * *" },
+    { labelKey: "workflows.loopCronPresetWorkdays9", cron: "0 9 * * 1-5" },
+    { labelKey: "workflows.loopCronPresetMonday9", cron: "0 9 * * 1" },
+    { labelKey: "workflows.loopCronPresetMonthly1st", cron: "0 0 1 * *" },
+];
+
+// Two-char zero-pad for HH:MM strings inside the humanized preview.
+function pad2(n: number): string {
+    return n < 10 ? `0${n}` : String(n);
+}
+
+type CronPattern =
+    | { kind: "minutely" }
+    | { kind: "hourly" }
+    | { kind: "everyNMin"; n: number }
+    | { kind: "everyNHour"; n: number }
+    | { kind: "dailyAt"; hm: string }
+    | { kind: "weekdaysAt"; hm: string }
+    | { kind: "weekendAt"; hm: string }
+    | { kind: "weeklyAt"; hm: string; dow: number }
+    | { kind: "monthlyAt"; hm: string; dom: number }
+    | { kind: "custom" }
+    | null;
+
+// Conservative field validator — accepts only the syntax we humanize so
+// the preview can confidently say "invalid" instead of misleading users.
+const CRON_FIELD_RE = /^(\*|\d+|\d+-\d+|\*\/\d+|\d+(?:,\d+)*)$/;
+
+/**
+ * Parse a cron expression into one of the patterns our preview knows
+ * how to describe. Anything we recognize syntactically but can't shape
+ * into a known phrase falls into `custom` (we show "custom expression"
+ * rather than "invalid"). Anything malformed returns `null`.
+ */
+function parseCron(expr: string): CronPattern {
+    const parts = expr.trim().split(/\s+/);
+    if (parts.length !== 5) return null;
+    const [m, h, dom, mon, dow] = parts;
+    if (![m, h, dom, mon, dow].every((p) => CRON_FIELD_RE.test(p))) return null;
+
+    const everyDate = dom === "*" && mon === "*" && dow === "*";
+
+    if (m === "*" && h === "*" && everyDate) return { kind: "minutely" };
+
+    if (h === "*" && everyDate) {
+        if (m === "0") return { kind: "hourly" };
+        const everyN = m.match(/^\*\/(\d+)$/);
+        if (everyN) return { kind: "everyNMin", n: parseInt(everyN[1], 10) };
+    }
+
+    if (m === "0" && everyDate) {
+        const everyN = h.match(/^\*\/(\d+)$/);
+        if (everyN) return { kind: "everyNHour", n: parseInt(everyN[1], 10) };
+    }
+
+    const mNum = /^\d+$/.test(m) ? parseInt(m, 10) : null;
+    const hNum = /^\d+$/.test(h) ? parseInt(h, 10) : null;
+    if (mNum !== null && hNum !== null) {
+        const hm = `${pad2(hNum)}:${pad2(mNum)}`;
+        if (everyDate) return { kind: "dailyAt", hm };
+        if (dom === "*" && mon === "*" && dow === "1-5") {
+            return { kind: "weekdaysAt", hm };
+        }
+        if (dom === "*" && mon === "*" && (dow === "0,6" || dow === "6,0")) {
+            return { kind: "weekendAt", hm };
+        }
+        if (dom === "*" && mon === "*" && /^\d+$/.test(dow)) {
+            return { kind: "weeklyAt", hm, dow: parseInt(dow, 10) };
+        }
+        if (/^\d+$/.test(dom) && mon === "*" && dow === "*") {
+            return { kind: "monthlyAt", hm, dom: parseInt(dom, 10) };
+        }
+    }
+
+    return { kind: "custom" };
+}
+
+// Cron uses 0–6 for Sun–Sat (and 7 also = Sun). Translation keys are
+// stable string literals so the type system catches typos.
+const DOW_LABEL_KEYS = [
+    "workflows.loopCronDaySun",
+    "workflows.loopCronDayMon",
+    "workflows.loopCronDayTue",
+    "workflows.loopCronDayWed",
+    "workflows.loopCronDayThu",
+    "workflows.loopCronDayFri",
+    "workflows.loopCronDaySat",
+] as const;
+
+function dowName(dow: number): string {
+    const idx = dow === 7 ? 0 : dow;
+    if (idx < 0 || idx > 6) return String(dow);
+    return t(DOW_LABEL_KEYS[idx]);
+}
+
+/**
+ * Translate a cron string into a single human-readable line. Returns
+ * the localized "invalid expression" message when parsing fails so the
+ * user immediately sees the typo instead of a frozen-looking preview.
+ */
+function humanizeCron(expr: string): string {
+    const parsed = parseCron(expr);
+    if (!parsed) return t("workflows.loopCronHumanInvalid");
+    switch (parsed.kind) {
+        case "minutely":
+            return t("workflows.loopCronHumanMinutely");
+        case "hourly":
+            return t("workflows.loopCronHumanHourly");
+        case "everyNMin":
+            return t("workflows.loopCronHumanEveryNMin", parsed.n);
+        case "everyNHour":
+            return t("workflows.loopCronHumanEveryNHour", parsed.n);
+        case "dailyAt":
+            return t("workflows.loopCronHumanDailyAt", parsed.hm);
+        case "weekdaysAt":
+            return t("workflows.loopCronHumanWeekdaysAt", parsed.hm);
+        case "weekendAt":
+            return t("workflows.loopCronHumanWeekendAt", parsed.hm);
+        case "weeklyAt":
+            return t("workflows.loopCronHumanWeeklyAt", {
+                day: dowName(parsed.dow),
+                hm: parsed.hm,
+            });
+        case "monthlyAt":
+            return t("workflows.loopCronHumanMonthlyAt", {
+                dom: parsed.dom,
+                hm: parsed.hm,
+            });
+        case "custom":
+            return t("workflows.loopCronHumanCustom");
+    }
+}
 
 /**
  * Minimum CLI version that ships the daemon endpoints required for
@@ -107,12 +279,52 @@ const styles = StyleSheet.create((theme) => ({
         borderRadius: 8,
         backgroundColor: `${theme.colors.accentOrange}14`,
     },
+    infoBody: {
+        flex: 1,
+        gap: 4,
+    },
     infoText: {
         flex: 1,
         fontSize: 12,
         color: theme.colors.text,
         ...Typography.default(),
         lineHeight: 17,
+    },
+    infoBullet: {
+        fontSize: 12,
+        color: theme.colors.text,
+        ...Typography.default(),
+        lineHeight: 17,
+    },
+    infoHint: {
+        fontSize: 11,
+        color: theme.colors.textSecondary,
+        ...Typography.default(),
+        lineHeight: 16,
+        marginTop: 2,
+    },
+    cronPresetsLabel: {
+        fontSize: 11,
+        color: theme.colors.textSecondary,
+        ...Typography.default(),
+        marginTop: 10,
+    },
+    cronPreviewRow: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 6,
+        marginTop: 6,
+        paddingHorizontal: 2,
+    },
+    cronPreviewText: {
+        flex: 1,
+        fontSize: 12,
+        color: theme.colors.textSecondary,
+        ...Typography.default(),
+        lineHeight: 17,
+    },
+    cronPreviewTextInvalid: {
+        color: theme.colors.warning,
     },
     sectionLabel: {
         fontSize: 12,
@@ -211,9 +423,14 @@ const styles = StyleSheet.create((theme) => ({
     },
     buttonCancel: { backgroundColor: theme.colors.surfaceHigh },
     buttonPrimary: { backgroundColor: theme.colors.button.primary.background },
-    buttonPrimaryDisabled: { backgroundColor: theme.colors.surfaceHigh },
+    buttonPrimaryDisabled: {
+        backgroundColor: theme.colors.surfaceHigh,
+        borderWidth: StyleSheet.hairlineWidth,
+        borderColor: theme.colors.divider,
+    },
     buttonText: { fontSize: 14, ...Typography.default("semiBold") },
     buttonTextPrimary: { color: theme.colors.button.primary.tint },
+    buttonTextPrimaryDisabled: { color: theme.colors.textSecondary },
     buttonTextCancel: { color: theme.colors.textSecondary },
 }));
 
@@ -221,12 +438,18 @@ export const CreateLoopModal = React.memo(function CreateLoopModal({
     visible,
     onClose,
     onCreated,
+    session,
 }: CreateLoopModalProps) {
     const { theme } = useUnistyles();
     const sheetRef = React.useRef<BottomSheetHandle>(null);
 
     const machines = useAllMachines();
     const projects = useProjects();
+
+    // Adopt mode flag — set once on open and pinned for the modal's
+    // lifetime. The machine/project pickers are slaved to the Session in
+    // this mode and the picker UI is hidden entirely.
+    const isAdoptMode = !!session;
 
     const [pickedMachineId, setPickedMachineId] = React.useState<string>("");
     const [pickedProjectServerId, setPickedProjectServerId] = React.useState<string>("");
@@ -247,10 +470,26 @@ export const CreateLoopModal = React.memo(function CreateLoopModal({
     const wasVisible = React.useRef(visible);
     React.useEffect(() => {
         if (visible && !wasVisible.current) {
-            setPickedMachineId(machines[0]?.id ?? "");
-            setPickedProjectServerId("");
-            setPrompt("");
-            setName("");
+            // Adopt mode seeds from the Session; create-from-scratch
+            // mode falls back to the historical defaults.
+            if (session) {
+                setPickedMachineId(session.metadata?.machineId ?? "");
+                // pickedProjectServerId is filled by the machineProjects
+                // effect below once projects are filtered. Leave blank
+                // here so the auto-pick fires.
+                setPickedProjectServerId("");
+                setPrompt(
+                    session.latestUserRequestPreview?.text?.trim() ||
+                        session.metadata?.summary?.text?.trim() ||
+                        "",
+                );
+                setName(session.metadata?.summary?.text?.trim()?.slice(0, 60) ?? "");
+            } else {
+                setPickedMachineId(machines[0]?.id ?? "");
+                setPickedProjectServerId("");
+                setPrompt("");
+                setName("");
+            }
             setSchedule("1h");
             setCronExpression("*/30 * * * *");
             setAgent("claude");
@@ -313,32 +552,53 @@ export const CreateLoopModal = React.memo(function CreateLoopModal({
         if (!valid || submitting || !pickedProject?.serverId) return;
         setSubmitting(true);
         try {
-            const credentials = await TokenStorage.getCredentials();
-            if (!credentials) throw new Error("Not authenticated");
-
-            const body: CreateGenericAgentLoopBody = {
-                prompt: prompt.trim(),
-                directory: pickedProject.key.path,
-                agent,
-                enabled: true,
-            };
-            if (schedule === "cron") {
-                body.cronExpression = cronExpression.trim();
-            } else {
-                body.intervalMs = SCHEDULE_INTERVALS_MS[schedule];
-            }
-            // The trimmed name is folded into genericConfig so the
-            // server preserves it for round-tripping back to the App.
+            const trimmedPrompt = prompt.trim();
             const trimmedName = name.trim();
-            if (trimmedName) {
-                body.genericConfig = { name: trimmedName };
-            }
+            const intervalMs =
+                schedule === "cron" ? undefined : SCHEDULE_INTERVALS_MS[schedule];
+            const cron =
+                schedule === "cron" ? cronExpression.trim() : undefined;
 
-            await createAgentLoop(credentials, pickedProject.serverId, body);
+            if (isAdoptMode && session) {
+                // Phase 2 sessionAdopt — server creates the loop AND
+                // binds this Session to it (single round-trip; daemon
+                // ephemeral updates GuardianSessionRegistry so next
+                // trigger reuses this Session).
+                const result = await sessionAdopt({
+                    sessionId: session.id,
+                    target: {
+                        kind: "new-loop",
+                        prompt: trimmedPrompt,
+                        directory: pickedProject.key.path,
+                        intervalMs,
+                        cronExpression: cron,
+                        name: trimmedName || undefined,
+                    },
+                });
+                if (!result.success) {
+                    throw new Error(result.errorMessage);
+                }
+            } else {
+                // Standalone "create loop" path — no Session to adopt.
+                const credentials = await TokenStorage.getCredentials();
+                if (!credentials) throw new Error("Not authenticated");
+
+                const body: CreateGenericAgentLoopBody = {
+                    prompt: trimmedPrompt,
+                    directory: pickedProject.key.path,
+                    agent,
+                    enabled: true,
+                };
+                if (cron) body.cronExpression = cron;
+                if (intervalMs !== undefined) body.intervalMs = intervalMs;
+                if (trimmedName) body.genericConfig = { name: trimmedName };
+
+                await createAgentLoop(credentials, pickedProject.serverId, body);
+            }
 
             // Fire the global bus first (so every useWorkflows hook in the
             // app refetches in lockstep), then the caller-supplied callback.
-            notifyAgentLoopsChanged();
+            notifyWorkflowSourcesChanged();
             onCreated?.();
             sheetRef.current?.requestClose();
         } catch (err) {
@@ -386,7 +646,12 @@ export const CreateLoopModal = React.memo(function CreateLoopModal({
                                 color={theme.colors.button.primary.tint}
                             />
                         ) : (
-                            <Text style={[styles.buttonText, styles.buttonTextPrimary]}>
+                            <Text style={[
+                                styles.buttonText,
+                                valid && !submitting
+                                    ? styles.buttonTextPrimary
+                                    : styles.buttonTextPrimaryDisabled,
+                            ]}>
                                 {t("workflows.loopFormSubmit")}
                             </Text>
                         )}
@@ -400,75 +665,111 @@ export const CreateLoopModal = React.memo(function CreateLoopModal({
                     size={16}
                     color={theme.colors.accentOrange}
                 />
-                <Text style={styles.infoText}>{t("workflows.loopFormInfo")}</Text>
+                <View style={styles.infoBody}>
+                    {isAdoptMode ? (
+                        <Text style={styles.infoText}>
+                            {t("workflows.loopFormAdoptInfo")}
+                        </Text>
+                    ) : (
+                        <>
+                            <Text style={styles.infoText}>
+                                {t("workflows.loopFormInfoIntro")}
+                            </Text>
+                            <Text style={styles.infoBullet}>
+                                • {t("workflows.loopFormInfoStep1")}
+                            </Text>
+                            <Text style={styles.infoBullet}>
+                                • {t("workflows.loopFormInfoStep2")}
+                            </Text>
+                            <Text style={styles.infoBullet}>
+                                • {t("workflows.loopFormInfoStep3")}
+                            </Text>
+                            <Text style={styles.infoHint}>
+                                {t("workflows.loopFormInfoHint")}
+                            </Text>
+                            <Text style={styles.infoHint}>
+                                {t("workflows.loopDifferentiator")}
+                            </Text>
+                        </>
+                    )}
+                </View>
             </View>
 
-            {/* Machine picker — only machines that already exist on this
-                account. Loop creation needs a machine + a known project. */}
-            <View>
-                <Text style={styles.sectionLabel}>{t("workflows.sectionMachine")}</Text>
-                {machines.length === 0 ? (
-                    <Text
-                        style={[
-                            styles.infoText,
-                            { color: theme.colors.warning, marginTop: 6 },
-                        ]}
-                    >
-                        {t("workflows.standaloneNoMachine")}
-                    </Text>
-                ) : (
-                    <View style={styles.presetGrid}>
-                        {machines.map((m) => (
-                            <PresetChip
-                                key={m.id}
-                                label={m.metadata?.displayName || m.metadata?.host || m.id}
-                                active={pickedMachineId === m.id}
-                                onPress={() => setPickedMachineId(m.id)}
-                            />
-                        ))}
+            {/* Machine + Project pickers — only visible in standalone
+                ("create from scratch") mode. Adopt mode inherits both
+                from the source Session, so the pickers would just be
+                noise and a foot-gun. The pickedMachineId / pickedProjectServerId
+                state still gets auto-set from session metadata via the
+                open-effect, so handleConfirm has everything it needs. */}
+            {isAdoptMode ? null : (
+                <>
+                    <View>
+                        <Text style={styles.sectionLabel}>{t("workflows.sectionMachine")}</Text>
+                        {machines.length === 0 ? (
+                            <Text
+                                style={[
+                                    styles.infoText,
+                                    { color: theme.colors.warning, marginTop: 6 },
+                                ]}
+                            >
+                                {t("workflows.standaloneNoMachine")}
+                            </Text>
+                        ) : (
+                            <View style={styles.presetGrid}>
+                                {machines.map((m) => (
+                                    <PresetChip
+                                        key={m.id}
+                                        label={m.metadata?.displayName || m.metadata?.host || m.id}
+                                        active={pickedMachineId === m.id}
+                                        onPress={() => setPickedMachineId(m.id)}
+                                    />
+                                ))}
+                            </View>
+                        )}
                     </View>
-                )}
-            </View>
 
-            {/* Project picker — filtered to projects on the selected
-                machine that have a server id. */}
-            <View>
-                <Text style={styles.sectionLabel}>
-                    {t("workflows.loopSectionProject")}
-                </Text>
-                {!pickedMachineId ? (
-                    <Text
-                        style={[styles.infoText, { marginTop: 6 }]}
-                    >
-                        {t("workflows.loopProjectNone")}
-                    </Text>
-                ) : machineProjects.length === 0 ? (
-                    <Text
-                        style={[
-                            styles.infoText,
-                            { color: theme.colors.warning, marginTop: 6 },
-                        ]}
-                    >
-                        {t("workflows.loopProjectEmpty")}
-                    </Text>
-                ) : (
-                    <View style={styles.presetGrid}>
-                        {machineProjects.map((p) => (
-                            <PresetChip
-                                key={p.id}
-                                label={p.key.path.split("/").filter(Boolean).pop() || p.key.path}
-                                active={p.serverId === pickedProjectServerId}
-                                onPress={() => setPickedProjectServerId(p.serverId ?? "")}
-                            />
-                        ))}
+                    <View>
+                        <Text style={styles.sectionLabel}>
+                            {t("workflows.loopSectionProject")}
+                        </Text>
+                        {!pickedMachineId ? (
+                            <Text
+                                style={[styles.infoText, { marginTop: 6 }]}
+                            >
+                                {t("workflows.loopProjectNone")}
+                            </Text>
+                        ) : machineProjects.length === 0 ? (
+                            <Text
+                                style={[
+                                    styles.infoText,
+                                    { color: theme.colors.warning, marginTop: 6 },
+                                ]}
+                            >
+                                {t("workflows.loopProjectEmpty")}
+                            </Text>
+                        ) : (
+                            <View style={styles.presetGrid}>
+                                {machineProjects.map((p) => (
+                                    <PresetChip
+                                        key={p.id}
+                                        label={p.key.path.split("/").filter(Boolean).pop() || p.key.path}
+                                        active={p.serverId === pickedProjectServerId}
+                                        onPress={() => setPickedProjectServerId(p.serverId ?? "")}
+                                    />
+                                ))}
+                            </View>
+                        )}
                     </View>
-                )}
-            </View>
+                </>
+            )}
 
             {/* Schedule — interval chips OR a custom cron expression. */}
             <View>
                 <Text style={styles.sectionLabel}>
                     {t("workflows.loopSectionSchedule")}
+                </Text>
+                <Text style={[styles.infoHint, { marginTop: 4 }]}>
+                    {t("workflows.loopScheduleHint")}
                 </Text>
                 <View style={styles.presetGrid}>
                     <PresetChip
@@ -498,39 +799,106 @@ export const CreateLoopModal = React.memo(function CreateLoopModal({
                     />
                 </View>
                 {schedule === "cron" ? (
-                    <TextInput
-                        style={[styles.input, styles.cronInput, { marginTop: 8 }]}
-                        value={cronExpression}
-                        onChangeText={setCronExpression}
-                        placeholder={t("workflows.loopCronPlaceholder")}
-                        placeholderTextColor={theme.colors.textSecondary}
-                        autoCapitalize="none"
-                        autoCorrect={false}
-                    />
+                    <>
+                        {/* Quick templates — one tap rewrites the cron
+                            input below. We don't track "which preset is
+                            active" because hand-edits would make the
+                            chip lie; users see the actual schedule via
+                            the preview line instead. */}
+                        <Text style={styles.cronPresetsLabel}>
+                            {t("workflows.loopCronPresetsLabel")}
+                        </Text>
+                        <View style={styles.presetGrid}>
+                            {CRON_PRESETS.map((preset) => (
+                                <PresetChip
+                                    key={preset.cron}
+                                    label={t(preset.labelKey)}
+                                    active={
+                                        cronExpression.trim() === preset.cron
+                                    }
+                                    onPress={() =>
+                                        setCronExpression(preset.cron)
+                                    }
+                                />
+                            ))}
+                        </View>
+                        <TextInput
+                            style={[
+                                styles.input,
+                                styles.cronInput,
+                                { marginTop: 8 },
+                            ]}
+                            value={cronExpression}
+                            onChangeText={setCronExpression}
+                            placeholder={t("workflows.loopCronPlaceholder")}
+                            placeholderTextColor={theme.colors.textSecondary}
+                            autoCapitalize="none"
+                            autoCorrect={false}
+                        />
+                        {/* Schedule preview — translates the current
+                            cron string into a one-line description so
+                            users don't have to mentally parse asterisks
+                            before tapping Submit. */}
+                        {(() => {
+                            const valid = parseCron(cronExpression) !== null;
+                            return (
+                                <View style={styles.cronPreviewRow}>
+                                    <Ionicons
+                                        name={
+                                            valid
+                                                ? "time-outline"
+                                                : "alert-circle-outline"
+                                        }
+                                        size={14}
+                                        color={
+                                            valid
+                                                ? theme.colors.textSecondary
+                                                : theme.colors.warning
+                                        }
+                                    />
+                                    <Text
+                                        style={[
+                                            styles.cronPreviewText,
+                                            !valid &&
+                                                styles.cronPreviewTextInvalid,
+                                        ]}
+                                    >
+                                        {humanizeCron(cronExpression)}
+                                    </Text>
+                                </View>
+                            );
+                        })()}
+                    </>
                 ) : null}
             </View>
 
-            {/* Agent picker. */}
-            <View>
-                <Text style={styles.sectionLabel}>{t("workflows.loopSectionAgent")}</Text>
-                <View style={styles.presetGrid}>
-                    <PresetChip
-                        label={t("workflows.loopAgentClaude")}
-                        active={agent === "claude"}
-                        onPress={() => setAgent("claude")}
-                    />
-                    <PresetChip
-                        label={t("workflows.loopAgentCodex")}
-                        active={agent === "codex"}
-                        onPress={() => setAgent("codex")}
-                    />
-                    <PresetChip
-                        label={t("workflows.loopAgentGemini")}
-                        active={agent === "gemini"}
-                        onPress={() => setAgent("gemini")}
-                    />
+            {/* Agent picker — hidden in adopt mode. Phase 2's
+                SessionAdoptTarget.new-loop schema doesn't carry an
+                `agent` field today (server hard-codes claude); to keep
+                the UI honest we hide the picker so the user can't pick
+                codex/gemini and expect it to stick. */}
+            {isAdoptMode ? null : (
+                <View>
+                    <Text style={styles.sectionLabel}>{t("workflows.loopSectionAgent")}</Text>
+                    <View style={styles.presetGrid}>
+                        <PresetChip
+                            label={t("workflows.loopAgentClaude")}
+                            active={agent === "claude"}
+                            onPress={() => setAgent("claude")}
+                        />
+                        <PresetChip
+                            label={t("workflows.loopAgentCodex")}
+                            active={agent === "codex"}
+                            onPress={() => setAgent("codex")}
+                        />
+                        <PresetChip
+                            label={t("workflows.loopAgentGemini")}
+                            active={agent === "gemini"}
+                            onPress={() => setAgent("gemini")}
+                        />
+                    </View>
                 </View>
-            </View>
+            )}
 
             {/* Prompt textarea. */}
             <View>
@@ -545,6 +913,13 @@ export const CreateLoopModal = React.memo(function CreateLoopModal({
                     placeholder={t("workflows.loopPromptPlaceholder")}
                     placeholderTextColor={theme.colors.textSecondary}
                 />
+                {/* Hint: how to close the feedback loop via `happy issue`.
+                    Just a UX nudge — we don't auto-inject anything into
+                    the prompt. The Agent reads this in the prompt
+                    context once the user includes it. */}
+                <Text style={styles.infoHint}>
+                    {t("workflows.loopIssueHint")}
+                </Text>
             </View>
 
             {/* Optional name. */}

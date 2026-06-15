@@ -17,6 +17,7 @@ import { usageHandler } from "./socket/usageHandler";
 import { rpcHandler } from "./socket/rpcHandler";
 import { pingHandler } from "./socket/pingHandler";
 import { sessionUpdateHandler } from "./socket/sessionUpdateHandler";
+import { sessionAdoptHandler } from "./socket/sessionAdoptHandler";
 import { machineUpdateHandler } from "./socket/machineUpdateHandler";
 import { webhookStatusHandler } from "./socket/webhookStatusHandler";
 import { supervisorRunStatusHandler } from "./socket/supervisorRunStatusHandler";
@@ -233,6 +234,7 @@ export function startSocket(app: Fastify) {
     });
     usageHandler(userId, socket);
     sessionUpdateHandler(userId, socket, connection);
+    sessionAdoptHandler(userId, socket);
     sessionPreferencesHandler(userId, socket, connection);
     pingHandler(socket);
     machineUpdateHandler(userId, socket);
