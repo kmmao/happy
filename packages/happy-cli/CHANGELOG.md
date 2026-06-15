@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.98.0 - 2026-06-15
+
+Sessions spawned by automation now carry their provenance through to the App's Workflow IA, and the daemon can resume an externally-adopted session on the next trigger.
+
+- Added `metadata.automationContext` to `Metadata` (`{kind, trigger?, projectId?, runId?, loopId?, dedupeKey?}`) and updated `createSessionMetadata` to reconstruct it from the daemon-injected `HAPPY_AUTOMATION_CONTEXT_JSON` env var. Previously, AgentLoop / supervisor / webhook / task sessions all spawned with this context known to the daemon (`SpawnSessionOptions.automationContext`) but it was never written to session metadata, so the App's `useWorkflows()` grouping fell through and every automation-spawned session ended up in the "Ad-hoc" tab.
+- Added a new `finalSessionEnv` injection in `startDaemon.spawnSession` that JSON-encodes `automationContext` into `HAPPY_AUTOMATION_CONTEXT_JSON` whenever the spawn carries one. All four automation runners (AgentLoopRunner, supervisor handler, webhook handler, TaskRunner) benefit automatically — no per-runner env wiring needed.
+- Wired a `session-adopted` ephemeral handler in `apiMachine` and `startDaemon` (Phase 2 sessionAdopt §A6). When the user binds an existing Session to an automation owner in the App, server pushes this ephemeral to the daemon; the daemon calls `guardianSessionRegistry.rememberByKey({key, projectId, loopId?, sessionId})` so the **next** trigger for that loop/schedule reuses the adopted Session instead of spawning a fresh one. Best-effort: if the daemon is offline at adopt time the view-layer grouping still works (server returns the context to the client), the next trigger just spawns fresh.
+- Added `happy issue {create|comment|close}` — a minimal outbound write-back so an Agent that ran inside a loop / webhook trigger session can close the feedback loop on the same Git host that triggered it. Supports both `github.com` and Gitea-style REST APIs (auto-detected from `git remote get-url origin`; override with `--provider`). Tokens come from `GITHUB_TOKEN` / `GITEA_TOKEN` env vars (webhook triggers already inject these) or `--token`.
+
 ## 0.97.2 - 2026-06-15
 
 Progress lists no longer accidentally merge unrelated TaskCreate batches into a single chip.

@@ -459,6 +459,27 @@ export type Metadata = {
    */
   sessionSummaryRefresh?: SessionSummaryRefreshState;
   machineId?: string;
+  /**
+   * Automation provenance written when the daemon spawned this Session as
+   * part of an automation (loop / supervisor / webhook / task). Mirrors
+   * the `SpawnSessionOptions.automationContext` field — the daemon
+   * serializes it into the `HAPPY_AUTOMATION_CONTEXT_JSON` env var so the
+   * child happy process can reconstruct it here verbatim without each
+   * runner having to inject its own env vars.
+   *
+   * Consumed by the Workflow IA in happy-app to group these Sessions
+   * under their owning Loop / Schedule / Webhook row (see
+   * `useWorkflows`). Absent on manually-started Sessions
+   * (`startedBy === "terminal"`).
+   */
+  automationContext?: {
+    kind: "supervisor" | "webhook" | "agent_loop" | "task";
+    trigger?: string;
+    projectId?: string;
+    runId?: string;
+    loopId?: string;
+    dedupeKey?: string;
+  };
   claudeSessionId?: string; // Claude Code session ID
   tools?: string[];
   slashCommands?: string[];

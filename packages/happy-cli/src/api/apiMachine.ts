@@ -413,6 +413,23 @@ export class ApiMachineClient {
   private sessionTerminateHandler:
     | ((data: { sessionId: string; reason: string }) => void)
     | null = null;
+  /**
+   * Phase 2 sessionAdopt — server pushes this ephemeral after the user
+   * binds an existing Session to an automation owner (loop / schedule)
+   * via the App. The daemon stamps the sessionId into
+   * GuardianSessionRegistry so the NEXT trigger reuses the Session
+   * instead of spawning a fresh one. Best effort: if the daemon was
+   * offline at adopt time, the server skips the push and the next
+   * trigger will just spawn fresh (same behaviour as no adoption).
+   */
+  private sessionAdoptedHandler:
+    | ((data: {
+        sessionId: string;
+        projectId: string;
+        loopId?: string;
+        guardianKey: string;
+      }) => void)
+    | null = null;
   private supervisorRunCompleteHandler:
     | ((data: { runId: string; projectId: string; status: "completed" | "failed" }) => void)
     | null = null;
@@ -1112,6 +1129,21 @@ export class ApiMachineClient {
   }
 
   /**
+   * Set handler for session-adopted ephemeral (Phase 2 sessionAdopt).
+   * Startup wiring in startDaemon.ts hooks this to GuardianSessionRegistry.
+   */
+  setSessionAdoptedHandler(
+    handler: (data: {
+      sessionId: string;
+      projectId: string;
+      loopId?: string;
+      guardianKey: string;
+    }) => void,
+  ) {
+    this.sessionAdoptedHandler = handler;
+  }
+
+  /**
    * Report webhook processing status back to server.
    * Queues the status if the socket is disconnected and flushes on reconnect.
    */
@@ -1713,6 +1745,20 @@ export class ApiMachineClient {
           `[API MACHINE] Received session-terminate for session ${data.sessionId} (reason: ${data.reason})`,
         );
         this.sessionTerminateHandler(data as unknown as { sessionId: string; reason: string });
+      }
+
+      if (data.type === "session-adopted" && this.sessionAdoptedHandler) {
+        logger.debug(
+          `[API MACHINE] Received session-adopted for session ${data.sessionId} (guardianKey=${data.guardianKey})`,
+        );
+        this.sessionAdoptedHandler(
+          data as unknown as {
+            sessionId: string;
+            projectId: string;
+            loopId?: string;
+            guardianKey: string;
+          },
+        );
       }
 
       if (data.type === "supervisor-run-complete" && this.supervisorRunCompleteHandler) {

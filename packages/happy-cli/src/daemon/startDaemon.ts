@@ -810,6 +810,15 @@ export async function startDaemon(): Promise<void> {
                 HAPPY_DAEMON_CONTROL_URL: `http://127.0.0.1:${daemonControlPort}`,
               }
             : {}),
+          // Surface the full automationContext to the child happy process
+          // as a single JSON env var so createSessionMetadata can stamp it
+          // on Metadata. This is what lets the Workflow IA in happy-app
+          // group these Sessions under their owning Loop / Schedule /
+          // Webhook (otherwise every loop iteration shows up as an
+          // unattached Ad-hoc row).
+          ...(automationContext
+            ? { HAPPY_AUTOMATION_CONTEXT_JSON: JSON.stringify(automationContext) }
+            : {}),
         };
 
         // Fail-fast validation: Check that any auth variables present are fully expanded
@@ -2817,6 +2826,30 @@ export async function startDaemon(): Promise<void> {
         `[DAEMON RUN] Server requested session termination: ${data.sessionId} (reason: ${data.reason})`,
       );
       stopSession(data.sessionId);
+    });
+
+    // Phase 2 sessionAdopt — Server pushed a `session-adopted` ephemeral
+    // because the user bound an existing Session to a Workflow owner in
+    // the App. Persist into GuardianSessionRegistry so the NEXT trigger
+    // for this loop/schedule reuses this Session instead of spawning a
+    // fresh one. Best effort: if the registry write fails we just log
+    // (next trigger spawns fresh — same as no adoption).
+    apiMachine.setSessionAdoptedHandler((data) => {
+      logger.debug(
+        `[DAEMON RUN] Adopting session ${data.sessionId} under guardian key ${data.guardianKey}`,
+      );
+      void guardianSessionRegistry
+        .rememberByKey({
+          key: data.guardianKey,
+          projectId: data.projectId,
+          loopId: data.loopId,
+          sessionId: data.sessionId,
+        })
+        .catch((err) => {
+          logger.debug(
+            `[DAEMON RUN] Failed to remember guardian for adopted session ${data.sessionId}: ${err}`,
+          );
+        });
     });
 
     // Set up fix-kill handler: terminate fix sessions after completion/failure
