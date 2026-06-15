@@ -47,6 +47,22 @@ export interface ClaudePtyRuntimeOptions {
 export type ClaudePtyDataHandler = (data: string) => void;
 export type ClaudePtyExitHandler = (event: { exitCode: number; signal?: number }) => void;
 
+const CLAUDE_PARENT_SESSION_ENV_KEYS = [
+  "CLAUDECODE",
+  "CLAUDE_CODE_SESSION_ID",
+  "CLAUDE_CODE_CHILD_SESSION",
+  "CLAUDE_CODE_PARENT_SESSION_ID",
+  "CLAUDE_CODE_ENTRYPOINT",
+  "CLAUDE_CODE_EXECPATH",
+  "CLAUDE_CODE_SUBAGENT_MODEL",
+  "CLAUDE_CODE_SIMPLE_SYSTEM_PROMPT",
+  "CLAUDE_CODE_DISABLE_AUTO_MEMORY",
+  "CLAUDE_CODE_DISABLE_1M_CONTEXT",
+  "CLAUDE_EFFORT",
+  "CODEX_COMPANION_SESSION_ID",
+  "CLAUDE_PLUGIN_DATA",
+];
+
 /**
  * Live PTY handle. Returned from `startClaudePty` — caller keeps a reference
  * for the duration of the claude session and disposes via `kill()` on
@@ -271,9 +287,18 @@ function sanitizeEnv(
 ): NodeJS.ProcessEnv {
   const env: NodeJS.ProcessEnv = { ...base };
 
-  // Avoid nested-session detection from inside `claude` (it checks
-  // `CLAUDECODE` to refuse re-entry).
-  delete env.CLAUDECODE;
+  // Avoid nested-session / companion-mode detection from the parent Claude
+  // process. Daemon-spawned Happy sessions can themselves be started from
+  // inside Claude Code; if the child TUI inherits the parent's
+  // CLAUDE_CODE_SESSION_ID / CHILD_SESSION / CODEX_COMPANION_* markers,
+  // Claude 2.1.177 treats it as a nested child session. It still renders a TUI
+  // and fires hooks, but it does not persist the normal
+  // ~/.claude/projects/<cwd>/<session>.jsonl transcript that Happy tails for
+  // App sync. Strip only Claude-owned process-context markers; authentication
+  // and caller-provided ANTHROPIC_* profile env vars stay intact.
+  for (const key of CLAUDE_PARENT_SESSION_ENV_KEYS) {
+    delete env[key];
+  }
 
   // Encourage a colourful TUI on Web terminals (xterm.js supports
   // truecolor). The user's existing env wins if they set these.

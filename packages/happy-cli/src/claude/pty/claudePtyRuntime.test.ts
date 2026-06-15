@@ -33,6 +33,50 @@ describe("claudePtyRuntime", () => {
     expect(pty.exited).toBe(true);
   });
 
+  it("strips parent Claude session markers but preserves profile env", async () => {
+    const keys = [
+      "CLAUDECODE",
+      "CLAUDE_CODE_SESSION_ID",
+      "CLAUDE_CODE_CHILD_SESSION",
+      "CODEX_COMPANION_SESSION_ID",
+      "CLAUDE_PLUGIN_DATA",
+      "ANTHROPIC_AUTH_TOKEN",
+      "HAPPY_HOME_DIR",
+    ];
+    const pty = startClaudePty({
+      command: process.execPath,
+      args: [
+        "-e",
+        `const keys = ${JSON.stringify(keys)}; console.log(JSON.stringify(Object.fromEntries(keys.map((key) => [key, process.env[key] ?? null]))));`,
+      ],
+      env: {
+        ...process.env,
+        CLAUDECODE: "1",
+        CLAUDE_CODE_SESSION_ID: "parent-session",
+        CLAUDE_CODE_CHILD_SESSION: "1",
+        CODEX_COMPANION_SESSION_ID: "parent-session",
+        CLAUDE_PLUGIN_DATA: "/tmp/parent-plugin-data",
+        ANTHROPIC_AUTH_TOKEN: "keep-auth-token",
+        HAPPY_HOME_DIR: "/tmp/happy-home",
+      },
+    });
+    const received: string[] = [];
+    pty.onData((d) => received.push(d));
+
+    await delay(WAIT_MS);
+
+    const match = received.join("").match(/\{.*\}/s);
+    expect(match).not.toBeNull();
+    const env = JSON.parse(match![0]) as Record<string, string | null>;
+    expect(env.CLAUDECODE).toBeNull();
+    expect(env.CLAUDE_CODE_SESSION_ID).toBeNull();
+    expect(env.CLAUDE_CODE_CHILD_SESSION).toBeNull();
+    expect(env.CODEX_COMPANION_SESSION_ID).toBeNull();
+    expect(env.CLAUDE_PLUGIN_DATA).toBeNull();
+    expect(env.ANTHROPIC_AUTH_TOKEN).toBe("keep-auth-token");
+    expect(env.HAPPY_HOME_DIR).toBe("/tmp/happy-home");
+  });
+
   it("onExit fires after kill()", async () => {
     const pty = startClaudePty({ command: "cat" });
     let exitInfo: { exitCode: number; signal?: number } | null = null;
