@@ -213,10 +213,13 @@ export class ApiSessionClient extends EventEmitter {
   private modelModeKey: string | undefined;
   private subagentFlushTimer: ReturnType<typeof setTimeout> | null = null;
   /**
-   * When true, the next assistant message's text/thinking envelopes are suppressed
-   * because they were already sent as real-time text-delta stream events.
+   * Which full assistant envelopes to suppress on the next assistant message
+   * because that content was already sent as real-time text-delta envelopes.
    */
-  private _suppressAssistantTextEnvelopes = false;
+  private _suppressAssistantTextEnvelopes: {
+    text: boolean;
+    thinking: boolean;
+  } | null = null;
   private readonly sendSync: InvalidateSync;
   private readonly receiveSync: InvalidateSync;
   // Track last reported cumulative cost to compute deltas.
@@ -253,11 +256,20 @@ export class ApiSessionClient extends EventEmitter {
   }
 
   /**
-   * Mark that text/thinking content was already streamed as text-delta envelopes.
-   * The next assistant message's text envelopes will be suppressed to avoid duplicates.
+   * Mark which assistant content was already streamed as text-delta envelopes.
+   * Only matching full-text envelopes are suppressed, so streamed thinking alone
+   * never hides the final visible assistant answer.
    */
-  suppressAssistantTextEnvelopes() {
-    this._suppressAssistantTextEnvelopes = true;
+  suppressAssistantTextEnvelopes(options: {
+    text?: boolean;
+    thinking?: boolean;
+  } = { text: false, thinking: true }) {
+    const text = options.text === true;
+    const thinking = options.thinking === true;
+    if (!text && !thinking) {
+      return;
+    }
+    this._suppressAssistantTextEnvelopes = { text, thinking };
   }
 
   constructor(token: string, session: Session) {
@@ -694,17 +706,21 @@ export class ApiSessionClient extends EventEmitter {
     // Extract subagent from mapped envelopes for usage-update attribution
     const mappedSubagent = mapped.envelopes.find((e) => e.subagent)?.subagent;
 
-    // When text was already streamed as text-delta envelopes, suppress the
-    // duplicate full-text envelopes from the complete assistant message.
+    // When thinking was already streamed as text-delta envelopes, suppress only
+    // matching full thinking envelopes from the complete assistant message. The
+    // visible assistant text is always sent as a durable history fallback.
     const suppressText =
-      this._suppressAssistantTextEnvelopes && body.type === "assistant";
-    if (suppressText) {
-      this._suppressAssistantTextEnvelopes = false;
+      body.type === "assistant" ? this._suppressAssistantTextEnvelopes : null;
+    if (body.type === "assistant") {
+      this._suppressAssistantTextEnvelopes = null;
     }
 
     for (const envelope of mapped.envelopes) {
       if (suppressText && envelope.ev.t === "text") {
-        continue;
+        const isThinking = envelope.ev.thinking === true;
+        if (isThinking ? suppressText.thinking : suppressText.text) {
+          continue;
+        }
       }
       this.sendSessionProtocolMessage(envelope);
     }

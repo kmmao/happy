@@ -48,6 +48,10 @@ export interface StreamEventMapperState {
   ttftLogged: boolean;
   /** Whether any text/thinking deltas were streamed in this query cycle. */
   textStreamed: boolean;
+  /** Whether visible assistant text deltas were streamed in this query cycle. */
+  visibleTextStreamed: boolean;
+  /** Whether thinking deltas were streamed in this query cycle. */
+  thinkingStreamed: boolean;
 }
 
 export function createStreamEventMapperState(): StreamEventMapperState {
@@ -56,6 +60,8 @@ export function createStreamEventMapperState(): StreamEventMapperState {
     streamCounter: 0,
     ttftLogged: false,
     textStreamed: false,
+    visibleTextStreamed: false,
+    thinkingStreamed: false,
   };
 }
 
@@ -97,6 +103,7 @@ export function mapStreamEventToEnvelope(
 
   if (delta.type === "text_delta" && delta.text) {
     state.textStreamed = true;
+    state.visibleTextStreamed = true;
     return createEnvelope(
       "agent",
       {
@@ -110,6 +117,7 @@ export function mapStreamEventToEnvelope(
 
   if (delta.type === "thinking_delta" && delta.thinking) {
     state.textStreamed = true;
+    state.thinkingStreamed = true;
     return createEnvelope(
       "agent",
       {

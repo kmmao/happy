@@ -380,6 +380,58 @@ describe('ApiSessionClient v3 messages API migration', () => {
         });
     });
 
+    it('keeps final assistant text when only streamed thinking is suppressed', async () => {
+        const client = new ApiSessionClient('fake-token', session);
+        (client as any).claudeDriver.setCurrentTurn('turn-1');
+        (client as any).suppressAssistantTextEnvelopes({ text: false, thinking: true });
+        mockAxiosPost.mockResolvedValueOnce({
+            data: {
+                messages: [{ id: 'msg-1', seq: 1, localId: 'local-1', createdAt: 1, updatedAt: 1 }]
+            }
+        });
+
+        client.sendClaudeSessionMessage({
+            type: 'assistant',
+            uuid: 'assistant-1',
+            message: {
+                role: 'assistant',
+                content: [
+                    { type: 'thinking', thinking: 'internal reasoning' },
+                    { type: 'text', text: 'Visible final answer' }
+                ]
+            }
+        } as any);
+
+        await waitForCheck(() => {
+            expect(mockAxiosPost).toHaveBeenCalledTimes(1);
+        });
+
+        const payload = mockAxiosPost.mock.calls[0][1];
+        expect(payload.messages).toHaveLength(1);
+
+        const decrypted = decrypt(
+            session.encryptionKey,
+            session.encryptionVariant,
+            decodeBase64(payload.messages[0].content)
+        );
+
+        expect(decrypted).toMatchObject({
+            role: 'session',
+            content: {
+                role: 'agent',
+                turn: 'turn-1',
+                ev: {
+                    t: 'text',
+                    text: 'Visible final answer'
+                }
+            },
+            meta: {
+                sentFrom: 'cli'
+            }
+        });
+        expect((decrypted as any).content.ev.thinking).toBeUndefined();
+    });
+
     it('sends only modern payload for user session envelopes', async () => {
         const client = new ApiSessionClient('fake-token', session);
         mockAxiosPost.mockResolvedValueOnce({

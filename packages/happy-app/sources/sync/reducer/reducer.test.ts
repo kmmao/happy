@@ -226,6 +226,54 @@ describe('reducer', () => {
                 expect(result.messages[1].text).toBe('Part 2');
             }
         });
+
+        it('keeps final assistant text when a streamed thinking delta arrived first', () => {
+            const state = createReducer();
+
+            const streamedThinking: NormalizedMessage = {
+                id: 'thinking-delta-1',
+                localId: null,
+                createdAt: 1000,
+                role: 'agent',
+                isSidechain: false,
+                content: [
+                    {
+                        type: 'text-delta',
+                        delta: 'considering',
+                        streamId: 'cb-0',
+                        uuid: 'cb-0',
+                        parentUUID: null,
+                        thinking: true
+                    }
+                ]
+            };
+            const finalText: NormalizedMessage = {
+                id: 'agent-final-1',
+                localId: null,
+                createdAt: 1001,
+                role: 'agent',
+                isSidechain: false,
+                content: [
+                    {
+                        type: 'text',
+                        text: 'Final answer shown in transcript',
+                        uuid: 'test-uuid-final',
+                        parentUUID: null
+                    }
+                ]
+            };
+
+            const streamed = reducer(state, [streamedThinking]);
+            const final = reducer(state, [finalText]);
+
+            expect(streamed.messages).toHaveLength(1);
+            expect(final.messages).toHaveLength(1);
+            expect(final.messages[0].kind).toBe('agent-text');
+            if (final.messages[0].kind === 'agent-text') {
+                expect(final.messages[0].text).toBe('Final answer shown in transcript');
+                expect(final.messages[0].isThinking).toBeUndefined();
+            }
+        });
     });
 
     describe('mixed message processing', () => {

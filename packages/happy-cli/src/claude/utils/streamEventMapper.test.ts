@@ -40,6 +40,9 @@ describe("mapStreamEventToEnvelope", () => {
     const ev = result!.ev as { t: string; delta: string; thinking?: boolean };
     expect(ev.delta).toBe("hello");
     expect(ev.thinking).toBeUndefined();
+    expect(state.textStreamed).toBe(true);
+    expect(state.visibleTextStreamed).toBe(true);
+    expect(state.thinkingStreamed).toBe(false);
   });
 
   it("maps thinking_delta to text-delta envelope with thinking=true", () => {
@@ -61,6 +64,9 @@ describe("mapStreamEventToEnvelope", () => {
     expect(ev.t).toBe("text-delta");
     expect(ev.delta).toBe("let me think...");
     expect(ev.thinking).toBe(true);
+    expect(state.textStreamed).toBe(true);
+    expect(state.visibleTextStreamed).toBe(false);
+    expect(state.thinkingStreamed).toBe(true);
   });
 
   it("returns null for message_start events", () => {
@@ -170,5 +176,8 @@ describe("createStreamEventMapperState", () => {
     expect(state.activeStreams.size).toBe(0);
     expect(state.streamCounter).toBe(0);
     expect(state.ttftLogged).toBe(false);
+    expect(state.textStreamed).toBe(false);
+    expect(state.visibleTextStreamed).toBe(false);
+    expect(state.thinkingStreamed).toBe(false);
   });
 });

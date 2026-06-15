@@ -1947,25 +1947,29 @@ export async function claudeRemoteLauncher(
         }
       }
 
-      // When text/thinking was already sent as real-time text-delta stream
-      // events, suppress the duplicate full-text envelopes from the log message.
-      // IMPORTANT: reset textStreamed after consuming so each assistant message
-      // independently determines whether its text was streamed. Without this
-      // reset, a second assistant message within the same query (e.g. after a
-      // tool call like AskUserQuestion) would be incorrectly suppressed even
-      // if its stream events never arrived.
+      // Real-time text-delta stream events are optimistic UI only; keep the
+      // complete assistant text envelope as the durable history fallback. We only
+      // suppress full thinking blocks after thinking deltas were streamed, because
+      // thinking-only streams must never hide the final visible assistant answer.
+      // IMPORTANT: reset stream flags after consuming so each assistant message
+      // independently determines whether anything was streamed.
       if (logMessage.type === "assistant") {
         const contentBlocks = Array.isArray((logMessage as any).message?.content)
           ? (logMessage as any).message.content
           : [];
         const blockTypes = contentBlocks.map((b: any) => b.type);
-        logger.debug(`[assistant] blocks=${JSON.stringify(blockTypes)}, textStreamed=${streamEventState.textStreamed}, turnId=${session.client.currentTurnId}`);
-        if (streamEventState.textStreamed) {
-          session.client.suppressAssistantTextEnvelopes();
+        logger.debug(`[assistant] blocks=${JSON.stringify(blockTypes)}, textStreamed=${streamEventState.textStreamed}, visibleTextStreamed=${streamEventState.visibleTextStreamed}, thinkingStreamed=${streamEventState.thinkingStreamed}, turnId=${session.client.currentTurnId}`);
+        if (streamEventState.thinkingStreamed) {
+          session.client.suppressAssistantTextEnvelopes({
+            text: false,
+            thinking: true,
+          });
         }
         // Reset per-response: the next assistant message must independently
         // prove its text was streamed before we suppress its full-text envelopes.
         streamEventState.textStreamed = false;
+        streamEventState.visibleTextStreamed = false;
+        streamEventState.thinkingStreamed = false;
       }
 
       // Queue message with optional delay for tool calls
