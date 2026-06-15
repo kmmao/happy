@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.98.2 - 2026-06-15
+
+Stops the "5 ghost sessions appear at once" effect when the daemon restarts.
+
+- Reworked `AutomationScheduler.recover()` to NOT requeue in-flight jobs at daemon restart. Pre-0.98.2 every in-flight automation job whose `sessionId` couldn't be reattached to a live tracked session was set back to `status="queued"` and `pump()` immediately re-dispatched it, fresh-spawning a new happy process for every iteration. In practice the `recoveredRunningSessionIds` snapshot was taken before the existing child processes had a chance to re-register with the new daemon over webhook, so they were all considered "lost" and we spawned a small flock of duplicates under each loop / supervisor / task row in the workflow list.
+- The fallback branch now marks those jobs `cancelled` with `errorMessage = "Cancelled at daemon restart — next scheduler tick will re-trigger naturally"`. `agent_loop` and `supervisor` jobs are picked up by the next cron tick (within minutes). `task` / `webhook` jobs that were genuinely in flight are forfeited at restart, matching the semantics of a server-side crash mid-request.
+- Added `AutomationRecoveryResult.cancelledOnRestart` counter (the legacy `requeued` field is preserved as a permanent zero for any external readers). Doctor log line at startup now reports `cancelledOnRestart=...` instead of `requeued=...`.
+
 ## 0.98.1 - 2026-06-15
 
 Follow-up to 0.98.0: the `metadata.automationContext` write was wired into the codex / gemini launchers via `createSessionMetadata`, but the **claude launcher** (`runClaude.ts`) builds its own inline `Metadata` literal and never went through that helper — so every claude-flavored automation session (which is the vast majority) was still landing with no `automationContext` field. The App's Workflow IA grouping silently fell through and the sessions appeared in the Ad-hoc tab.

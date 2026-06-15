@@ -88,9 +88,14 @@ describe("AutomationScheduler", () => {
 
     try {
       const recovery = await scheduler.start();
-      expect(recovery.requeued).toBe(1);
+      // 0.98.2+: instead of requeuing the in-flight job we cancel it,
+      // so the next natural scheduler tick (cron / external trigger)
+      // re-creates the work cleanly without a "ghost spawn" storm at
+      // daemon restart.
+      expect(recovery.requeued).toBe(0);
+      expect(recovery.cancelledOnRestart).toBe(1);
       expect(recovery.reattachedRunning).toBe(0);
-      expect(scheduler.getJobsSnapshot()[0]?.status).toBe("queued");
+      expect(scheduler.getJobsSnapshot()[0]?.status).toBe("cancelled");
       expect(scheduler.getJobsSnapshot()[0]?.sessionId).toBeUndefined();
     } finally {
       await scheduler.stop();
@@ -133,6 +138,7 @@ describe("AutomationScheduler", () => {
     try {
       const recovery = await scheduler.start(new Set(["sid-live-1"]));
       expect(recovery.requeued).toBe(0);
+      expect(recovery.cancelledOnRestart).toBe(0);
       expect(recovery.reattachedRunning).toBe(1);
       expect(scheduler.getJobsSnapshot()[0]?.status).toBe("running");
       expect(scheduler.getJobsSnapshot()[0]?.sessionId).toBe("sid-live-1");

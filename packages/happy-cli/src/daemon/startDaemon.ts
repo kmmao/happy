@@ -2658,7 +2658,7 @@ export async function startDaemon(): Promise<void> {
       void publishAutomationState();
     }, 1_000);
     logger.debug(
-      `[DAEMON RUN] Automation scheduler started (requeued=${automationRecovery.requeued}, retainedTerminal=${automationRecovery.retainedTerminal}, reattachedRunning=${automationRecovery.reattachedRunning})`,
+      `[DAEMON RUN] Automation scheduler started (cancelledOnRestart=${automationRecovery.cancelledOnRestart}, retainedTerminal=${automationRecovery.retainedTerminal}, reattachedRunning=${automationRecovery.reattachedRunning})`,
     );
 
     // Set up webhook trigger handler

@@ -159,9 +159,24 @@ export interface AutomationEnqueueResult {
 }
 
 export interface AutomationRecoveryResult {
+  /**
+   * Jobs still found in the persisted queue at daemon restart that
+   * were re-queued for immediate dispatch. As of 0.98.2 the recover
+   * path no longer "resurrects" automation jobs on restart, so this
+   * counter is permanently 0 — preserved here for callers (and the
+   * status doctor) that read the field by name. The work is now
+   * tracked by `cancelledOnRestart` instead.
+   */
   requeued: number;
   retainedTerminal: number;
   reattachedRunning: number;
+  /**
+   * Jobs whose `sessionId` could not be reattached to a live session
+   * at daemon restart and were therefore marked `cancelled`. The next
+   * natural scheduler tick (cron) will re-trigger them, avoiding the
+   * "5 ghost sessions appear at once" effect when daemon restarts.
+   */
+  cancelledOnRestart: number;
 }
 
 export interface AutomationMutationResult {

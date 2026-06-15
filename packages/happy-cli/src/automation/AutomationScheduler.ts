@@ -522,9 +522,9 @@ export class AutomationScheduler {
   }
 
   private async recover(recoveredRunningSessionIds?: ReadonlySet<string>): Promise<AutomationRecoveryResult> {
-    let requeued = 0;
     let retainedTerminal = 0;
     let reattachedRunning = 0;
+    let cancelledOnRestart = 0;
 
     for (const job of this.store.getAll()) {
       if (TERMINAL_STATUSES.has(job.status)) {
@@ -544,28 +544,39 @@ export class AutomationScheduler {
         continue;
       }
 
-      const recovered: AutomationJob = {
+      // Pre-0.98.2 we would requeue these jobs so `pump()` re-dispatched
+      // them immediately. That meant every daemon restart could trigger a
+      // flurry of fresh session spawns for in-flight loop / supervisor /
+      // task work — visually "5 ghost sessions appear under the workflow
+      // card the moment daemon restarts". We now mark them cancelled and
+      // let the next scheduler tick (cron interval or external trigger)
+      // do the re-trigger naturally. agent_loop / supervisor recover on
+      // their next tick within minutes; task / webhook trigger work that
+      // was actually in flight is lost — same semantics as a server-side
+      // crash in the middle of a request.
+      const cancelled: AutomationJob = {
         ...job,
-        status: "queued",
+        status: "cancelled",
         sessionId: undefined,
         completionMode: undefined,
         errorMessage:
           job.errorMessage ??
-          "Recovered after daemon restart before automation outcome was finalized",
+          "Cancelled at daemon restart — next scheduler tick will re-trigger naturally",
+        completedAt: Date.now(),
         updatedAt: Date.now(),
       };
-      await this.store.upsert(recovered);
-      requeued++;
+      await this.store.upsert(cancelled);
+      cancelledOnRestart++;
     }
 
-    if (requeued > 0) {
+    if (cancelledOnRestart > 0) {
       logger.info(
-        `[AUTOMATION] Recovered ${requeued} queued job(s) from previous daemon run`,
+        `[AUTOMATION] Cancelled ${cancelledOnRestart} in-flight job(s) at daemon restart; next scheduler tick will re-trigger them naturally`,
       );
       try {
         this.sendPushNotification?.(
           "Automation Recovery",
-          `${requeued} task(s) re-queued after daemon restart`,
+          `${cancelledOnRestart} in-flight task(s) cancelled at daemon restart; the next scheduled tick will re-trigger them`,
         );
       } catch {
         // best-effort notification
@@ -577,7 +588,12 @@ export class AutomationScheduler {
       );
     }
 
-    return { requeued, retainedTerminal, reattachedRunning };
+    return {
+      requeued: 0,
+      retainedTerminal,
+      reattachedRunning,
+      cancelledOnRestart,
+    };
   }
 
   private isReady(job: AutomationJob, now: number): boolean {
