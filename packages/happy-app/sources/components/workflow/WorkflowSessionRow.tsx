@@ -60,7 +60,7 @@ import { StatusDot } from "@/components/StatusDot";
 import { formatTokenCountShort } from "@/utils/formatUsage";
 import { useNavigateToSession } from "@/hooks/useNavigateToSession";
 import { useHappyAction } from "@/hooks/useHappyAction";
-import { sessionDelete } from "@/sync/ops";
+import { sessionDelete, archiveSessionWithKill } from "@/sync/ops";
 import { HappyError } from "@/utils/errors";
 import { Modal } from "@/modal";
 import { useAutoOptionSendEnabled } from "@/hooks/useAutoOptionSendEnabled";
@@ -371,6 +371,17 @@ export const WorkflowSessionRow = React.memo(function WorkflowSessionRow({
         storage.getState().deleteSession(session.id);
     });
 
+    const [archivingSession, performArchive] = useHappyAction(async () => {
+        const result = await archiveSessionWithKill(session.id);
+        if (!result.success) {
+            throw new HappyError(
+                result.message || t("sessionInfo.failedToArchiveSession"),
+                false,
+            );
+        }
+        storage.getState().applySessions([{ ...session, active: false }]);
+    });
+
     const [reactivatingSession, performReactivation] = useHappyAction(async () => {
         if (!reactivationContext) {
             throw new HappyError(t("machine.failedToStartSession"), false);
@@ -434,6 +445,25 @@ export const WorkflowSessionRow = React.memo(function WorkflowSessionRow({
         );
     }, [performDelete, issueLink]);
 
+    const handleArchive = React.useCallback(() => {
+        if (issueLink && (issueLink.status === "processing" || issueLink.prUrl)) {
+            Modal.alert("", t("issues.cannotArchiveProcessing"));
+            return;
+        }
+        Modal.alert(
+            t("sessionInfo.archiveSession"),
+            t("sessionInfo.archiveSessionConfirm"),
+            [
+                { text: t("common.cancel"), style: "cancel" },
+                {
+                    text: t("sessionInfo.archiveSession"),
+                    style: "destructive",
+                    onPress: performArchive,
+                },
+            ],
+        );
+    }, [performArchive, issueLink]);
+
     const handleLongPress = React.useCallback(() => {
         // Action menu instead of swipe — works on all platforms and is
         // discoverable. The exact set of actions depends on reactivation
@@ -460,6 +490,16 @@ export const WorkflowSessionRow = React.memo(function WorkflowSessionRow({
                 onPress: action.onPress,
             });
         });
+        // Active (non-archived) sessions get an Archive entry — parity with
+        // the ActiveSessionsGroup swipe menu so ad-hoc workflow rows can
+        // be archived without navigating into the session info page.
+        if (session.active) {
+            buttons.push({
+                text: t("sessionInfo.archiveSession"),
+                style: "destructive",
+                onPress: handleArchive,
+            });
+        }
         buttons.push({
             text: t("sessionInfo.deleteSession"),
             style: "destructive",
@@ -467,9 +507,9 @@ export const WorkflowSessionRow = React.memo(function WorkflowSessionRow({
         });
 
         Modal.alert(sessionName, "", buttons);
-    }, [sessionName, canReactivate, reactivationMode, performReactivation, extraMenuActions, handleDelete]);
+    }, [sessionName, canReactivate, reactivationMode, performReactivation, extraMenuActions, handleDelete, handleArchive, session.active]);
 
-    const isBusy = deletingSession || reactivatingSession;
+    const isBusy = deletingSession || reactivatingSession || archivingSession;
     const isTree = mode === "treeChild";
     const avatarSize = isTree ? 32 : 44;
 
