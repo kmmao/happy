@@ -34,7 +34,7 @@ import { logger } from "@/ui/logger";
 import { RawJSONLinesSchema, type RawJSONLines } from "@/claude/types";
 
 /** Claude session-id format: UUID v4 8-4-4-4-12 hex digits. */
-const UUID_RE =
+export const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export interface SessionInfo {

@@ -130,11 +130,24 @@ type ClaudeSessionMessageSendOptions = {
   localIdForEnvelope?: ReplayLocalIdFactory;
   /**
    * When true, the call is part of historical transcript replay (see
-   * transcriptReplay.ts). Skips side-channels that are NOT deduped by
-   * `localId` and would therefore double-attribute usage / cost to the new
-   * Happy session: `sendUsageData` (`usage-report` socket emit) and
-   * `sendTurnCostReport` (`usage-report` cost socket emit). Envelopes still
-   * flow through the localId-deduped pipeline so re-runs are idempotent.
+   * transcriptReplay.ts and ADR-0032). Skips side-channels that are NOT
+   * deduped by `localId` and would therefore double-attribute usage / cost
+   * to the new Happy Session: `sendUsageData` (`usage-report` socket emit)
+   * and `sendTurnCostReport` (`usage-report` cost socket emit). Envelopes
+   * still flow through the localId-deduped pipeline so re-runs are idempotent.
+   *
+   * Naming caveat — the flag reads as a context label ("we're in replay")
+   * but its load-bearing semantics are a behavior gate ("mute every
+   * socket-emit channel that does NOT carry a deduplication key").
+   * When adding a NEW socket-emit channel from this client, ask whether
+   * the channel is `localId`-deduped:
+   *   - If yes (goes through `enqueueMessage` / outbox) → no gate needed,
+   *     the localId scheme already makes it idempotent.
+   *   - If no (direct `this.socket.emit("...")` or `emitWithAck`) → gate
+   *     it on `!options.replay`. Otherwise replay will double-emit under
+   *     the new Happy Session id, defeating the ADR-0032 invariant.
+   * The replay-skips-X tests in apiSession.test.ts are the contract pin
+   * for these channels; mirror that pattern for any new one.
    */
   replay?: boolean;
 };

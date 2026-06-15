@@ -49,6 +49,7 @@ import { claudeLocal } from "@/claude/claudeLocal";
 import { collectClaudeLocalCommands } from "@/claude/utils/claudeLocalCommands";
 import { createSessionScanner } from "@/claude/utils/sessionScanner";
 import { replayClaudeTranscriptToHappySession } from "@/claude/utils/transcriptReplay";
+import { UUID_RE as CLAUDE_SESSION_ID_RE } from "@/claude/rpc/sessionStoreRpc";
 import { Session } from "./session";
 import {
   applySandboxPermissionPolicy,
@@ -173,8 +174,8 @@ export async function runClaude(
   // `undefined` or `"--verbose"` into `metadata.claudeSessionId` and the
   // transcript-replay path — polluting server metadata and logging spurious
   // "file not found" failures during replay.
-  const CLAUDE_SESSION_ID_RE =
-    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  // `CLAUDE_SESSION_ID_RE` is the `UUID_RE` from `sessionStoreRpc.ts` —
+  // re-aliased so the call site reads as "the session-id shape", not "any UUID".
   const resumeIndex = options.claudeArgs?.indexOf("--resume") ?? -1;
   const resumeCandidate =
     resumeIndex >= 0 ? options.claudeArgs?.[resumeIndex + 1] : undefined;
@@ -417,7 +418,17 @@ export async function runClaude(
   // Create realtime session FIRST (before SDK metadata extraction)
   const session = api.sessionSyncClient(response);
 
-  if (resumeSessionId && response.seq === 0) {
+  // `response.seq` is the server's `Session.seq` column — the per-session
+  // SessionMessage seq counter, NOT the per-Account SyncUpdate seq (ADR-0012)
+  // and NOT a SessionEvent seq. It only advances when a SessionMessage row is
+  // created (`allocateSessionSeq{,Batch}` in v3 POST + the socket handler);
+  // `reconnectSession` / fresh creates do not bump it, and metadata /
+  // agentState writes go through their own `*Version` columns. So `seq === 0`
+  // is the precise wire signal for "this Happy Session has no SessionMessages
+  // yet" — i.e. the chat is empty and replaying historical Claude transcript
+  // into it is safe and idempotent on the per-session localId-deduped path.
+  const happySessionHasNoMessages = response.seq === 0;
+  if (resumeSessionId && happySessionHasNoMessages) {
     try {
       await replayClaudeTranscriptToHappySession({
         sourceSessionId: resumeSessionId,
