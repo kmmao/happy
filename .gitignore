@@ -55,6 +55,9 @@ logs/
 !packages/happy-app/sources/text/translations/logs/untranslated/*.md
 .plan
 
+# Local agent loops/state
+.happy/
+
 CLAUDE.local.md
 
 .dev/worktree/*
