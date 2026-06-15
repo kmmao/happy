@@ -48,6 +48,7 @@ import {
 import { claudeLocal } from "@/claude/claudeLocal";
 import { collectClaudeLocalCommands } from "@/claude/utils/claudeLocalCommands";
 import { createSessionScanner } from "@/claude/utils/sessionScanner";
+import { replayClaudeTranscriptToHappySession } from "@/claude/utils/transcriptReplay";
 import { Session } from "./session";
 import {
   applySandboxPermissionPolicy,
@@ -403,6 +404,20 @@ export async function runClaude(
 
   // Create realtime session FIRST (before SDK metadata extraction)
   const session = api.sessionSyncClient(response);
+
+  if (resumeSessionId && response.seq === 0) {
+    try {
+      await replayClaudeTranscriptToHappySession({
+        sourceSessionId: resumeSessionId,
+        workingDirectory,
+        client: session,
+      });
+    } catch (error) {
+      logger.debug(
+        `[TRANSCRIPT_REPLAY] Failed to replay ${resumeSessionId}: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
 
   // Report worktree context for server-side push notification enrichment.
   // Sent once the socket is connected (best-effort: drops silently on disconnect).

@@ -31,6 +31,7 @@ import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 import { getProjectPath } from "@/claude/utils/path";
 import { logger } from "@/ui/logger";
+import { RawJSONLinesSchema, type RawJSONLines } from "@/claude/types";
 
 /** Claude session-id format: UUID v4 8-4-4-4-12 hex digits. */
 const UUID_RE =
@@ -342,6 +343,10 @@ export interface GetSessionMessagesOptions {
   includeSystemMessages?: boolean;
 }
 
+export interface ReadRawSessionRecordsOptions {
+  dir?: string;
+}
+
 export interface ForkSessionOptions {
   dir?: string;
   upToMessageId?: string;
@@ -432,6 +437,23 @@ export async function forkSession(
     `[sessionStoreRpc] forkSession ${sourceSessionId} → ${newSessionId} (${out.length} records)`,
   );
   return { sessionId: newSessionId };
+}
+
+export async function readRawSessionRecords(
+  sessionId: string,
+  opts: ReadRawSessionRecordsOptions = {},
+): Promise<RawJSONLines[]> {
+  const f = findSessionFile(sessionId, opts.dir);
+  if (!f) return [];
+  const records = await readJsonlRecords(f.path);
+  const parsed: RawJSONLines[] = [];
+  for (const raw of records) {
+    const result = RawJSONLinesSchema.safeParse(raw);
+    if (result.success) {
+      parsed.push(result.data);
+    }
+  }
+  return parsed;
 }
 
 export async function getSessionMessages(

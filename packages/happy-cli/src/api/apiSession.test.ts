@@ -380,6 +380,59 @@ describe('ApiSessionClient v3 messages API migration', () => {
         });
     });
 
+    it('uses caller-provided localId for replayed session protocol messages', async () => {
+        const client = new ApiSessionClient('fake-token', session);
+        mockAxiosPost.mockResolvedValueOnce({
+            data: {
+                messages: [{ id: 'msg-1', seq: 1, localId: 'stable-local-id', createdAt: 1, updatedAt: 1 }]
+            }
+        });
+
+        client.sendSessionProtocolMessage(
+            {
+                id: 'env-stable-1',
+                time: 1000,
+                role: 'agent' as const,
+                turn: 'turn-1',
+                ev: { t: 'text' as const, text: 'replayed' }
+            },
+            { localId: 'stable-local-id' },
+        );
+
+        await waitForCheck(() => {
+            expect(mockAxiosPost).toHaveBeenCalledTimes(1);
+        });
+
+        const payload = mockAxiosPost.mock.calls[0][1];
+        expect(payload.messages[0].localId).toBe('stable-local-id');
+    });
+
+    it('uses stable localIds for replayed claude envelopes', async () => {
+        const client = new ApiSessionClient('fake-token', session);
+        mockAxiosPost.mockResolvedValueOnce({
+            data: {
+                messages: [
+                    { id: 'msg-1', seq: 1, localId: 'replay-0', createdAt: 1, updatedAt: 1 }
+                ]
+            }
+        });
+
+        client.sendClaudeSessionMessage({
+            type: 'user',
+            uuid: 'user-replay-1',
+            message: { content: 'one' }
+        } as any, {
+            localIdForEnvelope: ({ envelopeIndex }) => `replay-${envelopeIndex}`,
+        });
+
+        await waitForCheck(() => {
+            expect(mockAxiosPost).toHaveBeenCalledTimes(1);
+        });
+
+        const payload = mockAxiosPost.mock.calls[0][1];
+        expect(payload.messages.map((m: any) => m.localId)).toEqual(['replay-0']);
+    });
+
     it('keeps final assistant text when only streamed thinking is suppressed', async () => {
         const client = new ApiSessionClient('fake-token', session);
         (client as any).claudeDriver.setCurrentTurn('turn-1');

@@ -27,6 +27,7 @@ const execFileAsync = promisify(execFile);
 export interface SpawnSessionOptions {
   directory: string;
   machineId?: string;
+  sessionId?: string;
   agent?: "claude" | "codex" | "gemini";
   approvedNewDirectoryCreation?: boolean;
   happySessionId?: string;
@@ -108,6 +109,7 @@ export async function spawnSession(
 ): Promise<SpawnSessionResult> {
   const {
     directory,
+    sessionId,
     agent = "claude",
     approvedNewDirectoryCreation = false,
     happySessionId,
@@ -152,6 +154,9 @@ export async function spawnSession(
     "--happy-starting-mode", "remote",
     "--started-by", "daemon",
   ];
+  if (agent === "claude" && sessionId && /^[0-9a-f-]+$/i.test(sessionId)) {
+    args.push("--resume", sessionId);
+  }
   if (happySessionId) {
     args.push("--happy-session-id", happySessionId);
   }

@@ -115,6 +115,21 @@ type V3PostSessionMessagesResponse = {
   }>;
 };
 
+type ReplayLocalIdFactory = (input: {
+  envelope: SessionEnvelope;
+  envelopeIndex: number;
+}) => string;
+
+type SessionProtocolSendOptions = {
+  invalidate?: boolean;
+  localId?: string;
+};
+
+type ClaudeSessionMessageSendOptions = {
+  invalidate?: boolean;
+  localIdForEnvelope?: ReplayLocalIdFactory;
+};
+
 /** Helper to safely access the message.content array from a RawJSONLines body. */
 interface MessageWithContent {
   content?: unknown[];
@@ -667,13 +682,16 @@ export class ApiSessionClient extends EventEmitter {
     }, 50);
   }
 
-  private enqueueMessage(content: unknown, invalidate: boolean = true) {
+  private enqueueMessage(
+    content: unknown,
+    options: SessionProtocolSendOptions = {},
+  ) {
     const encrypted = this.cipher.encrypt(content);
     this.pendingOutbox.push({
       content: encrypted,
-      localId: randomUUID(),
+      localId: options.localId ?? randomUUID(),
     });
-    if (invalidate) {
+    if (options.invalidate ?? true) {
       this.sendSync.invalidate();
     }
   }
@@ -682,7 +700,10 @@ export class ApiSessionClient extends EventEmitter {
    * Send message to session
    * @param body - Message body (can be MessageContent or raw content for agent messages)
    */
-  sendClaudeSessionMessage(body: RawJSONLines) {
+  sendClaudeSessionMessage(
+    body: RawJSONLines,
+    options: ClaudeSessionMessageSendOptions = {},
+  ) {
     // Strip large image base64 from tool results to prevent oversized messages
     body = stripLargeImageContent(body);
 
@@ -715,6 +736,15 @@ export class ApiSessionClient extends EventEmitter {
       this._suppressAssistantTextEnvelopes = null;
     }
 
+    let envelopeIndex = 0;
+    const sendReplayAwareEnvelope = (envelope: SessionEnvelope) => {
+      this.sendSessionProtocolMessage(envelope, {
+        invalidate: options.invalidate,
+        localId: options.localIdForEnvelope?.({ envelope, envelopeIndex }),
+      });
+      envelopeIndex += 1;
+    };
+
     for (const envelope of mapped.envelopes) {
       if (suppressText && envelope.ev.t === "text") {
         const isThinking = envelope.ev.thinking === true;
@@ -722,7 +752,7 @@ export class ApiSessionClient extends EventEmitter {
           continue;
         }
       }
-      this.sendSessionProtocolMessage(envelope);
+      sendReplayAwareEnvelope(envelope);
     }
 
     // Subagent messages bypass InvalidateSync's single-flight limit so the App
@@ -751,7 +781,7 @@ export class ApiSessionClient extends EventEmitter {
           const callDurationMs =
             now - (this.lastApiCallEndTime ?? this.currentTurnStartTime ?? now);
           this.lastApiCallEndTime = now;
-          this.sendSessionProtocolMessage(
+          sendReplayAwareEnvelope(
             createEnvelope(
               "agent",
               {
@@ -820,6 +850,7 @@ export class ApiSessionClient extends EventEmitter {
         }
       >;
     },
+    options: ClaudeSessionMessageSendOptions = {},
   ) {
     const durationMs =
       this.currentTurnStartTime != null
@@ -873,9 +904,12 @@ export class ApiSessionClient extends EventEmitter {
     this.currentTurnUsage = null;
     this.accumulatedTurnUsage = null;
 
-    for (const envelope of mapped.envelopes) {
-      this.sendSessionProtocolMessage(envelope);
-    }
+    mapped.envelopes.forEach((envelope, envelopeIndex) => {
+      this.sendSessionProtocolMessage(envelope, {
+        invalidate: options.invalidate,
+        localId: options.localIdForEnvelope?.({ envelope, envelopeIndex }),
+      });
+    });
   }
 
   private accumulateTurnUsage(usage: Usage) {
@@ -933,7 +967,7 @@ export class ApiSessionClient extends EventEmitter {
 
   private enqueueSessionProtocolEnvelope(
     envelope: SessionEnvelope,
-    invalidate: boolean = true,
+    options: SessionProtocolSendOptions = {},
   ) {
     const content = {
       role: "session",
@@ -943,21 +977,24 @@ export class ApiSessionClient extends EventEmitter {
       },
     };
 
-    this.enqueueMessage(content, invalidate);
+    this.enqueueMessage(content, options);
   }
 
-  sendSessionProtocolMessage(envelope: SessionEnvelope) {
+  sendSessionProtocolMessage(
+    envelope: SessionEnvelope,
+    options: SessionProtocolSendOptions = {},
+  ) {
     if (envelope.role !== "user") {
-      this.enqueueSessionProtocolEnvelope(envelope);
+      this.enqueueSessionProtocolEnvelope(envelope, options);
       return;
     }
 
     if (envelope.ev.t !== "text") {
-      this.enqueueSessionProtocolEnvelope(envelope);
+      this.enqueueSessionProtocolEnvelope(envelope, options);
       return;
     }
 
-    this.enqueueSessionProtocolEnvelope(envelope);
+    this.enqueueSessionProtocolEnvelope(envelope, options);
   }
 
   /**

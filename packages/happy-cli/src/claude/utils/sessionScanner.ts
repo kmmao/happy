@@ -13,7 +13,7 @@ import { createIncrementalJsonlReader, type IncrementalJsonlReader } from "./inc
  * These are written to session JSONL files by Claude Code but are not 
  * actual conversation messages - they're internal state/tracking events.
  */
-const INTERNAL_CLAUDE_EVENT_TYPES = new Set([
+export const INTERNAL_CLAUDE_EVENT_TYPES = new Set([
     'file-history-snapshot',
     'change',
     'queue-operation',
@@ -273,7 +273,7 @@ export type SessionScanner = ReturnType<typeof createSessionScanner>;
 // Helpers
 //
 
-function messageKey(message: RawJSONLines): string {
+export function messageKey(message: RawJSONLines): string {
     if (message.type === 'user') {
         return message.uuid;
     } else if (message.type === 'assistant') {
@@ -299,7 +299,7 @@ function messageKey(message: RawJSONLines): string {
  * Non-Task/Agent tool_use blocks are ignored. Missing subagents/ directory or
  * unmatched tool_use blocks fall through without touching the message stream.
  */
-async function interleaveSubagentMessages(
+export async function interleaveSubagentMessages(
     projectDir: string,
     sessionId: string,
     mainMessages: RawJSONLines[],
@@ -350,7 +350,7 @@ async function interleaveSubagentMessages(
  * the same per-line semantics the old full-file reader used, factored out so
  * the incremental reader (readMainMessages) can reuse them on appended text.
  */
-function parseJsonlText(text: string): RawJSONLines[] {
+export function parseJsonlText(text: string): RawJSONLines[] {
     const messages: RawJSONLines[] = [];
     for (const l of text.split('\n')) {
         if (l.trim() === '') {
