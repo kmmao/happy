@@ -129,6 +129,18 @@ export async function ingestSyncUpdate(
             // new state without a page reload.
             log.log(`🔁 Received ${body.t} event`);
             return [{ kind: "agent-loops-stale" }];
+        case "trigger-schedule-updated":
+        case "trigger-schedule-deleted":
+            // Server emits on cron tick + every Schedule CRUD. Replaces
+            // the 30 s poll that useWorkflows used to run as a fallback.
+            log.log(`⏰ Received ${body.t} event`);
+            return [{ kind: "schedules-stale" }];
+        case "webhook-trigger-updated":
+        case "webhook-trigger-deleted":
+            // Server emits on webhook fire + every Webhook CRUD. Same
+            // story as above — kills the wall-clock poll fallback.
+            log.log(`⚡ Received ${body.t} event`);
+            return [{ kind: "webhooks-stale" }];
         case "new-message":
             return await ingestNewMessage(update, body, ctx);
         default: {

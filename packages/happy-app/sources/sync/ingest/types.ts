@@ -112,6 +112,15 @@ export type IngestEvent =
      * reflects changes without a page reload.
      */
     | { kind: "agent-loops-stale" }
+    /**
+     * Workflow IA Phase C — Schedule + Webhook real-time updates emitted
+     * by the server on every cron tick / webhook fire / CRUD. With these
+     * signals the App no longer needs a 30 s wall-clock poll over
+     * triggerSchedules / webhookTriggers — useWorkflows refetches on the
+     * same throttled callback used for agent-loops-stale.
+     */
+    | { kind: "schedules-stale" }
+    | { kind: "webhooks-stale" }
     // --- SyncUpdate-side: domain-specific batched changes ----------------
     /** A `kv-batch-update` produced ResearchConfig changes that other modules listen for. */
     | { kind: "research-config-changed"; changes: ResearchConfigChange[] }

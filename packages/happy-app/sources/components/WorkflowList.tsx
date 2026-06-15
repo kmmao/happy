@@ -104,11 +104,16 @@ function isWorkflowEnabled(workflow: Workflow): boolean {
 
 function formatRunTimestamp(timestamp: number | null | undefined): string | null {
     if (!timestamp || timestamp <= 0) return null;
+    // Show seconds too — schedules / loops fire on cron ticks that the
+    // user expects to land at a specific second (e.g. "*/30 * * * * *").
+    // Minute-only granularity loses that signal and makes it look like
+    // the row hasn't ticked when it actually has.
     return new Date(timestamp).toLocaleString(undefined, {
         month: "short",
         day: "numeric",
         hour: "2-digit",
         minute: "2-digit",
+        second: "2-digit",
     });
 }
 

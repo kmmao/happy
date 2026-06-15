@@ -1,4 +1,5 @@
 import { emitSyncEphemeral } from "@/app/events/syncEphemeral";
+import { emitSyncUpdate } from "@/app/events/syncUpdate";
 import { type Fastify } from "../types";
 import { db } from "@/storage/db";
 import { z } from "zod";
@@ -270,6 +271,19 @@ export function webhookTriggerRoutes(app: Fastify) {
                 `Webhook trigger ${trigger.id} (slug=${slug}) created task ${task.id}`,
             );
 
+            // Phase C — real-time push so the App's Event Workflow card
+            // updates triggerCount + lastTriggeredAt the moment the
+            // webhook fires. Reload to get the post-increment row.
+            const fresh = await db.webhookTrigger.findUnique({
+                where: { id: trigger.id },
+            });
+            if (fresh) {
+                await emitSyncUpdate(trigger.accountId, {
+                    t: "webhook-trigger-updated",
+                    trigger: serializeWebhookTrigger(fresh),
+                });
+            }
+
             return reply.code(201).send({
                 taskId: task.id,
                 status: "dispatching",
@@ -339,8 +353,13 @@ export function webhookTriggerRoutes(app: Fastify) {
             });
 
             log({ module: "trigger" }, `WebhookTrigger created: ${trigger.id} slug=${slug}`);
+            const serialized = serializeWebhookTrigger(trigger);
+            await emitSyncUpdate(userId, {
+                t: "webhook-trigger-updated",
+                trigger: serialized,
+            });
             return reply.code(201).send({
-                webhookTrigger: serializeWebhookTrigger(trigger),
+                webhookTrigger: serialized,
                 secret, // One-time reveal
             });
         },
@@ -419,7 +438,12 @@ export function webhookTriggerRoutes(app: Fastify) {
                 data,
             });
 
-            return reply.send({ webhookTrigger: serializeWebhookTrigger(updated) });
+            const serialized = serializeWebhookTrigger(updated);
+            await emitSyncUpdate(request.userId, {
+                t: "webhook-trigger-updated",
+                trigger: serialized,
+            });
+            return reply.send({ webhookTrigger: serialized });
         },
     );
 
@@ -456,6 +480,10 @@ export function webhookTriggerRoutes(app: Fastify) {
             const trigger = await ownedWebhookTrigger(request.userId, request.params.id);
 
             await db.webhookTrigger.delete({ where: { id: trigger.id } });
+            await emitSyncUpdate(request.userId, {
+                t: "webhook-trigger-deleted",
+                triggerId: trigger.id,
+            });
             return reply.send({ deleted: true });
         },
     );

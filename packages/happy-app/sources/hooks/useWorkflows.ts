@@ -44,12 +44,11 @@ import { ingestEvents } from "@/sync/ingest/dispatcher";
 import { useThrottledCallback } from "@/hooks/useThrottledCallback";
 import { AUTOMATION_SUMMARY_THROTTLE_MS } from "@/components/machine/automationConstants";
 
-// 30 seconds — fast enough that a cron schedule's lastRunAt/runCount
-// catches up almost-imperceptibly after each tick, slow enough that
-// idle tabs don't hammer the server. Loop changes don't need this
-// poll because they ride on the real-time `agent-loop-updated` /
-// `agent-loop-deleted` SyncUpdates emitted by agentLoopEngine.
-const WORKFLOW_POLL_INTERVAL_MS = 30_000;
+// Phase C — wall-clock polling is gone. All three workflow kinds
+// ride real-time SyncUpdates (agent-loop-* / trigger-schedule-* /
+// webhook-trigger-*) emitted by the server on every state change.
+// AppState foreground transition is the only catch-up signal kept,
+// for the rare case where the socket missed events while backgrounded.
 
 export type WorkflowKind = "adhoc" | "scheduled" | "event" | "loop";
 
@@ -255,38 +254,32 @@ export function useWorkflows(): UseWorkflowsResult {
     }, [throttledLoad]);
 
     React.useEffect(() => {
-        // AgentLoop real-time path: server emits `agent-loop-updated` /
-        // `agent-loop-deleted` SyncUpdates from agentLoopEngine on every
-        // CRUD/iteration/pause/resume. The syncUpdateIngest seam funnels
-        // both into a single `agent-loops-stale` IngestEvent, which we
-        // hook here to refetch and re-derive. Without this subscription
-        // Loop iteration/nextRunAt would only refresh on the 30 s poll
-        // below or when the user touches the page.
-        return ingestEvents.on("agent-loops-stale", () => {
-            throttledLoad();
-        });
+        // Real-time path for all three workflow kinds. Server emits:
+        //   - agent-loop-updated / agent-loop-deleted on every CRUD /
+        //     iteration / pause / resume (agentLoopEngine)
+        //   - trigger-schedule-updated / -deleted on every cron tick +
+        //     CRUD (triggerScheduleRunner + triggerScheduleRoutes)
+        //   - webhook-trigger-updated / -deleted on every fire + CRUD
+        //     (webhookTriggerRoutes)
+        // syncUpdateIngest funnels each pair into one stale IngestEvent.
+        // All three subscriptions throttle through the same throttledLoad
+        // so a burst of events triggers at most one refetch per window.
+        const offLoops = ingestEvents.on("agent-loops-stale", () => throttledLoad());
+        const offSchedules = ingestEvents.on("schedules-stale", () => throttledLoad());
+        const offWebhooks = ingestEvents.on("webhooks-stale", () => throttledLoad());
+        return () => {
+            offLoops();
+            offSchedules();
+            offWebhooks();
+        };
     }, [throttledLoad]);
 
     React.useEffect(() => {
-        // Polling fallback for Scheduled / Event workflows. Their server-
-        // side cron tick / webhook fire updates `lastRunAt`, `runCount`,
-        // `nextRunAt`, etc., but neither path emits a SyncUpdate yet, so
-        // an open WorkflowList would otherwise show stale numbers until
-        // the user navigated away and back. 30 s is a good trade-off
-        // between freshness and request volume.
-        const id = setInterval(() => {
-            throttledLoad();
-        }, WORKFLOW_POLL_INTERVAL_MS);
-        return () => clearInterval(id);
-    }, [throttledLoad]);
-
-    React.useEffect(() => {
-        // App-foreground refresh — same idea as the poll above, but tuned
-        // for the case where the user comes back to a tab/app that's been
-        // backgrounded long enough that even the latest poll is stale.
-        // RN's AppState fires `active` on initial mount AND on every
-        // foreground transition; we skip the initial since the mount-load
-        // effect already covers it.
+        // App-foreground refresh — safety net for the case where socket
+        // SyncUpdates were missed while the tab/app was backgrounded
+        // (browser may suspend, RN AppState may pause socket). Catches
+        // up the moment user returns. Skip initial fire (mount-load
+        // already covers it).
         let isFirst = true;
         const sub = AppState.addEventListener("change", (state) => {
             if (state !== "active") return;

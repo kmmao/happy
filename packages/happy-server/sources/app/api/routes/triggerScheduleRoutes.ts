@@ -3,6 +3,7 @@ import { db } from "@/storage/db";
 import { z } from "zod";
 import { assertOwnedMachine, assertOwnedProject, ownedTriggerSchedule } from "../ownership";
 import { log } from "@/utils/log";
+import { emitSyncUpdate } from "@/app/events/syncUpdate";
 import { CronExpressionParser } from "cron-parser";
 
 const TaskPrioritySchema = z.enum(["urgent", "user", "background"]);
@@ -97,7 +98,12 @@ export function triggerScheduleRoutes(app: Fastify) {
             });
 
             log({ module: "trigger" }, `TriggerSchedule created: ${schedule.id} cron=${cronExpression}`);
-            return reply.code(201).send({ triggerSchedule: serializeTriggerSchedule(schedule) });
+            const serialized = serializeTriggerSchedule(schedule);
+            await emitSyncUpdate(userId, {
+                t: "trigger-schedule-updated",
+                schedule: serialized,
+            });
+            return reply.code(201).send({ triggerSchedule: serialized });
         },
     );
 
@@ -184,7 +190,12 @@ export function triggerScheduleRoutes(app: Fastify) {
                 data,
             });
 
-            return reply.send({ triggerSchedule: serializeTriggerSchedule(updated) });
+            const serialized = serializeTriggerSchedule(updated);
+            await emitSyncUpdate(request.userId, {
+                t: "trigger-schedule-updated",
+                schedule: serialized,
+            });
+            return reply.send({ triggerSchedule: serialized });
         },
     );
 
@@ -219,7 +230,12 @@ export function triggerScheduleRoutes(app: Fastify) {
             });
 
             log({ module: "trigger" }, `TriggerSchedule ${schedule.id} ${newEnabled ? "enabled" : "disabled"}`);
-            return reply.send({ triggerSchedule: serializeTriggerSchedule(updated) });
+            const serialized = serializeTriggerSchedule(updated);
+            await emitSyncUpdate(request.userId, {
+                t: "trigger-schedule-updated",
+                schedule: serialized,
+            });
+            return reply.send({ triggerSchedule: serialized });
         },
     );
 
@@ -234,6 +250,10 @@ export function triggerScheduleRoutes(app: Fastify) {
             const schedule = await ownedTriggerSchedule(request.userId, request.params.id);
 
             await db.triggerSchedule.delete({ where: { id: schedule.id } });
+            await emitSyncUpdate(request.userId, {
+                t: "trigger-schedule-deleted",
+                scheduleId: schedule.id,
+            });
             return reply.send({ deleted: true });
         },
     );

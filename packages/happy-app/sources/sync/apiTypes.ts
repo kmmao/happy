@@ -183,6 +183,30 @@ export const ApiAgentLoopDeletedSchema = z.object({
   projectId: z.string(),
 });
 
+// Workflow IA realtime — Schedule + Webhook variants. Wire shape is the
+// same Record<string,any> the server-side serializeTriggerSchedule /
+// serializeWebhookTrigger returns; downstream fan-out happens inside
+// useWorkflows via the schedules-stale / webhooks-stale IngestEvents.
+export const ApiTriggerScheduleUpdatedSchema = z.object({
+  t: z.literal("trigger-schedule-updated"),
+  schedule: z.record(z.string(), z.any()),
+});
+
+export const ApiTriggerScheduleDeletedSchema = z.object({
+  t: z.literal("trigger-schedule-deleted"),
+  scheduleId: z.string(),
+});
+
+export const ApiWebhookTriggerUpdatedSchema = z.object({
+  t: z.literal("webhook-trigger-updated"),
+  trigger: z.record(z.string(), z.any()),
+});
+
+export const ApiWebhookTriggerDeletedSchema = z.object({
+  t: z.literal("webhook-trigger-deleted"),
+  triggerId: z.string(),
+});
+
 // Use a plain union here to avoid runtime discriminator extraction issues
 // when some schemas come from shared package exports.
 export const ApiUpdateSchema = z.union([
@@ -204,6 +228,10 @@ export const ApiUpdateSchema = z.union([
   ApiDeleteProjectSchema,
   ApiAgentLoopUpdatedSchema,
   ApiAgentLoopDeletedSchema,
+  ApiTriggerScheduleUpdatedSchema,
+  ApiTriggerScheduleDeletedSchema,
+  ApiWebhookTriggerUpdatedSchema,
+  ApiWebhookTriggerDeletedSchema,
 ]);
 
 export type ApiUpdateNewMessage = z.infer<typeof ApiUpdateNewMessageSchema>;

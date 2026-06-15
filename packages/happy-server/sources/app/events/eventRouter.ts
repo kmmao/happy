@@ -225,6 +225,26 @@ export type UpdateEvent =
       type: "agent-loop-deleted";
       loopId: string;
       projectId: string;
+    }
+  // Workflow IA realtime — Schedule + Webhook variants. Emitted on
+  // cron tick / webhook fire / CRUD so the App's useWorkflows hook can
+  // re-derive without a 30 s wall-clock poll (App-side fallback that
+  // landed when this signal was missing).
+  | {
+      type: "trigger-schedule-updated";
+      schedule: Record<string, any>;
+    }
+  | {
+      type: "trigger-schedule-deleted";
+      scheduleId: string;
+    }
+  | {
+      type: "webhook-trigger-updated";
+      trigger: Record<string, any>;
+    }
+  | {
+      type: "webhook-trigger-deleted";
+      triggerId: string;
     };
 
 // === EPHEMERAL EVENT TYPES (Transient) ===

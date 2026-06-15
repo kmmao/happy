@@ -18,8 +18,14 @@ import { inTx } from "@/storage/inTx";
 // Track last seen brief timestamp per machine to detect new briefs
 const lastBriefTimestamp = new Map<string, number>();
 
-// Throttle schedule checks to once per 5 minutes per machine
-const SCHEDULE_CHECK_INTERVAL = 5 * 60 * 1000;
+// Throttle schedule checks per machine. The (role, enabled, nextRunAt)
+// composite index makes the underlying query an index scan, so we can
+// afford to check more frequently than the original 5-minute window
+// without measurable db load. 30 s keeps loop/schedule triggers timely
+// even when the loop's own intervalMs is around the old throttle window
+// (a 5-minute loop used to drift up to one full period because the
+// throttle and the interval were the same value).
+const SCHEDULE_CHECK_INTERVAL = 30 * 1000;
 const lastScheduleCheck = new Map<string, number>();
 
 function shouldCheckSchedule(machineId: string): boolean {

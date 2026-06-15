@@ -167,7 +167,17 @@ export type SyncUpdateBody =
     // the wire-shape SerializedAgentLoop body (kept as Record<string,any> here
     // to avoid wire-package import cycle through prisma type).
     | { t: "agent-loop-updated"; loop: Record<string, any> }
-    | { t: "agent-loop-deleted"; loopId: string; projectId: string };
+    | { t: "agent-loop-deleted"; loopId: string; projectId: string }
+    // Workflow IA realtime — Scheduled + Event workflows. Emitted on
+    // every cron tick / webhook fire / CRUD so the App's `useWorkflows`
+    // hook re-derives without a 30 s wall-clock poll. Schedule and
+    // Webhook rows are serialized to the same wire shape the App's
+    // apiTriggerSchedules / apiWebhookTriggers fetches return, so the
+    // ingest path can patch local state directly without a refetch.
+    | { t: "trigger-schedule-updated"; schedule: Record<string, any> }
+    | { t: "trigger-schedule-deleted"; scheduleId: string }
+    | { t: "webhook-trigger-updated"; trigger: Record<string, any> }
+    | { t: "webhook-trigger-deleted"; triggerId: string };
 
 export type EmitSyncUpdateOptions = {
     /**
@@ -241,6 +251,10 @@ function recipientFilterFor(body: SyncUpdateBody): RecipientFilter {
         case "delete-project":
         case "agent-loop-updated":
         case "agent-loop-deleted":
+        case "trigger-schedule-updated":
+        case "trigger-schedule-deleted":
+        case "webhook-trigger-updated":
+        case "webhook-trigger-deleted":
             return { type: "user-scoped-only" };
         case "update-machine":
             return { type: "machine-scoped-only", machineId: body.machineId };
@@ -338,6 +352,34 @@ function buildPayload(
                     loopId: body.loopId,
                     projectId: body.projectId,
                 },
+                createdAt: Date.now(),
+            };
+        case "trigger-schedule-updated":
+            return {
+                id,
+                seq,
+                body: { t: "trigger-schedule-updated", schedule: body.schedule },
+                createdAt: Date.now(),
+            };
+        case "trigger-schedule-deleted":
+            return {
+                id,
+                seq,
+                body: { t: "trigger-schedule-deleted", scheduleId: body.scheduleId },
+                createdAt: Date.now(),
+            };
+        case "webhook-trigger-updated":
+            return {
+                id,
+                seq,
+                body: { t: "webhook-trigger-updated", trigger: body.trigger },
+                createdAt: Date.now(),
+            };
+        case "webhook-trigger-deleted":
+            return {
+                id,
+                seq,
+                body: { t: "webhook-trigger-deleted", triggerId: body.triggerId },
                 createdAt: Date.now(),
             };
     }

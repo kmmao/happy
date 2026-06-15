@@ -2,6 +2,7 @@ import { db } from "@/storage/db";
 import { inTx } from "@/storage/inTx";
 import { log } from "@/utils/log";
 import { emitSyncEphemeral } from "@/app/events/syncEphemeral";
+import { emitSyncUpdate } from "@/app/events/syncUpdate";
 import { CronExpressionParser } from "cron-parser";
 import { inboxCreate } from "./inboxCreate";
 import {
@@ -268,6 +269,22 @@ export async function checkAndTriggerSchedules(
                 { module: "trigger" },
                 `Cron schedule ${schedule.id} triggered task ${task.id} (runCount=${schedule.runCount + 1})`,
             );
+
+            // Phase C — real-time push to App's useWorkflows so the
+            // Scheduled Workflow card updates lastRunAt/runCount/nextRunAt
+            // the moment the cron fires. Without this the App would only
+            // see the change on its next 30 s poll (which we're removing
+            // in this PR). Reload the row from db to get the post-claim
+            // shape, then emit the same wire form the route returns.
+            const fresh = await db.triggerSchedule.findUnique({
+                where: { id: schedule.id },
+            });
+            if (fresh) {
+                await emitSyncUpdate(userId, {
+                    t: "trigger-schedule-updated",
+                    schedule: serializeTriggerScheduleForSync(fresh),
+                });
+            }
         } catch (error) {
             log(
                 { module: "trigger", level: "error" },
@@ -284,4 +301,33 @@ function safeParseJsonArray(json: string): string[] {
     } catch {
         return [];
     }
+}
+
+/**
+ * Wire shape used by the `trigger-schedule-updated` SyncUpdate body.
+ * Mirrors the App's `ServerTriggerSchedule` interface (apiTriggerSchedules.ts)
+ * field-for-field — keep them in sync if either side adds fields.
+ *
+ * Date columns are serialized to epoch ms so the App can treat them
+ * identically to its periodic REST fetches.
+ */
+function serializeTriggerScheduleForSync(s: Record<string, any>): Record<string, any> {
+    return {
+        id: s.id,
+        machineId: s.machineId,
+        projectId: s.projectId,
+        name: s.name,
+        prompt: s.prompt,
+        cronExpression: s.cronExpression,
+        priority: s.priority,
+        skillIds: typeof s.skillIds === "string" ? safeParseJsonArray(s.skillIds) : s.skillIds,
+        profileId: s.profileId,
+        enabled: s.enabled,
+        nextRunAt: s.nextRunAt instanceof Date ? s.nextRunAt.getTime() : s.nextRunAt,
+        lastRunAt: s.lastRunAt instanceof Date ? s.lastRunAt.getTime() : s.lastRunAt,
+        runCount: s.runCount,
+        lastTaskId: s.lastTaskId,
+        createdAt: s.createdAt instanceof Date ? s.createdAt.getTime() : s.createdAt,
+        updatedAt: s.updatedAt instanceof Date ? s.updatedAt.getTime() : s.updatedAt,
+    };
 }
