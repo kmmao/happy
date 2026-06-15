@@ -88,6 +88,12 @@ export async function replayClaudeTranscriptToHappySession(
   let closedTurns = 0;
   for (const record of records) {
     const recordKey = messageKey(record);
+    // Defense in depth — the JSONL scanner created later by `claudeRemote`
+    // re-reads the rewritten resume file. If Claude does NOT preserve message
+    // UUIDs across `--resume`, the scanner's `messageKey` dedup would not
+    // recognise these records. Recording the key on the client lets
+    // `sendClaudeSessionMessage` drop the scanner's forward of the same row.
+    options.client.markClaudeMessageReplayed(recordKey);
     const scope = {
       sourceSessionId: options.sourceSessionId,
       recordKey,
@@ -99,6 +105,7 @@ export async function replayClaudeTranscriptToHappySession(
         closeTurnResultData(record),
         {
           invalidate: false,
+          replay: true,
           localIdForEnvelope: ({ envelopeIndex }) =>
             replayLocalId(scope, envelopeIndex),
         },
@@ -109,11 +116,36 @@ export async function replayClaudeTranscriptToHappySession(
 
     options.client.sendClaudeSessionMessage(record, {
       invalidate: false,
+      replay: true,
       localIdForEnvelope: ({ envelopeIndex }) =>
         replayLocalId(scope, envelopeIndex),
     });
     replayed += 1;
   }
+
+  // Truncated histories (history ended mid-turn — last record is an
+  // assistant without a terminal `result`) would otherwise leak
+  // `currentTurnUsage` / `accumulatedTurnUsage` into the first real turn.
+  // Force-close as `cancelled` if a turn is still open, then wipe per-turn
+  // tracking so the live session starts from a clean state.
+  if (options.client.currentTurnId) {
+    const scope = {
+      sourceSessionId: options.sourceSessionId,
+      recordKey: "replay-cancel-tail",
+    };
+    options.client.closeClaudeSessionTurn(
+      "cancelled",
+      undefined,
+      {
+        invalidate: false,
+        replay: true,
+        localIdForEnvelope: ({ envelopeIndex }) =>
+          replayLocalId(scope, envelopeIndex),
+      },
+    );
+    closedTurns += 1;
+  }
+  options.client.resetCurrentTurnTracking();
 
   await options.client.flush();
   logger.debug(

@@ -433,6 +433,97 @@ describe('ApiSessionClient v3 messages API migration', () => {
         expect(payload.messages.map((m: any) => m.localId)).toEqual(['replay-0']);
     });
 
+    it('skips usage-report socket emit on replay sendClaudeSessionMessage', () => {
+        const client = new ApiSessionClient('fake-token', session);
+
+        client.sendClaudeSessionMessage({
+            type: 'assistant',
+            uuid: 'assistant-replay-1',
+            message: {
+                model: 'claude-sonnet-4-6',
+                usage: { input_tokens: 100, output_tokens: 50 },
+                content: [{ type: 'text', text: 'hi' }],
+            }
+        } as any, {
+            replay: true,
+            invalidate: false,
+            localIdForEnvelope: ({ envelopeIndex }) => `replay-asst-${envelopeIndex}`,
+        });
+
+        const usageEmits = mockSocket.emit.mock.calls.filter(
+            (call: any[]) => call[0] === 'usage-report',
+        );
+        expect(usageEmits).toHaveLength(0);
+    });
+
+    it('still emits usage-report socket data for live sendClaudeSessionMessage', () => {
+        const client = new ApiSessionClient('fake-token', session);
+
+        client.sendClaudeSessionMessage({
+            type: 'assistant',
+            uuid: 'assistant-live-1',
+            message: {
+                model: 'claude-sonnet-4-6',
+                usage: { input_tokens: 100, output_tokens: 50 },
+                content: [{ type: 'text', text: 'hi' }],
+            }
+        } as any, { invalidate: false });
+
+        const usageEmits = mockSocket.emit.mock.calls.filter(
+            (call: any[]) => call[0] === 'usage-report',
+        );
+        expect(usageEmits.length).toBeGreaterThan(0);
+    });
+
+    it('skips turn-end cost report on replay closeClaudeSessionTurn', () => {
+        const client = new ApiSessionClient('fake-token', session);
+        (client as any).claudeDriver.setCurrentTurn('turn-replay-1');
+
+        client.closeClaudeSessionTurn(
+            'completed',
+            { totalCostUsd: 1.23, numTurns: 1, modelUsage: {} },
+            {
+                replay: true,
+                invalidate: false,
+                localIdForEnvelope: ({ envelopeIndex }) => `replay-end-${envelopeIndex}`,
+            },
+        );
+
+        const usageEmits = mockSocket.emit.mock.calls.filter(
+            (call: any[]) => call[0] === 'usage-report',
+        );
+        expect(usageEmits).toHaveLength(0);
+    });
+
+    it('drops scanner-forwarded record already covered by replay', async () => {
+        const client = new ApiSessionClient('fake-token', session);
+
+        client.markClaudeMessageReplayed('user-dedup-1');
+
+        client.sendClaudeSessionMessage({
+            type: 'user',
+            uuid: 'user-dedup-1',
+            message: { content: 'history' }
+        } as any, { invalidate: false });
+
+        // Give any async outbox a moment to misbehave.
+        await new Promise((r) => setTimeout(r, 20));
+        expect(mockAxiosPost).not.toHaveBeenCalled();
+    });
+
+    it('clears per-turn tracking via resetCurrentTurnTracking', () => {
+        const client = new ApiSessionClient('fake-token', session);
+        (client as any).currentTurnModel = 'claude-sonnet-4-6';
+        (client as any).currentTurnUsage = { input_tokens: 1, output_tokens: 1 };
+        (client as any).accumulatedTurnUsage = { input_tokens: 5, output_tokens: 7 };
+
+        client.resetCurrentTurnTracking();
+
+        expect((client as any).currentTurnModel).toBeNull();
+        expect((client as any).currentTurnUsage).toBeNull();
+        expect((client as any).accumulatedTurnUsage).toBeNull();
+    });
+
     it('keeps final assistant text when only streamed thinking is suppressed', async () => {
         const client = new ApiSessionClient('fake-token', session);
         (client as any).claudeDriver.setCurrentTurn('turn-1');

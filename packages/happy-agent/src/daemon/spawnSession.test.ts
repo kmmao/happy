@@ -88,4 +88,18 @@ describe("spawnSession", () => {
 
     expect(mockSpawn.mock.calls[0][1]).not.toContain("--resume");
   });
+
+  it("rejects non-UUID sessionId values", async () => {
+    const { spawnSession } = await import("./spawnSession");
+
+    for (const badId of ["-", "--", "deadbeef", "not-a-uuid", "0000"]) {
+      mockSpawn.mockClear();
+      await spawnSession({
+        directory: "/repo",
+        agent: "claude",
+        sessionId: badId,
+      });
+      expect(mockSpawn.mock.calls[0][1]).not.toContain("--resume");
+    }
+  });
 });

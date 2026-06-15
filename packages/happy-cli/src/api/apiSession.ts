@@ -128,7 +128,36 @@ type SessionProtocolSendOptions = {
 type ClaudeSessionMessageSendOptions = {
   invalidate?: boolean;
   localIdForEnvelope?: ReplayLocalIdFactory;
+  /**
+   * When true, the call is part of historical transcript replay (see
+   * transcriptReplay.ts). Skips side-channels that are NOT deduped by
+   * `localId` and would therefore double-attribute usage / cost to the new
+   * Happy session: `sendUsageData` (`usage-report` socket emit) and
+   * `sendTurnCostReport` (`usage-report` cost socket emit). Envelopes still
+   * flow through the localId-deduped pipeline so re-runs are idempotent.
+   */
+  replay?: boolean;
 };
+
+/**
+ * Dedup key for a `RawJSONLines` record — kept in sync with
+ * `messageKey` in sessionScanner.ts. Duplicated here to avoid pulling the
+ * full scanner module into the realtime client.
+ */
+function claudeRecordKey(body: RawJSONLines): string | null {
+  switch (body.type) {
+    case "user":
+    case "assistant":
+    case "system":
+      return body.uuid;
+    case "result":
+      return "result: " + body.uuid;
+    case "summary":
+      return "summary: " + body.leafUuid + ": " + body.summary;
+    default:
+      return null;
+  }
+}
 
 /** Helper to safely access the message.content array from a RawJSONLines body. */
 interface MessageWithContent {
@@ -225,6 +254,15 @@ export class ApiSessionClient extends EventEmitter {
   private currentTurnModel: string | null = null;
   private currentTurnUsage: Usage | null = null;
   private accumulatedTurnUsage: Usage | null = null;
+  /**
+   * Dedup keys for records already pushed through the historical-transcript
+   * replay path (see transcriptReplay.ts). The JSONL session scanner running
+   * concurrently re-reads the same records from the rewritten resume file —
+   * we skip them here so a Claude version that does NOT preserve message
+   * UUIDs across `--resume` cannot duplicate the whole chat under random
+   * localIds. Population is opt-in via `markClaudeMessageReplayed`.
+   */
+  private replayedClaudeMessageKeys: Set<string> = new Set();
   private modelModeKey: string | undefined;
   private subagentFlushTimer: ReturnType<typeof setTimeout> | null = null;
   /**
@@ -700,10 +738,44 @@ export class ApiSessionClient extends EventEmitter {
    * Send message to session
    * @param body - Message body (can be MessageContent or raw content for agent messages)
    */
+  /**
+   * Mark a `RawJSONLines` record as already pushed through transcript replay.
+   * The next `sendClaudeSessionMessage` call carrying a record with the same
+   * dedup key (the scanner forwarding the resume-rewritten copy) is dropped.
+   */
+  markClaudeMessageReplayed(key: string) {
+    this.replayedClaudeMessageKeys.add(key);
+  }
+
+  /**
+   * Force-clear per-turn tracking state. Called at the end of transcript
+   * replay so a truncated history (no terminal `result` record) does not leak
+   * `currentTurnUsage` / `accumulatedTurnUsage` into the first real turn.
+   */
+  resetCurrentTurnTracking() {
+    this.currentTurnStartTime = null;
+    this.lastApiCallEndTime = null;
+    this.currentTurnModel = null;
+    this.currentTurnUsage = null;
+    this.accumulatedTurnUsage = null;
+  }
+
   sendClaudeSessionMessage(
     body: RawJSONLines,
     options: ClaudeSessionMessageSendOptions = {},
   ) {
+    // Defense in depth: if the JSONL scanner re-discovers a record that
+    // transcript replay already pushed, drop it here. Without this, a Claude
+    // version that rewrites message UUIDs on `--resume` would duplicate the
+    // whole chat (scanner uses random localIds — server can't dedup).
+    const recordKey = claudeRecordKey(body);
+    if (recordKey && this.replayedClaudeMessageKeys.has(recordKey)) {
+      logger.debug(
+        `[SOCKET] Skipping scanner-forwarded record already covered by replay: type=${body.type} key=${recordKey}`,
+      );
+      return;
+    }
+
     // Strip large image base64 from tool results to prevent oversized messages
     body = stripLargeImageContent(body);
 
@@ -772,7 +844,13 @@ export class ApiSessionClient extends EventEmitter {
           this.modelModeKey?.endsWith("-1m") && body.message.model
             ? `${body.message.model}[1m]`
             : body.message.model;
-        this.sendUsageData(body.message.usage, effectiveModel);
+        // Skip `sendUsageData` during transcript replay — that path goes over
+        // the `usage-report` socket emit which is NOT deduplicated by
+        // `localId`, so historical tokens would be re-attributed to the new
+        // Happy session on every replay.
+        if (!options.replay) {
+          this.sendUsageData(body.message.usage, effectiveModel);
+        }
 
         // Send per-request usage-update envelope to App for real-time display
         const turnId = this.claudeDriver.currentTurnId;
@@ -881,7 +959,12 @@ export class ApiSessionClient extends EventEmitter {
     // Always send when totalCostUsd is present (even if 0) — the SDK explicitly
     // reported a value. Previously required > 0 && modelUsage, which silently
     // dropped reports when total_cost_usd defaulted to 0 or modelUsage was empty.
-    if (resultData?.totalCostUsd !== undefined) {
+    //
+    // Skip during transcript replay — `sendTurnCostReport` writes to the
+    // `usage-report` socket channel (non-deduped); historical cost was
+    // already billed under the OLD session, replaying it would double-bill
+    // under the new one.
+    if (resultData?.totalCostUsd !== undefined && !options.replay) {
       try {
         this.sendTurnCostReport({
           totalCostUsd: resultData.totalCostUsd,
@@ -984,16 +1067,6 @@ export class ApiSessionClient extends EventEmitter {
     envelope: SessionEnvelope,
     options: SessionProtocolSendOptions = {},
   ) {
-    if (envelope.role !== "user") {
-      this.enqueueSessionProtocolEnvelope(envelope, options);
-      return;
-    }
-
-    if (envelope.ev.t !== "text") {
-      this.enqueueSessionProtocolEnvelope(envelope, options);
-      return;
-    }
-
     this.enqueueSessionProtocolEnvelope(envelope, options);
   }
 

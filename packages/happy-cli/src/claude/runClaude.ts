@@ -167,11 +167,23 @@ export async function runClaude(
   // Extract --resume session ID from claudeArgs so initial metadata preserves it.
   // Without this, the initial metadata overwrites the server's existing claudeSessionId
   // before the SessionStart hook has a chance to set the new one.
+  //
+  // Validate against the Claude UUID v4 shape. Without this, `--resume` at the
+  // end of the args list (or followed by another flag) would silently feed
+  // `undefined` or `"--verbose"` into `metadata.claudeSessionId` and the
+  // transcript-replay path — polluting server metadata and logging spurious
+  // "file not found" failures during replay.
+  const CLAUDE_SESSION_ID_RE =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   const resumeIndex = options.claudeArgs?.indexOf("--resume") ?? -1;
-  const resumeSessionId =
+  const resumeCandidate =
     resumeIndex >= 0 ? options.claudeArgs?.[resumeIndex + 1] : undefined;
+  const resumeSessionId =
+    resumeCandidate && CLAUDE_SESSION_ID_RE.test(resumeCandidate)
+      ? resumeCandidate
+      : undefined;
   logger.debug(
-    `[START] Resume extraction: claudeArgs=${JSON.stringify(options.claudeArgs)}, resumeIndex=${resumeIndex}, resumeSessionId=${resumeSessionId}`,
+    `[START] Resume extraction: claudeArgs=${JSON.stringify(options.claudeArgs)}, resumeIndex=${resumeIndex}, resumeCandidate=${resumeCandidate}, resumeSessionId=${resumeSessionId}`,
   );
 
   let metadata: Metadata = {

@@ -20,6 +20,16 @@ import { trackSession, untrackSession, type TrackedSession } from "./trackedSess
 
 const execFileAsync = promisify(execFile);
 
+/**
+ * Claude session-id format: UUID v4 8-4-4-4-12 hex digits.
+ * Mirrors `UUID_RE` in happy-cli's sessionStoreRpc — kept in sync because
+ * happy-cli and happy-agent cannot import each other (see CLAUDE.md
+ * "Package Dependency & Sync Rules"). Stricter than the previous
+ * `/^[0-9a-f-]+$/i`, which accepted "-", "--", "deadbeef", etc.
+ */
+const CLAUDE_SESSION_ID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
@@ -154,7 +164,7 @@ export async function spawnSession(
     "--happy-starting-mode", "remote",
     "--started-by", "daemon",
   ];
-  if (agent === "claude" && sessionId && /^[0-9a-f-]+$/i.test(sessionId)) {
+  if (agent === "claude" && sessionId && CLAUDE_SESSION_ID_RE.test(sessionId)) {
     args.push("--resume", sessionId);
   }
   if (happySessionId) {
