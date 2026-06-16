@@ -125,11 +125,11 @@ export function WebPromptModal({ config, onClose, onConfirm }: WebPromptModalPro
                     <Text style={[styles.title, Typography.default('semiBold')]}>
                         {config.title}
                     </Text>
-                    {config.message && (
+                    {config.message ? (
                         <Text style={[styles.message, Typography.default()]}>
                             {config.message}
                         </Text>
-                    )}
+                    ) : null}
                     <TextInput
                         ref={inputRef}
                         style={[styles.input, Typography.default()]}

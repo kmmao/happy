@@ -3582,6 +3582,11 @@ export const ca: TranslationStructure = {
       codex: "Codex",
       builtin: "Integrat",
     },
+    reorder: {
+      title: "Reordena el preferit",
+      up: "Mou amunt",
+      down: "Mou avall",
+    },
   },
 
   kanban: {

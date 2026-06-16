@@ -3577,6 +3577,11 @@ export const it: TranslationStructure = {
       codex: "Codex",
       builtin: "Integrato",
     },
+    reorder: {
+      title: "Riordina preferito",
+      up: "Sposta su",
+      down: "Sposta giù",
+    },
   },
 
   kanban: {

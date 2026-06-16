@@ -3493,6 +3493,11 @@ export const zhHans: TranslationStructure = {
       codex: "Codex",
       builtin: "内置",
     },
+    reorder: {
+      title: "调整顺序",
+      up: "上移",
+      down: "下移",
+    },
   },
 
   kanban: {

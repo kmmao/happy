@@ -506,7 +506,7 @@ export const WorkflowSessionRow = React.memo(function WorkflowSessionRow({
             onPress: handleDelete,
         });
 
-        Modal.alert(sessionName, "", buttons);
+        Modal.alert(sessionName, undefined, buttons);
     }, [sessionName, canReactivate, reactivationMode, performReactivation, extraMenuActions, handleDelete, handleArchive, session.active]);
 
     const isBusy = deletingSession || reactivatingSession || archivingSession;

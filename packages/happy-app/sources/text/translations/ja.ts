@@ -3557,6 +3557,11 @@ export const ja: TranslationStructure = {
       codex: "Codex",
       builtin: "組み込み",
     },
+    reorder: {
+      title: "並び替え",
+      up: "上へ",
+      down: "下へ",
+    },
   },
 
   kanban: {

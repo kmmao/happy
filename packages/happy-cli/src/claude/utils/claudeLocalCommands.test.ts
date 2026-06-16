@@ -54,6 +54,34 @@ describe("collectClaudeLocalCommands", () => {
     });
   });
 
+  it("extracts YAML folded block scalar description (`description: >`)", async () => {
+    const dir = join(cwd, ".claude", "skills", "caveman");
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(
+      join(dir, "SKILL.md"),
+      `---\nname: caveman\ndescription: >\n  Ultra-compressed mode. Cuts token usage ~75% by dropping\n  filler and pleasantries.\n  Use when user says "caveman" or invokes /caveman.\n---\n\nBody.`,
+    );
+
+    const result = await collectClaudeLocalCommands({ cwd, userHome });
+    expect(result.slashCommandDescriptions.caveman).toBe(
+      `Ultra-compressed mode. Cuts token usage ~75% by dropping filler and pleasantries. Use when user says "caveman" or invokes /caveman.`,
+    );
+  });
+
+  it("extracts YAML literal block scalar description (`description: |`)", async () => {
+    const dir = join(cwd, ".claude", "commands");
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(
+      join(dir, "multi.md"),
+      `---\ndescription: |\n  Line one of the help.\n  Line two continues.\n---\n`,
+    );
+
+    const result = await collectClaudeLocalCommands({ cwd, userHome });
+    expect(result.slashCommandDescriptions.multi).toBe(
+      `Line one of the help. Line two continues.`,
+    );
+  });
+
   it("falls back to the first non-empty body line when frontmatter has no description", async () => {
     const dir = join(cwd, ".claude", "commands");
     mkdirSync(dir, { recursive: true });

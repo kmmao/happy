@@ -71,7 +71,7 @@ export const Header = React.memo((props: HeaderProps) => {
 
                     <View style={styles.centerContainer}>
                         {title}
-                        {subtitle && <Text style={subtitleStyle} numberOfLines={1}>{subtitle}</Text>}
+                        {subtitle ? <Text style={subtitleStyle} numberOfLines={1}>{subtitle}</Text> : null}
                     </View>
 
                     <View style={styles.rightContainer}>

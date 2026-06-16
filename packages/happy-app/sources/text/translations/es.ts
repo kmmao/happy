@@ -3580,6 +3580,11 @@ export const es: TranslationStructure = {
       codex: "Codex",
       builtin: "Integrado",
     },
+    reorder: {
+      title: "Reordenar favorito",
+      up: "Mover arriba",
+      down: "Mover abajo",
+    },
   },
 
   kanban: {

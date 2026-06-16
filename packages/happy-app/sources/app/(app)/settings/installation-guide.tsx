@@ -229,8 +229,8 @@ function Step({
                 <Text style={styles.stepTitle}>{title}</Text>
             </View>
             <Text style={styles.stepDescription}>{description}</Text>
-            {code && <CodeBlock code={code} theme={theme} />}
-            {tip && <Tip text={tip} />}
+            {code ? <CodeBlock code={code} theme={theme} /> : null}
+            {tip ? <Tip text={tip} /> : null}
         </View>
     );
 }

@@ -3604,6 +3604,11 @@ export const pl: TranslationStructure = {
       codex: "Codex",
       builtin: "Wbudowane",
     },
+    reorder: {
+      title: "Zmień kolejność",
+      up: "Przesuń w górę",
+      down: "Przesuń w dół",
+    },
   },
 
   kanban: {

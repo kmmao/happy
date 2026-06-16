@@ -102,6 +102,11 @@ async function pathExists(p: string): Promise<boolean> {
  *
  * 1. If a YAML frontmatter block exists and contains `description: …`,
  *    that wins. Surrounding quotes are stripped.
+ *    Supports both inline (`description: text`) and block scalars
+ *    (`description: >\n  multi-line text`, `description: |\n  preserved`).
+ *    Block scalars are folded into a single line: `>` folds linebreaks to
+ *    spaces (YAML semantics), `|` is conservatively folded the same way
+ *    so the popover never renders raw `\n` in the one-line description.
  * 2. Otherwise the first non-empty body line that is not a heading, HR,
  *    or closing-frontmatter marker is used. This matches what `claude`
  *    TUI displays in its own autocomplete preview.
@@ -113,9 +118,44 @@ async function pathExists(p: string): Promise<boolean> {
 function extractDescription(content: string): string | null {
   const fmMatch = content.match(/^---\r?\n([\s\S]*?)\r?\n---/);
   if (fmMatch) {
-    const desc = fmMatch[1].match(/^description:\s*(.+)$/m);
-    if (desc?.[1]) {
-      return desc[1].trim().replace(/^['"]|['"]$/g, "");
+    const fmLines = fmMatch[1].split(/\r?\n/);
+    for (let i = 0; i < fmLines.length; i++) {
+      const line = fmLines[i];
+      // Block scalar form: `description: >` or `description: |` (with optional
+      // chomp indicator `-`/`+`). Continuation lines follow, indented deeper
+      // than the `description:` key.
+      const block = line.match(/^description:\s*([>|])[-+]?\s*$/);
+      if (block) {
+        const folded: string[] = [];
+        let baseIndent = -1;
+        for (let j = i + 1; j < fmLines.length; j++) {
+          const cont = fmLines[j];
+          if (cont.trim() === "") {
+            folded.push("");
+            continue;
+          }
+          const indent = cont.match(/^(\s*)/)?.[1].length ?? 0;
+          if (baseIndent < 0) baseIndent = indent;
+          // Continuation lines must be indented at least as much as the first
+          // continuation; once indent drops we've exited the block scalar.
+          if (indent < baseIndent) break;
+          folded.push(cont.slice(baseIndent));
+        }
+        const joined = folded
+          .map((l) => l.trim())
+          .filter((l) => l !== "")
+          .join(" ")
+          .trim();
+        return joined || null;
+      }
+      // Inline form: `description: actual text`. Skip when value is empty or
+      // is a sole block indicator (handled above).
+      const inline = line.match(/^description:\s*(.+)$/);
+      if (inline?.[1]) {
+        const value = inline[1].trim();
+        if (value === ">" || value === "|" || /^[>|][-+]?$/.test(value)) continue;
+        return value.replace(/^['"]|['"]$/g, "");
+      }
     }
   }
 

@@ -3602,6 +3602,11 @@ export const ru: TranslationStructure = {
       codex: "Codex",
       builtin: "Встроенные",
     },
+    reorder: {
+      title: "Изменить порядок",
+      up: "Вверх",
+      down: "Вниз",
+    },
   },
 
   kanban: {

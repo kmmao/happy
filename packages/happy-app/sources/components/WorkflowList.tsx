@@ -839,7 +839,7 @@ const WorkflowRow = React.memo(function WorkflowRow({
             );
         };
 
-        Modal.alert(workflow.displayName, "", [
+        Modal.alert(workflow.displayName, undefined, [
             { text: t("common.cancel"), style: "cancel" },
             {
                 text: currentlyEnabled

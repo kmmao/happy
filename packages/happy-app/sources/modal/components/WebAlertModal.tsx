@@ -129,7 +129,7 @@ export function WebAlertModal({
           <Text style={[styles.title, Typography.default("semiBold")]}>
             {config.title}
           </Text>
-          {config.message && (
+          {config.message ? (
             <ScrollView
               style={{ maxHeight: maxMessageHeight }}
               bounces={false}
@@ -139,7 +139,7 @@ export function WebAlertModal({
                 {config.message}
               </Text>
             </ScrollView>
-          )}
+          ) : null}
         </View>
 
         {buttons.length > 0 ? (

@@ -12,6 +12,7 @@ import {
 } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { Typography } from "@/constants/Typography";
+import { Modal } from "@/modal";
 import { useSettingMutable } from "@/sync/storage";
 import {
   getAllCommands,
@@ -94,30 +95,39 @@ export const CommandListPopover = React.memo(
       return legacyFavoriteSlashCommands.map(normalizeFavoriteShortcut);
     }, [favoriteShortcuts, legacyFavoriteSlashCommands]);
 
+    // Favorites tab = subset view of `filteredCommands`, ordered by the
+    // user's saved favorite shortcut list. The source tabs (otherItems)
+    // intentionally include favorited commands too — otherwise favoriting
+    // every command of a source (e.g. /compact + /clear in builtin) would
+    // make that whole source tab disappear, which surprised the user. Each
+    // command therefore shows up in BOTH ⭐收藏 AND its source tab; the
+    // star icon's filled / outline state reflects the favorited status
+    // identically in either tab.
+    const favoriteKeySet = React.useMemo(
+      () => new Set(normalizedFavorites.map(getCommandItemKey)),
+      [normalizedFavorites],
+    );
     const { favoriteItems, otherItems } = React.useMemo(() => {
-      const favKeys = normalizedFavorites.map(getCommandItemKey);
-      const favSet = new Set(favKeys);
       const commandMap = new Map(
         filteredCommands.map((cmd) => [getCommandItemKey(cmd), cmd]),
       );
-      // Only show favorites that exist in the current session's shortcut list
-      const favItems: CommandItem[] = favKeys
-        .filter((fav) => commandMap.has(fav))
-        .map((fav) => commandMap.get(fav)!)
+      const favItems: CommandItem[] = normalizedFavorites
+        .map(getCommandItemKey)
+        .filter((key) => commandMap.has(key))
+        .map((key) => commandMap.get(key)!)
         .filter((cmd) =>
           query.trim()
             ? cmd.command.toLowerCase().includes(query.trim().toLowerCase())
             : true,
         );
-      const others = filteredCommands.filter((cmd) => !favSet.has(getCommandItemKey(cmd)));
-      return { favoriteItems: favItems, otherItems: others };
+      return { favoriteItems: favItems, otherItems: filteredCommands };
     }, [filteredCommands, normalizedFavorites, query]);
 
     /**
      * Group the non-favorite commands by `source` so the popover renders one
-     * section per origin. Plugin commands are sub-grouped by plugin name —
+     * tab per origin. Plugin commands are sub-grouped by plugin name —
      * a user with `codex` and `commit-commands` installed sees them as two
-     * distinct sub-headers instead of one bucket.
+     * distinct plugin tabs instead of one bucket.
      *
      * Display order is fixed: project → user → plugin (alphabetic per plugin)
      * → codex → builtin → unknown. Empty buckets are skipped at render time.
@@ -156,6 +166,94 @@ export const CommandListPopover = React.memo(
       };
     }, [otherItems]);
 
+    /**
+     * Build the tab strip from the favorites list + grouped buckets. Empty
+     * buckets are dropped so the user only sees tabs that have content.
+     *
+     * `isFavoriteTab` flips on the reorder chevrons + star icon — the only
+     * tab whose item layout differs from the others.
+     */
+    type Tab = {
+      key: string;
+      label: string;
+      items: CommandItem[];
+      isFavoriteTab?: boolean;
+    };
+    const tabs = React.useMemo<Tab[]>(() => {
+      const list: Tab[] = [];
+      if (favoriteItems.length > 0) {
+        list.push({
+          key: "fav",
+          label: t("quickCommands.favorites"),
+          items: favoriteItems,
+          isFavoriteTab: true,
+        });
+      }
+      if (grouped.project.length > 0) {
+        list.push({
+          key: "project",
+          label: t("quickCommands.groups.project"),
+          items: grouped.project,
+        });
+      }
+      if (grouped.user.length > 0) {
+        list.push({
+          key: "user",
+          label: t("quickCommands.groups.user"),
+          items: grouped.user,
+        });
+      }
+      for (const [pluginName, items] of grouped.plugins) {
+        list.push({
+          key: `plugin:${pluginName}`,
+          label: pluginName
+            ? t("quickCommands.groups.pluginNamed", { name: pluginName })
+            : t("quickCommands.groups.plugin"),
+          items,
+        });
+      }
+      if (grouped.codex.length > 0) {
+        list.push({
+          key: "codex",
+          label: t("quickCommands.groups.codex"),
+          items: grouped.codex,
+        });
+      }
+      if (grouped.builtin.length > 0) {
+        list.push({
+          key: "builtin",
+          label: t("quickCommands.groups.builtin"),
+          items: grouped.builtin,
+        });
+      }
+      if (grouped.unknown.length > 0) {
+        list.push({
+          key: "unknown",
+          label: t("quickCommands.allCommands"),
+          items: grouped.unknown,
+        });
+      }
+      return list;
+    }, [favoriteItems, grouped]);
+
+    // Active tab is sticky between renders (won't snap back to "fav" on every
+    // keystroke), but resets to the first available tab whenever the prior
+    // active tab disappears (e.g. user un-stars their last favorite or a
+    // session-switch swaps the command set).
+    const [activeTabKey, setActiveTabKey] = React.useState<string | null>(null);
+    React.useEffect(() => {
+      if (tabs.length === 0) {
+        if (activeTabKey !== null) setActiveTabKey(null);
+        return;
+      }
+      if (!activeTabKey || !tabs.some((tab) => tab.key === activeTabKey)) {
+        setActiveTabKey(tabs[0].key);
+      }
+    }, [tabs, activeTabKey]);
+
+    const activeTab =
+      tabs.find((tab) => tab.key === activeTabKey) ?? tabs[0] ?? null;
+
     const toggleFavorite = React.useCallback(
       (item: CommandItem) => {
         const key = getCommandItemKey(item);
@@ -183,93 +281,111 @@ export const CommandListPopover = React.memo(
       [normalizedFavorites, setFavoriteShortcuts],
     );
 
+    /**
+     * Open an action sheet for reordering a single favorite. Used by the
+     * inline drag-handle icon in each favorites row — replaces the previous
+     * pair of stacked chevrons, which made favorites rows visually denser
+     * than other tabs' rows. Up/down options are conditionally enabled
+     * based on the item's index so the alert never offers a no-op.
+     */
+    const openReorderMenu = React.useCallback(
+      (item: CommandItem, favIndex: number, favTotal: number) => {
+        const buttons: {
+          text: string;
+          onPress?: () => void;
+          style?: "default" | "cancel" | "destructive";
+        }[] = [];
+        if (favIndex > 0) {
+          buttons.push({
+            text: t("quickCommands.reorder.up"),
+            onPress: () => moveFavorite(item, "up"),
+          });
+        }
+        if (favIndex < favTotal - 1) {
+          buttons.push({
+            text: t("quickCommands.reorder.down"),
+            onPress: () => moveFavorite(item, "down"),
+          });
+        }
+        buttons.push({ text: t("common.cancel"), style: "cancel" });
+        Modal.alert(t("quickCommands.reorder.title"), undefined, buttons);
+      },
+      [moveFavorite],
+    );
+
     if (!shouldRender) return null;
 
+    // Two orthogonal flags after the favorites-also-appear-in-source-tabs
+    // refactor:
+    //   - `inFavoritesTab`: render the drag-handle for reordering. Only true
+    //     when the row is inside the ⭐收藏 tab; even a favorited command in
+    //     its source tab gets NO chevron because reorder only makes sense
+    //     against the favorites list itself.
+    //   - `isFavorited`: render the star as filled gold. True whenever the
+    //     command is in the user's favorites set, regardless of tab.
     const renderItem = (
       cmd: CommandItem,
-      isFav: boolean,
+      inFavoritesTab: boolean,
       favIndex?: number,
       favTotal?: number,
-    ) => (
-      <View key={getCommandItemKey(cmd)} style={styles.commandRow}>
-        <Pressable
-          style={({ pressed }) => [
-            styles.commandItem,
-            pressed && styles.commandItemPressed,
-          ]}
-          onPress={() => onCommandSelect(getCommandInsertionText(cmd))}
-        >
-          <Text style={styles.commandName}>{cmd.kind === "skill" ? `$${cmd.command}` : `/${cmd.command}`}</Text>
-          <Text style={[styles.commandKind, { color: theme.colors.textSecondary }]}>
-            {cmd.kind === "skill" ? "skill" : "cmd"}
-          </Text>
-          {cmd.description ? (
-            <Text
-              style={[
-                styles.commandDesc,
-                { color: theme.colors.textSecondary },
-              ]}
-              numberOfLines={1}
-            >
-              {cmd.description}
+    ) => {
+      const isFavorited = favoriteKeySet.has(getCommandItemKey(cmd));
+      return (
+        <View key={getCommandItemKey(cmd)} style={styles.commandRow}>
+          <Pressable
+            style={({ pressed }) => [
+              styles.commandItem,
+              pressed && styles.commandItemPressed,
+            ]}
+            onPress={() => onCommandSelect(getCommandInsertionText(cmd))}
+          >
+            <Text style={styles.commandName}>{cmd.kind === "skill" ? `$${cmd.command}` : `/${cmd.command}`}</Text>
+            <Text style={[styles.commandKind, { color: theme.colors.textSecondary }]}>
+              {cmd.kind === "skill" ? "skill" : "cmd"}
             </Text>
-          ) : null}
-        </Pressable>
-        {isFav && favIndex !== undefined && favTotal !== undefined && (
-          <View style={styles.reorderButtons}>
+            {cmd.description ? (
+              <Text
+                style={[
+                  styles.commandDesc,
+                  { color: theme.colors.textSecondary },
+                ]}
+              >
+                {cmd.description}
+              </Text>
+            ) : null}
+          </Pressable>
+          {inFavoritesTab && favIndex !== undefined && favTotal !== undefined && favTotal > 1 && (
+            // Single drag-handle icon — replaces the stacked chevron column
+            // that made favorites rows visually denser than other tabs'.
+            // Tapping opens an action sheet with Move up / Move down options
+            // (kept off when the item is already at the boundary).
             <Pressable
-              onPress={() => moveFavorite(cmd, "up")}
-              hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
-              style={[
-                styles.reorderButton,
-                favIndex === 0 && styles.reorderButtonDisabled,
-              ]}
-              disabled={favIndex === 0}
+              onPress={() => openReorderMenu(cmd, favIndex, favTotal)}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              style={styles.reorderHandle}
+              accessibilityLabel={t("quickCommands.reorder.title")}
             >
               <Ionicons
-                name="chevron-up"
-                size={14}
-                color={
-                  favIndex === 0
-                    ? theme.colors.textSecondary
-                    : theme.colors.textSecondary
-                }
+                name="reorder-three-outline"
+                size={20}
+                color={theme.colors.textSecondary}
               />
             </Pressable>
-            <Pressable
-              onPress={() => moveFavorite(cmd, "down")}
-              hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
-              style={[
-                styles.reorderButton,
-                favIndex === favTotal - 1 && styles.reorderButtonDisabled,
-              ]}
-              disabled={favIndex === favTotal - 1}
-            >
-              <Ionicons
-                name="chevron-down"
-                size={14}
-                color={
-                  favIndex === favTotal - 1
-                    ? theme.colors.textSecondary
-                    : theme.colors.textSecondary
-                }
-              />
-            </Pressable>
-          </View>
-        )}
-        <Pressable
-          onPress={() => toggleFavorite(cmd)}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          style={styles.starButton}
-        >
-          <Ionicons
-            name={isFav ? "star" : "star-outline"}
-            size={16}
-            color={isFav ? "#FFB800" : theme.colors.textSecondary}
-          />
-        </Pressable>
-      </View>
-    );
+          )}
+          <Pressable
+            onPress={() => toggleFavorite(cmd)}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            style={styles.starButton}
+          >
+            <Ionicons
+              name={isFavorited ? "star" : "star-outline"}
+              size={16}
+              color={isFavorited ? "#FFB800" : theme.colors.textSecondary}
+            />
+          </Pressable>
+        </View>
+      );
+    };
 
     const bubbleContent = (
       <View style={inline ? styles.inlineBubble : styles.bubble}>
@@ -301,123 +417,93 @@ export const CommandListPopover = React.memo(
           )}
         </View>
 
-        {/* Command list */}
+        {/* Tab strip — horizontally scrollable, one tab per source bucket */}
+        {tabs.length > 0 && (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={styles.tabStrip}
+            contentContainerStyle={styles.tabStripContent}
+            keyboardShouldPersistTaps="handled"
+          >
+            {tabs.map((tab) => {
+              const isActive = tab.key === activeTab?.key;
+              return (
+                <Pressable
+                  key={tab.key}
+                  onPress={() => setActiveTabKey(tab.key)}
+                  style={[
+                    styles.tabItem,
+                    isActive && {
+                      borderBottomColor: theme.colors.text,
+                    },
+                  ]}
+                >
+                  {tab.isFavoriteTab && (
+                    <View style={styles.tabIconWrap}>
+                      <Ionicons
+                        name="star"
+                        size={12}
+                        color={
+                          isActive ? "#FFB800" : theme.colors.textSecondary
+                        }
+                      />
+                    </View>
+                  )}
+                  <Text
+                    style={[
+                      styles.tabLabel,
+                      {
+                        color: isActive
+                          ? theme.colors.text
+                          : theme.colors.textSecondary,
+                      },
+                    ]}
+                  >
+                    {tab.label}
+                  </Text>
+                  <View
+                    style={[
+                      styles.tabCountBadge,
+                      {
+                        backgroundColor: isActive
+                          ? theme.colors.text
+                          : theme.colors.surfaceHigh,
+                      },
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.tabCountText,
+                        {
+                          color: isActive
+                            ? theme.colors.surface
+                            : theme.colors.textSecondary,
+                        },
+                      ]}
+                    >
+                      {tab.items.length}
+                    </Text>
+                  </View>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+        )}
+
+        {/* Command list — only the active tab's items */}
         <ScrollView
           style={styles.scrollView}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
-          {favoriteItems.length > 0 && (
-            <>
-              <View style={styles.sectionHeader}>
-                <Ionicons name="star" size={12} color="#FFB800" />
-                <Text
-                  style={[
-                    styles.sectionHeaderText,
-                    { color: theme.colors.textSecondary },
-                  ]}
-                >
-                  {t("quickCommands.favorites")}
-                </Text>
-              </View>
-              {favoriteItems.map((cmd, idx) =>
-                renderItem(cmd, true, idx, favoriteItems.length),
-              )}
-            </>
-          )}
-          {grouped.project.length > 0 && (
-            <>
-              <View style={styles.sectionHeader}>
-                <Text
-                  style={[
-                    styles.sectionHeaderText,
-                    { color: theme.colors.textSecondary },
-                  ]}
-                >
-                  {t("quickCommands.groups.project")}
-                </Text>
-              </View>
-              {grouped.project.map((cmd) => renderItem(cmd, false))}
-            </>
-          )}
-          {grouped.user.length > 0 && (
-            <>
-              <View style={styles.sectionHeader}>
-                <Text
-                  style={[
-                    styles.sectionHeaderText,
-                    { color: theme.colors.textSecondary },
-                  ]}
-                >
-                  {t("quickCommands.groups.user")}
-                </Text>
-              </View>
-              {grouped.user.map((cmd) => renderItem(cmd, false))}
-            </>
-          )}
-          {grouped.plugins.map(([pluginName, items]) => (
-            <React.Fragment key={`plugin:${pluginName}`}>
-              <View style={styles.sectionHeader}>
-                <Text
-                  style={[
-                    styles.sectionHeaderText,
-                    { color: theme.colors.textSecondary },
-                  ]}
-                >
-                  {pluginName
-                    ? t("quickCommands.groups.pluginNamed", { name: pluginName })
-                    : t("quickCommands.groups.plugin")}
-                </Text>
-              </View>
-              {items.map((cmd) => renderItem(cmd, false))}
-            </React.Fragment>
-          ))}
-          {grouped.codex.length > 0 && (
-            <>
-              <View style={styles.sectionHeader}>
-                <Text
-                  style={[
-                    styles.sectionHeaderText,
-                    { color: theme.colors.textSecondary },
-                  ]}
-                >
-                  {t("quickCommands.groups.codex")}
-                </Text>
-              </View>
-              {grouped.codex.map((cmd) => renderItem(cmd, false))}
-            </>
-          )}
-          {grouped.builtin.length > 0 && (
-            <>
-              <View style={styles.sectionHeader}>
-                <Text
-                  style={[
-                    styles.sectionHeaderText,
-                    { color: theme.colors.textSecondary },
-                  ]}
-                >
-                  {t("quickCommands.groups.builtin")}
-                </Text>
-              </View>
-              {grouped.builtin.map((cmd) => renderItem(cmd, false))}
-            </>
-          )}
-          {grouped.unknown.length > 0 && (
-            <>
-              <View style={styles.sectionHeader}>
-                <Text
-                  style={[
-                    styles.sectionHeaderText,
-                    { color: theme.colors.textSecondary },
-                  ]}
-                >
-                  {t("quickCommands.allCommands")}
-                </Text>
-              </View>
-              {grouped.unknown.map((cmd) => renderItem(cmd, false))}
-            </>
-          )}
-          {favoriteItems.length === 0 && otherItems.length === 0 && (
+          {activeTab && activeTab.items.length > 0
+            ? activeTab.isFavoriteTab
+              ? activeTab.items.map((cmd, idx) =>
+                  renderItem(cmd, true, idx, activeTab.items.length),
+                )
+              : activeTab.items.map((cmd) => renderItem(cmd, false))
+            : (
             <View style={styles.emptyState}>
               <Text
                 style={[
@@ -495,6 +581,15 @@ const styles = StyleSheet.create((theme, rt) => ({
     maxHeight: 420,
     overflow: "hidden",
   },
+  // `flexShrink: 0` is mandatory on the three fixed-height children of
+  // `bubble` (search container, tab strip, command rows). The bubble has
+  // `maxHeight: 420` and a flex-column layout — once its content overflows,
+  // RN's flexbox shrinks every child proportionally by their default
+  // `flexShrink: 1`, regardless of explicit `height`. That's exactly what
+  // caused the favorites tab (17 items) to compress search/tabs/rows
+  // visually shorter than the project tab (4 items, no overflow).
+  // Pinning `flexShrink: 0` here forces ScrollView (which keeps its own
+  // default shrink: 1) to absorb 100% of the overflow via internal scroll.
   searchContainer: {
     flexDirection: "row",
     alignItems: "center",
@@ -503,6 +598,67 @@ const styles = StyleSheet.create((theme, rt) => ({
     gap: 8,
     borderBottomWidth: 0.5,
     borderBottomColor: theme.colors.divider,
+    flexShrink: 0,
+  },
+  // Horizontal tab strip sitting between the search input and the command
+  // list. `flexGrow: 0` keeps it from stealing the popover's vertical space
+  // when the list scrolls. `flexShrink: 0` keeps it from being squeezed
+  // when the list overflows.
+  tabStrip: {
+    flexGrow: 0,
+    flexShrink: 0,
+    borderBottomWidth: 0.5,
+    borderBottomColor: theme.colors.divider,
+  },
+  tabStripContent: {
+    paddingHorizontal: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  // Every tab chip must render at the SAME height regardless of whether
+  // it has the leading star icon (favorites only) or how wide its count
+  // badge is. Without a fixed `height` the row collapses to its tallest
+  // descendant, which varies between platforms (Ionicons baseline ≠ Text
+  // line-height ≠ Badge padding box).
+  tabItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 10,
+    height: 40,
+    borderBottomWidth: 2,
+    borderBottomColor: "transparent",
+    // Pull the active underline down so it overlaps the divider beneath the
+    // tab strip instead of sitting above it.
+    marginBottom: -1,
+  },
+  // Fixed icon container so the favorites star renders inside the same
+  // 14×14 box as if a text glyph occupied that slot — keeps the row baseline
+  // identical across favorites vs non-favorites tabs.
+  tabIconWrap: {
+    width: 14,
+    height: 14,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  tabLabel: {
+    ...Typography.default("semiBold"),
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  tabCountBadge: {
+    paddingHorizontal: 6,
+    height: 16,
+    borderRadius: 8,
+    minWidth: 18,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  tabCountText: {
+    ...Typography.default("semiBold"),
+    fontSize: 10,
+    lineHeight: 14,
   },
   searchInput: {
     flex: 1,
@@ -513,23 +669,17 @@ const styles = StyleSheet.create((theme, rt) => ({
   scrollView: {
     flexGrow: 0,
   },
-  sectionHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    paddingHorizontal: 16,
-    paddingTop: 10,
-    paddingBottom: 6,
-  },
-  sectionHeaderText: {
-    ...Typography.default("semiBold"),
-    fontSize: 12,
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
-  },
+  // `minHeight: 56` keeps the baseline tab-to-tab visual rhythm (so short
+  // descriptions still render at the same row height as those with text),
+  // while letting long descriptions push the row taller — they wrap to
+  // multi-line and the row grows around them. `flexShrink: 0` blocks the
+  // popover's `maxHeight: 420` from compressing the row via flex layout
+  // when overflow scrolls.
   commandRow: {
     flexDirection: "row",
     alignItems: "center",
+    minHeight: 56,
+    flexShrink: 0,
   },
   commandItem: {
     flex: 1,
@@ -538,6 +688,8 @@ const styles = StyleSheet.create((theme, rt) => ({
     paddingHorizontal: 16,
     paddingVertical: 12,
     gap: 12,
+    minHeight: 56,
+    flexShrink: 0,
   },
   commandItemPressed: {
     backgroundColor: theme.colors.surfaceHigh,
@@ -560,21 +712,25 @@ const styles = StyleSheet.create((theme, rt) => ({
     fontSize: 13,
     flex: 1,
   },
-  reorderButtons: {
-    flexDirection: "column",
+  // Single drag-handle slot, sized to match the star button's footprint so
+  // favorites rows look identical to non-favorites rows on the right edge —
+  // just two icons (handle + star) instead of a stacked chevron column.
+  // `minHeight` so it grows with multi-line descriptions; icon stays
+  // vertically centered via row's `alignItems: center`.
+  reorderHandle: {
+    width: 40,
+    minHeight: 56,
     alignItems: "center",
     justifyContent: "center",
-    gap: 0,
   },
-  reorderButton: {
-    padding: 2,
-  },
-  reorderButtonDisabled: {
-    opacity: 0.3,
-  },
+  // Match commandRow height so the star button fills the full row vertically,
+  // giving favorites + non-favorites rows the same touch-target footprint.
+  // `minHeight` so it grows with multi-line descriptions.
   starButton: {
     paddingHorizontal: 12,
-    paddingVertical: 12,
+    minHeight: 56,
+    alignItems: "center",
+    justifyContent: "center",
   },
   emptyState: {
     paddingVertical: 24,

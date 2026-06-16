@@ -3618,6 +3618,11 @@ export const en = {
       codex: "Codex",
       builtin: "Built-in",
     },
+    reorder: {
+      title: "Reorder favorite",
+      up: "Move up",
+      down: "Move down",
+    },
   },
 
   kanban: {

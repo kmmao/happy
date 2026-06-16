@@ -3492,6 +3492,11 @@ export const zhHant: TranslationStructure = {
       codex: "Codex",
       builtin: "內建",
     },
+    reorder: {
+      title: "調整順序",
+      up: "上移",
+      down: "下移",
+    },
   },
 
   kanban: {
