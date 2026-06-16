@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type {
+  ClaudeSlashCommand,
   CodexMetadata,
   SessionProgressState,
   SessionSummaryRefreshState,
@@ -484,6 +485,13 @@ export type Metadata = {
   tools?: string[];
   slashCommands?: string[];
   slashCommandDescriptions?: Record<string, string>;
+  /**
+   * Slash commands with origin/source info — supersedes `slashCommands` +
+   * `slashCommandDescriptions`. Older Apps fall back to the flat fields above;
+   * newer Apps consume this list and group the popover by source.
+   * See `claudeLocalCommands.ts` for collection logic.
+   */
+  slashCommandsRich?: ClaudeSlashCommand[];
   homeDir: string;
   happyHomeDir: string;
   happyLibDir: string;

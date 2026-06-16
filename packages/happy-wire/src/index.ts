@@ -16,6 +16,7 @@ export * from './sessionState';
 export * from './happyMcp';
 export * from './codexBackendSelection';
 export * from './codexMetadata';
+export * from './claudeSlashCommands';
 export * from './claudeControlRpc';
 export * from './mcpRegistry';
 export * from './replayBuffer';

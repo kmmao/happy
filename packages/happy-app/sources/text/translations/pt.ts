@@ -3573,6 +3573,12 @@ export const pt: TranslationStructure = {
       favorites: "Favoritos",
       root: "Scripts do projeto",
       shell: "Comandos Shell",
+      project: "Projeto",
+      user: "Usuário",
+      plugin: "Plugin",
+      pluginNamed: ({ name }: { name: string }) => `Plugin · ${name}`,
+      codex: "Codex",
+      builtin: "Integrado",
     },
   },
 

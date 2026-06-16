@@ -38,12 +38,13 @@ describe("getAllCommands", () => {
     };
 
     expect(getAllCommands("codex-session")).toEqual([
-      { command: "compact", description: "Compact the conversation history", kind: "slash" },
-      { command: "clear", description: "Clear the conversation", kind: "slash" },
+      { command: "compact", description: "Compact the conversation history", kind: "slash", source: "builtin" },
+      { command: "clear", description: "Clear the conversation", kind: "slash", source: "builtin" },
       {
         command: "ecc-plan",
         description: "Run the ECC planning workflow.",
         kind: "slash",
+        source: "codex",
       },
     ]);
   });
@@ -83,6 +84,7 @@ describe("getAllCommands", () => {
         command: "ecc-plan",
         description: "Prompt metadata description",
         kind: "slash",
+        source: "codex",
       },
     ]);
   });
@@ -114,17 +116,19 @@ describe("getAllCommands", () => {
     };
 
     expect(getAllCommands("codex-session")).toEqual([
-      { command: "compact", description: "Compact the conversation history", kind: "slash" },
-      { command: "clear", description: "Clear the conversation", kind: "slash" },
+      { command: "compact", description: "Compact the conversation history", kind: "slash", source: "builtin" },
+      { command: "clear", description: "Clear the conversation", kind: "slash", source: "builtin" },
       {
         command: "plan",
         description: "Generic planner command",
         kind: "slash",
+        source: "unknown",
       },
       {
         command: "ecc-plan",
         description: "Prompt metadata description",
         kind: "slash",
+        source: "codex",
       },
     ]);
   });
@@ -156,7 +160,84 @@ describe("getAllCommands", () => {
       command: "tdd",
       description: "Test-driven development workflow",
       kind: "skill",
+      source: "codex",
     });
   });
 
+  it("prefers slashCommandsRich (with source tags) over the flat slashCommands list", () => {
+    mockState = {
+      sessions: {
+        "claude-session": {
+          metadata: {
+            path: "/tmp/project",
+            host: "test-host",
+            slashCommands: ["deploy", "codex:rescue"],
+            slashCommandDescriptions: {
+              deploy: "ignored description",
+            },
+            slashCommandsRich: [
+              {
+                name: "deploy",
+                description: "Deploy project",
+                source: "project",
+                kind: "command",
+              },
+              {
+                name: "codex:rescue",
+                description: "Codex rescue",
+                source: "plugin",
+                kind: "command",
+                plugin: "codex",
+              },
+            ],
+          },
+        },
+      },
+    };
+
+    const result = getAllCommands("claude-session");
+    expect(result).toContainEqual({
+      command: "deploy",
+      description: "Deploy project",
+      kind: "slash",
+      source: "project",
+    });
+    expect(result).toContainEqual({
+      command: "codex:rescue",
+      description: "Codex rescue",
+      kind: "slash",
+      source: "plugin",
+      plugin: "codex",
+    });
+  });
+
+  it("infers plugin source from `<plugin>:<name>` shape on the flat fallback path", () => {
+    mockState = {
+      sessions: {
+        "claude-session": {
+          metadata: {
+            path: "/tmp/project",
+            host: "test-host",
+            // No slashCommandsRich — simulates older CLI.
+            slashCommands: ["deploy", "codex:rescue"],
+          },
+        },
+      },
+    };
+
+    const result = getAllCommands("claude-session");
+    expect(result).toContainEqual({
+      command: "deploy",
+      description: undefined,
+      kind: "slash",
+      source: "unknown",
+    });
+    expect(result).toContainEqual({
+      command: "codex:rescue",
+      description: undefined,
+      kind: "slash",
+      source: "plugin",
+      plugin: "codex",
+    });
+  });
 });

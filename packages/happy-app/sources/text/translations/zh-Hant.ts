@@ -3485,6 +3485,12 @@ export const zhHant: TranslationStructure = {
       favorites: "收藏",
       root: "專案腳本",
       shell: "Shell 指令",
+      project: "專案",
+      user: "使用者",
+      plugin: "外掛",
+      pluginNamed: ({ name }: { name: string }) => `外掛 · ${name}`,
+      codex: "Codex",
+      builtin: "內建",
     },
   },
 

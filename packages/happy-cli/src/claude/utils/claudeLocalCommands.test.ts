@@ -287,4 +287,88 @@ describe("collectClaudeLocalCommands", () => {
       "release-cli": "Publish CLI",
     });
   });
+
+  it("emits slashCommandsRich tagged with source/kind/plugin per entry", async () => {
+    // project command
+    mkdirSync(join(cwd, ".claude", "commands"), { recursive: true });
+    writeFileSync(
+      join(cwd, ".claude", "commands", "deploy.md"),
+      `---\ndescription: Project deploy\n---\n`,
+    );
+    // user command
+    mkdirSync(join(userHome, ".claude", "commands"), { recursive: true });
+    writeFileSync(
+      join(userHome, ".claude", "commands", "notes.md"),
+      `Personal notes`,
+    );
+    // user skill
+    const userSkillDir = join(userHome, ".claude", "skills", "debug-issue");
+    mkdirSync(userSkillDir, { recursive: true });
+    writeFileSync(
+      join(userSkillDir, "SKILL.md"),
+      `---\ndescription: Diagnose runtime issues\n---\n`,
+    );
+    // project skill
+    const projectSkillDir = join(cwd, ".claude", "skills", "release-cli");
+    mkdirSync(projectSkillDir, { recursive: true });
+    writeFileSync(
+      join(projectSkillDir, "SKILL.md"),
+      `---\ndescription: Publish CLI\n---\n`,
+    );
+    // plugin command + skill
+    const pluginDir = join(testRoot, "plugins", "codex");
+    mkdirSync(join(pluginDir, "commands"), { recursive: true });
+    writeFileSync(
+      join(pluginDir, "commands", "rescue.md"),
+      `---\ndescription: Codex rescue\n---\n`,
+    );
+    const pluginSkillDir = join(pluginDir, "skills", "codex-cli-runtime");
+    mkdirSync(pluginSkillDir, { recursive: true });
+    writeFileSync(
+      join(pluginSkillDir, "SKILL.md"),
+      `---\ndescription: Run codex CLI\n---\n`,
+    );
+    const manifestDir = join(userHome, ".claude", "plugins");
+    mkdirSync(manifestDir, { recursive: true });
+    writeFileSync(
+      join(manifestDir, "installed_plugins.json"),
+      JSON.stringify({
+        version: 2,
+        plugins: {
+          "codex@claude-plugins-official": [{ installPath: pluginDir }],
+        },
+      }),
+    );
+
+    const result = await collectClaudeLocalCommands({ cwd, userHome });
+
+    const byName = Object.fromEntries(
+      result.slashCommandsRich.map((c) => [c.name, c]),
+    );
+    expect(byName.deploy).toMatchObject({
+      source: "project",
+      kind: "command",
+      description: "Project deploy",
+    });
+    expect(byName.deploy.plugin).toBeUndefined();
+    expect(byName.notes).toMatchObject({ source: "user", kind: "command" });
+    expect(byName["debug-issue"]).toMatchObject({
+      source: "user",
+      kind: "skill",
+    });
+    expect(byName["release-cli"]).toMatchObject({
+      source: "project",
+      kind: "skill",
+    });
+    expect(byName["codex:rescue"]).toMatchObject({
+      source: "plugin",
+      kind: "command",
+      plugin: "codex",
+    });
+    expect(byName["codex:codex-cli-runtime"]).toMatchObject({
+      source: "plugin",
+      kind: "skill",
+      plugin: "codex",
+    });
+  });
 });

@@ -3595,6 +3595,12 @@ export const ru: TranslationStructure = {
       favorites: "Избранное",
       root: "Скрипты проекта",
       shell: "Команды Shell",
+      project: "Проект",
+      user: "Пользователь",
+      plugin: "Плагин",
+      pluginNamed: ({ name }: { name: string }) => `Плагин · ${name}`,
+      codex: "Codex",
+      builtin: "Встроенные",
     },
   },
 

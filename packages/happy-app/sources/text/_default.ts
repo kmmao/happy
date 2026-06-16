@@ -3611,6 +3611,12 @@ export const en = {
       favorites: "Favorites",
       root: "Project Scripts",
       shell: "Shell Commands",
+      project: "Project",
+      user: "User",
+      plugin: "Plugin",
+      pluginNamed: ({ name }: { name: string }) => `Plugin · ${name}`,
+      codex: "Codex",
+      builtin: "Built-in",
     },
   },
 

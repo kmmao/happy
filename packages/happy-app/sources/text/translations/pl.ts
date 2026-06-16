@@ -3597,6 +3597,12 @@ export const pl: TranslationStructure = {
       favorites: "Ulubione",
       root: "Skrypty projektu",
       shell: "Polecenia Shell",
+      project: "Projekt",
+      user: "Użytkownik",
+      plugin: "Wtyczka",
+      pluginNamed: ({ name }: { name: string }) => `Wtyczka · ${name}`,
+      codex: "Codex",
+      builtin: "Wbudowane",
     },
   },
 

@@ -3573,6 +3573,12 @@ export const es: TranslationStructure = {
       favorites: "Favoritos",
       root: "Scripts del proyecto",
       shell: "Comandos Shell",
+      project: "Proyecto",
+      user: "Usuario",
+      plugin: "Complemento",
+      pluginNamed: ({ name }: { name: string }) => `Complemento · ${name}`,
+      codex: "Codex",
+      builtin: "Integrado",
     },
   },
 

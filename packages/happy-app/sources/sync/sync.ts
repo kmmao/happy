@@ -2543,102 +2543,30 @@ class Sync {
       return;
     }
     const updateData = validatedUpdate.data;
-    const ctx = this.updateHandlerCtx;
+    // [diag:nextRunAt] trace every incoming socket update. Originally added
+    // to catch the trigger-schedule-updated routing gap — handleUpdate's
+    // old if/else chain forgot agent-loop / trigger-schedule / webhook-trigger
+    // variants, so server pushes were silently dropped and the Scheduled
+    // Workflow card's nextRunAt only refreshed on mount / task-status /
+    // modal POST / app-foreground. Now that the chain is gone (every
+    // body.t is delegated to ingestSyncUpdate, whose own switch is exhaustive
+    // via its `_exhaustive: never` check), this log is mostly redundant
+    // — keep it for the immediate diagnosis window and remove with the
+    // other [diag:nextRunAt] log lines once the fix is verified live.
+    log.log(`[sync.handleUpdate] body.t=${updateData.body.t}`);
 
-    if (updateData.body.t === "new-message") {
-      // PR 5: routed through ingest seam — emits 'terminal-signal',
-      // 'task-completed', 'mutable-tool-observed', 'message-gap' as
-      // applicable. Storage mutations (prompt suggestion, needsContinue,
-      // sdkSessionState, session thinking state) are applied inside the
-      // seam; subscribers handle the per-kind dispatch + web notification
-      // + git status invalidation + per-session refetch.
-      const events = await ingestSyncUpdate(updateData, this.ingestCtx);
-      ingestEvents.emit(events);
-    } else if (updateData.body.t === "new-session") {
-      // PR 3: routed through ingest seam — emits 'sessions-stale' which the
-      // subscriber registered in `registerIngestSubscribers()` translates
-      // into `sessionsSync.invalidate()`.
-      const events = await ingestSyncUpdate(updateData, this.ingestCtx);
-      ingestEvents.emit(events);
-    } else if (updateData.body.t === "delete-session") {
-      // PR 4: routed through ingest seam — emits 'session-deleted' which
-      // the subscriber translates into Sync-class queue cleanup (messagesSync,
-      // sendSync, pendingOutbox, lastSeq, deleted404Sessions, message processor).
-      const events = await ingestSyncUpdate(updateData, this.ingestCtx);
-      ingestEvents.emit(events);
-    } else if (updateData.body.t === "update-session") {
-      // PR 4: routed through ingest seam — emits 'permission-requested'
-      // (voice + web notification), 'permission-resolved' (clear notified),
-      // and/or 'session-control-returned' (re-fetch messages).
-      const events = await ingestSyncUpdate(updateData, this.ingestCtx);
-      ingestEvents.emit(events);
-    } else if (updateData.body.t === "update-account") {
-      // PR 4: routed through ingest seam — emits 'account-settings-applied'
-      // when settings were decrypted; subscriber re-layers pendingSettings.
-      const events = await ingestSyncUpdate(updateData, this.ingestCtx);
-      ingestEvents.emit(events);
-    } else if (updateData.body.t === "new-machine") {
-      // Per ADR-0026 PR 2: new-machine is the first variant migrated to the
-      // SyncUpdateIngest seam. The seam owns the encryption-key pre-step
-      // (previously the reason this 62-line block had to be inlined here),
-      // mirrors the decrypted key into Sync.machineDataKeys via
-      // `ctx.machineDataKeys.set`, and applies the new Machine to storage.
-      // The seam returns IngestEvent[]; for new-machine today the list is
-      // empty (no subscribers consume a machine-onboarding event), but the
-      // emit is wired so future events from this variant fan out correctly.
-      const events = await ingestSyncUpdate(updateData, this.ingestCtx);
-      ingestEvents.emit(events);
-    } else if (updateData.body.t === "update-machine") {
-      // PR 4: routed through ingest seam — uses the same race-recovery
-      // primitives as new-machine; no subscriber-driven side effect today.
-      const events = await ingestSyncUpdate(updateData, this.ingestCtx);
-      ingestEvents.emit(events);
-    } else if (updateData.body.t === "relationship-updated") {
-      // PR 3: routed through ingest seam — emits ['friends-stale',
-      // 'friend-requests-stale', 'feed-stale'] after applying the storage
-      // mutation; subscribers in `registerIngestSubscribers()` call the
-      // matching invalidate().
-      const events = await ingestSyncUpdate(updateData, this.ingestCtx);
-      ingestEvents.emit(events);
-    } else if (updateData.body.t === "new-artifact") {
-      // PR 4: routed through ingest seam — populates artifactDataKeys via ctx,
-      // decrypts header/body, applies to storage.
-      const events = await ingestSyncUpdate(updateData, this.ingestCtx);
-      ingestEvents.emit(events);
-    } else if (updateData.body.t === "update-artifact") {
-      // PR 4: routed through ingest seam — emits 'artifacts-stale' when the
-      // existing artifact / data key is missing (recovery path).
-      const events = await ingestSyncUpdate(updateData, this.ingestCtx);
-      ingestEvents.emit(events);
-    } else if (updateData.body.t === "delete-artifact") {
-      // PR 4: routed through ingest seam — storage delete + artifactDataKeys
-      // cleanup; no event.
-      const events = await ingestSyncUpdate(updateData, this.ingestCtx);
-      ingestEvents.emit(events);
-    } else if (updateData.body.t === "new-feed-post") {
-      // PR 3: routed through ingest seam — handles the assumeUsers gating
-      // for friend_request / friend_accepted items inline; no event emitted
-      // today (feed-stale is reserved for the relationship-updated path,
-      // which arrives separately).
-      const events = await ingestSyncUpdate(updateData, this.ingestCtx);
-      ingestEvents.emit(events);
-    } else if (updateData.body.t === "kv-batch-update") {
-      // PR 3: routed through ingest seam — issueSessionStore changes are
-      // applied inside the seam; research-config changes fan out as a
-      // single 'research-config-changed' event whose subscriber iterates
-      // the listener Set (see `registerIngestSubscribers()`).
-      const events = await ingestSyncUpdate(updateData, this.ingestCtx);
-      ingestEvents.emit(events);
-    } else if (
-      updateData.body.t === "new-project" ||
-      updateData.body.t === "update-project" ||
-      updateData.body.t === "delete-project"
-    ) {
-      // PR 3: routed through ingest seam — emits 'projects-stale' which the
-      // subscriber translates into `projectsSync.invalidate()`.
-      const events = await ingestSyncUpdate(updateData, this.ingestCtx);
-      ingestEvents.emit(events);
-    }
+    // ADR-0026: every ApiUpdate variant is routed through the SyncUpdateIngest
+    // seam, which owns the per-kind dispatch (storage mutations, encryption
+    // setup, subscriber fan-out via the returned IngestEvent[]). Earlier this
+    // function had a body.t-by-body.t if/else chain that all did the same
+    // work, which made it easy to forget a variant — exactly how the
+    // agent-loop / trigger-schedule / webhook-trigger pushes ended up being
+    // dropped. Delegate everything; ingestSyncUpdate's own switch is the
+    // single source of truth, and its `_exhaustive: never` default makes
+    // adding a new ApiUpdate variant a compile-time error there rather than
+    // a silent drop here.
+    const events = await ingestSyncUpdate(updateData, this.ingestCtx);
+    ingestEvents.emit(events);
   };
 
   private flushActivityUpdates = (

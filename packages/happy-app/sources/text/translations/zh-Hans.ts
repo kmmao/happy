@@ -3486,6 +3486,12 @@ export const zhHans: TranslationStructure = {
       favorites: "收藏",
       root: "项目脚本",
       shell: "Shell 命令",
+      project: "项目",
+      user: "用户",
+      plugin: "插件",
+      pluginNamed: ({ name }: { name: string }) => `插件 · ${name}`,
+      codex: "Codex",
+      builtin: "内置",
     },
   },
 

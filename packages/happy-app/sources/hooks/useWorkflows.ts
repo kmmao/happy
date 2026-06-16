@@ -43,6 +43,7 @@ import { sync } from "@/sync/sync";
 import { ingestEvents } from "@/sync/ingest/dispatcher";
 import { useThrottledCallback } from "@/hooks/useThrottledCallback";
 import { AUTOMATION_SUMMARY_THROTTLE_MS } from "@/components/machine/automationConstants";
+import { log } from "@/log";
 
 // Phase C — wall-clock polling is gone. All three workflow kinds
 // ride real-time SyncUpdates (agent-loop-* / trigger-schedule-* /
@@ -211,11 +212,21 @@ export function useWorkflows(): UseWorkflowsResult {
     const load = React.useCallback(async () => {
         const credentials = await TokenStorage.getCredentials().catch(() => null);
         if (!credentials) return;
+        // [diag:nextRunAt] mark this load invocation so we can correlate
+        // the fetch result with the trigger that scheduled it (mount,
+        // task-status, stale event, foreground, …). Remove together with
+        // the other [diag:nextRunAt] log lines below once the
+        // schedule-time-not-updating issue is resolved.
+        const loadStartedAt = Date.now();
+        log.log(`[useWorkflows] load() begin @${loadStartedAt}`);
         // Fetch all triggers across machines — list view spans the whole
         // account, so a per-machine filter would lose Workflows for
         // currently offline machines.
         const [cron, hooks, loops] = await Promise.all([
-            fetchTriggerSchedules(credentials).catch(() => ({ triggerSchedules: [], total: 0 })),
+            fetchTriggerSchedules(credentials).catch((err) => {
+                log.log('[useWorkflows] fetchTriggerSchedules failed', err);
+                return { triggerSchedules: [], total: 0 };
+            }),
             fetchWebhookTriggers(credentials).catch(() => ({ webhookTriggers: [], total: 0 })),
             // ADR-0022 Phase 4 — omit `role` so the unified endpoint
             // returns BOTH supervisor + generic rows. The workflow row
@@ -224,6 +235,20 @@ export function useWorkflows(): UseWorkflowsResult {
             fetchAgentLoopsAcrossProjects(credentials, serverProjectIds)
                 .catch(() => [] as SerializedAgentLoop[]),
         ]);
+        // [diag:nextRunAt] dump every cron trigger's nextRunAt so we can
+        // tell whether the server is advancing it. Compare consecutive
+        // log lines for the same id: if nextRunAt stays identical past
+        // its own timestamp, the server didn't tick (runner down /
+        // schedule disabled / claim race). If it advances here but the
+        // UI still shows the old value, the bug is in the render path.
+        log.log(
+            `[useWorkflows] load() done in ${Date.now() - loadStartedAt}ms — cron=${cron.triggerSchedules.length} hooks=${hooks.webhookTriggers.length} loops=${loops.length}`,
+        );
+        for (const t of cron.triggerSchedules) {
+            log.log(
+                `[useWorkflows]   cron ${t.id} name=${JSON.stringify(t.name ?? null)} enabled=${t.enabled} nextRunAt=${t.nextRunAt ? new Date(t.nextRunAt).toISOString() : null} lastRunAt=${t.lastRunAt ? new Date(t.lastRunAt).toISOString() : null} runCount=${t.runCount}`,
+            );
+        }
         setCronTriggers(cron.triggerSchedules);
         setWebhookTriggers(hooks.webhookTriggers);
         setServerLoops(loops);
@@ -240,6 +265,7 @@ export function useWorkflows(): UseWorkflowsResult {
 
     React.useEffect(() => {
         return sync.onTaskStatusChanged(() => {
+            log.log('[useWorkflows] trigger: task-status-changed → throttledLoad');
             throttledLoad();
         });
     }, [throttledLoad]);
@@ -249,6 +275,7 @@ export function useWorkflows(): UseWorkflowsResult {
         // a successful POST so the list reflects the new row without
         // waiting for the next throttle tick.
         return onWorkflowSourcesChanged(() => {
+            log.log('[useWorkflows] trigger: workflow-sources-changed → throttledLoad');
             throttledLoad();
         });
     }, [throttledLoad]);
@@ -264,9 +291,22 @@ export function useWorkflows(): UseWorkflowsResult {
         // syncUpdateIngest funnels each pair into one stale IngestEvent.
         // All three subscriptions throttle through the same throttledLoad
         // so a burst of events triggers at most one refetch per window.
-        const offLoops = ingestEvents.on("agent-loops-stale", () => throttledLoad());
-        const offSchedules = ingestEvents.on("schedules-stale", () => throttledLoad());
-        const offWebhooks = ingestEvents.on("webhooks-stale", () => throttledLoad());
+        // [diag:nextRunAt] log each stale signal so you can tell whether
+        // the server is actually pushing trigger-schedule-updated. If you
+        // never see "schedules-stale" around a known cron tick, the
+        // problem is upstream (server runner / emit / socket).
+        const offLoops = ingestEvents.on("agent-loops-stale", () => {
+            log.log('[useWorkflows] stale: agent-loops → throttledLoad');
+            throttledLoad();
+        });
+        const offSchedules = ingestEvents.on("schedules-stale", () => {
+            log.log('[useWorkflows] stale: schedules → throttledLoad');
+            throttledLoad();
+        });
+        const offWebhooks = ingestEvents.on("webhooks-stale", () => {
+            log.log('[useWorkflows] stale: webhooks → throttledLoad');
+            throttledLoad();
+        });
         return () => {
             offLoops();
             offSchedules();

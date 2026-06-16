@@ -16,6 +16,7 @@ import { useSettingMutable } from "@/sync/storage";
 import {
   getAllCommands,
   CommandItem,
+  CommandItemSource,
   getCommandInsertionText,
   getCommandItemKey,
   normalizeFavoriteShortcut,
@@ -111,6 +112,49 @@ export const CommandListPopover = React.memo(
       const others = filteredCommands.filter((cmd) => !favSet.has(getCommandItemKey(cmd)));
       return { favoriteItems: favItems, otherItems: others };
     }, [filteredCommands, normalizedFavorites, query]);
+
+    /**
+     * Group the non-favorite commands by `source` so the popover renders one
+     * section per origin. Plugin commands are sub-grouped by plugin name —
+     * a user with `codex` and `commit-commands` installed sees them as two
+     * distinct sub-headers instead of one bucket.
+     *
+     * Display order is fixed: project → user → plugin (alphabetic per plugin)
+     * → codex → builtin → unknown. Empty buckets are skipped at render time.
+     */
+    const grouped = React.useMemo(() => {
+      const buckets: Record<CommandItemSource, CommandItem[]> = {
+        project: [],
+        user: [],
+        plugin: [],
+        codex: [],
+        builtin: [],
+        unknown: [],
+      };
+      for (const item of otherItems) {
+        buckets[item.source].push(item);
+      }
+      // Sub-group plugin entries by plugin name. Items missing the `plugin`
+      // field (shouldn't happen, but defensive) land in an "(plugin)" bucket.
+      const pluginGroups = new Map<string, CommandItem[]>();
+      for (const item of buckets.plugin) {
+        const key = item.plugin ?? "";
+        const list = pluginGroups.get(key) ?? [];
+        list.push(item);
+        pluginGroups.set(key, list);
+      }
+      const sortedPluginGroups = [...pluginGroups.entries()].sort(([a], [b]) =>
+        a.localeCompare(b),
+      );
+      return {
+        project: buckets.project,
+        user: buckets.user,
+        plugins: sortedPluginGroups,
+        codex: buckets.codex,
+        builtin: buckets.builtin,
+        unknown: buckets.unknown,
+      };
+    }, [otherItems]);
 
     const toggleFavorite = React.useCallback(
       (item: CommandItem) => {
@@ -281,21 +325,96 @@ export const CommandListPopover = React.memo(
               )}
             </>
           )}
-          {otherItems.length > 0 && (
+          {grouped.project.length > 0 && (
             <>
-              {favoriteItems.length > 0 && (
-                <View style={styles.sectionHeader}>
-                  <Text
-                    style={[
-                      styles.sectionHeaderText,
-                      { color: theme.colors.textSecondary },
-                    ]}
-                  >
-                    {t("quickCommands.allCommands")}
-                  </Text>
-                </View>
-              )}
-              {otherItems.map((cmd) => renderItem(cmd, false))}
+              <View style={styles.sectionHeader}>
+                <Text
+                  style={[
+                    styles.sectionHeaderText,
+                    { color: theme.colors.textSecondary },
+                  ]}
+                >
+                  {t("quickCommands.groups.project")}
+                </Text>
+              </View>
+              {grouped.project.map((cmd) => renderItem(cmd, false))}
+            </>
+          )}
+          {grouped.user.length > 0 && (
+            <>
+              <View style={styles.sectionHeader}>
+                <Text
+                  style={[
+                    styles.sectionHeaderText,
+                    { color: theme.colors.textSecondary },
+                  ]}
+                >
+                  {t("quickCommands.groups.user")}
+                </Text>
+              </View>
+              {grouped.user.map((cmd) => renderItem(cmd, false))}
+            </>
+          )}
+          {grouped.plugins.map(([pluginName, items]) => (
+            <React.Fragment key={`plugin:${pluginName}`}>
+              <View style={styles.sectionHeader}>
+                <Text
+                  style={[
+                    styles.sectionHeaderText,
+                    { color: theme.colors.textSecondary },
+                  ]}
+                >
+                  {pluginName
+                    ? t("quickCommands.groups.pluginNamed", { name: pluginName })
+                    : t("quickCommands.groups.plugin")}
+                </Text>
+              </View>
+              {items.map((cmd) => renderItem(cmd, false))}
+            </React.Fragment>
+          ))}
+          {grouped.codex.length > 0 && (
+            <>
+              <View style={styles.sectionHeader}>
+                <Text
+                  style={[
+                    styles.sectionHeaderText,
+                    { color: theme.colors.textSecondary },
+                  ]}
+                >
+                  {t("quickCommands.groups.codex")}
+                </Text>
+              </View>
+              {grouped.codex.map((cmd) => renderItem(cmd, false))}
+            </>
+          )}
+          {grouped.builtin.length > 0 && (
+            <>
+              <View style={styles.sectionHeader}>
+                <Text
+                  style={[
+                    styles.sectionHeaderText,
+                    { color: theme.colors.textSecondary },
+                  ]}
+                >
+                  {t("quickCommands.groups.builtin")}
+                </Text>
+              </View>
+              {grouped.builtin.map((cmd) => renderItem(cmd, false))}
+            </>
+          )}
+          {grouped.unknown.length > 0 && (
+            <>
+              <View style={styles.sectionHeader}>
+                <Text
+                  style={[
+                    styles.sectionHeaderText,
+                    { color: theme.colors.textSecondary },
+                  ]}
+                >
+                  {t("quickCommands.allCommands")}
+                </Text>
+              </View>
+              {grouped.unknown.map((cmd) => renderItem(cmd, false))}
             </>
           )}
           {favoriteItems.length === 0 && otherItems.length === 0 && (

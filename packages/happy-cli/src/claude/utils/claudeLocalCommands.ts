@@ -54,11 +54,24 @@ import { constants } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
+import type {
+  ClaudeSlashCommand,
+  ClaudeSlashCommandKind,
+  ClaudeSlashCommandSource,
+} from "@kmmao/happy-wire";
+
 import { logger } from "@/ui/logger";
 
 export interface ClaudeLocalCommands {
+  /** Legacy flat list — kept for backward compat with older Apps. */
   slashCommands: string[];
+  /** Legacy descriptions map — kept for backward compat with older Apps. */
   slashCommandDescriptions: Record<string, string>;
+  /**
+   * Rich list with per-entry source/kind/plugin info. Newer Apps consume
+   * this to group the `/` popover by origin (project / user / plugin).
+   */
+  slashCommandsRich: ClaudeSlashCommand[];
 }
 
 interface CollectOptions {
@@ -69,6 +82,10 @@ interface CollectOptions {
 interface CommandEntry {
   name: string;
   description: string | null;
+  source: ClaudeSlashCommandSource;
+  kind: ClaudeSlashCommandKind;
+  /** Plugin name when `source === "plugin"`. */
+  plugin?: string;
 }
 
 async function pathExists(p: string): Promise<boolean> {
@@ -116,6 +133,8 @@ function extractDescription(content: string): string | null {
 async function readCommandsDir(
   dir: string,
   prefix: string,
+  source: ClaudeSlashCommandSource,
+  plugin?: string,
 ): Promise<CommandEntry[]> {
   if (!(await pathExists(dir))) return [];
 
@@ -152,6 +171,9 @@ async function readCommandsDir(
     results.push({
       name: prefix ? `${prefix}:${base}` : base,
       description: extractDescription(content),
+      source,
+      kind: "command",
+      ...(plugin ? { plugin } : {}),
     });
   }
   return results;
@@ -172,6 +194,8 @@ async function readCommandsDir(
 async function readSkillsDir(
   dir: string,
   prefix: string,
+  source: ClaudeSlashCommandSource,
+  plugin?: string,
 ): Promise<CommandEntry[]> {
   if (!(await pathExists(dir))) return [];
 
@@ -209,6 +233,9 @@ async function readSkillsDir(
     results.push({
       name: prefix ? `${prefix}:${entry.name}` : entry.name,
       description: extractDescription(content),
+      source,
+      kind: "skill",
+      ...(plugin ? { plugin } : {}),
     });
   }
   return results;
@@ -262,8 +289,18 @@ async function readPluginCommands(claudeHome: string): Promise<CommandEntry[]> {
     if (typeof install?.installPath !== "string") continue;
 
     const [cmds, skills] = await Promise.all([
-      readCommandsDir(join(install.installPath, "commands"), pluginName),
-      readSkillsDir(join(install.installPath, "skills"), pluginName),
+      readCommandsDir(
+        join(install.installPath, "commands"),
+        pluginName,
+        "plugin",
+        pluginName,
+      ),
+      readSkillsDir(
+        join(install.installPath, "skills"),
+        pluginName,
+        "plugin",
+        pluginName,
+      ),
     ]);
     all.push(...cmds, ...skills);
   }
@@ -291,10 +328,10 @@ export async function collectClaudeLocalCommands(
   const [pluginEntries, userCmds, projectCmds, userSkills, projectSkills] =
     await Promise.all([
       readPluginCommands(claudeHome),
-      readCommandsDir(join(claudeHome, "commands"), ""),
-      readCommandsDir(join(cwd, ".claude", "commands"), ""),
-      readSkillsDir(join(claudeHome, "skills"), ""),
-      readSkillsDir(join(cwd, ".claude", "skills"), ""),
+      readCommandsDir(join(claudeHome, "commands"), "", "user"),
+      readCommandsDir(join(cwd, ".claude", "commands"), "", "project"),
+      readSkillsDir(join(claudeHome, "skills"), "", "user"),
+      readSkillsDir(join(cwd, ".claude", "skills"), "", "project"),
     ]);
 
   // De-dupe by name. Iterate in low → high precedence order so later
@@ -325,6 +362,13 @@ export async function collectClaudeLocalCommands(
       slashCommandDescriptions[c.name] = c.description;
     }
   }
+  const slashCommandsRich: ClaudeSlashCommand[] = sorted.map((c) => ({
+    name: c.name,
+    ...(c.description ? { description: c.description } : {}),
+    source: c.source,
+    kind: c.kind,
+    ...(c.plugin ? { plugin: c.plugin } : {}),
+  }));
 
   logger.debug(
     `[claudeLocalCommands] Discovered ${slashCommands.length} slash commands ` +
@@ -333,5 +377,5 @@ export async function collectClaudeLocalCommands(
       `${pluginEntries.length} plugin entries)`,
   );
 
-  return { slashCommands, slashCommandDescriptions };
+  return { slashCommands, slashCommandDescriptions, slashCommandsRich };
 }

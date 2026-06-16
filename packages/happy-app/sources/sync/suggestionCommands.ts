@@ -4,6 +4,7 @@
  */
 
 import Fuse from "fuse.js";
+import type { ClaudeSlashCommand } from "@kmmao/happy-wire";
 import {
   resolveCodexCompatibilitySlashCommands,
   resolveCodexPromptCommands,
@@ -12,10 +13,35 @@ import { storage } from "./storage";
 
 export type CommandItemKind = "slash" | "skill";
 
+/**
+ * Origin of a command shown in the `/` popover. Used by `CommandListPopover`
+ * to group entries by source. Mirrors `ClaudeSlashCommandSource` from wire
+ * plus an extra `codex` bucket for Codex-side prompts/skills (which use a
+ * separate scanning surface).
+ *
+ * - `builtin` — App-provided fallback (`/compact`, `/clear`)
+ * - `project` — `<cwd>/.claude/commands|skills/`
+ * - `user`    — `~/.claude/commands|skills/`
+ * - `plugin`  — `<pluginInstallPath>/commands|skills/`
+ * - `codex`   — Codex prompts / skills (`metadata.codex.prompts|skills`)
+ * - `unknown` — older CLI that only emits the flat `slashCommands` list
+ *               with no source info; surfaced under a generic group
+ */
+export type CommandItemSource =
+  | "builtin"
+  | "project"
+  | "user"
+  | "plugin"
+  | "codex"
+  | "unknown";
+
 export interface CommandItem {
   command: string; // The command without slash/sigil (e.g., "compact" or "tdd")
   description?: string; // Optional description of what the command does
   kind: CommandItemKind;
+  source: CommandItemSource;
+  /** Plugin name when `source === "plugin"`. */
+  plugin?: string;
 }
 
 export interface FavoriteShortcut {
@@ -84,8 +110,8 @@ export const IGNORED_COMMANDS = [
 
 // Default commands always available
 const DEFAULT_COMMANDS: CommandItem[] = [
-  { command: "compact", description: "Compact the conversation history", kind: "slash" },
-  { command: "clear", description: "Clear the conversation", kind: "slash" },
+  { command: "compact", description: "Compact the conversation history", kind: "slash", source: "builtin" },
+  { command: "clear", description: "Clear the conversation", kind: "slash", source: "builtin" },
 ];
 
 // Command descriptions for known tools/commands
@@ -107,7 +133,31 @@ const COMMAND_DESCRIPTIONS: Record<string, string> = {
   // Add more descriptions as needed
 };
 
-// Merge slash commands from a metadata object into an existing list
+// Merge rich (source-tagged) slash commands from CLI metadata.
+// Each entry's source is preserved as-is so the UI can group by origin.
+function mergeRichSlashCommands(
+  commands: CommandItem[],
+  rich: readonly ClaudeSlashCommand[],
+): void {
+  for (const entry of rich) {
+    if (IGNORED_COMMANDS.includes(entry.name)) continue;
+    if (commands.find((c) => c.kind === "slash" && c.command === entry.name)) {
+      continue;
+    }
+    commands.push({
+      command: entry.name,
+      description: entry.description ?? COMMAND_DESCRIPTIONS[entry.name],
+      kind: "slash",
+      source: entry.source,
+      ...(entry.plugin ? { plugin: entry.plugin } : {}),
+    });
+  }
+}
+
+// Merge slash commands from a metadata object into an existing list. Used as
+// the fallback path when the CLI didn't emit `slashCommandsRich` (older CLI
+// versions). Entries land in the `unknown` bucket because we can't tell
+// project vs user vs plugin from the flat list alone.
 function mergeSlashCommands(
   commands: CommandItem[],
   slashCommands: string[],
@@ -120,6 +170,12 @@ function mergeSlashCommands(
         command: cmd,
         description: descriptions?.[cmd] ?? COMMAND_DESCRIPTIONS[cmd],
         kind: "slash",
+        // Plugin-namespaced names follow `<plugin>:<name>` — infer the origin
+        // even without the rich list so existing plugin commands group
+        // correctly when talking to an older CLI.
+        ...(cmd.includes(":")
+          ? { source: "plugin" as const, plugin: cmd.split(":", 1)[0] }
+          : { source: "unknown" as const }),
       });
     }
   }
@@ -127,7 +183,7 @@ function mergeSlashCommands(
 
 function mergeCodexPromptCommands(
   commands: CommandItem[],
-  promptCommands: readonly Omit<CommandItem, "kind">[],
+  promptCommands: readonly Omit<CommandItem, "kind" | "source">[],
 ): void {
   for (const prompt of promptCommands) {
     if (IGNORED_COMMANDS.includes(prompt.command)) continue;
@@ -136,6 +192,7 @@ function mergeCodexPromptCommands(
         command: prompt.command,
         description: prompt.description,
         kind: "slash",
+        source: "codex",
       });
     }
   }
@@ -152,9 +209,33 @@ function mergeCodexSkills(
         command: skill.name,
         description: skill.description ?? undefined,
         kind: "skill",
+        source: "codex",
       });
     }
   }
+}
+
+// Merge one session's metadata into the running command list. Prefers the
+// rich (source-tagged) list when the CLI emits one; falls back to the flat
+// `slashCommands` field for older CLIs.
+function mergeSessionMetadata(
+  commands: CommandItem[],
+  metadata: NonNullable<
+    ReturnType<typeof storage.getState>["sessions"][string]
+  >["metadata"],
+): void {
+  if (!metadata) return;
+  if (metadata.slashCommandsRich && metadata.slashCommandsRich.length > 0) {
+    mergeRichSlashCommands(commands, metadata.slashCommandsRich);
+  } else {
+    mergeSlashCommands(
+      commands,
+      resolveCodexCompatibilitySlashCommands(metadata),
+      metadata.slashCommandDescriptions,
+    );
+  }
+  mergeCodexPromptCommands(commands, resolveCodexPromptCommands(metadata));
+  mergeCodexSkills(commands, metadata.codex?.skills);
 }
 
 // Get commands from session metadata
@@ -166,18 +247,7 @@ function getCommandsFromSession(sessionId: string): CommandItem[] {
   if (!sessionId) {
     const commands: CommandItem[] = [...DEFAULT_COMMANDS];
     for (const session of Object.values(state.sessions)) {
-      if (session?.metadata) {
-        mergeSlashCommands(
-          commands,
-          resolveCodexCompatibilitySlashCommands(session.metadata),
-          session.metadata.slashCommandDescriptions,
-        );
-        mergeCodexPromptCommands(
-          commands,
-          resolveCodexPromptCommands(session.metadata),
-        );
-        mergeCodexSkills(commands, session.metadata.codex?.skills);
-      }
+      mergeSessionMetadata(commands, session?.metadata);
     }
     return commands;
   }
@@ -188,19 +258,7 @@ function getCommandsFromSession(sessionId: string): CommandItem[] {
   }
 
   const commands: CommandItem[] = [...DEFAULT_COMMANDS];
-  if (session.metadata) {
-    mergeSlashCommands(
-      commands,
-      resolveCodexCompatibilitySlashCommands(session.metadata),
-      session.metadata.slashCommandDescriptions,
-    );
-  }
-  mergeCodexPromptCommands(
-    commands,
-    resolveCodexPromptCommands(session.metadata),
-  );
-  mergeCodexSkills(commands, session.metadata.codex?.skills);
-
+  mergeSessionMetadata(commands, session.metadata);
   return commands;
 }
 

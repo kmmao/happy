@@ -3575,6 +3575,12 @@ export const ca: TranslationStructure = {
       favorites: "Preferits",
       root: "Scripts del projecte",
       shell: "Comandes Shell",
+      project: "Projecte",
+      user: "Usuari",
+      plugin: "Connector",
+      pluginNamed: ({ name }: { name: string }) => `Connector · ${name}`,
+      codex: "Codex",
+      builtin: "Integrat",
     },
   },
 

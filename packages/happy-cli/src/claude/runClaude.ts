@@ -250,6 +250,9 @@ export async function runClaude(
       ...(Object.keys(localCommands.slashCommandDescriptions).length > 0
         ? { slashCommandDescriptions: localCommands.slashCommandDescriptions }
         : {}),
+      ...(localCommands.slashCommandsRich.length > 0
+        ? { slashCommandsRich: localCommands.slashCommandsRich }
+        : {}),
     };
   }
 

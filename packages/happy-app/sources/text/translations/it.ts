@@ -3570,6 +3570,12 @@ export const it: TranslationStructure = {
       favorites: "Preferiti",
       root: "Script del progetto",
       shell: "Comandi Shell",
+      project: "Progetto",
+      user: "Utente",
+      plugin: "Plugin",
+      pluginNamed: ({ name }: { name: string }) => `Plugin · ${name}`,
+      codex: "Codex",
+      builtin: "Integrato",
     },
   },
 

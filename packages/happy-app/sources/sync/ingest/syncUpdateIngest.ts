@@ -133,7 +133,25 @@ export async function ingestSyncUpdate(
         case "trigger-schedule-deleted":
             // Server emits on cron tick + every Schedule CRUD. Replaces
             // the 30 s poll that useWorkflows used to run as a fallback.
-            log.log(`⏰ Received ${body.t} event`);
+            // [diag:nextRunAt] dump the schedule payload so we can verify
+            // the server-side nextRunAt actually advances on each tick
+            // (compare to what useWorkflows logs on the follow-up fetch).
+            if (body.t === "trigger-schedule-updated") {
+                const schedule = body.schedule as Record<string, unknown>;
+                const nextRunAt =
+                    typeof schedule?.nextRunAt === "number"
+                        ? new Date(schedule.nextRunAt).toISOString()
+                        : (schedule?.nextRunAt ?? null);
+                const lastRunAt =
+                    typeof schedule?.lastRunAt === "number"
+                        ? new Date(schedule.lastRunAt).toISOString()
+                        : (schedule?.lastRunAt ?? null);
+                log.log(
+                    `⏰ Received trigger-schedule-updated id=${schedule?.id} name=${JSON.stringify(schedule?.name ?? null)} enabled=${schedule?.enabled} nextRunAt=${nextRunAt} lastRunAt=${lastRunAt} runCount=${schedule?.runCount}`,
+                );
+            } else {
+                log.log(`⏰ Received trigger-schedule-deleted id=${(body as { scheduleId?: string }).scheduleId}`);
+            }
             return [{ kind: "schedules-stale" }];
         case "webhook-trigger-updated":
         case "webhook-trigger-deleted":

@@ -1,5 +1,6 @@
 import { z } from "zod";
 import {
+  ClaudeSlashCommandSchema,
   CodexMetadataSchema,
   sessionProgressStateSchema,
   sessionSummaryRefreshStateSchema,
@@ -87,6 +88,10 @@ export const MetadataSchema = z.object({
   tools: z.array(z.string()).optional(),
   slashCommands: z.array(z.string()).optional(),
   slashCommandDescriptions: z.record(z.string(), z.string()).optional(),
+  // Rich slash-command list with origin/source per entry. Newer CLIs emit
+  // this alongside the flat `slashCommands` for back-compat with older Apps.
+  // See `suggestionCommands.ts` for consumption.
+  slashCommandsRich: z.array(ClaudeSlashCommandSchema).optional(),
   homeDir: z.string().optional(),
   happyHomeDir: z.string().optional(),
   hostPid: z.number().optional(),

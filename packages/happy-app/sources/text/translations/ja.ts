@@ -3550,6 +3550,12 @@ export const ja: TranslationStructure = {
       favorites: "お気に入り",
       root: "プロジェクトスクリプト",
       shell: "シェルコマンド",
+      project: "プロジェクト",
+      user: "ユーザー",
+      plugin: "プラグイン",
+      pluginNamed: ({ name }: { name: string }) => `プラグイン · ${name}`,
+      codex: "Codex",
+      builtin: "組み込み",
     },
   },
 
