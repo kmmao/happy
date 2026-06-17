@@ -681,6 +681,26 @@ export async function runClaude(
     }
   }
 
+  // Bootstrap slash command (e.g. "/caveman") — push as a standalone user
+  // message BEFORE the initial prompt so Claude Code's slash parser activates
+  // the skill first and the subsequent prompt is processed under that mode.
+  // Goes through the same PTY-input pipeline as keyboard input, so the slash
+  // command is interpreted, not delivered as literal text to the LLM.
+  const bootstrapSlash = process.env.HAPPY_BOOTSTRAP_SLASH_COMMAND?.trim();
+  if (bootstrapSlash) {
+    messageQueue.push(
+      bootstrapSlash,
+      {
+        permissionMode: "bypassPermissions",
+        ...(currentMaxBudgetUsd !== undefined ? { maxBudgetUsd: currentMaxBudgetUsd } : {}),
+      } as EnhancedMode,
+      undefined,
+      { priority: "background", kind: "automation", source: "bootstrap-slash" },
+    );
+    logger.debug(`[START] Pushed bootstrap slash command: ${bootstrapSlash}`);
+    delete process.env.HAPPY_BOOTSTRAP_SLASH_COMMAND;
+  }
+
   // Inject initial prompt from file if env var is set (webhook-triggered sessions)
   const initialPromptFile = process.env.HAPPY_INITIAL_PROMPT_FILE;
   if (initialPromptFile) {

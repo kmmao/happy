@@ -31,6 +31,7 @@
  */
 
 import { logger } from "@/ui/logger";
+import { readDaemonState } from "@/persistence";
 import {
   claudePtyTerminalId,
   TERMINAL_REPLAY_BUFFER_BYTES,
@@ -77,23 +78,117 @@ function ensureQueue(terminalId: string): OutgoingQueue {
   return q;
 }
 
+// ---------------------------------------------------------------------------
+// Daemon-restart self-healing
+// ---------------------------------------------------------------------------
+// `HAPPY_DAEMON_CONTROL_URL` is injected at session-spawn time and points at
+// the daemon's then-current loopback HTTP port. When the user runs
+// `happy daemon stop && start` the daemon's PID and HTTP port both change,
+// the session child still holds the stale URL, all POSTs ECONNREFUSED, and
+// the App's "Claude" side panel goes blank because the new daemon has no
+// record of this session's PTY.
+//
+// We fix this from the session side (the daemon end stays untouched):
+//
+// 1. Cache every successful `bridgeAttach` input in `attachedTerminals`.
+// 2. Treat the URL as a hint — if a POST fails, read `~/.happy/daemon.state.json`
+//    (the daemon already maintains this file with `httpPort`), build a fresh
+//    URL, replay every cached `attachClaudePty` against it, then retry the
+//    failed POST once.
+// 3. Single inflight refresh so a burst of failures during the daemon's
+//    sub-second downtime fans into a single reconnect attempt, not N.
+//
+// No daemon code change is required because `/claude-pty/attach` is already
+// idempotent on the registry side — re-POSTing the same terminalId after a
+// daemon restart just re-creates the entry.
+
+const attachedTerminals = new Map<string, ClaudePtyBridgeAttachInput>();
+// Reconnect override — set only when `refreshAndReattach` discovers a fresh
+// daemon URL after the env var's URL stopped responding. Treated as a fallback
+// the env var hasn't yet been updated to; getBaseUrl prefers the env var when
+// both are set, so a new session-spawn (where the daemon injects a current
+// env var) always wins.
+let reconnectBaseUrl: string | null = null;
+let reconnectInflight: Promise<string | null> | null = null;
+
+function getBaseUrl(): string | null {
+  return process.env[DAEMON_CONTROL_ENV] ?? reconnectBaseUrl;
+}
+
+async function refreshAndReattach(): Promise<string | null> {
+  if (reconnectInflight) return reconnectInflight;
+  reconnectInflight = (async () => {
+    try {
+      const state = await readDaemonState();
+      if (!state?.httpPort) return getBaseUrl();
+      const url = `http://127.0.0.1:${state.httpPort}`;
+      const current = getBaseUrl();
+      if (url === current) return current;
+      logger.debug(
+        `[claudePtyDaemonBridge] Daemon URL changed: ${current ?? "(none)"} → ${url}; re-attaching ${attachedTerminals.size} terminal(s)`,
+      );
+      reconnectBaseUrl = url;
+      // Replay every known attachment so the fresh daemon learns about them.
+      // We bypass postRaw's failure-triggered refresh by calling fetch
+      // directly to avoid recursive refresh attempts during reconnect.
+      for (const input of attachedTerminals.values()) {
+        try {
+          await fetch(`${url}/claude-pty/attach`, {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify(input),
+          });
+        } catch (err) {
+          logger.debug(
+            `[claudePtyDaemonBridge] Re-attach of ${input.terminalId} failed: ${err instanceof Error ? err.message : String(err)}`,
+          );
+        }
+      }
+      return url;
+    } finally {
+      reconnectInflight = null;
+    }
+  })();
+  return reconnectInflight;
+}
+
 async function postRaw(path: string, body: unknown): Promise<void> {
-  const base = process.env[DAEMON_CONTROL_ENV];
-  if (!base) return;
+  const url = getBaseUrl();
+  if (!url) return;
   try {
-    const res = await fetch(`${base}${path}`, {
+    const res = await fetch(`${url}${path}`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (res.ok) return;
+    logger.debug(
+      `[claudePtyDaemonBridge] POST ${path} → ${res.status} ${res.statusText}; refreshing daemon URL`,
+    );
+  } catch (err) {
+    logger.debug(
+      `[claudePtyDaemonBridge] POST ${path} failed: ${err instanceof Error ? err.message : String(err)}; refreshing daemon URL`,
+    );
+  }
+  // Failure path — refresh URL and retry once with the fresh base. Skip retry
+  // for /claude-pty/attach itself: refreshAndReattach already replayed every
+  // cached attachment, so re-POSTing here would just duplicate the work.
+  const fresh = await refreshAndReattach();
+  if (!fresh || fresh === url || path === "/claude-pty/attach") return;
+  try {
+    const res = await fetch(`${fresh}${path}`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify(body),
     });
     if (!res.ok) {
       logger.debug(
-        `[claudePtyDaemonBridge] POST ${path} → ${res.status} ${res.statusText}`,
+        `[claudePtyDaemonBridge] Retry POST ${path} → ${res.status} ${res.statusText}`,
       );
     }
   } catch (err) {
     logger.debug(
-      `[claudePtyDaemonBridge] POST ${path} failed: ${err instanceof Error ? err.message : String(err)}`,
+      `[claudePtyDaemonBridge] Retry POST ${path} failed: ${err instanceof Error ? err.message : String(err)}`,
     );
   }
 }
@@ -181,6 +276,9 @@ export interface ClaudePtyBridgeAttachInput {
 
 /** Register the Claude PTY with the daemon so App spawn/list RPCs can find it. */
 export function bridgeAttach(input: ClaudePtyBridgeAttachInput): Promise<void> {
+  // Cache the input so refreshAndReattach can replay it after a daemon restart
+  // (the daemon's PTY registry is in-memory and gets wiped on every restart).
+  attachedTerminals.set(input.terminalId, input);
   return postRaw("/claude-pty/attach", input);
 }
 
@@ -190,6 +288,7 @@ export function bridgeAttach(input: ClaudePtyBridgeAttachInput): Promise<void> {
  * command before the terminal goes away.
  */
 export async function bridgeDetach(terminalId: string): Promise<void> {
+  attachedTerminals.delete(terminalId);
   await flushAndDrop(terminalId);
   await postRaw("/claude-pty/detach", { terminalId });
 }
@@ -208,6 +307,7 @@ export function bridgeData(terminalId: string, data: string): void {
  * closed" event arrives strictly after every byte the terminal produced.
  */
 export async function bridgeExit(terminalId: string, exitCode: number): Promise<void> {
+  attachedTerminals.delete(terminalId);
   await flushAndDrop(terminalId);
   await postRaw("/claude-pty/exit", { terminalId, exitCode });
 }
@@ -223,4 +323,7 @@ export function bridgeAvailable(): boolean {
  */
 export function _resetBridgeForTests(): void {
   queues.clear();
+  attachedTerminals.clear();
+  reconnectBaseUrl = null;
+  reconnectInflight = null;
 }

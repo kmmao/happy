@@ -87,6 +87,9 @@ export async function runAgentLoopJob(
       HAPPY_AGENT_LOOP_ROLE_NAME: data.roleName ?? "",
       HAPPY_AGENT_LOOP_ROLE_TYPE: data.roleType ?? "",
       HAPPY_AGENT_LOOP_MAX_USD_PER_RUN: data.maxUsdPerRun !== undefined ? String(data.maxUsdPerRun) : "",
+      // Optional skill/slash command pushed into the session as the first
+      // user message — see runClaude.ts consumer.
+      HAPPY_BOOTSTRAP_SLASH_COMMAND: data.bootstrapSlashCommand ?? "",
       ...(data.environmentVariables ?? {}),
     },
   });

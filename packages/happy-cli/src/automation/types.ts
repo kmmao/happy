@@ -73,6 +73,13 @@ export interface AgentLoopTriggerData {
   roleName?: string;
   roleType?: string;
   maxUsdPerRun?: number;
+  /**
+   * Optional slash command (e.g. "/caveman") pushed into the spawned
+   * session as the first user message — runs through the same PTY-input
+   * pipeline as keyboard input, so Claude Code's slash parser triggers
+   * the skill before the iteration's main prompt is delivered.
+   */
+  bootstrapSlashCommand?: string;
 }
 
 export interface TaskTriggerData {

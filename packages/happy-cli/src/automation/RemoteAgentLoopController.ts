@@ -248,6 +248,9 @@ function spreadGenericConfig(
     if (typeof cfg.quietHoursStart === "string") out.quietHoursStart = cfg.quietHoursStart;
     if (typeof cfg.quietHoursEnd === "string") out.quietHoursEnd = cfg.quietHoursEnd;
     if (typeof cfg.maxAutoRunsPerDay === "number") out.maxAutoRunsPerDay = cfg.maxAutoRunsPerDay;
+    if (typeof cfg.bootstrapSlashCommand === "string") {
+        out.bootstrapSlashCommand = cfg.bootstrapSlashCommand;
+    }
     if (cfg.environmentVariables && typeof cfg.environmentVariables === "object") {
         out.environmentVariables = cfg.environmentVariables as Record<string, string>;
     }

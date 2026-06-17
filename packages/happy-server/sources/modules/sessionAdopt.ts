@@ -164,10 +164,19 @@ export async function sessionAdopt(opts: {
                     enabled: true,
                     intervalMs: target.intervalMs,
                     cronExpression: target.cronExpression,
-                    // Stash the optional name in genericConfig — same place
-                    // serializeAgentLoop reads it from for the list view.
-                    ...(target.name
-                        ? { genericConfig: { name: target.name } }
+                    // Stash optional name + bootstrapSlashCommand in
+                    // genericConfig — serializeAgentLoop reads name for
+                    // the list view, and the CLI daemon's spreadGenericConfig
+                    // promotes bootstrapSlashCommand into the trigger.
+                    ...((target.name || target.bootstrapSlashCommand)
+                        ? {
+                            genericConfig: {
+                                ...(target.name ? { name: target.name } : {}),
+                                ...(target.bootstrapSlashCommand
+                                    ? { bootstrapSlashCommand: target.bootstrapSlashCommand }
+                                    : {}),
+                            },
+                        }
                         : {}),
                 },
             });

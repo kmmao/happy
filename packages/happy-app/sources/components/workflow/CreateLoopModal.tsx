@@ -455,6 +455,7 @@ export const CreateLoopModal = React.memo(function CreateLoopModal({
     const [pickedProjectServerId, setPickedProjectServerId] = React.useState<string>("");
     const [prompt, setPrompt] = React.useState("");
     const [name, setName] = React.useState("");
+    const [bootstrapSlashCommand, setBootstrapSlashCommand] = React.useState("");
     const [schedule, setSchedule] = React.useState<ScheduleChoice>("1h");
     const [cronExpression, setCronExpression] = React.useState("*/30 * * * *");
     const [agent, setAgent] = React.useState<AgentChoice>("claude");
@@ -554,6 +555,7 @@ export const CreateLoopModal = React.memo(function CreateLoopModal({
         try {
             const trimmedPrompt = prompt.trim();
             const trimmedName = name.trim();
+            const trimmedBootstrap = bootstrapSlashCommand.trim();
             const intervalMs =
                 schedule === "cron" ? undefined : SCHEDULE_INTERVALS_MS[schedule];
             const cron =
@@ -573,6 +575,7 @@ export const CreateLoopModal = React.memo(function CreateLoopModal({
                         intervalMs,
                         cronExpression: cron,
                         name: trimmedName || undefined,
+                        bootstrapSlashCommand: trimmedBootstrap || undefined,
                     },
                 });
                 if (!result.success) {
@@ -591,7 +594,16 @@ export const CreateLoopModal = React.memo(function CreateLoopModal({
                 };
                 if (cron) body.cronExpression = cron;
                 if (intervalMs !== undefined) body.intervalMs = intervalMs;
-                if (trimmedName) body.genericConfig = { name: trimmedName };
+                // Stash optional name + bootstrap slash command in the
+                // generic-config bag (same path the daemon promotes from).
+                if (trimmedName || trimmedBootstrap) {
+                    body.genericConfig = {
+                        ...(trimmedName ? { name: trimmedName } : {}),
+                        ...(trimmedBootstrap
+                            ? { bootstrapSlashCommand: trimmedBootstrap }
+                            : {}),
+                    };
+                }
 
                 await createAgentLoop(credentials, pickedProject.serverId, body);
             }
@@ -934,6 +946,28 @@ export const CreateLoopModal = React.memo(function CreateLoopModal({
                     placeholder={t("workflows.loopOptionalNamePlaceholder")}
                     placeholderTextColor={theme.colors.textSecondary}
                 />
+            </View>
+
+            {/* Optional bootstrap slash command (e.g. /caveman) — pushed
+                into the session as the first user message every iteration
+                so a Skill activates before the prompt runs. Daemon reads
+                this from genericConfig.bootstrapSlashCommand. */}
+            <View>
+                <Text style={styles.sectionLabel}>
+                    {t("workflows.loopBootstrapSlashCommand")}
+                </Text>
+                <TextInput
+                    style={[styles.input, { marginTop: 6 }]}
+                    value={bootstrapSlashCommand}
+                    onChangeText={setBootstrapSlashCommand}
+                    placeholder={t("workflows.loopBootstrapSlashCommandPlaceholder")}
+                    placeholderTextColor={theme.colors.textSecondary}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                />
+                <Text style={styles.infoHint}>
+                    {t("workflows.loopBootstrapSlashCommandHint")}
+                </Text>
             </View>
 
             {/* Advanced fold-out — CLI readiness panel from the old
