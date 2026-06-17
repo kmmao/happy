@@ -1488,6 +1488,7 @@ export const ca: TranslationStructure = {
     input: "Entrada",
     output: "Sortida",
     arguments: "Arguments",
+    mcpOutputTruncated: "Truncat — toca la targeta per veure la sortida completa",
   },
 
   diff: {

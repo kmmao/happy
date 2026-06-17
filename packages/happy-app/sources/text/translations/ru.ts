@@ -1498,6 +1498,7 @@ export const ru: TranslationStructure = {
     input: "Входные данные",
     output: "Результат",
     arguments: "Аргументы",
+    mcpOutputTruncated: "Обрезано — нажмите на карточку, чтобы увидеть полный результат",
   },
 
   diff: {

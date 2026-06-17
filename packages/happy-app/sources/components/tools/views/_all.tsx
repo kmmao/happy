@@ -22,6 +22,7 @@ import { HappyUpdateProgressView } from "./HappyUpdateProgressView";
 import { TaskManagementView } from "./TaskManagementView";
 import { SkillView } from "./SkillView";
 import { SkillViewFull } from "./SkillViewFull";
+import { McpToolView } from "./MCPToolView";
 
 export type ToolViewProps = {
   tool: ToolCall;
@@ -73,11 +74,17 @@ export const toolFullViewRegistry: Record<string, ToolViewComponent> = {
   mcp__happy__update_progress: HappyUpdateProgressView,
 };
 
-// Helper function to get the appropriate view component for a tool
+// Helper function to get the appropriate view component for a tool.
+// Falls back to McpToolView for any `mcp__*` tool not explicitly registered —
+// replaces the old header-only `minimal` rendering with an inline input/output
+// preview. Explicit registry entries (e.g. mcp__happy__ask_user) win.
 export function getToolViewComponent(
   toolName: string,
 ): ToolViewComponent | null {
-  return toolViewRegistry[toolName] || null;
+  const explicit = toolViewRegistry[toolName];
+  if (explicit) return explicit;
+  if (toolName.startsWith("mcp__")) return McpToolView;
+  return null;
 }
 
 // Helper function to get the full view component for a tool
@@ -106,3 +113,4 @@ export { HappyUpdateProgressView } from "./HappyUpdateProgressView";
 export { TaskManagementView } from "./TaskManagementView";
 export { SkillView } from "./SkillView";
 export { SkillViewFull } from "./SkillViewFull";
+export { McpToolView } from "./MCPToolView";

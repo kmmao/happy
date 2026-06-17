@@ -1512,6 +1512,7 @@ export const en = {
     input: "Input",
     output: "Output",
     arguments: "Arguments",
+    mcpOutputTruncated: "Truncated — tap the card to view the full output",
   },
 
   diff: {

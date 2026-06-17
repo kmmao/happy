@@ -1610,6 +1610,7 @@ export const ja: TranslationStructure = {
     input: "入力",
     output: "出力",
     arguments: "引数",
+    mcpOutputTruncated: "省略されています — カードをタップして完全な出力を表示",
   },
 
   diff: {

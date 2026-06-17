@@ -1497,6 +1497,7 @@ export const pl: TranslationStructure = {
     input: "Wejście",
     output: "Wyjście",
     arguments: "Argumenty",
+    mcpOutputTruncated: "Skrócono — dotknij karty, aby wyświetlić pełne wyjście",
   },
 
   diff: {

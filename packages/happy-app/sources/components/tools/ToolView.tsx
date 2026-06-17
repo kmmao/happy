@@ -219,7 +219,11 @@ export const ToolView = React.memo<ToolViewProps>((props) => {
   // Handle optional title and function type
   let toolTitle = tool.name;
 
-  // Special handling for MCP tools
+  // Special handling for MCP tools: keep the puzzle icon + formatted title,
+  // but let `McpToolView` (registered via getToolViewComponent's mcp__ fallback)
+  // render the inline input/output preview. Previously this branch set
+  // `minimal = true`, suppressing all content and forcing users into the
+  // detail page just to see what an MCP server returned.
   if (tool.name.startsWith("mcp__") && !knownTool) {
     toolTitle = formatMCPTitle(tool.name);
     icon = (
@@ -229,7 +233,6 @@ export const ToolView = React.memo<ToolViewProps>((props) => {
         color={theme.colors.textSecondary}
       />
     );
-    minimal = true;
   } else if (knownTool?.title) {
     if (typeof knownTool.title === "function") {
       toolTitle = knownTool.title({ tool, metadata: props.metadata });

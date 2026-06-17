@@ -1448,6 +1448,7 @@ export const zhHans: TranslationStructure = {
     input: "输入",
     output: "输出",
     arguments: "参数",
+    mcpOutputTruncated: "已截断 — 点击卡片查看完整输出",
   },
 
   diff: {

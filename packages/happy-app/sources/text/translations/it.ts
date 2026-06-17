@@ -1622,6 +1622,7 @@ export const it: TranslationStructure = {
     input: "Input",
     output: "Output",
     arguments: "Argomenti",
+    mcpOutputTruncated: "Troncato — tocca la scheda per vedere l'output completo",
   },
 
   diff: {
