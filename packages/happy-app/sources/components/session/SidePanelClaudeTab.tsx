@@ -45,18 +45,43 @@ export const SidePanelClaudeTab = React.memo<SidePanelClaudeTabProps>(
                 setState({ kind: "offline" });
                 return;
             }
+            // The session child registers its Claude PTY with the daemon
+            // asynchronously after spawn (PTY can take 20-30 s to become
+            // ready in remote mode). A single fetch here would race and lock
+            // the panel into a permanent "Claude is not running" state.
+            // Poll with backoff so the panel self-recovers without a refresh.
+            // Total horizon ~50 s — long enough for normal startup latency,
+            // short enough that a truly missing PTY surfaces promptly.
+            const BACKOFF_MS = [2000, 3000, 5000, 8000, 12000, 20000];
             let cancelled = false;
+            let timer: ReturnType<typeof setTimeout> | null = null;
+            let attempt = 0;
+
             setState({ kind: "loading" });
-            (async () => {
+
+            const tick = async () => {
+                attempt += 1;
                 const result = await machineClaudePtyAttach(machineId, sessionId);
                 if (cancelled) return;
                 if (result.success && result.exists && result.terminalId) {
                     setState({ kind: "attached", terminalId: result.terminalId });
-                } else {
-                    setState({ kind: "missing" });
+                    return;
                 }
-            })();
-            return () => { cancelled = true; };
+                if (attempt > BACKOFF_MS.length) {
+                    setState({ kind: "missing" });
+                    return;
+                }
+                // Stay in "loading" between attempts so the user sees a
+                // single steady "connecting…" instead of flicker between
+                // states. Only commit to "missing" once we exhaust retries.
+                timer = setTimeout(tick, BACKOFF_MS[attempt - 1]);
+            };
+            void tick();
+
+            return () => {
+                cancelled = true;
+                if (timer) clearTimeout(timer);
+            };
         }, [machineId, sessionId]);
 
         if (!machineId || state.kind === "offline") {
