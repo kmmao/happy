@@ -32,7 +32,7 @@ import { CommandListPopover } from "./CommandListPopover";
 import { TextInputState, MultiTextInputHandle } from "./MultiTextInput";
 import { applySuggestion } from "./autocomplete/applySuggestion";
 import { useUserMessageHistory } from "@/hooks/useUserMessageHistory";
-import { useUnistyles } from "react-native-unistyles";
+import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import {
   useSetting,
   useSettingMutable,
@@ -1022,45 +1022,50 @@ export const AgentInput = React.memo(
                         />
                       )}
                     </Pressable>
-                    {props.connectionStatus.cavemanActive && (
-                      <Pressable
-                        onPress={props.connectionStatus.onCavemanPress}
-                        disabled={!props.connectionStatus.onCavemanPress}
-                        hitSlop={6}
-                        // Pill matches the RPC summary capsule
-                        // (InputFAB:summaryPill) — same shape and sizing, but
-                        // tinted with accentOrange so caveman reads as a
-                        // distinct mode badge rather than a status indicator.
-                        style={({ pressed }) => ({
-                          flexDirection: "row",
-                          alignItems: "center",
-                          gap: 5,
-                          paddingHorizontal: 7,
-                          paddingVertical: 3,
-                          borderRadius: 999,
-                          backgroundColor: `${theme.colors.accentOrange}18`,
-                          opacity: pressed ? 0.6 : 1,
-                          cursor: props.connectionStatus?.onCavemanPress
-                            ? ("pointer" as any)
-                            : undefined,
-                        })}
-                      >
-                        <StatusDot
-                          color={theme.colors.accentOrange}
-                          size={5}
-                        />
-                        <Text
-                          style={{
-                            fontSize: 10,
-                            color: theme.colors.accentOrange,
-                            ...Typography.default("semiBold"),
-                          }}
-                          numberOfLines={1}
+                    {props.connectionStatus.onCavemanPress && (() => {
+                      // Caveman badge is ALWAYS visible so users can toggle the
+                      // skill on/off from any device — not only after it's been
+                      // activated. Active state uses `success` (green fill);
+                      // inactive uses a hollow capsule with a `textSecondary`
+                      // outline so the badge reads as "off, click to enable".
+                      const active = !!props.connectionStatus.cavemanActive;
+                      const tone = active
+                        ? theme.colors.success
+                        : theme.colors.textSecondary;
+                      return (
+                        <Pressable
+                          onPress={props.connectionStatus.onCavemanPress}
+                          hitSlop={6}
+                          style={({ pressed }) => ({
+                            flexDirection: "row",
+                            alignItems: "center",
+                            gap: 5,
+                            paddingHorizontal: 7,
+                            paddingVertical: 3,
+                            borderRadius: 999,
+                            backgroundColor: active
+                              ? `${theme.colors.success}18`
+                              : "transparent",
+                            borderWidth: active ? 0 : StyleSheet.hairlineWidth,
+                            borderColor: active ? "transparent" : tone,
+                            opacity: pressed ? 0.6 : 1,
+                            cursor: "pointer" as any,
+                          })}
                         >
-                          {t("session.cavemanBadge")}
-                        </Text>
-                      </Pressable>
-                    )}
+                          <StatusDot color={tone} size={5} />
+                          <Text
+                            style={{
+                              fontSize: 10,
+                              color: tone,
+                              ...Typography.default("semiBold"),
+                            }}
+                            numberOfLines={1}
+                          >
+                            {t("session.cavemanBadge")}
+                          </Text>
+                        </Pressable>
+                      );
+                    })()}
                     {props.connectionStatus.cliStatus && (
                       <>
                         <View

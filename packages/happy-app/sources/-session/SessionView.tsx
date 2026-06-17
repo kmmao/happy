@@ -979,18 +979,29 @@ function SessionViewInner({
     [messages],
   );
   const handleCavemanPress = React.useCallback(async () => {
-    const confirmed = await Modal.confirm(
-      t("session.cavemanCloseTitle"),
-      t("session.cavemanCloseMessage"),
-      { confirmText: t("common.ok"), destructive: true },
-    );
-    if (!confirmed) return;
+    // Toggle the caveman skill: when inactive, just send `/caveman` (enabling
+    // it has no destructive side effects, so we skip the confirm); when active,
+    // keep the confirm so the user doesn't disable the mode by accident.
+    if (cavemanActive) {
+      const confirmed = await Modal.confirm(
+        t("session.cavemanCloseTitle"),
+        t("session.cavemanCloseMessage"),
+        { confirmText: t("common.ok"), destructive: true },
+      );
+      if (!confirmed) return;
+      storage.getState().appendToPendingQueue(sessionId, {
+        localId: randomUUID(),
+        message: "stop caveman",
+      });
+      trackMessageSent();
+      return;
+    }
     storage.getState().appendToPendingQueue(sessionId, {
       localId: randomUUID(),
-      message: "stop caveman",
+      message: "/caveman",
     });
     trackMessageSent();
-  }, [sessionId]);
+  }, [sessionId, cavemanActive]);
   const sessionStatus = React.useMemo(
     () => applyRunningWorkflowStatus(baseSessionStatus, hasRunningWorkflow),
     [baseSessionStatus, hasRunningWorkflow],

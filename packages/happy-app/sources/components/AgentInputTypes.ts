@@ -80,9 +80,11 @@ export interface AgentInputProps {
             codex: boolean | null;
             gemini?: boolean | null;
         };
-        // Caveman skill indicator — shown inline next to the status text when
-        // the session has activated the caveman skill. Press opens a confirm
-        // modal that, on confirm, sends a "stop caveman" message to disable it.
+        // Caveman skill toggle — the badge is shown inline next to the status
+        // text whenever `onCavemanPress` is provided, and `cavemanActive`
+        // controls the visual state (green filled when on, hollow outlined
+        // when off). Pressing it sends `/caveman` to enable or `stop caveman`
+        // to disable (with a confirm modal on the disable path).
         cavemanActive?: boolean;
         onCavemanPress?: () => void;
     };

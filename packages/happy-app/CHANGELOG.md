@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.41.0 - 2026-06-17
+
+The Caveman skill badge above the input is now always visible so you can toggle the skill on or off from any device — previously it only appeared after Caveman was already active, which made the off→on direction invisible from the App.
+
+### Caveman skill toggle
+- Added an always-on Caveman badge next to the connection status. Inactive state renders as a hollow capsule with a `textSecondary` outline; active state fills with `theme.colors.success` (green) so the mode is unmistakable at a glance.
+- Improved the press behavior to be bi-directional: pressing the badge while inactive sends `/caveman` straight through (no confirm — enabling has no side effects), while pressing it while active still shows the existing confirm modal before sending `stop caveman`.
+
 ## 2.40.2 - 2026-06-17
 
 ### Context window control

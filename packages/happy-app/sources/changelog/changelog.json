@@ -2,6 +2,16 @@
   "entries": {
     "en": [
       {
+        "version": "2.41.0",
+        "date": "2026-06-17",
+        "summary": "The Caveman skill badge above the input is now always visible so you can toggle the skill on or off from any device — previously it only appeared after Caveman was already active, which made the off→on direction invisible from the App.",
+        "changes": [
+          "Added an always-on Caveman badge next to the connection status. Inactive state renders as a hollow capsule with a `textSecondary` outline; active state fills with `theme.colors.success` (green) so the mode is unmistakable at a glance.",
+          "Improved the press behavior to be bi-directional: pressing the badge while inactive sends `/caveman` straight through (no confirm — enabling has no side effects), while pressing it while active still shows the existing confirm modal before sending `stop caveman`."
+        ],
+        "rawMarkdown": "## 2.41.0 - 2026-06-17\n\n\nThe Caveman skill badge above the input is now always visible so you can toggle the skill on or off from any device — previously it only appeared after Caveman was already active, which made the off→on direction invisible from the App.\n\n### Caveman skill toggle\n- Added an always-on Caveman badge next to the connection status. Inactive state renders as a hollow capsule with a `textSecondary` outline; active state fills with `theme.colors.success` (green) so the mode is unmistakable at a glance.\n- Improved the press behavior to be bi-directional: pressing the badge while inactive sends `/caveman` straight through (no confirm — enabling has no side effects), while pressing it while active still shows the existing confirm modal before sending `stop caveman`."
+      },
+      {
         "version": "2.40.2",
         "date": "2026-06-17",
         "summary": "",
@@ -1088,6 +1098,16 @@
     ],
     "zh-Hans": [
       {
+        "version": "2.41.0",
+        "date": "2026-06-17",
+        "summary": "输入框上方的 Caveman skill 徽章现在始终可见 —— 之前只有在 Caveman 已激活时才会显示，从 App 这边无法看到 off→on 的入口，需要手动输入 `/caveman`。徽章现在常驻显示，从任何设备都能点一下开关。",
+        "changes": [
+          "新增常驻 Caveman 徽章，紧邻连接状态：未激活时显示为空心胶囊（`textSecondary` 描边），激活时填充 `theme.colors.success`（绿色），一眼能看出当前模式。",
+          "改进点击行为为双向：未激活时点击直接发送 `/caveman`（启用无副作用，跳过确认）；已激活时仍弹出原确认弹窗后发送 `stop caveman`。"
+        ],
+        "rawMarkdown": "## 2.41.0 - 2026-06-17\n\n\n输入框上方的 Caveman skill 徽章现在始终可见 —— 之前只有在 Caveman 已激活时才会显示，从 App 这边无法看到 off→on 的入口，需要手动输入 `/caveman`。徽章现在常驻显示，从任何设备都能点一下开关。\n\n### Caveman skill 切换\n- 新增常驻 Caveman 徽章，紧邻连接状态：未激活时显示为空心胶囊（`textSecondary` 描边），激活时填充 `theme.colors.success`（绿色），一眼能看出当前模式。\n- 改进点击行为为双向：未激活时点击直接发送 `/caveman`（启用无副作用，跳过确认）；已激活时仍弹出原确认弹窗后发送 `stop caveman`。"
+      },
+      {
         "version": "2.40.2",
         "date": "2026-06-17",
         "summary": "",
@@ -2151,7 +2171,7 @@
       }
     ]
   },
-  "latestVersion": "2.40.2",
+  "latestVersion": "2.41.0",
   "availableLocales": [
     "en",
     "zh-Hans"
