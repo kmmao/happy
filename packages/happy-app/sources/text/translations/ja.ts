@@ -1015,6 +1015,9 @@ export const ja: TranslationStructure = {
     loadingProgress: ({ percent, loaded, total }: { percent: number; loaded: number; total: number }) => `読み込み中 ${percent}%（${loaded}/${total}）`,
     inputPlaceholder: "メッセージを入力...",
     startedByDaemon: "デーモン",
+    cavemanBadge: "CAVEMAN",
+    cavemanCloseTitle: "Disable Caveman mode?",
+    cavemanCloseMessage: "Will send \"stop caveman\" to the session to restore normal output.",
     sentImage: "画像を送信しました",
     sentImages: ({ count }: { count: number }) =>
       `${count}枚の画像を送信しました`,

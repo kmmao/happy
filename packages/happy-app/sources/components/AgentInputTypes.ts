@@ -80,6 +80,11 @@ export interface AgentInputProps {
             codex: boolean | null;
             gemini?: boolean | null;
         };
+        // Caveman skill indicator — shown inline next to the status text when
+        // the session has activated the caveman skill. Press opens a confirm
+        // modal that, on confirm, sends a "stop caveman" message to disable it.
+        cavemanActive?: boolean;
+        onCavemanPress?: () => void;
     };
     modelSummaryRpcState?: SessionRpcVisualState | null;
     autocompletePrefixes: string[];

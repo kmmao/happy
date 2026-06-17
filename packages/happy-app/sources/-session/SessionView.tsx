@@ -109,6 +109,7 @@ import {
   formatTerminalLiveStatus,
   useSessionStatus,
 } from "@/utils/sessionUtils";
+import { isCavemanActive } from "@/utils/cavemanState";
 import { isVersionSupported, MINIMUM_CLI_VERSION } from "@/utils/versionUtils";
 import { SessionSidePanel, SIDE_PANEL_MIN_WINDOW_WIDTH } from "@/components/session/SessionSidePanel";
 import { MobileSessionPanelSheet } from "@/components/session/MobileSessionPanelSheet";
@@ -973,6 +974,23 @@ function SessionViewInner({
     () => backgroundTasks.some((task) => task.isWorkflow),
     [backgroundTasks],
   );
+  const cavemanActive = React.useMemo(
+    () => isCavemanActive(messages),
+    [messages],
+  );
+  const handleCavemanPress = React.useCallback(async () => {
+    const confirmed = await Modal.confirm(
+      t("session.cavemanCloseTitle"),
+      t("session.cavemanCloseMessage"),
+      { confirmText: t("common.ok"), destructive: true },
+    );
+    if (!confirmed) return;
+    storage.getState().appendToPendingQueue(sessionId, {
+      localId: randomUUID(),
+      message: "stop caveman",
+    });
+    trackMessageSent();
+  }, [sessionId]);
   const sessionStatus = React.useMemo(
     () => applyRunningWorkflowStatus(baseSessionStatus, hasRunningWorkflow),
     [baseSessionStatus, hasRunningWorkflow],
@@ -1975,6 +1993,8 @@ function SessionViewInner({
           color: sessionStatus.statusColor,
           dotColor: sessionStatus.statusDotColor,
           isPulsing: sessionStatus.isPulsing,
+          cavemanActive: cavemanActive,
+          onCavemanPress: handleCavemanPress,
         }}
         modelSummaryRpcState={modelSummaryRpcState}
         isInputDisabled={isSessionInputDisabled}

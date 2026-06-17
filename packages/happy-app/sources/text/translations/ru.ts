@@ -1131,6 +1131,9 @@ export const ru: TranslationStructure = {
     loadingProgress: ({ percent, loaded, total }: { percent: number; loaded: number; total: number }) => `Загрузка ${percent}% (${loaded}/${total})`,
     inputPlaceholder: "Введите сообщение...",
     startedByDaemon: "демон",
+    cavemanBadge: "CAVEMAN",
+    cavemanCloseTitle: "Disable Caveman mode?",
+    cavemanCloseMessage: "Will send \"stop caveman\" to the session to restore normal output.",
     sentImage: "Отправлено изображение",
     sentImages: ({ count }: { count: number }) =>
       `Отправлено ${count} изображений`,

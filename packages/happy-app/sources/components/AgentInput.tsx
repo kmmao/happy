@@ -1022,6 +1022,45 @@ export const AgentInput = React.memo(
                         />
                       )}
                     </Pressable>
+                    {props.connectionStatus.cavemanActive && (
+                      <Pressable
+                        onPress={props.connectionStatus.onCavemanPress}
+                        disabled={!props.connectionStatus.onCavemanPress}
+                        hitSlop={6}
+                        // Pill matches the RPC summary capsule
+                        // (InputFAB:summaryPill) — same shape and sizing, but
+                        // tinted with accentOrange so caveman reads as a
+                        // distinct mode badge rather than a status indicator.
+                        style={({ pressed }) => ({
+                          flexDirection: "row",
+                          alignItems: "center",
+                          gap: 5,
+                          paddingHorizontal: 7,
+                          paddingVertical: 3,
+                          borderRadius: 999,
+                          backgroundColor: `${theme.colors.accentOrange}18`,
+                          opacity: pressed ? 0.6 : 1,
+                          cursor: props.connectionStatus?.onCavemanPress
+                            ? ("pointer" as any)
+                            : undefined,
+                        })}
+                      >
+                        <StatusDot
+                          color={theme.colors.accentOrange}
+                          size={5}
+                        />
+                        <Text
+                          style={{
+                            fontSize: 10,
+                            color: theme.colors.accentOrange,
+                            ...Typography.default("semiBold"),
+                          }}
+                          numberOfLines={1}
+                        >
+                          {t("session.cavemanBadge")}
+                        </Text>
+                      </Pressable>
+                    )}
                     {props.connectionStatus.cliStatus && (
                       <>
                         <View
