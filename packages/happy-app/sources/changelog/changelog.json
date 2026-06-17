@@ -2,6 +2,16 @@
   "entries": {
     "en": [
       {
+        "version": "2.42.0",
+        "date": "2026-06-18",
+        "summary": "When Caveman mode is active and you send `/clear`, the App now asks whether to re-enable Caveman after the wipe — previously `/clear` silently dropped you back to normal output because the `/caveman` activation lived inside the conversation context that just got cleared.",
+        "changes": [
+          "Added a confirm modal that appears when sending `/clear` while Caveman is active. \"Keep enabled\" chains a follow-up `/caveman` behind the `/clear` so the mode re-activates as soon as the fresh context is ready; \"Clear only\" leaves you in normal output. Both outcomes still send the `/clear` — the choice only decides whether to re-enable Caveman.",
+          "Improved the dispatch path by reusing the existing `pendingQueueDispatcher` one-at-a-time drain — `/caveman` is enqueued behind `/clear` and only fires once Claude is idle again, so the re-enable lands on the fresh context without any extra coordination code."
+        ],
+        "rawMarkdown": "## 2.42.0 - 2026-06-18\n\n\nWhen Caveman mode is active and you send `/clear`, the App now asks whether to re-enable Caveman after the wipe — previously `/clear` silently dropped you back to normal output because the `/caveman` activation lived inside the conversation context that just got cleared.\n\n### Caveman skill toggle\n- Added a confirm modal that appears when sending `/clear` while Caveman is active. \"Keep enabled\" chains a follow-up `/caveman` behind the `/clear` so the mode re-activates as soon as the fresh context is ready; \"Clear only\" leaves you in normal output. Both outcomes still send the `/clear` — the choice only decides whether to re-enable Caveman.\n- Improved the dispatch path by reusing the existing `pendingQueueDispatcher` one-at-a-time drain — `/caveman` is enqueued behind `/clear` and only fires once Claude is idle again, so the re-enable lands on the fresh context without any extra coordination code."
+      },
+      {
         "version": "2.41.0",
         "date": "2026-06-17",
         "summary": "The Caveman skill badge above the input is now always visible so you can toggle the skill on or off from any device — previously it only appeared after Caveman was already active, which made the off→on direction invisible from the App.",
@@ -1098,6 +1108,16 @@
     ],
     "zh-Hans": [
       {
+        "version": "2.42.0",
+        "date": "2026-06-18",
+        "summary": "Caveman 模式开启时发送 `/clear`，App 现在会先弹窗询问\"清空后是否保持 Caveman？\" —— 之前 `/clear` 会把对话上下文（`/caveman` 的激活就在里面）一起清掉，结果用户被静默打回普通输出模式，从 App 这边看不到任何提示。",
+        "changes": [
+          "新增确认弹窗：Caveman 开启时发送 `/clear` 会先弹窗。\"保持启用\"会在 `/clear` 后自动追加一条 `/caveman` 重新激活；\"仅清空\"则只清空上下文。两种选择都会真正发出 `/clear`，弹窗只决定是否重新启用 Caveman。",
+          "改进发送时序：复用现有 `pendingQueueDispatcher` 的串行机制，`/caveman` 排在 `/clear` 后面入队，等 Claude 重新 idle 才发出，所以重新启用一定落在新上下文上，零额外协调代码。"
+        ],
+        "rawMarkdown": "## 2.42.0 - 2026-06-18\n\n\nCaveman 模式开启时发送 `/clear`，App 现在会先弹窗询问\"清空后是否保持 Caveman？\" —— 之前 `/clear` 会把对话上下文（`/caveman` 的激活就在里面）一起清掉，结果用户被静默打回普通输出模式，从 App 这边看不到任何提示。\n\n### Caveman skill 切换\n- 新增确认弹窗：Caveman 开启时发送 `/clear` 会先弹窗。\"保持启用\"会在 `/clear` 后自动追加一条 `/caveman` 重新激活；\"仅清空\"则只清空上下文。两种选择都会真正发出 `/clear`，弹窗只决定是否重新启用 Caveman。\n- 改进发送时序：复用现有 `pendingQueueDispatcher` 的串行机制，`/caveman` 排在 `/clear` 后面入队，等 Claude 重新 idle 才发出，所以重新启用一定落在新上下文上，零额外协调代码。"
+      },
+      {
         "version": "2.41.0",
         "date": "2026-06-17",
         "summary": "输入框上方的 Caveman skill 徽章现在始终可见 —— 之前只有在 Caveman 已激活时才会显示，从 App 这边无法看到 off→on 的入口，需要手动输入 `/caveman`。徽章现在常驻显示，从任何设备都能点一下开关。",
@@ -2171,7 +2191,7 @@
       }
     ]
   },
-  "latestVersion": "2.41.0",
+  "latestVersion": "2.42.0",
   "availableLocales": [
     "en",
     "zh-Hans"

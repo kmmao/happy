@@ -1140,6 +1140,10 @@ export const ru: TranslationStructure = {
     cavemanBadge: "CAVEMAN",
     cavemanCloseTitle: "Disable Caveman mode?",
     cavemanCloseMessage: "Will send \"stop caveman\" to the session to restore normal output.",
+    cavemanKeepAfterClearTitle: "Keep Caveman after clearing?",
+    cavemanKeepAfterClearMessage: "/clear wipes the conversation context. Re-enable Caveman mode after the wipe?",
+    cavemanKeepAfterClearKeep: "Keep enabled",
+    cavemanKeepAfterClearClearOnly: "Clear only",
     sentImage: "Отправлено изображение",
     sentImages: ({ count }: { count: number }) =>
       `Отправлено ${count} изображений`,

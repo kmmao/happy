@@ -1024,6 +1024,10 @@ export const ja: TranslationStructure = {
     cavemanBadge: "CAVEMAN",
     cavemanCloseTitle: "Disable Caveman mode?",
     cavemanCloseMessage: "Will send \"stop caveman\" to the session to restore normal output.",
+    cavemanKeepAfterClearTitle: "Keep Caveman after clearing?",
+    cavemanKeepAfterClearMessage: "/clear wipes the conversation context. Re-enable Caveman mode after the wipe?",
+    cavemanKeepAfterClearKeep: "Keep enabled",
+    cavemanKeepAfterClearClearOnly: "Clear only",
     sentImage: "画像を送信しました",
     sentImages: ({ count }: { count: number }) =>
       `${count}枚の画像を送信しました`,

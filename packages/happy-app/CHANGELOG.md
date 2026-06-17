@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.42.0 - 2026-06-18
+
+When Caveman mode is active and you send `/clear`, the App now asks whether to re-enable Caveman after the wipe — previously `/clear` silently dropped you back to normal output because the `/caveman` activation lived inside the conversation context that just got cleared.
+
+### Caveman skill toggle
+- Added a confirm modal that appears when sending `/clear` while Caveman is active. "Keep enabled" chains a follow-up `/caveman` behind the `/clear` so the mode re-activates as soon as the fresh context is ready; "Clear only" leaves you in normal output. Both outcomes still send the `/clear` — the choice only decides whether to re-enable Caveman.
+- Improved the dispatch path by reusing the existing `pendingQueueDispatcher` one-at-a-time drain — `/caveman` is enqueued behind `/clear` and only fires once Claude is idle again, so the re-enable lands on the fresh context without any extra coordination code.
+
 ## 2.41.0 - 2026-06-17
 
 The Caveman skill badge above the input is now always visible so you can toggle the skill on or off from any device — previously it only appeared after Caveman was already active, which made the off→on direction invisible from the App.

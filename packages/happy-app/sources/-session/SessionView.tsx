@@ -2025,7 +2025,7 @@ function SessionViewInner({
         sendIcon={isRunning ? (
           <Ionicons name="time-outline" size={17} color={theme.colors.button.primary.tint} />
         ) : undefined}
-        onSend={() => {
+        onSend={async () => {
           // Prevent double-tap sending duplicate messages
           if (sendingRef.current) return;
           sendingRef.current = true;
@@ -2037,6 +2037,25 @@ function SessionViewInner({
           const visibleText = message.trim();
           // Special commands (/compact, /clear) don't support images or paste blocks — send command only
           const isSpecialCommand = /^\/(compact|clear)\b/.test(visibleText);
+          // When caveman mode is active and the user issues /clear, ask
+          // whether to re-enable caveman after the wipe. /clear nukes the
+          // conversation context, so by the time pendingQueueDispatcher
+          // drains the message isCavemanActive(messages) will already
+          // return false — capture the choice now, before we enqueue.
+          // Both modal outcomes still send /clear; the choice only
+          // controls whether to chain /caveman behind it.
+          const isClearCmd = /^\/clear\b/.test(visibleText);
+          let reEnableCavemanAfterClear = false;
+          if (isClearCmd && cavemanActive) {
+            reEnableCavemanAfterClear = await Modal.confirm(
+              t("session.cavemanKeepAfterClearTitle"),
+              t("session.cavemanKeepAfterClearMessage"),
+              {
+                confirmText: t("session.cavemanKeepAfterClearKeep"),
+                cancelText: t("session.cavemanKeepAfterClearClearOnly"),
+              },
+            );
+          }
           const text = appendPasteBlocksToMessage(
             visibleText,
             isSpecialCommand ? [] : pasteBlocks,
@@ -2094,6 +2113,16 @@ function SessionViewInner({
             message: finalMessage,
             displayText,
           });
+          // Chain /caveman behind /clear when the user opted to keep
+          // caveman after clearing. pendingQueueDispatcher drains
+          // one-at-a-time when AI is idle, so /caveman only lands once
+          // /clear has fully cleared the context.
+          if (isClearCmd && reEnableCavemanAfterClear) {
+            storage.getState().appendToPendingQueue(sessionId, {
+              localId: randomUUID(),
+              message: "/caveman",
+            });
+          }
           trackMessageSent();
         }}
         onMicPress={micButtonState.onMicPress}
