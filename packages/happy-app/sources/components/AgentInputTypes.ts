@@ -103,6 +103,17 @@ export interface AgentInputProps {
         contextWindow?: number;
     };
     alwaysShowContextSize?: boolean;
+    /**
+     * AUTO/1M toggle next to the context progress bar. When provided, the
+     * bar renders unconditionally (not gated on the "<=10% left" rule) so
+     * the chip is always reachable while the input is expanded. Wired the
+     * same way as in InputFAB so both collapsed and expanded states show
+     * the same control.
+     */
+    autoCompact?: {
+        enabled: boolean;
+        onToggle: (next: boolean) => void;
+    };
     sdkContextUsage?: {
         totalTokens: number;
         maxTokens: number;

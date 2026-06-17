@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.40.2 - 2026-06-17
+
+### Context window control
+- Fixed the AUTO/1M toggle disappearing when the input box was expanded. The expanded view uses a different progress component (`ContextProgressBar`) which 2.40.1 didn't reach — wire the same toggle there too so the chip is reachable in both collapsed and expanded states.
+
 ## 2.40.1 - 2026-06-17
 
 ### Context window control

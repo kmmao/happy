@@ -2,6 +2,15 @@
   "entries": {
     "en": [
       {
+        "version": "2.40.2",
+        "date": "2026-06-17",
+        "summary": "",
+        "changes": [
+          "Fixed the AUTO/1M toggle disappearing when the input box was expanded. The expanded view uses a different progress component (`ContextProgressBar`) which 2.40.1 didn't reach — wire the same toggle there too so the chip is reachable in both collapsed and expanded states."
+        ],
+        "rawMarkdown": "## 2.40.2 - 2026-06-17\n\n\n### Context window control\n- Fixed the AUTO/1M toggle disappearing when the input box was expanded. The expanded view uses a different progress component (`ContextProgressBar`) which 2.40.1 didn't reach — wire the same toggle there too so the chip is reachable in both collapsed and expanded states."
+      },
+      {
         "version": "2.40.1",
         "date": "2026-06-17",
         "summary": "",
@@ -1079,6 +1088,15 @@
     ],
     "zh-Hans": [
       {
+        "version": "2.40.2",
+        "date": "2026-06-17",
+        "summary": "",
+        "changes": [
+          "修复输入框展开时 AUTO/1M 切换 chip 消失的问题。展开状态用的是另一个进度组件(`ContextProgressBar`),2.40.1 没覆盖到,现在也接入了同一个切换,折叠 / 展开两个状态都能看到。"
+        ],
+        "rawMarkdown": "## 2.40.2 - 2026-06-17\n\n\n### 上下文窗口控制\n- 修复输入框展开时 AUTO/1M 切换 chip 消失的问题。展开状态用的是另一个进度组件(`ContextProgressBar`),2.40.1 没覆盖到,现在也接入了同一个切换,折叠 / 展开两个状态都能看到。"
+      },
+      {
         "version": "2.40.1",
         "date": "2026-06-17",
         "summary": "",
@@ -2133,7 +2151,7 @@
       }
     ]
   },
-  "latestVersion": "2.40.1",
+  "latestVersion": "2.40.2",
   "availableLocales": [
     "en",
     "zh-Hans"

@@ -2124,6 +2124,10 @@ function SessionViewInner({
               : undefined
         }
         alwaysShowContextSize={alwaysShowContextSize}
+        autoCompact={{
+          enabled: autoCompactEnabled,
+          onToggle: toggleAutoCompact,
+        }}
         sdkContextUsage={contextUsage}
         currentModelCode={effectiveModelCode}
         images={{

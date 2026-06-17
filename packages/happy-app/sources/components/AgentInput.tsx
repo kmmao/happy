@@ -1377,6 +1377,7 @@ export const AgentInput = React.memo(
                 theme={theme}
                 sdkContextUsage={props.sdkContextUsage}
                 extraSummary={animatedTokensCostValue}
+                autoCompact={props.autoCompact}
               />
             ) : null}
 

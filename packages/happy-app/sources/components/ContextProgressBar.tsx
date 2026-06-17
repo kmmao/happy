@@ -1,5 +1,5 @@
 import * as React from "react";
-import { View, Text } from "react-native";
+import { View, Text, Pressable } from "react-native";
 import { Typography } from "@/constants/Typography";
 import { Theme } from "@/theme";
 import { t } from "@/text";
@@ -77,7 +77,16 @@ export const ContextProgressBar: React.FC<{
     theme: Theme;
     sdkContextUsage?: ContextUsageData | null;
     extraSummary?: AnimatedTokensCostValue | null;
-}> = ({ contextSize, alwaysShow, modelCode, sdkContextWindow, theme, sdkContextUsage, extraSummary }) => {
+    /**
+     * AUTO/1M toggle rendered to the right of the percentage label. When
+     * provided, the bar renders even when usage is below the 10% warning
+     * threshold so the chip stays reachable.
+     */
+    autoCompact?: {
+        enabled: boolean;
+        onToggle: (next: boolean) => void;
+    };
+}> = ({ contextSize, alwaysShow, modelCode, sdkContextWindow, theme, sdkContextUsage, extraSummary, autoCompact }) => {
     const hasPreciseData = Boolean(sdkContextUsage && sdkContextUsage.maxTokens > 0);
     const usedTokens = hasPreciseData ? sdkContextUsage!.totalTokens : contextSize;
     const resolvedContextWindow = (() => {
@@ -97,7 +106,10 @@ export const ContextProgressBar: React.FC<{
     );
     const percentageUsed = Math.min(100, (usedTokens / resolvedContextWindow) * 100);
     const percentageRemaining = Math.max(0, 100 - percentageUsed);
-    const shouldShow = alwaysShow || percentageRemaining <= 10;
+    // Show the bar whenever there's a toggle to render — the chip must stay
+    // reachable, not gated on the original "<=10% left" warning threshold.
+    const shouldShowLabel = alwaysShow || percentageRemaining <= 10;
+    const shouldShow = shouldShowLabel || Boolean(autoCompact);
 
     if (!shouldShow) {
         return null;
@@ -127,17 +139,27 @@ export const ContextProgressBar: React.FC<{
                     }}
                 />
             </View>
-            <Text
+            <View
                 style={{
-                    fontSize: 10,
-                    color: barColor,
-                    textAlign: "right",
-                    ...Typography.default(),
+                    flexDirection: "row",
+                    alignItems: "center",
+                    justifyContent: "flex-end",
+                    gap: 8,
                 }}
-                numberOfLines={1}
             >
-                {label}
-                {extraSummary?.tokensLabel ? (
+                {shouldShowLabel ? (
+                    <Text
+                        style={{
+                            fontSize: 10,
+                            color: barColor,
+                            textAlign: "right",
+                            ...Typography.default(),
+                            flexShrink: 1,
+                        }}
+                        numberOfLines={1}
+                    >
+                        {label}
+                        {extraSummary?.tokensLabel ? (
                     <Text style={{ color: theme.colors.textSecondary }}>
                         {` · `}
                         <Text style={{ color: theme.colors.textLink }}>
@@ -155,7 +177,48 @@ export const ContextProgressBar: React.FC<{
                         ) : null}
                     </Text>
                 ) : null}
-            </Text>
+                    </Text>
+                ) : null}
+                {autoCompact ? (
+                    <Pressable
+                        onPress={() => autoCompact.onToggle(!autoCompact.enabled)}
+                        hitSlop={6}
+                        accessibilityRole="button"
+                        accessibilityLabel={
+                            autoCompact.enabled
+                                ? t("agentInput.context.autoCompactHintOn")
+                                : t("agentInput.context.autoCompactHintOff")
+                        }
+                        style={({ pressed }) => ({
+                            paddingHorizontal: 6,
+                            paddingVertical: 1,
+                            borderRadius: 6,
+                            borderWidth: 1,
+                            borderColor: autoCompact.enabled
+                                ? theme.colors.success
+                                : theme.colors.textLink,
+                            backgroundColor: autoCompact.enabled
+                                ? "transparent"
+                                : theme.colors.textLink + "1A",
+                            opacity: pressed ? 0.55 : 1,
+                        })}
+                    >
+                        <Text
+                            style={{
+                                fontSize: 9,
+                                ...Typography.default("semiBold"),
+                                color: autoCompact.enabled
+                                    ? theme.colors.success
+                                    : theme.colors.textLink,
+                            }}
+                        >
+                            {autoCompact.enabled
+                                ? t("agentInput.context.autoCompactOn")
+                                : t("agentInput.context.autoCompactOff")}
+                        </Text>
+                    </Pressable>
+                ) : null}
+            </View>
             <ContextBreakdownPanel
                 items={breakdownItems}
                 source={breakdownSource}
