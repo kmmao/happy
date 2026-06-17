@@ -95,6 +95,33 @@ import { createSessionScanner } from "./utils/sessionScanner";
 void resolvePath; // path resolution kept available for future flag builders
 
 /**
+ * Resolve the CLI-facing `--model` string from an EnhancedMode, honouring
+ * the session's autoCompact preference. When `autoCompact !== false`
+ * (the 200K compress mode, default), strip the `[1m]` suffix from the
+ * resolved id so Claude TUI does NOT enable its 1M context — the existing
+ * `CLAUDE_CODE_DISABLE_1M_CONTEXT=1` env (or its default behaviour) then
+ * keeps the window at 200K and happy's apiSession.ts threshold pushes
+ * `/compact` at 150K. When `autoCompact === false`, leave the `[1m]`
+ * suffix intact so Claude TUI grants the premium 1M window.
+ *
+ * Centralises the "200K vs 1M tier" decision so the launcher hot-swap
+ * path (`claudeRemote.ts:1256`) and the boot path (`claudeRemote.ts:700`)
+ * stay in sync; without this wrapper a stale boot id would survive a
+ * toggle and the next hot-swap would write a different one without a
+ * matching cold restart.
+ */
+export function resolveCliModelForMode(
+  mode: { model?: string; autoCompact?: boolean },
+): string | undefined {
+  const resolved = resolveModelKey(mode.model);
+  if (!resolved) return resolved;
+  if (mode.autoCompact === false) return resolved;
+  return resolved.endsWith("[1m]")
+    ? resolved.slice(0, -"[1m]".length)
+    : resolved;
+}
+
+/**
  * Map App-level virtual model mode keys to real Anthropic model IDs.
  * Returns undefined for "use default" modes so the system default takes effect.
  */
@@ -697,7 +724,7 @@ export async function claudeRemote(opts: {
   // Per-turn state.
   let mode: EnhancedMode = initial.mode;
   let model =
-    resolveModelKey(initial.mode.model) ??
+    resolveCliModelForMode(initial.mode) ??
     opts.claudeEnvVars?.ANTHROPIC_MODEL ??
     process.env.ANTHROPIC_MODEL;
   const appliedSettingsState = createAppliedSettingsState();
@@ -1253,7 +1280,7 @@ export async function claudeRemote(opts: {
       // setModel call below), using the resolved key — the same value `--model`
       // received at spawn.
       const newModel =
-        resolveModelKey(next.mode.model) ??
+        resolveCliModelForMode(next.mode) ??
         opts.claudeEnvVars?.ANTHROPIC_MODEL ??
         process.env.ANTHROPIC_MODEL;
       const modelToApply = newModel && newModel !== model ? newModel : null;

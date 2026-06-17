@@ -23,6 +23,11 @@ export const MessageMetaSchema = z.object({
     .optional(), // Thinking configuration
   effort: z.enum(["low", "medium", "high", "max", "xhigh"]).nullable().optional(), // Reasoning effort level
   locale: z.string().optional(), // User's preferred UI language (e.g. 'en', 'zh-Hans', 'ja')
+  // Per-session autoCompact preference, read by happy-cli's runClaude.ts
+  // (`message.meta.autoCompact`) and propagated into EnhancedMode. true =
+  // 200K compress mode (default), false = 1M premium. Optional for
+  // back-compat: old App builds omit it and the CLI defaults to true.
+  autoCompact: z.boolean().optional(),
 });
 
 export type MessageMeta = z.infer<typeof MessageMetaSchema>;

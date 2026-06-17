@@ -886,8 +886,15 @@ class Sync {
     // Pass current settings so resolveMessageModeMeta can fall back to the
     // user's per-agent defaults (settings.agentDefaultOverrides) when the
     // session itself has no explicit override.
-    const { permissionMode, model, thinking, effort, maxBudgetUsd, taskBudget } =
-      resolveMessageModeMeta(session, storage.getState().settings);
+    const {
+      permissionMode,
+      model,
+      thinking,
+      effort,
+      maxBudgetUsd,
+      taskBudget,
+      autoCompact,
+    } = resolveMessageModeMeta(session, storage.getState().settings);
 
     // Generate local ID (or use provided one)
     const localId = options?.localId ?? randomUUID();
@@ -932,6 +939,7 @@ class Sync {
         effort,
         ...(maxBudgetUsd != null && { maxBudgetUsd }),
         ...(taskBudget && { taskBudget }),
+        autoCompact,
         ...(options?.continue && { continue: true }),
       },
     };
@@ -1515,6 +1523,7 @@ class Sync {
           maxBudgetUsd: session.maxBudgetUsd,
           taskBudgetTokens: session.taskBudgetTokens,
           starred: session.starred,
+          autoCompact: session.autoCompact,
         };
 
         const encrypted =

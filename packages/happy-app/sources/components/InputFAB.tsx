@@ -115,6 +115,16 @@ const stylesheet = StyleSheet.create((theme, rt) => ({
     flexShrink: 1,
     ...Typography.default("semiBold"),
   },
+  autoCompactChip: {
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderRadius: 6,
+    borderWidth: 1,
+  },
+  autoCompactChipText: {
+    fontSize: 9,
+    ...Typography.default("semiBold"),
+  },
   summaryCapsuleLine: {
     flexDirection: "row" as const,
     alignItems: "center" as const,
@@ -220,6 +230,17 @@ interface InputFABProps {
     remainingMs: number | null;
     onToggle: (next: boolean) => void;
   };
+  /**
+   * AUTO/1M chip next to the context-usage label. `enabled === true` shows
+   * "AUTO" (200K + happy auto-`/compact` at 150K, the default).
+   * `enabled === false` shows "1M" (1M premium context, no happy compact).
+   * Tapping calls `onToggle(!enabled)`; the change is lazy — it reaches the
+   * CLI on the next user message via `message.meta.autoCompact`.
+   */
+  autoCompact?: {
+    enabled: boolean;
+    onToggle: (next: boolean) => void;
+  };
   onHeightChange?: (height: number) => void;
 }
 
@@ -238,6 +259,7 @@ export const InputFAB = React.memo(function InputFAB({
   onBookmarksPress,
   statusInfo,
   autoOptionSend,
+  autoCompact,
   onHeightChange,
 }: InputFABProps) {
   const { theme } = useUnistyles();
@@ -303,6 +325,7 @@ export const InputFAB = React.memo(function InputFAB({
             info={statusInfo}
             theme={theme}
             maxWidth={Math.min(width - 32, 420)}
+            autoCompact={autoCompact}
           />
         ) : (
           <View />
@@ -401,10 +424,15 @@ const CompactStatus = React.memo(function CompactStatus({
   info,
   theme,
   maxWidth,
+  autoCompact,
 }: {
   info: InputFABStatusInfo;
   theme: ReturnType<typeof useUnistyles>["theme"];
   maxWidth: number;
+  autoCompact?: {
+    enabled: boolean;
+    onToggle: (next: boolean) => void;
+  };
 }) {
   const styles = stylesheet;
   const rpcVisualState = React.useMemo(
@@ -628,6 +656,45 @@ const CompactStatus = React.memo(function CompactStatus({
                   >
                     {contextLabel}
                   </Text>
+                  {autoCompact ? (
+                    <Pressable
+                      onPress={() => autoCompact.onToggle(!autoCompact.enabled)}
+                      hitSlop={6}
+                      accessibilityRole="button"
+                      accessibilityLabel={
+                        autoCompact.enabled
+                          ? t("agentInput.context.autoCompactHintOn")
+                          : t("agentInput.context.autoCompactHintOff")
+                      }
+                      style={({ pressed }) => [
+                        styles.autoCompactChip,
+                        {
+                          borderColor: autoCompact.enabled
+                            ? theme.colors.success
+                            : theme.colors.textLink,
+                          backgroundColor: autoCompact.enabled
+                            ? "transparent"
+                            : theme.colors.textLink + "1A",
+                          opacity: pressed ? 0.55 : 1,
+                        },
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.autoCompactChipText,
+                          {
+                            color: autoCompact.enabled
+                              ? theme.colors.success
+                              : theme.colors.textLink,
+                          },
+                        ]}
+                      >
+                        {autoCompact.enabled
+                          ? t("agentInput.context.autoCompactOn")
+                          : t("agentInput.context.autoCompactOff")}
+                      </Text>
+                    </Pressable>
+                  ) : null}
                 </View>
               ) : sessionTokensLabel ? (
                 <View style={styles.statusStatsLine}>

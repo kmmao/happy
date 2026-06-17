@@ -2,6 +2,17 @@
   "entries": {
     "en": [
       {
+        "version": "2.39.0",
+        "date": "2026-06-17",
+        "summary": "A new AUTO/1M toggle next to the context-usage chip in the session header lets you choose between the 200K compress mode (default, with happy auto-pushing `/compact` at 75% usage) and the full 1M premium context. The toggle is per-session, takes effect on the next user message, and rides a streamlined cold-restart path so the switch is seamless even on large sessions.",
+        "changes": [
+          "Added an AUTO/1M toggle next to the context-usage chip. AUTO (default) keeps Claude at the 200K window and auto-runs `/compact` at 150K tokens (75%) so the session never hits the wall. Tap to switch to 1M premium context — happy stops auto-compacting and the TUI's own ~80% compact takes over.",
+          "Improved the cold-restart path that fires when you flip the toggle (or trigger any model/mode swap): a 5s grace window after the new PTY spawns no longer mistakes Claude TUI's `--resume` history replay for a real first response, so a stalled session is detected at 45–90s instead of 138s and the original prompt is auto-redelivered.",
+          "Fixed a class of \"No response for 138s\" freezes after plan-mode `ExitPlanMode` or slash commands like `/deploy-server`. Lost continuation prompts now re-deliver automatically instead of disappearing silently."
+        ],
+        "rawMarkdown": "## 2.39.0 - 2026-06-17\n\n\nA new AUTO/1M toggle next to the context-usage chip in the session header lets you choose between the 200K compress mode (default, with happy auto-pushing `/compact` at 75% usage) and the full 1M premium context. The toggle is per-session, takes effect on the next user message, and rides a streamlined cold-restart path so the switch is seamless even on large sessions.\n\n### Context window control\n- Added an AUTO/1M toggle next to the context-usage chip. AUTO (default) keeps Claude at the 200K window and auto-runs `/compact` at 150K tokens (75%) so the session never hits the wall. Tap to switch to 1M premium context — happy stops auto-compacting and the TUI's own ~80% compact takes over.\n- Improved the cold-restart path that fires when you flip the toggle (or trigger any model/mode swap): a 5s grace window after the new PTY spawns no longer mistakes Claude TUI's `--resume` history replay for a real first response, so a stalled session is detected at 45–90s instead of 138s and the original prompt is auto-redelivered.\n\n### Stability\n- Fixed a class of \"No response for 138s\" freezes after plan-mode `ExitPlanMode` or slash commands like `/deploy-server`. Lost continuation prompts now re-deliver automatically instead of disappearing silently."
+      },
+      {
         "version": "2.38.0",
         "date": "2026-06-12",
         "summary": "Picker alerts now reach you on web: when Claude's terminal blocks on a numbered picker or fires a notification, the web app raises a native browser notification, and blocked sessions are highlighted directly in the sessions list on every platform.",
@@ -1049,6 +1060,17 @@
     ],
     "zh-Hans": [
       {
+        "version": "2.39.0",
+        "date": "2026-06-17",
+        "summary": "会话头部上下文用量芯片旁新增 AUTO/1M 切换开关。AUTO 模式（默认）让 Claude 留在 200K 窗口，并在用量到 75% 时由 happy 自动 `/compact`；切到 1M 则启用 1M 大上下文，由 Claude TUI 自己管理压缩。切换是会话级的，下一条用户消息生效，并走经过优化的冷重启路径 —— 即使在大会话里也能平滑过渡。",
+        "changes": [
+          "新增上下文用量芯片旁的 AUTO/1M 切换。AUTO（默认）让 Claude 留在 200K 窗口，用量到 150K（75%）自动跑 `/compact`，避免触底。点击切到 1M 大上下文模式 —— happy 不再自动压缩，由 TUI 自己在约 80% 时处理。",
+          "改进切换 toggle（以及任何模型/模式切换）时的冷重启路径：新 PTY 启动后增加 5s 宽限期，不再把 Claude TUI 的 `--resume` 历史回放误判为真正的首次响应。结果是卡住的会话在 45–90s 而非 138s 时被检测到，并自动重投原始消息。",
+          "修复 plan 模式 `ExitPlanMode` 或 `/deploy-server` 这类 slash command 后会触发的「No response for 138s」一类卡顿。丢失的延续 prompt 现在会自动重投，而不再静默消失。"
+        ],
+        "rawMarkdown": "## 2.39.0 - 2026-06-17\n\n\n会话头部上下文用量芯片旁新增 AUTO/1M 切换开关。AUTO 模式（默认）让 Claude 留在 200K 窗口，并在用量到 75% 时由 happy 自动 `/compact`；切到 1M 则启用 1M 大上下文，由 Claude TUI 自己管理压缩。切换是会话级的，下一条用户消息生效，并走经过优化的冷重启路径 —— 即使在大会话里也能平滑过渡。\n\n### 上下文窗口控制\n- 新增上下文用量芯片旁的 AUTO/1M 切换。AUTO（默认）让 Claude 留在 200K 窗口，用量到 150K（75%）自动跑 `/compact`，避免触底。点击切到 1M 大上下文模式 —— happy 不再自动压缩，由 TUI 自己在约 80% 时处理。\n- 改进切换 toggle（以及任何模型/模式切换）时的冷重启路径：新 PTY 启动后增加 5s 宽限期，不再把 Claude TUI 的 `--resume` 历史回放误判为真正的首次响应。结果是卡住的会话在 45–90s 而非 138s 时被检测到，并自动重投原始消息。\n\n### 稳定性\n- 修复 plan 模式 `ExitPlanMode` 或 `/deploy-server` 这类 slash command 后会触发的「No response for 138s」一类卡顿。丢失的延续 prompt 现在会自动重投，而不再静默消失。"
+      },
+      {
         "version": "2.38.0",
         "date": "2026-06-12",
         "summary": "Picker 提醒现在能在 Web 端触达你：当 Claude 的终端阻塞在编号选择器或发出通知信号时，Web App 会弹出浏览器原生通知；所有平台的会话列表也会直接高亮被阻塞的会话行。",
@@ -2073,7 +2095,7 @@
       }
     ]
   },
-  "latestVersion": "2.38.0",
+  "latestVersion": "2.39.0",
   "availableLocales": [
     "en",
     "zh-Hans"

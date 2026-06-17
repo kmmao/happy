@@ -1597,6 +1597,18 @@ function SessionViewInner({
     [sessionId],
   );
 
+  // Toggle the "AUTO" chip next to the context-usage label. Lazy: writes
+  // the per-session preference; the change reaches the CLI on the next
+  // user message (mode_change cold restart, guarded by Part 1 grace).
+  const toggleAutoCompact = React.useCallback(
+    (next: boolean) => {
+      storage.getState().updateSessionAutoCompact(sessionId, next);
+    },
+    [sessionId],
+  );
+  // session.autoCompact: null/undefined → default true (AUTO on).
+  const autoCompactEnabled = session.autoCompact !== false;
+
   const updateModelMode = React.useCallback(
     (mode: ModelMode) => {
       storage.getState().updateSessionModelMode(sessionId, mode.key);
@@ -2266,6 +2278,10 @@ function SessionViewInner({
               {...scrollNavProps}
               statusInfo={fabStatusInfo}
               autoOptionSend={autoOptionSendControl}
+              autoCompact={{
+                enabled: autoCompactEnabled,
+                onToggle: toggleAutoCompact,
+              }}
               onHeightChange={setCollapsedOverlayHeight}
             />
           }

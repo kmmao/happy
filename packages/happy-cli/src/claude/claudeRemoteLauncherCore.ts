@@ -254,6 +254,24 @@ export async function claudeRemoteLauncher(
   // which a live PTY spinner keeps refreshing — masking deep extended-thinking
   // hangs from the existing idle-based strand detector.
   let turnStartedAt = 0;
+  // Cold-restart grace window: when nextMessage() returns a `pending` message
+  // (the PLAN_FAKE_RESTART / isolate-slash / mode-change cold-swap path), the
+  // new PTY is spawned with --resume and Claude TUI creates a NEW session file
+  // with a fresh sessionId (per happy-cli/CLAUDE.md "Claude Session Resume
+  // Behavior"). sessionScanner sees all historical messages as new and syncs
+  // a burst into onMessage within ~600ms (observed in pid-42129 log; ~200
+  // records at spawn+500ms). Those replays are NOT this turn's real output —
+  // if we let them flip turnProducedOutput, a subsequent submission wedge
+  // (TUI never commits the continuation prompt) is masked from the 90s
+  // fast-wedge path AND blocks the maybeRedeliverStrandedPrompt guard, so
+  // recovery stalls until the generic 120s idle path and the lost prompt is
+  // never re-delivered (user-visible: 138s freeze + silent message loss).
+  // 5s gives ~8x margin over the observed burst length while staying well
+  // under the 90s wedge threshold; a turn genuinely streaming refreshes
+  // lastClaudeOutputAt via PTY bytes the whole time so the grace window
+  // can never cause a false-positive recovery.
+  let coldRestartGraceUntil = 0;
+  const COLD_RESTART_GRACE_MS = 5_000;
 
   const strandDiagState = (): string => {
     const snap = executionGuard.getSnapshot();
@@ -1010,7 +1028,20 @@ export async function claudeRemoteLauncher(
     // Any JSONL record proves the turn actually ran — so a strand recovery
     // must NOT re-deliver its prompt (it wasn't lost), and the session is
     // healthy enough to re-arm the one-shot auto-redelivery budget.
-    turnProducedOutput = true;
+    //
+    // Exception: within the cold-restart grace window an arriving JSONL is
+    // most likely a sessionScanner replay of pre-existing history (Claude
+    // TUI rewrites the session file with a fresh sessionId on --resume, so
+    // every historical message looks "new" to the scanner). Don't flip
+    // turnProducedOutput inside the window — if the PTY then goes silent
+    // past WATCHDOG_WEDGE_RECOVER_MS the 90s wedge path can still trip AND
+    // maybeRedeliverStrandedPrompt can still re-push the lost continuation
+    // prompt. A turn genuinely streaming refreshes lastClaudeOutputAt via
+    // PTY bytes regardless, so suppressing the flag here cannot cause a
+    // false-positive recovery. See coldRestartGraceUntil declaration.
+    if (Date.now() >= coldRestartGraceUntil) {
+      turnProducedOutput = true;
+    }
     clearWriteVerify();
     strandRedeliverCount = 0;
     // ── Stream events (partial messages) → text-delta envelopes ────────
@@ -2222,7 +2253,16 @@ export async function claudeRemoteLauncher(
           // `disallowedTools` set, which Claude TUI binds at boot only —
           // hot-swap can't propagate it, so this MUST force a cold restart.
           planLockdown: planModeLockdownActive,
-          isExtendedContext: is1MModelKey(m.model),
+          // The 200K ↔ 1M tier is driven by BOTH `m.model` (must be a
+          // 1M-capable key) AND `m.autoCompact` (the user-facing toggle
+          // strips the `[1m]` suffix when true). Hashing both ensures a
+          // toggle flip diverges the hash even when model id is unchanged,
+          // forcing a mode_change cold restart so the next PTY spawn picks
+          // up the new `--model` string (see resolveCliModelForMode).
+          // `undefined` is treated as `true` (default 200K) so old App
+          // builds that never send the field don't accidentally diverge.
+          isExtendedContext:
+            is1MModelKey(m.model) && m.autoCompact === false,
           fallbackModel: m.fallbackModel,
           customSystemPrompt: m.customSystemPrompt,
           appendSystemPrompt: m.appendSystemPrompt,
@@ -2473,6 +2513,14 @@ export async function claudeRemoteLauncher(
             if (pending) {
               let p = pending;
               pending = null;
+              // The new PTY is about to consume a cold-restart continuation
+              // (PLAN_FAKE_RESTART, isolate slash command, or mode-change
+              // cold-swap). Open a grace window so the sessionScanner replay
+              // burst the new --resume produces doesn't mark this turn as
+              // "produced output" — that would mask a real submission wedge
+              // from both the 90s fast-wedge path and the re-deliver guard.
+              // See coldRestartGraceUntil declaration for full rationale.
+              coldRestartGraceUntil = Date.now() + COLD_RESTART_GRACE_MS;
               dispatchTurn(reasonForQueuedMessage(p));
               // Re-establish tracked mode state for the post-cold-restart turn.
               // The restart loop reset these to null, so without this the

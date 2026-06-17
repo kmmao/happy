@@ -1,0 +1,102 @@
+import { describe, expect, it } from "vitest";
+
+import {
+  is1MModelKey,
+  resolveCliModelForMode,
+  resolveModelKey,
+} from "./claudeRemote";
+
+// Sanity-check the toggle-driven 200K ↔ 1M switch. The behavioural contract:
+//
+//   resolveCliModelForMode({model, autoCompact}) returns the `--model` string
+//   that Claude TUI receives. Strip the `[1m]` suffix when autoCompact is
+//   true (or undefined — the default) so the TUI stays at 200K and happy's
+//   apiSession.ts threshold handles the compact. Keep the suffix when
+//   autoCompact === false so the TUI grants the 1M premium window.
+//
+// is1MModelKey is unchanged — still answers "is this App-level mode key
+// 1M-capable?" — and used by coldModeHash together with the autoCompact
+// flag to drive mode_change cold restarts when the toggle flips.
+
+describe("resolveCliModelForMode", () => {
+  it("strips [1m] suffix when autoCompact is true (default 200K compress mode)", () => {
+    expect(
+      resolveCliModelForMode({ model: "opus-4-7", autoCompact: true }),
+    ).toBe("claude-opus-4-7");
+    expect(
+      resolveCliModelForMode({ model: "opus-4-7-1m", autoCompact: true }),
+    ).toBe("claude-opus-4-7");
+    expect(
+      resolveCliModelForMode({ model: "sonnet", autoCompact: true }),
+    ).toBe("claude-sonnet-4-6");
+  });
+
+  it("strips [1m] suffix when autoCompact is undefined (default behaviour)", () => {
+    // Back-compat: old App builds without the field land here. Default
+    // intent is 200K compress mode, matching ADR 0003.
+    expect(resolveCliModelForMode({ model: "opus-4-7" })).toBe(
+      "claude-opus-4-7",
+    );
+    expect(resolveCliModelForMode({ model: "opus-4-7-1m" })).toBe(
+      "claude-opus-4-7",
+    );
+  });
+
+  it("keeps [1m] suffix when autoCompact is false (1M premium mode)", () => {
+    expect(
+      resolveCliModelForMode({ model: "opus-4-7", autoCompact: false }),
+    ).toBe("claude-opus-4-7[1m]");
+    expect(
+      resolveCliModelForMode({ model: "opus-4-7-1m", autoCompact: false }),
+    ).toBe("claude-opus-4-7[1m]");
+    expect(
+      resolveCliModelForMode({ model: "fable-5", autoCompact: false }),
+    ).toBe("claude-fable-5[1m]");
+  });
+
+  it("passes through non-1M-capable model ids untouched in either mode", () => {
+    // `haiku` and unknown keys never carried a `[1m]` suffix, so they
+    // bypass the stripping logic and return the raw mapping.
+    expect(
+      resolveCliModelForMode({ model: "haiku", autoCompact: true }),
+    ).toBe("haiku");
+    expect(
+      resolveCliModelForMode({ model: "haiku", autoCompact: false }),
+    ).toBe("haiku");
+    expect(
+      resolveCliModelForMode({ model: "some-custom-id", autoCompact: false }),
+    ).toBe("some-custom-id");
+  });
+
+  it("returns undefined for unset / 'default' model ids regardless of toggle", () => {
+    expect(
+      resolveCliModelForMode({ model: undefined, autoCompact: true }),
+    ).toBeUndefined();
+    expect(
+      resolveCliModelForMode({ model: "default", autoCompact: false }),
+    ).toBeUndefined();
+  });
+});
+
+describe("is1MModelKey", () => {
+  it("still recognises 1M-capable App-level keys", () => {
+    expect(is1MModelKey("opus-4-7")).toBe(true);
+    expect(is1MModelKey("opus-4-7-1m")).toBe(true);
+    expect(is1MModelKey("sonnet")).toBe(true);
+    expect(is1MModelKey("fable-5-1m")).toBe(true);
+  });
+
+  it("returns false for non-1M-capable / unknown keys", () => {
+    expect(is1MModelKey("haiku")).toBe(false);
+    expect(is1MModelKey(undefined)).toBe(false);
+    expect(is1MModelKey("claude-opus-4-7[1m]")).toBe(false);
+    // ^ Note: is1MModelKey takes App key form, not the resolved CLI id.
+  });
+});
+
+describe("resolveModelKey (unchanged sanity)", () => {
+  it("maps App keys to canonical [1m] CLI ids", () => {
+    expect(resolveModelKey("opus-4-7")).toBe("claude-opus-4-7[1m]");
+    expect(resolveModelKey("opus-4-7-1m")).toBe("claude-opus-4-7[1m]");
+  });
+});

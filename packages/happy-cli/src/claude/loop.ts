@@ -44,6 +44,15 @@ export interface EnhancedMode {
   shouldQuery?: boolean;
   /** Enable beta features (e.g. 1M context window) */
   betas?: ClaudeJsonlBeta[];
+  /**
+   * When true (default), keep this turn in the 200K context window — happy
+   * strips the model id's `[1m]` suffix in `resolveModelKey` and triggers
+   * auto-`/compact` at 150K usage. When false, leave the `[1m]` suffix
+   * intact and skip the auto-compact threshold (full 1M, premium pricing).
+   * Sourced from `SessionPreferences.autoCompact` via `message.meta.autoCompact`.
+   * `undefined` is treated as `true` for back-compat with old App builds.
+   */
+  autoCompact?: boolean;
   /** Agent name for the main thread */
   agent?: string;
   /** Custom subagent definitions */

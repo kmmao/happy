@@ -1,5 +1,16 @@
 # Changelog
 
+## 2.39.0 - 2026-06-17
+
+A new AUTO/1M toggle next to the context-usage chip in the session header lets you choose between the 200K compress mode (default, with happy auto-pushing `/compact` at 75% usage) and the full 1M premium context. The toggle is per-session, takes effect on the next user message, and rides a streamlined cold-restart path so the switch is seamless even on large sessions.
+
+### Context window control
+- Added an AUTO/1M toggle next to the context-usage chip. AUTO (default) keeps Claude at the 200K window and auto-runs `/compact` at 150K tokens (75%) so the session never hits the wall. Tap to switch to 1M premium context — happy stops auto-compacting and the TUI's own ~80% compact takes over.
+- Improved the cold-restart path that fires when you flip the toggle (or trigger any model/mode swap): a 5s grace window after the new PTY spawns no longer mistakes Claude TUI's `--resume` history replay for a real first response, so a stalled session is detected at 45–90s instead of 138s and the original prompt is auto-redelivered.
+
+### Stability
+- Fixed a class of "No response for 138s" freezes after plan-mode `ExitPlanMode` or slash commands like `/deploy-server`. Lost continuation prompts now re-deliver automatically instead of disappearing silently.
+
 ## 2.38.0 - 2026-06-12
 
 Picker alerts now reach you on web: when Claude's terminal blocks on a numbered picker or fires a notification, the web app raises a native browser notification, and blocked sessions are highlighted directly in the sessions list on every platform.

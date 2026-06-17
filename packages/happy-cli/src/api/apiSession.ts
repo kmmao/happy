@@ -277,6 +277,30 @@ export class ApiSessionClient extends EventEmitter {
    */
   private replayedClaudeMessageKeys: Set<string> = new Set();
   private modelModeKey: string | undefined;
+  /**
+   * Whether the App's "AUTO" toggle is on for this session. Default true:
+   * happy stays in the 200K context window and pushes `/compact` when
+   * usage crosses `AUTO_COMPACT_THRESHOLD` (one shot per turn). Set false
+   * by `runClaude.ts` when the user toggles to the 1M premium mode — the
+   * threshold check then no-ops and the TUI's own ~80% auto-compact takes
+   * over. Toggled via `setAutoCompactEnabled` whenever `message.meta.autoCompact`
+   * lands on a new user message.
+   */
+  private autoCompactEnabled: boolean = true;
+  /**
+   * Per-turn latch — prevents stacking multiple `/compact` injections when
+   * a long turn accumulates several assistant messages past the threshold
+   * before the TUI actually processes the first compact. Cleared on
+   * `startNewTurn` (the canonical turn boundary, same place
+   * `accumulatedTurnUsage` resets).
+   */
+  private autoCompactTriggeredInThisTurn: boolean = false;
+  /**
+   * 75% of the 200K window. Fires before Claude TUI's own ~80% auto-compact
+   * so happy's nudge always wins the race; raising this to 80% would risk
+   * stepping on TUI's compact and producing two compact_boundary events.
+   */
+  private static readonly AUTO_COMPACT_THRESHOLD = 150_000;
   private subagentFlushTimer: ReturnType<typeof setTimeout> | null = null;
   /**
    * Which full assistant envelopes to suppress on the next assistant message
@@ -522,6 +546,30 @@ export class ApiSessionClient extends EventEmitter {
   setModelModeKey(key: string | undefined) {
     this.modelModeKey = key;
   }
+
+  /**
+   * Sync the session's "compress at 75%" preference. Called from runClaude
+   * whenever a user message carries `meta.autoCompact`. Idempotent — silent
+   * no-op if the flag is unchanged so we don't log on every turn.
+   */
+  setAutoCompactEnabled(enabled: boolean): void {
+    if (this.autoCompactEnabled === enabled) return;
+    this.autoCompactEnabled = enabled;
+    logger.debug(`[autoCompact] enabled=${enabled}`);
+  }
+
+  /**
+   * Subscribe to "context size crossed the auto-compact threshold" events.
+   * Fired at most once per turn (the latch resets at the same place
+   * `accumulatedTurnUsage` does). The handler is expected to push a
+   * `/compact` message into the launcher's queue — kept here as a
+   * callback so ApiSessionClient stays queue-agnostic (the queue lives
+   * on the Session object, not on the API client).
+   */
+  onAutoCompactRequest(callback: (contextSize: number) => void): void {
+    this.autoCompactHandler = callback;
+  }
+  private autoCompactHandler: ((contextSize: number) => void) | null = null;
 
   onUserMessage(callback: (data: UserMessage) => void) {
     this.pendingMessageCallback = callback;
@@ -771,6 +819,7 @@ export class ApiSessionClient extends EventEmitter {
     this.currentTurnModel = null;
     this.currentTurnUsage = null;
     this.accumulatedTurnUsage = null;
+    this.autoCompactTriggeredInThisTurn = false;
   }
 
   sendClaudeSessionMessage(
@@ -906,6 +955,37 @@ export class ApiSessionClient extends EventEmitter {
 
         // Accumulate usage across all API calls within this turn
         this.accumulateTurnUsage(body.message.usage);
+
+        // Auto-compact threshold. Skip during replay (we are reconstructing
+        // history, not living through it — pushing /compact here would
+        // double-execute on every session restart). The latch is per-turn:
+        // a long turn with multiple API calls past the threshold still
+        // triggers at most one /compact, and the next turn's
+        // `resetCurrentTurnTracking` re-arms it.
+        if (
+          !options.replay &&
+          this.autoCompactEnabled &&
+          !this.autoCompactTriggeredInThisTurn &&
+          this.autoCompactHandler
+        ) {
+          const contextSize =
+            body.message.usage.input_tokens +
+            (body.message.usage.cache_read_input_tokens ?? 0) +
+            (body.message.usage.cache_creation_input_tokens ?? 0);
+          if (contextSize >= ApiSessionClient.AUTO_COMPACT_THRESHOLD) {
+            this.autoCompactTriggeredInThisTurn = true;
+            logger.debug(
+              `[autoCompact] threshold reached at ${contextSize} tokens — requesting /compact`,
+            );
+            try {
+              this.autoCompactHandler(contextSize);
+            } catch (handlerError) {
+              logger.debug(
+                `[autoCompact] handler threw: ${handlerError instanceof Error ? handlerError.message : String(handlerError)}`,
+              );
+            }
+          }
+        }
       } catch (error) {
         logger.debug("[SOCKET] Failed to send usage data:", error);
       }
@@ -999,6 +1079,7 @@ export class ApiSessionClient extends EventEmitter {
     this.currentTurnModel = null;
     this.currentTurnUsage = null;
     this.accumulatedTurnUsage = null;
+    this.autoCompactTriggeredInThisTurn = false;
 
     mapped.envelopes.forEach((envelope, envelopeIndex) => {
       this.sendSessionProtocolMessage(envelope, {

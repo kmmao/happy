@@ -37,6 +37,7 @@ describe("sessionPreferencesState", () => {
       maxBudgetUsd: null,
       taskBudgetTokens: null,
       starred: null,
+      autoCompact: null,
     });
   });
 

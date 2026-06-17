@@ -734,6 +734,12 @@ export async function runClaude(
   let currentThinking: EnhancedMode["thinking"] = undefined; // Track current thinking config
   let currentEffort: EnhancedMode["effort"] = DEFAULT_CLAUDE_EFFORT; // Track current effort level
   let currentLocale: string | undefined = undefined; // Track current locale
+  // Tracks the session's auto-compact preference. Default true (200K window +
+  // happy auto-`/compact` at 150K). Flipped by `message.meta.autoCompact`
+  // when the App pushes a SessionPreferences update via the next user message.
+  // Reaches `resolveModelKey` (strips `-1m` suffix when true) and contributes
+  // to `coldModeHash` so toggling triggers a mode_change cold restart.
+  let currentAutoCompact: boolean = true;
 
   // Reset live mode tracking back to configured defaults. Wired to
   // Session.onAbort so a remote abort or local→remote switch starts the next
@@ -747,8 +753,50 @@ export async function runClaude(
     currentAllowedTools = undefined;
     currentDisallowedTools = undefined;
     currentEffort = DEFAULT_CLAUDE_EFFORT;
+    currentAutoCompact = true;
     logger.debug("[loop] Reset current mode defaults after abort");
   };
+
+  // When ApiSessionClient sees per-turn context usage cross 150K (75% of the
+  // 200K window), push a `/compact` into the queue using the current live
+  // mode. Mirrors the manual `/compact` handling further below (specialCommand
+  // path) — same isolate semantics, same priority — so the TUI's own compact
+  // event sequencing is unchanged. The closure reads the `current*` vars at
+  // trigger time so a recently-changed effort/permission mode is honoured.
+  // Setting `session.autoCompactEnabled` happens later via the user-message
+  // handler when `meta.autoCompact` arrives; the handler itself is registered
+  // once here. Per-turn deduplication and the enabled-flag gate live in
+  // ApiSessionClient — we don't re-check them here.
+  session.onAutoCompactRequest((contextSize) => {
+    const enhancedMode: EnhancedMode = {
+      permissionMode: currentPermissionMode || "default",
+      model: currentModel,
+      fallbackModel: currentFallbackModel,
+      customSystemPrompt: currentCustomSystemPrompt,
+      appendSystemPrompt: currentAppendSystemPrompt,
+      allowedTools: currentAllowedTools,
+      disallowedTools: currentDisallowedTools,
+      maxBudgetUsd: currentMaxBudgetUsd,
+      taskBudget: currentTaskBudget,
+      thinking: currentThinking,
+      effort: currentEffort,
+      locale: currentLocale,
+      autoCompact: currentAutoCompact,
+    };
+    messageQueue.pushIsolateAndClear("/compact", enhancedMode, {
+      priority: "urgent",
+      kind: "isolated",
+      source: "auto-compact",
+    });
+    logger.debug(
+      `[autoCompact] pushed /compact to queue (contextSize=${contextSize})`,
+    );
+    session.sendSessionEvent({
+      type: "message",
+      message: `Context reached ${Math.round(contextSize / 1000)}K tokens — auto-compacting (75% threshold).`,
+    });
+  });
+
   session.onUserMessage((message) => {
     // Resolve permission mode from meta - pass through as-is, mapping happens at SDK boundary
     let messagePermissionMode: PermissionMode | undefined =
@@ -916,6 +964,20 @@ export async function runClaude(
       logger.debug(`[loop] effort updated: ${messageEffort ?? "none"}`);
     }
 
+    // Resolve autoCompact (true = 200K + happy auto-compact at 150K;
+    // false = 1M context). null/undefined preserves the current value;
+    // an old App that doesn't send the field leaves CLI defaults intact.
+    let messageAutoCompact = currentAutoCompact;
+    if (message.meta?.hasOwnProperty("autoCompact")) {
+      const raw = (message.meta as { autoCompact?: boolean | null }).autoCompact;
+      messageAutoCompact = raw === false ? false : true;
+      currentAutoCompact = messageAutoCompact;
+      // Propagate to ApiSessionClient so the threshold check uses the new value
+      // starting with the next assistant message in this turn. Idempotent.
+      session.setAutoCompactEnabled(messageAutoCompact);
+      logger.debug(`[loop] autoCompact updated: ${messageAutoCompact}`);
+    }
+
     // Resolve locale
     let messageLocale = currentLocale;
     if (message.meta?.hasOwnProperty("locale")) {
@@ -973,6 +1035,7 @@ export async function runClaude(
         thinking: messageThinking,
         effort: messageEffort,
         locale: messageLocale,
+        autoCompact: messageAutoCompact,
       };
       messageQueue.pushIsolateAndClear(
         specialCommand.originalMessage || message.content.text,
@@ -1001,6 +1064,7 @@ export async function runClaude(
         thinking: messageThinking,
         effort: messageEffort,
         locale: messageLocale,
+        autoCompact: messageAutoCompact,
       };
       messageQueue.pushIsolateAndClear(
         specialCommand.originalMessage || message.content.text,
@@ -1038,6 +1102,7 @@ export async function runClaude(
       thinking: messageThinking,
       effort: messageEffort,
       locale: messageLocale,
+      autoCompact: messageAutoCompact,
       ...(messageContinue && { continue: true }),
       ...(messageShouldQuery === false && { shouldQuery: false }),
       ...(claudePlugins.length > 0 && { plugins: claudePlugins }),
