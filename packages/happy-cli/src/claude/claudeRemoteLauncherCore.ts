@@ -246,7 +246,27 @@ export async function claudeRemoteLauncher(
   // persistently wedged session escalates to tier-2 instead of re-strand
   // looping. Gating on zero output is what makes re-delivery double-execution
   // safe: no JSONL record means nothing ran.
-  let inFlightPrompt: { message: string; mode: EnhancedMode } | null = null;
+  let inFlightPrompt: {
+    message: string;
+    mode: EnhancedMode;
+    /**
+     * Queue `source` of the message that produced this write — propagated
+     * from the queue item via `nextPromptSource` so `maybeRedeliverStranded
+     * Prompt` can skip re-pushing internally-generated prompts.
+     * Specifically `"auto-compact"`: the threshold handler in `runClaude.ts`
+     * already debounces via the per-turn latch and the new cooldown latch,
+     * so re-delivering its `/compact` on a strand only stacks pastes in the
+     * TUI composer (`/compact/compact/compact…`) without helping.
+     */
+    source?: string;
+  } | null = null;
+  /**
+   * Source of the message most recently returned from `nextMessage()`, used
+   * to stamp `inFlightPrompt.source` inside `onPromptWritten`. Set at every
+   * return site in the launcher's `nextMessage` implementation; read once
+   * per turn after `claudeRemote` writes the bracketed paste to the PTY.
+   */
+  let nextPromptSource: string | undefined = undefined;
   let turnProducedOutput = false;
   let strandRedeliverCount = 0;
   // Wall-clock when the current watchdog started (= turn start). Used to
@@ -470,6 +490,19 @@ export async function claudeRemoteLauncher(
   // any backlog so the lost prompt runs before later sends.
   function maybeRedeliverStrandedPrompt(): void {
     if (exitReason || turnProducedOutput || !inFlightPrompt) return;
+    // Auto-compact pushes are internal — the API-side cooldown and per-turn
+    // latches already prevent stacked /compact firings, and a TUI that
+    // failed to consume the first /compact will not consume a re-pasted
+    // copy either (the composer literally accumulates `/compact/compact…`
+    // text the user has to clean up). Skip silently; the cold-restart
+    // tier-2 path is the right recovery for a wedged compact, not a
+    // re-paste.
+    if (inFlightPrompt.source === "auto-compact") {
+      logger.debug(
+        "[remote][strand] skipping redeliver of auto-compact /compact — cooldown will gate next push",
+      );
+      return;
+    }
     if (strandRedeliverCount >= 1) {
       logger.debug(
         "[remote][strand] stranded prompt already re-delivered once — not retrying (next strand escalates to tier-2).",
@@ -1720,6 +1753,13 @@ export async function claudeRemoteLauncher(
           type: "message",
           message: "Context compacted",
         });
+        // Arm the auto-compact cooldown latch in the API client. The next
+        // assistant message will either (a) report context < threshold —
+        // proof the TUI compact really shrunk the window, so cooldown
+        // clears automatically — or (b) report ≥ threshold, in which case
+        // cooldown holds and the user is notified once. Prevents the
+        // `/compact/compact/compact…` runaway when TUI compact is a no-op.
+        session.client.armAutoCompactCooldown();
         // SDK-era seedReadState() pre-warmed the read cache here so the
         // post-compact assistant could Edit tracked files. PTY mode has no
         // such cache — Claude TUI re-reads files itself when needed.
@@ -2159,6 +2199,13 @@ export async function claudeRemoteLauncher(
       requestIds: string[];
       queueWaitMs?: number;
       socketToQueueMs?: number;
+      /**
+       * Origin tag carried over from the queue item that triggered the
+       * cold-restart. Preserved so the post-restart `nextMessage()` return
+       * can stamp `nextPromptSource` and the strand-redeliver guard keeps
+       * working across the restart boundary.
+       */
+      source?: string;
     } | null = null;
 
     // Track session ID to detect when it actually changes
@@ -2540,6 +2587,7 @@ export async function claudeRemoteLauncher(
               streamEventState = createStreamEventMapperState();
               permissionHandler.handleModeChange(p.mode.permissionMode);
               startMidTurnDrain();
+              nextPromptSource = p.source;
               return p;
             }
 
@@ -2603,6 +2651,7 @@ export async function claudeRemoteLauncher(
                   streamEventState = createStreamEventMapperState();
                   permissionHandler.handleModeChange(mode.permissionMode);
                   startMidTurnDrain();
+                  nextPromptSource = msg.source;
                   return {
                     message: msg.message,
                     mode: msg.mode,
@@ -2692,6 +2741,7 @@ export async function claudeRemoteLauncher(
                       // Prepend a lightweight hint — Claude uses query_project_knowledge to get details
                       const titles = newEntries.map((e) => `"${e.title}"`).join(", ");
                       const hint = `[Knowledge base update: ${newEntries.length} new ${newEntries.length === 1 ? "entry" : "entries"} added (${titles}). Use query_project_knowledge tool if relevant to this task.]\n\n`;
+                      nextPromptSource = msg.source;
                       return {
                         message: hint + msg.message,
                         mode: msg.mode,
@@ -2709,6 +2759,7 @@ export async function claudeRemoteLauncher(
               if (knowledgeInjected && pendingFileHint) {
                 const hint = pendingFileHint;
                 pendingFileHint = null;
+                nextPromptSource = msg.source;
                 return {
                   message: hint + msg.message,
                   mode: msg.mode,
@@ -2743,6 +2794,7 @@ export async function claudeRemoteLauncher(
                 logger.debug("[context] Injected project CONTEXT.md into first message");
               }
 
+              nextPromptSource = msg.source;
               return {
                 message: contextMdPrefix + worldConfigPrefix + knowledgePrefix + msg.message,
                 mode: msg.mode,
@@ -2881,7 +2933,18 @@ export async function claudeRemoteLauncher(
           // which matches currentColdHash at strand time so the re-pushed
           // message is accepted by the still-alive mid-turn drain.
           onPromptWritten: (text: string) => {
-            inFlightPrompt = { message: text, mode: mode! };
+            // `nextPromptSource` was stamped at every nextMessage() return
+            // site below. Pair it with the captured write so `maybeRedeliver
+            // StrandedPrompt` can decide whether to re-push (real user
+            // prompt → yes; auto-compact internal isolate → no).
+            inFlightPrompt = {
+              message: text,
+              mode: mode!,
+              source: nextPromptSource,
+            };
+            // Consume so a stale value cannot leak into the next turn if
+            // the next nextMessage() return forgets to re-stamp.
+            nextPromptSource = undefined;
             // Post-write submission-wedge check. A healthy submit makes the TUI
             // echo the pasted prompt within milliseconds (raw PTY bytes →
             // onPtyActivity → lastClaudeOutputAt advances past writtenAt); a

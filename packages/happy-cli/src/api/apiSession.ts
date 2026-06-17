@@ -296,6 +296,29 @@ export class ApiSessionClient extends EventEmitter {
    */
   private autoCompactTriggeredInThisTurn: boolean = false;
   /**
+   * Inter-turn cooldown latch — armed when the launcher observes a
+   * `compact_boundary` (the TUI signalled "compaction done"). While armed,
+   * the threshold check refuses to push another `/compact`. The latch
+   * auto-clears the moment the NEXT assistant message reports a context
+   * size BELOW the threshold (proof the prior compaction actually shrunk
+   * the window). If the next message is STILL ≥ threshold, the latch
+   * persists, a one-shot "auto-compact paused" event is emitted, and no
+   * further `/compact` fires until the user intervenes (manual `/compact`,
+   * model toggle, or a fresh user turn that drops context naturally).
+   *
+   * Fixes the infinite-loop seen when Claude Code 2.x TUI's compact emits
+   * `compact_boundary` but the actual context window does not shrink:
+   * the per-turn latch alone reset between turns and re-fired `/compact`
+   * on the very next assistant message, stacking pastes in the composer
+   * (`/compact/compact/compact…`) and tripping the strand watchdog.
+   */
+  private autoCompactCooldownArmed: boolean = false;
+  /**
+   * One-shot guard so the "auto-compact paused" event is emitted at most
+   * once per cooldown cycle. Reset whenever the cooldown clears.
+   */
+  private autoCompactCooldownNotified: boolean = false;
+  /**
    * 75% of the 200K window. Fires before Claude TUI's own ~80% auto-compact
    * so happy's nudge always wins the race; raising this to 80% would risk
    * stepping on TUI's compact and producing two compact_boundary events.
@@ -559,6 +582,28 @@ export class ApiSessionClient extends EventEmitter {
   }
 
   /**
+   * Called by the launcher when the TUI emits `compact_boundary`. Suppresses
+   * the next `/compact` push until either (a) an assistant message reports
+   * context size below the threshold — meaning the TUI compact really did
+   * shrink the window — or (b) a real user message arrives via the socket
+   * (`dispatchUserMessage`), giving the user an escape hatch when the
+   * compact was a no-op.
+   */
+  armAutoCompactCooldown(): void {
+    if (this.autoCompactCooldownArmed) return;
+    this.autoCompactCooldownArmed = true;
+    this.autoCompactCooldownNotified = false;
+    logger.debug("[autoCompact] cooldown armed (compact_boundary observed)");
+  }
+
+  private clearAutoCompactCooldown(reason: string): void {
+    if (!this.autoCompactCooldownArmed) return;
+    this.autoCompactCooldownArmed = false;
+    this.autoCompactCooldownNotified = false;
+    logger.debug(`[autoCompact] cooldown cleared (${reason})`);
+  }
+
+  /**
    * Subscribe to "context size crossed the auto-compact threshold" events.
    * Fired at most once per turn (the latch resets at the same place
    * `accumulatedTurnUsage` does). The handler is expected to push a
@@ -597,6 +642,11 @@ export class ApiSessionClient extends EventEmitter {
     if (!this.pendingMessageCallback) {
       return;
     }
+    // Real socket-delivered user message → clear any auto-compact cooldown
+    // so the next threshold crossing can act. Auto-compact's own `/compact`
+    // pushes bypass this path entirely (they go straight to the queue), so
+    // this only fires for genuine user input. Idempotent when already clear.
+    this.clearAutoCompactCooldown("user message dispatched");
     try {
       this.pendingMessageCallback(message);
     } catch (error) {
@@ -972,17 +1022,52 @@ export class ApiSessionClient extends EventEmitter {
             body.message.usage.input_tokens +
             (body.message.usage.cache_read_input_tokens ?? 0) +
             (body.message.usage.cache_creation_input_tokens ?? 0);
-          if (contextSize >= ApiSessionClient.AUTO_COMPACT_THRESHOLD) {
-            this.autoCompactTriggeredInThisTurn = true;
-            logger.debug(
-              `[autoCompact] threshold reached at ${contextSize} tokens — requesting /compact`,
+          const belowThreshold =
+            contextSize < ApiSessionClient.AUTO_COMPACT_THRESHOLD;
+          // Hysteresis: an assistant message reporting below-threshold
+          // context is proof that the prior compact actually shrunk the
+          // window. Lift the cooldown latch so the normal threshold guard
+          // can fire again on future growth.
+          if (belowThreshold && this.autoCompactCooldownArmed) {
+            this.clearAutoCompactCooldown(
+              `assistant usage ${contextSize} < ${ApiSessionClient.AUTO_COMPACT_THRESHOLD}`,
             );
-            try {
-              this.autoCompactHandler(contextSize);
-            } catch (handlerError) {
+          }
+          if (contextSize >= ApiSessionClient.AUTO_COMPACT_THRESHOLD) {
+            if (this.autoCompactCooldownArmed) {
+              // The TUI's prior compact_boundary did NOT reduce the window
+              // (Claude Code 2.x PTY-mode bug). Pushing another `/compact`
+              // here is what caused the original infinite loop. Notify the
+              // user once and stay quiet until they intervene.
+              if (!this.autoCompactCooldownNotified) {
+                this.autoCompactCooldownNotified = true;
+                logger.debug(
+                  `[autoCompact] cooldown holds at ${contextSize} tokens — prior compact did not shrink context; notifying user once.`,
+                );
+                try {
+                  this.sendSessionEvent({
+                    type: "message",
+                    message:
+                      "Auto-compact paused — the previous /compact did not reduce context. Run /compact manually, switch to 1M context, or start a new session.",
+                  });
+                } catch (notifyError) {
+                  logger.debug(
+                    `[autoCompact] cooldown notify threw: ${notifyError instanceof Error ? notifyError.message : String(notifyError)}`,
+                  );
+                }
+              }
+            } else {
+              this.autoCompactTriggeredInThisTurn = true;
               logger.debug(
-                `[autoCompact] handler threw: ${handlerError instanceof Error ? handlerError.message : String(handlerError)}`,
+                `[autoCompact] threshold reached at ${contextSize} tokens — requesting /compact`,
               );
+              try {
+                this.autoCompactHandler(contextSize);
+              } catch (handlerError) {
+                logger.debug(
+                  `[autoCompact] handler threw: ${handlerError instanceof Error ? handlerError.message : String(handlerError)}`,
+                );
+              }
             }
           }
         }

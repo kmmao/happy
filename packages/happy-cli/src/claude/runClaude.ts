@@ -744,6 +744,17 @@ export async function runClaude(
   // Reset live mode tracking back to configured defaults. Wired to
   // Session.onAbort so a remote abort or local→remote switch starts the next
   // turn from a clean slate instead of inheriting one-message overrides.
+  //
+  // `currentAutoCompact` is INTENTIONALLY preserved across abort: it is the
+  // session's context-tier preference (200K + happy-side `/compact` at 150K
+  // vs the 1M premium window), set by the App via `meta.autoCompact`. The
+  // strand watchdog's tier-2 cold-restart funnels through this same path,
+  // and silently flipping a user-on-1M session back to 200K there would
+  // (a) re-arm the threshold checker that just looped on a wedged
+  //     `/compact`, defeating the cooldown fix below, and
+  // (b) silently downgrade the user's chosen context tier mid-conversation.
+  // The next user message's `meta.autoCompact` (if present) will still
+  // overwrite this value through the normal user-message handler.
   const resetCurrentModeDefaults = () => {
     currentPermissionMode = initialPermissionMode;
     currentModel = options.model ?? DEFAULT_CLAUDE_MODEL;
@@ -753,7 +764,6 @@ export async function runClaude(
     currentAllowedTools = undefined;
     currentDisallowedTools = undefined;
     currentEffort = DEFAULT_CLAUDE_EFFORT;
-    currentAutoCompact = true;
     logger.debug("[loop] Reset current mode defaults after abort");
   };
 
