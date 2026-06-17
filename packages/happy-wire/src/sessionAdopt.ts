@@ -40,6 +40,14 @@ export const SessionAdoptTargetSchema = z.discriminatedUnion("kind", [
         cronExpression: z.string().optional(),
         prompt: z.string(),
         directory: z.string(),
+        /**
+         * Optional slash command (e.g. "/caveman") delivered into the
+         * loop's session as the first user message — server stashes it
+         * inside the loop's genericConfig and the CLI daemon picks it
+         * up at spawn time. Lets a Skill activate before the iteration
+         * prompt runs.
+         */
+        bootstrapSlashCommand: z.string().optional(),
     }),
     // "Make this recurring" — create a TriggerSchedule that, on each fire,
     // reuses this Session via the Guardian registry.
