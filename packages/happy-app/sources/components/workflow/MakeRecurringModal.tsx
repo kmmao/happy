@@ -31,7 +31,7 @@ import { createTriggerSchedule } from "@/sync/apiTriggerSchedules";
 import { sessionAdopt } from "@/sync/apiSessionAdopt";
 import { webInteractive } from "@/utils/interactiveSurface";
 import { t } from "@/text";
-import { useAllMachines } from "@/sync/storage";
+import { useAllMachines, useProjects } from "@/sync/storage";
 import { BottomSheet, BottomSheetHandle, PresetChip } from "@/components/BottomSheet";
 import type { Session } from "@/sync/storageTypes";
 
@@ -134,7 +134,13 @@ export const MakeRecurringModal = React.memo(function MakeRecurringModal({
 
     const isStandalone = !session;
     const machines = useAllMachines();
+    const projects = useProjects();
     const [pickedMachineId, setPickedMachineId] = React.useState<string>("");
+    // Standalone-only: project picker is gated on the machine pick so the
+    // chip list always shows projects from the right host. Server stores
+    // null when omitted (legacy path); we now force a value in the App so
+    // the cron runner never falls back to its default directory.
+    const [pickedProjectServerId, setPickedProjectServerId] = React.useState<string>("");
 
     const [presetId, setPresetId] = React.useState<string>("daily");
     const [customCron, setCustomCron] = React.useState<string>("");
@@ -160,8 +166,38 @@ export const MakeRecurringModal = React.memo(function MakeRecurringModal({
         setSubmitting(false);
         if (isStandalone) {
             setPickedMachineId(machines[0]?.id ?? "");
+            setPickedProjectServerId("");
         }
     }, [visible, session, isStandalone, machines]);
+
+    // Filter projects to those on the currently-picked machine that are
+    // already synced to the server (we send the serverId, not the local
+    // id, so unsynced projects can't be selected). Mirrors
+    // CreateLoopModal.tsx so behaviour stays consistent between the two
+    // standalone create flows.
+    const machineProjects = React.useMemo(() => {
+        if (!pickedMachineId) return [];
+        return projects.filter(
+            (p) => p.key.machineId === pickedMachineId && p.serverId,
+        );
+    }, [projects, pickedMachineId]);
+
+    // Auto-select the first project whenever the machine changes (or the
+    // current pick is no longer valid for the new list). Clears to "" when
+    // the machine has no projects so the warning state below renders and
+    // `valid` blocks submit.
+    React.useEffect(() => {
+        if (machineProjects.length === 0) {
+            setPickedProjectServerId("");
+            return;
+        }
+        const stillValid = machineProjects.some(
+            (p) => p.serverId === pickedProjectServerId,
+        );
+        if (!stillValid) {
+            setPickedProjectServerId(machineProjects[0].serverId ?? "");
+        }
+    }, [machineProjects, pickedProjectServerId]);
 
     const cronExpression =
         presetId === "custom"
@@ -169,8 +205,16 @@ export const MakeRecurringModal = React.memo(function MakeRecurringModal({
             : CRON_PRESETS.find((p) => p.id === presetId)?.expr ?? "";
 
     const machineId = session?.metadata?.machineId ?? pickedMachineId;
+    // Standalone mode now requires a project — the server's cron runner
+    // falls back to the user's home directory when projectId is null,
+    // which is almost never what people want. Session-adopt mode skips
+    // this check because the server binds projectId from the source
+    // session automatically.
     const valid =
-        cronExpression.length > 0 && prompt.trim().length > 0 && machineId.length > 0;
+        cronExpression.length > 0 &&
+        prompt.trim().length > 0 &&
+        machineId.length > 0 &&
+        (!isStandalone || pickedProjectServerId.length > 0);
 
     const handleConfirm = async () => {
         if (!valid || submitting) return;
@@ -203,6 +247,7 @@ export const MakeRecurringModal = React.memo(function MakeRecurringModal({
                 const trimmedName = name.trim();
                 await createTriggerSchedule(credentials, {
                     machineId,
+                    projectId: pickedProjectServerId,
                     prompt: prompt.trim(),
                     cronExpression,
                     ...(trimmedName ? { name: trimmedName } : {}),
@@ -294,6 +339,44 @@ export const MakeRecurringModal = React.memo(function MakeRecurringModal({
                                     label={m.metadata?.displayName || m.metadata?.host || m.id}
                                     active={pickedMachineId === m.id}
                                     onPress={() => setPickedMachineId(m.id)}
+                                />
+                            ))}
+                        </View>
+                    )}
+                </View>
+            ) : null}
+
+            {isStandalone ? (
+                <View>
+                    <Text style={styles.sectionLabel}>
+                        {t("workflows.recurringSectionProject")}
+                    </Text>
+                    {!pickedMachineId ? (
+                        <Text style={[styles.infoText, { marginTop: 6 }]}>
+                            {t("workflows.recurringProjectNone")}
+                        </Text>
+                    ) : machineProjects.length === 0 ? (
+                        <Text
+                            style={[
+                                styles.infoText,
+                                { color: theme.colors.warning, marginTop: 6 },
+                            ]}
+                        >
+                            {t("workflows.recurringProjectEmpty")}
+                        </Text>
+                    ) : (
+                        <View style={styles.presetGrid}>
+                            {machineProjects.map((p) => (
+                                <PresetChip
+                                    key={p.id}
+                                    label={
+                                        p.key.path.split("/").filter(Boolean).pop() ||
+                                        p.key.path
+                                    }
+                                    active={p.serverId === pickedProjectServerId}
+                                    onPress={() =>
+                                        setPickedProjectServerId(p.serverId ?? "")
+                                    }
                                 />
                             ))}
                         </View>

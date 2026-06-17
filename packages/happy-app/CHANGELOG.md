@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.40.0 - 2026-06-17
+
+Standalone "Make Recurring" now forces you to pick a project before the schedule can be saved — previously, leaving it blank quietly sent `projectId=null` to the server, which fell back to a literal `~` directory string and created a `./~/` folder on the daemon's working directory. Cron-fired sessions now land in the right place.
+
+### Recurring schedules
+- Added a project picker to the standalone Make Recurring modal, cascading off the machine pick. Submit is blocked until you pick a project so the cron runner never falls back to the wrong directory.
+- Fixed the server-side fallback for legacy / third-party schedules with no `projectId`: the runner now uses `os.homedir()` instead of the literal string `"~"`, so existing rows that still slip through stop creating `./~/` folders on the daemon host.
+
 ## 2.39.0 - 2026-06-17
 
 A new AUTO/1M toggle next to the context-usage chip in the session header lets you choose between the 200K compress mode (default, with happy auto-pushing `/compact` at 75% usage) and the full 1M premium context. The toggle is per-session, takes effect on the next user message, and rides a streamlined cold-restart path so the switch is seamless even on large sessions.

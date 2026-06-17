@@ -1,3 +1,4 @@
+import { homedir } from "node:os";
 import { db } from "@/storage/db";
 import { inTx } from "@/storage/inTx";
 import { log } from "@/utils/log";
@@ -120,7 +121,13 @@ export async function checkAndTriggerSchedules(
                 continue;
             }
 
-            let directory = "~";
+            // App now forces a projectId on standalone creates, but
+            // sessionAdopt + legacy DB rows + third-party scripts can still
+            // hit this with projectId=null. Use the server process's
+            // homedir so spawnSession lands somewhere real — the previous
+            // literal "~" was not expanded by fs/spawn and ended up
+            // creating a `./~/` directory under the daemon's cwd.
+            let directory = homedir();
             let resolvedProjectId: string | null = null;
             let projectSupervisorConfig: string | null = null;
             if (schedule.projectId) {
