@@ -648,14 +648,16 @@ const CompactStatus = React.memo(function CompactStatus({
                 </View>
               ) : null}
 
-              {shouldShowContext ? (
+              {shouldShowContext || autoCompact ? (
                 <View style={styles.statusStatsLine}>
-                  <Text
-                    style={[styles.statusSummaryLine, { color: barColor }]}
-                    numberOfLines={1}
-                  >
-                    {contextLabel}
-                  </Text>
+                  {shouldShowContext ? (
+                    <Text
+                      style={[styles.statusSummaryLine, { color: barColor }]}
+                      numberOfLines={1}
+                    >
+                      {contextLabel}
+                    </Text>
+                  ) : null}
                   {autoCompact ? (
                     <Pressable
                       onPress={() => autoCompact.onToggle(!autoCompact.enabled)}

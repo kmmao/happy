@@ -2,6 +2,15 @@
   "entries": {
     "en": [
       {
+        "version": "2.40.1",
+        "date": "2026-06-17",
+        "summary": "",
+        "changes": [
+          "Fixed the new AUTO/1M toggle being hidden until usage crossed 90%. The chip was nested inside the existing \"low-context warning\" block, so on a fresh session it never appeared. The toggle now renders unconditionally next to the context-usage area whenever the session is autoCompact-aware, while the percentage label still respects the previous \"show when ≤ 10% left or settings opt-in\" rule."
+        ],
+        "rawMarkdown": "## 2.40.1 - 2026-06-17\n\n\n### Context window control\n- Fixed the new AUTO/1M toggle being hidden until usage crossed 90%. The chip was nested inside the existing \"low-context warning\" block, so on a fresh session it never appeared. The toggle now renders unconditionally next to the context-usage area whenever the session is autoCompact-aware, while the percentage label still respects the previous \"show when ≤ 10% left or settings opt-in\" rule."
+      },
+      {
         "version": "2.40.0",
         "date": "2026-06-17",
         "summary": "Standalone \"Make Recurring\" now forces you to pick a project before the schedule can be saved — previously, leaving it blank quietly sent `projectId=null` to the server, which fell back to a literal `~` directory string and created a `./~/` folder on the daemon's working directory. Cron-fired sessions now land in the right place.",
@@ -1070,6 +1079,15 @@
     ],
     "zh-Hans": [
       {
+        "version": "2.40.1",
+        "date": "2026-06-17",
+        "summary": "",
+        "changes": [
+          "修复 AUTO/1M 切换 chip 在用量未达 90% 时不显示的问题。之前 chip 嵌在「低上下文警告」分支里,所以新会话上根本看不到。现在只要会话支持 autoCompact,chip 就始终显示;百分比文字仍然按老规则(剩余 ≤ 10% 或在设置里打开了「始终显示上下文用量」)显示。"
+        ],
+        "rawMarkdown": "## 2.40.1 - 2026-06-17\n\n\n### 上下文窗口控制\n- 修复 AUTO/1M 切换 chip 在用量未达 90% 时不显示的问题。之前 chip 嵌在「低上下文警告」分支里,所以新会话上根本看不到。现在只要会话支持 autoCompact,chip 就始终显示;百分比文字仍然按老规则(剩余 ≤ 10% 或在设置里打开了「始终显示上下文用量」)显示。"
+      },
+      {
         "version": "2.40.0",
         "date": "2026-06-17",
         "summary": "Standalone「转为定时」现在强制选择项目后才能保存 —— 之前留空会静默给 server 发 `projectId=null`,server 端兜底成字面字符串 `~`,导致 daemon 在自己 cwd 下创建一个名叫 `~` 的目录(通常落在 `$HOME/~/`),用户的定时任务全跑在那里。现在 cron 触发的会话落到正确的目录。",
@@ -2115,7 +2133,7 @@
       }
     ]
   },
-  "latestVersion": "2.40.0",
+  "latestVersion": "2.40.1",
   "availableLocales": [
     "en",
     "zh-Hans"

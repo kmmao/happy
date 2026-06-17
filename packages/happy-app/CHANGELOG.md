@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.40.1 - 2026-06-17
+
+### Context window control
+- Fixed the new AUTO/1M toggle being hidden until usage crossed 90%. The chip was nested inside the existing "low-context warning" block, so on a fresh session it never appeared. The toggle now renders unconditionally next to the context-usage area whenever the session is autoCompact-aware, while the percentage label still respects the previous "show when ≤ 10% left or settings opt-in" rule.
+
 ## 2.40.0 - 2026-06-17
 
 Standalone "Make Recurring" now forces you to pick a project before the schedule can be saved — previously, leaving it blank quietly sent `projectId=null` to the server, which fell back to a literal `~` directory string and created a `./~/` folder on the daemon's working directory. Cron-fired sessions now land in the right place.
