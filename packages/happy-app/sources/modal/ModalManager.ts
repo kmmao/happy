@@ -1,16 +1,40 @@
-import { Platform, Alert } from "react-native";
-import { t } from "@/text";
+/**
+ * ModalManager — factory dispatching to a selected ModalAdapter.
+ *
+ * The native vs web branches that used to interleave inside every
+ * method (`alert`, `confirm`, `prompt`) now live in two distinct
+ * `ModalAdapter` implementations — `NativeModalAdapter` and
+ * `WebModalAdapter` — in `./modalAdapter.ts`. This class is a thin
+ * dispatch wrapper that picks the right adapter at `setFunctions`
+ * time and forwards every call.
+ *
+ * The public surface (`IModal`) is unchanged; CLAUDE.md's "never use
+ * Alert module — use @/modal instead" rule stays satisfied.
+ *
+ * `resolveConfirm` / `resolvePrompt` (called by `WebAlertModal` /
+ * other web modal components after a button click) delegate to the
+ * web adapter — that's where the resolver maps live. On native
+ * platforms these are no-ops (resolution happens inside the
+ * Alert.alert callback synchronously) but the IModal contract keeps
+ * the methods so the web component code paths remain unchanged.
+ */
+
 import { AlertButton, ModalConfig, CustomModalConfig, IModal } from "./types";
-import { log } from '@/log';
+import { log } from "@/log";
+
+import {
+  selectModalAdapter,
+  type ModalAdapter,
+  type WebModalAdapter,
+} from "./modalAdapter";
 
 class ModalManagerClass implements IModal {
   private showModalFn: ((config: Omit<ModalConfig, "id">) => string) | null =
     null;
   private hideModalFn: ((id: string) => void) | null = null;
   private hideAllModalsFn: (() => void) | null = null;
-  private confirmResolvers: Map<string, (value: boolean) => void> = new Map();
-  private promptResolvers: Map<string, (value: string | null) => void> =
-    new Map();
+  private adapter: ModalAdapter | null = null;
+  private webAdapter: WebModalAdapter | null = null;
 
   setFunctions(
     showModal: (config: Omit<ModalConfig, "id">) => string,
@@ -20,32 +44,22 @@ class ModalManagerClass implements IModal {
     this.showModalFn = showModal;
     this.hideModalFn = hideModal;
     this.hideAllModalsFn = hideAllModals;
-  }
 
-  private generateId(): string {
-    return Date.now().toString(36) + Math.random().toString(36).substr(2);
+    const { adapter, webAdapter } = selectModalAdapter({
+      showModalFn: showModal,
+    });
+    this.adapter = adapter;
+    this.webAdapter = webAdapter;
   }
 
   alert(title: string, message?: string, buttons?: AlertButton[]): void {
-    if (Platform.OS === "web") {
-      // Show custom web modal
-      if (!this.showModalFn) {
-        log.error(
-          "ModalManager not initialized. Make sure ModalProvider is mounted.",
-        );
-        return;
-      }
-
-      this.showModalFn({
-        type: "alert",
-        title,
-        message,
-        buttons: buttons || [{ text: t("common.ok") }],
-      } as Omit<ModalConfig, "id">);
-    } else {
-      // Use native alert
-      Alert.alert(title, message, buttons);
+    if (!this.adapter) {
+      log.error(
+        "ModalManager not initialized. Make sure ModalProvider is mounted.",
+      );
+      return;
     }
+    this.adapter.alert(title, message, buttons);
   }
 
   async confirm(
@@ -57,50 +71,38 @@ class ModalManagerClass implements IModal {
       destructive?: boolean;
     },
   ): Promise<boolean> {
-    if (Platform.OS === "web") {
-      // Show custom web modal
-      if (!this.showModalFn) {
-        log.error(
-          "ModalManager not initialized. Make sure ModalProvider is mounted.",
-        );
-        return false;
-      }
-
-      const modalId = this.showModalFn({
-        type: "confirm",
-        title,
-        message,
-        cancelText: options?.cancelText,
-        confirmText: options?.confirmText,
-        destructive: options?.destructive,
-      } as Omit<ModalConfig, "id">);
-
-      return new Promise<boolean>((resolve) => {
-        this.confirmResolvers.set(modalId, resolve);
-      });
-    } else {
-      // Use native alert
-      return new Promise<boolean>((resolve) => {
-        Alert.alert(
-          title,
-          message,
-          [
-            {
-              text: options?.cancelText || t("common.cancel"),
-              style: "cancel",
-              onPress: () => resolve(false),
-            },
-            {
-              text: options?.confirmText || t("common.ok"),
-              style: options?.destructive ? "destructive" : "default",
-              onPress: () => resolve(true),
-            },
-          ],
-          { cancelable: false },
-        );
-      });
+    if (!this.adapter) {
+      log.error(
+        "ModalManager not initialized. Make sure ModalProvider is mounted.",
+      );
+      return false;
     }
+    return this.adapter.confirm(title, message, options);
   }
+
+  async prompt(
+    title: string,
+    message?: string,
+    options?: {
+      placeholder?: string;
+      defaultValue?: string;
+      cancelText?: string;
+      confirmText?: string;
+      inputType?: "default" | "secure-text" | "email-address" | "numeric";
+    },
+  ): Promise<string | null> {
+    if (!this.adapter) {
+      log.error(
+        "ModalManager not initialized. Make sure ModalProvider is mounted.",
+      );
+      return null;
+    }
+    return this.adapter.prompt(title, message, options);
+  }
+
+  // toast / show / hide / hideAll are platform-agnostic — they always
+  // route through the custom-modal infrastructure, so they don't need
+  // adapter dispatch.
 
   toast(message: string, duration: number = 1500): void {
     if (!this.showModalFn) {
@@ -154,80 +156,17 @@ class ModalManagerClass implements IModal {
     this.hideAllModalsFn();
   }
 
+  // Web modal components call these after the user clicks a button.
+  // Delegated to the web adapter where the resolver maps live. On
+  // native the maps are empty (Alert.alert resolves inline), so the
+  // calls are no-ops.
+
   resolveConfirm(id: string, value: boolean): void {
-    const resolver = this.confirmResolvers.get(id);
-    if (resolver) {
-      resolver(value);
-      this.confirmResolvers.delete(id);
-    }
+    this.webAdapter?.resolveConfirm(id, value);
   }
 
   resolvePrompt(id: string, value: string | null): void {
-    const resolver = this.promptResolvers.get(id);
-    if (resolver) {
-      resolver(value);
-      this.promptResolvers.delete(id);
-    }
-  }
-
-  async prompt(
-    title: string,
-    message?: string,
-    options?: {
-      placeholder?: string;
-      defaultValue?: string;
-      cancelText?: string;
-      confirmText?: string;
-      inputType?: "default" | "secure-text" | "email-address" | "numeric";
-    },
-  ): Promise<string | null> {
-    if (Platform.OS === "ios" && !options?.inputType) {
-      // Use native Alert.prompt on iOS (only supports basic text input)
-      return new Promise<string | null>((resolve) => {
-        // @ts-ignore - Alert.prompt is iOS only
-        Alert.prompt(
-          title,
-          message,
-          [
-            {
-              text: options?.cancelText || t("common.cancel"),
-              style: "cancel",
-              onPress: () => resolve(null),
-            },
-            {
-              text: options?.confirmText || t("common.ok"),
-              onPress: (text?: string) => resolve(text || null),
-            },
-          ],
-          "plain-text",
-          options?.defaultValue,
-          "default",
-        );
-      });
-    } else {
-      // Use custom modal for web and Android
-      if (!this.showModalFn) {
-        log.error(
-          "ModalManager not initialized. Make sure ModalProvider is mounted.",
-        );
-        return null;
-      }
-
-      const modalId = this.showModalFn({
-        type: "prompt",
-        title,
-        message,
-        placeholder: options?.placeholder,
-        defaultValue: options?.defaultValue,
-        cancelText: options?.cancelText,
-        confirmText: options?.confirmText,
-        inputType: options?.inputType,
-      } as Omit<ModalConfig, "id">);
-
-      return new Promise<string | null>((resolve) => {
-        this.promptResolvers.set(modalId, resolve);
-      });
-    }
+    this.webAdapter?.resolvePrompt(id, value);
   }
 }
 
