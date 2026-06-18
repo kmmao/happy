@@ -1022,50 +1022,6 @@ export const AgentInput = React.memo(
                         />
                       )}
                     </Pressable>
-                    {props.connectionStatus.onCavemanPress && (() => {
-                      // Caveman badge is ALWAYS visible so users can toggle the
-                      // skill on/off from any device — not only after it's been
-                      // activated. Active state uses `success` (green fill);
-                      // inactive uses a hollow capsule with a `textSecondary`
-                      // outline so the badge reads as "off, click to enable".
-                      const active = !!props.connectionStatus.cavemanActive;
-                      const tone = active
-                        ? theme.colors.success
-                        : theme.colors.textSecondary;
-                      return (
-                        <Pressable
-                          onPress={props.connectionStatus.onCavemanPress}
-                          hitSlop={6}
-                          style={({ pressed }) => ({
-                            flexDirection: "row",
-                            alignItems: "center",
-                            gap: 5,
-                            paddingHorizontal: 7,
-                            paddingVertical: 3,
-                            borderRadius: 999,
-                            backgroundColor: active
-                              ? `${theme.colors.success}18`
-                              : "transparent",
-                            borderWidth: active ? 0 : StyleSheet.hairlineWidth,
-                            borderColor: active ? "transparent" : tone,
-                            opacity: pressed ? 0.6 : 1,
-                            cursor: "pointer" as any,
-                          })}
-                        >
-                          <StatusDot color={tone} size={5} />
-                          <Text
-                            style={{
-                              fontSize: 10,
-                              color: tone,
-                              ...Typography.default("semiBold"),
-                            }}
-                            numberOfLines={1}
-                          >
-                            {t("session.cavemanBadge")}
-                          </Text>
-                        </Pressable>
-                      );
-                    })()}
                     {props.connectionStatus.cliStatus && (
                       <>
                         <View
@@ -1214,6 +1170,59 @@ export const AgentInput = React.memo(
                     gap: 3,
                   })}
                 >
+                  {props.connectionStatus?.onCavemanPress && (() => {
+                    // Caveman toggle was relocated from the left status row
+                    // into the model summary pill so it no longer crowds
+                    // "Ready" on mobile web. Stays always-visible per the
+                    // original "toggle from any device" contract. Label is
+                    // always the short "CM" so width stays predictable on
+                    // narrow screens; state is signalled by color alone
+                    // (green fill = active, gray outline = inactive).
+                    // stopPropagation: RN-Web maps Pressable to a DOM
+                    // click that bubbles, so without it a tap on the badge
+                    // would also open the model picker.
+                    const active = !!props.connectionStatus.cavemanActive;
+                    const tone = active
+                      ? theme.colors.success
+                      : theme.colors.textSecondary;
+                    return (
+                      <Pressable
+                        onPress={(e) => {
+                          e.stopPropagation();
+                          props.connectionStatus!.onCavemanPress!();
+                        }}
+                        hitSlop={6}
+                        style={({ pressed }) => ({
+                          flexDirection: "row",
+                          alignItems: "center",
+                          gap: 4,
+                          paddingHorizontal: 6,
+                          paddingVertical: 2,
+                          borderRadius: 999,
+                          backgroundColor: active
+                            ? `${theme.colors.success}18`
+                            : "transparent",
+                          borderWidth: active ? 0 : StyleSheet.hairlineWidth,
+                          borderColor: active ? "transparent" : tone,
+                          opacity: pressed ? 0.6 : 1,
+                          cursor: "pointer" as any,
+                          flexShrink: 0,
+                        })}
+                      >
+                        <StatusDot color={tone} size={4} />
+                        <Text
+                          style={{
+                            fontSize: 9,
+                            color: tone,
+                            ...Typography.default("semiBold"),
+                          }}
+                          numberOfLines={1}
+                        >
+                          {t("session.cavemanBadgeShort")}
+                        </Text>
+                      </Pressable>
+                    );
+                  })()}
                   {modelSummaryStatusLabel ? (
                     <View
                       style={{

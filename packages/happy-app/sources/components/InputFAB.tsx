@@ -208,6 +208,14 @@ export interface InputFABStatusInfo {
   isThinking?: boolean;
   turnStartedAt?: number;
   onStatusPress?: () => void;
+  /**
+   * Caveman skill toggle, mirrored from AgentInput's expanded status row.
+   * When `onCavemanPress` is provided, CompactStatus renders the same
+   * always-visible CAVEMAN pill inside its summary capsule so users can
+   * flip Caveman mode from the collapsed FAB layout too.
+   */
+  cavemanActive?: boolean;
+  onCavemanPress?: () => void;
 }
 
 interface InputFABProps {
@@ -598,6 +606,53 @@ const CompactStatus = React.memo(function CompactStatus({
             >
               {showSummaryCapsule ? (
                 <View style={styles.summaryCapsuleLine}>
+                  {info.onCavemanPress ? (() => {
+                    // Mirror the CAVEMAN toggle from AgentInput's expanded
+                    // status row into the collapsed InputFAB so users can
+                    // flip Caveman from either layout. Always-visible per
+                    // the original "toggle from any device" contract.
+                    // Label is always the short "CM"; state is signalled
+                    // by color alone (green fill = active, gray outline
+                    // = inactive).
+                    const active = !!info.cavemanActive;
+                    const tone = active
+                      ? theme.colors.success
+                      : theme.colors.textSecondary;
+                    return (
+                      <Pressable
+                        onPress={info.onCavemanPress}
+                        hitSlop={6}
+                        style={({ pressed }) => ({
+                          flexDirection: "row",
+                          alignItems: "center",
+                          gap: 4,
+                          paddingHorizontal: 6,
+                          paddingVertical: 2,
+                          borderRadius: 999,
+                          backgroundColor: active
+                            ? `${theme.colors.success}18`
+                            : "transparent",
+                          borderWidth: active ? 0 : StyleSheet.hairlineWidth,
+                          borderColor: active ? "transparent" : tone,
+                          opacity: pressed ? 0.6 : 1,
+                          cursor: "pointer" as any,
+                          flexShrink: 0,
+                        })}
+                      >
+                        <StatusDot color={tone} size={4} />
+                        <Text
+                          style={{
+                            fontSize: 9,
+                            color: tone,
+                            ...Typography.default("semiBold"),
+                          }}
+                          numberOfLines={1}
+                        >
+                          {t("session.cavemanBadgeShort")}
+                        </Text>
+                      </Pressable>
+                    );
+                  })() : null}
                   {rpcStatusLabel ? (
                     <View
                       style={[

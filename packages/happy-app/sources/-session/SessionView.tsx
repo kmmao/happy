@@ -1869,6 +1869,8 @@ function SessionViewInner({
       isThinking: isRunning,
       turnStartedAt,
       onStatusPress: hasPendingPermission ? handleRequiresActionPress : undefined,
+      cavemanActive,
+      onCavemanPress: handleCavemanPress,
     }),
     [
       sessionStatus.statusText,
@@ -1890,6 +1892,8 @@ function SessionViewInner({
       alwaysShowContextSize,
       isRunning,
       turnStartedAt,
+      cavemanActive,
+      handleCavemanPress,
     ],
   );
 

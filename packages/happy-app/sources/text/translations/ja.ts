@@ -1022,6 +1022,7 @@ export const ja: TranslationStructure = {
     inputPlaceholder: "メッセージを入力...",
     startedByDaemon: "デーモン",
     cavemanBadge: "CAVEMAN",
+    cavemanBadgeShort: "CM",
     cavemanCloseTitle: "Disable Caveman mode?",
     cavemanCloseMessage: "Will send \"stop caveman\" to the session to restore normal output.",
     cavemanKeepAfterClearTitle: "Keep Caveman after clearing?",
@@ -1552,7 +1553,7 @@ export const ja: TranslationStructure = {
       sourceFallbackMessage: "このターンでは SDK のカテゴリ分類が取得できなかったため、このパネルは messageBreakdown にフォールバックしています。このフォールバックは粒度が粗く、システム、キャッシュ、その他の非メッセージ区分を含まない場合があります。",
       autoCompactOn: "AUTO",
       autoCompactOff: "1M",
-      autoCompactHintOn: "使用量 75%(200K)で自動圧縮。タップで 1M に切替。",
+      autoCompactHintOn: "使用量 75%(200K)で /compact 提案。タップで 1M に切替。",
       autoCompactHintOff: "1M コンテキスト、自動圧縮なし。タップで 75% 圧縮に切替。",
     },
     suggestion: {

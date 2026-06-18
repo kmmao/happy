@@ -871,6 +871,7 @@ export const zhHans: TranslationStructure = {
     inputPlaceholder: "输入消息...",
     startedByDaemon: "守护进程",
     cavemanBadge: "CAVEMAN",
+    cavemanBadgeShort: "CM",
     cavemanCloseTitle: "关闭 Caveman 模式？",
     cavemanCloseMessage: "将向会话发送 \"stop caveman\" 以恢复正常输出。",
     cavemanKeepAfterClearTitle: "清空后保持 Caveman？",
@@ -1390,7 +1391,7 @@ export const zhHans: TranslationStructure = {
       sourceFallbackMessage: "当前回合没有 SDK categories，所以这里退回使用 messageBreakdown。它只提供较粗的消息级拆分，可能缺少 system、cache 或其他非消息 bucket。",
       autoCompactOn: "AUTO",
       autoCompactOff: "1M",
-      autoCompactHintOn: "用量到 75%(150K)自动压缩。点击切换 1M 大上下文。",
+      autoCompactHintOn: "用量到 75%(150K)提示 /compact。点击切换 1M 大上下文。",
       autoCompactHintOff: "1M 大上下文模式，不自动压缩。点击切换到 75% 自动压缩。",
     },
     suggestion: {

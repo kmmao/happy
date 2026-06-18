@@ -1138,6 +1138,7 @@ export const ru: TranslationStructure = {
     inputPlaceholder: "Введите сообщение...",
     startedByDaemon: "демон",
     cavemanBadge: "CAVEMAN",
+    cavemanBadgeShort: "CM",
     cavemanCloseTitle: "Disable Caveman mode?",
     cavemanCloseMessage: "Will send \"stop caveman\" to the session to restore normal output.",
     cavemanKeepAfterClearTitle: "Keep Caveman after clearing?",
@@ -1439,7 +1440,7 @@ export const ru: TranslationStructure = {
       sourceFallbackMessage: "Для этого хода категории SDK были недоступны, поэтому панель использует резервный вариант через messageBreakdown. Этот вариант грубее и может не включать системные данные, кэш и другие категории вне сообщений.",
       autoCompactOn: "AUTO",
       autoCompactOff: "1M",
-      autoCompactHintOn: "Авто-сжатие при 75% (200K). Нажмите, чтобы переключиться на 1M.",
+      autoCompactHintOn: "Подсказка /compact при 75% (200K). Нажмите, чтобы переключиться на 1M.",
       autoCompactHintOff: "1M контекст, без авто-сжатия. Нажмите, чтобы сжимать при 75%.",
     },
     suggestion: {

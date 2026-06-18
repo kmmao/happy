@@ -903,6 +903,7 @@ export const es: TranslationStructure = {
     inputPlaceholder: "Escriba un mensaje ...",
     startedByDaemon: "daemon",
     cavemanBadge: "CAVEMAN",
+    cavemanBadgeShort: "CM",
     cavemanCloseTitle: "Disable Caveman mode?",
     cavemanCloseMessage: "Will send \"stop caveman\" to the session to restore normal output.",
     cavemanKeepAfterClearTitle: "Keep Caveman after clearing?",
@@ -1431,7 +1432,7 @@ export const es: TranslationStructure = {
       sourceFallbackMessage: "Las categorías del SDK no estuvieron disponibles en este turno, así que este panel recurre al fallback de messageBreakdown. Ese fallback es más grueso y puede omitir datos del sistema, caché u otras categorías que no sean mensajes.",
       autoCompactOn: "AUTO",
       autoCompactOff: "1M",
-      autoCompactHintOn: "Auto-compact al 75% (200K). Toca para cambiar a 1M.",
+      autoCompactHintOn: "Aviso /compact al 75% (200K). Toca para cambiar a 1M.",
       autoCompactHintOff: "Contexto 1M, sin auto-compact. Toca para comprimir al 75%.",
     },
     suggestion: {

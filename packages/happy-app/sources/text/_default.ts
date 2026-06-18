@@ -926,6 +926,7 @@ export const en = {
     inputPlaceholder: "Type a message ...",
     startedByDaemon: "daemon",
     cavemanBadge: "CAVEMAN",
+    cavemanBadgeShort: "CM",
     cavemanCloseTitle: "Disable Caveman mode?",
     cavemanCloseMessage: 'Will send "stop caveman" to the session to restore normal output.',
     cavemanKeepAfterClearTitle: "Keep Caveman after clearing?",
@@ -1454,7 +1455,7 @@ export const en = {
       sourceFallbackMessage: "SDK categories were unavailable for this turn, so this panel falls back to messageBreakdown. This fallback is coarser and may omit system, cache, or other non-message buckets.",
       autoCompactOn: "AUTO",
       autoCompactOff: "1M",
-      autoCompactHintOn: "Auto-compact on at 75% (200K). Tap to switch to 1M.",
+      autoCompactHintOn: "Hint to /compact at 75% (200K). Tap to switch to 1M.",
       autoCompactHintOff: "1M context, no auto-compact. Tap to compress at 75%.",
     },
     suggestion: {

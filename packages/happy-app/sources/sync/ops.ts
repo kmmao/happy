@@ -2449,11 +2449,6 @@ export async function sessionUnarchive(
 }
 
 /**
- * Legacy alias — prefer sessionUnarchive() for clarity.
- */
-export const sessionRestore = sessionUnarchive;
-
-/**
  * Server-side fallback to archive a session when the killSession RPC cannot
  * reach the daemon. Sets active=false on the server and signals the daemon
  * to terminate the process if it is still running.

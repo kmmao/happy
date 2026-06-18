@@ -869,6 +869,7 @@ export const zhHant: TranslationStructure = {
     inputPlaceholder: "輸入訊息...",
     startedByDaemon: "守護程序",
     cavemanBadge: "CAVEMAN",
+    cavemanBadgeShort: "CM",
     cavemanCloseTitle: "關閉 Caveman 模式？",
     cavemanCloseMessage: "將向會話發送 \"stop caveman\" 以恢復正常輸出。",
     cavemanKeepAfterClearTitle: "清空後保持 Caveman？",
@@ -1388,7 +1389,7 @@ export const zhHant: TranslationStructure = {
       sourceFallbackMessage: "目前回合沒有 SDK categories，所以這裡退回使用 messageBreakdown。它只提供較粗的訊息級拆分，可能缺少 system、cache 或其他非訊息 bucket。",
       autoCompactOn: "AUTO",
       autoCompactOff: "1M",
-      autoCompactHintOn: "用量到 75%(150K)自動壓縮。點擊切換 1M 大上下文。",
+      autoCompactHintOn: "用量到 75%(150K)提示 /compact。點擊切換 1M 大上下文。",
       autoCompactHintOff: "1M 大上下文模式，不自動壓縮。點擊切換到 75% 自動壓縮。",
     },
     suggestion: {
