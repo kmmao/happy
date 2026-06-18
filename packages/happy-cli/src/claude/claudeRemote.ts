@@ -69,6 +69,7 @@ import { mergeThinkingIntoSettings } from "@/claude/utils/mergeThinkingIntoSetti
 import { mergeExitPlanAutoApproveIntoSettings } from "@/claude/utils/mergeExitPlanAutoApproveIntoSettings";
 import { buildPtyDisallowedTools } from "@/claude/utils/disallowedTools";
 import { rawToJsonlMessage } from "@/claude/pty/rawToJsonlMessage";
+import { createClaudeTurnReducer } from "@/claude/claudeTurnReducer";
 import {
   createTerminalSequenceExtractor,
   type TerminalSequenceEvent,
@@ -763,17 +764,17 @@ export async function claudeRemote(opts: {
     return;
   }
 
-  let isCompactCommand = false;
-  // Set to true when the TUI emits a `compact_boundary` JSONL event during
-  // this turn — the canonical "compaction actually happened" signal. The
-  // turn-end branch reads this to decide between "Compaction completed" and
-  // the no-op path that triggers `onCompactNoOp` + cooldown arming.
-  let compactBoundaryObserved = false;
+  // Auto-compact turn-state machine — pure reducer owns the
+  // (isCompactCommand, compactBoundaryObserved) latch and the
+  // "Compaction completed" vs "Compaction skipped + armCooldown" decision
+  // at turn end. See claudeTurnReducer.ts. Replaces two scattered `let`
+  // flags + a hand-coded two-arm branch that the closure left untested.
+  const turnReducer = createClaudeTurnReducer();
   if (specialCommand.type === "compact") {
     logger.debug(
       "[claudeRemote] /compact command detected — will process as normal but with compaction behavior",
     );
-    isCompactCommand = true;
+    turnReducer.dispatch({ t: "promptIsCompact" });
     opts.onCompletionEvent?.("Compaction started");
   }
 
@@ -1294,28 +1295,22 @@ export async function claudeRemote(opts: {
 
       opts.onTurnComplete?.();
 
-      if (isCompactCommand) {
-        if (compactBoundaryObserved) {
-          logger.debug("[claudeRemote] Compaction completed");
-          opts.onCompletionEvent?.("Compaction completed");
-        } else {
-          // Turn ended but no `compact_boundary` arrived — the TUI never
-          // actually compacted (commonly because the bracketed-paste landed
-          // as prose, e.g. `/compact/compact` from an echo-retry concat, or
-          // the model handled `/compact` as plain text). Surface the
-          // truthful status and let the launcher arm the auto-compact
-          // cooldown so the same `/compact` doesn't re-fire on the next
-          // over-threshold assistant message.
-          logger.debug(
-            "[claudeRemote] Compaction skipped — no compact_boundary observed (TUI did not compact)",
-          );
-          opts.onCompletionEvent?.(
-            "Compaction skipped — TUI did not compact this turn",
-          );
-          opts.onCompactNoOp?.();
+      // Auto-compact turn-end: fold reducer outputs into the existing
+      // callback shape. "Compaction completed" → emit only. "Compaction
+      // skipped — TUI did not compact this turn" → emit + onCompactNoOp
+      // (the launcher reads onCompactNoOp to arm the cooldown so the
+      // same `/compact` doesn't re-fire on the next over-threshold
+      // assistant message). State resets inside the reducer.
+      for (const out of turnReducer.dispatch({ t: "turnEnd" })) {
+        switch (out.t) {
+          case "emitCompletion":
+            logger.debug(`[claudeRemote] ${out.text}`);
+            opts.onCompletionEvent?.(out.text);
+            break;
+          case "armCooldown":
+            opts.onCompactNoOp?.();
+            break;
         }
-        isCompactCommand = false;
-        compactBoundaryObserved = false;
       }
 
       await opts.onReady();
@@ -1453,11 +1448,13 @@ export async function claudeRemote(opts: {
         // record exactly when a `/compact` actually compacted the window;
         // absence is the no-op signal the turn-end branch acts on.
         if (
-          isCompactCommand &&
           jsonlMsg.type === "system" &&
           (jsonlMsg as { subtype?: string }).subtype === "compact_boundary"
         ) {
-          compactBoundaryObserved = true;
+          // Reducer ignores spurious boundaries (no /compact in flight)
+          // and is idempotent on duplicates — the guard that used to
+          // gate this if-check now lives inside the seam.
+          turnReducer.dispatch({ t: "compactBoundary" });
         }
         opts.onMessage(jsonlMsg);
       }
