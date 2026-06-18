@@ -1,26 +1,39 @@
 /**
- * Generic RPC handler manager for session and machine clients.
- * Manages RPC method registration, encryption/decryption, and handler execution.
+ * RpcHandlerManager — socket-bound wrapper around `dispatchRpcMethod`
+ * (from `@kmmao/happy-wire`).
  *
- * Adapted from happy-cli/src/api/rpc/RpcHandlerManager.ts with
- * Agent-local imports (no @/ path alias).
+ * The plaintext routing core + the type contract live in wire so both
+ * `@kmmao/happy-coder` and this package share one implementation (see
+ * wire's `rpcDispatch.ts` for the rationale). What's left here is the
+ * per-package responsibilities that wire's pure-types invariant doesn't
+ * cover: the socket.io lifecycle, retry policy, fast-retry timer, and
+ * periodic re-register safety net. None of those are pure functions —
+ * they all touch real timers + a live Socket — so they stay out of wire
+ * and stay in the consumer.
+ *
+ * If the lifecycle ever drifts between this file and the matching CLI
+ * file, the duplication is the smell — extract the lifecycle into a
+ * separate `@kmmao/happy-rpc-runtime` package at that point.
  */
 
 import { logger as defaultLogger } from "../../logger";
 import type { Cipher } from "../../encryption";
+import { dispatchRpcMethod } from "@kmmao/happy-wire";
+import type { Socket } from "socket.io-client";
+
 import type {
   RpcHandler,
-  RpcHandlerMap,
-  RpcRequest,
   RpcHandlerConfig,
+  RpcHandlerMap,
+  RpcLogger,
+  RpcRequest,
 } from "./types";
-import type { Socket } from "socket.io-client";
 
 export class RpcHandlerManager {
   private handlers: RpcHandlerMap = new Map();
   private readonly scopePrefix: string;
   private readonly cipher: Cipher;
-  private readonly logger: (message: string, data?: unknown) => void;
+  private readonly logger: RpcLogger;
   private socket: Socket | null = null;
   private reregisterInterval: ReturnType<typeof setInterval> | null = null;
   private fastRetryTimer: ReturnType<typeof setTimeout> | null = null;
@@ -32,53 +45,32 @@ export class RpcHandlerManager {
       config.logger ?? ((msg, data) => defaultLogger.debug(msg, data));
   }
 
-  /**
-   * Register an RPC handler for a specific method
-   */
+  /** Register an RPC handler for a specific method. */
   registerHandler<TRequest = any, TResponse = any>(
     method: string,
     handler: RpcHandler<TRequest, TResponse>,
   ): void {
     const prefixedMethod = this.getPrefixedMethod(method);
     this.handlers.set(prefixedMethod, handler);
-
     if (this.socket) {
       this.emitRegisterWithRetry(this.socket, prefixedMethod);
     }
   }
 
   /**
-   * Route a decrypted RPC call to its handler. This is the plaintext core of
-   * the manager: it knows nothing about the wire (no base64, no cipher), so it
-   * is TOTAL — an unknown method or a throwing handler both resolve to an
-   * `{ error }` value rather than rejecting. That makes it the test surface for
-   * routing behaviour, exercised without any crypto setup.
+   * Route a decrypted RPC call to its handler. Delegates to wire's
+   * `dispatchRpcMethod` — TOTAL, returns `{ error }` instead of
+   * rejecting. Routing-behaviour tests live in wire.
    */
   async dispatch(method: string, params: unknown): Promise<unknown> {
-    const handler = this.handlers.get(method);
-    if (!handler) {
-      this.logger("[RPC] [ERROR] Method not found", { method });
-      return { error: "Method not found" };
-    }
-    try {
-      this.logger("[RPC] Calling handler", { method });
-      const result = await handler(params);
-      this.logger("[RPC] Handler returned", {
-        method,
-        hasResult: result !== undefined,
-      });
-      return result;
-    } catch (error) {
-      this.logger("[RPC] [ERROR] Error handling request", { error });
-      return { error: error instanceof Error ? error.message : "Unknown error" };
-    }
+    return dispatchRpcMethod(this.handlers, method, params, this.logger);
   }
 
   /**
-   * Handle an incoming wire RPC request: decrypt params, dispatch in plaintext,
-   * encrypt the result. The Cipher is the only encryption seam; on a decrypt
-   * failure the handler is still dispatched with `null` params (preserving the
-   * previous behaviour where a corrupt payload decrypted to `null`).
+   * Handle an incoming wire RPC request: decrypt params, dispatch in
+   * plaintext, encrypt the result. The `Cipher` is the only encryption
+   * seam; on decrypt failure the handler is still dispatched with `null`
+   * params.
    */
   async handleRequest(request: RpcRequest): Promise<string> {
     const decrypted = this.cipher.decrypt(request.params);
@@ -120,8 +112,8 @@ export class RpcHandlerManager {
   // -----------------------------------------------------------------------
 
   /**
-   * Register a single method with ack + retry.
-   * Falls back to fire-and-forget emit after all retries exhausted.
+   * Register a single method with ack + retry. Falls back to
+   * fire-and-forget emit after all retries exhausted.
    */
   private emitRegisterWithRetry(
     socket: Socket,
@@ -168,8 +160,9 @@ export class RpcHandlerManager {
   }
 
   /**
-   * Fast retry: 5 seconds after initial connect, re-register all handlers once.
-   * Covers the case where the first batch of registrations failed silently.
+   * Fast retry: 5s after initial connect, re-register all handlers once.
+   * Covers the case where the first batch of registrations failed
+   * silently.
    */
   private scheduleFastRetry(socket: Socket): void {
     this.cancelFastRetry();
@@ -189,9 +182,7 @@ export class RpcHandlerManager {
     }
   }
 
-  /**
-   * Periodic re-registration every 30s as a safety net.
-   */
+  /** Periodic re-registration every 30s as a safety net. */
   private startReregisterInterval(): void {
     this.stopReregisterInterval();
     this.reregisterInterval = setInterval(() => {

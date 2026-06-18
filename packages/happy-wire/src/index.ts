@@ -24,3 +24,4 @@ export * from './spawnSession';
 export * from './previewTypes';
 export * from './sessionAdopt';
 export * from './agentLoop';
+export * from './rpcDispatch';
