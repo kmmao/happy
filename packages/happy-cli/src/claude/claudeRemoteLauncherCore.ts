@@ -552,6 +552,12 @@ export async function claudeRemoteLauncher(
       kind: "prompt",
       source: "strand-redeliver",
     });
+    // Hand-off complete — the queue now owns this prompt. Clear the capture
+    // so a subsequent recover in the same turn (before onPromptWritten
+    // re-stamps for the redelivered prompt) cannot re-push the same text a
+    // second time. strandRedeliverCount already guards against this, but
+    // clearing the capture makes the lifecycle explicit at zero cost.
+    inFlightPrompt = null;
   }
 
   const dispatchTurn = (reason: "user_message" | "continue" | "isolated_command" | "mode_change") => {
@@ -563,6 +569,17 @@ export async function claudeRemoteLauncher(
     // re-arm it once it sees PTY echo for the new prompt; until then the 45s
     // elapsed-based strand check stays armed in case the prompt never lands.
     promptSubmissionConfirmed = false;
+    // Fresh turn — drop any prior turn's captured prompt. onPromptWritten
+    // will re-stamp inFlightPrompt once the new turn's bracketed paste
+    // lands on the PTY. Without this, a recover triggered between
+    // dispatchTurn and onPromptWritten (e.g. a stale watchdog tick on the
+    // newly-reserved "running" guard) could see the OLD inFlightPrompt and
+    // re-deliver the previous turn's prompt against the new turn. The
+    // turnProducedOutput guard does not fully cover this — it is also reset
+    // to false above, so the guard alone cannot distinguish "no output yet
+    // because prompt hasn't been written" from "no output yet because
+    // submission wedge".
+    inFlightPrompt = null;
     if (!executionGuard.reserve(reason)) {
       const snapshot = executionGuard.getSnapshot();
       logger.debug(
@@ -1107,9 +1124,19 @@ export async function claudeRemoteLauncher(
     // false-positive recovery. See coldRestartGraceUntil declaration.
     if (Date.now() >= coldRestartGraceUntil) {
       turnProducedOutput = true;
+      // Re-arm the one-shot redeliver budget ONLY on genuine post-grace
+      // output. sessionScanner bursts ~200 historical JSONL records into
+      // onMessage within the cold-restart grace window (Claude TUI rewrites
+      // the session file with a fresh sessionId on --resume — see
+      // coldRestartGraceUntil declaration). If we reset the counter on those
+      // replays, a single cold restart silently refunds the redeliver budget
+      // and a re-strand-loop could push the same prompt twice. Gating reset
+      // on the same grace window as turnProducedOutput keeps the invariant
+      // "redeliver budget is only refunded by output the redelivered prompt
+      // actually produced".
+      strandRedeliverCount = 0;
     }
     clearWriteVerify();
-    strandRedeliverCount = 0;
     // ── Stream events (partial messages) → text-delta envelopes ────────
     // Intercept before the rest of the pipeline. stream_event messages
     // carry raw API SSE chunks (text_delta, thinking_delta) that are
