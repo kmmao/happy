@@ -40,8 +40,7 @@ export type ReducerIntent =
   | { t: "turnEnd" };
 
 export type ReducerOutput =
-  | { t: "emitCompletion"; text: string }
-  | { t: "armCooldown" };
+  | { t: "emitCompletion"; text: string };
 
 export interface ReducerState {
   readonly isCompactCommand: boolean;
@@ -107,14 +106,12 @@ export function reduceTurn(
       // actually compacted (commonly because the bracketed-paste landed
       // as prose, e.g. `/compact/compact` from an echo-retry concat, or
       // the model handled `/compact` as plain text). Emit the truthful
-      // status AND signal the cooldown so the launcher gates the next
-      // over-threshold push.
+      // status so the user sees the no-op. Pre-0.100.7 we also signalled
+      // an `armCooldown` to gate the next auto-push; with auto-push gone
+      // (hint-only path lives in `runClaude.ts`), no cooldown is needed.
       return {
         next: initialReducerState,
-        outputs: [
-          { t: "emitCompletion", text: SKIPPED_TEXT },
-          { t: "armCooldown" },
-        ],
+        outputs: [{ t: "emitCompletion", text: SKIPPED_TEXT }],
       };
   }
 }

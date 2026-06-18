@@ -768,42 +768,20 @@ export async function runClaude(
   };
 
   // When ApiSessionClient sees per-turn context usage cross 150K (75% of the
-  // 200K window), push a `/compact` into the queue using the current live
-  // mode. Mirrors the manual `/compact` handling further below (specialCommand
-  // path) — same isolate semantics, same priority — so the TUI's own compact
-  // event sequencing is unchanged. The closure reads the `current*` vars at
-  // trigger time so a recently-changed effort/permission mode is honoured.
-  // Setting `session.autoCompactEnabled` happens later via the user-message
-  // handler when `meta.autoCompact` arrives; the handler itself is registered
-  // once here. Per-turn deduplication and the enabled-flag gate live in
-  // ApiSessionClient — we don't re-check them here.
+  // 200K window), surface a hint so the user can run `/compact` themselves.
+  // Pre-0.100.6 we pushed `/compact` onto messageQueue here, but the queued
+  // isolate could race with an in-flight user input — the dispatched
+  // `/compact` landed mid-typing, merged with whatever the user was
+  // composing, and ate the pending message. Hint-only path avoids that
+  // collision entirely; the per-turn gate and enabled-flag check still
+  // live in ApiSessionClient so the hint also respects the user toggle.
   session.onAutoCompactRequest((contextSize) => {
-    const enhancedMode: EnhancedMode = {
-      permissionMode: currentPermissionMode || "default",
-      model: currentModel,
-      fallbackModel: currentFallbackModel,
-      customSystemPrompt: currentCustomSystemPrompt,
-      appendSystemPrompt: currentAppendSystemPrompt,
-      allowedTools: currentAllowedTools,
-      disallowedTools: currentDisallowedTools,
-      maxBudgetUsd: currentMaxBudgetUsd,
-      taskBudget: currentTaskBudget,
-      thinking: currentThinking,
-      effort: currentEffort,
-      locale: currentLocale,
-      autoCompact: currentAutoCompact,
-    };
-    messageQueue.pushIsolateAndClear("/compact", enhancedMode, {
-      priority: "urgent",
-      kind: "isolated",
-      source: "auto-compact",
-    });
     logger.debug(
-      `[autoCompact] pushed /compact to queue (contextSize=${contextSize})`,
+      `[autoCompact] hint emitted at contextSize=${contextSize} (no auto-push)`,
     );
     session.sendSessionEvent({
       type: "message",
-      message: `Context reached ${Math.round(contextSize / 1000)}K tokens — auto-compacting (75% threshold).`,
+      message: `Context reached ${Math.round(contextSize / 1000)}K tokens — consider running /compact to free room.`,
     });
   });
 

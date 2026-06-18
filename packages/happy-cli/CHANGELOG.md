@@ -1,5 +1,35 @@
 # Changelog
 
+## 0.100.8 - 2026-06-18
+
+Follow-up dead-code sweep after the 0.100.6/0.100.7 auto-compact cleanup. Scanned every package for `@deprecated`, `legacy`, `TODO: remove`, and similar markers; most were intentional public-API back-compat (e.g. server's `/v1/sessions/:id/restore` alias, wire's legacy message schemas, `CODEX_MCP_LEGACY_BACKEND` fallback) and were left alone. One CLI symbol was actually orphaned:
+
+- **`serverConnectionErrors.ts`** — removed the `@deprecated printOfflineWarning(backendName?)` helper. The function's only callers were its own test suite, the production codepaths had already migrated to `connectionState.fail(...)` for dedup + context tracking, and no other package in the monorepo (or `dist`) referenced the export. Test suite shrank from 28 → 26 cases; the `connectionState` / `logger` imports it pulled in were dropped too.
+
+Companion app-side cleanup (no version bump for the app — single-line alias removal):
+- **`packages/happy-app/sources/sync/ops.ts`** — dropped `export const sessionRestore = sessionUnarchive;`. Zero consumers across app/agent/codium/cli, and the `happy-app` rule ("No backward compatibility code ever") makes this a textbook case.
+
+## 0.100.7 - 2026-06-18
+
+Strips the auto-compact cooldown machinery that 0.100.6's hint-only path left orphaned. The cooldown latch, the "auto-compact paused" event, the launcher-side `onCompactNoOp` consumer, the source-conditional `maybeRedeliverStrandedPrompt` branch, the `armCooldown` reducer action — all existed to guard the auto-pushed `/compact` from re-firing into a `/compact/compact/compact…` loop. With the auto-push gone, every one of these branches is unreachable.
+
+- **`apiSession.ts`** — removed `autoCompactCooldownArmed`, `autoCompactCooldownNotified`, `armAutoCompactCooldown()`, `clearAutoCompactCooldown()`, the cooldown-clearing call in `dispatchUserMessage`, the below-threshold hysteresis re-arm, and the "Auto-compact paused — the previous /compact did not reduce context…" one-shot event. Threshold check is now a single straight-line: per-turn latch + replay skip + enabled-flag + ≥ 150K → invoke handler.
+- **`claudeRemoteLauncherCore.ts`** — dropped the three `armAutoCompactCooldown()` call sites (post-`compact_boundary`, strand-redeliver skip branch, `onCompactNoOp` consumer), simplified the strand stalled-prompt event to a single unconditional "re-sending your message…" copy (no more `source === "auto-compact"` branch), and trimmed the `inFlightPrompt.source` docstring to drop the auto-compact-specific paragraph.
+- **`claudeRemote.ts`** — removed the `onCompactNoOp?: () => void` callback type and the `case "armCooldown"` arm in the turn-end reducer switch. The reducer now produces a single output kind (`emitCompletion`), so the switch collapses to a straight loop.
+- **`claudeTurnReducer.ts`** — removed `{ t: "armCooldown" }` from the `ReducerOutput` union and from the turn-end "skipped" path. Comments updated to point at runClaude's hint-only path as the live auto-compact owner.
+- **`claudeTurnReducer.test.ts`** — dropped the `armCooldown` expectations in the two "Compaction skipped" test cases. All 8 reducer tests + 12 autoCompact resolver tests + the rest of the 1423-test happy-cli suite still pass.
+
+No behavior change for users — every removed branch was already dead after 0.100.6. The diff is a code-shape cleanup that bounds the auto-compact surface to: ApiSessionClient detects the threshold ↦ `runClaude` formats a hint ↦ `session.sendSessionEvent` ships it to the App. The user runs `/compact` when they're ready.
+
+## 0.100.6 - 2026-06-18
+
+Auto-compact at the 150K (75%) threshold no longer dispatches `/compact` on the user's behalf — it now only surfaces a hint and leaves the actual command to the user. Reported in-the-wild: the queued `/compact` isolate could race an in-flight user input, land mid-typing in the Claude TUI, merge with whatever the user was composing, and silently eat the pending message. Hint-only path removes the collision entirely.
+
+- Stripped the `messageQueue.pushIsolateAndClear("/compact", …)` call (and the dead `EnhancedMode` closure that fed it) from `runClaude.ts`'s `onAutoCompactRequest` handler. The handler now logs + sends a single `session.sendSessionEvent({ type: "message", message: "Context reached XK tokens — consider running /compact to free room." })`.
+- The per-turn dedup latch and enabled-flag gate inside `ApiSessionClient` are unchanged, so the AUTO toggle still controls whether the hint fires (off ⇒ 1M premium window with no hint).
+- Dead branches that handle `source === "auto-compact"` (cooldown latch, redeliver suppression, stalled-prompt interrupt copy) are intentionally left in place; they are inert without the push and removing them would expand scope into the strand/cooldown machinery for no gain. Worth a follow-up cleanup once the new behaviour ships.
+- App-side i18n bumped in parallel: `agentInput.context.autoCompactHintOn` rewritten across all 11 translation files from "Auto-compact on at 75%…" to "Hint to /compact at 75%…" so the chip label matches the new behaviour.
+
 ## 0.98.2 - 2026-06-15
 
 Stops the "5 ghost sessions appear at once" effect when the daemon restarts.

@@ -29,12 +29,12 @@ describe("reduceTurn", () => {
     ]);
   });
 
-  it("emits 'Compaction skipped' AND armCooldown when turn ends without compact_boundary", () => {
-    // The bug we just shipped a fix for. The TUI silently treated
-    // `/compact/compact` (echo-retry concat) as prose, no boundary fired,
-    // and the launcher never armed the cooldown — so the next
-    // over-threshold assistant message immediately re-pushed `/compact`,
-    // looping forever. Pinning this prevents regression.
+  it("emits 'Compaction skipped' when turn ends without compact_boundary", () => {
+    // Pre-0.100.7 this slice also emitted `armCooldown` to gate the next
+    // auto-push of `/compact`. With auto-push removed (the threshold now
+    // only surfaces a hint via runClaude's onAutoCompactRequest), no
+    // cooldown is needed — the user-typed `/compact` no-op just needs the
+    // truthful "skipped" status so the user knows to act.
     const { dispatch } = createClaudeTurnReducer();
 
     dispatch({ t: "promptIsCompact" });
@@ -45,7 +45,6 @@ describe("reduceTurn", () => {
         t: "emitCompletion",
         text: "Compaction skipped — TUI did not compact this turn",
       },
-      { t: "armCooldown" },
     ]);
   });
 
@@ -118,7 +117,6 @@ describe("reduceTurn", () => {
         t: "emitCompletion",
         text: "Compaction skipped — TUI did not compact this turn",
       },
-      { t: "armCooldown" },
     ]);
   });
 });

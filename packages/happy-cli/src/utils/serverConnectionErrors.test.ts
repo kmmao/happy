@@ -16,8 +16,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { startOfflineReconnection, printOfflineWarning, connectionState, isNetworkError, NETWORK_ERROR_CODES } from './serverConnectionErrors';
-import { logger } from '@/ui/logger';
+import { startOfflineReconnection, isNetworkError, NETWORK_ERROR_CODES } from './serverConnectionErrors';
 
 // Mock axios - only isAxiosError needed for error type detection
 vi.mock('axios', () => ({
@@ -505,43 +504,6 @@ describe('startOfflineReconnection', () => {
             // Should not throw when cancelling without onCleanup
             expect(() => handle.cancel()).not.toThrow();
         });
-    });
-});
-
-// ============================================================================
-// printOfflineWarning Tests
-// ============================================================================
-
-describe('printOfflineWarning', () => {
-    beforeEach(() => {
-        connectionState.reset(); // Reset singleton state between tests
-    });
-
-    it('should print offline warning with unified format', () => {
-        vi.mocked(logger.warn).mockClear();
-
-        printOfflineWarning();
-
-        // New unified format via connectionState.fail() → logger.warn
-        expect(logger.warn).toHaveBeenCalledWith(
-            expect.stringContaining('⚠️  Claude server unreachable, offline mode with auto-reconnect enabled')
-        );
-        expect(logger.warn).toHaveBeenCalledWith(
-            expect.stringContaining('Server connection failed')
-        );
-    });
-
-    it('should deduplicate repeated calls', () => {
-        vi.mocked(logger.warn).mockClear();
-
-        printOfflineWarning('Claude');
-        const callCountAfterFirst = vi.mocked(logger.warn).mock.calls.length;
-
-        printOfflineWarning('Claude'); // Second call should be deduplicated
-        const callCountAfterSecond = vi.mocked(logger.warn).mock.calls.length;
-
-        // Should not print again (same call count)
-        expect(callCountAfterSecond).toBe(callCountAfterFirst);
     });
 });
 

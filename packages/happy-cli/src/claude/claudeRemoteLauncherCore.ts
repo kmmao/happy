@@ -252,11 +252,11 @@ export async function claudeRemoteLauncher(
     /**
      * Queue `source` of the message that produced this write — propagated
      * from the queue item via `nextPromptSource` so `maybeRedeliverStranded
-     * Prompt` can skip re-pushing internally-generated prompts.
-     * Specifically `"auto-compact"`: the threshold handler in `runClaude.ts`
-     * already debounces via the per-turn latch and the new cooldown latch,
-     * so re-delivering its `/compact` on a strand only stacks pastes in the
-     * TUI composer (`/compact/compact/compact…`) without helping.
+     * Prompt` (and other consumers) can branch on origin. Pre-0.100.7 this
+     * field also gated the auto-compact internal isolate; that path is
+     * gone (hint-only via runClaude's onAutoCompactRequest), so the field
+     * is currently only consumed by the permission-handler PLAN_FAKE_RESTART
+     * source and still useful for future tagged isolates.
      */
     source?: string;
   } | null = null;
@@ -402,18 +402,14 @@ export async function claudeRemoteLauncher(
           logger.debug(
             `[remote][strand] no JSONL output ${elapsedMs}ms after turn start (PTY spinner may be active) — likely a dropped submission or hung API. Forcing recovery. ${strandDiagState()}`,
           );
-          // For auto-compact internal pushes the redeliver path is silently
-          // skipped (see maybeRedeliverStrandedPrompt), so promising "re-
-          // sending your message…" is a lie that confuses the user. Use a
-          // truthful, source-aware message instead. The cooldown latch
-          // (armed below via `onCompactNoOp` when the turn ends without a
-          // `compact_boundary`) handles preventing immediate re-fires.
-          const isAutoCompact = inFlightPrompt?.source === "auto-compact";
+          // Pre-0.100.7 this branched on `source === "auto-compact"` to
+          // print a separate "Auto-compact stalled / pausing" copy; the
+          // auto-push is gone (hint-only path) so every stalled prompt is
+          // now a real user message and the unconditional re-send copy
+          // tells the truth.
           session.client.sendSessionEvent({
             type: "message",
-            message: isAutoCompact
-              ? `Auto-compact stalled after ${elapsedSec}s — interrupting and pausing auto-compact.`
-              : `No response after ${elapsedSec}s — re-sending your message…`,
+            message: `No response after ${elapsedSec}s — re-sending your message…`,
           });
           void recoverStrandedTurn(elapsedMs);
           return;
@@ -530,27 +526,12 @@ export async function claudeRemoteLauncher(
   // any backlog so the lost prompt runs before later sends.
   function maybeRedeliverStrandedPrompt(): void {
     if (exitReason || turnProducedOutput || !inFlightPrompt) return;
-    // Auto-compact pushes are internal — the API-side cooldown and per-turn
-    // latches already prevent stacked /compact firings, and a TUI that
-    // failed to consume the first /compact will not consume a re-pasted
-    // copy either (the composer literally accumulates `/compact/compact…`
-    // text the user has to clean up). Skip silently; the cold-restart
-    // tier-2 path is the right recovery for a wedged compact, not a
-    // re-paste.
-    if (inFlightPrompt.source === "auto-compact") {
-      // Make the "cooldown will gate next push" promise actually true. When
-      // the wedge happens BEFORE the TUI emits any JSONL, claudeRemote's
-      // turn-end branch (which would otherwise call `onCompactNoOp` to arm
-      // the cooldown) never runs because it's parked awaiting a result
-      // record. Arming here ensures the next over-threshold assistant
-      // message hits the "Auto-compact paused" branch instead of immediately
-      // pushing another `/compact` and looping.
-      session.client.armAutoCompactCooldown();
-      logger.debug(
-        "[remote][strand] skipping redeliver of auto-compact /compact — cooldown armed to gate next push",
-      );
-      return;
-    }
+    // Pre-0.100.7 we additionally skipped redeliver when `source ===
+    // "auto-compact"` (the threshold handler used to push `/compact` here)
+    // and armed a cooldown latch from inside this branch. The auto-push is
+    // gone — every in-flight prompt is now a real user message — so the
+    // skip is unconditionally the wrong choice and the cooldown nothing
+    // observes it.
     if (strandRedeliverCount >= 1) {
       logger.debug(
         "[remote][strand] stranded prompt already re-delivered once — not retrying (next strand escalates to tier-2).",
@@ -1805,13 +1786,12 @@ export async function claudeRemoteLauncher(
           type: "message",
           message: "Context compacted",
         });
-        // Arm the auto-compact cooldown latch in the API client. The next
-        // assistant message will either (a) report context < threshold —
-        // proof the TUI compact really shrunk the window, so cooldown
-        // clears automatically — or (b) report ≥ threshold, in which case
-        // cooldown holds and the user is notified once. Prevents the
-        // `/compact/compact/compact…` runaway when TUI compact is a no-op.
-        session.client.armAutoCompactCooldown();
+        // Pre-0.100.7 we armed an auto-compact cooldown latch here to gate
+        // the next auto-push of `/compact`. The auto-push is gone (hint-
+        // only path) so there is nothing to gate — the user fires /compact
+        // themselves, and the threshold detector's per-turn dedup latch
+        // covers intra-turn re-hint suppression on its own.
+        //
         // SDK-era seedReadState() pre-warmed the read cache here so the
         // post-compact assistant could Edit tracked files. PTY mode has no
         // such cache — Claude TUI re-reads files itself when needed.
@@ -3046,20 +3026,11 @@ export async function claudeRemoteLauncher(
             logger.debug(`[remote]: Completion event: ${message}`);
             session.client.sendSessionEvent({ type: "message", message });
           },
-          // When a `/compact` turn finishes but the TUI never emitted
-          // `compact_boundary`, treat it the same way the cooldown handler
-          // treats "compact ran but didn't shrink the window" — arm the
-          // cooldown latch so the next over-threshold assistant message goes
-          // through the "Auto-compact paused" branch instead of immediately
-          // pushing another `/compact`. This breaks the infinite-loop the
-          // user reported on a wedged compact (where `compact_boundary` never
-          // arrived and the per-turn latch alone reset on turn close).
-          onCompactNoOp: () => {
-            logger.debug(
-              "[remote]: compact no-op observed — arming auto-compact cooldown to prevent re-fire",
-            );
-            session.client.armAutoCompactCooldown();
-          },
+          // `onCompactNoOp` handler was removed in 0.100.7. It used to arm
+          // an auto-compact cooldown latch when the TUI compact silently
+          // no-op'd, gating the next auto-push of `/compact`. With auto-push
+          // gone (hint-only path) there is nothing to gate — the user
+          // decides when to retry /compact themselves.
           onShellResult: (output: string) => {
             logger.debug("[remote]: Shell command result received");
             session.client.sendDirectResult(output);

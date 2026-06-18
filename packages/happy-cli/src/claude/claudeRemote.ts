@@ -373,7 +373,7 @@ function writePromptWithEchoConfirm(
   // docstring. A wedged slash command is caught by the launcher's watchdog;
   // re-pasting risks `/compact/compact`-style concatenation that the TUI
   // silently treats as prose, breaking the `/compact` ↔ compact_boundary
-  // contract that the auto-compact cooldown relies on.
+  // contract that downstream "Compaction completed" telemetry relies on.
   if (isSlashCommand(message)) {
     logger.debug(
       `[claudeRemote] slash-command write — skipping echo-retry (relying on watchdog). preview=${JSON.stringify(message.slice(0, 40))}`,
@@ -621,19 +621,6 @@ export async function claudeRemote(opts: {
    */
   onPromptWritten?: (text: string) => void;
   onCompletionEvent?: (message: string) => void;
-  /**
-   * Fires when a `/compact` turn finishes WITHOUT the TUI emitting a
-   * `compact_boundary` JSONL event. That means the TUI never actually
-   * compacted (most often because the bracketed-paste landed as text — e.g.
-   * `/compact/compact` after an echo-retry concatenation — or because the
-   * model handled the slash command as prose).
-   *
-   * The launcher uses this hook to arm `armAutoCompactCooldown()` even
-   * though no `compact_boundary` arrived, so the next assistant message
-   * above the auto-compact threshold goes through the cooldown's "paused"
-   * branch instead of immediately pushing another `/compact` and looping.
-   */
-  onCompactNoOp?: () => void;
   onShellResult?: (output: string) => void;
   onSessionReset?: () => void;
   /** Called when a result record is observed in the JSONL stream. */
@@ -766,9 +753,9 @@ export async function claudeRemote(opts: {
 
   // Auto-compact turn-state machine — pure reducer owns the
   // (isCompactCommand, compactBoundaryObserved) latch and the
-  // "Compaction completed" vs "Compaction skipped + armCooldown" decision
-  // at turn end. See claudeTurnReducer.ts. Replaces two scattered `let`
-  // flags + a hand-coded two-arm branch that the closure left untested.
+  // "Compaction completed" vs "Compaction skipped" decision at turn end.
+  // See claudeTurnReducer.ts. Replaces two scattered `let` flags + a
+  // hand-coded two-arm branch that the closure left untested.
   const turnReducer = createClaudeTurnReducer();
   if (specialCommand.type === "compact") {
     logger.debug(
@@ -1295,22 +1282,16 @@ export async function claudeRemote(opts: {
 
       opts.onTurnComplete?.();
 
-      // Auto-compact turn-end: fold reducer outputs into the existing
-      // callback shape. "Compaction completed" → emit only. "Compaction
-      // skipped — TUI did not compact this turn" → emit + onCompactNoOp
-      // (the launcher reads onCompactNoOp to arm the cooldown so the
-      // same `/compact` doesn't re-fire on the next over-threshold
-      // assistant message). State resets inside the reducer.
+      // Auto-compact turn-end: emit reducer outputs into onCompletionEvent.
+      // Pre-0.100.7 a "Compaction skipped" path also fanned out to an
+      // `armCooldown` → `onCompactNoOp` hook to gate the next auto-push
+      // of `/compact`; auto-push is gone (hint-only via runClaude's
+      // onAutoCompactRequest), so the skipped status is informational
+      // only and there is no second signal to fire. State resets inside
+      // the reducer.
       for (const out of turnReducer.dispatch({ t: "turnEnd" })) {
-        switch (out.t) {
-          case "emitCompletion":
-            logger.debug(`[claudeRemote] ${out.text}`);
-            opts.onCompletionEvent?.(out.text);
-            break;
-          case "armCooldown":
-            opts.onCompactNoOp?.();
-            break;
-        }
+        logger.debug(`[claudeRemote] ${out.text}`);
+        opts.onCompletionEvent?.(out.text);
       }
 
       await opts.onReady();

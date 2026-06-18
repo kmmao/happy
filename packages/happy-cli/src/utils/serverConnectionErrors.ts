@@ -335,11 +335,3 @@ class OfflineState {
  * recover() on successful reconnection.
  */
 export const connectionState = new OfflineState();
-
-/**
- * @deprecated Use connectionState.fail() for deduplication and context tracking
- */
-export function printOfflineWarning(backendName: string = 'Claude'): void {
-    connectionState.setBackend(backendName);
-    connectionState.fail({ operation: 'Server connection' });
-}
