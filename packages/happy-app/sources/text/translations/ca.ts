@@ -1429,10 +1429,10 @@ export const ca: TranslationStructure = {
       sourceInfoTitle: "Origen del desglossament",
       sourceSdkCategoriesMessage: "Aquest desglossament prové directament de les categories proporcionades per l'SDK. És la font preferida i pot incloure grups més detallats, com ara el prompt del sistema o categories personalitzades.",
       sourceFallbackMessage: "Les categories de l'SDK no estaven disponibles en aquest torn, així que aquest panell recorre al fallback de messageBreakdown. Aquest fallback és més groller i pot ometre dades del sistema, memòria cau o altres categories que no siguin missatges.",
-      autoCompactOn: "AUTO",
+      autoCompactOn: "200K",
       autoCompactOff: "1M",
-      autoCompactHintOn: "Avís /compact al 75% (200K). Toca per canviar a 1M.",
-      autoCompactHintOff: "Context 1M, sense auto-compact. Toca per comprimir al 75%.",
+      autoCompactHintOn: "Context 200K. Avís /compact al 75% (150K). Toca per canviar a 1M.",
+      autoCompactHintOff: "Context 1M. Sense avís ni compactació. Toca per canviar a 200K + avís al 75%.",
     },
     suggestion: {
       fileLabel: "FITXER",

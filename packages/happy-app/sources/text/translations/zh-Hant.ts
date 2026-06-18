@@ -1387,10 +1387,10 @@ export const zhHant: TranslationStructure = {
       sourceInfoTitle: "來源說明",
       sourceSdkCategoriesMessage: "目前明細直接來自 SDK 提供的 categories。這通常是首選來源，粒度更細，可能包含 system prompt 或自訂 bucket。",
       sourceFallbackMessage: "目前回合沒有 SDK categories，所以這裡退回使用 messageBreakdown。它只提供較粗的訊息級拆分，可能缺少 system、cache 或其他非訊息 bucket。",
-      autoCompactOn: "AUTO",
+      autoCompactOn: "200K",
       autoCompactOff: "1M",
-      autoCompactHintOn: "用量到 75%(150K)提示 /compact。點擊切換 1M 大上下文。",
-      autoCompactHintOff: "1M 大上下文模式，不自動壓縮。點擊切換到 75% 自動壓縮。",
+      autoCompactHintOn: "200K 上下文。用量到 75%(150K) 時提示 /compact。點擊切換到 1M 大視窗。",
+      autoCompactHintOff: "1M 大上下文。不提示也不壓縮。點擊切換到 200K + 75% 提示。",
     },
     suggestion: {
       fileLabel: "檔案",

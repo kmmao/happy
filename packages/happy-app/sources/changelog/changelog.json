@@ -2,6 +2,17 @@
   "entries": {
     "en": [
       {
+        "version": "2.42.1",
+        "date": "2026-06-19",
+        "summary": "Renamed the context-window toggle from \"AUTO\" to \"200K\" and rewrote its tooltips in all 10 languages. The button never actually auto-compacted — since CLI 0.100.7 it only emits a hint at 75% and lets you run `/compact` yourself — so the old label and OFF-state copy were misleading.",
+        "changes": [
+          "Improved the toggle label from \"AUTO\" to \"200K\" for symmetry with the \"1M\" side and to stop suggesting that anything compacts automatically.",
+          "Fixed the ON-state tooltip in 8 languages that said `(200K)` — that's the window size, not the threshold. Unified to `(150K)` (the real 75% trigger) across all 10 translations.",
+          "Fixed the OFF-state tooltip in all 10 languages that promised \"switch back to auto-compact at 75%\" — happy hints at 75%, it does not auto-compact. Now reads \"switch to 200K + hint at 75%\" (translated per locale)."
+        ],
+        "rawMarkdown": "## 2.42.1 - 2026-06-19\n\n\nRenamed the context-window toggle from \"AUTO\" to \"200K\" and rewrote its tooltips in all 10 languages. The button never actually auto-compacted — since CLI 0.100.7 it only emits a hint at 75% and lets you run `/compact` yourself — so the old label and OFF-state copy were misleading.\n\n### Context window control\n- Improved the toggle label from \"AUTO\" to \"200K\" for symmetry with the \"1M\" side and to stop suggesting that anything compacts automatically.\n- Fixed the ON-state tooltip in 8 languages that said `(200K)` — that's the window size, not the threshold. Unified to `(150K)` (the real 75% trigger) across all 10 translations.\n- Fixed the OFF-state tooltip in all 10 languages that promised \"switch back to auto-compact at 75%\" — happy hints at 75%, it does not auto-compact. Now reads \"switch to 200K + hint at 75%\" (translated per locale)."
+      },
+      {
         "version": "2.42.0",
         "date": "2026-06-18",
         "summary": "When Caveman mode is active and you send `/clear`, the App now asks whether to re-enable Caveman after the wipe — previously `/clear` silently dropped you back to normal output because the `/caveman` activation lived inside the conversation context that just got cleared.",
@@ -1108,6 +1119,17 @@
     ],
     "zh-Hans": [
       {
+        "version": "2.42.1",
+        "date": "2026-06-19",
+        "summary": "把上下文窗口切换按钮的标签从 \"AUTO\" 改成 \"200K\"，并重写了所有 10 种语言的 tooltip 文案。这个按钮其实从来都没\"自动压缩\"过 —— CLI 0.100.7 起它只在 75% 用量时发提示，由用户自己运行 `/compact` —— 旧的标签和 OFF 状态文案存在误导。",
+        "changes": [
+          "改进按钮标签从 \"AUTO\" 改成 \"200K\"，与对侧 \"1M\" 对称，消除\"自动 compact\"的歧义。",
+          "修复 8 种语言的 ON 状态 tooltip 把阈值写成 `(200K)` —— 那是窗口大小不是阈值。10 种语言统一改成 `(150K)`（真实的 75% 触发点）。",
+          "修复 10 种语言的 OFF 状态 tooltip 都说\"切回去时会在 75% 自动压缩\" —— happy 现在只发提示，不自动压缩。改为\"切到 200K + 75% 提示\"（每种语言本地化）。"
+        ],
+        "rawMarkdown": "## 2.42.1 - 2026-06-19\n\n\n把上下文窗口切换按钮的标签从 \"AUTO\" 改成 \"200K\"，并重写了所有 10 种语言的 tooltip 文案。这个按钮其实从来都没\"自动压缩\"过 —— CLI 0.100.7 起它只在 75% 用量时发提示，由用户自己运行 `/compact` —— 旧的标签和 OFF 状态文案存在误导。\n\n### 上下文窗口控制\n- 改进按钮标签从 \"AUTO\" 改成 \"200K\"，与对侧 \"1M\" 对称，消除\"自动 compact\"的歧义。\n- 修复 8 种语言的 ON 状态 tooltip 把阈值写成 `(200K)` —— 那是窗口大小不是阈值。10 种语言统一改成 `(150K)`（真实的 75% 触发点）。\n- 修复 10 种语言的 OFF 状态 tooltip 都说\"切回去时会在 75% 自动压缩\" —— happy 现在只发提示，不自动压缩。改为\"切到 200K + 75% 提示\"（每种语言本地化）。"
+      },
+      {
         "version": "2.42.0",
         "date": "2026-06-18",
         "summary": "Caveman 模式开启时发送 `/clear`，App 现在会先弹窗询问\"清空后是否保持 Caveman？\" —— 之前 `/clear` 会把对话上下文（`/caveman` 的激活就在里面）一起清掉，结果用户被静默打回普通输出模式，从 App 这边看不到任何提示。",
@@ -2191,7 +2213,7 @@
       }
     ]
   },
-  "latestVersion": "2.42.0",
+  "latestVersion": "2.42.1",
   "availableLocales": [
     "en",
     "zh-Hans"

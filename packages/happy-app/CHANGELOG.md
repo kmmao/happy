@@ -1,5 +1,14 @@
 # Changelog
 
+## 2.42.1 - 2026-06-19
+
+Renamed the context-window toggle from "AUTO" to "200K" and rewrote its tooltips in all 10 languages. The button never actually auto-compacted — since CLI 0.100.7 it only emits a hint at 75% and lets you run `/compact` yourself — so the old label and OFF-state copy were misleading.
+
+### Context window control
+- Improved the toggle label from "AUTO" to "200K" for symmetry with the "1M" side and to stop suggesting that anything compacts automatically.
+- Fixed the ON-state tooltip in 8 languages that said `(200K)` — that's the window size, not the threshold. Unified to `(150K)` (the real 75% trigger) across all 10 translations.
+- Fixed the OFF-state tooltip in all 10 languages that promised "switch back to auto-compact at 75%" — happy hints at 75%, it does not auto-compact. Now reads "switch to 200K + hint at 75%" (translated per locale).
+
 ## 2.42.0 - 2026-06-18
 
 When Caveman mode is active and you send `/clear`, the App now asks whether to re-enable Caveman after the wipe — previously `/clear` silently dropped you back to normal output because the `/caveman` activation lived inside the conversation context that just got cleared.

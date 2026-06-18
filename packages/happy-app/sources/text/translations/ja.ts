@@ -1551,10 +1551,10 @@ export const ja: TranslationStructure = {
       sourceInfoTitle: "内訳のソース",
       sourceSdkCategoriesMessage: "この内訳は SDK が提供したカテゴリ分類を直接使っています。通常はこちらが優先されるソースで、システムプロンプトやカスタム分類のような、より細かい区分を含む場合があります。",
       sourceFallbackMessage: "このターンでは SDK のカテゴリ分類が取得できなかったため、このパネルは messageBreakdown にフォールバックしています。このフォールバックは粒度が粗く、システム、キャッシュ、その他の非メッセージ区分を含まない場合があります。",
-      autoCompactOn: "AUTO",
+      autoCompactOn: "200K",
       autoCompactOff: "1M",
-      autoCompactHintOn: "使用量 75%(200K)で /compact 提案。タップで 1M に切替。",
-      autoCompactHintOff: "1M コンテキスト、自動圧縮なし。タップで 75% 圧縮に切替。",
+      autoCompactHintOn: "200K コンテキスト。使用量 75%(150K)で /compact 提案。タップで 1M に切替。",
+      autoCompactHintOff: "1M コンテキスト。提案も圧縮もなし。タップで 200K + 75% 提案に切替。",
     },
     suggestion: {
       fileLabel: "ファイル",
