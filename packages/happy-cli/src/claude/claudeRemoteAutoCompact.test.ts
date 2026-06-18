@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   is1MModelKey,
+  isSlashCommand,
   resolveCliModelForMode,
   resolveModelKey,
 } from "./claudeRemote";
@@ -98,5 +99,45 @@ describe("resolveModelKey (unchanged sanity)", () => {
   it("maps App keys to canonical [1m] CLI ids", () => {
     expect(resolveModelKey("opus-4-7")).toBe("claude-opus-4-7[1m]");
     expect(resolveModelKey("opus-4-7-1m")).toBe("claude-opus-4-7[1m]");
+  });
+});
+
+// Guards the echo-retry skip for slash commands. The retry path's Esc + re-
+// paste concatenates onto a partially-landed first paste (TUI doesn't always
+// clear the composer on Esc — vim mode, mid-turn drain, etc.). For prose the
+// concatenation is recoverable via the launcher's watchdog redeliver; for
+// slash commands the concatenated text is no longer a valid slash command
+// (`/compact/compact` is prose), so the TUI silently treats it as text, the
+// command never runs, and `compact_boundary` never fires. The auto-compact
+// loop the user reported was exactly this. Test pins the heuristic so a
+// future tweak doesn't accidentally let `/compact` re-enter the retry path.
+describe("isSlashCommand", () => {
+  it("matches typical slash commands", () => {
+    expect(isSlashCommand("/compact")).toBe(true);
+    expect(isSlashCommand("/clear")).toBe(true);
+    expect(isSlashCommand("/handoff")).toBe(true);
+    expect(isSlashCommand("/model claude-opus-4-7")).toBe(true);
+    expect(isSlashCommand("/compact with optional args")).toBe(true);
+  });
+
+  it("tolerates surrounding whitespace", () => {
+    expect(isSlashCommand("  /compact  ")).toBe(true);
+    expect(isSlashCommand("\n/compact\n")).toBe(true);
+  });
+
+  it("rejects prose, code, and shell prefixes", () => {
+    expect(isSlashCommand("Hello /compact world")).toBe(false);
+    expect(isSlashCommand("$ ls")).toBe(false);
+    expect(isSlashCommand("! pwd")).toBe(false);
+    expect(isSlashCommand("Please run /compact for me")).toBe(false);
+    expect(isSlashCommand("")).toBe(false);
+    expect(isSlashCommand("   ")).toBe(false);
+  });
+
+  it("rejects long messages that happen to start with '/' (defensive cap)", () => {
+    // 200-char cap means a prose paste that starts with "/" is still given
+    // the retry path. Real slash commands are well under this.
+    expect(isSlashCommand("/" + "a".repeat(250))).toBe(false);
+    expect(isSlashCommand("/" + "a".repeat(150))).toBe(true);
   });
 });

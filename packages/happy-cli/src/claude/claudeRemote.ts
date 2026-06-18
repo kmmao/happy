@@ -313,6 +313,32 @@ function writeSubmitNewline(pty: ClaudePtyHandle): boolean {
  * Returns true if the initial paste write succeeded (PTY alive); the async
  * confirm/retry runs in the background. Returns false only when the PTY is dead.
  */
+/**
+ * Heuristic: is this message a slash command (e.g. `/compact`, `/clear`)?
+ *
+ * Why it matters: the Esc + re-paste retry path below assumes Esc clears the
+ * composer between attempts. If it doesn't (TUI in vim NORMAL mode, TUI busy
+ * draining the prior turn, etc.), the re-paste appends to the partially-landed
+ * first paste. For a real user prompt the concatenation is recoverable
+ * (watchdog redelivers). For a slash command the concatenated text — e.g.
+ * `/compact/compact` — is NOT a valid slash command, so the TUI treats it as
+ * plain text: the command never runs, `compact_boundary` never fires, and the
+ * caller's "Compaction completed" event misleads the App while server-side
+ * cooldown stays unarmed and immediately re-fires the next `/compact`.
+ *
+ * Slash commands are short and unique enough that a true wedge surfaces as
+ * "zero PTY echo, zero JSONL" — which the watchdog catches and recovers via
+ * the proper tier-1 Esc path. So for slash commands we skip echo-retry
+ * entirely and trust the single paste; the watchdog is the safety net.
+ */
+export function isSlashCommand(message: string): boolean {
+  const trimmed = message.trim();
+  // Cap at 200 chars so the rare prose that starts with "/" (a file path,
+  // a URL fragment) doesn't accidentally skip retry — real slash commands
+  // are well under this.
+  return trimmed.startsWith("/") && trimmed.length < 200;
+}
+
 function writePromptWithEchoConfirm(
   pty: ClaudePtyHandle,
   message: string,
@@ -341,6 +367,18 @@ function writePromptWithEchoConfirm(
 
   // Empty/whitespace prompts have no echo to confirm — fire and forget.
   if (needle.length === 0) return true;
+
+  // Slash commands skip the Esc+re-paste retry path — see isSlashCommand
+  // docstring. A wedged slash command is caught by the launcher's watchdog;
+  // re-pasting risks `/compact/compact`-style concatenation that the TUI
+  // silently treats as prose, breaking the `/compact` ↔ compact_boundary
+  // contract that the auto-compact cooldown relies on.
+  if (isSlashCommand(message)) {
+    logger.debug(
+      `[claudeRemote] slash-command write — skipping echo-retry (relying on watchdog). preview=${JSON.stringify(message.slice(0, 40))}`,
+    );
+    return true;
+  }
 
   let attempt = 0;
   let echoSeen = false;
@@ -582,6 +620,19 @@ export async function claudeRemote(opts: {
    */
   onPromptWritten?: (text: string) => void;
   onCompletionEvent?: (message: string) => void;
+  /**
+   * Fires when a `/compact` turn finishes WITHOUT the TUI emitting a
+   * `compact_boundary` JSONL event. That means the TUI never actually
+   * compacted (most often because the bracketed-paste landed as text — e.g.
+   * `/compact/compact` after an echo-retry concatenation — or because the
+   * model handled the slash command as prose).
+   *
+   * The launcher uses this hook to arm `armAutoCompactCooldown()` even
+   * though no `compact_boundary` arrived, so the next assistant message
+   * above the auto-compact threshold goes through the cooldown's "paused"
+   * branch instead of immediately pushing another `/compact` and looping.
+   */
+  onCompactNoOp?: () => void;
   onShellResult?: (output: string) => void;
   onSessionReset?: () => void;
   /** Called when a result record is observed in the JSONL stream. */
@@ -713,6 +764,11 @@ export async function claudeRemote(opts: {
   }
 
   let isCompactCommand = false;
+  // Set to true when the TUI emits a `compact_boundary` JSONL event during
+  // this turn — the canonical "compaction actually happened" signal. The
+  // turn-end branch reads this to decide between "Compaction completed" and
+  // the no-op path that triggers `onCompactNoOp` + cooldown arming.
+  let compactBoundaryObserved = false;
   if (specialCommand.type === "compact") {
     logger.debug(
       "[claudeRemote] /compact command detected — will process as normal but with compaction behavior",
@@ -1239,9 +1295,27 @@ export async function claudeRemote(opts: {
       opts.onTurnComplete?.();
 
       if (isCompactCommand) {
-        logger.debug("[claudeRemote] Compaction completed");
-        opts.onCompletionEvent?.("Compaction completed");
+        if (compactBoundaryObserved) {
+          logger.debug("[claudeRemote] Compaction completed");
+          opts.onCompletionEvent?.("Compaction completed");
+        } else {
+          // Turn ended but no `compact_boundary` arrived — the TUI never
+          // actually compacted (commonly because the bracketed-paste landed
+          // as prose, e.g. `/compact/compact` from an echo-retry concat, or
+          // the model handled `/compact` as plain text). Surface the
+          // truthful status and let the launcher arm the auto-compact
+          // cooldown so the same `/compact` doesn't re-fire on the next
+          // over-threshold assistant message.
+          logger.debug(
+            "[claudeRemote] Compaction skipped — no compact_boundary observed (TUI did not compact)",
+          );
+          opts.onCompletionEvent?.(
+            "Compaction skipped — TUI did not compact this turn",
+          );
+          opts.onCompactNoOp?.();
+        }
         isCompactCommand = false;
+        compactBoundaryObserved = false;
       }
 
       await opts.onReady();
@@ -1375,6 +1449,16 @@ export async function claudeRemote(opts: {
       const jsonlMsg = rawToJsonlMessage(raw);
       if (jsonlMsg) {
         logger.debugLargeJson(`[claudeRemote] onMessageReceived ${raw.type}`, jsonlMsg);
+        // Track compaction success. The TUI emits a `system`/`compact_boundary`
+        // record exactly when a `/compact` actually compacted the window;
+        // absence is the no-op signal the turn-end branch acts on.
+        if (
+          isCompactCommand &&
+          jsonlMsg.type === "system" &&
+          (jsonlMsg as { subtype?: string }).subtype === "compact_boundary"
+        ) {
+          compactBoundaryObserved = true;
+        }
         opts.onMessage(jsonlMsg);
       }
 

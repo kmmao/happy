@@ -371,9 +371,18 @@ export async function claudeRemoteLauncher(
           logger.debug(
             `[remote][strand] no JSONL output ${elapsedMs}ms after turn start (PTY spinner may be active) — likely a dropped submission or hung API. Forcing recovery. ${strandDiagState()}`,
           );
+          // For auto-compact internal pushes the redeliver path is silently
+          // skipped (see maybeRedeliverStrandedPrompt), so promising "re-
+          // sending your message…" is a lie that confuses the user. Use a
+          // truthful, source-aware message instead. The cooldown latch
+          // (armed below via `onCompactNoOp` when the turn ends without a
+          // `compact_boundary`) handles preventing immediate re-fires.
+          const isAutoCompact = inFlightPrompt?.source === "auto-compact";
           session.client.sendSessionEvent({
             type: "message",
-            message: `No response after ${elapsedSec}s — re-sending your message…`,
+            message: isAutoCompact
+              ? `Auto-compact stalled after ${elapsedSec}s — interrupting and pausing auto-compact.`
+              : `No response after ${elapsedSec}s — re-sending your message…`,
           });
           void recoverStrandedTurn(elapsedMs);
           return;
@@ -498,8 +507,16 @@ export async function claudeRemoteLauncher(
     // tier-2 path is the right recovery for a wedged compact, not a
     // re-paste.
     if (inFlightPrompt.source === "auto-compact") {
+      // Make the "cooldown will gate next push" promise actually true. When
+      // the wedge happens BEFORE the TUI emits any JSONL, claudeRemote's
+      // turn-end branch (which would otherwise call `onCompactNoOp` to arm
+      // the cooldown) never runs because it's parked awaiting a result
+      // record. Arming here ensures the next over-threshold assistant
+      // message hits the "Auto-compact paused" branch instead of immediately
+      // pushing another `/compact` and looping.
+      session.client.armAutoCompactCooldown();
       logger.debug(
-        "[remote][strand] skipping redeliver of auto-compact /compact — cooldown will gate next push",
+        "[remote][strand] skipping redeliver of auto-compact /compact — cooldown armed to gate next push",
       );
       return;
     }
@@ -2976,6 +2993,20 @@ export async function claudeRemoteLauncher(
           onCompletionEvent: (message: string) => {
             logger.debug(`[remote]: Completion event: ${message}`);
             session.client.sendSessionEvent({ type: "message", message });
+          },
+          // When a `/compact` turn finishes but the TUI never emitted
+          // `compact_boundary`, treat it the same way the cooldown handler
+          // treats "compact ran but didn't shrink the window" — arm the
+          // cooldown latch so the next over-threshold assistant message goes
+          // through the "Auto-compact paused" branch instead of immediately
+          // pushing another `/compact`. This breaks the infinite-loop the
+          // user reported on a wedged compact (where `compact_boundary` never
+          // arrived and the per-turn latch alone reset on turn close).
+          onCompactNoOp: () => {
+            logger.debug(
+              "[remote]: compact no-op observed — arming auto-compact cooldown to prevent re-fire",
+            );
+            session.client.armAutoCompactCooldown();
           },
           onShellResult: (output: string) => {
             logger.debug("[remote]: Shell command result received");
