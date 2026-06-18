@@ -1,6 +1,7 @@
 import { storage } from "@/sync/storage";
 import { log } from "@/log";
 import { isSessionRunning } from "@/utils/sessionUtils";
+import { checkSendEligibility } from "@/sync/sendGate";
 
 type QueuedMessage = {
   localId: string;
@@ -70,32 +71,46 @@ export class PendingQueueDispatcher {
   private async dispatchIfReady(sessionId: string): Promise<void> {
     const state = storage.getState();
     const session = state.sessions[sessionId];
-    if (!session) {
-      this.disposeSession(sessionId);
-      return;
-    }
 
-    if (isSessionRunning(session)) {
-      if (this.inFlight.has(sessionId)) {
-        this.inFlight.delete(sessionId);
-        this.clearFallback(sessionId);
+    // Eligibility lives behind a pure gate — see sendGate.ts. The
+    // dispatcher only owns the side effects each blocker reason maps to
+    // (dispose / clear in-flight latch / clear override). The five-arm
+    // cascade that used to live inline (with implicit precedence) is now
+    // a typed switch.
+    const verdict = checkSendEligibility({
+      sessionExists: !!session,
+      isSessionRunning: !!session && isSessionRunning(session),
+      isInFlight: this.inFlight.has(sessionId),
+      isPaused: !!state.sessionPendingQueuePaused[sessionId],
+      hasOverride: this.forceUnpaused.has(sessionId),
+      queueLength: state.sessionPendingQueues[sessionId]?.length ?? 0,
+    });
+    if (!verdict.eligible) {
+      switch (verdict.reason) {
+        case "no-session":
+          this.disposeSession(sessionId);
+          return;
+        case "session-running":
+          // A running session will deliver its own ack — drop any held
+          // in-flight latch so the next idle transition can schedule.
+          if (this.inFlight.has(sessionId)) {
+            this.inFlight.delete(sessionId);
+            this.clearFallback(sessionId);
+          }
+          return;
+        case "in-flight":
+          // Another dispatch is already mid-flight; it will re-schedule.
+          return;
+        case "paused":
+          // No override yet — a future `schedule({ ignorePaused: true })`
+          // will lift it.
+          return;
+        case "empty-queue":
+          // Clear standing override so the next paused schedule doesn't
+          // auto-bypass.
+          this.forceUnpaused.delete(sessionId);
+          return;
       }
-      return;
-    }
-
-    if (this.inFlight.has(sessionId)) {
-      return;
-    }
-
-    const ignorePaused = this.forceUnpaused.has(sessionId);
-    if (!ignorePaused && state.sessionPendingQueuePaused[sessionId]) {
-      return;
-    }
-
-    const queue = state.sessionPendingQueues[sessionId];
-    if (!queue || queue.length === 0) {
-      this.forceUnpaused.delete(sessionId);
-      return;
     }
 
     const next = storage.getState().shiftPendingQueue(sessionId);
