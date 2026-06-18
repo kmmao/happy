@@ -268,6 +268,19 @@ export async function claudeRemoteLauncher(
    */
   let nextPromptSource: string | undefined = undefined;
   let turnProducedOutput = false;
+  // Echo-confirmation latch — flipped true once the post-write WRITE_VERIFY
+  // check observes PTY echo / output after the bracketed-paste write, proving
+  // the TUI actually consumed the prompt (a real case-(a) submission wedge
+  // produces zero echo, leaving this false and getting caught by WRITE_VERIFY
+  // in 2.5s). The 45s elapsed-based strand check below gates on
+  // `!promptSubmissionConfirmed` so legitimate slow first tokens — Opus 4.x
+  // 超高 thinking in particular, where the spinner keeps the PTY alive
+  // (idleMs<90s) but no JSONL arrives for 60-90s — do NOT get aborted just
+  // because the wall-clock crossed 45s. Without this, the 45s path
+  // (introduced in c36211a75) misreads extended-thinking as case-(a) wedge,
+  // re-delivers mid-thought, and surfaces as the "No response after 60s —
+  // re-sending your message…" loop the user observed.
+  let promptSubmissionConfirmed = false;
   let strandRedeliverCount = 0;
   // Wall-clock when the current watchdog started (= turn start). Used to
   // measure total elapsed thinking time independent of lastClaudeOutputAt,
@@ -365,8 +378,26 @@ export async function claudeRemoteLauncher(
       // in <10s typically) never trips it, short enough that a wedge recovers
       // in ~45s instead of the old 110s. Heartbeats at 2m/4m only matter for
       // case (b) on a genuinely slow-but-alive API.
+      //
+      // Gate (added 2026-06-18): require `!promptSubmissionConfirmed`. The
+      // WRITE_VERIFY check at +2.5s already arms `promptSubmissionConfirmed`
+      // the moment PTY echo proves the TUI accepted the paste — which is the
+      // signature that distinguishes case (a) (NO echo, paste dropped, prompt
+      // never submitted) from a legitimate slow first token (echo back in
+      // milliseconds, then Claude is genuinely thinking). Without this gate,
+      // Opus 4.x 超高 turns that legitimately take 60-90s+ to first-token
+      // (spinner refreshing PTY bytes the whole time, JSONL pending) get
+      // misread as case-(a) wedges at 45s and aborted/re-delivered mid-
+      // thought — the loop the user reported. A real wedge still gets caught
+      // by WRITE_VERIFY in 2.5s (faster than this 45s path was), and the
+      // existing idleMs>=90s WEDGE_RECOVER / idleMs>=120s IDLE_RECOVER paths
+      // still catch any case (b) hang on a confirmed-submitted prompt.
       if (!turnProducedOutput && idleMs < WATCHDOG_WEDGE_RECOVER_MS) {
-        if (elapsedMs >= 45_000 && !strandRecoveryInFlight) {
+        if (
+          elapsedMs >= 45_000 &&
+          !strandRecoveryInFlight &&
+          !promptSubmissionConfirmed
+        ) {
           const elapsedSec = Math.round(elapsedMs / 1000);
           logger.debug(
             `[remote][strand] no JSONL output ${elapsedMs}ms after turn start (PTY spinner may be active) — likely a dropped submission or hung API. Forcing recovery. ${strandDiagState()}`,
@@ -547,6 +578,10 @@ export async function claudeRemoteLauncher(
     // record (onMessage) flips it true; a strand recovery reads it to decide
     // whether the prompt was lost and must be re-delivered.
     turnProducedOutput = false;
+    // Fresh turn — clear the echo-confirmation latch too. WRITE_VERIFY will
+    // re-arm it once it sees PTY echo for the new prompt; until then the 45s
+    // elapsed-based strand check stays armed in case the prompt never lands.
+    promptSubmissionConfirmed = false;
     if (!executionGuard.reserve(reason)) {
       const snapshot = executionGuard.getSnapshot();
       logger.debug(
@@ -2962,6 +2997,13 @@ export async function claudeRemoteLauncher(
             // Consume so a stale value cannot leak into the next turn if
             // the next nextMessage() return forgets to re-stamp.
             nextPromptSource = undefined;
+            // Reset the echo-confirmation latch so the WRITE_VERIFY check
+            // below re-validates THIS prompt's submission. Without this,
+            // a strand-redeliver mid-turn push would inherit the previous
+            // prompt's confirmed=true status, letting a second wedge slip
+            // past the 45s elapsed-based strand check until the 90s
+            // WEDGE_RECOVER / 120s IDLE_RECOVER path picks it up.
+            promptSubmissionConfirmed = false;
             // Post-write submission-wedge check. A healthy submit makes the TUI
             // echo the pasted prompt within milliseconds (raw PTY bytes →
             // onPtyActivity → lastClaudeOutputAt advances past writtenAt); a
@@ -2979,7 +3021,17 @@ export async function claudeRemoteLauncher(
               writeVerifyTimer = null;
               if (exitReason || strandRecoveryInFlight) return;
               if (executionGuard.getSnapshot().state !== "running") return;
-              if (turnProducedOutput || lastClaudeOutputAt > writtenAt) return;
+              // Echo / output observed after the write → TUI consumed the
+              // paste, the prompt is genuinely in flight. Arm the echo-
+              // confirmation latch so the 45s elapsed-based strand check
+              // below stops misreading legitimate slow first tokens (Opus
+              // xhigh thinking) as a submission wedge. Real wedges produce
+              // zero echo and fall through to the recovery branch below
+              // (still ~2.5s, far faster than the 45s path).
+              if (turnProducedOutput || lastClaudeOutputAt > writtenAt) {
+                promptSubmissionConfirmed = true;
+                return;
+              }
               if (ongoingToolCalls.size > 0 || pendingElicitations.size > 0) return;
               logger.debug(
                 `[remote][strand] post-write wedge — no PTY echo/output ${Date.now() - writtenAt}ms after prompt write, fast auto-recovery. ${strandDiagState()}`,
