@@ -12,7 +12,11 @@ import {
   UserMessageSchema,
   Usage,
 } from "./types";
-import { createCipher, type Cipher } from "./encryption";
+import { createCipher } from "./encryption";
+import {
+  createSessionCryptoCodec,
+  type SessionCryptoCodec,
+} from "./sessionCryptoCodec";
 import { backoff, delay } from "@/utils/time";
 import { configuration } from "@/configuration";
 import { RawJSONLines } from "@/claude/types";
@@ -258,7 +262,13 @@ export class ApiSessionClient extends EventEmitter {
   readonly rpcHandlerManager: RpcHandlerManager;
   private agentStateLock = new AsyncLock();
   private metadataLock = new AsyncLock();
-  private readonly cipher: Cipher;
+  // SessionCryptoCodec extends Cipher — adds typed encrypt/decode
+  // methods per content kind (Metadata, AgentState, message content),
+  // so the 9 wire-call sites no longer hand-narrow `(value as
+  // Metadata)` after each decrypt. The codec also satisfies wire's
+  // structural RpcCipher, so the cipher passed to RpcHandlerManager
+  // below is the codec itself — no parallel surface.
+  private readonly cipher: SessionCryptoCodec;
   private claudeDriver: ClaudeProtocolDriver = createClaudeProtocolDriver();
   private lastSeq: number;
   private pendingOutbox: Array<{ content: string; localId: string }> = [];
@@ -396,7 +406,9 @@ export class ApiSessionClient extends EventEmitter {
     this.metadataVersion = session.metadataVersion;
     this.agentState = session.agentState;
     this.agentStateVersion = session.agentStateVersion;
-    this.cipher = createCipher(session.encryptionKey, session.encryptionVariant);
+    this.cipher = createSessionCryptoCodec(
+      createCipher(session.encryptionKey, session.encryptionVariant),
+    );
     this.sendSync = new InvalidateSync(() => this.flushOutbox());
     this.receiveSync = new InvalidateSync(() => this.fetchMessages());
 
@@ -503,7 +515,9 @@ export class ApiSessionClient extends EventEmitter {
             this.receiveSync.invalidate();
             return;
           }
-          const decrypted = this.cipher.decrypt(data.body.message.content.c);
+          const decrypted = this.cipher.decodeMessageContent(
+            data.body.message.content.c,
+          );
           const body = decrypted.ok ? decrypted.value : null;
           const decryptedAt = Date.now();
           logger.debug(`[perf] socket_received → decrypted: ${decryptedAt - socketReceivedAt}ms (seq=${messageSeq})`);
@@ -519,7 +533,9 @@ export class ApiSessionClient extends EventEmitter {
             data.body.metadata &&
             data.body.metadata.version > this.metadataVersion
           ) {
-            const decryptedMetadata = this.cipher.decrypt(data.body.metadata.value);
+            const decryptedMetadata = this.cipher.decodeMetadata(
+              data.body.metadata.value,
+            );
             this.metadata = decryptedMetadata.ok ? decryptedMetadata.value : null;
             this.metadataVersion = data.body.metadata.version;
           }
@@ -528,7 +544,7 @@ export class ApiSessionClient extends EventEmitter {
             data.body.agentState.version > this.agentStateVersion
           ) {
             const decryptedAgentState = data.body.agentState.value
-              ? this.cipher.decrypt(data.body.agentState.value)
+              ? this.cipher.decodeAgentState(data.body.agentState.value)
               : null;
             this.agentState = decryptedAgentState?.ok ? decryptedAgentState.value : null;
             this.agentStateVersion = data.body.agentState.version;
@@ -754,7 +770,7 @@ export class ApiSessionClient extends EventEmitter {
           continue;
         }
 
-        const decrypted = this.cipher.decrypt(message.content.c);
+        const decrypted = this.cipher.decodeMessageContent(message.content.c);
         if (!decrypted.ok) {
           decryptFailures++;
           logger.debug(
@@ -835,7 +851,7 @@ export class ApiSessionClient extends EventEmitter {
     content: unknown,
     options: SessionProtocolSendOptions = {},
   ) {
-    const encrypted = this.cipher.encrypt(content);
+    const encrypted = this.cipher.encryptMessageContent(content);
     this.pendingOutbox.push({
       content: encrypted,
       localId: options.localId ?? randomUUID(),
@@ -1684,16 +1700,16 @@ export class ApiSessionClient extends EventEmitter {
         const answer = await this.socket.emitWithAck("update-metadata", {
           sid: this.sessionId,
           expectedVersion: this.metadataVersion,
-          metadata: this.cipher.encrypt(updated),
+          metadata: this.cipher.encryptMetadata(updated),
         });
         if (answer.result === "success") {
-          const decrypted = this.cipher.decrypt(answer.metadata);
+          const decrypted = this.cipher.decodeMetadata(answer.metadata);
           this.metadata = decrypted.ok ? decrypted.value : null;
           this.metadataVersion = answer.version;
         } else if (answer.result === "version-mismatch") {
           if (answer.version > this.metadataVersion) {
             this.metadataVersion = answer.version;
-            const decrypted = this.cipher.decrypt(answer.metadata);
+            const decrypted = this.cipher.decodeMetadata(answer.metadata);
             this.metadata = decrypted.ok ? decrypted.value : null;
           }
           throw new Error("Metadata version mismatch");
@@ -1716,11 +1732,11 @@ export class ApiSessionClient extends EventEmitter {
         const answer = await this.socket.emitWithAck("update-state", {
           sid: this.sessionId,
           expectedVersion: this.agentStateVersion,
-          agentState: updated ? this.cipher.encrypt(updated) : null,
+          agentState: updated ? this.cipher.encryptAgentState(updated) : null,
         });
         if (answer.result === "success") {
           const decrypted = answer.agentState
-            ? this.cipher.decrypt(answer.agentState)
+            ? this.cipher.decodeAgentState(answer.agentState)
             : null;
           this.agentState = decrypted?.ok ? decrypted.value : null;
           this.agentStateVersion = answer.version;
@@ -1729,7 +1745,7 @@ export class ApiSessionClient extends EventEmitter {
           if (answer.version > this.agentStateVersion) {
             this.agentStateVersion = answer.version;
             const decrypted = answer.agentState
-              ? this.cipher.decrypt(answer.agentState)
+              ? this.cipher.decodeAgentState(answer.agentState)
               : null;
             this.agentState = decrypted?.ok ? decrypted.value : null;
           }
