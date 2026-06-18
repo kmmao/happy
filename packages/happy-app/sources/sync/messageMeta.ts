@@ -24,16 +24,6 @@ export interface ResolvedMessageMeta {
   effort: "low" | "medium" | "high" | "max" | "xhigh" | null;
   maxBudgetUsd: number | null;
   taskBudget: { total: number } | null;
-  /**
-   * True (default) = compress mode (Claude TUI stays at 200K, happy
-   * pushes `/compact` at 150K). False = 1M premium context. The CLI's
-   * runClaude.ts reads `message.meta.autoCompact` and propagates to
-   * ApiSessionClient + EnhancedMode; toggling this flips
-   * `coldModeHash.isExtendedContext`, forcing a mode_change cold restart
-   * on the next turn (Part 1 grace window guards against the resulting
-   * submission wedge race).
-   */
-  autoCompact: boolean;
 }
 
 export function resolveMessageModeMeta(
@@ -49,7 +39,6 @@ export function resolveMessageModeMeta(
     | "effortLevel"
     | "maxBudgetUsd"
     | "taskBudgetTokens"
-    | "autoCompact"
   >,
   settings?: Pick<Settings, "agentDefaultOverrides">,
 ): ResolvedMessageMeta {
@@ -122,10 +111,6 @@ export function resolveMessageModeMeta(
     ? { total: session.taskBudgetTokens }
     : null;
 
-  // null/undefined → true (default 200K compress mode). Explicit `false`
-  // means the user toggled to 1M premium mode for this session.
-  const autoCompact = session.autoCompact === false ? false : true;
-
   return {
     permissionMode,
     model,
@@ -133,6 +118,5 @@ export function resolveMessageModeMeta(
     effort,
     maxBudgetUsd,
     taskBudget,
-    autoCompact,
   };
 }

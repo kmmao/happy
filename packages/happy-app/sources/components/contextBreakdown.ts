@@ -4,8 +4,6 @@ export type ContextUsageData = {
   percentage: number;
   model?: string;
   categories?: Array<{ name: string; tokens: number; color?: string }>;
-  isAutoCompactEnabled?: boolean;
-  autoCompactThreshold?: number;
   messageBreakdown?: {
     toolCallTokens: number;
     toolResultTokens: number;

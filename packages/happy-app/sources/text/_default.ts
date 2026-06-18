@@ -1453,10 +1453,6 @@ export const en = {
       sourceInfoTitle: "Breakdown source",
       sourceSdkCategoriesMessage: "This breakdown comes directly from SDK-provided categories. It is the preferred source and may include finer-grained buckets such as system prompts or custom categories.",
       sourceFallbackMessage: "SDK categories were unavailable for this turn, so this panel falls back to messageBreakdown. This fallback is coarser and may omit system, cache, or other non-message buckets.",
-      autoCompactOn: "200K",
-      autoCompactOff: "1M",
-      autoCompactHintOn: "200K context. Hint to /compact at 75% (150K). Tap to switch to 1M.",
-      autoCompactHintOff: "1M context. No hint, no compact. Tap to switch to 200K + hint at 75%.",
     },
     suggestion: {
       fileLabel: "FILE",

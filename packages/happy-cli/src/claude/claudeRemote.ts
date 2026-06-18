@@ -96,27 +96,29 @@ import { createSessionScanner } from "./utils/sessionScanner";
 void resolvePath; // path resolution kept available for future flag builders
 
 /**
- * Resolve the CLI-facing `--model` string from an EnhancedMode, honouring
- * the session's autoCompact preference. When `autoCompact !== false`
- * (the 200K compress mode, default), strip the `[1m]` suffix from the
- * resolved id so Claude TUI does NOT enable its 1M context — the existing
- * `CLAUDE_CODE_DISABLE_1M_CONTEXT=1` env (or its default behaviour) then
- * keeps the window at 200K and happy's apiSession.ts threshold pushes
- * `/compact` at 150K. When `autoCompact === false`, leave the `[1m]`
- * suffix intact so Claude TUI grants the premium 1M window.
+ * Resolve the CLI-facing `--model` string from an EnhancedMode. The window
+ * tier is encoded in the modelMode key itself — `opus-4-7` (200K) vs
+ * `opus-4-7-1m` (1M) — and that is the SINGLE source of truth.
  *
- * Centralises the "200K vs 1M tier" decision so the launcher hot-swap
- * path (`claudeRemote.ts:1256`) and the boot path (`claudeRemote.ts:700`)
- * stay in sync; without this wrapper a stale boot id would survive a
- * toggle and the next hot-swap would write a different one without a
- * matching cold restart.
+ * `resolveModelKey` always appends happy-cli's internal `[1m]` marker for
+ * any 1M-capable model (a tracking convention for usage attribution). We
+ * strip it here unless the user picked the `-1m` variant explicitly, so
+ * the SDK receives a vanilla `claude-opus-4-7` for the default tier and
+ * a `claude-opus-4-7[1m]` only when 1M was actually requested.
+ *
+ * Pre-removal of the `autoCompact` protocol this gated the suffix on a
+ * separate per-session toggle, which produced a class of "user picked 1M
+ * in the modelMode picker but got 200K" bugs (the toggle defaulted to
+ * AUTO and silently undid the modelMode choice). The toggle is gone —
+ * the picker is the single source of truth.
  */
 export function resolveCliModelForMode(
-  mode: { model?: string; autoCompact?: boolean },
+  mode: { model?: string },
 ): string | undefined {
   const resolved = resolveModelKey(mode.model);
   if (!resolved) return resolved;
-  if (mode.autoCompact === false) return resolved;
+  const userPickedOneMillion = mode.model?.endsWith("-1m") ?? false;
+  if (userPickedOneMillion) return resolved;
   return resolved.endsWith("[1m]")
     ? resolved.slice(0, -"[1m]".length)
     : resolved;
@@ -656,8 +658,6 @@ export async function claudeRemote(opts: {
     percentage: number;
     model: string;
     categories?: Array<{ name: string; tokens: number; color: string }>;
-    isAutoCompactEnabled: boolean;
-    autoCompactThreshold?: number;
     messageBreakdown?: {
       toolCallTokens: number;
       toolResultTokens: number;
@@ -1262,7 +1262,6 @@ export async function claudeRemote(opts: {
               percentage: ctx.percentage,
               model: ctx.model,
               categories: ctx.categories,
-              isAutoCompactEnabled: false,
               messageBreakdown: ctx.messageBreakdown
                 ? {
                     toolCallTokens: ctx.messageBreakdown.toolCallTokens,

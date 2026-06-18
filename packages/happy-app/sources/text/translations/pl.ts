@@ -1437,10 +1437,6 @@ export const pl: TranslationStructure = {
       sourceInfoTitle: "Źródło podziału",
       sourceSdkCategoriesMessage: "Ten podział pochodzi bezpośrednio z kategorii dostarczonych przez SDK. To preferowane źródło i może zawierać bardziej szczegółowe grupy, takie jak prompt systemowy lub niestandardowe kategorie.",
       sourceFallbackMessage: "W tej turze kategorie z SDK nie były dostępne, więc panel przechodzi na fallback oparty na messageBreakdown. Ten fallback jest bardziej zgrubny i może pomijać dane systemowe, pamięć podręczną oraz inne kategorie niezwiązane z wiadomościami.",
-      autoCompactOn: "200K",
-      autoCompactOff: "1M",
-      autoCompactHintOn: "Kontekst 200K. Podpowiedź /compact przy 75% (150K). Dotknij, aby przełączyć na 1M.",
-      autoCompactHintOff: "Kontekst 1M. Bez podpowiedzi i kompresji. Dotknij, aby przełączyć na 200K + podpowiedź przy 75%.",
     },
     suggestion: {
       fileLabel: "PLIK",

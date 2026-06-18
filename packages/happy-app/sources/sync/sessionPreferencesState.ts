@@ -37,7 +37,6 @@ export function normalizeSessionPreferencesSnapshot(
     taskBudgetTokens:
       input?.taskBudgetTokens === undefined ? null : input.taskBudgetTokens,
     starred: input?.starred ?? null,
-    autoCompact: input?.autoCompact ?? null,
   };
 }
 
@@ -81,6 +80,5 @@ export function overlayPendingSessionPreferences(
     maxBudgetUsd: normalized.maxBudgetUsd,
     taskBudgetTokens: normalized.taskBudgetTokens,
     starred: normalized.starred,
-    autoCompact: normalized.autoCompact,
   };
 }

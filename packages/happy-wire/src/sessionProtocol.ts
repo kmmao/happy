@@ -286,8 +286,6 @@ export const sessionContextUsageEventSchema = z.object({
   percentage: z.number(),
   model: z.string().optional(),
   categories: z.array(sessionContextUsageCategorySchema).optional(),
-  isAutoCompactEnabled: z.boolean().optional(),
-  autoCompactThreshold: z.number().optional(),
   messageBreakdown: z.object({
     toolCallTokens: z.number(),
     toolResultTokens: z.number(),

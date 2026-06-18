@@ -7,75 +7,50 @@ import {
   resolveModelKey,
 } from "./claudeRemote";
 
-// Sanity-check the toggle-driven 200K ↔ 1M switch. The behavioural contract:
-//
-//   resolveCliModelForMode({model, autoCompact}) returns the `--model` string
-//   that Claude TUI receives. Strip the `[1m]` suffix when autoCompact is
-//   true (or undefined — the default) so the TUI stays at 200K and happy's
-//   apiSession.ts threshold handles the compact. Keep the suffix when
-//   autoCompact === false so the TUI grants the 1M premium window.
+// After the `autoCompact` protocol removal, the model key alone decides the
+// window tier: a `-1m`-suffixed App key (e.g. `opus-4-7-1m`) maps to a CLI
+// id with the `[1m]` marker; everything else stays at 200K. `resolveCliModelForMode`
+// is now a thin wrapper around `resolveModelKey` with no extra stripping.
 //
 // is1MModelKey is unchanged — still answers "is this App-level mode key
-// 1M-capable?" — and used by coldModeHash together with the autoCompact
-// flag to drive mode_change cold restarts when the toggle flips.
+// 1M-capable?" — and used by coldModeHash to force a mode_change cold restart
+// when the modelMode picker swaps between tiers.
 
 describe("resolveCliModelForMode", () => {
-  it("strips [1m] suffix when autoCompact is true (default 200K compress mode)", () => {
-    expect(
-      resolveCliModelForMode({ model: "opus-4-7", autoCompact: true }),
-    ).toBe("claude-opus-4-7");
-    expect(
-      resolveCliModelForMode({ model: "opus-4-7-1m", autoCompact: true }),
-    ).toBe("claude-opus-4-7");
-    expect(
-      resolveCliModelForMode({ model: "sonnet", autoCompact: true }),
-    ).toBe("claude-sonnet-4-6");
+  it("keeps the [1m] suffix when the user picked a -1m modelMode variant", () => {
+    expect(resolveCliModelForMode({ model: "opus-4-7-1m" })).toBe(
+      "claude-opus-4-7[1m]",
+    );
+    expect(resolveCliModelForMode({ model: "sonnet-1m" })).toBe(
+      "claude-sonnet-4-6[1m]",
+    );
+    expect(resolveCliModelForMode({ model: "fable-5-1m" })).toBe(
+      "claude-fable-5[1m]",
+    );
   });
 
-  it("strips [1m] suffix when autoCompact is undefined (default behaviour)", () => {
-    // Back-compat: old App builds without the field land here. Default
-    // intent is 200K compress mode, matching ADR 0003.
+  it("strips the [1m] suffix when the user picked a default (non-1m) modelMode", () => {
+    // `resolveModelKey` always appends [1m] for any 1M-capable model — this
+    // is happy-cli's internal tracking marker. Strip it for the default
+    // tier so the SDK gets a vanilla id.
     expect(resolveCliModelForMode({ model: "opus-4-7" })).toBe(
       "claude-opus-4-7",
     );
-    expect(resolveCliModelForMode({ model: "opus-4-7-1m" })).toBe(
-      "claude-opus-4-7",
+    expect(resolveCliModelForMode({ model: "sonnet" })).toBe(
+      "claude-sonnet-4-6",
     );
   });
 
-  it("keeps [1m] suffix when autoCompact is false (1M premium mode)", () => {
-    expect(
-      resolveCliModelForMode({ model: "opus-4-7", autoCompact: false }),
-    ).toBe("claude-opus-4-7[1m]");
-    expect(
-      resolveCliModelForMode({ model: "opus-4-7-1m", autoCompact: false }),
-    ).toBe("claude-opus-4-7[1m]");
-    expect(
-      resolveCliModelForMode({ model: "fable-5", autoCompact: false }),
-    ).toBe("claude-fable-5[1m]");
+  it("passes non-1M-capable keys through untouched", () => {
+    expect(resolveCliModelForMode({ model: "haiku" })).toBe("haiku");
+    expect(resolveCliModelForMode({ model: "some-custom-id" })).toBe(
+      "some-custom-id",
+    );
   });
 
-  it("passes through non-1M-capable model ids untouched in either mode", () => {
-    // `haiku` and unknown keys never carried a `[1m]` suffix, so they
-    // bypass the stripping logic and return the raw mapping.
-    expect(
-      resolveCliModelForMode({ model: "haiku", autoCompact: true }),
-    ).toBe("haiku");
-    expect(
-      resolveCliModelForMode({ model: "haiku", autoCompact: false }),
-    ).toBe("haiku");
-    expect(
-      resolveCliModelForMode({ model: "some-custom-id", autoCompact: false }),
-    ).toBe("some-custom-id");
-  });
-
-  it("returns undefined for unset / 'default' model ids regardless of toggle", () => {
-    expect(
-      resolveCliModelForMode({ model: undefined, autoCompact: true }),
-    ).toBeUndefined();
-    expect(
-      resolveCliModelForMode({ model: "default", autoCompact: false }),
-    ).toBeUndefined();
+  it("returns undefined for unset / 'default' model ids", () => {
+    expect(resolveCliModelForMode({ model: undefined })).toBeUndefined();
+    expect(resolveCliModelForMode({ model: "default" })).toBeUndefined();
   });
 });
 
@@ -96,7 +71,7 @@ describe("is1MModelKey", () => {
 });
 
 describe("resolveModelKey (unchanged sanity)", () => {
-  it("maps App keys to canonical [1m] CLI ids", () => {
+  it("maps App keys to canonical [1m] CLI ids for 1M-capable models", () => {
     expect(resolveModelKey("opus-4-7")).toBe("claude-opus-4-7[1m]");
     expect(resolveModelKey("opus-4-7-1m")).toBe("claude-opus-4-7[1m]");
   });
@@ -108,9 +83,9 @@ describe("resolveModelKey (unchanged sanity)", () => {
 // concatenation is recoverable via the launcher's watchdog redeliver; for
 // slash commands the concatenated text is no longer a valid slash command
 // (`/compact/compact` is prose), so the TUI silently treats it as text, the
-// command never runs, and `compact_boundary` never fires. The auto-compact
-// loop the user reported was exactly this. Test pins the heuristic so a
-// future tweak doesn't accidentally let `/compact` re-enter the retry path.
+// command never runs, and `compact_boundary` never fires. Test pins the
+// heuristic so a future tweak doesn't accidentally let `/compact` re-enter
+// the retry path.
 describe("isSlashCommand", () => {
   it("matches typical slash commands", () => {
     expect(isSlashCommand("/compact")).toBe(true);

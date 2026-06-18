@@ -200,8 +200,6 @@ export type ReducerState = {
     percentage: number;
     model?: string;
     categories?: Array<{ name: string; tokens: number; color?: string }>;
-    isAutoCompactEnabled?: boolean;
-    autoCompactThreshold?: number;
     messageBreakdown?: {
       toolCallTokens: number;
       toolResultTokens: number;
@@ -447,8 +445,6 @@ export function reducer(
         percentage: msg.content.percentage,
         model: msg.content.model,
         categories: msg.content.categories,
-        isAutoCompactEnabled: msg.content.isAutoCompactEnabled,
-        autoCompactThreshold: msg.content.autoCompactThreshold,
         messageBreakdown: msg.content.messageBreakdown,
         timestamp: msg.createdAt,
       };

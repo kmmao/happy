@@ -1562,10 +1562,6 @@ export const it: TranslationStructure = {
       sourceInfoTitle: "Origine del dettaglio",
       sourceSdkCategoriesMessage: "Questo dettaglio proviene direttamente dalle categorie fornite dall'SDK. È la fonte preferita e può includere gruppi più granulari, come il prompt di sistema o categorie personalizzate.",
       sourceFallbackMessage: "Le categorie dell'SDK non erano disponibili per questo turno, quindi questo pannello usa il fallback tramite messageBreakdown. Questo fallback è più grossolano e può omettere dati di sistema, cache o altre categorie non legate ai messaggi.",
-      autoCompactOn: "200K",
-      autoCompactOff: "1M",
-      autoCompactHintOn: "Contesto 200K. Avviso /compact al 75% (150K). Tocca per passare a 1M.",
-      autoCompactHintOff: "Contesto 1M. Nessun avviso né compattazione. Tocca per passare a 200K + avviso al 75%.",
     },
     suggestion: {
       fileLabel: "FILE",

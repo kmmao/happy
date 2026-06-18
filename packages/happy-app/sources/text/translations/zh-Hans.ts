@@ -1389,10 +1389,6 @@ export const zhHans: TranslationStructure = {
       sourceInfoTitle: "来源说明",
       sourceSdkCategoriesMessage: "当前明细直接来自 SDK 提供的 categories。这通常是首选来源，粒度更细，可能包含 system prompt 或自定义 bucket。",
       sourceFallbackMessage: "当前回合没有 SDK categories，所以这里退回使用 messageBreakdown。它只提供较粗的消息级拆分，可能缺少 system、cache 或其他非消息 bucket。",
-      autoCompactOn: "200K",
-      autoCompactOff: "1M",
-      autoCompactHintOn: "200K 上下文。用量到 75%(150K) 时提示 /compact。点击切换到 1M 大窗口。",
-      autoCompactHintOff: "1M 大上下文。不提示也不压缩。点击切换到 200K + 75% 提示。",
     },
     suggestion: {
       fileLabel: "文件",

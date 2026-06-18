@@ -1426,10 +1426,6 @@ export const pt: TranslationStructure = {
       sourceInfoTitle: "Origem do detalhamento",
       sourceSdkCategoriesMessage: "Este detalhamento vem diretamente das categorias fornecidas pelo SDK. Esta é a origem preferida e pode incluir grupos mais granulares, como prompt do sistema ou categorias personalizadas.",
       sourceFallbackMessage: "As categorias do SDK não estavam disponíveis neste turno, então este painel usa o fallback via messageBreakdown. Esse fallback é mais grosseiro e pode omitir dados de sistema, cache ou outras categorias que não sejam de mensagens.",
-      autoCompactOn: "200K",
-      autoCompactOff: "1M",
-      autoCompactHintOn: "Contexto 200K. Aviso /compact aos 75% (150K). Toque para mudar para 1M.",
-      autoCompactHintOff: "Contexto 1M. Sem aviso nem compactação. Toque para mudar para 200K + aviso aos 75%.",
     },
     suggestion: {
       fileLabel: "ARQUIVO",

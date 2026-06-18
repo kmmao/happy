@@ -239,14 +239,6 @@ export const SessionPreferencesSchema = z.object({
   maxBudgetUsd: z.number().nullish(),
   taskBudgetTokens: z.number().nullish(),
   starred: z.boolean().nullish(),
-  // When true (default), the session runs without the BETA_1M context flag —
-  // Claude TUI stays at the 200K window and happy auto-pushes `/compact` at
-  // 75% usage (150K). When false, happy adds `--betas context-1m-2025-08-07`
-  // for a 1M context and skips the auto-compact threshold. Toggle change is
-  // lazy: the new value reaches the CLI via the standard SessionUpdates
-  // sync; the next user message picks it up and a mode_change cold restart
-  // takes effect. null/undefined treated as true.
-  autoCompact: z.boolean().nullish(),
 });
 
 export type SessionPreferences = z.infer<typeof SessionPreferencesSchema>;

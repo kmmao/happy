@@ -1,5 +1,5 @@
 import * as React from "react";
-import { View, Text, Pressable } from "react-native";
+import { View, Text } from "react-native";
 import { Typography } from "@/constants/Typography";
 import { Theme } from "@/theme";
 import { t } from "@/text";
@@ -77,25 +77,18 @@ export const ContextProgressBar: React.FC<{
     theme: Theme;
     sdkContextUsage?: ContextUsageData | null;
     extraSummary?: AnimatedTokensCostValue | null;
-    /**
-     * AUTO/1M toggle rendered to the right of the percentage label. When
-     * provided, the bar renders even when usage is below the 10% warning
-     * threshold so the chip stays reachable.
-     */
-    autoCompact?: {
-        enabled: boolean;
-        onToggle: (next: boolean) => void;
-    };
-}> = ({ contextSize, alwaysShow, modelCode, sdkContextWindow, theme, sdkContextUsage, extraSummary, autoCompact }) => {
+}> = ({ contextSize, alwaysShow, modelCode, sdkContextWindow, theme, sdkContextUsage, extraSummary }) => {
     const hasPreciseData = Boolean(sdkContextUsage && sdkContextUsage.maxTokens > 0);
     const usedTokens = hasPreciseData ? sdkContextUsage!.totalTokens : contextSize;
-    const resolvedContextWindow = (() => {
-        const reportedWindow = hasPreciseData
-            ? sdkContextUsage!.maxTokens
-            : sdkContextWindow;
-        const knownWindowSize = getContextWindowSize(modelCode, reportedWindow);
-        return usedTokens > knownWindowSize ? 1_000_000 : knownWindowSize;
-    })();
+    // Honest display: window size comes from SDK report or modelCode mapping;
+    // we no longer fall back to 1M when usage exceeds the window. A session
+    // that picked the default tier (200K) and went over shows >100% rather
+    // than silently being rebranded as 1M. The 1M tier is now an explicit
+    // modelMode choice (e.g. `opus-4-7-1m`).
+    const resolvedContextWindow = getContextWindowSize(
+        modelCode,
+        hasPreciseData ? sdkContextUsage!.maxTokens : sdkContextWindow,
+    );
     const breakdownItems = React.useMemo(
         () => getContextBreakdownItems(sdkContextUsage, t),
         [sdkContextUsage],
@@ -104,14 +97,11 @@ export const ContextProgressBar: React.FC<{
         () => getContextBreakdownSource(sdkContextUsage),
         [sdkContextUsage],
     );
-    const percentageUsed = Math.min(100, (usedTokens / resolvedContextWindow) * 100);
+    const percentageUsed = (usedTokens / resolvedContextWindow) * 100;
     const percentageRemaining = Math.max(0, 100 - percentageUsed);
-    // Show the bar whenever there's a toggle to render — the chip must stay
-    // reachable, not gated on the original "<=10% left" warning threshold.
     const shouldShowLabel = alwaysShow || percentageRemaining <= 10;
-    const shouldShow = shouldShowLabel || Boolean(autoCompact);
 
-    if (!shouldShow) {
+    if (!shouldShowLabel) {
         return null;
     }
 
@@ -147,77 +137,36 @@ export const ContextProgressBar: React.FC<{
                     gap: 8,
                 }}
             >
-                {shouldShowLabel ? (
-                    <Text
-                        style={{
-                            fontSize: 10,
-                            color: barColor,
-                            textAlign: "right",
-                            ...Typography.default(),
-                            flexShrink: 1,
-                        }}
-                        numberOfLines={1}
-                    >
-                        {label}
-                        {extraSummary?.tokensLabel ? (
-                    <Text style={{ color: theme.colors.textSecondary }}>
-                        {` · `}
-                        <Text style={{ color: theme.colors.textLink }}>
-                            {extraSummary.tokensLabel}
-                        </Text>
-                        {extraSummary.costLabel ? (
-                            <Text style={{ color: theme.colors.accentOrange }}>
-                                {` · ${extraSummary.costLabel}`}
+                <Text
+                    style={{
+                        fontSize: 10,
+                        color: barColor,
+                        textAlign: "right",
+                        ...Typography.default(),
+                        flexShrink: 1,
+                    }}
+                    numberOfLines={1}
+                >
+                    {label}
+                    {extraSummary?.tokensLabel ? (
+                        <Text style={{ color: theme.colors.textSecondary }}>
+                            {` · `}
+                            <Text style={{ color: theme.colors.textLink }}>
+                                {extraSummary.tokensLabel}
                             </Text>
-                        ) : null}
-                        {extraSummary.durationLabel ? (
-                            <Text style={{ color: theme.colors.success }}>
-                                {` · ${extraSummary.durationLabel}`}
-                            </Text>
-                        ) : null}
-                    </Text>
-                ) : null}
-                    </Text>
-                ) : null}
-                {autoCompact ? (
-                    <Pressable
-                        onPress={() => autoCompact.onToggle(!autoCompact.enabled)}
-                        hitSlop={6}
-                        accessibilityRole="button"
-                        accessibilityLabel={
-                            autoCompact.enabled
-                                ? t("agentInput.context.autoCompactHintOn")
-                                : t("agentInput.context.autoCompactHintOff")
-                        }
-                        style={({ pressed }) => ({
-                            paddingHorizontal: 6,
-                            paddingVertical: 1,
-                            borderRadius: 6,
-                            borderWidth: 1,
-                            borderColor: autoCompact.enabled
-                                ? theme.colors.success
-                                : theme.colors.textLink,
-                            backgroundColor: autoCompact.enabled
-                                ? "transparent"
-                                : theme.colors.textLink + "1A",
-                            opacity: pressed ? 0.55 : 1,
-                        })}
-                    >
-                        <Text
-                            style={{
-                                fontSize: 9,
-                                ...Typography.default("semiBold"),
-                                color: autoCompact.enabled
-                                    ? theme.colors.success
-                                    : theme.colors.textLink,
-                            }}
-                        >
-                            {autoCompact.enabled
-                                ? t("agentInput.context.autoCompactOn")
-                                : t("agentInput.context.autoCompactOff")}
+                            {extraSummary.costLabel ? (
+                                <Text style={{ color: theme.colors.accentOrange }}>
+                                    {` · ${extraSummary.costLabel}`}
+                                </Text>
+                            ) : null}
+                            {extraSummary.durationLabel ? (
+                                <Text style={{ color: theme.colors.success }}>
+                                    {` · ${extraSummary.durationLabel}`}
+                                </Text>
+                            ) : null}
                         </Text>
-                    </Pressable>
-                ) : null}
+                    ) : null}
+                </Text>
             </View>
             <ContextBreakdownPanel
                 items={breakdownItems}

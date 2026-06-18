@@ -734,27 +734,15 @@ export async function runClaude(
   let currentThinking: EnhancedMode["thinking"] = undefined; // Track current thinking config
   let currentEffort: EnhancedMode["effort"] = DEFAULT_CLAUDE_EFFORT; // Track current effort level
   let currentLocale: string | undefined = undefined; // Track current locale
-  // Tracks the session's auto-compact preference. Default true (200K window +
-  // happy auto-`/compact` at 150K). Flipped by `message.meta.autoCompact`
-  // when the App pushes a SessionPreferences update via the next user message.
-  // Reaches `resolveModelKey` (strips `-1m` suffix when true) and contributes
-  // to `coldModeHash` so toggling triggers a mode_change cold restart.
-  let currentAutoCompact: boolean = true;
 
   // Reset live mode tracking back to configured defaults. Wired to
   // Session.onAbort so a remote abort or local→remote switch starts the next
   // turn from a clean slate instead of inheriting one-message overrides.
   //
-  // `currentAutoCompact` is INTENTIONALLY preserved across abort: it is the
-  // session's context-tier preference (200K + happy-side `/compact` at 150K
-  // vs the 1M premium window), set by the App via `meta.autoCompact`. The
-  // strand watchdog's tier-2 cold-restart funnels through this same path,
-  // and silently flipping a user-on-1M session back to 200K there would
-  // (a) re-arm the threshold checker that just looped on a wedged
-  //     `/compact`, defeating the cooldown fix below, and
-  // (b) silently downgrade the user's chosen context tier mid-conversation.
-  // The next user message's `meta.autoCompact` (if present) will still
-  // overwrite this value through the normal user-message handler.
+  // The 200K vs 1M window choice is encoded in the model key itself via the
+  // modelMode picker (e.g. `opus-4-7` vs `opus-4-7-1m`) — there is no
+  // separate session preference to preserve here. See the `autoCompact`
+  // protocol removal notes for context.
   const resetCurrentModeDefaults = () => {
     currentPermissionMode = initialPermissionMode;
     currentModel = options.model ?? DEFAULT_CLAUDE_MODEL;
@@ -773,11 +761,11 @@ export async function runClaude(
   // isolate could race with an in-flight user input — the dispatched
   // `/compact` landed mid-typing, merged with whatever the user was
   // composing, and ate the pending message. Hint-only path avoids that
-  // collision entirely; the per-turn gate and enabled-flag check still
-  // live in ApiSessionClient so the hint also respects the user toggle.
-  session.onAutoCompactRequest((contextSize) => {
+  // collision entirely. Skipped automatically for 1M models (the per-turn
+  // gate and the model check both live in ApiSessionClient).
+  session.onCompactHintRequest((contextSize) => {
     logger.debug(
-      `[autoCompact] hint emitted at contextSize=${contextSize} (no auto-push)`,
+      `[compactHint] emitted at contextSize=${contextSize}`,
     );
     session.sendSessionEvent({
       type: "message",
@@ -952,19 +940,10 @@ export async function runClaude(
       logger.debug(`[loop] effort updated: ${messageEffort ?? "none"}`);
     }
 
-    // Resolve autoCompact (true = 200K + happy auto-compact at 150K;
-    // false = 1M context). null/undefined preserves the current value;
-    // an old App that doesn't send the field leaves CLI defaults intact.
-    let messageAutoCompact = currentAutoCompact;
-    if (message.meta?.hasOwnProperty("autoCompact")) {
-      const raw = (message.meta as { autoCompact?: boolean | null }).autoCompact;
-      messageAutoCompact = raw === false ? false : true;
-      currentAutoCompact = messageAutoCompact;
-      // Propagate to ApiSessionClient so the threshold check uses the new value
-      // starting with the next assistant message in this turn. Idempotent.
-      session.setAutoCompactEnabled(messageAutoCompact);
-      logger.debug(`[loop] autoCompact updated: ${messageAutoCompact}`);
-    }
+    // Note: `meta.autoCompact` was removed in the protocol cleanup that
+    // collapsed the AUTO/1M toggle. Old App clients (≤2.42.x) may still
+    // send the field; it is silently ignored — the modelMode key (e.g.
+    // `-1m` suffix) is now the single source of truth for window size.
 
     // Resolve locale
     let messageLocale = currentLocale;
@@ -1023,7 +1002,6 @@ export async function runClaude(
         thinking: messageThinking,
         effort: messageEffort,
         locale: messageLocale,
-        autoCompact: messageAutoCompact,
       };
       messageQueue.pushIsolateAndClear(
         specialCommand.originalMessage || message.content.text,
@@ -1052,7 +1030,6 @@ export async function runClaude(
         thinking: messageThinking,
         effort: messageEffort,
         locale: messageLocale,
-        autoCompact: messageAutoCompact,
       };
       messageQueue.pushIsolateAndClear(
         specialCommand.originalMessage || message.content.text,
@@ -1090,7 +1067,6 @@ export async function runClaude(
       thinking: messageThinking,
       effort: messageEffort,
       locale: messageLocale,
-      autoCompact: messageAutoCompact,
       ...(messageContinue && { continue: true }),
       ...(messageShouldQuery === false && { shouldQuery: false }),
       ...(claudePlugins.length > 0 && { plugins: claudePlugins }),

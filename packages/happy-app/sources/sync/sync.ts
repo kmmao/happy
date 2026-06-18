@@ -893,7 +893,6 @@ class Sync {
       effort,
       maxBudgetUsd,
       taskBudget,
-      autoCompact,
     } = resolveMessageModeMeta(session, storage.getState().settings);
 
     // Generate local ID (or use provided one)
@@ -939,7 +938,6 @@ class Sync {
         effort,
         ...(maxBudgetUsd != null && { maxBudgetUsd }),
         ...(taskBudget && { taskBudget }),
-        autoCompact,
         ...(options?.continue && { continue: true }),
       },
     };
@@ -1523,7 +1521,6 @@ class Sync {
           maxBudgetUsd: session.maxBudgetUsd,
           taskBudgetTokens: session.taskBudgetTokens,
           starred: session.starred,
-          autoCompact: session.autoCompact,
         };
 
         const encrypted =

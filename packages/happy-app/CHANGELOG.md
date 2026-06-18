@@ -1,5 +1,15 @@
 # Changelog
 
+## 2.43.0 - 2026-06-19
+
+Removed the AUTO/200K/1M context toggle from the input area. The modelMode picker is now the single source of truth for the window tier: pick a `-1m` variant (e.g. `opus-4-7-1m`, `sonnet-1m`) for the 1M premium window, pick the default variant for 200K + a hint at 75% usage. Companion CLI release: `@kmmao/happy-coder@0.101.0`, wire `@kmmao/happy-wire@0.33.0`.
+
+### Context window control
+- Removed the AUTO/200K/1M chip from both the collapsed FAB summary and the expanded input bar. Tooltip i18n keys (`autoCompactOn/Off/HintOn/HintOff`) and the `session.autoCompact` storage field were also removed.
+- Removed the `meta.autoCompact` wire field and the `isAutoCompactEnabled` / `autoCompactThreshold` envelopes on the context-usage event. The CLI now decides whether to emit the 75% hint based on the model key alone (1M models skip the hint — 150K is only 15% of 1M).
+- Fixed the silent display fallback that rebranded a session as 1M whenever usage exceeded the 200K window. The progress bar and FAB summary now honestly show the real tier; a session that picked the 200K default and went over reads `222.0K/200.0K` instead of `222.0K/1.0M`.
+- **Behaviour change:** users who previously picked a `-1m` modelMode variant but kept AUTO on were silently downgraded back to 200K. With AUTO removed, the `-1m` choice now actually takes effect — billing reflects 1M premium pricing. Pick the non-`-1m` variant to stay at 200K.
+
 ## 2.42.1 - 2026-06-19
 
 Renamed the context-window toggle from "AUTO" to "200K" and rewrote its tooltips in all 10 languages. The button never actually auto-compacted — since CLI 0.100.7 it only emits a hint at 75% and lets you run `/compact` yourself — so the old label and OFF-state copy were misleading.

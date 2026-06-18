@@ -290,16 +290,6 @@ interface StorageState {
   markSessionViewed: (sessionId: string) => void;
   updateSessionPermissionMode: (sessionId: string, mode: string) => void;
   updateSessionStarred: (sessionId: string, starred: boolean) => void;
-  /**
-   * Flip the per-session 200K compress mode (the "AUTO" toggle next to the
-   * context-usage chip). `true` keeps the session in 200K + happy
-   * auto-`/compact` at 150K; `false` enables 1M premium context and lets
-   * Claude TUI handle its own ~80% compact. The change is lazy on the CLI —
-   * effective starting with the next user message via SessionPreferences
-   * → message meta → EnhancedMode.autoCompact → coldModeHash divergence
-   * (forces mode_change cold restart, guarded by Part 1 grace window).
-   */
-  updateSessionAutoCompact: (sessionId: string, autoCompact: boolean) => void;
   updateSessionModelMode: (sessionId: string, mode: string) => void;
   /**
    * Clear per-session permission/model/effort overrides so they fall back
@@ -1882,27 +1872,6 @@ const storageStore = create<StorageState>()((set, get) => {
         };
       });
       // Sync starred state to server so other devices see the change in real time
-      stagePendingSessionPreferences(sessionId);
-      onPreferencesChanged?.(sessionId);
-    },
-    updateSessionAutoCompact: (sessionId: string, autoCompact: boolean) => {
-      set((state) => {
-        const session = state.sessions[sessionId];
-        if (!session) return state;
-        return {
-          ...state,
-          sessions: {
-            ...state.sessions,
-            [sessionId]: {
-              ...session,
-              autoCompact,
-            },
-          },
-        };
-      });
-      // Stage + sync to server so it reaches the CLI on the next user message.
-      // No MMKV cache: autoCompact lives only in server preferences + memory —
-      // a cold start without server sync starts at the default (true).
       stagePendingSessionPreferences(sessionId);
       onPreferencesChanged?.(sessionId);
     },

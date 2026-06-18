@@ -1430,10 +1430,6 @@ export const es: TranslationStructure = {
       sourceInfoTitle: "Origen del desglose",
       sourceSdkCategoriesMessage: "Este desglose proviene directamente de las categorías proporcionadas por el SDK. Es la fuente preferida y puede incluir grupos más granulares, como el prompt del sistema o categorías personalizadas.",
       sourceFallbackMessage: "Las categorías del SDK no estuvieron disponibles en este turno, así que este panel recurre al fallback de messageBreakdown. Ese fallback es más grueso y puede omitir datos del sistema, caché u otras categorías que no sean mensajes.",
-      autoCompactOn: "200K",
-      autoCompactOff: "1M",
-      autoCompactHintOn: "Contexto 200K. Aviso /compact al 75% (150K). Toca para cambiar a 1M.",
-      autoCompactHintOff: "Contexto 1M. Sin aviso ni compactación. Toca para cambiar a 200K + aviso al 75%.",
     },
     suggestion: {
       fileLabel: "ARCHIVO",

@@ -1,5 +1,15 @@
 # 更新日志
 
+## 2.43.0 - 2026-06-19
+
+移除了输入区的 AUTO/200K/1M 上下文开关。modelMode picker 现在是窗口大小的唯一真相：选 `-1m` 变体（如 `opus-4-7-1m`、`sonnet-1m`）走 1M premium，选默认变体走 200K + 75% 提示。配套 CLI 发布：`@kmmao/happy-coder@0.101.0`，wire `@kmmao/happy-wire@0.33.0`。
+
+### 上下文窗口控制
+- 移除收起 FAB 摘要和展开输入栏中的 AUTO/200K/1M chip。Tooltip i18n key（`autoCompactOn/Off/HintOn/HintOff`）和 `session.autoCompact` 存储字段也一并删除。
+- 移除 wire 协议里的 `meta.autoCompact` 字段和 context-usage 事件上的 `isAutoCompactEnabled` / `autoCompactThreshold`。CLI 现在仅凭 model key 决定是否发 75% 提示（1M 模型跳过提示——150K 在 1M 里只占 15%）。
+- 修复用量超过 200K 时进度条悄悄把会话改标成 1M 的兜底逻辑。进度条和 FAB 摘要现在如实显示真实窗口；选默认 200K 模型后超了会显示 `222.0K/200.0K`，而不是骗你的 `222.0K/1.0M`。
+- **行为变化：** 之前选了 `-1m` modelMode 变体但保留 AUTO 开启的用户，会被静默降级回 200K。AUTO 删除后，`-1m` 选择会真正生效——计费按 1M premium 走。如果想停在 200K，请选非 `-1m` 变体。
+
 ## 2.42.1 - 2026-06-19
 
 把上下文窗口切换按钮的标签从 "AUTO" 改成 "200K"，并重写了所有 10 种语言的 tooltip 文案。这个按钮其实从来都没"自动压缩"过 —— CLI 0.100.7 起它只在 75% 用量时发提示，由用户自己运行 `/compact` —— 旧的标签和 OFF 状态文案存在误导。

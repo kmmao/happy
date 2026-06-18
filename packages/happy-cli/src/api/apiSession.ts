@@ -288,32 +288,25 @@ export class ApiSessionClient extends EventEmitter {
   private replayedClaudeMessageKeys: Set<string> = new Set();
   private modelModeKey: string | undefined;
   /**
-   * Whether the App's "AUTO" toggle is on for this session. Default true:
-   * happy stays in the 200K context window and pushes `/compact` when
-   * usage crosses `AUTO_COMPACT_THRESHOLD` (one shot per turn). Set false
-   * by `runClaude.ts` when the user toggles to the 1M premium mode — the
-   * threshold check then no-ops and the TUI's own ~80% auto-compact takes
-   * over. Toggled via `setAutoCompactEnabled` whenever `message.meta.autoCompact`
-   * lands on a new user message.
-   */
-  private autoCompactEnabled: boolean = true;
-  /**
    * Per-turn latch — prevents emitting multiple `/compact` hints when a
    * long turn accumulates several assistant messages past the threshold
    * before the user reacts. Cleared on `startNewTurn` (the canonical turn
    * boundary, same place `accumulatedTurnUsage` resets), so a still-above-
    * threshold next turn will re-hint exactly once.
    */
-  private autoCompactTriggeredInThisTurn: boolean = false;
+  private compactHintEmittedInThisTurn: boolean = false;
   /**
    * 75% of the 200K window. The threshold detector fires a hint at this
    * usage so the user can run `/compact` before Claude TUI's own ~80%
-   * auto-compact takes over. Pre-0.100.7 we ALSO auto-pushed `/compact`
-   * here (with a cooldown latch to guard a TUI compact-no-op infinite
-   * loop); auto-push is gone — the user runs the slash command themselves
-   * — so the cooldown machinery was removed with it.
+   * auto-compact takes over.
+   *
+   * Skipped entirely for 1M models (modelModeKey ends with "-1m"): 150K
+   * inside a 1M window is only 15%, so a "near limit" hint would be a
+   * lie. The window-size choice is the model's own (via modelMode picker);
+   * there is no separate "AUTO/1M" preference — see ADR notes in PR for
+   * the removal of the `autoCompact` protocol.
    */
-  private static readonly AUTO_COMPACT_THRESHOLD = 150_000;
+  private static readonly COMPACT_HINT_THRESHOLD = 150_000;
   private subagentFlushTimer: ReturnType<typeof setTimeout> | null = null;
   /**
    * Which full assistant envelopes to suppress on the next assistant message
@@ -567,29 +560,16 @@ export class ApiSessionClient extends EventEmitter {
   }
 
   /**
-   * Sync the session's "compress at 75%" preference. Called from runClaude
-   * whenever a user message carries `meta.autoCompact`. Idempotent — silent
-   * no-op if the flag is unchanged so we don't log on every turn.
-   */
-  setAutoCompactEnabled(enabled: boolean): void {
-    if (this.autoCompactEnabled === enabled) return;
-    this.autoCompactEnabled = enabled;
-    logger.debug(`[autoCompact] enabled=${enabled}`);
-  }
-
-  /**
-   * Subscribe to "context size crossed the auto-compact threshold" events.
+   * Subscribe to "context size crossed the compact-hint threshold" events.
    * Fired at most once per turn (the latch resets at the same place
    * `accumulatedTurnUsage` does). The handler is expected to surface a
-   * hint to the user — pre-0.100.7 it auto-pushed `/compact` into the
-   * launcher queue and was paired with `armAutoCompactCooldown` /
-   * `clearAutoCompactCooldown` to guard against a TUI compact-no-op loop;
-   * with auto-push gone the cooldown was removed too.
+   * hint to the user. Skipped automatically for 1M models (modelModeKey
+   * ends with "-1m").
    */
-  onAutoCompactRequest(callback: (contextSize: number) => void): void {
-    this.autoCompactHandler = callback;
+  onCompactHintRequest(callback: (contextSize: number) => void): void {
+    this.compactHintHandler = callback;
   }
-  private autoCompactHandler: ((contextSize: number) => void) | null = null;
+  private compactHintHandler: ((contextSize: number) => void) | null = null;
 
   onUserMessage(callback: (data: UserMessage) => void) {
     this.pendingMessageCallback = callback;
@@ -839,7 +819,7 @@ export class ApiSessionClient extends EventEmitter {
     this.currentTurnModel = null;
     this.currentTurnUsage = null;
     this.accumulatedTurnUsage = null;
-    this.autoCompactTriggeredInThisTurn = false;
+    this.compactHintEmittedInThisTurn = false;
   }
 
   sendClaudeSessionMessage(
@@ -976,32 +956,34 @@ export class ApiSessionClient extends EventEmitter {
         // Accumulate usage across all API calls within this turn
         this.accumulateTurnUsage(body.message.usage);
 
-        // Auto-compact threshold. Skip during replay (we are reconstructing
-        // history, not living through it — emitting a hint here would
-        // double-fire on every session restart). Per-turn latch keeps the
-        // hint at most once across a long turn with multiple API calls
-        // past the threshold; `resetCurrentTurnTracking` re-arms it on the
-        // next turn so a still-above-threshold session re-hints once more.
+        // Compact-hint threshold. Skip during replay (reconstructing history)
+        // and for 1M models (150K is only 15% of 1M — hint would be a lie).
+        // Per-turn latch keeps the hint at most once across a long turn with
+        // multiple API calls past the threshold; `resetCurrentTurnTracking`
+        // re-arms it on the next turn so a still-above-threshold session
+        // re-hints once more.
+        const isOneMillionContextModel =
+          this.modelModeKey?.endsWith("-1m") ?? false;
         if (
           !options.replay &&
-          this.autoCompactEnabled &&
-          !this.autoCompactTriggeredInThisTurn &&
-          this.autoCompactHandler
+          !isOneMillionContextModel &&
+          !this.compactHintEmittedInThisTurn &&
+          this.compactHintHandler
         ) {
           const contextSize =
             body.message.usage.input_tokens +
             (body.message.usage.cache_read_input_tokens ?? 0) +
             (body.message.usage.cache_creation_input_tokens ?? 0);
-          if (contextSize >= ApiSessionClient.AUTO_COMPACT_THRESHOLD) {
-            this.autoCompactTriggeredInThisTurn = true;
+          if (contextSize >= ApiSessionClient.COMPACT_HINT_THRESHOLD) {
+            this.compactHintEmittedInThisTurn = true;
             logger.debug(
-              `[autoCompact] threshold reached at ${contextSize} tokens — emitting hint`,
+              `[compactHint] threshold reached at ${contextSize} tokens — emitting hint`,
             );
             try {
-              this.autoCompactHandler(contextSize);
+              this.compactHintHandler(contextSize);
             } catch (handlerError) {
               logger.debug(
-                `[autoCompact] handler threw: ${handlerError instanceof Error ? handlerError.message : String(handlerError)}`,
+                `[compactHint] handler threw: ${handlerError instanceof Error ? handlerError.message : String(handlerError)}`,
               );
             }
           }
@@ -1099,7 +1081,7 @@ export class ApiSessionClient extends EventEmitter {
     this.currentTurnModel = null;
     this.currentTurnUsage = null;
     this.accumulatedTurnUsage = null;
-    this.autoCompactTriggeredInThisTurn = false;
+    this.compactHintEmittedInThisTurn = false;
 
     mapped.envelopes.forEach((envelope, envelopeIndex) => {
       this.sendSessionProtocolMessage(envelope, {

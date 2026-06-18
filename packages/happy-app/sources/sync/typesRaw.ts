@@ -93,8 +93,6 @@ const agentEventSchema = z.discriminatedUnion("type", [
       tokens: z.number(),
       color: z.string().optional(),
     })).optional(),
-    isAutoCompactEnabled: z.boolean().optional(),
-    autoCompactThreshold: z.number().optional(),
     messageBreakdown: z.object({
       toolCallTokens: z.number(),
       toolResultTokens: z.number(),
@@ -293,8 +291,6 @@ const sessionContextUsageEventSchema = z.object({
     tokens: z.number(),
     color: z.string().optional(),
   })).optional(),
-  isAutoCompactEnabled: z.boolean().optional(),
-  autoCompactThreshold: z.number().optional(),
   messageBreakdown: z.object({
     toolCallTokens: z.number(),
     toolResultTokens: z.number(),
@@ -1160,8 +1156,6 @@ function normalizeSessionEnvelopeCore(
         percentage: envelope.ev.percentage,
         ...(envelope.ev.model !== undefined ? { model: envelope.ev.model } : {}),
         ...(envelope.ev.categories !== undefined ? { categories: envelope.ev.categories } : {}),
-        ...(envelope.ev.isAutoCompactEnabled !== undefined ? { isAutoCompactEnabled: envelope.ev.isAutoCompactEnabled } : {}),
-        ...(envelope.ev.autoCompactThreshold !== undefined ? { autoCompactThreshold: envelope.ev.autoCompactThreshold } : {}),
         ...(envelope.ev.messageBreakdown !== undefined ? { messageBreakdown: envelope.ev.messageBreakdown } : {}),
       },
       meta,

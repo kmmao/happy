@@ -2359,16 +2359,13 @@ export async function claudeRemoteLauncher(
           // `disallowedTools` set, which Claude TUI binds at boot only —
           // hot-swap can't propagate it, so this MUST force a cold restart.
           planLockdown: planModeLockdownActive,
-          // The 200K ↔ 1M tier is driven by BOTH `m.model` (must be a
-          // 1M-capable key) AND `m.autoCompact` (the user-facing toggle
-          // strips the `[1m]` suffix when true). Hashing both ensures a
-          // toggle flip diverges the hash even when model id is unchanged,
-          // forcing a mode_change cold restart so the next PTY spawn picks
-          // up the new `--model` string (see resolveCliModelForMode).
-          // `undefined` is treated as `true` (default 200K) so old App
-          // builds that never send the field don't accidentally diverge.
-          isExtendedContext:
-            is1MModelKey(m.model) && m.autoCompact === false,
+          // The 200K ↔ 1M tier is driven by `m.model` alone — picking a
+          // 1M-capable modelMode key (e.g. `opus-4-7-1m`) IS the choice.
+          // Pre-removal of the `autoCompact` protocol this also AND-gated
+          // on a per-session toggle that defaulted to AUTO and would strip
+          // the `[1m]` suffix; the toggle is gone (see ADR) and the model
+          // key is the single source of truth.
+          isExtendedContext: is1MModelKey(m.model),
           fallbackModel: m.fallbackModel,
           customSystemPrompt: m.customSystemPrompt,
           appendSystemPrompt: m.appendSystemPrompt,
@@ -3113,8 +3110,6 @@ export async function claudeRemoteLauncher(
                 tokens: c.tokens,
                 ...(c.color ? { color: c.color } : {}),
               })),
-              isAutoCompactEnabled: ctx.isAutoCompactEnabled,
-              autoCompactThreshold: ctx.autoCompactThreshold,
               messageBreakdown: ctx.messageBreakdown,
             });
             session.client.sendSessionProtocolMessage(envelope as any);
