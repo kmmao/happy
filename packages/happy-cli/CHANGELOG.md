@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.101.1 - 2026-06-19
+
+Fixes the `/compact` failure mode that surfaced as **"Compaction started → No response for 96s — attempting recovery → Session recovered — resending your message…"** with no compaction ever happening. Two independent bugs combined to produce that trace; both are now closed, and the compacted-context summary is now surfaced as a session event so the user can see what survived.
+
+- **`claudeRemote.handleResult`** — follow-up `/compact` prompts (the ones the strand-recovery path puts back on the queue after a tier-1 wedge) now dispatch `{ t: "promptIsCompact" }` to the turn reducer the same way the initial-message path does. Pre-fix the redelivered `/compact` was treated as a plain prompt: the reducer stayed in initial state (`isCompactCommand: false`), `compact_boundary` was silently ignored, and neither "Compaction completed" nor "Compaction skipped" surfaced to the App — just "Compaction started" followed by silence. Pinned by a new reducer test (`redelivered /compact arms the reducer just like the initial one`).
+- **`maybeRedeliverStrandedPrompt`** — when the in-flight prompt is a slash command (`isSlashCommand(message)`), the strand recovery now forces a tier-2 cold restart instead of the default tier-1 Esc + paste redeliver. Tier-1 Esc does not reliably clear the TUI composer in every state (vim NORMAL, mid-turn drain race, Ink raw-mode reattach), so pasting `/compact` onto a composer that still holds `/compact` yields `/compact/compact` — which the TUI silently treats as prose, the command never runs, and `compact_boundary` never fires. Cold restart guarantees an empty composer for the redeliver. User-visible event copy now reads "Session recovered — restarting to safely resend slash command…".
+- **`compact_boundary` handler** — after the boundary fires, polls the session JSONL for the new `type: "summary"` record (250ms tick, 8s budget) and emits it as a `session.sendSessionEvent({ type: "message", message: "Compaction summary:\\n<text>" })`. A `lastEmittedCompactionSummary` snapshot prevents re-emitting the same summary across reconnects. Users now see the actual compacted-context text, not just a "Context compacted" marker.
+
+## 0.101.0 - 2026-06-19
+
+The `autoCompact` protocol — a per-session AUTO/200K/1M toggle bound to two separate side effects (window-tier choice + 75%-threshold hint) — has been removed. The modelMode key (a `-1m` suffix on the App-level key, e.g. `opus-4-7-1m`) is now the single source of truth for both. Pre-fix the picker disagreed with itself: picking `opus-4-7-1m` while autoCompact stayed on AUTO silently downgraded the session back to 200K with no way to tell which tier was actually in effect.
+
+- **`apiSession.ts`** — removed `autoCompactEnabled` flag, `setAutoCompactEnabled`, and the `AUTO_COMPACT_THRESHOLD` static. Renamed `onAutoCompactRequest` → `onCompactHintRequest`. Compact-hint emission now gates on `modelModeKey?.endsWith('-1m')` (1M models skip the hint entirely — there's nothing to hint about).
+- **`runClaude.ts`** — removed `currentAutoCompact`, `meta.autoCompact` parsing, and the three `autoCompact` transit fields on `EnhancedMode` (`compact`, `clear`, `normal`). Old App clients still sending `meta.autoCompact` are silently ignored — no error, no warning, just dead bytes.
+- **`claudeRemote.ts`** — `resolveCliModelForMode` simplified: strips the internal `[1m]` marker for any non-`-1m` modelMode pick, keeps it for explicit `-1m` picks. `coldModeHash.isExtendedContext` simplified to `is1MModelKey(m.model)` alone — no separate toggle to hash, so a modelMode swap is the only thing that can force a tier change cold restart.
+- **Wire 0.33.0 (breaking)** companion — `sessionContextUsageEventSchema.isAutoCompactEnabled` / `autoCompactThreshold` removed; the agent (0.8.0) and app (2.43.0) sync are released alongside.
+
 ## 0.100.8 - 2026-06-18
 
 Follow-up dead-code sweep after the 0.100.6/0.100.7 auto-compact cleanup. Scanned every package for `@deprecated`, `legacy`, `TODO: remove`, and similar markers; most were intentional public-API back-compat (e.g. server's `/v1/sessions/:id/restore` alias, wire's legacy message schemas, `CODEX_MCP_LEGACY_BACKEND` fallback) and were left alone. One CLI symbol was actually orphaned:
