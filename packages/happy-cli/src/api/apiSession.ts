@@ -1241,6 +1241,43 @@ export class ApiSessionClient extends EventEmitter {
         }
       | {
           type: "ready";
+        }
+      | {
+          // Structured `compact_boundary` event emitted alongside the legacy
+          // `{type:"message", message:"Context compacted"}` text bubble. New
+          // Apps render this with token deltas + duration + collapsible
+          // summary; older Apps reject it at the agentEventSchema strict
+          // discriminator and drop the envelope — they still see the legacy
+          // text bubble. The `summary` field is populated asynchronously
+          // after the JSONL `isCompactSummary:true` user record materializes
+          // — emitted as a SECOND event carrying the same `boundaryUuid` so
+          // the App reducer can merge it onto the first bubble in place
+          // instead of inserting a duplicate.
+          type: "compact-boundary";
+          // Stable dedup key shared by BOTH emits for the same /compact
+          // run. Mirrors the JSONL `compact_boundary.uuid`. The envelope's
+          // own `content.id` is not propagated to the App's NormalizedMessage,
+          // so we surface the uuid inside the event payload itself.
+          boundaryUuid: string;
+          // Source of truth: `compactMetadata.preTokens` from the Claude TUI
+          // `compact_boundary` system record (pre-compaction context size in
+          // tokens).
+          preTokens: number;
+          // Post-compaction context size in tokens (compactMetadata.postTokens).
+          postTokens: number;
+          // Wall-clock duration of the /compact call in milliseconds
+          // (compactMetadata.durationMs).
+          durationMs: number;
+          // Whether the user invoked /compact ("manual") or the TUI hit its
+          // own auto-compact threshold ("auto"). Mirrored from
+          // compactMetadata.trigger.
+          trigger: "manual" | "auto";
+          // The full summary text injected by the TUI as the post-compact
+          // context. Lives in the next-record `{type:"user",
+          // isCompactSummary:true}` message — typically ~5-15KB of structured
+          // prose. Optional because the second emit (with summary populated)
+          // can be skipped if the user navigated away before the JSONL flush.
+          summary?: string;
         },
     id?: string,
   ) {

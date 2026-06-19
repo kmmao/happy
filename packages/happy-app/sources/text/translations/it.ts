@@ -3024,6 +3024,14 @@ export const it: TranslationStructure = {
     taskCompleted: "Attività completata",
     taskFailed: "Attività non riuscita",
     taskStopped: "Attività interrotta",
+    compactBoundary: {
+      manualHeader: "Contesto compattato",
+      autoHeader: "Contesto compattato automaticamente",
+      tokensDelta: ({ pre, post }: { pre: string; post: string }) =>
+        `${pre} → ${post} token`,
+      showSummary: "Mostra riepilogo",
+      hideSummary: "Nascondi riepilogo",
+    },
   },
 
   codex: {

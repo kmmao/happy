@@ -808,6 +808,84 @@ function formatCost(costUsd: number): string {
   return `$${costUsd.toFixed(2)}`;
 }
 
+/**
+ * Compact token counts for the `/compact` summary bubble. Mirrors the
+ * UsagePanel formatter (K / M cutoff) without taking on its full settings
+ * dependency — the boundary bubble only ever shows two numbers.
+ */
+function formatTokensShort(tokens: number): string {
+  if (tokens >= 1_000_000) return `${(tokens / 1_000_000).toFixed(2)}M`;
+  if (tokens >= 1_000) return `${(tokens / 1_000).toFixed(1)}K`;
+  return tokens.toLocaleString();
+}
+
+/**
+ * Bubble for the structured `compact_boundary` event (CLI 0.101.4+).
+ * Header line always shows tokens delta + duration; when the CLI's second
+ * emit lands with `summary` populated, an expandable section reveals the
+ * full prose Claude paste-injected as the new conversation seed.
+ */
+const CompactBoundaryEvent = React.memo(function CompactBoundaryEvent(props: {
+  preTokens: number;
+  postTokens: number;
+  durationMs: number;
+  trigger: "manual" | "auto";
+  summary?: string;
+}) {
+  const { theme } = useUnistyles();
+  const [expanded, setExpanded] = React.useState(false);
+  const tokenDelta = t("message.compactBoundary.tokensDelta", {
+    pre: formatTokensShort(props.preTokens),
+    post: formatTokensShort(props.postTokens),
+  });
+  // Duration only contributes when the TUI reported one (compactMetadata
+  // omits durationMs on auto-compact paths in some Claude Code versions).
+  const durationStr =
+    props.durationMs > 0 ? formatDuration(props.durationMs) : null;
+  const header =
+    props.trigger === "auto"
+      ? t("message.compactBoundary.autoHeader")
+      : t("message.compactBoundary.manualHeader");
+  return (
+    <View style={styles.compactBoundaryContainer}>
+      <Text style={styles.compactBoundarySubtitle} numberOfLines={2}>
+        {header}
+        {" · "}
+        {tokenDelta}
+        {durationStr !== null && " · "}
+        {durationStr !== null && durationStr}
+      </Text>
+      {props.summary !== undefined && props.summary.length > 0 && (
+        <View style={styles.compactBoundarySummaryWrap}>
+          <Pressable
+            style={({ pressed }) => [
+              styles.compactBoundaryToggle,
+              pressed && { opacity: 0.6 },
+            ]}
+            onPress={() => setExpanded((v) => !v)}
+          >
+            <Ionicons
+              name={expanded ? "chevron-down" : "chevron-forward"}
+              size={14}
+              color={theme.colors.textSecondary}
+            />
+            <Text style={styles.compactBoundaryToggleLabel}>
+              {expanded
+                ? t("message.compactBoundary.hideSummary")
+                : t("message.compactBoundary.showSummary")}
+            </Text>
+          </Pressable>
+          {expanded && (
+            <View style={styles.compactBoundarySummaryContent}>
+              <MarkdownView markdown={props.summary} />
+            </View>
+          )}
+        </View>
+      )}
+    </View>
+  );
+});
+
 function AgentEventBlock(props: {
   event: AgentEvent;
   metadata: Metadata | null;
@@ -834,6 +912,17 @@ function AgentEventBlock(props: {
       <View style={styles.agentEventContainer}>
         <Text style={styles.agentEventText}>{props.event.message}</Text>
       </View>
+    );
+  }
+  if (props.event.type === "compact-boundary") {
+    return (
+      <CompactBoundaryEvent
+        preTokens={props.event.preTokens}
+        postTokens={props.event.postTokens}
+        durationMs={props.event.durationMs}
+        trigger={props.event.trigger}
+        summary={props.event.summary}
+      />
     );
   }
   if (props.event.type === "limit-reached") {
@@ -1267,6 +1356,39 @@ const styles = StyleSheet.create((theme) => ({
     color: theme.colors.agentEventText,
     fontSize: 14,
     textAlign: "center",
+  },
+  compactBoundaryContainer: {
+    marginHorizontal: 8,
+    paddingVertical: 8,
+    alignItems: "center",
+  },
+  compactBoundarySubtitle: {
+    color: theme.colors.agentEventText,
+    fontSize: 13,
+    textAlign: "center",
+    paddingHorizontal: 8,
+  },
+  compactBoundarySummaryWrap: {
+    marginTop: 6,
+    alignSelf: "stretch",
+  },
+  compactBoundaryToggle: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingVertical: 6,
+    paddingHorizontal: 8,
+    alignSelf: "center",
+    opacity: 0.7,
+  },
+  compactBoundaryToggleLabel: {
+    color: theme.colors.textSecondary,
+    fontSize: 12,
+  },
+  compactBoundarySummaryContent: {
+    paddingHorizontal: 8,
+    paddingVertical: 8,
+    opacity: 0.85,
   },
   limitReachedContainer: {
     marginHorizontal: 16,

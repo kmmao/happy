@@ -2889,6 +2889,14 @@ export const ca: TranslationStructure = {
     taskCompleted: "Tasca completada",
     taskFailed: "Tasca fallida",
     taskStopped: "Tasca aturada",
+    compactBoundary: {
+      manualHeader: "Context compactat",
+      autoHeader: "Context compactat automàticament",
+      tokensDelta: ({ pre, post }: { pre: string; post: string }) =>
+        `${pre} → ${post} tokens`,
+      showSummary: "Mostra el resum",
+      hideSummary: "Amaga el resum",
+    },
   },
 
   codex: {

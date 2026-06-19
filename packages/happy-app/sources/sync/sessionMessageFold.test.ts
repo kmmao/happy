@@ -36,6 +36,9 @@ function makeReducerState(
         backgroundTaskIdToMessageId: new Map(),
         backgroundTasks: new Map(),
         recentEventMessageTimes: new Map(),
+        recentCompactBoundaryAt: null,
+        recentContextCompactedTextMid: null,
+        compactBoundaryContentIdToMid: new Map(),
         ...overrides,
     };
 }

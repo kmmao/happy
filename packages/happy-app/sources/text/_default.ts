@@ -2920,6 +2920,14 @@ export const en = {
     taskCompleted: "Task completed",
     taskFailed: "Task failed",
     taskStopped: "Task stopped",
+    compactBoundary: {
+      manualHeader: "Context compacted",
+      autoHeader: "Context auto-compacted",
+      tokensDelta: ({ pre, post }: { pre: string; post: string }) =>
+        `${pre} → ${post} tokens`,
+      showSummary: "Show summary",
+      hideSummary: "Hide summary",
+    },
   },
 
   codex: {

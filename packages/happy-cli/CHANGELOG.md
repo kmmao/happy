@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.101.4 - 2026-06-19
+
+Fixes the silent failure mode where `/compact` finished cleanly but no summary text ever surfaced in the App — `[remote]: no new compaction summary observed after compact_boundary` in the CLI log for every `/compact`, every time. The detection logic was reading the wrong JSONL record type. While in there, also emit a structured `compact_boundary` event so the App can render token deltas + duration + collapsible summary instead of a bare "Context compacted" string.
+
+### Compaction summary detection
+- The TUI writes the post-compact summary as `{type:"user", isCompactSummary:true, parentUuid:<boundary_uuid>}` immediately after `compact_boundary` lands. We were polling for `{type:"summary", summary:"…"}` records — those are the SDK-era session-title records (e.g. `"Casual Chat: Simple Greeting"`), not the `/compact` artifact. Result: the JSONL had the summary all along; the CLI just never looked at the right line.
+- New `compactSummaryParser.extractCompactSummary(jsonlText, boundaryUuid?)` is a pure I/O-free function that prefers the `parentUuid` tie when supplied (precise — disambiguates back-to-back `/compact` runs) and falls back to "latest summary of either shape" for the RPC handler and the fork-copy path. Eight vitest cases pin the contract: PTY user-record shape, array vs string content, parentUuid tie-break, SDK legacy shape, truncated-final-line resilience, whitespace coercion to null.
+- The post-`compact_boundary` poll horizon stays at 250ms × 8s — that handles the file-flush lag the in-memory boundary event has over the JSONL write.
+- The `getCompactionSummary` RPC handler and the fork-copy path now share the same reader; previously each maintained its own parsing loop.
+
+### Structured `compact-boundary` session event
+- New `{type:"compact-boundary", boundaryUuid, preTokens, postTokens, durationMs, trigger, summary?}` variant on `sendSessionEvent`. Emitted alongside the legacy `{type:"message", message:"Context compacted"}` bubble — older Apps that don't recognise the new discriminator reject it at the strict zod parse and continue to show the legacy bubble. New Apps (`@kmmao/happy-app@2.43.1+`) render the structured bubble and suppress the legacy one within a 5s window.
+- The TUI writes `compactMetadata` in camelCase at runtime even though the TS interface declares snake_case — the emit branch reads both for forward-compat with whichever the TUI version happens to write.
+- Two emits per `/compact`: the first carries token deltas only (fires the moment `compact_boundary` arrives — immediate UI feedback), the second re-fires under the same `boundaryUuid` with `summary` populated once the JSONL flush lands. The App reducer merges the second on top of the first in place rather than inserting a duplicate row.
+
 ## 0.101.1 - 2026-06-19
 
 Fixes the `/compact` failure mode that surfaced as **"Compaction started → No response for 96s — attempting recovery → Session recovered — resending your message…"** with no compaction ever happening. Two independent bugs combined to produce that trace; both are now closed, and the compacted-context summary is now surfaced as a session event so the user can see what survived.

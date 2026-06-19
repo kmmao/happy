@@ -2834,6 +2834,14 @@ export const ru: TranslationStructure = {
     taskCompleted: "Задача завершена",
     taskFailed: "Задача не выполнена",
     taskStopped: "Задача остановлена",
+    compactBoundary: {
+      manualHeader: "Контекст сжат",
+      autoHeader: "Контекст сжат автоматически",
+      tokensDelta: ({ pre, post }: { pre: string; post: string }) =>
+        `${pre} → ${post} токенов`,
+      showSummary: "Показать сводку",
+      hideSummary: "Скрыть сводку",
+    },
   },
 
   codex: {

@@ -3003,6 +3003,14 @@ export const ja: TranslationStructure = {
     taskCompleted: "タスク完了",
     taskFailed: "タスク失敗",
     taskStopped: "タスク停止",
+    compactBoundary: {
+      manualHeader: "コンテキストを圧縮しました",
+      autoHeader: "コンテキストを自動圧縮しました",
+      tokensDelta: ({ pre, post }: { pre: string; post: string }) =>
+        `${pre} → ${post} トークン`,
+      showSummary: "要約を表示",
+      hideSummary: "要約を非表示",
+    },
   },
 
   codex: {

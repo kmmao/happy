@@ -49,6 +49,7 @@ import { fetchMcpRegistryServers } from "@/claude/utils/mcpRegistryReader";
 import { EnhancedMode } from "./loop";
 import { createSessionEventReporter } from "./sessionEventReporter";
 import { tryRegisterCompactBoundaryEmission } from "./compactBoundaryDedup";
+import { extractCompactSummary } from "./compactSummaryParser";
 import { hashObject } from "@/utils/deterministicJson";
 import { getProjectPath } from "./utils/path";
 import { readFile, writeFile, mkdir } from "node:fs/promises";
@@ -964,51 +965,41 @@ export async function claudeRemoteLauncher(
     },
   );
 
-  // Read the latest `type:"summary"` record from a session JSONL file.
-  // Shared between the getCompactionSummary RPC (App-pull) and the
-  // post-compact_boundary auto-emit (CLI-push) so both use the same
-  // parsing contract.
+  // I/O wrapper around `extractCompactSummary` (compactSummaryParser.ts).
+  // The pure parser is the source of truth for the record-selection rule;
+  // this function only handles file resolution + read-error swallowing so
+  // callers degrade gracefully when the JSONL hasn't materialised yet.
   async function readLatestSummaryFromJsonl(
     sessionId: string,
+    boundaryUuid?: string,
   ): Promise<string | null> {
     try {
       const projectDir = getProjectPath(session.path);
       const filePath = join(projectDir, `${sessionId}.jsonl`);
       const content = await readFile(filePath, "utf-8");
-      let latestSummary: string | null = null;
-      for (const line of content.split("\n")) {
-        if (!line.trim()) continue;
-        try {
-          const parsed = JSON.parse(line);
-          if (parsed.type === "summary" && parsed.summary) {
-            latestSummary = parsed.summary;
-          }
-        } catch {
-          continue;
-        }
-      }
-      return latestSummary;
+      return extractCompactSummary(content, boundaryUuid);
     } catch {
       return null;
     }
   }
 
-  // After a `compact_boundary` JSONL record fires, the TUI writes a
-  // `type:"summary"` record alongside it — but the two records can land
-  // out-of-order (boundary first, then summary milliseconds-to-seconds
-  // later, depending on which API call returned first). Poll briefly so
-  // the user-visible event lands shortly after the boundary without
-  // racing the file write. Returns the summary text (suitable for an
-  // emit-as-event) or null when no summary ever materializes.
+  // After a `compact_boundary` JSONL record fires, the TUI writes the
+  // `isCompactSummary:true` user record next to it — but the file flush
+  // can lag the in-memory boundary event by milliseconds-to-seconds. Poll
+  // briefly so the user-visible event lands shortly after the boundary
+  // without racing the write. Returns the summary text suitable for an
+  // emit-as-event, or null when no matching summary materializes within
+  // the budget.
   async function pollForCompactionSummary(
     sessionId: string,
+    boundaryUuid: string,
     sinceSummaryHash: string | null,
   ): Promise<string | null> {
     const POLL_INTERVAL_MS = 250;
     const MAX_POLL_MS = 8_000;
     const startedAt = Date.now();
     while (Date.now() - startedAt < MAX_POLL_MS) {
-      const summary = await readLatestSummaryFromJsonl(sessionId);
+      const summary = await readLatestSummaryFromJsonl(sessionId, boundaryUuid);
       if (summary && summary !== sinceSummaryHash) {
         return summary;
       }
@@ -1031,7 +1022,11 @@ export async function claudeRemoteLauncher(
   const emittedCompactBoundaryUuids = new Set<string>();
 
   // Register RPC handler to allow App to fetch the latest compaction summary
-  // In remote mode, read from the JSONL file on demand (no scanner available)
+  // In remote mode, read from the JSONL file on demand (no scanner available).
+  // Delegates to readLatestSummaryFromJsonl so the RPC path and the
+  // post-boundary auto-emit path share the same source-of-truth parser
+  // (handles both the PTY `isCompactSummary:true` user record and the legacy
+  // SDK `type:"summary"` record).
   session.client.rpcHandlerManager.registerHandler(
     "getCompactionSummary",
     async () => {
@@ -1039,27 +1034,8 @@ export async function claudeRemoteLauncher(
       if (!currentSessionId) {
         return { summary: null };
       }
-      try {
-        const projectDir = getProjectPath(session.path);
-        const filePath = join(projectDir, `${currentSessionId}.jsonl`);
-        const content = await readFile(filePath, "utf-8");
-        const lines = content.split("\n");
-        let latestSummary: string | null = null;
-        for (const line of lines) {
-          if (!line.trim()) continue;
-          try {
-            const parsed = JSON.parse(line);
-            if (parsed.type === "summary" && parsed.summary) {
-              latestSummary = parsed.summary;
-            }
-          } catch {
-            continue;
-          }
-        }
-        return { summary: latestSummary };
-      } catch {
-        return { summary: null };
-      }
+      const summary = await readLatestSummaryFromJsonl(currentSessionId);
+      return { summary };
     },
   );
 
@@ -1111,20 +1087,14 @@ export async function claudeRemoteLauncher(
 
         // Copy the latest compaction summary from the source session JSONL
         // into the forked JSONL so getCompactionSummary works on the fork.
+        // We write the legacy SDK `type:"summary"` shape into the fork because
+        // it's the lowest-common-denominator shape that BOTH the PTY-path
+        // reader and the SDK-path scanner recognise — synthesising the full
+        // PTY `isCompactSummary:true` user record would require fabricating a
+        // valid parentUuid that the fork session doesn't have.
         try {
           const projectDir = getProjectPath(session.path);
-          const sourceFile = join(projectDir, `${claudeSessionId}.jsonl`);
-          const sourceContent = await readFile(sourceFile, "utf-8");
-          let latestSummary: string | null = null;
-          for (const line of sourceContent.split("\n")) {
-            if (!line.trim()) continue;
-            try {
-              const parsed = JSON.parse(line);
-              if (parsed.type === "summary" && parsed.summary) {
-                latestSummary = parsed.summary;
-              }
-            } catch { continue; }
-          }
+          const latestSummary = await readLatestSummaryFromJsonl(claudeSessionId);
           if (latestSummary) {
             const forkFile = join(projectDir, `${result.sessionId}.jsonl`);
             const summaryRecord = JSON.stringify({ type: "summary", summary: latestSummary });
@@ -1981,20 +1951,82 @@ export async function claudeRemoteLauncher(
             `[remote]: compact_boundary uuid=${boundaryUuid} already emitted — suppressing replay`,
           );
         } else {
+          // Legacy text bubble — kept so older Apps that don't know the
+          // `compact-boundary` structured variant still surface the event.
+          // New Apps suppress this string via reducer content-window dedup
+          // when the structured variant arrives within the same window.
           session.client.sendSessionEvent({
             type: "message",
             message: "Context compacted",
           });
-          // Asynchronously surface the actual compaction summary text. The TUI
-          // writes a `type:"summary"` record alongside compact_boundary, but
-          // the file write can lag the boundary by milliseconds-to-seconds —
-          // pollForCompactionSummary handles the race. We snapshot the prior
-          // summary hash so a stale record (left over from an earlier /compact
-          // in this session) is not re-emitted on every boundary.
+          // Structured variant. The JSONL fields land in camelCase at
+          // runtime (preTokens / postTokens / durationMs / trigger) even
+          // though the TS type was declared in snake_case — read both for
+          // forward-compat with whichever the TUI writes today.
+          const meta = ((message as unknown) as {
+            compactMetadata?: {
+              trigger?: "manual" | "auto";
+              preTokens?: number;
+              postTokens?: number;
+              durationMs?: number;
+            };
+            compact_metadata?: {
+              trigger?: "manual" | "auto";
+              pre_tokens?: number;
+              post_tokens?: number;
+              duration_ms?: number;
+            };
+          }).compactMetadata ?? ((message as unknown) as {
+            compact_metadata?: {
+              trigger?: "manual" | "auto";
+              pre_tokens?: number;
+              post_tokens?: number;
+              duration_ms?: number;
+            };
+          }).compact_metadata;
+          const preTokens =
+            (meta as { preTokens?: number; pre_tokens?: number })?.preTokens ??
+            (meta as { pre_tokens?: number })?.pre_tokens ??
+            0;
+          const postTokens =
+            (meta as { postTokens?: number; post_tokens?: number })?.postTokens ??
+            (meta as { post_tokens?: number })?.post_tokens ??
+            0;
+          const durationMs =
+            (meta as { durationMs?: number; duration_ms?: number })?.durationMs ??
+            (meta as { duration_ms?: number })?.duration_ms ??
+            0;
+          const trigger: "manual" | "auto" = meta?.trigger ?? "manual";
+          // Stable envelope id mirrors the boundary uuid so two emits hash
+          // to the same server-side record id; the App reducer dedups on
+          // the in-payload `boundaryUuid` (envelope id isn't propagated).
+          const structuredEventId = `compact-boundary-${boundaryUuid}`;
+          session.client.sendSessionEvent(
+            {
+              type: "compact-boundary",
+              boundaryUuid,
+              preTokens,
+              postTokens,
+              durationMs,
+              trigger,
+            },
+            structuredEventId,
+          );
+          // Asynchronously surface the actual compaction summary text. The
+          // TUI writes the `isCompactSummary:true` user record next to
+          // compact_boundary, but the file write can lag the in-memory
+          // boundary by milliseconds-to-seconds — pollForCompactionSummary
+          // handles the race. When it lands we re-emit the structured
+          // event under the SAME id so the App's reducer treats it as an
+          // update (no duplicate bubble).
           const compactedSessionId = session.sessionId;
           if (compactedSessionId) {
             const previousSummary = lastEmittedCompactionSummary;
-            void pollForCompactionSummary(compactedSessionId, previousSummary)
+            void pollForCompactionSummary(
+              compactedSessionId,
+              boundaryUuid,
+              previousSummary,
+            )
               .then((summary) => {
                 if (!summary || summary === previousSummary) {
                   logger.debug(
@@ -2003,10 +2035,18 @@ export async function claudeRemoteLauncher(
                   return;
                 }
                 lastEmittedCompactionSummary = summary;
-                session.client.sendSessionEvent({
-                  type: "message",
-                  message: `Compaction summary:\n${summary}`,
-                });
+                session.client.sendSessionEvent(
+                  {
+                    type: "compact-boundary",
+                    boundaryUuid,
+                    preTokens,
+                    postTokens,
+                    durationMs,
+                    trigger,
+                    summary,
+                  },
+                  structuredEventId,
+                );
               })
               .catch((err) => {
                 logger.debug(

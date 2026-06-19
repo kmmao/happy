@@ -2822,6 +2822,14 @@ export const zhHant: TranslationStructure = {
     taskCompleted: "任務完成",
     taskFailed: "任務失敗",
     taskStopped: "任務停止",
+    compactBoundary: {
+      manualHeader: "上下文已壓縮",
+      autoHeader: "上下文已自動壓縮",
+      tokensDelta: ({ pre, post }: { pre: string; post: string }) =>
+        `${pre} → ${post} tokens`,
+      showSummary: "顯示摘要",
+      hideSummary: "隱藏摘要",
+    },
   },
 
   codex: {

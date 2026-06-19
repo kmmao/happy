@@ -3483,6 +3483,119 @@ describe('reducer', () => {
             expect(result2.messages.filter(m => m.kind === 'agent-event')).toHaveLength(1);
         });
 
+        // -- Structured compact-boundary event (CLI 0.101.4+) ----------------
+        // The CLI emits BOTH the legacy text bubble AND a structured event
+        // for the same /compact run, so two redundant bubbles arrive within
+        // a few milliseconds. The reducer must:
+        //   1. Render the structured event as a single bubble.
+        //   2. Merge the second emit (summary now populated) onto the same
+        //      row instead of inserting a duplicate.
+        //   3. Suppress the legacy text bubble that overlaps the structured
+        //      event (in either arrival order).
+        const makeCompactBoundaryMsg = (
+            id: string,
+            boundaryUuid: string,
+            createdAt: number,
+            extra: Partial<{
+                preTokens: number;
+                postTokens: number;
+                durationMs: number;
+                trigger: 'manual' | 'auto';
+                summary: string;
+            }> = {},
+        ): NormalizedMessage => ({
+            id,
+            localId: null,
+            createdAt,
+            role: 'event',
+            content: {
+                type: 'compact-boundary',
+                boundaryUuid,
+                preTokens: extra.preTokens ?? 280_000,
+                postTokens: extra.postTokens ?? 11_000,
+                durationMs: extra.durationMs ?? 125_000,
+                trigger: extra.trigger ?? 'manual',
+                ...(extra.summary !== undefined ? { summary: extra.summary } : {}),
+            } as any, // NormalizedMessage's content union doesn't strictly type compact-boundary outside the reducer; the reducer narrows on `.type`.
+            isSidechain: false,
+        });
+
+        it('compact-boundary — renders single bubble on first emit', () => {
+            const state = createReducer();
+            const result = reducer(state, [
+                makeCompactBoundaryMsg('db-cb-1', 'boundary-aaa', 1000),
+            ]);
+            const events = result.messages.filter(m => m.kind === 'agent-event');
+            expect(events).toHaveLength(1);
+        });
+
+        it('compact-boundary — second emit with same boundaryUuid merges in place (no duplicate)', () => {
+            const state = createReducer();
+            reducer(state, [makeCompactBoundaryMsg('db-cb-1', 'boundary-aaa', 1000)]);
+            // Second emit lands ~600ms later with summary populated. New
+            // server DB id, same boundaryUuid.
+            const result2 = reducer(state, [
+                makeCompactBoundaryMsg('db-cb-2', 'boundary-aaa', 1600, {
+                    summary: 'Full summary text',
+                }),
+            ]);
+            const events = result2.messages.filter(m => m.kind === 'agent-event');
+            // Still exactly one bubble — the row was updated in place.
+            expect(events).toHaveLength(1);
+            // And the surviving event carries the summary now.
+            const event = events[0] as any;
+            expect(event.event.summary).toBe('Full summary text');
+        });
+
+        it('compact-boundary — legacy "Context compacted" text bubble suppressed when structured arrives within 5s', () => {
+            const state = createReducer();
+            // Order observed in production (text first, structured second).
+            reducer(state, [makeEventMsg('db-ctxc-1', 'Context compacted', 1000)]);
+            const result2 = reducer(state, [
+                makeCompactBoundaryMsg('db-cb-1', 'boundary-aaa', 1300),
+            ]);
+            const events = result2.messages.filter(m => m.kind === 'agent-event');
+            // The structured bubble replaces the legacy text bubble — only
+            // ONE bubble survives.
+            expect(events).toHaveLength(1);
+            const event = events[0] as any;
+            expect(event.event.type).toBe('compact-boundary');
+        });
+
+        it('compact-boundary — legacy text suppressed when structured arrived FIRST (reverse arrival order)', () => {
+            const state = createReducer();
+            // Reverse order: structured first, legacy text 200ms later.
+            reducer(state, [makeCompactBoundaryMsg('db-cb-1', 'boundary-aaa', 1000)]);
+            const result2 = reducer(state, [
+                makeEventMsg('db-ctxc-1', 'Context compacted', 1200),
+            ]);
+            // The legacy bubble is suppressed; result2 carries no new
+            // emissions for this batch (the structured bubble was already
+            // emitted in the prior batch).
+            expect(result2.messages.filter(m => m.kind === 'agent-event')).toHaveLength(0);
+            // The seen-id is recorded so it won't reappear on re-sync.
+            expect(state.messageIds.has('db-ctxc-1')).toBe(true);
+        });
+
+        it('compact-boundary — legacy text >5s before structured event still shown (genuine prior compact)', () => {
+            const state = createReducer();
+            // A real prior /compact from earlier in the session — separate
+            // event entirely, must NOT be suppressed by a later structured
+            // event for a different /compact run.
+            reducer(state, [makeEventMsg('db-ctxc-old', 'Context compacted', 1000)]);
+            const result2 = reducer(state, [
+                makeCompactBoundaryMsg('db-cb-1', 'boundary-aaa', 7001),
+            ]);
+            // Batch 2 only emits the new structured bubble — the prior
+            // text bubble was emitted in batch 1 and is unchanged.
+            expect(result2.messages.filter(m => m.kind === 'agent-event')).toHaveLength(1);
+            // The prior text bubble was NOT removed (would have surfaced
+            // in changed set and thus result.messages if it had been).
+            // Verify by checking the recentContextCompactedTextMid was
+            // cleared only on near-window structured, not far-window.
+            expect(state.recentContextCompactedTextMid).not.toBeNull();
+        });
+
         it('distinct server DB IDs within 5s window — content-deduped, not shown twice', () => {
             const state = createReducer();
             reducer(state, [makeEventMsg('db-ctx-1', 'Context was reset', 1000)]);

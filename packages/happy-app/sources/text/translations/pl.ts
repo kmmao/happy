@@ -2898,6 +2898,14 @@ export const pl: TranslationStructure = {
     taskCompleted: "Zadanie ukończone",
     taskFailed: "Zadanie nieudane",
     taskStopped: "Zadanie zatrzymane",
+    compactBoundary: {
+      manualHeader: "Kontekst skompaktowany",
+      autoHeader: "Kontekst skompaktowany automatycznie",
+      tokensDelta: ({ pre, post }: { pre: string; post: string }) =>
+        `${pre} → ${post} tokenów`,
+      showSummary: "Pokaż podsumowanie",
+      hideSummary: "Ukryj podsumowanie",
+    },
   },
 
   codex: {

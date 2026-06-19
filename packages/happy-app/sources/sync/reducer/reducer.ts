@@ -212,6 +212,34 @@ export type ReducerState = {
   /** Timestamps of recent lifecycle event messages, keyed by message content.
    * Used to deduplicate rapid duplicates (race between WebSocket push and API fetch). */
   recentEventMessageTimes: Map<string, number>;
+  /**
+   * State for the dual-emit `/compact` flow introduced in CLI 0.101.4.
+   *
+   * New CLIs emit BOTH a legacy `{type:"message", message:"Context compacted"}`
+   * text bubble (back-compat for older Apps) AND a structured
+   * `{type:"compact-boundary", preTokens, postTokens, durationMs, …}` event.
+   * The two arrive within a few milliseconds of each other but in either
+   * order depending on which sync path (WebSocket push vs API fetch) lands
+   * first. The structured event also re-fires under the same `content.id`
+   * once the summary text materialises in the JSONL.
+   *
+   *  - `recentCompactBoundaryAt`: createdAt of the most-recently-seen
+   *    structured event. When a text "Context compacted" then arrives
+   *    within 5s, we suppress it (the structured bubble already covers it).
+   *
+   *  - `recentContextCompactedTextMid`: mid + createdAt of the most
+   *    recently-rendered text bubble. When a structured event then
+   *    arrives within 5s, we drop the text mid from state.messages so
+   *    only the richer structured bubble remains.
+   *
+   *  - `compactBoundaryContentIdToMid`: maps the CLI-supplied stable
+   *    `content.id` (e.g. `compact-boundary-<boundaryUuid>`) to the
+   *    reducer-allocated mid, so the second emit (summary-populated) can
+   *    update the same row in place instead of inserting a duplicate.
+   */
+  recentCompactBoundaryAt: number | null;
+  recentContextCompactedTextMid: { mid: string; at: number } | null;
+  compactBoundaryContentIdToMid: Map<string, string>;
 };
 
 export function createReducer(): ReducerState {
@@ -230,6 +258,9 @@ export function createReducer(): ReducerState {
     backgroundTasks: new Map(),
     turnHadUsageStats: false,
     recentEventMessageTimes: new Map(),
+    recentCompactBoundaryAt: null,
+    recentContextCompactedTextMid: null,
+    compactBoundaryContentIdToMid: new Map(),
   };
 }
 
@@ -1448,6 +1479,77 @@ export function reducer(
       // Dedup: skip if already processed (e.g. re-fetched via sync)
       if (state.messageIds.has(msg.id)) continue;
 
+      // Structured compact-boundary event (CLI 0.101.4+). Two semantics
+      // overlap here:
+      //   1. In-place merge on re-emit: the CLI may fire the same event
+      //      twice under the same `content.id` — first without `summary`
+      //      (token deltas only), then again with `summary` populated once
+      //      the JSONL flush lands. The second arrival should UPDATE the
+      //      existing message row instead of inserting a duplicate.
+      //   2. Suppress the redundant legacy text bubble: the CLI also
+      //      emits `{type:"message", message:"Context compacted"}` for
+      //      back-compat with older Apps. When the structured bubble lands
+      //      we drop the text bubble created within the same 5s window so
+      //      the user sees only the richer one.
+      if (msg.content.type === "compact-boundary") {
+        const boundaryUuid = msg.content.boundaryUuid;
+        const existingMid =
+          state.compactBoundaryContentIdToMid.get(boundaryUuid);
+        if (existingMid !== undefined && state.messages.has(existingMid)) {
+          // Second emit (summary now populated, or any other field
+          // update). Merge fields in place — keep the original createdAt
+          // so the bubble doesn't jump in the timeline.
+          const existing = state.messages.get(existingMid)!;
+          existing.event = msg.content;
+          changed.add(existingMid);
+          state.messageIds.set(msg.id, msg.id);
+          continue;
+        }
+        // First emit — drop the matching legacy text bubble if we
+        // rendered one inside the 5s window already.
+        const recentTextMid = state.recentContextCompactedTextMid;
+        if (
+          recentTextMid !== null &&
+          Math.abs(msg.createdAt - recentTextMid.at) < 5000 &&
+          state.messages.has(recentTextMid.mid)
+        ) {
+          state.messages.delete(recentTextMid.mid);
+          changed.add(recentTextMid.mid);
+          state.recentContextCompactedTextMid = null;
+        }
+        state.recentCompactBoundaryAt = msg.createdAt;
+        state.messageIds.set(msg.id, msg.id);
+        const mid = allocateId();
+        state.messages.set(mid, {
+          id: mid,
+          realID: msg.id,
+          role: "agent",
+          createdAt: msg.createdAt,
+          event: msg.content,
+          tool: null,
+          text: null,
+          meta: msg.meta,
+        });
+        state.compactBoundaryContentIdToMid.set(boundaryUuid, mid);
+        changed.add(mid);
+        continue;
+      }
+
+      // Legacy "Context compacted" text bubble — suppress when a
+      // structured compact-boundary event has already landed within 5s
+      // (new CLI + new App). When the structured one arrives later, the
+      // branch above drops THIS text mid from the messages map; here we
+      // pre-empt the create when the structured one already won.
+      if (
+        msg.content.type === "message" &&
+        msg.content.message === "Context compacted" &&
+        state.recentCompactBoundaryAt !== null &&
+        Math.abs(msg.createdAt - state.recentCompactBoundaryAt) < 5000
+      ) {
+        state.messageIds.set(msg.id, msg.id);
+        continue;
+      }
+
       // Content-based dedup for lifecycle event messages: if two events with the
       // same message content arrive within 5 seconds (different DB IDs — race
       // condition between WebSocket push and a concurrent API fetch, or a
@@ -1476,6 +1578,15 @@ export function reducer(
         text: null,
         meta: msg.meta,
       });
+      // Track the just-created "Context compacted" mid so a later
+      // structured compact-boundary (arriving inside the 5s window) can
+      // remove this row in favour of the richer bubble.
+      if (
+        msg.content.type === "message" &&
+        msg.content.message === "Context compacted"
+      ) {
+        state.recentContextCompactedTextMid = { mid, at: msg.createdAt };
+      }
       changed.add(mid);
     }
   }

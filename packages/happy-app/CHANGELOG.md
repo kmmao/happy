@@ -1,5 +1,16 @@
 # Changelog
 
+## 2.43.1 - 2026-06-19
+
+Surfaces the actual `/compact` summary text and token deltas inside the chat. Pre-fix the "Context compacted" bubble was a bare lifecycle marker — useful as a confirmation, but the user could not see WHAT was compacted (286K → 11K tokens? Which 9KB of summary prose did Claude inject as the new conversation seed?). The summary text was being written to the JSONL by the TUI all along; the CLI was just looking at the wrong record type. Companion CLI release: `@kmmao/happy-coder@0.101.4`.
+
+### Compaction summary bubble
+- Added a structured `compact-boundary` agent event variant that renders a richer "Context compacted" bubble: header line `Context compacted · 286K → 11K tokens · 2m5s` plus an expandable section revealing the full summary text the TUI paste-injected after `/compact`.
+- The summary lands asynchronously — the CLI emits the token-delta header immediately when `compact_boundary` fires, then re-emits with `summary` populated once the JSONL `isCompactSummary:true` user record flushes (typically <1s later). The reducer merges the second emit onto the same row in place via the shared `boundaryUuid` key, so the bubble updates rather than duplicating.
+- Auto-compact runs (TUI-triggered at its own threshold) and manual `/compact` runs render with distinct header copy.
+- The legacy `{type:"message", message:"Context compacted"}` bubble that older CLIs emit is suppressed when a structured event arrives within 5s (either arrival order). Lone legacy bubbles from older CLIs continue to render as before — no regression for unupdated CLI users.
+- Five new vitest cases pin the dual-emit contract: single-emit render, in-place merge on second emit, suppression in both arrival orders, and the >5s window that protects a genuinely-earlier `/compact` from being suppressed by a later boundary.
+
 ## 2.43.0 - 2026-06-19
 
 Removed the AUTO/200K/1M context toggle from the input area. The modelMode picker is now the single source of truth for the window tier: pick a `-1m` variant (e.g. `opus-4-7-1m`, `sonnet-1m`) for the 1M premium window, pick the default variant for 200K + a hint at 75% usage. Companion CLI release: `@kmmao/happy-coder@0.101.0`, wire `@kmmao/happy-wire@0.33.0`.

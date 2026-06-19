@@ -101,6 +101,22 @@ const agentEventSchema = z.discriminatedUnion("type", [
       userMessageTokens: z.number(),
     }).optional(),
   }),
+  // Structured `/compact` boundary event (CLI 0.101.4+). Emitted twice for
+  // the same run under the same `boundaryUuid`: first without `summary`
+  // (token deltas only, fires immediately when the JSONL compact_boundary
+  // record lands), then again with `summary` populated once the JSONL
+  // `isCompactSummary:true` user record flushes (typically <1s later).
+  // The reducer keys de-dup on `boundaryUuid`, merging the second emit
+  // onto the first row in place.
+  z.object({
+    type: z.literal("compact-boundary"),
+    boundaryUuid: z.string(),
+    preTokens: z.number(),
+    postTokens: z.number(),
+    durationMs: z.number(),
+    trigger: z.enum(["manual", "auto"]),
+    summary: z.string().optional(),
+  }),
 ]);
 export type AgentEvent = z.infer<typeof agentEventSchema>;
 

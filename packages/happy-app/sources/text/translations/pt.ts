@@ -2885,6 +2885,14 @@ export const pt: TranslationStructure = {
     taskCompleted: "Tarefa concluída",
     taskFailed: "Tarefa falhou",
     taskStopped: "Tarefa interrompida",
+    compactBoundary: {
+      manualHeader: "Contexto compactado",
+      autoHeader: "Contexto compactado automaticamente",
+      tokensDelta: ({ pre, post }: { pre: string; post: string }) =>
+        `${pre} → ${post} tokens`,
+      showSummary: "Mostrar resumo",
+      hideSummary: "Ocultar resumo",
+    },
   },
 
   codex: {

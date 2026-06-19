@@ -2823,6 +2823,14 @@ export const zhHans: TranslationStructure = {
     taskCompleted: "任务完成",
     taskFailed: "任务失败",
     taskStopped: "任务停止",
+    compactBoundary: {
+      manualHeader: "上下文已压缩",
+      autoHeader: "上下文已自动压缩",
+      tokensDelta: ({ pre, post }: { pre: string; post: string }) =>
+        `${pre} → ${post} tokens`,
+      showSummary: "显示摘要",
+      hideSummary: "隐藏摘要",
+    },
   },
 
   codex: {
