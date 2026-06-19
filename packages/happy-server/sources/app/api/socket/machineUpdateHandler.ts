@@ -5,10 +5,7 @@ import { emitSyncEphemeral } from "@/app/events/syncEphemeral";
 import { log } from "@/utils/log";
 import { db } from "@/storage/db";
 import { Socket } from "socket.io";
-import { checkAndTriggerScheduledRuns } from "@/modules/supervisorScheduler";
-import { tickDueGenericAgentLoops } from "@/modules/agentLoopEngine";
-import { cleanupStaleFixActions } from "@/modules/supervisorFixWatchdog";
-import { checkAndTriggerSchedules } from "@/modules/triggerScheduleRunner";
+import { runDueMachineHeartbeatScans } from "@/app/api/socket/machineHeartbeatScans";
 import { buildBriefPushBody, pushSend } from "@/modules/pushSend";
 import { consolidate } from "@/modules/knowledgeConsolidate";
 import { storeKnowledgeEmbedding } from "@/modules/knowledgeEmbedding";
@@ -17,24 +14,6 @@ import { inTx } from "@/storage/inTx";
 
 // Track last seen brief timestamp per machine to detect new briefs
 const lastBriefTimestamp = new Map<string, number>();
-
-// Throttle schedule checks per machine. The (role, enabled, nextRunAt)
-// composite index makes the underlying query an index scan, so we can
-// afford to check more frequently than the original 5-minute window
-// without measurable db load. 30 s keeps loop/schedule triggers timely
-// even when the loop's own intervalMs is around the old throttle window
-// (a 5-minute loop used to drift up to one full period because the
-// throttle and the interval were the same value).
-const SCHEDULE_CHECK_INTERVAL = 30 * 1000;
-const lastScheduleCheck = new Map<string, number>();
-
-function shouldCheckSchedule(machineId: string): boolean {
-    const now = Date.now();
-    const last = lastScheduleCheck.get(machineId) ?? 0;
-    if (now - last < SCHEDULE_CHECK_INTERVAL) return false;
-    lastScheduleCheck.set(machineId, now);
-    return true;
-}
 
 export function machineUpdateHandler(userId: string, socket: Socket) {
     socket.on('machine-alive', async (data: {
@@ -75,30 +54,10 @@ export function machineUpdateHandler(userId: string, socket: Socket) {
                 activeAt: t,
             });
 
-            // Check for scheduled supervisor runs (fire-and-forget, throttled)
-            if (shouldCheckSchedule(data.machineId)) {
-                checkAndTriggerScheduledRuns(data.machineId, userId).catch(err =>
-                    log({ module: 'supervisor', level: 'error' }, `Schedule check error: ${err}`)
-                );
-
-                // Also clean up stale fix actions whose sessions are no longer active
-                cleanupStaleFixActions(userId, data.machineId).catch(err =>
-                    log({ module: 'supervisor', level: 'error' }, `Stale fix cleanup error: ${err}`)
-                );
-
-                // Check for due cron trigger schedules (shares 5-min heartbeat throttle)
-                checkAndTriggerSchedules(data.machineId, userId).catch(err =>
-                    log({ module: 'trigger', level: 'error' }, `Trigger schedule check error: ${err}`)
-                );
-
-                // ADR-0022 Phase 3b — fire due generic AgentLoops on this machine.
-                // Same 5-min throttle as supervisor; the (role, enabled, nextRunAt)
-                // composite index makes this an index scan over the small set of
-                // due loops, not a full table scan.
-                tickDueGenericAgentLoops(data.machineId, userId).catch(err =>
-                    log({ module: 'agent-loop', level: 'error' }, `Agent loop tick error: ${err}`)
-                );
-            }
+            // Fire all due heartbeat scans (supervisor runs, stale-fix cleanup,
+            // cron triggers, generic AgentLoops). The seam owns the registry,
+            // per-machine throttle, and per-scan error isolation.
+            runDueMachineHeartbeatScans(data.machineId, userId);
         } catch (error) {
             log({ module: 'websocket', level: 'error' }, `Error in machine-alive: ${error}`);
         }

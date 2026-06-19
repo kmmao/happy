@@ -12,10 +12,13 @@ import {
 } from "@/modules/taskStatusLogic";
 import { taskStatusApply } from "@/app/api/task/taskStatusApply";
 import {
-    isUnifiedRuntimeProfileResolverEnabled,
-    notifyRuntimeProfileFailure,
-    resolveRuntimeProfile,
-} from "@/modules/runtimeProfileResolver";
+    buildTaskCreateData,
+    dispatchTaskTrigger,
+    loadTaskSkillContents,
+    resolveTaskRuntimeProfile,
+    resolveTaskRuntimeProfileBestEffort,
+    taskProfileFields,
+} from "@/app/api/task/taskCreate";
 import { assertOwnedMachine, ownedProject, ownedTask } from "../ownership";
 import {
     TaskPrioritySchema,
@@ -138,52 +141,30 @@ export function taskRoutes(app: Fastify) {
                 return reply.code(400).send({ error: "directory override requires projectId" });
             }
 
-            let taskProfileId: string | undefined;
-            let taskRuntimeProfile:
-                | Awaited<ReturnType<typeof resolveRuntimeProfile>>
-                | null = null;
-            if (isUnifiedRuntimeProfileResolverEnabled()) {
-                taskRuntimeProfile = await resolveRuntimeProfile({
-                    accountId: userId,
-                    explicitProfileId: bodyProfileId ?? null,
-                    projectSupervisorConfig,
-                    purpose: "task-manual",
+            const profileResolution = await resolveTaskRuntimeProfile({
+                accountId: userId,
+                explicitProfileId: bodyProfileId,
+                projectSupervisorConfig,
+                purpose: "task-manual",
+                failureNotice: {
+                    referenceUrl: `/machine/${machineId}/tasks`,
+                    refType: "machine",
+                    refId: machineId,
+                },
+            });
+            if (profileResolution.kind === "failed") {
+                return reply.code(400).send({
+                    error: "profile_unavailable",
+                    reason: profileResolution.failure.reason,
+                    message: profileResolution.failure.message,
                 });
-                if (!taskRuntimeProfile.ok) {
-                    notifyRuntimeProfileFailure({
-                        accountId: userId,
-                        purpose: "task-manual",
-                        failure: taskRuntimeProfile,
-                        referenceUrl: `/machine/${machineId}/tasks`,
-                        refType: "machine",
-                        refId: machineId,
-                    });
-                    return reply.code(400).send({
-                        error: "profile_unavailable",
-                        reason: taskRuntimeProfile.reason,
-                        message: taskRuntimeProfile.message,
-                    });
-                }
-                taskProfileId = taskRuntimeProfile.profileId;
             }
+            const { profileId: taskProfileId, runtimeProfile } = taskProfileFields(profileResolution);
 
-            let skillContents: Array<{ name: string; content: string }> | undefined;
-            if (skillIds.length > 0) {
-                const skills = await db.skill.findMany({
-                    where: {
-                        id: { in: skillIds },
-                        accountId: userId,
-                        archived: false,
-                    },
-                    orderBy: { name: "asc" },
-                });
-                if (skills.length > 0) {
-                    skillContents = skills.map((s) => ({ name: s.name, content: s.content }));
-                }
-            }
+            const skillContents = await loadTaskSkillContents(userId, skillIds);
 
             const task = await db.task.create({
-                data: {
+                data: buildTaskCreateData({
                     accountId: userId,
                     projectId: resolvedProjectId,
                     machineId,
@@ -192,18 +173,11 @@ export function taskRoutes(app: Fastify) {
                     priority,
                     maxAttempts,
                     triggerType: "manual",
-                    status: "dispatching",
                     profileId: taskProfileId,
-                    worktreeIsolation: worktreeIsolation ?? false,
-                    parentTaskId: parentTaskId ?? null,
-                    ...(skillIds.length > 0
-                        ? {
-                              skillBindings: {
-                                  create: skillIds.map((sid, idx) => ({ skillId: sid, order: idx })),
-                              },
-                          }
-                        : {}),
-                },
+                    skillIds,
+                    worktreeIsolation,
+                    parentTaskId,
+                }),
                 include: {
                     skillBindings: { include: { skill: { select: { name: true } } } },
                 },
@@ -214,22 +188,18 @@ export function taskRoutes(app: Fastify) {
                 taskId: task.id,
             });
 
-            await emitSyncEphemeral(userId, {
-                t: "task-trigger",
-                machineId,
+            await dispatchTaskTrigger(userId, {
                 taskId: task.id,
+                machineId,
                 prompt: task.prompt,
                 directory,
                 priority: task.priority,
-                projectId: resolvedProjectId ?? undefined,
+                projectId: resolvedProjectId,
                 resultToken,
                 skillContents,
                 profileId: taskProfileId,
-                runtimeProfile:
-                    taskRuntimeProfile?.ok
-                        ? taskRuntimeProfile.runtimeProfile
-                        : undefined,
-                worktreeIsolation: task.worktreeIsolation || undefined,
+                runtimeProfile,
+                worktreeIsolation: task.worktreeIsolation,
             });
 
             log({ module: "task" }, `Created task ${task.id} for machine ${machineId} (priority=${priority})`);
@@ -374,34 +344,26 @@ export function taskRoutes(app: Fastify) {
             // wins, with project default as a fallback path. If the referenced
             // profile has since been archived / broken, fail loudly with 400
             // + Inbox rather than silently spawning with stale env.
-            let retryProfileId: string | undefined;
-            let retryRuntimeProfile:
-                | Awaited<ReturnType<typeof resolveRuntimeProfile>>
-                | null = null;
-            if (isUnifiedRuntimeProfileResolverEnabled()) {
-                retryRuntimeProfile = await resolveRuntimeProfile({
-                    accountId: request.userId,
-                    explicitProfileId: task.profileId,
-                    projectSupervisorConfig,
-                    purpose: "task-retry",
+            const retryResolution = await resolveTaskRuntimeProfile({
+                accountId: request.userId,
+                explicitProfileId: task.profileId,
+                projectSupervisorConfig,
+                purpose: "task-retry",
+                failureNotice: {
+                    referenceUrl: `/machine/${task.machineId}/tasks`,
+                    refType: "task",
+                    refId: task.id,
+                },
+            });
+            if (retryResolution.kind === "failed") {
+                return reply.code(400).send({
+                    error: "profile_unavailable",
+                    reason: retryResolution.failure.reason,
+                    message: retryResolution.failure.message,
                 });
-                if (!retryRuntimeProfile.ok) {
-                    notifyRuntimeProfileFailure({
-                        accountId: request.userId,
-                        purpose: "task-retry",
-                        failure: retryRuntimeProfile,
-                        referenceUrl: `/machine/${task.machineId}/tasks`,
-                        refType: "task",
-                        refId: task.id,
-                    });
-                    return reply.code(400).send({
-                        error: "profile_unavailable",
-                        reason: retryRuntimeProfile.reason,
-                        message: retryRuntimeProfile.message,
-                    });
-                }
-                retryProfileId = retryRuntimeProfile.profileId;
             }
+            const { profileId: retryProfileId, runtimeProfile: retryRuntimeProfile } =
+                taskProfileFields(retryResolution);
 
             let skillContents: Array<{ name: string; content: string }> | undefined;
             const bindings = await db.taskSkillBinding.findMany({
@@ -434,22 +396,18 @@ export function taskRoutes(app: Fastify) {
                 taskId: task.id,
             });
 
-            await emitSyncEphemeral(request.userId, {
-                t: "task-trigger",
-                machineId: task.machineId,
+            await dispatchTaskTrigger(request.userId, {
                 taskId: task.id,
+                machineId: task.machineId,
                 prompt: task.prompt,
                 directory,
                 priority: task.priority,
-                projectId: task.projectId ?? undefined,
+                projectId: task.projectId,
                 resultToken,
                 skillContents,
                 profileId: retryProfileId,
-                runtimeProfile:
-                    retryRuntimeProfile?.ok
-                        ? retryRuntimeProfile.runtimeProfile
-                        : undefined,
-                worktreeIsolation: task.worktreeIsolation || undefined,
+                runtimeProfile: retryRuntimeProfile,
+                worktreeIsolation: task.worktreeIsolation,
             });
 
             log({ module: "task" }, `Retrying task ${task.id} (attempt ${updated.attempt})`);
@@ -854,21 +812,14 @@ export function taskRoutes(app: Fastify) {
                         }
                     }
 
-                    let swarmProfileId: string | undefined = task.profileId ?? undefined;
-                    let swarmRuntimeProfile:
-                        | Awaited<ReturnType<typeof resolveRuntimeProfile>>
-                        | null = null;
-                    if (isUnifiedRuntimeProfileResolverEnabled()) {
-                        swarmRuntimeProfile = await resolveRuntimeProfile({
+                    const { profileId: swarmProfileId, runtimeProfile: swarmRuntimeProfile } =
+                        await resolveTaskRuntimeProfileBestEffort({
                             accountId: userId,
                             explicitProfileId: task.profileId,
                             projectSupervisorConfig,
                             purpose: "task-manual",
+                            fallbackProfileId: task.profileId ?? undefined,
                         });
-                        if (swarmRuntimeProfile.ok) {
-                            swarmProfileId = swarmRuntimeProfile.profileId;
-                        }
-                    }
 
                     const skillContents =
                         task.skillBindings.length > 0
@@ -888,21 +839,17 @@ export function taskRoutes(app: Fastify) {
                         taskId: task.id,
                     });
 
-                    await emitSyncEphemeral(userId, {
-                        t: "task-trigger",
-                        machineId: task.machineId,
+                    await dispatchTaskTrigger(userId, {
                         taskId: task.id,
+                        machineId: task.machineId,
                         prompt: task.prompt,
                         directory,
                         priority: task.priority,
-                        projectId: task.projectId ?? undefined,
+                        projectId: task.projectId,
                         resultToken,
                         skillContents,
                         profileId: swarmProfileId,
-                        runtimeProfile:
-                            swarmRuntimeProfile?.ok
-                                ? swarmRuntimeProfile.runtimeProfile
-                                : undefined,
+                        runtimeProfile: swarmRuntimeProfile,
                         worktreeIsolation: true,
                     });
                 }),

@@ -557,14 +557,6 @@ describe("MessageQueue2", () => {
     expect(result3?.priority).toBe("background");
   });
 
-  it("peekIsolate checks the highest-priority item", () => {
-    const queue = new MessageQueue2<string>((mode) => mode);
-
-    queue.push("normal", "A", undefined, { priority: "user" });
-    queue.pushIsolateAndClear("isolated", "B", { priority: "urgent" });
-
-    expect(queue.peekIsolate()).toBe(true);
-  });
   describe("tryTakeForMidTurn", () => {
     const coldHasher = (mode: { type: string; cold?: string }) =>
       mode.cold ?? mode.type;
@@ -576,39 +568,46 @@ describe("MessageQueue2", () => {
       queue.push("msg1", { type: "A", cold: "X" });
 
       const result = queue.tryTakeForMidTurn("X", coldHasher);
-      expect(result).not.toBeNull();
-      expect(result?.message).toBe("msg1");
+      expect(result.status).toBe("taken");
+      if (result.status === "taken") {
+        expect(result.message).toBe("msg1");
+      }
       expect(queue.size()).toBe(0);
     });
 
-    it("should reject isolate message", () => {
+    it("should report isolate for an isolate head (highest priority)", () => {
       const queue = new MessageQueue2<{ type: string; cold?: string }>(
         (mode) => mode.type,
       );
-      queue.pushIsolateAndClear("compact", { type: "A", cold: "X" });
+      queue.push("normal", { type: "A", cold: "X" }, undefined, {
+        priority: "user",
+      });
+      queue.pushIsolateAndClear("compact", { type: "B", cold: "X" }, {
+        priority: "urgent",
+      });
 
       const result = queue.tryTakeForMidTurn("X", coldHasher);
-      expect(result).toBeNull();
+      expect(result.status).toBe("isolate");
       expect(queue.size()).toBe(1); // not consumed
     });
 
-    it("should reject when cold hash differs", () => {
+    it("should report cold-mismatch when cold hash differs", () => {
       const queue = new MessageQueue2<{ type: string; cold?: string }>(
         (mode) => mode.type,
       );
       queue.push("msg1", { type: "A", cold: "Y" });
 
       const result = queue.tryTakeForMidTurn("X", coldHasher);
-      expect(result).toBeNull();
+      expect(result.status).toBe("cold-mismatch");
       expect(queue.size()).toBe(1); // not consumed
     });
 
-    it("should return null on empty queue", () => {
+    it("should report empty on empty queue", () => {
       const queue = new MessageQueue2<{ type: string; cold?: string }>(
         (mode) => mode.type,
       );
       const result = queue.tryTakeForMidTurn("X", coldHasher);
-      expect(result).toBeNull();
+      expect(result.status).toBe("empty");
     });
 
     it("should take multiple messages sequentially", () => {
@@ -619,31 +618,12 @@ describe("MessageQueue2", () => {
       queue.push("msg2", { type: "B", cold: "X" }); // different full hash, same cold hash
 
       const r1 = queue.tryTakeForMidTurn("X", coldHasher);
-      expect(r1?.message).toBe("msg1");
+      expect(r1.status === "taken" && r1.message).toBe("msg1");
 
       const r2 = queue.tryTakeForMidTurn("X", coldHasher);
-      expect(r2?.message).toBe("msg2");
+      expect(r2.status === "taken" && r2.message).toBe("msg2");
 
       expect(queue.size()).toBe(0);
-    });
-  });
-
-  describe("peekIsolate", () => {
-    it("should return true when first message is isolate", () => {
-      const queue = new MessageQueue2<string>((mode) => mode);
-      queue.pushIsolateAndClear("compact", "A");
-      expect(queue.peekIsolate()).toBe(true);
-    });
-
-    it("should return false when first message is not isolate", () => {
-      const queue = new MessageQueue2<string>((mode) => mode);
-      queue.push("normal", "A");
-      expect(queue.peekIsolate()).toBe(false);
-    });
-
-    it("should return false on empty queue", () => {
-      const queue = new MessageQueue2<string>((mode) => mode);
-      expect(queue.peekIsolate()).toBe(false);
     });
   });
 

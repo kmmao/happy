@@ -55,6 +55,7 @@ import { stylesheet, FAVORITE_CHIP_GRADIENTS, getFavoriteSlashChipGlassStyle, ge
 import { ContextProgressBar } from "./ContextProgressBar";
 import { AttachButton, type AttachAction } from "./AttachButton";
 import { AgentInputSettingsOverlay } from "./AgentInputSettingsOverlay";
+import { AgentInputModelSelectorModal } from "./AgentInputModelSelectorModal";
 import { PasteBlockPreviewModal } from "./PasteBlockPreviewModal";
 import { getReasoningSummaryLabels } from "./reasoningEffort";
 import {
@@ -724,130 +725,13 @@ export const AgentInput = React.memo(
             maxHeight={overlayMaxHeight}
           />
 
-          <RNModal
+          <AgentInputModelSelectorModal
             visible={showModelSelectorModal}
-            transparent
-            animationType="fade"
-            onRequestClose={() => setShowModelSelectorModal(false)}
-          >
-            <Pressable
-              style={{
-                flex: 1,
-                backgroundColor: "rgba(0,0,0,0.45)",
-                justifyContent: "center",
-                paddingHorizontal: 16,
-                paddingVertical: 24,
-              }}
-              onPress={() => setShowModelSelectorModal(false)}
-            >
-              <Pressable
-                onPress={(event) => event.stopPropagation()}
-                style={{
-                  maxHeight: "70%",
-                  borderRadius: 16,
-                  overflow: "hidden",
-                  backgroundColor: theme.colors.surface,
-                  borderWidth: 1,
-                  borderColor: theme.colors.divider,
-                }}
-              >
-                <View
-                  style={{
-                    paddingHorizontal: 16,
-                    paddingTop: 16,
-                    paddingBottom: 12,
-                    borderBottomWidth: 1,
-                    borderBottomColor: theme.colors.divider,
-                  }}
-                >
-                  <Text
-                    style={{
-                      fontSize: 16,
-                      color: theme.colors.text,
-                      ...Typography.default("semiBold"),
-                    }}
-                  >
-                    {t("agentInput.model.title")}
-                  </Text>
-                </View>
-
-                <ScrollView>
-                  {availableModels.map((model) => {
-                    const isSelected = props.modelMode?.key === model.key;
-                    return (
-                      <Pressable
-                        key={model.key}
-                        onPress={() => {
-                          hapticsLight();
-                          props.onModelModeChange?.(model);
-                          setShowModelSelectorModal(false);
-                        }}
-                        style={({ pressed }) => ({
-                          flexDirection: "row",
-                          alignItems: "center",
-                          paddingHorizontal: 16,
-                          paddingVertical: 12,
-                          backgroundColor: pressed
-                            ? theme.colors.surfacePressed
-                            : "transparent",
-                        })}
-                      >
-                        <View
-                          style={{
-                            width: 16,
-                            height: 16,
-                            borderRadius: 8,
-                            borderWidth: 2,
-                            borderColor: isSelected
-                              ? theme.colors.radio.active
-                              : theme.colors.radio.inactive,
-                            alignItems: "center",
-                            justifyContent: "center",
-                            marginRight: 12,
-                          }}
-                        >
-                          {isSelected && (
-                            <View
-                              style={{
-                                width: 6,
-                                height: 6,
-                                borderRadius: 3,
-                                backgroundColor: theme.colors.radio.dot,
-                              }}
-                            />
-                          )}
-                        </View>
-                        <View style={{ flex: 1 }}>
-                          <Text
-                            style={{
-                              fontSize: 14,
-                              color: isSelected
-                                ? theme.colors.radio.active
-                                : theme.colors.text,
-                              ...Typography.default(),
-                            }}
-                          >
-                            {model.name}
-                          </Text>
-                          {!!model.description && (
-                            <Text
-                              style={{
-                                fontSize: 11,
-                                color: theme.colors.textSecondary,
-                                ...Typography.default(),
-                              }}
-                            >
-                              {model.description}
-                            </Text>
-                          )}
-                        </View>
-                      </Pressable>
-                    );
-                  })}
-                </ScrollView>
-              </Pressable>
-            </Pressable>
-          </RNModal>
+            onClose={() => setShowModelSelectorModal(false)}
+            availableModels={availableModels}
+            selectedKey={props.modelMode?.key}
+            onSelectModel={props.onModelModeChange}
+          />
 
           {/* Slash Command List - toggled by slash command button */}
           {props.commands?.showCommandList && (

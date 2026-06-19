@@ -2,15 +2,15 @@ import { homedir } from "node:os";
 import { db } from "@/storage/db";
 import { inTx } from "@/storage/inTx";
 import { log } from "@/utils/log";
-import { emitSyncEphemeral } from "@/app/events/syncEphemeral";
 import { emitSyncUpdate } from "@/app/events/syncUpdate";
 import { CronExpressionParser } from "cron-parser";
 import { inboxCreate } from "./inboxCreate";
 import {
-    isUnifiedRuntimeProfileResolverEnabled,
-    notifyRuntimeProfileFailure,
-    resolveRuntimeProfile,
-} from "./runtimeProfileResolver";
+    buildTaskCreateData,
+    dispatchTaskTrigger,
+    resolveTaskRuntimeProfile,
+    taskProfileFields,
+} from "@/app/api/task/taskCreate";
 
 const TERMINAL_TASK_STATUSES = new Set(["completed", "failed", "cancelled"]);
 
@@ -144,30 +144,21 @@ export async function checkAndTriggerSchedules(
             // notification instead of a silently-spawned session using stale
             // env defaults. Disabled path (`RUNTIME_PROFILE_UNIFIED_RESOLVER=false`)
             // keeps the legacy "no runtimeProfile in payload" behavior.
-            let resolvedProfileId: string | undefined;
-            let resolvedRuntimeProfile:
-                | Awaited<ReturnType<typeof resolveRuntimeProfile>>
-                | null = null;
-            if (isUnifiedRuntimeProfileResolverEnabled()) {
-                resolvedRuntimeProfile = await resolveRuntimeProfile({
-                    accountId: userId,
-                    explicitProfileId: schedule.profileId,
-                    projectSupervisorConfig,
-                    purpose: "cron",
-                });
-                if (!resolvedRuntimeProfile.ok) {
-                    notifyRuntimeProfileFailure({
-                        accountId: userId,
-                        purpose: "cron",
-                        failure: resolvedRuntimeProfile,
-                        referenceUrl: `/machine/${machineId}/tasks`,
-                        refType: "triggerSchedule",
-                        refId: schedule.id,
-                    });
-                    continue;
-                }
-                resolvedProfileId = resolvedRuntimeProfile.profileId;
+            const profileResolution = await resolveTaskRuntimeProfile({
+                accountId: userId,
+                explicitProfileId: schedule.profileId,
+                projectSupervisorConfig,
+                purpose: "cron",
+                failureNotice: {
+                    referenceUrl: `/machine/${machineId}/tasks`,
+                    refType: "triggerSchedule",
+                    refId: schedule.id,
+                },
+            });
+            if (profileResolution.kind === "failed") {
+                continue;
             }
+            const { profileId: resolvedProfileId, runtimeProfile } = taskProfileFields(profileResolution);
 
             let skillContents: Array<{ name: string; content: string }> | undefined;
             const skillIds: string[] = safeParseJsonArray(schedule.skillIds);
@@ -202,8 +193,11 @@ export async function checkAndTriggerSchedules(
                     return { status: "already-claimed" as const };
                 }
 
+                // directory is intentionally not persisted on the row for
+                // webhook/cron (it stays null); the resolved directory only
+                // travels in the dispatch payload below.
                 const task = await tx.task.create({
-                    data: {
+                    data: buildTaskCreateData({
                         accountId: userId,
                         projectId: resolvedProjectId,
                         machineId,
@@ -212,19 +206,9 @@ export async function checkAndTriggerSchedules(
                         maxAttempts: 3,
                         triggerType: "cron",
                         triggerRef: schedule.id,
-                        status: "dispatching",
                         profileId: resolvedProfileId,
-                        ...(skillIds.length > 0
-                            ? {
-                                  skillBindings: {
-                                      create: skillIds.map((sid, idx) => ({
-                                          skillId: sid,
-                                          order: idx,
-                                      })),
-                                  },
-                              }
-                            : {}),
-                    },
+                        skillIds,
+                    }),
                 });
 
                 await tx.triggerSchedule.update({
@@ -242,20 +226,16 @@ export async function checkAndTriggerSchedules(
             const { task } = result;
 
             // Dispatch to CLI daemon via ephemeral.
-            await emitSyncEphemeral(userId, {
-                t: "task-trigger",
-                machineId,
+            await dispatchTaskTrigger(userId, {
                 taskId: task.id,
+                machineId,
                 prompt: schedule.prompt,
                 directory,
                 priority: schedule.priority,
-                projectId: resolvedProjectId ?? undefined,
+                projectId: resolvedProjectId,
                 skillContents,
                 profileId: resolvedProfileId,
-                runtimeProfile:
-                    resolvedRuntimeProfile?.ok
-                        ? resolvedRuntimeProfile.runtimeProfile
-                        : undefined,
+                runtimeProfile,
             });
 
             void inboxCreate({

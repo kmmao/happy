@@ -13,7 +13,8 @@
  *
  * If the lifecycle ever drifts between this file and the matching CLI
  * file, the duplication is the smell — extract the lifecycle into a
- * separate `@kmmao/happy-rpc-runtime` package at that point.
+ * separate `@kmmao/happy-rpc-runtime` package at that point. The current
+ * difference is import paths only; keep it that way.
  */
 
 import { logger as defaultLogger } from "../../logger";

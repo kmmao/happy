@@ -20,6 +20,10 @@ _Avoid_: Chat, conversation, thread
 An automated work unit with an encrypted prompt, dispatched to a Machine's CLI daemon. Created manually, by schedule (TriggerSchedule), or by webhook (WebhookTrigger). Follows a state machine: queued → dispatching → running → completed/failed/cancelled. Can nest (parent Task decomposes into child Steps).
 _Avoid_: Job, command, request (and do not confuse with UI todo/checklist items)
 
+**Task intake**:
+The server-side seam that turns any Task creation request — manual (`POST /v1/tasks`), webhook (`WebhookTrigger` inbound), cron (`TriggerSchedule` fire), retry, and swarm re-dispatch — into a dispatched **Task**. Owns the invariant-bearing pieces shared across all five paths: runtime-profile resolution protocol (strict — notify + abort — or best-effort — fall back silently), skill-content loading, the Task row shape + ordered skillBindings + initial `dispatching` state, and the `task-trigger` dispatch payload. Lives in `app/api/task/taskCreate.ts`. Each caller keeps ownership of its own directory policy, surrounding transaction (webhook updates trigger stats; cron optimistically claims the schedule), and profile-failure action (HTTP 400/503 vs skip iteration).
+_Avoid_: TaskFactory, TaskService, createTask (too narrow — the seam is the whole intake, not one function).
+
 **Project**:
 A named codebase location on a specific Machine (`machineId:path`). Container for Knowledge, Skills, Supervisors, Triggers, and Tasks. Machine-scoped — the same git repo on two Machines produces two distinct Projects.
 _Avoid_: Repo, workspace, codebase

@@ -29,6 +29,28 @@ interface QueueItem<T> {
   source?: string;
 }
 
+/**
+ * Outcome of {@link MessageQueue2.tryTakeForMidTurn}. The queue knows exactly
+ * why a head item cannot be injected mid-turn, so it reports that reason rather
+ * than collapsing every rejection to `null` and forcing the caller to re-probe:
+ *
+ *   - `taken`         — the head item was removed and can be pushed mid-turn.
+ *   - `isolate`       — the head is an isolate command (`/compact`, `/clear`);
+ *                       the caller must interrupt the turn so it runs cleanly.
+ *   - `cold-mismatch` — the head needs a fresh process (its cold hash differs
+ *                       from the running one); defer to the post-turn path.
+ *   - `empty`         — nothing is queued.
+ *
+ * `cold-mismatch` and `empty` share the same caller response (let the turn end,
+ * then `nextMessage()` handles it); they stay distinct so the reason is legible
+ * in logs and tests.
+ */
+export type MidTurnTake<T> =
+  | { status: "taken"; message: string; mode: T; modeHash: string; priority: QueuePriority }
+  | { status: "isolate" }
+  | { status: "cold-mismatch" }
+  | { status: "empty" };
+
 const PRIORITY_ORDER: Record<QueuePriority, number> = {
   urgent: 0,
   user: 1,
@@ -507,13 +529,20 @@ export class MessageQueue2<T> {
     });
   }
 
+  /**
+   * Attempt to remove the highest-priority item for mid-turn injection.
+   * Returns a {@link MidTurnTake} that names the outcome — the head's
+   * isolate flag and cold-hash comparison are computed here and reported
+   * directly, so callers never re-inspect queue state to learn why a take
+   * was rejected.
+   */
   tryTakeForMidTurn(
     currentColdHash: string,
     coldHasher: (mode: T) => string,
-  ): { message: string; mode: T; modeHash: string; priority: QueuePriority } | null {
+  ): MidTurnTake<T> {
     const firstIdx = this.findHighestPriorityIndex();
     if (firstIdx === -1) {
-      return null;
+      return { status: "empty" };
     }
 
     const first = this.queue[firstIdx]!;
@@ -522,7 +551,7 @@ export class MessageQueue2<T> {
       logger.debug(
         "[MessageQueue2] tryTakeForMidTurn: rejected — isolate message",
       );
-      return null;
+      return { status: "isolate" };
     }
 
     const msgColdHash = coldHasher(first.mode);
@@ -530,7 +559,7 @@ export class MessageQueue2<T> {
       logger.debug(
         "[MessageQueue2] tryTakeForMidTurn: rejected — cold hash mismatch",
       );
-      return null;
+      return { status: "cold-mismatch" };
     }
 
     const [item] = this.queue.splice(firstIdx, 1);
@@ -540,16 +569,12 @@ export class MessageQueue2<T> {
     // Mid-turn pickup counts as the consumer being alive — refresh watchdog.
     this.markConsumed();
     return {
+      status: "taken",
       message: item!.message,
       mode: item!.mode,
       modeHash: item!.modeHash,
       priority: item!.priority,
     };
-  }
-
-  peekIsolate(): boolean {
-    const firstIdx = this.findHighestPriorityIndex();
-    return firstIdx !== -1 && (this.queue[firstIdx]!.isolate ?? false);
   }
 
   private afterPush(message: string, mode: T, immediate = false): void {

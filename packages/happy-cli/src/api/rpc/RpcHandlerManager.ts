@@ -4,22 +4,23 @@
  *
  * The plaintext routing core + the type contract live in wire so both
  * `@kmmao/happy-coder` and `@kmmao/happy-agent` share one implementation
- * (see wire's `rpcDispatch.ts` for the rationale). What's left here is
- * the per-package responsibilities that wire's pure-types invariant
- * doesn't cover: the socket.io lifecycle, retry policy, fast-retry timer,
- * and periodic re-register safety net. None of those are pure functions
- * — they all touch real timers + a live Socket — so they stay out of
- * wire and stay in the consumer.
+ * (see wire's `rpcDispatch.ts` for the rationale). What's left here is the
+ * per-package responsibilities that wire's pure-types invariant doesn't
+ * cover: the socket.io lifecycle, retry policy, fast-retry timer, and
+ * periodic re-register safety net. None of those are pure functions —
+ * they all touch real timers + a live Socket — so they stay out of wire
+ * and stay in the consumer.
  *
  * If the lifecycle ever drifts between this file and the matching Agent
  * file, the duplication is the smell — extract the lifecycle into a
- * separate `@kmmao/happy-rpc-runtime` package at that point.
+ * separate `@kmmao/happy-rpc-runtime` package at that point. The current
+ * difference is import paths only; keep it that way.
  */
 
 import { logger as defaultLogger } from "@/ui/logger";
 import type { Cipher } from "@/api/encryption";
 import { dispatchRpcMethod } from "@kmmao/happy-wire";
-import { Socket } from "socket.io-client";
+import type { Socket } from "socket.io-client";
 
 import type {
   RpcHandler,
@@ -42,14 +43,10 @@ export class RpcHandlerManager {
     this.scopePrefix = config.scopePrefix;
     this.cipher = config.cipher;
     this.logger =
-      config.logger || ((msg, data) => defaultLogger.debug(msg, data));
+      config.logger ?? ((msg, data) => defaultLogger.debug(msg, data));
   }
 
-  /**
-   * Register an RPC handler for a specific method.
-   * @param method - The method name (without prefix).
-   * @param handler - The handler function.
-   */
+  /** Register an RPC handler for a specific method. */
   registerHandler<TRequest = any, TResponse = any>(
     method: string,
     handler: RpcHandler<TRequest, TResponse>,
@@ -74,8 +71,7 @@ export class RpcHandlerManager {
    * Handle an incoming wire RPC request: decrypt params, dispatch in
    * plaintext, encrypt the result. The `Cipher` is the only encryption
    * seam; on decrypt failure the handler is still dispatched with `null`
-   * params (preserving the previous behaviour where a corrupt payload
-   * decrypted to `null`).
+   * params.
    */
   async handleRequest(request: RpcRequest): Promise<string> {
     const decrypted = this.cipher.decrypt(request.params);
@@ -104,8 +100,7 @@ export class RpcHandlerManager {
   }
 
   hasHandler(method: string): boolean {
-    const prefixedMethod = this.getPrefixedMethod(method);
-    return this.handlers.has(prefixedMethod);
+    return this.handlers.has(this.getPrefixedMethod(method));
   }
 
   clearHandlers(): void {
@@ -113,9 +108,13 @@ export class RpcHandlerManager {
     this.logger("Cleared all RPC handlers");
   }
 
+  // -----------------------------------------------------------------------
+  // Private
+  // -----------------------------------------------------------------------
+
   /**
    * Register a single method with ack + retry. Falls back to
-   * fire-and-forget emit after all retries are exhausted.
+   * fire-and-forget emit after all retries exhausted.
    */
   private emitRegisterWithRetry(
     socket: Socket,
@@ -126,27 +125,31 @@ export class RpcHandlerManager {
       if (this.socket !== socket) return;
       socket
         .timeout(5000)
-        .emit("rpc-register", { method }, (err: any, ackResponse: any) => {
-          if (this.socket !== socket) return;
-          if (err && remaining > 0) {
-            this.logger("[RPC] rpc-register ack timeout, retrying", {
-              method,
-              remaining,
-            });
-            setTimeout(() => attempt(remaining - 1), 1000);
-          } else if (err) {
-            this.logger(
-              "[RPC] [WARN] rpc-register failed after retries, falling back to emit",
-              { method },
-            );
-            socket.emit("rpc-register", { method });
-          } else if (!ackResponse?.ok) {
-            this.logger("[RPC] [WARN] rpc-register rejected by server", {
-              method,
-              error: ackResponse?.error,
-            });
-          }
-        });
+        .emit(
+          "rpc-register",
+          { method },
+          (err: unknown, ackResponse: { ok?: boolean; error?: string }) => {
+            if (this.socket !== socket) return;
+            if (err && remaining > 0) {
+              this.logger("[RPC] rpc-register ack timeout, retrying", {
+                method,
+                remaining,
+              });
+              setTimeout(() => attempt(remaining - 1), 1000);
+            } else if (err) {
+              this.logger(
+                "[RPC] [WARN] rpc-register failed after retries, falling back to emit",
+                { method },
+              );
+              socket.emit("rpc-register", { method });
+            } else if (!ackResponse?.ok) {
+              this.logger("[RPC] [WARN] rpc-register rejected by server", {
+                method,
+                error: ackResponse?.error,
+              });
+            }
+          },
+        );
     };
     attempt(maxRetries);
   }
@@ -160,7 +163,7 @@ export class RpcHandlerManager {
   /**
    * Fast retry: 5s after initial connect, re-register all handlers once.
    * Covers the case where the first batch of registrations failed
-   * silently (e.g. server not fully ready yet after restart).
+   * silently.
    */
   private scheduleFastRetry(socket: Socket): void {
     this.cancelFastRetry();
@@ -180,11 +183,7 @@ export class RpcHandlerManager {
     }
   }
 
-  /**
-   * Periodic re-registration every 30s as a safety net. If the server
-   * lost our registrations (deploy, network glitch), this restores them
-   * without requiring a daemon restart.
-   */
+  /** Periodic re-registration every 30s as a safety net. */
   private startReregisterInterval(): void {
     this.stopReregisterInterval();
     this.reregisterInterval = setInterval(() => {
@@ -206,9 +205,6 @@ export class RpcHandlerManager {
   }
 }
 
-/**
- * Factory function to create an RPC handler manager.
- */
 export function createRpcHandlerManager(
   config: RpcHandlerConfig,
 ): RpcHandlerManager {

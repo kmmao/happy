@@ -2642,28 +2642,30 @@ export async function claudeRemoteLauncher(
           const hasNew = await session.queue.waitForNewMessage(signal);
           if (!hasNew || signal.aborted) break;
 
-          const item = session.queue.tryTakeForMidTurn(
+          const take = session.queue.tryTakeForMidTurn(
             currentHash,
             coldModeHash,
           );
 
-          if (!item) {
-            // Message exists but can't be mid-turn pushed.
-            // If it's an isolate (/compact, /clear), interrupt the current turn
-            // so nextMessage() can handle it properly.
-            if (session.queue.peekIsolate()) {
+          if (take.status !== "taken") {
+            // Head item can't be mid-turn pushed; the queue tells us why.
+            if (take.status === "isolate") {
+              // An isolate command (/compact, /clear) must run on a clean turn —
+              // interrupt so nextMessage() can handle it properly.
               logger.debug(
                 "[remote]: mid-turn drain — isolate detected, interrupting",
               );
               executionGuard.interrupt("isolated_command");
               await doInterrupt();
             } else {
+              // cold-mismatch (needs a fresh process) or empty — stop draining
+              // and let nextMessage() handle after the turn ends.
               executionGuard.requestRestart("mode_change");
             }
-            // For other non-mid-turn cases (cold hash change, continue),
-            // just stop draining and let nextMessage() handle after turn ends.
             break;
           }
+
+          const item = take;
 
           // `continue` requires a fresh PTY spawn with options.continue=true.
           // It cannot be mid-turn pushed — put it back and let nextMessage()
