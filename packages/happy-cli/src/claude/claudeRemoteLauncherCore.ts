@@ -218,6 +218,24 @@ export async function claudeRemoteLauncher(
   // received it) still has zero PTY echo bytes, so 90s still catches it while
   // giving the API enough headroom for extended-thinking first-token latency.
   const WATCHDOG_WEDGE_RECOVER_MS = 90_000;
+  // ── Slash-command in-flight exemption ──
+  // Once a slash command (e.g. `/compact`, `/clear`, `/model …`) is written to
+  // the PTY and the WRITE_VERIFY check has confirmed PTY echo (so we know the
+  // TUI consumed the paste), the command is handled entirely INSIDE the TUI —
+  // /compact in particular spawns its own API call to summarise the context.
+  // That work produces NO JSONL records (compact_boundary only fires at the
+  // very end when compaction succeeds) AND emits NO PTY spinner bytes (the TUI
+  // suppresses the chat-turn spinner during the internal command). The
+  // standard wedge detectors above interpret that legitimate silence as a
+  // strand and force-abort the in-flight compaction at ~90s, surfacing to the
+  // user as "No response for 99s — attempting recovery…" followed by
+  // "Session recovered — restarting to safely resend slash command…" — the
+  // exact bug pattern in pid-99141 (2026-06-19, /compact at 13:02:26 aborted
+  // at 13:04:05). Real compactions on a full 200K context routinely take
+  // 60–180s, sometimes longer. We exempt confirmed-submitted slash commands
+  // from the fast wedge paths and only fall back to a generous idle threshold
+  // so a truly dead session is still caught — just not at 90s.
+  const WATCHDOG_SLASH_COMMAND_RECOVER_MS = 600_000; // 10 min — covers worst-case /compact on a maxed context
   // Post-write submission-wedge check (armed at the moment each prompt is
   // written, see onPromptWritten). A normal submit echoes the pasted prompt
   // back as raw PTY bytes within milliseconds; a wedge produces zero echo and
@@ -336,6 +354,36 @@ export async function claudeRemoteLauncher(
       if (ongoingToolCalls.size > 0 || pendingElicitations.size > 0) return;
       const idleMs = Date.now() - lastClaudeOutputAt;
       const elapsedMs = Date.now() - turnStartedAt;
+      // Slash-command exemption — see WATCHDOG_SLASH_COMMAND_RECOVER_MS doc.
+      // /compact (and friends) runs entirely inside the TUI: no JSONL records
+      // until compact_boundary fires at completion, no PTY spinner bytes
+      // during the internal API call. The standard wedge paths read that
+      // silence as a strand and kill the in-flight command at 90s. We only
+      // apply the exemption once WRITE_VERIFY has confirmed the paste landed
+      // (promptSubmissionConfirmed), so a genuine submission wedge — paste
+      // dropped, prompt never submitted, zero echo — still gets caught by
+      // the post-write WRITE_VERIFY check in 2.5s. A real strand on a long-
+      // running slash command is still caught, just at the 10-min threshold
+      // instead of 90s.
+      const inFlightIsSlashCommand =
+        !!inFlightPrompt && isSlashCommand(inFlightPrompt.message);
+      if (inFlightIsSlashCommand && promptSubmissionConfirmed) {
+        if (idleMs < WATCHDOG_IDLE_WARN_MS) return;
+        if (
+          idleMs >= WATCHDOG_SLASH_COMMAND_RECOVER_MS &&
+          !strandRecoveryInFlight
+        ) {
+          logger.debug(
+            `[remote][strand] slash command (${inFlightPrompt!.message.trim().slice(0, 40)}) silent ${idleMs}ms past ${WATCHDOG_SLASH_COMMAND_RECOVER_MS}ms threshold — starting auto-recovery. ${strandDiagState()}`,
+          );
+          void recoverStrandedTurn(idleMs);
+          return;
+        }
+        logger.debug(
+          `[remote][strand] slash command in flight (${inFlightPrompt!.message.trim().slice(0, 40)}) — PTY silent ${idleMs}ms (legitimate for /compact etc.), holding off recovery until ${WATCHDOG_SLASH_COMMAND_RECOVER_MS}ms. ${strandDiagState()}`,
+        );
+        return;
+      }
       // Fast wedge recovery: turn produced no output AND the PTY has been silent
       // since it started — the prompt never submitted. Recover well before the
       // general threshold (a working turn's spinner bytes keep idleMs tiny, so
