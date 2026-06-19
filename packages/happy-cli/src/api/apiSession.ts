@@ -17,6 +17,7 @@ import {
   createSessionCryptoCodec,
   type SessionCryptoCodec,
 } from "./sessionCryptoCodec";
+import { createUsageReporter, type UsageReporter } from "./usageReporter";
 import { backoff, delay } from "@/utils/time";
 import { configuration } from "@/configuration";
 import { RawJSONLines } from "@/claude/types";
@@ -318,10 +319,20 @@ export class ApiSessionClient extends EventEmitter {
   } | null = null;
   private readonly sendSync: InvalidateSync;
   private readonly receiveSync: InvalidateSync;
-  // Track last reported cumulative cost to compute deltas.
-  // SDK's total_cost_usd is cumulative since session start, but we report per-turn deltas.
-  private lastReportedCumulativeCost = 0;
-  private lastReportedModelCosts: Record<string, number> = {};
+  // Usage/cost reporting (delta accounting + payload shaping) lives behind this
+  // seam; the transport (sessionId stamp + socket emit) is injected here.
+  private readonly usageReporter: UsageReporter = createUsageReporter({
+    emit: (report) => {
+      const payload = {
+        key: report.key,
+        sessionId: this.sessionId,
+        tokens: report.tokens,
+        cost: report.cost,
+      };
+      logger.debugLargeJson(report.logLabel, payload);
+      this.socket.emit("usage-report", payload);
+    },
+  });
 
   /** Current session protocol turn ID, or null if no turn is open. */
   get currentTurnId(): string | null {
@@ -1523,28 +1534,12 @@ export class ApiSessionClient extends EventEmitter {
     }
   }
 
-  private emitUsageReport(
-    key: string,
-    tokens: { [key: string]: number; total: number },
-    cost: { [key: string]: number; total: number },
-    logLabel: string,
-  ) {
-    const usageReport = {
-      key,
-      sessionId: this.sessionId,
-      tokens,
-      cost,
-    };
-    logger.debugLargeJson(logLabel, usageReport);
-    this.socket.emit("usage-report", usageReport);
-  }
-
   /**
    * Send per-request usage data (tokens only) to the server.
    * Cost is reported once at turn end using SDK-provided data.
    */
   sendUsageData(usage: Usage, model?: string) {
-    this.sendProviderUsageData("claude-session", usage, model);
+    this.usageReporter.reportProviderUsage("claude-session", usage, model);
   }
 
   /**
@@ -1552,79 +1547,18 @@ export class ApiSessionClient extends EventEmitter {
    * This keeps Claude and Codex usage isolated while reusing the same socket transport.
    */
   sendProviderUsageData(key: string, usage: Usage, model?: string) {
-    const totalTokens =
-      usage.input_tokens +
-      usage.output_tokens +
-      (usage.cache_creation_input_tokens || 0) +
-      (usage.cache_read_input_tokens || 0);
-
-    const tokens: { [key: string]: number; total: number } = {
-      total: totalTokens,
-      input: usage.input_tokens,
-      output: usage.output_tokens,
-      cache_creation: usage.cache_creation_input_tokens || 0,
-      cache_read: usage.cache_read_input_tokens || 0,
-    };
-    if (model) {
-      tokens[model] = totalTokens;
-    }
-
-    // Cost is zero for per-request reports; actual cost comes from SDK at turn end
-    const cost: { [key: string]: number; total: number } = {
-      total: 0,
-      input: 0,
-      output: 0,
-    };
-
-    this.emitUsageReport(key, tokens, cost, "[SOCKET] Sending usage data:");
+    this.usageReporter.reportProviderUsage(key, usage, model);
   }
 
   /**
    * Send turn-end cost report using SDK-provided cost data.
    * Called once per turn with accurate cost from the official SDK.
-   *
-   * IMPORTANT: SDK's total_cost_usd and modelUsage[model].costUSD are CUMULATIVE
-   * values (total since session/process start), not per-turn values.
-   * We compute the delta from the last report to avoid double-counting.
    */
   sendTurnCostReport(resultData: {
     totalCostUsd: number;
     modelUsage: Record<string, { costUSD: number }>;
   }) {
-    // Compute delta from last reported cumulative cost.
-    // If cumulative drops (e.g., SDK reports 0 for aborted turn, or new process),
-    // treat it as a new run boundary — use the raw value as delta and reset baseline.
-    const isNewRun =
-      resultData.totalCostUsd < this.lastReportedCumulativeCost;
-    const deltaTotalCost = isNewRun
-      ? resultData.totalCostUsd
-      : Math.max(0, resultData.totalCostUsd - this.lastReportedCumulativeCost);
-    this.lastReportedCumulativeCost = resultData.totalCostUsd;
-
-    const cost: { [key: string]: number; total: number } = {
-      total: deltaTotalCost,
-    };
-    for (const [model, usage] of Object.entries(resultData.modelUsage)) {
-      const prevModelCost =
-        isNewRun ? 0 : this.lastReportedModelCosts[model] || 0;
-      cost[model] = Math.max(0, usage.costUSD - prevModelCost);
-      this.lastReportedModelCosts[model] = usage.costUSD;
-    }
-
-    if (isNewRun) {
-      // Reset all model costs for new run boundary
-      this.lastReportedModelCosts = {};
-      for (const [model, usage] of Object.entries(resultData.modelUsage)) {
-        this.lastReportedModelCosts[model] = usage.costUSD;
-      }
-    }
-
-    this.emitUsageReport(
-      "claude-session",
-      { total: 0, input: 0, output: 0 },
-      cost,
-      "[SOCKET] Sending turn-end cost report (SDK):",
-    );
+    this.usageReporter.reportTurnCost(resultData);
   }
 
   /**
