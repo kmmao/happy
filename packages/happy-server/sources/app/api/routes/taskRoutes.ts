@@ -15,6 +15,7 @@ import {
     buildTaskCreateData,
     dispatchTaskTrigger,
     loadTaskSkillContents,
+    profileUnavailableBody,
     resolveTaskRuntimeProfile,
     resolveTaskRuntimeProfileBestEffort,
     taskProfileFields,
@@ -153,11 +154,7 @@ export function taskRoutes(app: Fastify) {
                 },
             });
             if (profileResolution.kind === "failed") {
-                return reply.code(400).send({
-                    error: "profile_unavailable",
-                    reason: profileResolution.failure.reason,
-                    message: profileResolution.failure.message,
-                });
+                return reply.code(400).send(profileUnavailableBody(profileResolution.failure));
             }
             const { profileId: taskProfileId, runtimeProfile } = taskProfileFields(profileResolution);
 
@@ -356,11 +353,7 @@ export function taskRoutes(app: Fastify) {
                 },
             });
             if (retryResolution.kind === "failed") {
-                return reply.code(400).send({
-                    error: "profile_unavailable",
-                    reason: retryResolution.failure.reason,
-                    message: retryResolution.failure.message,
-                });
+                return reply.code(400).send(profileUnavailableBody(retryResolution.failure));
             }
             const { profileId: retryProfileId, runtimeProfile: retryRuntimeProfile } =
                 taskProfileFields(retryResolution);

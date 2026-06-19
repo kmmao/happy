@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   classifyStrandTick,
+  classifyOutputTick,
   DEFAULT_STRAND_THRESHOLDS,
   type StrandTickSignals,
 } from "./strandPolicy";
@@ -129,5 +130,36 @@ describe("classifyStrandTick — general idle thresholds", () => {
         T,
       ),
     ).toEqual({ action: "warn", kind: "stranded" });
+  });
+});
+
+describe("classifyOutputTick", () => {
+  it("counts output and refunds the redeliver budget after the grace window", () => {
+    expect(classifyOutputTick(5_000, 5_000)).toEqual({
+      countAsTurnOutput: true,
+      rearmRedeliverBudget: true,
+    });
+    expect(classifyOutputTick(10_000, 5_000)).toEqual({
+      countAsTurnOutput: true,
+      rearmRedeliverBudget: true,
+    });
+  });
+
+  it("treats a tick inside the grace window as a replay — neither counts nor refunds", () => {
+    expect(classifyOutputTick(4_999, 5_000)).toEqual({
+      countAsTurnOutput: false,
+      rearmRedeliverBudget: false,
+    });
+    expect(classifyOutputTick(0, 5_000)).toEqual({
+      countAsTurnOutput: false,
+      rearmRedeliverBudget: false,
+    });
+  });
+
+  it("with no grace window active (graceUntil=0) every tick is genuine output", () => {
+    expect(classifyOutputTick(1, 0)).toEqual({
+      countAsTurnOutput: true,
+      rearmRedeliverBudget: true,
+    });
   });
 });

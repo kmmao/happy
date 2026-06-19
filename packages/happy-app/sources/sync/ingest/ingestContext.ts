@@ -1,7 +1,8 @@
 /**
- * The minimal context required by SyncUpdateIngest. Replaces the 24-field
- * UpdateHandlerContext (`syncUpdateHandlers.ts:59–89`) that today threads
- * through every handler signature (see ADR-0026 Decision D).
+ * The minimal context required by SyncUpdateIngest. Replaced the 24-field
+ * UpdateHandlerContext that used to thread through every legacy handler
+ * signature; that context and `syncUpdateHandlers.ts` were retired in
+ * ADR-0026 PR 7 (see ADR-0026 Decision D).
  *
  * What this context owns:
  *

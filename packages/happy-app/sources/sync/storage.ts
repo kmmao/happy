@@ -2992,8 +2992,8 @@ export function useNeedsContinue(sessionId: string): boolean {
 
 /**
  * Latest TUI window title for `sessionId`, or `null` if none has been
- * received. Updated by `syncUpdateHandlers` whenever a `terminal-signal`
- * envelope of kind `window-title` lands. Consumers should treat it as a
+ * received. Updated by the `terminal-signal` ingest subscriber whenever a
+ * `terminal-signal` envelope of kind `window-title` lands. Consumers should treat it as a
  * higher-priority subtitle than the static project path so the user sees the
  * same context their native terminal would show.
  */
@@ -3006,8 +3006,8 @@ export function useSessionTerminalTitle(sessionId: string): string | null {
 /**
  * Live TUI status for `sessionId` (spinner verb + counters, ConEmu progress,
  * picker-pending flag), or `null` if no terminal-signal status events have
- * been received. Updated by `syncUpdateHandlers` on `activity` / `progress` /
- * `picker` terminal-signal envelopes.
+ * been received. Updated by the `terminal-signal` ingest subscriber on
+ * `activity` / `progress` / `picker` terminal-signal envelopes.
  */
 export function useSessionTerminalStatus(
   sessionId: string,

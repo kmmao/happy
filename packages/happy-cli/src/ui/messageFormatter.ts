@@ -1,6 +1,7 @@
 import chalk from 'chalk';
 import type { ClaudeJsonlMessage, ClaudeJsonlAssistantMessage, ClaudeJsonlResultMessage, ClaudeJsonlSystemMessage, ClaudeJsonlUserMessage } from '@/claude/jsonl';
 import { logger } from './logger';
+import { truncateForDisplay } from './truncate';
 
 export type OnAssistantResultCallback = (result: ClaudeJsonlResultMessage) => void | Promise<void>;
 
@@ -50,12 +51,8 @@ export function formatClaudeMessage(
                                 const outputStr = typeof block.content === 'string' 
                                     ? block.content 
                                     : JSON.stringify(block.content, null, 2);
-                                const maxLength = 200;
-                                if (outputStr.length > maxLength) {
-                                    logger.print(outputStr.substring(0, maxLength) + chalk.gray('\n... (truncated)'));
-                                } else {
-                                    logger.print(outputStr);
-                                }
+                                const { text, truncated } = truncateForDisplay(outputStr, 200);
+                                logger.print(truncated ? text + chalk.gray('\n... (truncated)') : text);
                             }
                         }
                     }
@@ -80,13 +77,8 @@ export function formatClaudeMessage(
                     } else if (block.type === 'tool_use') {
                         logger.print(chalk.yellow.bold(`\n🔧 Tool: ${block.name}`));
                         if (block.input) {
-                            const inputStr = JSON.stringify(block.input, null, 2);
-                            const maxLength = 500;
-                            if (inputStr.length > maxLength) {
-                                logger.print(chalk.gray('Input:'), inputStr.substring(0, maxLength) + chalk.gray('\n... (truncated)'));
-                            } else {
-                                logger.print(chalk.gray('Input:'), inputStr);
-                            }
+                            const { text, truncated } = truncateForDisplay(JSON.stringify(block.input, null, 2), 500);
+                            logger.print(chalk.gray('Input:'), truncated ? text + chalk.gray('\n... (truncated)') : text);
                         }
                     }
                 }

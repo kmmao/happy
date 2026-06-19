@@ -1,7 +1,28 @@
 import { log } from "@/log";
+import type { Encryption } from "./encryption/encryption";
 import type { SessionEncryption } from "./encryption/sessionEncryption";
 import type { MachineEncryption } from "./encryption/machineEncryption";
-import type { UpdateHandlerContext } from "./syncUpdateHandlers";
+
+/**
+ * The narrow context this seam actually needs — the encryptor lookup plus the
+ * per-scope race-recovery primitives (`awaitQueue` to block on an in-flight
+ * sync, `forceRefetch` to recover). `IngestContext` is structurally assignable
+ * to it, so the ingest seam passes its `ctx` directly with no adapter object.
+ */
+type ScopeEncryptionContext = {
+    readonly encryption: Pick<
+        Encryption,
+        "getSessionEncryption" | "getMachineEncryption"
+    >;
+    readonly sessionsSync: {
+        readonly awaitQueue: () => Promise<void>;
+        readonly forceRefetch: () => void;
+    };
+    readonly machinesSync: {
+        readonly awaitQueue: () => Promise<void>;
+        readonly forceRefetch: () => void;
+    };
+};
 
 /**
  * The single owner of one invariant that used to be copy-pasted — and had
@@ -50,14 +71,14 @@ async function resolveScope<E>(
  */
 export function resolveSessionEncryption(
     sessionId: string,
-    ctx: UpdateHandlerContext,
+    ctx: ScopeEncryptionContext,
     extraReady?: () => boolean,
 ): Promise<SessionEncryption | null> {
     return resolveScope(
         () => {
             const encryption = ctx.encryption.getSessionEncryption(sessionId);
             // Some callers (update-session) also need the session row to exist.
-            // fetchSessions registers the encryptor (initializeSessions) BEFORE
+            // forceRefetch registers the encryptor (initializeSessions) BEFORE
             // it writes the row (applySessions), so there is a window where the
             // encryptor exists but the row does not — gating on encryption alone
             // would drop the update in that window instead of awaiting the sync.
@@ -67,7 +88,7 @@ export function resolveSessionEncryption(
             return encryption;
         },
         () => ctx.sessionsSync.awaitQueue(),
-        () => ctx.fetchSessions(),
+        () => ctx.sessionsSync.forceRefetch(),
         `session ${sessionId}`,
     );
 }
@@ -79,12 +100,12 @@ export function resolveSessionEncryption(
  */
 export function resolveMachineEncryption(
     machineId: string,
-    ctx: UpdateHandlerContext,
+    ctx: ScopeEncryptionContext,
 ): Promise<MachineEncryption | null> {
     return resolveScope(
         () => ctx.encryption.getMachineEncryption(machineId),
         () => ctx.machinesSync.awaitQueue(),
-        () => ctx.fetchMachines(),
+        () => ctx.machinesSync.forceRefetch(),
         `machine ${machineId}`,
     );
 }

@@ -110,6 +110,15 @@ export class PendingQueueDispatcher {
           // auto-bypass.
           this.forceUnpaused.delete(sessionId);
           return;
+        default: {
+          // Exhaustiveness guard: a new SendBlockReason added to sendGate.ts
+          // fails typecheck HERE, forcing its side-effect contract to be
+          // handled. At runtime we fail safe — return without sending, never
+          // fall through to the dispatch below (a blocked verdict must block).
+          const _exhaustive: never = verdict.reason;
+          log.error(`pending-queue: unhandled send block reason '${String(_exhaustive)}' for session=${sessionId}; not sending`);
+          return;
+        }
       }
     }
 

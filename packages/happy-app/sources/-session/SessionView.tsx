@@ -135,6 +135,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useUnistyles } from "react-native-unistyles";
 import { Message, ToolCall } from "@/sync/typesMessage";
+import { hasPendingAskUserQuestion } from "@/sync/messageQueries";
 import { PermissionSheet } from "@/components/tools/PermissionSheet";
 import {
   buildOptionsHash,
@@ -195,24 +196,6 @@ function findPendingPermission(messages: readonly Message[]): PendingPermissionI
     }
   }
   return null;
-}
-
-function hasPendingAskUserQuestion(messages: readonly Message[]): boolean {
-  for (const msg of messages) {
-    if (msg.kind === "tool-call") {
-      if (
-        msg.tool.name === "AskUserQuestion" &&
-        msg.tool.state === "running" &&
-        msg.tool.permission?.status === "pending"
-      ) {
-        return true;
-      }
-      if (msg.children.length > 0 && hasPendingAskUserQuestion(msg.children)) {
-        return true;
-      }
-    }
-  }
-  return false;
 }
 
 export const SessionView = React.memo((props: { id: string }) => {

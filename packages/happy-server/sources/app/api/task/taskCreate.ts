@@ -110,6 +110,21 @@ export async function resolveTaskRuntimeProfileBestEffort(
         : { profileId: input.fallbackProfileId, runtimeProfile: undefined };
 }
 
+/**
+ * The response body every strict caller sends when profile resolution fails.
+ * Single-sourced here so the wire contract `{ error, reason, message }` stays
+ * identical across the manual (400), retry (400), and webhook (503) paths —
+ * the HTTP *status code* stays caller-owned (Task intake decision), only the
+ * body shape is shared.
+ */
+export function profileUnavailableBody(failure: ResolveRuntimeProfileFailure): {
+    error: "profile_unavailable";
+    reason: ResolveRuntimeProfileFailure["reason"];
+    message: ResolveRuntimeProfileFailure["message"];
+} {
+    return { error: "profile_unavailable", reason: failure.reason, message: failure.message };
+}
+
 /** Flatten a resolution into the profileId + runtimeProfile carried downstream. */
 export function taskProfileFields(resolution: TaskRuntimeProfileResolution): {
     profileId: string | undefined;

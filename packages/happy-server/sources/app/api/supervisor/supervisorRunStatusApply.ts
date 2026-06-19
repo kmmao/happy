@@ -32,6 +32,14 @@
  * (authenticated only by a callback token carrying a machineId) prove the run's
  * project belongs to that machine, while the daemon socket — already
  * authenticated as the machine by its connection — passes `false`.
+ *
+ * The invariant-dense action-resurfacing rules (pending > skipped > ignored
+ * priority, skipped→pending restore on return, ignored stays suppressed) are
+ * extracted as the pure `classifyReportedActions` (`@/modules/
+ * supervisorActionResurfacing`), pinned by its own spec; this module owns only
+ * turning the returned plan into the actual `supervisorAction` writes. Mirrors
+ * how `taskStatusApply` delegates its transition decision to the pure
+ * `decideTaskTransition`.
  */
 
 import { Prisma, type SupervisorRun } from "@prisma/client";
@@ -47,6 +55,7 @@ import { handleAutoApproval } from "./supervisorAutoApproval";
 import { pushSupervisorNotification } from "@/modules/pushSend";
 import { inboxCreate } from "@/modules/inboxCreate";
 import { contributeSupervisorKnowledge } from "@/modules/knowledgeContributor";
+import { classifyReportedActions } from "@/modules/supervisorActionResurfacing";
 
 /** A single finding reported alongside a terminal status. */
 export interface SupervisorRunStatusAction {
@@ -223,85 +232,58 @@ export async function supervisorRunStatusApply(
                 category: true,
                 title: true,
                 approval: true,
-                updatedAt: true,
             },
+            // Most-recent first so equal-priority same-key rows resolve to the
+            // newest one (the resurfacing tiebreak in classifyReportedActions).
             orderBy: { updatedAt: "desc" },
         });
 
-        // category::title → { id, approval }. When several rows share a key,
-        // prefer pending > skipped > ignored.
-        const approvalPriority: Record<string, number> = {
-            pending: 3,
-            skipped: 2,
-            ignored: 1,
-        };
-        const existingKeys = new Map<string, { id: string; approval: string }>();
-        for (const a of existingActions) {
-            const key = `${a.category}::${a.title}`;
-            const existing = existingKeys.get(key);
-            if (!existing || (approvalPriority[a.approval] ?? 0) > (approvalPriority[existing.approval] ?? 0)) {
-                existingKeys.set(key, { id: a.id, approval: a.approval });
-            }
-        }
+        // Pure resurfacing rules (pending > skipped > ignored, skip→pending
+        // restore, ignored stays suppressed) live in supervisorActionResurfacing
+        // and are pinned by its spec; here we just turn the plan into DB writes.
+        const plan = classifyReportedActions(reportedActions, existingActions);
 
-        const newActions: typeof reportedActions = [];
-        const updatedIds: string[] = [];
-        const restoredIds: string[] = [];
-        const suppressedIds: string[] = [];
-        const batchOps: ReturnType<typeof db.supervisorAction.update>[] = [];
-
-        for (const action of reportedActions) {
-            const key = `${action.category}::${action.title}`;
-            const existing = existingKeys.get(key);
-            if (!existing) {
-                newActions.push(action);
-            } else if (existing.approval === "pending") {
-                batchOps.push(
-                    db.supervisorAction.update({
-                        where: { id: existing.id },
-                        data: {
-                            lastSeenRunId: runId,
-                            description: action.description,
-                            suggestedFix: action.suggestedFix ?? null,
-                            confidence: action.confidence ?? null,
-                            severity: action.severity,
-                        },
-                    }),
-                );
-                updatedIds.push(existing.id);
-            } else if (existing.approval === "skipped") {
-                batchOps.push(
-                    db.supervisorAction.update({
-                        where: { id: existing.id },
-                        data: {
-                            approval: "pending",
-                            lastSeenRunId: runId,
-                            description: action.description,
-                            suggestedFix: action.suggestedFix ?? null,
-                            confidence: action.confidence ?? null,
-                            severity: action.severity,
-                        },
-                    }),
-                );
-                restoredIds.push(existing.id);
-            } else if (existing.approval === "ignored") {
-                batchOps.push(
-                    db.supervisorAction.update({
-                        where: { id: existing.id },
-                        data: { lastSeenRunId: runId },
-                    }),
-                );
-                suppressedIds.push(existing.id);
-            }
-        }
+        const batchOps: ReturnType<typeof db.supervisorAction.update>[] = [
+            ...plan.toUpdatePending.map(({ id: actionId, action }) =>
+                db.supervisorAction.update({
+                    where: { id: actionId },
+                    data: {
+                        lastSeenRunId: runId,
+                        description: action.description,
+                        suggestedFix: action.suggestedFix ?? null,
+                        confidence: action.confidence ?? null,
+                        severity: action.severity,
+                    },
+                }),
+            ),
+            ...plan.toRestoreFromSkip.map(({ id: actionId, action }) =>
+                db.supervisorAction.update({
+                    where: { id: actionId },
+                    data: {
+                        approval: "pending",
+                        lastSeenRunId: runId,
+                        description: action.description,
+                        suggestedFix: action.suggestedFix ?? null,
+                        confidence: action.confidence ?? null,
+                        severity: action.severity,
+                    },
+                }),
+            ),
+            ...plan.toSuppressIgnored.map(({ id: actionId }) =>
+                db.supervisorAction.update({
+                    where: { id: actionId },
+                    data: { lastSeenRunId: runId },
+                }),
+            ),
+        ];
 
         if (batchOps.length > 0) {
             await db.$transaction(batchOps);
         }
 
-        if (newActions.length > 0) {
+        if (plan.toCreate.length > 0) {
             await db.supervisorAction.createMany({
-                data: newActions.map((action) => ({
+                data: plan.toCreate.map((action) => ({
                     runId,
                     projectId: id,
                     accountId: userId,
@@ -322,7 +304,7 @@ export async function supervisorRunStatusApply(
 
         log(
             { module: "supervisor" },
-            `supervisor-run-status: ${newActions.length} new, ${updatedIds.length} deduped, ${restoredIds.length} restored from skip, ${suppressedIds.length} suppressed by ignore`,
+            `supervisor-run-status: ${plan.toCreate.length} new, ${plan.toUpdatePending.length} deduped, ${plan.toRestoreFromSkip.length} restored from skip, ${plan.toSuppressIgnored.length} suppressed by ignore`,
         );
 
         // Contribute findings to the knowledge base, terminal status only.

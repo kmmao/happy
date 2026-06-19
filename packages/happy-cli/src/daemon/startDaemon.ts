@@ -85,6 +85,7 @@ import {
   onHappySessionWebhook as onHappySessionWebhookAction,
   onSessionHeartbeat as onSessionHeartbeatAction,
 } from "./startDaemonSessionWebhook";
+import { createProcessTreeKiller } from "./daemonProcessTree";
 
 export { initialMachineMetadata };
 
@@ -264,30 +265,13 @@ export async function startDaemon(): Promise<void> {
     // Send signal to the process and its entire process group.
     // Using a negative PID kills all processes in the group (the spawned subtree).
     // Falls back to the direct PID if the process group signal fails.
-    const killProcessTree = (pid: number, signal: NodeJS.Signals = "SIGTERM") => {
-      try {
-        process.kill(-pid, signal);
-      } catch {
-        try {
-          process.kill(pid, signal);
-        } catch (e) {
-          logger.debug(`[DAEMON RUN] Failed to kill PID ${pid} with ${signal}:`, e);
-        }
-      }
-    };
-
-    // Schedule a SIGKILL escalation if the process doesn't exit within the grace period.
-    const scheduleKillEscalation = (pid: number, gracePeriodMs = 5000) => {
-      setTimeout(() => {
-        try {
-          process.kill(pid, 0); // check if still alive
-          logger.debug(`[DAEMON RUN] PID ${pid} still alive after grace period, sending SIGKILL`);
-          killProcessTree(pid, "SIGKILL");
-        } catch {
-          // process already exited, nothing to do
-        }
-      }, gracePeriodMs);
-    };
+    // Process-tree termination mechanics live in daemonProcessTree (a testable
+    // seam); the closure just wires process.kill + setTimeout into it.
+    const { killProcessTree, scheduleKillEscalation } = createProcessTreeKiller({
+      kill: (pid, signal) => process.kill(pid, signal),
+      schedule: (fn, ms) => setTimeout(fn, ms),
+      logger,
+    });
 
     const requestTrackedSessionTermination = (
       pid: number,

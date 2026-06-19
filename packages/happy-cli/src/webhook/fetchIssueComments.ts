@@ -4,8 +4,8 @@
  * Returns empty array on any failure — non-critical, must not block launch.
  */
 
-import { execFile } from "child_process";
 import { logger } from "@/ui/logger";
+import { execFileLocal } from "./execFileLocal";
 
 export interface IssueComment {
   readonly author: string;
@@ -15,31 +15,6 @@ export interface IssueComment {
 
 /** Only allow safe characters in owner/repo to prevent injection */
 const SAFE_NAME = /^[a-zA-Z0-9._-]+$/;
-
-function execFileAsync(
-  file: string,
-  args: readonly string[],
-  cwd: string,
-): Promise<{ stdout: string; stderr: string; exitCode: number }> {
-  return new Promise((resolve) => {
-    execFile(
-      file,
-      [...args],
-      { cwd, timeout: 30_000 },
-      (error, stdout, stderr) => {
-        resolve({
-          stdout: stdout ?? "",
-          stderr: stderr ?? "",
-          exitCode: error
-            ? typeof error.code === "number"
-              ? error.code
-              : 1
-            : 0,
-        });
-      },
-    );
-  });
-}
 
 /**
  * Parse owner/repo from a repo URL like "https://github.com/owner/repo".
@@ -99,7 +74,7 @@ export async function fetchIssueComments(
   }
 
   if (provider === "github") {
-    const result = await execFileAsync(
+    const result = await execFileLocal(
       "gh",
       [
         "api",
@@ -126,7 +101,7 @@ export async function fetchIssueComments(
         curlArgs.push("-H", `Authorization: token ${apiToken}`);
       }
       curlArgs.push(apiUrl);
-      const result = await execFileAsync("curl", curlArgs, cwd);
+      const result = await execFileLocal("curl", curlArgs, cwd);
       if (result.exitCode !== 0) return [];
       const lines = result.stdout.trim().split("\n");
       const httpStatus = lines.pop()?.trim() ?? "";

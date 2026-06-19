@@ -219,17 +219,23 @@ describe("AutoOptionSendService timer", () => {
         const passiveController = new AbortController();
         const generationController = new AbortController();
         const autoGenerationController = new AbortController();
+        // Per-session state now lives in one record per session (see SessionAosRecord);
+        // disposeSession drops the whole record in one delete.
         const internals = service as unknown as {
-            semanticControllers: Map<string, AbortController>;
-            passiveScoringControllers: Map<string, AbortController>;
-            generationControllers: Map<string, AbortController>;
-            autoGenerationControllers: Map<string, AbortController>;
+            sessions: Map<string, {
+                semanticController?: AbortController;
+                passiveScoringController?: AbortController;
+                generationController?: AbortController;
+                autoGenerationController?: AbortController;
+            }>;
         };
 
-        internals.semanticControllers.set("session-1", semanticController);
-        internals.passiveScoringControllers.set("session-1", passiveController);
-        internals.generationControllers.set("session-1", generationController);
-        internals.autoGenerationControllers.set("session-1", autoGenerationController);
+        internals.sessions.set("session-1", {
+            semanticController,
+            passiveScoringController: passiveController,
+            generationController,
+            autoGenerationController,
+        });
 
         service.disposeSession("session-1");
 
@@ -238,9 +244,6 @@ describe("AutoOptionSendService timer", () => {
         expect(generationController.signal.aborted).toBe(true);
         expect(autoGenerationController.signal.aborted).toBe(true);
         expect(abortSpy).toHaveBeenCalledTimes(4);
-        expect(internals.semanticControllers.has("session-1")).toBe(false);
-        expect(internals.passiveScoringControllers.has("session-1")).toBe(false);
-        expect(internals.generationControllers.has("session-1")).toBe(false);
-        expect(internals.autoGenerationControllers.has("session-1")).toBe(false);
+        expect(internals.sessions.has("session-1")).toBe(false);
     });
 });

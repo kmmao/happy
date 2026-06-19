@@ -11,6 +11,7 @@ import {
     buildTaskCreateData,
     dispatchTaskTrigger,
     loadTaskSkillContents,
+    profileUnavailableBody,
     resolveTaskRuntimeProfile,
     taskProfileFields,
 } from "@/app/api/task/taskCreate";
@@ -166,11 +167,7 @@ export function webhookTriggerRoutes(app: Fastify) {
                 },
             });
             if (profileResolution.kind === "failed") {
-                return reply.code(503).send({
-                    error: "profile_unavailable",
-                    reason: profileResolution.failure.reason,
-                    message: profileResolution.failure.message,
-                });
+                return reply.code(503).send(profileUnavailableBody(profileResolution.failure));
             }
             const { profileId: resolvedProfileId, runtimeProfile } = taskProfileFields(profileResolution);
 

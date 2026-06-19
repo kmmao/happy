@@ -6,6 +6,7 @@ import React from "react";
 import { claudeRemote, is1MModelKey, isSlashCommand } from "./claudeRemote";
 import {
   classifyStrandTick,
+  classifyOutputTick,
   DEFAULT_STRAND_THRESHOLDS,
 } from "./strandPolicy";
 import { mapToClaudeMode } from "./utils/permissionMode";
@@ -1168,18 +1169,15 @@ export async function claudeRemoteLauncher(
     // prompt. A turn genuinely streaming refreshes lastClaudeOutputAt via
     // PTY bytes regardless, so suppressing the flag here cannot cause a
     // false-positive recovery. See coldRestartGraceUntil declaration.
-    if (Date.now() >= coldRestartGraceUntil) {
+    // The cold-restart-grace invariant (replays inside the window are NOT this
+    // turn's output, and must not refund the redeliver budget) lives in the
+    // pure `classifyOutputTick` policy, pinned by strandPolicy.test.ts. See its
+    // doc + the `coldRestartGraceUntil` declaration for the incident rationale.
+    const outputEffect = classifyOutputTick(Date.now(), coldRestartGraceUntil);
+    if (outputEffect.countAsTurnOutput) {
       turnProducedOutput = true;
-      // Re-arm the one-shot redeliver budget ONLY on genuine post-grace
-      // output. sessionScanner bursts ~200 historical JSONL records into
-      // onMessage within the cold-restart grace window (Claude TUI rewrites
-      // the session file with a fresh sessionId on --resume — see
-      // coldRestartGraceUntil declaration). If we reset the counter on those
-      // replays, a single cold restart silently refunds the redeliver budget
-      // and a re-strand-loop could push the same prompt twice. Gating reset
-      // on the same grace window as turnProducedOutput keeps the invariant
-      // "redeliver budget is only refunded by output the redelivered prompt
-      // actually produced".
+    }
+    if (outputEffect.rearmRedeliverBudget) {
       strandRedeliverCount = 0;
     }
     clearWriteVerify();

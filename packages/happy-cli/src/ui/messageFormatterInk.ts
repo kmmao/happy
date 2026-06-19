@@ -1,6 +1,7 @@
 import type { ClaudeJsonlMessage, ClaudeJsonlAssistantMessage, ClaudeJsonlResultMessage, ClaudeJsonlSystemMessage, ClaudeJsonlUserMessage } from '@/claude/jsonl'
 import type { MessageBuffer } from './ink/messageBuffer'
 import { logger } from './logger'
+import { truncateForDisplay } from './truncate'
 
 export type OnAssistantResultInkCallback = (result: ClaudeJsonlResultMessage, messageBuffer: MessageBuffer) => void | Promise<void>
 
@@ -48,12 +49,8 @@ export function formatClaudeMessageForInk(
                                 const outputStr = typeof block.content === 'string' 
                                     ? block.content 
                                     : JSON.stringify(block.content, null, 2)
-                                const maxLength = 200
-                                if (outputStr.length > maxLength) {
-                                    messageBuffer.addMessage(outputStr.substring(0, maxLength) + '... (truncated)', 'result')
-                                } else {
-                                    messageBuffer.addMessage(outputStr, 'result')
-                                }
+                                const { text, truncated } = truncateForDisplay(outputStr, 200)
+                                messageBuffer.addMessage(truncated ? text + '... (truncated)' : text, 'result')
                             }
                         }
                     }
@@ -76,13 +73,8 @@ export function formatClaudeMessageForInk(
                     } else if (block.type === 'tool_use') {
                         messageBuffer.addMessage(`🔧 Tool: ${block.name}`, 'tool')
                         if (block.input) {
-                            const inputStr = JSON.stringify(block.input, null, 2)
-                            const maxLength = 500
-                            if (inputStr.length > maxLength) {
-                                messageBuffer.addMessage(`Input: ${inputStr.substring(0, maxLength)}... (truncated)`, 'tool')
-                            } else {
-                                messageBuffer.addMessage(`Input: ${inputStr}`, 'tool')
-                            }
+                            const { text, truncated } = truncateForDisplay(JSON.stringify(block.input, null, 2), 500)
+                            messageBuffer.addMessage(truncated ? `Input: ${text}... (truncated)` : `Input: ${text}`, 'tool')
                         }
                     }
                 }

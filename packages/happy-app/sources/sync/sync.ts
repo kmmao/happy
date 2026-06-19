@@ -32,17 +32,10 @@ import {
   normalizeRawMessage,
   RawRecord,
 } from "./typesRaw";
-import {
-  // All 12 handle*Update functions have been replaced by SyncUpdateIngest
-  // (PRs 3–5 per ADR-0026). Their exports remain in syncUpdateHandlers.ts
-  // for the moment; removal is deferred to PR 7 cleanup. Only the shared
-  // type aliases are still imported here.
-  type UpdateHandlerContext,
-  type ResearchConfigChange,
-} from "./syncUpdateHandlers";
 import { ingestSyncUpdate } from "./ingest/syncUpdateIngest";
 import { ingestEvents } from "./ingest/dispatcher";
 import type { IngestContext } from "./ingest/ingestContext";
+import type { ResearchConfigChange } from "./ingest/types";
 import {
   fetchArtifactsList as fetchArtifactsListAction,
   fetchArtifactWithBody as fetchArtifactWithBodyAction,
@@ -194,9 +187,10 @@ class Sync {
   /**
    * Single owner of per-session read position (seq) + live dedup. Replaces the
    * former parallel `sessionLastSeq` + `processedWebSocketMessageIds` maps; seq
-   * persistence is owned by the cursor's advanceTo (no ad-hoc saveLastSeq).
+   * persistence is owned by the cursor — `advanceTo` saves and `delete` deletes,
+   * so callers never pair `cursors.delete` with a separate `deleteLastSeq`.
    */
-  private cursors = new SessionMessageCursorRegistry(saveLastSeq, loadLastSeqs());
+  private cursors = new SessionMessageCursorRegistry(saveLastSeq, loadLastSeqs(), deleteLastSeq);
   private pendingOutbox = new Map<string, OutboxMessage[]>();
   // Owns the per-session message queue, serialization lock, processing flag,
   // and delta-batching frame. See sessionMessageProcessor.ts.
@@ -553,8 +547,7 @@ class Sync {
           // Always re-run full backfill for trimmed caches because only the
           // newest messages are persisted between app launches.
           if (!this.backfilledSessions.has(sessionId)) {
-            this.cursors.delete(sessionId);
-            deleteLastSeq(sessionId);
+            this.cursors.delete(sessionId); // also deletes persisted seq
           } else if (!this.cursors.has(sessionId)) {
             this.cursors.seed(sessionId, cached.lastSeq);
           }
@@ -570,8 +563,7 @@ class Sync {
         // Reset to 0 to force full re-fetch, otherwise history would be missing.
         // Clear any stale backfill boundary too — the tail range it claims to
         // cover is no longer guaranteed to be in storage.
-        this.cursors.delete(sessionId);
-        deleteLastSeq(sessionId);
+        this.cursors.delete(sessionId); // also deletes persisted seq
         deleteBackfillBoundary(sessionId);
         log.log(`💬 Reset lastSeq for ${sessionId} — no cache available`);
       }
@@ -595,8 +587,7 @@ class Sync {
    * from the beginning, recovering any messages that went missing.
    */
   forceReloadMessages = (sessionId: string): void => {
-    this.cursors.delete(sessionId);
-    deleteLastSeq(sessionId);
+    this.cursors.delete(sessionId); // also deletes persisted seq
     deleteBackfillBoundary(sessionId);
     this.backfilledSessions.delete(sessionId);
     this.sessionOldestSeq.delete(sessionId);
@@ -2238,42 +2229,13 @@ class Sync {
     });
   };
 
-  private get updateHandlerCtx(): UpdateHandlerContext {
-    return {
-      encryption: this.encryption,
-      artifactDataKeys: this.artifactDataKeys,
-      applySessions: this.applySessions.bind(this),
-      enqueueMessages: this.enqueueMessages.bind(this),
-      getMessagesSync: this.getMessagesSync.bind(this),
-      fetchSessions: () => { this.fetchSessions(); },
-      fetchMachines: () => { this.fetchMachines(); },
-      onSessionVisible: this.onSessionVisible.bind(this),
-      getCursor: (sessionId) => this.cursors.get(sessionId),
-      deleteCursor: (sessionId) => this.cursors.delete(sessionId),
-      deleted404Sessions: this.deleted404Sessions,
-      messagesSync: this.messagesSync as Map<string, { stop: () => void }>,
-      sendSync: this.sendSync as Map<string, { stop: () => void }>,
-      pendingOutbox: this.pendingOutbox as Map<string, unknown[]>,
-      deleteLastSeq: deleteLastSeq,
-      releaseMessageProcessing: (sessionId) =>
-        this.messageProcessor.release(sessionId),
-      artifactsSync: this.artifactsSync,
-      friendsSync: this.friendsSync,
-      friendRequestsSync: this.friendRequestsSync,
-      feedSync: this.feedSync,
-      projectsSync: this.projectsSync,
-      sessionsSync: this.sessionsSync,
-      machinesSync: this.machinesSync,
-      assumeUsers: this.assumeUsers.bind(this),
-    };
-  }
-
   /**
    * The reduced IngestContext consumed by `ingestSyncUpdate` (ADR-0026).
-   * Compare with the 24-field `updateHandlerCtx` above — everything the
-   * ingest seam doesn't need has moved to `ingestEvents` subscribers
-   * (sync invalidators, listener Sets) or to direct `storage.getState()`
-   * calls inside the seam (Zustand stays the store of record).
+   * This is the ONLY context the ingest seam needs — the 24-field legacy
+   * `UpdateHandlerContext` was retired in PR 7: everything the seam doesn't
+   * need moved to `ingestEvents` subscribers (sync invalidators, listener
+   * Sets) or to direct `storage.getState()` calls inside the seam (Zustand
+   * stays the store of record).
    */
   private get ingestCtx(): IngestContext {
     return {
@@ -2360,7 +2322,8 @@ class Sync {
       }
       this.pendingOutbox.delete(sessionId);
       pendingQueueDispatcher.disposeSession(sessionId);
-      deleteLastSeq(sessionId);
+      // Persisted seq is deleted by `ctx.cursor.delete` in the ingest delete
+      // handler (which runs before this event fires) — not repeated here.
       this.messageProcessor.release(sessionId);
     });
 

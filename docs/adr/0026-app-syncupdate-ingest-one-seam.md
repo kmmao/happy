@@ -124,3 +124,13 @@ The migration introduces no behavioral change in production; reviewer attention 
 - **Event ordering across subscribers.** Today subscribers fire in registration order. If a subscriber depends on an earlier subscriber's side effect (e.g. terminal-signal storing the title before notification reads it), ordering matters. We bet on no such cross-subscriber dependencies in the current event set; if one emerges, the dispatcher can grow a `priority` or replace registration-order with explicit dependency.
 - **SyncUpdate dedup-by-id.** Today `sync.ts` dedups by `update.id`; this should move into `ingestSyncUpdate` as a pre-step. PR 4 absorbs it.
 - **Cursor advancement seam.** `SessionMessageCursor` owns per-session seq + dedup independently today. After PR 5, `new-message` ingest will call into the cursor explicitly; the cursor itself stays an internal seam (it is already deep).
+
+## Status update — PR 7 landed (2026-06)
+
+The migration is complete. PR 7 cleanup:
+
+- `syncUpdateHandlers.ts` (1059 lines) and `syncUpdateHandlers.test.ts` deleted. All 12 `handle*Update` functions had zero call sites — `Sync.handleUpdate` already delegated everything to `ingestSyncUpdate` (the if-else chain collapsed in an earlier PR).
+- The legacy `UpdateHandlerContext` type and `Sync`'s dead `updateHandlerCtx` getter were removed. `ingestCtx` (the reduced `IngestContext`) is now the only context the ingest seam consumes.
+- `ResearchConfigChange` moved to its live home `ingest/types.ts` (it is the payload of the `research-config-changed` ingest event).
+- `syncEncryptionScope.ts` no longer depends on `UpdateHandlerContext`; `resolveSessionEncryption` / `resolveMachineEncryption` now take a narrow structural `ScopeEncryptionContext` (`encryption` + per-scope `awaitQueue`/`forceRefetch`). `IngestContext` is structurally assignable to it, which removed the 3 inline `as any` adapter objects the ingest seam used to build at each `resolve*Encryption` call site.
+- The startup-race / refetch-recovery invariant (#80/#84) is now pinned by a dedicated `syncEncryptionScope.test.ts` (5 tests); the duplicate race tests that lived on the deleted handler tests were dropped per the migration plan.

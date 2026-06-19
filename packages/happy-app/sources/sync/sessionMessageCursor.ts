@@ -124,11 +124,17 @@ export class SessionMessageCursor {
 export class SessionMessageCursorRegistry {
   private readonly cursors = new Map<string, SessionMessageCursor>();
   private readonly save: SaveLastSeq;
+  private readonly deleteSaved: (sessionId: string) => void;
   private readonly seeds: Map<string, number>;
 
-  constructor(save: SaveLastSeq, seeds: Map<string, number> = new Map()) {
+  constructor(
+    save: SaveLastSeq,
+    seeds: Map<string, number> = new Map(),
+    deleteSaved: (sessionId: string) => void = () => {},
+  ) {
     this.save = save;
     this.seeds = seeds;
+    this.deleteSaved = deleteSaved;
   }
 
   /** Get-or-create the cursor for a session, seeded from persisted seq once. */
@@ -169,9 +175,16 @@ export class SessionMessageCursorRegistry {
     }
   }
 
-  /** Forget a session entirely (seq + dedup). Used on delete / 404 cleanup. */
+  /**
+   * Forget a session entirely (seq + dedup), including the PERSISTED seq. Used on
+   * delete / 404 cleanup / forced refetch — every caller of `delete` wants the
+   * cursor reset to 0 on the next read, so the persisted seq must go too (else it
+   * re-seeds stale). Callers no longer pair this with a separate `deleteLastSeq`.
+   * Contrast with the eviction path, which uses `releaseDedup()` to KEEP the seq.
+   */
   delete(sessionId: string): void {
     this.cursors.delete(sessionId);
     this.seeds.delete(sessionId);
+    this.deleteSaved(sessionId);
   }
 }

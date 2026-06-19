@@ -3,8 +3,8 @@
  * Ported from happy-app's createWorktree.ts for CLI-side webhook handling.
  */
 
-import { execFile } from "child_process";
 import { logger } from "@/ui/logger";
+import { execFileLocal } from "./execFileLocal";
 
 const adjectives = [
   "clever",
@@ -79,31 +79,6 @@ function generateWorktreeName(): string {
   return `${adj}-${noun}-${hash}`;
 }
 
-function execFileAsync(
-  file: string,
-  args: readonly string[],
-  cwd: string,
-): Promise<{ stdout: string; stderr: string; exitCode: number }> {
-  return new Promise((resolve) => {
-    execFile(
-      file,
-      [...args],
-      { cwd, timeout: 30_000 },
-      (error, stdout, stderr) => {
-        resolve({
-          stdout: stdout ?? "",
-          stderr: stderr ?? "",
-          exitCode: error
-            ? typeof error.code === "number"
-              ? error.code
-              : 1
-            : 0,
-        });
-      },
-    );
-  });
-}
-
 export interface CreateWorktreeResult {
   readonly success: boolean;
   readonly worktreePath: string;
@@ -121,7 +96,7 @@ export async function removeWorktreeForced(
 ): Promise<void> {
   const worktreeRelPath = `.dev/worktree/${branchName}`;
   try {
-    await execFileAsync(
+    await execFileLocal(
       "git",
       ["worktree", "remove", worktreeRelPath, "--force"],
       basePath,
@@ -130,7 +105,7 @@ export async function removeWorktreeForced(
     /* best-effort */
   }
   try {
-    await execFileAsync("git", ["branch", "-D", branchName], basePath);
+    await execFileLocal("git", ["branch", "-D", branchName], basePath);
   } catch {
     /* best-effort */
   }
@@ -153,7 +128,7 @@ export async function fetchOriginBranch(
   basePath: string,
   branch: string,
 ): Promise<boolean> {
-  const result = await execFileAsync(
+  const result = await execFileLocal(
     "git",
     ["fetch", "origin", branch],
     basePath,
@@ -162,7 +137,7 @@ export async function fetchOriginBranch(
 }
 
 export async function resolveParentBranch(basePath: string): Promise<string> {
-  const branchResult = await execFileAsync(
+  const branchResult = await execFileLocal(
     "git",
     ["rev-parse", "--abbrev-ref", "HEAD"],
     basePath,
@@ -171,7 +146,7 @@ export async function resolveParentBranch(basePath: string): Promise<string> {
   if (branchResult.exitCode === 0 && branch && branch !== "HEAD") {
     return branch;
   }
-  const defaultResult = await execFileAsync(
+  const defaultResult = await execFileLocal(
     "git",
     ["symbolic-ref", "refs/remotes/origin/HEAD", "--short"],
     basePath,
@@ -195,7 +170,7 @@ export async function createWorktreeLocal(
       : randomPart;
 
   // Check if it's a git repository
-  const gitCheck = await execFileAsync(
+  const gitCheck = await execFileLocal(
     "git",
     ["rev-parse", "--git-dir"],
     basePath,
@@ -221,7 +196,7 @@ export async function createWorktreeLocal(
   const worktreeArgs = startPoint
     ? ["worktree", "add", "-b", name, worktreeRelPath, startPoint]
     : ["worktree", "add", "-b", name, worktreeRelPath];
-  let result = await execFileAsync("git", worktreeArgs, basePath);
+  let result = await execFileLocal("git", worktreeArgs, basePath);
 
   // If worktree/branch exists, try with numbered suffixes
   if (result.exitCode !== 0 && result.stderr.includes("already exists")) {
@@ -231,7 +206,7 @@ export async function createWorktreeLocal(
       const retryArgs = startPoint
         ? ["worktree", "add", "-b", newName, newRelPath, startPoint]
         : ["worktree", "add", "-b", newName, newRelPath];
-      result = await execFileAsync("git", retryArgs, basePath);
+      result = await execFileLocal("git", retryArgs, basePath);
 
       if (result.exitCode === 0) {
         logger.debug(

@@ -70,6 +70,45 @@ export const DEFAULT_STRAND_THRESHOLDS: StrandThresholds = {
   elapsedWedgeRecoverMs: 45_000,
 };
 
+/**
+ * Effect of one arriving JSONL output tick on the per-turn liveness latches.
+ * Both fields are decided here rather than inline in the launcher so the
+ * cold-restart-grace invariant — "JSONL arriving inside the grace window is a
+ * sessionScanner replay of pre-existing history (Claude rewrites the session
+ * file with a fresh id on --resume), not this turn's real output" — is pinned
+ * by a test instead of living as untested closure glue. Getting it wrong cost a
+ * 138s freeze + silent message loss (see `coldRestartGraceUntil` in
+ * claudeRemoteLauncherCore): a replay that flips `turnProducedOutput` masks a
+ * real submission wedge from the 90s fast-wedge path and blocks prompt
+ * redelivery; a replay that refunds the one-shot redeliver budget lets a
+ * re-strand-loop push the same prompt twice.
+ */
+export interface OutputTickEffect {
+  /** Flip the turn's "produced real output" latch true. */
+  countAsTurnOutput: boolean;
+  /** Refund the one-shot strand-redeliver budget (reset the counter to 0). */
+  rearmRedeliverBudget: boolean;
+}
+
+/**
+ * Decide how one JSONL output tick affects the per-turn liveness latches. A
+ * tick at or after `coldRestartGraceUntil` is genuine post-grace output (counts
+ * + refunds the budget); a tick before it is a cold-restart replay and does
+ * neither. The two effects share the grace gate today but are distinct
+ * decisions (output liveness vs. redeliver accounting), so each gets its own
+ * field rather than one boolean the caller reuses.
+ */
+export function classifyOutputTick(
+  nowMs: number,
+  coldRestartGraceUntil: number,
+): OutputTickEffect {
+  const genuinePostGraceOutput = nowMs >= coldRestartGraceUntil;
+  return {
+    countAsTurnOutput: genuinePostGraceOutput,
+    rearmRedeliverBudget: genuinePostGraceOutput,
+  };
+}
+
 /** Timing + state signals sampled at one watchdog tick. */
 export interface StrandTickSignals {
   /** ms since the last PTY byte / JSONL record (liveness). */

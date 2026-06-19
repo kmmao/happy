@@ -10,7 +10,7 @@ import { resolveActivityThinking } from "./reducer/resolveActivityThinking";
 import { ingestStorage, storage } from "./storage";
 import { log } from "@/log";
 import { Session, Machine } from "./storageTypes";
-import type { ResearchConfigChange } from "./syncUpdateHandlers";
+import type { ResearchConfigChange } from "./ingest/types";
 import {
   handleWebhookIssueLinked as issueHandleWebhookIssueLinked,
   handleWebhookPRMerged as issueHandleWebhookPRMerged,

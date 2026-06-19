@@ -149,6 +149,15 @@ describe("SessionMessageCursorRegistry (single owner)", () => {
     expect(reg.get("s1").lastSeq()).toBe(0);
   });
 
+  it("delete also deletes the persisted seq, so callers don't pair it", () => {
+    const save = vi.fn();
+    const deleteSaved = vi.fn();
+    const reg = new SessionMessageCursorRegistry(save, new Map(), deleteSaved);
+    reg.get("s1").advanceTo(9);
+    reg.delete("s1");
+    expect(deleteSaved).toHaveBeenCalledWith("s1");
+  });
+
   it("seed before first access primes the seq; seed after advances", () => {
     const reg = new SessionMessageCursorRegistry(vi.fn());
     reg.seed("s1", 12); // before get

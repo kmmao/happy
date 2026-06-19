@@ -28,7 +28,18 @@
  */
 
 import type { TerminalSignal } from "../typesRaw";
-import type { ResearchConfigChange } from "../syncUpdateHandlers";
+
+/**
+ * A single research-config KV change, surfaced by the `kv-batch-update`
+ * SyncUpdate variant and fanned out as the `research-config-changed` ingest
+ * event. Lives here (the ingest seam's type home) since ADR-0026 PR 7 retired
+ * the legacy `syncUpdateHandlers.ts`.
+ */
+export interface ResearchConfigChange {
+    projectId: string;
+    value: string | null;
+    version: number;
+}
 
 export type IngestEvent =
     // --- SyncUpdate-side: state-change / domain-fact events --------------

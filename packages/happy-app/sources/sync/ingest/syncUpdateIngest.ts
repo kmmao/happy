@@ -308,14 +308,7 @@ async function ingestUpdateMachine(
         daemonStateVersion: machine?.daemonStateVersion ?? 0,
     };
 
-    const machineEncryption = await resolveMachineEncryption(machineId, {
-        encryption: ctx.encryption,
-        machinesSync: {
-            awaitQueue: () => ctx.machinesSync.awaitQueue(),
-            invalidate: () => ctx.machinesSync.forceRefetch(),
-        },
-        fetchMachines: () => ctx.machinesSync.forceRefetch(),
-    } as any);
+    const machineEncryption = await resolveMachineEncryption(machineId, ctx);
     if (!machineEncryption) {
         return [];
     }
@@ -413,9 +406,10 @@ function ingestDeleteSession(
     ctx.encryption.removeSessionEncryption(sessionId);
     disposeSessionScopedState(sessionId);
 
-    // The cursor lives on ctx (per-session seq + dedup). Sync-class queues
-    // (messagesSync/sendSync/pendingOutbox/lastSeq/messageProcessor) are
-    // cleaned by the `session-deleted` subscriber.
+    // The cursor lives on ctx (per-session seq + dedup). `delete` forgets the
+    // in-memory cursor AND the persisted seq in one call. Other Sync-class queues
+    // (messagesSync/sendSync/pendingOutbox/messageProcessor) are cleaned by the
+    // `session-deleted` subscriber this handler's return value triggers.
     ctx.cursor.delete(sessionId);
 
     deleteBackfillBoundary(sessionId);
@@ -451,14 +445,7 @@ async function ingestUpdateSession(
 ): Promise<IngestEvent[]> {
     const sessionEncryption = await resolveSessionEncryption(
         body.id,
-        {
-            encryption: ctx.encryption,
-            sessionsSync: {
-                awaitQueue: () => ctx.sessionsSync.awaitQueue(),
-                invalidate: () => ctx.sessionsSync.forceRefetch(),
-            },
-            fetchSessions: () => ctx.sessionsSync.forceRefetch(),
-        } as any,
+        ctx,
         () => !!storage.getState().sessions[body.id],
     );
     if (!sessionEncryption) {
@@ -778,14 +765,7 @@ async function ingestNewMessage(
     body: NewMessageBody,
     ctx: IngestContext,
 ): Promise<IngestEvent[]> {
-    const sessionEncryption = await resolveSessionEncryption(body.sid, {
-        encryption: ctx.encryption,
-        sessionsSync: {
-            awaitQueue: () => ctx.sessionsSync.awaitQueue(),
-            invalidate: () => ctx.sessionsSync.forceRefetch(),
-        },
-        fetchSessions: () => ctx.sessionsSync.forceRefetch(),
-    } as any);
+    const sessionEncryption = await resolveSessionEncryption(body.sid, ctx);
     if (!sessionEncryption) {
         return [];
     }
