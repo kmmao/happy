@@ -12,6 +12,14 @@ This monorepo contains multiple packages, each with its own changelog:
 
 ## Recent Highlights
 
+### 2026-06-19
+
+- **happy-cli 0.101.2** — Fix duplicate "Context compacted" bubbles after one `/compact`. The `compact_boundary` JSONL record was being re-emitted as a session event on every `--resume` cold-swap (sessionScanner replays the historical record as new), so the App saw N copies of "Context compacted" — one real + one per intervening cold restart (observed: 4 bubbles after 1 `/compact` + 3 restarts). New `compactBoundaryDedup.tryRegisterCompactBoundaryEmission` gates emission on `compact_boundary.uuid`; the downstream summary poll is short-circuited on replay too. Pure-function helper with a 5-case vitest pinning the contract.
+
+- **happy-cli 0.101.1** — Two-bug fix for the `/compact → 96s wait → recovery → silence` failure mode. `claudeRemote.handleResult` now dispatches `promptIsCompact` for strand-redelivered `/compact`, and `maybeRedeliverStrandedPrompt` forces a tier-2 cold restart for any slash-command in-flight prompt (tier-1 Esc + paste was producing `/compact/compact` when the TUI composer wasn't fully cleared, which the TUI silently treats as prose). After `compact_boundary`, the new JSONL summary record is polled and emitted as a "Compaction summary:\n…" session event so users see the actual compacted text.
+
+- **happy-wire 0.33.0 + happy-cli 0.101.0 + happy-agent 0.8.0 + happy-app 2.43.0** — Removed the `autoCompact` protocol entirely. The modelMode key (`-1m` suffix on App-level keys, e.g. `opus-4-7-1m`) is now the single source of truth for both the 200K/1M window-tier choice and the 75%-threshold hint. Pre-fix the AUTO/200K/1M chip could disagree with the model picker — picking `opus-4-7-1m` while autoCompact stayed on AUTO silently downgraded back to 200K with no UI signal. Wire 0.33.0 is breaking (dropped `isAutoCompactEnabled` and `autoCompactThreshold` from `sessionContextUsageEventSchema`).
+
 ### 2026-06-05
 
 - **happy-app 2.36.2** — Chat header tightening: the live working directory introduced in 2.36.0 as a faint third row is folded into the existing Process ID subtitle as `Process ID N · <cwd>`, saving one row of vertical space on every session screen. The cwd label is now always rendered (falls back to the launch directory's basename when Claude has not moved), so you always see "where am I" at a glance. Backed by a new `formatSessionCwdLabel` helper with 18 unit tests covering POSIX / Windows / sibling / missing-path cases.

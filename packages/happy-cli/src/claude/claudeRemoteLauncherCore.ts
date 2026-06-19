@@ -48,6 +48,7 @@ import {
 import { fetchMcpRegistryServers } from "@/claude/utils/mcpRegistryReader";
 import { EnhancedMode } from "./loop";
 import { createSessionEventReporter } from "./sessionEventReporter";
+import { tryRegisterCompactBoundaryEmission } from "./compactBoundaryDedup";
 import { hashObject } from "@/utils/deterministicJson";
 import { getProjectPath } from "./utils/path";
 import { readFile, writeFile, mkdir } from "node:fs/promises";
@@ -973,6 +974,13 @@ export async function claudeRemoteLauncher(
   // already present from a prior /compact" (so we don't re-emit on a
   // boundary that produced no new summary record).
   let lastEmittedCompactionSummary: string | null = null;
+
+  // Uuid-keyed dedup state for `compact_boundary` replays. The actual
+  // once-per-uuid logic lives in `compactBoundaryDedup.ts` so the rule has a
+  // single test surface; the closure just owns the Set's lifetime (launcher
+  // instance scope, cleared implicitly on process exit). See that module's
+  // docblock for the cold-restart replay rationale.
+  const emittedCompactBoundaryUuids = new Set<string>();
 
   // Register RPC handler to allow App to fetch the latest compaction summary
   // In remote mode, read from the JSONL file on demand (no scanner available)
@@ -1914,38 +1922,50 @@ export async function claudeRemoteLauncher(
         // the "API call in progress" signal, so the persistent "Requesting..."
         // chat chip was redundant noise.
       } else if ((message as ClaudeJsonlCompactMsg).subtype === "compact_boundary") {
-        session.client.sendSessionEvent({
-          type: "message",
-          message: "Context compacted",
-        });
-        // Asynchronously surface the actual compaction summary text. The TUI
-        // writes a `type:"summary"` record alongside compact_boundary, but
-        // the file write can lag the boundary by milliseconds-to-seconds —
-        // pollForCompactionSummary handles the race. We snapshot the prior
-        // summary hash so a stale record (left over from an earlier /compact
-        // in this session) is not re-emitted on every boundary.
-        const compactedSessionId = session.sessionId;
-        if (compactedSessionId) {
-          const previousSummary = lastEmittedCompactionSummary;
-          void pollForCompactionSummary(compactedSessionId, previousSummary)
-            .then((summary) => {
-              if (!summary || summary === previousSummary) {
+        const boundaryUuid = (message as ClaudeJsonlCompactMsg).uuid;
+        // sessionScanner replays the same boundary uuid back into onMessage on
+        // every --resume cold-swap; emit-once gating lives in
+        // compactBoundaryDedup so the downstream summary poll is skipped on
+        // replays too (saves the JSONL re-read; lastEmittedCompactionSummary
+        // is the second line of defence for the summary text itself).
+        if (!tryRegisterCompactBoundaryEmission(emittedCompactBoundaryUuids, boundaryUuid)) {
+          logger.debug(
+            `[remote]: compact_boundary uuid=${boundaryUuid} already emitted — suppressing replay`,
+          );
+        } else {
+          session.client.sendSessionEvent({
+            type: "message",
+            message: "Context compacted",
+          });
+          // Asynchronously surface the actual compaction summary text. The TUI
+          // writes a `type:"summary"` record alongside compact_boundary, but
+          // the file write can lag the boundary by milliseconds-to-seconds —
+          // pollForCompactionSummary handles the race. We snapshot the prior
+          // summary hash so a stale record (left over from an earlier /compact
+          // in this session) is not re-emitted on every boundary.
+          const compactedSessionId = session.sessionId;
+          if (compactedSessionId) {
+            const previousSummary = lastEmittedCompactionSummary;
+            void pollForCompactionSummary(compactedSessionId, previousSummary)
+              .then((summary) => {
+                if (!summary || summary === previousSummary) {
+                  logger.debug(
+                    "[remote]: no new compaction summary observed after compact_boundary",
+                  );
+                  return;
+                }
+                lastEmittedCompactionSummary = summary;
+                session.client.sendSessionEvent({
+                  type: "message",
+                  message: `Compaction summary:\n${summary}`,
+                });
+              })
+              .catch((err) => {
                 logger.debug(
-                  "[remote]: no new compaction summary observed after compact_boundary",
+                  `[remote]: pollForCompactionSummary threw: ${err instanceof Error ? err.message : String(err)}`,
                 );
-                return;
-              }
-              lastEmittedCompactionSummary = summary;
-              session.client.sendSessionEvent({
-                type: "message",
-                message: `Compaction summary:\n${summary}`,
               });
-            })
-            .catch((err) => {
-              logger.debug(
-                `[remote]: pollForCompactionSummary threw: ${err instanceof Error ? err.message : String(err)}`,
-              );
-            });
+          }
         }
         // Pre-0.100.7 we armed an auto-compact cooldown latch here to gate
         // the next auto-push of `/compact`. The auto-push is gone (hint-
