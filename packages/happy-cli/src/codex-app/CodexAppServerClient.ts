@@ -458,6 +458,16 @@ function buildGrantedPermissions(
   return result;
 }
 
+/**
+ * Outcome of one app-server request handler: either a JSON-RPC result to send
+ * back, or an error message. The dispatch envelope (handleServerRequest) maps it
+ * uniformly onto sendResponse / sendError, so individual handlers never touch the
+ * transport and stay focused on their own extract → handler → shape logic.
+ */
+type ServerRequestOutcome =
+  | { kind: "respond"; result: unknown }
+  | { kind: "error"; message: string };
+
 export class CodexAppServerClient {
   private transport: CodexTransport | null = null;
   private injectedTransport: CodexTransport | null = null;
@@ -1241,286 +1251,41 @@ export class CodexAppServerClient {
     pending.resolve(payload.result);
   }
 
+  /**
+   * Dispatch table: app-server request method → handler producing a
+   * ServerRequestOutcome. Adding an approval / elicitation type is one entry
+   * here plus its handler method — no edit to the dispatch envelope below.
+   */
+  private readonly serverRequestHandlers: Map<
+    string,
+    (params: Record<string, unknown>, requestKey: string) => Promise<ServerRequestOutcome>
+  > = new Map([
+    ["item/commandExecution/requestApproval", (p, k) => this.handleCommandExecutionApproval(p, k)],
+    ["execCommandApproval", (p, k) => this.handleExecCommandApproval(p, k)],
+    ["item/fileChange/requestApproval", (p, k) => this.handleFileChangeApproval(p, k)],
+    ["applyPatchApproval", (p, k) => this.handleApplyPatchApproval(p, k)],
+    ["item/permissions/requestApproval", (p, k) => this.handlePermissionsApproval(p, k)],
+    ["item/tool/call", (p, k) => this.handleDynamicToolCall(p, k)],
+    ["item/tool/requestUserInput", (p) => this.handleRequestUserInput(p)],
+    ["mcpServer/elicitation/request", (p, k) => this.handleMcpElicitation(p, k)],
+    ["account/chatgptAuthTokens/refresh", () => this.handleChatGptAuthTokensRefresh()],
+  ]);
+
   private async handleServerRequest(payload: JsonRpcRequest): Promise<void> {
     const requestId = payload.id!;
     const requestKey = String(requestId);
-    const method = payload.method;
     const params = (payload.params || {}) as Record<string, unknown>;
 
     try {
-      if (method === "item/commandExecution/requestApproval") {
-        const decision = this.permissionHandler
-          ? mapPermissionDecision(
-              (
-                await this.permissionHandler.handleToolCall(requestKey, "CodexBash", {
-                  command: params.command,
-                  cwd: params.cwd,
-                  reason: params.reason,
-                  availableDecisions: params.availableDecisions,
-                })
-              ).decision,
-            )
-          : "cancel";
-        this.sendResponse(requestId, { decision });
-        return;
+      const handler = this.serverRequestHandlers.get(payload.method);
+      const outcome: ServerRequestOutcome = handler
+        ? await handler(params, requestKey)
+        : { kind: "respond", result: {} };
+      if (outcome.kind === "error") {
+        this.sendError(requestId, outcome.message);
+      } else {
+        this.sendResponse(requestId, outcome.result);
       }
-
-      if (method === "execCommandApproval") {
-        const permissionId =
-          typeof params.callId === "string" && params.callId.length > 0
-            ? params.callId
-            : requestKey;
-        const decision = this.permissionHandler
-          ? mapLegacyReviewDecision(
-              (
-                await this.permissionHandler.handleToolCall(permissionId, "CodexBash", {
-                  command: params.command,
-                  cwd: params.cwd,
-                  reason: params.reason,
-                  parsedCmd: params.parsedCmd,
-                  approvalId: params.approvalId,
-                })
-              ).decision,
-            )
-          : "abort";
-        this.sendResponse(requestId, { decision });
-        return;
-      }
-
-      if (method === "item/fileChange/requestApproval") {
-        const decision = this.permissionHandler
-          ? mapPermissionDecision(
-              (
-                await this.permissionHandler.handleToolCall(requestKey, "CodexPatch", {
-                  reason: params.reason,
-                  grantRoot: params.grantRoot,
-                })
-              ).decision,
-            )
-          : "cancel";
-        this.sendResponse(requestId, { decision });
-        return;
-      }
-
-      if (method === "applyPatchApproval") {
-        const permissionId =
-          typeof params.callId === "string" && params.callId.length > 0
-            ? params.callId
-            : requestKey;
-        const decision = this.permissionHandler
-          ? mapLegacyReviewDecision(
-              (
-                await this.permissionHandler.handleToolCall(permissionId, "CodexPatch", {
-                  reason: params.reason,
-                  grantRoot: params.grantRoot,
-                  fileChanges: params.fileChanges,
-                })
-              ).decision,
-            )
-          : "abort";
-        this.sendResponse(requestId, { decision });
-        return;
-      }
-
-      if (method === "item/permissions/requestApproval") {
-        const permissionId =
-          typeof params.itemId === "string" && params.itemId.length > 0
-            ? params.itemId
-            : requestKey;
-        const requestedToolName =
-          typeof params.itemId === "string" && params.itemId.length > 0
-            ? this.mcpToolNames.get(params.itemId) ?? null
-            : null;
-        const decision = this.permissionHandler
-          ? (
-              await this.permissionHandler.handleToolCall(
-                permissionId,
-                requestedToolName ?? "CodexPermissions",
-                {
-                  itemId: params.itemId,
-                  reason: params.reason,
-                  permissions: params.permissions,
-                  ...(requestedToolName
-                    ? { requestedToolName }
-                    : {}),
-                },
-              )
-            ).decision
-          : "abort";
-
-        if (decision === "approved" || decision === "approved_for_session") {
-          this.sendResponse(requestId, {
-            permissions: buildGrantedPermissions(
-              params.permissions as Record<string, unknown> | undefined,
-            ),
-            scope: decision === "approved_for_session" ? "session" : "turn",
-          });
-          return;
-        }
-
-        this.sendResponse(requestId, {
-          permissions: {},
-          scope: "turn",
-        });
-        return;
-      }
-
-      if (method === "item/tool/call") {
-        const dynamicCallId = String(params.callId ?? requestKey);
-        const dynamicToolName = String(params.tool ?? "").trim();
-        const dynamicToolArguments =
-          params.arguments && typeof params.arguments === "object"
-            ? (params.arguments as Record<string, unknown>)
-            : {};
-        if (dynamicToolName.length > 0) {
-          this.dynamicToolMetadata.set(dynamicCallId, {
-            toolName: dynamicToolName,
-            arguments: dynamicToolArguments,
-          });
-        }
-        const result = this.dynamicToolHandler
-          ? await this.dynamicToolHandler({
-              threadId: String(params.threadId ?? ""),
-              turnId: String(params.turnId ?? ""),
-              callId: dynamicCallId,
-              tool: dynamicToolName,
-              arguments: params.arguments,
-            })
-          : {
-              contentItems: [
-                {
-                  type: "inputText" as const,
-                  text: `Unsupported dynamic tool: ${String(params.tool ?? "unknown")}`,
-                },
-              ],
-              success: false,
-            };
-        this.sendResponse(requestId, result);
-        return;
-      }
-
-      if (method === "item/tool/requestUserInput") {
-        const questions = Array.isArray(params.questions)
-          ? (params.questions as AppServerQuestion[])
-          : [];
-        const result = this.elicitationHandler
-          ? await this.elicitationHandler(
-              {
-                serverName: "Codex",
-                message:
-                  questions.length > 0
-                    ? questions.map((question) => question.question).join("\n")
-                    : "Codex requires additional user input.",
-                mode: "form",
-                requestedSchema: buildElicitationSchema(questions),
-              },
-              { signal: AbortSignal.timeout(10 * 60 * 1000) },
-            )
-          : { action: "cancel" as const };
-
-        if (result.action !== "accept") {
-          this.sendResponse(requestId, { answers: {} });
-          return;
-        }
-
-        const answers = Object.fromEntries(
-          questions.map((question) => {
-            const value = result.content?.[question.id];
-            if (Array.isArray(value)) {
-              return [
-                question.id,
-                { answers: value.map((item) => String(item)) },
-              ];
-            }
-            if (value == null) {
-              return [question.id, { answers: [] }];
-            }
-            return [question.id, { answers: [String(value)] }];
-          }),
-        );
-        this.sendResponse(requestId, { answers });
-        return;
-      }
-
-      if (method === "mcpServer/elicitation/request") {
-        const requestedToolName = extractMcpToolNameFromApprovalRequest(params);
-        if (requestedToolName && this.permissionHandler) {
-          const permissionId =
-            typeof params.elicitationId === "string" && params.elicitationId.length > 0
-              ? params.elicitationId
-              : requestKey;
-          const decision = (
-            await this.permissionHandler.handleToolCall(permissionId, requestedToolName, {
-              reason: params.message,
-              requestedToolName,
-              serverName: params.serverName,
-              meta: params._meta,
-            })
-          ).decision;
-          this.sendResponse(requestId, {
-            action: mapElicitationDecision(decision),
-            content: decision === "approved" || decision === "approved_for_session" ? {} : null,
-            _meta: null,
-          });
-          return;
-        }
-
-        const mode = params.mode === "url" ? "url" : "form";
-        const result = this.elicitationHandler
-          ? await this.elicitationHandler(
-              {
-                serverName:
-                  typeof params.serverName === "string" &&
-                  params.serverName.length > 0
-                    ? params.serverName
-                    : "MCP Server",
-                message:
-                  typeof params.message === "string" && params.message.length > 0
-                    ? params.message
-                    : "MCP server requires user input.",
-                mode,
-                url:
-                  mode === "url" && typeof params.url === "string"
-                    ? params.url
-                    : undefined,
-                requestedSchema:
-                  mode === "form" &&
-                  params.requestedSchema &&
-                  typeof params.requestedSchema === "object"
-                    ? (params.requestedSchema as Record<string, unknown>)
-                    : undefined,
-              },
-              { signal: AbortSignal.timeout(10 * 60 * 1000) },
-            )
-          : { action: "cancel" as const };
-
-        this.sendResponse(requestId, {
-          action: result.action,
-          content: result.action === "accept" ? result.content ?? null : null,
-          _meta: null,
-        });
-        return;
-      }
-
-      if (method === "account/chatgptAuthTokens/refresh") {
-        if (!this.chatGptAuthTokensProvider) {
-          this.sendError(requestId, "No ChatGPT auth token provider configured");
-          return;
-        }
-        const refreshed = await this.chatGptAuthTokensProvider();
-        if (!refreshed) {
-          this.sendError(requestId, "No ChatGPT auth tokens available");
-          return;
-        }
-        this.sendResponse(requestId, {
-          accessToken: refreshed.accessToken,
-          chatgptAccountId: refreshed.chatgptAccountId,
-          chatgptPlanType: refreshed.chatgptPlanType ?? null,
-        });
-        return;
-      }
-
-      this.sendResponse(requestId, {});
     } catch (error) {
       logger.debug("[CodexAppServer] Server request handler failed", error);
       this.sendError(
@@ -1528,6 +1293,288 @@ export class CodexAppServerClient {
         error instanceof Error ? error.message : "Server request handler failed",
       );
     }
+  }
+
+  private async handleCommandExecutionApproval(
+    params: Record<string, unknown>,
+    requestKey: string,
+  ): Promise<ServerRequestOutcome> {
+    const decision = this.permissionHandler
+      ? mapPermissionDecision(
+          (
+            await this.permissionHandler.handleToolCall(requestKey, "CodexBash", {
+              command: params.command,
+              cwd: params.cwd,
+              reason: params.reason,
+              availableDecisions: params.availableDecisions,
+            })
+          ).decision,
+        )
+      : "cancel";
+    return { kind: "respond", result: { decision } };
+  }
+
+  private async handleExecCommandApproval(
+    params: Record<string, unknown>,
+    requestKey: string,
+  ): Promise<ServerRequestOutcome> {
+    const permissionId =
+      typeof params.callId === "string" && params.callId.length > 0
+        ? params.callId
+        : requestKey;
+    const decision = this.permissionHandler
+      ? mapLegacyReviewDecision(
+          (
+            await this.permissionHandler.handleToolCall(permissionId, "CodexBash", {
+              command: params.command,
+              cwd: params.cwd,
+              reason: params.reason,
+              parsedCmd: params.parsedCmd,
+              approvalId: params.approvalId,
+            })
+          ).decision,
+        )
+      : "abort";
+    return { kind: "respond", result: { decision } };
+  }
+
+  private async handleFileChangeApproval(
+    params: Record<string, unknown>,
+    requestKey: string,
+  ): Promise<ServerRequestOutcome> {
+    const decision = this.permissionHandler
+      ? mapPermissionDecision(
+          (
+            await this.permissionHandler.handleToolCall(requestKey, "CodexPatch", {
+              reason: params.reason,
+              grantRoot: params.grantRoot,
+            })
+          ).decision,
+        )
+      : "cancel";
+    return { kind: "respond", result: { decision } };
+  }
+
+  private async handleApplyPatchApproval(
+    params: Record<string, unknown>,
+    requestKey: string,
+  ): Promise<ServerRequestOutcome> {
+    const permissionId =
+      typeof params.callId === "string" && params.callId.length > 0
+        ? params.callId
+        : requestKey;
+    const decision = this.permissionHandler
+      ? mapLegacyReviewDecision(
+          (
+            await this.permissionHandler.handleToolCall(permissionId, "CodexPatch", {
+              reason: params.reason,
+              grantRoot: params.grantRoot,
+              fileChanges: params.fileChanges,
+            })
+          ).decision,
+        )
+      : "abort";
+    return { kind: "respond", result: { decision } };
+  }
+
+  private async handlePermissionsApproval(
+    params: Record<string, unknown>,
+    requestKey: string,
+  ): Promise<ServerRequestOutcome> {
+    const permissionId =
+      typeof params.itemId === "string" && params.itemId.length > 0
+        ? params.itemId
+        : requestKey;
+    const requestedToolName =
+      typeof params.itemId === "string" && params.itemId.length > 0
+        ? this.mcpToolNames.get(params.itemId) ?? null
+        : null;
+    const decision = this.permissionHandler
+      ? (
+          await this.permissionHandler.handleToolCall(
+            permissionId,
+            requestedToolName ?? "CodexPermissions",
+            {
+              itemId: params.itemId,
+              reason: params.reason,
+              permissions: params.permissions,
+              ...(requestedToolName ? { requestedToolName } : {}),
+            },
+          )
+        ).decision
+      : "abort";
+
+    if (decision === "approved" || decision === "approved_for_session") {
+      return {
+        kind: "respond",
+        result: {
+          permissions: buildGrantedPermissions(
+            params.permissions as Record<string, unknown> | undefined,
+          ),
+          scope: decision === "approved_for_session" ? "session" : "turn",
+        },
+      };
+    }
+
+    return { kind: "respond", result: { permissions: {}, scope: "turn" } };
+  }
+
+  private async handleDynamicToolCall(
+    params: Record<string, unknown>,
+    requestKey: string,
+  ): Promise<ServerRequestOutcome> {
+    const dynamicCallId = String(params.callId ?? requestKey);
+    const dynamicToolName = String(params.tool ?? "").trim();
+    const dynamicToolArguments =
+      params.arguments && typeof params.arguments === "object"
+        ? (params.arguments as Record<string, unknown>)
+        : {};
+    if (dynamicToolName.length > 0) {
+      this.dynamicToolMetadata.set(dynamicCallId, {
+        toolName: dynamicToolName,
+        arguments: dynamicToolArguments,
+      });
+    }
+    const result = this.dynamicToolHandler
+      ? await this.dynamicToolHandler({
+          threadId: String(params.threadId ?? ""),
+          turnId: String(params.turnId ?? ""),
+          callId: dynamicCallId,
+          tool: dynamicToolName,
+          arguments: params.arguments,
+        })
+      : {
+          contentItems: [
+            {
+              type: "inputText" as const,
+              text: `Unsupported dynamic tool: ${String(params.tool ?? "unknown")}`,
+            },
+          ],
+          success: false,
+        };
+    return { kind: "respond", result };
+  }
+
+  private async handleRequestUserInput(
+    params: Record<string, unknown>,
+  ): Promise<ServerRequestOutcome> {
+    const questions = Array.isArray(params.questions)
+      ? (params.questions as AppServerQuestion[])
+      : [];
+    const result = this.elicitationHandler
+      ? await this.elicitationHandler(
+          {
+            serverName: "Codex",
+            message:
+              questions.length > 0
+                ? questions.map((question) => question.question).join("\n")
+                : "Codex requires additional user input.",
+            mode: "form",
+            requestedSchema: buildElicitationSchema(questions),
+          },
+          { signal: AbortSignal.timeout(10 * 60 * 1000) },
+        )
+      : { action: "cancel" as const };
+
+    if (result.action !== "accept") {
+      return { kind: "respond", result: { answers: {} } };
+    }
+
+    const answers = Object.fromEntries(
+      questions.map((question) => {
+        const value = result.content?.[question.id];
+        if (Array.isArray(value)) {
+          return [question.id, { answers: value.map((item) => String(item)) }];
+        }
+        if (value == null) {
+          return [question.id, { answers: [] }];
+        }
+        return [question.id, { answers: [String(value)] }];
+      }),
+    );
+    return { kind: "respond", result: { answers } };
+  }
+
+  private async handleMcpElicitation(
+    params: Record<string, unknown>,
+    requestKey: string,
+  ): Promise<ServerRequestOutcome> {
+    const requestedToolName = extractMcpToolNameFromApprovalRequest(params);
+    if (requestedToolName && this.permissionHandler) {
+      const permissionId =
+        typeof params.elicitationId === "string" && params.elicitationId.length > 0
+          ? params.elicitationId
+          : requestKey;
+      const decision = (
+        await this.permissionHandler.handleToolCall(permissionId, requestedToolName, {
+          reason: params.message,
+          requestedToolName,
+          serverName: params.serverName,
+          meta: params._meta,
+        })
+      ).decision;
+      return {
+        kind: "respond",
+        result: {
+          action: mapElicitationDecision(decision),
+          content: decision === "approved" || decision === "approved_for_session" ? {} : null,
+          _meta: null,
+        },
+      };
+    }
+
+    const mode = params.mode === "url" ? "url" : "form";
+    const result = this.elicitationHandler
+      ? await this.elicitationHandler(
+          {
+            serverName:
+              typeof params.serverName === "string" && params.serverName.length > 0
+                ? params.serverName
+                : "MCP Server",
+            message:
+              typeof params.message === "string" && params.message.length > 0
+                ? params.message
+                : "MCP server requires user input.",
+            mode,
+            url:
+              mode === "url" && typeof params.url === "string" ? params.url : undefined,
+            requestedSchema:
+              mode === "form" &&
+              params.requestedSchema &&
+              typeof params.requestedSchema === "object"
+                ? (params.requestedSchema as Record<string, unknown>)
+                : undefined,
+          },
+          { signal: AbortSignal.timeout(10 * 60 * 1000) },
+        )
+      : { action: "cancel" as const };
+
+    return {
+      kind: "respond",
+      result: {
+        action: result.action,
+        content: result.action === "accept" ? result.content ?? null : null,
+        _meta: null,
+      },
+    };
+  }
+
+  private async handleChatGptAuthTokensRefresh(): Promise<ServerRequestOutcome> {
+    if (!this.chatGptAuthTokensProvider) {
+      return { kind: "error", message: "No ChatGPT auth token provider configured" };
+    }
+    const refreshed = await this.chatGptAuthTokensProvider();
+    if (!refreshed) {
+      return { kind: "error", message: "No ChatGPT auth tokens available" };
+    }
+    return {
+      kind: "respond",
+      result: {
+        accessToken: refreshed.accessToken,
+        chatgptAccountId: refreshed.chatgptAccountId,
+        chatgptPlanType: refreshed.chatgptPlanType ?? null,
+      },
+    };
   }
 
   private handleNotification(method: string, params: unknown): void {
