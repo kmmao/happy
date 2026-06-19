@@ -94,6 +94,35 @@ describe("reduceTurn", () => {
     expect(dispatch({ t: "turnEnd" })).toEqual([]);
   });
 
+  // Bug pinned (2026-06-19): strand recovery may redeliver `/compact` via
+  // the queue after a tier-1 wedge — claudeRemote.handleResult re-detects
+  // the slash command and MUST dispatch promptIsCompact again so the
+  // reducer is armed for THIS turn's compact_boundary. Pre-fix this
+  // dispatch was missing: a successful redelivery still emitted no
+  // "Compaction completed", and the user saw only the initial-turn's
+  // "Compaction started" hint followed by silence after recovery.
+  it("redelivered /compact arms the reducer just like the initial one", () => {
+    const { dispatch } = createClaudeTurnReducer();
+
+    // Initial turn: /compact wedges, no boundary arrives, turn ends.
+    dispatch({ t: "promptIsCompact" });
+    expect(dispatch({ t: "turnEnd" })).toEqual<ReducerOutput[]>([
+      {
+        t: "emitCompletion",
+        text: "Compaction skipped — TUI did not compact this turn",
+      },
+    ]);
+
+    // Strand-recovery redelivers /compact onto a fresh PTY (cold restart),
+    // claudeRemote.handleResult re-dispatches promptIsCompact, the TUI
+    // actually compacts this time, turn ends — completed must fire.
+    dispatch({ t: "promptIsCompact" });
+    dispatch({ t: "compactBoundary" });
+    expect(dispatch({ t: "turnEnd" })).toEqual<ReducerOutput[]>([
+      { t: "emitCompletion", text: "Compaction completed" },
+    ]);
+  });
+
   it("a fresh promptIsCompact clears prior compactBoundaryObserved", () => {
     // Strand recovery edge case — turnEnd never fired for the prior
     // /compact, so the observation flag was left set. The next

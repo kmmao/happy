@@ -3,7 +3,7 @@ import { Session } from "./session";
 import { MessageBuffer } from "@/ui/ink/messageBuffer";
 import { RemoteModeDisplay } from "@/ui/ink/RemoteModeDisplay";
 import React from "react";
-import { claudeRemote, is1MModelKey } from "./claudeRemote";
+import { claudeRemote, is1MModelKey, isSlashCommand } from "./claudeRemote";
 import { mapToClaudeMode } from "./utils/permissionMode";
 import { PermissionHandler } from "./utils/permissionHandler";
 import { Future } from "@/utils/future";
@@ -540,6 +540,52 @@ export async function claudeRemoteLauncher(
     }
     strandRedeliverCount++;
     const { message, mode } = inFlightPrompt;
+
+    // Slash commands (`/compact`, `/clear`, `/model …`) cannot be safely
+    // re-pasted onto the same PTY. The tier-1 Esc does not reliably clear
+    // the TUI composer in every state — vim NORMAL mode, mid-turn drain
+    // races, and Ink raw-mode reattach can leave the original paste
+    // partially in the composer. Re-pasting `/compact` onto a composer
+    // that still contains `/compact` yields `/compact/compact`, which is
+    // not a valid slash command — the TUI silently treats it as prose,
+    // `compact_boundary` never fires, and the user sees only "Compaction
+    // started" followed by a long silence (see the symptom screenshot
+    // that motivated this fix). For prose the same concat is recoverable
+    // (it just gets typed twice), but for slash commands the command
+    // itself is destroyed.
+    //
+    // Force a tier-2 cold restart instead: the new PTY's composer is
+    // guaranteed empty, and the queue-pushed slash command lands cleanly
+    // as the first prompt of the new launch iteration.
+    if (isSlashCommand(message)) {
+      logger.debug(
+        `[remote][strand] in-flight prompt is slash command (${message.trim().slice(0, 40)}) — forcing cold restart instead of paste redeliver to avoid composer concat`,
+      );
+      session.client.sendSessionEvent({
+        type: "message",
+        message: "Session recovered — restarting to safely resend slash command…",
+      });
+      // Push the slash command back onto the queue so the post-restart
+      // launch iteration picks it up via nextMessage(). urgent priority
+      // keeps it ahead of any backlog the user accumulated during the
+      // wedge window.
+      session.queue.push(message, mode, undefined, {
+        priority: "urgent",
+        kind: "prompt",
+        source: "strand-redeliver-coldrestart",
+      });
+      inFlightPrompt = null;
+      lastColdRestartAt = Date.now();
+      strandColdRestart = true;
+      // Fire-and-forget abort — the await in the outer launch loop will
+      // unwind, finally runs, and the while(!exitReason) loop spawns a
+      // fresh PTY. We deliberately do NOT await here because
+      // recoverStrandedTurn's finally needs to clear strandRecoveryInFlight
+      // before the next iteration's watchdog ticks.
+      void abort();
+      return;
+    }
+
     logger.debug(
       `[remote][strand] re-delivering stranded prompt (turn produced 0 output, attempt ${strandRedeliverCount}) — ${message.length} chars`,
     );
@@ -868,6 +914,65 @@ export async function claudeRemoteLauncher(
       return { ok: true };
     },
   );
+
+  // Read the latest `type:"summary"` record from a session JSONL file.
+  // Shared between the getCompactionSummary RPC (App-pull) and the
+  // post-compact_boundary auto-emit (CLI-push) so both use the same
+  // parsing contract.
+  async function readLatestSummaryFromJsonl(
+    sessionId: string,
+  ): Promise<string | null> {
+    try {
+      const projectDir = getProjectPath(session.path);
+      const filePath = join(projectDir, `${sessionId}.jsonl`);
+      const content = await readFile(filePath, "utf-8");
+      let latestSummary: string | null = null;
+      for (const line of content.split("\n")) {
+        if (!line.trim()) continue;
+        try {
+          const parsed = JSON.parse(line);
+          if (parsed.type === "summary" && parsed.summary) {
+            latestSummary = parsed.summary;
+          }
+        } catch {
+          continue;
+        }
+      }
+      return latestSummary;
+    } catch {
+      return null;
+    }
+  }
+
+  // After a `compact_boundary` JSONL record fires, the TUI writes a
+  // `type:"summary"` record alongside it — but the two records can land
+  // out-of-order (boundary first, then summary milliseconds-to-seconds
+  // later, depending on which API call returned first). Poll briefly so
+  // the user-visible event lands shortly after the boundary without
+  // racing the file write. Returns the summary text (suitable for an
+  // emit-as-event) or null when no summary ever materializes.
+  async function pollForCompactionSummary(
+    sessionId: string,
+    sinceSummaryHash: string | null,
+  ): Promise<string | null> {
+    const POLL_INTERVAL_MS = 250;
+    const MAX_POLL_MS = 8_000;
+    const startedAt = Date.now();
+    while (Date.now() - startedAt < MAX_POLL_MS) {
+      const summary = await readLatestSummaryFromJsonl(sessionId);
+      if (summary && summary !== sinceSummaryHash) {
+        return summary;
+      }
+      await new Promise<void>((r) => setTimeout(r, POLL_INTERVAL_MS));
+    }
+    return null;
+  }
+
+  // Snapshot of the most recently emitted compaction summary, used to
+  // distinguish "new summary just written by THIS /compact" from "summary
+  // already present from a prior /compact" (so we don't re-emit on a
+  // boundary that produced no new summary record).
+  let lastEmittedCompactionSummary: string | null = null;
 
   // Register RPC handler to allow App to fetch the latest compaction summary
   // In remote mode, read from the JSONL file on demand (no scanner available)
@@ -1813,6 +1918,35 @@ export async function claudeRemoteLauncher(
           type: "message",
           message: "Context compacted",
         });
+        // Asynchronously surface the actual compaction summary text. The TUI
+        // writes a `type:"summary"` record alongside compact_boundary, but
+        // the file write can lag the boundary by milliseconds-to-seconds —
+        // pollForCompactionSummary handles the race. We snapshot the prior
+        // summary hash so a stale record (left over from an earlier /compact
+        // in this session) is not re-emitted on every boundary.
+        const compactedSessionId = session.sessionId;
+        if (compactedSessionId) {
+          const previousSummary = lastEmittedCompactionSummary;
+          void pollForCompactionSummary(compactedSessionId, previousSummary)
+            .then((summary) => {
+              if (!summary || summary === previousSummary) {
+                logger.debug(
+                  "[remote]: no new compaction summary observed after compact_boundary",
+                );
+                return;
+              }
+              lastEmittedCompactionSummary = summary;
+              session.client.sendSessionEvent({
+                type: "message",
+                message: `Compaction summary:\n${summary}`,
+              });
+            })
+            .catch((err) => {
+              logger.debug(
+                `[remote]: pollForCompactionSummary threw: ${err instanceof Error ? err.message : String(err)}`,
+              );
+            });
+        }
         // Pre-0.100.7 we armed an auto-compact cooldown latch here to gate
         // the next auto-push of `/compact`. The auto-push is gone (hint-
         // only path) so there is nothing to gate — the user fires /compact

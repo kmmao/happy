@@ -1303,6 +1303,23 @@ export async function claudeRemote(opts: {
       }
 
       const nextSpecialCommand = parseSpecialCommand(next.message);
+      // Follow-up /compact must dispatch promptIsCompact to the reducer the
+      // same way the initial-message path does — otherwise the reducer stays
+      // in initial state (isCompactCommand:false), compact_boundary is
+      // ignored, and neither "Compaction started" nor "Compaction completed/
+      // skipped" surfaces to the user. This branch fixes the strand-redeliver
+      // case where a /compact wedged the first turn, recovered, and got re-
+      // pushed via session.queue → next.message here. Pre-fix the UI showed
+      // a single "Compaction started" from the initial turn and then went
+      // silent after recovery, leaving the user guessing whether compaction
+      // succeeded.
+      if (nextSpecialCommand.type === "compact") {
+        logger.debug(
+          "[claudeRemote] follow-up /compact command detected — dispatching promptIsCompact",
+        );
+        turnReducer.dispatch({ t: "promptIsCompact" });
+        opts.onCompletionEvent?.("Compaction started");
+      }
       if (
         nextSpecialCommand.type === "shell" &&
         nextSpecialCommand.shellCommand
