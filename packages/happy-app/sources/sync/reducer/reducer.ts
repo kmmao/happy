@@ -283,6 +283,12 @@ const LIFECYCLE_DEDUP_MESSAGES = new Set([
   "Compaction started",
   "Compaction completed",
   "Compacting context...",
+  // "Context compacted" is the CLI-side `compact_boundary` confirmation. It
+  // gets replayed by sessionScanner on every --resume cold-swap; the CLI
+  // landed a uuid-keyed guard but this second-line defence stays in case a
+  // future regression slips through (matches the WebSocket/REST race the
+  // other lifecycle entries already cover).
+  "Context compacted",
 ]);
 
 export function reducer(
@@ -1444,9 +1450,10 @@ export function reducer(
 
       // Content-based dedup for lifecycle event messages: if two events with the
       // same message content arrive within 5 seconds (different DB IDs — race
-      // condition between WebSocket push and a concurrent API fetch), show only
-      // the first one. Covers: "Context was reset", "Compaction started",
-      // "Compaction completed", "Compacting context...".
+      // condition between WebSocket push and a concurrent API fetch, or a
+      // cold-restart sessionScanner replay missed by the CLI uuid guard), show
+      // only the first one. Covers: "Context was reset", "Compaction started",
+      // "Compaction completed", "Compacting context...", "Context compacted".
       if (msg.content.type === "message" && LIFECYCLE_DEDUP_MESSAGES.has(msg.content.message)) {
         const lastAt = state.recentEventMessageTimes.get(msg.content.message);
         if (lastAt !== undefined && msg.createdAt - lastAt < 5000) {

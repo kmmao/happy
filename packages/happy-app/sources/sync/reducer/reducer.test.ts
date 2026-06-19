@@ -3452,6 +3452,37 @@ describe('reducer', () => {
             expect(result2.messages.filter(m => m.kind === 'agent-event')).toHaveLength(0);
         });
 
+        // The CLI emits "Context compacted" on every `compact_boundary`. After
+        // a --resume cold-swap, sessionScanner replays the historical boundary
+        // record (see claudeRemoteLauncherCore.ts coldRestartGraceUntil docs)
+        // — without dedup the user saw 4 identical bubbles for one /compact.
+        // The CLI now uuid-dedups upstream; this defensive content-window
+        // dedup keeps the App safe if a regression slips through.
+        it('Context compacted — deduplicated on re-delivery (same server DB ID)', () => {
+            const state = createReducer();
+            reducer(state, [makeEventMsg('db-ctxc-1', 'Context compacted', 1000)]);
+            const result2 = reducer(state, [makeEventMsg('db-ctxc-1', 'Context compacted', 1000)]);
+            expect(result2.messages.filter(m => m.kind === 'agent-event')).toHaveLength(0);
+        });
+
+        it('Context compacted — distinct DB IDs within 5s window are content-deduped (CLI replay shape)', () => {
+            const state = createReducer();
+            reducer(state, [makeEventMsg('db-ctxc-1', 'Context compacted', 1000)]);
+            // Same content, different DB ID, 1s later — mimics a CLI replay
+            // that bypassed the uuid guard. The 5s window must suppress it.
+            const result2 = reducer(state, [makeEventMsg('db-ctxc-2', 'Context compacted', 2000)]);
+            expect(result2.messages.filter(m => m.kind === 'agent-event')).toHaveLength(0);
+            expect(state.messageIds.has('db-ctxc-2')).toBe(true);
+        });
+
+        it('Context compacted — distinct DB IDs more than 5s apart are both shown (real second compact)', () => {
+            const state = createReducer();
+            reducer(state, [makeEventMsg('db-ctxc-1', 'Context compacted', 1000)]);
+            // 6s later — a genuine second /compact, not a replay race.
+            const result2 = reducer(state, [makeEventMsg('db-ctxc-2', 'Context compacted', 7001)]);
+            expect(result2.messages.filter(m => m.kind === 'agent-event')).toHaveLength(1);
+        });
+
         it('distinct server DB IDs within 5s window — content-deduped, not shown twice', () => {
             const state = createReducer();
             reducer(state, [makeEventMsg('db-ctx-1', 'Context was reset', 1000)]);

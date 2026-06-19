@@ -82,6 +82,7 @@ function WebTerminalComponent({ machineId, cwd, sessionId, terminalId: terminalI
         let mounted = true;
         let outputCleanup: (() => void) | null = null;
         let exitCleanup: (() => void) | null = null;
+        let resizeObserver: ResizeObserver | null = null;
 
         async function init() {
             const [{ Terminal }, { FitAddon }, { WebLinksAddon }] = await Promise.all([
@@ -145,8 +146,76 @@ function WebTerminalComponent({ machineId, cwd, sessionId, terminalId: terminalI
             // Fit synchronously so cols/rows reflect actual container size before spawn
             try { fitAddon.fit(); } catch { /* ignore */ }
 
+            // Sanity-check the initial fit. When the side panel is animating in,
+            // the container's `getBoundingClientRect()` can briefly be 0 (or a
+            // single character cell — RN Web's `<View style={{ flex: 1 }}>` is
+            // a `<div>` whose layout hasn't settled yet). FitAddon then computes
+            // cols≈1/rows≈1 and we spawn the PTY at 1x1, causing Claude TUI to
+            // emit ANSI sequences against a window that's essentially a single
+            // cell — the App sees either a near-blank panel with isolated chars
+            // (the "9 / 7" symptom) or wider-PTY-vs-narrower-xterm overdraw with
+            // cursor-positioning offsets (the "/User7/.../Documsnts/" symptom).
+            // Wait one rAF and refit when this happens; if still degenerate
+            // after the retry, fall through to spawn with what we have — the
+            // ResizeObserver below picks up the eventual settle and re-fits.
+            if (terminal.cols < 20 || terminal.rows < 5) {
+                await new Promise<void>((resolve) =>
+                    typeof requestAnimationFrame === "function"
+                        ? requestAnimationFrame(() => resolve())
+                        : setTimeout(resolve, 16),
+                );
+                if (!mounted || !containerRef.current) return;
+                try { fitAddon.fit(); } catch { /* ignore */ }
+            }
+
             const cols = terminal.cols;
             const rows = terminal.rows;
+
+            // Container-driven re-fit: any time the panel resizes (user drags
+            // the split bar, side panel collapses/expands, mobile keyboard
+            // shows/hides, parent re-lays out after a tab switch), keep xterm's
+            // cols/rows in sync with the actual pixel size. Without this the
+            // only re-fit trigger is the global `window.resize` listener below,
+            // which never fires for in-page layout changes — and any drift
+            // between xterm's cols and the daemon PTY's cols re-introduces the
+            // overdraw / corruption ("/User7/.../Documsnts/") because Claude
+            // TUI's cursor-positioning ANSI escapes target one width while the
+            // viewport renders at another.
+            //
+            // fit() internally calls terminal.resize(cols, rows) when the
+            // computed dims differ, which fires terminal.onResize → the
+            // machineTerminalResize RPC below — so the daemon stays aligned
+            // automatically. If the new dims also differ from what the PTY
+            // last rendered with, we additionally write a local erase-display
+            // + cursor-home (CSI 2J + CSI H) to clear the stale frame xterm
+            // still has on screen; Claude TUI's next redraw (triggered by
+            // SIGWINCH on the daemon side) repaints the live state on top of
+            // a clean slate, suppressing the multi-frame overdraw symptom.
+            if (typeof ResizeObserver !== "undefined" && containerRef.current) {
+                let lastCols = terminal.cols;
+                let lastRows = terminal.rows;
+                resizeObserver = new ResizeObserver(() => {
+                    if (!fitAddonRef.current || !terminalRef.current) return;
+                    try {
+                        fitAddonRef.current.fit();
+                    } catch {
+                        return;
+                    }
+                    const nextCols = terminalRef.current.cols;
+                    const nextRows = terminalRef.current.rows;
+                    if (nextCols !== lastCols || nextRows !== lastRows) {
+                        lastCols = nextCols;
+                        lastRows = nextRows;
+                        // Local clear only — does NOT send anything to the PTY.
+                        // SIGWINCH already went out via fit()'s onResize hook
+                        // a few lines above; Claude TUI will repaint shortly.
+                        try {
+                            terminalRef.current.write("\x1b[2J\x1b[H");
+                        } catch { /* ignore */ }
+                    }
+                });
+                resizeObserver.observe(containerRef.current);
+            }
 
             // Register listener BEFORE spawn to buffer events arriving during RPC round-trip
             const pendingEvents: any[] = [];
@@ -246,6 +315,8 @@ function WebTerminalComponent({ machineId, cwd, sessionId, terminalId: terminalI
             mounted = false;
             outputCleanup?.();
             exitCleanup?.();
+            resizeObserver?.disconnect();
+            resizeObserver = null;
             // Detach only: don't close the PTY — it stays alive for reattach
             if (terminalRef.current) {
                 terminalRef.current.dispose();
