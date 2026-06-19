@@ -87,6 +87,12 @@ export const TaskTriggerDataSchema = z.object({
   })).optional(),
   agentType: z.string().nullable().optional(),    // "claude" | "codex" | "gemini" — null = inherit CLI default
   modelOverride: z.string().nullable().optional(), // e.g. "claude-sonnet-4-20250514" — null = agent default
+  // App model-mode KEY (e.g. "opus-4-8-1m") — drives 1M capability via the CLI's
+  // resolveCliModelForMode/is1MModelKey path. Distinct from `modelOverride` which is a
+  // raw ANTHROPIC_MODEL id. null/"default"/omitted = CLI default model.
+  modelMode: z.string().nullable().optional(),
+  // Reasoning effort for the first turn (low|medium|high|xhigh|max). Omitted = default medium.
+  effort: z.string().nullable().optional(),
   // Profile binding for this task. `profileId` references the AIBackendProfile
   // selected when the task was created (Task.profileId column). `runtimeProfile`
   // is the resolved snapshot (env vars, startup script, permission mode, etc.)

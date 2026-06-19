@@ -85,6 +85,9 @@ export const SerializedAgentLoopSchema = z.object({
     agent: AgentLoopAgentSchema.nullable().optional(),
     intervalMs: z.number().nullable().optional(),
     cronExpression: z.string().nullable().optional(),
+    // App model-mode KEY + reasoning effort for spawned iterations.
+    modelMode: z.string().nullable().optional(),
+    effort: z.string().nullable().optional(),
     enabled: z.boolean().optional(),
     nextRunAt: z.number().nullable().optional(),
     continuityKey: z.string().nullable().optional(),
@@ -134,6 +137,9 @@ export const CreateGenericAgentLoopBodySchema = z.object({
     profileId: z.string().nullable().optional(),
     runtimeProfile: ResolvedRuntimeProfileSchema.optional(),
     maxDurationMinutes: z.number().int().min(1).max(60 * 24).optional(),
+    // App model-mode KEY + reasoning effort for spawned iterations.
+    modelMode: z.string().nullable().optional(),
+    effort: z.string().nullable().optional(),
     /** Long-tail config (notification channels, file watchers, etc.). */
     genericConfig: AgentLoopGenericConfigSchema.optional(),
 });
@@ -153,6 +159,9 @@ export const UpdateGenericAgentLoopBodySchema = z.object({
     profileId: z.string().nullable().optional(),
     runtimeProfile: ResolvedRuntimeProfileSchema.optional(),
     maxDurationMinutes: z.number().int().min(1).max(60 * 24).nullable().optional(),
+    // App model-mode KEY + reasoning effort for spawned iterations.
+    modelMode: z.string().nullable().optional(),
+    effort: z.string().nullable().optional(),
     genericConfig: AgentLoopGenericConfigSchema.optional(),
 });
 export type UpdateGenericAgentLoopBody = z.infer<typeof UpdateGenericAgentLoopBodySchema>;
@@ -193,6 +202,9 @@ export const AgentLoopTriggerEphemeralSchema = z.object({
     continuityKey: z.string().optional(),
     profileId: z.string().nullable().optional(),
     runtimeProfile: ResolvedRuntimeProfileSchema.optional(),
+    // App model-mode KEY + reasoning effort for the spawned iteration.
+    modelMode: z.string().nullable().optional(),
+    effort: z.string().nullable().optional(),
     genericConfig: AgentLoopGenericConfigSchema.optional(),
     /** Bearer token CLI presents on completion callback. */
     callbackToken: z.string(),
