@@ -1,9 +1,8 @@
 import { type Fastify } from "../types";
-import { db } from "@/storage/db";
 import { z } from "zod";
 import { detectProviderFromEnv } from "@/modules/optionScorer";
-import { decryptAiBackendProfile } from "@/modules/aiBackendProfileCrypto";
 import { getAiBackendProfileEnvironmentVariables } from "@/modules/aiBackendProfileEnv";
+import { loadDecryptedProfile, serverEnvScoringCredentials } from "@/modules/scoringCredentials";
 
 // ---------------------------------------------------------------------------
 // AI prompt & parsing — mirrors AgentLoopSuggestionAI.ts on the CLI side
@@ -97,38 +96,13 @@ function mapRawToSuggestion(item: AILoopRaw, directory: string) {
 // ---------------------------------------------------------------------------
 
 async function resolveCredentials(accountId: string, profileId: string | null) {
-    if (!profileId) return fallbackFromServerEnv();
+    if (!profileId) return serverEnvScoringCredentials();
 
-    const rows = await db.$queryRaw<
-        Array<{ profileKey: string; encryptedPayload: Uint8Array<ArrayBuffer> }>
-    >`
-        SELECT "profileKey", "encryptedPayload"
-        FROM "AiBackendProfile"
-        WHERE "profileKey" = ${profileId}
-          AND "accountId" = ${accountId}
-          AND "archivedAt" IS NULL
-        LIMIT 1
-    `;
+    const profile = await loadDecryptedProfile(accountId, profileId);
+    if (!profile) return serverEnvScoringCredentials();
 
-    if (!rows[0]) return fallbackFromServerEnv();
-
-    const profile = decryptAiBackendProfile(
-        accountId,
-        rows[0].profileKey,
-        rows[0].encryptedPayload,
-    );
     const env = getAiBackendProfileEnvironmentVariables(profile);
     return detectProviderFromEnv(env);
-}
-
-function fallbackFromServerEnv() {
-    return detectProviderFromEnv({
-        ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY ?? "",
-        ANTHROPIC_BASE_URL: process.env.ANTHROPIC_BASE_URL ?? "",
-        OPENAI_API_KEY: process.env.OPENAI_API_KEY ?? "",
-        OPENAI_BASE_URL: process.env.OPENAI_BASE_URL ?? "",
-        OLLAMA_URL: process.env.OLLAMA_URL ?? "",
-    });
 }
 
 // ---------------------------------------------------------------------------

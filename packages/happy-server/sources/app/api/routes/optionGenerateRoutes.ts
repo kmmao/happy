@@ -3,9 +3,8 @@ import { Fastify } from "../types";
 import { log } from "@/utils/log";
 import { generateOptionsWithLLM } from "@/modules/optionGenerator";
 import { detectProviderFromEnv } from "@/modules/optionScorer";
-import { db } from "@/storage/db";
-import { decryptAiBackendProfile } from "@/modules/aiBackendProfileCrypto";
 import { getAiBackendProfileEnvironmentVariables } from "@/modules/aiBackendProfileEnv";
+import { loadDecryptedProfile, serverEnvScoringCredentials } from "@/modules/scoringCredentials";
 
 export function optionGenerateRoutes(app: Fastify) {
     app.post("/v1/options/generate", {
@@ -56,33 +55,11 @@ export function optionGenerateRoutes(app: Fastify) {
 }
 
 async function resolveCredentials(accountId: string, profileId: string | null) {
-    if (!profileId) return fallbackFromServerEnv();
+    if (!profileId) return serverEnvScoringCredentials();
 
-    const rows = await db.$queryRaw<Array<{
-        profileKey: string;
-        encryptedPayload: Uint8Array<ArrayBuffer>;
-    }>>`
-        SELECT "profileKey", "encryptedPayload"
-        FROM "AiBackendProfile"
-        WHERE "profileKey" = ${profileId}
-          AND "accountId" = ${accountId}
-          AND "archivedAt" IS NULL
-        LIMIT 1
-    `;
+    const profile = await loadDecryptedProfile(accountId, profileId);
+    if (!profile) return serverEnvScoringCredentials();
 
-    if (!rows[0]) return fallbackFromServerEnv();
-
-    const profile = decryptAiBackendProfile(accountId, rows[0].profileKey, rows[0].encryptedPayload);
     const env = getAiBackendProfileEnvironmentVariables(profile);
-    return detectProviderFromEnv(env) ?? fallbackFromServerEnv();
-}
-
-function fallbackFromServerEnv() {
-    return detectProviderFromEnv({
-        ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY ?? "",
-        ANTHROPIC_BASE_URL: process.env.ANTHROPIC_BASE_URL ?? "",
-        OPENAI_API_KEY: process.env.OPENAI_API_KEY ?? "",
-        OPENAI_BASE_URL: process.env.OPENAI_BASE_URL ?? "",
-        OLLAMA_URL: process.env.OLLAMA_URL ?? "",
-    });
+    return detectProviderFromEnv(env) ?? serverEnvScoringCredentials();
 }

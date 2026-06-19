@@ -1,6 +1,4 @@
-import { db } from "@/storage/db";
-import type { AIBackendProfile } from "@/types/aiBackendProfile";
-import { decryptAiBackendProfile } from "@/modules/aiBackendProfileCrypto";
+import { loadDecryptedProfile } from "@/modules/scoringCredentials";
 import {
   BUILT_IN_PROFILE_IDS,
   getAiBackendProfileEnvironmentVariables,
@@ -39,25 +37,8 @@ export async function resolveSupervisorProfile(
 ): Promise<ResolvedSupervisorProfile> {
   if (!profileId) return {};
 
-  const row = await db.$queryRaw<Array<{
-    profileKey: string;
-    encryptedPayload: Uint8Array<ArrayBuffer>;
-  }>>`
-    SELECT "profileKey", "encryptedPayload"
-    FROM "AiBackendProfile"
-    WHERE "profileKey" = ${profileId}
-      AND "accountId" = ${accountId}
-      AND "archivedAt" IS NULL
-    LIMIT 1
-  `;
-
-  const current = row[0];
-  if (current) {
-    const profile = decryptAiBackendProfile(
-      accountId,
-      current.profileKey,
-      current.encryptedPayload,
-    ) as AIBackendProfile;
+  const profile = await loadDecryptedProfile(accountId, profileId);
+  if (profile) {
     const env = getAiBackendProfileEnvironmentVariables(profile);
     return {
       runtimeProfile: createResolvedRuntimeProfile(profile, {
