@@ -65,8 +65,11 @@ const GEMINI_MODEL_FALLBACKS: ModelMode[] = [
 ];
 
 // Known Claude model pricing for enriching CLI-reported descriptions.
-// Sonnet/Opus default to 1M context — the -1m keys are kept for back-compat
-// of already-persisted sessions but no longer surfaced as separate options.
+// The non-suffixed keys use the 200K window; the matching `-1m` keys are
+// surfaced as explicit "(1M)" options in getClaudeModelModes(). The CLI
+// (resolveCliModelForMode) only emits the `[1m]` model suffix — which the
+// Claude TUI parses to enable the 1M window — when the picked key ends in
+// `-1m`, so the picker key is the single source of truth for the tier.
 const CLAUDE_MODEL_PRICING: Record<string, string> = {
   "sonnet": "$3/$15",
   "sonnet-1m": "$3/$15",
@@ -205,27 +208,52 @@ export function getClaudeModelModes(): ModelMode[] {
     {
       key: "sonnet",
       name: "Sonnet",
-      description: "Sonnet 4.6 \u00B7 $3/$15",
+      description: "Sonnet 4.6 \u00B7 200K \u00B7 $3/$15",
+    },
+    {
+      key: "sonnet-1m",
+      name: "Sonnet (1M)",
+      description: "Sonnet 4.6 \u00B7 1M context \u00B7 $3/$15",
     },
     {
       key: "fable-5",
       name: "Fable 5",
-      description: "Fable 5 \u00B7 Latest \u00B7 $10/$50",
+      description: "Fable 5 \u00B7 Latest \u00B7 200K \u00B7 $10/$50",
+    },
+    {
+      key: "fable-5-1m",
+      name: "Fable 5 (1M)",
+      description: "Fable 5 \u00B7 1M context \u00B7 $10/$50",
     },
     {
       key: "opus-4-8",
       name: "Opus 4.8",
-      description: "Opus 4.8 \u00B7 Newest Opus \u00B7 $5/$25",
+      description: "Opus 4.8 \u00B7 Newest Opus \u00B7 200K \u00B7 $5/$25",
+    },
+    {
+      key: "opus-4-8-1m",
+      name: "Opus 4.8 (1M)",
+      description: "Opus 4.8 \u00B7 1M context \u00B7 $5/$25",
     },
     {
       key: "opus-4-7",
       name: "Opus 4.7",
-      description: "Opus 4.7 \u00B7 $5/$25",
+      description: "Opus 4.7 \u00B7 200K \u00B7 $5/$25",
+    },
+    {
+      key: "opus-4-7-1m",
+      name: "Opus 4.7 (1M)",
+      description: "Opus 4.7 \u00B7 1M context \u00B7 $5/$25",
     },
     {
       key: "opus",
       name: "Opus",
-      description: "Opus 4.6 \u00B7 $5/$25",
+      description: "Opus 4.6 \u00B7 200K \u00B7 $5/$25",
+    },
+    {
+      key: "opus-1m",
+      name: "Opus (1M)",
+      description: "Opus 4.6 \u00B7 1M context \u00B7 $5/$25",
     },
     {
       key: "haiku",
