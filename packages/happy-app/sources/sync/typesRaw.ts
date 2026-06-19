@@ -731,17 +731,15 @@ const rawAgentRecordSchema = z.discriminatedUnion("type", [
 ]);
 
 /**
- * Preprocessor: Normalizes hyphenated content types to canonical before validation
- * This avoids Zod v4's "unmergable intersection" issue with transforms inside complex schemas
- * See: https://github.com/colinhacks/zod/discussions/2100
+ * Layer 1 — wire-protocol migration. Rewrites the CLI's hyphenated content
+ * types (`tool-call` → `tool_use`, `tool-call-result` → `tool_result`) on
+ * assistant and user message-content arrays to the App's canonical field names.
+ * This is the "old CLI wire shape → current wire shape" compatibility layer;
+ * new migrations for renamed wire fields belong here. Mutates `data` in place.
  */
-function preprocessMessageContent(data: any): any {
-  if (!data || typeof data !== "object") return data;
-
-  // Helper: normalize a single content item
+function migrateHyphenatedContentTypes(data: any): void {
   const normalizeContent = (item: any): any => {
     if (!item || typeof item !== "object") return item;
-
     if (item.type === "tool-call") {
       return normalizeToToolUse(item);
     }
@@ -751,7 +749,7 @@ function preprocessMessageContent(data: any): any {
     return item;
   };
 
-  // Normalize assistant message content
+  // Assistant message content
   if (
     data.role === "agent" &&
     data.content?.type === "output" &&
@@ -763,7 +761,7 @@ function preprocessMessageContent(data: any): any {
     }
   }
 
-  // Normalize user message content
+  // User message content
   if (
     data.role === "agent" &&
     data.content?.type === "output" &&
@@ -773,10 +771,15 @@ function preprocessMessageContent(data: any): any {
     data.content.data.message.content =
       data.content.data.message.content.map(normalizeContent);
   }
+}
 
-  // Accept new session wrapper shape and normalize to canonical wrapped shape.
-  // New shape:
-  // { role: 'session', content: { id, role, turn?, subagent?, ev }, meta? }
+/**
+ * Layer 2 — canonical envelope shaping. Accepts the newer bare session-envelope
+ * shape `{ role: 'session', content: { id, role, turn?, subagent?, ev } }` and
+ * wraps it into the App's canonical `{ type: 'session', data: <envelope> }`.
+ * This is structural normalization, not field migration. Mutates `data` in place.
+ */
+function normalizeSessionEnvelopeShape(data: any): void {
   if (
     data.role === "session" &&
     data.content &&
@@ -795,7 +798,19 @@ function preprocessMessageContent(data: any): any {
       };
     }
   }
+}
 
+/**
+ * Preprocessor: orchestrates the two normalization layers before validation —
+ * wire-protocol migration then canonical envelope shaping. Runs at the root via
+ * `.preprocess()` to avoid Zod v4's "unmergable intersection" issue with
+ * transforms inside complex schemas.
+ * See: https://github.com/colinhacks/zod/discussions/2100
+ */
+function preprocessMessageContent(data: any): any {
+  if (!data || typeof data !== "object") return data;
+  migrateHyphenatedContentTypes(data);
+  normalizeSessionEnvelopeShape(data);
   return data;
 }
 

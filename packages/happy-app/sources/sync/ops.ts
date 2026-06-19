@@ -11,6 +11,25 @@ import { getErrorMessage } from "@/utils/errors";
 import { getServerUrl } from "./serverConfig";
 import type { SpawnSessionResult } from "@kmmao/happy-wire";
 export type { SpawnSessionResult };
+
+/**
+ * Run a machine RPC and convert a thrown transport/timeout error into the
+ * operation's own result-object failure value. The single home for the
+ * "fallible, UI-surfaced op reports failure as a value (not a throw)"
+ * convention — see ADR-0034. `onError` builds the failure object so each op
+ * keeps its own result contract while the try/catch + getErrorMessage skeleton
+ * lives in one place.
+ */
+async function tryMachineOp<R>(
+  op: () => Promise<R>,
+  onError: (message: string) => R,
+): Promise<R> {
+  try {
+    return await op();
+  } catch (error) {
+    return onError(getErrorMessage(error));
+  }
+}
 type ResolvedRuntimeProfile = {
   profileId?: string;
   profileName?: string;
@@ -1331,48 +1350,33 @@ export async function machineBash(
   cwd: string,
   timeout?: number,
 ): Promise<MachineBashResult> {
-  try {
-    const result = await apiSocket.machineRPC<
-      MachineBashResult,
-      {
-        command: string;
-        cwd: string;
-        timeout?: number;
-      }
-    >(machineId, "bash", { command, cwd, ...(timeout != null && { timeout }) });
-    return result;
-  } catch (error) {
-    return {
-      success: false,
-      stdout: "",
-      stderr: getErrorMessage(error),
-      exitCode: -1,
-      error: getErrorMessage(error),
-    };
-  }
+  return tryMachineOp(
+    () =>
+      apiSocket.machineRPC<
+        MachineBashResult,
+        { command: string; cwd: string; timeout?: number }
+      >(machineId, "bash", { command, cwd, ...(timeout != null && { timeout }) }),
+    (error) => ({ success: false, stdout: "", stderr: error, exitCode: -1, error }),
+  );
 }
 
 export async function machineCleanRunawayProcesses(
   machineId: string,
 ): Promise<MachineDoctorCleanResult> {
-  try {
-    const result = await apiSocket.machineRPC<
-      { success: boolean; killed?: number; errors?: readonly { pid: number; error: string }[] },
-      Record<string, never>
-    >(machineId, "doctor-clean", {});
-    return {
-      success: Boolean(result.success),
-      killed: result.killed ?? 0,
-      errors: result.errors ?? [],
-    };
-  } catch (error) {
-    return {
-      success: false,
-      killed: 0,
-      errors: [],
-      error: getErrorMessage(error),
-    };
-  }
+  return tryMachineOp<MachineDoctorCleanResult>(
+    async () => {
+      const result = await apiSocket.machineRPC<
+        { success: boolean; killed?: number; errors?: readonly { pid: number; error: string }[] },
+        Record<string, never>
+      >(machineId, "doctor-clean", {});
+      return {
+        success: Boolean(result.success),
+        killed: result.killed ?? 0,
+        errors: result.errors ?? [],
+      };
+    },
+    (error) => ({ success: false, killed: 0, errors: [], error }),
+  );
 }
 
 export interface StaleSessionInfo {
@@ -1586,13 +1590,12 @@ export async function machineTunnelAdd(
     provider: string,
     params: { localPort: number; path?: string; hostname?: string; remotePort?: number; protocol?: string; publicAccess?: boolean },
 ): Promise<TunnelRpcResult> {
-    try {
-        return await apiSocket.machineRPC<TunnelRpcResult, any>(
+    return tryMachineOp(
+        () => apiSocket.machineRPC<TunnelRpcResult, any>(
             machineId, "tunnel-add", { provider, ...params },
-        );
-    } catch (error) {
-        return { success: false, error: getErrorMessage(error) };
-    }
+        ),
+        (error) => ({ success: false, error }),
+    );
 }
 
 export async function machineTunnelRemove(
@@ -1600,25 +1603,23 @@ export async function machineTunnelRemove(
     provider: string,
     params: { path?: string; hostname?: string; remotePort?: number; removeEntireSite?: boolean },
 ): Promise<TunnelRpcResult> {
-    try {
-        return await apiSocket.machineRPC<TunnelRpcResult, any>(
+    return tryMachineOp(
+        () => apiSocket.machineRPC<TunnelRpcResult, any>(
             machineId, "tunnel-remove", { provider, ...params },
-        );
-    } catch (error) {
-        return { success: false, error: getErrorMessage(error) };
-    }
+        ),
+        (error) => ({ success: false, error }),
+    );
 }
 
 export async function machineTunnelDetect(
     machineId: string,
 ): Promise<TunnelRpcResult> {
-    try {
-        return await apiSocket.machineRPC<TunnelRpcResult, any>(
+    return tryMachineOp(
+        () => apiSocket.machineRPC<TunnelRpcResult, any>(
             machineId, "tunnel-detect", {},
-        );
-    } catch (error) {
-        return { success: false, error: getErrorMessage(error) };
-    }
+        ),
+        (error) => ({ success: false, error }),
+    );
 }
 
 /** Signal name → number mapping (POSIX portable, works in /bin/sh). */
