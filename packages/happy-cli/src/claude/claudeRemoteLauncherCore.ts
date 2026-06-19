@@ -4,6 +4,10 @@ import { MessageBuffer } from "@/ui/ink/messageBuffer";
 import { RemoteModeDisplay } from "@/ui/ink/RemoteModeDisplay";
 import React from "react";
 import { claudeRemote, is1MModelKey, isSlashCommand } from "./claudeRemote";
+import {
+  classifyStrandTick,
+  DEFAULT_STRAND_THRESHOLDS,
+} from "./strandPolicy";
 import { mapToClaudeMode } from "./utils/permissionMode";
 import { PermissionHandler } from "./utils/permissionHandler";
 import { Future } from "@/utils/future";
@@ -197,46 +201,11 @@ export async function claudeRemoteLauncher(
   let strandRecoveryInFlight = false;
   let lastColdRestartAt = 0;
   const WATCHDOG_TICK_MS = 20_000;
-  const WATCHDOG_IDLE_WARN_MS = 60_000; // log-only "looks stranded" warning
-  const WATCHDOG_IDLE_RECOVER_MS = 120_000; // trigger auto-recovery (turn already produced output)
-  // Fast path for a submission wedge — a turn that has produced ZERO output and
-  // emitted ZERO PTY bytes since it began. That is the prompt-never-submitted
-  // strand (see the auto-redelivery block below), NOT slow thinking: a turn
-  // genuinely working refreshes lastClaudeOutputAt via the spinner's sub-second
-  // PTY bytes within ~300ms, so it never accumulates even this much idle. Re-
-  // delivery is double-execution safe here (zero output = nothing ran), so we
-  // recover in ~90s instead of paying the full 120s general threshold on every
-  // wedged turn — the user-visible "very slow / no response" on large sessions
-  // where the wedge recurred on every turn (~140s lost each).
-  //
-  // Why 90s (was 30s): Opus 4.x in "超高" (extended thinking, [1m] budget) mode
-  // can sit silent for 60–90s while the API processes the thinking phase before
-  // emitting any PTY bytes. The former 30s threshold caused false-positive wedge
-  // detections that re-delivered the prompt mid-thinking, surfacing as a duplicate
-  // response or a confusing "Aborted" right before Claude answered (observed in
-  // pid-47807: sdk_call→first_response=75022ms with tier-1 recovery at 49s).
-  // A real submission wedge (prompt stuck in the TUI composer, Claude never
-  // received it) still has zero PTY echo bytes, so 90s still catches it while
-  // giving the API enough headroom for extended-thinking first-token latency.
-  const WATCHDOG_WEDGE_RECOVER_MS = 90_000;
-  // ── Slash-command in-flight exemption ──
-  // Once a slash command (e.g. `/compact`, `/clear`, `/model …`) is written to
-  // the PTY and the WRITE_VERIFY check has confirmed PTY echo (so we know the
-  // TUI consumed the paste), the command is handled entirely INSIDE the TUI —
-  // /compact in particular spawns its own API call to summarise the context.
-  // That work produces NO JSONL records (compact_boundary only fires at the
-  // very end when compaction succeeds) AND emits NO PTY spinner bytes (the TUI
-  // suppresses the chat-turn spinner during the internal command). The
-  // standard wedge detectors above interpret that legitimate silence as a
-  // strand and force-abort the in-flight compaction at ~90s, surfacing to the
-  // user as "No response for 99s — attempting recovery…" followed by
-  // "Session recovered — restarting to safely resend slash command…" — the
-  // exact bug pattern in pid-99141 (2026-06-19, /compact at 13:02:26 aborted
-  // at 13:04:05). Real compactions on a full 200K context routinely take
-  // 60–180s, sometimes longer. We exempt confirmed-submitted slash commands
-  // from the fast wedge paths and only fall back to a generous idle threshold
-  // so a truly dead session is still caught — just not at 90s.
-  const WATCHDOG_SLASH_COMMAND_RECOVER_MS = 600_000; // 10 min — covers worst-case /compact on a maxed context
+  // Strand thresholds + the per-tick decision policy live in strandPolicy.ts
+  // (single source of truth, carrying the full incident rationale for each
+  // number). The watchdog here owns only the timer cadence + the recovery
+  // mechanics below.
+  const strandThresholds = DEFAULT_STRAND_THRESHOLDS;
   // Post-write submission-wedge check (armed at the moment each prompt is
   // written, see onPromptWritten). A normal submit echoes the pasted prompt
   // back as raw PTY bytes within milliseconds; a wedge produces zero echo and
@@ -355,127 +324,73 @@ export async function claudeRemoteLauncher(
       if (ongoingToolCalls.size > 0 || pendingElicitations.size > 0) return;
       const idleMs = Date.now() - lastClaudeOutputAt;
       const elapsedMs = Date.now() - turnStartedAt;
-      // Slash-command exemption — see WATCHDOG_SLASH_COMMAND_RECOVER_MS doc.
-      // /compact (and friends) runs entirely inside the TUI: no JSONL records
-      // until compact_boundary fires at completion, no PTY spinner bytes
-      // during the internal API call. The standard wedge paths read that
-      // silence as a strand and kill the in-flight command at 90s. We only
-      // apply the exemption once WRITE_VERIFY has confirmed the paste landed
-      // (promptSubmissionConfirmed), so a genuine submission wedge — paste
-      // dropped, prompt never submitted, zero echo — still gets caught by
-      // the post-write WRITE_VERIFY check in 2.5s. A real strand on a long-
-      // running slash command is still caught, just at the 10-min threshold
-      // instead of 90s.
       const inFlightIsSlashCommand =
         !!inFlightPrompt && isSlashCommand(inFlightPrompt.message);
-      if (inFlightIsSlashCommand && promptSubmissionConfirmed) {
-        if (idleMs < WATCHDOG_IDLE_WARN_MS) return;
-        if (
-          idleMs >= WATCHDOG_SLASH_COMMAND_RECOVER_MS &&
-          !strandRecoveryInFlight
-        ) {
+
+      // Decide what this tick means. The threshold branching + the full
+      // incident rationale for every number live in strandPolicy.classifyStrandTick
+      // (pure + unit-tested); here we only apply the decision — the greppable
+      // `[remote][strand]` diagnostics, the user-facing re-send event, and the
+      // recovery trigger.
+      const decision = classifyStrandTick(
+        {
+          idleMs,
+          elapsedMs,
+          turnProducedOutput,
+          promptSubmissionConfirmed,
+          inFlightIsSlashCommand,
+          strandRecoveryInFlight,
+        },
+        strandThresholds,
+      );
+
+      if (decision.action === "none") return;
+
+      if (decision.action === "warn") {
+        if (decision.kind === "slash-holdoff") {
           logger.debug(
-            `[remote][strand] slash command (${inFlightPrompt!.message.trim().slice(0, 40)}) silent ${idleMs}ms past ${WATCHDOG_SLASH_COMMAND_RECOVER_MS}ms threshold — starting auto-recovery. ${strandDiagState()}`,
+            `[remote][strand] slash command in flight (${inFlightPrompt!.message.trim().slice(0, 40)}) — PTY silent ${idleMs}ms (legitimate for /compact etc.), holding off recovery until ${strandThresholds.slashCommandRecoverMs}ms. ${strandDiagState()}`,
           );
-          void recoverStrandedTurn(idleMs);
-          return;
+        } else {
+          logger.debug(
+            `[remote][strand] turn appears stranded — PTY silent ${idleMs}ms while guard running. ${strandDiagState()}`,
+          );
         }
-        logger.debug(
-          `[remote][strand] slash command in flight (${inFlightPrompt!.message.trim().slice(0, 40)}) — PTY silent ${idleMs}ms (legitimate for /compact etc.), holding off recovery until ${WATCHDOG_SLASH_COMMAND_RECOVER_MS}ms. ${strandDiagState()}`,
-        );
         return;
       }
-      // Fast wedge recovery: turn produced no output AND the PTY has been silent
-      // since it started — the prompt never submitted. Recover well before the
-      // general threshold (a working turn's spinner bytes keep idleMs tiny, so
-      // this only ever trips on a real wedge; zero output makes redelivery safe).
-      if (
-        !turnProducedOutput &&
-        idleMs >= WATCHDOG_WEDGE_RECOVER_MS &&
-        !strandRecoveryInFlight
-      ) {
-        logger.debug(
-          `[remote][strand] zero-output submission wedge — PTY silent ${idleMs}ms since turn start, fast auto-recovery. ${strandDiagState()}`,
-        );
-        void recoverStrandedTurn(idleMs);
-        return;
-      }
-      // Lost-first-response / submission-wedge detection.
-      //
-      // Two failure modes share one signature — turn is "running" but ZERO
-      // JSONL has arrived:
-      //
-      //   (a) Submission wedge: the bracketed-paste prompt was written before
-      //       the Claude TUI's raw-mode keyboard handler was ready, so the
-      //       bytes were dropped and the prompt never submitted. The TUI sits
-      //       idle forever. This is a race — PTY-ready detection (~1064ms slow
-      //       path, since this Claude build emits no alt-screen sequence) is
-      //       sometimes too early. Observed in pid-88968: 110s of silence then
-      //       recovery re-delivered "hi" and it answered in 6s.
-      //
-      //   (b) Extended-thinking / slow-proxy hang: the API call is queued or
-      //       the One-API relay is slow, so the thinking phase blocks for
-      //       minutes with the spinner running.
-      //
-      // The old idle-based "zero-output submission wedge" check above only
-      // fires when the PTY is fully silent (idleMs >= 90s) — but the TUI's
-      // startup spinner keeps refreshing lastClaudeOutputAt, masking case (a).
-      // So we ALSO key off wall-clock elapsed since turn start, independent of
-      // PTY bytes. Re-delivery is double-execution safe in BOTH cases because
-      // zero JSONL means nothing executed.
-      //
-      // Threshold is 45s: long enough that a genuinely fast turn (first token
-      // in <10s typically) never trips it, short enough that a wedge recovers
-      // in ~45s instead of the old 110s. Heartbeats at 2m/4m only matter for
-      // case (b) on a genuinely slow-but-alive API.
-      //
-      // Gate (added 2026-06-18): require `!promptSubmissionConfirmed`. The
-      // WRITE_VERIFY check at +2.5s already arms `promptSubmissionConfirmed`
-      // the moment PTY echo proves the TUI accepted the paste — which is the
-      // signature that distinguishes case (a) (NO echo, paste dropped, prompt
-      // never submitted) from a legitimate slow first token (echo back in
-      // milliseconds, then Claude is genuinely thinking). Without this gate,
-      // Opus 4.x 超高 turns that legitimately take 60-90s+ to first-token
-      // (spinner refreshing PTY bytes the whole time, JSONL pending) get
-      // misread as case-(a) wedges at 45s and aborted/re-delivered mid-
-      // thought — the loop the user reported. A real wedge still gets caught
-      // by WRITE_VERIFY in 2.5s (faster than this 45s path was), and the
-      // existing idleMs>=90s WEDGE_RECOVER / idleMs>=120s IDLE_RECOVER paths
-      // still catch any case (b) hang on a confirmed-submitted prompt.
-      if (!turnProducedOutput && idleMs < WATCHDOG_WEDGE_RECOVER_MS) {
-        if (
-          elapsedMs >= 45_000 &&
-          !strandRecoveryInFlight &&
-          !promptSubmissionConfirmed
-        ) {
-          const elapsedSec = Math.round(elapsedMs / 1000);
+
+      // decision.action === "recover" — log per kind, then trigger recovery.
+      switch (decision.kind) {
+        case "slash":
+          logger.debug(
+            `[remote][strand] slash command (${inFlightPrompt!.message.trim().slice(0, 40)}) silent ${idleMs}ms past ${strandThresholds.slashCommandRecoverMs}ms threshold — starting auto-recovery. ${strandDiagState()}`,
+          );
+          break;
+        case "wedge":
+          logger.debug(
+            `[remote][strand] zero-output submission wedge — PTY silent ${idleMs}ms since turn start, fast auto-recovery. ${strandDiagState()}`,
+          );
+          break;
+        case "elapsed-wedge":
           logger.debug(
             `[remote][strand] no JSONL output ${elapsedMs}ms after turn start (PTY spinner may be active) — likely a dropped submission or hung API. Forcing recovery. ${strandDiagState()}`,
           );
-          // Pre-0.100.7 this branched on `source === "auto-compact"` to
-          // print a separate "Auto-compact stalled / pausing" copy; the
-          // auto-push is gone (hint-only path) so every stalled prompt is
-          // now a real user message and the unconditional re-send copy
-          // tells the truth.
+          // Pre-0.100.7 this branched on `source === "auto-compact"` to print a
+          // separate "Auto-compact stalled / pausing" copy; the auto-push is
+          // gone (hint-only path) so every stalled prompt is now a real user
+          // message and the unconditional re-send copy tells the truth.
           session.client.sendSessionEvent({
             type: "message",
-            message: `No response after ${elapsedSec}s — re-sending your message…`,
+            message: `No response after ${decision.notifyUserSeconds}s — re-sending your message…`,
           });
-          void recoverStrandedTurn(elapsedMs);
-          return;
-        }
+          break;
+        case "idle":
+          logger.debug(
+            `[remote][strand] PTY silent ${idleMs}ms while guard running — starting auto-recovery. ${strandDiagState()}`,
+          );
+          break;
       }
-      if (idleMs < WATCHDOG_IDLE_WARN_MS) return;
-      if (idleMs >= WATCHDOG_IDLE_RECOVER_MS && !strandRecoveryInFlight) {
-        logger.debug(
-          `[remote][strand] PTY silent ${idleMs}ms while guard running — starting auto-recovery. ${strandDiagState()}`,
-        );
-        void recoverStrandedTurn(idleMs);
-        return;
-      }
-      logger.debug(
-        `[remote][strand] turn appears stranded — PTY silent ${idleMs}ms while guard running. ${strandDiagState()}`,
-      );
+      void recoverStrandedTurn(decision.basisMs);
     }, WATCHDOG_TICK_MS);
     if (typeof turnWatchdog.unref === "function") turnWatchdog.unref();
   }
