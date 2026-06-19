@@ -16,6 +16,8 @@ export interface ServerTriggerSchedule {
     lastTaskId: string | null;
     runCount: number;
     profileId: string | null;
+    modelMode: string | null;
+    effort: string | null;
     createdAt: number;
     updatedAt: number;
 }
@@ -62,6 +64,8 @@ export async function createTriggerSchedule(
         projectId?: string;
         skillIds?: string[];
         profileId?: string;
+        modelMode?: string | null;
+        effort?: string | null;
     },
 ): Promise<ServerTriggerSchedule> {
     const data = await apiRequest<TriggerScheduleResponse>(credentials, "/v1/trigger-schedules", {
@@ -82,6 +86,8 @@ export async function updateTriggerSchedule(
         priority?: string;
         skillIds?: string[];
         profileId?: string | null;
+        modelMode?: string | null;
+        effort?: string | null;
     },
 ): Promise<ServerTriggerSchedule> {
     const data = await apiRequest<TriggerScheduleResponse>(credentials, `/v1/trigger-schedules/${id}`, {

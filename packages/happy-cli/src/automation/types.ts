@@ -49,6 +49,10 @@ export interface AgentLoopTriggerData {
   trigger: AgentLoopTriggerSource;
   iteration: number;
   agent?: "claude" | "codex" | "gemini";
+  /** App model-mode KEY (e.g. "opus-4-8-1m") for the spawned iteration. */
+  modelMode?: string | null;
+  /** Reasoning effort (low|medium|high|xhigh|max) for the spawned iteration. */
+  effort?: string | null;
   profileId?: string;
   projectId?: string;
   environmentVariables?: Record<string, string>;
@@ -93,6 +97,8 @@ export interface TaskTriggerData {
   skillContents?: Array<{ name: string; content: string }>;
   agentType?: string | null;    // "claude" | "codex" | "gemini" — null = inherit CLI default
   modelOverride?: string | null; // e.g. "claude-sonnet-4-20250514" — null = agent default
+  modelMode?: string | null;     // App model-mode KEY (e.g. "opus-4-8-1m") — drives 1M capability
+  effort?: string | null;        // Reasoning effort (low|medium|high|xhigh|max) for the first turn
   // Profile binding resolved server-side. `profileId` references the
   // AiBackendProfile (or built-in id); `runtimeProfile` carries the resolved
   // env vars + metadata that should govern the spawned session. See

@@ -14,6 +14,8 @@ export interface ServerWebhookTrigger {
     lastTriggeredAt: number | null;
     triggerCount: number;
     profileId: string | null;
+    modelMode: string | null;
+    effort: string | null;
     createdAt: number;
     updatedAt: number;
 }
@@ -65,6 +67,8 @@ export async function createWebhookTrigger(
         projectId?: string;
         skillIds?: string[];
         profileId?: string;
+        modelMode?: string | null;
+        effort?: string | null;
     },
 ): Promise<{ webhookTrigger: ServerWebhookTrigger; secret: string }> {
     return await apiRequest<CreateWebhookTriggerResponse>(credentials, "/v1/webhook-triggers", {
@@ -84,6 +88,8 @@ export async function updateWebhookTrigger(
         enabled?: boolean;
         skillIds?: string[];
         profileId?: string | null;
+        modelMode?: string | null;
+        effort?: string | null;
     },
 ): Promise<ServerWebhookTrigger> {
     const data = await apiRequest<WebhookTriggerResponse>(credentials, `/v1/webhook-triggers/${id}`, {

@@ -21,6 +21,7 @@ import { webInteractive } from "@/utils/interactiveSurface";
 import { t } from "@/text";
 import { useAllMachines, useSettings } from "@/sync/storage";
 import { BottomSheet, BottomSheetHandle, PresetChip } from "@/components/BottomSheet";
+import { TriggerModelEffortSection } from "@/components/workflow/TriggerModelEffortSection";
 import { router } from "expo-router";
 
 interface CreateWebhookModalProps {
@@ -320,6 +321,9 @@ export const CreateWebhookModal = React.memo(function CreateWebhookModal({
     const [slugRaw, setSlugRaw] = React.useState("");
     const [prompt, setPrompt] = React.useState("");
     const [name, setName] = React.useState("");
+    // Per-trigger model + reasoning effort. "default" / null = no override.
+    const [modelModeKey, setModelModeKey] = React.useState<string>("default");
+    const [effortLevel, setEffortLevel] = React.useState<string | null>(null);
     const [submitting, setSubmitting] = React.useState(false);
     // After successful creation we transition the same sheet into a
     // "secret reveal" view rather than closing immediately.
@@ -347,6 +351,8 @@ export const CreateWebhookModal = React.memo(function CreateWebhookModal({
             setSlugRaw("");
             setPrompt("");
             setName("");
+            setModelModeKey("default");
+            setEffortLevel(null);
             setSubmitting(false);
             setCreatedSecret(null);
             setCreatedSlug(null);
@@ -408,6 +414,8 @@ export const CreateWebhookModal = React.memo(function CreateWebhookModal({
                 slug,
                 prompt: prompt.trim(),
                 name: name.trim() || undefined,
+                ...(modelModeKey !== "default" ? { modelMode: modelModeKey } : {}),
+                ...(effortLevel ? { effort: effortLevel } : {}),
             });
             setCreatedSecret(result.secret);
             setCreatedSlug(result.webhookTrigger.slug);
@@ -509,6 +517,10 @@ export const CreateWebhookModal = React.memo(function CreateWebhookModal({
                     setName={setName}
                     prompt={prompt}
                     setPrompt={setPrompt}
+                    modelModeKey={modelModeKey}
+                    setModelModeKey={setModelModeKey}
+                    effortLevel={effortLevel}
+                    setEffortLevel={setEffortLevel}
                     flowOpen={flowOpen}
                     setFlowOpen={setFlowOpen}
                     pickedSource={pickedSource}
@@ -540,6 +552,10 @@ function CreateForm({
     setName,
     prompt,
     setPrompt,
+    modelModeKey,
+    setModelModeKey,
+    effortLevel,
+    setEffortLevel,
     flowOpen,
     setFlowOpen,
     pickedSource,
@@ -737,6 +753,13 @@ function CreateForm({
                     {t("workflows.webhookIssueHint")}
                 </Text>
             </View>
+
+            <TriggerModelEffortSection
+                modelModeKey={modelModeKey}
+                onSelectModel={setModelModeKey}
+                effortLevel={effortLevel}
+                onSelectEffort={setEffortLevel}
+            />
 
             <Pressable
                 style={styles.flowToggle}

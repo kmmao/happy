@@ -10,6 +10,7 @@ import { AgentState, Metadata } from "@/api/types";
 import packageJson from "../../package.json";
 import { Credentials, readSettings, readSessionKey, writeSessionKey } from "@/persistence";
 import { EnhancedMode, PermissionMode } from "./loop";
+import type { EffortLevel } from "./jsonl/types";
 import { MessageQueue2 } from "@/utils/MessageQueue2";
 import { hashObject } from "@/utils/deterministicJson";
 import { stopCaffeinate } from "@/utils/caffeinate";
@@ -701,6 +702,20 @@ export async function runClaude(
     delete process.env.HAPPY_BOOTSTRAP_SLASH_COMMAND;
   }
 
+  // Per-trigger model-mode KEY + reasoning effort for automation-spawned
+  // sessions. The model KEY (e.g. "opus-4-8-1m") flows onto the first-turn
+  // EnhancedMode so it travels the same resolveCliModelForMode/is1MModelKey
+  // path as an App `message.meta.model` — that's what actually enables 1M.
+  // Both are consumed once and cleared so subsequent turns reset to defaults.
+  const initialModelMode = process.env.HAPPY_INITIAL_MODEL_MODE?.trim();
+  const initialEffortRaw = process.env.HAPPY_INITIAL_EFFORT?.trim();
+  const VALID_EFFORTS: ReadonlyArray<EffortLevel> = ["low", "medium", "high", "xhigh", "max"];
+  const initialEffort = VALID_EFFORTS.includes(initialEffortRaw as EffortLevel)
+    ? (initialEffortRaw as EffortLevel)
+    : undefined;
+  if (process.env.HAPPY_INITIAL_MODEL_MODE) delete process.env.HAPPY_INITIAL_MODEL_MODE;
+  if (process.env.HAPPY_INITIAL_EFFORT) delete process.env.HAPPY_INITIAL_EFFORT;
+
   // Inject initial prompt from file if env var is set (webhook-triggered sessions)
   const initialPromptFile = process.env.HAPPY_INITIAL_PROMPT_FILE;
   if (initialPromptFile) {
@@ -711,6 +726,8 @@ export async function runClaude(
           promptContent,
           {
             permissionMode: "bypassPermissions",
+            ...(initialModelMode && initialModelMode !== "default" ? { model: initialModelMode } : {}),
+            ...(initialEffort ? { effort: initialEffort } : {}),
             ...(currentMaxBudgetUsd !== undefined ? { maxBudgetUsd: currentMaxBudgetUsd } : {}),
           } as EnhancedMode,
           undefined,

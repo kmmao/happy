@@ -128,6 +128,8 @@ export interface TaskTriggerOptions {
     skillContents?: Array<{ name: string; content: string }>;
     agentType?: string | null;
     modelOverride?: string | null;
+    modelMode?: string | null;
+    effort?: string | null;
     profileId?: string;
     runtimeProfile?: ResolvedRuntimeProfile;
     worktreeIsolation?: boolean;
@@ -275,6 +277,8 @@ export type SyncEphemeralBody =
           continuityKey?: string;
           profileId?: string | null;
           runtimeProfile?: unknown;
+          modelMode?: string | null;
+          effort?: string | null;
           genericConfig?: Record<string, unknown>;
           callbackToken: string;
           maxDurationMinutes?: number;

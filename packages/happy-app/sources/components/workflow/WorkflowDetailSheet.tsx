@@ -1,5 +1,5 @@
 import * as React from "react";
-import { Pressable, View } from "react-native";
+import { ActivityIndicator, Pressable, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
@@ -7,7 +7,14 @@ import { BottomSheet, BottomSheetHandle } from "@/components/BottomSheet";
 import { Text } from "@/components/StyledText";
 import { Typography } from "@/constants/Typography";
 import { useNavigateToSession } from "@/hooks/useNavigateToSession";
+import { useHappyAction } from "@/hooks/useHappyAction";
 import type { Workflow } from "@/hooks/useWorkflows";
+import { TriggerModelEffortSection } from "@/components/workflow/TriggerModelEffortSection";
+import { TokenStorage } from "@/auth/tokenStorage";
+import { updateTriggerSchedule } from "@/sync/apiTriggerSchedules";
+import { updateWebhookTrigger } from "@/sync/apiWebhookTriggers";
+import { updateAgentLoop } from "@/sync/apiAgentLoops";
+import { notifyWorkflowSourcesChanged } from "@/sync/workflowBus";
 import { t } from "@/text";
 import { webInteractive } from "@/utils/interactiveSurface";
 import { formatLastSeen } from "@/utils/sessionUtils";
@@ -209,9 +216,112 @@ export const WorkflowDetailSheet = React.memo(function WorkflowDetailSheet({
                     {workflow.loop.prompt ? <PromptBlock prompt={workflow.loop.prompt} /> : null}
                 </Section>
             ) : null}
+
+            <WorkflowModelEffortEditor workflow={workflow} />
         </BottomSheet>
     );
 });
+
+/** Current model-mode KEY + effort persisted on the workflow, if any. */
+function currentModelEffort(
+    workflow: Workflow,
+): { modelMode: string | null; effort: string | null } | null {
+    if (workflow.kind === "scheduled" || workflow.kind === "event") {
+        return {
+            modelMode: workflow.trigger.modelMode ?? null,
+            effort: workflow.trigger.effort ?? null,
+        };
+    }
+    // Loops are only editable when bound to a server project AND running a
+    // Claude agent (model/effort overrides are Claude-only).
+    if (workflow.kind === "loop" && workflow.projectId && workflow.loop.agent === "claude") {
+        return {
+            modelMode: workflow.loop.modelMode ?? null,
+            effort: workflow.loop.effort ?? null,
+        };
+    }
+    return null;
+}
+
+/**
+ * Inline editor for a trigger's per-spawn model + reasoning effort. Renders
+ * the same picker used by the create modals, initialised from the workflow's
+ * stored values, and persists via the kind-appropriate update endpoint.
+ * Returns null for kinds that can't carry overrides (ad-hoc, CLI-local loops).
+ */
+function WorkflowModelEffortEditor({ workflow }: { workflow: Workflow }) {
+    const { theme } = useUnistyles();
+    const current = currentModelEffort(workflow);
+
+    const [modelModeKey, setModelModeKey] = React.useState<string>(
+        current?.modelMode ?? "default",
+    );
+    const [effortLevel, setEffortLevel] = React.useState<string | null>(
+        current?.effort ?? null,
+    );
+
+    // Re-seed when the sheet swaps to a different workflow without unmounting.
+    React.useEffect(() => {
+        setModelModeKey(current?.modelMode ?? "default");
+        setEffortLevel(current?.effort ?? null);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [workflow.id]);
+
+    const dirty =
+        modelModeKey !== (current?.modelMode ?? "default") ||
+        effortLevel !== (current?.effort ?? null);
+
+    const [loading, save] = useHappyAction(async () => {
+        const credentials = await TokenStorage.getCredentials();
+        if (!credentials) throw new Error(t("errors.authenticationFailed"));
+        const modelMode = modelModeKey === "default" ? null : modelModeKey;
+        const effort = effortLevel ?? null;
+        if (workflow.kind === "scheduled") {
+            await updateTriggerSchedule(credentials, workflow.trigger.id, { modelMode, effort });
+        } else if (workflow.kind === "event") {
+            await updateWebhookTrigger(credentials, workflow.trigger.id, { modelMode, effort });
+        } else if (workflow.kind === "loop" && workflow.projectId) {
+            await updateAgentLoop(credentials, workflow.projectId, workflow.loop.id, { modelMode, effort });
+        }
+        notifyWorkflowSourcesChanged();
+    });
+
+    if (!current) return null;
+
+    return (
+        <View style={styles.section}>
+            <Text style={styles.sectionTitle}>{t("workflows.sectionModel")}</Text>
+            <View style={styles.editorBody}>
+                <TriggerModelEffortSection
+                    modelModeKey={modelModeKey}
+                    onSelectModel={setModelModeKey}
+                    effortLevel={effortLevel}
+                    onSelectEffort={setEffortLevel}
+                />
+                <Pressable
+                    style={[
+                        styles.button,
+                        dirty && !loading ? styles.buttonPrimary : styles.buttonPrimaryDisabled,
+                        { alignSelf: "flex-start" },
+                    ]}
+                    disabled={!dirty || loading}
+                    onPress={save}
+                >
+                    {loading ? (
+                        <ActivityIndicator size="small" color={theme.colors.button.primary.tint} />
+                    ) : (
+                        <Text style={[
+                            styles.buttonText,
+                            dirty ? styles.buttonTextPrimary : styles.buttonTextPrimaryDisabled,
+                        ]}>
+                            {t("common.save")}
+                        </Text>
+                    )}
+                </Pressable>
+            </View>
+        </View>
+    );
+}
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
     return (
@@ -299,6 +409,9 @@ const styles = StyleSheet.create((theme) => ({
         borderWidth: StyleSheet.hairlineWidth,
         borderColor: theme.colors.divider,
         overflow: "hidden",
+    },
+    editorBody: {
+        gap: 12,
     },
     detailRow: {
         flexDirection: "row",

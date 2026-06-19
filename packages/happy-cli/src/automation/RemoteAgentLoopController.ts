@@ -214,6 +214,8 @@ export class RemoteAgentLoopController {
             trigger: "schedule",
             iteration: ephemeral.iteration,
             agent: ephemeral.agent,
+            modelMode: ephemeral.modelMode ?? undefined,
+            effort: ephemeral.effort ?? undefined,
             profileId: ephemeral.profileId ?? undefined,
             projectId: ephemeral.projectId,
             // genericConfig is a passthrough record; surface common scalars

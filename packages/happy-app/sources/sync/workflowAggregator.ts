@@ -42,6 +42,9 @@ export type WorkflowAgentLoopSummary = AgentLoopSummary & {
   lastTriggerAt?: number;
   lastStartedAt?: number;
   lastCompletedAt?: number;
+  /** Per-loop model-mode KEY + reasoning effort (server loops only). */
+  modelMode?: string | null;
+  effort?: string | null;
 };
 
 interface BaseWorkflow {
@@ -177,6 +180,8 @@ function serializedToSummary(
           : "idle",
     phase: loop.status === "running" ? "planning" : "sleeping",
     agent: loop.agent ?? "claude",
+    modelMode: loop.modelMode ?? null,
+    effort: loop.effort ?? null,
   };
 }
 

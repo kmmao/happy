@@ -217,6 +217,10 @@ export interface DispatchTaskTriggerInput {
     runtimeProfile?: ResolvedRuntimeProfile;
     resultToken?: string;
     worktreeIsolation?: boolean;
+    /** App model-mode KEY (e.g. "opus-4-8-1m") — drives 1M capability in the CLI. */
+    modelMode?: string | null;
+    /** Reasoning effort for the first turn (low|medium|high|xhigh|max). */
+    effort?: string | null;
 }
 
 /**
@@ -239,6 +243,8 @@ export async function dispatchTaskTrigger(
         skillContents: input.skillContents,
         profileId: input.profileId,
         runtimeProfile: input.runtimeProfile,
+        modelMode: input.modelMode ?? undefined,
+        effort: input.effort ?? undefined,
         worktreeIsolation: input.worktreeIsolation || undefined,
     });
 }

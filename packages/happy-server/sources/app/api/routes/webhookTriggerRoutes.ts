@@ -32,6 +32,9 @@ const CreateWebhookTriggerBodySchema = z.object({
     // AiBackendProfile.profileKey. When null/omitted the inbound handler
     // falls back to project default via runtimeProfileResolver (C4).
     profileId: z.string().optional(),
+    // App model-mode KEY + reasoning effort for spawned sessions.
+    modelMode: z.string().nullable().optional(),
+    effort: z.string().nullable().optional(),
 });
 
 const UpdateWebhookTriggerBodySchema = z.object({
@@ -41,6 +44,8 @@ const UpdateWebhookTriggerBodySchema = z.object({
     enabled: z.boolean().optional(),
     skillIds: z.array(z.string()).max(10).optional(),
     profileId: z.string().nullable().optional(),
+    modelMode: z.string().nullable().optional(),
+    effort: z.string().nullable().optional(),
 });
 
 const QueryWebhookTriggersSchema = z.object({
@@ -215,6 +220,8 @@ export function webhookTriggerRoutes(app: Fastify) {
                 skillContents,
                 profileId: resolvedProfileId,
                 runtimeProfile,
+                modelMode: trigger.modelMode,
+                effort: trigger.effort,
             });
 
             void inboxCreate({
@@ -269,7 +276,7 @@ export function webhookTriggerRoutes(app: Fastify) {
         },
         async (request, reply) => {
             const userId = request.userId;
-            const { machineId, projectId, name, slug, prompt, priority, skillIds, profileId } = request.body;
+            const { machineId, projectId, name, slug, prompt, priority, skillIds, profileId, modelMode, effort } = request.body;
 
             // Verify machine
             const machine = await db.machine.findFirst({
@@ -314,6 +321,8 @@ export function webhookTriggerRoutes(app: Fastify) {
                     priority,
                     skillIds: JSON.stringify(skillIds),
                     profileId: profileId ?? null,
+                    modelMode: modelMode ?? null,
+                    effort: effort ?? null,
                 },
             });
 
@@ -388,7 +397,7 @@ export function webhookTriggerRoutes(app: Fastify) {
         async (request, reply) => {
             const trigger = await ownedWebhookTrigger(request.userId, request.params.id);
 
-            const { name, prompt, priority, enabled, skillIds, profileId } = request.body;
+            const { name, prompt, priority, enabled, skillIds, profileId, modelMode, effort } = request.body;
             const data: Record<string, unknown> = {};
 
             if (name !== undefined) data.name = name;
@@ -397,6 +406,8 @@ export function webhookTriggerRoutes(app: Fastify) {
             if (enabled !== undefined) data.enabled = enabled;
             if (skillIds !== undefined) data.skillIds = JSON.stringify(skillIds);
             if (profileId !== undefined) data.profileId = profileId;
+            if (modelMode !== undefined) data.modelMode = modelMode;
+            if (effort !== undefined) data.effort = effort;
 
             const updated = await db.webhookTrigger.update({
                 where: { id: trigger.id },
@@ -471,6 +482,8 @@ function serializeWebhookTrigger(trigger: Record<string, unknown>): Record<strin
         lastTriggeredAt: Date | null;
         triggerCount: number;
         profileId: string | null;
+        modelMode: string | null;
+        effort: string | null;
         createdAt: Date;
         updatedAt: Date;
     };
@@ -488,6 +501,8 @@ function serializeWebhookTrigger(trigger: Record<string, unknown>): Record<strin
         lastTriggeredAt: t.lastTriggeredAt?.getTime() ?? null,
         triggerCount: t.triggerCount,
         profileId: t.profileId,
+        modelMode: t.modelMode,
+        effort: t.effort,
         createdAt: t.createdAt.getTime(),
         updatedAt: t.updatedAt.getTime(),
     };

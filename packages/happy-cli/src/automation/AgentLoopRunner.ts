@@ -90,6 +90,14 @@ export async function runAgentLoopJob(
       // Optional skill/slash command pushed into the session as the first
       // user message — see runClaude.ts consumer.
       HAPPY_BOOTSTRAP_SLASH_COMMAND: data.bootstrapSlashCommand ?? "",
+      // Per-trigger model-mode KEY + reasoning effort — consumed by runClaude's
+      // first-turn EnhancedMode injection (claude only; model KEY drives 1M).
+      ...((data.agent ?? "claude") === "claude" && data.modelMode && data.modelMode !== "default"
+        ? { HAPPY_INITIAL_MODEL_MODE: data.modelMode }
+        : {}),
+      ...((data.agent ?? "claude") === "claude" && data.effort
+        ? { HAPPY_INITIAL_EFFORT: data.effort }
+        : {}),
       ...(data.environmentVariables ?? {}),
     },
   });

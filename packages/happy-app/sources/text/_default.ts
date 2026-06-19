@@ -77,6 +77,9 @@ export const en = {
     sectionLoop: "Loop",
     sectionActions: "Actions",
     sectionMachine: "Machine",
+    sectionModel: "Model",
+    sectionEffort: "Reasoning effort",
+    effortDefault: "Default",
     // Detail page rows
     detailCronExpression: "Cron expression",
     detailNextFire: "Next fire",

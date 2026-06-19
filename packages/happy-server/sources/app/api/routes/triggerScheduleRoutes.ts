@@ -20,6 +20,9 @@ const CreateTriggerScheduleBodySchema = z.object({
     // AiBackendProfile.profileKey. Resolved server-side by
     // triggerScheduleRunner (C4) when the cron fires.
     profileId: z.string().optional(),
+    // App model-mode KEY + reasoning effort for spawned sessions.
+    modelMode: z.string().nullable().optional(),
+    effort: z.string().nullable().optional(),
 });
 
 const UpdateTriggerScheduleBodySchema = z.object({
@@ -29,6 +32,8 @@ const UpdateTriggerScheduleBodySchema = z.object({
     priority: TaskPrioritySchema.optional(),
     skillIds: z.array(z.string()).max(10).optional(),
     profileId: z.string().nullable().optional(),
+    modelMode: z.string().nullable().optional(),
+    effort: z.string().nullable().optional(),
 });
 
 const QueryTriggerSchedulesSchema = z.object({
@@ -66,7 +71,7 @@ export function triggerScheduleRoutes(app: Fastify) {
         },
         async (request, reply) => {
             const userId = request.userId;
-            const { machineId, projectId, name, prompt, cronExpression, priority, skillIds, profileId } = request.body;
+            const { machineId, projectId, name, prompt, cronExpression, priority, skillIds, profileId, modelMode, effort } = request.body;
 
             // Validate cron expression
             const nextRunAt = computeNextRunAt(cronExpression);
@@ -94,6 +99,8 @@ export function triggerScheduleRoutes(app: Fastify) {
                     skillIds: JSON.stringify(skillIds),
                     nextRunAt,
                     profileId: profileId ?? null,
+                    modelMode: modelMode ?? null,
+                    effort: effort ?? null,
                 },
             });
 
@@ -165,7 +172,7 @@ export function triggerScheduleRoutes(app: Fastify) {
         async (request, reply) => {
             const schedule = await ownedTriggerSchedule(request.userId, request.params.id);
 
-            const { name, prompt, cronExpression, priority, skillIds, profileId } = request.body;
+            const { name, prompt, cronExpression, priority, skillIds, profileId, modelMode, effort } = request.body;
             const data: Record<string, unknown> = {};
 
             if (name !== undefined) data.name = name;
@@ -173,6 +180,8 @@ export function triggerScheduleRoutes(app: Fastify) {
             if (priority !== undefined) data.priority = priority;
             if (skillIds !== undefined) data.skillIds = JSON.stringify(skillIds);
             if (profileId !== undefined) data.profileId = profileId;
+            if (modelMode !== undefined) data.modelMode = modelMode;
+            if (effort !== undefined) data.effort = effort;
 
             if (cronExpression !== undefined) {
                 const nextRunAt = computeNextRunAt(cronExpression);
@@ -278,6 +287,8 @@ function serializeTriggerSchedule(schedule: Record<string, unknown>): Record<str
         lastTaskId: string | null;
         runCount: number;
         profileId: string | null;
+        modelMode: string | null;
+        effort: string | null;
         createdAt: Date;
         updatedAt: Date;
     };
@@ -297,6 +308,8 @@ function serializeTriggerSchedule(schedule: Record<string, unknown>): Record<str
         lastTaskId: s.lastTaskId,
         runCount: s.runCount,
         profileId: s.profileId,
+        modelMode: s.modelMode,
+        effort: s.effort,
         createdAt: s.createdAt.getTime(),
         updatedAt: s.updatedAt.getTime(),
     };

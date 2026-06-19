@@ -23,6 +23,7 @@ import { useAllMachines, useProjects } from "@/sync/storage";
 import type { Machine } from "@/sync/storageTypes";
 import { isMachineOnline } from "@/utils/machineUtils";
 import { BottomSheet, BottomSheetHandle, PresetChip } from "@/components/BottomSheet";
+import { TriggerModelEffortSection } from "@/components/workflow/TriggerModelEffortSection";
 import { Modal as AlertModal } from "@/modal";
 import { TokenStorage } from "@/auth/tokenStorage";
 import { createAgentLoop } from "@/sync/apiAgentLoops";
@@ -459,6 +460,9 @@ export const CreateLoopModal = React.memo(function CreateLoopModal({
     const [schedule, setSchedule] = React.useState<ScheduleChoice>("1h");
     const [cronExpression, setCronExpression] = React.useState("*/30 * * * *");
     const [agent, setAgent] = React.useState<AgentChoice>("claude");
+    // Per-loop model + reasoning effort (Claude only). "default"/null = no override.
+    const [modelModeKey, setModelModeKey] = React.useState<string>("default");
+    const [effortLevel, setEffortLevel] = React.useState<string | null>(null);
     const [advancedOpen, setAdvancedOpen] = React.useState(false);
     const [submitting, setSubmitting] = React.useState(false);
 
@@ -494,6 +498,8 @@ export const CreateLoopModal = React.memo(function CreateLoopModal({
             setSchedule("1h");
             setCronExpression("*/30 * * * *");
             setAgent("claude");
+            setModelModeKey("default");
+            setEffortLevel(null);
             setAdvancedOpen(false);
             setSubmitting(false);
         }
@@ -594,6 +600,14 @@ export const CreateLoopModal = React.memo(function CreateLoopModal({
                 };
                 if (cron) body.cronExpression = cron;
                 if (intervalMs !== undefined) body.intervalMs = intervalMs;
+                // Model + effort are Claude-only overrides. Persisted on the
+                // loop row; CLI injects them onto the first-turn EnhancedMode.
+                if (agent === "claude" && modelModeKey !== "default") {
+                    body.modelMode = modelModeKey;
+                }
+                if (agent === "claude" && effortLevel) {
+                    body.effort = effortLevel;
+                }
                 // Stash optional name + bootstrap slash command in the
                 // generic-config bag (same path the daemon promotes from).
                 if (trimmedName || trimmedBootstrap) {
@@ -911,6 +925,18 @@ export const CreateLoopModal = React.memo(function CreateLoopModal({
                     </View>
                 </View>
             )}
+
+            {/* Model + reasoning effort — Claude-only, standalone-only.
+                Adopt mode hides the agent picker and uses a server path that
+                doesn't carry these overrides yet. */}
+            {!isAdoptMode && agent === "claude" ? (
+                <TriggerModelEffortSection
+                    modelModeKey={modelModeKey}
+                    onSelectModel={setModelModeKey}
+                    effortLevel={effortLevel}
+                    onSelectEffort={setEffortLevel}
+                />
+            ) : null}
 
             {/* Prompt textarea. */}
             <View>

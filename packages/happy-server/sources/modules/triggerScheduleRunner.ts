@@ -236,6 +236,8 @@ export async function checkAndTriggerSchedules(
                 skillContents,
                 profileId: resolvedProfileId,
                 runtimeProfile,
+                modelMode: schedule.modelMode,
+                effort: schedule.effort,
             });
 
             void inboxCreate({
@@ -309,6 +311,8 @@ function serializeTriggerScheduleForSync(s: Record<string, any>): Record<string,
         priority: s.priority,
         skillIds: typeof s.skillIds === "string" ? safeParseJsonArray(s.skillIds) : s.skillIds,
         profileId: s.profileId,
+        modelMode: s.modelMode,
+        effort: s.effort,
         enabled: s.enabled,
         nextRunAt: s.nextRunAt instanceof Date ? s.nextRunAt.getTime() : s.nextRunAt,
         lastRunAt: s.lastRunAt instanceof Date ? s.lastRunAt.getTime() : s.lastRunAt,

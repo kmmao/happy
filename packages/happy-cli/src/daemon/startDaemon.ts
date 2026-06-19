@@ -2757,6 +2757,8 @@ export async function startDaemon(): Promise<void> {
           skillContents: data.skillContents,
           agentType: data.agentType,
           modelOverride: data.modelOverride,
+          modelMode: data.modelMode,
+          effort: data.effort,
           profileId: data.profileId,
           runtimeProfile: data.runtimeProfile,
         })

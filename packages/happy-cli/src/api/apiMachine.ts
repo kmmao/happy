@@ -1100,7 +1100,7 @@ export class ApiMachineClient {
    * Set handler for incoming task trigger events.
    * Called when Server dispatches a task-trigger ephemeral event to this machine.
    */
-  setTaskHandler(handler: (data: { type: string; taskId: string; prompt: string; directory: string; priority: string; projectId?: string; resultToken?: string; skillContents?: Array<{ name: string; content: string }>; agentType?: string | null; modelOverride?: string | null; profileId?: string; runtimeProfile?: ResolvedRuntimeProfile }) => void) {
+  setTaskHandler(handler: (data: { type: string; taskId: string; prompt: string; directory: string; priority: string; projectId?: string; resultToken?: string; skillContents?: Array<{ name: string; content: string }>; agentType?: string | null; modelOverride?: string | null; modelMode?: string | null; effort?: string | null; profileId?: string; runtimeProfile?: ResolvedRuntimeProfile }) => void) {
     this.taskHandler = handler;
   }
 
@@ -1723,7 +1723,7 @@ export class ApiMachineClient {
         logger.debug(
           `[API MACHINE] Received task-trigger for task ${data.taskId}`,
         );
-        this.taskHandler(data as { type: string; taskId: string; prompt: string; directory: string; priority: string; projectId?: string; resultToken?: string; skillContents?: Array<{ name: string; content: string }>; agentType?: string | null; modelOverride?: string | null; profileId?: string; runtimeProfile?: ResolvedRuntimeProfile });
+        this.taskHandler(data as { type: string; taskId: string; prompt: string; directory: string; priority: string; projectId?: string; resultToken?: string; skillContents?: Array<{ name: string; content: string }>; agentType?: string | null; modelOverride?: string | null; modelMode?: string | null; effort?: string | null; profileId?: string; runtimeProfile?: ResolvedRuntimeProfile });
       }
 
       if (data.type === "task-cancel" && this.taskCancelHandler) {

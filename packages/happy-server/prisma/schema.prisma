@@ -624,6 +624,11 @@ model AgentLoop {
     /// [ResolvedRuntimeProfile]
     runtimeProfile          Json?     @map("profileEnvironmentVariables")
 
+    // App model-mode KEY (e.g. "opus-4-8-1m") + reasoning effort for spawned
+    // iterations. Plain-text (non-sensitive), nullable for backward compat.
+    modelMode               String?
+    effort                  String?
+
     createdAt               DateTime  @default(now())
     updatedAt               DateTime  @updatedAt
     completedAt             DateTime?
@@ -1064,6 +1069,10 @@ model TriggerSchedule {
     // Profile binding — see Task.profileId docs. Nullable pending backfill.
     profileId       String?
 
+    // App model-mode KEY + reasoning effort for spawned sessions (plain-text).
+    modelMode       String?
+    effort          String?
+
     // Tracking
     nextRunAt       DateTime?
     lastRunAt       DateTime?
@@ -1102,6 +1111,10 @@ model WebhookTrigger {
 
     // Profile binding — see Task.profileId docs. Nullable pending backfill.
     profileId       String?
+
+    // App model-mode KEY + reasoning effort for spawned sessions (plain-text).
+    modelMode       String?
+    effort          String?
 
     // Stats
     lastTriggeredAt DateTime?

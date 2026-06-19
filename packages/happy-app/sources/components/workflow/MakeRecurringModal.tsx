@@ -33,6 +33,7 @@ import { webInteractive } from "@/utils/interactiveSurface";
 import { t } from "@/text";
 import { useAllMachines, useProjects } from "@/sync/storage";
 import { BottomSheet, BottomSheetHandle, PresetChip } from "@/components/BottomSheet";
+import { TriggerModelEffortSection } from "@/components/workflow/TriggerModelEffortSection";
 import type { Session } from "@/sync/storageTypes";
 
 interface MakeRecurringModalProps {
@@ -150,12 +151,17 @@ export const MakeRecurringModal = React.memo(function MakeRecurringModal({
     // text inside handleConfirm (see sessionAdopt(... name: ...) below),
     // so an input here would just duplicate that logic.
     const [name, setName] = React.useState<string>("");
+    // Per-trigger model + reasoning effort. "default" / null = no override.
+    const [modelModeKey, setModelModeKey] = React.useState<string>("default");
+    const [effortLevel, setEffortLevel] = React.useState<string | null>(null);
     const [submitting, setSubmitting] = React.useState(false);
 
     React.useEffect(() => {
         if (!visible) return;
         setPresetId("daily");
         setCustomCron("");
+        setModelModeKey("default");
+        setEffortLevel(null);
         const seed = session
             ? session.latestUserRequestPreview?.text?.trim() ||
               session.metadata?.summary?.text?.trim() ||
@@ -251,6 +257,8 @@ export const MakeRecurringModal = React.memo(function MakeRecurringModal({
                     prompt: prompt.trim(),
                     cronExpression,
                     ...(trimmedName ? { name: trimmedName } : {}),
+                    ...(modelModeKey !== "default" ? { modelMode: modelModeKey } : {}),
+                    ...(effortLevel ? { effort: effortLevel } : {}),
                 });
             }
 
@@ -452,6 +460,18 @@ export const MakeRecurringModal = React.memo(function MakeRecurringModal({
                         maxLength={200}
                     />
                 </View>
+            ) : null}
+
+            {/* Model + reasoning effort — standalone only. Session-adopt
+                creates the schedule through a different server path that
+                doesn't carry these overrides yet. */}
+            {isStandalone ? (
+                <TriggerModelEffortSection
+                    modelModeKey={modelModeKey}
+                    onSelectModel={setModelModeKey}
+                    effortLevel={effortLevel}
+                    onSelectEffort={setEffortLevel}
+                />
             ) : null}
         </BottomSheet>
     );

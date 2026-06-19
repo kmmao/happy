@@ -166,6 +166,14 @@ export async function runTaskJob(
       // Per-role model override: inject into the spawned agent's environment
       ...(data.modelOverride && agentType === "claude" ? { ANTHROPIC_MODEL: data.modelOverride } : {}),
       ...(agentType === "codex" ? { OPENAI_MODEL: LOCKED_CODEX_MODEL } : {}),
+      // Per-trigger model-mode KEY + reasoning effort. The model KEY (e.g.
+      // "opus-4-8-1m") drives 1M capability via runClaude's first-turn
+      // EnhancedMode injection (resolveCliModelForMode/is1MModelKey). Distinct
+      // from ANTHROPIC_MODEL above which is a raw model id.
+      ...(data.modelMode && data.modelMode !== "default" && agentType === "claude"
+        ? { HAPPY_INITIAL_MODEL_MODE: data.modelMode }
+        : {}),
+      ...(data.effort && agentType === "claude" ? { HAPPY_INITIAL_EFFORT: data.effort } : {}),
       // Expose worktree branch name so the agent can create a PR on completion
       ...(isolatedBranchName ? { HAPPY_TASK_WORKTREE_BRANCH: isolatedBranchName } : {}),
     },
