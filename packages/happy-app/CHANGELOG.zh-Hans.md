@@ -13,6 +13,17 @@
 ### 网页图片粘贴
 - 修复网页版粘贴图片有时附上之前发送过的旧图片、而非刚复制的图片的问题 —— 不再需要粘贴多次。现在会短暂轮询剪贴板,直到同步好的最新图片就绪。
 
+## 2.43.1 - 2026-06-19
+
+在聊天中直接呈现真实的 `/compact` 摘要文本和 token 变化。修复前「Context compacted」气泡只是一个干巴巴的生命周期标记 —— 能确认压缩发生了,但用户看不到压缩了什么(286K → 11K tokens?Claude 注入了哪 9KB 摘要文本作为新对话的种子?)。摘要文本其实一直都被 TUI 写进了 JSONL,只是 CLI 之前读错了记录类型。配套 CLI 发布:`@kmmao/happy-coder@0.101.4`。
+
+### 压缩摘要气泡
+- 新增结构化的 `compact-boundary` agent 事件变体,渲染更丰富的「Context compacted」气泡:标题行 `Context compacted · 286K → 11K tokens · 2m5s`,外加一个可展开区域,显示 TUI 在 `/compact` 后粘贴注入的完整摘要文本。
+- 摘要是异步到达的 —— `compact_boundary` 触发时 CLI 立即发出 token 变化标题行,待 JSONL 的 `isCompactSummary:true` user 记录刷出后(通常 <1s)再带上 `summary` 重新发一次。reducer 通过共享的 `boundaryUuid` key 把第二次的发送就地合并到同一行,因此气泡是原地更新而非重复。
+- 自动压缩(TUI 在自己的阈值触发)和手动 `/compact` 渲染为不同的标题文案。
+- 旧版 CLI 发出的 legacy `{type:"message", message:"Context compacted"}` 气泡,在 5s 内有结构化事件到达时会被抑制(任意到达顺序)。旧版 CLI 单独发出的 legacy 气泡照旧渲染 —— 未更新 CLI 的用户无回归。
+- 五个新增 vitest 用例锁定双发送契约:单发送渲染、第二次发送的就地合并、两种到达顺序下的抑制,以及 >5s 窗口(保护一个确实更早的 `/compact` 不被随后的 boundary 抑制)。
+
 ## 2.43.0 - 2026-06-19
 
 移除了输入区的 AUTO/200K/1M 上下文开关。modelMode picker 现在是窗口大小的唯一真相：选 `-1m` 变体（如 `opus-4-7-1m`、`sonnet-1m`）走 1M premium，选默认变体走 200K + 75% 提示。配套 CLI 发布：`@kmmao/happy-coder@0.101.0`，wire `@kmmao/happy-wire@0.33.0`。
