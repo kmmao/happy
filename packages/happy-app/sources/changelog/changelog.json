@@ -2,6 +2,17 @@
   "entries": {
     "en": [
       {
+        "version": "2.43.2",
+        "date": "2026-06-21",
+        "summary": "Three input-and-interrupt fixes. Sending an image alongside text no longer fires duplicate \"[Request interrupted by user]\" messages; tapping the abort button no longer leaves your sent prompt in Claude's composer to be re-sent with your next message; and pasting an image in the web app now grabs the freshly copied image on the first try. Companion CLI release: `@kmmao/happy-coder@0.102.4`.",
+        "changes": [
+          "Fixed sending an image together with text producing two spurious \"[Request interrupted by user]\" messages. The prompt-delivery echo check mistook the multi-line message (text plus the image reference on its own line) for a failed send and fired the interrupt-and-retry path twice.",
+          "Fixed the abort button leaving the just-sent prompt behind in Claude's input box. Claude Code restores a cancelled prompt into the composer on interrupt, so the next message was being sent glued to the restored one. The composer is now cleared before each send.",
+          "Fixed pasting an image in the web app sometimes attaching a previously sent image instead of the one you just copied — you no longer have to paste several times. The app now briefly polls the clipboard until the freshly synced image is available."
+        ],
+        "rawMarkdown": "## 2.43.2 - 2026-06-21\n\n\nThree input-and-interrupt fixes. Sending an image alongside text no longer fires duplicate \"[Request interrupted by user]\" messages; tapping the abort button no longer leaves your sent prompt in Claude's composer to be re-sent with your next message; and pasting an image in the web app now grabs the freshly copied image on the first try. Companion CLI release: `@kmmao/happy-coder@0.102.4`.\n\n### Image + text sends\n- Fixed sending an image together with text producing two spurious \"[Request interrupted by user]\" messages. The prompt-delivery echo check mistook the multi-line message (text plus the image reference on its own line) for a failed send and fired the interrupt-and-retry path twice.\n\n### Abort button\n- Fixed the abort button leaving the just-sent prompt behind in Claude's input box. Claude Code restores a cancelled prompt into the composer on interrupt, so the next message was being sent glued to the restored one. The composer is now cleared before each send.\n\n### Web image paste\n- Fixed pasting an image in the web app sometimes attaching a previously sent image instead of the one you just copied — you no longer have to paste several times. The app now briefly polls the clipboard until the freshly synced image is available."
+      },
+      {
         "version": "2.43.1",
         "date": "2026-06-19",
         "summary": "Surfaces the actual `/compact` summary text and token deltas inside the chat. Pre-fix the \"Context compacted\" bubble was a bare lifecycle marker — useful as a confirmation, but the user could not see WHAT was compacted (286K → 11K tokens? Which 9KB of summary prose did Claude inject as the new conversation seed?). The summary text was being written to the JSONL by the TUI all along; the CLI was just looking at the wrong record type. Companion CLI release: `@kmmao/happy-coder@0.101.4`.",
@@ -1144,6 +1155,17 @@
     ],
     "zh-Hans": [
       {
+        "version": "2.43.2",
+        "date": "2026-06-21",
+        "summary": "三处输入与中断修复。发图片+文字不再产生重复的「[Request interrupted by user]」提示;点击中断按钮不再把已发送的内容留在 Claude 输入框、跟着下一条消息一起重发;网页版粘贴图片现在第一次就能取到刚复制的图片。配套 CLI 发布:`@kmmao/happy-coder@0.102.4`。",
+        "changes": [
+          "修复发送图片连同文字时产生两条多余「[Request interrupted by user]」提示的问题。prompt 投递的回显校验把多行消息(文字 + 单独一行的图片引用)误判为发送失败,触发了两次中断重试。",
+          "修复中断按钮把刚发送的内容残留在 Claude 输入框的问题。Claude Code 在中断时会把被取消的 prompt 恢复回输入框,导致下一条消息与残留内容粘连重发。现在每次发送前都会清空输入框。",
+          "修复网页版粘贴图片有时附上之前发送过的旧图片、而非刚复制的图片的问题 —— 不再需要粘贴多次。现在会短暂轮询剪贴板,直到同步好的最新图片就绪。"
+        ],
+        "rawMarkdown": "## 2.43.2 - 2026-06-21\n\n\n三处输入与中断修复。发图片+文字不再产生重复的「[Request interrupted by user]」提示;点击中断按钮不再把已发送的内容留在 Claude 输入框、跟着下一条消息一起重发;网页版粘贴图片现在第一次就能取到刚复制的图片。配套 CLI 发布:`@kmmao/happy-coder@0.102.4`。\n\n### 图片 + 文字发送\n- 修复发送图片连同文字时产生两条多余「[Request interrupted by user]」提示的问题。prompt 投递的回显校验把多行消息(文字 + 单独一行的图片引用)误判为发送失败,触发了两次中断重试。\n\n### 中断按钮\n- 修复中断按钮把刚发送的内容残留在 Claude 输入框的问题。Claude Code 在中断时会把被取消的 prompt 恢复回输入框,导致下一条消息与残留内容粘连重发。现在每次发送前都会清空输入框。\n\n### 网页图片粘贴\n- 修复网页版粘贴图片有时附上之前发送过的旧图片、而非刚复制的图片的问题 —— 不再需要粘贴多次。现在会短暂轮询剪贴板,直到同步好的最新图片就绪。"
+      },
+      {
         "version": "2.43.0",
         "date": "2026-06-19",
         "summary": "移除了输入区的 AUTO/200K/1M 上下文开关。modelMode picker 现在是窗口大小的唯一真相：选 `-1m` 变体（如 `opus-4-7-1m`、`sonnet-1m`）走 1M premium，选默认变体走 200K + 75% 提示。配套 CLI 发布：`@kmmao/happy-coder@0.101.0`，wire `@kmmao/happy-wire@0.33.0`。",
@@ -2250,7 +2272,7 @@
       }
     ]
   },
-  "latestVersion": "2.43.1",
+  "latestVersion": "2.43.2",
   "availableLocales": [
     "en",
     "zh-Hans"

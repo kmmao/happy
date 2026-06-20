@@ -1,5 +1,18 @@
 # Changelog
 
+## 2.43.2 - 2026-06-21
+
+Three input-and-interrupt fixes. Sending an image alongside text no longer fires duplicate "[Request interrupted by user]" messages; tapping the abort button no longer leaves your sent prompt in Claude's composer to be re-sent with your next message; and pasting an image in the web app now grabs the freshly copied image on the first try. Companion CLI release: `@kmmao/happy-coder@0.102.4`.
+
+### Image + text sends
+- Fixed sending an image together with text producing two spurious "[Request interrupted by user]" messages. The prompt-delivery echo check mistook the multi-line message (text plus the image reference on its own line) for a failed send and fired the interrupt-and-retry path twice.
+
+### Abort button
+- Fixed the abort button leaving the just-sent prompt behind in Claude's input box. Claude Code restores a cancelled prompt into the composer on interrupt, so the next message was being sent glued to the restored one. The composer is now cleared before each send.
+
+### Web image paste
+- Fixed pasting an image in the web app sometimes attaching a previously sent image instead of the one you just copied — you no longer have to paste several times. The app now briefly polls the clipboard until the freshly synced image is available.
+
 ## 2.43.1 - 2026-06-19
 
 Surfaces the actual `/compact` summary text and token deltas inside the chat. Pre-fix the "Context compacted" bubble was a bare lifecycle marker — useful as a confirmation, but the user could not see WHAT was compacted (286K → 11K tokens? Which 9KB of summary prose did Claude inject as the new conversation seed?). The summary text was being written to the JSONL by the TUI all along; the CLI was just looking at the wrong record type. Companion CLI release: `@kmmao/happy-coder@0.101.4`.
