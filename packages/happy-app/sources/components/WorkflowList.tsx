@@ -27,6 +27,7 @@ import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
 import { Typography } from "@/constants/Typography";
 import { useWorkflows, type Workflow, type WorkflowKind } from "@/hooks/useWorkflows";
+import { useSetting } from "@/sync/storage";
 import { useNavigateToSession } from "@/hooks/useNavigateToSession";
 import { SharedStateView } from "./SharedStateView";
 import { UpdateBanner } from "./UpdateBanner";
@@ -508,9 +509,22 @@ export const WorkflowList = React.memo<WorkflowListProps>(function WorkflowList(
     const [standaloneWebhookVisible, setStandaloneWebhookVisible] = React.useState(false);
     const [standaloneLoopVisible, setStandaloneLoopVisible] = React.useState(false);
 
+    // "Hide inactive sessions" (settings.hideInactiveSessions) mirrors the
+    // legacy useVisibleSessionListViewData semantics, but scoped to Ad-hoc
+    // workflows only — those ARE chats. Scheduled / Event / Loop workflows
+    // are persistent automation containers, not chats, so hiding them when
+    // idle would make them vanish from their own kind tab. Keep an Ad-hoc
+    // workflow when its session is active OR starred (bookmarked).
+    const hideInactiveSessions = useSetting('hideInactiveSessions');
     const filtered = React.useMemo(() => {
-        return workflows.filter((w) => w.kind === activeFilter);
-    }, [workflows, activeFilter]);
+        const byKind = workflows.filter((w) => w.kind === activeFilter);
+        if (!hideInactiveSessions) {
+            return byKind;
+        }
+        return byKind.filter(
+            (w) => w.kind !== "adhoc" || w.session.active || w.session.starred,
+        );
+    }, [workflows, activeFilter, hideInactiveSessions]);
 
     const handleEmptyCreate = React.useCallback(() => {
         switch (activeFilter) {
