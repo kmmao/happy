@@ -284,8 +284,29 @@ function writePromptToPty(pty: ClaudePtyHandle, message: string): boolean {
   // separate write a tick later. A standalone \r is unambiguously the submit
   // key. The caller (writePromptWithEchoConfirm) schedules the \r; this helper
   // just does the paste so the two are independently retryable.
+  //
+  // Clear the composer BEFORE pasting. Claude Code auto-restores a cancelled
+  // prompt back into the input box on Esc/Ctrl-C interrupt (changelog
+  // v2.1.141). So after the App's abort button fires an Esc, the just-sent
+  // prompt is sitting in the composer — and a bracketed paste APPENDS to the
+  // composer's current contents, not replaces them. Without clearing first the
+  // restored prompt is re-submitted glued to the next message (user reported:
+  // "hi" stays after abort, then goes out again with the following message).
+  // Ctrl-U (0x15) kills to line start; repeating it clears across every line of
+  // a multi-line restored prompt (Claude Code interactive-mode docs). On an
+  // already-empty composer each Ctrl-U is a harmless no-op — never interrupts a
+  // turn and never exits Claude (unlike Ctrl-C) — so it is safe on every send,
+  // including a session's very first prompt. \x15 is not \x1b, so it cannot
+  // merge with the bracketed-paste \x1b[200~ start marker.
+  pty.write(COMPOSER_CLEAR);
   return pty.write(`\x1b[200~${message}\x1b[201~`);
 }
+
+// Ctrl-U (kill-to-line-start) repeated enough times to clear a multi-line
+// restored prompt from the composer. Real Happy prompts are a handful of lines
+// (text + an `[image: …]` reference); 16 covers pathological cases with margin,
+// and extra repeats on an empty composer are no-ops.
+const COMPOSER_CLEAR = "\x15".repeat(16);
 
 /** Send a standalone carriage return — the discrete "submit" keypress. */
 function writeSubmitNewline(pty: ClaudePtyHandle): boolean {
@@ -352,7 +373,19 @@ function writePromptWithEchoConfirm(
   const submitDelayMs = opts.submitDelayMs ?? 80;
 
   // Pick a short printable needle from the prompt to look for in the echo.
-  const visible = message.replace(/[\x00-\x1f\x7f]/g, "").trim();
+  //
+  // CRITICAL: derive the needle from the FIRST LINE only. A multi-line prompt
+  // (e.g. text + an `[image: /path]` reference the App appends on a new line —
+  // `hi\n[image: …]`) echoes into the composer with a rendered newline and
+  // cursor-positioning ANSI between the lines, so the raw `buf` reads
+  // `hi…\r\n…[image:…`. A needle spanning the line boundary (`hi[image: /v`)
+  // can never match that raw echo → echo "not seen" → the Esc + re-paste retry
+  // loop fires `maxRetries` times, and each Esc interrupts the turn that DID
+  // start, surfacing as duplicate "[Request interrupted by user]" messages.
+  // The first line always echoes as a contiguous run, so a needle taken from
+  // it matches reliably.
+  const firstLine = message.split("\n", 1)[0];
+  const visible = firstLine.replace(/[\x00-\x1f\x7f]/g, "").trim();
   const needle = visible.slice(0, Math.min(12, visible.length));
 
   // Paste the text, then submit with a standalone \r shortly after.
