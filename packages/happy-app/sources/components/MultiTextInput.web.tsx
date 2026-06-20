@@ -323,28 +323,34 @@ export const MultiTextInput = React.forwardRef<
             };
 
             void (async () => {
-              // Brief delay so Chrome can finish syncing the OS clipboard
-              // after the page regained focus. 80ms is below the human
-              // latency threshold (~100ms). Transient activation persists
-              // 5s, so subsequent clipboard.read() calls remain allowed.
-              await new Promise((resolve) => setTimeout(resolve, 80));
-              let blob = await readClipboardImage();
-
-              // Same size as the fallback file strongly suggests Chrome's
-              // OS-clipboard sync hasn't caught up yet (both reads served
-              // from the same stale snapshot). Retry once with a longer
-              // delay before giving up.
-              if (
-                blob &&
-                fallbackImageSize !== undefined &&
-                blob.size === fallbackImageSize
-              ) {
+              // Chrome serves a STALE image in both e.clipboardData and the
+              // first navigator.clipboard.read() calls until its async
+              // OS-clipboard sync completes. That latency varies by machine,
+              // so a single fixed retry was often too short — the previously
+              // pasted/sent image came back and the user had to paste several
+              // times before the fresh one landed (the reported bug). Poll
+              // clipboard.read() with increasing back-off and accept the first
+              // image whose size DIFFERS from the stale clipboardData snapshot
+              // — that read is the freshly-synced one. Total budget ~0.9s;
+              // transient activation lasts 5s so every read stays permitted.
+              const POLL_DELAYS_MS = [80, 150, 250, 400];
+              let blob: Blob | null = null;
+              for (const delay of POLL_DELAYS_MS) {
+                await new Promise((resolve) => setTimeout(resolve, delay));
+                const candidate = await readClipboardImage();
+                if (!candidate) continue;
+                blob = candidate;
+                // A size different from the stale fallback means the sync
+                // caught up and this is the fresh image — take it now.
+                if (
+                  fallbackImageSize === undefined ||
+                  candidate.size !== fallbackImageSize
+                ) {
+                  break;
+                }
                 log.log(
-                  `[paste] clipboard.read() blob size matched fallback (${blob.size}B), retrying after 200ms`,
+                  `[paste] clipboard.read() still matches stale fallback (${candidate.size}B), polling…`,
                 );
-                await new Promise((resolve) => setTimeout(resolve, 200));
-                const retried = await readClipboardImage();
-                if (retried) blob = retried;
               }
 
               if (blob) {
