@@ -6,6 +6,30 @@ import { Typography } from "@/constants/Typography";
 import { shouldCreatePasteBlock } from "./pasteBlock";
 import { log } from "@/log";
 
+// Stale-clipboard defense for web image paste.
+//
+// After a macOS screenshot, Chrome lags its clipboard cache behind the OS:
+// for a short window BOTH e.clipboardData AND navigator.clipboard.read() can
+// serve the PREVIOUS image, and which one refreshes first is not
+// deterministic (we tried preferring each — neither alone is reliable). The
+// one invariant we can lean on: the stale image is always one the user has
+// ALREADY pasted this page-session. So instead of guessing which source is
+// fresh, we remember the byte sizes we have already accepted and, when
+// pasting, pick the first candidate whose size we have NOT seen — that is
+// necessarily the new screenshot. Two different images practically never
+// share an exact byte size, so size is a good-enough signature here.
+const RECENT_PASTE_SIZES_CAP = 16;
+const recentlyPastedImageSizes: number[] = [];
+function isRecentlyPastedSize(size: number): boolean {
+  return recentlyPastedImageSizes.includes(size);
+}
+function recordPastedImageSize(size: number): void {
+  recentlyPastedImageSizes.push(size);
+  if (recentlyPastedImageSizes.length > RECENT_PASTE_SIZES_CAP) {
+    recentlyPastedImageSizes.shift();
+  }
+}
+
 export type SupportedKey =
   | "Enter"
   | "Escape"
@@ -291,19 +315,16 @@ export const MultiTextInput = React.forwardRef<
             `[paste] clipboardData files=${capturedFiles.length}, types=${capturedFiles.map((f) => `${f.file.type}/${f.file.size}B`).join(",")}`,
           );
 
-          // Use navigator.clipboard.read() for fresh clipboard data.
-          // Chrome may serve stale data in e.clipboardData.items when the
-          // clipboard was updated (e.g. macOS screenshot) after the page
-          // last gained focus. The modern Clipboard API can pull the
-          // current OS clipboard — but only AFTER Chrome has finished its
-          // internal OS-clipboard sync, which is asynchronous and not
-          // guaranteed to complete before the paste handler fires. We
-          // therefore (1) wait a short tick to give Chrome time to sync,
-          // and (2) treat a same-size-as-fallback result as suspected
-          // stale and retry once with a longer delay.
+          // Pick the FRESH image, defeating Chrome's post-screenshot stale
+          // clipboard (see recentlyPastedImageSizes notes at top of file).
+          // Both e.clipboardData and navigator.clipboard.read() may briefly
+          // serve the previous image, so we gather candidates from BOTH —
+          // the sync clipboardData snapshot plus a few polled clipboard.read()
+          // calls — and accept the first whose byte size we have NOT already
+          // pasted this session. Early-exit keeps the common fresh case
+          // instant; only a stuck-stale clipboard pays the full poll budget.
           if (typeof navigator?.clipboard?.read === "function" && onImagePaste) {
             const fallbackImage = capturedFiles.find((f) => f.isImage);
-            const fallbackImageSize = fallbackImage?.file.size;
 
             const readClipboardImage = async (): Promise<Blob | null> => {
               try {
@@ -323,49 +344,54 @@ export const MultiTextInput = React.forwardRef<
             };
 
             void (async () => {
-              // Chrome serves a STALE image in both e.clipboardData and the
-              // first navigator.clipboard.read() calls until its async
-              // OS-clipboard sync completes. That latency varies by machine,
-              // so a single fixed retry was often too short — the previously
-              // pasted/sent image came back and the user had to paste several
-              // times before the fresh one landed (the reported bug). Poll
-              // clipboard.read() with increasing back-off and accept the first
-              // image whose size DIFFERS from the stale clipboardData snapshot
-              // — that read is the freshly-synced one. Total budget ~0.9s;
-              // transient activation lasts 5s so every read stays permitted.
-              const POLL_DELAYS_MS = [80, 150, 250, 400];
-              let blob: Blob | null = null;
-              for (const delay of POLL_DELAYS_MS) {
-                await new Promise((resolve) => setTimeout(resolve, delay));
-                const candidate = await readClipboardImage();
-                if (!candidate) continue;
-                blob = candidate;
-                // A size different from the stale fallback means the sync
-                // caught up and this is the fresh image — take it now.
-                if (
-                  fallbackImageSize === undefined ||
-                  candidate.size !== fallbackImageSize
-                ) {
-                  break;
+              // Delays between successive clipboard.read() polls (the first is
+              // immediate). Total budget ~1.7s only ever spent when every read
+              // keeps returning a previously-pasted image; transient
+              // activation lasts 5s so each read stays permitted.
+              const POLL_DELAYS_MS = [0, 120, 200, 300, 450, 600];
+              // Freshest blob we have seen, used as the last-resort fallback
+              // when NO candidate has an unseen size (genuine re-paste of the
+              // same image, or the clipboard never synced).
+              let newestSeen: Blob | null = fallbackImage?.file ?? null;
+
+              const accept = (b: Blob): void => {
+                recordPastedImageSize(b.size);
+                onImagePaste(b);
+              };
+
+              const consider = (b: Blob | null): boolean => {
+                if (!b) return false;
+                newestSeen = b;
+                if (isRecentlyPastedSize(b.size)) {
+                  log.log(
+                    `[paste] candidate ${b.size}B already pasted — skipping as stale`,
+                  );
+                  return false;
                 }
-                log.log(
-                  `[paste] clipboard.read() still matches stale fallback (${candidate.size}B), polling…`,
-                );
+                log.log(`[paste] fresh image chosen: ${b.size}B`);
+                accept(b);
+                return true;
+              };
+
+              // clipboardData first (sync, needs no clipboard permission).
+              if (consider(fallbackImage?.file ?? null)) return;
+
+              // Then poll the OS clipboard until a fresh (unseen) image shows.
+              for (const delay of POLL_DELAYS_MS) {
+                if (delay) await new Promise((r) => setTimeout(r, delay));
+                if (consider(await readClipboardImage())) return;
               }
 
-              if (blob) {
-                log.log(`[paste] clipboard.read() image: ${blob.size}B`);
-                onImagePaste(blob);
+              // No unseen candidate — fall back to the freshest blob we saw.
+              if (newestSeen) {
+                log.log(
+                  `[paste] no fresh candidate; using ${newestSeen.size}B fallback`,
+                );
+                accept(newestSeen);
                 return;
               }
-
-              // Fallback: use synchronously captured file from clipboardData
               const first = capturedFiles[0];
-              if (first.isImage && onImagePaste) {
-                onImagePaste(first.file);
-              } else if (!first.isImage && onFilePaste) {
-                onFilePaste(first.file);
-              }
+              if (first && !first.isImage && onFilePaste) onFilePaste(first.file);
             })();
             return;
           }
