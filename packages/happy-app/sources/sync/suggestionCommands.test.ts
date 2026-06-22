@@ -40,6 +40,12 @@ describe("getAllCommands", () => {
     expect(getAllCommands("codex-session")).toEqual([
       { command: "compact", description: "Compact the conversation history", kind: "slash", source: "builtin" },
       { command: "clear", description: "Clear the conversation", kind: "slash", source: "builtin" },
+      { command: "goal", description: "Keep Claude working toward a goal until done", kind: "slash", source: "builtin" },
+      { command: "code-review", description: "Review the current diff for bugs and cleanups", kind: "slash", source: "builtin" },
+      { command: "ultrareview", description: "Cloud multi-agent deep code review", kind: "slash", source: "builtin" },
+      { command: "security-review", description: "Security review of pending changes", kind: "slash", source: "builtin" },
+      { command: "simplify", description: "Review changed code and apply simplifications", kind: "slash", source: "builtin" },
+      { command: "verify", description: "Run the app to verify a change works", kind: "slash", source: "builtin" },
       {
         command: "ecc-plan",
         description: "Run the ECC planning workflow.",
@@ -118,6 +124,12 @@ describe("getAllCommands", () => {
     expect(getAllCommands("codex-session")).toEqual([
       { command: "compact", description: "Compact the conversation history", kind: "slash", source: "builtin" },
       { command: "clear", description: "Clear the conversation", kind: "slash", source: "builtin" },
+      { command: "goal", description: "Keep Claude working toward a goal until done", kind: "slash", source: "builtin" },
+      { command: "code-review", description: "Review the current diff for bugs and cleanups", kind: "slash", source: "builtin" },
+      { command: "ultrareview", description: "Cloud multi-agent deep code review", kind: "slash", source: "builtin" },
+      { command: "security-review", description: "Security review of pending changes", kind: "slash", source: "builtin" },
+      { command: "simplify", description: "Review changed code and apply simplifications", kind: "slash", source: "builtin" },
+      { command: "verify", description: "Run the app to verify a change works", kind: "slash", source: "builtin" },
       {
         command: "plan",
         description: "Generic planner command",
