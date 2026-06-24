@@ -84,6 +84,7 @@ import { recoverTrackedSessionsFromIndex as recoverTrackedSessionsFromIndexActio
 import {
   onHappySessionWebhook as onHappySessionWebhookAction,
   onSessionHeartbeat as onSessionHeartbeatAction,
+  onSessionFault as onSessionFaultAction,
 } from "./startDaemonSessionWebhook";
 import { createProcessTreeKiller } from "./daemonProcessTree";
 
@@ -452,6 +453,21 @@ export async function startDaemon(): Promise<void> {
       activity?: "idle" | "thinking" | "executing" | "blocked";
     }): { known: boolean; keepAlive: boolean } =>
       onSessionHeartbeatAction(
+        { pidToTrackedSession, trackedSessionRegistry },
+        params,
+      );
+
+    // Out-of-band fault report — child pushes Claude SDK error category +
+    // rate-limit reset hints here BEFORE it exits, so onChildExited can
+    // route a smarter terminal signal to the AgentLoopCoordinator.
+    const onSessionFault = (params: {
+      pid: number;
+      happySessionId?: string;
+      spawnId?: string;
+      errorType?: string;
+      rateLimitResetsAt?: number;
+    }): { known: boolean } =>
+      onSessionFaultAction(
         { pidToTrackedSession, trackedSessionRegistry },
         params,
       );
@@ -1288,6 +1304,13 @@ export async function startDaemon(): Promise<void> {
         status: terminalStatus,
         sessionId: session.happySessionId,
         errorMessage: terminalError,
+        // PR2: surface the Claude SDK's last-known fault category so the
+        // coordinator can classify the failure (transient categories like
+        // `rate_limit` / `overloaded` / `server_error` skip the consecutive
+        // failure budget) and use `resetsAt` to defer the next iteration
+        // past the upstream rate-limit window.
+        errorType: session.lastErrorType,
+        rateLimitResetsAt: session.lastRateLimitResetsAt,
       });
       void recordAutomationAuditEvent({
         kind: "job_terminal",
@@ -1485,6 +1508,7 @@ export async function startDaemon(): Promise<void> {
         requestShutdown: () => requestShutdown("happy-cli"),
         onHappySessionWebhook,
         onSessionHeartbeat,
+        onSessionFault,
         getAutomationStatus: () => getAutomationStatusSnapshot(),
         cancelAutomationJob: async (jobId) => {
           if (!automationScheduler) {
@@ -2615,6 +2639,25 @@ export async function startDaemon(): Promise<void> {
         }
       },
       onBriefGenerated: (brief) => addBrief(brief),
+      // Self-heal hook for the AgentLoopCoordinator: when the coordinator
+      // decides a loop has been resuming the same dead Session for too
+      // many zero-cost iterations, it calls this to drop the guardian
+      // binding. The next iteration's spawn skips `--happy-session-id` and
+      // gets a fresh sessionId. Wrapped in try/catch because guardian
+      // forget is advisory — coordinator state must converge even if the
+      // file write fails.
+      forgetGuardian: async (loopId) => {
+        try {
+          await guardianSessionRegistry.forgetKey(`agent-loop:${loopId}`);
+          logger.debug(
+            `[DAEMON RUN] Self-heal: forgot guardian for loop ${loopId}`,
+          );
+        } catch (error) {
+          logger.debug(
+            `[DAEMON RUN] Self-heal: forgetKey failed for loop ${loopId}: ${error}`,
+          );
+        }
+      },
     });
     await agentLoopCoordinator.start();
     const agentLoopBootstrapStore = new AgentLoopBootstrapStore(

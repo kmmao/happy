@@ -129,6 +129,9 @@ describe("AgentLoopCoordinator", () => {
       prompt: "check tests",
       directory: "/tmp/repo",
       intervalMs: 600000,
+      // Explicit fail-fast: the default tolerance is now 3 strikes, but this
+      // test specifically asserts the single-failure → blocked transition.
+      maxConsecutiveFailures: 1,
       runNow: false,
     });
 
@@ -408,7 +411,10 @@ describe("AgentLoopCoordinator", () => {
       directory: "/tmp/repo",
       intervalMs: 600000,
       maxConsecutiveFailures: 3,
-      retryBackoffMs: 120000,
+      // Use a value above FAILURE_BACKOFF_FLOOR_MS (5min) so the assertion
+      // observes the configured backoff verbatim — the floor only matters
+      // when the caller picks something smaller.
+      retryBackoffMs: 600000,
       runNow: false,
     });
 
@@ -426,7 +432,7 @@ describe("AgentLoopCoordinator", () => {
     expect(firstFailure?.runtimeState).toBe("idle");
     expect(firstFailure?.consecutiveFailures).toBe(1);
     expect(firstFailure?.blockedReason).toBeUndefined();
-    expect((firstFailure?.nextRunAt ?? 0) - (firstFailure?.lastCompletedAt ?? 0)).toBe(120000);
+    expect((firstFailure?.nextRunAt ?? 0) - (firstFailure?.lastCompletedAt ?? 0)).toBe(600000);
 
     await coordinator.runNow(created.loop!.id);
     await coordinator.onJobTerminal({
@@ -451,6 +457,377 @@ describe("AgentLoopCoordinator", () => {
     expect(blocked?.runtimeState).toBe("blocked");
     expect(blocked?.consecutiveFailures).toBe(3);
     expect(blocked?.blockedReason).toBe("persistent failure");
+
+    await coordinator.stop();
+    await scheduler.stop();
+  });
+
+  it("tolerates two failures before blocking when maxConsecutiveFailures is unset", async () => {
+    // Regression guard for the autonomous-loop 429 storm: a single rate-limit
+    // burst used to flip enabled=false on the very first iteration. The
+    // default should now soak up at least two transient failures before
+    // blocking on the third.
+    const dir = await mkdtemp(join(tmpdir(), "happy-agent-loop-coordinator-default-tolerance-"));
+    tempDirs.push(dir);
+    const scheduler = createScheduler(dir);
+    await scheduler.start();
+    const coordinator = new AgentLoopCoordinator({
+      store: new AgentLoopStore(join(dir, "loops.json")),
+      scheduler,
+    });
+    await coordinator.start();
+
+    const created = await coordinator.createLoop({
+      name: "Default tolerance",
+      prompt: "watch ci",
+      directory: "/tmp/repo",
+      intervalMs: 600000,
+      // maxConsecutiveFailures omitted on purpose — exercising the default.
+      runNow: false,
+    });
+
+    for (let i = 1; i <= 2; i++) {
+      await coordinator.runNow(created.loop!.id);
+      await coordinator.onJobTerminal({
+        loopId: created.loop!.id,
+        status: "failed",
+        sessionId: `sid-${i}`,
+        errorMessage: "rate_limit",
+      });
+      const after = await coordinator.getLoop(created.loop!.id);
+      expect(after?.enabled).toBe(true);
+      expect(after?.runtimeState).toBe("idle");
+      expect(after?.consecutiveFailures).toBe(i);
+      expect(after?.blockedReason).toBeUndefined();
+    }
+
+    await coordinator.runNow(created.loop!.id);
+    await coordinator.onJobTerminal({
+      loopId: created.loop!.id,
+      status: "failed",
+      sessionId: "sid-3",
+      errorMessage: "rate_limit",
+    });
+    const final = await coordinator.getLoop(created.loop!.id);
+    expect(final?.enabled).toBe(false);
+    expect(final?.runtimeState).toBe("blocked");
+    expect(final?.consecutiveFailures).toBe(3);
+
+    await coordinator.stop();
+    await scheduler.stop();
+  });
+
+  it("floors the failure backoff at FAILURE_BACKOFF_FLOOR_MS", async () => {
+    // An aggressive interval (e.g. 1m) without an explicit retryBackoff
+    // shouldn't schedule the next attempt 60s after a rate-limit failure —
+    // the floor pulls it out to 5m to give the upstream window time to clear.
+    const dir = await mkdtemp(join(tmpdir(), "happy-agent-loop-coordinator-backoff-floor-"));
+    tempDirs.push(dir);
+    const scheduler = createScheduler(dir);
+    await scheduler.start();
+    const coordinator = new AgentLoopCoordinator({
+      store: new AgentLoopStore(join(dir, "loops.json")),
+      scheduler,
+    });
+    await coordinator.start();
+
+    const created = await coordinator.createLoop({
+      name: "Fast tick",
+      prompt: "watch ci",
+      directory: "/tmp/repo",
+      intervalMs: 60_000, // 1 minute — well under the 5min floor
+      runNow: false,
+    });
+
+    await coordinator.runNow(created.loop!.id);
+    await coordinator.onJobTerminal({
+      loopId: created.loop!.id,
+      status: "failed",
+      sessionId: "sid-1",
+      errorMessage: "rate_limit",
+    });
+
+    const after = await coordinator.getLoop(created.loop!.id);
+    expect(after?.runtimeState).toBe("idle");
+    expect((after?.nextRunAt ?? 0) - (after?.lastCompletedAt ?? 0)).toBe(5 * 60_000);
+
+    await coordinator.stop();
+    await scheduler.stop();
+  });
+
+  it("does not consume the failure budget on transient errorType", async () => {
+    // Three rate_limit hits in a row used to immediately block. With the
+    // transient-classification path, errorType=rate_limit/overloaded/server_error
+    // does NOT advance consecutiveFailures — the loop stays idle and the
+    // operator never has to manually resume after a passing rate-limit storm.
+    const dir = await mkdtemp(join(tmpdir(), "happy-agent-loop-coordinator-transient-"));
+    tempDirs.push(dir);
+    const scheduler = createScheduler(dir);
+    await scheduler.start();
+    const coordinator = new AgentLoopCoordinator({
+      store: new AgentLoopStore(join(dir, "loops.json")),
+      scheduler,
+    });
+    await coordinator.start();
+
+    const created = await coordinator.createLoop({
+      name: "Rate-limit storm",
+      prompt: "do work",
+      directory: "/tmp/repo",
+      intervalMs: 600_000,
+      maxConsecutiveFailures: 2, // tight budget — only permanent failures should hit it
+      runNow: false,
+    });
+
+    for (const errorType of ["rate_limit", "overloaded", "server_error"]) {
+      await coordinator.runNow(created.loop!.id);
+      await coordinator.onJobTerminal({
+        loopId: created.loop!.id,
+        status: "failed",
+        sessionId: `sid-${errorType}`,
+        errorMessage: `transient ${errorType}`,
+        errorType,
+      });
+      const after = await coordinator.getLoop(created.loop!.id);
+      expect(after?.runtimeState).toBe("idle");
+      expect(after?.enabled).toBe(true);
+      expect(after?.consecutiveFailures ?? 0).toBe(0);
+      expect(after?.blockedReason).toBeUndefined();
+    }
+
+    // A non-transient failure (e.g. billing_error) DOES still count.
+    await coordinator.runNow(created.loop!.id);
+    await coordinator.onJobTerminal({
+      loopId: created.loop!.id,
+      status: "failed",
+      sessionId: "sid-perm",
+      errorMessage: "no funds",
+      errorType: "billing_error",
+    });
+    const afterPerm = await coordinator.getLoop(created.loop!.id);
+    expect(afterPerm?.consecutiveFailures).toBe(1);
+
+    await coordinator.stop();
+    await scheduler.stop();
+  });
+
+  it("defers next iteration past rateLimitResetsAt when provided", async () => {
+    // A retryBackoffMs shorter than the upstream window would have us
+    // pounding the 429 wall. Honor `resetsAt` as a lower bound and add a
+    // 30s buffer so the next iteration lands AFTER the window clears.
+    const dir = await mkdtemp(join(tmpdir(), "happy-agent-loop-coordinator-resetsAt-"));
+    tempDirs.push(dir);
+    const scheduler = createScheduler(dir);
+    await scheduler.start();
+    const coordinator = new AgentLoopCoordinator({
+      store: new AgentLoopStore(join(dir, "loops.json")),
+      scheduler,
+    });
+    await coordinator.start();
+
+    const created = await coordinator.createLoop({
+      name: "Resets-aware loop",
+      prompt: "do work",
+      directory: "/tmp/repo",
+      intervalMs: 600_000,
+      retryBackoffMs: 600_000, // 10 minutes
+      runNow: false,
+    });
+
+    // resetsAt 25 minutes from now — far enough that it dominates the 10m backoff.
+    const resetsAt = Date.now() + 25 * 60_000;
+    await coordinator.runNow(created.loop!.id);
+    await coordinator.onJobTerminal({
+      loopId: created.loop!.id,
+      status: "failed",
+      sessionId: "sid-1",
+      errorMessage: "rate_limit",
+      errorType: "rate_limit",
+      rateLimitResetsAt: resetsAt,
+    });
+
+    const after = await coordinator.getLoop(created.loop!.id);
+    expect(after?.runtimeState).toBe("idle");
+    // Next run lands at resetsAt + 30s buffer ± a few ms of wall-clock drift.
+    const expectedNextRunAt = resetsAt + 30_000;
+    const drift = Math.abs((after?.nextRunAt ?? 0) - expectedNextRunAt);
+    expect(drift).toBeLessThan(2_000);
+
+    await coordinator.stop();
+    await scheduler.stop();
+  });
+
+  it("self-heals by forgetting the guardian after N zero-cost iterations", async () => {
+    // Field-observed 429 storm: a Session keeps resuming the same dead
+    // guardian and never bills a single request. After
+    // GUARDIAN_FORGET_THRESHOLD (3) consecutive zero-cost iterations the
+    // coordinator drops the binding so the next iteration spawns fresh.
+    const dir = await mkdtemp(join(tmpdir(), "happy-agent-loop-coordinator-self-heal-"));
+    tempDirs.push(dir);
+    const scheduler = createScheduler(dir);
+    await scheduler.start();
+    const forgotten: string[] = [];
+    const coordinator = new AgentLoopCoordinator({
+      store: new AgentLoopStore(join(dir, "loops.json")),
+      scheduler,
+      forgetGuardian: (loopId) => {
+        forgotten.push(loopId);
+      },
+    });
+    await coordinator.start();
+
+    const created = await coordinator.createLoop({
+      name: "Stuck loop",
+      prompt: "watch",
+      directory: "/tmp/repo",
+      intervalMs: 600_000,
+      runNow: false,
+    });
+
+    // Two zero-cost iterations — under threshold, no forget yet.
+    for (let i = 1; i <= 2; i++) {
+      await coordinator.runNow(created.loop!.id);
+      await coordinator.onJobTerminal({
+        loopId: created.loop!.id,
+        status: "failed",
+        sessionId: `sid-${i}`,
+        errorMessage: "rate_limit",
+        errorType: "rate_limit",
+      });
+      const after = await coordinator.getLoop(created.loop!.id);
+      expect(after?.consecutiveZeroCostIterations).toBe(i);
+    }
+    expect(forgotten).toEqual([]);
+
+    // Third zero-cost iteration trips the threshold.
+    await coordinator.runNow(created.loop!.id);
+    await coordinator.onJobTerminal({
+      loopId: created.loop!.id,
+      status: "failed",
+      sessionId: "sid-3",
+      errorMessage: "rate_limit",
+      errorType: "rate_limit",
+    });
+    expect(forgotten).toEqual([created.loop!.id]);
+
+    // Counter resets to 0 so the next stuck cycle gets its full budget again.
+    const healed = await coordinator.getLoop(created.loop!.id);
+    expect(healed?.consecutiveZeroCostIterations).toBe(0);
+
+    await coordinator.stop();
+    await scheduler.stop();
+  });
+
+  it("resets the zero-cost counter on any iteration that produces cost", async () => {
+    // A successful (or even failed) iteration that bills > 0 means the
+    // Session is alive enough to make upstream calls — the self-heal
+    // condition no longer applies. Reset the counter so we get a fresh
+    // window before the next forget.
+    const dir = await mkdtemp(join(tmpdir(), "happy-agent-loop-coordinator-cost-reset-"));
+    tempDirs.push(dir);
+    const scheduler = createScheduler(dir);
+    await scheduler.start();
+    const forgotten: string[] = [];
+    const coordinator = new AgentLoopCoordinator({
+      store: new AgentLoopStore(join(dir, "loops.json")),
+      scheduler,
+      forgetGuardian: (loopId) => {
+        forgotten.push(loopId);
+      },
+    });
+    await coordinator.start();
+
+    const created = await coordinator.createLoop({
+      name: "Mixed loop",
+      prompt: "watch",
+      directory: "/tmp/repo",
+      intervalMs: 600_000,
+      runNow: false,
+    });
+
+    // Two zero-cost failures.
+    for (let i = 1; i <= 2; i++) {
+      await coordinator.runNow(created.loop!.id);
+      await coordinator.onJobTerminal({
+        loopId: created.loop!.id,
+        status: "failed",
+        sessionId: `sid-fail-${i}`,
+        errorMessage: "rate_limit",
+        errorType: "rate_limit",
+      });
+    }
+    expect((await coordinator.getLoop(created.loop!.id))?.consecutiveZeroCostIterations).toBe(2);
+
+    // A successful iteration with real cost — counter must reset.
+    await coordinator.runNow(created.loop!.id);
+    await coordinator.onJobTerminal({
+      loopId: created.loop!.id,
+      status: "completed",
+      sessionId: "sid-ok",
+      sessionCostUsd: 0.42,
+    });
+    const reset = await coordinator.getLoop(created.loop!.id);
+    expect(reset?.consecutiveZeroCostIterations).toBe(0);
+    expect(forgotten).toEqual([]);
+
+    // Two more zero-cost runs — STILL under threshold because counter was reset.
+    for (let i = 1; i <= 2; i++) {
+      await coordinator.runNow(created.loop!.id);
+      await coordinator.onJobTerminal({
+        loopId: created.loop!.id,
+        status: "failed",
+        sessionId: `sid-fail2-${i}`,
+        errorMessage: "rate_limit",
+        errorType: "rate_limit",
+      });
+    }
+    expect(forgotten).toEqual([]);
+    expect((await coordinator.getLoop(created.loop!.id))?.consecutiveZeroCostIterations).toBe(2);
+
+    await coordinator.stop();
+    await scheduler.stop();
+  });
+
+  it("survives forgetGuardian throwing — store still converges", async () => {
+    // The self-heal callback is advisory. A filesystem hiccup writing
+    // guardians.json must not roll back the loop's accumulated state or
+    // crash the coordinator tick.
+    const dir = await mkdtemp(join(tmpdir(), "happy-agent-loop-coordinator-self-heal-throw-"));
+    tempDirs.push(dir);
+    const scheduler = createScheduler(dir);
+    await scheduler.start();
+    const coordinator = new AgentLoopCoordinator({
+      store: new AgentLoopStore(join(dir, "loops.json")),
+      scheduler,
+      forgetGuardian: () => {
+        throw new Error("simulated disk full");
+      },
+    });
+    await coordinator.start();
+
+    const created = await coordinator.createLoop({
+      name: "Throwy loop",
+      prompt: "watch",
+      directory: "/tmp/repo",
+      intervalMs: 600_000,
+      runNow: false,
+    });
+
+    for (let i = 1; i <= 3; i++) {
+      await coordinator.runNow(created.loop!.id);
+      await coordinator.onJobTerminal({
+        loopId: created.loop!.id,
+        status: "failed",
+        sessionId: `sid-${i}`,
+        errorMessage: "rate_limit",
+        errorType: "rate_limit",
+      });
+    }
+    const healed = await coordinator.getLoop(created.loop!.id);
+    // Counter still reset — self-heal is best-effort, the persisted loop
+    // state must show "we tried" even if the callback failed.
+    expect(healed?.consecutiveZeroCostIterations).toBe(0);
+    expect(healed?.enabled).toBe(true);
 
     await coordinator.stop();
     await scheduler.stop();

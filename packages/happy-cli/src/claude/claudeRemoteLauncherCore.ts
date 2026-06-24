@@ -51,6 +51,7 @@ import {
   readClaudePluginMcpServers,
 } from "@/claude/utils/claudeSettings";
 import { fetchMcpRegistryServers } from "@/claude/utils/mcpRegistryReader";
+import { notifyDaemonSessionFault } from "@/daemon/controlClient";
 import { EnhancedMode } from "./loop";
 import { createSessionEventReporter } from "./sessionEventReporter";
 import { tryRegisterCompactBoundaryEmission } from "./compactBoundaryDedup";
@@ -2097,6 +2098,23 @@ export async function claudeRemoteLauncher(
         utilization: m.rate_limit_info.utilization,
       });
       session.client.sendSessionProtocolMessage(envelope as any);
+      // Push `resetsAt` to the daemon out-of-band when the upstream
+      // actually rejected us. `allowed` / `allowed_warning` are advisory
+      // status pings, not real rate-limit hits — only `rejected` means the
+      // next call will fail until `resetsAt` clears. The coordinator uses
+      // this to defer the loop's next iteration past the window.
+      if (m.rate_limit_info.status === "rejected" && m.rate_limit_info.resetsAt) {
+        void notifyDaemonSessionFault(process.pid, {
+          // Session.sessionId is `string | null` (null before the SDK
+          // assigns one); coerce to undefined for the daemon API.
+          happySessionId: session.sessionId ?? undefined,
+          spawnId: process.env.HAPPY_SPAWN_ID,
+          errorType: "rate_limit",
+          rateLimitResetsAt: m.rate_limit_info.resetsAt,
+        }).catch((err) => {
+          logger.debug(`[remote] notifyDaemonSessionFault threw: ${err}`);
+        });
+      }
     }
 
     // Forward API retry status via keep-alive ephemeral channel

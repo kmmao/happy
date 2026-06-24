@@ -54,6 +54,15 @@ export interface AgentLoopDefinition {
   consecutiveFailures?: number;
   maxConsecutiveFailures?: number;
   retryBackoffMs?: number;
+  /**
+   * Count of consecutive iterations that produced zero cost (no successful
+   * Anthropic call). Used by the guardian-self-heal path: if a loop is stuck
+   * resuming the same Session that keeps dying before billing a single
+   * request (typical 429-storm symptom), the coordinator forgets the
+   * guardian binding so the next iteration spawns a fresh Session. Cleared
+   * the moment any iteration produces non-zero cost.
+   */
+  consecutiveZeroCostIterations?: number;
   cooldownMs?: number;
   quietHoursStart?: string;
   quietHoursEnd?: string;

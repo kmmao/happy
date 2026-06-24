@@ -50,4 +50,20 @@ export interface TrackedSession {
   recoveredAt?: number;
   /** Best-effort cleanup for daemon-local ephemeral resources. */
   cleanup?: () => Promise<void>;
+  /**
+   * Last error category surfaced by the Claude SDK before the child exited.
+   * Sourced from the `StopFailure` hook's `error` field (e.g. `"rate_limit"`,
+   * `"overloaded"`, `"server_error"`, `"billing_error"`). The daemon reads
+   * this on `onChildExited` to classify the failure as transient vs permanent
+   * before reporting to the AgentLoopCoordinator — transient errors must not
+   * burn through the loop's `maxConsecutiveFailures` budget.
+   */
+  lastErrorType?: string;
+  /**
+   * `rate_limit_event.resetsAt` (epoch ms) reported by the SDK when the
+   * upstream limit was hit. The coordinator uses this to schedule the next
+   * iteration AFTER the limit window expires rather than blindly re-trying
+   * on `retryBackoffMs`.
+   */
+  lastRateLimitResetsAt?: number;
 }

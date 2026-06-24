@@ -99,6 +99,42 @@ export async function notifyDaemonSessionHeartbeat(
   });
 }
 
+export interface DaemonSessionFaultResponse {
+  status: "ok";
+  known: boolean;
+}
+
+/**
+ * Push a fault hint to the daemon out-of-band. Called by the child when the
+ * Claude SDK surfaces a transient error category (`rate_limit`, `overloaded`,
+ * `server_error`, ...) or emits a `rate_limit_event.resetsAt`. The daemon
+ * stamps the hint onto the TrackedSession so the loop coordinator can read
+ * it when the child exits and pick a smarter retry (transient errors don't
+ * consume the loop's failure budget; `resetsAt` defers the next iteration
+ * past the upstream window).
+ *
+ * Fire-and-forget from the caller's perspective — failures are returned in
+ * the `{ error }` shape rather than thrown so the caller can ignore them
+ * without try/catch.
+ */
+export async function notifyDaemonSessionFault(
+  pid: number,
+  fields: {
+    happySessionId?: string;
+    spawnId?: string;
+    errorType?: string;
+    rateLimitResetsAt?: number;
+  },
+): Promise<DaemonSessionFaultResponse | { error: string }> {
+  return daemonPost("/session-fault", {
+    pid,
+    happySessionId: fields.happySessionId,
+    spawnId: fields.spawnId,
+    errorType: fields.errorType,
+    rateLimitResetsAt: fields.rateLimitResetsAt,
+  });
+}
+
 export async function listDaemonSessions(): Promise<any[]> {
   const result = await daemonPost("/list");
   return result.children || [];

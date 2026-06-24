@@ -437,6 +437,7 @@ export function startDaemonControlServer({
   requestShutdown,
   onHappySessionWebhook,
   onSessionHeartbeat,
+  onSessionFault,
   getAutomationStatus,
   cancelAutomationJob,
   retryAutomationJob,
@@ -503,6 +504,25 @@ export function startDaemonControlServer({
     spawnId?: string;
     activity?: "idle" | "thinking" | "executing" | "blocked";
   }) => { known: boolean; keepAlive: boolean };
+  /**
+   * Out-of-band fault report from a tracked child. The Claude SDK surfaces
+   * transient categories (rate_limit / overloaded / server_error) via the
+   * StopFailure hook, and forecasts the next allowed call via
+   * `rate_limit_event.resetsAt`. The child POSTs whichever fields it has so
+   * the daemon can attach them to the TrackedSession; `onChildExited` later
+   * consults them to classify the failure (transient vs permanent) and
+   * choose a smarter retry timestamp than blind `retryBackoffMs`.
+   *
+   * Returns `{ known: false }` when no matching child is tracked — the
+   * report becomes a no-op in that case.
+   */
+  onSessionFault: (params: {
+    pid: number;
+    happySessionId?: string;
+    spawnId?: string;
+    errorType?: string;
+    rateLimitResetsAt?: number;
+  }) => { known: boolean };
   getAutomationStatus: () => {
     jobs: AutomationJob[];
     counts: Record<string, number>;
@@ -697,6 +717,44 @@ export function startDaemonControlServer({
           activity,
         });
         return { status: "ok" as const, ...result };
+      },
+    );
+
+    // Out-of-band fault report from a child. Used by Claude/Codex children
+    // to push error category + rate-limit reset hints to the daemon BEFORE
+    // they exit, so `onChildExited` can route a smarter terminal status to
+    // the AgentLoopCoordinator. Body fields are all optional — the child
+    // sends whatever it managed to extract. No heartbeat semantics here:
+    // this endpoint never asks the child to stop.
+    typed.post(
+      "/session-fault",
+      {
+        schema: {
+          body: z.object({
+            pid: z.number().int().positive(),
+            happySessionId: z.string().optional(),
+            spawnId: z.string().optional(),
+            errorType: z.string().optional(),
+            rateLimitResetsAt: z.number().int().nonnegative().optional(),
+          }),
+          response: {
+            200: z.object({
+              status: z.literal("ok"),
+              known: z.boolean(),
+            }),
+          },
+        },
+      },
+      async (request) => {
+        const { pid, happySessionId, spawnId, errorType, rateLimitResetsAt } = request.body;
+        const result = onSessionFault({
+          pid,
+          happySessionId,
+          spawnId,
+          errorType,
+          rateLimitResetsAt,
+        });
+        return { status: "ok" as const, known: result.known };
       },
     );
 

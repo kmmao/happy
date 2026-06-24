@@ -188,3 +188,50 @@ export function onSessionHeartbeat(
   persistTrackedSession(trackedSessionRegistry, existing);
   return { known: true, keepAlive };
 }
+
+// ---------------------------------------------------------------------------
+// Session fault handler
+// ---------------------------------------------------------------------------
+
+/**
+ * Handle an out-of-band fault report from a child process. The child posts
+ * here whenever the Claude SDK surfaces a transient error category
+ * (`rate_limit`, `overloaded`, `server_error`, ...) or a `rate_limit_event`
+ * with a `resetsAt` hint. We persist the latest values on the TrackedSession
+ * so `onChildExited` can pass them to the AgentLoopCoordinator and the loop
+ * can pick a smarter retry timestamp (and avoid burning its failure budget
+ * on transient hiccups).
+ *
+ * Returns `known: false` when no matching child exists — that's normal during
+ * race conditions around child exit; the report is dropped silently.
+ */
+export function onSessionFault(
+  ctx: SessionHeartbeatContext,
+  params: {
+    pid: number;
+    happySessionId?: string;
+    spawnId?: string;
+    errorType?: string;
+    rateLimitResetsAt?: number;
+  },
+): { known: boolean } {
+  const { pidToTrackedSession, trackedSessionRegistry } = ctx;
+  const existing = pidToTrackedSession.get(params.pid);
+  if (!existing) {
+    logger.debug(
+      `[DAEMON RUN] Fault report from unknown PID ${params.pid}${params.spawnId ? ` (spawnId=${params.spawnId})` : ""}`,
+    );
+    return { known: false };
+  }
+  if (params.errorType !== undefined) {
+    existing.lastErrorType = params.errorType;
+  }
+  if (params.rateLimitResetsAt !== undefined) {
+    existing.lastRateLimitResetsAt = params.rateLimitResetsAt;
+  }
+  logger.debug(
+    `[DAEMON RUN] Fault report from PID ${params.pid}: errorType=${params.errorType ?? "-"} resetsAt=${params.rateLimitResetsAt ?? "-"}`,
+  );
+  persistTrackedSession(trackedSessionRegistry, existing);
+  return { known: true };
+}

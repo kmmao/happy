@@ -25,7 +25,7 @@ import { executeShellCommand } from "@/utils/shellCommand";
 import { parseAutomationContextEnv } from "@/utils/parseAutomationContextEnv";
 import { getEnvironmentInfo } from "@/ui/doctor";
 import { configuration } from "@/configuration";
-import { notifyDaemonSessionStarted } from "@/daemon/controlClient";
+import { notifyDaemonSessionFault, notifyDaemonSessionStarted } from "@/daemon/controlClient";
 import { startSessionHeartbeat } from "@/daemon/sessionHeartbeat";
 import { initialMachineMetadata } from "@/daemon/run";
 import { startHappyServer } from "@/claude/utils/startHappyServer";
@@ -526,6 +526,21 @@ export async function runClaude(
             lastAssistantMessage: data.last_assistant_message ?? null,
           },
         }));
+      }
+      // Push the SDK-classified error category to the daemon out-of-band so
+      // `onChildExited` can hand it to the AgentLoopCoordinator. Transient
+      // categories (rate_limit/overloaded/server_error) must not consume
+      // the loop's consecutive-failure budget. Fire-and-forget — the daemon
+      // may be unreachable, the call is advisory.
+      if (errorType) {
+        void notifyDaemonSessionFault(process.pid, {
+          // Session.sessionId is `string | null`; coerce to undefined.
+          happySessionId: currentSession?.sessionId ?? undefined,
+          spawnId: process.env.HAPPY_SPAWN_ID,
+          errorType,
+        }).catch((err) => {
+          logger.debug(`[START] notifyDaemonSessionFault threw: ${err}`);
+        });
       }
     },
     // ── Session-state hooks (Claude Code 2.1.121+ / 2.1.157+) ──────────────

@@ -4,6 +4,46 @@ import { logger } from "@/ui/logger";
 import { jitteredDelay } from "@/utils/jitter";
 
 /**
+ * Minimum wait between a failed loop iteration and the next attempt. Acts as
+ * a floor over `retryBackoffMs ?? intervalMs` in `onJobTerminal` so an
+ * aggressive interval can't hammer Anthropic during a rate-limit window.
+ * Chosen to align with Anthropic's typical 5-minute short-window — long
+ * enough that a single 429 cluster clears, short enough that occasional
+ * non-rate-limit failures still progress.
+ */
+const FAILURE_BACKOFF_FLOOR_MS = 5 * 60_000;
+
+/**
+ * Claude SDK `ClaudeJsonlAssistantMessageError` values that represent
+ * transient upstream conditions the user can do nothing about — they clear
+ * on their own once the rate-limit / overload window resets. These do NOT
+ * burn the loop's `consecutiveFailures` budget; only permanent categories
+ * (auth, billing, invalid request, unknown) tip the loop toward `blocked`.
+ *
+ * Kept as a `string` Set so callers passing raw daemon strings don't have to
+ * import the SDK type — anything not in the set falls back to the old
+ * "counts as a real failure" behaviour, which is the safe default.
+ */
+const TRANSIENT_ERROR_TYPES = new Set<string>([
+  "rate_limit",   // Anthropic 429
+  "overloaded",   // Anthropic 529 (split out of rate_limit in Claude Code 2.1.150)
+  "server_error", // upstream 5xx that isn't an explicit overload
+]);
+
+/**
+ * Number of back-to-back zero-cost iterations that triggers the self-heal
+ * path — the coordinator forgets the guardian Session binding so the next
+ * iteration spawns fresh. Chosen as 3 because: (1) one zero-cost run is a
+ * normal blip (transient 429 + retryBackoff cleared it), (2) two could be
+ * the same blip plus an immediate retry, (3) three is the smallest count
+ * that confidently means "this Session itself is stuck and resuming it
+ * isn't going to help". Aligns with the default `maxConsecutiveFailures`
+ * — by the time we'd block on permanent errors we've also self-healed any
+ * Session-stuck condition that produced no cost at all.
+ */
+const GUARDIAN_FORGET_THRESHOLD = 3;
+
+/**
  * Compute the next run timestamp from a cron expression.
  * Returns null if the expression is invalid or has no future match.
  */
@@ -153,6 +193,18 @@ export interface AgentLoopCoordinatorOptions {
   recordAuditEvent?: (event: Omit<AutomationAuditEvent, "id" | "occurredAt"> & { occurredAt?: number }) => Promise<void> | void;
   sendPushNotification?: (payload: { title: string; body: string; data?: Record<string, unknown> }) => Promise<void> | void;
   onBriefGenerated?: (brief: AgentLoopBriefSnapshot) => void;
+  /**
+   * Detach this loop from its guardian Session binding so the next iteration
+   * spawns a fresh `happySessionId`. Called by the self-heal path when a
+   * loop has accumulated `GUARDIAN_FORGET_THRESHOLD` consecutive zero-cost
+   * iterations — the classic "Session resumes into the same 429 wall every
+   * time" symptom from the field. Wired in `startDaemon.ts` to
+   * `guardianSessionRegistry.forgetKey('agent-loop:<loopId>')`.
+   *
+   * Best-effort: any error is logged at debug. Missing callback = no
+   * self-heal, which is the legacy behaviour.
+   */
+  forgetGuardian?: (loopId: string) => Promise<void> | void;
 }
 
 function normalizeOptionalString(value: string | null | undefined): string | undefined {
@@ -348,6 +400,7 @@ export class AgentLoopCoordinator {
   private readonly recordAuditEvent?: AgentLoopCoordinatorOptions["recordAuditEvent"];
   private readonly sendPushNotification?: AgentLoopCoordinatorOptions["sendPushNotification"];
   private readonly onBriefGenerated?: AgentLoopCoordinatorOptions["onBriefGenerated"];
+  private readonly forgetGuardian?: AgentLoopCoordinatorOptions["forgetGuardian"];
   private interval: NodeJS.Timeout | null = null;
   private loaded = false;
   private _killed = false;
@@ -360,6 +413,7 @@ export class AgentLoopCoordinator {
     this.recordAuditEvent = options.recordAuditEvent;
     this.sendPushNotification = options.sendPushNotification;
     this.onBriefGenerated = options.onBriefGenerated;
+    this.forgetGuardian = options.forgetGuardian;
   }
 
   get killed(): boolean {
@@ -765,6 +819,21 @@ export class AgentLoopCoordinator {
     sessionId?: string;
     errorMessage?: string;
     sessionCostUsd?: number;
+    /**
+     * Claude SDK fault category surfaced via the StopFailure hook (e.g.
+     * `"rate_limit"`, `"overloaded"`, `"server_error"`, `"billing_error"`).
+     * The coordinator uses this to classify the failure — transient
+     * categories skip the consecutive-failure budget so a single rate-limit
+     * burst can't tip the loop into `blocked`.
+     */
+    errorType?: string;
+    /**
+     * Upstream rate-limit reset timestamp (epoch ms) reported by
+     * `rate_limit_event.resetsAt`. When present, the next iteration is
+     * scheduled at or after this time (plus jitter) rather than blindly at
+     * `now + retryBackoffMs`.
+     */
+    rateLimitResetsAt?: number;
   }): Promise<void> {
     if (!params.loopId) {
       return;
@@ -776,9 +845,23 @@ export class AgentLoopCoordinator {
     }
     const now = Date.now();
     const failed = params.status === "failed";
-    const nextConsecutiveFailures = failed ? (existing.consecutiveFailures ?? 0) + 1 : 0;
-    const maxConsecutiveFailures = existing.maxConsecutiveFailures ?? 1;
-    const shouldBlock = failed && nextConsecutiveFailures >= maxConsecutiveFailures;
+    // Transient upstream faults (Anthropic rate limit, model overloaded,
+    // transient 5xx) must NOT burn the loop's failure budget — they clear
+    // on their own once the upstream window resets. Permanent faults
+    // (billing, auth, invalid request) and unknown failures still count.
+    const isTransient = failed && params.errorType !== undefined && TRANSIENT_ERROR_TYPES.has(params.errorType);
+    const nextConsecutiveFailures = failed && !isTransient
+      ? (existing.consecutiveFailures ?? 0) + 1
+      : (existing.consecutiveFailures ?? 0);
+    // Default tolerance bumped from 1 to 3 — a single transient 429 / 529 /
+    // network blip used to flip the loop to `blocked` + `enabled=false` on
+    // the very first iteration. Three strikes is the smallest budget that
+    // survives a typical rate-limit burst without overshooting a real
+    // recurring failure (which still trips after the third miss). Callers
+    // that want the old "fail fast" behaviour can pass an explicit
+    // `maxConsecutiveFailures: 1`.
+    const maxConsecutiveFailures = existing.maxConsecutiveFailures ?? 3;
+    const shouldBlock = failed && !isTransient && nextConsecutiveFailures >= maxConsecutiveFailures;
     const blockedReason = shouldBlock ? (params.errorMessage ?? params.status) : undefined;
     const reachedMaxIterations = Boolean(existing.maxIterations && existing.iteration >= existing.maxIterations);
     const shouldStopOnSuccess = params.status === "completed" && existing.stopOnSuccess === true;
@@ -791,7 +874,46 @@ export class AgentLoopCoordinator {
     const dailyBudgetExceeded = Boolean(existing.maxUsdPerDay && newTodayCostUsd >= existing.maxUsdPerDay);
 
     const stopReason = shouldBlock ? undefined : (shouldStopOnSuccess ? "stop-on-success" : (reachedMaxIterations ? "max-iterations" : (dailyBudgetExceeded ? "budget-daily" : undefined)));
-    const retryBackoffMs = existing.retryBackoffMs ?? existing.intervalMs;
+    // Floor the failure backoff at FAILURE_BACKOFF_FLOOR_MS so an aggressive
+    // interval (e.g. 1m) doesn't hammer Anthropic during a rate-limit window
+    // — the most common failure mode in practice. The configured backoff
+    // still wins when it's larger; the floor only kicks in for short
+    // intervals that didn't set an explicit retry backoff.
+    const retryBackoffMs = Math.max(
+      existing.retryBackoffMs ?? existing.intervalMs,
+      FAILURE_BACKOFF_FLOOR_MS,
+    );
+    // When the SDK reported a precise rate-limit reset, defer the next run
+    // until AFTER the window clears (plus a 30s buffer to absorb clock skew
+    // and any per-account smear). The configured backoff still wins if it's
+    // longer — we never schedule earlier than `now + retryBackoffMs`.
+    const rateLimitDeferralMs =
+      params.rateLimitResetsAt !== undefined && params.rateLimitResetsAt > now
+        ? params.rateLimitResetsAt - now + 30_000
+        : 0;
+    const effectiveBackoffMs = Math.max(retryBackoffMs, rateLimitDeferralMs);
+    // Guardian self-heal: track consecutive iterations that produced no
+    // upstream cost. Any positive cost clears the counter; otherwise it
+    // accumulates regardless of `params.status` (transient failures, hard
+    // failures, and "successful" turns that somehow billed zero all count
+    // as "this Session isn't producing useful work"). When we cross the
+    // threshold, drop the guardian binding so the next iteration spawns a
+    // brand-new Session — guards against the field-observed 429-storm
+    // pattern where a loop kept resuming the same dead Session for hours.
+    const nextConsecutiveZeroCost = runCost > 0
+      ? 0
+      : (existing.consecutiveZeroCostIterations ?? 0) + 1;
+    const shouldForgetGuardian = nextConsecutiveZeroCost >= GUARDIAN_FORGET_THRESHOLD;
+    if (shouldForgetGuardian && this.forgetGuardian) {
+      try {
+        await this.forgetGuardian(existing.id);
+        logger.debug(
+          `[AGENT LOOP] Guardian forgotten after ${nextConsecutiveZeroCost} zero-cost iterations: ${existing.id}`,
+        );
+      } catch (err) {
+        logger.debug(`[AGENT LOOP] forgetGuardian threw: ${err}`);
+      }
+    }
     const completedJobId = existing.activeJobId;
     const persistedMemory = await readAgentLoopMemorySnapshot(existing.directory, existing.id);
     const draftLoop: AgentLoopDefinition = {
@@ -805,8 +927,13 @@ export class AgentLoopCoordinator {
       activeJobId: undefined,
       activeSessionId: undefined,
       lastReflectionAt: now,
-      nextRunAt: failed && !shouldBlock ? now + retryBackoffMs : existing.nextRunAt,
+      nextRunAt: failed && !shouldBlock ? now + effectiveBackoffMs : existing.nextRunAt,
       consecutiveFailures: nextConsecutiveFailures,
+      // Reset the zero-cost counter at the moment we forget the guardian —
+      // the next iteration starts fresh, so the budget for "stuck Session"
+      // tolerance resets too. Otherwise we'd self-heal once and then need
+      // another N iterations of stale state before checking again.
+      consecutiveZeroCostIterations: shouldForgetGuardian ? 0 : nextConsecutiveZeroCost,
       memoryUpdatedAt: persistedMemory ? now : existing.memoryUpdatedAt,
       todayCostUsd: newTodayCostUsd,
       todayCostWindowStartedAt: dailyCostCounter.todayCostWindowStartedAt,
@@ -848,6 +975,19 @@ export class AgentLoopCoordinator {
     };
     await this.store.upsert(updated);
     this.notifyChange();
+    if (shouldForgetGuardian) {
+      // Surface the self-heal in the audit timeline so operators can correlate
+      // the next iteration's fresh sessionId with the auto-forget event.
+      await this.recordAuditEvent?.({
+        kind: "guardian_cleared",
+        loopId: updated.id,
+        projectId: updated.projectId,
+        guardianKey: `agent-loop:${updated.id}`,
+        guardianSessionId: existing.lastSessionId,
+        trigger: `agent_loop:self-heal`,
+        message: `Self-heal: forgot guardian after ${nextConsecutiveZeroCost} zero-cost iterations`,
+      });
+    }
     await this.sendLoopNotifications(updated, {
       status: params.status,
       blocked: shouldBlock,
