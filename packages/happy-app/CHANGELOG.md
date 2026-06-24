@@ -1,5 +1,28 @@
 # Changelog
 
+## 2.44.0 - 2026-06-24
+
+Agent loops now actually honor the model + effort overrides set in the App (they used to silently fall back to defaults every iteration), the workflow Create-Loop / Create-Webhook dialogs got a major decluttering with collapsible hints and one-tap skill presets, native Claude Code built-ins joined the slash command picker, and the inline image upload ceiling jumped from 500KB to 10MB. Companion CLI release: `@kmmao/happy-coder@0.102.6`, wire `@kmmao/happy-wire@0.35.0`.
+
+### Agent loops
+- Fixed `modelMode` and `effort` being silently dropped on every server-driven iteration. The App's picks now thread end-to-end through the wire, server, daemon, and Claude spawn, so a loop configured to use Opus 4.7 + high actually runs that way instead of falling back to Sonnet 4.6 + medium.
+- Fixed the guardian binding being forgotten on every iteration exit. The "one happy Session per loop, resumed across N iterations" contract now actually holds — child exits no longer wipe out the Session that the next iteration is supposed to resume.
+- Added a model + effort picker to Create Loop's adopt mode (promoting an existing Session to a loop). The picker preseeds from the source Session's current picks so the adopted loop keeps using what you already had configured.
+
+### Workflow create dialogs
+- Improved the issue write-back hint in both Create Loop and Create Webhook to be collapsible. Default collapsed — useful for first-timers, no longer noise for repeat users.
+- Added 6 one-tap skill chips above the bootstrap slash command input in Create Loop — `/caveman`, `/diagnose`, `/tdd`, `/code-review`, `/simplify`, `/verify` — plus a "None" chip to clear. Manual typing still works for custom skill names.
+- Improved the hint copy itself, trimming `loopIssueHint` by ~37% and `webhookIssueHint` by ~35%. Removed the `Tip:` prefix and other redundant framing while preserving the exact `happy issue create / comment / close` commands and `GITHUB_TOKEN / GITEA_TOKEN` names.
+
+### Command picker
+- Added native Claude Code built-ins (`/goal`, `/code-review`, `/ultrareview`, `/security-review`, `/simplify`, `/verify`) to the slash command popover. The CLI does not advertise these via metadata, so clicking inserts the literal `/command` text for the native session to execute.
+
+### Image uploads
+- Improved the inline image upload ceiling from 500KB to 10MB. Server-side socket buffer also bumped to 50MB to pair with the new client cap — both halves need to deploy together.
+
+### Web image paste
+- Fixed pasting an image in the web app sometimes attaching a previously sent image instead of the one you just copied. The picker now identifies a new screenshot by its unseen byte size instead of guessing between `clipboardData` and `clipboard.read()`. Falls back to the freshest blob for a genuine re-paste. `[paste]` diagnostics added to `/dev/logs`.
+
 ## 2.43.2 - 2026-06-21
 
 Three input-and-interrupt fixes. Sending an image alongside text no longer fires duplicate "[Request interrupted by user]" messages; tapping the abort button no longer leaves your sent prompt in Claude's composer to be re-sent with your next message; and pasting an image in the web app now grabs the freshly copied image on the first try. Companion CLI release: `@kmmao/happy-coder@0.102.4`.

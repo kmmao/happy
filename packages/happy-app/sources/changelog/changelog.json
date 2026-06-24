@@ -2,6 +2,23 @@
   "entries": {
     "en": [
       {
+        "version": "2.44.0",
+        "date": "2026-06-24",
+        "summary": "Agent loops now actually honor the model + effort overrides set in the App (they used to silently fall back to defaults every iteration), the workflow Create-Loop / Create-Webhook dialogs got a major decluttering with collapsible hints and one-tap skill presets, native Claude Code built-ins joined the slash command picker, and the inline image upload ceiling jumped from 500KB to 10MB. Companion CLI release: `@kmmao/happy-coder@0.102.6`, wire `@kmmao/happy-wire@0.35.0`.",
+        "changes": [
+          "Fixed `modelMode` and `effort` being silently dropped on every server-driven iteration. The App's picks now thread end-to-end through the wire, server, daemon, and Claude spawn, so a loop configured to use Opus 4.7 + high actually runs that way instead of falling back to Sonnet 4.6 + medium.",
+          "Fixed the guardian binding being forgotten on every iteration exit. The \"one happy Session per loop, resumed across N iterations\" contract now actually holds — child exits no longer wipe out the Session that the next iteration is supposed to resume.",
+          "Added a model + effort picker to Create Loop's adopt mode (promoting an existing Session to a loop). The picker preseeds from the source Session's current picks so the adopted loop keeps using what you already had configured.",
+          "Improved the issue write-back hint in both Create Loop and Create Webhook to be collapsible. Default collapsed — useful for first-timers, no longer noise for repeat users.",
+          "Added 6 one-tap skill chips above the bootstrap slash command input in Create Loop — `/caveman`, `/diagnose`, `/tdd`, `/code-review`, `/simplify`, `/verify` — plus a \"None\" chip to clear. Manual typing still works for custom skill names.",
+          "Improved the hint copy itself, trimming `loopIssueHint` by ~37% and `webhookIssueHint` by ~35%. Removed the `Tip:` prefix and other redundant framing while preserving the exact `happy issue create / comment / close` commands and `GITHUB_TOKEN / GITEA_TOKEN` names.",
+          "Added native Claude Code built-ins (`/goal`, `/code-review`, `/ultrareview`, `/security-review`, `/simplify`, `/verify`) to the slash command popover. The CLI does not advertise these via metadata, so clicking inserts the literal `/command` text for the native session to execute.",
+          "Improved the inline image upload ceiling from 500KB to 10MB. Server-side socket buffer also bumped to 50MB to pair with the new client cap — both halves need to deploy together.",
+          "Fixed pasting an image in the web app sometimes attaching a previously sent image instead of the one you just copied. The picker now identifies a new screenshot by its unseen byte size instead of guessing between `clipboardData` and `clipboard.read()`. Falls back to the freshest blob for a genuine re-paste. `[paste]` diagnostics added to `/dev/logs`."
+        ],
+        "rawMarkdown": "## 2.44.0 - 2026-06-24\n\n\nAgent loops now actually honor the model + effort overrides set in the App (they used to silently fall back to defaults every iteration), the workflow Create-Loop / Create-Webhook dialogs got a major decluttering with collapsible hints and one-tap skill presets, native Claude Code built-ins joined the slash command picker, and the inline image upload ceiling jumped from 500KB to 10MB. Companion CLI release: `@kmmao/happy-coder@0.102.6`, wire `@kmmao/happy-wire@0.35.0`.\n\n### Agent loops\n- Fixed `modelMode` and `effort` being silently dropped on every server-driven iteration. The App's picks now thread end-to-end through the wire, server, daemon, and Claude spawn, so a loop configured to use Opus 4.7 + high actually runs that way instead of falling back to Sonnet 4.6 + medium.\n- Fixed the guardian binding being forgotten on every iteration exit. The \"one happy Session per loop, resumed across N iterations\" contract now actually holds — child exits no longer wipe out the Session that the next iteration is supposed to resume.\n- Added a model + effort picker to Create Loop's adopt mode (promoting an existing Session to a loop). The picker preseeds from the source Session's current picks so the adopted loop keeps using what you already had configured.\n\n### Workflow create dialogs\n- Improved the issue write-back hint in both Create Loop and Create Webhook to be collapsible. Default collapsed — useful for first-timers, no longer noise for repeat users.\n- Added 6 one-tap skill chips above the bootstrap slash command input in Create Loop — `/caveman`, `/diagnose`, `/tdd`, `/code-review`, `/simplify`, `/verify` — plus a \"None\" chip to clear. Manual typing still works for custom skill names.\n- Improved the hint copy itself, trimming `loopIssueHint` by ~37% and `webhookIssueHint` by ~35%. Removed the `Tip:` prefix and other redundant framing while preserving the exact `happy issue create / comment / close` commands and `GITHUB_TOKEN / GITEA_TOKEN` names.\n\n### Command picker\n- Added native Claude Code built-ins (`/goal`, `/code-review`, `/ultrareview`, `/security-review`, `/simplify`, `/verify`) to the slash command popover. The CLI does not advertise these via metadata, so clicking inserts the literal `/command` text for the native session to execute.\n\n### Image uploads\n- Improved the inline image upload ceiling from 500KB to 10MB. Server-side socket buffer also bumped to 50MB to pair with the new client cap — both halves need to deploy together.\n\n### Web image paste\n- Fixed pasting an image in the web app sometimes attaching a previously sent image instead of the one you just copied. The picker now identifies a new screenshot by its unseen byte size instead of guessing between `clipboardData` and `clipboard.read()`. Falls back to the freshest blob for a genuine re-paste. `[paste]` diagnostics added to `/dev/logs`."
+      },
+      {
         "version": "2.43.2",
         "date": "2026-06-21",
         "summary": "Three input-and-interrupt fixes. Sending an image alongside text no longer fires duplicate \"[Request interrupted by user]\" messages; tapping the abort button no longer leaves your sent prompt in Claude's composer to be re-sent with your next message; and pasting an image in the web app now grabs the freshly copied image on the first try. Companion CLI release: `@kmmao/happy-coder@0.102.4`.",
@@ -1155,6 +1172,23 @@
     ],
     "zh-Hans": [
       {
+        "version": "2.44.0",
+        "date": "2026-06-24",
+        "summary": "循环 Agent 现在真正按 App 里配置的 model + effort 运行（之前每次迭代都会静默回退到默认值），创建循环 / 创建 Webhook 对话框做了大幅瘦身（提示折叠 + Skill 一键预设），原生 Claude Code 内置命令进入斜杠命令选择器，内嵌图片上传上限从 500KB 提升到 10MB。配套发布：`@kmmao/happy-coder@0.102.6`、`@kmmao/happy-wire@0.35.0`。",
+        "changes": [
+          "修复 `modelMode` 和 `effort` 在每次服务端驱动的迭代中被静默丢弃的问题。App 里选的模型和努力度现在贯穿 wire / server / daemon / Claude 启动全链路，配置成 Opus 4.7 + 高的循环真的会按此运行，不再回退到 Sonnet 4.6 + 中。",
+          "修复 guardian 绑定在每次迭代退出时被遗忘的问题。「一个 happy Session 服务一个循环，跨 N 次迭代复用」的契约现在真正生效——子进程退出不再清掉下一次迭代要复用的 Session。",
+          "新增创建循环对话框 adopt 模式（把已有 Session 升级为循环）的 model + effort 选择器。选择器从源 Session 的当前配置预填，升级后的循环继续使用原配置。",
+          "改进创建循环和创建 Webhook 两个对话框中的 issue 回写提示为可折叠。默认收起——新用户首次能看到，老用户不再被打扰。",
+          "新增创建循环对话框中「启动 SKILL 命令」输入框上方的 6 个常用 Skill 一键预设：`/caveman`、`/diagnose`、`/tdd`、`/code-review`、`/simplify`、`/verify`，外加「不使用」清空 chip。手动输入照常工作，支持自定义 skill 名。",
+          "改进提示文案本身，`loopIssueHint` 缩短约 37%，`webhookIssueHint` 缩短约 35%。去掉「提示:」前缀和重复说明，关键命令 `happy issue create / comment / close` 和 `GITHUB_TOKEN / GITEA_TOKEN` 等具体信息全部保留。",
+          "新增原生 Claude Code 内置命令（`/goal`、`/code-review`、`/ultrareview`、`/security-review`、`/simplify`、`/verify`）到斜杠命令弹窗。CLI 没通过 metadata 声明这些命令，所以点击只是插入字面量 `/command` 文本，交给原生 session 执行。",
+          "改进内嵌图片上传上限，从 500KB 提升到 10MB。服务端 socket buffer 同步提到 50MB 配套新的客户端上限——两边必须一起部署。",
+          "修复 Web 端粘贴图片有时附带上一张已发送图片而非刚复制图片的问题。现在通过「未见过的字节大小」识别新截图，不再在 `clipboardData` 和 `clipboard.read()` 之间猜测哪个更新。对真正的重复粘贴回退到最新 blob。新增 `[paste]` 诊断到 `/dev/logs`。"
+        ],
+        "rawMarkdown": "## 2.44.0 - 2026-06-24\n\n\n循环 Agent 现在真正按 App 里配置的 model + effort 运行（之前每次迭代都会静默回退到默认值），创建循环 / 创建 Webhook 对话框做了大幅瘦身（提示折叠 + Skill 一键预设），原生 Claude Code 内置命令进入斜杠命令选择器，内嵌图片上传上限从 500KB 提升到 10MB。配套发布：`@kmmao/happy-coder@0.102.6`、`@kmmao/happy-wire@0.35.0`。\n\n### 循环 Agent\n- 修复 `modelMode` 和 `effort` 在每次服务端驱动的迭代中被静默丢弃的问题。App 里选的模型和努力度现在贯穿 wire / server / daemon / Claude 启动全链路，配置成 Opus 4.7 + 高的循环真的会按此运行，不再回退到 Sonnet 4.6 + 中。\n- 修复 guardian 绑定在每次迭代退出时被遗忘的问题。「一个 happy Session 服务一个循环，跨 N 次迭代复用」的契约现在真正生效——子进程退出不再清掉下一次迭代要复用的 Session。\n- 新增创建循环对话框 adopt 模式（把已有 Session 升级为循环）的 model + effort 选择器。选择器从源 Session 的当前配置预填，升级后的循环继续使用原配置。\n\n### 工作流创建对话框\n- 改进创建循环和创建 Webhook 两个对话框中的 issue 回写提示为可折叠。默认收起——新用户首次能看到，老用户不再被打扰。\n- 新增创建循环对话框中「启动 SKILL 命令」输入框上方的 6 个常用 Skill 一键预设：`/caveman`、`/diagnose`、`/tdd`、`/code-review`、`/simplify`、`/verify`，外加「不使用」清空 chip。手动输入照常工作，支持自定义 skill 名。\n- 改进提示文案本身，`loopIssueHint` 缩短约 37%，`webhookIssueHint` 缩短约 35%。去掉「提示:」前缀和重复说明，关键命令 `happy issue create / comment / close` 和 `GITHUB_TOKEN / GITEA_TOKEN` 等具体信息全部保留。\n\n### 命令选择器\n- 新增原生 Claude Code 内置命令（`/goal`、`/code-review`、`/ultrareview`、`/security-review`、`/simplify`、`/verify`）到斜杠命令弹窗。CLI 没通过 metadata 声明这些命令，所以点击只是插入字面量 `/command` 文本，交给原生 session 执行。\n\n### 图片上传\n- 改进内嵌图片上传上限，从 500KB 提升到 10MB。服务端 socket buffer 同步提到 50MB 配套新的客户端上限——两边必须一起部署。\n\n### Web 端粘贴图片\n- 修复 Web 端粘贴图片有时附带上一张已发送图片而非刚复制图片的问题。现在通过「未见过的字节大小」识别新截图，不再在 `clipboardData` 和 `clipboard.read()` 之间猜测哪个更新。对真正的重复粘贴回退到最新 blob。新增 `[paste]` 诊断到 `/dev/logs`。"
+      },
+      {
         "version": "2.43.2",
         "date": "2026-06-21",
         "summary": "三处输入与中断修复。发图片+文字不再产生重复的「[Request interrupted by user]」提示;点击中断按钮不再把已发送的内容留在 Claude 输入框、跟着下一条消息一起重发;网页版粘贴图片现在第一次就能取到刚复制的图片。配套 CLI 发布:`@kmmao/happy-coder@0.102.4`。",
@@ -2285,7 +2319,7 @@
       }
     ]
   },
-  "latestVersion": "2.43.2",
+  "latestVersion": "2.44.0",
   "availableLocales": [
     "en",
     "zh-Hans"

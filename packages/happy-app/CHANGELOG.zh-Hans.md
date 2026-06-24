@@ -1,5 +1,28 @@
 # 更新日志
 
+## 2.44.0 - 2026-06-24
+
+循环 Agent 现在真正按 App 里配置的 model + effort 运行（之前每次迭代都会静默回退到默认值），创建循环 / 创建 Webhook 对话框做了大幅瘦身（提示折叠 + Skill 一键预设），原生 Claude Code 内置命令进入斜杠命令选择器，内嵌图片上传上限从 500KB 提升到 10MB。配套发布：`@kmmao/happy-coder@0.102.6`、`@kmmao/happy-wire@0.35.0`。
+
+### 循环 Agent
+- 修复 `modelMode` 和 `effort` 在每次服务端驱动的迭代中被静默丢弃的问题。App 里选的模型和努力度现在贯穿 wire / server / daemon / Claude 启动全链路，配置成 Opus 4.7 + 高的循环真的会按此运行，不再回退到 Sonnet 4.6 + 中。
+- 修复 guardian 绑定在每次迭代退出时被遗忘的问题。「一个 happy Session 服务一个循环，跨 N 次迭代复用」的契约现在真正生效——子进程退出不再清掉下一次迭代要复用的 Session。
+- 新增创建循环对话框 adopt 模式（把已有 Session 升级为循环）的 model + effort 选择器。选择器从源 Session 的当前配置预填，升级后的循环继续使用原配置。
+
+### 工作流创建对话框
+- 改进创建循环和创建 Webhook 两个对话框中的 issue 回写提示为可折叠。默认收起——新用户首次能看到，老用户不再被打扰。
+- 新增创建循环对话框中「启动 SKILL 命令」输入框上方的 6 个常用 Skill 一键预设：`/caveman`、`/diagnose`、`/tdd`、`/code-review`、`/simplify`、`/verify`，外加「不使用」清空 chip。手动输入照常工作，支持自定义 skill 名。
+- 改进提示文案本身，`loopIssueHint` 缩短约 37%，`webhookIssueHint` 缩短约 35%。去掉「提示:」前缀和重复说明，关键命令 `happy issue create / comment / close` 和 `GITHUB_TOKEN / GITEA_TOKEN` 等具体信息全部保留。
+
+### 命令选择器
+- 新增原生 Claude Code 内置命令（`/goal`、`/code-review`、`/ultrareview`、`/security-review`、`/simplify`、`/verify`）到斜杠命令弹窗。CLI 没通过 metadata 声明这些命令，所以点击只是插入字面量 `/command` 文本，交给原生 session 执行。
+
+### 图片上传
+- 改进内嵌图片上传上限，从 500KB 提升到 10MB。服务端 socket buffer 同步提到 50MB 配套新的客户端上限——两边必须一起部署。
+
+### Web 端粘贴图片
+- 修复 Web 端粘贴图片有时附带上一张已发送图片而非刚复制图片的问题。现在通过「未见过的字节大小」识别新截图，不再在 `clipboardData` 和 `clipboard.read()` 之间猜测哪个更新。对真正的重复粘贴回退到最新 blob。新增 `[paste]` 诊断到 `/dev/logs`。
+
 ## 2.43.2 - 2026-06-21
 
 三处输入与中断修复。发图片+文字不再产生重复的「[Request interrupted by user]」提示;点击中断按钮不再把已发送的内容留在 Claude 输入框、跟着下一条消息一起重发;网页版粘贴图片现在第一次就能取到刚复制的图片。配套 CLI 发布:`@kmmao/happy-coder@0.102.4`。
