@@ -489,17 +489,24 @@ export const CreateLoopModal = React.memo(function CreateLoopModal({
                         "",
                 );
                 setName(session.metadata?.summary?.text?.trim()?.slice(0, 60) ?? "");
+                // Inherit the source Session's model + effort picks so the
+                // adopted loop keeps running on whatever the user was using
+                // before promotion. Without this default, every adopted
+                // loop fell back to the CLI baseline (Sonnet 4.6 + medium)
+                // regardless of how the user had configured the chat.
+                setModelModeKey(session.modelMode ?? "default");
+                setEffortLevel(session.effortLevel ?? null);
             } else {
                 setPickedMachineId(machines[0]?.id ?? "");
                 setPickedProjectServerId("");
                 setPrompt("");
                 setName("");
+                setModelModeKey("default");
+                setEffortLevel(null);
             }
             setSchedule("1h");
             setCronExpression("*/30 * * * *");
             setAgent("claude");
-            setModelModeKey("default");
-            setEffortLevel(null);
             setAdvancedOpen(false);
             setSubmitting(false);
         }
@@ -571,7 +578,10 @@ export const CreateLoopModal = React.memo(function CreateLoopModal({
                 // Phase 2 sessionAdopt — server creates the loop AND
                 // binds this Session to it (single round-trip; daemon
                 // ephemeral updates GuardianSessionRegistry so next
-                // trigger reuses this Session).
+                // trigger reuses this Session). Carrying modelMode + effort
+                // through requires wire 0.35.0+; on older servers the
+                // fields are silently ignored (zod schema allows unknown
+                // input gracefully when transmitted).
                 const result = await sessionAdopt({
                     sessionId: session.id,
                     target: {
@@ -582,6 +592,12 @@ export const CreateLoopModal = React.memo(function CreateLoopModal({
                         cronExpression: cron,
                         name: trimmedName || undefined,
                         bootstrapSlashCommand: trimmedBootstrap || undefined,
+                        // Only override defaults when the user picked
+                        // something explicit — sending "default" / null
+                        // would shadow the loop's own fallback on the
+                        // server side.
+                        ...(modelModeKey !== "default" ? { modelMode: modelModeKey } : {}),
+                        ...(effortLevel ? { effort: effortLevel } : {}),
                     },
                 });
                 if (!result.success) {
@@ -926,10 +942,12 @@ export const CreateLoopModal = React.memo(function CreateLoopModal({
                 </View>
             )}
 
-            {/* Model + reasoning effort — Claude-only, standalone-only.
-                Adopt mode hides the agent picker and uses a server path that
-                doesn't carry these overrides yet. */}
-            {!isAdoptMode && agent === "claude" ? (
+            {/* Model + reasoning effort — Claude-only. As of wire 0.35.0
+                the sessionAdopt new-loop target also carries modelMode +
+                effort, and CreateLoopModal pre-fills both from the source
+                Session's current picks (see the visibility effect above).
+                Standalone create keeps its historical defaults. */}
+            {agent === "claude" ? (
                 <TriggerModelEffortSection
                     modelModeKey={modelModeKey}
                     onSelectModel={setModelModeKey}

@@ -38,6 +38,18 @@ export interface AgentLoopDefinition {
   iteration: number;
   continuityKey: string;
   agent: "claude" | "codex" | "gemini";
+  /**
+   * App model-mode KEY (e.g. "opus-4-7-1m") forwarded into the spawned
+   * iteration's first-turn EnhancedMode — drives 1M context and the
+   * effective Anthropic model id. Undefined means "use the CLI default
+   * model resolution", which historically baked everyone into Sonnet 4.6.
+   */
+  modelMode?: string;
+  /**
+   * Reasoning effort (`low|medium|high|xhigh|max`) forwarded the same way
+   * as `modelMode`. Undefined falls back to the CLI's `medium` default.
+   */
+  effort?: string;
   profileId?: string;
   projectId?: string;
   environmentVariables?: Record<string, string>;

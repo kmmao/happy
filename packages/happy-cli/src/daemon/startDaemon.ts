@@ -1323,9 +1323,21 @@ export async function startDaemon(): Promise<void> {
         status: terminalStatus,
         message: terminalError,
       });
-      void guardianSessionRegistry.forgetSession(session.happySessionId).catch((error) => {
-        logger.debug(`[DAEMON RUN] Failed to forget guardian session ${session.happySessionId}: ${error}`);
-      });
+      // Single-shot automations (supervisor / webhook / task) release their
+      // guardian binding on every child exit so the next trigger starts
+      // fresh. Agent loops are the opposite: the design intent is "one
+      // happy Session per loop, resumed across N iterations" — releasing
+      // it here would force every scheduled tick to spawn a brand-new
+      // Session, defeating the whole guardian mechanism. The PR3 self-heal
+      // path inside AgentLoopCoordinator owns guardian eviction for loops
+      // (after N consecutive zero-cost iterations); this layer must not
+      // pre-empt it. See packages/happy-cli/src/automation/AgentLoopCoordinator.ts
+      // (search "GUARDIAN_FORGET_THRESHOLD").
+      if (session.automationContext?.kind !== "agent_loop") {
+        void guardianSessionRegistry.forgetSession(session.happySessionId).catch((error) => {
+          logger.debug(`[DAEMON RUN] Failed to forget guardian session ${session.happySessionId}: ${error}`);
+        });
+      }
       forgetTrackedSession(session.happySessionId);
 
       const fixInfo = getFixWorktreeInfo(session.happySessionId);

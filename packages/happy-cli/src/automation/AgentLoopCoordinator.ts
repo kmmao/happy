@@ -96,6 +96,10 @@ export interface AgentLoopCreateInput {
   intervalMs: number;
   cronExpression?: string;
   agent?: "claude" | "codex" | "gemini";
+  /** App model-mode KEY forwarded to the iteration's first-turn EnhancedMode. */
+  modelMode?: string;
+  /** Reasoning effort (low|medium|high|xhigh|max) for the iteration's first turn. */
+  effort?: string;
   profileId?: string;
   projectId?: string;
   environmentVariables?: Record<string, string>;
@@ -136,6 +140,10 @@ export interface AgentLoopUpdateInput {
   intervalMs?: number;
   cronExpression?: string | null;
   agent?: "claude" | "codex" | "gemini";
+  /** App model-mode KEY; `null` clears the override and reverts to CLI default. */
+  modelMode?: string | null;
+  /** Reasoning effort; `null` clears and reverts to medium default. */
+  effort?: string | null;
   profileId?: string | null;
   projectId?: string | null;
   environmentVariables?: Record<string, string> | null;
@@ -479,6 +487,8 @@ export class AgentLoopCoordinator {
       iteration: 0,
       continuityKey: `agent-loop:${randomUUID()}`,
       agent: input.agent ?? "claude",
+      modelMode: normalizeOptionalString(input.modelMode),
+      effort: normalizeOptionalString(input.effort),
       profileId: normalizeOptionalString(input.profileId),
       projectId: normalizeOptionalString(input.projectId),
       environmentVariables: input.environmentVariables && Object.keys(input.environmentVariables).length > 0
@@ -556,6 +566,8 @@ export class AgentLoopCoordinator {
       cronExpression,
       nextRunAt,
       agent: input.agent ?? existing.agent,
+      modelMode: input.modelMode === undefined ? existing.modelMode : normalizeOptionalString(input.modelMode),
+      effort: input.effort === undefined ? existing.effort : normalizeOptionalString(input.effort),
       profileId: input.profileId === undefined ? existing.profileId : normalizeOptionalString(input.profileId),
       projectId: input.projectId === undefined ? existing.projectId : normalizeOptionalString(input.projectId),
       environmentVariables: input.environmentVariables === undefined
@@ -1162,6 +1174,14 @@ export class AgentLoopCoordinator {
       trigger: triggerSource,
       iteration,
       agent: loop.agent,
+      // Carry the per-loop model + effort overrides through the trigger
+      // payload so AgentLoopRunner can inject them into the spawned child's
+      // env (HAPPY_INITIAL_MODEL_MODE / HAPPY_INITIAL_EFFORT). Without this
+      // hop, every CLI-local iteration silently dropped the picks set on
+      // the loop definition — symmetric with the server-side path which
+      // had the same gap until wire 0.35.0.
+      modelMode: loop.modelMode,
+      effort: loop.effort,
       profileId: loop.profileId,
       projectId: loop.projectId,
       environmentVariables: loop.environmentVariables,

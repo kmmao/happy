@@ -788,6 +788,85 @@ describe("AgentLoopCoordinator", () => {
     await scheduler.stop();
   });
 
+  it("persists modelMode + effort and forwards them on the trigger payload", async () => {
+    // Bug A fix: adopted / CLI-local loops used to drop the user's model
+    // + effort picks because `createLoop` ignored the fields and
+    // `enqueueLoop` never wrote them onto AgentLoopTriggerData. Every
+    // spawned iteration silently fell back to the Claude Code default
+    // (Sonnet 4.6 + medium effort). This test pins both halves: the
+    // store keeps the values, and the scheduler-bound trigger carries
+    // them onward.
+    const dir = await mkdtemp(join(tmpdir(), "happy-agent-loop-coordinator-model-effort-"));
+    tempDirs.push(dir);
+    const scheduler = createScheduler(dir);
+    await scheduler.start();
+    const coordinator = new AgentLoopCoordinator({
+      store: new AgentLoopStore(join(dir, "loops.json")),
+      scheduler,
+    });
+    await coordinator.start();
+
+    const created = await coordinator.createLoop({
+      name: "Model-pinned loop",
+      prompt: "watch",
+      directory: "/tmp/repo",
+      intervalMs: 600_000,
+      modelMode: "opus-4-7-1m",
+      effort: "xhigh",
+      runNow: false,
+    });
+    expect(created.loop?.modelMode).toBe("opus-4-7-1m");
+    expect(created.loop?.effort).toBe("xhigh");
+
+    await coordinator.runNow(created.loop!.id);
+    const queuedJob = scheduler
+      .getJobsSnapshot()
+      .find((j) => j.kind === "agent_loop" && j.payload.loopId === created.loop!.id);
+    expect(queuedJob).toBeDefined();
+    if (queuedJob && queuedJob.kind === "agent_loop") {
+      expect(queuedJob.payload.modelMode).toBe("opus-4-7-1m");
+      expect(queuedJob.payload.effort).toBe("xhigh");
+    }
+
+    await coordinator.stop();
+    await scheduler.stop();
+  });
+
+  it("clears modelMode + effort on update with null", async () => {
+    // The update path treats explicit null as "clear back to default"
+    // (mirrors the wire's nullable contract); undefined means "no change".
+    const dir = await mkdtemp(join(tmpdir(), "happy-agent-loop-coordinator-model-effort-clear-"));
+    tempDirs.push(dir);
+    const scheduler = createScheduler(dir);
+    await scheduler.start();
+    const coordinator = new AgentLoopCoordinator({
+      store: new AgentLoopStore(join(dir, "loops.json")),
+      scheduler,
+    });
+    await coordinator.start();
+
+    const created = await coordinator.createLoop({
+      name: "Clearable loop",
+      prompt: "watch",
+      directory: "/tmp/repo",
+      intervalMs: 600_000,
+      modelMode: "opus-4-7-1m",
+      effort: "xhigh",
+      runNow: false,
+    });
+    expect(created.loop?.modelMode).toBe("opus-4-7-1m");
+
+    const updated = await coordinator.updateLoop(created.loop!.id, {
+      modelMode: null,
+      effort: null,
+    });
+    expect(updated.loop?.modelMode).toBeUndefined();
+    expect(updated.loop?.effort).toBeUndefined();
+
+    await coordinator.stop();
+    await scheduler.stop();
+  });
+
   it("survives forgetGuardian throwing — store still converges", async () => {
     // The self-heal callback is advisory. A filesystem hiccup writing
     // guardians.json must not roll back the loop's accumulated state or

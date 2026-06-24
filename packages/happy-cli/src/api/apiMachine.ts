@@ -1779,6 +1779,10 @@ export class ApiMachineClient {
         );
         // Rebuild a wire-shaped object (server uses `t`, socket forwarded
         // `type`). The controller reads only the documented fields below.
+        // `modelMode` and `effort` were added to the wire schema later and
+        // must be threaded through here too — without them the daemon would
+        // silently fall back to the Claude Code default model/effort
+        // instead of honouring the per-loop override stored on the server.
         const ephemeral: AgentLoopTriggerEphemeral = {
           t: "agent-loop-trigger",
           loopId: data.loopId,
@@ -1791,6 +1795,8 @@ export class ApiMachineClient {
           continuityKey: data.continuityKey,
           profileId: data.profileId ?? null,
           runtimeProfile: data.runtimeProfile,
+          modelMode: data.modelMode ?? null,
+          effort: data.effort ?? null,
           genericConfig: data.genericConfig,
           callbackToken: data.callbackToken,
           maxDurationMinutes: data.maxDurationMinutes,

@@ -48,6 +48,17 @@ export const SessionAdoptTargetSchema = z.discriminatedUnion("kind", [
          * prompt runs.
          */
         bootstrapSlashCommand: z.string().optional(),
+        /**
+         * Per-loop model + reasoning effort overrides for spawned
+         * iterations. Mirror of the standalone Create body — without
+         * these, an adopted loop would default to the daemon's CLI
+         * fallback (Sonnet 4.6 + medium effort) regardless of what the
+         * source Session was using. App should pre-fill from the source
+         * Session so adoption inherits the user's current model picks
+         * by default.
+         */
+        modelMode: z.string().nullable().optional(),
+        effort: z.string().nullable().optional(),
     }),
     // "Make this recurring" — create a TriggerSchedule that, on each fire,
     // reuses this Session via the Guardian registry.

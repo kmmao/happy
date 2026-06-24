@@ -80,6 +80,8 @@ function parseCreateArgs(args: string[]) {
   let directory: string | undefined;
   let interval: string | undefined;
   let agent: "claude" | "codex" | "gemini" | undefined;
+  let modelMode: string | undefined;
+  let effort: string | undefined;
   let profileId: string | undefined;
   let projectId: string | undefined;
   let runNow = true;
@@ -126,6 +128,12 @@ function parseCreateArgs(args: string[]) {
         break;
       case "--agent":
         agent = args[++i] as "claude" | "codex" | "gemini";
+        break;
+      case "--model-mode":
+        modelMode = args[++i];
+        break;
+      case "--effort":
+        effort = args[++i];
         break;
       case "--profile":
         profileId = args[++i];
@@ -227,6 +235,8 @@ function parseCreateArgs(args: string[]) {
       directory,
       intervalMs: parseIntervalMs(interval),
       agent,
+      modelMode,
+      effort,
       profileId,
       projectId,
       fileWatchEnabled,
@@ -832,6 +842,8 @@ function parseUpdateArgs(args: string[]) {
   let directory: string | undefined;
   let intervalMs: number | undefined;
   let agent: "claude" | "codex" | "gemini" | undefined;
+  let modelMode: string | null | undefined;
+  let effort: string | null | undefined;
   let profileId: string | null | undefined;
   let projectId: string | null | undefined;
   let fileWatchEnabled: boolean | undefined;
@@ -881,6 +893,18 @@ function parseUpdateArgs(args: string[]) {
         break;
       case "--agent":
         agent = args[++i] as "claude" | "codex" | "gemini";
+        break;
+      case "--model-mode":
+        modelMode = args[++i] ?? "";
+        break;
+      case "--clear-model-mode":
+        modelMode = null;
+        break;
+      case "--effort":
+        effort = args[++i] ?? "";
+        break;
+      case "--clear-effort":
+        effort = null;
         break;
       case "--profile":
         profileId = args[++i] ?? "";
@@ -1042,6 +1066,8 @@ function parseUpdateArgs(args: string[]) {
     ...(directory !== undefined ? { directory } : {}),
     ...(intervalMs !== undefined ? { intervalMs } : {}),
     ...(agent !== undefined ? { agent } : {}),
+    ...(modelMode !== undefined ? { modelMode } : {}),
+    ...(effort !== undefined ? { effort } : {}),
     ...(profileId !== undefined ? { profileId } : {}),
     ...(projectId !== undefined ? { projectId } : {}),
     ...(fileWatchEnabled !== undefined ? { fileWatchEnabled } : {}),
@@ -1082,8 +1108,8 @@ function showHelp(): void {
 ${chalk.bold("happy loop")} - Generic autonomous agent loops
 
 ${chalk.bold("Usage:")}
-  happy loop create --path <dir> --interval <10m> --prompt <text> [--name <name>] [--project <id>] [--profile <id>] [--agent <claude|codex|gemini>] [--file-watch] [--github-bridge] [--ci-bridge] [--event-source <name>] [--event-keyword <text>] [--goal <text>] [--focus <text>] [--working-memory <text>] [--reflection <text>] [--max-failures <n>] [--retry-backoff <10m>] [--cooldown <10m>] [--quiet-start <HH:MM>] [--quiet-end <HH:MM>] [--max-auto-runs <n>] [--max-iterations <n>] [--stop-on-success] [--downstream-loop <id>] [--downstream-trigger <completed|failed>] [--notify-event <completed|failed|blocked|brief>] [--notify-channel <push|webhook>] [--notify-webhook <url>] [--env KEY=value] [--no-run-now] [--json]
-  happy loop update <id> [--name <name>|--clear-name] [--prompt <text>] [--path <dir>] [--interval <10m>] [--project <id>|--clear-project] [--profile <id>|--clear-profile] [--agent <claude|codex|gemini>] [--file-watch|--no-file-watch] [--github-bridge|--no-github-bridge] [--ci-bridge|--no-ci-bridge] [--event-source <name>|--clear-event-sources] [--event-keyword <text>|--clear-event-keywords] [--goal <text>|--clear-goal] [--focus <text>|--clear-focus] [--working-memory <text>|--clear-working-memory] [--reflection <text>|--clear-reflection] [--max-failures <n>|--clear-max-failures] [--retry-backoff <10m>|--clear-retry-backoff] [--cooldown <10m>|--clear-cooldown] [--quiet-start <HH:MM>|--clear-quiet-start] [--quiet-end <HH:MM>|--clear-quiet-end] [--max-auto-runs <n>|--clear-max-auto-runs] [--max-iterations <n>|--clear-max-iterations] [--stop-on-success|--no-stop-on-success] [--downstream-loop <id>|--clear-downstream-loops] [--downstream-trigger <completed|failed>|--clear-downstream-triggers] [--notify-event <completed|failed|blocked|brief>|--clear-notify-events] [--notify-channel <push|webhook>|--clear-notify-channels] [--notify-webhook <url>|--clear-notify-webhook] [--env KEY=value] [--clear-env] [--json]
+  happy loop create --path <dir> --interval <10m> --prompt <text> [--name <name>] [--project <id>] [--profile <id>] [--agent <claude|codex|gemini>] [--model-mode <key>] [--effort <low|medium|high|xhigh|max>] [--file-watch] [--github-bridge] [--ci-bridge] [--event-source <name>] [--event-keyword <text>] [--goal <text>] [--focus <text>] [--working-memory <text>] [--reflection <text>] [--max-failures <n>] [--retry-backoff <10m>] [--cooldown <10m>] [--quiet-start <HH:MM>] [--quiet-end <HH:MM>] [--max-auto-runs <n>] [--max-iterations <n>] [--stop-on-success] [--downstream-loop <id>] [--downstream-trigger <completed|failed>] [--notify-event <completed|failed|blocked|brief>] [--notify-channel <push|webhook>] [--notify-webhook <url>] [--env KEY=value] [--no-run-now] [--json]
+  happy loop update <id> [--name <name>|--clear-name] [--prompt <text>] [--path <dir>] [--interval <10m>] [--project <id>|--clear-project] [--profile <id>|--clear-profile] [--agent <claude|codex|gemini>] [--model-mode <key>|--clear-model-mode] [--effort <level>|--clear-effort] [--file-watch|--no-file-watch] [--github-bridge|--no-github-bridge] [--ci-bridge|--no-ci-bridge] [--event-source <name>|--clear-event-sources] [--event-keyword <text>|--clear-event-keywords] [--goal <text>|--clear-goal] [--focus <text>|--clear-focus] [--working-memory <text>|--clear-working-memory] [--reflection <text>|--clear-reflection] [--max-failures <n>|--clear-max-failures] [--retry-backoff <10m>|--clear-retry-backoff] [--cooldown <10m>|--clear-cooldown] [--quiet-start <HH:MM>|--clear-quiet-start] [--quiet-end <HH:MM>|--clear-quiet-end] [--max-auto-runs <n>|--clear-max-auto-runs] [--max-iterations <n>|--clear-max-iterations] [--stop-on-success|--no-stop-on-success] [--downstream-loop <id>|--clear-downstream-loops] [--downstream-trigger <completed|failed>|--clear-downstream-triggers] [--notify-event <completed|failed|blocked|brief>|--clear-notify-events] [--notify-channel <push|webhook>|--clear-notify-channels] [--notify-webhook <url>|--clear-notify-webhook] [--env KEY=value] [--clear-env] [--json]
   happy loop list [--json]
   happy loop show <id> [--json]
   happy loop suggest --path <dir> [--create] [--run-now] [--json]

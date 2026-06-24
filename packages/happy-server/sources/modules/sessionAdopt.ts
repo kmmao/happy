@@ -164,6 +164,16 @@ export async function sessionAdopt(opts: {
                     enabled: true,
                     intervalMs: target.intervalMs,
                     cronExpression: target.cronExpression,
+                    // Carry the source Session's model + reasoning effort
+                    // through to the spawned iterations so the user's
+                    // current preferences are inherited by default. Before
+                    // this, adopted loops ignored the picks entirely and
+                    // every iteration fell back to the CLI default
+                    // (Sonnet 4.6 + medium effort) regardless of what the
+                    // adopted Session was running. App pre-fills the
+                    // request from session.modelMode / session.preferences.effortLevel.
+                    modelMode: target.modelMode ?? undefined,
+                    effort: target.effort ?? undefined,
                     // Stash optional name + bootstrapSlashCommand in
                     // genericConfig — serializeAgentLoop reads name for
                     // the list view, and the CLI daemon's spreadGenericConfig
