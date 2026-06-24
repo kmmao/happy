@@ -94,6 +94,24 @@ const CRON_PRESETS: Array<{
     { labelKey: "workflows.loopCronPresetMonthly1st", cron: "0 0 1 * *" },
 ];
 
+/**
+ * One-tap shortcuts for the bootstrap slash command field. These are the
+ * handful of skills that actually make sense as the first message every
+ * iteration of a long-running loop — token-saving (`/caveman`), bug
+ * hunting (`/diagnose`), TDD discipline (`/tdd`), self-review
+ * (`/code-review`, `/simplify`), or "did my change actually work"
+ * (`/verify`). Tapping a chip rewrites the text box; users can still
+ * hand-type a custom skill name afterwards.
+ */
+const SKILL_PRESETS: Array<{ command: string }> = [
+    { command: "/caveman" },
+    { command: "/diagnose" },
+    { command: "/tdd" },
+    { command: "/code-review" },
+    { command: "/simplify" },
+    { command: "/verify" },
+];
+
 // Two-char zero-pad for HH:MM strings inside the humanized preview.
 function pad2(n: number): string {
     return n < 10 ? `0${n}` : String(n);
@@ -365,6 +383,22 @@ const styles = StyleSheet.create((theme) => ({
         color: theme.colors.textLink,
         ...Typography.default("semiBold"),
     },
+    // Quieter variant of advancedToggle for the inline issue-hint
+    // fold-out below the prompt textarea — smaller text, tighter
+    // padding so it reads as a secondary aside, not a primary action.
+    issueHintToggle: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 4,
+        paddingVertical: 6,
+        marginTop: 4,
+        ...webInteractive,
+    },
+    issueHintToggleText: {
+        fontSize: 11,
+        color: theme.colors.textLink,
+        ...Typography.default("semiBold"),
+    },
     machineRow: {
         flexDirection: "row",
         alignItems: "center",
@@ -464,6 +498,10 @@ export const CreateLoopModal = React.memo(function CreateLoopModal({
     const [modelModeKey, setModelModeKey] = React.useState<string>("default");
     const [effortLevel, setEffortLevel] = React.useState<string | null>(null);
     const [advancedOpen, setAdvancedOpen] = React.useState(false);
+    // Issue-hint fold-out: the "tell the Agent to run `happy issue create`"
+    // tip is useful for first-time users but becomes noise once you know
+    // about it. Default collapsed; one tap reveals the full text.
+    const [issueHintOpen, setIssueHintOpen] = React.useState(false);
     const [submitting, setSubmitting] = React.useState(false);
 
     // Reset form state only on a fresh open (false → true transition).
@@ -508,6 +546,7 @@ export const CreateLoopModal = React.memo(function CreateLoopModal({
             setCronExpression("*/30 * * * *");
             setAgent("claude");
             setAdvancedOpen(false);
+            setIssueHintOpen(false);
             setSubmitting(false);
         }
         wasVisible.current = visible;
@@ -970,12 +1009,30 @@ export const CreateLoopModal = React.memo(function CreateLoopModal({
                     placeholderTextColor={theme.colors.textSecondary}
                 />
                 {/* Hint: how to close the feedback loop via `happy issue`.
-                    Just a UX nudge — we don't auto-inject anything into
-                    the prompt. The Agent reads this in the prompt
-                    context once the user includes it. */}
-                <Text style={styles.infoHint}>
-                    {t("workflows.loopIssueHint")}
-                </Text>
+                    Default collapsed — useful for first-timers, noise for
+                    everyone else. We don't auto-inject anything into the
+                    prompt; the Agent reads the tip from the prompt body
+                    only when the user includes it. */}
+                <Pressable
+                    style={styles.issueHintToggle}
+                    onPress={() => setIssueHintOpen((v) => !v)}
+                >
+                    <Ionicons
+                        name={issueHintOpen ? "chevron-down" : "chevron-forward"}
+                        size={12}
+                        color={theme.colors.textLink}
+                    />
+                    <Text style={styles.issueHintToggleText}>
+                        {issueHintOpen
+                            ? t("workflows.loopIssueHintToggleHide")
+                            : t("workflows.loopIssueHintToggleShow")}
+                    </Text>
+                </Pressable>
+                {issueHintOpen ? (
+                    <Text style={styles.infoHint}>
+                        {t("workflows.loopIssueHint")}
+                    </Text>
+                ) : null}
             </View>
 
             {/* Optional name. */}
@@ -995,11 +1052,34 @@ export const CreateLoopModal = React.memo(function CreateLoopModal({
             {/* Optional bootstrap slash command (e.g. /caveman) — pushed
                 into the session as the first user message every iteration
                 so a Skill activates before the prompt runs. Daemon reads
-                this from genericConfig.bootstrapSlashCommand. */}
+                this from genericConfig.bootstrapSlashCommand.
+
+                Common skills are exposed as one-tap chips above the input
+                so users don't have to remember exact slash names; the
+                "None" chip clears the field. Hand-edits still work for
+                custom skills not in the preset list. */}
             <View>
                 <Text style={styles.sectionLabel}>
                     {t("workflows.loopBootstrapSlashCommand")}
                 </Text>
+                <Text style={[styles.cronPresetsLabel, { marginTop: 4 }]}>
+                    {t("workflows.loopBootstrapSlashCommandPresetsLabel")}
+                </Text>
+                <View style={styles.presetGrid}>
+                    {SKILL_PRESETS.map((preset) => (
+                        <PresetChip
+                            key={preset.command}
+                            label={preset.command}
+                            active={bootstrapSlashCommand.trim() === preset.command}
+                            onPress={() => setBootstrapSlashCommand(preset.command)}
+                        />
+                    ))}
+                    <PresetChip
+                        label={t("workflows.loopBootstrapSlashCommandPresetNone")}
+                        active={bootstrapSlashCommand.trim().length === 0}
+                        onPress={() => setBootstrapSlashCommand("")}
+                    />
+                </View>
                 <TextInput
                     style={[styles.input, { marginTop: 6 }]}
                     value={bootstrapSlashCommand}

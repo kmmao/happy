@@ -196,6 +196,23 @@ const styles = StyleSheet.create((theme) => ({
         color: theme.colors.textLink,
         ...Typography.default("semiBold"),
     },
+    // Quieter variant of flowToggle for the inline issue-hint fold-out
+    // below the prompt textarea — smaller text, tighter padding so it
+    // reads as a secondary aside, not a primary action. Mirrors
+    // CreateLoopModal.issueHintToggle.
+    webhookHintToggle: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 4,
+        paddingVertical: 6,
+        marginTop: 4,
+        ...webInteractive,
+    },
+    webhookHintToggleText: {
+        fontSize: 11,
+        color: theme.colors.textLink,
+        ...Typography.default("semiBold"),
+    },
     flowDiagramRow: {
         flexDirection: "row",
         alignItems: "stretch",
@@ -333,6 +350,11 @@ export const CreateWebhookModal = React.memo(function CreateWebhookModal({
     // closed by default so it doesn't dominate first-time use but is one
     // tap away when users want to understand the lifecycle.
     const [flowOpen, setFlowOpen] = React.useState(false);
+    // Issue-hint fold-out: the "tell the Agent to comment back on the
+    // source Issue" tip is useful for first-time users but becomes noise
+    // once you know about it. Default collapsed; one tap reveals the
+    // full text. Mirrors the same UX in CreateLoopModal.
+    const [webhookHintOpen, setWebhookHintOpen] = React.useState(false);
     // Source preset selection — purely UI hint; the chip click prefills
     // slug + prompt, but the underlying state stays slug/prompt only so
     // the user is free to keep editing afterwards.
@@ -357,6 +379,7 @@ export const CreateWebhookModal = React.memo(function CreateWebhookModal({
             setCreatedSecret(null);
             setCreatedSlug(null);
             setFlowOpen(false);
+            setWebhookHintOpen(false);
             setPickedSource(null);
         }
         wasVisible.current = visible;
@@ -523,6 +546,8 @@ export const CreateWebhookModal = React.memo(function CreateWebhookModal({
                     setEffortLevel={setEffortLevel}
                     flowOpen={flowOpen}
                     setFlowOpen={setFlowOpen}
+                    webhookHintOpen={webhookHintOpen}
+                    setWebhookHintOpen={setWebhookHintOpen}
                     pickedSource={pickedSource}
                     onPickSource={handlePickSource}
                     onCloseAndRoute={(path: string) => {
@@ -558,6 +583,8 @@ function CreateForm({
     setEffortLevel,
     flowOpen,
     setFlowOpen,
+    webhookHintOpen,
+    setWebhookHintOpen,
     pickedSource,
     onPickSource,
     onCloseAndRoute,
@@ -749,9 +776,32 @@ function CreateForm({
                 <Text style={styles.helperText}>
                     {t("workflows.webhookPromptHelper")}
                 </Text>
-                <Text style={styles.helperText}>
-                    {t("workflows.webhookIssueHint")}
-                </Text>
+                {/* Hint: how to close the feedback loop by commenting back
+                    on the source Issue. Default collapsed — useful for
+                    first-timers, noise for repeat users. We don't
+                    auto-inject anything into the prompt; the Agent reads
+                    the tip from the prompt body only when the user
+                    includes it. */}
+                <Pressable
+                    style={styles.webhookHintToggle}
+                    onPress={() => setWebhookHintOpen((v: boolean) => !v)}
+                >
+                    <Ionicons
+                        name={webhookHintOpen ? "chevron-down" : "chevron-forward"}
+                        size={12}
+                        color={theme.colors.textLink}
+                    />
+                    <Text style={styles.webhookHintToggleText}>
+                        {webhookHintOpen
+                            ? t("workflows.webhookIssueHintToggleHide")
+                            : t("workflows.webhookIssueHintToggleShow")}
+                    </Text>
+                </Pressable>
+                {webhookHintOpen ? (
+                    <Text style={styles.helperText}>
+                        {t("workflows.webhookIssueHint")}
+                    </Text>
+                ) : null}
             </View>
 
             <TriggerModelEffortSection

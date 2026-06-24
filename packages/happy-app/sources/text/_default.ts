@@ -307,13 +307,26 @@ export const en = {
     loopBootstrapSlashCommandPlaceholder: "e.g. /caveman",
     loopBootstrapSlashCommandHint:
       "Sent as the first message on every iteration so a skill activates before the prompt runs.",
+    // One-tap skill presets shown above the bootstrap slash command
+    // input — see SKILL_PRESETS in CreateLoopModal. Picking a chip
+    // overwrites the text box; the "None" chip clears it.
+    loopBootstrapSlashCommandPresetsLabel: "Common skills",
+    loopBootstrapSlashCommandPresetNone: "None",
     loopFormSubmit: "Create loop",
     loopFormErrorTitle: "Couldn't create loop",
     loopAdvancedToggle: "Advanced — CLI readiness",
     // `happy issue` write-back hints — surfaced under prompt textareas
     // so the user can tell the Agent to close the loop on the Git host.
-    loopIssueHint: "Tip: tell the Agent to run `happy issue create --title \"…\" --body \"…\"` before finishing to record the result on the Git host. Webhook-triggered sessions get GITHUB_TOKEN / GITEA_TOKEN injected automatically.",
-    webhookIssueHint: "Tip: ask the Agent to run `happy issue comment <n> --body \"…\"` (or `issue close <n>`) before finishing. The webhook-trigger session already has the token in the env.",
+    loopIssueHint: "Have the Agent run `happy issue create --title \"…\" --body \"…\"` before exiting. Webhook-triggered sessions auto-inject GITHUB_TOKEN / GITEA_TOKEN.",
+    // Fold-out labels for loopIssueHint — collapsed by default so the
+    // hint doesn't dominate the form for repeat users.
+    loopIssueHintToggleShow: "💡 About writing results back to Git",
+    loopIssueHintToggleHide: "Hide tip",
+    webhookIssueHint: "Have the Agent run `happy issue comment <n> --body \"…\"` or `issue close <n>` before exiting — token is already in env.",
+    // Fold-out labels for webhookIssueHint — collapsed by default so the
+    // hint doesn't dominate the form for repeat users.
+    webhookIssueHintToggleShow: "💡 About commenting back on the Issue",
+    webhookIssueHintToggleHide: "Hide tip",
   },
 
   inbox: {
