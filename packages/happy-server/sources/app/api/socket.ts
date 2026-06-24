@@ -46,6 +46,10 @@ export function startSocket(app: Fastify) {
       allowedHeaders: ["Content-Type", "Authorization"],
     },
     transports: ["websocket", "polling"],
+    // Allow up to ~50MB per message so the App can attach files up to ~10MB raw
+    // (base64 + E2E re-encoding inflates the payload well above the raw size).
+    // This is a per-message ceiling, not a preallocation.
+    maxHttpBufferSize: 50e6,
     pingTimeout: 45000,
     pingInterval: 15000,
     path: "/v1/updates",

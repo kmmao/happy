@@ -23,7 +23,7 @@ export type MultiImageUploadResult = {
 
 export const MAX_DIMENSION = 2048;
 export const JPEG_QUALITY = 0.85;
-export const MAX_BASE64_SIZE = 650_000; // 650KB — after encryption re-encoding (~865KB) stays under Socket.IO 1MB default
+export const MAX_BASE64_SIZE = 14_000_000; // ~14MB base64 ≈ 10MB raw file; after encryption re-encoding stays under the server's 50MB maxHttpBufferSize
 
 /** Per-session cache of the CLI's upload directory. Evicts when session disappears. */
 const uploadDirCache = new Map<string, string>();
@@ -150,7 +150,7 @@ export async function uploadRawFile(
   originalName: string,
 ): Promise<string> {
   if (base64.length > MAX_BASE64_SIZE) {
-    throw new HappyError("File is too large to send (max ~500KB)", false);
+    throw new HappyError("File is too large to send (max ~10MB)", false);
   }
 
   evictStaleCache();
