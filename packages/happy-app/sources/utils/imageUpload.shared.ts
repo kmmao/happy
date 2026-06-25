@@ -10,7 +10,7 @@ import { apiSocket } from "@/sync/apiSocket";
 import { storage } from "@/sync/storage"; // Used by evictStaleCache
 import { HappyError } from "@/utils/errors";
 
-export const MAX_IMAGES = 5;
+export const MAX_IMAGES = 20;
 
 export type MultiImageUploadResult = {
   paths: string[];
