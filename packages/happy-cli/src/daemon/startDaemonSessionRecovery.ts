@@ -16,6 +16,55 @@ import type { AutomationAuditEvent } from "@/automation/types";
 const execFileAsync = promisify(execFileCb);
 
 // ---------------------------------------------------------------------------
+// ps etime parser (cross-platform)
+// ---------------------------------------------------------------------------
+
+/**
+ * Parse a `ps -o etime=` field to elapsed seconds.
+ *
+ * `etime` format is `[[DD-]HH:]MM:SS` and is supported by BOTH BSD ps (macOS)
+ * and GNU ps (Linux). We deliberately avoid `etimes` (raw integer seconds)
+ * because BSD ps rejects it with `ps: etimes: keyword not found`.
+ *
+ * Examples:
+ *   "01:23"         →     83  (1m 23s)
+ *   "12:34:56"      →  45296  (12h 34m 56s)
+ *   "1-02:03:04"    →  93784  (1d 2h 3m 4s)
+ *   "  5:00 "       →    300  (whitespace tolerated by caller)
+ */
+export function parsePsEtimeSeconds(input: string): number {
+  const s = input.trim();
+  if (!s) return 0;
+
+  let days = 0;
+  let rest = s;
+  const dashIdx = s.indexOf("-");
+  if (dashIdx >= 0) {
+    days = Number(s.slice(0, dashIdx));
+    rest = s.slice(dashIdx + 1);
+    if (!Number.isFinite(days)) return 0;
+  }
+
+  const parts = rest.split(":").map(Number);
+  if (parts.some((n) => !Number.isFinite(n))) return 0;
+
+  let hours = 0;
+  let minutes = 0;
+  let seconds = 0;
+  if (parts.length === 3) {
+    [hours, minutes, seconds] = parts;
+  } else if (parts.length === 2) {
+    [minutes, seconds] = parts;
+  } else if (parts.length === 1) {
+    seconds = parts[0];
+  } else {
+    return 0;
+  }
+
+  return days * 86400 + hours * 3600 + minutes * 60 + seconds;
+}
+
+// ---------------------------------------------------------------------------
 // Context type
 // ---------------------------------------------------------------------------
 
@@ -76,15 +125,18 @@ export async function resolveLikelyRecoverableHappyPid(
     }
 
     try {
+      // Use `etime` (not `etimes`) — `etime` is supported on both BSD ps
+      // (macOS) and GNU ps (Linux). BSD ps rejects `etimes` with
+      // "ps: etimes: keyword not found".
       const { stdout } = await execFileAsync("ps", [
         "-p",
         String(candidatePid),
         "-o",
-        "etimes=,command=",
+        "etime=,command=",
       ]);
       const line = stdout.trim();
-      const match = line.match(/^(\d+)\s+(.*)$/);
-      const elapsedSeconds = match ? Number(match[1]) : 0;
+      const match = line.match(/^(\S+)\s+(.*)$/);
+      const elapsedSeconds = match ? parsePsEtimeSeconds(match[1]) : 0;
       const command = match ? match[2].trim() : line;
       if (
         !/(\bhappy\b|index\.mjs|dist_next\/index\.mjs|dist\/index\.mjs)/i.test(command)

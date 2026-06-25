@@ -103,6 +103,48 @@ async function unpackArchive(archivePath, destDir) {
 }
 
 /**
+ * Fix node-pty spawn-helper executable bit.
+ *
+ * npm publishes node-pty's prebuilt `spawn-helper` binary without preserving
+ * the executable bit on some host/registry combinations. Without +x, the PTY
+ * launch fails inside our remote launcher with:
+ *
+ *   Process exited unexpectedly: posix_spawnp failed.
+ *
+ * Equivalent shell one-liner:
+ *   find $(npm root -g)/@kmmao/happy-coder -path "*node-pty*spawn-helper" -exec chmod +x {} +
+ *
+ * Idempotent — chmod 0755 is a no-op when the bit is already set.
+ * See: https://github.com/microsoft/node-pty/issues/581
+ */
+function fixNodePtyPermissions() {
+    if (os.platform() === 'win32') return; // no spawn-helper on Windows
+
+    let ptyRoot;
+    try {
+        ptyRoot = path.dirname(require.resolve('node-pty/package.json'));
+    } catch {
+        console.warn('node-pty not found via require.resolve, skipping spawn-helper chmod');
+        return;
+    }
+
+    const candidates = [
+        path.join(ptyRoot, 'build', 'Release', 'spawn-helper'),
+        path.join(ptyRoot, 'build', 'Debug', 'spawn-helper'),
+    ];
+
+    for (const helper of candidates) {
+        if (!fs.existsSync(helper)) continue;
+        try {
+            fs.chmodSync(helper, 0o755);
+            console.log(`Set executable bit on ${helper}`);
+        } catch (e) {
+            console.warn(`Failed to chmod ${helper}: ${e.message}`);
+        }
+    }
+}
+
+/**
  * Main unpacking function
  */
 async function unpackTools() {
@@ -141,19 +183,30 @@ async function unpackTools() {
         
         console.log(`Tools unpacked successfully to ${unpackedPath}`);
         return { success: true, alreadyUnpacked: false };
-        
+
     } catch (error) {
         console.error('Failed to unpack tools:', error.message);
         throw error;
     }
 }
 
+/**
+ * Wrapper that runs both unpacking and the node-pty permission fix.
+ * Permission fix runs unconditionally (even when tools are already unpacked)
+ * because it costs ~1ms and prevents posix_spawnp regressions across reinstalls.
+ */
+async function runPostinstall() {
+    const result = await unpackTools();
+    fixNodePtyPermissions();
+    return result;
+}
+
 // Export for use as module
-module.exports = { unpackTools, getPlatformDir, getToolsDir };
+module.exports = { unpackTools, fixNodePtyPermissions, getPlatformDir, getToolsDir };
 
 // Run if executed directly
 if (require.main === module) {
-    unpackTools()
+    runPostinstall()
         .then(result => {
             process.exit(0);
         })
