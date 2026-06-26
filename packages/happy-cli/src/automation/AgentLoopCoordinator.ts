@@ -4,46 +4,6 @@ import { logger } from "@/ui/logger";
 import { jitteredDelay } from "@/utils/jitter";
 
 /**
- * Minimum wait between a failed loop iteration and the next attempt. Acts as
- * a floor over `retryBackoffMs ?? intervalMs` in `onJobTerminal` so an
- * aggressive interval can't hammer Anthropic during a rate-limit window.
- * Chosen to align with Anthropic's typical 5-minute short-window — long
- * enough that a single 429 cluster clears, short enough that occasional
- * non-rate-limit failures still progress.
- */
-const FAILURE_BACKOFF_FLOOR_MS = 5 * 60_000;
-
-/**
- * Claude SDK `ClaudeJsonlAssistantMessageError` values that represent
- * transient upstream conditions the user can do nothing about — they clear
- * on their own once the rate-limit / overload window resets. These do NOT
- * burn the loop's `consecutiveFailures` budget; only permanent categories
- * (auth, billing, invalid request, unknown) tip the loop toward `blocked`.
- *
- * Kept as a `string` Set so callers passing raw daemon strings don't have to
- * import the SDK type — anything not in the set falls back to the old
- * "counts as a real failure" behaviour, which is the safe default.
- */
-const TRANSIENT_ERROR_TYPES = new Set<string>([
-  "rate_limit",   // Anthropic 429
-  "overloaded",   // Anthropic 529 (split out of rate_limit in Claude Code 2.1.150)
-  "server_error", // upstream 5xx that isn't an explicit overload
-]);
-
-/**
- * Number of back-to-back zero-cost iterations that triggers the self-heal
- * path — the coordinator forgets the guardian Session binding so the next
- * iteration spawns fresh. Chosen as 3 because: (1) one zero-cost run is a
- * normal blip (transient 429 + retryBackoff cleared it), (2) two could be
- * the same blip plus an immediate retry, (3) three is the smallest count
- * that confidently means "this Session itself is stuck and resuming it
- * isn't going to help". Aligns with the default `maxConsecutiveFailures`
- * — by the time we'd block on permanent errors we've also self-healed any
- * Session-stuck condition that produced no cost at all.
- */
-const GUARDIAN_FORGET_THRESHOLD = 3;
-
-/**
  * Compute the next run timestamp from a cron expression.
  * Returns null if the expression is invalid or has no future match.
  */
@@ -88,6 +48,14 @@ import {
   type AgentLoopRuntimeState,
   type AgentLoopTriggerSource,
 } from "./AgentLoopStore";
+import {
+  canAutoRun,
+  evaluateAutoRunPolicy,
+  localDayStartAt,
+  normalizeAutoRunCounter,
+} from "./agentLoopAutoRunPolicy";
+import { evaluateLoopEventFilters } from "./agentLoopEventMatch";
+import { computeAgentLoopTerminalOutcome } from "./agentLoopTerminalOutcome";
 
 export interface AgentLoopCreateInput {
   name?: string;
@@ -232,72 +200,6 @@ function normalizeOptionalTimeOfDay(value: string | null | undefined): string | 
   return /^([01]\d|2[0-3]):([0-5]\d)$/.test(normalized) ? normalized : undefined;
 }
 
-function localDayStartAt(now: number): number {
-  const date = new Date(now);
-  date.setHours(0, 0, 0, 0);
-  return date.getTime();
-}
-
-function normalizeAutoRunCounter(loop: Pick<AgentLoopDefinition, "autoRunsToday" | "autoRunWindowStartedAt">, now: number): { autoRunsToday: number; autoRunWindowStartedAt: number } {
-  const dayStart = localDayStartAt(now);
-  if (loop.autoRunWindowStartedAt === dayStart) {
-    return { autoRunsToday: loop.autoRunsToday ?? 0, autoRunWindowStartedAt: dayStart };
-  }
-  return { autoRunsToday: 0, autoRunWindowStartedAt: dayStart };
-}
-
-function normalizeDailyCostCounter(loop: Pick<AgentLoopDefinition, "todayCostUsd" | "todayCostWindowStartedAt">, now: number): { todayCostUsd: number; todayCostWindowStartedAt: number } {
-  const dayStart = localDayStartAt(now);
-  if (loop.todayCostWindowStartedAt === dayStart) {
-    return { todayCostUsd: loop.todayCostUsd ?? 0, todayCostWindowStartedAt: dayStart };
-  }
-  return { todayCostUsd: 0, todayCostWindowStartedAt: dayStart };
-}
-
-function isWithinQuietHours(now: number, start: string | undefined, end: string | undefined): boolean {
-  if (!start || !end || start === end) {
-    return false;
-  }
-  const [startHour, startMinute] = start.split(":").map(Number);
-  const [endHour, endMinute] = end.split(":").map(Number);
-  const current = new Date(now);
-  const currentMinutes = current.getHours() * 60 + current.getMinutes();
-  const startMinutes = startHour * 60 + startMinute;
-  const endMinutes = endHour * 60 + endMinute;
-  if (startMinutes < endMinutes) {
-    return currentMinutes >= startMinutes && currentMinutes < endMinutes;
-  }
-  return currentMinutes >= startMinutes || currentMinutes < endMinutes;
-}
-
-function evaluateAutoRunPolicy(loop: AgentLoopDefinition, now: number): { allowed: boolean; reason?: string } {
-  if (loop.maxIterations && loop.iteration >= loop.maxIterations) {
-    return { allowed: false, reason: "max-iterations" };
-  }
-  if (isWithinQuietHours(now, loop.quietHoursStart, loop.quietHoursEnd)) {
-    return { allowed: false, reason: "quiet-hours" };
-  }
-  if (loop.cooldownMs && loop.lastCompletedAt && now < loop.lastCompletedAt + loop.cooldownMs) {
-    return { allowed: false, reason: "cooldown" };
-  }
-  if (loop.maxAutoRunsPerDay) {
-    const counter = normalizeAutoRunCounter(loop, now);
-    if (counter.autoRunsToday >= loop.maxAutoRunsPerDay) {
-      return { allowed: false, reason: "max-auto-runs" };
-    }
-  }
-  if (loop.maxUsdPerDay) {
-    const costCounter = normalizeDailyCostCounter(loop, now);
-    if (costCounter.todayCostUsd >= loop.maxUsdPerDay) {
-      return { allowed: false, reason: "budget-daily" };
-    }
-  }
-  return { allowed: true };
-}
-
-function canAutoRun(loop: AgentLoopDefinition, now: number): boolean {
-  return evaluateAutoRunPolicy(loop, now).allowed;
-}
 function normalizeOptionalStringList(value: readonly string[] | null | undefined): string[] | undefined {
   if (value == null) {
     return undefined;
@@ -356,27 +258,6 @@ function normalizeNotificationChannels(value: readonly AgentLoopNotificationChan
   return normalized.length > 0 ? normalized : undefined;
 }
 
-function evaluateLoopEventFilters(
-  loop: Pick<AgentLoopDefinition, "eventSourceAllowlist" | "eventKeywordFilters">,
-  event: Pick<AgentLoopEvent, "source" | "title" | "details">,
-): { accepted: boolean; reason?: string } {
-  const allowlist = loop.eventSourceAllowlist?.map((entry) => entry.toLowerCase());
-  if (allowlist && allowlist.length > 0 && !allowlist.includes(event.source.toLowerCase())) {
-    return { accepted: false, reason: `source '${event.source}' not allowed` };
-  }
-
-  const keywords = loop.eventKeywordFilters?.map((entry) => entry.toLowerCase());
-  if (keywords && keywords.length > 0) {
-    const haystack = `${event.title}
-${event.details ?? ""}`.toLowerCase();
-    const matched = keywords.some((keyword) => haystack.includes(keyword));
-    if (!matched) {
-      return { accepted: false, reason: "event does not match keyword filters" };
-    }
-  }
-
-  return { accepted: true };
-}
 
 function getLoopMemorySnapshot(loop: Pick<AgentLoopDefinition, "goal" | "currentFocus" | "workingMemory" | "lastReflectionSummary" | "memoryUpdatedAt">) {
   return {
@@ -857,65 +738,22 @@ export class AgentLoopCoordinator {
     }
     const now = Date.now();
     const failed = params.status === "failed";
-    // Transient upstream faults (Anthropic rate limit, model overloaded,
-    // transient 5xx) must NOT burn the loop's failure budget — they clear
-    // on their own once the upstream window resets. Permanent faults
-    // (billing, auth, invalid request) and unknown failures still count.
-    const isTransient = failed && params.errorType !== undefined && TRANSIENT_ERROR_TYPES.has(params.errorType);
-    const nextConsecutiveFailures = failed && !isTransient
-      ? (existing.consecutiveFailures ?? 0) + 1
-      : (existing.consecutiveFailures ?? 0);
-    // Default tolerance bumped from 1 to 3 — a single transient 429 / 529 /
-    // network blip used to flip the loop to `blocked` + `enabled=false` on
-    // the very first iteration. Three strikes is the smallest budget that
-    // survives a typical rate-limit burst without overshooting a real
-    // recurring failure (which still trips after the third miss). Callers
-    // that want the old "fail fast" behaviour can pass an explicit
-    // `maxConsecutiveFailures: 1`.
-    const maxConsecutiveFailures = existing.maxConsecutiveFailures ?? 3;
-    const shouldBlock = failed && !isTransient && nextConsecutiveFailures >= maxConsecutiveFailures;
-    const blockedReason = shouldBlock ? (params.errorMessage ?? params.status) : undefined;
-    const reachedMaxIterations = Boolean(existing.maxIterations && existing.iteration >= existing.maxIterations);
-    const shouldStopOnSuccess = params.status === "completed" && existing.stopOnSuccess === true;
-
-    // Accumulate cost tracking
-    const runCost = (params.sessionCostUsd != null && Number.isFinite(params.sessionCostUsd) && params.sessionCostUsd > 0) ? params.sessionCostUsd : 0;
-    const dailyCostCounter = normalizeDailyCostCounter(existing, now);
-    const newTodayCostUsd = dailyCostCounter.todayCostUsd + runCost;
-    const newTotalCostUsd = (existing.totalCostUsd ?? 0) + runCost;
-    const dailyBudgetExceeded = Boolean(existing.maxUsdPerDay && newTodayCostUsd >= existing.maxUsdPerDay);
-
-    const stopReason = shouldBlock ? undefined : (shouldStopOnSuccess ? "stop-on-success" : (reachedMaxIterations ? "max-iterations" : (dailyBudgetExceeded ? "budget-daily" : undefined)));
-    // Floor the failure backoff at FAILURE_BACKOFF_FLOOR_MS so an aggressive
-    // interval (e.g. 1m) doesn't hammer Anthropic during a rate-limit window
-    // — the most common failure mode in practice. The configured backoff
-    // still wins when it's larger; the floor only kicks in for short
-    // intervals that didn't set an explicit retry backoff.
-    const retryBackoffMs = Math.max(
-      existing.retryBackoffMs ?? existing.intervalMs,
-      FAILURE_BACKOFF_FLOOR_MS,
-    );
-    // When the SDK reported a precise rate-limit reset, defer the next run
-    // until AFTER the window clears (plus a 30s buffer to absorb clock skew
-    // and any per-account smear). The configured backoff still wins if it's
-    // longer — we never schedule earlier than `now + retryBackoffMs`.
-    const rateLimitDeferralMs =
-      params.rateLimitResetsAt !== undefined && params.rateLimitResetsAt > now
-        ? params.rateLimitResetsAt - now + 30_000
-        : 0;
-    const effectiveBackoffMs = Math.max(retryBackoffMs, rateLimitDeferralMs);
-    // Guardian self-heal: track consecutive iterations that produced no
-    // upstream cost. Any positive cost clears the counter; otherwise it
-    // accumulates regardless of `params.status` (transient failures, hard
-    // failures, and "successful" turns that somehow billed zero all count
-    // as "this Session isn't producing useful work"). When we cross the
-    // threshold, drop the guardian binding so the next iteration spawns a
-    // brand-new Session — guards against the field-observed 429-storm
-    // pattern where a loop kept resuming the same dead Session for hours.
-    const nextConsecutiveZeroCost = runCost > 0
-      ? 0
-      : (existing.consecutiveZeroCostIterations ?? 0) + 1;
-    const shouldForgetGuardian = nextConsecutiveZeroCost >= GUARDIAN_FORGET_THRESHOLD;
+    // Failure classification, backoff, daily-cost rollup, stop-reason
+    // precedence, and the guardian self-heal threshold are one pure decision —
+    // see agentLoopTerminalOutcome. This method only applies the result.
+    const outcome = computeAgentLoopTerminalOutcome(existing, params, now);
+    const {
+      shouldBlock,
+      blockedReason,
+      stopReason,
+      runCost,
+      newTodayCostUsd,
+      newTotalCostUsd,
+      effectiveBackoffMs,
+      nextConsecutiveFailures,
+      nextConsecutiveZeroCost,
+      shouldForgetGuardian,
+    } = outcome;
     if (shouldForgetGuardian && this.forgetGuardian) {
       try {
         await this.forgetGuardian(existing.id);
@@ -948,7 +786,7 @@ export class AgentLoopCoordinator {
       consecutiveZeroCostIterations: shouldForgetGuardian ? 0 : nextConsecutiveZeroCost,
       memoryUpdatedAt: persistedMemory ? now : existing.memoryUpdatedAt,
       todayCostUsd: newTodayCostUsd,
-      todayCostWindowStartedAt: dailyCostCounter.todayCostWindowStartedAt,
+      todayCostWindowStartedAt: outcome.todayCostWindowStartedAt,
       totalCostUsd: newTotalCostUsd,
       lastRunCostUsd: runCost > 0 ? runCost : existing.lastRunCostUsd,
       recentEvents: completedJobId

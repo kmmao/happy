@@ -13,6 +13,7 @@ import { Socket } from "socket.io";
 import { z } from "zod";
 import { log } from "@/utils/log";
 import { supervisorRunStatusApply } from "@/app/api/supervisor/supervisorRunStatusApply";
+import { registerSocketEvent } from "./registerSocketEvent";
 
 const supervisorActionSchema = z.object({
     severity: z.enum(["critical", "high", "medium", "low"]),
@@ -43,18 +44,13 @@ export function supervisorRunStatusHandler(
     socket: Socket,
     userId: string,
 ): void {
-    socket.on("supervisor-run-status", async (rawData: unknown) => {
-        try {
-            const parsed = supervisorRunStatusSchema.safeParse(rawData);
-            if (!parsed.success) {
-                log(
-                    { module: "supervisor", level: "warn" },
-                    `supervisor-run-status: invalid data: ${parsed.error.message}`,
-                );
-                return;
-            }
-            const data = parsed.data;
-
+    registerSocketEvent({
+        socket,
+        userId,
+        event: "supervisor-run-status",
+        schema: supervisorRunStatusSchema,
+        module: "supervisor",
+        handler: async (data) => {
             const result = await supervisorRunStatusApply({
                 userId,
                 // The daemon socket is authenticated as its machine by the
@@ -88,11 +84,6 @@ export function supervisorRunStatusHandler(
                 { module: "supervisor" },
                 `supervisor-run-status: run ${data.runId} → ${data.status}${data.actions ? ` (${data.actions.length} actions)` : ""}`,
             );
-        } catch (error) {
-            log(
-                { module: "supervisor", level: "error" },
-                `supervisor-run-status handler error: ${error}`,
-            );
-        }
+        },
     });
 }

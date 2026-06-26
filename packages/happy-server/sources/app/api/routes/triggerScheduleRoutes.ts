@@ -4,7 +4,7 @@ import { z } from "zod";
 import { assertOwnedMachine, assertOwnedProject, ownedTriggerSchedule } from "../ownership";
 import { log } from "@/utils/log";
 import { emitSyncUpdate } from "@/app/events/syncUpdate";
-import { CronExpressionParser } from "cron-parser";
+import { cronNextRunAt } from "@/modules/cronNextRunAt";
 
 const TaskPrioritySchema = z.enum(["urgent", "user", "background"]);
 
@@ -47,15 +47,6 @@ const QueryTriggerSchedulesSchema = z.object({
     offset: z.coerce.number().int().min(0).default(0),
 });
 
-/** Compute next run time from a cron expression. Returns null if invalid. */
-function computeNextRunAt(cronExpression: string): Date | null {
-    try {
-        const interval = CronExpressionParser.parse(cronExpression);
-        return interval.next().toDate();
-    } catch {
-        return null;
-    }
-}
 
 /**
  * TriggerSchedule CRUD routes.
@@ -74,7 +65,7 @@ export function triggerScheduleRoutes(app: Fastify) {
             const { machineId, projectId, name, prompt, cronExpression, priority, skillIds, profileId, modelMode, effort } = request.body;
 
             // Validate cron expression
-            const nextRunAt = computeNextRunAt(cronExpression);
+            const nextRunAt = cronNextRunAt(cronExpression);
             if (!nextRunAt) {
                 return reply.code(400).send({ error: "Invalid cron expression" });
             }
@@ -184,7 +175,7 @@ export function triggerScheduleRoutes(app: Fastify) {
             if (effort !== undefined) data.effort = effort;
 
             if (cronExpression !== undefined) {
-                const nextRunAt = computeNextRunAt(cronExpression);
+                const nextRunAt = cronNextRunAt(cronExpression);
                 if (!nextRunAt) {
                     return reply.code(400).send({ error: "Invalid cron expression" });
                 }
@@ -223,7 +214,7 @@ export function triggerScheduleRoutes(app: Fastify) {
 
             if (newEnabled) {
                 // Re-enable: compute next run time
-                const nextRunAt = computeNextRunAt(schedule.cronExpression);
+                const nextRunAt = cronNextRunAt(schedule.cronExpression);
                 if (!nextRunAt) {
                     return reply.code(400).send({ error: "Stored cron expression is invalid" });
                 }

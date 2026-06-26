@@ -5,6 +5,7 @@ import { stat, mkdir } from "fs/promises";
 import { dirname, join, resolve, basename } from "path";
 import { homedir } from "os";
 import { RpcHandlerManager } from "../../api/rpc/RpcHandlerManager";
+import { parseHostEntry, parseCloneCoordinates, resolveCloneUrl } from "./gitUrl";
 
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
@@ -113,55 +114,6 @@ function repoDisplayName(repoPath: string): string {
 }
 
 const CACHE_TTL = 120_000; // 120 seconds
-
-function parseHostEntry(host: string): {
-  bare: string;
-  protocol: string | null;
-} {
-  const match = host.match(/^(https?):\/\/(.+)/);
-  if (match) {
-    return { bare: match[2].replace(/\/$/, ""), protocol: match[1] };
-  }
-  return { bare: host.replace(/\/$/, ""), protocol: null };
-}
-
-function parseCloneCoordinates(repoUrl: string): {
-  host: string;
-  owner: string;
-  repo: string;
-} | null {
-  const trimmed = repoUrl.trim();
-  const sshMatch = trimmed.match(/^git@([^:]+):([^/]+)\/([^/.]+?)(?:\.git)?$/);
-  if (sshMatch) {
-    return { host: sshMatch[1], owner: sshMatch[2], repo: sshMatch[3] };
-  }
-
-  const sshUrlMatch = trimmed.match(/^ssh:\/\/[^@]+@([^/]+)\/([^/]+)\/([^/.]+?)(?:\.git)?$/);
-  if (sshUrlMatch) {
-    return { host: sshUrlMatch[1], owner: sshUrlMatch[2], repo: sshUrlMatch[3] };
-  }
-
-  const httpsMatch = trimmed.match(/^https?:\/\/([^/]+)\/([^/]+)\/([^/.]+?)(?:\.git)?$/);
-  if (httpsMatch) {
-    return { host: httpsMatch[1], owner: httpsMatch[2], repo: httpsMatch[3] };
-  }
-
-  return null;
-}
-
-function resolveCloneUrl(repoUrl: string, configuredHost?: string): string {
-  if (/^https?:\/\//.test(repoUrl)) {
-    return repoUrl;
-  }
-
-  const coords = parseCloneCoordinates(repoUrl);
-  if (!coords) return repoUrl;
-
-  const hostEntry = configuredHost ? parseHostEntry(configuredHost) : null;
-  const protocol = hostEntry?.protocol ?? "https";
-  const bareHost = hostEntry?.bare ?? coords.host;
-  return `${protocol}://${bareHost}/${coords.owner}/${coords.repo}.git`;
-}
 
 function buildCloneAuthEnv(
   provider: "github" | "gitea" | undefined,

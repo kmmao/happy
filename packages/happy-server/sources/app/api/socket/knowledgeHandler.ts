@@ -11,6 +11,7 @@ import { emitSyncEphemeral } from "@/app/events/syncEphemeral";
 import { inTx } from "@/storage/inTx";
 import { addRelations, supersedeEntry, type KnowledgeRelationType } from "@/modules/knowledgeRelation";
 import { resolveKnowledgeConfig } from "@/modules/knowledgeConfigResolver";
+import { rankKnowledgeByContextHints } from "@/modules/knowledgeRanking";
 import {
     applyTurnHit,
     getEvictedKnowledgeIds,
@@ -255,7 +256,7 @@ export function knowledgeHandler(userId: string, socket: Socket) {
 
             let entries;
             if (contextHints && contextHints.length > 0) {
-                // Keyword-based relevance scoring
+                // Keyword-based relevance scoring (policy lives in knowledgeRanking).
                 const allActive = await db.projectKnowledge.findMany({
                     where: {
                         projectId,
@@ -265,16 +266,7 @@ export function knowledgeHandler(userId: string, socket: Socket) {
                     orderBy: [{ pinned: "desc" }, { createdAt: "desc" }],
                     take: 100,
                 });
-                const scored = allActive.map((e) => {
-                    const text = `${e.title} ${e.tags} ${e.content}`.toLowerCase();
-                    const score = contextHints.reduce(
-                        (acc: number, hint: string) => acc + (text.includes(hint.toLowerCase()) ? 1 : 0),
-                        0,
-                    );
-                    return { entry: e, score };
-                });
-                scored.sort((a, b) => b.score - a.score || b.entry.createdAt.getTime() - a.entry.createdAt.getTime());
-                entries = scored.slice(0, entryLimit).map((s) => s.entry);
+                entries = rankKnowledgeByContextHints(allActive, contextHints, entryLimit);
             } else {
                 entries = await db.projectKnowledge.findMany({
                     where: {

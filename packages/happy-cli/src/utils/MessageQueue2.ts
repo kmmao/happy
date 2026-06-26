@@ -81,12 +81,16 @@ const DEFAULT_STALL_THRESHOLD_MS = 5 * 60_000;
 const DEFAULT_WATCHDOG_INTERVAL_MS = 60_000;
 
 export class MessageQueue2<T> {
-  public queue: QueueItem<T>[] = [];
+  // Internal storage and the mode hasher are implementation, not interface:
+  // every caller drives the queue through push/unshift/collect/take. Keeping
+  // them private stops production code reaching past the seam into the raw
+  // array or swapping the hasher mid-flight.
+  private queue: QueueItem<T>[] = [];
   private waiter: ((hasMessages: boolean) => void) | null = null;
   private newMessageWaiters: Array<(hasMessages: boolean) => void> = [];
   private closed = false;
   private onMessageHandler: ((message: string, mode: T) => void) | null = null;
-  modeHasher: (mode: T) => string;
+  private readonly modeHasher: (mode: T) => string;
 
   // Stall watchdog state. lastConsumedAt is the wall-clock time of the most
   // recent successful collectBatch / tryTakeForMidTurn; stallReported is the

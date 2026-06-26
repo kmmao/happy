@@ -134,7 +134,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useUnistyles } from "react-native-unistyles";
-import { Message, ToolCall } from "@/sync/typesMessage";
+import { resolvePendingPermission } from "./pendingPermission";
 import { hasPendingAskUserQuestion } from "@/sync/messageQueries";
 import { PermissionSheet } from "@/components/tools/PermissionSheet";
 import {
@@ -159,12 +159,6 @@ import { getReasoningSummaryLabels } from "@/components/reasoningEffort";
 import { hackMode } from "@/sync/modeHacks";
 
 
-type PendingPermissionInfo = {
-  toolName: string;
-  toolInput: any;
-  permission: NonNullable<ToolCall["permission"]>;
-};
-
 // Stable empty array reference for Zustand selectors — avoids returning a fresh
 // `[]` on every render, which would defeat the default Object.is equality check
 // and trigger an infinite re-render loop.
@@ -182,21 +176,6 @@ const EMPTY_PENDING_QUEUE: ReadonlyArray<{
 // SBOX_FATAL_MEMORY_EXCEEDED). Start with a small window on web; "load older" pages
 // the rest back in on demand. Native keeps the full window.
 const INITIAL_DISPLAY_LIMIT = Platform.OS === "web" ? 500 : MAX_DISPLAY_MESSAGES;
-
-function findPendingPermission(messages: readonly Message[]): PendingPermissionInfo | null {
-  for (const msg of messages) {
-    if (msg.kind !== "tool-call") continue;
-    const tool = msg.tool;
-    if (tool.permission?.status === "pending") {
-      return { toolName: tool.name, toolInput: tool.input, permission: tool.permission };
-    }
-    if (msg.children.length > 0) {
-      const found = findPendingPermission(msg.children);
-      if (found) return found;
-    }
-  }
-  return null;
-}
 
 export const SessionView = React.memo((props: { id: string }) => {
   const sessionId = props.id;
@@ -1019,27 +998,15 @@ function SessionViewInner({
   const requiresAction = session.sdkSessionState === "requires_action";
   const hasPendingPermission = sessionStatus.state === "permission_required";
   const [showPermissionSheet, setShowPermissionSheet] = React.useState(false);
-  const pendingPermission = React.useMemo(() => {
-    if (!hasPendingPermission) return null;
-    // Prefer agentState.requests — available even when the permission message
-    // has scrolled past the MAX_DISPLAY_MESSAGES pagination window.
-    const requests = session.agentState?.requests;
-    if (requests) {
-      const entries = Object.entries(requests);
-      const entry =
-        entries.find(([, req]) => req.tool === "AskUserQuestion") ?? entries[0];
-      if (entry) {
-        const [permId, req] = entry;
-        return {
-          toolName: req.tool,
-          toolInput: req.arguments,
-          permission: { id: permId, status: "pending" as const },
-        };
-      }
-    }
-    // Fallback: search the visible messages tree
-    return findPendingPermission(messages);
-  }, [hasPendingPermission, session.agentState?.requests, messages]);
+  const pendingPermission = React.useMemo(
+    () =>
+      resolvePendingPermission({
+        hasPendingPermission,
+        requests: session.agentState?.requests,
+        messages,
+      }),
+    [hasPendingPermission, session.agentState?.requests, messages],
+  );
 
   // Auto-close the sheet when the permission is resolved
   React.useEffect(() => {

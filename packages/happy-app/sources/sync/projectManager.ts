@@ -91,7 +91,7 @@ export interface Project {
 /**
  * In-memory project manager
  */
-class ProjectManager {
+export class ProjectManager {
   private projects: Map<string, Project> = new Map();
   private projectKeyToId: Map<string, string> = new Map();
   private sessionToProject: Map<string, string> = new Map();
@@ -313,6 +313,19 @@ class ProjectManager {
   }
 
   /**
+   * Single owner of the git-status mutation invariant: set the status and bump
+   * BOTH `lastGitStatusUpdate` and the project's `updatedAt`. Every git-status
+   * mutation path (by key, by id, by session, clear) routes through here so a
+   * new path cannot forget a timestamp and leave the App reading a stale status.
+   */
+  private applyGitStatus(project: Project, gitStatus: GitStatus | null): void {
+    const now = Date.now();
+    project.gitStatus = gitStatus;
+    project.lastGitStatusUpdate = now;
+    project.updatedAt = now;
+  }
+
+  /**
    * Update git status for a project (identified by project key)
    */
   updateProjectGitStatus(
@@ -332,10 +345,7 @@ class ProjectManager {
       return;
     }
 
-    // Update git status and timestamp
-    project.gitStatus = gitStatus;
-    project.lastGitStatusUpdate = Date.now();
-    project.updatedAt = Date.now();
+    this.applyGitStatus(project, gitStatus);
   }
 
   /**
@@ -350,9 +360,7 @@ class ProjectManager {
       return;
     }
 
-    project.gitStatus = gitStatus;
-    project.lastGitStatusUpdate = Date.now();
-    project.updatedAt = Date.now();
+    this.applyGitStatus(project, gitStatus);
   }
 
   /**
@@ -369,9 +377,7 @@ class ProjectManager {
   clearProjectGitStatus(projectId: string): void {
     const project = this.projects.get(projectId);
     if (project) {
-      project.gitStatus = null;
-      project.lastGitStatusUpdate = Date.now();
-      project.updatedAt = Date.now();
+      this.applyGitStatus(project, null);
     }
   }
 

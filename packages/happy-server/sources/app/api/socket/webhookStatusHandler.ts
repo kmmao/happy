@@ -10,6 +10,7 @@ import { z } from "zod";
 import { db } from "@/storage/db";
 import { log } from "@/utils/log";
 import { emitSyncEphemeral } from "@/app/events/syncEphemeral";
+import { registerSocketEvent } from "./registerSocketEvent";
 
 const webhookStatusSchema = z.object({
   webhookEventId: z.string().min(1),
@@ -19,18 +20,13 @@ const webhookStatusSchema = z.object({
 });
 
 export function webhookStatusHandler(socket: Socket, userId: string): void {
-  socket.on("webhook-status", async (rawData: unknown) => {
-    try {
-      const parsed = webhookStatusSchema.safeParse(rawData);
-      if (!parsed.success) {
-        log(
-          { module: "webhook", level: "warn" },
-          `webhook-status: invalid data: ${parsed.error.message}`,
-        );
-        return;
-      }
-      const data = parsed.data;
-
+  registerSocketEvent({
+    socket,
+    userId,
+    event: "webhook-status",
+    schema: webhookStatusSchema,
+    module: "webhook",
+    handler: async (data) => {
       const event = await db.webhookEvent.findFirst({
         where: {
           id: data.webhookEventId,
@@ -102,11 +98,6 @@ export function webhookStatusHandler(socket: Socket, userId: string): void {
           });
         }
       }
-    } catch (error) {
-      log(
-        { module: "webhook", level: "error" },
-        `webhook-status handler error: ${error}`,
-      );
-    }
+    },
   });
 }

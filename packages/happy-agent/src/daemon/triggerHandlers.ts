@@ -10,6 +10,7 @@ import { tmpdir } from "os";
 import type { ResolvedRuntimeProfile } from "@kmmao/happy-wire";
 import { logger } from "../logger";
 import { spawnSession } from "./spawnSession";
+import { bindJobToSessionExit } from "./bindJobToSessionExit";
 import type { MachineClient } from "../api/machineClient";
 import type { AutomationScheduler } from "./scheduler";
 
@@ -151,15 +152,13 @@ export function handleWebhookTrigger(
         throw new Error(msg);
       }
 
-      // Register exit handler for scheduler lifecycle
-      const tracked = (await import("./trackedSessions")).getTrackedSession(result.pid);
-      if (tracked?.childProcess) {
-        tracked.childProcess.on("exit", (code) => {
-          if (code === 0) scheduler.markCompleted(jobId);
-          else scheduler.markFailed(jobId, `exit code ${code}`);
-          client.emitWebhookStatus({ webhookEventId: data.webhookEventId, status: code === 0 ? "completed" : "failed" });
-        });
-      }
+      await bindJobToSessionExit({
+        scheduler,
+        jobId,
+        pid: result.pid,
+        onExit: ({ status }) =>
+          client.emitWebhookStatus({ webhookEventId: data.webhookEventId, status }),
+      });
 
       return { pid: result.pid };
     },
@@ -206,15 +205,13 @@ export function handleSupervisorTrigger(
         throw new Error(msg);
       }
 
-      const tracked = (await import("./trackedSessions")).getTrackedSession(result.pid);
-      if (tracked?.childProcess) {
-        tracked.childProcess.on("exit", (code) => {
-          const status = code === 0 ? "completed" : "failed";
-          if (code === 0) scheduler.markCompleted(jobId);
-          else scheduler.markFailed(jobId, `exit code ${code}`);
-          client.emitSupervisorRunStatus({ runId: data.runId, projectId: data.projectId, status });
-        });
-      }
+      await bindJobToSessionExit({
+        scheduler,
+        jobId,
+        pid: result.pid,
+        onExit: ({ status }) =>
+          client.emitSupervisorRunStatus({ runId: data.runId, projectId: data.projectId, status }),
+      });
 
       return { pid: result.pid };
     },
@@ -270,13 +267,7 @@ export function handleTaskTrigger(
         throw new Error(result.type === "error" ? result.errorMessage : "Directory creation not approved");
       }
 
-      const tracked = (await import("./trackedSessions")).getTrackedSession(result.pid);
-      if (tracked?.childProcess) {
-        tracked.childProcess.on("exit", (code) => {
-          if (code === 0) scheduler.markCompleted(jobId);
-          else scheduler.markFailed(jobId, `exit code ${code}`);
-        });
-      }
+      await bindJobToSessionExit({ scheduler, jobId, pid: result.pid });
 
       return { pid: result.pid };
     },

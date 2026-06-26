@@ -14,6 +14,7 @@ import { logger } from "../logger";
 import type { AutomationScheduler } from "./scheduler";
 import type { GuardianSessionRegistry } from "./guardianRegistry";
 import { spawnSession } from "./spawnSession";
+import { bindJobToSessionExit } from "./bindJobToSessionExit";
 import { writeFile, mkdir } from "fs/promises";
 import { join } from "path";
 import { tmpdir } from "os";
@@ -273,16 +274,13 @@ export class AgentLoopCoordinator {
           throw new Error(result.type === "error" ? result.errorMessage : "Directory not approved");
         }
 
-        // Wire exit handler
-        const tracked = (await import("./trackedSessions")).getTrackedSession(result.pid);
-        if (tracked?.childProcess) {
-          tracked.childProcess.on("exit", (code) => {
-            const status = code === 0 ? "completed" : "failed";
-            coordinator.onJobTerminal(loopId, status, code !== 0 ? `exit code ${code}` : undefined);
-            if (code === 0) coordinator.scheduler.markCompleted(jobId);
-            else coordinator.scheduler.markFailed(jobId, `exit code ${code}`);
-          });
-        }
+        await bindJobToSessionExit({
+          scheduler: coordinator.scheduler,
+          jobId,
+          pid: result.pid,
+          onExit: ({ status, code }) =>
+            coordinator.onJobTerminal(loopId, status, code !== 0 ? `exit code ${code}` : undefined),
+        });
 
         return { pid: result.pid };
       },

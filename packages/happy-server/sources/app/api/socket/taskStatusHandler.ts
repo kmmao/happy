@@ -9,6 +9,7 @@ import { log } from "@/utils/log";
 import { inboxCreate } from "@/modules/inboxCreate";
 import { normalizeTaskStatusReport } from "@/modules/taskStatusLogic";
 import { taskStatusApply } from "@/app/api/task/taskStatusApply";
+import { registerSocketEvent } from "./registerSocketEvent";
 
 const taskStatusSchema = z.object({
     taskId: z.string().min(1),
@@ -21,17 +22,13 @@ const taskStatusSchema = z.object({
 
 
 export function taskStatusHandler(socket: Socket, userId: string): void {
-    socket.on("task-status", async (rawData: unknown) => {
-        try {
-            const parsed = taskStatusSchema.safeParse(rawData);
-            if (!parsed.success) {
-                log(
-                    { module: "task", level: "warn" },
-                    `task-status: invalid data: ${parsed.error.message}`,
-                );
-                return;
-            }
-            const data = parsed.data;
+    registerSocketEvent({
+        socket,
+        userId,
+        event: "task-status",
+        schema: taskStatusSchema,
+        module: "task",
+        handler: async (data) => {
             const normalized = normalizeTaskStatusReport({
                 status: data.status,
                 outcome: data.outcome,
@@ -87,11 +84,6 @@ export function taskStatusHandler(socket: Socket, userId: string): void {
             }
 
             log({ module: "task" }, `task-status: task ${data.taskId} → ${resolvedStatus}`);
-        } catch (error) {
-            log(
-                { module: "task", level: "error" },
-                `task-status handler error: ${error}`,
-            );
-        }
+        },
     });
 }

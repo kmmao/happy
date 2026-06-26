@@ -10,6 +10,7 @@ import { z } from "zod";
 import { db } from "@/storage/db";
 import { log } from "@/utils/log";
 import { emitSyncEphemeral } from "@/app/events/syncEphemeral";
+import { registerSocketEvent } from "./registerSocketEvent";
 
 const interAgentMessageSchema = z.object({
     fromSessionId: z.string().min(1),
@@ -18,18 +19,13 @@ const interAgentMessageSchema = z.object({
 });
 
 export function interAgentMessageHandler(socket: Socket, userId: string): void {
-    socket.on("session:message", async (rawData: unknown) => {
-        try {
-            const parsed = interAgentMessageSchema.safeParse(rawData);
-            if (!parsed.success) {
-                log(
-                    { module: "inter-agent", level: "warn" },
-                    `session:message: invalid payload: ${parsed.error.message}`,
-                );
-                return;
-            }
-            const { fromSessionId, toSessionId, message } = parsed.data;
-
+    registerSocketEvent({
+        socket,
+        userId,
+        event: "session:message",
+        schema: interAgentMessageSchema,
+        module: "inter-agent",
+        handler: async ({ fromSessionId, toSessionId, message }) => {
             // Verify both sessions belong to this user
             const [fromSession, toSession] = await Promise.all([
                 db.session.findFirst({
@@ -74,11 +70,6 @@ export function interAgentMessageHandler(socket: Socket, userId: string): void {
                 toSessionId,
                 message,
             });
-        } catch (error) {
-            log(
-                { module: "inter-agent", level: "error" },
-                `session:message handler error: ${error}`,
-            );
-        }
+        },
     });
 }

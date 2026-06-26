@@ -9,6 +9,7 @@ import { z } from "zod";
 import { db } from "@/storage/db";
 import { log } from "@/utils/log";
 import { emitSyncEphemeral } from "@/app/events/syncEphemeral";
+import { registerSocketEvent } from "./registerSocketEvent";
 
 const sessionEventSchema = z.object({
     sessionId: z.string().min(1),
@@ -21,18 +22,13 @@ const sessionEventSchema = z.object({
 });
 
 export function sessionEventHandler(socket: Socket, userId: string): void {
-    socket.on("session-event", async (rawData: unknown) => {
-        try {
-            const parsed = sessionEventSchema.safeParse(rawData);
-            if (!parsed.success) {
-                log(
-                    { module: "timeline", level: "warn" },
-                    `session-event: invalid data: ${parsed.error.message}`,
-                );
-                return;
-            }
-            const data = parsed.data;
-
+    registerSocketEvent({
+        socket,
+        userId,
+        event: "session-event",
+        schema: sessionEventSchema,
+        module: "timeline",
+        handler: async (data) => {
             // Verify session belongs to user
             const session = await db.session.findFirst({
                 where: { id: data.sessionId, accountId: userId },
@@ -67,11 +63,6 @@ export function sessionEventHandler(socket: Socket, userId: string): void {
                     createdAt: event.createdAt.getTime(),
                 },
             });
-        } catch (error) {
-            log(
-                { module: "timeline", level: "error" },
-                `session-event handler error: ${error}`,
-            );
-        }
+        },
     });
 }

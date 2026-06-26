@@ -26,6 +26,14 @@ export interface TunnelProvider {
 
   /** Toggle public/private access (not all providers support this) */
   toggleAccess?(entry: TunnelEntry, publicAccess: boolean): Promise<TunnelOpResult>;
+
+  /**
+   * Renew time-limited tunnel leases (not all providers support this).
+   * Providers whose mappings expire — e.g. UPnP port mappings — declare this
+   * so TunnelManager renews them periodically. Providers with permanent
+   * mappings omit it. Should never throw; the manager logs and continues.
+   */
+  renewLeases?(): Promise<void>;
 }
 
 // ---------------------------------------------------------------------------

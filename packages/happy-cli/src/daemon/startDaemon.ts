@@ -87,6 +87,7 @@ import {
   onSessionFault as onSessionFaultAction,
 } from "./startDaemonSessionWebhook";
 import { createProcessTreeKiller } from "./daemonProcessTree";
+import { runAutomationWatchdog as runAutomationWatchdogAction } from "./daemonAutomationWatchdog";
 
 export { initialMachineMetadata };
 
@@ -343,76 +344,16 @@ export async function startDaemon(): Promise<void> {
       }
     };
 
-    const runAutomationWatchdog = async () => {
-      if (!automationScheduler) {
-        return;
-      }
-
-      const maxRuntimeMs = parseInt(
-        process.env.HAPPY_AUTOMATION_WATCHDOG_MAX_RUNTIME_MS ?? `${45 * 60_000}`,
-      );
-      const maxInactivityMs = parseInt(
-        process.env.HAPPY_AUTOMATION_WATCHDOG_MAX_INACTIVITY_MS ?? `${10 * 60_000}`,
-      );
-      if (maxRuntimeMs <= 0 || maxInactivityMs <= 0) {
-        return;
-      }
-
-      const now = Date.now();
-      for (const job of automationScheduler.getJobsSnapshot()) {
-        const isSupervisor = job.kind === "supervisor";
-        const isTask = job.kind === "task";
-        if (
-          (!isSupervisor && !isTask) ||
-          job.status !== "running" ||
-          (isSupervisor && job.payload.trigger === "fix") ||
-          !job.sessionId
-        ) {
-          continue;
-        }
-
-        const trackedSession = findTrackedSessionByHappySessionId(job.sessionId);
-        if (!trackedSession) {
-          continue;
-        }
-
-        const runtimeSince = trackedSession.recoveredAt ?? trackedSession.startedAt ?? job.dispatchedAt ?? job.createdAt;
-        const activitySince =
-          trackedSession.lastActivityAt ??
-          trackedSession.lastOutputAt ??
-          trackedSession.recoveredAt ??
-          trackedSession.startedAt ??
-          job.dispatchedAt ??
-          job.createdAt;
-        const runtimeMs = now - runtimeSince;
-        const inactivityMs = now - activitySince;
-        const inactivityExceeded = !trackedSession.recoveredFromIndex && inactivityMs > maxInactivityMs;
-        if (runtimeMs <= maxRuntimeMs && !inactivityExceeded) {
-          continue;
-        }
-
-        const failureReason = runtimeMs > maxRuntimeMs
-          ? `Automation watchdog aborted session after ${formatDurationMs(runtimeMs)} of runtime`
-          : `Automation watchdog aborted session after ${formatDurationMs(inactivityMs)} of inactivity`;
-        logger.warn(
-          `[DAEMON RUN] Automation watchdog stopping ${job.kind} session ${job.sessionId} for job ${job.id}: ${failureReason}`,
-        );
-        if (isSupervisor) {
-          await guardianSessionRegistry.forgetSession(job.sessionId).catch((error) => {
-            logger.debug(`[DAEMON RUN] Failed to forget guardian session ${job.sessionId}: ${error}`);
-          });
-        }
-        requestTrackedSessionTermination(
-          trackedSession.pid,
-          trackedSession,
-          {
-            reason: `watchdog:${job.id}`,
-            terminalStatus: "failed",
-            terminalError: failureReason,
-          },
-        );
-      }
-    };
+    // Thin delegator — watchdog policy + effects live in the extracted,
+    // testable daemonAutomationWatchdog seam.
+    const runAutomationWatchdog = () =>
+      runAutomationWatchdogAction({
+        scheduler: automationScheduler,
+        resolveSession: findTrackedSessionByHappySessionId,
+        formatDurationMs,
+        forgetGuardianSession: (sessionId) => guardianSessionRegistry.forgetSession(sessionId),
+        requestTermination: requestTrackedSessionTermination,
+      });
 
     const getCurrentChildren = () => Array.from(pidToTrackedSession.values());
 

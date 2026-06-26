@@ -3,8 +3,8 @@ import { db } from "@/storage/db";
 import { inTx } from "@/storage/inTx";
 import { log } from "@/utils/log";
 import { emitSyncUpdate } from "@/app/events/syncUpdate";
-import { CronExpressionParser } from "cron-parser";
 import { inboxCreate } from "./inboxCreate";
+import { cronNextRunAt } from "./cronNextRunAt";
 import {
     buildTaskCreateData,
     dispatchTaskTrigger,
@@ -13,18 +13,6 @@ import {
 } from "@/app/api/task/taskCreate";
 
 const TERMINAL_TASK_STATUSES = new Set(["completed", "failed", "cancelled"]);
-
-/**
- * Compute next run time from a cron expression, starting after `currentDate`.
- */
-function computeNextRunAt(cronExpression: string, currentDate: Date): Date | null {
-    try {
-        const interval = CronExpressionParser.parse(cronExpression, { currentDate });
-        return interval.next().toDate();
-    } catch {
-        return null;
-    }
-}
 
 /**
  * Check for TriggerSchedules that are due and create Tasks.
@@ -112,7 +100,7 @@ export async function checkAndTriggerSchedules(
                 }
             }
 
-            const nextRunAt = computeNextRunAt(schedule.cronExpression, now);
+            const nextRunAt = cronNextRunAt(schedule.cronExpression, now);
             if (!nextRunAt) {
                 log(
                     { module: "trigger", level: "error" },

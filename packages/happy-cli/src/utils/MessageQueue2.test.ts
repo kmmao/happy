@@ -474,8 +474,11 @@ describe("MessageQueue2", () => {
     queue.push("message1", { type: "A" });
     queue.push("message2", { type: "A" });
 
-    // Manually add an isolated message without clearing (simulating edge case)
-    queue.queue.push({
+    // Manually add an isolated message without clearing (simulating an edge
+    // case the public API never produces — pushIsolateAndClear clears first).
+    // Reach past the seam deliberately to exercise collectBatch's defensive
+    // "stop at a mid-queue isolate" branch; `queue` is private by design.
+    (queue as unknown as { queue: Array<Record<string, unknown>> }).queue.push({
       message: "isolated",
       mode: { type: "A" },
       modeHash: "A",

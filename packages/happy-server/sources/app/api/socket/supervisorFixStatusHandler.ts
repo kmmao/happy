@@ -12,6 +12,7 @@ import { emitSyncEphemeral } from "@/app/events/syncEphemeral";
 import { activityCache } from "@/app/presence/sessionCache";
 import { pushSupervisorNotification } from "@/modules/pushSend";
 import { onFixCompleted as loopOnFixCompleted } from "@/modules/supervisorLoopEngine";
+import { registerSocketEvent } from "./registerSocketEvent";
 
 const supervisorFixStatusSchema = z.object({
     actionId: z.string().min(1),
@@ -25,18 +26,13 @@ export function supervisorFixStatusHandler(
     socket: Socket,
     userId: string,
 ): void {
-    socket.on("supervisor-fix-status", async (rawData: unknown) => {
-        try {
-            const parsed = supervisorFixStatusSchema.safeParse(rawData);
-            if (!parsed.success) {
-                log(
-                    { module: "supervisor", level: "warn" },
-                    `supervisor-fix-status: invalid data: ${parsed.error.message}`,
-                );
-                return;
-            }
-            const data = parsed.data;
-
+    registerSocketEvent({
+        socket,
+        userId,
+        event: "supervisor-fix-status",
+        schema: supervisorFixStatusSchema,
+        module: "supervisor",
+        handler: async (data) => {
             // Verify the action belongs to this user and is approved
             const action = await db.supervisorAction.findFirst({
                 where: {
@@ -180,11 +176,6 @@ export function supervisorFixStatusHandler(
                     );
                 }
             }
-        } catch (error) {
-            log(
-                { module: "supervisor", level: "error" },
-                `supervisor-fix-status handler error: ${error}`,
-            );
-        }
+        },
     });
 }
