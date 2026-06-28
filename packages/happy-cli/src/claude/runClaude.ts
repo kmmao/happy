@@ -26,6 +26,7 @@ import { parseAutomationContextEnv } from "@/utils/parseAutomationContextEnv";
 import { getEnvironmentInfo } from "@/ui/doctor";
 import { configuration } from "@/configuration";
 import { notifyDaemonSessionFault, notifyDaemonSessionStarted } from "@/daemon/controlClient";
+import { TRANSIENT_ERROR_TYPES } from "@/automation/agentLoopTerminalOutcome";
 import { startSessionHeartbeat } from "@/daemon/sessionHeartbeat";
 import { initialMachineMetadata } from "@/daemon/run";
 import { startHappyServer } from "@/claude/utils/startHappyServer";
@@ -512,12 +513,17 @@ export async function runClaude(
         ?? data.last_assistant_message
         ?? errorType
         ?? "Session stopped unexpectedly";
-      logger.debug(`[START] StopFailure hook: ${errorMsg}`);
+      // Transient = AgentLoopCoordinator already auto-retries this category
+      // (rate_limit / overloaded / server_error) without burning the failure
+      // budget. Source of truth: agentLoopTerminalOutcome.TRANSIENT_ERROR_TYPES.
+      const isTransient = errorType !== undefined && TRANSIENT_ERROR_TYPES.has(errorType);
+      logger.debug(
+        `[START] StopFailure hook (transient=${isTransient}, errorType=${errorType ?? "none"}): ${errorMsg}`,
+      );
       if (currentSession) {
-        currentSession.client.sendSessionEvent({
-          type: "message",
-          message: `StopFailure: ${errorMsg}`,
-        });
+        // agentState is always updated — the App's StopFailureBanner reads
+        // `session.agentState?.stopFailure` and renders a prominent banner
+        // (restart button + billing_error / rate_limit contextual hints).
         currentSession.client.updateAgentState((s) => ({
           ...s,
           stopFailure: {
@@ -526,6 +532,16 @@ export async function runClaude(
             lastAssistantMessage: data.last_assistant_message ?? null,
           },
         }));
+        // Permanent transcript message only for non-transient failures.
+        // For transient ones the loop self-heals every 5 min — pushing a
+        // permanent message each iteration would spam the transcript while
+        // the banner above already conveys the same state non-destructively.
+        if (!isTransient) {
+          currentSession.client.sendSessionEvent({
+            type: "message",
+            message: `StopFailure: ${errorMsg}`,
+          });
+        }
       }
       // Push the SDK-classified error category to the daemon out-of-band so
       // `onChildExited` can hand it to the AgentLoopCoordinator. Transient

@@ -1,5 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { computeAgentLoopTerminalOutcome } from "./agentLoopTerminalOutcome";
+import {
+  TRANSIENT_ERROR_TYPES,
+  computeAgentLoopTerminalOutcome,
+} from "./agentLoopTerminalOutcome";
 import type { AgentLoopDefinition } from "./AgentLoopStore";
 
 const NOW = 1_700_000_000_000;
@@ -105,5 +108,17 @@ describe("computeAgentLoopTerminalOutcome", () => {
     const out = computeAgentLoopTerminalOutcome(loop(), { status: "completed" }, NOW);
     expect(out.shouldBlock).toBe(false);
     expect(out.stopReason).toBeUndefined();
+  });
+});
+
+describe("TRANSIENT_ERROR_TYPES (public — consumed by runClaude StopFailure split)", () => {
+  it("includes the auto-retry categories and excludes permanent ones", () => {
+    expect(TRANSIENT_ERROR_TYPES.has("rate_limit")).toBe(true);
+    expect(TRANSIENT_ERROR_TYPES.has("overloaded")).toBe(true);
+    expect(TRANSIENT_ERROR_TYPES.has("server_error")).toBe(true);
+    expect(TRANSIENT_ERROR_TYPES.has("billing_error")).toBe(false);
+    expect(TRANSIENT_ERROR_TYPES.has("authentication_failed")).toBe(false);
+    expect(TRANSIENT_ERROR_TYPES.has("refusal")).toBe(false);
+    expect(TRANSIENT_ERROR_TYPES.has("invalid_request")).toBe(false);
   });
 });

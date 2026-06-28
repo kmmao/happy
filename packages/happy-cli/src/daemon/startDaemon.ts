@@ -64,6 +64,7 @@ import { detectTailscale, detectTailscaleServe } from "@/utils/tailscale";
 import { TunnelManager, TailscaleProvider, UpnpProvider, CaddyProvider } from "@/tunnel";
 import { createCodexHomeOverlay } from "@/codex-shared/codexHomeOverlay";
 import { filterGuiEnvironmentVariables, isTrustedProfileEnvironment } from "./profileEnvironmentTrust";
+import { OPERATOR_ONLY_ENV_VARS } from "./operatorOnlyEnvironment";
 import { normalizeResolvedRuntimeProfile } from "@kmmao/happy-wire";
 import { detectCliInstallInfo } from "./cliInstallInfo";
 import {
@@ -761,6 +762,37 @@ export async function startDaemon(): Promise<void> {
             ? { HAPPY_AUTOMATION_CONTEXT_JSON: JSON.stringify(automationContext) }
             : {}),
         };
+
+        // ── Env composition summary — one-line audit of what the spawn
+        // actually sees, grouped by source. Lets operators answer "why does
+        // ANTHROPIC_BASE_URL leak into my session?" without grepping for
+        // each `[DAEMON RUN] Loaded N env vars from profile ...` line. The
+        // operator-only callout below names the specific OPERATOR_ONLY_ENV_VARS
+        // keys that survived into the spawn, and which side (profile vs
+        // daemon shell) seeded them.
+        const operatorOnlyInFinal = Object.keys(finalSessionEnv)
+          .filter((k) => OPERATOR_ONLY_ENV_VARS.has(k))
+          .sort();
+        const isolationActive = shouldIsolateProfileFromDaemonDefaults({
+          profileId: options.profileId,
+          runtimeProfile,
+        });
+        logger.info(
+          `[DAEMON RUN] Env composition for spawn: ` +
+          `profile=${Object.keys(profileEnv).length}, ` +
+          `auth=${Object.keys(authEnv).length}, ` +
+          `daemonFallback=${Object.keys(filteredDaemonEnv).length}, ` +
+          `total=${Object.keys(finalSessionEnv).length}` +
+          (startupBashScript ? " (+ startup script — see line above)" : ""),
+        );
+        if (operatorOnlyInFinal.length > 0) {
+          logger.info(
+            `[DAEMON RUN] Operator-only env vars present in spawn: ${operatorOnlyInFinal.join(", ")}` +
+            (isolationActive
+              ? " (profile-provided; daemon shell isolated)"
+              : " (from daemon shell — attach a profileId to isolate)"),
+          );
+        }
 
         // Fail-fast validation: Check that any auth variables present are fully expanded
         // Only validate variables that are actually set (different agents need different auth)

@@ -1070,11 +1070,15 @@ export async function claudeRemote(opts: {
   // already inherited the env above; this only fixes our own process.env so
   // downstream code in the same process sees the profile values.
   if (opts.claudeEnvVars) {
-    Object.entries(opts.claudeEnvVars).forEach(([key, value]) => {
-      process.env[key] = value;
+    const claudeEnvVarKeys = Object.keys(opts.claudeEnvVars).sort();
+    claudeEnvVarKeys.forEach((key) => {
+      process.env[key] = opts.claudeEnvVars![key];
     });
+    // Key-list (not values) so an operator can correlate this side's
+    // process.env with the daemon-side `[DAEMON RUN] Env composition`
+    // line that explains where each key originated.
     logger.debug(
-      `[claudeRemote] Re-applied ${Object.keys(opts.claudeEnvVars).length} profile env vars after spawn`,
+      `[claudeRemote] Re-applied ${claudeEnvVarKeys.length} profile env vars to process.env: ${claudeEnvVarKeys.join(", ")}`,
     );
   }
 

@@ -35,7 +35,7 @@ const FAILURE_BACKOFF_FLOOR_MS = 5 * 60_000;
  * overload window resets. These do NOT burn the loop's `consecutiveFailures`
  * budget; anything not in the set counts as a real failure (the safe default).
  */
-const TRANSIENT_ERROR_TYPES = new Set<string>([
+export const TRANSIENT_ERROR_TYPES = new Set<string>([
   "rate_limit", // Anthropic 429
   "overloaded", // Anthropic 529
   "server_error", // upstream 5xx that isn't an explicit overload
