@@ -1,7 +1,6 @@
 import * as React from 'react';
 import { Message } from '@/sync/typesMessage';
-import { isHiddenTool } from '@/components/tools/toolVisibility';
-import { shouldHideToolCall } from '@/components/tools/shouldHideToolCall';
+import { isEffectivelyHiddenToolCall } from '@/components/tools/shouldHideToolCall';
 import { t } from '@/text';
 
 // Display item types for the grouped message list
@@ -97,14 +96,13 @@ function isStandaloneMessage(msg: Message): boolean {
 
 /** Returns true for messages that render as null and should be excluded from groups */
 function isInvisibleMessage(msg: Message): boolean {
-    // Hidden tools (ToolSearch, etc.) — toolVisibility is the source of truth
+    // A tool call that ToolView renders as null must also be excluded here,
+    // otherwise a lone hidden tool pads an empty "Used N tools" group whose
+    // expanded content is blank. The union of both hiding rules (internal
+    // plumbing tools + dynamically-hidden successful Happy MCP tools) lives in
+    // isEffectivelyHiddenToolCall — the one seam ToolView also crosses.
     if (msg.kind === 'tool-call') {
-        if (isHiddenTool(msg.tool.name)) return true;
-        // ToolView also dynamically renders successful happy MCP tools
-        // (change_title, update_session_summary, …) as null. Exclude them too,
-        // otherwise a lone hidden tool pads an empty "Used N tools" group whose
-        // expanded content is blank. Keep in sync with ToolView's hideToolCall.
-        return shouldHideToolCall(msg.tool);
+        return isEffectivelyHiddenToolCall(msg.tool);
     }
     // Thinking messages render as null in MessageView
     if (msg.kind === 'agent-text') {

@@ -71,6 +71,8 @@ const GEMINI_MODEL_FALLBACKS: ModelMode[] = [
 // Claude TUI parses to enable the 1M window — when the picked key ends in
 // `-1m`, so the picker key is the single source of truth for the tier.
 const CLAUDE_MODEL_PRICING: Record<string, string> = {
+  "sonnet-5": "$3/$15",
+  "sonnet-5-1m": "$3/$15",
   "sonnet": "$3/$15",
   "sonnet-1m": "$3/$15",
   "haiku": "$1/$5 \u00B7 200K",
@@ -204,6 +206,16 @@ export function getClaudeModelModes(): ModelMode[] {
       key: "default",
       name: "Default",
       description: "Use CLI configured model",
+    },
+    {
+      key: "sonnet-5",
+      name: "Sonnet 5",
+      description: "Sonnet 5 \u00B7 Newest Sonnet \u00B7 200K \u00B7 $3/$15",
+    },
+    {
+      key: "sonnet-5-1m",
+      name: "Sonnet 5 (1M)",
+      description: "Sonnet 5 \u00B7 1M context \u00B7 $3/$15",
     },
     {
       key: "sonnet",

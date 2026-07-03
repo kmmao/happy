@@ -211,6 +211,31 @@ export function createStoredPermission(
 }
 
 /**
+ * Apply a tool-result content block to a single tool message — but only when
+ * that message's tool is still `running`. This is the ONE place the tool-result
+ * state transition lives: running → completed/error, plus result, completedAt,
+ * and backend-supplied permission data. Both the main stream (Phase 3) and the
+ * sidechain path call this, so the transition cannot drift between them.
+ * Returns true iff the message was mutated.
+ */
+export function applyToolResultToMessage(
+    message: ReducerMessage | undefined,
+    c: { tool_use_id: string; is_error: boolean; content: any; permissions?: any },
+    completedAt: number,
+): boolean {
+    if (message?.tool?.state !== "running") {
+        return false;
+    }
+    message.tool.state = c.is_error ? "error" : "completed";
+    message.tool.result = c.content;
+    message.tool.completedAt = completedAt;
+    if (c.permissions) {
+        applyPermissionFromToolResult(message.tool, c.tool_use_id, c.permissions);
+    }
+    return true;
+}
+
+/**
  * Process a tool-result content block within a sidechain, updating both the
  * sidechain tool message and the main permission message if they exist.
  * Returns set of changed message IDs.
@@ -222,33 +247,17 @@ export function processSidechainToolResult(
 ): Set<string> {
     const changedIds = new Set<string>();
 
-    // Update the sidechain tool message
+    // Update the sidechain tool message (not tracked in changedIds — matches the
+    // prior behavior where only the main permission message was reported changed).
     const sidechainMessageId = maps.sidechainToolIdToMessageId.get(c.tool_use_id);
     if (sidechainMessageId) {
-        const sidechainMessage = maps.messages.get(sidechainMessageId);
-        if (sidechainMessage?.tool?.state === "running") {
-            sidechainMessage.tool.state = c.is_error ? "error" : "completed";
-            sidechainMessage.tool.result = c.content;
-            sidechainMessage.tool.completedAt = msgCreatedAt;
-            if (c.permissions) {
-                applyPermissionFromToolResult(sidechainMessage.tool, c.tool_use_id, c.permissions);
-            }
-        }
+        applyToolResultToMessage(maps.messages.get(sidechainMessageId), c, msgCreatedAt);
     }
 
-    // Also update the main permission message if it exists
+    // Also update the main permission message if it exists.
     const permissionMessageId = maps.toolIdToMessageId.get(c.tool_use_id);
-    if (permissionMessageId) {
-        const permissionMessage = maps.messages.get(permissionMessageId);
-        if (permissionMessage?.tool?.state === "running") {
-            permissionMessage.tool.state = c.is_error ? "error" : "completed";
-            permissionMessage.tool.result = c.content;
-            permissionMessage.tool.completedAt = msgCreatedAt;
-            if (c.permissions) {
-                applyPermissionFromToolResult(permissionMessage.tool, c.tool_use_id, c.permissions);
-            }
-            changedIds.add(permissionMessageId);
-        }
+    if (permissionMessageId && applyToolResultToMessage(maps.messages.get(permissionMessageId), c, msgCreatedAt)) {
+        changedIds.add(permissionMessageId);
     }
 
     return changedIds;

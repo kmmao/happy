@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { shouldHideToolCall } from "./shouldHideToolCall";
+import { shouldHideToolCall, isEffectivelyHiddenToolCall } from "./shouldHideToolCall";
 import type { ToolCall } from "@/sync/typesMessage";
 
 function createToolCall(overrides: Partial<ToolCall>): ToolCall {
@@ -72,6 +72,47 @@ describe("shouldHideToolCall", () => {
         createToolCall({
           name: "Bash",
           state: "completed",
+        }),
+      ),
+    ).toBe(false);
+  });
+});
+
+describe("isEffectivelyHiddenToolCall", () => {
+  it("hides internal plumbing tools (isHiddenTool rule)", () => {
+    // ToolSearch is never rendered but is NOT a Happy MCP tool, so only the
+    // name-based rule catches it — the composite must still return true.
+    expect(
+      isEffectivelyHiddenToolCall(createToolCall({ name: "ToolSearch", state: "completed" })),
+    ).toBe(true);
+    // shouldHideToolCall alone does not hide it:
+    expect(
+      shouldHideToolCall(createToolCall({ name: "ToolSearch", state: "completed" })),
+    ).toBe(false);
+  });
+
+  it("hides successful Happy MCP tools (shouldHideToolCall rule)", () => {
+    expect(
+      isEffectivelyHiddenToolCall(
+        createToolCall({
+          name: "mcp__happy__change_title",
+          state: "completed",
+          result: "Successfully changed chat title",
+        }),
+      ),
+    ).toBe(true);
+  });
+
+  it("keeps ordinary and pending-permission tools visible", () => {
+    expect(
+      isEffectivelyHiddenToolCall(createToolCall({ name: "Bash", state: "completed" })),
+    ).toBe(false);
+    expect(
+      isEffectivelyHiddenToolCall(
+        createToolCall({
+          name: "mcp__happy__change_title",
+          state: "running",
+          permission: { id: "perm-1", status: "pending" },
         }),
       ),
     ).toBe(false);

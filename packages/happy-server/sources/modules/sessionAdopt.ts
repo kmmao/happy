@@ -43,6 +43,23 @@ export type SessionAdoptOutcome =
       };
 
 /**
+ * What a successful target branch resolves to. Carries everything the single
+ * success tail needs — the response's ownerId + automationContext, and the
+ * `session-adopted` emit's guardian params. Branches produce this instead of
+ * emitting + returning inline, so the emit lives at exactly one place and no
+ * success path can skip it.
+ */
+interface AdoptResolution {
+    ownerId: string;
+    automationContext: wire.AdoptedAutomationContext;
+    guardian: {
+        projectId: string;
+        loopId?: string;
+        guardianKey: string;
+    };
+}
+
+/**
  * Drive a single sessionAdopt request end-to-end. The socket handler should
  * forward the parsed wire body here verbatim and ship the returned response
  * back through its callback.
@@ -104,7 +121,13 @@ export async function sessionAdopt(opts: {
         };
     }
 
-    // 2/3. Resolve owner + compute AdoptedAutomationContext.
+    // 2/3. Resolve owner + compute the adopted context for this target. Each
+    //      branch either returns an error outcome (failures never emit) or
+    //      assigns `resolution`; the single success tail below owns the
+    //      `session-adopted` emit + response, so no branch can succeed without
+    //      notifying the daemon. Adding a target.kind without producing a
+    //      resolution fails to compile at the exhaustiveness `default`.
+    let resolution: AdoptResolution;
     switch (request.target.kind) {
         case "existing-loop": {
             const target = request.target;
@@ -121,29 +144,21 @@ export async function sessionAdopt(opts: {
                     },
                 };
             }
-            const ctx: wire.AdoptedAutomationContext = {
-                kind: "agent_loop",
-                loopId: loop.id,
-                projectId: loop.projectId,
-                adoptedAt,
-            };
-            emitSessionAdoptedEphemeral({
-                userId,
-                machineId: project.machineId,
-                sessionId: request.sessionId,
-                projectId: loop.projectId,
-                loopId: loop.id,
-                guardianKey: `agent-loop:${loop.id}`,
-            });
-            return {
-                ok: true,
-                response: {
-                    success: true,
-                    sessionId: request.sessionId,
-                    automationContext: ctx,
-                    ownerId: loop.id,
+            resolution = {
+                ownerId: loop.id,
+                automationContext: {
+                    kind: "agent_loop",
+                    loopId: loop.id,
+                    projectId: loop.projectId,
+                    adoptedAt,
+                },
+                guardian: {
+                    projectId: loop.projectId,
+                    loopId: loop.id,
+                    guardianKey: `agent-loop:${loop.id}`,
                 },
             };
+            break;
         }
 
         case "new-loop": {
@@ -200,29 +215,21 @@ export async function sessionAdopt(opts: {
                     },
                 };
             }
-            const ctx: wire.AdoptedAutomationContext = {
-                kind: "agent_loop",
-                loopId: result.value.loopId,
-                projectId: session.projectId,
-                adoptedAt,
-            };
-            emitSessionAdoptedEphemeral({
-                userId,
-                machineId: project.machineId,
-                sessionId: request.sessionId,
-                projectId: session.projectId,
-                loopId: result.value.loopId,
-                guardianKey: `agent-loop:${result.value.loopId}`,
-            });
-            return {
-                ok: true,
-                response: {
-                    success: true,
-                    sessionId: request.sessionId,
-                    automationContext: ctx,
-                    ownerId: result.value.loopId,
+            resolution = {
+                ownerId: result.value.loopId,
+                automationContext: {
+                    kind: "agent_loop",
+                    loopId: result.value.loopId,
+                    projectId: session.projectId,
+                    adoptedAt,
+                },
+                guardian: {
+                    projectId: session.projectId,
+                    loopId: result.value.loopId,
+                    guardianKey: `agent-loop:${result.value.loopId}`,
                 },
             };
+            break;
         }
 
         case "new-schedule": {
@@ -259,31 +266,52 @@ export async function sessionAdopt(opts: {
                 { module: "session-adopt" },
                 `Schedule ${schedule.id} created for sessionAdopt session=${request.sessionId}`,
             );
-            const ctx: wire.AdoptedAutomationContext = {
-                kind: "task",
-                triggerType: "cron",
-                triggerRef: schedule.id,
-                projectId: session.projectId,
-                adoptedAt,
-            };
-            emitSessionAdoptedEphemeral({
-                userId,
-                machineId: project.machineId,
-                sessionId: request.sessionId,
-                projectId: session.projectId,
-                guardianKey: `project:${session.projectId}:${schedule.id}:claude`,
-            });
-            return {
-                ok: true,
-                response: {
-                    success: true,
-                    sessionId: request.sessionId,
-                    automationContext: ctx,
-                    ownerId: schedule.id,
+            resolution = {
+                ownerId: schedule.id,
+                automationContext: {
+                    kind: "task",
+                    triggerType: "cron",
+                    triggerRef: schedule.id,
+                    projectId: session.projectId,
+                    adoptedAt,
+                },
+                guardian: {
+                    projectId: session.projectId,
+                    guardianKey: `project:${session.projectId}:${schedule.id}:claude`,
                 },
             };
+            break;
+        }
+
+        default: {
+            // Exhaustiveness guard: a new target.kind must add a case that
+            // produces a resolution, or this fails to compile.
+            const _exhaustive: never = request.target;
+            throw new Error(
+                `Unhandled sessionAdopt target kind: ${(_exhaustive as { kind?: string }).kind}`,
+            );
         }
     }
+
+    // Single success tail. Reaching here means a branch produced a resolution,
+    // so the `session-adopted` emit is structurally unavoidable for any success.
+    emitSessionAdoptedEphemeral({
+        userId,
+        machineId: project.machineId,
+        sessionId: request.sessionId,
+        projectId: resolution.guardian.projectId,
+        loopId: resolution.guardian.loopId,
+        guardianKey: resolution.guardian.guardianKey,
+    });
+    return {
+        ok: true,
+        response: {
+            success: true,
+            sessionId: request.sessionId,
+            automationContext: resolution.automationContext,
+            ownerId: resolution.ownerId,
+        },
+    };
 }
 
 /**

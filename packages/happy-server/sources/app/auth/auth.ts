@@ -37,6 +37,24 @@ interface AuthTokens {
     githubGenerator: Awaited<ReturnType<typeof privacyKit.createEphemeralTokenGenerator>>;
 }
 
+/**
+ * Declares how to turn a verified, scope-matched, unexpired token into a typed
+ * payload. The security-critical invariants shared by every scoped token —
+ * signature/cache verification, `scope` discriminator match, and `expiresAt`
+ * presence + expiry — live in `verifyScopedToken` and cannot be forgotten by a
+ * spec. `build` only asserts the scope's own required fields and shapes the
+ * result; return `null` to reject.
+ */
+interface ScopedTokenSpec<T> {
+    scope: string;
+    build: (ctx: {
+        userId: string;
+        uuid?: string;
+        extras: Record<string, unknown>;
+        expiresAt: number;
+    }) => T | null;
+}
+
 const TOKEN_CACHE_MAX = 100_000;
 const TOKEN_CACHE_TTL = 60 * 60 * 1000; // 1 hour
 const CLEANUP_INTERVAL = 10 * 60 * 1000; // 10 minutes
@@ -195,30 +213,52 @@ class AuthModule {
         });
     }
 
-    async verifyTaskResultToken(token: string): Promise<TaskResultTokenPayload | null> {
+    /**
+     * The single seam every scoped-token verifier crosses. Owns the invariants
+     * that must hold for ANY scoped token — verified signature (or cache hit),
+     * matching `scope` discriminator, and a numeric `expiresAt` that is not in
+     * the past — then delegates the scope's own field validation + shaping to
+     * `spec.build`. Adding a new scoped token type means writing a spec, not
+     * re-implementing this sequence.
+     */
+    private async verifyScopedToken<T>(token: string, spec: ScopedTokenSpec<T>): Promise<T | null> {
         const verified = await this.verifyToken(token);
         if (!verified) {
             return null;
         }
 
-        const extras = verified.extras as { purpose?: string; taskId?: string; scope?: string; expiresAt?: number } | undefined;
-        if (extras?.purpose !== "task-result") {
+        const extras = verified.extras as Record<string, unknown> | undefined;
+        if (!extras || extras.scope !== spec.scope) {
             return null;
         }
-        if (!extras.taskId || extras.scope !== "task-result" || typeof extras.expiresAt !== "number") {
-            return null;
-        }
-        if (extras.expiresAt < Date.now()) {
+        if (typeof extras.expiresAt !== "number" || extras.expiresAt < Date.now()) {
             return null;
         }
 
-        return {
+        return spec.build({
             userId: verified.userId,
-            taskId: extras.taskId,
-            scope: "task-result",
+            uuid: verified.uuid,
+            extras,
             expiresAt: extras.expiresAt,
-            jti: verified.uuid ?? crypto.randomUUID(),
-        };
+        });
+    }
+
+    async verifyTaskResultToken(token: string): Promise<TaskResultTokenPayload | null> {
+        return this.verifyScopedToken(token, {
+            scope: "task-result",
+            build: ({ userId, uuid, extras, expiresAt }) => {
+                if (extras.purpose !== "task-result" || !extras.taskId || typeof extras.taskId !== "string") {
+                    return null;
+                }
+                return {
+                    userId,
+                    taskId: extras.taskId,
+                    scope: "task-result",
+                    expiresAt,
+                    jti: uuid ?? crypto.randomUUID(),
+                };
+            },
+        });
     }
 
     async createSupervisorCallbackToken(input: {
@@ -243,47 +283,32 @@ class AuthModule {
     }
 
     async verifySupervisorCallbackToken(token: string): Promise<SupervisorCallbackTokenPayload | null> {
-        const verified = await this.verifyToken(token);
-        if (!verified) {
-            return null;
-        }
-
-        const extras = verified.extras as {
-            purpose?: string;
-            projectId?: string;
-            machineId?: string;
-            runId?: string;
-            actionId?: string;
-            scope?: string;
-            expiresAt?: number;
-        } | undefined;
-        if (extras?.scope !== "supervisor-callback") {
-            return null;
-        }
-        if ((extras.purpose !== "run-status" && extras.purpose !== "fix-status") || !extras.projectId || !extras.machineId || typeof extras.expiresAt !== "number") {
-            return null;
-        }
-        if (extras.expiresAt < Date.now()) {
-            return null;
-        }
-        if (extras.purpose === "run-status" && !extras.runId) {
-            return null;
-        }
-        if (extras.purpose === "fix-status" && !extras.actionId) {
-            return null;
-        }
-
-        return {
-            userId: verified.userId,
-            projectId: extras.projectId,
-            machineId: extras.machineId,
+        return this.verifyScopedToken(token, {
             scope: "supervisor-callback",
-            purpose: extras.purpose,
-            runId: extras.runId,
-            actionId: extras.actionId,
-            expiresAt: extras.expiresAt,
-            jti: verified.uuid,
-        };
+            build: ({ userId, uuid, extras, expiresAt }) => {
+                const purpose = extras.purpose;
+                if ((purpose !== "run-status" && purpose !== "fix-status") || !extras.projectId || !extras.machineId) {
+                    return null;
+                }
+                if (purpose === "run-status" && !extras.runId) {
+                    return null;
+                }
+                if (purpose === "fix-status" && !extras.actionId) {
+                    return null;
+                }
+                return {
+                    userId,
+                    projectId: extras.projectId as string,
+                    machineId: extras.machineId as string,
+                    scope: "supervisor-callback",
+                    purpose,
+                    runId: extras.runId as string | undefined,
+                    actionId: extras.actionId as string | undefined,
+                    expiresAt,
+                    jti: uuid,
+                };
+            },
+        });
     }
 
     async createGithubToken(userId: string): Promise<string> {

@@ -4,12 +4,19 @@ import { getServerUrl } from '@/sync/serverConfig';
 import { QRAuthKeyPair } from './authQRStart';
 import { decryptBox } from '@/encryption/libsodium';
 
-export interface AuthCredentials {
+/**
+ * The raw material produced by QR account pairing: the freshly-decrypted account
+ * secret as bytes plus the auth token. This is the PRE-CONVERSION shape — the
+ * caller must base64-encode `secret` before it becomes the stored
+ * `AuthCredentials` in tokenStorage (whose `secret` is a `string | null`).
+ * Named distinctly so the two shapes can't be confused at the seam.
+ */
+export interface QRPairingResult {
     secret: Uint8Array;
     token: string;
 }
 
-export async function authQRWait(keypair: QRAuthKeyPair, onProgress?: (dots: number) => void, shouldCancel?: () => boolean): Promise<AuthCredentials | null> {
+export async function authQRWait(keypair: QRAuthKeyPair, onProgress?: (dots: number) => void, shouldCancel?: () => boolean): Promise<QRPairingResult | null> {
     let dots = 0;
     const serverUrl = getServerUrl();
 

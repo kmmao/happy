@@ -262,24 +262,33 @@ export async function dispatchWebhook(
 }
 
 /**
- * Verify the webhook signature for a route.
- * Returns true if signature is valid.
+ * The single route-signature gate every dispatch path crosses. Owns the one fact
+ * a caller must NOT get wrong: the secret is decrypted under the
+ * `["webhook-route", "<accountId>:<repoUrl>"]` scope before verifying — so that
+ * key derivation lives here once instead of being copy-pasted at each call site
+ * (a mismatch would silently fail all verification). Returns true iff the
+ * signature is valid.
+ *
+ * `options.failureLog` preserves each caller's historical failure logging:
+ * omitted → generic warn; `{ label }` → prefixed warn; `false` → silent.
  */
 function verifyRouteSignature(
   route: { id: string; accountId: string; repoUrl: string; webhookSecret: Uint8Array<ArrayBuffer> },
   provider: string,
   rawBody: string,
   headers: Record<string, string | undefined>,
+  options?: { failureLog?: false | { label: string } },
 ): boolean {
   const secret = decryptString(
     ["webhook-route", `${route.accountId}:${route.repoUrl}`],
     route.webhookSecret as unknown as Uint8Array<ArrayBuffer>,
   );
   const valid = verifyWebhookSignature(provider, secret, rawBody, headers);
-  if (!valid) {
+  if (!valid && options?.failureLog !== false) {
+    const label = options?.failureLog?.label;
     log(
       { module: "webhook", level: "warn" },
-      `Signature verification failed for route ${route.id}`,
+      `${label ? label + " s" : "S"}ignature verification failed for route ${route.id}`,
     );
   }
   return valid;
@@ -521,16 +530,7 @@ async function processRoutePRMerge(
   prMerge: ParsedWebhookPRMerge,
 ): Promise<boolean> {
   // 1. Verify signature (use route.repoUrl which is already normalized in DB)
-  const secret = decryptString(
-    ["webhook-route", `${route.accountId}:${route.repoUrl}`],
-    route.webhookSecret as unknown as Uint8Array<ArrayBuffer>,
-  );
-  const valid = verifyWebhookSignature(provider, secret, rawBody, headers);
-  if (!valid) {
-    log(
-      { module: "webhook", level: "warn" },
-      `PR merge signature verification failed for route ${route.id}`,
-    );
+  if (!verifyRouteSignature(route, provider, rawBody, headers, { failureLog: { label: "PR merge" } })) {
     return false;
   }
 
@@ -717,12 +717,9 @@ async function handlePushSupervisorTrigger(
       if (!route) return false;
 
       // Verify signature
-      const secret = decryptString(
-        ["webhook-route", `${route.accountId}:${route.repoUrl}`],
-        route.webhookSecret as unknown as Uint8Array<ArrayBuffer>,
-      );
-      const valid = verifyWebhookSignature(provider, secret, rawBody, headers);
-      if (!valid) return false;
+      if (!verifyRouteSignature(route, provider, rawBody, headers, { failureLog: false })) {
+        return false;
+      }
 
       // Check daily limit
       const limitCheck = await checkDailyRunLimit(project.id);
@@ -882,12 +879,9 @@ async function handlePROpenSupervisorTrigger(
       if (!route) return false;
 
       // Verify signature
-      const secret = decryptString(
-        ["webhook-route", `${route.accountId}:${route.repoUrl}`],
-        route.webhookSecret as unknown as Uint8Array<ArrayBuffer>,
-      );
-      const valid = verifyWebhookSignature(provider, secret, rawBody, headers);
-      if (!valid) return false;
+      if (!verifyRouteSignature(route, provider, rawBody, headers, { failureLog: false })) {
+        return false;
+      }
 
       // Check daily limit
       const limitCheck = await checkDailyRunLimit(project.id);

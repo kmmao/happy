@@ -12,6 +12,10 @@ This monorepo contains multiple packages, each with its own changelog:
 
 ## Recent Highlights
 
+### 2026-07-03
+
+- **happy-cli + happy-app** — Added **Sonnet 5** (`claude-sonnet-5`) to the Claude model picker. Two new keys — `sonnet-5` (200K) and `sonnet-5-1m` (1M context) — surface at the top of the Sonnet tier in the App, priced at `$3/$15`. Like Fable 5, Sonnet 5 is 1M-capable: `resolveModelKey` maps both keys to `claude-sonnet-5[1m]` and `is1MModelKey` returns `true`, so the `context-1m-2025-08-07` beta is enabled when the `-1m` variant is picked and stripped for the default 200K tier. `formatModelName`'s existing `sonnet-N` pattern renders the raw id as "Sonnet 5" unchanged.
+
 ### 2026-06-19
 
 - **happy-cli 0.101.4 + happy-app 2.43.1** — Surface the actual `/compact` summary text + token deltas in the chat. The TUI writes the post-compact summary as `{type:"user", isCompactSummary:true}` immediately after `compact_boundary`; the CLI was polling for `{type:"summary", summary:"…"}` records that only the SDK era ever wrote, so every `/compact` logged `no new compaction summary observed` and the App showed a bare "Context compacted" lifecycle bubble (observed log: pid-91031, 16:53:04). New `compactSummaryParser.extractCompactSummary(jsonlText, boundaryUuid?)` pure helper (8 vitest cases) drives both the post-boundary auto-emit and the `getCompactionSummary` RPC. A new structured `compact-boundary` session event carries `{preTokens, postTokens, durationMs, trigger, summary?}` — the App reducer dedups two emits sharing the same `boundaryUuid` (token deltas land immediately, summary lands ~600ms later as a second emit that merges in place), and suppresses the legacy text bubble when the structured one arrives within 5s. Older Apps reject the new discriminator and continue to show the legacy bubble (no regression). Five new App reducer vitest cases pin both arrival orders + the >5s window protecting a genuinely-earlier `/compact`.

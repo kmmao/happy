@@ -10,7 +10,6 @@ import {
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { Ionicons, Octicons } from "@expo/vector-icons";
 import { getToolViewComponent } from "./views/_all";
-import { isHiddenTool } from "./toolVisibility";
 import { Message, ToolCall } from "@/sync/typesMessage";
 import { CodeView } from "../CodeView";
 import { ToolSectionView } from "./ToolSectionView";
@@ -43,7 +42,8 @@ import {
   getCodexParsedCommandSummary,
 } from "./codexCommandUtils";
 import { getCodexBashIconName } from "./codexBashPresentation";
-import { shouldHideToolCall } from "./shouldHideToolCall";
+import { shouldHideToolCall, isEffectivelyHiddenToolCall } from "./shouldHideToolCall";
+import { summarizeToolResult } from "./summarizeToolResult";
 import { TOOLS_WITH_BUILTIN_SUBMIT_UI } from "./toolsWithBuiltinSubmitUI";
 
 interface ToolViewProps {
@@ -116,12 +116,11 @@ export const ToolView = React.memo<ToolViewProps>((props) => {
       });
     }
 
-    // Copy output
+    // Copy output — routed through summarizeToolResult so a Read of a binary
+    // (image / large blob) doesn't dump hundreds of KB of base64 onto the
+    // clipboard; the user gets the same placeholder they see in the panel.
     if (tool.state === "completed" && tool.result) {
-      const resultText =
-        typeof tool.result === "string"
-          ? tool.result
-          : JSON.stringify(tool.result, null, 2);
+      const resultText = summarizeToolResult(tool.result);
       buttons.push({
         text: t("tools.contextMenu.copyOutput"),
         onPress: () => {
@@ -175,17 +174,15 @@ export const ToolView = React.memo<ToolViewProps>((props) => {
     hideToolCall,
   ]);
 
-  if (hideToolCall) {
+  // Renders as null when either hiding rule fires: dynamically-hidden successful
+  // Happy MCP tools (hideToolCall) or internal plumbing tools (ToolSearch, etc.).
+  // The union lives in one seam so grouping/timeline consumers stay in agreement.
+  if (isEffectivelyHiddenToolCall(tool)) {
     return null;
   }
 
   let knownTool = knownTools[tool.name as keyof typeof knownTools] as any;
   const isSessionCompact = sessionCompactToolNames.has(tool.name);
-
-  // Internal Claude Code tools (e.g. ToolSearch) are completely hidden from the UI
-  if (isHiddenTool(tool.name)) {
-    return null;
-  }
 
   let description: string | null = null;
   let status: string | null = null;
@@ -676,13 +673,7 @@ export const ToolView = React.memo<ToolViewProps>((props) => {
                 title={t("toolView.output")}
                 provider={toolProvider}
               >
-                <CodeView
-                  code={
-                    typeof tool.result === "string"
-                      ? tool.result
-                      : JSON.stringify(tool.result, null, 2)
-                  }
-                />
+                <CodeView code={summarizeToolResult(tool.result)} />
               </ToolSectionView>
             )}
           </View>

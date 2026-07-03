@@ -28,7 +28,17 @@ import { useMachine } from "@/sync/storage";
 import { resolveCliSelfUpgradeSupport } from "@/hooks/cliSelfUpgradeSupport";
 import { useCliVersionCheck } from "@/hooks/useCliVersionCheck";
 import { attemptChunkReload, isChunkLoadError } from "@/utils/chunkReloadGuard";
+import { loadXtermSnapshot, saveXtermSnapshot } from "@/utils/xtermSnapshotCache";
 import { t } from "@/text";
+
+// Debounce window for persisting xterm state to localStorage after new bytes
+// land. Long enough that streaming a paragraph of Claude output only writes
+// once; short enough that a browser refresh moments after content stops
+// reliably captures it. See xtermSnapshotCache module comment for the full
+// rationale — the persistence layer exists so refresh doesn't fall back to
+// the daemon's 256 KB rolling replay buffer (which drops history at
+// clear-screen / alt-screen sync points).
+const XTERM_SNAPSHOT_SAVE_DEBOUNCE_MS = 1500;
 
 interface WebTerminalProps {
     machineId: string;
@@ -47,7 +57,16 @@ function WebTerminalComponent({ machineId, cwd, sessionId, terminalId: terminalI
     const containerRef = useRef<HTMLDivElement | null>(null);
     const terminalRef = useRef<any>(null);
     const fitAddonRef = useRef<any>(null);
+    const serializeAddonRef = useRef<any>(null);
     const terminalIdRef = useRef<string | null>(null);
+    // True when the current xterm started life by writing a persisted
+    // snapshot from localStorage — used to skip the daemon's `recentOutput`
+    // replay path so the two don't stomp on each other with a fresh
+    // clear-screen erasing the restored history.
+    const restoredFromCacheRef = useRef<boolean>(false);
+    // Debounce handle for xtermSnapshotCache writes. See the constant's
+    // XTERM_SNAPSHOT_SAVE_DEBOUNCE_MS declaration at the top of this file.
+    const snapshotSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const [state, setState] = useState<TerminalState>("connecting");
     const [errorMsg, setErrorMsg] = useState<string | null>(null);
     const [retryKey, setRetryKey] = useState(0);
@@ -85,10 +104,16 @@ function WebTerminalComponent({ machineId, cwd, sessionId, terminalId: terminalI
         let resizeObserver: ResizeObserver | null = null;
 
         async function init() {
-            const [{ Terminal }, { FitAddon }, { WebLinksAddon }] = await Promise.all([
+            const [
+                { Terminal },
+                { FitAddon },
+                { WebLinksAddon },
+                { SerializeAddon },
+            ] = await Promise.all([
                 import("@xterm/xterm"),
                 import("@xterm/addon-fit"),
                 import("@xterm/addon-web-links"),
+                import("@xterm/addon-serialize"),
             ]);
 
             if (!document.querySelector('link[data-xterm-css]')) {
@@ -136,12 +161,42 @@ function WebTerminalComponent({ machineId, cwd, sessionId, terminalId: terminalI
 
             const fitAddon = new FitAddon();
             const webLinksAddon = new WebLinksAddon();
+            const serializeAddon = new SerializeAddon();
             terminal.loadAddon(fitAddon);
             terminal.loadAddon(webLinksAddon);
+            terminal.loadAddon(serializeAddon);
             terminalRef.current = terminal;
             fitAddonRef.current = fitAddon;
+            serializeAddonRef.current = serializeAddon;
 
             terminal.open(containerRef.current);
+
+            // Cache key for xterm state persistence — `terminalId` when the
+            // parent (Claude tab / multi-shell tab) already knows it (they
+            // pass in the deterministic `claude:<sessionId>` for the Claude
+            // PTY, or a cuid2 for shells); a synthetic `claude:<sessionId>`
+            // key when we only have `sessionId` at mount time. `null` means
+            // we can't persist meaningfully (no id available) — skip.
+            //
+            // Restoring here (before `machineTerminalSpawn` fires the RPC
+            // that would return `recentOutput`) means the user sees the
+            // pre-refresh screen instantly on remount; the daemon path only
+            // fills in when no client-side cache exists.
+            const cacheKey =
+                terminalIdProp ?? (sessionId ? `claude:${sessionId}` : null);
+            let restoredFromCache = false;
+            if (cacheKey) {
+                const snapshot = loadXtermSnapshot(cacheKey);
+                if (snapshot) {
+                    try {
+                        terminal.write(snapshot);
+                        restoredFromCache = true;
+                    } catch {
+                        // Corrupt snapshot — fall back to daemon flow.
+                    }
+                }
+            }
+            restoredFromCacheRef.current = restoredFromCache;
 
             // Fit synchronously so cols/rows reflect actual container size before spawn
             try { fitAddon.fit(); } catch { /* ignore */ }
@@ -217,6 +272,28 @@ function WebTerminalComponent({ machineId, cwd, sessionId, terminalId: terminalI
                 resizeObserver.observe(containerRef.current);
             }
 
+            // Debounced persistence of the xterm's serialized state. Called
+            // after every incoming byte on the terminal; the debounce means a
+            // streaming burst only writes once at the tail so the hot path
+            // stays cheap. See xtermSnapshotCache.ts for storage semantics.
+            const scheduleSnapshotSave = () => {
+                if (!cacheKey || !serializeAddonRef.current) return;
+                if (snapshotSaveTimerRef.current) {
+                    clearTimeout(snapshotSaveTimerRef.current);
+                }
+                snapshotSaveTimerRef.current = setTimeout(() => {
+                    snapshotSaveTimerRef.current = null;
+                    if (!serializeAddonRef.current) return;
+                    try {
+                        const serialized = serializeAddonRef.current.serialize();
+                        saveXtermSnapshot(cacheKey, serialized);
+                    } catch {
+                        // SerializeAddon can throw if the terminal was
+                        // disposed between the schedule and the fire — no-op.
+                    }
+                }, XTERM_SNAPSHOT_SAVE_DEBOUNCE_MS);
+            };
+
             // Register listener BEFORE spawn to buffer events arriving during RPC round-trip
             const pendingEvents: any[] = [];
             outputCleanup = apiSocket.addEphemeralListener((data: any) => {
@@ -230,11 +307,17 @@ function WebTerminalComponent({ machineId, cwd, sessionId, terminalId: terminalI
                 if (data.terminalId !== terminalIdRef.current) return;
                 if (data.type === "terminal-output") {
                     terminal.write(data.data);
+                    scheduleSnapshotSave();
                 }
                 if (data.type === "terminal-exit") {
                     terminal.write(`\r\n\x1b[90m[Process exited with code ${data.exitCode}]\x1b[0m\r\n`);
                     setState("disconnected");
                     terminalIdRef.current = null;
+                    // Persist the final state — the user can Retry from here,
+                    // which remounts and restores from the snapshot we just
+                    // saved; without this, the "[Process exited]" line and
+                    // whatever came before would be lost on remount.
+                    scheduleSnapshotSave();
                     onCloseRef.current?.();
                 }
             });
@@ -251,10 +334,25 @@ function WebTerminalComponent({ machineId, cwd, sessionId, terminalId: terminalI
 
             terminalIdRef.current = result.terminalId;
 
-            // Reattach: replay buffered output from CLI so the screen is up to date
-            if (result.isExisting && result.recentOutput) {
+            // Reattach: replay buffered output from CLI — but skip when we
+            // already restored from the client-side snapshot cache. The
+            // daemon buffer is capped at 256 KB and drops history at
+            // clear-screen / alt-screen sync points; the client cache is a
+            // strict superset of that, so writing both would only add
+            // duplication (and a spurious clear-screen inside the daemon
+            // snapshot would erase the restored history).
+            if (
+                result.isExisting &&
+                result.recentOutput &&
+                !restoredFromCacheRef.current
+            ) {
                 terminal.write(result.recentOutput);
             }
+
+            // Capture the initial screen — either from the persisted snapshot
+            // we restored, or from the daemon's recentOutput. Ensures a fresh
+            // spawn (no reattach) also gets its very first state saved.
+            scheduleSnapshotSave();
 
             setState("connected");
 
@@ -263,9 +361,11 @@ function WebTerminalComponent({ machineId, cwd, sessionId, terminalId: terminalI
                 if (data.terminalId !== terminalIdRef.current) continue;
                 if (data.type === "terminal-output") {
                     terminal.write(data.data);
+                    scheduleSnapshotSave();
                 }
                 if (data.type === "terminal-exit") {
                     terminal.write(`\r\n\x1b[90m[Process exited with code ${data.exitCode}]\x1b[0m\r\n`);
+                    scheduleSnapshotSave();
                     setState("disconnected");
                     terminalIdRef.current = null;
                     onCloseRef.current?.();
@@ -317,11 +417,33 @@ function WebTerminalComponent({ machineId, cwd, sessionId, terminalId: terminalI
             exitCleanup?.();
             resizeObserver?.disconnect();
             resizeObserver = null;
+            // Force-flush one last serialization before we lose the addon
+            // instance — the debounced timer would otherwise fire against a
+            // disposed terminal and get nothing. This is why tabbing away
+            // and back preserves the exact pre-blur screen instead of the
+            // "1.5 s ago" screen the last scheduled write captured.
+            const flushKey =
+                terminalIdRef.current ??
+                terminalIdProp ??
+                (sessionId ? `claude:${sessionId}` : null);
+            if (snapshotSaveTimerRef.current) {
+                clearTimeout(snapshotSaveTimerRef.current);
+                snapshotSaveTimerRef.current = null;
+            }
+            if (flushKey && serializeAddonRef.current) {
+                try {
+                    const serialized = serializeAddonRef.current.serialize();
+                    saveXtermSnapshot(flushKey, serialized);
+                } catch {
+                    // ignore — terminal may already be mid-teardown
+                }
+            }
             // Detach only: don't close the PTY — it stays alive for reattach
             if (terminalRef.current) {
                 terminalRef.current.dispose();
                 terminalRef.current = null;
             }
+            serializeAddonRef.current = null;
             terminalIdRef.current = null;
         };
     }, [machineId, cwd, sessionId, terminalIdProp, theme.colors.groupped?.background, retryKey]);

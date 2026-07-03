@@ -185,6 +185,66 @@ describe("AuthModule", () => {
         });
     });
 
+    describe("scoped-token invariants (shared verifyScopedToken seam)", () => {
+        it("rejects a plain token (no scope) as a task-result token", async () => {
+            const token = await auth.createToken("u", { taskId: "t", purpose: "task-result", expiresAt: Date.now() + 60_000 });
+            // scope discriminator is absent -> rejected by the shared seam
+            expect(await auth.verifyTaskResultToken(token)).toBeNull();
+        });
+
+        it("rejects a task-result token with the wrong purpose", async () => {
+            const token = await auth.createToken("u", { scope: "task-result", taskId: "t", purpose: "something-else", expiresAt: Date.now() + 60_000 });
+            expect(await auth.verifyTaskResultToken(token)).toBeNull();
+        });
+
+        it("rejects a task-result token missing taskId", async () => {
+            const token = await auth.createToken("u", { scope: "task-result", purpose: "task-result", expiresAt: Date.now() + 60_000 });
+            expect(await auth.verifyTaskResultToken(token)).toBeNull();
+        });
+
+        it("rejects a task-result token with a non-numeric expiresAt", async () => {
+            const token = await auth.createToken("u", { scope: "task-result", purpose: "task-result", taskId: "t", expiresAt: "soon" });
+            expect(await auth.verifyTaskResultToken(token)).toBeNull();
+        });
+
+        it("rejects an expired task-result token", async () => {
+            const token = await auth.createTaskResultToken({ userId: "u", taskId: "t", expiresInMs: -1000 });
+            expect(await auth.verifyTaskResultToken(token)).toBeNull();
+        });
+
+        it("does not confuse a supervisor-callback token for a task-result token (scope mismatch)", async () => {
+            const token = await auth.createSupervisorCallbackToken({
+                userId: "u", projectId: "p", machineId: "m", purpose: "run-status", runId: "r", expiresInMs: 60_000,
+            });
+            expect(await auth.verifyTaskResultToken(token)).toBeNull();
+        });
+
+        it("does not confuse a task-result token for a supervisor-callback token (scope mismatch)", async () => {
+            const token = await auth.createTaskResultToken({ userId: "u", taskId: "t", expiresInMs: 60_000 });
+            expect(await auth.verifySupervisorCallbackToken(token)).toBeNull();
+        });
+
+        it("rejects a supervisor-callback token missing projectId", async () => {
+            const token = await auth.createToken("u", { scope: "supervisor-callback", purpose: "run-status", machineId: "m", runId: "r", expiresAt: Date.now() + 60_000 });
+            expect(await auth.verifySupervisorCallbackToken(token)).toBeNull();
+        });
+
+        it("rejects a run-status callback token missing runId", async () => {
+            const token = await auth.createToken("u", { scope: "supervisor-callback", purpose: "run-status", projectId: "p", machineId: "m", expiresAt: Date.now() + 60_000 });
+            expect(await auth.verifySupervisorCallbackToken(token)).toBeNull();
+        });
+
+        it("rejects a fix-status callback token missing actionId", async () => {
+            const token = await auth.createToken("u", { scope: "supervisor-callback", purpose: "fix-status", projectId: "p", machineId: "m", expiresAt: Date.now() + 60_000 });
+            expect(await auth.verifySupervisorCallbackToken(token)).toBeNull();
+        });
+
+        it("rejects a supervisor-callback token with an unknown purpose", async () => {
+            const token = await auth.createToken("u", { scope: "supervisor-callback", purpose: "bogus", projectId: "p", machineId: "m", expiresAt: Date.now() + 60_000 });
+            expect(await auth.verifySupervisorCallbackToken(token)).toBeNull();
+        });
+    });
+
     describe("GitHub tokens", () => {
         it("should create and verify a GitHub token", async () => {
             const token = await auth.createGithubToken("gh-user-1");

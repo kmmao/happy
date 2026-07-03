@@ -8,6 +8,7 @@ import { MarkdownView } from "@/components/markdown/MarkdownView";
 import { knownTools } from "../knownTools";
 import { toolFullViewStyles } from "../ToolFullView";
 import { buildToolFullViewTheme } from "../toolChromeTheme";
+import { summarizeToolResult } from "../summarizeToolResult";
 import { getToolProvider } from "../toolProvider";
 import { t } from "@/text";
 
@@ -84,13 +85,7 @@ export const SkillViewFull = React.memo<ToolViewProps>(({ tool, metadata }) => {
               {t("tools.fullView.output")}
             </Text>
           </View>
-          <CodeView
-            code={
-              typeof tool.result === "string"
-                ? tool.result
-                : JSON.stringify(tool.result, null, 2)
-            }
-          />
+          <CodeView code={summarizeToolResult(tool.result)} />
         </View>
       )}
 

@@ -224,6 +224,13 @@ class Sync {
   private friendRequestsSync: InvalidateSync;
   private feedSync: InvalidateSync;
   private projectsSync: InvalidateSync;
+  // Account-scoped syncs and their bulk-refresh policy — the single source of
+  // truth for "which syncs refresh together, and when". Bulk invalidation on
+  // init/restore/account-switch and on app-foreground iterates this table instead
+  // of hand-enumerating each sync at every call site, so adding an account-scoped
+  // sync is one entry here rather than edits scattered across three blocks.
+  // Targeted, event-driven invalidations of individual syncs stay at their seams.
+  private accountScopedSyncs!: { sync: InvalidateSync; refreshOnForeground: boolean }[];
   private activityAccumulator: ActivityUpdateAccumulator;
   private supervisorStatusListeners = new Set<(event: {
     projectId: string;
@@ -353,6 +360,26 @@ class Sync {
       await this.registerPushToken();
     };
     this.pushTokenSync = new InvalidateSync(registerPushToken);
+
+    // Refresh order among distinct entity syncs is irrelevant (each invalidate()
+    // just enqueues an independent refetch), so this list is ordered for reading.
+    // `refreshOnForeground: false` for settings mirrors the historical policy:
+    // settings are not re-fetched merely because the app returned to foreground.
+    this.accountScopedSyncs = [
+      { sync: this.settingsSync, refreshOnForeground: false },
+      { sync: this.profileSync, refreshOnForeground: true },
+      { sync: this.accountProfilesSync, refreshOnForeground: true },
+      { sync: this.purchasesSync, refreshOnForeground: true },
+      { sync: this.machinesSync, refreshOnForeground: true },
+      { sync: this.pushTokenSync, refreshOnForeground: true },
+      { sync: this.nativeUpdateSync, refreshOnForeground: true },
+      { sync: this.friendsSync, refreshOnForeground: true },
+      { sync: this.friendRequestsSync, refreshOnForeground: true },
+      { sync: this.artifactsSync, refreshOnForeground: true },
+      { sync: this.feedSync, refreshOnForeground: true },
+      { sync: this.projectsSync, refreshOnForeground: true },
+    ];
+
     this.activityAccumulator = new ActivityUpdateAccumulator(
       this.flushActivityUpdates.bind(this),
       500, // Reduced from 2000ms for faster terminal feedback on mobile
@@ -376,20 +403,9 @@ class Sync {
           );
         }
         log.log("📱 App became active");
-        this.purchasesSync.invalidate();
-        this.profileSync.invalidate();
-        this.accountProfilesSync.invalidate();
-        this.machinesSync.invalidate();
-        this.pushTokenSync.invalidate();
+        this.invalidateForegroundAccountSyncs();
         this.sessionsSync.invalidate();
         pendingQueueDispatcher.scheduleAll();
-        this.nativeUpdateSync.invalidate();
-        log.log("📱 App became active: Invalidating artifacts sync");
-        this.artifactsSync.invalidate();
-        this.friendsSync.invalidate();
-        this.friendRequestsSync.invalidate();
-        this.feedSync.invalidate();
-        this.projectsSync.invalidate();
         // Foreground session may have missed `update` pushes while backgrounded
         // (web tab throttled, iOS keep-alive). Re-invalidate its messagesSync
         // so lastSeq-based incremental fetch fills any gap.
@@ -405,6 +421,22 @@ class Sync {
         this.flushPendingCacheWrites();
       }
     });
+  }
+
+  /** Refresh every account-scoped sync (init / restore / account switch). */
+  private invalidateAllAccountSyncs() {
+    for (const entry of this.accountScopedSyncs) {
+      entry.sync.invalidate();
+    }
+  }
+
+  /** Refresh account-scoped syncs whose policy opts into app-foreground refresh. */
+  private invalidateForegroundAccountSyncs() {
+    for (const entry of this.accountScopedSyncs) {
+      if (entry.refreshOnForeground) {
+        entry.sync.invalidate();
+      }
+    }
   }
 
   async create(credentials: AuthCredentials, encryption: Encryption) {
@@ -500,18 +532,7 @@ class Sync {
     // Invalidate sync
     log.log("🔄 #init: Invalidating all syncs");
     this.sessionsSync.invalidate();
-    this.settingsSync.invalidate();
-    this.profileSync.invalidate();
-    this.accountProfilesSync.invalidate();
-    this.purchasesSync.invalidate();
-    this.machinesSync.invalidate();
-    this.pushTokenSync.invalidate();
-    this.nativeUpdateSync.invalidate();
-    this.friendsSync.invalidate();
-    this.friendRequestsSync.invalidate();
-    this.artifactsSync.invalidate();
-    this.feedSync.invalidate();
-    this.projectsSync.invalidate();
+    this.invalidateAllAccountSyncs();
     log.log("🔄 #init: All syncs invalidated, including artifacts");
 
     // Wait for both sessions and machines to load, then mark as ready

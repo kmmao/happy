@@ -119,7 +119,7 @@ import {
     ReducerMessage,
     StoredPermission,
     allocateId,
-    applyPermissionFromToolResult,
+    applyToolResultToMessage,
     updateMessageWithCompletedPermission,
     createStoredPermission,
     processSidechainToolResult,
@@ -1131,21 +1131,11 @@ export function reducer(
             }
           }
 
-          if (message.tool.state !== "running") {
-            continue;
+          // Apply the tool-result state transition — the same seam the sidechain
+          // path (processSidechainToolResult) crosses, so the two cannot drift.
+          if (applyToolResultToMessage(message, c, msg.createdAt)) {
+            changed.add(messageId);
           }
-
-          // Update tool state and result
-          message.tool.state = c.is_error ? "error" : "completed";
-          message.tool.result = c.content;
-          message.tool.completedAt = msg.createdAt;
-
-          // Update permission data if provided by backend
-          if (c.permissions) {
-            applyPermissionFromToolResult(message.tool, c.tool_use_id, c.permissions);
-          }
-
-          changed.add(messageId);
         }
       }
     }

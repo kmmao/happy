@@ -20,6 +20,7 @@ import { t } from "@/text";
 import { buildToolFullViewTheme } from "@/components/tools/toolChromeTheme";
 import { ToolSimpleContent } from "./ToolSimpleContent";
 import { getToolProvider } from "@/components/tools/toolProvider";
+import { summarizeToolResult } from "./summarizeToolResult";
 
 interface ToolFullViewProps {
   tool: ToolCall;
@@ -210,13 +211,7 @@ export const ToolFullView = React.memo(function ToolFullView({
                     {t("tools.fullView.output")}
                   </Text>
                 </View>
-                <CodeView
-                  code={
-                    typeof tool.result === "string"
-                      ? tool.result
-                      : JSON.stringify(tool.result, null, 2)
-                  }
-                />
+                <CodeView code={summarizeToolResult(tool.result)} />
               </View>
             )}
 
