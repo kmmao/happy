@@ -4,11 +4,10 @@
 
 import type { TunnelState, TunnelEntry } from "@kmmao/happy-wire";
 import type { TunnelProvider, TunnelAddParams, TunnelRemoveParams, TunnelOpResult } from "./types";
-import type { UpnpProvider } from "./providers/upnp";
 import { logger } from "@/logger";
 
 const DEFAULT_REFRESH_INTERVAL_MS = 60_000;
-const UPNP_LEASE_RENEWAL_MS = 30 * 60 * 1000;
+const LEASE_RENEWAL_INTERVAL_MS = 30 * 60 * 1000;
 const DETECT_TIMEOUT_MS = 5_000;
 
 export class TunnelManager {
@@ -68,13 +67,21 @@ export class TunnelManager {
       if (JSON.stringify(next) !== prev) onChange(next);
     }, intervalMs);
 
-    const upnp = this.providers.find((p) => p.name === "upnp") as UpnpProvider | undefined;
-    if (upnp && typeof upnp.renewLeases === "function") {
+    // Renew time-limited leases for any provider that declares the capability
+    // (e.g. UPnP port mappings). ADR-0045: capabilities are discovered
+    // structurally off the TunnelProvider interface — no provider-name match
+    // or concrete-class cast.
+    const renewables = this.providers.filter((p) => typeof p.renewLeases === "function");
+    if (renewables.length > 0) {
       this.leaseRenewalTimer = setInterval(async () => {
-        try { await upnp.renewLeases(); } catch (err) {
-          logger.debug(`[TUNNEL] UPnP lease renewal failed: ${String(err)}`);
+        for (const provider of renewables) {
+          try {
+            await provider.renewLeases!();
+          } catch (err) {
+            logger.debug(`[TUNNEL] lease renewal failed for ${provider.name}: ${String(err)}`);
+          }
         }
-      }, UPNP_LEASE_RENEWAL_MS);
+      }, LEASE_RENEWAL_INTERVAL_MS);
     }
   }
 
