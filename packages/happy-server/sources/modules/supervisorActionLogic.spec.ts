@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import {
     decideApprovalTransition,
     DISMISSED_APPROVALS,
-    ACTIVE_FIX_STATUSES,
 } from "./supervisorActionLogic";
 
 describe("decideApprovalTransition", () => {
@@ -42,9 +41,5 @@ describe("decideApprovalTransition", () => {
 describe("supervisor action vocabulary", () => {
     it("treats skipped and ignored as dismissed", () => {
         expect([...DISMISSED_APPROVALS]).toEqual(["skipped", "ignored"]);
-    });
-
-    it("treats pending and running fixes as active", () => {
-        expect([...ACTIVE_FIX_STATUSES]).toEqual(["pending", "running"]);
     });
 });

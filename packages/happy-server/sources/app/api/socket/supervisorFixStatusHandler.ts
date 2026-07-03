@@ -12,6 +12,7 @@ import { emitSyncEphemeral } from "@/app/events/syncEphemeral";
 import { activityCache } from "@/app/presence/sessionCache";
 import { pushSupervisorNotification } from "@/modules/pushSend";
 import { onFixCompleted as loopOnFixCompleted } from "@/modules/supervisorLoopEngine";
+import { decideFixStatusReport, type TerminalFixStatus } from "@/modules/supervisorFixStatusLogic";
 import { registerSocketEvent } from "./registerSocketEvent";
 
 const supervisorFixStatusSchema = z.object({
@@ -83,14 +84,14 @@ export function supervisorFixStatusHandler(
                 `supervisor-fix-status: action ${data.actionId} → ${data.fixStatus}`,
             );
 
-            // Archive fix session on truly terminal statuses only.
-            // "analyzed" is intentionally excluded: the analyze-first session should
-            // remain accessible so the user can review the analysis results before
-            // deciding whether to proceed with a fix.
-            if (
-                data.fixStatus === "completed" ||
-                data.fixStatus === "failed"
-            ) {
+            // Everything that follows from a fix-status report (archive?
+            // notify? progress the loop?) is decided in one place shared with
+            // the HTTP callback transport — decideFixStatusReport. Notably
+            // "analyzed" does NOT archive: the analyze-first session should
+            // remain accessible so the user can review the analysis results.
+            const report = decideFixStatusReport(data.fixStatus, action.title);
+
+            if (report.archiveSessionInDb) {
                 // Archive the fix session first (before broadcasting status)
                 // so clients see active: false when they query after the status event.
                 const resolvedFixSessionId =
@@ -118,33 +119,13 @@ export function supervisorFixStatusHandler(
             }
 
             // Send push notification for all notable statuses (including analyzed).
-            if (
-                data.fixStatus === "completed" ||
-                data.fixStatus === "failed" ||
-                data.fixStatus === "analyzed"
-            ) {
-                const notifTitle =
-                    data.fixStatus === "completed"
-                        ? "Fix Applied Successfully"
-                        : data.fixStatus === "analyzed"
-                            ? "Analysis Complete"
-                            : "Fix Failed";
-                const notifBody =
-                    data.fixStatus === "completed"
-                        ? `Fixed: ${action.title}`
-                        : data.fixStatus === "analyzed"
-                            ? `Analyzed: ${action.title}`
-                            : `Failed to fix: ${action.title}`;
-
+            if (report.notification) {
                 await pushSupervisorNotification(userId, {
                     projectId: data.projectId,
                     runId: action.runId,
-                    type:
-                        data.fixStatus === "completed" || data.fixStatus === "analyzed"
-                            ? "fix_complete"
-                            : "error",
-                    title: notifTitle,
-                    body: notifBody,
+                    type: report.notification.type,
+                    title: report.notification.title,
+                    body: report.notification.body,
                 });
             }
 
@@ -157,17 +138,13 @@ export function supervisorFixStatusHandler(
             });
 
             // Loop progression: if this fix belongs to a loop, check if all fixes are done
-            if (
-                data.fixStatus === "completed" ||
-                data.fixStatus === "failed" ||
-                data.fixStatus === "analyzed"
-            ) {
+            if (report.progressLoop) {
                 try {
                     await loopOnFixCompleted(
                         userId,
                         data.actionId,
                         data.projectId,
-                        data.fixStatus,
+                        data.fixStatus as TerminalFixStatus,
                     );
                 } catch (loopError) {
                     log(

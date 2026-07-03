@@ -20,6 +20,7 @@ import { createIssueOnProvider } from "@/app/webhook/webhookProviderApi";
 import { parseAutoApproveSeverities } from "@/modules/supervisorConfig";
 import { decryptString } from "@/modules/encrypt";
 import { emitConfiguredSupervisorFixTrigger } from "@/modules/supervisorFixTrigger";
+import { decideAutoApproveAndQueueFix } from "@/modules/supervisorFixStatusLogic";
 
 export async function handleAutoApproval(
     userId: string,
@@ -78,16 +79,16 @@ export async function handleAutoApproval(
 
         if (actions.length === 0) return;
 
-        // Batch-approve matching actions per configured severities
+        // Batch-approve matching actions per configured severities — the
+        // approve-and-queue transition (and its CAS guard) is owned by
+        // decideAutoApproveAndQueueFix, shared with the loop engine.
+        const autoApprove = decideAutoApproveAndQueueFix();
         await db.supervisorAction.updateMany({
             where: {
                 id: { in: actions.map((a) => a.id) },
-                approval: "pending",
+                approval: autoApprove.allowedFrom,
             },
-            data: {
-                approval: "approved",
-                fixStatus: "pending",
-            },
+            data: autoApprove.data,
         });
 
         log(

@@ -8,8 +8,16 @@ import { emitConfiguredSupervisorFixTrigger } from "@/modules/supervisorFixTrigg
 import {
     decideApprovalTransition,
     DISMISSED_APPROVALS,
-    ACTIVE_FIX_STATUSES,
 } from "@/modules/supervisorActionLogic";
+import {
+    ACTIVE_FIX_STATUSES,
+    canTriggerFix,
+    decideFixStatusReport,
+    supervisorActionViewFilter,
+    isUpdatedAtOrderedView,
+    type SupervisorFixStatus,
+    type TerminalFixStatus,
+} from "@/modules/supervisorFixStatusLogic";
 import { assertOwnedProject } from "../ownership";
 
 /**
@@ -64,35 +72,17 @@ export function supervisorActionRoutes(app: Fastify) {
             if (runId) where.runId = runId;
             if (category) where.category = category;
 
-            // view takes precedence over approval
-            if (view === "approved") {
-                where.approval = "approved";
-                where.fixStatus = null;
-            } else if (view === "fixing") {
-                where.approval = "approved";
-                where.fixStatus = { in: ["pending", "running"] };
-                where.fixMode = { not: "analyze-first" };
-            } else if (view === "analyzing") {
-                where.approval = "approved";
-                where.fixStatus = { in: ["pending", "running"] };
-                where.fixMode = "analyze-first";
-            } else if (view === "analyzed") {
-                where.approval = "approved";
-                where.fixStatus = "analyzed";
-            } else if (view === "done") {
-                where.approval = "approved";
-                where.fixStatus = "completed";
-            } else if (view === "failed") {
-                where.approval = "approved";
-                where.fixStatus = "failed";
-            } else if (view === "dismissed") {
-                where.approval = { in: [...DISMISSED_APPROVALS] };
+            // view takes precedence over approval. The view → filter mapping
+            // (and its fixing/analyzing fixMode split) is owned by
+            // supervisorActionViewFilter — do not re-derive it here.
+            if (view) {
+                Object.assign(where, supervisorActionViewFilter(view));
             } else if (approval) {
                 where.approval = approval;
             }
 
-            // Sort by updatedAt for done/fixing/analyzing views (shows latest status change first)
-            const orderBy = (view === "done" || view === "fixing" || view === "analyzing" || view === "analyzed")
+            // Sort by updatedAt for fix-progress views (latest status change first)
+            const orderBy = isUpdatedAtOrderedView(view)
                 ? { updatedAt: "desc" as const }
                 : { createdAt: "desc" as const };
 
@@ -308,7 +298,7 @@ export function supervisorActionRoutes(app: Fastify) {
                         accountId: userId,
                         approval: "approved",
                         fixMode: "analyze-first",
-                        fixStatus: { in: ["pending", "running"] },
+                        fixStatus: { in: [...ACTIVE_FIX_STATUSES] },
                     },
                 });
             } catch {
@@ -387,10 +377,7 @@ export function supervisorActionRoutes(app: Fastify) {
             }
 
             // Don't re-trigger if fix is already in progress
-            if (
-                action.fixStatus === "running" ||
-                action.fixStatus === "pending"
-            ) {
+            if (!canTriggerFix(action.fixStatus as SupervisorFixStatus | null)) {
                 return reply.code(409).send({
                     error: "Fix is already in progress",
                 });
@@ -582,11 +569,13 @@ export function supervisorActionRoutes(app: Fastify) {
                 });
             }
 
-            // On completion/failure/analyzed: tell CLI daemon to kill the fix session
-            if (
-                (fixStatus === "completed" || fixStatus === "failed" || fixStatus === "analyzed") &&
-                updated?.fixSessionId
-            ) {
+            // Everything that follows from a fix-status report (kill? notify?
+            // progress the loop?) is decided in one place shared with the
+            // socket transport — decideFixStatusReport.
+            const report = decideFixStatusReport(fixStatus, updated?.title ?? "");
+
+            // On terminal statuses: tell CLI daemon to kill the fix session
+            if (report.requestSessionKill && updated?.fixSessionId) {
                 const project = await db.project.findUnique({
                     where: { id },
                     select: { machineId: true },
@@ -603,31 +592,21 @@ export function supervisorActionRoutes(app: Fastify) {
                 }
 
                 // Send push notification
-                const notifTitle =
-                    fixStatus === "completed"
-                        ? "Fix Applied Successfully"
-                        : fixStatus === "analyzed"
-                            ? "Analysis Complete"
-                            : "Fix Failed";
-                const notifBody =
-                    fixStatus === "completed"
-                        ? `Fixed: ${updated.title}`
-                        : fixStatus === "analyzed"
-                            ? `Analyzed: ${updated.title}`
-                            : `Failed to fix: ${updated.title}`;
-                await pushSupervisorNotification(userId, {
-                    projectId: id,
-                    runId: updated.runId,
-                    type: fixStatus === "completed" || fixStatus === "analyzed" ? "fix_complete" : "error",
-                    title: notifTitle,
-                    body: notifBody,
-                });
+                if (report.notification) {
+                    await pushSupervisorNotification(userId, {
+                        projectId: id,
+                        runId: updated.runId,
+                        type: report.notification.type,
+                        title: report.notification.title,
+                        body: report.notification.body,
+                    });
+                }
             }
 
             // Loop progression: if this fix belongs to a loop, check if all fixes
             // are done. The engine absorbs its own errors.
-            if (fixStatus === "completed" || fixStatus === "failed" || fixStatus === "analyzed") {
-                await loopOnFixCompleted(userId, actionId, id, fixStatus);
+            if (report.progressLoop) {
+                await loopOnFixCompleted(userId, actionId, id, fixStatus as TerminalFixStatus);
             }
 
             return reply.send({
@@ -663,7 +642,7 @@ export function supervisorActionRoutes(app: Fastify) {
                     projectId: id,
                     accountId: userId,
                     approval: "approved",
-                    fixStatus: { in: ["running", "pending"] },
+                    fixStatus: { in: [...ACTIVE_FIX_STATUSES] },
                 },
                 select: { id: true, fixSessionId: true, runId: true, title: true },
             });

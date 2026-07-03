@@ -32,6 +32,12 @@ function severityForExitReason(reason: LoopExitReason): "info" | "warning" {
     }
 }
 import { checkDailyRunLimit, incrementDailyRunCount } from "@/modules/supervisorLimits";
+import {
+    ACTIVE_FIX_STATUSES,
+    decideAutoApproveAndQueueFix,
+    selectTrulyStaleFixActions,
+    STALE_FIX_RESOLUTION,
+} from "@/modules/supervisorFixStatusLogic";
 import { auth } from "@/app/auth/auth";
 import {
     BUILT_IN_AI_BACKEND_PROFILE_IDS,
@@ -442,7 +448,7 @@ async function progressLoopAfterFix(
             projectId,
             accountId: userId,
             approval: "approved",
-            fixStatus: { in: ["pending", "running"] },
+            fixStatus: { in: [...ACTIVE_FIX_STATUSES] },
             run: { loopId: loop.id },
         },
     });
@@ -657,16 +663,16 @@ async function decideNextStep(
         },
     });
 
-    // Auto-approve and trigger fixes
+    // Auto-approve and trigger fixes — the approve-and-queue transition (and
+    // its CAS guard) is owned by decideAutoApproveAndQueueFix, shared with
+    // auto/semi-auto mode's handleAutoApproval.
+    const autoApprove = decideAutoApproveAndQueueFix();
     await db.supervisorAction.updateMany({
         where: {
             id: { in: approvableActions.map((a) => a.id) },
-            approval: "pending",
+            approval: autoApprove.allowedFrom,
         },
-        data: {
-            approval: "approved",
-            fixStatus: "pending",
-        },
+        data: autoApprove.data,
     });
 
     // Fetch project for trigger data
@@ -1047,10 +1053,8 @@ function scheduleFixWatchdog(
                 : [];
             const activeSessionIds = new Set(activeSessions.map((s) => s.id));
 
-            // Determine which actions are truly stale
-            const trueStaleActions = staleActions.filter(
-                (a) => !a.fixSessionId || !activeSessionIds.has(a.fixSessionId),
-            );
+            // Determine which actions are truly stale — shared watchdog rule
+            const trueStaleActions = selectTrulyStaleFixActions(staleActions, activeSessionIds);
 
             if (trueStaleActions.length === 0) return;
 
@@ -1058,7 +1062,7 @@ function scheduleFixWatchdog(
             const staleActionIds = trueStaleActions.map((a) => a.id);
             await db.supervisorAction.updateMany({
                 where: { id: { in: staleActionIds } },
-                data: { fixStatus: "failed" },
+                data: { fixStatus: STALE_FIX_RESOLUTION },
             });
 
             // Log and trigger loop progression for each stale action
@@ -1069,7 +1073,7 @@ function scheduleFixWatchdog(
                 );
 
                 // Trigger loop progression
-                await onFixCompleted(userId, action.id, projectId, "failed");
+                await onFixCompleted(userId, action.id, projectId, STALE_FIX_RESOLUTION);
             }
         } catch (error) {
             log(

@@ -19,9 +19,6 @@ export type SupervisorApproval = "pending" | "approved" | "skipped" | "ignored";
 /** Approval states that count as "dismissed" (hidden from the active queue). */
 export const DISMISSED_APPROVALS = ["skipped", "ignored"] as const;
 
-/** Fix statuses that mean a fix is actively in flight and must not be disturbed. */
-export const ACTIVE_FIX_STATUSES = ["pending", "running"] as const;
-
 export type ApprovalTransitionDecision = {
     /** Current approval states this transition may be applied from (CAS guard). */
     allowedFrom: SupervisorApproval[];

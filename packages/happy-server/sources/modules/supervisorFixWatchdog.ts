@@ -17,6 +17,11 @@ import { emitSyncEphemeral } from "@/app/events/syncEphemeral";
 import { activityCache } from "@/app/presence/sessionCache";
 import { pushSupervisorNotification } from "@/modules/pushSend";
 import { onFixCompleted as loopOnFixCompleted } from "@/modules/supervisorLoopEngine";
+import {
+    ACTIVE_FIX_STATUSES,
+    selectTrulyStaleFixActions,
+    STALE_FIX_RESOLUTION,
+} from "@/modules/supervisorFixStatusLogic";
 
 /** Only process actions that have been stuck for at least this long. */
 const STALE_THRESHOLD_MS = 5 * 60_000; // 5 minutes
@@ -47,7 +52,7 @@ export async function cleanupStaleFixActions(
             projectId: { in: projectIds },
             accountId: userId,
             approval: "approved",
-            fixStatus: { in: ["running", "pending"] },
+            fixStatus: { in: [...ACTIVE_FIX_STATUSES] },
             updatedAt: { lt: cutoff },
         },
         select: {
@@ -82,10 +87,8 @@ export async function cleanupStaleFixActions(
 
     const activeSessionIds = new Set(activeSessions.map((s) => s.id));
 
-    // Filter to truly stale actions (no active session)
-    const trueStale = staleActions.filter(
-        (a) => !a.fixSessionId || !activeSessionIds.has(a.fixSessionId),
-    );
+    // Filter to truly stale actions (no active session) — shared watchdog rule
+    const trueStale = selectTrulyStaleFixActions(staleActions, activeSessionIds);
 
     if (trueStale.length === 0) return;
 
@@ -98,7 +101,7 @@ export async function cleanupStaleFixActions(
     for (const action of trueStale) {
         await db.supervisorAction.update({
             where: { id: action.id },
-            data: { fixStatus: "failed" },
+            data: { fixStatus: STALE_FIX_RESOLUTION },
         });
 
         // Archive the fix session if present
@@ -135,6 +138,6 @@ export async function cleanupStaleFixActions(
 
         // Trigger loop progression if applicable — the engine absorbs its
         // own errors.
-        await loopOnFixCompleted(userId, action.id, action.projectId, "failed");
+        await loopOnFixCompleted(userId, action.id, action.projectId, STALE_FIX_RESOLUTION);
     }
 }
