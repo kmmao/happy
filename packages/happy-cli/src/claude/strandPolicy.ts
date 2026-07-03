@@ -208,3 +208,64 @@ export function classifyStrandTick(
   }
   return { action: "warn", kind: "stranded" };
 }
+
+/** State signals sampled when tier-1 recovery asks "re-deliver the prompt?". */
+export interface RedeliverSignals {
+  /** the launcher is already exiting (exitReason set). */
+  exiting: boolean;
+  /** whether this turn emitted any real JSONL output (double-execution risk). */
+  turnProducedOutput: boolean;
+  /** whether a prompt was captured for this turn (onPromptWritten fired). */
+  hasInFlightPrompt: boolean;
+  /** prior re-deliveries this turn (one-shot budget; next strand escalates). */
+  redeliverCount: number;
+  /** whether the captured prompt is a slash command (/compact, /model, …). */
+  promptIsSlashCommand: boolean;
+}
+
+/**
+ * What tier-1 recovery should do with the captured prompt. `cold-restart`
+ * exists because a slash command must NEVER be re-pasted onto the same PTY:
+ * the tier-1 Esc does not reliably clear the TUI composer in every state
+ * (vim NORMAL mode, mid-turn drain races, Ink raw-mode reattach), and
+ * re-pasting `/compact` onto a composer still holding `/compact` yields
+ * `/compact/compact` — not a valid slash command, silently treated as prose,
+ * `compact_boundary` never fires, and the user sees "Compaction started"
+ * followed by silence. Prose survives the same concat (it just gets typed
+ * twice); a slash command is destroyed. A cold restart guarantees an empty
+ * composer and the queued command lands cleanly on the fresh PTY.
+ */
+export type RedeliverDecision =
+  | {
+      action: "skip";
+      reason:
+        | "exiting"
+        | "turn-produced-output"
+        | "no-inflight-prompt"
+        | "budget-exhausted";
+    }
+  | { action: "cold-restart" }
+  | { action: "redeliver" };
+
+/**
+ * Decide whether a stranded turn's captured prompt is re-delivered, and how.
+ * Pure — the launcher applies the decision (queue push, session events,
+ * abort) and owns the mutable latches. Skip-reason order mirrors the
+ * historical guard exactly: exiting / produced-output / no-capture first,
+ * then the one-shot budget, then the slash-vs-prose split.
+ */
+export function decideStrandRedeliver(s: RedeliverSignals): RedeliverDecision {
+  if (s.exiting) return { action: "skip", reason: "exiting" };
+  if (s.turnProducedOutput) {
+    return { action: "skip", reason: "turn-produced-output" };
+  }
+  if (!s.hasInFlightPrompt) {
+    return { action: "skip", reason: "no-inflight-prompt" };
+  }
+  if (s.redeliverCount >= 1) {
+    return { action: "skip", reason: "budget-exhausted" };
+  }
+  return s.promptIsSlashCommand
+    ? { action: "cold-restart" }
+    : { action: "redeliver" };
+}

@@ -7,6 +7,7 @@ import { claudeRemote, is1MModelKey, isSlashCommand } from "./claudeRemote";
 import {
   classifyStrandTick,
   classifyOutputTick,
+  decideStrandRedeliver,
   DEFAULT_STRAND_THRESHOLDS,
 } from "./strandPolicy";
 import { mapToClaudeMode } from "./utils/permissionMode";
@@ -55,6 +56,7 @@ import { notifyDaemonSessionFault } from "@/daemon/controlClient";
 import { EnhancedMode } from "./loop";
 import { createSessionEventReporter } from "./sessionEventReporter";
 import { tryRegisterCompactBoundaryEmission } from "./compactBoundaryDedup";
+import { createElicitationRegistry } from "./elicitationRegistry";
 import { extractCompactSummary } from "./compactSummaryParser";
 import { hashObject } from "@/utils/deterministicJson";
 import { getProjectPath } from "./utils/path";
@@ -302,7 +304,7 @@ export async function claudeRemoteLauncher(
     return (
       `guard=${snap.state} gen=${snap.generation} activeGen=${activeTurnGeneration} ` +
       `idle=${Date.now() - lastClaudeOutputAt}ms ongoingTools=${ongoingToolCalls.size} ` +
-      `pendingElicit=${pendingElicitations.size}`
+      `pendingElicit=${elicitations.size()}`
     );
   };
 
@@ -323,7 +325,7 @@ export async function claudeRemoteLauncher(
       if (snap.state !== "running") return;
       // Skip legitimate long waits: an active tool (e.g. a slow Bash) or a
       // pending MCP elicitation explains the silence without being a strand.
-      if (ongoingToolCalls.size > 0 || pendingElicitations.size > 0) return;
+      if (ongoingToolCalls.size > 0 || elicitations.size() > 0) return;
       const idleMs = Date.now() - lastClaudeOutputAt;
       const elapsedMs = Date.now() - turnStartedAt;
       const inFlightIsSlashCommand =
@@ -492,39 +494,36 @@ export async function claudeRemoteLauncher(
   // escalates to tier-2 instead of re-strand looping). `urgent` priority jumps
   // any backlog so the lost prompt runs before later sends.
   function maybeRedeliverStrandedPrompt(): void {
-    if (exitReason || turnProducedOutput || !inFlightPrompt) return;
-    // Pre-0.100.7 we additionally skipped redeliver when `source ===
+    // The skip guards, one-shot budget, and the slash-vs-prose split (with
+    // the /compact/compact composer-concat rationale) live in
+    // strandPolicy.decideStrandRedeliver (pure + unit-tested); here we only
+    // apply the decision — queue pushes, session events, latches, abort.
+    //
+    // Pre-0.100.7 this additionally skipped redeliver when `source ===
     // "auto-compact"` (the threshold handler used to push `/compact` here)
     // and armed a cooldown latch from inside this branch. The auto-push is
     // gone — every in-flight prompt is now a real user message — so the
     // skip is unconditionally the wrong choice and the cooldown nothing
     // observes it.
-    if (strandRedeliverCount >= 1) {
-      logger.debug(
-        "[remote][strand] stranded prompt already re-delivered once — not retrying (next strand escalates to tier-2).",
-      );
+    const decision = decideStrandRedeliver({
+      exiting: !!exitReason,
+      turnProducedOutput,
+      hasInFlightPrompt: !!inFlightPrompt,
+      redeliverCount: strandRedeliverCount,
+      promptIsSlashCommand: !!inFlightPrompt && isSlashCommand(inFlightPrompt.message),
+    });
+    if (decision.action === "skip") {
+      if (decision.reason === "budget-exhausted") {
+        logger.debug(
+          "[remote][strand] stranded prompt already re-delivered once — not retrying (next strand escalates to tier-2).",
+        );
+      }
       return;
     }
     strandRedeliverCount++;
-    const { message, mode } = inFlightPrompt;
+    const { message, mode } = inFlightPrompt!;
 
-    // Slash commands (`/compact`, `/clear`, `/model …`) cannot be safely
-    // re-pasted onto the same PTY. The tier-1 Esc does not reliably clear
-    // the TUI composer in every state — vim NORMAL mode, mid-turn drain
-    // races, and Ink raw-mode reattach can leave the original paste
-    // partially in the composer. Re-pasting `/compact` onto a composer
-    // that still contains `/compact` yields `/compact/compact`, which is
-    // not a valid slash command — the TUI silently treats it as prose,
-    // `compact_boundary` never fires, and the user sees only "Compaction
-    // started" followed by a long silence (see the symptom screenshot
-    // that motivated this fix). For prose the same concat is recoverable
-    // (it just gets typed twice), but for slash commands the command
-    // itself is destroyed.
-    //
-    // Force a tier-2 cold restart instead: the new PTY's composer is
-    // guaranteed empty, and the queue-pushed slash command lands cleanly
-    // as the first prompt of the new launch iteration.
-    if (isSlashCommand(message)) {
+    if (decision.action === "cold-restart") {
       logger.debug(
         `[remote][strand] in-flight prompt is slash command (${message.trim().slice(0, 40)}) — forcing cold restart instead of paste redeliver to avoid composer concat`,
       );
@@ -2340,63 +2339,13 @@ export async function claudeRemoteLauncher(
   }
 
   // ── MCP Elicitation: forward to App, wait for response via RPC ──
-  // Hoisted outside the per-turn loop so pending elicitations survive across turns
-  const pendingElicitations = new Map<
-    string,
-    { resolve: (result: ElicitationResult) => void; reject: (err: Error) => void }
-  >();
-  let elicitationCounter = 0;
-
-  session.client.rpcHandlerManager.registerHandler(
-    "elicitationResponse",
-    async (response: { id: string; action: string; content?: Record<string, unknown> }) => {
-      const pendingItem = pendingElicitations.get(response.id);
-      if (!pendingItem) {
-        logger.debug(`[remote]: elicitationResponse for unknown id ${response.id}`);
-        return;
-      }
-      const validActions = ["accept", "decline", "cancel"] as const;
-      if (!validActions.includes(response.action as typeof validActions[number])) {
-        logger.debug(`[remote]: invalid elicitation action: ${response.action}`);
-        return;
-      }
-      pendingElicitations.delete(response.id);
-      // Clear the elicitation banner from App
-      session.client.updateAgentState((s) => ({ ...s, elicitation: null }));
-      pendingItem.resolve({
-        action: response.action as "accept" | "decline" | "cancel",
-        content: response.content,
-      } as ElicitationResult);
-    },
-  );
-
-  const handleElicitation = async (
-    request: ElicitationRequest,
-    options: { signal: AbortSignal },
-  ): Promise<ElicitationResult> => {
-    const id = `elicit-${++elicitationCounter}`;
-    logger.debug(`[remote]: MCP elicitation request from ${request.mcpServerName}: ${id}`);
-
-    return new Promise<ElicitationResult>((resolve, reject) => {
-      const abortHandler = () => {
-        pendingElicitations.delete(id);
-        // Clear the elicitation banner on abort
-        session.client.updateAgentState((s) => ({ ...s, elicitation: null }));
-        reject(new Error("Elicitation aborted"));
-      };
-      options.signal.addEventListener("abort", abortHandler, { once: true });
-
-      pendingElicitations.set(id, {
-        resolve: (result) => {
-          options.signal.removeEventListener("abort", abortHandler);
-          resolve(result);
-        },
-        reject: (err) => {
-          options.signal.removeEventListener("abort", abortHandler);
-          reject(err);
-        },
-      });
-
+  // Lifecycle (pending map, id allocation, settle/abort/drain invariants)
+  // lives in elicitationRegistry (unit-tested); the launcher wires the
+  // App-facing surfaces — the agent-state banner and the push notification.
+  // Created outside the per-turn loop so pending elicitations survive across
+  // turns.
+  const elicitations = createElicitationRegistry({
+    onOpen: (id, request) => {
       // Push elicitation request to App via agent state
       session.client.updateAgentState((currentState) => ({
         ...currentState,
@@ -2421,8 +2370,25 @@ export async function claudeRemoteLauncher(
             type: "elicitation_request",
           },
         );
-    });
-  };
+    },
+    onClose: () => {
+      // Clear the elicitation banner from App
+      session.client.updateAgentState((s) => ({ ...s, elicitation: null }));
+    },
+    log: (message) => logger.debug(message),
+  });
+
+  session.client.rpcHandlerManager.registerHandler(
+    "elicitationResponse",
+    async (response: { id: string; action: string; content?: Record<string, unknown> }) => {
+      elicitations.settle(response);
+    },
+  );
+
+  const handleElicitation = (
+    request: ElicitationRequest,
+    options: { signal: AbortSignal },
+  ): Promise<ElicitationResult> => elicitations.open(request, options);
 
   try {
     let pending: {
@@ -3211,7 +3177,7 @@ export async function claudeRemoteLauncher(
                 promptSubmissionConfirmed = true;
                 return;
               }
-              if (ongoingToolCalls.size > 0 || pendingElicitations.size > 0) return;
+              if (ongoingToolCalls.size > 0 || elicitations.size() > 0) return;
               logger.debug(
                 `[remote][strand] post-write wedge — no PTY echo/output ${Date.now() - writtenAt}ms after prompt write, fast auto-recovery. ${strandDiagState()}`,
               );
@@ -3589,10 +3555,7 @@ export async function claudeRemoteLauncher(
     }
   } finally {
     // Drain any pending elicitations to prevent Promise/listener leaks
-    for (const [_id, { reject }] of pendingElicitations) {
-      reject(new Error("Session ended"));
-    }
-    pendingElicitations.clear();
+    elicitations.drainAll(new Error("Session ended"));
 
     // Clean up permission handler
     permissionHandler.reset();

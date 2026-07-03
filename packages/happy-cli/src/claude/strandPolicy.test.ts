@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   classifyStrandTick,
   classifyOutputTick,
+  decideStrandRedeliver,
   DEFAULT_STRAND_THRESHOLDS,
   type StrandTickSignals,
 } from "./strandPolicy";
@@ -161,5 +162,59 @@ describe("classifyOutputTick", () => {
       countAsTurnOutput: true,
       rearmRedeliverBudget: true,
     });
+  });
+});
+
+describe("decideStrandRedeliver", () => {
+  const base = {
+    exiting: false,
+    turnProducedOutput: false,
+    hasInFlightPrompt: true,
+    redeliverCount: 0,
+    promptIsSlashCommand: false,
+  };
+
+  it("re-delivers a prose prompt when the turn produced zero output", () => {
+    expect(decideStrandRedeliver(base)).toEqual({ action: "redeliver" });
+  });
+
+  it("forces a cold restart for a slash command — never re-paste onto the same PTY", () => {
+    expect(decideStrandRedeliver({ ...base, promptIsSlashCommand: true })).toEqual({
+      action: "cold-restart",
+    });
+  });
+
+  it("skips when the launcher is exiting", () => {
+    expect(decideStrandRedeliver({ ...base, exiting: true })).toEqual({
+      action: "skip",
+      reason: "exiting",
+    });
+  });
+
+  it("skips when the turn already produced output (double-execution risk)", () => {
+    expect(decideStrandRedeliver({ ...base, turnProducedOutput: true })).toEqual({
+      action: "skip",
+      reason: "turn-produced-output",
+    });
+  });
+
+  it("skips when no prompt was captured for this turn", () => {
+    expect(decideStrandRedeliver({ ...base, hasInFlightPrompt: false })).toEqual({
+      action: "skip",
+      reason: "no-inflight-prompt",
+    });
+  });
+
+  it("enforces the one-shot budget — a second strand does not re-deliver again", () => {
+    expect(decideStrandRedeliver({ ...base, redeliverCount: 1 })).toEqual({
+      action: "skip",
+      reason: "budget-exhausted",
+    });
+  });
+
+  it("budget check precedes the slash split — an exhausted slash prompt skips, not cold-restarts", () => {
+    expect(
+      decideStrandRedeliver({ ...base, redeliverCount: 1, promptIsSlashCommand: true }),
+    ).toEqual({ action: "skip", reason: "budget-exhausted" });
   });
 });
