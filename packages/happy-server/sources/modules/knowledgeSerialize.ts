@@ -1,5 +1,9 @@
 import { z } from "zod";
 import type { ProjectKnowledge } from "@prisma/client";
+import { safeParseJsonArray } from "@/utils/safeJson";
+
+// Re-exported for the existing importers of this module.
+export { safeParseJsonArray };
 
 const ProjectProfileSchema = z.object({
     techStack: z.array(z.string()),
@@ -9,18 +13,6 @@ const ProjectProfileSchema = z.object({
     lastUpdatedAt: z.number(),
     lastUpdatedBy: z.string().optional(),
 });
-
-/**
- * Safely parse a JSON array string. Returns empty array on failure.
- */
-export function safeParseJsonArray(json: string): string[] {
-    try {
-        const parsed = JSON.parse(json);
-        return Array.isArray(parsed) ? parsed : [];
-    } catch {
-        return [];
-    }
-}
 
 /**
  * Serialize a ProjectKnowledge DB row to API response format.

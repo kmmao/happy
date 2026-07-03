@@ -1,6 +1,6 @@
 import { machineAliveEventsCounter, websocketEventsCounter } from "@/app/monitoring/metrics2";
 import { activityCache } from "@/app/presence/sessionCache";
-import { emitSyncUpdate } from "@/app/events/syncUpdate";
+import { machineVersionedUpdate } from "./machineVersionedUpdate";
 import { emitSyncEphemeral } from "@/app/events/syncEphemeral";
 import { log } from "@/utils/log";
 import { db } from "@/storage/db";
@@ -8,9 +8,7 @@ import { Socket } from "socket.io";
 import { runDueMachineHeartbeatScans } from "@/app/api/socket/machineHeartbeatScans";
 import { buildBriefPushBody, pushSend } from "@/modules/pushSend";
 import { consolidate } from "@/modules/knowledgeConsolidate";
-import { storeKnowledgeEmbedding } from "@/modules/knowledgeEmbedding";
-import { supersedeEntry } from "@/modules/knowledgeRelation";
-import { inTx } from "@/storage/inTx";
+import { writeKnowledgeEntry } from "@/modules/knowledgeWrite";
 
 // Track last seen brief timestamp per machine to detect new briefs
 const lastBriefTimestamp = new Map<string, number>();
@@ -70,80 +68,11 @@ export function machineUpdateHandler(userId: string, socket: Socket) {
 
             // Validate input
             if (!machineId || typeof metadata !== 'string' || typeof expectedVersion !== 'number') {
-                if (callback) {
-                    callback({ result: 'error', message: 'Invalid parameters' });
-                }
+                callback?.({ result: 'error', message: 'Invalid parameters' });
                 return;
             }
 
-            // Resolve machine
-            const machine = await db.machine.findFirst({
-                where: {
-                    accountId: userId,
-                    id: machineId
-                }
-            });
-            if (!machine) {
-                if (callback) {
-                    callback({ result: 'error', message: 'Machine not found' });
-                }
-                return;
-            }
-
-            // Check version
-            if (machine.metadataVersion !== expectedVersion) {
-                callback({
-                    result: 'version-mismatch',
-                    version: machine.metadataVersion,
-                    metadata: machine.metadata
-                });
-                return;
-            }
-
-            // Update metadata with atomic version check
-            const { count } = await db.machine.updateMany({
-                where: {
-                    accountId: userId,
-                    id: machineId,
-                    metadataVersion: expectedVersion  // Atomic CAS
-                },
-                data: {
-                    metadata: metadata,
-                    metadataVersion: expectedVersion + 1
-                    // NOT updating active or lastActiveAt here
-                }
-            });
-
-            if (count === 0) {
-                // Re-fetch current version
-                const current = await db.machine.findFirst({
-                    where: {
-                        accountId: userId,
-                        id: machineId
-                    }
-                });
-                callback({
-                    result: 'version-mismatch',
-                    version: current?.metadataVersion || 0,
-                    metadata: current?.metadata
-                });
-                return;
-            }
-
-            // Broadcast metadata change. Seam owns seq + id + recipient
-            // (ADR-0023). update-machine -> machine-scoped-only.
-            await emitSyncUpdate(userId, {
-                t: "update-machine",
-                machineId,
-                metadata: { value: metadata, version: expectedVersion + 1 },
-            });
-
-            // Send success response with new version
-            callback({
-                result: 'success',
-                version: expectedVersion + 1,
-                metadata: metadata
-            });
+            await machineVersionedUpdate({ userId, machineId, field: 'metadata', value: metadata, expectedVersion, callback });
         } catch (error) {
             log({ module: 'websocket', level: 'error' }, `Error in machine-update-metadata: ${error}`);
             if (callback) {
@@ -159,108 +88,41 @@ export function machineUpdateHandler(userId: string, socket: Socket) {
 
             // Validate input
             if (!machineId || typeof daemonState !== 'string' || typeof expectedVersion !== 'number') {
-                if (callback) {
-                    callback({ result: 'error', message: 'Invalid parameters' });
-                }
+                callback?.({ result: 'error', message: 'Invalid parameters' });
                 return;
             }
 
-            // Resolve machine
-            const machine = await db.machine.findFirst({
-                where: {
-                    accountId: userId,
-                    id: machineId
-                }
-            });
-            if (!machine) {
-                if (callback) {
-                    callback({ result: 'error', message: 'Machine not found' });
-                }
-                return;
-            }
+            const result = await machineVersionedUpdate({ userId, machineId, field: 'daemonState', value: daemonState, expectedVersion, callback });
 
-            // Check version
-            if (machine.daemonStateVersion !== expectedVersion) {
-                callback({
-                    result: 'version-mismatch',
-                    version: machine.daemonStateVersion,
-                    daemonState: machine.daemonState
-                });
-                return;
-            }
-
-            // Update daemon state with atomic version check
-            const { count } = await db.machine.updateMany({
-                where: {
-                    accountId: userId,
-                    id: machineId,
-                    daemonStateVersion: expectedVersion  // Atomic CAS
-                },
-                data: {
-                    daemonState: daemonState,
-                    daemonStateVersion: expectedVersion + 1,
-                    active: true,
-                    lastActiveAt: new Date()
-                }
-            });
-
-            if (count === 0) {
-                // Re-fetch current version
-                const current = await db.machine.findFirst({
-                    where: {
-                        accountId: userId,
-                        id: machineId
-                    }
-                });
-                callback({
-                    result: 'version-mismatch',
-                    version: current?.daemonStateVersion || 0,
-                    daemonState: current?.daemonState
-                });
-                return;
-            }
-
-            // Broadcast daemon-state change. Seam owns seq + id + recipient
-            // (ADR-0023). update-machine -> machine-scoped-only.
-            await emitSyncUpdate(userId, {
-                t: "update-machine",
-                machineId,
-                daemonState: { value: daemonState, version: expectedVersion + 1 },
-            });
-
-            // Check for new briefs and send push notifications
-            try {
-                const parsed = JSON.parse(daemonState);
-                const briefs = parsed?.recentBriefs;
-                if (Array.isArray(briefs) && briefs.length > 0) {
-                    const latestBrief = briefs[0];
-                    const lastSeen = lastBriefTimestamp.get(machineId) ?? 0;
-                    if (latestBrief.generatedAt > lastSeen) {
-                        lastBriefTimestamp.set(machineId, latestBrief.generatedAt);
-                        // Only push if this is genuinely new (not first load)
-                        if (lastSeen > 0) {
-                            void pushSend(userId, {
-                                title: `Loop Brief: ${latestBrief.loopName ?? latestBrief.loopId}`,
-                                body: buildBriefPushBody(latestBrief),
-                                data: {
-                                    type: "loop_brief",
-                                    loopId: latestBrief.loopId,
-                                    status: latestBrief.status,
-                                },
-                            });
+            // Check for new briefs and send push notifications — only after a
+            // successful write (best-effort; must not fail the update).
+            if (result.applied) {
+                try {
+                    const parsed = JSON.parse(daemonState);
+                    const briefs = parsed?.recentBriefs;
+                    if (Array.isArray(briefs) && briefs.length > 0) {
+                        const latestBrief = briefs[0];
+                        const lastSeen = lastBriefTimestamp.get(machineId) ?? 0;
+                        if (latestBrief.generatedAt > lastSeen) {
+                            lastBriefTimestamp.set(machineId, latestBrief.generatedAt);
+                            // Only push if this is genuinely new (not first load)
+                            if (lastSeen > 0) {
+                                void pushSend(userId, {
+                                    title: `Loop Brief: ${latestBrief.loopName ?? latestBrief.loopId}`,
+                                    body: buildBriefPushBody(latestBrief),
+                                    data: {
+                                        type: "loop_brief",
+                                        loopId: latestBrief.loopId,
+                                        status: latestBrief.status,
+                                    },
+                                });
+                            }
                         }
                     }
+                } catch {
+                    // best-effort brief detection — don't fail the update
                 }
-            } catch {
-                // best-effort brief detection — don't fail the update
             }
-
-            // Send success response with new version
-            callback({
-                result: 'success',
-                version: expectedVersion + 1,
-                daemonState: daemonState
-            });
         } catch (error) {
             log({ module: 'websocket', level: 'error' }, `Error in machine-update-state: ${error}`);
             if (callback) {
@@ -348,33 +210,24 @@ export function machineUpdateHandler(userId: string, socket: Socket) {
 
                 if (action.type === "noop") continue;
 
-                const created = await inTx(async (tx) => {
-                    const row = await tx.projectKnowledge.create({
-                        data: {
-                            projectId,
-                            entryType: turn.entryType ?? "discovery",
-                            contributorType: "auto-dream",
-                            action: action.type === "update" ? "supersede" : "create",
-                            title: turn.title ?? "Session activity",
-                            content: turn.content ?? "",
-                            structured: turn.request || turn.outcome
-                                ? JSON.stringify({ request: turn.request, outcome: turn.outcome })
-                                : null,
-                            tags: JSON.stringify(turn.tags ?? []),
-                            confidence: turn.confidence ?? "medium",
-                            model: turn.model ?? null,
-                            sessionId,
-                            affectedFiles: JSON.stringify(turn.affectedFiles ?? []),
-                            supersedesId: action.type === "update" ? action.existingId : null,
-                        },
-                    });
-                    if (action.type === "update" && action.existingId) {
-                        await supersedeEntry(tx, row.id, action.existingId);
-                    }
-                    return row;
+                const created = await writeKnowledgeEntry(action, {
+                    projectId,
+                    entryType: turn.entryType ?? "discovery",
+                    contributorType: "auto-dream",
+                    action: "create",
+                    title: turn.title ?? "Session activity",
+                    content: turn.content ?? "",
+                    structured: turn.request || turn.outcome
+                        ? JSON.stringify({ request: turn.request, outcome: turn.outcome })
+                        : null,
+                    tags: JSON.stringify(turn.tags ?? []),
+                    confidence: turn.confidence ?? "medium",
+                    model: turn.model ?? null,
+                    sessionId,
+                    affectedFiles: JSON.stringify(turn.affectedFiles ?? []),
+                    supersedesId: null,
                 });
 
-                void storeKnowledgeEmbedding(created.id, turn.title ?? "", turn.content ?? "");
                 updatedSessionIds.add(sessionId);
 
                 // Push unified world event for Stream Mode real-time updates

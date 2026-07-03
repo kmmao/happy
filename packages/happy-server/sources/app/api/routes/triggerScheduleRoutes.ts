@@ -1,4 +1,5 @@
 import { type Fastify } from "../types";
+import { safeParseJsonArray } from "@/utils/safeJson";
 import { db } from "@/storage/db";
 import { z } from "zod";
 import { assertOwnedMachine, assertOwnedProject, ownedTriggerSchedule } from "../ownership";
@@ -304,13 +305,4 @@ function serializeTriggerSchedule(schedule: Record<string, unknown>): Record<str
         createdAt: s.createdAt.getTime(),
         updatedAt: s.updatedAt.getTime(),
     };
-}
-
-function safeParseJsonArray(json: string): string[] {
-    try {
-        const parsed = JSON.parse(json);
-        return Array.isArray(parsed) ? parsed : [];
-    } catch {
-        return [];
-    }
 }

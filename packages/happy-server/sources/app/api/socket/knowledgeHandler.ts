@@ -4,12 +4,11 @@ import { db } from "@/storage/db";
 import { log } from "@/utils/log";
 import { consolidate } from "@/modules/knowledgeConsolidate";
 import { parseProfileContent, safeParseJsonArray } from "@/modules/knowledgeSerialize";
-import { storeKnowledgeEmbedding } from "@/modules/knowledgeEmbedding";
+import { writeKnowledgeEntry } from "@/modules/knowledgeWrite";
 import { trackKnowledgeCreation } from "@/modules/knowledgeAutoProfile";
 import { refineKnowledgeEntry } from "@/modules/knowledgeRefiner";
 import { emitSyncEphemeral } from "@/app/events/syncEphemeral";
-import { inTx } from "@/storage/inTx";
-import { addRelations, supersedeEntry, type KnowledgeRelationType } from "@/modules/knowledgeRelation";
+import { addRelations, type KnowledgeRelationType } from "@/modules/knowledgeRelation";
 import { resolveKnowledgeConfig } from "@/modules/knowledgeConfigResolver";
 import { rankKnowledgeByContextHints } from "@/modules/knowledgeRanking";
 import {
@@ -99,38 +98,28 @@ export function knowledgeHandler(userId: string, socket: Socket) {
                 return;
             }
 
-            const created = await inTx(async (tx) => {
-                const row = await tx.projectKnowledge.create({
-                    data: {
-                        projectId,
-                        entryType: entry.entryType,
-                        contributorType: entry.contributorType,
-                        action: action.type === "update" ? "supersede" : entry.action,
-                        title: entry.title,
-                        content: entry.content,
-                        structured: entry.request || entry.outcome
-                            ? JSON.stringify({
-                                request: entry.request,
-                                outcome: entry.outcome,
-                            })
-                            : null,
-                        tags: JSON.stringify(entry.tags),
-                        confidence: entry.confidence,
-                        model: entry.model ?? null,
-                        sessionId: sid,
-                        affectedFiles: JSON.stringify(entry.affectedFiles),
-                        relatedIds: JSON.stringify(entry.relatedIds),
-                        supersedesId: action.type === "update" ? action.existingId : null,
-                    },
-                });
-                if (action.type === "update" && action.existingId) {
-                    await supersedeEntry(tx, row.id, action.existingId);
-                }
-                return row;
+            const created = await writeKnowledgeEntry(action, {
+                projectId,
+                entryType: entry.entryType,
+                contributorType: entry.contributorType,
+                action: entry.action,
+                title: entry.title,
+                content: entry.content,
+                structured: entry.request || entry.outcome
+                    ? JSON.stringify({
+                        request: entry.request,
+                        outcome: entry.outcome,
+                    })
+                    : null,
+                tags: JSON.stringify(entry.tags),
+                confidence: entry.confidence,
+                model: entry.model ?? null,
+                sessionId: sid,
+                affectedFiles: JSON.stringify(entry.affectedFiles),
+                relatedIds: JSON.stringify(entry.relatedIds),
+                supersedesId: null,
             });
 
-            // Fire-and-forget: generate embedding for semantic search
-            void storeKnowledgeEmbedding(created.id, entry.title, entry.content);
             // Fire-and-forget: LLM refinement — skip for repo_map (structured file-tree, not prose)
             if (entry.entryType !== "repo_map") {
                 void refineKnowledgeEntry({

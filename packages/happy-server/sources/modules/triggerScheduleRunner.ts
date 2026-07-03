@@ -1,4 +1,5 @@
 import { homedir } from "node:os";
+import { safeParseJsonArray } from "@/utils/safeJson";
 import { db } from "@/storage/db";
 import { inTx } from "@/storage/inTx";
 import { log } from "@/utils/log";
@@ -268,15 +269,6 @@ export async function checkAndTriggerSchedules(
                 `Failed to trigger schedule ${schedule.id}: ${error}`,
             );
         }
-    }
-}
-
-function safeParseJsonArray(json: string): string[] {
-    try {
-        const parsed = JSON.parse(json);
-        return Array.isArray(parsed) ? parsed : [];
-    } catch {
-        return [];
     }
 }
 

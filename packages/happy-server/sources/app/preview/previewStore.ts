@@ -40,13 +40,6 @@ interface StoredConnection {
     lastActiveAt: number;
 }
 
-interface PendingProxyRequest {
-    requestId: string;
-    timeout: NodeJS.Timeout;
-    resolve: (data: any) => void;
-    reject: (err: any) => void;
-}
-
 /**
  * Streaming response subscriber — receives response-start, body chunks, end,
  * and error events for a single proxy request.
@@ -62,7 +55,6 @@ class PreviewStore {
     private candidates = new Map<string, StoredCandidate>();
     private connections = new Map<string, StoredConnection>(); // tunnelId → connection
     private sessionConnections = new Map<string, string>(); // sessionId → tunnelId
-    private pendingRequests = new Map<string, PendingProxyRequest>(); // requestId → resolver
     private streamSubscribers = new Map<string, ProxyResponseSubscriber>(); // requestId → streaming subscriber
     private requestTunnel = new Map<string, string>(); // requestId → tunnelId (for byte counting)
 
@@ -136,26 +128,6 @@ class PreviewStore {
     }
 
     /**
-     * Create a pending request with automatic timeout.
-     * Used for one-shot request/response (legacy non-streaming path).
-     */
-    createPendingRequest(requestId: string, timeoutMs: number): Promise<any> {
-        return new Promise((resolve, reject) => {
-            const timeout = setTimeout(() => {
-                this.pendingRequests.delete(requestId);
-                reject(new Error(`Preview request timeout: ${requestId}`));
-            }, timeoutMs);
-
-            this.pendingRequests.set(requestId, {
-                requestId,
-                timeout,
-                resolve,
-                reject,
-            });
-        });
-    }
-
-    /**
      * Subscribe to a streaming proxy response.
      * The subscriber's callbacks fire as response-start/body/end/error events
      * arrive from the CLI daemon. Returns an unsubscribe function.
@@ -188,25 +160,15 @@ class PreviewStore {
      * Resolve the response start (status, headers).
      */
     resolveResponseStart(requestId: string, data: any): void {
-        // Streaming subscriber (preferred)
         const sub = this.streamSubscribers.get(requestId);
-        if (sub) {
-            this.touchByRequest(requestId);
-            sub.onStart({
-                status: data.status,
-                statusText: data.statusText,
-                headers: data.headers ?? {},
-                hasBody: data.hasBody ?? false,
-            });
-            return;
-        }
-        // Legacy one-shot
-        const pending = this.pendingRequests.get(requestId);
-        if (pending) {
-            clearTimeout(pending.timeout);
-            this.pendingRequests.delete(requestId);
-            pending.resolve({ type: "start", ...data });
-        }
+        if (!sub) return;
+        this.touchByRequest(requestId);
+        sub.onStart({
+            status: data.status,
+            statusText: data.statusText,
+            headers: data.headers ?? {},
+            hasBody: data.hasBody ?? false,
+        });
     }
 
     /**
@@ -214,19 +176,12 @@ class PreviewStore {
      */
     resolveResponseBody(requestId: string, chunk: string): void {
         const sub = this.streamSubscribers.get(requestId);
-        if (sub) {
-            this.touchByRequest(requestId);
-            try {
-                sub.onBody(Buffer.from(chunk, "base64"));
-            } catch {
-                sub.onError("Invalid base64 chunk");
-            }
-            return;
-        }
-        // Legacy one-shot path (unused with subscribers)
-        const pending = this.pendingRequests.get(requestId);
-        if (pending) {
-            pending.resolve({ type: "body", chunk });
+        if (!sub) return;
+        this.touchByRequest(requestId);
+        try {
+            sub.onBody(Buffer.from(chunk, "base64"));
+        } catch {
+            sub.onError("Invalid base64 chunk");
         }
     }
 
@@ -235,18 +190,10 @@ class PreviewStore {
      */
     resolveResponseEnd(requestId: string): void {
         const sub = this.streamSubscribers.get(requestId);
-        if (sub) {
-            this.streamSubscribers.delete(requestId);
-            this.requestTunnel.delete(requestId);
-            sub.onEnd();
-            return;
-        }
-        const pending = this.pendingRequests.get(requestId);
-        if (pending) {
-            clearTimeout(pending.timeout);
-            this.pendingRequests.delete(requestId);
-            pending.resolve({ type: "end" });
-        }
+        if (!sub) return;
+        this.streamSubscribers.delete(requestId);
+        this.requestTunnel.delete(requestId);
+        sub.onEnd();
     }
 
     /**
@@ -254,18 +201,10 @@ class PreviewStore {
      */
     resolveResponseError(requestId: string, error: string): void {
         const sub = this.streamSubscribers.get(requestId);
-        if (sub) {
-            this.streamSubscribers.delete(requestId);
-            this.requestTunnel.delete(requestId);
-            sub.onError(error);
-            return;
-        }
-        const pending = this.pendingRequests.get(requestId);
-        if (pending) {
-            clearTimeout(pending.timeout);
-            this.pendingRequests.delete(requestId);
-            pending.reject(new Error(error));
-        }
+        if (!sub) return;
+        this.streamSubscribers.delete(requestId);
+        this.requestTunnel.delete(requestId);
+        sub.onError(error);
     }
 
     // ── F6: Idle / lease cleanup ──────────────────────────────────────────

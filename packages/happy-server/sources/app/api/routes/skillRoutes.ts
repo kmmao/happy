@@ -1,4 +1,5 @@
 import { type Fastify } from "../types";
+import { safeParseJsonArray } from "@/utils/safeJson";
 import { db } from "@/storage/db";
 import { z } from "zod";
 import { log } from "@/utils/log";
@@ -256,13 +257,4 @@ function serializeSkill(skill: Record<string, unknown>): Record<string, unknown>
         createdAt: s.createdAt.getTime(),
         updatedAt: s.updatedAt.getTime(),
     };
-}
-
-function safeParseJsonArray(json: string): string[] {
-    try {
-        const parsed = JSON.parse(json);
-        return Array.isArray(parsed) ? parsed : [];
-    } catch {
-        return [];
-    }
 }

@@ -5,13 +5,14 @@ import { assertOwnedProject } from "../ownership";
 import { consolidate } from "@/modules/knowledgeConsolidate";
 import { inTx } from "@/storage/inTx";
 import { serializeKnowledgeEntry, parseProfileContent, safeParseJsonArray } from "@/modules/knowledgeSerialize";
-import { storeKnowledgeEmbedding, findSimilarByEmbedding } from "@/modules/knowledgeEmbedding";
+import { findSimilarByEmbedding } from "@/modules/knowledgeEmbedding";
+import { writeKnowledgeEntry } from "@/modules/knowledgeWrite";
 import { fetchKnowledgeChain } from "@/modules/knowledgeChain";
 import { generateEmbedding, truncateForEmbedding } from "@/modules/embeddingService";
 import { regenerateProfile } from "@/modules/knowledgeProfileGenerator";
 import { trackKnowledgeCreation } from "@/modules/knowledgeAutoProfile";
 import { refineKnowledgeEntry } from "@/modules/knowledgeRefiner";
-import { addRelations, supersedeEntry, type KnowledgeRelationType } from "@/modules/knowledgeRelation";
+import { addRelations, type KnowledgeRelationType } from "@/modules/knowledgeRelation";
 import { inboxCreate } from "@/modules/inboxCreate";
 import {
     getEvictedKnowledgeIds,
@@ -252,42 +253,32 @@ export function knowledgeRoutes(app: Fastify) {
                 return reply.send({ action: "noop", reason: dedupAction.reason });
             }
 
-            const entry = await inTx(async (tx) => {
-                const created = await tx.projectKnowledge.create({
-                    data: {
-                        projectId: id,
-                        entryType: body.entryType,
-                        category: body.category ?? null,
-                        contributorType: body.contributorType,
-                        action: dedupAction.type === "update" ? "supersede" : body.action,
-                        title: body.title,
-                        content: body.content,
-                        structured: body.request || body.findings || body.analysis || body.outcome || body.nextSteps
-                            ? JSON.stringify({
-                                request: body.request,
-                                findings: body.findings,
-                                analysis: body.analysis,
-                                outcome: body.outcome,
-                                nextSteps: body.nextSteps,
-                            })
-                            : null,
-                        tags: JSON.stringify(body.tags),
-                        confidence: body.confidence,
-                        model: body.model,
-                        sessionId: body.sessionId,
-                        affectedFiles: JSON.stringify(body.affectedFiles),
-                        relatedIds: JSON.stringify(body.relatedIds),
-                        supersedesId: dedupAction.type === "update" ? dedupAction.existingId : body.supersedesId,
-                    },
-                });
-                if (dedupAction.type === "update") {
-                    await supersedeEntry(tx, created.id, dedupAction.existingId);
-                }
-                return created;
+            const entry = await writeKnowledgeEntry(dedupAction, {
+                projectId: id,
+                entryType: body.entryType,
+                category: body.category ?? null,
+                contributorType: body.contributorType,
+                action: body.action,
+                title: body.title,
+                content: body.content,
+                structured: body.request || body.findings || body.analysis || body.outcome || body.nextSteps
+                    ? JSON.stringify({
+                        request: body.request,
+                        findings: body.findings,
+                        analysis: body.analysis,
+                        outcome: body.outcome,
+                        nextSteps: body.nextSteps,
+                    })
+                    : null,
+                tags: JSON.stringify(body.tags),
+                confidence: body.confidence,
+                model: body.model,
+                sessionId: body.sessionId,
+                affectedFiles: JSON.stringify(body.affectedFiles),
+                relatedIds: JSON.stringify(body.relatedIds),
+                supersedesId: body.supersedesId,
             });
 
-            // Fire-and-forget: generate embedding for semantic search
-            void storeKnowledgeEmbedding(entry.id, entry.title, entry.content);
             // Fire-and-forget: LLM refinement (rewrites title/content/structured in-place)
             void refineKnowledgeEntry({
                 id: entry.id,

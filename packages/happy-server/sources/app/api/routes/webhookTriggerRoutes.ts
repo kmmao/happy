@@ -1,4 +1,5 @@
 import { emitSyncUpdate } from "@/app/events/syncUpdate";
+import { safeParseJsonArray } from "@/utils/safeJson";
 import { type Fastify } from "../types";
 import { db } from "@/storage/db";
 import { z } from "zod";
@@ -503,13 +504,4 @@ function serializeWebhookTrigger(trigger: Record<string, unknown>): Record<strin
         createdAt: t.createdAt.getTime(),
         updatedAt: t.updatedAt.getTime(),
     };
-}
-
-function safeParseJsonArray(json: string): string[] {
-    try {
-        const parsed = JSON.parse(json);
-        return Array.isArray(parsed) ? parsed : [];
-    } catch {
-        return [];
-    }
 }

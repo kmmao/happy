@@ -20,10 +20,8 @@ import { ProfileEditForm } from "@/components/ProfileEditForm";
 import { randomUUID } from "expo-crypto";
 import { TokenStorage } from "@/auth/tokenStorage";
 import {
-  createAccountProfile,
   deleteAccountProfile,
   fetchAccountProfiles,
-  updateAccountProfile,
 } from "@/sync/apiAccountProfiles";
 import { sync } from "@/sync/sync";
 import { storage, useSetting, useSettingMutable } from "@/sync/storage";
@@ -34,7 +32,10 @@ import {
 import { getProfileConfigSummary } from "@/utils/profileConfigSummary";
 import { mergeAccountProfiles } from "@/utils/mergeAccountProfiles";
 import {
-  buildConflictRetryProfile,
+  buildRemoteState,
+  persistProfileToAccount,
+} from "@/components/settings/profiles/accountProfilePersist";
+import {
   buildProfileSettingsOverview,
   getProfileSyncActionState,
   getProfileSyncStatus,
@@ -136,54 +137,6 @@ function getSyncActionIconName(syncStatus: ProfileSyncStatus): keyof typeof Ioni
       return "cloud-upload-outline";
     case "synced":
       return "cloud-done-outline";
-  }
-}
-
-function buildRemoteState(remoteProfiles: Awaited<ReturnType<typeof fetchAccountProfiles>>): ProfileRemoteState {
-  return remoteProfiles.reduce<ProfileRemoteState>((accumulator, entry) => {
-    accumulator[entry.profile.id] = {
-      revision: entry.revision,
-      updatedAt: entry.profile.updatedAt ?? 0,
-    };
-    return accumulator;
-  }, {});
-}
-
-async function persistProfileToAccount(
-  profile: AIBackendProfile,
-  remoteEntry: ProfileRemoteState[string] | undefined,
-) {
-  const credentials = await TokenStorage.getCredentials();
-  if (!credentials) {
-    return;
-  }
-
-  if (!remoteEntry) {
-    await createAccountProfile(credentials, profile);
-    return;
-  }
-
-  const result = await updateAccountProfile(
-    credentials,
-    profile.id,
-    profile,
-    remoteEntry.revision,
-  );
-
-  if (result.success) {
-    return;
-  }
-
-  const retryProfile = buildConflictRetryProfile(profile, result.current.profile);
-  const retryResult = await updateAccountProfile(
-    credentials,
-    profile.id,
-    retryProfile,
-    result.current.revision,
-  );
-
-  if (!retryResult.success) {
-    throw new Error("revision-mismatch");
   }
 }
 

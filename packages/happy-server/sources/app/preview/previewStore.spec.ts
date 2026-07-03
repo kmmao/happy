@@ -160,84 +160,102 @@ describe("PreviewStore", () => {
         });
     });
 
-    describe("pending requests", () => {
-        it("resolves on response start", async () => {
-            const requestId = "req-resolve-" + Date.now();
-            const promise = previewStore.createPendingRequest(requestId, 5000);
-            previewStore.resolveResponseStart(requestId, {
+    describe("streaming responses", () => {
+        type Event =
+            | { t: "start"; d: unknown }
+            | { t: "body"; b: Buffer }
+            | { t: "end" }
+            | { t: "error"; m: string };
+
+        function makeSubscriber() {
+            const events: Event[] = [];
+            return {
+                events,
+                sub: {
+                    onStart: (d: unknown) => events.push({ t: "start", d }),
+                    onBody: (b: Buffer) => events.push({ t: "body", b }),
+                    onEnd: () => events.push({ t: "end" }),
+                    onError: (m: string) => events.push({ t: "error", m }),
+                },
+            };
+        }
+
+        it("routes response start to the subscriber with mapped fields", () => {
+            const { events, sub } = makeSubscriber();
+            previewStore.subscribeProxyResponse("r1", "t1", sub);
+            previewStore.resolveResponseStart("r1", {
                 status: 200,
                 statusText: "OK",
                 headers: { "content-type": "text/html" },
                 hasBody: true,
             });
-            const result = await promise;
-            expect(result.type).toBe("start");
-            expect(result.status).toBe(200);
-            expect(result.statusText).toBe("OK");
-            expect(result.headers).toEqual({ "content-type": "text/html" });
+            expect(events).toEqual([
+                { t: "start", d: { status: 200, statusText: "OK", headers: { "content-type": "text/html" }, hasBody: true } },
+            ]);
         });
 
-        it("resolves on response end", async () => {
-            const requestId = "req-end-" + Date.now();
-            const promise = previewStore.createPendingRequest(requestId, 5000);
-            previewStore.resolveResponseEnd(requestId);
-            const result = await promise;
-            expect(result.type).toBe("end");
+        it("decodes base64 body chunks to the subscriber", () => {
+            const { events, sub } = makeSubscriber();
+            previewStore.subscribeProxyResponse("r2", "t1", sub);
+            previewStore.resolveResponseBody("r2", Buffer.from("hello").toString("base64"));
+            expect(events).toHaveLength(1);
+            expect(events[0]).toMatchObject({ t: "body" });
+            expect((events[0] as { b: Buffer }).b.toString()).toBe("hello");
         });
 
-        it("rejects on timeout", async () => {
-            const requestId = "req-timeout-" + Date.now();
-            const promise = previewStore.createPendingRequest(requestId, 50); // 50ms
-            await expect(promise).rejects.toThrow("Preview request timeout");
+        it("reports an invalid base64 chunk as an error", () => {
+            const { events, sub } = makeSubscriber();
+            previewStore.subscribeProxyResponse("r2b", "t1", sub);
+            // Buffer.from is lenient, so force the throw path via a subscriber whose onBody rejects.
+            const throwingSub = {
+                ...sub,
+                onBody: () => { throw new Error("boom"); },
+            };
+            previewStore.subscribeProxyResponse("r2b", "t1", throwingSub);
+            previewStore.resolveResponseBody("r2b", "###");
+            expect(events).toEqual([{ t: "error", m: "Invalid base64 chunk" }]);
         });
 
-        it("rejects on error", async () => {
-            const requestId = "req-error-" + Date.now();
-            const promise = previewStore.createPendingRequest(requestId, 5000);
-            previewStore.resolveResponseError(requestId, "Connection refused");
-            await expect(promise).rejects.toThrow("Connection refused");
+        it("ends the stream and unsubscribes (later resolves are no-ops)", () => {
+            const { events, sub } = makeSubscriber();
+            previewStore.subscribeProxyResponse("r3", "t1", sub);
+            previewStore.resolveResponseEnd("r3");
+            previewStore.resolveResponseStart("r3", { status: 200 }); // subscriber already gone
+            expect(events).toEqual([{ t: "end" }]);
         });
 
-        it("ignores resolve for unknown request", () => {
-            const unknownId = "unknown-" + Date.now();
-            expect(() => previewStore.resolveResponseStart(unknownId, {})).not.toThrow();
-            expect(() => previewStore.resolveResponseEnd(unknownId)).not.toThrow();
-            expect(() => previewStore.resolveResponseError(unknownId, "err")).not.toThrow();
+        it("errors the stream and unsubscribes", () => {
+            const { events, sub } = makeSubscriber();
+            previewStore.subscribeProxyResponse("r4", "t1", sub);
+            previewStore.resolveResponseError("r4", "Connection refused");
+            previewStore.resolveResponseBody("r4", "x"); // subscriber already gone
+            expect(events).toEqual([{ t: "error", m: "Connection refused" }]);
         });
 
-        it("resolves response body chunk", async () => {
-            const requestId = "req-body-" + Date.now();
-            const promise = previewStore.createPendingRequest(requestId, 5000);
-            const chunk = "<html>test</html>";
-            previewStore.resolveResponseBody(requestId, chunk);
-            const result = await promise;
-            expect(result.type).toBe("body");
-            expect(result.chunk).toBe(chunk);
+        it("unsubscribe removes the subscriber", () => {
+            const { events, sub } = makeSubscriber();
+            const unsub = previewStore.subscribeProxyResponse("r5", "t1", sub);
+            unsub();
+            previewStore.resolveResponseStart("r5", { status: 200 });
+            expect(events).toEqual([]);
         });
 
-        it("clears timeout when resolving response start", async () => {
-            const requestId = "req-clear-timeout-" + Date.now();
-            const promise = previewStore.createPendingRequest(requestId, 100);
-            previewStore.resolveResponseStart(requestId, { status: 200 });
-            const result = await promise;
-            expect(result.status).toBe(200);
-            // If timeout wasn't cleared, it would reject after 100ms
-            // This test passes if it resolves before the timeout
+        it("resolves for an unknown request are silent no-ops", () => {
+            expect(() => previewStore.resolveResponseStart("nope", {})).not.toThrow();
+            expect(() => previewStore.resolveResponseBody("nope", "eA==")).not.toThrow();
+            expect(() => previewStore.resolveResponseEnd("nope")).not.toThrow();
+            expect(() => previewStore.resolveResponseError("nope", "err")).not.toThrow();
         });
 
-        it("handles multiple pending requests independently", async () => {
-            const req1 = "req-multi-1-" + Date.now();
-            const req2 = "req-multi-2-" + Date.now();
-            const promise1 = previewStore.createPendingRequest(req1, 5000);
-            const promise2 = previewStore.createPendingRequest(req2, 5000);
-
-            previewStore.resolveResponseStart(req1, { status: 200 });
-            previewStore.resolveResponseError(req2, "Failed");
-
-            const result1 = await promise1;
-            expect(result1.status).toBe(200);
-
-            await expect(promise2).rejects.toThrow("Failed");
+        it("keeps concurrent request streams independent", () => {
+            const a = makeSubscriber();
+            const b = makeSubscriber();
+            previewStore.subscribeProxyResponse("ra", "t1", a.sub);
+            previewStore.subscribeProxyResponse("rb", "t1", b.sub);
+            previewStore.resolveResponseStart("ra", { status: 200 });
+            previewStore.resolveResponseError("rb", "Failed");
+            expect(a.events).toEqual([{ t: "start", d: { status: 200, statusText: undefined, headers: {}, hasBody: false } }]);
+            expect(b.events).toEqual([{ t: "error", m: "Failed" }]);
         });
     });
 });
