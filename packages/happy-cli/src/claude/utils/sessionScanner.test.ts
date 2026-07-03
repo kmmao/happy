@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { createSessionScanner } from './sessionScanner'
+import { createSessionScanner, parseJsonlText } from './sessionScanner'
+import type { ClaudeGoalStatusTranscriptEvent } from '../claudeGoalStatus'
 import { RawJSONLines } from '../types'
 import { mkdir, writeFile, appendFile, rm, readFile } from 'node:fs/promises'
 import { join } from 'node:path'
@@ -782,5 +783,44 @@ describe('sessionScanner', () => {
       expect(out).toBeDefined()
       expect((out as any).parent_tool_use_id).toBe('tu_w')
     })
+  })
+})
+
+describe('parseJsonlText — goal_status interception', () => {
+  const goalLine = ln({
+    type: 'attachment',
+    uuid: 'goal-1',
+    sessionId: 'sess-1',
+    timestamp: '2026-06-19T14:38:48.095Z',
+    attachment: { type: 'goal_status', met: false, sentinel: true, condition: 'keep going' },
+  })
+  const assistantLine = ln({
+    type: 'assistant',
+    uuid: 'msg-1',
+    sessionId: 'sess-1',
+    message: { role: 'assistant', content: [{ type: 'text', text: 'hi' }] },
+  })
+
+  it('routes goal_status attachments to onGoalStatus and excludes them from messages', () => {
+    const goals: ClaudeGoalStatusTranscriptEvent[] = []
+    const messages = parseJsonlText(goalLine + assistantLine, (e) => goals.push(e))
+    expect(goals).toHaveLength(1)
+    expect(goals[0]).toMatchObject({ uuid: 'goal-1', sourceSessionId: 'sess-1', attachment: { met: false } })
+    // Only the assistant message survives as a conversation message.
+    expect(messages).toHaveLength(1)
+    expect(messages[0].type).toBe('assistant')
+  })
+
+  it('does not fire onGoalStatus for ordinary messages', () => {
+    const goals: ClaudeGoalStatusTranscriptEvent[] = []
+    const messages = parseJsonlText(assistantLine, (e) => goals.push(e))
+    expect(goals).toHaveLength(0)
+    expect(messages).toHaveLength(1)
+  })
+
+  it('drops goal_status lines even when no sink is provided (never leak into chat)', () => {
+    const messages = parseJsonlText(goalLine + assistantLine)
+    expect(messages).toHaveLength(1)
+    expect(messages[0].type).toBe('assistant')
   })
 })

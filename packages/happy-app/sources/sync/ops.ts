@@ -1729,6 +1729,28 @@ export async function sessionAbort(sessionId: string): Promise<void> {
 }
 
 /**
+ * Dispatch an authoritative `/goal` action for a session.
+ *
+ * PTY-mode Claude has no dedicated goal RPC — the TUI drives goal state through
+ * the `/goal` slash command, which flows through the normal message queue. So a
+ * clear/edit action is sent as a `/goal` message; the CLI's transcript scanner
+ * then reports the resulting authoritative state back into agentState. `stop`
+ * is a no-op placeholder (Claude has no goal-pause command).
+ */
+export async function sessionGoalAction(
+  sessionId: string,
+  action: "clear" | "stop" | "edit",
+  objective?: string,
+): Promise<void> {
+  if (action === "stop") {
+    return;
+  }
+  const command =
+    action === "edit" && objective ? `/goal ${objective}` : "/goal clear";
+  await sync.sendMessage(sessionId, command);
+}
+
+/**
  * Discover installed Claude Code plugins on the target machine (legacy session-based)
  */
 export async function sessionDiscoverPlugins(

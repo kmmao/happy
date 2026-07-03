@@ -1334,6 +1334,13 @@ export const pl: TranslationStructure = {
   },
 
   components: {
+    agentGoalBar: {
+      currentGoal: 'Bieżący cel',
+      accessibilityLabel: ({ goal }: { goal: string }) => `Bieżący cel: ${goal}`,
+      clearGoal: 'Wyczyść cel',
+      stopGoal: 'Zatrzymaj cel',
+      editGoal: 'Edytuj cel',
+    },
     emptyMainScreen: {
       // Used by EmptyMainScreen component
       readyToCode: "Gotowy do kodowania?",

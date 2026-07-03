@@ -1448,6 +1448,13 @@ export const ja: TranslationStructure = {
   },
 
   components: {
+    agentGoalBar: {
+      currentGoal: '現在の目標',
+      accessibilityLabel: ({ goal }: { goal: string }) => `現在の目標: ${goal}`,
+      clearGoal: '目標をクリア',
+      stopGoal: '目標を停止',
+      editGoal: '目標を編集',
+    },
     emptyMainScreen: {
       // Used by EmptyMainScreen component
       readyToCode: "コーディングを始めますか？",

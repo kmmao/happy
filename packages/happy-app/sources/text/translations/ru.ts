@@ -1064,6 +1064,13 @@ export const ru: TranslationStructure = {
   },
 
   components: {
+    agentGoalBar: {
+      currentGoal: 'Текущая цель',
+      accessibilityLabel: ({ goal }: { goal: string }) => `Текущая цель: ${goal}`,
+      clearGoal: 'Очистить цель',
+      stopGoal: 'Остановить цель',
+      editGoal: 'Изменить цель',
+    },
     emptyMainScreen: {
       // Used by EmptyMainScreen component
       readyToCode: "Готовы к программированию?",

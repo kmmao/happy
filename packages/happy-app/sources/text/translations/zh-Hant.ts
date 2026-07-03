@@ -1284,6 +1284,13 @@ export const zhHant: TranslationStructure = {
   },
 
   components: {
+    agentGoalBar: {
+      currentGoal: '目前目標',
+      accessibilityLabel: ({ goal }: { goal: string }) => `目前目標：${goal}`,
+      clearGoal: '清除目標',
+      stopGoal: '停止目標',
+      editGoal: '編輯目標',
+    },
     emptyMainScreen: {
       // Used by EmptyMainScreen component
       readyToCode: "準備開始寫程式？",

@@ -92,6 +92,7 @@ import {
   type ClaudePtyReverseServer,
 } from "@/claude/pty/claudePtyReverseServer";
 import { createSessionScanner } from "./utils/sessionScanner";
+import type { ClaudeGoalStatusTranscriptEvent } from "./claudeGoalStatus";
 
 void resolvePath; // path resolution kept available for future flag builders
 
@@ -648,6 +649,14 @@ export async function claudeRemote(opts: {
    * `picker`).
    */
   onTuiStatus?: (event: TuiStatusEvent) => void;
+  /**
+   * Fires with each authoritative `/goal` state event extracted from the
+   * transcript (`attachment.type === 'goal_status'`). These are NOT chat
+   * messages — the launcher folds them into agentState.agentGoalStatus so the
+   * App can render a goal bar. Fired once per newly-appended goal line (may
+   * re-fire on a rare in-place truncation reset; dedupe by `event.uuid`).
+   */
+  onGoalStatus?: (event: ClaudeGoalStatusTranscriptEvent) => void;
   /**
    * Fires with the EXACT text written to the PTY composer for a turn —
    * the bracketed-paste payload as Claude actually received it, including any
@@ -1472,6 +1481,7 @@ export async function claudeRemote(opts: {
   const scanner = await createSessionScanner({
     sessionId: startFrom,
     workingDirectory: opts.path,
+    onGoalStatus: opts.onGoalStatus,
     onMessage: (raw) => {
       if (!firstResponseLogged) {
         firstResponseLogged = true;

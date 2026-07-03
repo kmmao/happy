@@ -47,7 +47,7 @@ import {
   startRealtimeSession,
   stopRealtimeSession,
 } from "@/realtime/RealtimeSession";
-import { sessionInterrupt, sessionStopTask, sessionBash } from "@/sync/ops";
+import { sessionInterrupt, sessionStopTask, sessionBash, sessionGoalAction } from "@/sync/ops";
 import { QueueBanner, QueuePreviewOverlay, type QueuedMessageItem } from "@/components/QueueBanner";
 import { reactivateArchivedSession } from "@/sync/sessionResumeFlow";
 import { forkSessionFromMessage } from "@/sync/sessionForkFlow";
@@ -119,6 +119,9 @@ import { OpenFilesTabBar } from "@/components/session/OpenFilesTabBar";
 import { SidePanelFilePreview } from "@/components/session/SidePanelFilePreview";
 import { useOpenFilesStack } from "@/components/session/useOpenFilesStack";
 import { useLayout } from "@/components/layout";
+import { AgentGoalBar, type AgentGoalAction } from "@/components/AgentGoalBar";
+import { resolveVisibleAgentGoalStatus } from "@/components/agentGoalStatus";
+import { performAgentGoalAction } from "./agentGoalActionHandler";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import * as React from "react";
@@ -976,6 +979,40 @@ function SessionViewInner({
         rpcReady: session.rpcReady,
       }),
     [socketStatus.status, session.presence, session.rpcReady],
+  );
+
+  // Authoritative `/goal` bar. Resolved from provider-owned agentState (scanned
+  // from the transcript by the CLI), gated to the current online claude session.
+  const visibleAgentGoal = React.useMemo(
+    () => resolveVisibleAgentGoalStatus(session),
+    [
+      session.agentState?.agentGoalStatus,
+      session.presence,
+      session.metadata?.claudeSessionId,
+    ],
+  );
+  const [goalActionInFlight, setGoalActionInFlight] =
+    React.useState<AgentGoalAction | null>(null);
+  const handleGoalAction = React.useCallback(
+    async (action: AgentGoalAction) => {
+      await performAgentGoalAction({
+        action,
+        currentGoalText: visibleAgentGoal?.text ?? "",
+        promptEditGoal: (currentGoalText) =>
+          Modal.prompt(t("components.agentGoalBar.editGoal"), undefined, {
+            placeholder: t("components.agentGoalBar.currentGoal"),
+            defaultValue: currentGoalText,
+            cancelText: t("common.cancel"),
+            confirmText: t("common.save"),
+          }),
+        dispatchGoalAction: (nextAction, objective) =>
+          sessionGoalAction(sessionId, nextAction, objective),
+        setInFlight: setGoalActionInFlight,
+        onError: (error) =>
+          console.error("Failed to perform goal action", error),
+      });
+    },
+    [sessionId, visibleAgentGoal?.text],
   );
   const isSessionInputDisabled = modelSummaryRpcState !== "rpcReady";
   const disabledInputPlaceholder = React.useMemo(() => {
@@ -1893,6 +1930,22 @@ function SessionViewInner({
 
   const input = (
     <>
+      {visibleAgentGoal && (
+        <View
+          style={{
+            width: "100%",
+            maxWidth: layout.maxWidth,
+            alignSelf: "center",
+            paddingHorizontal: 16,
+          }}
+        >
+          <AgentGoalBar
+            goal={visibleAgentGoal}
+            onAction={handleGoalAction}
+            inFlightAction={goalActionInFlight}
+          />
+        </View>
+      )}
       <BackgroundTaskBar
         sessionId={sessionId}
         tasks={backgroundTasks}

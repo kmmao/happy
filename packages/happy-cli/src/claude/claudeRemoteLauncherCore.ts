@@ -5,6 +5,11 @@ import { RemoteModeDisplay } from "@/ui/ink/RemoteModeDisplay";
 import React from "react";
 import { claudeRemote, is1MModelKey, isSlashCommand } from "./claudeRemote";
 import {
+  claudeGoalActionCapabilities,
+  reduceClaudeGoalStatusEvents,
+  type ClaudeGoalStatusTranscriptEvent,
+} from "./claudeGoalStatus";
+import {
   classifyStrandTick,
   classifyOutputTick,
   decideStrandRedeliver,
@@ -2406,6 +2411,34 @@ export async function claudeRemoteLauncher(
       source?: string;
     } | null = null;
 
+    // Authoritative `/goal` state. Accumulated across re-launches (like the
+    // elicitations registry above) so a goal set in an earlier turn survives a
+    // model hot-swap or permission-mode restart. Keyed by transcript uuid so a
+    // rare truncation-reset re-emit just overwrites. `reduceGoalStatus` folds
+    // the map into agentState, gated to the CURRENT claude session id — a
+    // `/clear` (new session id) therefore drops the previous session's goal.
+    const goalStatusEvents = new Map<string, ClaudeGoalStatusTranscriptEvent>();
+    const reduceGoalStatus = () => {
+      const currentClaudeSessionId = session.sessionId;
+      if (!currentClaudeSessionId) {
+        return;
+      }
+      const capabilities = claudeGoalActionCapabilities({
+        goalCommandSupported: true,
+        observedGoalStatus: true,
+        confirmedActions: { clear: true, edit: true },
+      });
+      const status = reduceClaudeGoalStatusEvents(
+        goalStatusEvents.values(),
+        currentClaudeSessionId,
+        capabilities ? { capabilities } : undefined,
+      );
+      session.client.updateAgentState((s) => ({
+        ...s,
+        agentGoalStatus: status ?? undefined,
+      }));
+    };
+
     // Track session ID to detect when it actually changes
     // This prevents context loss when mode changes (permission mode, model, etc.)
     // without starting a new session. Only reset parent chain when session ID
@@ -3005,6 +3038,12 @@ export async function claudeRemoteLauncher(
             // Update converter's session ID when new session is found
             jsonlToLogConverter.updateSessionId(sessionId);
             session.onSessionFound(sessionId);
+          },
+          // Authoritative `/goal` state extracted from the transcript. Fold
+          // into agentState so the App renders a goal bar; never enters chat.
+          onGoalStatus: (event) => {
+            goalStatusEvents.set(event.uuid, event);
+            reduceGoalStatus();
           },
           // Wire the hookServer-driven session-id channel into claudeRemote so
           // its internal scanner learns which JSONL file to watch as soon as

@@ -1286,6 +1286,13 @@ export const zhHans: TranslationStructure = {
   },
 
   components: {
+    agentGoalBar: {
+      currentGoal: '当前目标',
+      accessibilityLabel: ({ goal }: { goal: string }) => `当前目标：${goal}`,
+      clearGoal: '清除目标',
+      stopGoal: '停止目标',
+      editGoal: '编辑目标',
+    },
     emptyMainScreen: {
       // Used by EmptyMainScreen component
       readyToCode: "准备开始编程？",

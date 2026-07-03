@@ -578,8 +578,49 @@ export type Metadata = {
   }>;
 };
 
+/**
+ * Authoritative agent goal (`/goal`) state, scanned from the Claude transcript
+ * (`attachment.type === 'goal_status'`) rather than inferred from chat text.
+ * `source: 'codex'` is reserved for a future Codex adapter; the CLI currently
+ * only emits `'claude'`.
+ */
+export type AgentGoalStatus = {
+  source: 'claude' | 'codex',
+  observedAt: number,
+  sourceSessionId?: string,
+  sourceRevision?: string | number,
+} & (
+  | {
+      status: 'unavailable',
+      reason?: 'unsupported' | 'not_loaded' | 'stale' | 'malformed' | 'error' | 'unknown',
+    }
+  | {
+      status: 'inactive',
+      reason?: 'none' | 'cleared' | 'completed' | 'unknown',
+    }
+  | {
+      status: 'active',
+      sourceSessionId: string,
+      text: string,
+      capabilities?: {
+        clear?: boolean,
+        stop?: boolean,
+        edit?: boolean,
+      },
+      progress?: {
+        currentStep?: number,
+        totalSteps?: number,
+        steps?: Array<{
+          text: string,
+          status: 'pending' | 'in_progress' | 'completed',
+        }>,
+      },
+    }
+);
+
 export type AgentState = {
   controlledByUser?: boolean | null | undefined;
+  agentGoalStatus?: AgentGoalStatus;
   requests?: {
     [id: string]: {
       tool: string;

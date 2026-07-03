@@ -1,5 +1,9 @@
 import { InvalidateSync } from "@/utils/sync";
 import { RawJSONLines, RawJSONLinesSchema } from "../types";
+import {
+    parseClaudeGoalStatusTranscriptEvent,
+    type ClaudeGoalStatusTranscriptEvent,
+} from "../claudeGoalStatus";
 import { join } from "node:path";
 import { existsSync } from "node:fs";
 import { logger } from "@/ui/logger";
@@ -23,6 +27,15 @@ export async function createSessionScanner(opts: {
     sessionId: string | null,
     workingDirectory: string
     onMessage: (message: RawJSONLines) => void
+    /**
+     * Authoritative `/goal` state events (`attachment.type === 'goal_status'`).
+     * These are NOT conversation messages — they are extracted before the
+     * RawJSONLinesSchema drop so they never surface in chat, and routed here
+     * for the launcher to fold into agentState. Fired once per newly-appended
+     * line (may re-fire on a rare in-place truncation reset; dedupe by
+     * `event.uuid` downstream).
+     */
+    onGoalStatus?: (event: ClaudeGoalStatusTranscriptEvent) => void
 }) {
 
     // Resolve project directory
@@ -65,7 +78,7 @@ export async function createSessionScanner(opts: {
         if (!reader) {
             reader = createIncrementalJsonlReader(
                 join(projectDir, `${sessionId}.jsonl`),
-                parseJsonlText,
+                (text) => parseJsonlText(text, opts.onGoalStatus),
             );
             mainReaders.set(sessionId, reader);
         }
@@ -349,8 +362,16 @@ export async function interleaveSubagentMessages(
  * lines, known-internal Claude events, and anything that fails the schema —
  * the same per-line semantics the old full-file reader used, factored out so
  * the incremental reader (readMainMessages) can reuse them on appended text.
+ *
+ * `onGoalStatus`, when provided, receives authoritative `/goal` state events
+ * (`attachment.type === 'goal_status'`) in the same single pass, before they
+ * are dropped by the schema check. Goal attachments are never conversation
+ * messages, so they are extracted here and excluded from the returned list.
  */
-export function parseJsonlText(text: string): RawJSONLines[] {
+export function parseJsonlText(
+    text: string,
+    onGoalStatus?: (event: ClaudeGoalStatusTranscriptEvent) => void,
+): RawJSONLines[] {
     const messages: RawJSONLines[] = [];
     for (const l of text.split('\n')) {
         if (l.trim() === '') {
@@ -367,6 +388,16 @@ export function parseJsonlText(text: string): RawJSONLines[] {
         // events, not conversation messages.
         if (message.type && INTERNAL_CLAUDE_EVENT_TYPES.has(message.type)) {
             continue;
+        }
+        // Authoritative goal state rides in on `attachment` lines that fail
+        // RawJSONLinesSchema. Extract before the drop so `/goal` surfaces in
+        // agentState without ever leaking into chat.
+        if (onGoalStatus) {
+            const goal = parseClaudeGoalStatusTranscriptEvent(message);
+            if (goal) {
+                onGoalStatus(goal);
+                continue;
+            }
         }
         const parsed = RawJSONLinesSchema.safeParse(message);
         if (!parsed.success) {

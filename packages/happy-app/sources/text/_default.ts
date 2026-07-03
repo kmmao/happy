@@ -1356,6 +1356,13 @@ export const en = {
   },
 
   components: {
+    agentGoalBar: {
+      currentGoal: 'Current goal',
+      accessibilityLabel: ({ goal }: { goal: string }) => `Current goal: ${goal}`,
+      clearGoal: 'Clear goal',
+      stopGoal: 'Stop goal',
+      editGoal: 'Edit goal',
+    },
     emptyMainScreen: {
       // Used by EmptyMainScreen component
       readyToCode: "Ready to code?",

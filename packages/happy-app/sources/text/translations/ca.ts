@@ -1326,6 +1326,13 @@ export const ca: TranslationStructure = {
   },
 
   components: {
+    agentGoalBar: {
+      currentGoal: 'Objectiu actual',
+      accessibilityLabel: ({ goal }: { goal: string }) => `Objectiu actual: ${goal}`,
+      clearGoal: 'Esborra objectiu',
+      stopGoal: 'Atura objectiu',
+      editGoal: 'Edita objectiu',
+    },
     emptyMainScreen: {
       // Used by EmptyMainScreen component
       readyToCode: "Llest per programar?",

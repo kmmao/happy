@@ -1459,6 +1459,13 @@ export const it: TranslationStructure = {
   },
 
   components: {
+    agentGoalBar: {
+      currentGoal: 'Obiettivo attuale',
+      accessibilityLabel: ({ goal }: { goal: string }) => `Obiettivo attuale: ${goal}`,
+      clearGoal: 'Cancella obiettivo',
+      stopGoal: 'Ferma obiettivo',
+      editGoal: 'Modifica obiettivo',
+    },
     emptyMainScreen: {
       // Used by EmptyMainScreen component
       readyToCode: "Pronto a programmare?",
