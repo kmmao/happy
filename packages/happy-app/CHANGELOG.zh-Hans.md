@@ -1,5 +1,26 @@
 # 更新日志
 
+## 2.45.0 - 2026-07-04
+
+以内部架构深化为主 —— App 侧抽出十余个新的可测试 seam（SessionController、turnLifecycle、toolMetadata、权限处理、工具视图可见性判定等），路上顺手带上几个用户可见的修复。内嵌图片选择器上限从每条消息 5 张提升到 20 张，supervisor 循环命中每日额度上限时的退出原因不再被笼统归类为「会话结束」，Machine metadata 不再静默丢弃 `happyLibDir`，另外 7 种语言补齐上一版遗漏的翻译。配套发布：`@kmmao/happy-coder@0.102.12`、`@kmmao/happy-wire@0.36.0`。
+
+### 图片上传
+- 改进内嵌图片选择器上限，从每条消息 5 张提升到 20 张。与 CLI 的排队能力对齐，重度用户可以一次性附上整套截图，不会被客户端上限先卡住。
+
+### Supervisor 循环
+- 修复 supervisor 命中每日额度上限时的退出原因在所有语言下都被显示为通用的「会话结束」。新增专门的 `daily_limit` 退出原因，端到端接入翻译（en/zh-Hans/zh-Hant/ja/es/pt/pl/it/ca/ru），循环状态现在会清晰告诉你「为什么停」，不用再在「用量上限」和「正常关闭」之间猜。
+- 修复新落地的 SessionController seam 中的一个隐性未处理 Promise rejection：当中断本身被 reject 时会以未处理 Promise 冒出，而不是被 dispatch 路径捕获。
+
+### Machine 元数据
+- 修复 App 的 `MachineMetadataSchema` 每次都静默丢弃解密后 metadata 中 `happyLibDir` 字段的问题。这份 schema 与 `@kmmao/happy-wire`（声明的单一真源）漂移了 —— 手动复制了 base 类型，Zod 会丢掉所有未知键，包括所有当前版本 CLI 都会发送的 `happyLibDir` 字段。现在 schema 直接 extend `WireMachineMetadataSchema`，wire 侧新增字段自动流入，旧版本密文也仍可解密。
+
+### 国际化
+- 新增 4 个工作流对话框键的翻译（`loopBootstrapSlashCommandPresetsLabel`、`loopBootstrapSlashCommandPresetNone`、`loopIssueHintToggleShow`、`webhookIssueHintToggleShow` 及对应的 Hide 标签），覆盖 ca/es/it/ja/pl/pt/ru。这些键在 2.44.0 补齐时被留在了英文；现在每种语言下的创建循环 / 创建 Webhook 界面都以本地语言渲染。
+
+### 底层重构
+- 抽出十余个纯函数 seam，让 App 的消息摄入、工具渲染、权限处理、会话生命周期都可以独立进行单元测试 —— `turnLifecycleClassify`、`toolMetadataResolve`、`buildSessionStatusDisplay`、`isEffectivelyHiddenToolCall`、`applyToolResultToMessage`、`sessionController` 及其适配后的 storage seam，另外把 QR 配对结果类型重命名，与账户凭证类型区分开。调用点没有行为变更；每个 seam 都有回归测试固定。设计动机见 ADR-0051 到 ADR-0058。
+- 共享 wire schema 升级到 `@kmmao/happy-wire@0.36.0`（新增 TunnelProvider 契约；下游依赖同步升级）。
+
 ## 2.44.0 - 2026-06-24
 
 循环 Agent 现在真正按 App 里配置的 model + effort 运行（之前每次迭代都会静默回退到默认值），创建循环 / 创建 Webhook 对话框做了大幅瘦身（提示折叠 + Skill 一键预设），原生 Claude Code 内置命令进入斜杠命令选择器，内嵌图片上传上限从 500KB 提升到 10MB。配套发布：`@kmmao/happy-coder@0.102.6`、`@kmmao/happy-wire@0.35.0`。

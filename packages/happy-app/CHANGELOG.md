@@ -1,5 +1,26 @@
 # Changelog
 
+## 2.45.0 - 2026-07-04
+
+Mostly an internal architecture-deepening cycle — a dozen new testable seams got extracted across the App (SessionController, turnLifecycle, toolMetadata, permission handling, tool-view visibility, and more), with a handful of user-visible fixes riding along. The inline image picker ceiling jumps from 5 to 20 per message, the supervisor loop's daily-limit exit is now labeled correctly across every language instead of being mis-bucketed as a generic "session ended," Machine metadata stops silently dropping `happyLibDir`, and 7 more locales get their catch-up i18n translations. Companion releases: `@kmmao/happy-coder@0.102.12`, `@kmmao/happy-wire@0.36.0`.
+
+### Image uploads
+- Improved the inline image picker ceiling from 5 to 20 images per message. Matches the CLI's queueing capacity so power users can batch attach a full screenshot set without hitting the client cap first.
+
+### Supervisor loop
+- Fixed the supervisor's daily-limit exit being labeled with a generic "session ended" reason across every language. A new dedicated `daily_limit` exit reason is now recognized and translated end-to-end (en/zh-Hans/zh-Hant/ja/es/pt/pl/it/ca/ru), so the loop status makes it obvious WHY the run stopped instead of leaving you guessing between usage-limit and a normal session close.
+- Fixed a latent unhandled-rejection in the newly landed SessionController seam: an interrupt that itself rejected would surface as an unhandled promise instead of being caught by the dispatch path.
+
+### Machine metadata
+- Fixed the App's `MachineMetadataSchema` silently stripping `happyLibDir` from every decrypted machine metadata payload. The schema had drifted from `@kmmao/happy-wire` (the declared single source of truth) by hand-copying the base type, so Zod dropped every unknown key — including the `happyLibDir` field every current CLI sends. The schema now extends `WireMachineMetadataSchema` directly, new wire fields flow through automatically, and pre-field ciphertexts still decrypt.
+
+### Internationalization
+- Added translations for 4 workflow-dialog keys (`loopBootstrapSlashCommandPresetsLabel`, `loopBootstrapSlashCommandPresetNone`, `loopIssueHintToggleShow`, `webhookIssueHintToggleShow` + matching Hide labels) across ca/es/it/ja/pl/pt/ru. These were left in English in the 2.44.0 catch-up; now every locale renders the Create Loop / Create Webhook screens in its own language.
+
+### Under the hood
+- Extracted a dozen pure-function seams across the App to make message ingest, tool rendering, permission handling, and session lifecycle unit-testable in isolation — `turnLifecycleClassify`, `toolMetadataResolve`, `buildSessionStatusDisplay`, `isEffectivelyHiddenToolCall`, `applyToolResultToMessage`, `sessionController` with its adapted storage seam, and a rename of the QR-pairing result type to disambiguate it from account credentials. No behavior changes at call sites; regression tests pin each seam. See ADR-0051 through ADR-0058 for the design rationale.
+- Bumped the shared wire schema to `@kmmao/happy-wire@0.36.0` (adds the TunnelProvider contract; downstream pins updated in lockstep).
+
 ## 2.44.0 - 2026-06-24
 
 Agent loops now actually honor the model + effort overrides set in the App (they used to silently fall back to defaults every iteration), the workflow Create-Loop / Create-Webhook dialogs got a major decluttering with collapsible hints and one-tap skill presets, native Claude Code built-ins joined the slash command picker, and the inline image upload ceiling jumped from 500KB to 10MB. Companion CLI release: `@kmmao/happy-coder@0.102.6`, wire `@kmmao/happy-wire@0.35.0`.
