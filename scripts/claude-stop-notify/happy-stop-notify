@@ -1,0 +1,155 @@
+#!/usr/bin/env bash
+# Stop hook: send a compact ntfy notification with duration + the meaningful
+# content for THIS turn.
+#
+#  - Normal sessions    -> body = your original user prompt for the turn.
+#  - Autonomous loops    -> body = what the agent actually did this iteration
+#                           (the last assistant text message), because the
+#                           injected "# Happy Autonomous Loop ..." boilerplate
+#                           would otherwise just replay useless template text.
+#
+# Invoked by ~/.claude/settings.json Stop hook. Reads a JSON payload from
+# stdin containing at least { transcript_path, cwd }.
+#
+# Config:
+#   HAPPY_STOP_NOTIFY_TOPIC   ntfy topic/URL to publish to (default below).
+#
+# Deps: jq, perl (core MIME::Base64), python3, and an `ntfy` CLI.
+# Records are passed jq -> perl as base64 to stay free of separator/control
+# characters, so the script is portable across macOS and Linux.
+set -u
+
+TOPIC="${HAPPY_STOP_NOTIFY_TOPIC:-ntfy.zmddg.com/claude}"
+USER_MAX=300        # UTF-8 chars kept from the body (ntfy still caps display)
+
+PAYLOAD="$(cat)"
+
+# Reverse file lines: macOS ships `tail -r`, GNU/Linux ships `tac`.
+if command -v tac >/dev/null 2>&1; then
+  rev_lines() { tac "$@"; }
+else
+  rev_lines() { tail -r "$@"; }
+fi
+
+# --- resolve inputs ---------------------------------------------------------
+TRANSCRIPT=""
+CWD=""
+if command -v jq >/dev/null 2>&1; then
+  TRANSCRIPT="$(printf '%s' "$PAYLOAD" | jq -r '.transcript_path // empty' 2>/dev/null || true)"
+  CWD="$(printf '%s' "$PAYLOAD" | jq -r '.cwd // empty' 2>/dev/null || true)"
+fi
+[ -z "$CWD" ] && CWD="${CLAUDE_PROJECT_DIR:-$PWD}"
+PROJECT="$(basename "$CWD")"
+STAMP="$(date '+%H:%M:%S')"
+
+# Fallback path: no transcript → simplest notification and exit
+if [ -z "$TRANSCRIPT" ] || [ ! -f "$TRANSCRIPT" ]; then
+  ntfy send "$TOPIC" "Task Completed in $PROJECT @ $STAMP" >/dev/null 2>&1 || true
+  exit 0
+fi
+
+# --- locate this turn's real user prompt -----------------------------------
+# Walk user messages newest-first and skip harness-injected wrapper messages —
+# <task-notification> (subagent completions), <local-command-caveat>/<-stdout>,
+# <system-reminder>, and hook stubs — which are plain-string user messages too
+# and would otherwise be picked as "the prompt". Slash commands (<command-name>)
+# are kept and rendered as "/cmd args". The first message with meaningful text
+# after cleaning wins; its timestamp anchors the duration, so a late injected
+# message can no longer produce a negative "-14s".
+#
+# Each record is emitted as "<timestamp>\t<base64(content)>" — base64 keeps the
+# (possibly multi-line) content on a single tab-delimited line.
+PROMPT_REC="$(rev_lines "$TRANSCRIPT" 2>/dev/null \
+  | jq -r 'select(.type=="user" and (.message.content | type)=="string")
+           | .timestamp + "\t" + (.message.content | @base64)' 2>/dev/null \
+  | perl -CSD -MMIME::Base64 -e '
+      my $n = '"$USER_MAX"';
+      while (my $line = <STDIN>) {
+        chomp $line;
+        my ($ts, $b64) = split /\t/, $line, 2;
+        next unless defined $b64;
+        my $c = decode_base64($b64); utf8::decode($c);
+        my ($cmd)  = $c =~ m{<command-name>\s*([^<]+?)\s*</command-name>}s;
+        my ($args) = $c =~ m{<command-args>\s*(.*?)\s*</command-args>}s;
+        # drop known noise blocks entirely (opening tag + inner content + close)
+        $c =~ s{<(task-notification|local-command-caveat|local-command-stdout|system-reminder|user-prompt-submit-hook|post-tool-use-hook|command-message|command-args|command-name)\b[^>]*>.*?</\1>}{}gs;
+        $c =~ s{</?[a-zA-Z][^>]*>}{}g;      # strip any leftover tags
+        $c =~ s{\[[Ii]mage[^\]]*\]}{}g;     # strip image / attachment stubs
+        $c =~ s/\s+/ /g; $c =~ s/^\s+|\s+$//g;
+        # pure slash command (no free-text left) -> show "/cmd args"
+        if ($c eq "" && defined $cmd) {
+          $c = $cmd . (defined $args && $args ne "" ? " $args" : "");
+        }
+        next if $c eq "";
+        $c = substr($c, 0, $n) . chr(0x2026) if length($c) > $n;
+        print $ts, "\n", $c;   # ts on line 1, single-line prompt on line 2+
+        last;
+      }
+    ')"
+LO="$(printf '%s\n' "$PROMPT_REC" | head -n1)"
+USER_PROMPT="$(printf '%s\n' "$PROMPT_REC" | tail -n +2)"
+
+HI="$(rev_lines "$TRANSCRIPT" 2>/dev/null \
+  | jq -r 'select(.type=="assistant") | .timestamp' 2>/dev/null \
+  | awk 'NF { print; exit }')"
+
+# --- duration (seconds) -----------------------------------------------------
+DUR=""
+if [ -n "$LO" ] && [ -n "$HI" ] && command -v python3 >/dev/null 2>&1; then
+  DUR="$(python3 - <<PY 2>/dev/null
+from datetime import datetime
+lo = datetime.fromisoformat("$LO".replace("Z","+00:00"))
+hi = datetime.fromisoformat("$HI".replace("Z","+00:00"))
+s = int((hi - lo).total_seconds())
+print(f"{s}s" if s < 60 else f"{s//60}m{s%60:02d}s")
+PY
+)"
+fi
+
+# --- assemble title ---------------------------------------------------------
+if [ -n "$DUR" ]; then
+  TITLE="$PROJECT · $DUR"
+else
+  TITLE="$PROJECT @ $STAMP"
+fi
+
+# --- assemble body ----------------------------------------------------------
+# In loop sessions the daemon injects a "# Happy Autonomous Loop ..." block as
+# the turn's user message, so the prompt-echo above would just replay useless
+# boilerplate (overflowing the 300-char cap -> cut with the ellipsis). Detect
+# it and instead surface what the agent actually did this iteration: the last
+# assistant text message, summarized. Falls back to a loop id when the turn
+# ended on a tool call with no trailing assistant text.
+BODY="${USER_PROMPT:-Task completed.}"
+case "$USER_PROMPT" in
+  *"Happy Autonomous Loop"*|*"durable autonomous loop"*)
+    ASSISTANT_TEXT="$(rev_lines "$TRANSCRIPT" 2>/dev/null \
+      | jq -r 'select(.type=="assistant" and (.message.content | type)=="array")
+               | ([.message.content[] | select(.type=="text") | .text] | join(" ")) | @base64' 2>/dev/null \
+      | perl -CSD -MMIME::Base64 -e '
+          my $n = '"$USER_MAX"';
+          while (my $line = <STDIN>) {
+            chomp $line;
+            next if $line eq "";
+            my $c = decode_base64($line); utf8::decode($c);
+            $c =~ s/\s+/ /g; $c =~ s/^\s+|\s+$//g;
+            next if $c eq "";
+            $c = substr($c, 0, $n) . chr(0x2026) if length($c) > $n;
+            print $c; last;
+          }
+        ')"
+    if [ -n "$ASSISTANT_TEXT" ]; then
+      BODY="$ASSISTANT_TEXT"
+    else
+      LOOP_ID="$(printf '%s' "$USER_PROMPT" | sed -n 's#.*/agent-loops/\([^/]*\)/.*#\1#p' | head -n1)"
+      BODY="Autonomous loop iteration${LOOP_ID:+ (${LOOP_ID})}"
+    fi
+    ;;
+esac
+
+# --- send. Never fail the hook (non-zero would block harness stop). --------
+ntfy send --title "$TITLE" "$TOPIC" "$BODY" >/dev/null 2>&1 \
+  || ntfy send "$TOPIC" "$TITLE — $BODY" >/dev/null 2>&1 \
+  || true
+
+exit 0
