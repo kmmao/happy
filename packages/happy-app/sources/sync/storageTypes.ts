@@ -2,6 +2,7 @@ import { z } from "zod";
 import {
   ClaudeSlashCommandSchema,
   CodexMetadataSchema,
+  MachineMetadataSchema as WireMachineMetadataSchema,
   sessionProgressStateSchema,
   sessionSummaryRefreshStateSchema,
   sessionSummaryStateSchema,
@@ -338,15 +339,28 @@ export interface DecryptedMessage {
   createdAt: number;
 }
 
-export const MachineMetadataSchema = z.object({
-  host: z.string(),
-  platform: z.string(),
-  happyCliVersion: z.string(),
-  happyHomeDir: z.string(),
-  homeDir: z.string(),
+/**
+ * MachineMetadata = the wire base (single source of truth in
+ * @kmmao/happy-wire — what the CLI daemon actually sends) + explicit
+ * App-side extensions. Previously this was a hand-copied mirror that had
+ * drifted both ways: it silently STRIPPED `happyLibDir` (Zod drops unknown
+ * keys) and carried fields the CLI never sends. Extending the wire schema
+ * means new wire fields flow in automatically and the App's own additions
+ * stay visible in one place.
+ */
+export const MachineMetadataSchema = WireMachineMetadataSchema.extend({
+  // Present from every current CLI, but absent in metadata ciphertexts
+  // written before the field existed — the App must keep decrypting those,
+  // so the wire-required field is relaxed to optional here.
+  happyLibDir: z.string().optional(),
+  // App-side extension: the user-editable machine name, written by the
+  // machine settings screen and round-tripped through encryptMetadata.
+  displayName: z.string().optional(),
+  // Legacy/optional fields other writers have historically included.
+  // daemonStatus is NOT DaemonState.status (["running","shutting-down"]) —
+  // it is an old metadata-level field kept for old ciphertexts.
   username: z.string().optional(),
   arch: z.string().optional(),
-  displayName: z.string().optional(),
   daemonVersion: z.string().optional(),
   daemonStatus: z.enum(["running", "stopped", "error"]).optional(),
   daemonStartedAt: z.number().optional(),
